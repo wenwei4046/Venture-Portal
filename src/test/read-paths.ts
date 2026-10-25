@@ -382,6 +382,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // one is on (Manage: any); Nudge and a series paused or ended by Manage; one project read by View.
   'mkt_task_create', 'mkt_stage_accept', 'mkt_stage_save', 'mkt_stage_submit', 'mkt_stage_decide', 'mkt_free_block', 'mkt_nudge',
   'mkt_series_set', 'mkt_project',
+  // New Project kept as a draft while it is typed (mig 20261025211000): the login's own drafts listed, opened, saved on
+  // their count and dropped — all Marketing · Create, each the caller's own rows alone.
+  'mkt_new_drafts', 'mkt_new_draft', 'mkt_new_draft_save', 'mkt_new_draft_drop',
   // Subtasks (mig 20261025101000): split off the stage now and taken back by its owner, delivered by their assignee
   // (files sent under subtask/ first), reviewed by the stage's owner — all Marketing · Edit, the database deciding whose.
   'mkt_subtask_add', 'mkt_subtask_deliver', 'mkt_subtask_review', 'mkt_subtask_remove',

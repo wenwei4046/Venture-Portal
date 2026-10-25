@@ -2,15 +2,19 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { longDay, type MktSub } from '@/lib/marketing/board'
-import { addMktClient, createMktTask, startMktProduct } from '@/lib/marketing/actions'
+import { addMktClient, createMktTask, dropMktDraft, openMktDraft, saveMktDraft, startMktProduct } from '@/lib/marketing/actions'
 import { billEditOf, billOf, billProblems, type BillEdit } from '@/lib/marketing/billing'
+import {
+  draftHref, draftLine, draftOf, formFromDraft, rowOf, worthKeeping, type DraftRow, type NewForm, type NewMode, type OpenDraft,
+} from '@/lib/marketing/drafts'
 import type { ProductPick } from '@/lib/marketing/project'
 import {
   defaultRule, DAY_NAMES, ENDS, FREQS, INTERVALS, MONTH_DAYS, periodText, recurPreview, rulePayload, ruleText, type RecurRule,
 } from '@/lib/marketing/recur'
-import { stageDates, stageProblems, stagesPayload, starterStages, TASK_TYPES, type DraftStage, type TaskType } from '@/lib/marketing/tasks'
+import { trailTime } from '@/lib/marketing/task'
+import { stageDates, stageProblems, stagesPayload, starterStages, TASK_TYPES } from '@/lib/marketing/tasks'
 import { formatMoney } from '@/lib/utils'
 import MoneyInput from '../products/MoneyInput'
 import BillFields from '../subsidiary/BillFields'
@@ -23,8 +27,15 @@ import s from './newproject.module.css'
 // manager's): a product on sale and its amount (②b-2b — a quote, its list price offered), whose intake meeting minutes
 // open next. Created, the task (or the project) opens. The manager adds Marketing's own clients here too (the "+"
 // beside Subsidiary — the handoff's Add & select), with their billing details when given (②b-2b).
+// Kept as a draft while it is typed (mig 20261025211000 — the user: "一有输入就会自动进 draft"): the first thing typed
+// starts one (~0.7 s after a change, every change after it), the address names it (?draft=) so a reload opens it again;
+// the viewer's other drafts are listed above, to go on with or to discard; made into its project, it is dropped.
 
-type Mode = 'product' | 'task' | 'recurring'
+type Mode = NewMode
+
+/** Where the draft stands: none yet (nothing typed), being saved, kept (when), or not saved and why — `stale` when another
+ * window saved it since: nothing more is sent until the page is reloaded. */
+type Keep = { state: 'none' } | { state: 'saving' } | { state: 'saved'; at: string } | { state: 'error'; reason: string; stale: boolean }
 
 const MODES: readonly { key: Mode; icon: string; name: string }[] = [
   { key: 'product', icon: '📦', name: 'Product project' },
@@ -45,6 +56,8 @@ export default function NewProject({
   canAddSub = false,
   addFirst = false,
   from = null,
+  drafts = [],
+  draft = null,
 }: {
   today: string
   me: string | null
@@ -62,19 +75,36 @@ export default function NewProject({
   addFirst?: boolean
   /** The project it is opened from (④-4c — ?from=), none for none. */
   from?: { id: string; trackId: string; title: string } | null
+  /** The viewer's drafts, newest first (mig 20261025211000). */
+  drafts?: DraftRow[]
+  /** The draft opened (?draft=) — its form as kept. */
+  draft?: OpenDraft | null
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [sub, setSub] = useState(firstSub ?? subs[0]?.id ?? '')
-  const [mode, setMode] = useState<Mode>('task')
-  const [product, setProduct] = useState(products?.[0]?.id ?? '')
-  const [title, setTitle] = useState('')
-  const [type, setType] = useState<TaskType>('social')
-  const [brief, setBrief] = useState('')
-  const [rule, setRule] = useState<RecurRule>(() => defaultRule(today))
   const mine = me ? people.find(p => p.id === me) ?? null : null
-  const [stages, setStages] = useState<DraftStage[]>(() => starterStages(mine, approvers.find(a => a.id === me)?.id ?? approvers[0]?.id ?? null))
+  // The blank form, and the one the page opens on — a draft's when one is opened (a subsidiary or a product no longer
+  // offered stays the blank form's).
+  const [first] = useState(() => {
+    const blank: NewForm = {
+      sub: firstSub ?? subs[0]?.id ?? '', mode: 'task', product: products?.[0]?.id ?? '', amounts: {}, title: '', type: 'social',
+      brief: '', rule: defaultRule(today), stages: starterStages(mine, approvers.find(a => a.id === me)?.id ?? approvers[0]?.id ?? null),
+      source: from,
+    }
+    const kept = draft ? formFromDraft(draft.data, blank) : blank
+    const form: NewForm = {
+      ...kept,
+      sub: subs.some(x => x.id === kept.sub) ? kept.sub : blank.sub,
+      product: !products || products.some(p => p.id === kept.product) ? kept.product : blank.product,
+      mode: kept.mode === 'product' && !products ? 'task' : kept.mode,
+    }
+    return { blank, form }
+  })
+  const blank = first.blank
+  const [form, setForm] = useState<NewForm>(first.form)
+  const { sub, mode, product, title, type, brief, rule, stages, amounts, source } = form
   const [error, setError] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   // Marketing's own clients: added here, picked at once.
   const [subList, setSubList] = useState(subs)
   const [adding, setAdding] = useState(canAddSub && addFirst)
@@ -85,10 +115,101 @@ export default function NewProject({
   const [billOpen, setBillOpen] = useState(false)
   const [draftBill, setDraftBill] = useState<BillEdit>(() => billEditOf(null))
   const [billRefusal, setBillRefusal] = useState<string | null>(null)
-  // Each product's amount as typed (②b-2b — the user's answer 43: a quote, typed now); its list price until then.
-  const [amounts, setAmounts] = useState<Record<string, number | null>>({})
-  // Where it is opened from (④-4c) — dropped with its ×, then it is opened from nowhere.
-  const [source, setSource] = useState(from)
+
+  // The draft (mig 20261025211000): which one, on what count, what it last kept and when.
+  const [keep, setKeep] = useState<Keep>(draft ? { state: 'saved', at: draft.at } : { state: 'none' })
+  const [openId, setOpenId] = useState<string | null>(draft?.id ?? null)
+  const draftRef = useRef<{ id: string | null; rev: number | null }>({ id: draft?.id ?? null, rev: draft?.rev ?? null })
+  const formRef = useRef(form)
+  const keptRef = useRef(draft ? JSON.stringify(draftOf(first.form)) : '')
+  const atRef = useRef(draft?.at ?? '')
+  const staleRef = useRef(false)
+  // Made into its project: nothing more is kept.
+  const doneRef = useRef(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const chain = useRef<Promise<boolean>>(Promise.resolve(true))
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // The viewer's other drafts: the page's list less the one open, with what this page did since — one left for another
+  // put back on it, one opened or discarded taken off.
+  const [gone, setGone] = useState<readonly string[]>([])
+  const [added, setAdded] = useState<readonly DraftRow[]>([])
+  const [asking, setAsking] = useState<string | null>(null)
+  const others = useMemo(() => {
+    const seen = new Set<string>()
+    return [...added, ...drafts].filter(d => {
+      if (d.id === openId || gone.includes(d.id) || seen.has(d.id)) return false
+      seen.add(d.id)
+      return true
+    })
+  }, [added, drafts, gone, openId])
+
+  const say = useCallback((words: string) => {
+    setToast(words)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 2800)
+  }, [])
+
+  // The save: the form as it now stands, one at a time, on the count this page last kept — none until something is typed.
+  const flush = useCallback((): Promise<boolean> => {
+    if (timer.current) {
+      clearTimeout(timer.current)
+      timer.current = null
+    }
+    const run = chain.current.then(async () => {
+      const now = formRef.current
+      const d = draftRef.current
+      const snap = JSON.stringify(draftOf(now))
+      if (doneRef.current || staleRef.current || snap === keptRef.current || (!d.id && !worthKeeping(now, blank))) {
+        setKeep(k => (k.state === 'saving' ? (atRef.current ? { state: 'saved', at: atRef.current } : { state: 'none' }) : k))
+        return !staleRef.current
+      }
+      setKeep({ state: 'saving' })
+      const r = await saveMktDraft(d.id, d.rev, draftOf(now))
+      if (!r.ok) {
+        const stale = /another window/.test(r.reason)
+        staleRef.current = stale
+        setKeep({ state: 'error', reason: r.reason, stale })
+        return false
+      }
+      draftRef.current = { id: r.id, rev: r.rev }
+      keptRef.current = snap
+      atRef.current = r.at
+      if (!d.id) {
+        // The address names it, so a reload opens it again — the rest of the query kept, the page the same page.
+        setOpenId(r.id)
+        window.history.replaceState(window.history.state, '', draftHref(window.location.search, r.id))
+      }
+      if (formRef.current === now) setKeep({ state: 'saved', at: r.at })
+      return true
+    })
+    chain.current = run.catch(() => false)
+    return run
+  }, [blank])
+
+  const update = (next: NewForm | ((f: NewForm) => NewForm)) => {
+    const f = typeof next === 'function' ? next(formRef.current) : next
+    formRef.current = f
+    setForm(f)
+    if (doneRef.current || staleRef.current) return
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => void flush(), 700)
+  }
+  const set = (patch: Partial<NewForm>) => update(f => ({ ...f, ...patch }))
+
+  // Leaving with a change not kept yet: asked first; leaving the page in the app: kept on the way out.
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      const now = formRef.current
+      const typed = draftRef.current.id ? JSON.stringify(draftOf(now)) !== keptRef.current : worthKeeping(now, blank)
+      if (!doneRef.current && (timer.current || typed)) e.preventDefault()
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => {
+      window.removeEventListener('beforeunload', warn)
+      if (timer.current) void flush()
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+    }
+  }, [blank, flush])
 
   const hol = useMemo(() => new Set(holidays), [holidays])
   const isRec = mode === 'recurring'
@@ -114,7 +235,7 @@ export default function NewProject({
   else if (isRec) hint = `${subName} · Recurring · ${ruleText(rule)} · ${preview.count.toLowerCase()}`
   else hint = `${subName} · Quick task · ${stages.length} stage${stages.length === 1 ? '' : 's'} · finishes ${dates.length ? longDay(dates[dates.length - 1].dueOn) : '—'}`
 
-  const setR = (patch: Partial<RecurRule>) => setRule(r => ({ ...r, ...patch }))
+  const setR = (patch: Partial<RecurRule>) => update(f => ({ ...f, rule: { ...f.rule, ...patch } }))
 
   const closeAdd = () => {
     setAdding(false)
@@ -138,41 +259,117 @@ export default function NewProject({
         return
       }
       setSubList(l => [...l, r.sub])
-      setSub(r.sub.id)
+      set({ sub: r.sub.id })
       closeAdd()
+    })
+  }
+
+  // Another draft opened in this one's place — what is typed here kept first, this one put back on the list.
+  const openDraft = (row: DraftRow) => {
+    if (pending) return
+    setAsking(null)
+    start(async () => {
+      if (!(await flush())) return say('Not saved — reload before opening another draft')
+      const r = await openMktDraft(row.id)
+      if (!r.ok) {
+        setGone(g => [...g, row.id])
+        return say(r.reason)
+      }
+      // This one as it stands now — before the form below takes its place.
+      const cur = draftRef.current
+      const left = cur.id ? rowOf(cur.id, cur.rev ?? 1, formRef.current, atRef.current) : null
+      if (left) setAdded(a => [left, ...a.filter(x => x.id !== left.id)])
+      const kept = formFromDraft(r.data, blank)
+      const next: NewForm = {
+        ...kept,
+        sub: subList.some(x => x.id === kept.sub) ? kept.sub : blank.sub,
+        product: !products || products.some(p => p.id === kept.product) ? kept.product : blank.product,
+        mode: kept.mode === 'product' && !products ? 'task' : kept.mode,
+      }
+      formRef.current = next
+      setForm(next)
+      draftRef.current = { id: r.id, rev: r.rev }
+      keptRef.current = JSON.stringify(draftOf(next))
+      atRef.current = r.at
+      setOpenId(r.id)
+      setAdded(a => a.filter(x => x.id !== r.id))
+      setKeep({ state: 'saved', at: r.at })
+      setError(null)
+      window.history.replaceState(window.history.state, '', draftHref(window.location.search, r.id))
+    })
+  }
+
+  // A draft discarded — one on the list, or the one open: then the form starts again blank.
+  const discard = (id: string) => {
+    if (pending) return
+    const open = id === draftRef.current.id
+    if (open && timer.current) {
+      clearTimeout(timer.current)
+      timer.current = null
+    }
+    start(async () => {
+      if (open) await chain.current
+      const r = await dropMktDraft(id)
+      setAsking(null)
+      if (!r.ok) return say(r.reason)
+      setGone(g => [...g, id])
+      setAdded(a => a.filter(x => x.id !== id))
+      if (!open) return say('Draft discarded')
+      draftRef.current = { id: null, rev: null }
+      keptRef.current = ''
+      atRef.current = ''
+      staleRef.current = false
+      formRef.current = blank
+      setForm(blank)
+      setOpenId(null)
+      setKeep({ state: 'none' })
+      setError(null)
+      window.history.replaceState(window.history.state, '', draftHref(window.location.search, null))
+      say('Draft discarded')
     })
   }
 
   const create = () => {
     if (!ready || pending) return
     setError(null)
-    if (isProduct) {
-      start(async () => {
-        const r = await startMktProduct(sub, product, amount, source?.id ?? null)
-        if (!r.ok) {
-          setError(r.reason)
-          return
-        }
-        router.push(`/marketing/projects/${r.track}`)
-      })
-      return
+    // A save waiting is not sent: the project is made from the form as it stands, and its draft dropped.
+    if (timer.current) {
+      clearTimeout(timer.current)
+      timer.current = null
     }
     start(async () => {
-      const r = await createMktTask({
-        sub,
-        kind: isRec ? 'recurring' : 'quick',
-        title: title.trim(),
-        type,
-        brief: brief.trim(),
-        stages: stagesPayload(stages),
-        recur: isRec ? rulePayload(rule) : null,
-        from: source?.id ?? null,
+      // In the saves' line: one under way lands first (its draft is the one dropped); one asked meanwhile waits for the
+      // answer — and keeps nothing once the project is made.
+      const job = chain.current.then(async (): Promise<string | null> => {
+        if (isProduct) {
+          const r = await startMktProduct(sub, product, amount, source?.id ?? null, draftRef.current.id)
+          if (!r.ok) return r.reason
+          doneRef.current = true
+          router.push(`/marketing/projects/${r.track}`)
+          return null
+        }
+        const r = await createMktTask({
+          sub,
+          kind: isRec ? 'recurring' : 'quick',
+          title: title.trim(),
+          type,
+          brief: brief.trim(),
+          stages: stagesPayload(stages),
+          recur: isRec ? rulePayload(rule) : null,
+          from: source?.id ?? null,
+          draft: draftRef.current.id,
+        })
+        if (!r.ok) return r.reason
+        doneRef.current = true
+        router.push(`/marketing/projects/${r.open}`)
+        return null
       })
-      if (!r.ok) {
-        setError(r.reason)
-        return
-      }
-      router.push(`/marketing/projects/${r.open}`)
+      chain.current = job.then(() => true, () => false)
+      const refused = await job
+      if (!refused) return
+      setError(refused)
+      // Not made: what is typed is kept again.
+      update(formRef.current)
     })
   }
 
@@ -182,6 +379,23 @@ export default function NewProject({
         <Link href="/marketing/projects" className={s.crumbLink}>← Projects</Link>
         <span>/</span>
         <span>New project</span>
+        <span className={s.grow} />
+        {keep.state === 'saving' ? <span className={s.kept}>Saving draft…</span> : null}
+        {keep.state === 'saved' ? <span className={s.kept}>Draft saved{keep.at ? ` · ${trailTime(keep.at)}` : ''}</span> : null}
+        {keep.state === 'error' ? (
+          <span className={s.notKept} role="alert">
+            Draft not saved · {keep.reason}
+            {keep.stale ? <button type="button" className={s.reload} onClick={() => window.location.reload()}>Reload</button> : null}
+          </span>
+        ) : null}
+        {openId ? (
+          asking === openId ? (
+            <span className={s.ask}>
+              <button type="button" className={s.askYes} disabled={pending} onClick={() => discard(openId)}>Discard draft</button>
+              <button type="button" className={s.askNo} disabled={pending} onClick={() => setAsking(null)}>Keep</button>
+            </span>
+          ) : <button type="button" className={s.textBtn} disabled={pending} onClick={() => setAsking(openId)}>Discard draft</button>
+        ) : null}
       </div>
 
       <div className={s.steps}>
@@ -194,13 +408,42 @@ export default function NewProject({
         ))}
       </div>
 
+      {others.length ? (
+        <section className={s.drafts} aria-label="Drafts">
+          <div className={s.draftsHead}>Drafts · {others.length}</div>
+          {others.map(d => {
+            const line = draftLine(d, subList, products)
+            return (
+              <div key={d.id} className={s.draft}>
+                <span className={s.draftIcon} aria-hidden="true">{line.icon}</span>
+                <span className={s.draftText}>
+                  <span className={s.draftName}>{line.name}</span>
+                  {line.meta ? <span className={s.draftMeta}>{line.meta}</span> : null}
+                </span>
+                {asking === d.id ? (
+                  <span className={s.ask}>
+                    <button type="button" className={s.askYes} disabled={pending} onClick={() => discard(d.id)}>Discard</button>
+                    <button type="button" className={s.askNo} disabled={pending} onClick={() => setAsking(null)}>Keep</button>
+                  </span>
+                ) : (
+                  <>
+                    <button type="button" className={s.draftGo} disabled={pending} onClick={() => openDraft(d)}>Continue</button>
+                    <button type="button" className={s.draftX} disabled={pending} aria-label={`Discard ${line.name}`} onClick={() => setAsking(d.id)}>×</button>
+                  </>
+                )}
+              </div>
+            )
+          })}
+        </section>
+      ) : null}
+
       <div className={s.lead}>Start a project</div>
       {source ? (
         <div className={s.from}>
           <span>↳ Opened from</span>
           <Link href={`/marketing/projects/${encodeURIComponent(source.trackId)}`} className={s.fromTrack}>{source.trackId}</Link>
           <span className={s.fromTitle}>{source.title}</span>
-          <button type="button" className={s.fromX} aria-label={`Not from ${source.trackId}`} onClick={() => setSource(null)}>×</button>
+          <button type="button" className={s.fromX} aria-label={`Not from ${source.trackId}`} onClick={() => set({ source: null })}>×</button>
         </div>
       ) : null}
 
@@ -212,7 +455,7 @@ export default function NewProject({
       </div>
       <div className={s.subs} role="radiogroup" aria-label="Subsidiary">
         {subList.map(x => (
-          <button key={x.id} type="button" role="radio" aria-checked={sub === x.id} className={`${s.subCard}${sub === x.id ? ` ${s.cardOn}` : ''}`} onClick={() => setSub(x.id)}>
+          <button key={x.id} type="button" role="radio" aria-checked={sub === x.id} className={`${s.subCard}${sub === x.id ? ` ${s.cardOn}` : ''}`} onClick={() => set({ sub: x.id })}>
             <span className={s.subDot} style={{ background: x.dot }} />
             <span className={s.cardText}>
               <span className={s.cardName} style={{ display: 'block' }}>{x.name}</span>
@@ -267,7 +510,7 @@ export default function NewProject({
               aria-checked={mode === m.key}
               aria-disabled={off}
               className={`${s.modeCard}${mode === m.key ? ` ${s.cardOn}` : ''}${off ? ` ${s.modeOff}` : ''}`}
-              onClick={() => !off && setMode(m.key)}
+              onClick={() => !off && set({ mode: m.key })}
             >
               <span className={s.modeIcon}>{m.icon}</span>
               <span className={s.cardText}>
@@ -286,7 +529,7 @@ export default function NewProject({
           {products?.length ? (
             <div className={s.products} role="radiogroup" aria-label="Product">
               {products.map(p => (
-                <button key={p.id} type="button" role="radio" aria-checked={product === p.id} className={`${s.productCard}${product === p.id ? ` ${s.cardOn}` : ''}`} onClick={() => setProduct(p.id)}>
+                <button key={p.id} type="button" role="radio" aria-checked={product === p.id} className={`${s.productCard}${product === p.id ? ` ${s.cardOn}` : ''}`} onClick={() => set({ product: p.id })}>
                   <span className={s.productTop}>
                     <span className={s.kindChip}>{p.kind === 'recurring' ? 'Recurring monthly' : 'One-time project'}</span>
                     <span className={s.grow} />
@@ -310,9 +553,9 @@ export default function NewProject({
               <div className={s.amountRow}>
                 <span className={s.amountRm}>RM</span>
                 <MoneyInput key={picked.id} className={`${s.input} ${s.amountInput}`} value={amount} label="Amount" placeholder="0.00"
-                  onChange={v => setAmounts(m => ({ ...m, [picked.id]: v }))} />
+                  onChange={v => update(f => ({ ...f, amounts: { ...f.amounts, [picked.id]: v } }))} />
                 {picked.price != null && amount !== picked.price ? (
-                  <button type="button" className={s.amountReset} onClick={() => setAmounts(m => { const n = { ...m }; delete n[picked.id]; return n })}>
+                  <button type="button" className={s.amountReset} onClick={() => update(f => { const n = { ...f.amounts }; delete n[picked.id]; return { ...f, amounts: n } })}>
                     List price {formatMoney(picked.price)}
                   </button>
                 ) : null}
@@ -325,13 +568,13 @@ export default function NewProject({
       <div className={s.box}>
         <label className={s.field}>
           <span className={s.fieldLabel}>Task title</span>
-          <input className={s.input} value={title} maxLength={140} onChange={e => setTitle(e.target.value)} placeholder="e.g. Amend 11.11 ad · new price RM 1,299" />
+          <input className={s.input} value={title} maxLength={140} onChange={e => set({ title: e.target.value })} placeholder="e.g. Amend 11.11 ad · new price RM 1,299" />
         </label>
         <div className={s.field}>
           <span className={s.fieldLabel}>Type</span>
           <div className={s.chips}>
             {TASK_TYPES.map(t => (
-              <button key={t.key} type="button" className={`${s.chip}${type === t.key ? ` ${s.chipOn}` : ''}`} onClick={() => setType(t.key)} aria-pressed={type === t.key}>{t.label}</button>
+              <button key={t.key} type="button" className={`${s.chip}${type === t.key ? ` ${s.chipOn}` : ''}`} onClick={() => set({ type: t.key })} aria-pressed={type === t.key}>{t.label}</button>
             ))}
           </div>
         </div>
@@ -343,7 +586,7 @@ export default function NewProject({
               <button type="button" className={`${s.segBtn} ${s.segOff}`} disabled title="Comes with the Minutes Builder">Use meeting minutes</button>
             </div>
           </div>
-          <textarea className={s.textarea} rows={3} value={brief} maxLength={4000} onChange={e => setBrief(e.target.value)} placeholder="What to change, where, and anything they should know" />
+          <textarea className={s.textarea} rows={3} value={brief} maxLength={4000} onChange={e => set({ brief: e.target.value })} placeholder="What to change, where, and anything they should know" />
         </div>
       </div>
 
@@ -441,7 +684,7 @@ export default function NewProject({
         </div>
       ) : null}
 
-      <StageBuilder stages={stages} onChange={setStages} people={people} approvers={approvers} me={me} start={base} holidays={hol} />
+      <StageBuilder stages={stages} onChange={next => set({ stages: next })} people={people} approvers={approvers} me={me} start={base} holidays={hol} />
       </>
       )}
 
@@ -451,6 +694,7 @@ export default function NewProject({
           {pending ? (isProduct ? 'Opening…' : 'Creating…') : isProduct ? 'Open meeting minutes →' : isRec ? 'Create recurring task →' : 'Create task & open →'}
         </button>
       </div>
+      {toast ? <div className={s.toast} role="status">{toast}</div> : null}
     </div>
   )
 }

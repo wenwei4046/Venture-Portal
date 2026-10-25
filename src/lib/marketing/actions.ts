@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/server'
 import { correctionOk, projectLogFromRow, type ProjectLog } from './audit'
 import { billingFromRow, clientBillFromRow, type BillingPage } from './billing'
 import { subFromRow, type MktSub } from './board'
+import { openDraftFromRow } from './drafts'
 import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPage } from './task'
 import type { StageWork } from './tasks'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
@@ -73,6 +74,47 @@ export interface NewTaskInput {
   recur: Record<string, unknown> | null
   /** The project it is opened from (④-4c — answer 23), none for none. */
   from?: string | null
+  /** The draft it was typed in (mig 20261025211000), dropped once the task is made. */
+  draft?: string | null
+}
+
+/** The draft a project was made from, dropped — what fails here leaves it on the list, to discard by hand. */
+async function dropDraft(db: SupabaseClient, draft: string | null | undefined) {
+  if (draft && isId(draft)) await db.rpc('mkt_new_draft_drop', { p_id: draft })
+}
+
+/** New Project kept as it is typed (mig 20261025211000 — the user: "一有输入就会自动进 draft"): a new draft (id null), or
+ * the viewer's own on the count it was last saved on — another window's save is never written over. Nothing else changes,
+ * so no page is drawn again. */
+export async function saveMktDraft(id: string | null, rev: number | null, data: Record<string, unknown>): Promise<Done<{ id: string; rev: number; at: string }>> {
+  await requireActionOn('/marketing/new', 'marketing', 'create')
+  if (id != null && !isId(id)) return { ok: false, reason: 'That draft is not there any more.' }
+  if (id != null && !Number.isInteger(rev)) return { ok: false, reason: 'Reload the page and try again.' }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return { ok: false, reason: 'Nothing to keep.' }
+  const { data: r, error } = await (await client()).rpc('mkt_new_draft_save', { p_id: id, p_rev: id == null ? null : rev, p_data: data })
+  if (error) return { ok: false, reason: words(error, 'The draft could not be saved. Please try again.') }
+  const out = (r ?? {}) as { id?: string; rev?: number; updatedAt?: string }
+  return { ok: true, id: String(out.id ?? ''), rev: Number(out.rev ?? 1), at: String(out.updatedAt ?? '') }
+}
+
+/** One of the viewer's drafts opened from New Project's list — its form as kept. */
+export async function openMktDraft(id: string): Promise<Done<{ id: string; rev: number; data: unknown; at: string }>> {
+  await requireActionOn('/marketing/new', 'marketing', 'create')
+  if (!isId(id)) return { ok: false, reason: 'That draft is not there any more.' }
+  const { data, error } = await (await client()).rpc('mkt_new_draft', { p_id: id })
+  if (error) return { ok: false, reason: words(error, 'The draft could not be opened. Please try again.') }
+  const r = openDraftFromRow(data)
+  if (!r) return { ok: false, reason: 'That draft is not there any more.' }
+  return { ok: true, ...r }
+}
+
+/** A draft discarded — the viewer's own. */
+export async function dropMktDraft(id: string): Promise<Done> {
+  await requireActionOn('/marketing/new', 'marketing', 'create')
+  if (!isId(id)) return { ok: false, reason: 'That draft is not there any more.' }
+  const { error } = await (await client()).rpc('mkt_new_draft_drop', { p_id: id })
+  if (error) return { ok: false, reason: words(error, 'The draft could not be discarded. Please try again.') }
+  return { ok: true }
 }
 
 /** New Project: a quick task, or a recurring one and its runs — opened from another, or from nowhere. */
@@ -82,7 +124,8 @@ export async function createMktTask(input: NewTaskInput): Promise<Done<{ id: str
   if (input.kind !== 'quick' && input.kind !== 'recurring') return { ok: false, reason: 'Pick a quick task or a recurring task.' }
   if (!Array.isArray(input.stages) || input.stages.length === 0) return { ok: false, reason: 'A task has 1 to 20 stages.' }
   if (input.from != null && !isId(input.from)) return { ok: false, reason: 'The project it is opened from is not there.' }
-  const { data, error } = await (await client()).rpc('mkt_task_create', {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_task_create', {
     p_subsidiary: input.sub,
     p_kind: input.kind,
     p_title: String(input.title ?? ''),
@@ -93,6 +136,7 @@ export async function createMktTask(input: NewTaskInput): Promise<Done<{ id: str
     ...(input.from ? { p_source: input.from } : {}),
   })
   if (error) return { ok: false, reason: words(error, 'The task could not be created. Please try again.') }
+  await dropDraft(db, input.draft)
   freshen()
   const r = (data ?? {}) as { id?: string; track?: string; open?: string }
   return { ok: true, id: String(r.id ?? ''), track: String(r.track ?? ''), open: String(r.open ?? r.id ?? '') }
@@ -444,7 +488,7 @@ async function freshProject(db: SupabaseClient, project: string): Promise<Produc
 
 /** New Project › 📦 Product project: made on the product's version in effect, its intake minutes ready to fill in — with
  * the manager's amount (②b-2b: a quote; the list price when none is typed). */
-export async function startMktProduct(sub: string, product: string, amount?: number | null, from?: string | null): Promise<Done<{ id: string; track: string }>> {
+export async function startMktProduct(sub: string, product: string, amount?: number | null, from?: string | null, draft?: string | null): Promise<Done<{ id: string; track: string }>> {
   await requireActionOn('/marketing/new', 'marketing', 'manage')
   if (!isId(sub)) return { ok: false, reason: 'Pick who the project is for.' }
   if (!isId(product)) return { ok: false, reason: 'Pick a product.' }
@@ -452,10 +496,13 @@ export async function startMktProduct(sub: string, product: string, amount?: num
   if (a === undefined) return { ok: false, reason: 'An amount in ringgit above zero, at most two decimals.' }
   // Opened from another (④-4c — answer 23).
   if (from != null && !isId(from)) return { ok: false, reason: 'The project it is opened from is not there.' }
-  const { data, error } = await (await client()).rpc('mkt_product_start', {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_product_start', {
     p_sub: sub, p_product: product, ...(a === null ? {} : { p_amount: a }), ...(from ? { p_source: from } : {}),
   })
   if (error) return { ok: false, reason: words(error, 'The project could not be started. Please try again.') }
+  // The draft it was typed in (mig 20261025211000).
+  await dropDraft(db, draft)
   freshen()
   const r = (data ?? {}) as { id?: string; track?: string }
   return { ok: true, id: String(r.id ?? ''), track: String(r.track ?? '') }

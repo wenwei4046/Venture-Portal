@@ -6,7 +6,9 @@ import type { ProductPick } from '@/lib/marketing/project'
 // pick who it is for and a product on sale, and its intake meeting minutes open next. The database's side is
 // tests/member-sql/validate-marketing-product-projects.mjs.
 
-const actions = vi.hoisted(() => ({ createMktTask: vi.fn(), startMktProduct: vi.fn(), addMktClient: vi.fn() }))
+const actions = vi.hoisted(() => ({
+  createMktTask: vi.fn(), startMktProduct: vi.fn(), addMktClient: vi.fn(), saveMktDraft: vi.fn(), openMktDraft: vi.fn(), dropMktDraft: vi.fn(),
+}))
 vi.mock('@/lib/marketing/actions', () => actions)
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => router }))
@@ -28,6 +30,11 @@ const open = (p: ProductPick[] | null, add: { canAddSub?: boolean; addFirst?: bo
 
 beforeEach(() => {
   for (const f of [...Object.values(actions), ...Object.values(router)]) f.mockReset()
+  // A draft kept as it is typed (mig 20261025211000): the first save makes d1, each after it counts on.
+  let rev = 0
+  actions.saveMktDraft.mockImplementation(async () => ({ ok: true, id: 'd1', rev: ++rev, at: '2026-10-25T05:07:00Z' }))
+  actions.dropMktDraft.mockResolvedValue({ ok: true })
+  window.history.replaceState(null, '', '/marketing/new')
 })
 
 describe('New Project’s product projects', () => {
@@ -58,7 +65,7 @@ describe('New Project’s product projects', () => {
     })
     // The answer is awaited after the call: wait for what it does, not for the call (2026-10-23 — such waits raced on CI).
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/marketing/projects/MKT-MVS-2610-001'))
-    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-mvs', 'pr-b', 8000, null)
+    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-mvs', 'pr-b', 8000, null, null)
     expect(actions.createMktTask).not.toHaveBeenCalled()
   })
 
@@ -91,7 +98,8 @@ describe('New Project’s product projects', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Open meeting minutes →' }))
     })
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/marketing/projects/MKT-CAR-2610-001'))
-    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-car', 'pr-b', 7500.5, null)
+    // The quote typed made a draft, or not yet: it is dropped once the project is made.
+    expect(actions.startMktProduct.mock.calls[0].slice(0, 4)).toEqual(['sub-car', 'pr-b', 7500.5, null])
 
     fireEvent.click(screen.getByRole('radio', { name: /Event day/ }))
     expect((screen.getByRole('textbox', { name: 'Amount' }) as HTMLInputElement).value).toBe('')
@@ -194,7 +202,7 @@ describe('New Project opened from another project', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Open meeting minutes →' }))
     })
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/marketing/projects/MKT-CAR-2610-001'))
-    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-car', 'pr-a', 3000, 'p0')
+    expect(actions.startMktProduct).toHaveBeenCalledWith('sub-car', 'pr-a', 3000, 'p0', null)
   })
 
   it('a quick task keeps it too — and once × takes it off, it is opened from nowhere', async () => {
@@ -215,5 +223,154 @@ describe('New Project opened from another project', () => {
     })
     await waitFor(() => expect(actions.createMktTask).toHaveBeenCalledTimes(2))
     expect(actions.createMktTask.mock.calls[1][0]).toMatchObject({ from: null })
+  })
+})
+
+// 2026-10-25 — New Project kept as a draft while it is typed (mig 20261025211000; the user: "一有输入就会自动进 draft（草稿）
+// 那边，这样的话内容就不会丢了"). The database's side is tests/member-sql/validate-marketing-new-drafts.mjs.
+describe('New Project kept as a draft', () => {
+  const MEI = { id: 's1', first: 'Mei', hint: '', group: 'SOCIAL MEDIA SPECIALIST' }
+  type Extra = { drafts?: { id: string; rev: number; mode: 'task' | 'recurring' | 'product' | null; title: string; sub: string | null; product: string | null; updatedAt: string }[];
+    draft?: { id: string; rev: number; data: unknown; at: string } | null }
+  const openNew = (extra: Extra = {}) =>
+    render(<NewProject today="2026-10-24" me="s1" subs={subs} people={[MEI]} approvers={[]} holidays={[]} firstSub="sub-car" products={null} {...extra} />)
+  const titleBox = () => screen.getByPlaceholderText(/e\.g\. Amend 11\.11 ad/) as HTMLInputElement
+  const LATER = { timeout: 3000 }
+  // One stage, Mei's: the starter's other two taken off.
+  const oneStage = () => {
+    for (const name of [/Publish/, /Redesign/]) {
+      fireEvent.click(screen.getAllByRole('button', { name }).find(b => b.getAttribute('tabindex') === '0')!)
+      fireEvent.click(screen.getByRole('button', { name: 'Remove stage' }))
+    }
+  }
+
+  it('nothing typed, nothing kept: picking who it is for or what is being started is no draft', async () => {
+    openNew()
+    fireEvent.click(screen.getByRole('radio', { name: /Mattress Villa/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /Recurring task/ }))
+    await new Promise(r => setTimeout(r, 900))
+    expect(actions.saveMktDraft).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Draft saved/)).toBeNull()
+  })
+
+  it('the first thing typed starts one — the address names it — and each change after is kept on its count', async () => {
+    openNew()
+    fireEvent.change(titleBox(), { target: { value: 'Raya banner' } })
+    await waitFor(() => expect(actions.saveMktDraft).toHaveBeenCalledTimes(1), LATER)
+    const [id, rev, data] = actions.saveMktDraft.mock.calls[0]
+    expect([id, rev]).toEqual([null, null])
+    expect(data).toMatchObject({ v: 1, sub: 'sub-car', mode: 'task', title: 'Raya banner', source: null })
+    expect(await screen.findByText('Draft saved · 25 Oct 13:07')).toBeTruthy()
+    expect(window.location.search).toBe('?draft=d1')
+
+    fireEvent.click(screen.getByRole('radio', { name: /Mattress Villa/ }))
+    await waitFor(() => expect(actions.saveMktDraft).toHaveBeenCalledTimes(2), LATER)
+    expect(actions.saveMktDraft.mock.calls[1].slice(0, 2)).toEqual(['d1', 1])
+    expect(actions.saveMktDraft.mock.calls[1][2]).toMatchObject({ sub: 'sub-mvs', title: 'Raya banner' })
+  })
+
+  it('made into its task, the draft goes with it — a save asked meanwhile is not sent', async () => {
+    openNew()
+    oneStage()
+    fireEvent.change(titleBox(), { target: { value: 'Raya banner' } })
+    await waitFor(() => expect(actions.saveMktDraft).toHaveBeenCalledTimes(1), LATER)
+    fireEvent.change(titleBox(), { target: { value: 'Raya banner v2' } })
+    actions.createMktTask.mockResolvedValue({ ok: true, id: 't9', track: 'TSK-CAR-2610-009', open: 't9' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create task & open →' }))
+    })
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith('/marketing/projects/t9'))
+    expect(actions.createMktTask.mock.calls[0][0]).toMatchObject({ title: 'Raya banner v2', draft: 'd1' })
+    await new Promise(r => setTimeout(r, 900))
+    expect(actions.saveMktDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it('not made: what is typed is kept again', async () => {
+    openNew()
+    oneStage()
+    fireEvent.change(titleBox(), { target: { value: 'Raya banner' } })
+    actions.createMktTask.mockResolvedValue({ ok: false, reason: 'Pick who the task is for.' })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create task & open →' }))
+    })
+    expect(await screen.findByText('Pick who the task is for.')).toBeTruthy()
+    await waitFor(() => expect(actions.saveMktDraft).toHaveBeenCalledTimes(1), LATER)
+    expect(actions.saveMktDraft.mock.calls[0][2]).toMatchObject({ title: 'Raya banner' })
+  })
+
+  it('a draft opened puts its form back, and saves on its own count', async () => {
+    openNew({ draft: { id: 'd9', rev: 3, at: '2026-10-25T04:00:00Z', data: { v: 1, mode: 'recurring', sub: 'sub-mvs', title: 'Weekly reel', brief: 'Every Monday' } } })
+    expect(titleBox().value).toBe('Weekly reel')
+    expect(screen.getByRole('radio', { name: /Recurring task/ }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('radio', { name: /Mattress Villa/ }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByText('Draft saved · 25 Oct 12:00')).toBeTruthy()
+    fireEvent.change(titleBox(), { target: { value: 'Weekly reel 2' } })
+    await waitFor(() => expect(actions.saveMktDraft).toHaveBeenCalledTimes(1), LATER)
+    expect(actions.saveMktDraft.mock.calls[0].slice(0, 2)).toEqual(['d9', 3])
+  })
+
+  it('a product project’s draft, for somebody who may not start one, opens as a quick task — a subsidiary gone, the first', () => {
+    openNew({ draft: { id: 'd9', rev: 1, at: '', data: { v: 1, mode: 'product', sub: 'gone', title: 'x' } } })
+    expect(screen.getByRole('radio', { name: /Quick task/ }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('radio', { name: /Carres/ }).getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('another window saved it since: not kept, Reload — and nothing more is sent', async () => {
+    actions.saveMktDraft.mockResolvedValue({ ok: false, reason: 'This draft was changed in another window since you opened it — reload to see it.' })
+    openNew({ draft: { id: 'd9', rev: 3, at: '', data: { v: 1, title: 'Weekly reel' } } })
+    fireEvent.change(titleBox(), { target: { value: 'Weekly reel 2' } })
+    expect(await screen.findByRole('alert', {}, LATER)).toBeTruthy()
+    expect(screen.getByText(/Draft not saved · This draft was changed in another window/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeTruthy()
+    fireEvent.change(titleBox(), { target: { value: 'Weekly reel 3' } })
+    await new Promise(r => setTimeout(r, 900))
+    expect(actions.saveMktDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it('the other drafts: listed, one opened in this one’s place — this one put back on the list — or discarded, asked first', async () => {
+    const drafts = [
+      { id: 'd1', rev: 1, mode: 'task' as const, title: 'Raya banner', sub: 'sub-car', product: null, updatedAt: '2026-10-25T05:07:00Z' },
+      { id: 'd2', rev: 4, mode: 'recurring' as const, title: '', sub: 'sub-mvs', product: null, updatedAt: '2026-10-24T09:30:00Z' },
+    ]
+    openNew({ drafts, draft: { id: 'd1', rev: 1, at: '2026-10-25T05:07:00Z', data: { v: 1, title: 'Raya banner' } } })
+    const list = screen.getByRole('region', { name: 'Drafts' })
+    expect(list.textContent).toContain('Drafts · 1')
+    expect(list.textContent).toContain('Untitled recurring task')
+    expect(list.textContent).toContain('Mattress Villa · saved 24 Oct 17:30')
+    expect(list.textContent).not.toContain('Raya banner')
+
+    actions.openMktDraft.mockResolvedValue({ ok: true, id: 'd2', rev: 4, at: '2026-10-24T09:30:00Z', data: { v: 1, mode: 'recurring', sub: 'sub-mvs', title: 'Daily reel' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    })
+    await waitFor(() => expect(titleBox().value).toBe('Daily reel'))
+    expect(actions.openMktDraft).toHaveBeenCalledWith('d2')
+    expect(window.location.search).toBe('?draft=d2')
+    expect(screen.getByRole('region', { name: 'Drafts' }).textContent).toContain('Raya banner')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discard Raya banner' }))
+    expect(actions.dropMktDraft).not.toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    })
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Drafts' })).toBeNull())
+    expect(actions.dropMktDraft).toHaveBeenCalledWith('d1')
+    expect(titleBox().value).toBe('Daily reel')
+  })
+
+  it('the one open discarded, asked first: the form starts again blank, the address names none', async () => {
+    openNew({ draft: { id: 'd9', rev: 2, at: '', data: { v: 1, title: 'Weekly reel' } } })
+    window.history.replaceState(null, '', '/marketing/new?draft=d9')
+    fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    expect(actions.dropMktDraft).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }))
+    })
+    await waitFor(() => expect(titleBox().value).toBe(''))
+    expect(actions.dropMktDraft).toHaveBeenCalledWith('d9')
+    expect(window.location.search).toBe('')
+    expect(screen.queryByText(/Draft saved/)).toBeNull()
   })
 })
