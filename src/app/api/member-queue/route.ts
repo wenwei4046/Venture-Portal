@@ -51,6 +51,11 @@ export async function GET(request: Request) {
     const marketingRuns = await db.rpc('mkt_product_runs_due')
     if (marketingRuns.error) console.error('Marketing monthly runs failed', marketingRuns.error.code ?? 'unknown')
     else if (marketingRuns.data) console.info('Marketing monthly runs made', marketingRuns.data)
+    // An Ads report's period over and not published (mig 20261026002000 — the user, asked: "can do"): told once, from
+    // 9:00 the office's time, to its owner and whoever keeps the report — then sent by the flush below. A count only.
+    const adsDue = await db.rpc('mkt_ads_due')
+    if (adsDue.error) console.error('Marketing Ads reports due failed', adsDue.error.code ?? 'unknown')
+    else if (adsDue.data) console.info('Marketing Ads reports due told', adsDue.data)
     // Whether each CRM ad is still running (mig 20261022120000): Ads Manager's effective_status, kept for the
     // phone's Assignment tabs (Running | Paused). Best effort — a count only.
     const adStatuses = await refreshAdStatuses(db, process.env.META_SYSTEM_USER_TOKEN?.trim())
