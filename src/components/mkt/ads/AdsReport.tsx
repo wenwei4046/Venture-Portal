@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { adsRows, EVERY_WORDS, figureOf, reportCards, reportRange, type AdsPage } from '@/lib/marketing/ads'
+import { adsReportPdfUrl, adsRows, EVERY_WORDS, figureOf, reportCards, reportRange, type AdsPage } from '@/lib/marketing/ads'
 import { shortDay } from '@/lib/marketing/board'
 import { trailTime } from '@/lib/marketing/task'
 import AdsFigures, { targetWords } from './AdsFigures'
@@ -74,6 +74,7 @@ export default function AdsReport({ project, title, initial, edit, say }: {
               {r.report ? (
                 <>
                   <span className={`${s.state} ${s.stateDone}`}>Published</span>
+                  <a className={s.act} href={adsReportPdfUrl(project, r.no)} aria-label={`Report #${r.no} as a PDF`}>PDF</a>
                   <button type="button" className={s.act} aria-expanded={open === r.no} onClick={() => setOpen(o => (o === r.no ? null : r.no))}>
                     {open === r.no ? 'Hide' : 'Show'}
                   </button>

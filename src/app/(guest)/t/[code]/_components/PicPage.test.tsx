@@ -265,7 +265,10 @@ describe('its Ads reports', () => {
     const card = screen.getByRole('region', { name: 'Reports' })
     expect(within(card).getByText('Every 2 weeks')).toBeTruthy()
     const reports = [...card.querySelectorAll('[class*="repHead"]')].map(h => h.textContent)
-    expect(reports).toEqual(['Report #220 Oct – 2 Nov', 'Report #16 – 19 Oct'])
+    expect(reports).toEqual(['Report #220 Oct – 2 NovPDF', 'Report #16 – 19 OctPDF'])
+    // Its PDF at each head's right (⑤-3e — the handoff's), read from the link itself.
+    expect(within(card).getByRole('link', { name: 'Report #2 as a PDF' }).getAttribute('href')).toBe(`/t/${CODE}/r/2`)
+    expect(within(card).getByRole('link', { name: 'Report #1 as a PDF' }).getAttribute('href')).toBe(`/t/${CODE}/r/1`)
     const first = card.querySelectorAll('[class*="repFigs"]')[0] as HTMLElement
     expect([...first.querySelectorAll('[class*="repLabel"]')].map(l => l.textContent)).toEqual(['Spend so far', 'Cost per lead', 'Appointments', 'ROAS', 'Appointment rate'])
     expect(within(first).getByText('RM 3,240')).toBeTruthy()

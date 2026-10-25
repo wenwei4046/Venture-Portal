@@ -56,7 +56,9 @@ describe('a project’s Ads report', () => {
     expect(within(card).getByText('Budget RM 6,000 · Cost per lead RM 20.00 · ROAS 3.0 · Appointment rate 25%')).toBeTruthy()
     expect(within(card).getByText('No PIC link yet')).toBeTruthy()
     const rows = [...card.querySelectorAll('[class*="rowHead"]')].map(r => r.textContent)
-    expect(rows).toEqual(['Report #3' + '3 – 16 Nov' + 'Ends 16 Nov', 'Report #2' + '20 Oct – 2 Nov' + 'Due' + 'Publish…', 'Report #1' + '6 – 19 Oct' + 'Published' + 'Show' + 'Publish again…'])
+    expect(rows).toEqual(['Report #3' + '3 – 16 Nov' + 'Ends 16 Nov', 'Report #2' + '20 Oct – 2 Nov' + 'Due' + 'Publish…', 'Report #1' + '6 – 19 Oct' + 'Published' + 'PDF' + 'Show' + 'Publish again…'])
+    // A published one's PDF (⑤-3e): the document the PIC reads, from the project's page.
+    expect(within(card).getAllByRole('link', { name: /as a PDF/ }).map(a => a.getAttribute('href'))).toEqual([`/marketing/projects/${PID}/ads?no=1`])
     expect(within(card).queryByText('Target RM 20 · above')).toBeNull()
     fireEvent.click(within(card).getByRole('button', { name: 'Show' }))
     expect(within(card).getByRole('button', { name: 'Hide' }).getAttribute('aria-expanded')).toBe('true')

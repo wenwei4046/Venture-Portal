@@ -22,6 +22,8 @@
 .stateDone { background: rgb(var(--mk-done-bg)); border-color: rgb(var(--mk-done-line)); color: rgb(var(--mk-done)); }
 .act { height: 26px; padding: 0 10px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: inherit; font: inherit; font-size: .8em; font-weight: 500; cursor: pointer; white-space: nowrap; }
 .act:hover { background: rgb(var(--mk-surface)); }
+/* A published report's PDF (⑤-3e): a link drawn as its row's buttons. */
+a.act { display: inline-flex; align-items: center; text-decoration: none; }
 .actOn { background: var(--mk-primary); border-color: var(--mk-primary); color: rgb(var(--mk-ink-2)); }
 .actOn:hover { background: var(--mk-primary-hover); }
 

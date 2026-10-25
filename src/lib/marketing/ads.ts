@@ -5,6 +5,7 @@
 // conversations), over a report's days; the figures built from them; a report's periods by its cadence; each figure as
 // the PIC reads it, against its target. Pure.
 
+import { officeTime } from '@/lib/office-time'
 import { addDays, addMonths, shortDay } from './board'
 
 // ── The cadence and the periods ───────────────────────────────────────────────────────────────────────────────
@@ -321,22 +322,41 @@ export function reportsFromRow(v: unknown): AdsReport[] {
   }).sort((a, b) => b.no - a.no)
 }
 
-/** mkt_ads_page(project): its setup (null until set up), its reports (newest first), whether the PIC has a link. */
+/** mkt_ads_page(project): its setup (null until set up), its reports (newest first), whether the PIC has a link — and the
+ * project it is on (⑤-3e, mig 20261026003000: its Track ID, title and subsidiary, for its PDF's head). */
 export interface AdsPage {
   today: string
   link: boolean
+  project: { track: string; title: string; sub: string } | null
   setup: AdsSetup | null
   reports: AdsReport[]
 }
 
 export function adsPageFromRow(v: unknown): AdsPage {
   const o = isObj(v) ? v : {}
+  const p = isObj(o.project) && typeof o.project.track === 'string' && o.project.track ? o.project : null
   return {
     today: typeof o.today === 'string' && DAY_RE.test(o.today) ? o.today : '',
     link: o.link === true,
+    project: p ? { track: p.track as string, title: typeof p.title === 'string' ? p.title : '', sub: typeof p.sub === 'string' ? p.sub : '' } : null,
     setup: setupFromRow(o.setup),
     reports: reportsFromRow(o.reports),
   }
+}
+
+// ── Its PDF (⑤-3e — the user: "can do"; the handoff's PIC Link writes *PDF* at each report's right) ────────────────────
+
+/** Where a report's PDF is read: the team's from the project's page (Marketing · View), the PIC's from their link. */
+export const adsReportPdfUrl = (project: string, no: number) => `/marketing/projects/${encodeURIComponent(project)}/ads?no=${no}`
+export const picReportPdfUrl = (code: string, no: number) => `/t/${encodeURIComponent(code)}/r/${no}`
+/** Its file's name, without the .pdf: "TSK-CAR-2610-001_ads-report-2". */
+export const adsPdfName = (track: string, no: number) => `${(track || 'ads').replace(/[^A-Za-z0-9-]/g, '')}_ads-report-${no}`
+/** The office's day an instant fell on, as the PDF says it: "3 Nov 2026" — '' for none. */
+export function publishedWords(at: string | null | undefined): string {
+  const d = at ? officeTime(at) : null
+  if (!d || !d.isValid()) return ''
+  const day = d.format('YYYY-MM-DD')
+  return `${shortDay(day)} ${day.slice(0, 4)}`
 }
 
 /** A period as the card lists it: its report if published, else due once its last day is over. */
