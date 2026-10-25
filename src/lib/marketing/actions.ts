@@ -11,6 +11,7 @@ import { correctionOk, projectLogFromRow, type ProjectLog } from './audit'
 import { billingFromRow, clientBillFromRow, type BillingPage } from './billing'
 import { subFromRow, type MktSub } from './board'
 import { openDraftFromRow } from './drafts'
+import { keyDatesFromRow, keyPatchOf, type KeyPatch, type MktKeyDate } from './key-dates'
 import { freeFromRow, taskFromRow, type FreeBlock, type FreeType, type MktTaskPage } from './task'
 import type { StageWork } from './tasks'
 import { minutesTemplatesFromRow, type MinutesTemplate } from './minutes'
@@ -791,6 +792,32 @@ export async function mktCalendarLink(sub: string, slot: 1 | 2, renew = false): 
     return { ok: false, reason: words(error, 'The calendar link could not be made. Please try again.') }
   }
   return { ok: true, code: data }
+}
+
+// ── A subsidiary's key dates (mig 20261025235500 — the user: "Marketing 全员，可每年重复") ──────────────────────────
+
+/** A key date added (`id` null — sent in full) or changed (only what changed is sent): Marketing · Edit. The
+ * subsidiary's key dates come back, as they now stand. */
+export async function saveMktKeyDate(sub: string, id: string | null, patch: KeyPatch): Promise<Done<{ keys: MktKeyDate[] }>> {
+  await requireActionOn('/marketing/subsidiaries/[code]', 'marketing', 'edit')
+  if (!isId(sub)) return { ok: false, reason: 'That subsidiary is not there.' }
+  if (id !== null && !isId(id)) return { ok: false, reason: 'That key date is not there any more.' }
+  const clean = keyPatchOf(patch)
+  if (!clean) return { ok: false, reason: 'Nothing changed.' }
+  const { data, error } = await (await client()).rpc('mkt_key_date_save', { p_sub: sub, p_id: id, p_patch: clean })
+  if (error) return { ok: false, reason: words(error, 'The key date could not be saved. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, keys: keyDatesFromRow(data) }
+}
+
+/** A key date deleted (one already gone is no error): Marketing · Edit. The subsidiary's key dates come back. */
+export async function deleteMktKeyDate(sub: string, id: string): Promise<Done<{ keys: MktKeyDate[] }>> {
+  await requireActionOn('/marketing/subsidiaries/[code]', 'marketing', 'edit')
+  if (!isId(sub) || !isId(id)) return { ok: false, reason: 'That key date is not there any more.' }
+  const { data, error } = await (await client()).rpc('mkt_key_date_delete', { p_sub: sub, p_id: id })
+  if (error) return { ok: false, reason: words(error, 'The key date could not be deleted. Please try again.') }
+  revalidatePath('/marketing', 'layout')
+  return { ok: true, keys: keyDatesFromRow(data) }
 }
 
 // ── Billing (②b-2b, mig 20261025121000 — the user's answers 43–48, 50, 51), the manager's ──────────────────────

@@ -9,9 +9,9 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | What is it | Marketing's own department view — "这里其实就是他们的 desktop view". |
 | Who has the manager tools | **MM + AMM** — MARKETING MANAGER and ASSISTANT MARKETING MANAGER (template *Marketing · Manager*); the rest *Marketing · Staff*. |
 | Billing | Marketing lists each subsidiary's billable drafts for the month; Finance imports them in one click into the `marketing_project` invoice. |
-| CRM | Not wired for now: an Ads report's figures are typed in. |
+| CRM | Not wired at first: an Ads report's figures typed in. **2026-10-25: connect it** ("可以接crm 那边了 那边有一个proformance的 base 你看有什么能够sync 过来") — each Ads project picks its own CRM ads; the report's cadence and figures set per project; the Ads person publishes it to the PIC link; an ad not in the CRM keeps typed figures (answer 57). |
 | "+ Add subsidiary" | Marketing's own client list (not Finance's `companies`). |
-| Punching from a phone | Not from Marketing for now — "cause last once desktop view done, i will do marketing app mobile". |
+| Punching from a phone | Not from Marketing for now — "cause last once desktop view done, i will do marketing app mobile". Asked again once the desktop view was done (2026-10-25): **not now** — "先不做手机版" (answer 56). |
 | Scope | Everything as designed, in order ① → ⑦ below. |
 | Big files | ≤ 50 MB uploaded; bigger as links. Then, once every bucket was in R2 (to the storage session): "make sure in future i can upload all big file, video and etc", "make the size more bigger for all" — the Library takes 2 GB a file (mig `20261024007100`), a folder kept elsewhere a link. |
 
@@ -47,6 +47,7 @@ The Marketing Department's own desktop view, from the Claude Design handoff **HO
 | ④-2 | The Subsidiary page (the cards, Month / Week / Timeline, key dates, the feed, the projects) — what exists (mig `20261024005000`, `mkt_sub_feed`); campaigns, posts, shoots and ads wait for questions 13–17 | #654, live 2026-10-23 |
 | ④-2b | **Built 2026-10-24** (mig `20261025141000`): campaigns (answer 13) — a minutes field *Campaign period*, the intake's period on its product project, the product page's run, the PIC reading it; the Subsidiary page's *📢 Campaigns running*, a campaign on its days in Month and Week, the timeline's *Campaigns* and *Overlaps* rows and their note, the filter's *Campaign*; *Live* in the projects (gaps 181–186) | answered |
 | ④-2c | **Built 2026-10-24** (mig `20261025151000`): a task's dates on the calendar — a stage's Date field marked for it, once filled (answer 16; the handoff's *Dates sync from task fields*); posts (answer 15) — In production / Overdue / Scheduled / Posted, marked posted with the link by its owner or the manager once done; the Calendar's 📣 / 🗓️ layers and a 📈 Ads & reports one; the Subsidiary page's five cards as the handoff draws them, its filter's kinds (gaps 187–192) | answered |
+| ④-2d | **Built 2026-10-25** (mig `20261025235500`): a subsidiary's own key dates (answers 14, 58) — added, changed (only what changed sent) and deleted by everybody with Marketing · Edit, once or every year; flagged before HR's holidays on its page (*Edit* after ⚑ Key dates, its own flags opening them) and on the PIC's calendar | answered |
 | ④-3 | The Audit trail's formal log (mig `20261024006000`, `mkt_project_log`), its filters, from every project's trail; export waits for question 18 | #655, live 2026-10-23 |
 | ④-3b | **Built 2026-10-25** (mig `20261025171000`): the formal log exported by anybody in Marketing — the rows the filter keeps, as a formal document, as the table (two PDFs — answer 21) and as the handoff's CSV (answer 18); a record corrected by the manager — a record of its own, *correction of #n*, the record never touched (answer 19) | |
 | ④-4 | The Task map (map / list, a station's panel, the lines' records) and Replay, in the project's Map / Audit trail sheet — drawn from the task page | #657, live 2026-10-23 |
@@ -128,6 +129,14 @@ Asked 2026-10-25 (~13:20 MYT), after the user's note on a side agent's note abou
 53. A task whose minutes the PIC approves: does its first stage wait? **Answered: it waits, as a product project's work does — the manager may start before approval.**
 54. Where are a quick task's minutes written? **Answered: on New Project, there and then** — and (the user's next note) New Project keeps a draft as soon as anything is typed (②a-2, built).
 55. A recurring task's minutes? **Answered: written once, on its series; every run takes them as its requirements.**
+
+Asked 2026-10-25 (~17:10 MYT), once ②a-5 was live — the questions parked while building:
+56. Marketing's view on a phone? **Answered: not now** ("先不做手机版").
+57. An Ads report's figures — typed, or from the CRM? **Answered: from the CRM** ("可以接crm 那边了 那边有一个proformance的 base 你看有什么能够sync 过来") — each Ads **project picks its own CRM ads**; the report's cadence **set by them** ("可以自己set"), which figures **set by them** ("可以自己set 要加哪一个"); the **Ads person publishes** it to the PIC link; an ad not in the CRM keeps typed figures. Being built (several PRs).
+58. Key dates — who keeps them, may one repeat? **Answered: everybody in Marketing, every year allowed** ("Marketing 全员，可每年重复"; HR's holidays shown as they are) — built (④-2d). Not built: a monthly one (the handoff's *Payday*) — not asked yet.
+59. A recurring product's monthly minutes? **Answered: none** ("不用每月开") — the intake's only.
+60. Gap 206 — resumed after its run day, the month resumed in gets its work at once? **Answered: as built** ("对，照现在").
+61. The two Finance date bugs found on the way? **Answered: left to Chew** (Finance's).
 52. **Who is told** (⑤-1). The handoff does not say: the project's owner; with none (the Principal started it), Marketing's managers.
 53. **Changes ask no name** (⑤-1). The handoff's changes step has no name field: the reply goes under the PIC's name on the project (Kelvin), approving asks the full name typed.
 54. **A client's code** (④-1). The handoff's (the name's first four letters and digits, else OTH) can collide or fall under two characters, and a Track ID keeps it for good: the database makes it, numbered when taken.
@@ -135,7 +144,7 @@ Asked 2026-10-25 (~13:20 MYT), after the user's note on a side agent's note abou
 56. **Editing or hiding a client** (④-1). The handoff adds clients and never renames, edits or hides one — not built (question 29). Its sidebar row has no click: built as New Project with the form open.
 57. **The cards** (④-2). The handoff's are *Campaigns running*, *Posts* (n posted), *Shoots*, *Ads live* and *Overdue*, from sample data with no source in the portal (questions 13, 15). Built from what exists: *Projects running*, *Waiting for PIC*, *Due this week*, *Done this month*, *Overdue*.
 58. **What the dates are** (④-2). The handoff's items are posts (Reels, Post, Tip, Launch, Offer, Testimonial), shoot days, ads go-live and end, report days and PIC deadlines; the portal has stage due dates and a series' runs to come — its Type filter offers those two until questions 15–16 are answered.
-59. **Key dates** (④-2). The handoff's are typed into its sample (Payday, 11.11, *Carres showroom opens*); built from HR's holidays (gap 6) until question 14.
+59. **Key dates** (④-2). The handoff's are typed into its sample (Payday, 11.11, *Carres showroom opens*); built from HR's holidays (gap 6) until question 14. Each subsidiary's own since 2026-10-25 (④-2d, answer 58), HR's holidays beside them.
 60. **The timeline's bars** (④-2). The handoff's are campaigns; built as projects — from their start (else the day made) to their due day, ten weeks from the Monday two weeks back.
 61. **Progress** (④-2). The handoff's n/m is never defined: built as stages done (or passed) ÷ stages (question 17).
 62. **Where the log opens** (④-3). The handoff's is a tab of the product task page (Canvas · Map · Audit trail · Versions), which comes with the Assignment plan (②b-2). Until then **Formal log** on the trail's head of every project's page opens it over the page — quick and recurring tasks too (question 22).

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { boardFromRow, type MktSub } from '@/lib/marketing/board'
 import { subFeedFromRow } from '@/lib/marketing/subsidiary'
-const actions = vi.hoisted(() => ({ editMktClient: vi.fn(), mktCalendarLink: vi.fn() }))
+const actions = vi.hoisted(() => ({ editMktClient: vi.fn(), mktCalendarLink: vi.fn(), saveMktKeyDate: vi.fn(), deleteMktKeyDate: vi.fn() }))
 vi.mock('@/lib/marketing/actions', () => actions)
 import SubsidiaryPage from './SubsidiaryPage'
 
@@ -79,6 +79,43 @@ describe('a subsidiary’s page', () => {
     expect(screen.queryByText(/⚑ Deepavali/)).toBeNull()
     fireEvent.click(screen.getByRole('switch', { name: /Key dates/ }))
     expect(screen.getByText(/⚑ Deepavali/)).toBeTruthy()
+  })
+
+  // 2026-10-25 — its own key dates (the user: "Marketing 全员，可每年重复").
+  it('flags its own key dates beside HR’s holidays — for Marketing · Edit, Edit opens them and its own flag opens it', async () => {
+    const keys = [
+      { id: 'k1', day: '2025-10-28', name: 'Carres anniversary', short: 'Anniversary', yearly: true },
+      { id: 'k2', day: '2026-10-20', name: 'Payday', short: null, yearly: false },
+    ]
+    const { unmount } = render(<SubsidiaryPage board={board} sub={sub} feed={feed} keyDates={keys} />)
+    expect(screen.queryByRole('button', { name: 'Edit key dates' })).toBeNull()
+    fireEvent.click(screen.getByRole('switch', { name: /Key dates/ }))
+    const month = () => document.querySelector('[class*="grid"]') as HTMLElement
+    // Every year from 2025: this year's on its day; its own first on a day it shares with a holiday.
+    expect([...month().querySelectorAll('[title]')].filter(e => e.textContent?.startsWith('⚑')).map(e => e.textContent)).toEqual([
+      '⚑ Payday', '⚑ Deepavali', '⚑ Anniversary'])
+    // Without Edit a flag opens nothing.
+    expect(screen.queryByRole('button', { name: 'Key date Payday' })).toBeNull()
+    unmount()
+
+    render(<SubsidiaryPage board={board} sub={sub} feed={feed} keyDates={keys} edit />)
+    fireEvent.click(screen.getByRole('button', { name: 'Edit key dates' }))
+    // Edit turns them on and opens the window on a new one.
+    expect(screen.getByRole('switch', { name: /Key dates/ }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('dialog', { name: 'Key dates · Carres' })).toBeTruthy()
+    expect(screen.getByText('Add a key date')).toBeTruthy()
+    // A new one saved shows on the month at once.
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'Year-end sale' } })
+    fireEvent.change(screen.getByLabelText('Day'), { target: { value: '2026-10-30' } })
+    actions.saveMktKeyDate.mockResolvedValue({ ok: true, keys: [...keys, { id: 'k3', day: '2026-10-30', name: 'Year-end sale', short: null, yearly: false }] })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add key date' })) })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('dialog', { name: 'Key dates · Carres' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Key date Year-end sale' }))
+    expect((screen.getByRole('textbox', { name: 'Name' }) as HTMLInputElement).value).toBe('Year-end sale')
+    expect(screen.getByText('Change key date')).toBeTruthy()
+    // HR's holidays stay HR's: no button.
+    expect(screen.queryByRole('button', { name: 'Key date Deepavali' })).toBeNull()
   })
 
   it('draws a week and a ten-week timeline', () => {

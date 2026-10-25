@@ -1,10 +1,11 @@
 // The PIC's own calendar (⑤-2, `PIC Calendar.dc.html`): what mkt_pic_calendar answers the stranger holding a
 // subsidiary's calendar link — the dates of the work sent to that PIC, their approvals, the minutes waiting for them,
-// the campaigns, HR's holidays — and, from it, the items, the list's days, the month's weeks with their campaign bars,
-// the campaigns running, the banner and the legend. Pure.
+// the campaigns, the subsidiary's own key dates and HR's holidays — and, from it, the items, the list's days, the month's
+// weeks with their campaign bars, the campaigns running, the banner and the legend. Pure.
 
 import { ACCEPT_HOURS, addDays, daysBetween, mondayOf, MONTH_SHORT, shortDay, WEEKDAYS, weekdayOf, workingHours, type MktDateKind } from './board'
 import { addMonths, monthOf } from './calendar'
+import { keyDatesFromRow, keyFlags, type KeyFlag, type MktKeyDate } from './key-dates'
 
 const DATE_KINDS: readonly MktDateKind[] = ['post', 'shoot', 'meeting', 'ads_live', 'ads_end', 'report']
 
@@ -47,6 +48,8 @@ export interface PicCalendar {
   minutes: { title: string; code: string | null; sentAt: string | null }[]
   campaigns: { title: string; from: string; until: string; code: string | null }[]
   holidays: { day: string; name: string }[]
+  /** The subsidiary's own key dates that may fall in the window (2026-10-25) — once, or every year. */
+  keyDates: MktKeyDate[]
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -94,6 +97,7 @@ export function picCalendarFromRow(v: unknown): PicCalendar | null {
       return a && b && a <= b ? [{ title: own(c.title), from: a, until: b, code: codeOrNull(c.code) }] : []
     }),
     holidays: rows(v.holidays).flatMap(h => (dayOrNull(h.day) ? [{ day: str(h.day), name: str(h.name) }] : [])),
+    keyDates: keyDatesFromRow(v.keyDates),
   }
 }
 
@@ -180,9 +184,10 @@ const dayOrder = (a: PicCalItem, b: PicCalItem) =>
   Number(b.urgent) - Number(a.urgent) || Number(b.kind === 'approve') - Number(a.kind === 'approve')
 const itemsOn = (items: readonly PicCalItem[], day: string) => items.filter(i => i.day === day).sort(dayOrder)
 
-export interface PicKeyDate { day: string; name: string; short: string }
-const keyDatesOn = (c: PicCalendar, day: string): PicKeyDate[] =>
-  c.holidays.filter(h => h.day === day).map(h => ({ day: h.day, name: h.name, short: h.name.split(/\s+/)[0].slice(0, 12) || h.name }))
+export type PicKeyDate = KeyFlag
+/** Its ⚑ over the window: the subsidiary's own key dates first, then HR's holidays. */
+const flagsOf = (c: PicCalendar): PicKeyDate[] => keyFlags(c.keyDates, c.holidays, c.from, c.to)
+const flagsOn = (flags: readonly PicKeyDate[], day: string): PicKeyDate[] => flags.filter(f => f.day === day)
 
 // ── The list: what is coming up ─────────────────────────────────────────────────────────────────────────────
 
@@ -204,10 +209,11 @@ export interface PicListDay {
 export function listDays(c: PicCalendar, items: readonly PicCalItem[], keyOn: boolean): PicListDay[] {
   const end = addDays(c.today, LIST_DAYS)
   const days = new Set(items.filter(i => i.day >= c.today && i.day <= end).map(i => i.day))
-  if (keyOn) for (const h of c.holidays) if (h.day >= c.today && h.day <= end) days.add(h.day)
+  const flags = keyOn ? flagsOf(c) : []
+  for (const f of flags) if (f.day >= c.today && f.day <= end) days.add(f.day)
   return [...days].sort().map(day => ({
     day, wd: day === c.today ? 'Today' : WEEKDAYS[weekdayOf(day)], n: +day.slice(8, 10), mon: MONTH_SHORT[+day.slice(5, 7) - 1],
-    today: day === c.today, flags: keyOn ? keyDatesOn(c, day) : [], items: itemsOn(items, day),
+    today: day === c.today, flags: flagsOn(flags, day), items: itemsOn(items, day),
   }))
 }
 
@@ -284,12 +290,13 @@ export function monthWeeks(c: PicCalendar, items: readonly PicCalItem[], month: 
   const first = monthOf(month)
   const start = mondayOf(first)
   const weeks = Math.ceil(daysBetween(start, addMonths(first, 1)) / 7)
+  const flags = keyOn ? flagsOf(c) : []
   return Array.from({ length: weeks }, (_, w) => {
     const ws = addDays(start, w * 7)
     const we = addDays(ws, 6)
     const days = Array.from({ length: 7 }, (_, i) => {
       const day = addDays(ws, i)
-      return { day, n: +day.slice(8, 10), out: day.slice(0, 7) !== first.slice(0, 7), today: day === c.today, flags: keyOn ? keyDatesOn(c, day) : [], items: itemsOn(items, day) }
+      return { day, n: +day.slice(8, 10), out: day.slice(0, 7) !== first.slice(0, 7), today: day === c.today, flags: flagsOn(flags, day), items: itemsOn(items, day) }
     })
     const bars = c.campaigns.flatMap((x, i) => (x.from <= we && x.until >= ws ? [{ x, i }] : [])).map(({ x, i }, row): PicBar => {
       const a = x.from > ws ? x.from : ws

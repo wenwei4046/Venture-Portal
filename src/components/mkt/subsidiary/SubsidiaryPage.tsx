@@ -6,23 +6,25 @@ import type { ClientBill } from '@/lib/marketing/billing'
 import { addDays, type MktBoard, type MktSub } from '@/lib/marketing/board'
 import { addMonths, calendarEvents, monthCells, monthLabel, monthOf, weekCells, weekLabel, type CalEvent, type CalTone } from '@/lib/marketing/calendar'
 import {
-  agoLabel, campaignOverlaps, campaignsOn, feedLine, filterCount, keyDates, NO_FILTER, overlapNote, passesCampaign, passesSub, spanWords,
-  SUB_STATUSES, SUB_TYPES, subCampaigns, subProjects, subStats, timelineBars, timelineCampaigns, timelineHeads, timelineLeft, timelineOverlaps,
-  timelineTitle, timelineWindow, type SubCampaign, type SubFeedEvent, type SubFilter, type SubType,
+  agoLabel, campaignOverlaps, campaignsOn, feedLine, filterCount, keyDates as keyFlagsOf, NO_FILTER, overlapNote, passesCampaign, passesSub,
+  spanWords, SUB_STATUSES, SUB_TYPES, subCampaigns, subProjects, subStats, timelineBars, timelineCampaigns, timelineHeads, timelineLeft,
+  timelineOverlaps, timelineTitle, timelineWindow, type KeyDate, type SubCampaign, type SubFeedEvent, type SubFilter, type SubType,
 } from '@/lib/marketing/subsidiary'
+import type { MktKeyDate } from '@/lib/marketing/key-dates'
 import { trailTime } from '@/lib/marketing/task'
 import { groupLabel, groupTone, rosterGroups, sameGroup, type MktTone } from '@/lib/marketing/groups'
 import { whatsappOk } from '@/lib/marketing/project'
 import CalendarLink from './CalendarLink'
 import ClientEdit from './ClientEdit'
+import KeyDatesWindow from './KeyDatesWindow'
 import s from './subsidiary.module.css'
 
 // A subsidiary's page (`Subsidiary Page.dc.html`, ④-2): who it is and its PICs — the manager edits them, and a client's
 // name (②b-2d-2a); where its work stands (the handoff's five cards — campaigns running, posts, shoots, ads live, overdue);
 // its dates by Month, Week or Timeline — its campaigns (④-2b) on the days they run, the timeline's own rows with their
-// overlaps — — coloured by group (a People title), red once passed undone, done faded — with
-// HR's holidays as ⚑ key dates and the handoff's filter (type, group, status); ⚡ Recent activity from its projects' trails; and its
-// projects with how far each has come. Every item opens its project.
+// overlaps — — coloured by group (a People title), red once passed undone, done faded — with its own key dates (kept by
+// everybody with Marketing · Edit, 2026-10-25) and HR's holidays as ⚑, and the handoff's filter (type, group, status);
+// ⚡ Recent activity from its projects' trails; and its projects with how far each has come. Every item opens its project.
 
 const TONE_CLASS: Record<MktTone, string> = {
   content: s.team_content, social: s.team_social, design: s.team_design, ads: s.team_ads, brand: s.team_brand, manager: s.team_manager, none: s.team_none,
@@ -38,10 +40,16 @@ const evClass = (e: CalEvent) => `${s.item} ${e.tone === 'red' ? s.red : e.team 
 const evEmoji = (e: CalEvent) => (e.kind !== 'due' ? e.icon : e.recur ? '🔁' : e.quick ? '⚡' : '⏱')
 const campClass = (c: SubCampaign) => `${s.item} ${s.team_brand}${c.ran ? ` ${s.faded}` : ''}`
 
-export default function SubsidiaryPage({ board, sub: initial, feed, manage = false, bill: billOnFile = null, openEdit = false }: {
+export default function SubsidiaryPage({
+  board, sub: initial, feed, keyDates: keysOnFile = [], edit = false, manage = false, bill: billOnFile = null, openEdit = false,
+}: {
   board: MktBoard
   sub: MktSub
   feed: SubFeedEvent[]
+  /** Its own key dates (2026-10-25). */
+  keyDates?: MktKeyDate[]
+  /** Marketing · Edit: its key dates added, changed and deleted. */
+  edit?: boolean
   manage?: boolean
   /** Marketing's own client's billing details, for the manager's Edit (②b-2b). */
   bill?: ClientBill | null
@@ -58,6 +66,9 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
   const [month, setMonth] = useState(() => monthOf(board.today))
   const [week, setWeek] = useState(board.today)
   const [keyOn, setKeyOn] = useState(false)
+  // Its own key dates as last saved here, and the window that keeps them — on a key date, or a new one (null).
+  const [keys, setKeys] = useState(keysOnFile)
+  const [keysOpen, setKeysOpen] = useState<{ id: string | null } | null>(null)
   const [filterOpen, setFilterOpen] = useState(false)
   const [filter, setFilter] = useState<SubFilter>(NO_FILTER)
   // Relative times ("3h ago") only once the page is in the browser — the server's clock and the browser's differ.
@@ -68,8 +79,16 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
   const events = all.filter(e => passesSub(e, filter))
   const stats = subStats(board, sub.id, all)
   const rows = subProjects(board, sub.id)
-  const flags = keyOn ? keyDates(board) : []
+  const flags = keyOn ? keyFlagsOf(board, keys) : []
   const flagsOn = (day: string) => flags.filter(f => f.day === day)
+  // A ⚑ — its own key date's opens it in the window for whoever may change it; HR's holidays only say their name.
+  const flag = (f: KeyDate, words: string, extra = '') => {
+    const id = f.id
+    return id && edit ? (
+      <button key={`${id}${f.day}`} type="button" className={`${s.flag} ${s.flagBtn}${extra}`} title={f.name} aria-label={`Key date ${f.name}`}
+        onClick={() => setKeysOpen({ id })}>⚑ {words}</button>
+    ) : <span key={`${id ?? 'hr'}${f.day}${f.name}`} className={`${s.flag}${extra}`} title={f.name}>⚑ {words}</span>
+  }
   const tw = timelineWindow(board.today)
   const heads = timelineHeads(tw)
   const bars = timelineBars(board, rows.filter(r => !filter.teams.length || filter.teams.some(g => sameGroup(g, r.team))), tw)
@@ -123,6 +142,9 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
       </div>
       {editing ? <ClientEdit sub={sub} bill={bill} onClose={() => setEditing(false)} onSaved={(next, b) => { setSub(next); setBill(b); setEditing(false) }} /> : null}
       {calFor ? <CalendarLink sub={sub} slot={calFor} onClose={() => setCalFor(null)} /> : null}
+      {keysOpen ? (
+        <KeyDatesWindow sub={sub} keys={keys} today={board.today} open={keysOpen.id} onSaved={setKeys} onClose={() => setKeysOpen(null)} />
+      ) : null}
 
       <div className={s.stats}>
         {stats.map(st => (
@@ -147,6 +169,11 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
             <button type="button" className={`${s.keyBtn}${keyOn ? ` ${s.keyOn}` : ''}`} role="switch" aria-checked={keyOn} onClick={() => setKeyOn(v => !v)}>
               <span className={s.track} aria-hidden="true"><span className={s.knob} /></span>⚑ Key dates
             </button>
+            {edit ? (
+              <button type="button" className={s.keyEditBtn} aria-label="Edit key dates" onClick={() => { setKeyOn(true); setKeysOpen({ id: null }) }}>
+                <span aria-hidden="true">✎</span>Edit
+              </button>
+            ) : null}
             <button type="button" className={`${s.filterBtn}${filterOpen || n ? ` ${s.filterOn}` : ''}`} aria-expanded={filterOpen} onClick={() => setFilterOpen(v => !v)}>
               Filter{n ? <span className={s.filterCount}>{n}</span> : null}
             </button>
@@ -200,7 +227,7 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
                 {monthCells(month, events, board.today).map(c => (
                   <div key={c.day} className={`${s.cell}${c.out ? ` ${s.cellOut}` : ''}`}>
                     <div className={s.cellTop}>
-                      {flagsOn(c.day).map(f => <span key={f.name} className={s.flag} title={f.name}>⚑ {f.short}</span>)}
+                      {flagsOn(c.day).map(f => flag(f, f.short))}
                       <span className={s.grow} />
                       <span className={`${s.dayN}${c.today ? ` ${s.dayToday}` : ''}`}>{c.n === 1 ? `${c.n} ${monthLabel(c.day).slice(0, 3)}` : c.n}</span>
                     </div>
@@ -229,7 +256,7 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
                   <div className={s.wcolHead}>
                     <span className={s.wcolWd}>{WD[i]}</span>
                     <span className={`${s.wcolN}${c.today ? ` ${s.wcolNToday}` : ''}`}>{c.n}</span>
-                    {flagsOn(c.day).map(f => <span key={f.name} className={s.flag} title={f.name}>⚑ {f.name}</span>)}
+                    {flagsOn(c.day).map(f => flag(f, f.name))}
                   </div>
                   <div className={s.wcolBody}>
                     {campaignsOn(campsShown, c.day).map(cp => (
@@ -260,7 +287,7 @@ export default function SubsidiaryPage({ board, sub: initial, feed, manage = fal
                   {heads.months.map(m => <div key={`${m.name}${m.left}`} className={s.tlMonth} style={{ left: `${m.left}%` }}>{m.name}</div>)}
                   {heads.weeks.map(w => <div key={w.left} className={`${s.tlWeek}${w.left === 0 ? ` ${s.tlWeekFirst}` : ''}`} style={{ left: `${w.left}%` }}>{w.n}</div>)}
                   {flags.filter(f => f.day >= tw.start && f.day < addDays(tw.start, tw.days)).map(f => (
-                    <div key={f.day + f.name} className={`${s.flag} ${s.tlFlag}`} style={{ left: `${timelineLeft(tw, f.day)}%` }} title={f.name}>⚑ {f.short}</div>
+                    <div key={`${f.id ?? 'hr'}${f.day}${f.name}`} className={s.tlFlag} style={{ left: `${timelineLeft(tw, f.day)}%` }}>{flag(f, f.short)}</div>
                   ))}
                 </div>
                 {tlCamps.length ? (

@@ -91,6 +91,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_minutes_picker',
   // A Marketing subsidiary's page (mig 20261024005000): its projects' newest trail lines — STABLE.
   'mkt_sub_feed',
+  // …and its own key dates (mig 20261025235500) — STABLE.
+  'mkt_key_dates',
   // A Marketing project's formal log (mig 20261024006000): every line of its trail — STABLE.
   'mkt_project_log',
   // Marketing's Library (mig 20261024007000): its folder types, folders, files and Dustbin — STABLE.

@@ -110,6 +110,31 @@
   font-weight: 600; letter-spacing: .02em; white-space: nowrap; overflow: hidden; max-width: 86px; flex: none; box-sizing: border-box;
   clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 50%, 100% 100%, 0 100%); animation: mkIn .2s ease-out;
 }
+/* A subsidiary's own key date (2026-10-25): its flag opens it for whoever may change it. */
+.flagBtn { border: 0; margin: 0; font-family: inherit; line-height: inherit; cursor: pointer; }
+.flagBtn:hover, .flagBtn:focus-visible { opacity: .82; }
+/* Key dates' Edit, beside the switch — and its window: the list, then the form. */
+.keyEditBtn { height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); display: flex; align-items: center; gap: 6px; cursor: pointer; font: inherit; font-size: .9em; color: inherit; white-space: nowrap; }
+.keyEditBtn:hover { background: rgb(var(--mk-surface)); }
+.keyList { display: flex; flex-direction: column; max-height: min(40vh, 320px); overflow-y: auto; border: 1px solid rgb(var(--mk-line-2)); border-radius: 10px; }
+.keyRow { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid rgb(var(--mk-line-4)); min-width: 0; }
+.keyRow:last-child { border-bottom: 0; }
+.keyRowOn { background: rgb(var(--mk-surface)); }
+.keyPast { color: rgb(var(--mk-muted)); }
+.keyPast .flag { opacity: .5; }
+.keyText { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.keyName { font-weight: 500; overflow-wrap: anywhere; }
+.keyWhen { font-size: 12px; color: rgb(var(--mk-muted)); }
+.keyAsk { display: flex; gap: 6px; flex: none; }
+.keyAct { height: 26px; padding: 0 9px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); font: inherit; font-size: .85em; cursor: pointer; color: inherit; white-space: nowrap; }
+.keyAct:hover { background: rgb(var(--mk-surface)); }
+.keyAct:disabled { cursor: default; opacity: .5; }
+.keyDel { color: rgb(var(--mk-red)); border-color: rgb(var(--mk-red-line)); }
+.keyNone { padding: 14px 12px; color: rgb(var(--mk-muted)); font-size: 12.5px; }
+.keyForm { display: flex; flex-direction: column; gap: 10px; }
+.keyGrid { display: grid; grid-template-columns: minmax(0, 170px) minmax(0, 1fr); gap: 10px 12px; align-items: end; }
+.keyCheck { display: flex; align-items: center; gap: 8px; height: 36px; font-size: .94em; cursor: pointer; }
+.keyLeft { margin-right: auto; }
 .item {
   display: flex; align-items: center; gap: 5px; padding: 3px 6px; border-radius: 5px; font-size: .8em; text-decoration: none; min-width: 0;
   border: 1px solid transparent;
@@ -217,4 +242,6 @@ a.tr:hover { background: rgb(var(--mk-surface)); }
   .tr > :nth-child(3), .tr > :nth-child(4) { display: none; }
   .th { display: none; }
   .editGrid { grid-template-columns: minmax(0, 1fr); }
+  .keyGrid { grid-template-columns: minmax(0, 1fr); }
+  .keyRow { flex-wrap: wrap; }
 }
