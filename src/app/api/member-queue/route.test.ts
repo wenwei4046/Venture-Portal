@@ -9,6 +9,7 @@ const answers = vi.hoisted(() => ({
   terms: { data: 3 as number | null, error: null as { code: string } | null },
   purge: { data: null as null, error: null as { code: string } | null },
   runs: { data: 2 as number | null, error: null as { code: string } | null },
+  adsDue: { data: 1 as number | null, error: null as { code: string } | null },
 }))
 vi.mock('@/lib/supabase/admin', () => ({
   adminClient: () => ({
@@ -19,6 +20,7 @@ vi.mock('@/lib/supabase/admin', () => ({
       if (name === 'notify_term_ends') return answers.terms
       if (name === 'mkt_lib_purge') return answers.purge
       if (name === 'mkt_product_runs_due') return answers.runs
+      if (name === 'mkt_ads_due') return answers.adsDue
       return { data: 0, error: null }
     },
   }),
@@ -39,6 +41,7 @@ beforeEach(() => {
   answers.terms = { data: 3, error: null }
   answers.purge = { data: null, error: null }
   answers.runs = { data: 2, error: null }
+  answers.adsDue = { data: 1, error: null }
   process.env.CRON_SECRET = SECRET
 })
 afterEach(() => {
@@ -90,6 +93,20 @@ describe('the hourly sweep', () => {
     answers.runs = { data: null, error: { code: '42883' } }
     expect((await sweep()).status).toBe(200)
     expect(error).toHaveBeenCalledWith('Marketing monthly runs failed', '42883')
+  })
+
+  // ⑤-3d — the user, asked whether an Ads report should tell when a period is due: "can do".
+  it("tells Marketing's Ads reports due before the pushes go; a failure is logged by its code and stops nothing", async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    expect((await sweep()).status).toBe(200)
+    expect(calls.indexOf('mkt_ads_due')).toBeGreaterThan(-1)
+    expect(calls.indexOf('mkt_ads_due')).toBeLessThan(calls.indexOf('flushPush'))
+    expect(info).toHaveBeenCalledWith('Marketing Ads reports due told', 1)
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    answers.adsDue = { data: null, error: { code: '42883' } }
+    expect((await sweep()).status).toBe(200)
+    expect(error).toHaveBeenCalledWith('Marketing Ads reports due failed', '42883')
+    expect(calls).toContain('mkt_lib_purge')
   })
 
   it('answers nobody without the cron secret — nothing is written', async () => {
