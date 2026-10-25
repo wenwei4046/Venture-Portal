@@ -1,5 +1,5 @@
 import { mayActOn, requireActionOn, requirePage } from '@/lib/auth'
-import { readBoard, readProductPicks, readTask } from '@/lib/marketing/server'
+import { readBoard, readNewDraft, readNewDrafts, readProductPicks, readTask } from '@/lib/marketing/server'
 import { newProjectKey, opensFrom } from '@/lib/marketing/task'
 import { builderPeople } from '@/lib/marketing/tasks'
 import NewProject from '@/components/mkt/newproject/NewProject'
@@ -9,15 +9,18 @@ export const dynamic = 'force-dynamic'
 /** New Project — a quick task or a recurring one (Marketing · Create), or a 📦 product project (the manager's); the
  * manager adds Marketing's own clients here too (?add=1 opens the form — the sidebar's + Add subsidiary). Opened from
  * another project (?from=<Track ID> — ④-4c, the user's answer 23): it keeps that one as where it came from, for its
- * subsidiary unless another is picked. */
-export default async function MarketingNewPage({ searchParams }: { searchParams: Promise<{ sub?: string; add?: string; from?: string }> }) {
+ * subsidiary unless another is picked. Kept as a draft while it is typed (mig 20261025211000): the viewer's drafts listed,
+ * one opened by ?draft=<id>. */
+export default async function MarketingNewPage({ searchParams }: { searchParams: Promise<{ sub?: string; add?: string; from?: string; draft?: string }> }) {
   await requirePage('/marketing/new')
   await requireActionOn('/marketing/new', 'marketing', 'create')
   const sp = await searchParams
-  const [board, manages, source] = await Promise.all([
+  const [board, manages, source, drafts, draft] = await Promise.all([
     readBoard(),
     mayActOn('/marketing/new', 'marketing', 'manage'),
     sp.from ? readTask(sp.from) : null,
+    readNewDrafts(),
+    sp.draft ? readNewDraft(sp.draft) : null,
   ])
   // The products on sale, for whoever may start a product project.
   const products = manages ? await readProductPicks() : null
@@ -42,6 +45,8 @@ export default async function MarketingNewPage({ searchParams }: { searchParams:
       canAddSub={manages}
       addFirst={sp.add === '1'}
       from={from ? { id: from.id, trackId: from.trackId, title: from.title } : null}
+      drafts={drafts}
+      draft={draft}
     />
   )
 }

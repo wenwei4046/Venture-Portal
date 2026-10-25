@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { billingFromRow, clientBillFromRow, type BillingPage, type ClientBill } from './billing'
 import { boardFromRow, type MktBoard } from './board'
 import { chatListFromRow, type ChatList } from './chat'
+import { draftsFromRow, openDraftFromRow, type DraftRow, type OpenDraft } from './drafts'
 import { reviewLogFromRow, type ChatReviewLog } from './chat-review'
 import { libraryFromRow, taskFilesFromRow, type Library, type TaskFile } from './library'
 import { mktNoticesFromRow, type MktNotice } from './shell'
@@ -86,6 +87,23 @@ export async function readProductPicks(): Promise<ProductPick[]> {
   const { data, error } = await db.rpc('mkt_product_picker')
   if (error) throw new Error(error.message)
   return productPicksFromRow(data)
+}
+
+/** The viewer's New Project drafts, newest first, without their forms (mig 20261025211000) — Marketing · Create. */
+export async function readNewDrafts(): Promise<DraftRow[]> {
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_new_drafts')
+  if (error) throw new Error(error.message)
+  return draftsFromRow(data)
+}
+
+/** One of the viewer's New Project drafts with its form (?draft=); null when it is not theirs, or not there. */
+export async function readNewDraft(id: string): Promise<OpenDraft | null> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return null
+  const db = await client()
+  const { data, error } = await db.rpc('mkt_new_draft', { p_id: id })
+  if (error) throw new Error(error.message)
+  return openDraftFromRow(data)
 }
 
 /** A product project's page — its product, its minutes, its trail (mig 20261024002000); null when none. */

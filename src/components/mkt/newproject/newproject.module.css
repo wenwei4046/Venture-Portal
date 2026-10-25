@@ -134,3 +134,31 @@
 .amountRm { font-family: var(--mk-mono); font-size: .9em; color: rgb(var(--mk-muted)); }
 .amountInput { width: 180px; font-family: var(--mk-mono); }
 .amountReset { font: inherit; font-size: .86em; color: rgb(var(--mk-muted)); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+/* Kept as a draft while it is typed (mig 20261025211000): where it stands at the crumbs' right, Discard asked first; the
+   viewer's other drafts above what is being started, each to go on with or to discard. */
+.kept { font-size: .86em; color: rgb(var(--mk-muted)); white-space: nowrap; }
+.notKept { font-size: .86em; color: rgb(var(--mk-red)); display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; max-width: 460px; }
+.reload { font: inherit; color: inherit; text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; cursor: pointer; padding: 0; }
+.textBtn { font: inherit; font-size: .86em; font-weight: 500; color: rgb(var(--mk-ink)); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+.textBtn:disabled { opacity: .45; cursor: not-allowed; }
+.ask { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.askYes { height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid rgb(var(--mk-red)); background: rgb(var(--mk-white)); color: rgb(var(--mk-red)); font: inherit; font-size: .86em; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.askNo { height: 28px; padding: 0 10px; border-radius: 7px; border: 0; background: transparent; color: rgb(var(--mk-muted)); font: inherit; font-size: .86em; font-weight: 500; cursor: pointer; }
+.askYes:disabled, .askNo:disabled { opacity: .45; cursor: not-allowed; }
+.drafts { margin-top: 22px; border: 1px solid rgb(var(--mk-line-2)); border-radius: 12px; background: rgb(var(--mk-white)); padding: 6px 0; animation: mkIn .2s ease-out; }
+.draftsHead { padding: 8px 16px 6px; font-size: .75em; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: rgb(var(--mk-muted)); }
+.draft { display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 16px; border-top: 1px solid rgb(var(--mk-line-3)); min-width: 0; }
+.draftIcon { font-size: 16px; line-height: 1; flex: none; }
+.draftText { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1; flex-wrap: wrap; }
+.draftName { font-weight: 600; font-size: .95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; }
+.draftMeta { font-size: .84em; color: rgb(var(--mk-muted)); white-space: nowrap; }
+.draftGo { height: 30px; padding: 0 12px; border-radius: 7px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-ink)); font: inherit; font-size: .88em; font-weight: 600; cursor: pointer; flex: none; }
+.draftGo:hover { border-color: rgb(var(--mk-hover-line)); }
+.draftGo:disabled { opacity: .45; cursor: not-allowed; }
+.draftX { width: 28px; height: 28px; flex: none; border-radius: 50%; border: 0; background: transparent; color: rgb(var(--mk-muted)); font: inherit; font-size: 1.1em; line-height: 1; cursor: pointer; }
+.draftX:hover { background: rgb(var(--mk-surface-2)); color: rgb(var(--mk-ink)); }
+.draftX:disabled { opacity: .45; cursor: not-allowed; }
+@media (max-width: 900px) {
+  .crumbs { flex-wrap: wrap; }
+}
