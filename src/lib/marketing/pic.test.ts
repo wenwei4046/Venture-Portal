@@ -35,7 +35,7 @@ describe('the PIC’s page as it is read', () => {
   it('reads the project and the minutes’ fields — an empty one as nothing, blank table rows dropped', () => {
     const p = page()
     expect([p.sub, p.product, p.track, p.status, p.owner]).toEqual(['Carres', 'Social Media Package A', 'MKT-CAR-2610-001', 'waiting_pic', 'SIA'])
-    expect(p.minutes.fields.map(f => [f.name, f.value])).toEqual([
+    expect(p.minutes?.fields.map(f => [f.name, f.value])).toEqual([
       ['Meeting date', '2026-11-05'],
       ['Attendees', ['SIA', 'Mei']],
       ['Objective', 'Year-end walk-ins'],
@@ -157,6 +157,21 @@ describe('the work on the PIC’s link (②b-2d)', () => {
   })
 })
 
+// 2026-10-25 — ②a-5: a task whose stages the PIC approves on its link, its minutes not theirs (the user's answer 52).
+describe('a task’s link for its stages alone', () => {
+  const p = page({ kind: 'quick', product: '', status: 'active', sentAt: null, minutes: null, work: [
+    { id: 't1', title: 'Raya visual', status: 'active', stages: 2, done: 0, stage: { name: 'Design', status: 'review', ver: 1, waiting: true } },
+  ] })
+  it('no minutes on it — the task started, its work, what waits for them', () => {
+    expect([p.minutes, kindWords(p), picStatus(p.status).label, picBanner(p)]).toEqual([null, 'Quick task', 'In progress', null])
+    expect(picTimeline(p)).toEqual([
+      { label: 'Started', state: 'done', date: '23 Oct', sub: '' },
+      { label: 'The work', state: 'cur', date: '', sub: '0 of 1 done · 1 waiting for you' },
+    ])
+    expect(picAnswered(p)).toBeNull()
+  })
+})
+
 describe('two PICs, each their own link — either one’s answer counts (②b-2d-2a, the user’s answer 29)', () => {
   const kelvin = { decision: 'approved', name: 'Kelvin Tan', reason: '', at: '2026-10-25T02:12:00Z', pic: 1 }
   const asHana = (over: Record<string, unknown>) => page({ you: 2, pic: 'Hana Lee', other: 'Kelvin Tan', ...over })
@@ -228,7 +243,7 @@ describe('an approval that asks both PICs (②b-2d-2b, the user’s answer 29)',
 // 2026-10-24 — ④-2b: a campaign's run period on the PIC's link, in words.
 describe('a campaign period on the link', () => {
   it('reads as its days, once both are picked', () => {
-    const field = (value: unknown) => page({ minutes: { title: 'Kickoff', fields: [{ name: 'Campaign period', type: 'Campaign period', value }] } }).minutes.fields[0].value
+    const field = (value: unknown) => page({ minutes: { title: 'Kickoff', fields: [{ name: 'Campaign period', type: 'Campaign period', value }] } }).minutes?.fields[0].value
     expect(field({ from: '2026-11-09', to: '2026-11-12' })).toBe('9 – 12 Nov 2026')
     expect(field({ from: '2026-11-09', to: null })).toBeNull()
     expect(field(null)).toBeNull()

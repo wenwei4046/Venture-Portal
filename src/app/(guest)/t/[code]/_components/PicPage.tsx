@@ -127,64 +127,67 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
               </div>
             ) : null}
 
-            <section className={s.card} aria-label="Meeting minutes">
-              <div className={s.cardHead}>
-                <span className={s.cardTitle}>{waiting ? 'Needs your approval' : 'Requirements'}</span>
-                <span className={s.grow} />
-                {waiting && page.sentAt ? <span className={s.cardMeta}>Sent {receiptTime(page.sentAt)}</span> : null}
-              </div>
-              <div className={s.minutesTitle}>Meeting minutes · {page.minutes.title}</div>
-              <dl className={s.fields}>
-                {page.minutes.fields.filter(f => f.type !== 'Signature' || f.value !== null).map(f => (
-                  <div key={f.name} className={s.kv}>
-                    <dt className={s.k}>{f.name}</dt>
-                    <Value field={f} />
-                  </div>
-                ))}
-              </dl>
-
-              {both?.mine ? <div className={s.bothMine}>You approved · waiting for {both.other}</div> : null}
-              {waiting && step === 'choose' ? (
-                <div className={s.choose}>
-                  <button type="button" className={`${s.btn} ${s.approve}`} onClick={() => go('approve')}>Approve</button>
-                  <button type="button" className={`${s.btn} ${s.ghost}`} onClick={() => go('changes')}>Request changes</button>
+            {/* A task whose minutes are not theirs (②a-5): its stages alone, above. */}
+            {page.minutes ? (
+              <section className={s.card} aria-label="Meeting minutes">
+                <div className={s.cardHead}>
+                  <span className={s.cardTitle}>{waiting ? 'Needs your approval' : 'Requirements'}</span>
+                  <span className={s.grow} />
+                  {waiting && page.sentAt ? <span className={s.cardMeta}>Sent {receiptTime(page.sentAt)}</span> : null}
                 </div>
-              ) : null}
-              {waiting && step === 'approve' ? (
-                <div className={s.step}>
-                  <div className={s.stepTitle}>You’re approving the minutes</div>
-                  <div className={s.stepText}>This confirms the meeting minutes as they are. Type your full name to sign off.</div>
-                  <input className={s.nameInput} value={name} maxLength={80} placeholder="Full name" aria-label="Full name" autoComplete="name"
-                    onChange={e => setName(e.target.value)} />
-                  {error ? <div className={s.error} role="alert">{error}</div> : null}
-                  <div className={s.stepBtns}>
-                    <button type="button" className={`${s.btn} ${s.ghost} ${s.back}`} disabled={pending} onClick={() => go('choose')}>Back</button>
-                    <button type="button" className={`${s.btn} ${s.approve}`} disabled={pending || !nameOk(name)} onClick={() => send('approve')}>
-                      {pending ? 'Sending…' : 'Confirm approval'}
-                    </button>
+                <div className={s.minutesTitle}>Meeting minutes · {page.minutes.title}</div>
+                <dl className={s.fields}>
+                  {page.minutes.fields.filter(f => f.type !== 'Signature' || f.value !== null).map(f => (
+                    <div key={f.name} className={s.kv}>
+                      <dt className={s.k}>{f.name}</dt>
+                      <Value field={f} />
+                    </div>
+                  ))}
+                </dl>
+  
+                {both?.mine ? <div className={s.bothMine}>You approved · waiting for {both.other}</div> : null}
+                {waiting && step === 'choose' ? (
+                  <div className={s.choose}>
+                    <button type="button" className={`${s.btn} ${s.approve}`} onClick={() => go('approve')}>Approve</button>
+                    <button type="button" className={`${s.btn} ${s.ghost}`} onClick={() => go('changes')}>Request changes</button>
                   </div>
-                </div>
-              ) : null}
-              {waiting && step === 'changes' ? (
-                <div className={s.step}>
-                  <div className={s.stepTitle}>What should change?</div>
-                  <div className={s.stepText}>A reason is required. Be as specific as you can.</div>
-                  <textarea className={`${s.reasonInput}${reason && !reasonOk(reason) ? ` ${s.reasonBad}` : ''}`} value={reason} maxLength={500}
-                    placeholder="e.g. Add Threads, and start the campaign on 5 Nov" aria-label="What should change" onChange={e => setReason(e.target.value)} />
-                  <div className={`${s.hintRow}${reasonOk(reason) ? ` ${s.hintOk}` : ''}`}>
-                    <span>{reasonOk(reason) ? 'Ready to send' : 'Required'}</span>
-                    <span className={s.mono}>{reason.length}/500</span>
+                ) : null}
+                {waiting && step === 'approve' ? (
+                  <div className={s.step}>
+                    <div className={s.stepTitle}>You’re approving the minutes</div>
+                    <div className={s.stepText}>This confirms the meeting minutes as they are. Type your full name to sign off.</div>
+                    <input className={s.nameInput} value={name} maxLength={80} placeholder="Full name" aria-label="Full name" autoComplete="name"
+                      onChange={e => setName(e.target.value)} />
+                    {error ? <div className={s.error} role="alert">{error}</div> : null}
+                    <div className={s.stepBtns}>
+                      <button type="button" className={`${s.btn} ${s.ghost} ${s.back}`} disabled={pending} onClick={() => go('choose')}>Back</button>
+                      <button type="button" className={`${s.btn} ${s.approve}`} disabled={pending || !nameOk(name)} onClick={() => send('approve')}>
+                        {pending ? 'Sending…' : 'Confirm approval'}
+                      </button>
+                    </div>
                   </div>
-                  {error ? <div className={s.error} role="alert">{error}</div> : null}
-                  <div className={s.stepBtns}>
-                    <button type="button" className={`${s.btn} ${s.ghost} ${s.back}`} disabled={pending} onClick={() => go('choose')}>Back</button>
-                    <button type="button" className={`${s.btn} ${s.dark}`} disabled={pending || !reasonOk(reason)} onClick={() => send('changes')}>
-                      {pending ? 'Sending…' : 'Send to the team'}
-                    </button>
+                ) : null}
+                {waiting && step === 'changes' ? (
+                  <div className={s.step}>
+                    <div className={s.stepTitle}>What should change?</div>
+                    <div className={s.stepText}>A reason is required. Be as specific as you can.</div>
+                    <textarea className={`${s.reasonInput}${reason && !reasonOk(reason) ? ` ${s.reasonBad}` : ''}`} value={reason} maxLength={500}
+                      placeholder="e.g. Add Threads, and start the campaign on 5 Nov" aria-label="What should change" onChange={e => setReason(e.target.value)} />
+                    <div className={`${s.hintRow}${reasonOk(reason) ? ` ${s.hintOk}` : ''}`}>
+                      <span>{reasonOk(reason) ? 'Ready to send' : 'Required'}</span>
+                      <span className={s.mono}>{reason.length}/500</span>
+                    </div>
+                    {error ? <div className={s.error} role="alert">{error}</div> : null}
+                    <div className={s.stepBtns}>
+                      <button type="button" className={`${s.btn} ${s.ghost} ${s.back}`} disabled={pending} onClick={() => go('choose')}>Back</button>
+                      <button type="button" className={`${s.btn} ${s.dark}`} disabled={pending || !reasonOk(reason)} onClick={() => send('changes')}>
+                        {pending ? 'Sending…' : 'Send to the team'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : null}
-            </section>
+                ) : null}
+              </section>
+            ) : null}
           </div>
 
           <div className={s.col}>

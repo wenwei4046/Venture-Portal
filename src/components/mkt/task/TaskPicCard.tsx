@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { linkUrl, whatsappUrl, type MinutesEdit } from '@/lib/marketing/project'
 import { picWho } from '@/lib/marketing/task-minutes'
-import { trailTime, type MktTaskPage, type TaskPicMinutes } from '@/lib/marketing/task'
+import { picMessage, picWaiting, trailTime, type MktTaskPage, type TaskPicMinutes } from '@/lib/marketing/task'
 import p from '../project/project.module.css'
 import s from './task.module.css'
 
@@ -54,6 +54,8 @@ export default function TaskPicCard({ page, pm, edit, readOnly, sends, manage, p
   const waiting = pm.status === 'waiting_pic' || pm.status === 'changes'
   const complete = tally.done >= tally.total
   const title = page.project.title
+  // Once the work is under way the PIC approves its stages on the same link (②a-5): the message names the one ready.
+  const stage = picWaiting(page)
   // Each PIC their own link (the user's answer 29), shared with them on WhatsApp.
   const links = [
     { key: 'pic', who: edit.pic.trim(), code: pm.link, whatsapp: edit.whatsapp },
@@ -61,7 +63,8 @@ export default function TaskPicCard({ page, pm, edit, readOnly, sends, manage, p
   ].flatMap(l => {
     if (!l.code || pm.status === 'minutes') return []
     const url = linkUrl(origin, l.code)
-    return [{ ...l, url, wa: whatsappUrl(l.whatsapp, `Hi ${l.who || 'there'}, the minutes of our meeting for ${title} — please review and approve: ${url}`) }]
+    return [{ ...l, url, wa: whatsappUrl(l.whatsapp, stage ? picMessage(l.who, title, url, stage)
+      : `Hi ${l.who || 'there'}, the minutes of our meeting for ${title} — please review and approve: ${url}`) }]
   })
   const halfway = pm.status === 'waiting_pic' && both && pm.ok
     ? pm.ok['1'] && !pm.ok['2'] ? `${pm.ok['1'].name || pm.pic} approved · waiting for ${pm.pic2}`

@@ -84,6 +84,9 @@
 .wbLevelN { font-size: .78em; font-weight: 600; color: rgb(var(--mk-muted)); }
 .wbLevelLock { font-size: 10.5px; color: rgb(var(--mk-muted)); }
 .wbLevelRemove { margin-left: auto; font-size: .8em; color: rgb(var(--mk-muted)); cursor: pointer; background: none; border: 0; font-family: inherit; padding: 0; }
+/* A PIC level with two PICs: either one's approval, or both — the Assignment Plan's toggle (②a-5). */
+.wbBoth { height: 18px; padding: 0 7px; border-radius: 9px; border: 1px solid rgb(var(--mk-line)); background: rgb(var(--mk-white)); color: rgb(var(--mk-text-2)); font: inherit; font-size: 10.5px; font-weight: 600; cursor: pointer; }
+.wbBothOn { background: rgb(var(--mk-ink)); border-color: rgb(var(--mk-ink)); color: rgb(var(--mk-cream)); }
 .wbAddLevel { align-self: flex-start; font-size: .86em; font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; font-family: inherit; color: inherit; padding: 0; }
 .wbSla { display: flex; align-items: center; gap: 10px; }
 .wbStepper { display: flex; align-items: center; border: 1px solid rgb(var(--mk-line)); border-radius: 8px; height: 34px; }

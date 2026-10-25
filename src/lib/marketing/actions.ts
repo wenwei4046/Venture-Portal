@@ -79,6 +79,9 @@ export interface NewTaskInput {
   /** Its meeting minutes instead of what is written (②a-3 — mkt_task_create's p_minutes): { template, vals, notes, sign,
    * pic } — pic { name, whatsapp, name2?, whatsapp2? } when the PIC approves them (②a-4), else null. */
   minutes?: Record<string, unknown> | null
+  /** The PIC a stage's 🔗 level asks, when the minutes do not name them (②a-5 — mkt_task_create's p_pic): { name, whatsapp,
+   * name2?, whatsapp2? }; null for none. */
+  pic?: Record<string, unknown> | null
 }
 
 /** The draft a project was made from, dropped — what fails here leaves it on the list, to discard by hand. */
@@ -132,6 +135,8 @@ export async function createMktTask(input: NewTaskInput): Promise<Done<{ id: str
     return { ok: false, reason: 'Pick the meeting minutes.' }
   }
   if (minutes?.pic != null && (typeof minutes.pic !== 'object' || Array.isArray(minutes.pic))) return { ok: false, reason: 'Name the PIC, or leave the PIC out.' }
+  const pic = input.pic ?? null
+  if (pic !== null && (typeof pic !== 'object' || Array.isArray(pic))) return { ok: false, reason: 'Name the PIC, or leave the PIC out.' }
   const db = await client()
   const { data, error } = await db.rpc('mkt_task_create', {
     p_subsidiary: input.sub,
@@ -143,6 +148,7 @@ export async function createMktTask(input: NewTaskInput): Promise<Done<{ id: str
     p_recur: input.kind === 'recurring' ? input.recur : null,
     ...(input.from ? { p_source: input.from } : {}),
     ...(minutes ? { p_minutes: minutes } : {}),
+    ...(pic ? { p_pic: pic } : {}),
   })
   if (error) return { ok: false, reason: words(error, 'The task could not be created. Please try again.') }
   await dropDraft(db, input.draft)

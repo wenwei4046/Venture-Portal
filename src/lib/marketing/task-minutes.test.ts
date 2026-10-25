@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   minutesPayload, minutesPicksFromRow, minutesProblems, minutesState, minutesTyped, newMinutesDoc, newMinutesFromDraft, NO_MINUTES, NO_PIC, picFor,
-  pickMinutes, picOnSubChange, picWho, type MinutesPick, type NewMinutes,
+  pickMinutes, picNamed, picOnSubChange, picPayload, picProblems, picWho, type MinutesPick, type NewMinutes,
 } from './task-minutes'
 import type { TaskPicMinutes } from './task'
 
@@ -128,6 +128,16 @@ describe('the PIC approving them (②a-4)', () => {
     expect(minutesProblems(INTAKE, { ...m, pic: { ...m.pic, name: 'Kelvin', whatsapp: '012-345 678', name2: 'Hana' } })).toEqual(['Add the second PIC’s WhatsApp'])
     expect(minutesProblems(INTAKE, { ...m, pic: { ...m.pic, name: 'Kelvin', whatsapp: '012-345 678' } })).toEqual([])
     expect(minutesProblems(INTAKE, { ...m, pic: NO_PIC })).toEqual([])
+  })
+
+  // ②a-5 — the same PICs for a stage they approve on the link, whether or not they approve the minutes.
+  it('a stage of theirs: named as the subsidiary names them — unless typed — never switched on for the minutes', () => {
+    expect(picNamed(NO_PIC, DOM)).toEqual({ on: false, name: 'Siti', whatsapp: '019-222 3333', name2: '', whatsapp2: '' })
+    expect(picNamed({ ...NO_PIC, whatsapp: '012-000 0000' }, DOM)).toEqual({ ...NO_PIC, whatsapp: '012-000 0000' })
+    expect(picNamed({ ...NO_PIC, on: true }, CAR)).toMatchObject({ on: true, name: 'Kelvin Tan' })
+    expect(picPayload({ on: false, name: ' Kelvin ', whatsapp: ' 012-345 6789', name2: '', whatsapp2: '013' })).toEqual({ name: 'Kelvin', whatsapp: '012-345 6789' })
+    expect(picProblems({ ...NO_PIC, name: 'Kelvin', whatsapp: '012-345 678', name2: 'Hana' })).toEqual(['Add the second PIC’s WhatsApp'])
+    expect(picProblems(NO_PIC)).toEqual(['Name the PIC', 'Add the PIC’s WhatsApp'])
   })
 
   it('whom it waits for: one PIC, either of two, or both', () => {

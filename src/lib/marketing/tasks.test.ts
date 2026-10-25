@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { formFromRow, missingWork, moveStage, removeStage, stageDates, stageProblems, stagesPayload, starterStages, workFromRow, type DraftStage, type FormField } from './tasks'
+import {
+  formFromRow, isPicLevel, missingWork, moveStage, PIC_BOTH, PIC_LEVEL, picStages, removeStage, stageDates, stageProblems, stagesPayload, starterStages, workFromRow,
+  type DraftStage, type FormField,
+} from './tasks'
 import { defaultRule, periodText, recurDays, recurPreview, ruleFromRow, rulePayload, ruleText, type RecurRule } from './recur'
 
 // The same days and the same needs the database reckons (tests/member-sql/validate-marketing-tasks.mjs holds
@@ -130,5 +133,19 @@ describe('the stage form', () => {
     s[0].sla = 99
     expect(stagesPayload(s)[0]).toEqual({ name: 'First draft', dept: 'SOCIAL MEDIA SPECIALIST', who: 'me', sla: 30, appr: [],
       form: [{ label: 'Canva template link', type: 'Text' }, { label: 'Draft notes', type: 'Text' }], back: null })
+  })
+
+  // 2026-10-25 — ②a-5: 🔗 the PIC via link as a quick stage's level (the user's answer 52).
+  it('🔗 the PIC as a level — either PIC or both — counted at the foot; what they read sent only on a stage of theirs', () => {
+    const s = three()
+    expect([isPicLevel(PIC_LEVEL), isPicLevel(PIC_BOTH), isPicLevel('boss'), picStages(s)]).toEqual([true, true, false, 0])
+    s[0].appr = [PIC_LEVEL]
+    s[0].picText = `  ${'x'.repeat(130)}  `
+    s[1].appr = ['boss', PIC_BOTH]
+    s[2].picText = 'not theirs'
+    expect(picStages(s)).toBe(2)
+    const out = stagesPayload(s)
+    expect([out[0].appr, out[0].picText, out[1].appr, 'picText' in out[1], 'picText' in out[2]]).toEqual([['pic'], 'x'.repeat(120), ['boss', 'pic:all'], false, false])
+    expect(starterStages(ME, 'boss').map(x => x.picText)).toEqual(['', '', ''])
   })
 })

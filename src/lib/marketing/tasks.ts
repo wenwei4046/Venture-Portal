@@ -108,16 +108,28 @@ export interface DraftStage {
   /** The person who does it (People id). */
   who: string | null
   sla: number
-  /** Who approves it, in order (People ids), at most three. */
+  /** Who approves it, in order, at most three: People ids — or 🔗 the PIC on the link (PIC_LEVEL, PIC_BOTH — ②a-5). */
   appr: string[]
   form: FormField[]
   /** The earlier stage changes go back to; null = stay on this stage. */
   back: number | null
+  /** What the PIC reads of it on the link, when they approve it (②a-5 — a template's *What does PIC see on the link?*). */
+  picText: string
 }
 
 export const MAX_STAGES = 20
 export const MAX_APPROVALS = 3
 export const MAX_SLA = 30
+export const MAX_PIC_TEXT = 120
+
+/** 🔗 The PIC on the link as a quick stage's approval level (②a-5, mig 20261025235000 — the user's answer 52: "两个都可以",
+ * the level the handoff's quick builder leaves out): either PIC's approval — or, the task naming two, both PICs'. Kept
+ * among the levels' People ids, which it never is; mkt_task_create takes the same words. */
+export const PIC_LEVEL = 'pic'
+export const PIC_BOTH = 'pic:all'
+export const isPicLevel = (a: string) => a === PIC_LEVEL || a === PIC_BOTH
+/** How many of the stages the PIC approves — the builder's foot, "PIC approves 2×". */
+export const picStages = (stages: readonly Pick<DraftStage, 'appr'>[]) => stages.filter(s => s.appr.some(isPicLevel)).length
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 
@@ -226,18 +238,18 @@ export const stageKey = () => `s${Date.now().toString(36)}${(seq++).toString(36)
  * and with them their groups. */
 export function starterStages(me: { id: string; group: string } | null, approver: string | null): DraftStage[] {
   return [
-    { key: stageKey(), name: 'First draft', dept: me?.group ?? '', who: me?.id ?? null, sla: 1, appr: [], back: null,
+    { key: stageKey(), name: 'First draft', dept: me?.group ?? '', who: me?.id ?? null, sla: 1, appr: [], back: null, picText: '',
       form: [{ label: 'Canva template link', type: 'Text' }, { label: 'Draft notes', type: 'Text' }] },
-    { key: stageKey(), name: 'Redesign', dept: '', who: null, sla: 1, appr: approver ? [approver] : [], back: 0,
+    { key: stageKey(), name: 'Redesign', dept: '', who: null, sla: 1, appr: approver ? [approver] : [], back: 0, picText: '',
       form: [{ label: 'Final artwork', type: 'File' }] },
-    { key: stageKey(), name: 'Publish', dept: '', who: null, sla: 1, appr: [], back: null,
+    { key: stageKey(), name: 'Publish', dept: '', who: null, sla: 1, appr: [], back: null, picText: '',
       form: [{ label: 'Post link', type: 'Text' }, { label: 'Posted on', type: 'Date' }] },
   ]
 }
 
 /** A stage added at the end: nobody yet — and so no group until its person is picked — a day. */
 export function newStage(_after?: DraftStage): DraftStage {
-  return { key: stageKey(), name: 'New stage', dept: '', who: null, sla: 1, appr: [], form: [], back: null }
+  return { key: stageKey(), name: 'New stage', dept: '', who: null, sla: 1, appr: [], form: [], back: null, picText: '' }
 }
 
 /** A stage on a builder: its key on the form and the earlier stage changes go back to. */
@@ -285,17 +297,21 @@ export function stageProblems(stages: readonly DraftStage[]): string[] {
   return out
 }
 
-/** The stages as mkt_task_create takes them. */
+/** The stages as mkt_task_create takes them — what the PIC reads only on a stage they approve. */
 export function stagesPayload(stages: readonly DraftStage[]): Record<string, unknown>[] {
-  return stages.map(s => ({
-    name: s.name.trim(),
-    dept: s.dept,
-    who: s.who,
-    sla: Math.min(MAX_SLA, Math.max(1, Math.trunc(s.sla))),
-    appr: s.appr.slice(0, MAX_APPROVALS),
-    form: s.form.map(f => (f.type === 'Table' ? { label: f.label.trim(), type: f.type, cols: f.cols ?? [] } : { label: f.label.trim(), type: f.type })),
-    back: s.back,
-  }))
+  return stages.map(s => {
+    const picText = s.appr.some(isPicLevel) ? s.picText.trim().slice(0, MAX_PIC_TEXT) : ''
+    return {
+      name: s.name.trim(),
+      dept: s.dept,
+      who: s.who,
+      sla: Math.min(MAX_SLA, Math.max(1, Math.trunc(s.sla))),
+      appr: s.appr.slice(0, MAX_APPROVALS),
+      form: s.form.map(f => (f.type === 'Table' ? { label: f.label.trim(), type: f.type, cols: f.cols ?? [] } : { label: f.label.trim(), type: f.type })),
+      back: s.back,
+      ...(picText ? { picText } : {}),
+    }
+  })
 }
 
 /** "Wei Lun · GRAPHIC DESIGNER · 2 active" — whom the stage's person picker offers: their People title (2026-10-24, the

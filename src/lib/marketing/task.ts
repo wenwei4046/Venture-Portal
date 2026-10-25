@@ -107,6 +107,24 @@ export interface TaskProject extends MktProject {
   source: MktSource | null
   /** Its minutes go to the PIC (②a-4): where that stands; a run's, its series'. */
   picMinutes: TaskPicMinutes | null
+  /** Its stages ask the PIC on the link and its minutes do not (②a-5): the PICs and their links; a run's, its series'. */
+  picLink: TaskPicLink | null
+}
+
+/** A task's links for the stages the PIC approves (②a-5, mig 20261025235000 — the user's answer 52): its PICs, their
+ * WhatsApps, each one's link, made at Create. */
+export interface TaskPicLink {
+  pic: string
+  whatsapp: string
+  pic2: string
+  whatsapp2: string
+  link: string
+  link2: string | null
+}
+
+export function picLinkFromRow(v: unknown): TaskPicLink | null {
+  if (!isObj(v) || !str(v.link)) return null
+  return { pic: str(v.pic), whatsapp: str(v.whatsapp), pic2: str(v.pic2), whatsapp2: str(v.whatsapp2), link: str(v.link), link2: strOrNull(v.link2) }
 }
 
 /** Where the PIC's approval of a task's minutes stands (②a-4, mig 20261025231000 — the user's answers 52, 53): the task's
@@ -247,6 +265,7 @@ export function taskFromRow(v: unknown): MktTaskPage | null {
       posted: Object.fromEntries(Object.entries(isObj(p.posted) ? p.posted : {}).flatMap(([k, x]) => { const m = postedFromRow(x); return m ? [[k, m]] : [] })),
       source: sourceFromRow(p.source),
       picMinutes: picMinutesFromRow(p.picMinutes),
+      picLink: picLinkFromRow(p.picLink),
     },
     stages,
     subtasks: rowsOf(v.subtasks).map(subtaskFromRow),
@@ -348,6 +367,20 @@ export function picApprover(p: { pic: string | null; pic2: string | null }, sub:
   if (ok?.['1'] && !ok['2']) return `${two} (PIC) · ${ok['1'].name || one} approved`
   if (ok?.['2'] && !ok['1']) return `${one} (PIC) · ${ok['2'].name || two} approved`
   return `${one} and ${two} (PIC)`
+}
+
+/** The stage waiting for the PIC now (②a-5): the stage on, in review at a 🔗 level — its name and the version sent. */
+export function picWaiting(page: Pick<MktTaskPage, 'project' | 'stages'>): { name: string; ver: number } | null {
+  const cur = page.stages[page.project.cur]
+  if (!cur || cur.status !== 'review' || page.project.status !== 'active') return null
+  return approverNow(cur)?.kind === 'pic' ? { name: cur.name, ver: cur.ver } : null
+}
+
+/** What the WhatsApp to a PIC says (②a-5): the stage ready for their approval — else, the task to follow on the link. */
+export function picMessage(who: string, title: string, url: string, waiting: { name: string; ver: number } | null): string {
+  const hi = `Hi ${who.trim() || 'there'}`
+  return waiting ? `${hi}, ${waiting.name} (version ${waiting.ver}) of ${title} is ready for your approval: ${url}`
+    : `${hi}, you can follow ${title} and approve its stages on this link: ${url}`
 }
 
 export function taskView(page: MktTaskPage, can: TaskViewer): TaskView {
@@ -685,6 +718,17 @@ export function minutesWords(data: Record<string, unknown> | null | undefined): 
   return ` · ${data.minutes} minutes${typeof data.pic === 'string' && data.pic ? ` for ${data.pic} (PIC) to approve` : ''}`
 }
 
+/** The stages the PIC approves on the link (②a-5): a 'created' record's " · 2 stages for Kelvin Tan (PIC) to approve", ''
+ * for none. */
+export function picStagesWords(data: Record<string, unknown> | null | undefined): string {
+  const p = data?.picStages
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return ''
+  const { n, pic } = p as { n?: unknown; pic?: unknown }
+  const count = typeof n === 'number' && n > 0 ? n : 0
+  if (!count) return ''
+  return ` · ${count} stage${count === 1 ? '' : 's'} for ${typeof pic === 'string' && pic ? pic : 'the PIC'} (PIC) to approve`
+}
+
 /** Opened from another (④-4c — answer 23): a 'created' record's " · from TSK-CAR-2610-004", '' for none. */
 export function fromWords(data: Record<string, unknown> | null | undefined): string {
   return typeof data?.from === 'string' && data.from ? ` · from ${data.from}` : ''
@@ -711,9 +755,9 @@ export function eventText(e: TaskEvent, page: Pick<MktTaskPage, 'project' | 'sta
     case 'created': {
       const kind = e.data?.kind
       const rule = ruleFromRow(e.data?.rule)
-      if (kind === 'recurring') return `${e.actor} created recurring task "${page.project.title}"${rule ? ` · ${ruleText(rule)} · ${periodText(rule)}` : ''}${minutesWords(e.data)}${fromWords(e.data)}`
+      if (kind === 'recurring') return `${e.actor} created recurring task "${page.project.title}"${rule ? ` · ${ruleText(rule)} · ${periodText(rule)}` : ''}${minutesWords(e.data)}${picStagesWords(e.data)}${fromWords(e.data)}`
       const count = Number(e.data?.stages) || page.stages.length
-      return `${e.actor} created quick task "${page.project.title}" · ${count} stage${count === 1 ? '' : 's'}${minutesWords(e.data)}${fromWords(e.data)}`
+      return `${e.actor} created quick task "${page.project.title}" · ${count} stage${count === 1 ? '' : 's'}${minutesWords(e.data)}${picStagesWords(e.data)}${fromWords(e.data)}`
     }
     // A project opened from this one (④-4c — answer 23).
     case 'opened project': return openedProjectText(e.actor, e.data)

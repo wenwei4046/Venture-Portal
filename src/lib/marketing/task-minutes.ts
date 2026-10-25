@@ -20,7 +20,7 @@ export interface MinutesPick {
 }
 
 /** The PIC approving the minutes (②a-4): asked or not, whom, on what WhatsApp — the link goes to them; a second PIC on their
- * own link. */
+ * own link. The same PICs approve a stage on the link (②a-5), whether or not they approve the minutes (`on`). */
 export interface NewPic {
   on: boolean
   name: string
@@ -86,9 +86,15 @@ type SubPics = Pick<MktSub, 'pic' | 'whatsapp' | 'pic2' | 'whatsapp2'>
 const picsOf = (s: SubPics | null) => ({ name: s?.pic ?? '', whatsapp: s?.whatsapp ?? '', name2: s?.pic2 ?? '', whatsapp2: s?.whatsapp2 ?? '' })
 const picTyped = (p: NewPic) => !!(p.name.trim() || p.whatsapp.trim() || p.name2.trim() || p.whatsapp2.trim())
 
+/** The PICs named as the subsidiary names them — unless somebody is typed already: for a stage the PIC approves (②a-5),
+ * whether or not they approve the minutes. */
+export function picNamed(pic: NewPic, sub: SubPics | null): NewPic {
+  return picTyped(pic) ? pic : { ...pic, ...picsOf(sub) }
+}
+
 /** The PIC asked for (②a-4): named as the subsidiary names its PICs — unless somebody is typed already. */
 export function picFor(pic: NewPic, sub: SubPics | null): NewPic {
-  return picTyped(pic) ? { ...pic, on: true } : { ...pic, ...picsOf(sub), on: true }
+  return { ...picNamed(pic, sub), on: true }
 }
 
 /** Another subsidiary picked: its PICs instead — unless the PICs were typed by hand (they differ from the one before's). */
@@ -150,10 +156,22 @@ export function minutesPayload(pick: MinutesPick, m: NewMinutes): Record<string,
     if (!f || f.type === 'Project link' || f.type === 'Signature' || blank(v)) continue
     vals[k] = v
   }
-  const pic = m.pic.on
-    ? { name: m.pic.name.trim(), whatsapp: m.pic.whatsapp.trim(), ...(m.pic.name2.trim() ? { name2: m.pic.name2.trim(), whatsapp2: m.pic.whatsapp2.trim() } : {}) }
-    : null
-  return { template: pick.id, vals, notes: m.notes, sign: m.sign, pic }
+  return { template: pick.id, vals, notes: m.notes, sign: m.sign, pic: m.pic.on ? picPayload(m.pic) : null }
+}
+
+/** The PIC as mkt_task_create takes them — the minutes' (p_minutes.pic), or a stage's they approve (p_pic — ②a-5): a
+ * second PIC only when named. */
+export function picPayload(p: NewPic): Record<string, string> {
+  return { name: p.name.trim(), whatsapp: p.whatsapp.trim(), ...(p.name2.trim() ? { name2: p.name2.trim(), whatsapp2: p.whatsapp2.trim() } : {}) }
+}
+
+/** What a PIC named still needs (as mkt_task_create asks): their name, a WhatsApp the link can go to — a second PIC's too. */
+export function picProblems(p: NewPic): string[] {
+  const out: string[] = []
+  if (!p.name.trim()) out.push('Name the PIC')
+  if (!whatsappOk(p.whatsapp)) out.push('Add the PIC’s WhatsApp')
+  if (p.name2.trim() && !whatsappOk(p.whatsapp2)) out.push('Add the second PIC’s WhatsApp')
+  return out
 }
 
 /** What stops the task being made with them: none picked, a required field empty, the PIC asked but not named or not
@@ -161,10 +179,7 @@ export function minutesPayload(pick: MinutesPick, m: NewMinutes): Record<string,
 export function minutesProblems(pick: MinutesPick | null, m: NewMinutes): string[] {
   if (!pick) return ['Pick the meeting minutes']
   const out = minutesMissing(pick.fields, onlyItsFields(pick, m.vals)).map(n => `${n} is empty`)
-  if (m.pic.on && !m.pic.name.trim()) out.push('Name the PIC')
-  if (m.pic.on && !whatsappOk(m.pic.whatsapp)) out.push('Add the PIC’s WhatsApp')
-  if (m.pic.on && m.pic.name2.trim() && !whatsappOk(m.pic.whatsapp2)) out.push('Add the second PIC’s WhatsApp')
-  return out
+  return m.pic.on ? [...out, ...picProblems(m.pic)] : out
 }
 
 /** "Kelvin (PIC)"; two — "Kelvin or Hana (PIC)", or "Kelvin and Hana (PIC)" when both sign off. */

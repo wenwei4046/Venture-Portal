@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { approvalText, eventText, newFromHref, newProjectKey, opensFrom, ordinal, picApprover, seriesView, taskFromRow, taskView, trailLines } from './task'
+import {
+  approvalText, eventText, newFromHref, newProjectKey, opensFrom, ordinal, picApprover, picMessage, picStagesWords, picWaiting, seriesView, taskFromRow, taskView,
+  trailLines,
+} from './task'
 
 // A task's page as mkt_project answers it (mig 20261023234000) and what each viewer is offered on it — the handoff's
 // New Task Page: the owner Accepts, works and hands it on; the approver approves or sends it back; everybody else sees
@@ -244,6 +247,44 @@ describe('the PIC approving a task’s minutes', () => {
     expect(ev('started before approval', { actor: 'SIA', reason: 'Phone' })).toBe('SIA started before PIC approval: "Phone"')
     expect(ev('work started', { actor: 'Kelvin Tan (PIC)', data: { stages: 2 } })).toBe('The work started · its stages dated from today')
     expect(ev('work started', { actor: 'Kelvin Tan (PIC)', data: { runs: 3 } })).toBe('The work started · 3 runs made from today')
+  })
+})
+
+// 2026-10-25 — ②a-5: a stage the PIC approves on the task's own link (the user's answer 52).
+describe('a stage the PIC approves on the task’s link', () => {
+  const pl = { pic: 'Kelvin Tan', whatsapp: '012-345 6789', pic2: '', whatsapp2: '', link: 'a'.repeat(32), link2: null }
+  it('reads its links — none for a task nobody outside approves, or without a link', () => {
+    expect(taskFromRow(row([stage(0, {})], { picLink: pl }))!.project.picLink).toEqual(pl)
+    expect(taskFromRow(row([stage(0, {})]))!.project.picLink).toBeNull()
+    expect(taskFromRow(row([stage(0, {})], { picLink: { ...pl, link: null } }))!.project.picLink).toBeNull()
+  })
+
+  it('the stage waiting for them now: the one on, in review at the PIC’s level — never a person’s, never one not handed in', () => {
+    const at = (over: Record<string, unknown>, project: Record<string, unknown> = {}) =>
+      picWaiting(taskFromRow(row([stage(0, { status: 'done' }), stage(1, { ver: 2, ...over }), stage(2, {})], project))!)
+    expect(at({ status: 'review', appr: [{ kind: 'pic' }] })).toEqual({ name: 'Redesign', ver: 2 })
+    expect(at({ status: 'review', appr: [{ kind: 'person', staff: RACHEL }, { kind: 'pic' }], apprIdx: 1 })).toEqual({ name: 'Redesign', ver: 2 })
+    expect(at({ status: 'review', appr: [{ kind: 'person', staff: RACHEL }, { kind: 'pic' }] })).toBeNull()
+    expect(at({ status: 'accepted', appr: [{ kind: 'pic' }] })).toBeNull()
+    expect(at({ status: 'review', appr: [{ kind: 'pic' }] }, { status: 'paused' })).toBeNull()
+  })
+
+  it('what the WhatsApp to them says: the stage ready — else the task to follow', () => {
+    expect(picMessage('Kelvin', 'Price update', 'https://x/t/a', { name: 'Redesign', ver: 2 }))
+      .toBe('Hi Kelvin, Redesign (version 2) of Price update is ready for your approval: https://x/t/a')
+    expect(picMessage(' ', 'Price update', 'https://x/t/a', null)).toBe('Hi there, you can follow Price update and approve its stages on this link: https://x/t/a')
+  })
+
+  it('the trail: how many stages the PIC approves', () => {
+    const page = taskFromRow(row([stage(0, {})]))!
+    const ev = (data: Record<string, unknown>) => eventText({ id: 1, at: '', actor: 'Mei', action: 'created', stage: null, stageName: null, fromTo: null,
+      reason: null, version: null, data }, page)
+    expect(ev({ kind: 'quick', stages: 3, picStages: { n: 2, pic: 'Kelvin Tan' } })).toBe('Mei created quick task "Price update" · 3 stages · 2 stages for Kelvin Tan (PIC) to approve')
+    expect(ev({ kind: 'quick', stages: 1, picStages: { n: 1, pic: 'Kelvin Tan' }, from: 'TSK-CAR-2610-004' }))
+      .toBe('Mei created quick task "Price update" · 1 stage · 1 stage for Kelvin Tan (PIC) to approve · from TSK-CAR-2610-004')
+    expect(picStagesWords({ picStages: { n: 0 } })).toBe('')
+    expect(picStagesWords({ picStages: 'Kelvin' })).toBe('')
+    expect(picStagesWords(null)).toBe('')
   })
 })
 

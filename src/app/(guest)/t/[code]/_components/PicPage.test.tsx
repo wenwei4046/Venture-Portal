@@ -226,3 +226,23 @@ describe('an approval asking both PICs (②b-2d-2b, the user’s answer 29)', ()
     expect(within(screen.getByLabelText('Image post 1/2')).getByRole('button', { name: 'Approve' })).toBeTruthy()
   })
 })
+
+// 2026-10-25 — ②a-5: a task whose stages the PIC approves on its link, its minutes not theirs (the user's answer 52).
+describe('a task’s link for its stages alone', () => {
+  const task = () => page({ kind: 'quick', product: '', title: 'Raya visual', track: 'TSK-CAR-2610-007', status: 'active', sentAt: null, minutes: null,
+    work: [{ id: 't1', title: 'Raya visual', status: 'active', stages: 2, done: 0,
+      stage: { idx: 0, name: 'Design', status: 'review', ver: 1, waiting: true, note: 'Check the logo size', fields: [], links: [] }, last: null }] })
+
+  it('no minutes card: the stage waiting for them, its answer — the task started, its work', () => {
+    render(<PicPage code={CODE} initial={task()} />)
+    expect(screen.getByText('Carres · Quick task')).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Meeting minutes' })).toBeNull()
+    const item = screen.getByLabelText('Raya visual', { selector: 'div' })
+    expect(within(item).getByText('Design · version 1')).toBeTruthy()
+    expect(within(item).getByRole('button', { name: 'Approve' })).toBeTruthy()
+    const progress = screen.getByRole('region', { name: 'Progress' })
+    expect(progress.textContent).toContain('Started')
+    expect(progress.textContent).toContain('0 of 1 done · 1 waiting for you')
+    expect(progress.textContent).not.toContain('Minutes')
+  })
+})
