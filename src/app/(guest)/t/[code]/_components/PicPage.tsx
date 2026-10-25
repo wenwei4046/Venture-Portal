@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { EVERY_WORDS, reportCards, reportRange } from '@/lib/marketing/ads'
+import { EVERY_WORDS, picReportPdfUrl, reportCards, reportRange } from '@/lib/marketing/ads'
 import { ACCEPT_HOURS, workingHours } from '@/lib/marketing/board'
 import { answerPic } from '@/lib/marketing/pic-actions'
 import {
@@ -205,6 +205,7 @@ export default function PicPage({ code, initial }: { code: string; initial: Page
                     <div className={s.repHead}>
                       <span className={s.repTitle}>Report #{r.no}</span>
                       <span className={s.repRange}>{reportRange(r)}</span>
+                      <a className={s.repPdf} href={picReportPdfUrl(code, r.no)} aria-label={`Report #${r.no} as a PDF`}>PDF</a>
                     </div>
                     <div className={s.repFigs}>
                       {reportCards(r, page.ads?.figures ?? []).map(c => (

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   adsCard, adsEventText, adsPageFromRow, adsPatch, adsPatchOf, adsPeriod, adsPeriods, adsRows, adsValues, adsValuesOf, choicesFromRow,
-  draftOf, draftProblems, figureText, lastChoices, metaSum, NO_TARGETS, reportCards, reportDay, reportDays, reportRange, setupFromRow, targetOf,
-  typedValues, valueText, type AdsSetup,
+  adsPdfName, adsReportPdfUrl, draftOf, draftProblems, figureText, lastChoices, metaSum, NO_TARGETS, picReportPdfUrl, publishedWords, reportCards,
+  reportDay, reportDays, reportRange, setupFromRow, targetOf, typedValues, valueText, type AdsSetup,
 } from './ads'
 
 // 2026-10-25 — a project's Ads report (the user's answer 57: from the CRM's Ads Performance; each Ads project picks its
@@ -183,6 +183,27 @@ describe('publishing a period', () => {
     expect(kept.cpl).toBe(Math.round((kept.spend! / 12) * 100) / 100)
     expect(kept.cpmsg).toBe(Math.round((kept.spend! / 10) * 100) / 100)
     expect(figures.map(k => figureText(k, kept[k]))).toEqual(['RM 517', 'RM 517', 'RM 43.06', 'RM 51.67'])
+  })
+})
+
+describe('its PDF (⑤-3e)', () => {
+  it('reads the project it is on, for the document’s head — none when not said', () => {
+    expect(adsPageFromRow({ today: '2026-11-03', project: { track: 'TSK-CAR-2610-001', title: 'Raya ads', sub: 'Carres' } }).project)
+      .toEqual({ track: 'TSK-CAR-2610-001', title: 'Raya ads', sub: 'Carres' })
+    expect([adsPageFromRow({ today: '2026-11-03' }).project, adsPageFromRow({ project: { title: 'x' } }).project]).toEqual([null, null])
+  })
+
+  it('is read from the project’s page, or from the PIC’s link; its file named by the Track ID', () => {
+    expect(adsReportPdfUrl('7d3e0c1a-2b4f-4a6e-9c8d-1f2e3d4c5b6a', 2)).toBe('/marketing/projects/7d3e0c1a-2b4f-4a6e-9c8d-1f2e3d4c5b6a/ads?no=2')
+    expect(picReportPdfUrl('0123456789abcdef0123456789abcdef', 1)).toBe('/t/0123456789abcdef0123456789abcdef/r/1')
+    expect([adsPdfName('TSK-CAR-2610-001', 2), adsPdfName('', 1), adsPdfName('MKT-CAR-2610-002/"x"', 3)])
+      .toEqual(['TSK-CAR-2610-001_ads-report-2', 'ads_ads-report-1', 'MKT-CAR-2610-002x_ads-report-3'])
+  })
+
+  it('says the office’s day it was published', () => {
+    // 17:30 UTC on 31 Oct is already 1 Nov in Kuala Lumpur.
+    expect([publishedWords('2026-11-03T02:00:00Z'), publishedWords('2026-10-31T17:30:00Z'), publishedWords(null), publishedWords('soon')])
+      .toEqual(['3 Nov 2026', '1 Nov 2026', '', ''])
   })
 })
 
