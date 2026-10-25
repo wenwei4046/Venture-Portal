@@ -6,8 +6,8 @@ import type { InvoicePageData } from '@/app/(portal)/invoices/[id]/_lib/invoice-
 
 // Daily › Invoice in the Finance phone app (2026-10-15, M10–M11): the hub's
 // stacked cards under the month pill, a list with Select — one payer's issued
-// invoices ticked, the dark bar settles them — the credit notes, projects and
-// non-billable lines, and an invoice: the drawer's parts and what the full page
+// invoices ticked, the dark bar settles them — the credit notes, Marketing's
+// billing lines and non-billable lines, and an invoice: the drawer's parts and what the full page
 // adds (its trail, its audit log), with the drawer's own steps.
 
 const mocks = vi.hoisted(() => ({
@@ -49,7 +49,12 @@ vi.mock('@/app/(portal)/statements/_components/ChangeAccountDialog', () => ({ de
 vi.mock('@/app/(portal)/statements/_components/SettleDialog', () => ({
   default: ({ invoices }: { invoices: Array<{ no: string | null }> }) => (invoices.length > 0 ? <div data-testid="settle">{invoices.map((i) => i.no).join(',')}</div> : null),
 }))
-vi.mock('@/app/(portal)/statements/_components/GenerateDialogs', () => ({ MarketingDialog: () => null, PayrollInvoicesDialog: () => null, ReconcileDialog: () => null, OwnShareDialog: () => null }))
+vi.mock('@/app/(portal)/statements/_components/GenerateDialogs', () => ({
+  MarketingDialog: ({ open, period }: { open: boolean; period: string }) => (open ? <div data-testid="import-marketing">{period}</div> : null),
+  PayrollInvoicesDialog: () => null,
+  ReconcileDialog: () => null,
+  OwnShareDialog: () => null,
+}))
 vi.mock('@/components/department/DepartmentModeSwitch', () => ({ default: () => <div data-testid="mode-switch" /> }))
 // The voucher page's work, as the app's sheets (part E4b).
 vi.mock('@/app/(portal)/payments/create-actions', () => ({ openInvoiceSettle: mocks.openSettle, openInvoiceRefund: mocks.openRefund, openCreatePayment: vi.fn(() => new Promise(() => {})) }))
@@ -124,7 +129,17 @@ const HUB: InvoiceHubData = {
   ],
   otherOpen: [],
   creditNotes: [CN],
-  contracts: [{ id: 'ct1', description: 'Marketing retainer — Q4', amount: 6000, status: 'active', start: '2026-10-01', end: '2026-12-31', company: 'HOUZS Century (HC)', companyId: 'co-hc', invoice: null }],
+  marketing: {
+    month: '2026-10-01',
+    locked: false,
+    lines: [
+      { bill: 'b1', project: 'p1', track: 'PRJ-HC-2610-001', title: 'Retainer', words: "Social Media - Oct'26", amount: 2000, sub: { id: 's-hc', code: 'HC', name: 'HOUZS Century' },
+        party: { kind: 'subsidiary', id: 'co-hc', name: 'HOUZS Century', code: 'HC' }, account: { code: '5017', name: 'Social Media' }, invoice: { id: 'hc2', no: 'HV-INV-202610-0009', status: 'issued' } },
+      { bill: 'b2', project: 'p2', track: 'PRJ-REDT-2610-001', title: 'Post pack', words: "Post pack - Oct'26", amount: 500, sub: { id: 's-rt', code: 'REDT', name: 'Red Truck' },
+        party: { kind: 'client', id: 's-rt', name: 'Red Truck Sdn Bhd', code: 'REDT' }, account: null, invoice: null },
+    ],
+    typed: [],
+  },
   nonBillable: [{ id: 'vp1', at: '2026-10-06T02:00:00Z', type: 'expense_out', amount: 2899.75, description: 'AI tools Sep26 claim', source: 'Payment voucher', out: true }],
   banks: [{ id: 'b1', label: 'Hong Leong Bank — 123-456-7890' }],
   basis: { status: 'Pending', note: 'HR pending', summary: 'Nothing from payroll yet', lines: [], director: null, allocation: [] },
@@ -255,31 +270,28 @@ describe('Daily › Invoice on the phone', () => {
     expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument()
   })
 
-  it('a project without this month’s invoice says how to raise one', () => {
+  it('Marketing billing: a line on an invoice opens it; one on none says how to import it', async () => {
     window.history.replaceState(null, '', '/fin-app/daily/invoices?f=mkt')
     draw('f=mkt')
-    fireEvent.click(screen.getByRole('button', { name: 'Invoice' }))
-    expect(mocks.flash).toHaveBeenCalledWith('No invoice for this project in October 2026 yet — Create invoice ▾ › Generate Marketing invoices raises them.')
+    expect(screen.getAllByText('Marketing billing').length).toBeGreaterThan(0)
+    expect(screen.getByText('HOUZS Century · PRJ-HC-2610-001 · 5017')).toBeInTheDocument()
+    expect(screen.getByText('issued')).toBeInTheDocument()
+    expect(screen.getByText('to import')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ New contract' })).toBeNull()
+    const [onIt, notYet] = screen.getAllByRole('button', { name: 'Invoice' })
+    fireEvent.click(notYet)
+    expect(mocks.flash).toHaveBeenCalledWith('Not on an invoice yet — Create invoice ▾ › Import Marketing billing puts it on its draft.')
+    await act(async () => {
+      fireEvent.click(onIt)
+    })
+    expect(window.location.search).toBe('?id=hc2&from=mkt')
   })
 
-  it('a project is edited in the app’s sheet, sending only what changed; + New contract opens it empty', async () => {
-    mocks.updateContract.mockResolvedValue({ ok: true })
+  it('Marketing billing: Import · n opens the import window on the hub’s month', () => {
     window.history.replaceState(null, '', '/fin-app/daily/invoices?f=mkt')
     draw('f=mkt')
-    fireEvent.click(screen.getByRole('button', { name: /Marketing retainer — Q4/ }))
-    const sheet = await screen.findByRole('dialog', { name: /Edit contract/ })
-    expect(within(sheet).getByLabelText('Contract amount RM')).toHaveValue('6000.00')
-    fireEvent.change(within(sheet).getByLabelText('Contract amount RM'), { target: { value: '6500' } })
-    await act(async () => {
-      fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }))
-    })
-    const fd = mocks.updateContract.mock.calls[0][0] as FormData
-    expect(Object.fromEntries(fd.entries())).toEqual({ id: 'ct1', amount: '6500' })
-    expect(mocks.flash).toHaveBeenCalledWith('Contract saved')
-    expect(mocks.push).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '+ New contract' }))
-    const fresh = await screen.findByRole('dialog', { name: /New marketing contract/ })
-    expect(within(fresh).getByLabelText('Subsidiary')).toHaveValue('')
+    fireEvent.click(screen.getByRole('button', { name: 'Import · 1' }))
+    expect(screen.getByTestId('import-marketing')).toHaveTextContent('2026-10-01')
   })
 
   it('+ Add non-billable expense opens Create payment in the app, on the Venture Pool', () => {

@@ -2,6 +2,7 @@ import { billingModeLabel, invoiceParty } from '@/lib/invoice-labels'
 import { payeeKey } from '@/lib/invoice-settlement'
 import type { AccountType } from '@/lib/coa'
 import type { DepartmentMode } from '@/lib/department-mode'
+import type { MarketingLines } from './marketing-lines'
 
 // Invoice's hub (2026-10-14, the Finance revamp v2 — D10 of `.design/fin-r2/handoff`):
 // what the page hands the browser, and how it is put together from the rows
@@ -100,7 +101,6 @@ export interface HubInvoice {
   settleable: boolean
   /** Voided as it stands: issued, nothing received, no credit note. */
   voidable: boolean
-  contractId: string | null
   edit: InvoiceEditInitial
   /** Its stored lines as the edit dialog takes them (none for a simple invoice). */
   editLines: Array<{ description: string | null; amount: number; category_code: string | null }>
@@ -118,22 +118,6 @@ export interface HubCreditNote {
   /** "5020 · Salary Income". */
   category: string | null
   createdAt: string | null
-}
-
-export interface HubContract {
-  id: string
-  description: string
-  amount: number | null
-  /** active · completed · … ; an active one not yet signed off reads *pending approval*. */
-  status: string
-  start: string | null
-  end: string | null
-  /** "HOUZS Century (HC)". */
-  company: string
-  /** The company it is with — its Edit starts from it. */
-  companyId: string
-  /** Its invoice this month (the Generate Marketing invoices draft). */
-  invoice: { id: string; no: string | null } | null
 }
 
 export interface HubMovement {
@@ -190,7 +174,8 @@ export interface InvoiceHubData {
   /** Other months' invoices still owed (issued), for one receipt across months. */
   otherOpen: HubInvoice[]
   creditNotes: HubCreditNote[]
-  contracts: HubContract[]
+  /** Marketing's billing for the month (2026-10-26, ②b-2h): the lines its manager confirmed, to import or imported. */
+  marketing: MarketingLines
   nonBillable: HubMovement[]
   /** "Hong Leong Bank — 123-456-7890", the primary first. */
   banks: Array<{ id: string; label: string }>
@@ -332,7 +317,6 @@ export function toHubInvoice(inv: InvoiceRowIn, ctx: InvoiceContext, other = fal
     creditNotes,
     settleable: status === 'issued' && inv.billable_to_type !== 'dept_pool',
     voidable: status === 'issued' && directReceived <= 0 && credited <= 0,
-    contractId: inv.contract_id ?? null,
     edit: {
       total_amount: total,
       category_code: inv.category_code,

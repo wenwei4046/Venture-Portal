@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   amountLocked, billEditOf, billingFromRow, billingTotals, billMissing, billOf, billPartyLines, billPatch, billProblems, canStop,
-  clientBillFromRow, clientLines, confirmable, EMPTY_ADDR, lineWhen, monthKey, monthLabel, monthParam, projectBillFromRow, projectBillWords,
+  clientBillFromRow, clientLines, confirmable, EMPTY_ADDR, invoiceWords, lineWhen, monthKey, monthLabel, monthParam, projectBillFromRow, projectBillWords,
   shiftMonth,
 } from './billing'
 
@@ -35,11 +35,21 @@ describe('the month’s billing as the page reads it', () => {
   it('reads mkt_billing: its lines, their clients, the months still open — nothing else', () => {
     expect([page.month, page.now, page.lines.length, page.open]).toEqual(['2026-10-01', '2026-10-01', 3, [{ month: '2026-09-01', due: 2 }]])
     expect(page.lines[1]).toMatchObject({ kind: 'recurring', amount: 2800, from: '2026-08-01', bill: null })
-    expect(page.lines[0].bill).toEqual({ id: 'b1', amount: 500, words: "Post pack - Oct'26", by: 'Sia', at: '2026-10-24T03:00:00Z' })
+    expect(page.lines[0].bill).toEqual({ id: 'b1', amount: 500, words: "Post pack - Oct'26", by: 'Sia', at: '2026-10-24T03:00:00Z', invoice: null })
     expect(page.subs[0].bill).toBeNull()
     expect(page.subs[2].bill).toEqual({ name: null, address: null, phone: null, email: null })
     expect(billingFromRow(null)).toBeNull()
     expect(billingFromRow({ month: 'October' })).toBeNull()
+  })
+
+  // ②b-2h (2026-10-26): a confirmed line Finance imported says the invoice it is on (none once voided — the database's).
+  it('a confirmed line on Finance’s invoice says which, in words', () => {
+    const on = billingFromRow({ ...row, lines: [{ ...row.lines[0], bill: { ...row.lines[0].bill, invoice: { no: 'HV-INV-202610-0040', status: 'draft' } } }] })!
+    expect(on.lines[0].bill!.invoice).toEqual({ no: 'HV-INV-202610-0040', status: 'draft' })
+    expect(invoiceWords(on.lines[0].bill!.invoice!)).toBe('On HV-INV-202610-0040 · Draft')
+    expect(invoiceWords({ no: 'HV-INV-202610-0040', status: 'paid_via_netting' })).toBe('On HV-INV-202610-0040 · Paid via netting')
+    const odd = billingFromRow({ ...row, lines: [{ ...row.lines[0], bill: { ...row.lines[0].bill, invoice: { status: 'draft' } } }] })!
+    expect(odd.lines[0].bill!.invoice).toBeNull()
   })
 
   it('by client, each with what is still to confirm and what is confirmed — a client with nothing billed left out', () => {

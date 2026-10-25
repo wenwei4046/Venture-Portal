@@ -471,6 +471,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Billing (mig 20261025121000), all Marketing · Manage: the month's lines read, confirmed and withdrawn; a product
   // project's amount changed, a recurring one stopped; an outside client's billing details read for its page.
   'mkt_billing', 'mkt_bill_confirm', 'mkt_bill_withdraw', 'mkt_project_bill_set', 'mkt_product_stop', 'mkt_client_bill',
+  // Finance imports them (mig 20261026023000): a product's revenue account set by Marketing · Manage; the month's
+  // confirmed lines read by Billing · View or Create, imported onto drafts by Billing · Create (the invoice page's box).
+  'mkt_product_account', 'mkt_bill_import_preview', 'mkt_bill_import',
   // A recurring product's months (mig 20261025131000): its run day moved by Marketing · Manage; the months due made by the
   // hourly sweep (the service role) as by every Marketing write; paused and resumed by Marketing · Manage (mig 20261025181000).
   'mkt_product_run_day', 'mkt_product_runs_due', 'mkt_product_pause',

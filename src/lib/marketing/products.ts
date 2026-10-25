@@ -2,7 +2,8 @@
 // to the subsidiaries — what each includes (actions in categories, a quantity and a unit price each, a workflow each),
 // its intake minutes template, its list price and internal cost, the day a version takes effect, its versions. What the
 // list and the editor show, the five sections' ticks, the margin, what publishing refuses (as mkt_product_publish
-// does), and only what changed, for the save. Prices and costs are the manager's alone. Pure.
+// does), and only what changed, for the save. Prices and costs are the manager's alone. Its revenue account (2026-10-26,
+// ②b-2h — Finance's chart, set once; the import posts its lines there) is set at once, never a new version. Pure.
 
 export type ProductKind = 'one' | 'recurring'
 export type ProductStatus = 'draft' | 'active' | 'retired'
@@ -41,6 +42,8 @@ export interface Product {
   intake: string | null
   price: number | null
   cost: number | null
+  /** The revenue account its billing posts to (Finance's chart) — none until the manager picks one. */
+  account: string | null
   effectiveFrom: string | null
   status: ProductStatus
   retiredOn: string | null
@@ -71,10 +74,17 @@ export interface ProductMinutesOption {
   fields: number
 }
 
+/** A revenue account a product may post to: Finance's, under 5030 Service Management Charge. */
+export interface ProductAccount {
+  code: string
+  name: string
+}
+
 export interface ProductBook {
   products: Product[]
   workflows: ProductWorkflowOption[]
   minutes: ProductMinutesOption[]
+  accounts: ProductAccount[]
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -113,6 +123,7 @@ export function productBookFromRow(v: unknown): ProductBook {
     intake: strOrNull(p.intake),
     price: money(p.price),
     cost: money(p.cost),
+    account: strOrNull(p.account),
     effectiveFrom: strOrNull(p.effectiveFrom),
     status: p.status === 'active' || p.status === 'retired' ? p.status : 'draft',
     retiredOn: strOrNull(p.retiredOn),
@@ -128,7 +139,14 @@ export function productBookFromRow(v: unknown): ProductBook {
   const minutes = (Array.isArray(r.minutes) ? r.minutes : []).filter(isObj).map(t => ({
     id: str(t.id), name: str(t.name), version: int(t.version) ?? 0, fields: int(t.fields) ?? 0,
   }))
-  return { products, workflows, minutes }
+  const accounts = (Array.isArray(r.accounts) ? r.accounts : []).filter(isObj).map(a => ({ code: str(a.code), name: str(a.name) })).filter(a => a.code)
+  return { products, workflows, minutes, accounts }
+}
+
+/** "5019 · Design Income"; an account Finance no longer offers, its code and that. */
+export function accountLabel(code: string, accounts: readonly ProductAccount[]): string {
+  const a = accounts.find(x => x.code === code)
+  return a ? `${a.code} · ${a.name}` : `${code} · no longer on Finance's list`
 }
 
 /** "4 image posts + 2 videos" — what a product includes, as the database writes it in a version's note. */

@@ -1,8 +1,10 @@
 // Billing drafts, Marketing's side (②b-2b, mig 20261025121000 — the user's answers 43–48, 50, 51): each product project
 // carries the manager's amount (a quote, typed when it is made); a one-time project is billed the month it is done, a
 // recurring one every month from the month its work starts until the manager stops it; the manager confirms a month's
-// lines, Finance imports them (not built — the user asks Chew first). An outside client's billing details are
-// Marketing's; a group company is billed as Finance keeps it. Pure: the pages draw what this says.
+// lines, Finance imports them onto its invoice drafts (②b-2h, mig 20261026023000 — the user's "A"): a line on an invoice
+// Finance has (not voided) says which, and is withdrawn only once Finance deletes the draft or voids it. An outside
+// client's billing details are Marketing's; a group company is billed as Finance keeps it. Pure: the pages draw what this
+// says.
 
 import dayjs from 'dayjs'
 import { addressFromParts, addressLines, cleanAddress, isEmptyAddress, sameAddress, type Address } from '@/lib/address/address'
@@ -35,8 +37,14 @@ export interface BillLine {
   until: string | null
   /** The project's amount now — null while none is set. */
   amount: number | null
-  /** Confirmed for the month: the amount and words kept, who and when. */
-  bill: { id: string; amount: number; words: string; by: string; at: string } | null
+  /** Confirmed for the month: the amount and words kept, who and when — and the invoice Finance put it on, unless voided. */
+  bill: { id: string; amount: number; words: string; by: string; at: string; invoice: BillInvoice | null } | null
+}
+
+/** The invoice Finance imported a line onto: its number and its state (draft · issued · paid · paid_via_netting). */
+export interface BillInvoice {
+  no: string
+  status: string
 }
 
 export interface BillClient {
@@ -95,6 +103,14 @@ export function projectBillFromRow(v: unknown): ProjectBill | null {
   return { amount: num(v.amount), from: month(v.from), until: month(v.until), confirmed: Math.max(0, num(v.confirmed) ?? 0), last: month(v.last) }
 }
 
+function invoiceFromRow(v: unknown): BillInvoice | null {
+  if (!isObj(v) || !str(v.no)) return null
+  return { no: str(v.no), status: str(v.status) || 'draft' }
+}
+
+/** "On HV-INV-202610-0004 · Draft" — the line's invoice, as Billing says it. */
+export const invoiceWords = (i: BillInvoice) => `On ${i.no} · ${i.status === 'paid_via_netting' ? 'Paid via netting' : i.status.charAt(0).toUpperCase() + i.status.slice(1)}`
+
 function lineFromRow(l: Record<string, unknown>): BillLine {
   const b = isObj(l.bill) ? l.bill : null
   return {
@@ -109,7 +125,7 @@ function lineFromRow(l: Record<string, unknown>): BillLine {
     from: month(l.from),
     until: month(l.until),
     amount: num(l.amount),
-    bill: b ? { id: str(b.id), amount: num(b.amount) ?? 0, words: str(b.words), by: str(b.by), at: str(b.at) } : null,
+    bill: b ? { id: str(b.id), amount: num(b.amount) ?? 0, words: str(b.words), by: str(b.by), at: str(b.at), invoice: invoiceFromRow(b.invoice) } : null,
   }
 }
 
