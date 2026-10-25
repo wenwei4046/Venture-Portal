@@ -40,7 +40,8 @@ const s = StyleSheet.create({
   metaVal: { flex: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -5 },
   cell: { width: '50%', paddingHorizontal: 5, paddingBottom: 10 },
-  card: { backgroundColor: SOFT, borderRadius: 6, paddingVertical: 10, paddingHorizontal: 12 },
+  // As tall as the other in its row.
+  card: { flexGrow: 1, backgroundColor: SOFT, borderRadius: 6, paddingVertical: 10, paddingHorizontal: 12 },
   label: { fontSize: 9, color: MUTED },
   value: { fontFamily: 'Helvetica-Bold', fontSize: 17, marginTop: 3 },
   vs: { fontSize: 8.5, marginTop: 2 },
