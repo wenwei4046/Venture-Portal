@@ -112,6 +112,21 @@
 .workLast { font-size: 12px; color: rgb(var(--pk-text-2)); overflow-wrap: anywhere; }
 
 .progress { padding: 14px 16px 6px; }
+/* Its Ads reports (⑤-3b): the handoff's *Reports · Every 2 weeks* — each its period and its figures, two a row. */
+.repEvery { font-size: 12px; color: rgb(var(--pk-muted)); }
+.rep { padding: 14px 16px; border-top: 1px solid rgb(var(--pk-line-3)); display: flex; flex-direction: column; gap: 10px; }
+.cardHead + .rep { border-top: 0; }
+.repHead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.repTitle { font-weight: 600; }
+.repRange { font-size: 12px; color: rgb(var(--pk-muted)); }
+.repFigs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.repFig { padding: 10px 12px; border-radius: 8px; background: rgb(var(--pk-soft)); min-width: 0; }
+.repLabel { font-size: 11.5px; color: rgb(var(--pk-muted)); }
+.repValue { font-size: 17px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.repSub { font-size: 11.5px; margin-top: 1px; color: rgb(var(--pk-muted)); }
+.repGood { color: rgb(var(--pk-done)); }
+.repBad { color: rgb(var(--pk-red)); }
+.repNote { font-size: 13px; color: rgb(var(--pk-text-2)); white-space: pre-wrap; overflow-wrap: anywhere; }
 .progressHead { margin-bottom: 12px; }
 .tl { display: flex; gap: 12px; }
 .tlRail { display: flex; flex-direction: column; align-items: center; width: 20px; flex: none; }

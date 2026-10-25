@@ -246,3 +246,40 @@ describe('a task’s link for its stages alone', () => {
     expect(progress.textContent).not.toContain('Minutes')
   })
 })
+
+// 2026-10-25 — ⑤-3b: the Ads reports the Ads person published (the user's answer 57), on the PIC's link — the handoff's
+// *Reports · Every 2 weeks*, each its period and its figures against the targets it was published with.
+describe('its Ads reports', () => {
+  const ads = {
+    every: '2w', figures: ['spendToDate', 'cpl', 'appt', 'roas'],
+    reports: [
+      { no: 2, from: '2026-10-20', until: '2026-11-02', values: { roas: 3.2, spendToDate: 3240, cpl: 18.4, appt: 46, apptRate: 26 },
+        targets: { budget: 6000, cpl: 20, roas: 3, apptRate: 25 }, note: 'Google ads added by hand', at: '2026-11-03T02:00:00Z' },
+      { no: 1, from: '2026-10-06', until: '2026-10-19', values: { spendToDate: 1410, cpl: 22.1, appt: 17, roas: 2.7 },
+        targets: { budget: 6000, cpl: 20, roas: 3, apptRate: 25 }, note: null, at: '2026-10-20T02:00:00Z' },
+    ],
+  }
+
+  it('reads each, the newest first — its figures in the setup’s order, each against its target', () => {
+    render(<PicPage code={CODE} initial={page({ status: 'active', ads })} />)
+    const card = screen.getByRole('region', { name: 'Reports' })
+    expect(within(card).getByText('Every 2 weeks')).toBeTruthy()
+    const reports = [...card.querySelectorAll('[class*="repHead"]')].map(h => h.textContent)
+    expect(reports).toEqual(['Report #220 Oct – 2 Nov', 'Report #16 – 19 Oct'])
+    const first = card.querySelectorAll('[class*="repFigs"]')[0] as HTMLElement
+    expect([...first.querySelectorAll('[class*="repLabel"]')].map(l => l.textContent)).toEqual(['Spend so far', 'Cost per lead', 'Appointments', 'ROAS', 'Appointment rate'])
+    expect(within(first).getByText('RM 3,240')).toBeTruthy()
+    expect(within(first).getByText('of RM 6,000 budget')).toBeTruthy()
+    expect(within(first).getByText('Target RM 20 · on target').className).toMatch(/repGood/)
+    expect(within(card).getByText('Min 3.0 · below').className).toMatch(/repBad/)
+    expect(within(card).getByText('Google ads added by hand')).toBeTruthy()
+  })
+
+  it('none published, or no Ads report: no Reports card', () => {
+    const { unmount } = render(<PicPage code={CODE} initial={page({ status: 'active', ads: { ...ads, reports: [] } })} />)
+    expect(screen.queryByRole('region', { name: 'Reports' })).toBeNull()
+    unmount()
+    render(<PicPage code={CODE} initial={page({ status: 'active' })} />)
+    expect(screen.queryByRole('region', { name: 'Reports' })).toBeNull()
+  })
+})

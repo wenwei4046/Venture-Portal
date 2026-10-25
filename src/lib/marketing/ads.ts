@@ -216,6 +216,12 @@ export function adsCard(key: AdsKey, values: AdsValues, targets: AdsTargets): Ad
   }
 }
 
+/** A published report's cards, in its setup's order (a figure since taken off the setup last). */
+export function reportCards(r: Pick<AdsReport, 'values' | 'targets'>, figures: readonly string[]): AdsCard[] {
+  const at = (k: string) => (figures.indexOf(k) < 0 ? 99 : figures.indexOf(k))
+  return (Object.keys(r.values) as AdsKey[]).filter(isAdsKey).sort((a, b) => at(a) - at(b)).map(k => adsCard(k, r.values, r.targets))
+}
+
 // ── What is kept: the setup, a report ────────────────────────────────────────────────────────────────────────────
 
 export interface AdsSetup {
