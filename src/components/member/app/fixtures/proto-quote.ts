@@ -115,7 +115,8 @@ const DEMO_CHARGES: FrameChoices = {
 };
 const DEMO_SOFA: QSofaChoices = {
   legs: [{ value: '4"', charge: 80 }, { value: '6"', charge: 100 }],
-  specials: [{ value: "Wooden Arm", charge: 120 }, { value: "Seat Add 1ft", charge: 150 }],
+  // Not in the prototype: one charged by quantity (2026-10-26).
+  specials: [{ value: "Wooden Arm", charge: 120 }, { value: "Seat Add 1ft", charge: 150 }, { value: "Change 8030 Backcushion", charge: 200, byQuantity: true }],
 };
 
 function catalog(brand: { code: string; name: string; sofa: boolean }, charges = false): QCatalog {
@@ -211,7 +212,7 @@ function openSheet(name: string | undefined): SheetState | null {
     fx: name === "mattress-frame" ? { size: "K", frame: "linden", kpi: ["protector"], qty: 1, drop: false, idx: -1 } : null,
   });
   switch (name) {
-    case "sofa": return { mode: "sofa", key: "verona", layout: "R1", mods: { "2A-LHF": 1, CNR: 1, "2A-RHF": 1 }, qty: 1, kpi: ["protector"], height: null, tier: null, leg: null, specials: [], acc: {}, accAll: false };
+    case "sofa": return { mode: "sofa", key: "verona", layout: "R1", mods: { "2A-LHF": 1, CNR: 1, "2A-RHF": 1 }, qty: 1, kpi: ["protector"], height: null, tier: null, leg: null, specials: [], specialQty: {}, acc: {}, accAll: false };
     case "mattress": return mattress(2);
     case "mattress-frame": return mattress(1);
     case "frame": return { mode: "frame", size: "Q", frame: "linden", kpi: ["protector", "pillowset"], qty: 2, drop: false };

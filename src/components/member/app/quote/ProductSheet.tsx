@@ -8,7 +8,7 @@ import { valueKey } from "@/lib/catalogue/keys";
 import { ICON, Svg } from "../icons";
 import { rm } from "../format";
 import {
-  SIZES, accAt, accOnlyTitle, accOrder, accVariants, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText,
+  MAX_QTY, SIZES, accAt, accOnlyTitle, accOrder, accVariants, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText,
   type BfPick, type CartLine, type QCatalog, type QuoteMemory, type RecentFrame, type SheetState, type SizeKey, type SofaBuild,
 } from "./quote-model";
 import s from "./quote.module.css";
@@ -297,10 +297,11 @@ function FrameOptions({ rows, specials, build, start, onBuild }: {
   );
 }
 
-/** Specials as chips that wrap their words, each with what Maintenance charges for it. */
-function SpecialChips({ specials, picked, onToggle }: {
+/** Specials as chips that wrap their words, each with what Maintenance charges for it (` per sofa` when `per` says so). */
+function SpecialChips({ specials, picked, per = "", onToggle }: {
   specials: OptionCharge[];
   picked: string[];
+  per?: string;
   onToggle: (sp: string) => void;
 }) {
   return (
@@ -310,8 +311,54 @@ function SpecialChips({ specials, picked, onToggle }: {
         return (
           <button key={o.value} className={`${s.chip} ${s.chipWords} ${on ? s.chipOn : ""}`} aria-pressed={on} onClick={() => onToggle(o.value)}>
             <span className={s.chipLabel}>{o.value}</span>
-            <span className={s.chipSub}>+ {rm(o.charge)}</span>
+            <span className={s.chipSub}>+ {rm(o.charge)}{per}</span>
           </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * A sofa's specials: one charged once per sofa is a chip (2026-10-06); one Maintenance charges
+ * BY QUANTITY is a row with − / + (2026-10-26, the user: "所以它需要在 quotation 那边的
+ * quantity 可以放 plus 和 minus"), its count for the whole cart, 0 = not chosen.
+ */
+function SofaSpecials({ n, pick, specialQty, onPatch }: {
+  n: number;
+  pick: ReturnType<typeof sofaPick>;
+  specialQty: Record<string, number> | undefined;
+  onPatch: (p: Partial<SheetState>) => void;
+}) {
+  const perSofa = pick.specials.filter(o => !o.byQuantity);
+  const counted = pick.specials.filter(o => o.byQuantity);
+  const toggle = (sp: string) => onPatch({ specials: pick.picked.includes(sp) ? pick.picked.filter(x => x !== sp) : [...pick.picked, sp] });
+  const setQty = (value: string, q: number) => {
+    const rest = pick.picked.filter(x => valueKey(x) !== valueKey(value));
+    const others = Object.fromEntries(Object.entries(specialQty ?? {}).filter(([sp]) => valueKey(sp) !== valueKey(value)));
+    onPatch(q > 0 ? { specials: [...rest, value], specialQty: { ...others, [value]: q } } : { specials: rest, specialQty: others });
+  };
+  return (
+    <div>
+      <div className={s.rowHead}>
+        <p className={s.rowHeadTitle}>{n} · Specials</p>
+        <span className={s.rowHeadCap}>{counted.length ? "Not in margin" : "Once per sofa · not in margin"}</span>
+      </div>
+      {perSofa.length > 0 && <SpecialChips specials={perSofa} picked={pick.picked} per={counted.length ? " per sofa" : ""} onToggle={toggle} />}
+      {counted.map(o => {
+        const q = pick.picked.includes(o.value) ? pick.qty[o.value] ?? 1 : 0;
+        return (
+          <div key={o.value} className={s.accRow} role="group" aria-label={o.value}>
+            <div className={s.accText}>
+              <span className={s.accName}>{o.value}</span>
+              <span className={s.accSize}>+ {rm(o.charge)} each</span>
+            </div>
+            <div className={`${s.accStep} ${q ? s.accStepOn : ""}`}>
+              <button className={s.accBtn} aria-label="Remove one" onClick={() => q && setQty(o.value, q - 1)}>−</button>
+              <span className={s.accQty}>{q}</span>
+              <button className={s.accBtn} aria-label="Add one" onClick={() => setQty(o.value, Math.min(MAX_QTY, q + 1))}>+</button>
+            </div>
+          </div>
         );
       })}
     </div>
@@ -561,13 +608,7 @@ function SofaSections({ sheet, catalog, memory, pick, hasKpi, onPatch }: {
           </div>
         </div>
       )}
-      {pick.specials.length > 0 && (
-        <div>
-          <div className={s.rowHead}><p className={s.rowHeadTitle}>{++n} · Specials</p><span className={s.rowHeadCap}>Once per sofa · not in margin</span></div>
-          <SpecialChips specials={pick.specials} picked={pick.picked}
-            onToggle={sp => onPatch({ specials: pick.picked.includes(sp) ? pick.picked.filter(x => x !== sp) : [...pick.picked, sp] })} />
-        </div>
-      )}
+      {pick.specials.length > 0 && <SofaSpecials n={++n} pick={pick} specialQty={sheet.specialQty} onPatch={onPatch} />}
       {/* SKU Master's Sofa Accessory (2026-10-26), per set — what *Sofa accessories only* sells, beside the sofa. */}
       {catalog.accs.length > 0 && (
         <AccSection title={`${++n} · Accessories`} catalog={catalog} memory={memory} picked={sheet.acc} all={sheet.accAll}

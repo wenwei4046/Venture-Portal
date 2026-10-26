@@ -122,6 +122,54 @@ describe("option charges", () => {
     expect(r.optionCharge).toBe(0);
   });
 
+  // 2026-10-26 (user): "比如 change 8030 back cushion，一个沙发可能有三个 compartment（三个 seat），所以这个东西应该要乘三" —
+  // a special Maintenance charges BY QUANTITY is its price each, times the quantity set, once for the cart.
+  describe("a special charged by quantity", () => {
+    const counted = () => pricing({
+      options: [...pricing().options, { pool: "sofa_specials", value: "Change 8030 Backcushion", price: 200 }],
+      models: [{
+        id: "soffio", kind: "SOFA",
+        options: { leg_heights: ["Default", '4"'], specials: ["Nylon Fabric", "Change 8030 Backcushion"] },
+        charges: { specials: [{ value: "Nylon Fabric", charge: 50 }, { value: "Change 8030 Backcushion", charge: 200, byQuantity: true }] },
+      }, pricing().models[1]],
+    });
+
+    it("charges each times the quantity — three back cushions, RM 600 — beside what is charged once per sofa", () => {
+      const r = calculateQuote(quote([one("a"), one("b")], {
+        ...sofa, leg: '4"', specials: ["Nylon Fabric", "Change 8030 Backcushion"], specialQty: { "Change 8030 Backcushion": 3 },
+      }), products, bands, undefined, counted());
+      expect(r.valid).toBe(true);
+      expect(r.margin).toBeCloseTo(margin(1000 + 1500), 10);
+      expect(r.optionCharge).toBe(30 + 50 + 3 * 200);
+      expect(r.optionCharges).toEqual([
+        { label: '8030 SOFFIO · leg 4" · Nylon Fabric', qty: 1, amount: 80 },
+        { label: "Change 8030 Backcushion", qty: 3, amount: 600 },
+      ]);
+      expect(r.customerPays).toBe(5680);
+    });
+
+    it("counts it once for the cart, however many sofas; one picked with no quantity counts 1", () => {
+      const two = calculateQuote(quote([one("a", 2)], { ...sofa, specials: ["Change 8030 Backcushion"], specialQty: { "Change 8030 Backcushion": 5 } }),
+        products, bands, undefined, counted());
+      expect(two.optionCharges).toEqual([{ label: "Change 8030 Backcushion", qty: 5, amount: 1000 }]);
+      const none = calculateQuote(quote([one("a")], { ...sofa, specials: ["Change 8030 Backcushion"] }), products, bands, undefined, counted());
+      expect(none.optionCharge).toBe(200);
+    });
+
+    it("refuses a quantity for a special the build does not have", () => {
+      const r = calculateQuote(quote([one("a")], { ...sofa, specials: ["Nylon Fabric"], specialQty: { "Change 8030 Backcushion": 2 } }),
+        products, bands, undefined, counted());
+      expect(r.valid).toBe(false);
+      expect(r.error).toMatch(/quantity no longer matches/);
+    });
+
+    it("says the quantity on the customer's quote", () => {
+      const input = quote([one("a")], { ...sofa, specials: ["Change 8030 Backcushion", "Nylon Fabric"], specialQty: { "Change 8030 Backcushion": 3 } });
+      const r = calculateQuote(input, products, bands, undefined, counted());
+      expect(customerQuote(input, products, r)).toContain("Sofa build: seat height 30 · Tier 2 fabric · Change 8030 Backcushion ×3, Nylon Fabric");
+    });
+  });
+
   // 2026-10-05: a bed frame's divan is CHARGED to the customer; since 2026-10-06 its special too.
   it("charges a bed frame's divan and special on top of the price, out of the margin", () => {
     const r = calculateQuote(

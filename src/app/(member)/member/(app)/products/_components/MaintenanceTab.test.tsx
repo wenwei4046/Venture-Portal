@@ -10,7 +10,7 @@ import MaintenanceTab from './MaintenanceTab'
 
 function option(overrides: Partial<MaintenanceOption> = {}): MaintenanceOption {
   return { pool: 'bedframe_divan_heights', value: '24"', label: '24 inch', sortOrder: 0,
-    active: true, removed: false, isNew: false, price: 80, ...overrides }
+    active: true, removed: false, isNew: false, price: 80, byQuantity: false, ...overrides }
 }
 function fabric(overrides: Partial<FabricRow> = {}): FabricRow {
   return { erpId: 'fabric-a', code: 'FAB-A', description: 'Fine fabric', series: 'Linen', category: 'Imported',
@@ -268,6 +268,43 @@ describe('Maintenance workspace', () => {
     expect(screen.getByText('FAB-DEFAULT')).toBeInTheDocument()
     expect(screen.queryByText('FAB-SHARED')).not.toBeInTheDocument()
     expect(screen.queryByText('FAB-OVERRIDE')).not.toBeInTheDocument()
+  })
+
+  // 2026-10-26, the user: "在 sofa special 这里的 maintenance，我要它能够选择两种：一种是整 set 沙发的 … 另一种是 by quantity 的".
+  it('says how a sofa special is charged — Full set or By quantity — and saves the choice with its price', async () => {
+    const specials = [
+      option({ pool: 'sofa_specials', value: 'Change 8030 Backcushion', label: 'Change 8030 Backcushion', price: 200, byQuantity: true }),
+      option({ pool: 'sofa_specials', value: 'Seat Base Fully Cover', label: 'Seat Base Fully Cover', sortOrder: 1, price: 300 }),
+      option({ pool: 'sofa_specials', value: 'Nylon Fabric', label: 'Nylon Fabric', sortOrder: 2, price: null }),
+    ]
+    render(<MaintenanceTab options={[...options, ...specials]} fabrics={[]} />)
+    click('Sofa')
+    click('Specials')
+    expect(screen.getByRole('columnheader', { name: 'CHARGED' })).toBeInTheDocument()
+    const charged = () => within(screen.getByRole('table')).getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell')[3].textContent)
+    expect(charged()).toEqual(['By quantity', 'Full set', '—'])
+    expect(screen.getByText(/Full set: once per sofa; By quantity: each, times the quantity the member sets/)).toBeInTheDocument()
+    // A bed frame's specials are charged per frame: no such column there.
+    click('Bedframe')
+    click('Specials')
+    expect(screen.queryByRole('columnheader', { name: 'CHARGED' })).not.toBeInTheDocument()
+
+    click('Sofa')
+    click('Specials')
+    click('Edit charges')
+    // No price, nothing to choose.
+    expect(screen.getByRole('combobox', { name: 'Nylon Fabric charged' })).toBeDisabled()
+    select('Seat Base Fully Cover charged', 'qty')
+    changePrice('Change 8030 Backcushion charge', '180')
+    click('Save 2 prices')
+    await waitFor(() => expect(saveOptionPrices).toHaveBeenCalledTimes(1))
+    // Each sent whole: a typed price keeps how it is charged, a choice keeps its price.
+    expect(saveOptionPrices).toHaveBeenCalledWith('sofa_specials', [
+      { value: 'Seat Base Fully Cover', price: '300', byQuantity: true },
+      { value: 'Change 8030 Backcushion', price: '180', byQuantity: true },
+    ])
+    await saveSettled()
+    expect(charged()).toEqual(['By quantity', 'By quantity', '—'])
   })
 
   it('makes every fabric reachable past the former 400-row cutoff and searches the full list', () => {

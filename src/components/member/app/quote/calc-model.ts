@@ -124,6 +124,7 @@ function sofaQuoteBuild(build: SofaBuild): QuoteBuild | undefined {
   if (build.height && build.tier) { out.height = build.height; out.tier = build.tier; }
   if (build.leg) out.leg = build.leg;
   if (build.specials.length) out.specials = [...build.specials];
+  if (Object.keys(build.specialQty ?? {}).length) out.specialQty = { ...build.specialQty };
   return Object.keys(out).length ? out : undefined;
 }
 

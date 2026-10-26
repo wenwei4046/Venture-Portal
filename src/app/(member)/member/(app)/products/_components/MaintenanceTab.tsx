@@ -2,22 +2,25 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { validateOptionPrices } from '@/lib/catalogue/edits'
+import { BY_QUANTITY_POOL, validateOptionPrices } from '@/lib/catalogue/edits'
 import { MAINTENANCE_SECTIONS } from '@/lib/catalogue/options'
 import { saveOptionPrices } from '../actions'
 import type { FabricRow, MaintenanceOption } from '../load'
 import PageScrolledTable from './PageScrolledTable'
 import { useProductDraftGuard } from './ProductWorkspace'
 import {
-  ActionRow, CellChip, CellInput, Chip, ChipRow, Controls, EditButton, EditingButtons, FilterPanel, Heading, money,
+  ActionRow, CellChip, CellInput, CellSelect, Chip, ChipRow, Controls, EditButton, EditingButtons, FilterPanel, Heading, money,
   Notice, Note, plural, SearchField, SelectField, SubChipRow, TableFoot,
 } from './ui'
 import c from './products.module.css'
 
 const FABRICS = 'fabrics'
 const PAGE_SIZE = 300
-type Drafts = Map<string, Map<string, string>>
-type Prices = Map<string, Map<string, number | null>>
+/** An option's unsaved change: its price as typed, and — a sofa special's — how it is charged. */
+type Draft = { price?: string; byQuantity?: boolean }
+type Drafts = Map<string, Map<string, Draft>>
+type Prices = Map<string, Map<string, { price: number | null; byQuantity: boolean }>>
+const CHARGED_OPTIONS = [['set', 'Full set'], ['qty', 'By quantity']] as const
 
 const TIER_OPTIONS = [['', 'All tiers'], ['PRICE_1', 'P1'], ['PRICE_2', 'P2'], ['PRICE_3', 'P3'], ['unassigned', 'Unassigned category']] as const
 
@@ -80,12 +83,12 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
     setLimit(PAGE_SIZE)
   }
 
-  function touch(value: string, price: string) {
+  function touch(value: string, change: Draft) {
     if (saveInFlight.current) return
     setDrafts(previous => {
       const next = new Map(previous)
       const values = new Map(next.get(pool))
-      values.set(value, price)
+      values.set(value, { ...values.get(value), ...change })
       next.set(pool, values)
       return next
     })
@@ -102,13 +105,23 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
   function save() {
     if (saveInFlight.current || dirty === 0) return
     // Validate the entire batch first, before any pool can be written.
-    let pending: Array<{ pool: string; edits: Array<{ value: string; price: string }>; prices: Map<string, number | null> }>
+    let pending: Array<{ pool: string; edits: Array<{ value: string; price: string; byQuantity?: boolean }>; prices: Map<string, { price: number | null; byQuantity: boolean }> }>
     try {
       pending = [...drafts].map(([poolKey, values]) => {
-        const edits = [...values].map(([value, price]) => ({ value, price }))
+        // An option sent whole: a price typed keeps how it is charged, a choice of how keeps its price.
+        const edits = [...values].map(([value, d]) => {
+          const held = options.find(o => o.pool === poolKey && o.value === value)
+          const was = held ? optionPrice(held) : { price: null, byQuantity: false }
+          return {
+            value,
+            price: d.price ?? (was.price === null ? '' : String(was.price)),
+            ...(poolKey === BY_QUANTITY_POOL ? { byQuantity: d.byQuantity ?? was.byQuantity } : {}),
+          }
+        })
         const validated = validateOptionPrices(poolKey, edits)
-        const prices = new Map<string, number | null>(validated.upserts.map(row => [row.value, row.price]))
-        for (const value of validated.clears) prices.set(value, null)
+        const prices = new Map<string, { price: number | null; byQuantity: boolean }>(
+          validated.upserts.map(row => [row.value, { price: row.price, byQuantity: row.by_quantity === true }]))
+        for (const value of validated.clears) prices.set(value, { price: null, byQuantity: false })
         return { pool: poolKey, edits, prices }
       })
     } catch (e) {
@@ -147,10 +160,12 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
     })
   }
 
-  function optionPrice(option: MaintenanceOption) {
+  /** The option's price and how it is charged — a confirmed save's while the refresh catches up. */
+  function optionPrice(option: MaintenanceOption): { price: number | null; byQuantity: boolean } {
     const confirmed = savedPrices.source === options ? savedPrices.values.get(option.pool) : undefined
-    return confirmed?.has(option.value) ? confirmed.get(option.value)! : option.price
+    return confirmed?.get(option.value) ?? { price: option.price, byQuantity: option.byQuantity }
   }
+  const counted = pool === BY_QUANTITY_POOL
 
   const note = fabricView
     ? 'Sofa and Bedframe mappings override the shared ERP tier independently. With neither mapping nor shared tier, P2 is used.'
@@ -243,12 +258,16 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
                 <th scope="col" className={c.th} data-first="" style={{ minWidth: 150 }}>OPTION VALUE</th>
                 <th scope="col" className={c.th} style={{ minWidth: 260 }}>DESCRIPTION</th>
                 {meta?.priced ? <th scope="col" className={c.th} data-num="" style={{ minWidth: 150 }}>{meta.charge ? 'CHARGE (RM)' : 'SURCHARGE (RM)'}</th> : null}
+                {/* A sofa special's charge: once per sofa, or each times the Quote's quantity (2026-10-26). */}
+                {counted ? <th scope="col" className={c.th} style={{ minWidth: 150 }}>CHARGED</th> : null}
                 <th scope="col" className={c.th} style={{ minWidth: 120 }}>STATUS</th>
               </tr></thead>
               <tbody>
                 {rows.slice(0, limit).map((o, i) => {
-                  const price = optionPrice(o)
+                  const { price, byQuantity } = optionPrice(o)
                   const draft = drafts.get(pool)?.get(o.value)
+                  const typed = draft?.price ?? (price === null ? '' : String(price))
+                  const mode = draft?.byQuantity ?? byQuantity
                   return (
                     <tr key={o.value} className={c.row} data-stripe={i % 2 === 1 || undefined} data-dim={!o.active || undefined}>
                       <td className={c.td} data-first="">{o.value}</td>
@@ -256,18 +275,27 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
                       {meta?.priced ? (
                         <td className={`${c.td} ${editing ? c.inputCell : ''}`} data-num="">
                           {editing ? (
-                            <CellInput value={draft ?? (price === null ? '' : String(price))} onChange={v => touch(o.value, v)} edited={draft !== undefined}
+                            <CellInput value={typed} onChange={v => touch(o.value, { price: v })} edited={draft?.price !== undefined}
                               disabled={saving} label={`${o.label} charge`} />
                           ) : price === null ? (
                             <span className={`${c.muted} ${c.strong}`} title={FOC_POOLS.has(pool) ? 'No charge keyed — FOC' : 'No charge keyed — not offered on the Quote'}>{FOC_POOLS.has(pool) ? 'FOC' : '—'}</span>
                           ) : <span className={c.strong}>{money(price)}</span>}
                         </td>
                       ) : null}
+                      {counted ? (
+                        <td className={`${c.td} ${editing ? c.inputCell : ''}`}>
+                          {editing ? (
+                            // How it is charged needs a charge to go with: no price, nothing to choose.
+                            <CellSelect value={mode ? 'qty' : 'set'} options={CHARGED_OPTIONS} onChange={v => touch(o.value, { byQuantity: v === 'qty' })}
+                              edited={draft?.byQuantity !== undefined} disabled={saving || typed.trim() === ''} label={`${o.label} charged`} />
+                          ) : price === null ? <span className={c.muted}>—</span> : mode ? 'By quantity' : 'Full set'}
+                        </td>
+                      ) : null}
                       <td className={c.td}>{statusLabel(o)}{o.isNew ? <CellChip>NEW</CellChip> : null}</td>
                     </tr>
                   )
                 })}
-                {count === 0 ? <tr><td colSpan={meta?.priced ? 4 : 3} className={c.empty}>No options match these filters.</td></tr> : null}
+                {count === 0 ? <tr><td colSpan={(meta?.priced ? 4 : 3) + (counted ? 1 : 0)} className={c.empty}>No options match these filters.</td></tr> : null}
               </tbody>
             </table>
           )}

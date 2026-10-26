@@ -6,6 +6,7 @@ import {
   buildLines,
   kindOf,
   pruneBuild,
+  specialQtyOf,
 } from "./build";
 import type { MemberCatalogueModel, MemberProduct } from "./types";
 
@@ -155,5 +156,29 @@ describe("the build's identity and wording", () => {
   it("says nothing about a build the cart does not have or that chose nothing", () => {
     expect(buildLines({ height: "30", tier: "PRICE_2" }, { sofaGrid: false, sofa: false, bedframe: false })).toEqual([]);
     expect(buildLines({}, { sofaGrid: false, sofa: true, bedframe: true })).toEqual([]);
+  });
+});
+
+// 2026-10-26: a sofa special charged by quantity carries how many.
+describe("a special's quantity", () => {
+  it("reads it by the special's spelling, 1 when it has none", () => {
+    expect(specialQtyOf({ specialQty: { "Change 8030 Backcushion": 3 } }, "change  8030 backcushion")).toBe(3);
+    expect(specialQtyOf({ specialQty: { Back: 0 } }, "Back")).toBe(1);
+    expect(specialQtyOf(undefined, "Back")).toBe(1);
+  });
+
+  it("is part of the build's identity — a build with none keys as it always has", () => {
+    expect(buildKey({ specials: ["Back"], specialQty: { Back: 3 } })).not.toEqual(buildKey({ specials: ["Back"], specialQty: { Back: 2 } }));
+    expect(buildKey({ specials: ["Back"], specialQty: {} })).toEqual(buildKey({ specials: ["Back"] }));
+    expect(buildKey({ specials: ["Back"] })).toHaveLength(9);
+  });
+
+  it("is said on the customer's quote, and goes with its special", () => {
+    expect(buildLines({ specials: ["Change 8030 Backcushion", "Nylon Fabric"], specialQty: { "Change 8030 Backcushion": 3 } },
+      { sofaGrid: false, sofa: true, bedframe: false })).toEqual(["Sofa build: Change 8030 Backcushion ×3, Nylon Fabric"]);
+    const choices = buildChoicesFor([product("b", "SOFA", "roma")], models);
+    expect(pruneBuild({ specials: ["Nylon Fabric", "Pillow Back"], specialQty: { "Pillow Back": 2, "Nylon Fabric": 4 } }, choices))
+      .toEqual({ specials: ["Nylon Fabric"], specialQty: { "Nylon Fabric": 4 } });
+    expect(buildError({ specials: ["Nylon Fabric"], specialQty: { "Pillow Back": 2 } }, choices)).toMatch(/quantity no longer matches/);
   });
 });
