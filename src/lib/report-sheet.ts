@@ -15,8 +15,10 @@ export interface SheetTxn {
   /** The journal entry's number (empty when it has none) — Ref. 1. */
   ref: string
   date: string
-  /** Description · party. */
+  /** What the line was (lib/line-words). */
   text: string
+  /** Who it was with — shown first, in bold (2026-10-26, the user: "先名字再到 description", "名字变粗体"). */
+  party: string | null
   value: number
   /** 2026-10-24 (the user's drill-down, "我想要这样的概念"): the line's debit and credit, the entry's other side,
    *  the source document's number (Ref. 2). */
@@ -26,13 +28,17 @@ export interface SheetTxn {
   ref2: string | null
 }
 
+/** Where a month-by-month row's lines are filed in a read of them (2026-10-26): its account and, on the cash, its side. */
+export const drillRowKey = (code: string, side: 'in' | 'out' | null): string => `${side ?? 'pnl'}:${code}`
+
 /** A row's journal lines as the drill-down lists them. */
 export function sheetTxnsOf(rowKey: string, txns: GlTxn[]): SheetTxn[] {
   return txns.map((t, i) => ({
     key: `${rowKey}:t${i}`,
     ref: t.entryNo ?? '',
     date: t.date,
-    text: [t.description, t.party].filter(Boolean).join(' · '),
+    text: t.description,
+    party: t.party,
     value: t.amount,
     debit: t.debit,
     credit: t.credit,

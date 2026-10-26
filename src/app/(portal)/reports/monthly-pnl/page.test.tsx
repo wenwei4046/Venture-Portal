@@ -130,7 +130,7 @@ describe('the Monthly P&L, company-wide', () => {
     render(await page({ segment: 'marketing' }))
     fireEvent.click(screen.getByRole('button', { name: /4000 Service fees/ }))
     expect(mocks.openReportRow).toHaveBeenCalledWith('monthly-pnl', {
-      report: 'pnl', segment: 'marketing', from: '2026-07', to: '2026-10', code: '4000', side: null,
+      report: 'pnl', segment: 'marketing', from: '2026-07', to: '2026-10', rows: [{ code: '4000', side: null }],
     })
   })
 

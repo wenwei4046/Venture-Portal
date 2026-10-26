@@ -124,10 +124,12 @@ describe('the levels', () => {
   })
 })
 
-// 2026-10-24 — the user's drill-down ("我想要这样的概念", then "照样稿做，Monthly 用 A"): an account opens on its
-// whole row onto a ledger of its lines; month by month, onto its months first, read when it opens.
+// 2026-10-24 — the user's drill-down ("我想要这样的概念"): a single month's account opens on its whole row onto a
+// ledger of its lines. 2026-10-26 — the mockup's fifth round ("点开看 detail 可以那个 amount 在那个月份下面吗？… 然后加多一个
+// L4"): a month-by-month account opens onto its lines as rows of the sheet, newest first, each figure under its own
+// month; L4 opens every account in one read.
 const txn = (key: string, date: string, debit: number, credit: number, ref: string, more: Partial<SheetTxn> = {}): SheetTxn => ({
-  key, ref, date, text: 'Claude AI Claim · Tan Yong Hong', value: debit - credit, debit, credit,
+  key, ref, date, text: 'Claude AI Claim', party: 'Tan Yong Hong', value: debit - credit, debit, credit,
   otherSide: '3000 · Cash & Bank - Hong Leong', ref2: 'HV-PV-202610-0520', ...more,
 })
 const cellsOf = (tr: HTMLElement) => within(tr).getAllByRole('cell').map((td) => td.textContent)
@@ -136,7 +138,7 @@ describe('a single month’s drill-down', () => {
   const single: SheetRow[] = [
     {
       key: '4100', label: '4100 Interest income', code: '4100', kind: 'account', depth: 1, values: [10, 4],
-      txns: [txn('4100:t0', '2026-10-05', 0, 10, 'HV-JV-202610-0012', { text: 'Loan interest · HOUZS Century', ref2: null })],
+      txns: [txn('4100:t0', '2026-10-05', 0, 10, 'HV-JV-202610-0012', { text: 'Loan interest', party: 'HOUZS Century', ref2: null })],
     },
   ]
   const draw1 = (rows: SheetRow[]) =>
@@ -146,7 +148,7 @@ describe('a single month’s drill-down', () => {
       </ReportSearchProvider>,
     )
 
-  it('opens an account onto its journal lines as a ledger', () => {
+  it('opens an account onto its journal lines as a ledger, who first', () => {
     draw1(single)
     const toggle = within(row('group', 'Interest income')).getByRole('button', { name: /Interest income/ })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
@@ -157,7 +159,8 @@ describe('a single month’s drill-down', () => {
       'Date', 'Description', 'Other side', 'Ref. 1', 'Ref. 2', 'Debit', 'Credit',
     ])
     const [, line, foot] = within(ledger).getAllByRole('row')
-    expect(cellsOf(line)).toEqual(['2026-10-05', 'Loan interest · HOUZS Century', '3000 · Cash & Bank - Hong Leong', 'HV-JV-202610-0012', '—', '—', '10.00'])
+    expect(cellsOf(line)).toEqual(['2026-10-05', 'HOUZS Century · Loan interest', '3000 · Cash & Bank - Hong Leong', 'HV-JV-202610-0012', '—', '—', '10.00'])
+    expect(line.querySelector('.sr-dl-party')).toHaveTextContent(/^HOUZS Century$/)
     expect(foot).toHaveTextContent('1 line · Open in General Ledger ↗ · Oct 2026')
     expect(cellsOf(foot).slice(1)).toEqual(['0.00', '10.00'])
     expect(within(foot).getByRole('link', { name: /Open in General Ledger/ })).toHaveAttribute('href', '/reports/ledger?codes=4100&from=2026-10-01&to=2026-10-31')
@@ -174,6 +177,15 @@ describe('a single month’s drill-down', () => {
   })
 })
 
+function Level({ to }: { to: 1 | 2 | 3 | 4 }) {
+  const ctx = useReportSearch()
+  return (
+    <button type="button" onClick={() => ctx?.setLevel(to)}>
+      level {to}
+    </button>
+  )
+}
+
 describe('a month-by-month account opened', () => {
   const MONTHS: SheetColumn[] = [
     { key: 'acc', label: 'Accumulated', tone: 'acc' },
@@ -181,54 +193,75 @@ describe('a month-by-month account opened', () => {
     { key: '2026-09', label: 'Sep 2026' },
     { key: '2026-08', label: 'Aug 2026' },
   ]
+  // The P&L reads a cost negative; its lines come signed as it reads.
   const PNL: SheetRow[] = [
     { key: 'title:exp', label: 'Expenses', kind: 'title', depth: 0, values: [] },
-    { key: 'exp:9087', label: '9087 Website & Software', code: '9087', kind: 'account', depth: 1, values: [600, 400, 200, 0] },
-    { key: 'cat:exp', label: 'Total Expenses', kind: 'total', depth: 0, values: [600, 400, 200, 0] },
+    { key: 'exp:9020', label: '9020 Marketing Expense', code: '9020', kind: 'account', depth: 1, values: [-350, -350, 0, 0] },
+    { key: 'exp:9087', label: '9087 Website & Software', code: '9087', kind: 'account', depth: 1, values: [-600, -400, -200, 0] },
+    { key: 'cat:exp', label: 'Total Expenses', kind: 'total', depth: 0, values: [-950, -750, -200, 0] },
   ]
-  const LINES = [txn('a', '2026-09-12', 200, 0, 'JE-202609-0001'), txn('b', '2026-10-04', 150, 0, 'JE-202610-0002'), txn('c', '2026-10-15', 250, 0, 'JE-202610-0003')]
-  const drawM = (rows: SheetRow[], open: (ask: unknown) => Promise<unknown>, report: 'pnl' | 'cash-flow' = 'pnl') =>
+  const L9087 = [
+    txn('a', '2026-09-12', 200, 0, 'JE-202609-0001', { value: -200 }),
+    txn('b', '2026-10-04', 150, 0, 'JE-202610-0002', { value: -150, party: 'KHO WEI JIE', text: 'Outsource Design', ref2: 'HV-PV-202610-0447' }),
+    txn('c', '2026-10-15', 250, 0, 'JE-202610-0003', { value: -250 }),
+  ]
+  const L9020 = [txn('d', '2026-10-04', 350, 0, 'JE-202610-0004', { value: -350, party: 'SIA JOSIAH', text: 'Outsource Design' })]
+  const answer = (lines: Record<string, SheetTxn[]>) => vi.fn(async () => ({ ok: true, lines }))
+  const drawM = (rows: SheetRow[], open: (ask: unknown) => Promise<unknown>, opts: { report?: 'pnl' | 'cash-flow'; variant?: 'dept' } = {}) =>
     render(
-      <ReportSearchProvider level={3}>
-        <SheetReport columns={MONTHS} rows={rows} monthly={{ open: open as never, report, segment: 'marketing' }} />
+      <ReportSearchProvider level={3} levels={4}>
+        <Level to={4} />
+        <Level to={3} />
+        <SheetReport columns={MONTHS} rows={rows} monthly={{ open: open as never, report: opts.report ?? 'pnl', segment: 'marketing' }} variant={opts.variant} />
       </ReportSearchProvider>,
     )
-  const monthRows = () => Array.from(document.querySelectorAll('tr[data-kind="month"]')) as HTMLElement[]
+  const lineRows = () => Array.from(document.querySelectorAll('tr[data-kind="line"]')) as HTMLElement[]
 
-  it('reads its lines when it opens, lists its months latest first, and opens a month onto its lines', async () => {
-    const open = vi.fn(async () => ({ ok: true, lines: LINES }))
+  it('reads its lines when it opens and lists them as rows of the sheet, newest first, each figure under its month', async () => {
+    const open = answer({ 'pnl:9087': L9087 })
     drawM(PNL, open)
     const toggle = within(row('group', 'Website')).getByRole('button', { name: /Website/ })
     fireEvent.click(toggle)
-    expect(open).toHaveBeenCalledWith({ report: 'pnl', segment: 'marketing', from: '2026-08', to: '2026-10', code: '9087', side: null })
+    expect(open).toHaveBeenCalledWith({ report: 'pnl', segment: 'marketing', from: '2026-08', to: '2026-10', rows: [{ code: '9087', side: null }] })
     expect(screen.getByRole('status')).toHaveTextContent('Reading the lines…')
-    await waitFor(() => expect(monthRows()).toHaveLength(2))
-    // August has neither lines nor a figure: it is left out.
-    expect(monthRows().map(cellsOf)).toEqual([
-      ['▸Oct 2026', '2 lines', '400.00'],
-      ['▸Sep 2026', '1 line', '200.00'],
-    ])
-    const drill = row('drill', 'month by month')
-    expect(drill).toHaveTextContent('9087 Website & Software · Aug – Oct 2026 · month by month')
-    const foot = drill.querySelector('.sr-months tfoot tr') as HTMLElement
+    await waitFor(() => expect(lineRows()).toHaveLength(3))
+    expect(lineRows().map((tr) => tr.querySelector('.sr-ln-date')?.textContent)).toEqual(['2026-10-15', '2026-10-04', '2026-09-12'])
+    // "date · NAME · what it was · document", the name bold; its figure in the Total and its month, a dash elsewhere.
+    const [, outsource] = lineRows()
+    expect(outsource.querySelector('td')).toHaveTextContent('2026-10-04KHO WEI JIE · Outsource DesignHV-PV-202610-0447')
+    expect(outsource.querySelector('.sr-ln-party')).toHaveTextContent(/^KHO WEI JIE$/)
+    expect(cellsOf(outsource).slice(1)).toEqual(['(150.00)', '(150.00)', '—', '—'])
+    expect(outsource.title).toContain('Ref. 1 JE-202610-0002 · Ref. 2 HV-PV-202610-0447')
+    expect(outsource.title).toContain('Other side 3000 · Cash & Bank - Hong Leong')
+    expect(outsource.title).toContain('Debit 150.00 · Credit 0.00')
+    const foot = row('line-foot', 'lines')
     expect(foot).toHaveTextContent('3 lines · Open in General Ledger ↗ · Aug – Oct 2026')
-    expect(cellsOf(foot)[1]).toBe('600.00')
     expect(within(foot).getByRole('link')).toHaveAttribute('href', '/reports/ledger?codes=9087&from=2026-08-01&to=2026-10-31')
-
-    fireEvent.click(monthRows()[0])
-    const ledger = drill.querySelector('.sr-month-lines table') as HTMLElement
-    const [, first, second, end] = within(ledger).getAllByRole('row')
-    expect(cellsOf(first).slice(0, 4)).toEqual(['2026-10-04', 'Claude AI Claim · Tan Yong Hong', '3000 · Cash & Bank - Hong Leong', 'JE-202610-0002'])
-    expect(cellsOf(second)[3]).toBe('JE-202610-0003')
-    expect(end).toHaveTextContent('2 lines · Open in General Ledger ↗ · Oct 2026')
-    expect(cellsOf(end).slice(1)).toEqual(['400.00', '0.00'])
-    expect(within(end).getByRole('link')).toHaveAttribute('href', '/reports/ledger?codes=9087&from=2026-10-01&to=2026-10-31')
+    expect(document.querySelector('.sheet-rpt')).toHaveClass('has-lines')
 
     // Folded and opened again, it keeps what it read.
     fireEvent.click(toggle)
+    expect(lineRows()).toHaveLength(0)
+    expect(document.querySelector('.sheet-rpt')).not.toHaveClass('has-lines')
     fireEvent.click(toggle)
-    expect(monthRows()).toHaveLength(2)
+    expect(lineRows()).toHaveLength(3)
     expect(open).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens every account at L4 in one read, a click closing one', async () => {
+    const open = answer({ 'pnl:9020': L9020, 'pnl:9087': L9087 })
+    drawM(PNL, open)
+    fireEvent.click(screen.getByRole('button', { name: 'level 4' }))
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ rows: [{ code: '9020', side: null }, { code: '9087', side: null }] }))
+    await waitFor(() => expect(lineRows()).toHaveLength(4))
+    fireEvent.click(row('group', 'Website'))
+    expect(lineRows()).toHaveLength(1)
+    expect(within(row('group', 'Website')).getByRole('button')).toHaveAttribute('aria-expanded', 'false')
+    expect(open).toHaveBeenCalledTimes(1)
+    // Back at L3 the accounts are folded again.
+    fireEvent.click(screen.getByRole('button', { name: 'level 3' }))
+    expect(lineRows()).toHaveLength(0)
   })
 
   it('says why it could not read the lines, and reads again on Try again', async () => {
@@ -241,18 +274,35 @@ describe('a month-by-month account opened', () => {
   })
 
   it('opens the cash rows with their side, never the receivables under them', async () => {
-    const open = vi.fn(async () => ({ ok: true, lines: LINES }))
+    const open = answer({ 'in:5000': L9087.map((t) => ({ ...t, value: 0 - t.value })) })
     const cash: SheetRow[] = [
       { key: 'in:operating:5000', label: '5000 Service revenue', code: '5000', kind: 'account', depth: 1, values: [600, 400, 200, 0] },
       { key: 'AR_P_carres', label: 'Carres', code: '3033', kind: 'account', depth: 1, values: [80, 80, 0, 0] },
     ]
-    drawM(cash, open, 'cash-flow')
+    drawM(cash, open, { report: 'cash-flow' })
     expect(within(row('group', 'Carres')).queryByRole('button')).toBeNull()
     fireEvent.click(row('group', 'Carres'))
     expect(open).not.toHaveBeenCalled()
     fireEvent.click(within(row('group', 'Service revenue')).getByRole('button'))
-    expect(open).toHaveBeenCalledWith({ report: 'cash-flow', segment: 'marketing', from: '2026-08', to: '2026-10', code: '5000', side: 'in' })
-    await waitFor(() => expect(monthRows()).toHaveLength(2))
+    expect(open).toHaveBeenCalledWith({ report: 'cash-flow', segment: 'marketing', from: '2026-08', to: '2026-10', rows: [{ code: '5000', side: 'in' }] })
+    await waitFor(() => expect(lineRows()).toHaveLength(3))
+  })
+
+  it('reads money out positive on a department’s page, its lines with it', async () => {
+    const out = [txn('e', '2026-10-04', 150, 0, 'JE-202610-0002', { value: -150 })]
+    const open = answer({ 'out:9087': out })
+    const dept: SheetRow[] = [
+      { key: 'title:out', label: 'Money out', kind: 'title', depth: 0, values: [150, 150, 0, 0], side: 'out', pctBase: [150, 150, 0, 0] },
+      { key: 'out:grp:9087', label: 'Website & Software', code: '9087', kind: 'account', depth: 1, values: [150, 150, 0, 0], side: 'out', pctBase: [150, 150, 0, 0] },
+    ]
+    drawM(dept, open, { report: 'cash-flow', variant: 'dept' })
+    fireEvent.click(row('group', 'Website'))
+    await waitFor(() => expect(lineRows()).toHaveLength(1))
+    // The figure in its month, positive and not red; no % beside a line.
+    const cells = Array.from(lineRows()[0].querySelectorAll('td.sr-num'))
+    expect(cells.map((td) => td.textContent)).toEqual(['150.00', '150.00', '—', '—'])
+    expect(cells[0]).not.toHaveClass('is-neg')
+    expect(Array.from(lineRows()[0].querySelectorAll('td.sr-pct')).map((td) => td.textContent)).toEqual(['', '', '', ''])
   })
 })
 
