@@ -8,7 +8,7 @@ import { valueKey } from "@/lib/catalogue/keys";
 import { ICON, Svg } from "../icons";
 import { rm } from "../format";
 import {
-  SIZES, accAt, accOrder, accVariants, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText,
+  SIZES, accAt, accOnlyTitle, accOrder, accVariants, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText,
   type BfPick, type CartLine, type QCatalog, type QuoteMemory, type RecentFrame, type SheetState, type SizeKey, type SofaBuild,
 } from "./quote-model";
 import s from "./quote.module.css";
@@ -55,8 +55,9 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
   const lines = sheetLines(sheet, catalog);
   const pick = sheet.mode === "sofa" ? sofaPick(sheet, catalog, cart, build) : null;
   const brandUp = catalog.name.toUpperCase();
-  const eyebrow = `${brandUp} · ${inF ? "BED FRAME FOR THIS MATTRESS" : sheet.mode === "sofa" ? "SOFA" : sheet.mode === "model" ? "MATTRESS" : sheet.mode === "frame" ? "BED FRAME" : "ACCESSORIES"}`;
-  const title = inF ? "Add bed frame" : model ? model.name : sheet.mode === "frame" ? "Bed frame only" : "Accessories only";
+  const accWord = catalog.sofa ? "SOFA ACCESSORIES" : "ACCESSORIES";
+  const eyebrow = `${brandUp} · ${inF ? "BED FRAME FOR THIS MATTRESS" : sheet.mode === "sofa" ? "SOFA" : sheet.mode === "model" ? "MATTRESS" : sheet.mode === "frame" ? "BED FRAME" : accWord}`;
+  const title = inF ? "Add bed frame" : model ? model.name : sheet.mode === "frame" ? "Bed frame only" : accOnlyTitle(catalog);
   const hasKpi = catalog.kpis.length > 0;
 
   // ── the footer ──
@@ -106,7 +107,7 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
             </>
           )}
           {sheet.mode === "acc" && (
-            <AccSection title="Accessories" catalog={catalog} memory={memory} picked={sheet.acc} all={sheet.accAll}
+            <AccSection title={catalog.sofa ? "Sofa accessories" : "Accessories"} catalog={catalog} memory={memory} picked={sheet.acc} all={sheet.accAll}
               onAll={() => a.patch({ accAll: !sheet.accAll })} onSet={acc => a.patch({ acc })} />
           )}
         </div>
@@ -566,6 +567,11 @@ function SofaSections({ sheet, catalog, memory, pick, hasKpi, onPatch }: {
           <SpecialChips specials={pick.specials} picked={pick.picked}
             onToggle={sp => onPatch({ specials: pick.picked.includes(sp) ? pick.picked.filter(x => x !== sp) : [...pick.picked, sp] })} />
         </div>
+      )}
+      {/* SKU Master's Sofa Accessory (2026-10-26), per set — what *Sofa accessories only* sells, beside the sofa. */}
+      {catalog.accs.length > 0 && (
+        <AccSection title={`${++n} · Accessories`} catalog={catalog} memory={memory} picked={sheet.acc} all={sheet.accAll}
+          onAll={() => onPatch({ accAll: !sheet.accAll })} onSet={acc => onPatch({ acc })} />
       )}
       {hasKpi && (
         <div>

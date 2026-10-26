@@ -107,3 +107,56 @@ describe("accessory search in product sheets", () => {
     ]);
   });
 });
+
+// 2026-10-26, the user: "如果我点沙发的话，下面应该可以选择要不要加 accessory" — SKU Master's Sofa Accessory, beside the sofa.
+describe("a sofa's accessories", () => {
+  const sofaCatalog: QCatalog = {
+    brand: "ZANOTTI", name: "Zanotti", sofa: true, frames: [], kpis: [], accSummary: "2 items",
+    models: [{ key: "8030", name: "SOFFIO", desc: "8030", sizes: {}, choices: NO_SOFA_CHOICES, modules: [
+      { code: "1A(LHF)", desc: "1-seat · left arm", seats: 1, chaise: false, productId: "s-1a", options: [] },
+      { code: "1A(RHF)", desc: "1-seat · right arm", seats: 1, chaise: false, productId: "s-1b", options: [] },
+    ] }],
+    accs: [
+      { key: "BACK CUSHION 01", name: "BACK CUSHION 01", any: "bc01", sizes: {} },
+      { key: "SQUARE PILLOW", name: "SQUARE PILLOW", any: "sq", sizes: {} },
+    ],
+  };
+
+  function drawSofa(sheet: SheetState) {
+    const add = vi.fn();
+    function Harness() {
+      const [current, setSheet] = useState<SheetState>(sheet);
+      return <ProductSheet sheet={current} catalog={sofaCatalog} memory={EMPTY_MEMORY} cart={[]} build={NO_SOFA_BUILD} readOnly={false}
+        actions={{
+          close: vi.fn(), patch: patch => setSheet(s => ({ ...s, ...patch } as SheetState)),
+          patchFrame: vi.fn(), openBf: vi.fn(), editBf: vi.fn(), removeBf: vi.fn(), backToMattress: vi.fn(), applyFrame: vi.fn(),
+          add: () => add(sheetLines(current, sofaCatalog)),
+        }} />;
+    }
+    render(<Harness />);
+    return add;
+  }
+
+  it("lists the sofa accessories under the sofa, optional, and adds them with it — per set", () => {
+    const add = drawSofa({ mode: "sofa", key: "8030", layout: "C", mods: { "1A(LHF)": 1, "1A(RHF)": 1 }, qty: 1, kpi: [], height: null, tier: null,
+      leg: null, specials: [], acc: {}, accAll: false });
+    expect(screen.getByText("3 · Accessories")).toBeInTheDocument();
+    addOne("SQUARE PILLOW");
+    addOne("SQUARE PILLOW");
+    // The footer's sets — the last "More"; each module's stepper has one too.
+    fireEvent.click(screen.getAllByRole("button", { name: "More" }).at(-1)!);
+    fireEvent.click(screen.getByRole("button", { name: "Add 2 sets to cart" }));
+    expect(add).toHaveBeenCalledWith([
+      expect.objectContaining({ kind: "sofa", productId: "s-1a", qty: 2 }),
+      expect.objectContaining({ kind: "sofa", productId: "s-1b", qty: 2 }),
+      expect.objectContaining({ kind: "acc", productId: "sq", qty: 4 }),
+    ]);
+  });
+
+  it("sells them on their own as Sofa accessories only", () => {
+    drawSofa({ mode: "acc", acc: {}, accAll: false });
+    expect(screen.getByRole("dialog", { name: "Sofa accessories only" })).toBeInTheDocument();
+    expect(screen.getByText("ZANOTTI · SOFA ACCESSORIES")).toBeInTheDocument();
+    expect(screen.getByText("Sofa accessories")).toBeInTheDocument();
+  });
+});
