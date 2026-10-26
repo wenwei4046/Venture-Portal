@@ -9,6 +9,7 @@ import { parseMessengerDelivery } from '@/lib/messenger/webhook'
 import { pageToken, profileName } from '@/lib/messenger/send'
 import { sendLeadOutbox } from '@/lib/leads/messenger-outbox'
 import { adAccountName } from '@/lib/leads/ad-account'
+import { parseInstagramDelivery, takeInstagram } from '@/lib/leads/instagram'
 
 /**
  * /api/messenger/v1/webhook — the Callback URL for our Facebook Pages'
@@ -73,6 +74,16 @@ export async function POST(request: Request) {
   } catch {
     await client().from('crm_channel_events').insert({ channel: 'messenger', status: 'rejected', message: 'invalid JSON', payload: null })
     return NextResponse.json({ error: 'invalid JSON' }, { status: 400 })
+  }
+
+  // Instagram Direct (object "instagram") is Lead View's alone — the CRM takes no Instagram (lib/leads/instagram.ts).
+  if ((body as { object?: string } | null)?.object === 'instagram') {
+    const taken = await takeInstagram(client(), parseInstagramDelivery(body), process.env.META_SYSTEM_USER_TOKEN?.trim(), job => after(() => job().then(() => undefined)))
+    if (!taken.ok) {
+      console.error('lead_ingest_instagram failed:', taken.error)
+      return NextResponse.json({ ok: false, error: 'ingest failed' }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true, result: taken.data })
   }
 
   const delivery = parseMessengerDelivery(body)

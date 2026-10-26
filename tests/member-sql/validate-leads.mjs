@@ -894,4 +894,29 @@ await db.exec(`
   check(await brandOf('7700101'), bMini, 'a conversation already begun stays where it began')
 }
 
+// ── Instagram Direct (mig 20261027110000): the brand by its Instagram account, the Page kept for replies, the outbox ──
+{
+  const o0 = (await q(`select md5(prosrc) m from pg_proc where oid = 'public.lead_outbox(uuid[])'::regprocedure`))[0].m
+  check(o0, 'c1ca0feb687a89ec8e960d7579687979', 'lead_outbox here is production’s body (the swap is written against it)')
+  const mig = (await readFile(new URL('../../supabase/migrations/20261027110000_lead_instagram.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(mig)
+  await db.exec(mig) // twice: the outbox swap finds itself in place
+  const IG = '17841400000000001', P = '946946021838962'
+  await db.exec(`update public.lead_brands set ig_account_id = '${IG}' where id = '${b2990}'`)
+  const ig = async msgs => (await q('select public.lead_ingest_instagram($1::jsonb) r', [JSON.stringify(msgs)]))[0].r
+  const msg = (mid, psid, extra = {}) => ({ externalId: mid, pageId: IG, psid, name: 'insta_' + psid, kind: 'text', body: 'hi', sentAt: '2026-10-28T03:00:00Z', ad: null, ...extra })
+  const row = async psid => (await q(`select id, brand_id, channel, page_id, name from public.lead_contacts where channel = 'instagram' and external_id = $1`, [psid]))[0]
+  const r1 = await ig([msg('ig.1', '8800001'), msg('ig.1', '8800001'), { ...msg('ig.2', '8800009'), pageId: '17841499999999999' }])
+  check([r1.messages, r1.ignored], [1, 2], 'one taken: the same mid twice and an account no brand names are ignored')
+  const c1 = await row('8800001')
+  check([c1.brand_id, c1.channel, c1.page_id, c1.name], [b2990, 'instagram', P, 'insta_8800001'], 'the brand by its Instagram account, its Facebook Page kept for replies')
+  await ig([msg('ig.3', '8800002', { ad: { sourceId: '120210000000301', headline: 'Chat with us', sourceUrl: null, media: 'video', account: "2990's Mini@Kelana Jaya" } })])
+  check((await row('8800002')).brand_id, bMini, 'a mini ad account’s Instagram customer is 2990s mini’s')
+  check((await q(`select what from public.lead_events where contact_id = $1 order by id limit 1`, [c1.id]))[0].what, 'Came in on Instagram', 'the timeline says Instagram')
+  await db.exec(`insert into public.lead_messages (contact_id, direction, sender, body) values ('${c1.id}', 'out', 'flow', 'Hello on IG')`)
+  const out = (await q('select public.lead_outbox($1::uuid[]) o', [[c1.id]]))[0].o
+  check(out.filter(x => x.body === 'Hello on IG').map(x => [x.pageId, x.psid]), [[P, '8800001']], 'the outbox sends Instagram conversations through the Page')
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_instagram(jsonb)', 'execute') a`))[0].a, false, 'the Instagram ingest is the service role’s alone')
+}
+
 console.log(`validate-leads: ${checks} checks passed`)
