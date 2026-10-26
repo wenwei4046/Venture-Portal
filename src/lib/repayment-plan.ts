@@ -116,6 +116,18 @@ export interface RepaymentPlan {
   principalOwed: number
   /** 利滚利 (a compounding deal) — null otherwise. */
   compound: CompoundFacts | null
+  /** The next installment (2026-10-26, the schedule's fourth card — the user: "改成 next installment"); null when nothing
+   *  more falls due. Set by buildRepaymentPlan. */
+  next?: PlanNext | null
+}
+
+export interface PlanNext {
+  /** Its day, YYYY-MM-DD. */
+  due: string
+  amount: number
+  /** The principal it asks (0 with no fixed term) and the interest. */
+  principal: number
+  interest: number
 }
 
 export interface PlanInput {
@@ -214,9 +226,34 @@ function planOf(input: PlanInput): RepaymentPlan {
   if (segments[0].fromYM === '0000-00') return summary('none', [], null, 0, terms.principal, principalPaid, interestPaid)
 
   const pools = { principalPays, interestPays, principalPaid, interestPaid }
-  if (segments.some((s) => s.compounding)) return compoundPlan(input, segments, pools, dueDay)
-  if (!segments[segments.length - 1].months) return openPlan(input, segments, pools, dueDay)
-  return fixedPlan(input, segments, pools, dueDay)
+  const plan = segments.some((s) => s.compounding)
+    ? compoundPlan(input, segments, pools, dueDay)
+    : !segments[segments.length - 1].months
+      ? openPlan(input, segments, pools, dueDay)
+      : fixedPlan(input, segments, pools, dueDay)
+  plan.next = nextOf(plan, input, segments, dueDay)
+  return plan
+}
+
+/**
+ * The next installment: the first row still to fall due — else, on a plan that runs month by month to today (no
+ * fixed term, 利滚利), the month after its last: the interest on what is owed then (利滚利: the whole balance; else the
+ * terms' monthly interest) with any principal its terms ask. Nothing on a plan paid up, repaid, or past its term.
+ */
+function nextOf(plan: RepaymentPlan, input: PlanInput, segments: TermsSegment[], dueDay: number): PlanNext | null {
+  if (input.status === 'repaid' || input.status === 'fully_repaid' || input.status === 'cancelled') return null
+  const upcoming = plan.rows.find((r) => r.due > input.today)
+  if (upcoming) {
+    const interest = upcoming.interest
+    return { due: upcoming.due, amount: upcoming.installment, principal: r2(Math.max(0, upcoming.installment - interest)), interest }
+  }
+  const last = plan.rows[plan.rows.length - 1]
+  if (plan.kind !== 'open' || !last || last.balance <= PAID_UP) return null
+  const ym = addMonthsYM(last.ym, 1)
+  const seg = segmentFor(segments, ym)
+  const interest = seg.compounding ? r2(last.balance * seg.rate) : seg.interestPerMonth
+  const principal = seg.months && !seg.compounding && (!seg.scheduledEndYM || ym <= seg.scheduledEndYM) ? seg.principalPerMonth : 0
+  return { due: dueOn(ym, dueDay), amount: r2(principal + interest), principal, interest }
 }
 
 interface Pools {
