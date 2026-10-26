@@ -11,7 +11,7 @@ import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText,
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
-import { crmAdNumbers, listMetaAds, metaAdDaily, metaAdInsights, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
+import { crmAdNumbers, crmPages, listMetaAds, metaAdDaily, metaAdInsights, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
@@ -419,8 +419,8 @@ export async function fetchMetaAds(): Promise<{ ok: true; ads: MetaAdRow[] } | {
     await requireCrm("manage");
     const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
     if (!token) throw new Error("Meta is not connected on this server.");
-    // Only the ads that send people to the CRM's ad number(s) — 018-358 0219 (crmAdNumbers) — not every ad the system user sees.
-    return { ok: true, ads: await listMetaAds(token, fetch, { numbers: crmAdNumbers() }) };
+    // Only the ads that send people to the CRM's ad number(s) — 018-358 0219 (crmAdNumbers), or to Messenger on the CRM's Pages (crmPages) — not every ad the system user sees.
+    return { ok: true, ads: await listMetaAds(token, fetch, { numbers: crmAdNumbers(), pages: crmPages() }) };
   } catch (error) {
     return { ok: false, error: friendly(error, "Meta's ads could not be read.") };
   }
