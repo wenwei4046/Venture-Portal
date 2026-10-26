@@ -255,3 +255,66 @@ describe('a month-by-month account opened', () => {
     await waitFor(() => expect(monthRows()).toHaveLength(2))
   })
 })
+
+// 2026-10-25 — a department's page dresses the sheet as its charts (the mockup's rounds 11–12): each block opens on
+// its side's total, a group keeps its figure on its own line, L2 opens a group by its ▶, a % of each row's own base.
+describe('a department’s sheet', () => {
+  const DEPT_COLUMNS: SheetColumn[] = [
+    { key: 'acc', label: 'Total', tone: 'acc' },
+    { key: '2026-10', label: 'Oct 2026 *', tone: 'now' },
+    { key: '2026-09', label: 'Sep 2026' },
+  ]
+  const IN = [300, 200, 100]
+  const DEPT_ROWS: SheetRow[] = [
+    { key: 'OPENING_CASH', label: 'Opening cash', kind: 'total', depth: 0, values: [1000, 1040, 1000], pctBase: null },
+    { key: 'title:in', label: 'Money in', kind: 'title', depth: 0, values: IN, side: 'in', pctBase: IN },
+    { key: 'in:grp', label: 'Accounts Receivable - Subs', kind: 'account', depth: 1, isParent: true, values: IN, side: 'in', pctBase: IN },
+    { key: 'in:grp:3033', label: 'AR - Carres', code: '3033', kind: 'account', depth: 2, values: [240, 200, 40], side: 'in', pctBase: IN, swatch: '#3f7a64' },
+    { key: 'in:grp:3034', label: 'AR - Dream Crafter', code: '3034', kind: 'account', depth: 2, values: [60, 0, 60], side: 'in', pctBase: IN, swatch: '#5b7ba6' },
+    { key: 'NET_CHANGE', label: 'Net change', kind: 'total', depth: 0, values: [180, 140, 40], pctBase: IN, strong: true },
+  ]
+  const drawDept = (level: 1 | 2 | 3) =>
+    render(
+      <ReportSearchProvider level={level}>
+        <SheetReport columns={DEPT_COLUMNS} rows={DEPT_ROWS} variant="dept" />
+      </ReportSearchProvider>,
+    )
+  const pcts = (tr: HTMLElement) => Array.from(tr.querySelectorAll('td.sr-pct')).map((td) => td.textContent)
+
+  it('carries a block’s total on its title at every level, money in green', () => {
+    drawDept(1)
+    expect(kinds()).toEqual(['total', 'title', 'total'])
+    expect(row('title', 'Money in')).toHaveClass('is-in')
+    expect(row('title', 'Money in')).toHaveTextContent('300.00')
+    expect(pcts(row('title', 'Money in'))).toEqual(['100.0%', '100.0%', '100.0%'])
+  })
+
+  it('opens a category by its ▶ at L2, its figure staying on its own line, no Subtotal', () => {
+    drawDept(2)
+    expect(kinds()).toEqual(['total', 'title', 'group', 'total'])
+    fireEvent.click(within(row('group', 'Accounts Receivable')).getByRole('button'))
+    expect(kinds()).toEqual(['total', 'title', 'group', 'item', 'item', 'total'])
+    expect(row('group', 'Accounts Receivable')).toHaveTextContent('300.00')
+  })
+
+  it('has every category open at L3, each closed by hand', () => {
+    drawDept(3)
+    expect(kinds()).toEqual(['total', 'title', 'group', 'item', 'item', 'total'])
+    fireEvent.click(within(row('group', 'Accounts Receivable')).getByRole('button'))
+    expect(kinds()).toEqual(['total', 'title', 'group', 'total'])
+  })
+
+  it('reads each row’s % of its own base — 0.0% beside a nil figure, a dash with no base', () => {
+    drawDept(3)
+    expect(pcts(row('item', 'Dream Crafter'))).toEqual(['20.0%', '0.0%', '60.0%'])
+    expect(pcts(row('total', 'Opening cash'))).toEqual(['—', '—', '—'])
+    expect(pcts(row('total', 'Net change'))).toEqual(['60.0%', '70.0%', '40.0%'])
+  })
+
+  it('squares an account in its chart colour and names the Total first', () => {
+    drawDept(3)
+    const square = row('item', 'AR - Carres').querySelector<HTMLElement>('.sr-sw')
+    expect(square?.style.background).toMatch(/#3f7a64|rgb\(63, 122, 100\)/)
+    expect(Array.from(document.querySelectorAll('thead tr:first-child th')).slice(1).map((th) => th.textContent)).toEqual(['Total', 'Oct 2026 *', 'Sep 2026'])
+  })
+})

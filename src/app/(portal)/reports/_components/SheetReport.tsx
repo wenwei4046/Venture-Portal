@@ -26,6 +26,11 @@ import { useReportSearch } from './ReportSearchProvider'
  * 用 A"): a single month's (`drill`) onto its journal lines as a ledger — Date, Description, Other side, Ref. 1 (the
  * entry), Ref. 2 (the document), Debit, Credit, the count and totals under them with the General Ledger a click away;
  * a month-by-month sheet's (`monthly`) onto its months, read when it opens, each month onto its own lines.
+ *
+ * A department's page (`variant="dept"`, 2026-10-25, the mockup's rounds 11–12) dresses it as its charts: a block's
+ * title carries its side's total, green or orange, at every level; a group keeps its figure on its own line (no
+ * Subtotal); L2 opens a group by its ▶, L3 has them all open; a row may carry its own % base and a square in its
+ * chart colour (lib/dept-statement shapes the rows).
  */
 
 export type { SheetColumn }
@@ -253,10 +258,11 @@ export default function SheetReport({
   drill = false,
   drillMonth,
   monthly,
+  variant,
 }: {
   columns: SheetColumn[]
   rows: SheetRow[]
-  /** Each column's base for a % beside its figure; omit for no % column. */
+  /** Each column's base for a % beside its figure; omit for no % column (unless the rows carry their own). */
   pctBase?: number[]
   /** A single month: an item opens onto its journal lines. */
   drill?: boolean
@@ -264,6 +270,8 @@ export default function SheetReport({
   drillMonth?: string
   /** A month-by-month sheet: an account opens onto its months, read when it opens. */
   monthly?: MonthlyDrill
+  /** A department's page: its charts' dress (see above). */
+  variant?: 'dept'
 }) {
   const ctx = useReportSearch()
   const level = ctx?.level ?? 3
@@ -271,8 +279,12 @@ export default function SheetReport({
   const activeHit = ctx?.activeHit ?? 0
   const setHitCount = ctx?.setHitCount
   const jump = ctx?.jump ?? 0
-  const [closed, setClosed] = useState<Set<string>>(() => new Set())
-  const showPct = Array.isArray(pctBase)
+  const inline = variant === 'dept'
+  // The groups turned by hand: closed ones on Reports (L3 opens them all); on a department's page, at the level
+  // they were turned at — L2 opens, L3 closes, a new level starts afresh.
+  const [closed, setClosed] = useState<{ level: number; keys: ReadonlySet<string> }>(() => ({ level, keys: NONE }))
+  const turned = inline && closed.level !== level ? NONE : closed.keys
+  const showPct = Array.isArray(pctBase) || rows.some((r) => r.pctBase !== undefined)
 
   // The sheet's months (a month-by-month sheet's), first and last.
   const monthKeys = columns.map((c) => c.key).filter((k) => MONTH.test(k))
@@ -342,31 +354,33 @@ export default function SheetReport({
     const flush = (depth: number) => {
       while (stack.length > 0 && stack[stack.length - 1].row.depth >= depth) {
         const a = stack.pop()!
-        if (a.shown && a.open) out.push({ type: 'subtotal', row: a.row })
+        if (a.shown && a.open && !inline) out.push({ type: 'subtotal', row: a.row })
       }
     }
     for (const r of rows) {
       if (r.kind !== 'account') {
         flush(0)
         if (r.kind === 'total') out.push({ type: 'total', row: r })
-        else if (level >= 2) out.push({ type: 'title', row: r })
+        // A title from L2 — one carrying its block's total (a department's) at every level.
+        else if (level >= 2 || r.values.length > 0) out.push({ type: 'title', row: r })
         continue
       }
       flush(r.depth)
       const parent = stack[stack.length - 1]
       const onPath = hits.has(r.key) || forced.has(r.key)
       const shown = parent ? parent.shown && parent.open : level >= 2 || onPath
-      const open = !!r.isParent && (forced.has(r.key) || (level === 3 && !closed.has(r.key)))
+      const byHand = inline ? level >= 2 && (level === 3) !== turned.has(r.key) : level === 3 && !turned.has(r.key)
+      const open = !!r.isParent && (forced.has(r.key) || byHand)
       if (shown) {
         const drills = opens(r)
-        out.push({ type: r.depth <= 1 ? 'group' : 'item', row: r, open, toggles: (!!r.isParent && level === 3) || drills })
+        out.push({ type: r.depth <= 1 ? 'group' : 'item', row: r, open, toggles: (!!r.isParent && (inline ? level >= 2 : level === 3)) || drills })
         if (drills && openRows.has(r.key)) out.push({ type: 'drill', row: r })
       }
       stack.push({ row: r, open, shown })
     }
     flush(0)
     return out
-  }, [rows, level, closed, openRows, hits, forced, opens])
+  }, [rows, level, inline, turned, openRows, hits, forced, opens])
 
   const flip = (set: ReadonlySet<string>, key: string): Set<string> => {
     const next = new Set(set)
@@ -396,8 +410,10 @@ export default function SheetReport({
   }
   const toggleMonth = (r: SheetRow, ym: string) => setOpened({ scope, rows: openRows, months: flip(openMonths, `${r.key}|${ym}`) })
 
+  // The column's own wash: the month still running, or the Accumulated (a department's Total).
+  const tone = (i: number) => (columns[i]?.tone === 'now' ? ' is-now' : columns[i]?.tone === 'acc' ? ' is-acc' : '')
   const fig = (v: number, i: number) => {
-    const now = columns[i]?.tone === 'now' ? ' is-now' : ''
+    const now = tone(i)
     if (Math.abs(v) < 0.005) return <td key={`v${i}`} className={`sr-num is-nil${now}`}>—</td>
     return (
       <td key={`v${i}`} className={`sr-num${v < 0 ? ' is-neg' : ''}${now}`}>
@@ -405,27 +421,31 @@ export default function SheetReport({
       </td>
     )
   }
-  const pct = (v: number, i: number) => {
-    const now = columns[i]?.tone === 'now' ? ' is-now' : ''
-    const base = pctBase?.[i] ?? 0
-    const text = Math.abs(base) < 0.005 ? '—' : `${((v / base) * 100).toFixed(1)}%`
+  const pct = (v: number, i: number, row?: SheetRow) => {
+    const now = tone(i)
+    const own = row?.pctBase
+    const base = own === undefined ? (pctBase?.[i] ?? 0) : own === null ? 0 : (own[i] ?? 0)
+    const share = Math.abs(base) < 0.005 ? null : (v / base) * 100
+    // A share that rounds to nothing reads 0.0%, never -0.0%.
+    const text = share === null ? '—' : `${Math.abs(share) < 0.05 ? '0.0' : share.toFixed(1)}%`
     return (
-      <td key={`p${i}`} className={`sr-pct${v < 0 && Math.abs(base) >= 0.005 ? ' is-neg' : ''}${now}`}>
+      <td key={`p${i}`} className={`sr-pct${v < 0 && share !== null && Math.abs(share) >= 0.05 ? ' is-neg' : ''}${now}`}>
         {text}
       </td>
     )
   }
-  const cells = (values: number[] | null) =>
+  const cells = (values: number[] | null, row?: SheetRow) =>
     columns.map((c, i) => (
       <Fragment key={c.key}>
-        {values ? fig(values[i] ?? 0, i) : <td className={`sr-num${c.tone === 'now' ? ' is-now' : ''}`} />}
-        {showPct ? values ? pct(values[i] ?? 0, i) : <td className={`sr-pct${c.tone === 'now' ? ' is-now' : ''}`} /> : null}
+        {values ? fig(values[i] ?? 0, i) : <td className={`sr-num${tone(i)}`} />}
+        {showPct ? values ? pct(values[i] ?? 0, i, row) : <td className={`sr-pct${tone(i)}`} /> : null}
       </Fragment>
     ))
   const span = 1 + columns.length * (showPct ? 2 : 1)
+  const sideOf = (r: SheetRow) => (r.side ? ` is-${r.side}` : '')
 
   return (
-    <div className="sheet-rpt" ref={wrap}>
+    <div className={`sheet-rpt${inline ? ' is-dept' : ''}`} ref={wrap}>
       <table>
         <thead>
           <tr>
@@ -449,11 +469,11 @@ export default function SheetReport({
           {lines.map((l) => {
             if (l.type === 'title') {
               return (
-                <tr key={l.row.key} data-kind="title" className="sr-title">
+                <tr key={l.row.key} data-kind="title" className={`sr-title${sideOf(l.row)}`}>
                   <td className="sr-label" style={{ paddingLeft: 14 }}>
                     {l.row.label}
                   </td>
-                  {cells(null)}
+                  {cells(l.row.values.length > 0 ? l.row.values : null, l.row)}
                 </tr>
               )
             }
@@ -463,7 +483,7 @@ export default function SheetReport({
                   <td className="sr-label" style={{ paddingLeft: 14 }}>
                     {l.row.label}
                   </td>
-                  {cells(l.row.values)}
+                  {cells(l.row.values, l.row)}
                 </tr>
               )
             }
@@ -473,7 +493,7 @@ export default function SheetReport({
                   <td className="sr-label" style={{ paddingLeft: INDENT(l.row.depth + 1) }}>
                     Subtotal
                   </td>
-                  {cells(l.row.values)}
+                  {cells(l.row.values, l.row)}
                 </tr>
               )
             }
@@ -513,10 +533,11 @@ export default function SheetReport({
                 <span className="sr-chev" aria-hidden>
                   {arrow}
                 </span>
+                {r.swatch ? <i className="sr-sw" style={{ background: r.swatch }} aria-hidden /> : null}
                 <Highlight text={r.label} query={search} />
               </>
             )
-            const mark = `${hits.has(r.key) ? ' is-hit' : ''}${activeKey === r.key ? ' is-active' : ''}${drills ? ' can-open' : ''}`
+            const mark = `${hits.has(r.key) ? ' is-hit' : ''}${activeKey === r.key ? ' is-active' : ''}${drills ? ' can-open' : ''}${sideOf(r)}`
             return (
               <tr
                 key={r.key}
@@ -528,14 +549,14 @@ export default function SheetReport({
               >
                 <td className="sr-label" style={{ paddingLeft: INDENT(r.depth) }} title={r.label}>
                   {l.toggles ? (
-                    <button type="button" aria-expanded={expanded} onClick={drills ? undefined : () => setClosed(flip(closed, r.key))}>
+                    <button type="button" aria-expanded={expanded} onClick={drills ? undefined : () => setClosed({ level, keys: flip(turned, r.key) })}>
                       {label}
                     </button>
                   ) : (
                     label
                   )}
                 </td>
-                {cells(l.open ? null : r.values)}
+                {cells(l.open && !inline ? null : r.values, r)}
               </tr>
             )
           })}

@@ -27,8 +27,9 @@ export async function GET(req: Request) {
   const format = url.searchParams.get('format') === 'pdf' ? 'pdf' : 'xlsx'
   const periodRaw = url.searchParams.get('period') ?? ''
   const period = /^\d{4}-\d{2}$/.test(periodRaw) ? periodRaw : officeMonth()
-  // From – To (2026-10-09, the Finance revamp): the months cut as the page cuts them.
-  const range = reportRange({ from: url.searchParams.get('from') ?? undefined, period }, officeMonth())
+  // From – To (2026-10-09, the Finance revamp): the months cut as the page cuts them — a department's page may
+  // reach back across the year (2026-10-25), its months then built from From.
+  const range = reportRange({ from: url.searchParams.get('from') ?? undefined, period }, officeMonth(), { crossYear: true })
   const segment = url.searchParams.get('segment') ?? ''
   const year = Number(period.slice(0, 4))
   const throughMonth = Number(period.slice(5, 7))
@@ -51,7 +52,12 @@ export async function GET(req: Request) {
   ])
   const ibLines = ib ? ib.lines : []
   // Same shape as the Cash Flow STATEMENT (the reference view), month columns.
-  const data = buildMonthlyCashFlowSides([...lines, ...ibLines], [...accounts, interBillTransferAccount, payrollCustodyAccount], bankCodes, { year, throughMonth, segment: segmentFilterFor(segment) })
+  const data = buildMonthlyCashFlowSides([...lines, ...ibLines], [...accounts, interBillTransferAccount, payrollCustodyAccount], bankCodes, {
+    year,
+    throughMonth,
+    segment: segmentFilterFor(segment),
+    ...(range.buildFrom ? { from: range.buildFrom } : {}),
+  })
   const nCols = data.columns.length
   const rows: MatrixRow[] = [
     ...buildSideMatrixRows(data.inflow, inSaved as ReportLayout | null, nCols, 'in', 'Total money in', data.inflowTotalByCol),
@@ -70,7 +76,7 @@ export async function GET(req: Request) {
       element: (
         <MatrixPdf
           title="Monthly Cash Flow"
-          subtitle={`FY ${year} · all amounts RM · direct method`}
+          subtitle={`${range.buildFrom ? '' : `FY ${year} · `}all amounts RM · direct method`}
           periodLabel={range.wholeYear ? `Up to ${dayjs(`${period}-01`).format('MMMM YYYY')}` : rangeLabel(range.from, range.to)}
           data={matrix}
         />

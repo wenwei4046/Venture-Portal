@@ -35,10 +35,11 @@ export interface MonthlyPnlAccounts {
 export function buildPnlAccounts(
   lines: GlLine[],
   accounts: CoaAccount[],
-  args: { year: number; throughMonth: number; segment?: string | string[] },
+  /** `from`: a start before January (a department's page) — see monthColumns. */
+  args: { year: number; throughMonth: number; segment?: string | string[]; from?: string },
 ): MonthlyPnlAccounts {
   const { year, segment } = args
-  const { months, columns, accPeriod } = monthColumns(year, args.throughMonth)
+  const { months, columns, accPeriod } = monthColumns(year, args.throughMonth, args.from)
 
   const reportAcc = buildPnl(lines, accounts, { current: accPeriod, previous: EMPTY_PERIOD, segment })
   const reportByMonth = months.map((ym) =>

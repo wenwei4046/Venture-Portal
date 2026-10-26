@@ -44,17 +44,24 @@ export function r2(n: number): number {
 export const EMPTY_PERIOD = { from: '2099-12-31', to: '2099-01-01' }
 
 /** Columns = Accumulated + each month of the year up to `throughMonth`,
- *  latest month first (next to Accumulated). */
+ *  latest month first (next to Accumulated).
+ *
+ *  `from` before the year's January (a department's page, 2026-10-25 — its
+ *  "12 months" runs Nov – Oct) starts the months, and the Accumulated, there
+ *  instead; a From within the year is the page's own cut (sliceMatrixMonths). */
 export function monthColumns(
   year: number,
   throughMonth: number,
+  from?: string,
 ): { months: string[]; columns: MatrixColumn[]; accPeriod: { from: string; to: string } } {
   const tm = Math.min(12, Math.max(1, throughMonth))
+  const last = `${year}-${String(tm).padStart(2, '0')}`
+  const first = from && /^\d{4}-\d{2}$/.test(from) && from < `${year}-01` ? from : `${year}-01`
   const months: string[] = []
-  for (let m = tm; m >= 1; m--) months.push(`${year}-${String(m).padStart(2, '0')}`)
+  for (let m = dayjs(`${last}-01`); m.format('YYYY-MM') >= first; m = m.subtract(1, 'month')) months.push(m.format('YYYY-MM'))
   const accPeriod = {
-    from: `${year}-01-01`,
-    to: dayjs(`${year}-${String(tm).padStart(2, '0')}-01`).endOf('month').format('YYYY-MM-DD'),
+    from: `${first}-01`,
+    to: dayjs(`${last}-01`).endOf('month').format('YYYY-MM-DD'),
   }
   const columns: MatrixColumn[] = [
     { key: 'acc', label: 'Accumulated' },

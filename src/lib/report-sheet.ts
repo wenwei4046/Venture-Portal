@@ -56,6 +56,13 @@ export interface SheetRow {
   txns?: SheetTxn[]
   /** A total drawn heavier. */
   strong?: boolean
+  /** A department's page (2026-10-25): the side the row counts — its block tinted green or orange, the side's
+   *  total on its title. */
+  side?: 'in' | 'out'
+  /** Its colour on the page's charts, a square before its name. */
+  swatch?: string
+  /** Its own base for the % beside each figure, one per column (null: none, a dash) — else the sheet's. */
+  pctBase?: number[] | null
 }
 
 /** A column of the table (SheetReport's): now = the current / chosen month,
