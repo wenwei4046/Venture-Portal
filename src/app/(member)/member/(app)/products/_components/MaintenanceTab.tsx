@@ -149,10 +149,10 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
           })
         }
         setEditing(false)
-        setNotice(`${plural(saved, 'price')} saved.`)
+        setNotice(`${plural(saved, 'change')} saved.`)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not save the prices.')
-        if (saved > 0) setNotice(`${plural(saved, 'price')} saved. Remaining changes are kept for retry.`)
+        if (saved > 0) setNotice(`${plural(saved, 'change')} saved. Remaining changes are kept for retry.`)
       } finally {
         saveInFlight.current = false
         if (saved > 0) router.refresh()
@@ -215,7 +215,7 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
       <ActionRow>
         {editing ? (
           <EditingButtons cancelLabel="Cancel changes" onCancel={cancel} onSave={save} changes={dirty} saving={saving}
-            saveLabel={dirty === 0 ? 'Save changes' : `Save ${plural(dirty, 'price')}`} />
+            saveLabel={dirty === 0 ? 'Save changes' : `Save ${plural(dirty, 'change')}`} />
         ) : meta?.priced && !fabricView ? (
           <EditButton label={meta.charge ? 'Edit charges' : 'Edit surcharges'} onClick={() => { setEditing(true); setNotice(null) }} />
         ) : null}
