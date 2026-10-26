@@ -6,7 +6,8 @@
  *
  * What a request is as the app reads and writes it. Pure, so every screen draws the same thing and this is tested. The
  * database decides who may do what (mig 20261021020100): anybody signed in sends one and follows their own; IT requests ·
- * View reads everybody's; Edit writes notes on one and sets its status, and its sender is told.
+ * View reads everybody's; Edit writes notes on one and sets its status, and its sender is told — New, In progress or
+ * Fixed: once it is Fixed its sender closes it (2026-10-27).
  */
 
 import { officeDay } from '@/lib/office-time'
@@ -30,6 +31,14 @@ export const IT_STATUSES: ReadonlyArray<{ id: ItStatus; label: string }> = [
   { id: 'closed', label: 'Closed' },
 ]
 export const STATUS_LABEL: Readonly<Record<ItStatus, string>> = { new: 'New', in_progress: 'In progress', fixed: 'Fixed', closed: 'Closed' }
+/**
+ * What IT sets (2026-10-27 — the user: "我这边写已经 fix 了，所以那个 close 是不需要的。等我这边按了已经 fix，这个 close
+ * 其实应该是由提出这个 request / support 的人去操作"): New, In progress, Fixed. Closed is its sender's — once IT has marked
+ * it Fixed, they try it and close it, and the desk reads it closed (mig 20261027150000).
+ */
+export const IT_DESK_STATUSES: ReadonlyArray<{ id: ItStatus; label: string }> = IT_STATUSES.filter(s => s.id !== 'closed')
+/** Its sender may close it: IT has marked it Fixed. */
+export const senderMayClose = (r: Pick<ItRequest, 'mine' | 'status'>): boolean => r.mine && r.status === 'fixed'
 /** A status's chip, in the app's tones: waiting, being worked on, done, put away. */
 export const STATUS_TONE: Readonly<Record<ItStatus, 'pending' | 'warn' | 'good' | 'none'>> = { new: 'pending', in_progress: 'warn', fixed: 'good', closed: 'none' }
 

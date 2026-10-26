@@ -112,6 +112,42 @@ describe('shared white IT support', () => {
     await waitFor(() => expect(api.desk).toHaveBeenCalledOnce())
   })
 
+  // 2026-10-27 — the user: "等我这边按了已经 fix，这个 close 其实应该是由提出这个 request / support 的人去操作 … 然后我这边这个
+  // ticket 就 automatically close 了".
+  it('gives the desk New, In progress and Fixed — a closed one reads Closed, and only goes back to work', async () => {
+    const fixed = row({ mine: false, status: 'fixed' })
+    render(<ItSupport app="portal" desk canEdit initialRequests={[fixed]} initialRequest={fixed} />)
+    const dialog = await screen.findByRole('dialog', { name: fixed.title })
+    expect(within(within(dialog).getByRole('combobox', { name: 'Status' })).getAllByRole('option').map(o => o.textContent)).toEqual(['New', 'In progress', 'Fixed'])
+    expect(within(dialog).queryByRole('button', { name: 'Close request' })).toBeNull()
+    cleanup()
+    const closed = row({ mine: false, status: 'closed' })
+    render(<ItSupport app="portal" desk canEdit initialRequests={[closed]} initialRequest={closed} />)
+    const box = await screen.findByRole('dialog', { name: closed.title })
+    const select = within(box).getByRole('combobox', { name: 'Status' }) as HTMLSelectElement
+    expect(select.value).toBe('closed')
+    expect(within(select).getByRole('option', { name: 'Closed' })).toBeDisabled()
+  })
+
+  it('lets its sender close a Fixed request with their words, and then offers it no more', async () => {
+    const request = row({ status: 'fixed', statusByName: 'Principal', statusAt: '2026-10-21T03:00:00Z' })
+    api.note.mockResolvedValue({ ok: true, data: row({ ...request, status: 'closed' }) })
+    render(<ItSupport app="hr" initialRequests={[request]} initialRequest={request} />)
+    const dialog = await screen.findByRole('dialog', { name: request.title })
+    expect(within(dialog).queryByRole('combobox', { name: 'Status' })).toBeNull()
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Your reply' }), { target: { value: 'Works now.' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close request' }))
+    await waitFor(() => expect(api.note).toHaveBeenCalledWith({ id: request.id, body: 'Works now.', files: [], status: 'closed', current: 'fixed' }))
+    await waitFor(() => expect(within(dialog).queryByRole('button', { name: 'Close request' })).toBeNull())
+  })
+
+  it.each(['new', 'in_progress', 'closed'] as const)('offers its sender no Close request while it is %s', async status => {
+    const request = row({ status })
+    render(<ItSupport app="hr" initialRequests={[request]} initialRequest={request} />)
+    const dialog = await screen.findByRole('dialog', { name: request.title })
+    expect(within(dialog).queryByRole('button', { name: 'Close request' })).toBeNull()
+  })
+
   it.each([false, true])('an own-support deep link to another sender has no editor (readOnly=%s)', async readOnly => {
     const request = row({ mine: false, files: [picture] })
     render(<ItSupport app="finance" readOnly={readOnly} initialRequests={[]} initialRequest={request} initialFileUrls={{}} />)

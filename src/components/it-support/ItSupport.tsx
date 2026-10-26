@@ -9,8 +9,8 @@ import { Select } from '@/components/hrv/select'
 import ImageAnnotator from '@/components/it-requests/ImageAnnotator'
 import { fetchMyItRequests, fetchItDesk, fetchItRequest, submitItRequest, noteItRequest } from '@/lib/it-requests/actions'
 import {
-  IT_CATEGORIES, IT_STATUSES, IT_LIMITS, CATEGORY_LABEL, STATUS_LABEL, deviceLabel, itDay, itWhen,
-  submitProblem, noteProblem, type ItCategory, type ItFile, type ItRequest, type ItStatus,
+  IT_CATEGORIES, IT_DESK_STATUSES, IT_STATUSES, IT_LIMITS, CATEGORY_LABEL, STATUS_LABEL, deviceLabel, itDay, itWhen,
+  senderMayClose, submitProblem, noteProblem, type ItCategory, type ItFile, type ItRequest, type ItStatus,
 } from '@/lib/it-requests/model'
 import { FiledFiles, Uploads } from './Attachments'
 import FilePreview from './FilePreview'
@@ -266,6 +266,8 @@ function RequestDetail({ open, request, readOnly, canEdit, preloaded, onClose, o
   const files = useItUploads()
   const { closed, sending } = useDraftLifecycle(open, files.discard)
   const writes = (request.mine || canEdit) && !readOnly
+  // Once IT has marked it Fixed its sender tries it and closes it; the desk reads it closed (2026-10-27).
+  const closes = senderMayClose(request) && !readOnly
   // A file dragged onto the note attaches as if picked (2026-10-24); dropped elsewhere in the window it is not opened in place of the page.
   const drop = useFileDrop(files.add, open && writes && !busy && !files.full)
   const mayAnnotate = useRef(false)
@@ -276,9 +278,9 @@ function RequestDetail({ open, request, readOnly, canEdit, preloaded, onClose, o
   const annotate = writes ? (src: string, fileName: string) => {
     if (mayAnnotate.current) setAnnotation({ src, fileName })
   } : undefined
-  const send = async () => {
+  const send = async (close = false) => {
     if (sending.current || !writes || !open) return
-    const nextStatus = canEdit && status !== request.status ? status : null
+    const nextStatus: ItStatus | null = close ? 'closed' : canEdit && status !== request.status ? status : null
     const problem = noteProblem({ body, files: files.items.length, status: nextStatus, current: request.status })
     if (problem) return setError(problem)
     if (files.busy || files.failed) return setError(files.busy ? 'Wait for the files to finish uploading.' : 'Remove the files that could not be uploaded, then add them again.')
@@ -334,11 +336,16 @@ function RequestDetail({ open, request, readOnly, canEdit, preloaded, onClose, o
             {drop.over && <span className={s.dropHint} aria-hidden="true">Drop to attach</span>}
           </div></Field>
           <Uploads files={files} disabled={busy} onAnnotate={annotate} />
+          {/* IT sets New, In progress, Fixed; Closed, its sender's, shows only as what a closed one is. */}
           {canEdit && <Field label="Status" htmlFor={`${noteId}-status`}>
             <Select id={`${noteId}-status`} value={status} disabled={busy} onChange={event => setStatus(event.target.value as ItStatus)}>
-              {IT_STATUSES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              {IT_DESK_STATUSES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
+              {request.status === 'closed' && <option value="closed" disabled>{STATUS_LABEL.closed}</option>}
             </Select>
           </Field>}
+          {closes && <div className={s.closeRow}>
+            <DialogButton disabled={busy || files.busy} onClick={() => void send(true)}>Close request</DialogButton>
+          </div>}
         </section>}
         {error && <p className={s.error} role="alert">{error}</p>}
       </div>
