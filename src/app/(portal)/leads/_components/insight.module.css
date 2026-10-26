@@ -4,7 +4,7 @@
 .head { flex: none; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 12px; padding-bottom: 12px; border-bottom: 1px solid rgb(var(--lv-border)); }
 .titles { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .eyebrow { font-size: 11px; letter-spacing: 0.14em; color: rgb(var(--lv-text-2)); }
-.title { margin: 0; font-family: var(--lv-font-title); font-size: 32px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
+.title { margin: 0; font-family: var(--lv-font-title); font-size: 26px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
 .seg { display: inline-flex; border: 1px solid rgb(var(--lv-frame)); border-radius: 6px; overflow: hidden; background: rgb(var(--lv-white)); }
 .seg button { border: 0; border-left: 1px solid rgb(var(--lv-frame)); background: transparent; padding: 5px 11px; font: inherit; font-size: 13px; color: rgb(var(--lv-text-2)); cursor: pointer; white-space: nowrap; }
 .seg button:first-child { border-left: 0; }

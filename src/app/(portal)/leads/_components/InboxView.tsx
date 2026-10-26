@@ -144,9 +144,6 @@ export default function InboxView({
     <div className={s.page}>
       <div className={s.head}>
         <h1 className={s.title}>Inbox</h1>
-        <div className={s.status}>
-          <span className={s.dot} aria-hidden="true" />Messenger connected · Instagram not yet · replies outside 24 hours are not sent
-        </div>
       </div>
 
       <div className={s.grid} style={{ gridTemplateColumns: `${layout.listW}px minmax(0,1fr) ${cardW}px ${logW}px` }}>

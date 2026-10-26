@@ -48,7 +48,6 @@ export default function InsightView({ contacts, onlyTests, range, brands, more, 
     const d = drop[i].pct - x.pct
     return d > (b?.d ?? 0) ? { d, from: drop[i].label, to: x.label } : b
   }, null)
-  const brandName = brand === 'all' ? 'All brands' : brands.find(b => b.id === brand)?.name ?? '—'
 
   return (
     <div className={s.page}>
@@ -69,7 +68,7 @@ export default function InsightView({ contacts, onlyTests, range, brands, more, 
         {onlyTests ? <div className={s.note}>Only test conversations so far: these numbers come from tests.</div> : null}
 
         <section className={s.section}>
-          <div className={s.sectHead}><h2 className={s.h2}>From message to sale</h2><span className={s.sub}>{range.label} · {brandName}</span></div>
+          <div className={s.sectHead}><h2 className={s.h2}>From message to sale</h2></div>
           <div className={s.funnel}>
             {funnel.map((f, i) => (
               <div key={f.label} className={s.stage}>
@@ -83,7 +82,7 @@ export default function InsightView({ contacts, onlyTests, range, brands, more, 
         </section>
 
         <section className={s.section}>
-          <div className={s.sectHead}><h2 className={s.h2}>By ad</h2><span className={s.sub}>Spend comes from Ads Manager once it is connected. Sort by any column.</span></div>
+          <div className={s.sectHead}><h2 className={s.h2}>By ad</h2></div>
           <div className={s.table}>
             <div className={s.adRow} data-head="">
               {COLS.map(([k, l]) => (
