@@ -14,7 +14,7 @@ import s from './replies.module.css'
 /**
  * Lead View › Data Center (2026-10-16 text cards; files and links since 2026-10-23, the redesign v2 handoff `Data
  * Center.dc.html` — mig 20261023200000): what the AI Agent reads, in a brand's folder or Shared, by category, with
- * dates, a version and on / paused. Files go straight from the browser to the private bucket `lead-data`
+ * dates, a version and on / paused. Files go straight from the browser to the private bucket `lead-data` (R2 since mig 20261026100000)
  * (files/<uuid>/<name>, a Lead View · Manage session may upload), then lead_save_data_file records them; a new upload on
  * a file is its next version. USED BY: the brand's agent reads its folder, every agent reads Shared (pausing a file is
  * here only, as drawn). The old text cards are General info's job now. Blank templates: CSV starters for the most useful

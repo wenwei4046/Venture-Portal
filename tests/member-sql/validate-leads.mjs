@@ -770,4 +770,33 @@ await db.exec((await readFile(new URL('../../supabase/migrations/20261023500000_
   check((await q('select public.lead_info() i'))[0].i.cats.length, after.cats.length, 'the rest stay')
 }
 
+// ── Data Center files in R2 (mig 20261026100000): the bucket is R2's, the save asks public.file_objects ──
+await db.exec(`
+  create table if not exists public.file_buckets (id text primary key, public boolean not null default false, file_size_limit bigint,
+    allowed_mime_types text[], backend text not null default 'supabase', public_url text, created_at timestamptz default now());
+  create table if not exists public.file_objects (id uuid primary key default gen_random_uuid(), bucket_id text not null, name text not null,
+    owner uuid, owner_id text, metadata jsonb default '{}'::jsonb, created_at timestamptz default now(), unique (bucket_id, name));
+  alter table storage.objects add column if not exists id uuid default gen_random_uuid();
+  alter table storage.objects add column if not exists owner uuid;
+  alter table storage.objects add column if not exists metadata jsonb;
+  alter table storage.objects add column if not exists created_at timestamptz default now();
+  alter table storage.objects alter column owner_id type text using owner_id::text;
+`)
+{
+  const before = (await q(`select md5(prosrc) m from pg_proc where oid = 'public.lead_save_data_file(uuid, jsonb)'::regprocedure`))[0].m
+  const leadR2 = (await readFile(new URL('../../supabase/migrations/20261026100000_lead_data_r2.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+  // The test database's body differs from production's only if a migration drifted: say so instead of skipping.
+  check(before, 'ada0e52d0a74b57e6859a9042a9d4053', 'lead_save_data_file here is production’s body (the move is written against it)')
+  await db.exec(leadR2)
+  check((await q(`select backend, file_size_limit from public.file_buckets where id = 'lead-data'`))[0], { backend: 'r2', file_size_limit: 52428800 }, 'lead-data is an R2 bucket, 50 MB a file')
+  const src = (await q(`select prosrc from pg_proc where oid = 'public.lead_save_data_file(uuid, jsonb)'::regprocedure`))[0].prosrc
+  check([src.includes('storage.objects'), src.includes('public.file_objects'), src.includes('tab_write_guard')], [false, true, true], 'the save asks file_objects, its page guard kept')
+  check((await q(`select count(*)::int n from pg_policies where tablename = 'file_objects' and policyname in ('lead_data_upload', 'lead_data_read')`))[0].n, 2, 'the bucket’s two policies on file_objects')
+  const r2Path = `files/${'5'.repeat(8)}-5555-5555-5555-${'5'.repeat(12)}/price-list.pdf`
+  await refuses(`select public.lead_save_data_file(null, $1::jsonb)`, [JSON.stringify({ kind: 'file', name: 'Price list', path: r2Path })], /did not finish uploading/, 'a file not in file_objects has not arrived')
+  await db.exec(`insert into public.file_objects (bucket_id, name) values ('lead-data', '${r2Path}')`)
+  const r2File = (await q(`select public.lead_save_data_file(null, $1::jsonb) id`, [JSON.stringify({ kind: 'file', name: 'Price list', path: r2Path, mime: 'application/pdf', sizeBytes: 1200 })]))[0].id
+  check(typeof r2File, 'string', 'a file in file_objects is saved')
+}
+
 console.log(`validate-leads: ${checks} checks passed`)
