@@ -320,7 +320,7 @@ describe("A request, read", () => {
     fireEvent.click(within(box).getByRole("button", { name: "Close request" }));
     await waitFor(() => expect(p.onNote).toHaveBeenCalledWith({ id: "r1", body: "Works now, thanks.", files: [], status: "closed", current: "fixed" }));
     // Words alone are still a reply.
-    p.onNote.mockClear();
+    vi.mocked(p.onNote).mockClear();
     fireEvent.change(within(box).getByRole("textbox", { name: "Your note" }), { target: { value: "Not yet on Android." } });
     fireEvent.click(within(box).getByRole("button", { name: "Send" }));
     await waitFor(() => expect(p.onNote).toHaveBeenCalledWith({ id: "r1", body: "Not yet on Android.", files: [], status: null, current: "fixed" }));
