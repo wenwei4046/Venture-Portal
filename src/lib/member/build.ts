@@ -104,12 +104,28 @@ function inList(value: string | undefined, list: readonly string[]): boolean {
   return k !== null && list.some((v) => valueKey(v) === k);
 }
 
+/**
+ * How many of a special the build asks for (2026-10-26): the quantity the member set for a
+ * special charged by quantity, else 1. Read by the special's folded spelling.
+ */
+export function specialQtyOf(build: Pick<QuoteBuild, "specialQty"> | undefined, value: string): number {
+  const k = valueKey(value);
+  if (k === null) return 1;
+  for (const [key, n] of Object.entries(build?.specialQty ?? {})) {
+    if (valueKey(key) === k && Number.isInteger(n) && n >= 1 && n <= 100) return n;
+  }
+  return 1;
+}
+
 /** Why the build cannot be quoted, or null. Only the choices made are checked. */
 export function buildError(build: QuoteBuild | undefined, choices: BuildChoices): string | null {
   if (!build) return null;
   const sofaSpecials = build.specials ?? [];
   if ((build.leg || sofaSpecials.length) && !choices.sofa)
     return "The sofa options no longer match the cart. Choose them again.";
+  // A quantity is for a special the build has.
+  if (Object.keys(build.specialQty ?? {}).some((sp) => !inList(sp, sofaSpecials)))
+    return "A special's quantity no longer matches the sofa's specials. Choose them again.";
   if (choices.sofa) {
     if (build.leg && !inList(build.leg, choices.sofa.legs))
       return "That leg height is not offered for every sofa in the cart. Choose another.";
@@ -147,8 +163,11 @@ export function pruneBuild(build: QuoteBuild | undefined, choices: BuildChoices)
   const next: QuoteBuild = { ...build };
   next.leg = keep(build.leg, choices.sofa?.legs);
   next.specials = keepAll(build.specials, choices.sofa?.specials);
+  const kept = next.specials;
+  next.specialQty = Object.fromEntries(Object.entries(build.specialQty ?? {}).filter(([sp]) => inList(sp, kept)));
   if (!next.leg) delete next.leg;
   if (!next.specials.length) delete next.specials;
+  if (!Object.keys(next.specialQty).length) delete next.specialQty;
   if (build.bedframe) {
     const c = choices.bedframe;
     const bf: BedframeBuild = {
@@ -253,6 +272,10 @@ export function frameBuildText(build: BedframeBuild | undefined): string {
 export function buildKey(build: QuoteBuild | undefined): unknown[] {
   const sorted = (values: string[] | undefined) =>
     [...new Set((values ?? []).map((v) => v.trim()).filter(Boolean))].sort();
+  const quantities = Object.entries(build?.specialQty ?? {})
+    .map(([sp, n]) => [sp.trim(), n] as const)
+    .filter(([sp]) => sp)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   return [
     build?.height ?? null,
     build?.tier ?? null,
@@ -263,6 +286,8 @@ export function buildKey(build: QuoteBuild | undefined): unknown[] {
     build?.bedframe?.total ?? null,
     build?.bedframe?.gap ?? null,
     sorted(build?.bedframe?.specials),
+    // Last, so a build with none keys as it always has.
+    ...(quantities.length ? [quantities] : []),
   ];
 }
 
@@ -277,7 +302,10 @@ export function buildLines(
     if (has.sofaGrid && build?.height && build?.tier)
       parts.push(`seat height ${build.height}`, `${tierLabel(build.tier)} fabric`);
     if (build?.leg) parts.push(`leg ${build.leg}`);
-    if (build?.specials?.length) parts.push(build.specials.join(", "));
+    // A special charged by quantity says how many: `Change 8030 Backcushion ×3`.
+    const counted = new Set(Object.keys(build?.specialQty ?? {}).map((sp) => valueKey(sp)));
+    if (build?.specials?.length)
+      parts.push(build.specials.map((sp) => (counted.has(valueKey(sp)) ? `${sp} ×${specialQtyOf(build, sp)}` : sp)).join(", "));
     if (parts.length) out.push(`Sofa build: ${parts.join(" · ")}`);
   }
   const bf = build?.bedframe;

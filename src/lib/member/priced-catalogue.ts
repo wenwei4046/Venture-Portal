@@ -50,14 +50,18 @@ const CHARGE_KEYS = {
   SOFA: ["leg_heights", "specials"],
 } as const;
 
-/** `[{ value, charge }]`, each a short value and a charge above zero — anything else is dropped. */
+/**
+ * `[{ value, charge, byQuantity? }]`, each a short value and a charge above zero — anything
+ * else is dropped. `byQuantity` (a sofa special charged each, 2026-10-26) only when it is `true`.
+ */
 function chargeList(v: unknown): OptionCharge[] {
   if (!Array.isArray(v)) return [];
   return v.flatMap((x) => {
     if (!isRow(x)) return [];
     const value = text(x.value, 80);
     const charge = money(x.charge);
-    return value && value.trim() && charge !== null && charge > 0 ? [{ value, charge }] : [];
+    if (!value || !value.trim() || charge === null || !(charge > 0)) return [];
+    return [x.byQuantity === true ? { value, charge, byQuantity: true } : { value, charge }];
   });
 }
 

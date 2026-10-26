@@ -434,6 +434,8 @@ export interface MaintenanceOption {
   removed: boolean
   isNew: boolean
   price: number | null
+  /** A sofa special charged by the quantity the member sets (2026-10-26); false = once (per sofa, per frame). */
+  byQuantity: boolean
 }
 
 export interface FabricRow {
@@ -464,7 +466,7 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
         .range(f, t),
     ),
     all((f, t) =>
-      sb.from('catalogue_option_prices').select('pool, value, price').eq('erp_company_id', 1).order('pool').order('value').range(f, t),
+      sb.from('catalogue_option_prices').select('pool, value, price, by_quantity').eq('erp_company_id', 1).order('pool').order('value').range(f, t),
     ),
     all((f, t) =>
       sb
@@ -477,6 +479,7 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
     ),
   ])
   const priceOf = new Map(prices.map(p => [`${p.pool}\u0000${p.value}`, num(p.price)]))
+  const counted = new Set(prices.filter(p => p.by_quantity === true).map(p => `${p.pool}\u0000${p.value}`))
   const isNew = newness(options)
   return {
     options: options.map(o => ({
@@ -488,6 +491,7 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
       removed: o.removed_at !== null && o.removed_at !== undefined,
       isNew: isNew(str(o.first_seen_at)),
       price: priceOf.get(`${o.pool}\u0000${o.value}`) ?? null,
+      byQuantity: counted.has(`${o.pool}\u0000${o.value}`),
     })),
     fabrics: fabrics.map(f => ({
       erpId: String(f.erp_id),

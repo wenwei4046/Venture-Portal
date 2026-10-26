@@ -68,4 +68,15 @@ describe('what a line’s options were charged for', () => {
     expect(chargeText({ ...sofa, charge_set: { unit: 150, sets: 1, total: 150, lines: 1 } }))
       .toBe('for leg 6" · Nylon Fabric — RM 150.00 once for the sofa')
   })
+
+  // 2026-10-26: a sofa's special is charged what the bill's special order says.
+  it('says a sofa special came from the bill’s special order', () => {
+    expect(chargeText({
+      charges: [
+        { pool: 'sofa_leg_heights', value: '5"', price: 200 },
+        { pool: 'sofa_specials', value: 'Change 8030 Backcushion', price: 600, special_order: true },
+      ],
+      charge_set: { unit: 200, sets: 1, special_order: 600, total: 800, lines: 2 },
+    })).toBe('for leg 5" · Change 8030 Backcushion (special order) — RM 800.00 once for the sofa, spread over its 2 pieces')
+  })
 })

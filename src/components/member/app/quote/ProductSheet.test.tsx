@@ -107,3 +107,106 @@ describe("accessory search in product sheets", () => {
     ]);
   });
 });
+
+// 2026-10-26, the user: "如果我点沙发的话，下面应该可以选择要不要加 accessory" — SKU Master's Sofa Accessory, beside the sofa.
+describe("a sofa's accessories", () => {
+  const sofaCatalog: QCatalog = {
+    brand: "ZANOTTI", name: "Zanotti", sofa: true, frames: [], kpis: [], accSummary: "2 items",
+    models: [{ key: "8030", name: "SOFFIO", desc: "8030", sizes: {}, choices: NO_SOFA_CHOICES, modules: [
+      { code: "1A(LHF)", desc: "1-seat · left arm", seats: 1, chaise: false, productId: "s-1a", options: [] },
+      { code: "1A(RHF)", desc: "1-seat · right arm", seats: 1, chaise: false, productId: "s-1b", options: [] },
+    ] }],
+    accs: [
+      { key: "BACK CUSHION 01", name: "BACK CUSHION 01", any: "bc01", sizes: {} },
+      { key: "SQUARE PILLOW", name: "SQUARE PILLOW", any: "sq", sizes: {} },
+    ],
+  };
+
+  function drawSofa(sheet: SheetState) {
+    const add = vi.fn();
+    function Harness() {
+      const [current, setSheet] = useState<SheetState>(sheet);
+      return <ProductSheet sheet={current} catalog={sofaCatalog} memory={EMPTY_MEMORY} cart={[]} build={NO_SOFA_BUILD} readOnly={false}
+        actions={{
+          close: vi.fn(), patch: patch => setSheet(s => ({ ...s, ...patch } as SheetState)),
+          patchFrame: vi.fn(), openBf: vi.fn(), editBf: vi.fn(), removeBf: vi.fn(), backToMattress: vi.fn(), applyFrame: vi.fn(),
+          add: () => add(sheetLines(current, sofaCatalog)),
+        }} />;
+    }
+    render(<Harness />);
+    return add;
+  }
+
+  it("lists the sofa accessories under the sofa, optional, and adds them with it — per set", () => {
+    const add = drawSofa({ mode: "sofa", key: "8030", layout: "C", mods: { "1A(LHF)": 1, "1A(RHF)": 1 }, qty: 1, kpi: [], height: null, tier: null,
+      leg: null, specials: [], acc: {}, accAll: false });
+    expect(screen.getByText("3 · Accessories")).toBeInTheDocument();
+    addOne("SQUARE PILLOW");
+    addOne("SQUARE PILLOW");
+    // The footer's sets — the last "More"; each module's stepper has one too.
+    fireEvent.click(screen.getAllByRole("button", { name: "More" }).at(-1)!);
+    fireEvent.click(screen.getByRole("button", { name: "Add 2 sets to cart" }));
+    expect(add).toHaveBeenCalledWith([
+      expect.objectContaining({ kind: "sofa", productId: "s-1a", qty: 2 }),
+      expect.objectContaining({ kind: "sofa", productId: "s-1b", qty: 2 }),
+      expect.objectContaining({ kind: "acc", productId: "sq", qty: 4 }),
+    ]);
+  });
+
+  it("sells them on their own as Sofa accessories only", () => {
+    drawSofa({ mode: "acc", acc: {}, accAll: false });
+    expect(screen.getByRole("dialog", { name: "Sofa accessories only" })).toBeInTheDocument();
+    expect(screen.getByText("ZANOTTI · SOFA ACCESSORIES")).toBeInTheDocument();
+    expect(screen.getByText("Sofa accessories")).toBeInTheDocument();
+  });
+});
+
+// 2026-10-26, the user: "比如 change 8030 back cushion … 应该要乘三。所以它需要在 quotation 那边的 quantity 可以放 plus 和 minus".
+describe("a sofa special charged by quantity", () => {
+  const BACK = { value: "Change 8030 Backcushion", charge: 200, byQuantity: true };
+  const SEAT = { value: "Seat Base Fully Cover", charge: 300 };
+  const catalogWith = (specials: typeof SEAT[]): QCatalog => ({
+    brand: "ZANOTTI", name: "Zanotti", sofa: true, frames: [], kpis: [], accSummary: "0 items", accs: [],
+    models: [{ key: "8030", name: "SOFFIO", desc: "8030", sizes: {}, choices: { legs: [], specials }, modules: [
+      { code: "1A(LHF)", desc: "1-seat · left arm", seats: 1, chaise: false, productId: "s-1a", options: [] },
+    ] }],
+  });
+
+  function drawSofa(specials: typeof SEAT[]) {
+    const patches: Partial<SheetState>[] = [];
+    function Harness() {
+      const [sheet, setSheet] = useState<SheetState>({ mode: "sofa", key: "8030", layout: "C", mods: { "1A(LHF)": 1 }, qty: 1, kpi: [], height: null, tier: null,
+        leg: null, specials: [], specialQty: {}, acc: {}, accAll: false });
+      return <ProductSheet sheet={sheet} catalog={catalogWith(specials)} memory={EMPTY_MEMORY} cart={[]} build={NO_SOFA_BUILD} readOnly={false}
+        actions={{
+          close: vi.fn(), patch: patch => { patches.push(patch); setSheet(s => ({ ...s, ...patch } as SheetState)); },
+          patchFrame: vi.fn(), openBf: vi.fn(), editBf: vi.fn(), removeBf: vi.fn(), backToMattress: vi.fn(), applyFrame: vi.fn(), add: vi.fn(),
+        }} />;
+    }
+    render(<Harness />);
+    return patches;
+  }
+
+  it("counts it with − and +, each at its price, beside the specials charged once per sofa", () => {
+    const patches = drawSofa([SEAT, BACK]);
+    expect(screen.getByText("Not in margin")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Seat Base Fully Cover/ })).toHaveTextContent("+ RM 300 per sofa");
+    const row = screen.getByRole("group", { name: BACK.value });
+    expect(row).toHaveTextContent("+ RM 200 each");
+    expect(within(row).getByText("0")).toBeInTheDocument();
+    for (let i = 0; i < 3; i++) fireEvent.click(within(row).getByRole("button", { name: "Add one" }));
+    expect(within(row).getByText("3")).toBeInTheDocument();
+    expect(patches.at(-1)).toEqual({ specials: [BACK.value], specialQty: { [BACK.value]: 3 } });
+    fireEvent.click(within(row).getByRole("button", { name: "Remove one" }));
+    fireEvent.click(within(row).getByRole("button", { name: "Remove one" }));
+    fireEvent.click(within(row).getByRole("button", { name: "Remove one" }));
+    expect(within(row).getByText("0")).toBeInTheDocument();
+    expect(patches.at(-1)).toEqual({ specials: [], specialQty: {} });
+  });
+
+  it("keeps the once-per-sofa words when nothing is counted", () => {
+    drawSofa([SEAT]);
+    expect(screen.getByText("Once per sofa · not in margin")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Seat Base Fully Cover/ })).toHaveTextContent(/^Seat Base Fully Cover\+ RM 300$/);
+  });
+});

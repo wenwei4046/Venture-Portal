@@ -166,7 +166,7 @@ export interface QCatalog {
   accs: QAcc[];
   /** Empty while the sub-department's KPI pay is off. */
   kpis: QKpi[];
-  /** *Buy separately › Accessories only*, before ` · Akemi margin`. */
+  /** *Buy separately › Accessories only* (a sofa's: *Sofa accessories only*), before ` · Akemi margin`. */
   accSummary: string;
 }
 
@@ -260,11 +260,19 @@ export function layoutKey(mods: Record<string, number>): string {
 
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, "en", { sensitivity: "base", numeric: true });
 
+/** SKU Master's *Sofa Accessory* — the ERP's FABRIC_ACCESSORY: back cushions, arm rests, sofa pillows. */
+export function isSofaAccessory(product: Pick<MemberProduct, "kind">): boolean {
+  return (product.kind ?? "").trim().toUpperCase() === "FABRIC_ACCESSORY";
+}
+
 /**
  * One brand's quote from the Product List snapshot: its mattress or sofa
  * models, and every rider (bed frames, accessories) — riders carry no brand
  * and follow the mattress or sofa's margin (user 2026-09-12). A rider marked
- * with ANOTHER brand stays out: a quote is one brand's.
+ * with ANOTHER brand stays out: a quote is one brand's. A sofa brand's
+ * accessories are SKU Master's *Sofa Accessory* alone, and a mattress brand's
+ * every other accessory (user 2026-10-26: "沙发 accessory only"; the two
+ * lists are kept apart).
  */
 export function catalogFromProducts(
   products: MemberProduct[],
@@ -279,7 +287,8 @@ export function catalogFromProducts(
   const models = new Map<string, QModel>();
   const frames = new Map<string, QFrame>();
   const accs = new Map<string, QAcc>();
-  let sofa = false;
+  // Known before the loop: which accessories this quote sells depends on it.
+  const sofa = live.some(p => p.brand === brand && kindOf(p) === "SOFA");
   for (const p of live) {
     const kind = kindOf(p);
     const size = sizeKeyOf(p.size);
@@ -287,7 +296,6 @@ export function catalogFromProducts(
     // A mattress or a sofa is always a brand's own; one without the brand is not this quote's.
     if ((kind === "SOFA" || mattress) && p.brand !== brand) continue;
     if (kind === "SOFA") {
-      sofa = true;
       const key = p.modelId ?? p.baseModel ?? p.name;
       // A named sofa is shown by its name alone (2026-10-20); its code stays searchable.
       const model = models.get(key) ?? { key, name: p.name, desc: (p.baseModel ?? "").trim(), sizes: {}, modules: [], choices: sofaChoicesOf(p.modelId ? modelsById.get(p.modelId) : undefined) };
@@ -309,7 +317,7 @@ export function catalogFromProducts(
       };
       if (size && !frame.sizes[size]) frame.sizes[size] = p.id;
       frames.set(key, frame);
-    } else {
+    } else if (isSofaAccessory(p) === sofa) {
       // Accessories: one row per name, its fitted sizes beside the one-size SKU.
       const key = p.name.trim().toUpperCase();
       const acc = accs.get(key) ?? { key, name: p.name, any: null, sizes: {} };
@@ -331,6 +339,11 @@ export function catalogFromProducts(
     kpis,
     accSummary: `${accList.length} item${accList.length === 1 ? "" : "s"}`,
   };
+}
+
+/** What *Buy separately* calls the accessories on their own: a sofa brand's are its sofa accessories. */
+export function accOnlyTitle(catalog: Pick<QCatalog, "sofa">): string {
+  return catalog.sofa ? "Sofa accessories only" : "Accessories only";
 }
 
 /** The sizes a mattress model comes in, smallest first: `Single · Queen · King`. */
@@ -393,6 +406,10 @@ export type SheetState =
       mode: "sofa"; key: string; layout: string; mods: Record<string, number>; qty: number; kpi: string[]; height: string | null; tier: string | null;
       /** The cart's leg height and specials as the sheet opened on them, then as changed here (null = not chosen). */
       leg: string | null; specials: string[];
+      /** And how many of each special charged by quantity (2026-10-26); absent on a sheet from before. */
+      specialQty?: Record<string, number>;
+      /** Its sofa accessories (2026-10-26), by SKU, per set — as *Sofa accessories only* picks them. */
+      acc: Record<string, number>; accAll: boolean;
     }
   | { mode: "frame"; size: SizeKey; frame: string; kpi: string[]; qty: number; drop: boolean; build?: BedframeBuild }
   /** Standalone accessories are picked by SKU so several fitted sizes can be bought together. */
@@ -428,7 +445,10 @@ export function sheetLines(sh: SheetState, catalog: QCatalog): CartLine[] {
       const n = sh.mods[x.code] ?? 0;
       if (n > 0) push(out, { id: `s-${model.key}-${x.code}`, kind: "sofa", key: model.key, name: `${model.name} ${x.code}`, size: x.desc, qty: n * sh.qty, productId: x.productId });
     }
-    if (out.length) sh.kpi.forEach(k => kpiLine(k, sh.qty));
+    // Its KPI items and accessories ride the sofa: with no module chosen there is nothing to add.
+    if (!out.length) return out;
+    sh.kpi.forEach(k => kpiLine(k, sh.qty));
+    accLines(out, catalog, sh.acc, sh.qty);
     return out;
   }
   const bfs: BfPick[] = sh.mode === "frame" ? [sh] : sh.mode === "model" ? sh.bfs : [];
@@ -449,18 +469,29 @@ export function sheetLines(sh: SheetState, catalog: QCatalog): CartLine[] {
     });
     bf.kpi.forEach(k => kpiLine(k, n));
   }
-  if (sh.mode === "model" || sh.mode === "acc") {
+  if (sh.mode === "model") {
     for (const acc of catalog.accs) {
-      const variants = sh.mode === "acc" ? accVariants(acc) : [accAt(acc, sh.size)];
-      for (const at of variants) {
-        if (!at) continue;
-        const n = (sh.acc[sh.mode === "acc" ? at.productId : acc.key] ?? 0) * sets;
-        if (!n) continue;
-        push(out, { id: `a-${acc.key}-${at.size ?? ""}`, kind: "acc", key: acc.key, name: acc.name, size: at.size ? sizeLabel(at.size) : "", qty: n, productId: at.productId });
-      }
+      const at = accAt(acc, sh.size);
+      const n = (sh.acc[acc.key] ?? 0) * sets;
+      if (at && n) push(out, accLine(acc, at, n));
     }
   }
+  if (sh.mode === "acc") accLines(out, catalog, sh.acc, 1);
   return out;
+}
+
+function accLine(acc: QAcc, at: { productId: string; size: SizeKey | null }, qty: number): CartLine {
+  return { id: `a-${acc.key}-${at.size ?? ""}`, kind: "acc", key: acc.key, name: acc.name, size: at.size ? sizeLabel(at.size) : "", qty, productId: at.productId };
+}
+
+/** Accessories picked by SKU — *Accessories only*, and a sofa's own — times the sets they come with. */
+function accLines(out: CartLine[], catalog: QCatalog, picked: Record<string, number>, sets: number) {
+  for (const acc of catalog.accs) {
+    for (const at of accVariants(acc)) {
+      const n = (picked[at.productId] ?? 0) * sets;
+      if (n) push(out, accLine(acc, at, n));
+    }
+  }
 }
 
 // ── the cart ──────────────────────────────────────────────────────────────
@@ -582,10 +613,10 @@ export function remember(memory: QuoteMemory, sh: SheetState, catalog: QCatalog)
     const f: RecentFrame = { size: sh.size, frame: sh.frame, kpi: [...sh.kpi], ...(sh.build ? { build: { ...sh.build } } : {}) };
     next.frames = [f, ...memory.frames.filter(r => !sameFrame(r, f))].slice(0, 3);
   }
-  if (sh.mode === "model" || sh.mode === "acc") {
-    const used = sh.mode === "acc"
-      ? catalog.accs.filter(acc => accVariants(acc).some(at => (sh.acc[at.productId] ?? 0) > 0)).map(acc => acc.key)
-      : Object.entries(sh.acc).filter(([, n]) => n > 0).map(([k]) => k);
+  if (sh.mode === "model" || sh.mode === "acc" || sh.mode === "sofa") {
+    const used = sh.mode === "model"
+      ? Object.entries(sh.acc).filter(([, n]) => n > 0).map(([k]) => k)
+      : catalog.accs.filter(acc => accVariants(acc).some(at => (sh.acc[at.productId] ?? 0) > 0)).map(acc => acc.key);
     if (used.length) next.accs[brand] = [...used, ...(memory.accs[brand] ?? []).filter(k => !used.includes(k))].slice(0, 12);
   }
   return next;
@@ -672,17 +703,37 @@ export interface SofaBuild {
   /** null = not chosen. */
   leg: string | null;
   specials: string[];
+  /**
+   * How many of each special Maintenance charges BY QUANTITY (2026-10-26), for the whole
+   * cart, keyed as the list spells it; a special picked with none counts 1. Absent on a build from before.
+   */
+  specialQty?: Record<string, number>;
 }
 
-export const NO_SOFA_BUILD: SofaBuild = { height: null, tier: null, leg: null, specials: [] };
+export const NO_SOFA_BUILD: SofaBuild = { height: null, tier: null, leg: null, specials: [], specialQty: {} };
 
-/** A build kept on the phone — one kept before 2026-10-06 has only the seat height and tier. */
+/** Whole quantities of 1–100, by special; anything else is dropped. */
+function quantitiesOf(raw: unknown): Record<string, number> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return Object.fromEntries(Object.entries(raw as Record<string, unknown>)
+    .filter((e): e is [string, number] => typeof e[1] === "number" && Number.isInteger(e[1]) && e[1] >= 1 && e[1] <= MAX_QTY));
+}
+
+/** A special's quantity in a map keyed by spelling, read by its folded spelling; 1 when it has none. */
+export function qtyIn(quantities: Record<string, number> | undefined, value: string): number {
+  const k = valueKey(value);
+  const hit = Object.entries(quantities ?? {}).find(([sp]) => valueKey(sp) === k);
+  return hit ? hit[1] : 1;
+}
+
+/** A build kept on the phone — one kept before 2026-10-06 has only the seat height and tier, before 2026-10-26 no quantities. */
 export function sofaBuildOf(raw: Partial<SofaBuild> | null | undefined): SofaBuild {
   return {
     height: typeof raw?.height === "string" ? raw.height : null,
     tier: typeof raw?.tier === "string" ? raw.tier : null,
     leg: typeof raw?.leg === "string" ? raw.leg : null,
     specials: Array.isArray(raw?.specials) ? raw.specials.filter((v): v is string => typeof v === "string") : [],
+    specialQty: quantitiesOf(raw?.specialQty),
   };
 }
 
@@ -709,15 +760,21 @@ export function sofaChoicesIn(catalog: QCatalog, modelKeys: Iterable<string>): Q
 /**
  * What the cart's sofas are charged for their options until the server says —
  * ONCE PER SOFA (the twin of `sofaSetCharges`): each model in the cart is a
- * sofa, as many as the fewest of its pieces.
+ * sofa, as many as the fewest of its pieces. A special charged BY QUANTITY
+ * (2026-10-26) is its charge each times the quantity set, once for the cart
+ * (`specialQtyCharges`).
  */
 export function sofaCartCharge(catalog: QCatalog | null, cart: CartLine[], build: SofaBuild): number {
   if (!catalog) return 0;
   const keys = cartSofaKeys(cart);
+  if (!keys.length) return 0;
   const choices = sofaChoicesIn(catalog, keys);
-  const unit = chargeIn(choices.legs, build.leg ?? undefined) + specialsCharge(choices.specials, build.specials);
-  if (!(unit > 0)) return 0;
-  return keys.reduce((sum, key) => {
+  const picked = new Set(build.specials.map(sp => valueKey(sp)));
+  const counted = choices.specials.filter(o => o.byQuantity && picked.has(valueKey(o.value)))
+    .reduce((sum, o) => sum + o.charge * qtyIn(build.specialQty, o.value), 0);
+  const unit = chargeIn(choices.legs, build.leg ?? undefined) + specialsCharge(choices.specials.filter(o => !o.byQuantity), build.specials);
+  if (!(unit > 0)) return counted;
+  return counted + keys.reduce((sum, key) => {
     const pieces = cart.filter(l => l.kind === "sofa" && l.key === key).map(l => l.qty);
     return sum + unit * Math.max(1, Math.floor(Math.min(...pieces)));
   }, 0);
@@ -743,7 +800,14 @@ function offeredAll(values: string[], list: string[]): string[] {
  */
 export function sofaBuildToSend(build: SofaBuild, catalog: QCatalog | null, cart: CartLine[]): SofaBuild {
   const choices = catalog ? sofaChoicesIn(catalog, cartSofaKeys(cart)) : NO_SOFA_CHOICES;
-  return { ...build, leg: offeredOne(build.leg, choices.legs.map(o => o.value)), specials: offeredAll(build.specials, choices.specials.map(o => o.value)) };
+  const specials = offeredAll(build.specials, choices.specials.map(o => o.value));
+  return { ...build, leg: offeredOne(build.leg, choices.legs.map(o => o.value)), specials, specialQty: countedOf(choices.specials, specials, build.specialQty) };
+}
+
+/** Each picked special charged by quantity, with its quantity (1 when none was set), as the list spells it. */
+function countedOf(list: OptionCharge[], picked: string[], quantities: Record<string, number> | undefined): Record<string, number> {
+  const counted = new Set(list.filter(o => o.byQuantity).map(o => valueKey(o.value)));
+  return Object.fromEntries(picked.filter(sp => counted.has(valueKey(sp))).map(sp => [sp, qtyIn(quantities, sp)]));
 }
 
 export interface SofaBuildPick {
@@ -761,6 +825,8 @@ export interface SofaBuildPick {
   /** The sheet's leg height and specials, as far as they are still offered. */
   leg: string | null;
   picked: string[];
+  /** How many of each picked special charged by quantity, as the list spells it. */
+  qty: Record<string, number>;
 }
 
 /**
@@ -786,9 +852,10 @@ export function sofaPick(
   const wantedTier = sh.tier ?? build.tier;
   const tier = wantedTier && tiers.includes(wantedTier) ? wantedTier : tiers[0] ?? null;
   const options = sofaChoicesIn(catalog, [sh.key, ...cartSofaKeys(cart)]);
+  const picked = offeredAll(sh.specials, options.specials.map(o => o.value));
   return {
     graded, heights: choices.heights, tiers, height, tier, clash: graded && chosen.length > 0 && !choices.heights.length,
     legs: options.legs, specials: options.specials,
-    leg: offeredOne(sh.leg, options.legs.map(o => o.value)), picked: offeredAll(sh.specials, options.specials.map(o => o.value)),
+    leg: offeredOne(sh.leg, options.legs.map(o => o.value)), picked, qty: countedOf(options.specials, picked, sh.specialQty),
   };
 }

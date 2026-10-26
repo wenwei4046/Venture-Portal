@@ -136,21 +136,21 @@ export function useQuote(args: UseQuoteArgs) {
     if (catalog?.sofa) {
       const first = layouts(key)[0];
       setSheet({ mode: "sofa", key, layout: first ? "R0" : "C", mods: first ? { ...first } : {}, qty: 1, kpi: [], height: null, tier: null,
-        leg: build.leg, specials: [...build.specials] });
+        leg: build.leg, specials: [...build.specials], specialQty: { ...build.specialQty }, acc: {}, accAll: false });
     } else {
       setSheet({ mode: "model", key, size: defaultSize(model.sizes), acc: {}, qty: 1, bfs: [], fx: null, accAll: false });
     }
-  }, [catalog, layouts, build.leg, build.specials]);
+  }, [catalog, layouts, build.leg, build.specials, build.specialQty]);
 
   const applySet = useCallback((r: RecentSet) => {
     if (r.kind === "sofa") {
       const i = layouts(r.key).findIndex(m => layoutKey(m) === layoutKey(r.mods));
       setSheet({ mode: "sofa", key: r.key, layout: i >= 0 ? `R${i}` : "C", mods: { ...r.mods }, qty: 1, kpi: [...r.kpi], height: null, tier: null,
-        leg: build.leg, specials: [...build.specials] });
+        leg: build.leg, specials: [...build.specials], specialQty: { ...build.specialQty }, acc: {}, accAll: false });
     } else {
       setSheet({ mode: "model", key: r.key, size: r.size, acc: {}, qty: 1, bfs: r.bfs.map(b => ({ ...b, kpi: [...b.kpi] })), fx: null, accAll: false });
     }
-  }, [layouts, build.leg, build.specials]);
+  }, [layouts, build.leg, build.specials, build.specialQty]);
 
   const openFrameOnly = useCallback(() => {
     if (!catalog) return;
@@ -191,7 +191,7 @@ export function useQuote(args: UseQuoteArgs) {
     if (sofa?.clash) return;
     if (sofa) {
       // The sheet's seat height, tier, leg height and specials become every sofa's in the cart.
-      setBuild(b => ({ ...(sofa.graded ? { height: sofa.height, tier: sofa.tier } : { height: b.height, tier: b.tier }), leg: sofa.leg, specials: sofa.picked }));
+      setBuild(b => ({ ...(sofa.graded ? { height: sofa.height, tier: sofa.tier } : { height: b.height, tier: b.tier }), leg: sofa.leg, specials: sofa.picked, specialQty: sofa.qty }));
     }
     setCart(c => addLines(c, lines));
     setMemory(m => remember(m, sheet, catalog));

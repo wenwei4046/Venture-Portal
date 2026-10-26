@@ -81,6 +81,11 @@ export interface MemberModelOptions {
 export interface OptionCharge {
   value: string;
   charge: number;
+  /**
+   * A sofa special charged BY QUANTITY (Product List › Maintenance, 2026-10-26): the charge
+   * each, times the quantity the member sets on the Quote. Absent = charged once per sofa.
+   */
+  byQuantity?: boolean;
 }
 /**
  * What a model's options charge the customer (user 2026-10-04; every option
@@ -311,6 +316,11 @@ export interface QuoteBuild {
   tier?: string;
   leg?: string;
   specials?: string[];
+  /**
+   * How many of each special charged by quantity (2026-10-26) — `{ "Change 8030 Backcushion": 3 }`,
+   * for the whole cart; a special absent here counts 1. A special charged once per sofa has none.
+   */
+  specialQty?: Record<string, number>;
   bedframe?: BedframeBuild;
 }
 export interface QuoteInput {

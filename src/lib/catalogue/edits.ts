@@ -167,22 +167,30 @@ export function validateModelEdit(e: ModelEdit): {
 export interface OptionPriceEdit {
   value: string
   price: string | null
+  /** A sofa special only (2026-10-26): charged by the quantity the member sets, not once per sofa. */
+  byQuantity?: boolean
 }
+
+/** The one pool whose options may be charged by quantity (CHECK catalogue_option_prices_by_quantity_sofa_specials). */
+export const BY_QUANTITY_POOL = 'sofa_specials'
 
 /**
  * A price on Maintenance is what the CUSTOMER pays for the option (2026-10-05,
  * every priced pool since 2026-10-06), so it is never negative (CHECK
  * catalogue_option_prices_charge_not_negative). A sofa's seat size carries no
- * price at all (CHECK catalogue_option_prices_unpriced_pools).
+ * price at all (CHECK catalogue_option_prices_unpriced_pools). A sofa special is
+ * charged once per sofa or BY QUANTITY (2026-10-26); every other option once —
+ * a bed frame's per frame.
  */
 export function validateOptionPrices(pool: string, edits: readonly OptionPriceEdit[]): {
-  upserts: Array<{ pool: string; value: string; price: number }>
+  /** `by_quantity` only when the edit says how a sofa special is charged — absent, the saved choice stands. */
+  upserts: Array<{ pool: string; value: string; price: number; by_quantity?: boolean }>
   clears: string[]
 } {
   if (!/^(bedframe|sofa)_[a-z_]+$/.test(pool)) throw new EditError('Unknown pool')
   const kind = poolPriceOf(pool)
   if (kind === null) throw new EditError('That list carries no price')
-  const upserts: Array<{ pool: string; value: string; price: number }> = []
+  const upserts: Array<{ pool: string; value: string; price: number; by_quantity?: boolean }> = []
   const clears: string[] = []
   const seen = new Set<string>()
   for (const e of edits) {
@@ -191,9 +199,10 @@ export function validateOptionPrices(pool: string, edits: readonly OptionPriceEd
     const k = valueKey(value)!
     if (seen.has(k)) throw new EditError(`${value} appears twice`)
     seen.add(k)
+    if (e?.byQuantity === true && pool !== BY_QUANTITY_POOL) throw new EditError(`${value}: only a sofa special is charged by quantity`)
     const price = parseMoney(e.price, value)
     if (price === null) clears.push(value)
-    else upserts.push({ pool, value, price })
+    else upserts.push({ pool, value, price, ...(pool === BY_QUANTITY_POOL && typeof e?.byQuantity === 'boolean' ? { by_quantity: e.byQuantity } : {}) })
   }
   return { upserts, clears }
 }
