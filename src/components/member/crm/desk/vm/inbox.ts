@@ -16,7 +16,7 @@ import { DIRECTOR_C, DIRECTOR_TEAM, ST, teamColours } from "./tokens";
 import { avatarTint } from "../../shared/palette";
 import { adHref } from "../../shared/AdLink";
 import { isNewChat } from "../../shared/new-chat";
-import { jobTitle, personOf } from "../../shared/people";
+import { jobTitle, personOf, teamAssignees } from "../../shared/people";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
 
@@ -157,10 +157,33 @@ export function infoVM(ctx: DeskCtx) {
   };
 }
 
-/** Assign to (C3): people grouped by team in team colours, name + team. Sends through crm_send_to (30 s Undo). */
+/**
+ * Whom a leader's Assign to offers on the desktop — Mine's and the phone Team side's rule (shared/people.ts › teamAssignees;
+ * the owner, 2026-10-27: TL desktop "2 要"): a TL / STL / TA their own people in the customer's team, given at once through
+ * crm_assign_member with no undo. CRM · Manage keeps everybody through crm_send_to.
+ */
+export function leaderAssignees(ctx: DeskCtx, c: DeskCtx["data"]["customers"][number] | undefined) {
+  return c && !ctx.data.can.manage && ["tl", "stl", "ta"].includes(ctx.me.role) ? teamAssignees(ctx.me, ctx.data.people, c) : [];
+}
+
+/** Assign to (C3): people grouped by team in team colours, name + team. Sends through crm_send_to (30 s Undo); a leader's goes to their own people. */
 export function assignVM(ctx: DeskCtx) {
   const { ui, patch, set, teams, data } = ctx;
   const cid = ui.chat;
+  const cust = cid ? data.customers.find(x => x.id === cid) : undefined;
+  const mine = leaderAssignees(ctx, cust);
+  if (!data.can.manage) {
+    const tIdx = teams.findIndex(t => t.id === cust?.teamId), team = teams[tIdx];
+    return {
+      showAssign: mine.length > 0, showMove: false, menuOpen: ui.menu, menuBtnBg: ui.menu ? "var(--crm-tint-attention)" : "#fff",
+      toggleMenu: () => set(u => ({ ...u, menu: !u.menu })), closeMenu: () => patch({ menu: false }),
+      openAssign: () => patch({ menu: false, kind: "assign" }), backToChat: () => patch({ kind: "chat" }),
+      openInfo: () => { if (cid) patch({ menu: false, kind: "info", infoId: cid, visit: null }); },
+      openBook: () => { if (cid) patch({ menu: false, kind: "book" }); },
+      assignGroups: mine.length ? [{ label: (team?.name ?? "Your team").toUpperCase(), color: teamColours(Math.max(0, tIdx))[0], people: mine.map(p => ({ name: p.name, ini: initials(p.name), sub: jobTitle(p),
+        pick: () => { if (!cid || !cust) return; void ctx.act.assignMember(cid, p.id).then(ok => { if (ok) patch({ kind: "chat", toast: `${cust.name} assigned to ${ctx.nameOf(p.id)}` }); }); } })) }] : [],
+    };
+  }
   const groups = [
     ...(ctx.directors.length ? [{ label: DIRECTOR_TEAM.toUpperCase(), color: DIRECTOR_C[0], people: ctx.directors.map(d => ({ id: d.id, name: d.name, sub: DIRECTOR_TEAM })) }] : []),
     ...teams.map((t, k) => ({ label: t.name.toUpperCase(), color: teamColours(k)[0], people: t.people.map(p => ({ id: p.id, name: p.name, sub: t.name })) })),
@@ -271,7 +294,7 @@ export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(
   const up = personOf(personOf(holder, data.people)?.uplineId, data.people);
   const upTo = up && up.id !== me.id ? up : undefined;
   const items: [string, string, string, () => void, string, boolean][] = [
-    ...(data.can.manage ? [["Assign to", "var(--crm-ink-soft)", "M7 17 3 13l4-4M3 13h14M17 7l4 4-4 4M21 11H7", () => patch({ menu: false, kind: "assign" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
+    ...(data.can.manage || leaderAssignees(ctx, c).length ? [["Assign to", "var(--crm-ink-soft)", "M7 17 3 13l4-4M3 13h14M17 7l4 4-4 4M21 11H7", () => patch({ menu: false, kind: "assign" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
     // Move only when there is somebody to hand over to, as on the phone — the Principal keeps the design's top-level page.
     ...(upTo || top ? [["Move", "var(--crm-rust)", "M12 19V5M5 12l7-7 7 7", () => patch({ menu: false, kind: "move" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
     ["Share", "var(--crm-brown)", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6", () => patch({ menu: false, kind: "share" }), "", false],

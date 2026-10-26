@@ -69,16 +69,19 @@ const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const OUTCOMES = ["Upcoming", "To mark", "Showed up", "Won", "Follow up", "Lost", "No show", "Cancelled"];
 export function appointmentsReport(vs: ApptVisit[]) {
   const n = (o: string) => vs.filter(v => v.outcome === o).length;
-  const showed = n("Showed up") + n("Won") + n("Follow up") + n("Lost");
-  // The rate counts a customer once (2026-10-27): came at least once, of those who came or were marked No show.
+  // The figures count a customer once (2026-10-27, the owner: the rate, then "ok" to the tiles too): booked twice is one
+  // booked, came twice one who came; a No show is a customer marked so who never came. The cards below stay visits.
   const whoOf = (v: ApptVisit, i: number) => v.who ?? `#${i}`, CAME = ["Showed up", "Won", "Follow up", "Lost"];
-  const cameC = new Set(vs.map((v, i) => CAME.includes(v.outcome) ? whoOf(v, i) : null).filter(Boolean));
-  const markedC = new Set([...cameC, ...vs.map((v, i) => v.outcome === "No show" ? whoOf(v, i) : null).filter(Boolean)]);
+  const custOf = (keep: (v: ApptVisit) => boolean) => new Set(vs.map((v, i) => keep(v) ? whoOf(v, i) : null).filter((x): x is string => !!x));
+  const cameC = custOf(v => CAME.includes(v.outcome));
+  const noC = new Set([...custOf(v => v.outcome === "No show")].filter(w => !cameC.has(w)));
+  const markedC = new Set([...cameC, ...noC]);
   const times = [...new Set(vs.map(v => v.at.getHours() * 60 + v.at.getMinutes()))].sort((a, b) => a - b)
     .map(m => new Date(2000, 0, 1, Math.floor(m / 60), m % 60).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }));
   const timeOf = (v: ApptVisit) => v.at.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
   return {
-    figures: { booked: vs.length - n("Cancelled"), upcoming: n("Upcoming"), showed, noShow: n("No show"), toMark: n("To mark"), cancelled: n("Cancelled"), showRate: rate(cameC.size, markedC.size) },
+    figures: { booked: custOf(v => v.outcome !== "Cancelled").size, upcoming: custOf(v => v.outcome === "Upcoming").size, showed: cameC.size, noShow: noC.size,
+      toMark: custOf(v => v.outcome === "To mark").size, cancelled: custOf(v => v.outcome === "Cancelled").size, showRate: rate(cameC.size, markedC.size) },
     byRoom: breakdown(vs, v => v.room), byDow: breakdown(vs, v => DOW[(v.at.getDay() + 6) % 7], DOW), byTime: breakdown(vs, timeOf, times),
     byRep: breakdown(vs, v => v.rep), byOutcome: breakdown(vs, v => v.outcome, OUTCOMES),
   };
