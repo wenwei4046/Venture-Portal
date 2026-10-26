@@ -39,9 +39,51 @@ export function Uploads({ files, disabled = false, onAnnotate }: {
   )
 }
 
+/** A filed file in a tab of its own: the tab readied in the tap (a pop-up blocker allows only that), its link made after. */
+export async function openInNewTab(id: string): Promise<string | null> {
+  const tab = window.open('about:blank', '_blank')
+  if (!tab) return 'Allow pop-ups, then open the file again.'
+  tab.opener = null
+  try {
+    const result = await openItFile(id, 'view')
+    if (!result.ok) {
+      tab.close()
+      return result.error
+    }
+    tab.location.href = result.data.url
+    return null
+  } catch {
+    tab.close()
+    return 'The file could not be opened. Please try again.'
+  }
+}
+
+/** …or saved under its own name: a link signed to download, followed without leaving the page. */
+export async function downloadFile(id: string): Promise<string | null> {
+  try {
+    const result = await openItFile(id, 'download')
+    if (!result.ok) return result.error
+    const link = document.createElement('a')
+    link.href = result.data.url
+    link.download = result.data.fileName
+    link.rel = 'noopener'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    return null
+  } catch {
+    return 'The file could not be downloaded. Please try again.'
+  }
+}
+
 /** Each file is still checked by the server before its short-lived preview or open link is issued. */
-export function FiledFiles({ files, onAnnotate, disabled = false, preloaded }: {
-  files: ItFile[]; onAnnotate?: (src: string, fileName: string) => void; disabled?: boolean; preloaded?: { ids: string[]; urls: Record<string, string> }
+export function FiledFiles({ files, onAnnotate, onOpen, active = null, disabled = false, preloaded }: {
+  files: ItFile[]; onAnnotate?: (src: string, fileName: string) => void
+  /** Open beside the window (2026-10-24), with the picture's link when the list has one; without it, a new tab. */
+  onOpen?: (file: ItFile, url?: string) => void
+  /** The file shown beside the window now. */
+  active?: string | null
+  disabled?: boolean; preloaded?: { ids: string[]; urls: Record<string, string> }
 }) {
   const [urls, setUrls] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
@@ -55,27 +97,18 @@ export function FiledFiles({ files, onAnnotate, disabled = false, preloaded }: {
     }).catch(() => { /* The file can still be opened at its own button. */ })
     return () => { live = false }
   }, [pictures])
-  const open = async (id: string) => {
+  const open = async (file: ItFile) => {
     setError('')
-    const tab = window.open('about:blank', '_blank')
-    if (!tab) return setError('Allow pop-ups, then open the file again.')
-    tab.opener = null
-    try {
-      const result = await openItFile(id, 'view')
-      if (!result.ok) {
-        tab.close()
-        setError(result.error)
-      } else tab.location.href = result.data.url
-    } catch {
-      tab.close()
-      setError('The file could not be opened. Please try again.')
-    }
+    if (onOpen) return onOpen(file, shownUrls[file.id])
+    const problem = await openInNewTab(file.id)
+    if (problem) setError(problem)
   }
+  // A link made at the press: the shown one may have run out (ten minutes) while the request stayed open.
   const annotate = async (file: ItFile) => {
     if (!onAnnotate || disabled) return
     setError('')
     try {
-      const result = shownUrls[file.id] ? { ok: true as const, data: shownUrls } : await signItFiles([file.id])
+      const result = await signItFiles([file.id])
       if (result.ok && result.data[file.id]) onAnnotate(result.data[file.id], file.name)
       else setError('The picture could not be opened. Please try again.')
     } catch {
@@ -86,8 +119,8 @@ export function FiledFiles({ files, onAnnotate, disabled = false, preloaded }: {
   return (
     <div className={s.files}>
       {files.map(file => (
-        <div className={s.filedFile} key={file.id}>
-          <button type="button" className={s.fileOpen} onClick={() => void open(file.id)} aria-label={`Open ${file.name}`}>
+        <div className={s.filedFile} key={file.id} data-active={active === file.id ? '' : undefined}>
+          <button type="button" className={s.fileOpen} onClick={() => void open(file)} aria-label={`Open ${file.name}`} aria-current={active === file.id ? 'true' : undefined}>
             <span className={isImage(file.contentType) ? s.picture : s.fileTile}>
               {/* eslint-disable-next-line @next/next/no-img-element -- a short signed link to a private attachment */}
               {shownUrls[file.id] ? <img src={shownUrls[file.id]} alt={file.name} /> : fileTag(file.name, file.contentType)}

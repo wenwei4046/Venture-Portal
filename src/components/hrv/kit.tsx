@@ -190,13 +190,16 @@ export function GridTable({ children, style, label, scroll = true }: { children:
   return scroll ? <div className={s.gtScroll}>{table}</div> : table
 }
 
-export function GridHead({ cols, cells, cellStyle }: { cols: string; cells: Array<ReactNode | { label: ReactNode; style?: CSSProperties }>; cellStyle?: CSSProperties }) {
+/** A head cell: its label, its own style, and — on a column a press sorts — which way it sorts now (`aria-sort`). */
+type GridHeadCell = { label: ReactNode; style?: CSSProperties; sort?: 'ascending' | 'descending' | 'none' }
+
+export function GridHead({ cols, cells, cellStyle }: { cols: string; cells: Array<ReactNode | GridHeadCell>; cellStyle?: CSSProperties }) {
   return (
     <div className={s.gtHead} style={{ gridTemplateColumns: cols }} role="row">
       {cells.map((c, i) => {
-        const cell = c && typeof c === 'object' && 'label' in (c as object) ? (c as { label: ReactNode; style?: CSSProperties }) : { label: c as ReactNode }
+        const cell = c && typeof c === 'object' && 'label' in (c as object) ? (c as GridHeadCell) : { label: c as ReactNode }
         return (
-          <span key={i} role="columnheader" style={{ ...cellStyle, ...cell.style }}>
+          <span key={i} role="columnheader" aria-sort={cell.sort} style={{ ...cellStyle, ...cell.style }}>
             {cell.label}
           </span>
         )

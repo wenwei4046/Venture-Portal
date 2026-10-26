@@ -103,7 +103,7 @@ export default function DocumentsTab({
           <div className={s.fileBox}>
             <div className={s.fileBoxText}>
               <div className={s.fileBoxName}>{file ? file.name : 'No file chosen'}</div>
-              <div className={s.fileBoxHint}>PDF, Excel, Word or image</div>
+              <div className={s.fileBoxHint}>PDF, Office, image, video or zip</div>
             </div>
             <label className={s.fileBtn}>
               {file ? 'Replace' : 'Upload'}

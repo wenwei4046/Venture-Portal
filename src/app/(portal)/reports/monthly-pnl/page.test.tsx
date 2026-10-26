@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 
 // 2026-10-09 — the Monthly P&L per the user's Claude Design handoff (Phase 4
@@ -19,8 +19,10 @@ const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
     throw new Error('NEXT_NOT_FOUND')
   }),
+  openReportRow: vi.fn(async () => ({ ok: true, lines: [] })),
 }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requirePermission: mocks.requirePermission }))
+vi.mock('../drill-actions', () => ({ openReportRow: mocks.openReportRow }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/gl-reports', () => ({ fetchAllJournalLines: async () => [], fetchCoaAccounts: async () => [] }))
 vi.mock('@/lib/consolidation', () => ({ fetchInterBillingElimination: async () => null, eliminateInterBilling: (l: unknown) => l }))
@@ -115,12 +117,21 @@ describe('the Monthly P&L, company-wide', () => {
     expect(heads[1]).toHaveClass('is-now')
     expect(Array.from(document.querySelectorAll('.sheet-rpt thead tr:nth-child(2) th')).map((th) => th.textContent).slice(0, 4)).toEqual(['RM', '%', 'RM', '%'])
     const kinds = Array.from(document.querySelectorAll('.sheet-rpt tbody tr')).map((tr) => [(tr as HTMLElement).dataset.kind, tr.querySelector('td')?.textContent])
+    // 2026-10-24 — an account opens (▸) onto its months, then a month onto its lines.
     expect(kinds).toEqual([
       ['title', 'Revenue'],
-      ['group', '4000 Service fees'],
+      ['group', '▸4000 Service fees'],
       ['total', 'Total Revenue'],
       ['total', 'Net Income / (Loss)'],
     ])
+  })
+
+  it('reads an opened account’s lines through its own action, over the months shown', async () => {
+    render(await page({ segment: 'marketing' }))
+    fireEvent.click(screen.getByRole('button', { name: /4000 Service fees/ }))
+    expect(mocks.openReportRow).toHaveBeenCalledWith('monthly-pnl', {
+      report: 'pnl', segment: 'marketing', from: '2026-07', to: '2026-10', code: '4000', side: null,
+    })
   })
 
   it('cuts the matrix to From, Accumulated over the months kept', async () => {

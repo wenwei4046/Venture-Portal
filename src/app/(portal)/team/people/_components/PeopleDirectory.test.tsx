@@ -181,3 +181,106 @@ describe('the department filter and the full name', () => {
     expect(screen.getByText('LOO WEN WEI')).toBeInTheDocument()
   })
 })
+
+// 2026-10-22 — the user, circling the heads: "like press name, will be follow by alpahabe 排法， title will be follow
+// title 高到低 按多一次就低到高". Each band is sorted by the head pressed; pressed again, the other way.
+describe('a column head sorts each band', () => {
+  const roster: PersonRow[] = [
+    row({ id: 'c', name: 'Cara', code: 'HV008', title: 'Team Leader', levelRank: 7, levelName: 'L7' }),
+    row({ id: 'w', name: 'Wendy', code: 'HV009', title: 'Team Leader', levelRank: 7, levelName: 'L7' }),
+    row({ id: 'a', name: 'Ann', code: 'HV012', title: 'Revenue Specialist', levelRank: 3, levelName: 'L3' }),
+    row({ id: 'b', name: 'bella', code: 'HV030', title: 'Revenue Specialist', levelRank: 3, levelName: 'L3' }),
+    row({ id: 'l', name: 'LOO WEN WEI', code: 'HV001', title: 'CHIEF EXECUTIVE OFFICER', levelRank: 10, levelName: 'L10', department: 'Director' }),
+  ]
+  const draw = () => render(<PeopleDirectory people={roster} unattachedAccounts={[]} canSeeActivity={false} />)
+  /** The names on show, top to bottom. */
+  const order = () => {
+    const names = ['Cara', 'Wendy', 'Ann', 'bella', 'LOO WEN WEI'].map(n => screen.getByText(n))
+    return names.sort((x, y) => (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)).map(e => e.textContent)
+  }
+  const head = (label: string) => screen.getByRole('button', { name: label })
+  const sortOf = () => Object.fromEntries(screen.getAllByRole('columnheader').slice(0, 6).map(h => [h.textContent, h.getAttribute('aria-sort')]))
+
+  it('reads in the ladder’s order with no head sorting, every head a button', () => {
+    draw()
+    expect(order()).toEqual(['LOO WEN WEI', 'Cara', 'Wendy', 'Ann', 'bella'])
+    expect(sortOf()).toEqual({ Name: 'none', Title: 'none', Rank: 'none', Code: 'none', Employment: 'none', 'Last seen': 'none' })
+    expect(screen.getAllByRole('columnheader')[6]).not.toHaveAttribute('aria-sort')
+  })
+
+  it('Name: A→Z inside each band, case aside — pressed again, Z→A', () => {
+    draw()
+    fireEvent.click(head('Name'))
+    expect(order()).toEqual(['LOO WEN WEI', 'Ann', 'bella', 'Cara', 'Wendy'])
+    expect(sortOf()).toMatchObject({ Name: 'ascending', Title: 'none' })
+    fireEvent.click(head('Name'))
+    expect(order()).toEqual(['LOO WEN WEI', 'Wendy', 'Cara', 'bella', 'Ann'])
+    expect(sortOf()).toMatchObject({ Name: 'descending' })
+  })
+
+  it('Title: the most senior first — pressed again, the least senior first', () => {
+    draw()
+    fireEvent.click(head('Name'))
+    fireEvent.click(head('Title'))
+    expect(order()).toEqual(['LOO WEN WEI', 'Cara', 'Wendy', 'Ann', 'bella'])
+    expect(sortOf()).toMatchObject({ Name: 'none', Title: 'descending' })
+    fireEvent.click(head('Title'))
+    expect(order()).toEqual(['LOO WEN WEI', 'Ann', 'bella', 'Cara', 'Wendy'])
+    expect(sortOf()).toMatchObject({ Title: 'ascending' })
+  })
+
+  it('Code: from HV001 up — pressed again, down', () => {
+    draw()
+    fireEvent.click(head('Code'))
+    expect(order()).toEqual(['LOO WEN WEI', 'Cara', 'Wendy', 'Ann', 'bella'])
+    fireEvent.click(head('Code'))
+    expect(order()).toEqual(['LOO WEN WEI', 'bella', 'Ann', 'Wendy', 'Cara'])
+  })
+})
+
+// 2026-10-23 — the user, circling the Employment chip: "for the employment status, i want go with permenant, part time
+// and probation status follow by the hire date start".
+describe('the Employment column', () => {
+  const roster: PersonRow[] = [
+    row({ id: 'p', name: 'Zack', code: 'HV052', hireDate: '2026-10-05', employmentStatus: 'probation',
+      employmentChip: { label: 'Probation · 9d left', tone: 'alert', title: 'Probation ends 1 Nov 2026 · in 9 days' } }),
+    row({ id: 'm', name: 'Mei', code: 'HV030', hireDate: '2024-03-01', employmentStatus: 'permanent', employmentChip: { label: 'Permanent', tone: 'ledger' } }),
+    row({ id: 't', name: 'Tina', code: 'HV031', hireDate: '2026-09-01', employmentStatus: 'part_time', employmentChip: { label: 'Part time', tone: 'info' } }),
+    row({ id: 'n', name: 'Nobody Set', code: 'HV032', hireDate: null, employmentStatus: null, employmentChip: { label: 'Not set', tone: 'plain' }, missing: ['hire date'] }),
+    row({ id: 'g', name: 'Gone', code: 'HV004', active: false, resignedOn: '2026-09-30', hireDate: '2025-01-01', employmentStatus: 'permanent', employmentChip: null }),
+  ]
+  const draw = () => render(<PeopleDirectory people={roster} unattachedAccounts={[]} canSeeActivity={false} />)
+  const names = () => ['Zack', 'Mei', 'Tina', 'Nobody Set'].map(n => screen.getByText(n))
+    .sort((x, y) => (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1)).map(e => e.textContent)
+
+  it('reads the status where Active was, then the hire date', () => {
+    draw()
+    expect(rowOf('Zack')).toHaveTextContent('Probation · 9d left5 Oct 2026')
+    expect(within(rowOf('Zack')).getByText('Probation · 9d left').closest('[data-tone]')).toHaveAttribute('data-tone', 'alert')
+    expect(within(rowOf('Zack')).getByText('Probation · 9d left').closest('[title]')).toHaveAttribute('title', 'Probation ends 1 Nov 2026 · in 9 days')
+    expect(rowOf('Mei')).toHaveTextContent('Permanent1 Mar 2024')
+    expect(rowOf('Tina')).toHaveTextContent('Part time1 Sep 2026')
+    expect(rowOf('Nobody Set')).toHaveTextContent('Not set1 missing')
+    expect(within(rowOf('Mei')).getByTitle('Hire date')).toHaveTextContent('1 Mar 2024')
+    for (const name of ['Zack', 'Mei', 'Tina', 'Nobody Set']) expect(within(rowOf(name)).queryByText('Active')).toBeNull()
+  })
+
+  it('an inactive person keeps their own chip', () => {
+    draw()
+    fireEvent.click(screen.getByRole('button', { name: /^Inactive/ }))
+    expect(rowOf('Gone')).toHaveTextContent('Resigned 30 Sep 2026')
+  })
+
+  it('reads Active where the page could not say which (the directory)', () => {
+    render(<PeopleDirectory people={[row({ id: 'd', name: 'Dee', hireDate: '2026-01-05' })]} unattachedAccounts={[]} canSeeActivity={false} />)
+    expect(rowOf('Dee')).toHaveTextContent('Active5 Jan 2026')
+  })
+
+  it('its head sorts by the status, then the hire date — probation first', () => {
+    draw()
+    fireEvent.click(screen.getByRole('button', { name: 'Employment' }))
+    expect(names()).toEqual(['Zack', 'Tina', 'Mei', 'Nobody Set'])
+    fireEvent.click(screen.getByRole('button', { name: 'Employment' }))
+    expect(names()).toEqual(['Nobody Set', 'Mei', 'Tina', 'Zack'])
+  })
+})

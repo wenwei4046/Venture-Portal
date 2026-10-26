@@ -6,6 +6,29 @@ history (`git log -p -- TODOS.md`).
 
 ---
 
+## Owed — Supabase Storage's old copies, after the move to R2 (2026-10-23)
+
+Every bucket's files moved to Cloudflare R2 on 2026-10-23 (#633, #635, #638;
+`.claude/rules/portal-wide/storage.md`). Storage still holds the 261 old copies
+and its 34 policies, kept as the fallback until the owner says to delete them
+(about two weeks, ~2026-11-06). Before deleting:
+- look for a link still naming Storage's address in `crm_auto_replies.settings`
+  (`….supabase.co/storage/v1/object/public/…`) — an auto-reply page left open
+  over the move saves its old set back — and point it at `cdn.houzsventure.com`;
+- run `scripts/storage-to-r2.mjs --all --apply` and the move migrations'
+  `INSERT … SELECT` once more: a browser still on a pre-#633 bundle uploads
+  straight to Storage, and that file needs its bytes and its row in R2.
+
+## Owed — the CRM's one upload that still passes through a Server Action (2026-10-23)
+
+Every portal page that handed a file to a Server Action (4 MB body) now sends it
+ahead to the sender's own folder of `uploads` first (mig `20261024006800`,
+`.claude/rules/portal-wide/storage.md` › A FILE SENT AHEAD). One is left, in the
+CRM, which is Kaiyee's code: a showroom photo (`member/crm-actions.ts`,
+`ROOM_PHOTO_BYTES` 4 MB — WhatsApp takes no picture past 5 MB anyway). Kaiyee
+was told; `stageInto` (browser) and `formFile` (action) are the two calls if he
+wants it to go ahead too.
+
 ## Owed — the React Compiler's lint rules (2026-10-21)
 
 The move to Next 16 brought eslint-plugin-react-hooks 7, whose recommended set

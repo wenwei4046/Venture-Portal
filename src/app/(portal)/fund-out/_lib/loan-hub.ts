@@ -5,6 +5,7 @@ import { fundingSourceFromTerms } from '@/lib/utils'
 import { loadRepaymentBook } from '@/lib/repayment-book'
 import { overdueOf } from '@/lib/repayment-calendar'
 import { withCode, type FundRecord, type FundStatus } from '@/lib/fund-hub'
+import { installmentsInAll, resolveFirstDueYM } from '@/lib/treasury-terms'
 
 // Fund OUT's hub reads (2026-10-15, the Finance revamp v2 — D12): every loan
 // with its borrower, what is still owed on it (`loan_outstanding`), whether an
@@ -19,6 +20,8 @@ type LoanRow = {
   effective_rate: number | string
   tenure_months: number | null
   disbursement_date: string | null
+  repayment_start_month: string | null
+  terms_effective_from: string | null
   repayment_terms: string | null
   status: 'pending_approval' | 'active' | 'fully_repaid' | 'cancelled'
   compound_interest: boolean | null
@@ -35,7 +38,7 @@ export async function loadLoanHub(supabase: SupabaseClient, today: string): Prom
   const [{ data: loans, error }, { data: companies }, { data: outstandingRows }, book, { data: pendingRequests }] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, disbursement_date, repayment_terms, status, compound_interest, min_pay_interest, created_by, created_at, approved_by, approved_at')
+      .select('id, company_id, principal, effective_rate, tenure_months, disbursement_date, repayment_start_month, terms_effective_from, repayment_terms, status, compound_interest, min_pay_interest, created_by, created_at, approved_by, approved_at')
       .order('created_at', { ascending: false }),
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
@@ -66,6 +69,10 @@ export async function loadLoanHub(supabase: SupabaseClient, today: string): Prom
     const o = owed.get(l.id)
     const status = STATUS[l.status] ?? 'cancelled'
     const unscheduled = isLoanUnscheduled(l.repayment_terms)
+    // The whole plan's installments: a 从某月起 change left the months from its month on the record.
+    const termMonths = l.tenure_months
+      ? installmentsInAll(resolveFirstDueYM(l.repayment_start_month, l.disbursement_date), l.terms_effective_from ? l.terms_effective_from.slice(0, 7) : null, Number(l.tenure_months))
+      : null
     return {
       id: l.id,
       side: 'out',
@@ -82,8 +89,8 @@ export async function loadLoanHub(supabase: SupabaseClient, today: string): Prom
       createdBy: l.created_by ? (names.get(l.created_by) ?? null) : null,
       approvedAt: l.approved_at,
       approvedBy: l.approved_by ? (names.get(l.approved_by) ?? null) : null,
-      maturity: !unscheduled && l.disbursement_date && l.tenure_months ? addMonths(l.disbursement_date, Number(l.tenure_months)) : null,
-      months: unscheduled || !l.tenure_months ? null : Number(l.tenure_months),
+      maturity: !unscheduled && l.disbursement_date && termMonths ? addMonths(l.disbursement_date, termMonths) : null,
+      months: unscheduled || !termMonths ? null : termMonths,
       compound: l.compound_interest === true,
       minPayInterest: l.min_pay_interest === true,
       fundingSource: fundingSourceFromTerms(l.repayment_terms),

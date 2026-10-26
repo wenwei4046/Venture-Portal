@@ -1,16 +1,19 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { createClient } from '@/lib/supabase/server'
 import type { User } from '@/types'
 import { decision } from '@/lib/approval-domains'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { getVoucherDetailContext, type VoucherDetailContext } from '@/lib/voucher-detail'
+import { readTermsChange, type TermsChangeContext } from '@/lib/terms-change-request'
 
 // One approval request, read (2026-10-15 — moved out of
 // `/approvals/[id]/page.tsx` word for word, so the Finance phone app's request
 // screen reads the same): the request, who raised it, whether this reader may
-// decide it (and why not), a loan's terms or a voucher's whole context, and
-// whether the bank would go short. A payroll voucher's request is not this
-// reader's without Payroll payouts (it is titled with who is paid what).
+// decide it (and why not), a loan's terms or a voucher's whole context, a terms
+// change's figures now and as asked, and whether the bank would go short. A
+// payroll voucher's request is not this reader's without Payroll payouts (it is
+// titled with who is paid what).
 
 type Client = Awaited<ReturnType<typeof createClient>>
 
@@ -44,6 +47,8 @@ export type ApprovalRequestRead =
       verdict: { may: true } | { may: false; why: string }
       loanContext: ApprovalLoanContext | null
       voucherContext: VoucherDetailContext | null
+      /** A terms change filed for the Principal (mig 20261025110000): what it asks beside the terms now. */
+      termsContext: TermsChangeContext | null
       insufficientBalance: boolean
     }
 
@@ -75,6 +80,9 @@ export async function readApprovalRequest(supabase: Client, user: User, id: stri
   if (approval.request_type === 'payment_voucher' && approval.reference_id) {
     voucherContext = await getVoucherDetailContext(supabase, approval.reference_id)
   }
+  // A terms change: the month it asks from, and that month's terms now and as asked.
+  const termsContext = approval.request_type === 'terms_change' ? await readTermsChange(supabase as unknown as SupabaseClient, approval.id) : null
+
   // The request for a payroll voucher is titled with who is paid what, and
   // shows the voucher under it: not without Payroll payouts (2026-10-02).
   if (voucherContext && isPayrollReference(voucherContext.voucher.reference_type) && !canSeePayrollPayouts(user)) {
@@ -97,6 +105,7 @@ export async function readApprovalRequest(supabase: Client, user: User, id: stri
     verdict,
     loanContext,
     voucherContext,
+    termsContext,
     insufficientBalance,
   }
 }

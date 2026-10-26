@@ -7,18 +7,21 @@ import { formatDate, formatMoney } from '@/lib/utils'
 import { officeToday } from '@/lib/office-time'
 import { canAccessAuditLog, canInviteUsers, canManagePermissions } from '@/lib/roles'
 import { hasTab } from '@/lib/page-tabs'
+import { fullAccessTemplate } from '@/lib/invite'
 import { keptParts } from '@/lib/person-name'
 import { addressLines, addressOf } from '@/lib/address/address'
-import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, payModeOf, tenureLabel } from '@/lib/person-record'
+import { EPF_LABELS, PCB_LABELS, SOCSO_LABELS, loginEmailHeld, payModeOf, tenureLabel } from '@/lib/person-record'
+import { employmentStatusOf, reminderDue, statusChip, statusLine, whenLabel } from '@/lib/employment-status'
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { MASKED, sees } from '@/lib/sensitive'
 import { readDirectory, readOrgChart, readsStaffTable } from '@/lib/team-directory'
+import { letterChoicesOn } from '@/lib/documentation/letter-choices'
 import ActivityLog from '../../_components/ActivityLog'
 import PersonAccess from '../../_components/PersonAccess'
 import PersonWell from '../../_components/PersonWell'
 import w from '../../_components/person-well.module.css'
-import { loadPersonAccess } from '../../_lib/person-permissions'
+import { loadPersonAccess, type PersonAccessData } from '../../_lib/person-permissions'
 import { loadUplineChoices } from '../../_lib/upline-choices'
 import PersonChanges from '../_components/PersonChanges'
 import PersonRecord, { type PersonRecordView } from '../_components/PersonRecord'
@@ -48,6 +51,18 @@ async function uplineOf(supabase: Supabase, direct: boolean, managerId: string |
   return m ? { name: m.employee_name, title: m.titles?.name ?? null, href: null, active: true } : null
 }
 
+/**
+ * A login that can do everything (2026-10-22) — a Principal-kind template, one that ticks Manage permissions, or a
+ * Principal login on no template — with its template's name; null for any other. The database asks the same before
+ * their login's email moves (`person_login_email_move`).
+ */
+function fullAccessOf(access: PersonAccessData, role: string): { template: string | null } | null {
+  if (access.kind === 'template') {
+    return fullAccessTemplate(access.template.baseRole, !!access.template.grants.accounts?.manage) ? { template: access.template.name } : null
+  }
+  return role === 'principal' ? { template: null } : null
+}
+
 export default async function StaffDetailPage({ params, searchParams }: PageProps) {
   await requirePage('/team/people/[id]')
   // The roster's own key — or Team · View without the Salary tick, which reads
@@ -71,6 +86,9 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
         return null
       })
     : Promise.resolve(null)
+  // …and the Data center's letter types (2026-10-24): letters filed with the status on the card, and Renew's new
+  // contract — none for an editor who may not file one (Documentation · Create).
+  const letters = mayEdit && direct ? letterChoicesOn(supabase, '/team/people/[id]').catch(() => null) : Promise.resolve(null)
 
   // The row without its NRIC and account numbers, which come through the
   // reader beside it — the table no longer hands them out (2026-10-09, PR4).
@@ -130,13 +148,28 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
       )
     : null
 
-  const [card, uplineChoices] = await Promise.all([changes, uplines])
+  const [card, uplineChoices, letterTypes] = await Promise.all([changes, uplines, letters])
   const active = staff.status !== 'inactive'
+  // Their login's email is HR's to change here since 2026-10-22 — a full-access title's only whoever manages
+  // permissions' (the editor would choose where that login's mail goes), as Invite user keeps it.
+  const fullAccess = account && access && !canDo(viewer, 'accounts', 'manage') ? fullAccessOf(access, account.role) : null
+  const emailHeld = fullAccess ? loginEmailHeld(titleName, fullAccess.template) : null
 
   // Paid 100% on commission (no basic, no allowances, statutory at 0) or
   // variable pay (the Director department's month, keyed on payroll) — the
   // record words its salary and statutory by how they are paid.
   const parts = keptParts(row)
+  const today = officeToday()
+  // Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — the staff table's; a directory
+  // reader's row carries none.
+  const employmentStatus = row.employment_status === undefined ? undefined : employmentStatusOf(row.employment_status)
+  const probationEnds: string | null = employmentStatus === 'probation' ? (row.probation_end ?? null) : null
+  const contractEnds: string | null = employmentStatus === 'contract' ? (row.contract_end ?? null) : null
+  // The term they are on — its end, and its reminder's acknowledgement (2026-10-24: reminded 30 and 15 days before).
+  const termEnds = probationEnds ?? contractEnds
+  const termAck = employmentStatus === 'contract'
+    ? { ackEnd: row.contract_ack_end ?? null, ackAt: row.contract_ack_at ?? null, ackName: row.contract_ack_name ?? null }
+    : { ackEnd: row.probation_ack_end ?? null, ackAt: row.probation_ack_at ?? null, ackName: row.probation_ack_name ?? null }
   const view: PersonRecordView = {
     name: staff.employee_name,
     firstName: parts.first,
@@ -148,8 +181,22 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
     active,
     login: account ? (account.is_active ? 'active' : 'disabled') : null,
     reportsTo: upline,
+    employment: {
+      status: employmentStatus,
+      chip: statusChip({ status: employmentStatus, probationEnd: probationEnds, contractEnd: contractEnds, ack: termAck }, today),
+      value: employmentStatus
+        ? [
+            employmentStatus === 'contract'
+              ? statusLine(employmentStatus, row.contract_months ?? null, contractEnds)
+              : statusLine(employmentStatus, row.probation_months ?? null, probationEnds),
+            termEnds && reminderDue(termEnds, today) ? whenLabel(termEnds, today) : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : null,
+    },
     hireDate: staff.hire_date ? formatDate(staff.hire_date) : null,
-    tenure: tenureLabel(staff.hire_date, officeToday()),
+    tenure: tenureLabel(staff.hire_date, today),
     resignationDate: staff.resignation_date ? formatDate(staff.resignation_date) : null,
     nric: priv.nric,
     infotechCode: staff.infotech_code,
@@ -195,6 +242,8 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
                 canSee: { nric: card.canSee.nric, bank: card.canSee.bank },
                 reportsTo: row.reports_to ?? null,
                 uplines: active ? uplineChoices : null,
+                emailHeld,
+                letterTypes,
               }
             : null
         }
@@ -219,6 +268,35 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
             department={card.department}
             ladder={card.ladder}
             active={card.active}
+            // A probation's reminder, and its next step (2026-10-23): Acknowledge, Confirm as permanent, Extend.
+            probation={
+              card.active && card.staff.employment_status === 'probation'
+                ? {
+                    hireDate: card.staff.hire_date ?? null,
+                    months: card.staff.probation_months ?? null,
+                    endsOn: card.staff.probation_end ?? null,
+                    ackEnd: card.staff.probation_ack_end ?? null,
+                    ackName: card.staff.probation_ack_name ?? null,
+                    ackAt: card.staff.probation_ack_at ?? null,
+                  }
+                : null
+            }
+            // A contract's reminder (2026-10-24): Acknowledge — and Renew, from the day after its end.
+            contract={
+              card.active && card.staff.employment_status === 'contract'
+                ? {
+                    hireDate: card.staff.hire_date ?? null,
+                    months: card.staff.contract_months ?? null,
+                    endsOn: card.staff.contract_end ?? null,
+                    startsOn: card.staff.contract_start ?? card.staff.hire_date ?? null,
+                    ackEnd: card.staff.contract_ack_end ?? null,
+                    ackName: card.staff.contract_ack_name ?? null,
+                    ackAt: card.staff.contract_ack_at ?? null,
+                  }
+                : null
+            }
+            letterTypes={letterTypes}
+            today={today}
           />
         ) : null}
 

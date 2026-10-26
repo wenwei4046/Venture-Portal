@@ -5,6 +5,8 @@ import type { ShareRequest } from "@/lib/member/share-requests";
 import { marginStanding } from "../insight/insight-model";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import { arenaIncentive, arenaMonthFridays, arenaRankings, arenaWeekFriday, type ArenaMetric, type MemberArenaSnapshot } from "@/lib/member/arena";
+import type { ChampStanding } from "@/lib/member/championship";
+import { arenaLead } from "../arena/arena-model";
 import { dayLabel, dayRange, firstName, monthName, ordinalSuffix, rm2 } from "../format";
 import { ICON } from "../icons";
 
@@ -46,7 +48,8 @@ export interface TodayInput {
    * lead. The income stays their own; Sales / Margin / KPI are the whole
    * sub-department's — every bill of the month, the Insight block's `team` —
    * the Arena's cards name who leads (a director is on no board), and there is
-   * no week of their own.
+   * no week of their own. The Principal viewing nobody reads Today the same way
+   * (2026-10-25), their hero the sub-department's commission (`department`).
    */
   team?: string;
   hidden: boolean;
@@ -85,12 +88,20 @@ export interface TodayTodo {
 export interface TodayMetric { key: "sales" | "margin" | "kpi"; label: string; value: string; tag: string; tagTone: "sub" | "good"; loading?: boolean }
 /**
  * `ranked` shows the place; `unranked` says so in words (nothing on that board yet); `loading` is a placeholder;
- * `off` is KPI not counted this period — nobody will ever have a place there; `lead` (a director, on no board) names
- * who leads it (`leader`, absent while nobody is placed).
+ * `off` is KPI not counted this period — nobody will ever have a place there; `lead` (a director, or the Principal
+ * viewing nobody — on no board) names who leads it.
  */
 export interface TodayBoard {
   id: "sales" | "margin" | "kpi" | "champ"; label: string; rankNum: string; rankSuf: string;
-  state: "ranked" | "unranked" | "loading" | "off" | "lead"; leader?: string;
+  state: "ranked" | "unranked" | "loading" | "off" | "lead";
+  /**
+   * `lead`: who is first (absent while nobody is placed), drawn as the first name alone (2026-10-25, the user: "就放第一名是谁
+   * 就好了不需要放第一、第二、第三"); on Championship the most points ("championship i want is show 1st in championship point").
+   * `value` is their figure over the name — the Arena's card, word for word (2026-10-26, the user: "除了 show 他的名字，也要
+   * show 他的数字 … 跟 Arena 的 Hero Card 是一样的"; `arenaLead`).
+   */
+  leader?: string;
+  value?: string;
 }
 export interface TodayWeek { title: string; dates: string; venue: string | null; org: string | null }
 export interface TodayModel {
@@ -253,14 +264,14 @@ const BOARDS: { id: TodayBoard["id"]; label: string; metric?: ArenaMetric }[] = 
   { id: "champ", label: "Championship" },
 ];
 
-function boards(input: TodayInput, championRank: number | null, championLeader: string | null): TodayBoard[] {
+function boards(input: TodayInput, championRank: number | null, standings: readonly ChampStanding[] | null): TodayBoard[] {
   return BOARDS.map(({ id, label, metric }) => {
     if (input.arenaLoading && !input.arena) return { id, label, rankNum: "", rankSuf: "", state: "loading" as const };
     if (id === "kpi" && input.kpi && !input.kpi.enabled) return { id, label, rankNum: "—", rankSuf: "", state: "off" as const };
     const people = input.arena?.people ?? [];
     if (input.team) {
-      const leader = metric ? arenaRankings(people, metric).find(row => row.position === 1)?.name ?? null : championLeader;
-      return { id, label, rankNum: "", rankSuf: "", state: "lead" as const, ...(leader ? { leader: firstName(leader) } : {}) };
+      const lead = arenaLead(id, people, standings);
+      return { id, label, rankNum: "", rankSuf: "", state: "lead" as const, ...(lead ? { leader: lead.name, value: lead.value } : {}) };
     }
     const position = metric ? arenaRankings(people, metric).find(row => row.self)?.position ?? null : championRank;
     return position
@@ -305,7 +316,8 @@ export function hideIncome<T extends Pick<TodayModel, "heroAmount" | "heroLoadin
   return { ...model, heroAmount: HIDDEN_AMOUNT, heroLoading: false, heroSplit: HIDDEN_SPLIT };
 }
 
-export function todayModel(input: TodayInput, championRank: number | null = null, championLeader: string | null = null): TodayModel {
+/** `standings`: this month's Championship — its leader is the Championship card's, for a reader on no board. */
+export function todayModel(input: TodayInput, championRank: number | null = null, standings: readonly ChampStanding[] | null = null): TodayModel {
   const income = input.income;
   const commission = income?.total ?? null;
   const fixed = input.salary ?? 0;
@@ -334,6 +346,6 @@ export function todayModel(input: TodayInput, championRank: number | null = null
       : input.team ? teamMetrics(input, input.team) : [salesMetric(input), marginMetric(input), kpiMetric(input)],
     todo: todos(input),
     week: thisWeek(input),
-    boards: boards(input, championRank, championLeader),
+    boards: boards(input, championRank, standings),
   };
 }

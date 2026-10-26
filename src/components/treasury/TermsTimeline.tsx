@@ -18,12 +18,24 @@ const money = (n: number) => (Math.abs(n) < 0.005 ? '—' : formatMoneyBare(n))
 const signed = (n: number) => (Math.abs(n) < 0.005 ? '—' : `${n > 0 ? '+' : '−'}${formatMoneyBare(Math.abs(n))}`)
 const monthsLabel = (m: number | null) => (m == null ? 'no fixed term' : `${m}mo`)
 
+/** What a change took its interest on, when it said so: the original principal, or the base the terms before it used. */
+const basisWords = (s: Pick<TermsSegment, 'interestOnOriginal' | 'interestKeepsBase' | 'interestBase'>) =>
+  s.interestOnOriginal
+    ? `on the original RM ${formatMoneyBare(s.interestBase ?? 0)}`
+    : s.interestKeepsBase
+      ? `on RM ${formatMoneyBare(s.interestBase ?? 0)} as before`
+      : ''
+const interestBasis = (s: Pick<TermsSegment, 'interestOnOriginal' | 'interestKeepsBase' | 'interestBase'>) => (basisWords(s) ? ` · interest ${basisWords(s)}` : '')
+
 /** A segment's terms in a line — the Finance phone app's record says it too. */
 export function segmentLine(s: TermsSegment, i: number): string {
   let line = `${pct(s.rate)} /mo · ${monthsLabel(s.months)}${s.compounding ? ' · compounding' : ''}`
   if (!s.compounding && s.months) {
     line += ` · monthly RM ${formatMoneyBare(s.principalPerMonth)} + ${formatMoneyBare(s.interestPerMonth)}`
-    if (i > 0) line += ` on RM ${formatMoneyBare(s.base)}`
+    if (i > 0) line += interestBasis(s) || ` on RM ${formatMoneyBare(s.base)}`
+  } else if (!s.compounding && i > 0 && basisWords(s)) {
+    // No fixed term: no principal falls due — the interest is what it asks.
+    line += ` · interest RM ${formatMoneyBare(s.interestPerMonth)} ${basisWords(s)}`
   }
   return line
 }
@@ -51,7 +63,8 @@ function ChangeCard({ c }: { c: TermsChangeComparison }) {
           ) : (
             <>
               {monthsLabel(c.old.months)} → {monthsLabel(c.new.months)}
-              {c.old.endYM || c.new.endYM ? ` · ends ${c.old.endYM ?? '—'} → ${c.new.endYM ?? '—'}` : ''} · base RM {formatMoneyBare(c.new.base)} · monthly{' '}
+              {c.old.endYM || c.new.endYM ? ` · ends ${c.old.endYM ?? '—'} → ${c.new.endYM ?? '—'}` : ''} · base RM {formatMoneyBare(c.new.base)}
+              {interestBasis(c.new)} · monthly{' '}
               {formatMoneyBare(c.old.principalPerMonth + c.old.interestPerMonth)} → {formatMoneyBare(c.new.principalPerMonth + c.new.interestPerMonth)} ·
               remaining interest {formatMoneyBare(c.totals.oldInterest)} → {formatMoneyBare(c.totals.newInterest)} ({signed(c.totals.diffInterest)})
               {c.totals.shortfall > 0.005 ? (

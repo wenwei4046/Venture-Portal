@@ -1,6 +1,7 @@
 import 'server-only'
 import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { withFileStorage } from '@/lib/storage/server'
 
 /**
  * The guest page's client (2026-10-11, mig 20261011091000): the publishable
@@ -10,10 +11,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  * the service role.
  */
 export function guestClient(): SupabaseClient {
-  return createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  // `.storage` reaches the buckets moved to R2 as the same stranger (lib/storage/server.ts, 2026-10-23).
+  return withFileStorage(createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
       getAll: () => [],
       setAll: () => {},
     },
-  }) as unknown as SupabaseClient
+  })) as unknown as SupabaseClient
 }

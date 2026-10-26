@@ -5,12 +5,13 @@
  * and Team performance — the Director first, then each team; a team opens to
  * its people, a person opens their own CRM.
  */
+import { withoutHiddenAds } from "@/lib/member/crm-data";
 import { urgencyOf } from "../../sales/vm/common";
 import { jobTitle } from "../../shared/people";
-import { comparisonVM, dateSheetVM, DIRECTOR, first, gb, ini, numbersOf, pct, periodRange, tagOf, type PanelCtx } from "./common";
+import { comparisonVM, dateSheetVM, DIRECTOR, first, gb, inRange, ini, numbersOf, pct, periodRange, seatOf, tagOf, type PanelCtx } from "./common";
 
 export function overviewVM(ctx: PanelCtx) {
-  const { ui, set, patch, data, me, now, teams, directors } = ctx;
+  const { ui, set, patch, me, now, teams, directors } = ctx, data = withoutHiddenAds(ctx.data);
   const cur = periodRange(ui.period, ui.ovRange, now);
   const isC = ui.period === "custom" && !!ui.ovRange;
   const all = numbersOf(data.customers, data.visits, cur, now);
@@ -27,21 +28,25 @@ export function overviewVM(ctx: PanelCtx) {
       { label: "Reply 24 h", a: n.waits ? n.replied24 / n.waits : 0, fmt: x => `${Math.round(x * 100)}%`, rate: true },
     ];
   });
-  const row = (id: string, name: string, who: string, c: string, ids: string[], people: typeof teams[number]["people"], tints: [string, string]) => {
-    const s = ofStaff(ids), canOpen = people.length > 0, open = !!ui.openT[id];
+  const row = (id: string, name: string, who: string, c: string, ids: string[], people: typeof teams[number]["people"], tints: [string, string], list?: () => void) => {
+    const s = ofStaff(ids), canOpen = people.length > 0 || !!list, open = !list && !!ui.openT[id];
     return {
       name, who, c, lead: ini(who.replace(/^(Senior TL|TL|Own customers ·)\s*/, "")), leads: s.leads, appt: pct(s.booked, s.leads), show: pct(s.came, s.due),
       canOpen, open: canOpen && open, rot: open ? "90deg" : "0deg", cur: canOpen ? "pointer" : "default",
-      toggle: canOpen ? () => set(u => ({ ...u, openT: { ...u.openT, [id]: !open } })) : undefined,
+      toggle: list ?? (canOpen ? () => set(u => ({ ...u, openT: { ...u.openT, [id]: !open } })) : undefined),
       people: people.map(p => {
         const v = ofStaff([p.id]), w = waiting.filter(x => x.assignedTo === p.id).length, lead = p.role === "tl" || p.role === "stl";
         return { name: p.name, ini: ini(p.name), aBg: lead ? tints[1] : tints[0], aFg: lead ? "#fff" : tints[1], tag: tagOf(p), waiting: w ? ` · ${w} waiting` : "",
-          pad: `${p.role === "tl" ? 0 : 12}px`, leads: v.leads, appt: pct(v.booked, v.leads), show: pct(v.came, v.due), open: () => ctx.openCrmOf(p.id) };
+          pad: `${p.role === "tl" ? 0 : 12}px`, leads: v.leads, appt: pct(v.booked, v.leads), show: pct(v.came, v.due),
+          // The owner, 2026-10-23: a member opens the Team inbox filtered to them, still as oneself — never as them (View as is Profile's).
+          open: () => set(u => ({ ...u, tab: "inbox", lead: null, inbTeam: seatOf(ctx, p.id)?.id ?? "", inbWho: p.id, inbCol: 0 })) };
       }),
     };
   };
   const dirRows = directors.length
-    ? [row("hod", "Revenue Director", `Own customers · ${directors.map(d => d.name).join(", ")}`, DIRECTOR.c, directors.map(d => d.id), [], [DIRECTOR.tint, DIRECTOR.c])]
+    ? [row("hod", "Revenue Director", `Own customers · ${directors.map(d => d.name).join(", ")}`, // The Revenue Director opens the Leads list of the directors' customers, as the hero's Leads does (the owner, 2026-10-24:
+      // "點rd 之後的lead 可以長這樣，再點看customer info > open chat").
+      DIRECTOR.c, directors.map(d => d.id), [], [DIRECTOR.tint, DIRECTOR.c], () => patch({ cLs: "leads", cLsWho: directors.map(d => d.id) }))]
     : [];
   // 4a (T01, change list 19): the hero's four figures with their change on the comparison period — the one picked, else
   // the period before — and "vs Sep" on the period card; the greeting by the time of day.
@@ -55,7 +60,7 @@ export function overviewVM(ctx: PanelCtx) {
   const grow = all.leads - P.leads, growP = P.leads ? Math.round((grow / P.leads) * 100) : null;
   const hero4 = [
     { label: "Appt rate", value: pct(all.booked, all.leads), ...pts(r100(all.booked, all.leads), r100(P.booked, P.leads)) },
-    { label: "Leads", value: String(all.leads), delta: growP == null ? "" : `${growP > 0 ? "+" : growP < 0 ? "−" : "±"}${Math.abs(growP)}% vs last`, good: grow >= 0 },
+    { label: "Leads", open: () => patch({ cLs: "leads", cLsWho: null }), value: String(all.leads), delta: growP == null ? "" : `${growP > 0 ? "+" : growP < 0 ? "−" : "±"}${Math.abs(growP)}% vs last`, good: grow >= 0 },
     { label: "Show-up", value: pct(all.came, all.due), ...pts(r100(all.came, all.due), r100(P.came, P.due)) },
     { label: "Reply 24 h", value: pct(all.replied24, all.waits), ...pts(r100(all.replied24, all.waits), r100(P.replied24, P.waits)) },
   ];
@@ -63,6 +68,8 @@ export function overviewVM(ctx: PanelCtx) {
   const h = now.getHours(), greet = `Hello, ${me.role === "boss" ? "Principal" : first(me.name)}`; void h; // the owner, 2026-10-18: "改成 hello"
   return {
     hero4, vsLabel, greet,
+    // The period's leads, for the list Leads opens (the owner, 2026-10-24: "點20，可以看到list").
+    leadIds: data.customers.filter(c => inRange(c.createdAt, cur)).map(c => c.id),
     ...dateSheetVM(ctx),
     onOverview: ui.tab === "overview",
     exitApp: ctx.exitApp,

@@ -5,8 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // hangs off the invoices is asked the moment both invoice lists are in, never
 // after every other read; 100 invoices a time; a chunk at PostgREST's cap read
 // again in pages. And what the page is handed: the month's invoices and the
-// other months' open ones, the month's credit notes, the projects with their
-// invoice, the pool's movements, the payroll basis, Finance's mode switch.
+// other months' open ones, the month's credit notes, Marketing's billing (the
+// lines its manager confirmed, 2026-10-26 — it was the marketing contracts),
+// the pool's movements, the payroll basis, Finance's mode switch.
 
 vi.mock('server-only', () => ({}))
 const mocks = vi.hoisted(() => ({ loadDepartmentMode: vi.fn() }))
@@ -29,7 +30,7 @@ const base = {
 const INVOICES: Row[] = [
   { ...base, id: 'd1', invoice_no: 'HV-INV-202609-0055', billing_mode: 'director_attribution', total_amount: 9642.13, status: 'issued' },
   { ...base, id: 'c1', invoice_no: 'HV-INV-202609-0046', billing_mode: 'payroll_consolidated', total_amount: 8641.63, status: 'paid' },
-  { ...base, id: 'm1', invoice_no: 'HV-INV-202609-0039', billing_mode: 'marketing_project', total_amount: 2850, status: 'paid', company_id: 'co-old', contract_id: 'ct-1' },
+  { ...base, id: 'm1', invoice_no: 'HV-INV-202609-0039', billing_mode: 'marketing_project', total_amount: 2850, status: 'paid', company_id: 'co-old' },
   { ...base, id: 'v1', invoice_no: 'HV-INV-202610-0002', billing_mode: 'venture_attribution', total_amount: 1054.89, status: 'voided' },
 ]
 const OTHER: Row[] = [{ ...base, id: 'o1', period_month: '2026-08-01', invoice_no: 'HV-INV-202608-0090', billing_mode: 'hr_attribution', total_amount: 300, status: 'issued' }]
@@ -41,6 +42,19 @@ const LINES: Row[] = [
   { id: 'l5', invoice_id: 'm1', line_no: 1, description: 'Design', amount: 2850, category_code: '5019', segment: null },
   { id: 'l6', invoice_id: 'o1', line_no: 1, description: 'HR — Aug', amount: 300, category_code: '5050', segment: 'hr' },
 ]
+
+// mkt_bill_import_preview(month): one line on the paid Hookka invoice, one to import for an outside client.
+const MARKETING = {
+  month: PERIOD,
+  locked: false,
+  lines: [
+    { bill: 'b1', project: 'p1', track: 'PRJ-HK-2609-001', title: 'Catalog', words: "Bedframe Catalog - Sep'26", amount: 2850, sub: { id: 's-hk', code: 'HK', name: 'Hookka' },
+      party: { kind: 'subsidiary', id: 'co-old', name: 'Hookka', code: 'HK' }, account: { code: '5019', name: 'Design Income' }, invoice: { id: 'm1', no: 'HV-INV-202609-0039', status: 'paid' } },
+    { bill: 'b2', project: 'p2', track: 'PRJ-REDT-2609-001', title: 'Ads', words: "Social Media - Sep'26", amount: 3000, sub: { id: 's-rt', code: 'REDT', name: 'Red Truck' },
+      party: { kind: 'client', id: 's-rt', name: 'Red Truck Sdn Bhd', code: 'REDT' }, account: null, invoice: null },
+  ],
+  typed: [],
+}
 
 function database(tables: Record<string, Row[]> = {}) {
   const data: Record<string, Row[]> = {
@@ -59,7 +73,6 @@ function database(tables: Record<string, Row[]> = {}) {
       { code: '5050', name: 'Salary Income', type: 'revenue', parent_code: null, is_active: true },
     ],
     bank_accounts: [{ id: 'b1', bank_name: 'Hong Leong Bank', account_number: '123-456-7890', is_primary: true, status: 'active' }],
-    service_contracts: [{ billing_mode: 'marketing_project', id: 'ct-1', description: 'Rebranding', amount: 2850, status: 'active', start_date: '2026-09-01', end_date: '2026-09-30', company_id: 'co-old', approved_by: 'u' }],
     venture_pool: [
       { id: 'vp1', created_at: '2026-09-09T02:00:00Z', transaction_type: 'fund_out', amount: 40000, description: 'New loan to 2990', reference_table: 'loans' },
       { id: 'vp2', created_at: '2026-09-09T03:00:00Z', transaction_type: 'expense_out', amount: 4400, description: 'Minimum Pay', reference_table: 'payment_vouchers' },
@@ -121,7 +134,10 @@ function database(tables: Record<string, Row[]> = {}) {
     }
     return q
   })
-  const rpc = vi.fn(() => {
+  const rpc = vi.fn((fn?: string) => {
+    if (fn === 'mkt_bill_import_preview') {
+      return { then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => Promise.resolve({ data: MARKETING, error: null }).then(resolve, reject) }
+    }
     const result = {
       data: [
         { department_name: 'HR', company_id: 'co-2990', company_short_code: '2990', company_name: '2990', amount: 1000, salary_amount: 800, allowance_amount: 100, epf_amount: 80, socso_amount: 15, eis_amount: 5 },
@@ -164,10 +180,30 @@ describe('Invoice’s hub, read', () => {
     expect(hub.invoices.find((i) => i.id === 'd1')!.remaining).toBe(9542.13)
   })
 
-  it('gives each marketing project its invoice this month', async () => {
-    const { client } = database()
+  it('reads Marketing’s billing for the month — each line with its invoice, or none to import', async () => {
+    const { client, rpc } = database()
     const hub = await loadInvoiceHub(client, PERIOD)
-    expect(hub.contracts).toEqual([expect.objectContaining({ id: 'ct-1', company: 'Hookka (HK)', invoice: { id: 'm1', no: 'HV-INV-202609-0039' } })])
+    expect(rpc).toHaveBeenCalledWith('mkt_bill_import_preview', { p_month: PERIOD })
+    expect(hub.marketing.lines.map((l) => [l.bill, l.party.name, l.account?.code ?? null, l.invoice?.no ?? null])).toEqual([
+      ['b1', 'Hookka', '5019', 'HV-INV-202609-0039'],
+      ['b2', 'Red Truck Sdn Bhd', null, null],
+    ])
+    expect(hub.marketing.month).toBe(PERIOD)
+  })
+
+  it('a Marketing read that fails leaves its card empty, the rest of the hub as it is', async () => {
+    const { client, rpc } = database()
+    const real = rpc.getMockImplementation()!
+    rpc.mockImplementation((fn?: string) =>
+      fn === 'mkt_bill_import_preview'
+        ? { then: (resolve: (v: unknown) => unknown) => Promise.resolve({ data: null, error: { message: 'boom' } }).then(resolve) }
+        : real(fn),
+    )
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const hub = await loadInvoiceHub(client, PERIOD)
+    expect(hub.marketing).toEqual({ month: PERIOD, locked: false, lines: [], typed: [] })
+    expect(hub.invoices).toHaveLength(4)
+    spy.mockRestore()
   })
 
   it('reads every *_out movement as money that left the pool — a loan disbursed (fund_out) too', async () => {
@@ -184,7 +220,7 @@ describe('Invoice’s hub, read', () => {
     const { client } = database()
     const hub = await loadInvoiceHub(client, PERIOD)
     expect(hub.basis.status).toBe('Submitted')
-    expect(hub.basis.note).toBe('HR 5 Oct · Director salary 5 Oct · 1 marketing contract')
+    expect(hub.basis.note).toBe('HR 5 Oct · Director salary 5 Oct · 2 Marketing lines')
     expect(hub.basis.summary).toBe('HR 1,352 / 5,797 · Finance 2,129 / 26,637 · Director Office 2,175 / 7,416 · IT 2,986 / 5,972 · Director 9,642 ✓ · Marketing 2,850 / 59,698')
     expect(hub.basis.lines[0]).toEqual({ key: 'hr', label: 'HR', value: '1,352.45 / 5,797.05' })
     expect(hub.basis.director).toMatchObject({ count: 1, gross: 2500, billed: 9642.13 })

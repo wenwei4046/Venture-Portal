@@ -446,7 +446,9 @@ function navEntries(data: NavData): NavEntry[] {
     { href: '/team/hierarchy', label: 'Hierarchy', section: 'People', visible: canOpenPeople },
     { href: '/team/documentation', label: 'Documentation', section: 'People', visible: canAccessDocumentation },
     // Hiring (2026-10-11, HR revamp round 2): HR's requests, from submission to filled.
-    { href: '/hiring/requests', label: 'Hiring Requests', section: 'Hiring', visible: canAccessHiring },
+    // Its Listing tab is a row of its own (2026-10-24, the user).
+    { href: '/hiring/requests', label: 'Hiring Requests', section: 'Hiring', notTab: ['listing'], visible: canAccessHiring },
+    { href: '/hiring/requests?tab=listing', label: 'Hiring Listing', section: 'Hiring', tab: 'listing', visible: canAccessHiring },
     { href: '/hiring/insights', label: 'Hiring Insights', section: 'Hiring', visible: canAccessHiring },
     { href: '/hiring/talent', label: 'Talent Bank', section: 'Hiring', visible: canAccessHiring },
 
@@ -642,6 +644,11 @@ const TABS_BY_ROLE: Record<UserRole, TabDef[]> = {
   // only for an HR account the HR app has nothing for.
   hr: [
     { href: '/dashboard', label: '总览', icon: 'home' },
+  ],
+  // Marketing's view is the computer's (2026-10-23 — the user: a Marketing phone app comes later). The Principal's
+  // Marketing lens on a phone keeps the bar its own account would have.
+  marketing: [
+    { href: '/dashboard', label: 'Overview', icon: 'home' },
   ],
 }
 

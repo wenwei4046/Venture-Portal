@@ -34,12 +34,19 @@ async function tap(el: Element | null) {
 const refused = () => screen.getByText(/We have a few firm models/).closest<HTMLElement>("main[data-chat-screen] [data-chat-list] > div")!;
 const NOTE = failNote("131053 Media upload error");
 
+/** The board shows one status at a time (2026-10-24): step through the status tabs until `name` shows. */
+async function toCustomer(name: string) {
+  const tabs = [...document.querySelectorAll<HTMLElement>("span")].filter(e => e.style.borderBottom && /^(New|Attention|Follow up|Appointment|Won|Lost|Cold leads)/.test(e.textContent ?? ""));
+  for (const t of tabs) { if (screen.queryAllByText(name, { exact: true }).length) break; fireEvent.click(t); await act(async () => {}); }
+}
+
 describe("a message WhatsApp refused", () => {
   it("says so under its time in the Team chat — a ! where the ticks were, and why", async () => {
     window.history.replaceState({}, "", "/member/preview?crmAs=boss");
     render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
     await act(async () => {});
     await tap(screen.getAllByText("Inbox", { exact: true }).find(e => e.closest("nav")) ?? null);
+    await toCustomer("Lim Wei Jie");
     await tap(screen.getAllByText("Lim Wei Jie", { exact: true })[0]);
     expect(refused().textContent).toContain(NOTE);
     expect(refused().querySelector("svg path")?.getAttribute("d")).toBe(tickPathOf("failed"));
@@ -49,6 +56,7 @@ describe("a message WhatsApp refused", () => {
   it("says so in Mine's chat too, in white on its orange", async () => {
     render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
     await act(async () => {});
+    await toCustomer("Lim Wei Jie");
     await tap(screen.getAllByText("Lim Wei Jie", { exact: true })[0]);
     expect(refused().textContent).toContain(NOTE);
     expect(refused().querySelector('svg[aria-label="Not delivered"] path')?.getAttribute("d")).toBe(tickPathOf("failed"));

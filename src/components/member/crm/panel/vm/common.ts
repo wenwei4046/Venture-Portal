@@ -7,7 +7,7 @@
 import type { Dispatch, SetStateAction, SyntheticEvent } from "react";
 import type { CrmCustomer, CrmData, CrmPerson, CrmVisit } from "@/lib/member/crm-data";
 import { formatIntlDate } from "@/lib/utils";
-import { downlineOf, jobTitle, ROLE_ORDER, teamName, titleOf, titleShort } from "../../shared/people";
+import { downlineOf, isTeamTop, jobTitle, ROLE_ORDER, teamName, titleOf, titleShort } from "../../shared/people";
 import type { PanelActions } from "../actions";
 import type { PanelUi, Period, Range } from "../ui";
 import type { SalesTab } from "../../sales/ui";
@@ -48,22 +48,35 @@ export interface PanelCtx {
   /** Open someone's own CRM (View as / a tapped chat): the salesperson screens, on their customers. */
   openCrmOf: (staffId: string, customerId?: string) => void;
   /** The Director: Control panel ⇄ My CRM — on `tab` (the phone's round button: Mine's first page), else the same page. */
-  toMyCrm?: (tab?: SalesTab) => void;
+  toMyCrm?: (tab?: SalesTab, sub?: "notif" | "auto" | "quick") => void;
   exitApp: () => void;
   slotCounts: Record<string, number>;
   /** One's recent emoji, shared with Mine's chat (sales/vm/composer.ts › SharedRecents). */
   recents?: import("../../sales/vm/composer").SharedRecents;
+  /**
+   * A chat's ⋮ Assign to — Mine's rule (2026-10-23 — the owner: "照「同一套规则」，跟 Mine 一样"), decided by the SIGNED-IN
+   * account: `any` — it holds CRM · Manage (the Principal, the Director), whoever's Team is on screen: anyone, at once
+   * (crm_send_to); `team` — a TL / STL / TA on their own Team side: their downline in the customer's team (crm_assign_member);
+   * absent — no Assign to (the database would refuse it).
+   */
+  assign?: "any" | "team";
 }
 
 /** The teams, each a TL with everyone below them, in the design's order and colours. */
 export function teamsOf(data: CrmData): Team[] {
-  return data.people.filter(p => p.role === "tl").sort((a, b) => a.name.localeCompare(b.name)).map((tl, k) => {
+  // A team is every top — a TL, or a TA / RS reporting straight to the Revenue Director (2026-10-22, isTeamTop).
+  return data.people.filter(p => isTeamTop(p, data.people)).sort((a, b) => a.name.localeCompare(b.name)).map((tl, k) => {
     const [c, tint, own] = hue(k);
     const people = [tl, ...downlineOf(tl.id, data.people).map(id => data.people.find(p => p.id === id)!).filter(p => p && ["tl", "ta", "rs"].includes(p.role))]
       .sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || Number(b.fullTime) - Number(a.fullTime) || a.name.localeCompare(b.name));
     const above = data.people.find(p => p.id === tl.uplineId && p.role === "stl");
-    return { id: tl.id, tl, name: teamName(tl), who: above ? `Senior TL ${above.name}` : `TL ${tl.name}`, c, tint, own, people };
-  });
+    // A team of one (a TA / RS reporting straight to the Revenue Director, nobody under them) is named by the person
+    // (2026-10-22, the owner: "如果他没有下线的，就放他的名，不然很难看懂").
+    return { id: tl.id, tl, name: people.length === 1 && tl.role !== "tl" ? tl.name : teamName(tl), who: above ? `Senior TL ${above.name}` : tl.role === "tl" ? `TL ${tl.name}` : tl.name, c, tint, own, people };
+  })
+    // Teams first, then the people who are a team on their own, each by name (the owner, 2026-10-24: "RD-》team->"; the
+    // Revenue Director's row always comes before them all). The colours stay with each team as they were.
+    .sort((x, y) => Number(x.people.length === 1 && x.tl.role !== "tl") - Number(y.people.length === 1 && y.tl.role !== "tl") || x.name.localeCompare(y.name));
 }
 
 /** "RS · Full time", "TL", "Senior TL" — as the design tags people. */
@@ -80,7 +93,7 @@ export function periodRange(per: Period, custom: Range | null, now: Date): Range
 }
 export const inRange = (iso: string, r: Range) => { const t = day0(new Date(iso)); return t >= r.a && t <= r.b; };
 
-export interface Numbers { leads: number; booked: number; came: number; due: number; noshow: number; replied24: number; waits: number }
+export interface Numbers { leads: number; won: number; booked: number; came: number; due: number; noshow: number; replied24: number; waits: number }
 
 /** The numbers of some customers over a range. */
 export function numbersOf(customers: CrmCustomer[], visits: CrmVisit[], r: Range, now: Date): Numbers {
@@ -99,7 +112,7 @@ export function numbersOf(customers: CrmCustomer[], visits: CrmVisit[], r: Range
       if (m.from === "me" && !m.auto && wait != null) { if (inRange(new Date(wait).toISOString(), r) && t - wait <= DAY) replied24++; wait = null; }
     }
   }
-  return { leads: leads.length, booked, came: vs.filter(v => v.state === "attended").length, due: due.length, noshow: vs.filter(v => v.state === "no_show").length, replied24, waits };
+  return { leads: leads.length, won: leads.filter(c => c.status === "won").length, booked, came: vs.filter(v => v.state === "attended").length, due: due.length, noshow: vs.filter(v => v.state === "no_show").length, replied24, waits };
 }
 
 /* ── The date sheet: Period and Compare to (Overview, Ads Performance) ──── */
@@ -209,14 +222,20 @@ export interface PickGroup { name: string; c: string; n: number; people: PickRow
  * Anyone who takes enquiries but sits in no team (a Senior TL above the
  * teams) comes last under "Others", so nobody is unreachable.
  */
-export function pickGroups(ctx: PanelCtx, o: { skip?: string | null; sel?: string | null; pick: (id: string) => void; hodLabel?: string }): PickGroup[] {
+export function pickGroups(ctx: PanelCtx, o: { skip?: string | null; sel?: string | null; pick: (id: string) => void; hodLabel?: string; only?: CrmPerson[] }): PickGroup[] {
   const row = (p: CrmPerson, c: string): PickRow => {
     const on = o.sel === p.id;
-    return { id: p.id, label: p.name, c, sub: subLine(p), on, ring: on ? "var(--crm-rust)" : "var(--crm-line)", dot: on ? "var(--crm-rust)" : "transparent", bg: on ? "var(--crm-cream)" : "transparent", r: "12px", pick: () => o.pick(p.id) };
+    return { id: p.id, label: p.name, c, sub: subLine(p), on, ring: on ? "var(--crm-rust)" : "var(--crm-line)", dot: on ? "var(--crm-rust)" : "transparent", bg: on ? "var(--crm-sel)" : "transparent", r: "12px", pick: () => o.pick(p.id) };
   };
+  // `only`: a leader's own people (2026-10-23 — the chat's Assign to, as Mine's): those people, under their team's name.
+  if (o.only) {
+    const t = ctx.teams.find(x => o.only!.some(p => x.people.some(q => q.id === p.id)));
+    const ps = o.only.filter(p => p.id !== o.skip).sort((a, b) => sortKey(a) - sortKey(b) || a.name.localeCompare(b.name)).map(p => row(p, t?.c ?? "var(--crm-muted)"));
+    return ps.length ? [{ name: t?.name ?? "Your team", c: t?.c ?? "var(--crm-muted)", n: ps.length, people: ps }] : [];
+  }
   const groups: PickGroup[] = [];
   // The Principal can be given a customer too since 2026-10-13 (their Mine); listed first, only where CRM · Manage sends.
-  const boss = ctx.data.can.manage ? ctx.data.people.filter(p => p.role === "boss" && p.id !== o.skip).map(p => row(p, "var(--crm-ink)")) : [];
+  const boss = ctx.assign === "any" || ctx.data.can.manage ? ctx.data.people.filter(p => p.role === "boss" && p.id !== o.skip).map(p => row(p, "var(--crm-ink)")) : [];
   if (boss.length) groups.push({ name: "Principal", c: "var(--crm-ink)", n: boss.length, people: boss });
   const dirs = ctx.directors.filter(d => d.id !== o.skip).map(d => row(d, DIRECTOR.c));
   if (dirs.length) groups.push({ name: o.hodLabel ?? "Revenue Director", c: DIRECTOR.c, n: dirs.length, people: dirs });

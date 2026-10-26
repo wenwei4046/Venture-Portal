@@ -33,8 +33,8 @@ export const STATUS_LABEL: Readonly<Record<ItStatus, string>> = { new: 'New', in
 /** A status's chip, in the app's tones: waiting, being worked on, done, put away. */
 export const STATUS_TONE: Readonly<Record<ItStatus, 'pending' | 'warn' | 'good' | 'none'>> = { new: 'pending', in_progress: 'warn', fixed: 'good', closed: 'none' }
 
-/** The database's limits (mig 20261021020100), said before anything is sent. */
-export const IT_LIMITS = { title: 120, details: 5000, note: 3000, files: 10, fileBytes: 50 * 1024 * 1024 } as const
+/** The database's limits (mig 20261021020100; a file 2 GB since mig 20261024006700), said before anything is sent. */
+export const IT_LIMITS = { title: 120, details: 5000, note: 3000, files: 10, fileBytes: 2 * 1024 * 1024 * 1024 } as const
 
 export interface ItFile {
   id: string
@@ -189,7 +189,7 @@ export function itContentType(name: string, type: string): string | null {
 export function itFileRefusal(file: { name: string; size: number; type: string }): string | null {
   if (!itContentType(file.name, file.type)) return `${file.name || 'That file'}: a picture, a video, a PDF, an Office file, a zip or a text file.`
   if (file.size < 1) return `${file.name || 'That file'} is empty.`
-  if (file.size > IT_LIMITS.fileBytes) return `${file.name || 'That file'} is over 50 MB.`
+  if (file.size > IT_LIMITS.fileBytes) return `${file.name || 'That file'} is over 2 GB.`
   return null
 }
 
@@ -201,6 +201,19 @@ export function itObjectPath(uid: string, name: string, key: string): string {
 
 export const isImage = (contentType: string | null) => !!contentType && contentType.startsWith('image/') && contentType !== 'image/heic' && contentType !== 'image/heif'
 export const isVideo = (contentType: string | null) => !!contentType && contentType.startsWith('video/')
+
+/**
+ * How a filed file shows beside its request (2026-10-24): what a browser draws in place — a picture, a video, a PDF, a
+ * text file — or null (an Office file, a zip, a CSV, an iPhone's HEIC), which opens in a new tab or downloads instead.
+ */
+export function previewKind(name: string, contentType: string | null): 'image' | 'video' | 'pdf' | 'text' | null {
+  const type = itContentType(name, contentType ?? '') ?? ''
+  if (isImage(type)) return 'image'
+  if (isVideo(type)) return 'video'
+  if (type === 'application/pdf') return 'pdf'
+  if (type === 'text/plain' || type === 'application/json') return 'text'
+  return null
+}
 
 /** A moment on the office's calendar: 20 Oct (a request sent at 01:00 is the office's day, not UTC's). */
 export const itDay = (iso: string): string => (iso ? officeDay(iso).format('D MMM') : '')

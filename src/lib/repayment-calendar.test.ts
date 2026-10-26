@@ -10,8 +10,8 @@ const row = (no: number, due: string, installment: number, outstanding: number) 
   no, ym: due.slice(0, 7), due, installment, principal: installment - 400, interest: 400, balance: 0, outstanding, remark: '', tone: '' as const,
 })
 const plan = (rows: ReturnType<typeof row>[], months: number | null = 6): RepaymentPlan => ({
-  kind: months ? 'fixed' : 'open', rows, months, paidCount: 0, outstandingDue: 0, firstDue: rows[0]?.due ?? null, firstInstallment: 0,
-  totalInterest: 0, principalPaid: 0, interestPaid: 0, principalOwed: 0,
+  kind: months ? 'fixed' : 'open', rows, months, paidCount: 0, outstandingDue: 0, overdue: 0, overdueSince: null, overdueDays: 0, firstDue: rows[0]?.due ?? null, firstInstallment: 0,
+  totalInterest: 0, principalPaid: 0, interestPaid: 0, principalOwed: 0, compound: null,
 })
 const deal = { kind: 'collect' as const, name: 'CAR', href: '/fund-out/l1', rate: 0.04, principal: 60000 }
 

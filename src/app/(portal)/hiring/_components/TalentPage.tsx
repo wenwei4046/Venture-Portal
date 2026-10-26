@@ -8,10 +8,12 @@ import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { addHiringFiles, hiringFileLink, inviteHiringTalent, removeHiringFile, removeHiringTalent, replaceHiringFile, saveTalentNotes } from '@/lib/hiring/actions'
 import { HIRING_ACCEPT, startingType } from '@/lib/hiring/files'
+import { cameFrom } from '@/lib/hiring/reasons'
 import { uploadHiringFile } from '@/lib/hiring/upload'
 import { OPEN, answerOf, dayLabel, talentStatus } from '@/lib/hiring/view'
 import type { HiringBoard, HiringFile, HiringTalent } from '@/lib/hiring/types'
 import { FileRow, FileTypePick, NEW_TYPE, sendWaiting } from './HiringFiles'
+import ReasonPick from './ReasonPick'
 import s from './hiring.module.css'
 
 /**
@@ -70,7 +72,7 @@ export default function TalentPage({ board, talent: t, can }: { board: HiringBoa
     ['Department', t.department],
     ['Phone', t.phone || '—'],
     ['Email', t.email || '—'],
-    ['Saved from', t.fromRequest || 'Added directly'],
+    ['Came from', cameFrom(board, t)],
     ['Saved', `${dayLabel(t.savedAt)} · ${t.savedBy}`],
   ]
 
@@ -95,6 +97,13 @@ export default function TalentPage({ board, talent: t, can }: { board: HiringBoa
           <section className={s.card} aria-label="Profile">
             <SecLabel>Profile</SecLabel>
             <div className={s.tvTiles}>
+              {/* Why they are kept (2026-10-24): HR changes it here; their History says from what to what. */}
+              <div className={s.tvTile}>
+                <div className={s.tvTileLabel}>Reason</div>
+                <div className={s.tvTileValue}>
+                  <ReasonPick talent={t} reasons={board.talentReasons} canEdit={can.edit} className={s.select} />
+                </div>
+              </div>
               {tiles.map(([l, v]) => (
                 <div key={l} className={s.tvTile}>
                   <div className={s.tvTileLabel}>{l}</div>

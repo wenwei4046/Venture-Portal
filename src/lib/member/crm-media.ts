@@ -14,11 +14,12 @@ export function mediaKindOf(mime: string): CrmMediaKind {
 }
 
 /** Each channel's limit for a kind, in bytes (WhatsApp Cloud API: image 5 MB, video / audio 16 MB, document 100 MB;
- * Messenger 25 MB for any attachment). The bucket takes up to 25 MB. */
+ * Messenger 25 MB for any attachment). The bucket (R2 since 2026-10-23) takes up to 100 MB, so a WhatsApp document has
+ * its whole 100 MB. */
 export function mediaLimit(channel: "whatsapp" | "messenger", kind: CrmMediaKind): number {
   const MB = 1024 * 1024;
   if (channel === "messenger") return 25 * MB;
-  return kind === "image" ? 5 * MB : kind === "document" ? 25 * MB : 16 * MB;
+  return kind === "image" ? 5 * MB : kind === "document" ? 100 * MB : 16 * MB;
 }
 
 /** A file's place in the bucket: "<customer id>/<time>-<random>.<ext>" — the folder is what the storage policy asks. */

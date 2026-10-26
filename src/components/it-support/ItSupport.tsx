@@ -10,10 +10,11 @@ import ImageAnnotator from '@/components/it-requests/ImageAnnotator'
 import { fetchMyItRequests, fetchItDesk, fetchItRequest, submitItRequest, noteItRequest } from '@/lib/it-requests/actions'
 import {
   IT_CATEGORIES, IT_STATUSES, IT_LIMITS, CATEGORY_LABEL, STATUS_LABEL, deviceLabel, itDay, itWhen,
-  submitProblem, noteProblem, type ItCategory, type ItRequest, type ItStatus,
+  submitProblem, noteProblem, type ItCategory, type ItFile, type ItRequest, type ItStatus,
 } from '@/lib/it-requests/model'
 import { FiledFiles, Uploads } from './Attachments'
-import { useItUploads, useDraftLifecycle } from './useItUploads'
+import FilePreview from './FilePreview'
+import { useItUploads, useDraftLifecycle, useFileDrop } from './useItUploads'
 import s from './it-support.module.css'
 
 export interface ItSupportProps {
@@ -148,8 +149,11 @@ export default function ItSupport({
 }
 
 /** Finance already supplies its phone context; HR's phone uses the same white sheet and safe-area handling. */
-function SupportDialog({ open, title, locked, onClose, children }: {
-  open: boolean; title: string; locked: boolean; onClose: () => void; children: ReactNode
+function SupportDialog({ open, title, locked, onClose, aside = null, children }: {
+  open: boolean; title: string; locked: boolean; onClose: () => void
+  /** A filed file's preview, beside the window (2026-10-24). */
+  aside?: ReactNode
+  children: ReactNode
 }) {
   const inherited = useFinSurface()
   const [phone, setPhone] = useState<{ platform: FinPlatform } | null>(null)
@@ -161,7 +165,7 @@ function SupportDialog({ open, title, locked, onClose, children }: {
     return () => media.removeEventListener('change', update)
   }, [])
   return <FinSurface.Provider value={inherited ?? phone}>
-    <FinDialog open={open} title={title} locked={locked} tall onClose={onClose}>{children}</FinDialog>
+    <FinDialog open={open} title={title} locked={locked} tall aside={aside} onClose={onClose}>{children}</FinDialog>
   </FinSurface.Provider>
 }
 
@@ -192,6 +196,8 @@ function NewRequest({ open, app, readOnly, onClose, onSaved }: {
   const fields = useId()
   const files = useItUploads()
   const { closed, sending } = useDraftLifecycle(open, files.discard)
+  // A file dragged onto the form attaches as if picked (2026-10-24); Details says where it lands.
+  const drop = useFileDrop(files.add, open && !readOnly && !busy && !files.full)
   const mayAnnotate = useRef(false)
   mayAnnotate.current = open && !readOnly && !busy && !files.full
   const annotate = (src: string, fileName: string) => {
@@ -228,13 +234,16 @@ function NewRequest({ open, app, readOnly, onClose, onSaved }: {
       <DialogButton disabled={busy} onClick={onClose}>Cancel</DialogButton>
       <DialogButton kind="primary" type="submit" disabled={busy || files.busy || readOnly}>{busy ? 'Sending…' : 'Send to IT'}</DialogButton>
     </>}>
-      <div className={s.form} onPaste={busy || readOnly ? undefined : files.paste}>
+      <div className={s.form} onPaste={busy || readOnly ? undefined : files.paste} {...drop.zone} data-drop={drop.over ? '' : undefined}>
         <div role="group" aria-label="What is it?" className={s.categories}>
           {IT_CATEGORIES.map(item => <DialogButton key={item.id} disabled={busy} aria-pressed={category === item.id} className={category === item.id ? s.picked : undefined} onClick={() => setCategory(item.id)}>{item.label}</DialogButton>)}
         </div>
         <Field label="Title" htmlFor={`${fields}-title`}><Input id={`${fields}-title`} value={title} onChange={event => setTitle(event.target.value)} maxLength={IT_LIMITS.title} disabled={busy} aria-required="true" /></Field>
-        <Field label="Details" htmlFor={`${fields}-details`}><TextArea id={`${fields}-details`} value={details} onChange={event => setDetails(event.target.value)} maxLength={IT_LIMITS.details} rows={5} disabled={busy} placeholder="What happened, where in the app, and what you expected" /></Field>
-        <div><SecLabel>Screenshots and files</SecLabel><Uploads files={files} disabled={busy || readOnly} onAnnotate={readOnly ? undefined : annotate} /><p className={s.meta}>Up to 10 files, 50 MB each.</p></div>
+        <Field label="Details" htmlFor={`${fields}-details`}><div className={s.dropBox}>
+          <TextArea id={`${fields}-details`} value={details} onChange={event => setDetails(event.target.value)} maxLength={IT_LIMITS.details} rows={5} disabled={busy} placeholder="What happened, where in the app, and what you expected" />
+          {drop.over && <span className={s.dropHint} aria-hidden="true">Drop to attach</span>}
+        </div></Field>
+        <div><SecLabel>Screenshots and files</SecLabel><Uploads files={files} disabled={busy || readOnly} onAnnotate={readOnly ? undefined : annotate} /><p className={s.meta}>Up to 10 files, 2 GB each.</p></div>
         {error && <p className={s.error} role="alert">{error}</p>}
       </div>
     </DialogForm>}
@@ -251,14 +260,19 @@ function RequestDetail({ open, request, readOnly, canEdit, preloaded, onClose, o
   const [error, setError] = useState('')
   const [status, setStatus] = useState(request.status)
   const [annotation, setAnnotation] = useState<{ src: string; fileName: string } | null>(null)
+  // A filed file opened beside the window (2026-10-24), never in another tab of its own.
+  const [preview, setPreview] = useState<{ file: ItFile; thumb?: string } | null>(null)
   const noteId = useId()
   const files = useItUploads()
   const { closed, sending } = useDraftLifecycle(open, files.discard)
   const writes = (request.mine || canEdit) && !readOnly
+  // A file dragged onto the note attaches as if picked (2026-10-24); dropped elsewhere in the window it is not opened in place of the page.
+  const drop = useFileDrop(files.add, open && writes && !busy && !files.full)
   const mayAnnotate = useRef(false)
   mayAnnotate.current = open && writes && !busy && !files.full
   useEffect(() => { setStatus(request.status) }, [request.status])
-  useEffect(() => { if (!open) { setBody(''); setError(''); setAnnotation(null); setStatus(request.status) } }, [open, request.status])
+  useEffect(() => { if (!open) { setBody(''); setError(''); setAnnotation(null); setPreview(null); setStatus(request.status) } }, [open, request.status])
+  const opened = (file: ItFile, thumb?: string) => setPreview({ file, thumb })
   const annotate = writes ? (src: string, fileName: string) => {
     if (mayAnnotate.current) setAnnotation({ src, fileName })
   } : undefined
@@ -287,12 +301,13 @@ function RequestDetail({ open, request, readOnly, canEdit, preloaded, onClose, o
       else setBusy(false)
     }
   }
-  return <><SupportDialog open={open} title={request.title} locked={busy || !!annotation} onClose={onClose}>
+  return <><SupportDialog open={open} title={request.title} locked={busy || !!annotation} onClose={onClose}
+    aside={preview ? <FilePreview key={preview.file.id} file={preview.file} thumb={preview.thumb} onClose={() => setPreview(null)} /> : null}>
     <DialogForm onSubmit={() => void send()} buttons={<>
       <DialogButton disabled={busy} onClick={onClose}>Done</DialogButton>
       {writes && <DialogButton kind="primary" type="submit" disabled={busy || files.busy}>{busy ? 'Sending…' : canEdit ? 'Send' : 'Send reply'}</DialogButton>}
     </>}>
-      <div className={s.form}>
+      <div className={s.form} {...drop.guard}>
         <div className={s.detailHead}><span className={s.date}>{request.ref}</span><Status status={request.status} /></div>
         <Facts labelWidth={74} rows={[
           { l: 'Type', v: CATEGORY_LABEL[request.category] },
@@ -303,18 +318,21 @@ function RequestDetail({ open, request, readOnly, canEdit, preloaded, onClose, o
           ...(request.device ? [{ l: 'Device', v: request.device }] : []),
         ]} />
         {request.details && <p className={s.prose}>{request.details}</p>}
-        {request.files.some(file => file.noteId === null) && <section><SecLabel>Screenshots and files</SecLabel><FiledFiles files={request.files.filter(file => file.noteId === null)} onAnnotate={annotate} disabled={busy || files.full} preloaded={preloaded} /></section>}
+        {request.files.some(file => file.noteId === null) && <section><SecLabel>Screenshots and files</SecLabel><FiledFiles files={request.files.filter(file => file.noteId === null)} onAnnotate={annotate} onOpen={opened} active={preview?.file.id} disabled={busy || files.full} preloaded={preloaded} /></section>}
         {request.notes.length > 0 && <section>
           <SecLabel>Updates</SecLabel>
           <div className={s.thread}>{request.notes.map(note => <div className={s.note} data-it={note.side === 'it' ? '' : undefined} key={note.id}>
             <div className={s.noteHead}><strong>{note.mine ? 'You' : note.side === 'it' ? `IT · ${note.authorName}` : note.authorName}</strong><time className={s.date}>{itWhen(note.at)}</time></div>
             {note.statusTo && <div className={s.noteStatus}>Marked <Status status={note.statusTo} /></div>}
             {note.body && <p className={s.prose}>{note.body}</p>}
-            <FiledFiles files={request.files.filter(file => file.noteId === note.id)} onAnnotate={annotate} disabled={busy || files.full} preloaded={preloaded} />
+            <FiledFiles files={request.files.filter(file => file.noteId === note.id)} onAnnotate={annotate} onOpen={opened} active={preview?.file.id} disabled={busy || files.full} preloaded={preloaded} />
           </div>)}</div>
         </section>}
-        {writes && <section className={s.composer} onPaste={busy ? undefined : files.paste}>
-          <Field label={canEdit ? 'Your note' : 'Your reply'} htmlFor={noteId}><TextArea id={noteId} value={body} onChange={event => setBody(event.target.value)} rows={3} maxLength={IT_LIMITS.note} disabled={busy} /></Field>
+        {writes && <section className={s.composer} onPaste={busy ? undefined : files.paste} {...drop.zone} data-drop={drop.over ? '' : undefined}>
+          <Field label={canEdit ? 'Your note' : 'Your reply'} htmlFor={noteId}><div className={s.dropBox}>
+            <TextArea id={noteId} value={body} onChange={event => setBody(event.target.value)} rows={3} maxLength={IT_LIMITS.note} disabled={busy} />
+            {drop.over && <span className={s.dropHint} aria-hidden="true">Drop to attach</span>}
+          </div></Field>
           <Uploads files={files} disabled={busy} onAnnotate={annotate} />
           {canEdit && <Field label="Status" htmlFor={`${noteId}-status`}>
             <Select id={`${noteId}-status`} value={status} disabled={busy} onChange={event => setStatus(event.target.value as ItStatus)}>

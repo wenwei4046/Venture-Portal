@@ -205,6 +205,24 @@ describe('unitPrice — catalogue_unit_price', () => {
     expect(unitPrice({ price: null, grid: TWO_HEIGHTS }, '35"', 'PRICE_3')).toEqual({ price: 140, how: 'grid' })
   })
 
+  // 2026-10-25: the ERP sells 8211 MODENA at one seat, DEFAULT — its bills read `SEAT DEFAULT` or no seat at
+  // all. Priced under 24–35 (SKU Master showed no DEFAULT column), not one of them was ever costed; its price
+  // moved to DEFAULT (20261026021000), both kinds of bill cost it — a PRICE_2 bill at the one tier priced.
+  it('8211: a price kept at the seats it is never sold at costs no bill; kept at DEFAULT alone, every bill', () => {
+    const typed: PriceCell[] = [
+      ...['24', '26', '28', '30', '32', '35'].map(height => ({ height, tier: 'PRICE_1', price: 1080 })),
+      ...['25"', '27"', '29"'].map(height => ({ height, tier: 'PRICE_1', price: 0 })),
+    ]
+    expect(unitPrice({ price: null, grid: typed }, 'DEFAULT', 'PRICE_2')).toEqual({ price: null, how: 'no_height' })
+    expect(unitPrice({ price: null, grid: typed }, null, 'PRICE_2')).toEqual({ price: null, how: 'no_height' })
+    const moved: PriceCell[] = [{ height: 'DEFAULT', tier: 'PRICE_1', price: 1080 }]
+    expect(unitPrice({ price: null, grid: moved }, 'DEFAULT', 'PRICE_2')).toEqual({ price: 1080, how: 'grid' })
+    expect(unitPrice({ price: null, grid: moved }, null, 'PRICE_2')).toEqual({ price: 1080, how: 'grid' })
+    // DEFAULT is a seat of its own, never another height's fallback.
+    expect(unitPrice({ price: null, grid: [...moved, { height: '30', tier: 'PRICE_1', price: 900 }] }, '28', 'PRICE_2'))
+      .toEqual({ price: null, how: 'no_height' })
+  })
+
   it('an empty or missing grid is no grid', () => {
     expect(unitPrice({ price: null, grid: [] }, '30', null)).toEqual({ price: null, how: 'unpriced' })
     expect(unitPrice({ price: null, grid: null }, '30', null)).toEqual({ price: null, how: 'unpriced' })

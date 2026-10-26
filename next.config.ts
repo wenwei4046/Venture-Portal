@@ -78,6 +78,34 @@ const nextConfig: NextConfig = {
           { key: 'Cache-Control', value: 'no-store' },
         ],
       },
+      // The PIC's link (2026-10-23, Marketing ⑤-1): the same — its address carries the project's code.
+      {
+        source: '/t/:path*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
+      // A Library share link (2026-10-23, Marketing ⑥-3): the same — its address carries the link's code, and so do
+      // the addresses its files are fetched from (/l/<code>/f/<id>).
+      {
+        source: '/l/:path*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
+      // The PIC's calendar (2026-10-24, Marketing ⑤-2): the same — its address carries the subsidiary's calendar code.
+      {
+        source: '/cal/:path*',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'none'" },
+          { key: 'Cache-Control', value: 'no-store' },
+        ],
+      },
     ]
   },
 

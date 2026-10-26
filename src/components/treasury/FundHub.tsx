@@ -116,10 +116,14 @@ export default function FundHub({
   )
   const status = (r: FundRecord) => fundStatus(r, today)
   // The design's Name · Description · Amount, and its COLS['fund-out'] to tick on — Date, Type, Status (it has no
-  // numbers to give Ref #); Outstanding and Rate are ours, the old list's.
+  // numbers to give Ref #); Outstanding and Rate are ours, the old list's. A loan's funding source (SC) is a column
+  // of its own on Fund OUT, beside the Description (2026-10-23, the user: 栏名用source) — it sorts and filters.
   const columns: FinColumn<FundRecord>[] = [
     { key: 'name', label: 'Name', kind: 'name', fixed: true, width: 180, min: 120, value: (r) => r.party.toLowerCase(), text: (r) => r.party },
-    { key: 'desc', label: 'Description', kind: 'desc', fixed: true, width: 200, min: 120, value: (r) => fundLine(r).toLowerCase(), text: (r) => fundLine(r) },
+    { key: 'desc', label: 'Description', kind: 'desc', fixed: true, width: 200, min: 120, value: (r) => fundLine(r, false).toLowerCase(), text: (r) => fundLine(r, false) },
+    ...(out
+      ? [{ key: 'source', label: 'Source', kind: 'text' as const, width: 130, value: (r: FundRecord) => (r.fundingSource ?? '').toLowerCase(), text: (r: FundRecord) => r.fundingSource ?? '—' }]
+      : []),
     { key: 'date', label: 'Date', kind: 'date', width: 112, value: (r) => r.date ?? '', text: (r) => fd(r.date) },
     { key: 'type', label: 'Type', kind: 'text', width: 130, value: (r) => r.typeLabel, text: (r) => r.typeLabel },
     { key: 'status', label: 'Status', kind: 'chip', width: 130, value: (r) => status(r).text, text: (r) => status(r).text, chip: (r) => status(r) },

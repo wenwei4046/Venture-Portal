@@ -27,7 +27,7 @@ export default function SalesInbox({ v }: { v: InboxVM & ShellExtras }) {
           </span>
         </>)}
       </div>
-      <div style={{ flex: "none", display: "flex", gap: "8px" }}><span onClick={v.openAd} style={{ flex: "0 1 auto", minWidth: "0", maxWidth: "170px", height: "40px", padding: "0 12px", boxSizing: "border-box", borderRadius: "20px", display: "flex", alignItems: "center", gap: "6px", fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap", background: "var(--crm-cream)", color: "var(--crm-ink)", cursor: "pointer" }}><span style={{ minWidth: "0", overflow: "hidden", textOverflow: "ellipsis" }}>{v.adLabel}</span><Ic name="chevron-down" size={13} /></span><label style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 14px", boxSizing: "border-box", borderRadius: "20px", background: "var(--crm-field)", color: "var(--crm-faint)" }}>
+      <div style={{ flex: "none", display: "flex", gap: "8px" }}><span onClick={v.openAd} style={{ flex: "0 1 auto", minWidth: "0", maxWidth: "170px", height: "40px", padding: "0 12px", boxSizing: "border-box", borderRadius: "20px", display: "flex", alignItems: "center", gap: "6px", fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap", background: "var(--crm-sel)", color: "var(--crm-ink)", cursor: "pointer" }}><span style={{ minWidth: "0", overflow: "hidden", textOverflow: "ellipsis" }}>{v.adLabel}</span><Ic name="chevron-down" size={13} /></span><label style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 14px", boxSizing: "border-box", borderRadius: "20px", background: "var(--crm-field)", color: "var(--crm-faint)" }}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 2-4.35-4.35">
           </path>
@@ -94,7 +94,7 @@ export default function SalesInbox({ v }: { v: InboxVM & ShellExtras }) {
                   </span>
                   <span style={{ flex: "none", fontVariantNumeric: "tabular-nums", fontSize: "calc(13.04px * var(--rv-type, 1))", fontWeight: "500", color: l.whenC }}>{l.when}</span>
                 </span>
-                <span style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.ad}</span>
+                <span style={{ fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: l.padR }}>{l.ad}</span>
                 <span style={{ fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-ink-soft)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: l.padR }}>{l.preview}</span>
                 <span style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "10px", marginTop: "1px" }}>
                   {!!(l.urgShow) && (<>

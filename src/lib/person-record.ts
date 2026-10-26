@@ -83,12 +83,18 @@ export function payModeFields(mode: PayMode): Record<string, string> {
 }
 
 /**
- * Somebody with a login signs in with their Contact email, so it is theirs to
- * change — by a request from their app — and never HR's on this page
- * (2026-10-16, the user: "他们 email 是不能乱改的，除非他们 request to change
- * email"). The page shows it locked; `updateStaff` refuses it with this.
+ * Somebody with a login signs in with their Contact email. From 2026-10-16 it
+ * changed only by their own request; since 2026-10-22 HR changes it on this
+ * page too (the user: "i want the email can be editable, for hr") — and their
+ * login with it (`lib/account/login-email.ts`). Except a FULL-ACCESS title's,
+ * for whoever does not manage permissions: the editor would choose where that
+ * login's mail goes, as Invite user keeps it (`fullAccessTemplate`). The
+ * page shows such an email locked with this; the database refuses it in the
+ * same words (`person_login_email_move`).
  */
-export const LOGIN_EMAIL_LOCKED = 'Their email is the one they sign in with — it changes only by their own request.'
+export function loginEmailHeld(title: string | null | undefined, template: string | null | undefined): string {
+  return `${title || 'Their title'} is a full-access title (${template || 'a Principal login'}): only whoever manages permissions changes its login's email.`
+}
 
 /**
  * How long somebody has been with the company — their hire date against the
@@ -130,10 +136,15 @@ export const PCB_LABELS: Readonly<Record<string, string>> = {
   KA3: 'KA3 (Married, spouse working)',
 }
 
-/** Fields saved together: a bank account is its bank and its number. */
+/**
+ * Fields saved together: a bank account is its bank and its number; an employment status its probation's or its
+ * contract's period (2026-10-23; Contract 2026-10-24) — switching to Probation or Contract sends the period it shows,
+ * switching away sends none (no field is drawn).
+ */
 const SAVED_TOGETHER: ReadonlyArray<readonly string[]> = [
   ['bank_name', 'bank_account_no'],
   ['bank_name_2', 'bank_account_no_2'],
+  ['employment_status', 'probation_months', 'contract_months'],
 ]
 
 /**

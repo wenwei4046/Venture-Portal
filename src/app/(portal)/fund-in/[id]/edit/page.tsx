@@ -1,11 +1,13 @@
 import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { notFound, redirect } from 'next/navigation'
 import { requireAnyActionOn, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
 import { fundSourceStart } from '@/lib/repayment-start'
+import { latestTermsRequest } from '@/lib/terms-change-request'
 import type { AccountOption } from '@/components/AccountPicker'
 import EditFundSourceForm from './_components/EditFundSourceForm'
 import AmendFundSourceForm from './_components/AmendFundSourceForm'
@@ -17,7 +19,7 @@ interface Props {
 export default async function EditFundSourcePage({ params }: Props) {
   await requirePage('/fund-in/[id]/edit')
   // Two flows share the page: editing a pending request (Treasury · Edit) and
-  // amending a booked fund source (Treasury · Approve).
+  // amending a booked fund source (Treasury · Approve — or · Edit, filed for the Principal).
   const user = await requireAnyActionOn('/fund-in/[id]/edit', ['treasury', 'edit'], ['treasury', 'approve'])
   const { id } = await params
   const supabase = await createClient()
@@ -42,11 +44,17 @@ export default async function EditFundSourcePage({ params }: Props) {
 
   // Edit access:
   //  - pending_approval  → Finance edits via the create/approval flow (EditFundSourceForm)
-  //  - active            → Principal amends terms directly (AmendFundSourceForm)
+  //  - active            → Principal amends terms directly (AmendFundSourceForm); Treasury · Edit files the
+  //                        change for the Principal instead (2026-10-24 — applied once approved)
   //  - anything else     → frozen → bounce to detail
   const isPending = source.status === 'pending_approval' && canDo(user, 'treasury', 'edit')
-  const isActiveAmend = source.status === 'active' && canDo(user, 'treasury', 'approve')
+  const canApprove = canDo(user, 'treasury', 'approve')
+  const isActiveAmend = source.status === 'active' && (canApprove || canDo(user, 'treasury', 'edit'))
   if (!isPending && !isActiveAmend) {
+    redirect(`/fund-in/${id}`)
+  }
+  // One filed change at a time: while one waits, the deal's page says so (and Withdraw takes it back).
+  if (isActiveAmend && !canApprove && (await latestTermsRequest(supabase as unknown as SupabaseClient, 'fund_source', id))?.status === 'pending') {
     redirect(`/fund-in/${id}`)
   }
 
@@ -85,6 +93,7 @@ export default async function EditFundSourcePage({ params }: Props) {
           notes={source.notes ?? ''}
           nextMonth={officeTime().add(1, 'month').format('YYYY-MM')}
           termsFrom={((source as { terms_effective_from?: string | null }).terms_effective_from ?? null)?.slice(0, 7) ?? null}
+          direct={canApprove}
         />
       </div>
     )

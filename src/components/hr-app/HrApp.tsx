@@ -22,11 +22,21 @@ import { todayCard } from '@/lib/me/today'
 import { officeToday } from '@/lib/office-time'
 import { kindLabel, waitsAtMe, whenLabel } from '@/lib/attendance/requests'
 import { missingAnswers } from '@/lib/hiring/view'
+import { STARTING_REASONS, whyOrder } from '@/lib/hiring/reasons'
+import type { TalentReason } from '@/lib/hiring/types'
 import { GEN_META, genPage, type GenKey, type GenRow } from '@/lib/hr-app/gen-pages'
 import {
   approveCounts, approveRows, avatarOf, balanceRows, closeView, decidedWords, homeSummary, peopleGroups, personView, requestView,
-  todayCounts, todayRows, type TodayKey,
+  termFacts, termRows, todayCounts, todayRows, type TodayKey,
 } from '@/lib/hr-app/hr-view'
+import { CONTRACT_MONTH_CHOICES, EXTEND_MONTH_CHOICES, contractEnd, dayLabel as termDay, isDay, monthsLabel, probationEnd, reminderDue } from '@/lib/employment-status'
+import { RENEWAL_LETTER_TYPE, renewalMonths, renewalRefusal, renewalStart } from '@/lib/contract-renewal'
+import {
+  CONFIRMATION_LETTER_TYPE, EXTENSION_LETTER_TYPE, NEW_LETTER_TYPE, failedWords, filedWords, lettersRefusal, suggestedLetterType,
+  type FiledLetters, type LetterChoice, type PendingLetter,
+} from '@/lib/documentation/attach'
+import { DOC_ACCEPT, fileExt } from '@/lib/documentation/model'
+import { acknowledged, type TermReview } from '@/lib/term-reviews'
 import {
   CAND_STAGE, CHIP, HR_APP_VIEWS, MEMBER_KIND, bookingTimes, candChip, clashOf, dayLabel, hm, hourFrom, isPendingHire, isPendingRequest, positionLabel,
   type CandStage, type HrAppData, type HrAppView, type HrHire,
@@ -34,7 +44,7 @@ import {
 import { memoUnread, memoWaiting, memosInOrder, type MyMemo } from '@/lib/memos/model'
 import { personalUnseen, type MyDocuments } from '@/lib/documentation/personal'
 import { pageKeyOf, usePageScroll } from './page-scroll'
-import { Avatar, Field, Icon, MONO, Sheet, SheetFacts, Toast, useToast, type SheetAction } from './kit'
+import { Avatar, Field, Icon, MONO, Sheet, SheetFacts, TOAST_LONG, Toast, useToast, type SheetAction } from './kit'
 import {
   ApproveScreen, BalancesScreen, CloseScreen, DeskScreen, GenScreen, HireScreen, HomeScreen, MemberScreen, MemoScreen, MemosScreen, MyDocsScreen,
   NoticesScreen, PeopleScreen, PersonScreen, RequestScreen, STAGES, TalentScreen, TodayScreen, type ApproveTab, type HomeItem,
@@ -57,7 +67,7 @@ export interface HrAppActions {
   hireFill(id: string, hired: string, source: string, cost: string): Promise<ActResult>
   /** "+ New hiring request" (2026-10-17): the desktop drawer's own Submit to HR. */
   hireNew(requestedBy: string, answers: Record<string, string>): Promise<{ ok: true; id: string } | { ok: false; reason: string }>
-  candStage(hireId: string, candId: string, stage: CandStage): Promise<ActResult>
+  candStage(hireId: string, candId: string, stage: CandStage, reason?: TalentReason): Promise<ActResult>
   candAdd(hireId: string, cand: { name: string; phone: string; note: string }): Promise<ActResult>
   requestDecide(id: string, decision: 'accept' | 'approve' | 'reject', note: string, route?: 'payroll' | 'payment'): Promise<ActResult>
   /** HR › Attendance › Requests (2026-10-17): the waiting step — HR's, or the upline's on their behalf. */
@@ -90,6 +100,24 @@ export interface HrAppActions {
   memoFile(id: string, mode: 'view' | 'download'): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
   /** One of their own documents (2026-10-14): a short link made at the press. */
   myDocLink(kind: 'document' | 'drive' | 'letter', id: string): Promise<{ ok: true; url: string } | { ok: false; reason: string }>
+  /** A probation's reminder acknowledged (2026-10-23) — People · Edit on the person's page. Absent: no button. */
+  probationAck?(id: string): Promise<ActResult>
+  /** A contract's, the same way (2026-10-24). */
+  contractAck?(id: string): Promise<ActResult>
+  /** A probation confirmed as permanent, or extended by 1–3 months (2026-10-24) — People's own. Absent: no buttons. */
+  probationConfirm?(id: string): Promise<ActResult>
+  probationExtend?(id: string, months: number): Promise<ActResult>
+  /**
+   * A contract renewed (2026-10-24): the new contract's type and file go up, then the renewal files it with it
+   * (lib/hr-app/letters.ts) — `filed`, the type it went as. Absent: no Renew.
+   */
+  contractRenew?(
+    input: { staffId: string; start: string; months: number; endsWas: string },
+    letter: Pick<PendingLetter, 'typeId' | 'newType'> & { file: File },
+    types: readonly LetterChoice[],
+  ): Promise<{ ok: true; endsOn: string; filed: string } | { ok: false; reason: string }>
+  /** The letter a probation's step took, filed to their record once it is done (2026-10-24). Absent: the steps take none. */
+  lettersFile?(staffId: string, rows: readonly PendingLetter[], types: readonly LetterChoice[]): Promise<FiledLetters>
   /** After a write: read the app's data again. */
   refresh(): void
 }
@@ -115,15 +143,19 @@ type Page =
 
 type SheetK =
   | { k: 'facts'; eyebrow: string; title: string; sub?: string; facts: Array<[string, string]>; actions?: SheetAction[] }
-  | { k: 'stage'; cid: string; name: string; cur: CandStage }
+  // `why`: Not selected was tapped — why, before they go to the Talent Bank (2026-10-24).
+  | { k: 'stage'; cid: string; name: string; cur: CandStage; why?: boolean }
   | { k: 'ack' } | { k: 'info' } | { k: 'fill' } | { k: 'cand' } | { k: 'newHire' }
   | { k: 'book' }
   | { k: 'booking'; id: string }
   | { k: 'claim'; id: string }
   | { k: 'password' } | { k: 'email' }
   | { k: 'account' }
+  // A person's term (2026-10-24): a contract renewed, a probation confirmed as permanent or extended — each with its letter.
+  | { k: 'renew' | 'confirm' | 'extend'; id: string; name: string }
 
-type Form = Record<string, string | string[] | number | undefined>
+// `file`: the letter a term's sheet holds until it is filed (2026-10-24).
+type Form = Record<string, string | string[] | number | File | null | undefined>
 
 const TABS: Array<[Tab, string, HrIconName]> = [['home', 'Home', 'home'], ['today', 'Today', 'in'], ['approve', 'Approve', 'approve'], ['people', 'People', 'staff']]
 const TITLE: Record<Tab, string> = { home: '', today: 'Today', approve: 'Approve', people: 'People' }
@@ -135,6 +167,11 @@ const defaultDept = (d: HrAppData) => (d.bookDepts.find(x => x.name === 'HR') ??
 function waNumber(phone: string): string {
   const digits = phone.replace(/[^\d+]/g, '').replace(/^\+/, '')
   return digits.startsWith('0') ? `6${digits}` : digits
+}
+
+/** A person's page with more facts after its own — their probation's (2026-10-23). */
+function withFacts<V extends { facts: Array<{ k: string; v: string; mono: boolean }> }>(v: V, more: V['facts']): V {
+  return more.length ? { ...v, facts: [...v.facts, ...more] } : v
 }
 
 /** A link made at the press, opened in a tab readied in the tap (never kept; no handle back on the app). */
@@ -165,6 +202,8 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   const [q, setQ] = useState('')
   const [mdTab, setMdTab] = useState<'company' | 'personal'>('company')
   const [talentNotes, setTalentNotes] = useState<{ id: string; text: string } | null>(null)
+  // The hire whose Not selected fold is open (2026-10-24): another hire opens with its own folded.
+  const [hireOut, setHireOut] = useState<string | null>(null)
   const [arm, setArm] = useState(false)
   const [busy, startBusy] = useTransition()
   const [toast, flash] = useToast()
@@ -216,6 +255,12 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   const lowLeave = bRows.filter(r => r.low).length
   const pendingHires = d.parts.hiring ? d.hires.filter(isPendingHire).length : 0
   const attShut = (open: boolean) => (!open ? 'This is not open to your account.' : !att ? d.attError ?? 'Attendance could not be read.' : null)
+  // The probations and contracts HR is reminded of (2026-10-23 / 10-24): Home lists those waiting for Acknowledge; a
+  // person's page acknowledges.
+  const probation = useMemo(() => (d.viewingAs ? [] : d.probation ?? []), [d.viewingAs, d.probation])
+  const contract = useMemo(() => (d.viewingAs ? [] : d.contract ?? []), [d.viewingAs, d.contract])
+  const probRows = useMemo(() => termRows(probation, d.today), [probation, d.today])
+  const contRows = useMemo(() => termRows(contract, d.today), [contract, d.today])
 
   // ── Moving about ──
   const push = (p: Page) => {
@@ -284,6 +329,11 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       setTab('approve')
       setReqF('members')
       setStack(d.requests.some(r => r.id === id) ? [{ k: 'mreq', id }] : [])
+    } else if (kind === 'hr_staff') {
+      // A probation or a contract ending (2026-10-23 / 10-24): the person, over People — or People itself once they have
+      // left the lists.
+      setTab(d.parts.people ? 'people' : 'home')
+      setStack(att?.config.people.some(p => p.id === id) || d.staff.some(p => p.id === id) ? [{ k: 'person', id }] : [])
     } else {
       setTab('home')
       setStack([{ k: 'gen', id: 'roomSched' }])
@@ -308,7 +358,8 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       }
       return
     }
-    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : target.k === 'memo' ? 'memo' : target.k === 'it' ? 'it_request' : 'booking', target.id)
+    openRef(target.k === 'hire' ? 'hiring_request' : target.k === 'req' ? 'member_request' : target.k === 'memo' ? 'memo' : target.k === 'it' ? 'it_request'
+      : target.k === 'person' ? 'hr_staff' : 'booking', target.id)
     // Only on opening.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -336,6 +387,26 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
   const mf = top?.k === 'mydocsFolder' && d.myDocs ? d.myDocs.personal.folders.find(f => f.id === top.id) ?? null : null
   const attPerson = top?.k === 'person' && att ? att.config.people.find(p => p.id === top.id) ?? null : null
   const staffPerson = top?.k === 'person' ? d.staff.find(p => p.id === top.id) ?? null : null
+  // Their probation (2026-10-23) or contract (2026-10-24): its facts on the page, and Acknowledge while a reminder stands
+  // that nobody has acknowledged yet.
+  const pr = top?.k === 'person' ? probation.find(r => r.id === top.id) ?? contract.find(r => r.id === top.id) ?? null : null
+  const prFacts = pr ? termFacts(pr, d.today) : []
+  const prAction = pr?.kind === 'contract' ? actions.contractAck : actions.probationAck
+  const prAck = !!pr && reminderDue(pr.endsOn, d.today) && !acknowledged(pr, d.today) && !!d.may.termEdit && !d.viewingAs && !!prAction
+  // …and the step after it, as the desktop's line offers (2026-10-24): a probation's Confirm as permanent and Extend; a
+  // contract's Renew, for whoever may file its new contract — counted from its end, so none without one.
+  const prName = attPerson?.name ?? staffPerson?.name ?? pr?.name ?? ''
+  const prSteps = !!pr && !!d.may.termEdit && !d.viewingAs && (pr.kind === 'probation'
+    ? !!actions.probationConfirm && !!actions.probationExtend
+    : !!d.may.letters && !!d.letterTypes && !!pr.endsOn && !!actions.contractRenew)
+  /** A step's sheet, its letter row starting on the type that says what the step is (none when they may not file one). */
+  const openStep = (k: 'renew' | 'confirm' | 'extend', r: TermReview) => {
+    const types = d.letterTypes ?? []
+    const type = suggestedLetterType(types, k === 'renew' ? RENEWAL_LETTER_TYPE : k === 'confirm' ? CONFIRMATION_LETTER_TYPE : EXTENSION_LETTER_TYPE)
+    openSheet({ k, id: r.id, name: prName }, k === 'renew'
+      ? { start: renewalStart(r.endsOn) ?? '', months: String(renewalMonths(r.months)), type }
+      : { by: String(EXTEND_MONTH_CHOICES[0]), type })
+  }
 
   // Opening a memo is reading it: the login's receipt, the same in every view.
   const memoOpen = mm && memoUnread(mm) && !d.viewingAs ? mm.id : null
@@ -533,7 +604,8 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       <div ref={scrollerRef} className={s.scroller}>
         {main && tab === 'home' ? (
           <HomeScreen first={d.greetName} quick={quick} cats={cats} memos={d.viewingAs ? [] : memos.filter(memoWaiting)} openMemo={id => push({ k: 'memo', id })}
-            summary={homeSummary(hrWaiting, att && d.parts.today ? tCounts : null, att && d.parts.close ? att.month.month : null)} />
+            probation={probRows} contract={contRows} openPerson={id => push({ k: 'person', id })}
+            summary={homeSummary(hrWaiting, att && d.parts.today ? tCounts : null, att && d.parts.close ? att.month.month : null, { probation: probRows.length, contract: contRows.length })} />
         ) : null}
         {main && tab === 'today' ? (
           <TodayScreen rows={tRows} counts={tCounts} filter={todayF} setFilter={setTodayF} open={id => push({ k: 'person', id })} closed={attShut(d.parts.today)} />
@@ -553,11 +625,11 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
         ) : null}
         {top?.k === 'mreq' && mr ? <MemberScreen r={mr} note={note} setNote={setNote} canDecide={isPendingRequest(mr) && mr.kind !== 'replacement' && d.may.decide && !d.viewingAs} /> : null}
         {top?.k === 'person' && attPerson && att ? (
-          <PersonScreen v={personView(att, attPerson)} onCall={() => callOf(attPerson.id, attPerson.name, 'call')} onMessage={() => callOf(attPerson.id, attPerson.name, 'message')}
+          <PersonScreen v={withFacts(personView(att, attPerson), prFacts)} onCall={() => callOf(attPerson.id, attPerson.name, 'call')} onMessage={() => callOf(attPerson.id, attPerson.name, 'message')}
             onRecords={() => flash(`${dayLabel(att.month.month, { month: 'long' })} records · desktop`)} />
         ) : null}
         {top?.k === 'person' && !attPerson && staffPerson ? (
-          <PersonScreen v={{ name: staffPerson.name, title: staffPerson.title || 'No title', dept: staffPerson.dept || 'No department', chip: { label: 'Today · —', bg: 'var(--ds-surface-3)', fg: 'var(--ds-ink-2)' }, facts: [], leave: [] }}
+          <PersonScreen v={{ name: staffPerson.name, title: staffPerson.title || 'No title', dept: staffPerson.dept || 'No department', chip: { label: 'Today · —', bg: 'var(--ds-surface-3)', fg: 'var(--ds-ink-2)' }, facts: prFacts, leave: [] }}
             onCall={() => callOf(staffPerson.id, staffPerson.name, 'call')} onMessage={() => callOf(staffPerson.id, staffPerson.name, 'message')} onRecords={() => flash('Records · desktop')} />
         ) : null}
         {top?.k === 'leave' ? <BalancesScreen rows={bRows} filter={lvF} setFilter={setLvF} open={id => push({ k: 'person', id })} closed={attShut(d.parts.balances)} /> : null}
@@ -568,6 +640,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
         {top?.k === 'desk' ? <DeskScreen title={top.id} icon={top.icon} /> : null}
         {top?.k === 'hire' && hr ? (
           <HireScreen hr={hr} mayEdit={d.may.hireEdit && !d.viewingAs} mayCreate={d.may.hireCreate && !d.viewingAs}
+            outOpen={hireOut === hr.id} onOut={() => setHireOut(o => (o === hr.id ? null : hr.id))}
             onStage={(cid, name, cur) => openSheet({ k: 'stage', cid, name, cur })} onAdd={() => openSheet({ k: 'cand' })} />
         ) : null}
         {top?.k === 'talent' && tt ? (
@@ -615,6 +688,29 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
           </button>
         </div>
       ) : null}
+      {top?.k === 'person' && pr && ((prAck && prAction) || prSteps) ? (
+        // The term's bar (2026-10-24): its steps in outline — a probation's on a row of their own — and Acknowledge, the
+        // accent, while a reminder waits for it.
+        <div className={s.termBar}>
+          {prSteps && pr.kind === 'probation' ? (
+            <div className={s.termRow}>
+              <button type="button" className={`${s.decideBtn} ${s.outline}`} disabled={busy || !pr.months} onClick={() => openStep('extend', pr)}>Extend</button>
+              <button type="button" className={`${s.decideBtn} ${s.outline}`} disabled={busy} onClick={() => openStep('confirm', pr)}>Confirm as permanent</button>
+            </div>
+          ) : null}
+          {(prSteps && pr.kind === 'contract') || (prAck && prAction) ? (
+            <div className={s.termRow}>
+              {prSteps && pr.kind === 'contract' ? (
+                <button type="button" className={`${s.decideBtn} ${s.outline}`} disabled={busy} onClick={() => openStep('renew', pr)}>Renew</button>
+              ) : null}
+              {prAck && prAction ? (
+                <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy}
+                  onClick={() => run(() => prAction(pr.id), undefined, 'Acknowledged')}>{busy ? 'Recording…' : 'Acknowledge'}</button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {top?.k === 'memo' && mm && memoWaiting(mm) && !d.viewingAs ? (
         <div className={s.actBar}>
           <button type="button" className={`${s.decideBtn} ${s.accent}`} disabled={busy || !memoSig} onClick={() => {
@@ -650,7 +746,7 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       ) : null}
 
       <SheetLayer d={d} sheet={sheet} form={form} setForm={setForm} formErr={formErr} setFormErr={setFormErr} busy={busy} arm={arm} setArm={setArm}
-        close={closeSheet} pop={pop} run={run} actions={actions} hr={hr} day={gF.roomSched ?? d.today} pushNow={pushNow} togglePush={togglePush}
+        close={closeSheet} swap={setSheet} pop={pop} run={run} actions={actions} hr={hr} day={gF.roomSched ?? d.today} pushNow={pushNow} togglePush={togglePush}
         openGuide={() => setPopUpGuide(true)} openIt={() => openIt()} flash={flash} />
       {popUpGuide ? <PopUpGuide onClose={() => setPopUpGuide(false)} /> : null}
       <Toast msg={toast} />
@@ -732,6 +828,8 @@ function SheetLayer(p: {
   arm: boolean
   setArm: (a: boolean) => void
   close: () => void
+  /** Another sheet in this one's place (the status sheet's Not selected › why). */
+  swap: (next: SheetK) => void
   pop: () => void
   run: (fn: () => Promise<ActResult>, after?: () => void, done?: string) => void
   actions: HrAppActions
@@ -741,9 +839,9 @@ function SheetLayer(p: {
   togglePush: () => void
   openGuide: () => void
   openIt: () => void
-  flash: (m: string) => void
+  flash: (m: string, ms?: number) => void
 }) {
-  const { d, sheet: sh, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, pop, run, actions, day, pushNow, togglePush, flash } = p
+  const { d, sheet: sh, form: F, setForm, formErr, setFormErr, busy, arm, setArm, close, swap, pop, run, actions, day, pushNow, togglePush, flash } = p
   const hr = p.hr
   const [locked, setLocked] = useState(false)
   if (!sh) return null
@@ -763,6 +861,23 @@ function SheetLayer(p: {
     return <Sheet open eyebrow={sh.eyebrow} title={sh.title} sub={sh.sub} onClose={close} actions={sh.actions ?? [{ label: 'Close', onClick: close }]}><SheetFacts items={sh.facts} /></Sheet>
   }
 
+  if (sh.k === 'stage' && hr && sh.why) {
+    // Not selected keeps them in the Talent Bank: why — HR's reasons that are on, the one their stage says first.
+    const dot = CHIP[candChip('rejected').tone][1]
+    return (
+      <Sheet open eyebrow={hr.id} title={`Not selected · ${sh.name}`} sub="Why?" onClose={close}>
+        {whyOrder(d.hireReasons ?? STARTING_REASONS, sh.cur).map(x => (
+          <button key={x.id} type="button" className={s.option} style={{ background: 'var(--ds-surface-2)' }}
+            onClick={() => run(() => actions.candStage(hr.id, sh.cid, 'rejected', x.id), close, `${sh.name} · Not selected · kept in Talent Bank`)}>
+            <span className={s.optionDot} style={{ background: dot }} />
+            <span style={{ flex: 1, fontWeight: 500 }}>{x.name}</span>
+          </button>
+        ))}
+        {err}
+      </Sheet>
+    )
+  }
+
   if (sh.k === 'stage' && hr) {
     return (
       <Sheet open eyebrow={hr.id} title={`Status · ${sh.name}`} onClose={close}>
@@ -771,10 +886,10 @@ function SheetLayer(p: {
           const on = v === sh.cur
           return (
             <button key={v} type="button" className={s.option} style={{ background: on ? 'var(--hr2-pill-on)' : 'var(--ds-surface-2)' }}
-              onClick={() => (on ? close() : run(() => actions.candStage(hr.id, sh.cid, v), close, `${sh.name} · ${CAND_STAGE[v][0]}`))}>
+              onClick={() => (on ? close() : v === 'rejected' ? swap({ ...sh, why: true }) : run(() => actions.candStage(hr.id, sh.cid, v), close, `${sh.name} · ${CAND_STAGE[v][0]}`))}>
               <span className={s.optionDot} style={{ background: CHIP[cc.tone][1] }} />
               <span style={{ flex: 1, fontWeight: on ? 700 : 500 }}>{cc.label}</span>
-              <span>{on ? '✓' : ''}</span>
+              <span>{on ? '✓' : v === 'rejected' ? '›' : ''}</span>
             </button>
           )
         })}
@@ -973,6 +1088,99 @@ function SheetLayer(p: {
     )
   }
 
+  // A term's step (2026-10-24 — the user: "do for hr app as well"), as the person's page on the desktop takes it.
+  const file = F.file instanceof File ? F.file : null
+  const setFile = (f: File) => { setForm({ ...F, file: f }); setFormErr('') }
+
+  if (sh.k === 'renew') {
+    // Renew (team/people/_components/RenewContract.tsx): the new contract's first day, its period, the day it ends, and
+    // the new contract itself — required, its type the one that says contract.
+    const c = (d.contract ?? []).find(r => r.id === sh.id)
+    const renew = actions.contractRenew
+    const types = d.letterTypes ?? []
+    if (!c?.endsOn || !renew) return null
+    const endsWas = c.endsOn
+    const start = str('start')
+    const months = Number(str('months'))
+    const ends = isDay(start) ? contractEnd(start, months) : null
+    return (
+      <Sheet open eyebrow={sh.name} title="Renew the contract" sub={`This one ends ${termDay(endsWas)}`} onClose={close} locked={busy} actions={[
+        { label: 'Cancel', disabled: busy, onClick: close },
+        {
+          label: busy ? 'Renewing…' : 'Renew', primary: true, disabled: busy, onClick: () => {
+            const letter = { typeId: str('type'), newType: str('newType') }
+            // Counted here from the hire date; the server asks again from the contract's own first day (a renewed one's).
+            const refused = renewalRefusal({ startsOn: c.hireDate, months: c.months, endsOn: endsWas }, start, months)
+              ?? (file ? lettersRefusal([{ key: 'renew', ...letter, file }]) : 'Attach the new contract.')
+            if (refused || !file) return setFormErr(refused ?? 'Attach the new contract.')
+            run(async () => {
+              const r = await renew({ staffId: c.id, start, months, endsWas }, { ...letter, file }, types)
+              if (r.ok) flash(`Contract renewed to ${termDay(r.endsOn)} · ${r.filed} filed to ${sh.name}'s record`)
+              return r.ok ? { ok: true } : r
+            }, close)
+          },
+        },
+      ]}>
+        <Field label="New contract starts"><input type="date" className={s.input} value={start} onChange={e => set('start')(e.target.value)} /></Field>
+        {select('months', 'Period', CONTRACT_MONTH_CHOICES.map(n => ({ v: String(n), l: monthsLabel(n) })), false)}
+        <Field label="Ends" group><span className={s.fieldValue}>{ends ? termDay(ends) : '—'}</span></Field>
+        <LetterFields label="New contract" types={types} typeId={str('type')} newType={str('newType')} file={file}
+          onType={set('type')} onNewType={set('newType')} onFile={setFile} disabled={busy} />
+        {err}
+      </Sheet>
+    )
+  }
+
+  if (sh.k === 'confirm' || sh.k === 'extend') {
+    // Confirm as permanent, or Extend by 1–3 months (the desktop's probation line) — each with a letter, optional, filed
+    // once the step is done; one that is not is said, and left for the Data center.
+    const p = (d.probation ?? []).find(r => r.id === sh.id)
+    const confirmIt = actions.probationConfirm
+    const extendIt = actions.probationExtend
+    if (!p || !confirmIt || !extendIt) return null
+    const confirm = sh.k === 'confirm'
+    const types = d.may.letters && actions.lettersFile ? d.letterTypes ?? null : null
+    const fileThem = actions.lettersFile
+    const by = Number(str('by'))
+    const extendedEnd = p.months ? probationEnd(p.hireDate, p.months + by) : null
+    const stepDone = confirm ? `${sh.name} · confirmed as permanent` : `Probation extended${extendedEnd ? ` to ${termDay(extendedEnd)}` : ''}`
+    const go = () => {
+      const rows: PendingLetter[] = types && file ? [{ key: sh.k, typeId: str('type'), newType: str('newType'), file }] : []
+      const refused = lettersRefusal(rows)
+      if (refused) return setFormErr(refused)
+      run(async () => {
+        const r = confirm ? await confirmIt(p.id) : await extendIt(p.id, by)
+        if (!r.ok) return r
+        if (rows.length && types && fileThem) {
+          const filed = await fileThem(p.id, rows, types)
+          const failed = failedWords(filed.failed)
+          if (failed) flash(`${stepDone} · ${failed}`, TOAST_LONG)
+          else flash([stepDone, filedWords(filed.filed, sh.name)].filter(Boolean).join(' · '))
+        } else flash(stepDone)
+        return { ok: true }
+      }, close)
+    }
+    return (
+      <Sheet open eyebrow={sh.name} title={confirm ? 'Confirm as permanent' : 'Extend the probation'}
+        sub={confirm ? 'Their probation ends here' : p.endsOn ? `It ends ${termDay(p.endsOn)}` : undefined} onClose={close} locked={busy} actions={[
+          { label: 'Cancel', disabled: busy, onClick: close },
+          { label: busy ? (confirm ? 'Confirming…' : 'Extending…') : confirm ? 'Confirm' : 'Extend', primary: true, disabled: busy, onClick: go },
+        ]}>
+        {!confirm ? (
+          <>
+            {select('by', 'Extend by', EXTEND_MONTH_CHOICES.map(n => ({ v: String(n), l: `+ ${monthsLabel(n)}` })), false)}
+            <Field label="New end" group><span className={s.fieldValue}>{extendedEnd ? termDay(extendedEnd) : '—'}</span></Field>
+          </>
+        ) : null}
+        {types ? (
+          <LetterFields label="Letter" types={types} typeId={str('type')} newType={str('newType')} file={file}
+            onType={set('type')} onNewType={set('newType')} onFile={setFile} disabled={busy} />
+        ) : null}
+        {err}
+      </Sheet>
+    )
+  }
+
   if (sh.k === 'password') {
     return <Sheet open eyebrow="Account" title="Change password" onClose={close} locked={locked}><PasswordForm change={actions.changePassword} close={close} onBusy={setLocked} /></Sheet>
   }
@@ -996,6 +1204,52 @@ function SheetLayer(p: {
     )
   }
   return null
+}
+
+/**
+ * A letter in a term's sheet (2026-10-24 — the desktop's AttachLetters, one row, on the phone): its type, or a new one
+ * named here as the Data center's Upload names one, and its file — chosen on the phone, or taken with its camera. The
+ * input lies over the drop, so the tap is the input's own.
+ */
+function LetterFields({ label, types, typeId, newType, file, onType, onNewType, onFile, disabled }: {
+  label: string
+  types: readonly LetterChoice[]
+  typeId: string
+  newType: string
+  file: File | null
+  onType: (v: string) => void
+  onNewType: (v: string) => void
+  onFile: (f: File) => void
+  disabled: boolean
+}) {
+  return (
+    <>
+      <Field label="Letter type">
+        <Select bare className={s.select} value={typeId} disabled={disabled} onChange={e => onType(e.target.value)}>
+          <option value="">Choose…</option>
+          {types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          <option value={NEW_LETTER_TYPE}>+ Add a new letter type…</option>
+        </Select>
+      </Field>
+      {typeId === NEW_LETTER_TYPE ? (
+        <Field label="New letter type">
+          <input className={s.input} maxLength={80} autoComplete="off" value={newType} disabled={disabled} onChange={e => onNewType(e.target.value)} />
+        </Field>
+      ) : null}
+      <Field label={label} group>
+        <span className={s.fileDrop} data-chosen={file ? '' : undefined}>
+          <span className={s.fileTile} aria-hidden="true">{file ? fileExt(file.name) : '+'}</span>
+          <span className={s.fileName}>{file ? file.name : 'Choose a file'}</span>
+          <input type="file" accept={DOC_ACCEPT} aria-label={label} disabled={disabled} className={s.fileInput}
+            onChange={e => {
+              const f = e.target.files?.[0]
+              if (f) onFile(f)
+              e.target.value = ''
+            }} />
+        </span>
+      </Field>
+    </>
+  )
 }
 
 /** Change password's form (2026-10-12): the current one, the new one twice — the portal's own rules and action. */

@@ -23,6 +23,8 @@ export const APPROVAL_DOMAIN: Readonly<Record<ApprovalRequestType, Domain | null
   payment_voucher: 'treasury',
   new_loan: 'treasury',
   loan_cancel: 'treasury',
+  // A deal's terms change filed by Finance (mig 20261025110000): no domain, so only the queue's own Approve — the Principal — decides it.
+  terms_change: null,
   new_fund_source: 'treasury',
   tier_change: 'treasury',
   base_rate: 'treasury',

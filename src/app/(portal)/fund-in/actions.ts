@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireActionOn, requirePermission } from '@/lib/auth'
+import { requireActionOn, requireAnyActionOn, requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { fetchAllRows } from '@/lib/paginate'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeMonth, officeToday } from '@/lib/office-time'
@@ -77,14 +78,16 @@ async function amendFundSourceWork(formData: FormData): Promise<{ error: string 
 // Same gate as amendFundSource (Principal), but the months before the chosen
 // one keep their old terms — the RPC files them into treasury_terms_history
 // and the record carries the new terms from that month (lib/treasury-terms).
+// Treasury · Edit without Approve (2026-10-24, the user: "finance manager 可以改条款，但是经过principal approve"):
+// the same change is FILED for the Principal (file_terms_change) and applied only once approved in Approvals.
 export async function amendFundSourceFrom(formData: FormData): Promise<{ error: string } | undefined> {
-  await requireActionOn('/fund-in', 'treasury', 'approve')
-  const refused = await amendFundSourceFromWork(formData)
+  const user = await requireAnyActionOn('/fund-in', ['treasury', 'approve'], ['treasury', 'edit'])
+  const refused = await amendFundSourceFromWork(formData, canDo(user, 'treasury', 'approve'))
   if (refused) return refused
   redirect(`/fund-in/${formData.get('fund_source_id') as string}`)
 }
 
-async function amendFundSourceFromWork(formData: FormData): Promise<{ error: string } | undefined> {
+async function amendFundSourceFromWork(formData: FormData, direct = true): Promise<{ error: string } | undefined> {
   const supabase = await createClient()
 
   const id = (formData.get('fund_source_id') as string) ?? ''
@@ -108,7 +111,32 @@ async function amendFundSourceFromWork(formData: FormData): Promise<{ error: str
   }
   const reason = ((formData.get('reason') as string) ?? '').trim()
   const noFixedTerm = formData.get('no_fixed_term') === 'on'
+  const interestOnOriginal = formData.get('interest_on_original') === 'on'
+  const interestKeepsBase = formData.get('interest_keeps_base') === 'on'
+  if (interestOnOriginal && interestKeepsBase) return { error: '利息按原本金算、照之前的本金算，只能选一个' }
 
+  if (!direct) {
+    const { error: fileErr } = await supabase.rpc('file_terms_change' as never, {
+      p_record_kind: 'fund_source',
+      p_record_id: id,
+      p_effective_from: `${fromYM}-01`,
+      p_rate: rate,
+      p_remaining_months: noFixedTerm ? null : remaining,
+      p_compound_interest: compoundSent(formData),
+      p_no_fixed_term: noFixedTerm,
+      p_interest_on_original: interestOnOriginal,
+      p_interest_keeps_base: interestKeepsBase,
+      p_reason: reason || null,
+    } as never)
+    if (fileErr) return { error: `没有提交: ${fileErr.message}` }
+    revalidatePath(`/fund-in/${id}`)
+    revalidatePath('/fund-in')
+    revalidatePath('/approvals')
+    return undefined
+  }
+
+  // Applied at once is Treasury · Approve's — the RPC asks it too.
+  await requireActionOn('/fund-in', 'treasury', 'approve')
   const { error } = await supabase.rpc('amend_fund_source_from', {
     p_fund_source_id: id,
     p_effective_from: `${fromYM}-01`,
@@ -118,6 +146,8 @@ async function amendFundSourceFromWork(formData: FormData): Promise<{ error: str
     p_compound_interest: compoundSent(formData),
     p_reason: reason || null,
     p_no_fixed_term: noFixedTerm,
+    p_interest_on_original: interestOnOriginal,
+    p_interest_keeps_base: interestKeepsBase,
   })
   if (error) return { error: `修改失败: ${error.message}` }
 
@@ -135,14 +165,30 @@ async function amendFundSourceFromWork(formData: FormData): Promise<{ error: str
  * the same gate and work as `amendFundSource` / `amendFundSourceFrom`, without
  * the redirect to the portal's page — the app stays on its own screen.
  */
-export async function amendFundSourceInWords(mode: 'from' | 'whole', formData: FormData): Promise<{ ok: true } | { ok: false; reason: string }> {
-  await requireActionOn('/fund-in', 'treasury', 'approve')
+export async function amendFundSourceInWords(mode: 'from' | 'whole', formData: FormData): Promise<{ ok: true; filed?: boolean } | { ok: false; reason: string }> {
+  // Treasury · Edit files a from-month change for the Principal; the whole deal again stays Approve's.
+  const user = mode === 'whole'
+    ? await requireActionOn('/fund-in', 'treasury', 'approve')
+    : await requireAnyActionOn('/fund-in', ['treasury', 'approve'], ['treasury', 'edit'])
+  const direct = canDo(user, 'treasury', 'approve')
   try {
-    const refused = mode === 'from' ? await amendFundSourceFromWork(formData) : await amendFundSourceWork(formData)
-    return refused ? { ok: false, reason: refused.error } : { ok: true }
+    const refused = mode === 'from' ? await amendFundSourceFromWork(formData, direct) : await amendFundSourceWork(formData)
+    return refused ? { ok: false, reason: refused.error } : { ok: true, filed: !direct }
   } catch (e) {
     return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The terms could not be changed.' }
   }
+}
+
+/** Withdraw a terms change still waiting for the Principal — whoever filed it, or the Principal (mig 20261025110000). */
+export async function withdrawTermsChange(kind: 'loan' | 'fund_source', dealId: string, requestId: string): Promise<{ error: string } | undefined> {
+  await requireAnyActionOn(kind === 'loan' ? '/fund-out' : '/fund-in', ['treasury', 'edit'], ['treasury', 'approve'])
+  const supabase = await createClient()
+  if (!requestId) return { error: 'Request id is required' }
+  const { error } = await supabase.rpc('withdraw_terms_change' as never, { p_request_id: requestId } as never)
+  if (error) return { error: `The request was not withdrawn: ${error.message}` }
+  revalidatePath(kind === 'loan' ? `/fund-out/${dealId}` : `/fund-in/${dealId}`)
+  revalidatePath('/approvals')
+  return undefined
 }
 
 /** Undo the latest 从某月起 change on a loan or fund source (Principal). */

@@ -148,6 +148,10 @@
 .teamRight { text-align: right; }
 .teamSales { display: block; font-size: calc(14.5px * var(--rv-type)); font-weight: 650; font-variant-numeric: tabular-nums; }
 .teamMeta { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); margin-top: 1px; }
+/* The Principal's whole sub-department (2026-10-25): a member's row views them. */
+.teamRowTap { cursor: pointer; transition: opacity 120ms cubic-bezier(.2,.8,.2,1); }
+.teamRowTap:active { opacity: .6; }
+@media (prefers-reduced-motion: reduce) { .teamRowTap { transition: none; } }
 
 .footnote { margin: 0; font-size: calc(12px * var(--rv-type)); line-height: 1.6; color: var(--rv-sub); text-wrap: pretty; }
 .empty { margin: 0; font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); text-align: center; padding: 24px 0; }

@@ -13,6 +13,7 @@ import { waitingByLevel } from "./overlays";
 import { evenShare, first, ini, periodRange, inRange, type PanelCtx, type Team } from "./common";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
 import { adRunning } from "@/lib/member/crm-ad-running";
+import { is100, pctOf, pctShow, pctText } from "../../shared/pct";
 import { lockedOf } from "../../shared/locked";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], ALL7 = [0, 1, 2, 3, 4, 5, 6];
@@ -27,12 +28,18 @@ const seg = (cur: string, k: string, label: string, pick: () => void) => ({ labe
  * in proportion to what they had, or evenly. Values already set (locked) stay
  * put; only the untouched ones absorb the change (all of them, if none is left).
  */
-export function balance(ids: string[], cur: Record<string, number>, id: string, n: number, locked: string[] = []): Record<string, number> {
+export function balance(ids: string[], cur0: Record<string, number>, id: string, n0: number, locked: string[] = []): Record<string, number> {
+  // In hundredths (2026-10-22: a team's share takes two decimals): the same whole-number arithmetic on cents, out of 10 000.
+  const cur = Object.fromEntries(Object.entries(cur0).map(([k, v]) => [k, Math.round((v || 0) * 100)])), n1 = Math.round(n0 * 100);
+  const back = (o: Record<string, number>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v / 100]));
+  return back(balanceCents(ids, cur, id, n1, locked));
+}
+function balanceCents(ids: string[], cur: Record<string, number>, id: string, n: number, locked: string[]): Record<string, number> {
   let others = ids.filter(x => x !== id && !locked.includes(x));
   if (!others.length) others = ids.filter(x => x !== id);
   const fixed = ids.filter(x => x !== id && !others.includes(x)).reduce((s, k) => s + (cur[k] || 0), 0);
-  n = Math.max(0, Math.min(100 - fixed, n));
-  const rest = 100 - fixed - n, S = others.reduce((s, k) => s + (cur[k] || 0), 0), o = { ...cur, [id]: n };
+  n = Math.max(0, Math.min(10000 - fixed, n));
+  const rest = 10000 - fixed - n, S = others.reduce((s, k) => s + (cur[k] || 0), 0), o = { ...cur, [id]: n };
   if (!others.length) return o;
   const raw = others.map(k => (S > 0 ? ((cur[k] || 0) / S) * rest : rest / others.length)), fl = raw.map(Math.floor);
   let left = rest - fl.reduce((x, y) => x + y, 0);
@@ -80,20 +87,22 @@ function mkRow(teams: Team[], a: AdDraft, set: (p: Partial<AdDraft>) => void) {
     evenTeams: teams.map(t => ({ team: t.name, c: t.c, names: t.people.map(p => first(p.name)).join(", "), av: t.people.map((p, k) => ({ ini: ini(p.name), ml: k ? "-8px" : "0" })) })),
     splits: teams.map(t => {
       const v = a.split[t.id] || 0, isL = a.lockT.includes(t.id);
-      const put = (n: number) => set({ mode: "split", split: { ...a.split, ...balance(teams.map(x => x.id), a.split, t.id, n, a.lockT) }, lockT: nextLock(a.lockT, t.id) });
-      return { team: t.name, c: t.c, v, w: `${v}%`, ppl: `${t.people.length} people`, lockTxt: isL ? "Set" : "Auto", lockBg: isL ? "var(--crm-ink)" : "var(--crm-tint-cold)", lockFg: isL ? "#fff" : "var(--crm-muted)",
-        set: (e: ChangeEvent<HTMLInputElement>) => put(+e.target.value), setN: (e: ChangeEvent<HTMLInputElement>) => put(digits(e)), selAll,
+      const put = (n: number, typing: { id: string; text: string } | null = null) => set({ mode: "split", split: { ...a.split, ...balance(teams.map(x => x.id), a.split, t.id, n, a.lockT) }, lockT: nextLock(a.lockT, t.id), typing });
+      // The box keeps what is typed ("33."), two decimals (shared/pct.ts); the slider moves in fives.
+      const shown = a.typing?.id === t.id ? a.typing.text : pctShow(v);
+      return { team: t.name, c: t.c, v: shown, w: `${pctShow(v)}%`, ppl: `${t.people.length} people`, lockTxt: isL ? "Set" : "Auto", lockBg: isL ? "var(--crm-ink)" : "var(--crm-tint-cold)", lockFg: isL ? "#fff" : "var(--crm-muted)",
+        range: v, set: (e: ChangeEvent<HTMLInputElement>) => put(+e.target.value), setN: (e: ChangeEvent<HTMLInputElement>) => { const tx = pctText(e.target.value); put(pctOf(tx), { id: t.id, text: tx }); }, selAll,
         minus: () => put(v - 5), plus: () => put(v + 5), minusFg: v > 0 ? "var(--crm-ink)" : "var(--crm-line)", plusFg: v < 100 ? "var(--crm-ink)" : "var(--crm-line)" };
     }),
-    sumOk: total === 100, sumTot: `${total}%`,
+    sumOk: is100(total), sumTot: `${pctShow(total)}%`,
     splitReset: () => set({ mode: "split", split: Object.fromEntries(teams.map((t, k) => [t.id, Math.floor(100 / teams.length) + (k < 100 % teams.length ? 1 : 0)])), lockT: [] }),
-    sumNote: total === 100 ? "Adds up to 100%" : `Adds up to ${total}% · make it 100%`, sumFg: total === 100 ? "var(--crm-brown)" : "var(--crm-oxblood)", sumBg: total === 100 ? "var(--crm-tint-follow)" : "var(--crm-tint-attention)",
+    sumNote: is100(total) ? "Adds up to 100%" : `Adds up to ${pctShow(total)}% · make it 100%`, sumFg: is100(total) ? "var(--crm-brown)" : "var(--crm-oxblood)", sumBg: is100(total) ? "var(--crm-tint-follow)" : "var(--crm-tint-attention)",
     pModes: ([["cnt", "Max per person"], ["pct", "By %"]] as const).map(([k, label]) => ({ label, bg: pm === k ? "var(--crm-ink-soft)" : "#fff", fg: pm === k ? "#fff" : "var(--crm-ink)", bd: pm === k ? "var(--crm-ink-soft)" : "var(--crm-tint-cold)", pick: () => set({ mode: "people", pm: k, pp: {}, lockP: [] }) })),
     pIsPct: pm === "pct", pIsCnt: pm === "cnt", pGroups: P.groups, pSumNote: P.note, pSumFg: P.noteFg,
     resNone: !segs.length,
-    resLine: cur === "split" ? teams.filter(t => (a.split[t.id] || 0) > 0).map(t => `${t.name} ${a.split[t.id]}%`).join(" · ") : cur === "people" ? P.line : a.mode === "even" ? "Evenly to everyone" : "",
+    resLine: cur === "split" ? teams.filter(t => (a.split[t.id] || 0) > 0).map(t => `${t.name} ${pctShow(a.split[t.id])}%`).join(" · ") : cur === "people" ? P.line : a.mode === "even" ? "Evenly to everyone" : "",
     bar: segs.map(g => ({ c: g.c, w: `${(g.w / tw) * 100}%`, op: g.op })),
-    ok: cur === "split" ? total === 100 : cur === "people" ? P.ok : true,
+    ok: cur === "split" ? is100(total) : cur === "people" ? P.ok : true,
   };
 }
 
@@ -160,7 +169,7 @@ export function assignVM(ctx: PanelCtx) {
     // 4a (T03): the channel, the ad's headline under its name, Set up while it has no rule.
     head: head4(a.id), wa: a.page === "WhatsApp", setUp: !ruleOf(a.id),
     ...mkRow(adTeams, a, p => void saveAd({ ...a, ...p })),
-    edit: () => patch({ adEd: { ...a, split: { ...a.split }, pp: { ...a.pp } } }),
+    edit: () => patch({ adEd: { ...a, split: { ...a.split }, pp: { ...a.pp } }, applyPick: null }),
   }));
   const E = ui.adEd;
   const aeRow = E ? mkRow(adTeams, E, p => set(u => (u.adEd ? { ...u, adEd: { ...u.adEd, ...p } } : u))) : null;
@@ -179,7 +188,7 @@ export function assignVM(ctx: PanelCtx) {
     nameKey: (e: { key: string; currentTarget: { blur(): void } }) => { if (e.key === "Enter") e.currentTarget.blur(); },
   } : { canName: false, nameDraft: "", headline: "", onName: () => {}, saveName: () => {}, nameKey: () => {} };
   const ae = aeRow && E
-    ? { ...aeRow, ...naming, why: "", close: () => patch({ adEd: null, adNameDraft: null }), saveBg: aeRow.ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: aeRow.ok ? () => void saveAd(E).then(ok => { if (ok) patch({ adEd: null }); }) : undefined }
+    ? { ...aeRow, ...naming, why: "", close: () => patch({ adEd: null, adNameDraft: null, applyPick: null }), saveBg: aeRow.ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: aeRow.ok ? () => void saveAd(E).then(ok => { if (ok) patch({ adEd: null }); }) : undefined }
     : { ...mkRow(adTeams, draftOf(""), () => {}), ...naming, why: "", close: () => {}, saveBg: "var(--crm-faint-2)", save: undefined as (() => void) | undefined };
 
   // Awaiting reply, on Assignment: counts per level, then every waiting customer.

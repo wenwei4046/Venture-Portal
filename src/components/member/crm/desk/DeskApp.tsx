@@ -10,8 +10,9 @@ import DH from "./desk-hover.module.css";
 import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a, DeskSettings4a, DeskShowrooms4a } from "./Desk4a";
-import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
+import { DeskReports } from "./DeskReports";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
+import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
 /** The whole desktop CRM: the Revenue app's frame around it (sidebar, top bar), every page, pane, menu and the toast. */
@@ -549,7 +550,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </>)}
                 </div>
               </>)}
-              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.isMwtOp) && (<>
+              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}{!!(v.isLbaOp) && (<DeskLeadsByAd v={v.leadsByAd} />)}{!!(v.isMwtOp) && (<>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", marginTop: "-10px" }}>
                   <span style={{ flex: "1", minWidth: "260px", fontSize: "14px", color: "var(--crm-muted)" }}>Turned on here, they appear in Assignment › Full time lead allocation, where you pick their days.</span>
                   {!!(v.mwtSavedMsg) && (<>
@@ -563,16 +564,16 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </>)}
                   <button type="button" onClick={v.mwtSave} disabled={v.mwtClean} style={{ height: "40px", padding: "0 24px", borderRadius: "20px", border: "0", background: v.mwtBtnBg, font: "inherit", fontSize: "14.5px", fontWeight: "650", color: "#fff", cursor: v.mwtBtnCur }}>Save</button>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px", alignItems: "stretch" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "760px" }}>
                   {(v.mwtTeams).map((g, g_i) => (<Fragment key={g_i}>
                     <div style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--crm-field)" }}>
+                      <button type="button" onClick={g.fold} aria-expanded={!g.shut} style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", border: "0", borderBottom: g.shut ? "0" : "1px solid var(--crm-field)", background: "transparent", font: "inherit", textAlign: "left", cursor: "pointer" }}><span style={{ display: "flex", color: "var(--crm-ink-soft)", transform: g.shut ? "rotate(-90deg)" : "none", transition: "transform .16s" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg></span>
                         <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }}>
                         </span>
                         <strong style={{ flex: "1", fontSize: "14.5px", fontWeight: "700", color: g.color }}>{g.name}</strong>
                         <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{g.count}</span>
-                      </div>
-                      {(g.people).map((p, p_i) => (<Fragment key={p_i}>
+                      </button>
+                      {!g.shut && (g.people).map((p, p_i) => (<Fragment key={p_i}>
                         <button type="button" onClick={p.toggle} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className={DH.h12}>
                           <span style={{ flex: "0 0 36px", width: "36px", height: "36px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "12px", fontWeight: "700", display: "grid", placeItems: "center" }}>{p.ini}</span>
                           <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
@@ -738,148 +739,20 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </aside>
             </>)}
             {!!(v.adOpen) && (<>
-              <aside className={DX.slideIn} style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column" }}>
+              {!!(v.splitShut) && (<DeskFoldRail v={v.splitRail} />)}<aside className={DX.slideIn} style={{ flex: v.splitFlex, width: `${v.sheetW}px`, minWidth: "320px", position: "relative", boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: v.splitShut || !v.paneOn.split ? "none" : "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragSheet} onDoubleClick={v.resetSheet} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <DeskAdTabs4a v={v} which="split" />
-                <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 4px" }}>
-                  <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>Ad name</span>
-                  <label style={{ display: "flex", alignItems: "center", gap: "8px", height: "42px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-ink)" }}>
-                    {v.ad.canName ? (<input aria-label="Ad name" value={v.ad.nameDraft} onChange={v.ad.onName} onBlur={v.ad.saveName} onKeyDown={v.ad.nameKey} placeholder={v.ad.headline} maxLength={120} style={{ flex: "1", minWidth: "0", margin: "0", padding: "0", border: "0", background: "transparent", font: "500 15px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)", outline: "none" }} />) : (<span style={{ flex: "1", font: "500 15px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)" }}>{v.ad.name}</span>)}
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--crm-ink-soft)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5zM15 5l4 4"></path></svg>
-                  </label>
-                  <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.ad.headline ? <>Meta sends only the headline: &ldquo;{v.ad.headline}&rdquo;. · {v.ad.meta}</> : v.ad.meta}</span>
-                </div>
-                <div style={{ flex: "1", minHeight: "0", overflowY: "auto", overflowX: "hidden", padding: "0 20px 20px", display: "flex", flexDirection: "column" }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "18px 0", borderBottom: "1px solid var(--crm-rule)" }}>
-                    <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>SPLIT METHOD</span>
-                    <div style={{ display: "flex", background: "var(--crm-field)", borderRadius: "10px", padding: "3px", gap: "2px" }}>
-                      {(v.adModes).map((o, o_i) => (<Fragment key={o_i}>
-                        {!!(o.on) && (<>
-                          <button type="button" onClick={o.pick} style={{ flex: "1", border: "0", height: "34px", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)", font: "inherit", fontSize: "13.5px", fontWeight: "650", boxShadow: "0 1px 2px rgba(42,22,12,.12)", cursor: "pointer", whiteSpace: "nowrap" }}>{o.label}</button>
-                        </>)}
-                        {!!(o.off) && (<>
-                          <button type="button" onClick={o.pick} style={{ flex: "1", border: "0", height: "34px", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", font: "inherit", fontSize: "13.5px", fontWeight: "550", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h2}>{o.label}</button>
-                        </>)}
-                      </Fragment>))}
-                    </div>
-                  </div>
-                  {!!(v.adEvenly) && (<>
-                    <div style={{ display: "flex", flexDirection: "column", padding: "18px 0" }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: "8px", paddingBottom: "8px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)", flex: "1" }}>TEAMS</span>
-                        <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}><b style={{ fontSize: "13.5px", fontWeight: "650", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{v.evenTotal}</b> people share equally</span>
-                      </div>
-                      {(v.evenTeams).map((t, t_i) => (<Fragment key={t_i}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderTop: "1px solid var(--crm-field)" }}>
-                          <span style={{ flex: "0 0 8px", width: "8px", height: "8px", borderRadius: "50%", background: t.color }}>
-                          </span>
-                          <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                            <strong style={{ fontSize: "13.5px", fontWeight: "650" }}>{t.name}</strong>
-                            <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.names}</span>
-                          </span>
-                          <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>Equal share</span>
-                        </div>
-                      </Fragment>))}
-                    </div>
-                  </>)}
-                  {!!(v.adByTeam) && (<>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "18px 0", borderBottom: "1px solid var(--crm-rule)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)", flex: "1" }}>SPLIT ACROSS TEAMS</span>
-                        <span style={{ fontSize: "12px", fontWeight: "650", color: "var(--crm-brown)", fontVariantNumeric: "tabular-nums" }}>100%</span>
-                        <button type="button" onClick={v.resetSplit} style={{ border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }} className={DH.h25}>Reset</button>
-                      </div>
-                      <div style={{ display: "flex", gap: "2px", height: "6px", borderRadius: "3px", overflow: "hidden" }}>
-                        {(v.adSplit).map((t, t_i) => (<Fragment key={t_i}>
-                          <span style={{ flex: `${t.pct} 0 0`, background: t.color }}>
-                          </span>
-                        </Fragment>))}
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column" }}>
-                        {(v.adSplit).map((t, t_i) => (<Fragment key={t_i}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "14px", padding: "8px 0" }}>
-                            <span style={{ flex: "0 0 104px", display: "flex", alignItems: "center", gap: "8px", fontSize: "13.5px", fontWeight: "650", whiteSpace: "nowrap" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: t.color }}>
-                              </span>{t.name}</span>
-                            <span style={{ flex: "1", position: "relative", height: "4px", borderRadius: "2px", background: "var(--crm-field)" }}>
-                              <span style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: `${t.pct}%`, background: t.color, borderRadius: "2px" }}>
-                              </span>
-                              <span style={{ position: "absolute", top: "50%", left: `${t.pct}%`, width: "16px", height: "16px", margin: "-8px 0 0 -8px", boxSizing: "border-box", borderRadius: "50%", background: "#fff", border: `2px solid ${t.color}`, pointerEvents: "none" }}>
-                              </span>
-                              <input type="range" min="0" max="100" step="5" value={t.pct} onChange={t.onRange} aria-label={`${t.name} share`} style={{ position: "absolute", left: "-8px", right: "-8px", top: "-12px", bottom: "-12px", width: "calc(100% + 16px)", margin: "0", opacity: "0", cursor: "pointer" }} />
-                            </span>
-                            <span style={{ flex: "0 0 64px", height: "34px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px", padding: "0 10px", borderRadius: "8px", border: "1px solid var(--crm-rule)" }}>
-                              <input type="text" inputMode="numeric" value={t.pctStr} onChange={t.onRange} style={{ width: "30px", border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "14px", fontWeight: "650", color: "var(--crm-ink)", textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none" }} />
-                              <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>%</span>
-                            </span>
-                          </div>
-                        </Fragment>))}
-                      </div>
-                    </div>
-                    {(v.adTeams).map((t, t_i) => (<Fragment key={t_i}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "18px 0", borderBottom: "1px solid var(--crm-rule)" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: t.color }}>
-                          </span>
-                          <strong style={{ flex: "1", fontSize: "14px", fontWeight: "650" }}>{t.name}</strong>
-                          <span style={{ fontSize: "12.5px", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{t.share} of leads</span>
-                        </div>
-                        <div style={{ display: "flex", background: "var(--crm-field)", borderRadius: "10px", padding: "3px", gap: "2px" }}>
-                          {(t.opts).map((o, o_i) => (<Fragment key={o_i}>
-                            {!!(o.on) && (<>
-                              <button type="button" onClick={o.pick} style={{ flex: "1", border: "0", height: "30px", borderRadius: "8px", background: "#fff", color: "var(--crm-ink)", font: "inherit", fontSize: "12.5px", fontWeight: "650", boxShadow: "0 1px 2px rgba(42,22,12,.12)", cursor: "pointer", whiteSpace: "nowrap" }}>{o.label}</button>
-                            </>)}
-                            {!!(o.off) && (<>
-                              <button type="button" onClick={o.pick} style={{ flex: "1", border: "0", height: "30px", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", font: "inherit", fontSize: "12.5px", fontWeight: "550", cursor: "pointer", whiteSpace: "nowrap" }} className={DH.h2}>{o.label}</button>
-                            </>)}
-                          </Fragment>))}
-                        </div>
-                        {!!(t.evenShut) && (<>
-                          <button type="button" onClick={t.toggleList} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 0", border: "0", background: "transparent", font: "inherit", color: "var(--crm-muted)", textAlign: "left", cursor: "pointer" }} className={DH.h2}>
-                            <span style={{ flex: "1", fontSize: "12.5px" }}>{t.memberCount} members · each gets an equal share</span>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)" }}>Show<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="m6 9 6 6 6-6">
-                                </path>
-                              </svg></span>
-                          </button>
-                        </>)}
-                        {!!(t.listShown) && (<>
-                          {!!(t.evenOpen) && (<>
-                            <button type="button" onClick={t.toggleList} style={{ alignSelf: "flex-end", display: "inline-flex", alignItems: "center", gap: "3px", padding: "0", border: "0", background: "transparent", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }}>Hide<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="m18 15-6-6-6 6">
-                                </path>
-                              </svg></button>
-                          </>)}
-                          <div style={{ display: "flex", flexDirection: "column" }}>
-                            {(t.members).map((m, m_i) => (<Fragment key={m_i}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "10px", minHeight: "44px", padding: "4px 0", borderTop: "1px solid var(--crm-field)" }}>
-                                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                                  <span style={{ fontSize: "13.5px", fontWeight: "600", color: m.locked ? "var(--crm-faint)" : undefined }}>{m.name}</span>
-                                  <span style={{ fontSize: "12px", color: m.subColor }}>{m.sub}</span>
-                                </span>
-                                {!!(m.locked) && (<span aria-label="Locked" style={{ flex: "0 0 auto", width: "56px", height: "32px", display: "grid", placeItems: "center", color: "var(--crm-faint)" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>)}{!!(t.field && !m.locked) && (<>
-                                  <span style={{ flex: "0 0 auto", height: "32px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "4px", padding: "0 10px", borderRadius: "8px", border: "1px solid var(--crm-rule)" }}>
-                                    <input type="text" inputMode="numeric" value={m.valueStr} onChange={m.onVal} style={{ width: "28px", border: "0", background: "transparent", padding: "0", font: "inherit", fontSize: "14px", fontWeight: "650", color: "var(--crm-ink)", textAlign: "right", fontVariantNumeric: "tabular-nums", outline: "none" }} />
-                                    <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{t.unit}</span>
-                                  </span>
-                                </>)}
-                              </div>
-                            </Fragment>))}
-                            <span style={{ paddingTop: "6px", fontSize: "12px", fontWeight: "600", color: t.noteColor }}>{t.note}</span>{!!(t.lockedNote) && (<span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{t.lockedNote}</span>)}
-                          </div>
-                        </>)}
-                      </div>
-                    </Fragment>))}
-                  </>)}
-                </div>
-                <div style={{ flex: "0 0 auto", display: "flex", gap: "10px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>
+                <DeskSplit4a v={v} />
+                <div style={{ flex: "0 0 auto", display: "flex", gap: "8px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>
+                  <button type="button" onClick={v.closeAd} style={{ flex: "0 0 auto", height: "38px", padding: "0 16px", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "#fff", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer" }} className="crm4a-outline">Cancel</button>
                   <button type="button" onClick={v.saveOne4} style={{ flex: "0 0 auto", height: "38px", padding: "0 18px", borderRadius: "7px", border: "0", background: "var(--crm-rust)", font: "500 13px Inter, sans-serif", color: "#fff", cursor: "pointer" }} className="crm4a-primary">Save</button>
                   <button type="button" onClick={v.saveAll4} style={{ flex: "1", height: "38px", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer" }} className="crm4a-outline">{v.applyLabel}</button>
                 </div>
               </aside>
             </>)}
             {!!(v.adOpen) && (<>
-              {!(v.perfShut) && (<><aside style={{ position: "relative", flex: `0 1 ${v.perfW}px`, width: `${v.perfW}px`, minWidth: "220px", boxSizing: "border-box", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column" }}>
+              {!!(v.paneOn.perf) && (<><aside style={{ position: "relative", flex: `0 1 ${v.perfW}px`, width: `${v.perfW}px`, minWidth: "220px", boxSizing: "border-box", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column" }}>
                 <div onPointerDown={v.dragPerf} onDoubleClick={v.resetPerf} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                 </div>
                 <DeskAdTabs4a v={v} which="perf" />
@@ -983,9 +856,9 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </path>
                     </svg></button>
                 </div>
-              </aside></>)}{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}
-              {!!(v.adLogClosed) && (<DeskFoldRail v={{ title: "Audit log", open: v.adLogToggle }} />)}
-              {!!(v.adLogOpen) && (<>
+              </aside></>)}
+              
+              {!!(v.paneOn.audit) && (<>
                 <aside className={DX.slideIn} style={v.adLogStyle}>
                   <div onPointerDown={v.dragAudit} onDoubleClick={v.resetAudit} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: "0", bottom: "0", width: "9px", zIndex: "6", cursor: "col-resize", touchAction: "none" }} className={DH.h23}>
                   </div>
@@ -1879,7 +1752,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </button>
                 </div>
                 <p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.aw.owner}</p>
-                <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>
+                <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>
                   <span style={{ alignSelf: "center", padding: "0 0 6px", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{v.aw.time}</span>
                   {!!(v.aw.inn) && (<>
                     <div style={{ alignSelf: "flex-start", maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: "14px 14px 14px 4px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}>
@@ -1984,64 +1857,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
           {!!(v.notWide) && (<>
             <div style={{ flex: "1", minWidth: "0", boxSizing: "border-box", padding: v.f4.pad, display: "flex", flexDirection: "column", gap: v.f4.gap, overflow: "auto" }}>
               {!!(v.kList) && (<DeskInboxList4a v={v} />)}
-              {!!(v.kInsight) && (<>
-                <DeskInsight4a v={v} />
-                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "baseline", gap: "10px", marginTop: "22px" }}>
-                  <strong style={{ flex: "1", font: "500 18px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", color: "var(--crm-ink)" }}>Ads Performance</strong>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "var(--crm-muted)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.metaDot }}>
-                    </span>{v.metaSync}</span>
-                  <DeskCardPicker v={v} />
-                  <button type="button" onClick={v.goAdsPerf} style={{ display: "inline-flex", alignItems: "center", gap: "4px", border: "0", padding: "0", background: "transparent", font: "inherit", fontSize: "14px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }}>View all<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="m9 6 6 6-6 6">
-                      </path>
-                    </svg></button>
-                </div>
-                <div style={{ flex: "0 0 auto", display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "12px" }}>
-                  {(v.adTotals).map((k, k_i) => (<Fragment key={k_i}>
-                    <div style={{ padding: "14px 18px", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", display: "flex", flexDirection: "column", gap: "2px" }}>
-                      <span style={{ fontSize: "12.5px", color: "var(--crm-muted)", fontWeight: "600" }}>{k.label}</span>
-                      <b style={{ fontSize: "24px", fontWeight: "700", letterSpacing: "-.02em", fontVariantNumeric: "tabular-nums" }}>{k.value}</b>
-                    </div>
-                  </Fragment>))}
-                </div>
-                <div style={{ flex: "0 0 auto", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "18px", overflowX: "auto" }}>
-                  <div style={{ minWidth: `${v.insAdMinW}px` }}>
-                    <div style={{ display: "grid", gridTemplateColumns: v.insAdCols, gap: "12px", padding: "12px 20px", borderBottom: "1px solid var(--crm-rule)", fontSize: "11px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>
-                      {(v.insHead).map((h, h_i) => (<Fragment key={h_i}><button type="button" onClick={h.sort} style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: h.justify, gap: "5px", padding: "0", border: "0", background: "none", font: "inherit", color: h.fg, letterSpacing: "inherit", textTransform: "uppercase", textAlign: h.align, cursor: "pointer" }}><span>{h.label}</span><span style={{ flex: "0 0 auto", fontSize: "10px", color: h.ac }}>{h.arrow}</span><span onPointerDown={h.resize} onDoubleClick={h.unsize} onClick={e => e.stopPropagation()} title="Drag to resize · double-click to reset" style={{ position: "absolute", top: "-12px", bottom: "-12px", right: "-12px", width: "12px", cursor: "col-resize", display: "flex", justifyContent: "center" }}><span style={{ width: "1px", margin: "8px 0", background: "var(--crm-rule)" }}></span></span></button></Fragment>))}
-                    </div>
-                    {(v.adPerf).map((r, r_i) => (<Fragment key={r_i}>
-                      <div style={{ display: "grid", gridTemplateColumns: v.insAdCols, gap: "12px", alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--crm-field)", fontSize: "14.5px", fontWeight: "600", fontVariantNumeric: "tabular-nums" }}>
-                        <span style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: "0" }}>
-                          <strong style={{ fontSize: "14.5px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</strong>
-                          <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "600" }}>
-                            <span style={{ color: r.chFg }}>{r.channel}</span>
-                            <span style={{ color: "var(--crm-faint-2)" }}>·</span>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: r.stInk }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: r.stDot }}>
-                              </span>{r.status}</span>
-                          </span>
-                        </span>
-                        <span style={{ textAlign: "center" }}>{r.spend}</span>
-                        <span style={{ textAlign: "center" }}>{r.reach}</span>
-                        <span style={{ textAlign: "center" }}>{r.clicks}</span>
-                        <span style={{ textAlign: "center", color: "var(--crm-muted)" }}>{r.ctr}</span>
-                        <span style={{ textAlign: "center" }}>{r.leads}</span>
-                        <span style={{ textAlign: "center", color: r.cplColor }}>{r.cpl}</span>
-                        <span style={{ textAlign: "center" }}>{r.appt}</span>
-                      </div>
-                    </Fragment>))}
-                    <div style={{ display: "grid", gridTemplateColumns: v.insAdCols, gap: "12px", alignItems: "center", padding: "14px 20px", background: "var(--crm-cream-nav)", fontSize: "14.5px", fontWeight: "700", fontVariantNumeric: "tabular-nums" }}>
-                      <span style={{ fontSize: "12px", letterSpacing: ".08em", color: "var(--crm-ink)" }}>TOTAL · {v.adTot.n} ADS</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.spend}</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.reach}</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.clicks}</span>
-                      <span style={{ textAlign: "center", color: "var(--crm-muted)" }}>{v.adTot.ctr}</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.leads}</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.cpl}</span>
-                      <span style={{ textAlign: "center" }}>{v.adTot.appt}</span>
-                    </div>
-                  </div>
-                </div>
-              </>)}
+              {!!(v.kInsight) && (<DeskInsight4a v={v} />)}
               {!!(v.kCh) && (<>
                 <div style={{ display: "flex", flexDirection: "column", gap: "20px", paddingTop: "8px" }}>
                   <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", borderBottom: "1px solid var(--crm-rule)" }}>
@@ -2667,14 +2483,14 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </div>
               </>)}
               {!!(v.kPeople) && (<DeskContacts4a v={v} pager={<DeskPager v={v.ppPager} />} />)}
-              {!!(v.kAudit) && (<DeskAudit4a v={v} />)} {!!(v.kAdsPerf) && (<>
-                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              {!!(v.kAudit) && (<DeskAudit4a v={v} />)} {!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kAdsPerf) && (<>
+                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "6px 0 10px" }}>
                   <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.apStToggle} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    <button type="button" onClick={v.apStToggle} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.apStOpen) && (<><div onClick={v.apStToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", left: "0" }}>{(v.apStOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.dot }}></span><span style={{ flex: "1" }}>{o.label}</span><span style={{ color: "var(--crm-faint)" }}>{o.n}</span></button>))}</div></>)}
                   </span>
                   <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.dpOpen} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"></path></svg>{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    <button type="button" onClick={v.dpOpen} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline">{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.dp.open) && (<>
                       <div onClick={v.dpCancel} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
                       </div>
@@ -2756,13 +2572,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </div>
                     </>)}
                   </span>
-                  <span style={{ flex: "1" }}></span>
-                  <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.apToggleDl} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>Export<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
-                    {!!(v.apDlOpen) && (<><div onClick={v.apToggleDl} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", right: "0" }}>{(v.apDl).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }} className="crm4a-row"><span style={{ minWidth: "30px", height: "18px", padding: "0 5px", borderRadius: "4px", background: o.bg, color: o.fg, font: "600 10px Inter, sans-serif", display: "grid", placeItems: "center" }}>{o.tag}</span>{o.label}</button>))}</div></>)}
-                  </span>
                 </div>
-                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink-soft)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4M12 8h.01"></path></svg>Spend and cost per lead appear once Meta grants ads_read. Ad names are the ones managers typed in Assignment.</div>
                 {!!(v.apCmpOn) && (<>
                   <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "18px", fontSize: "13px", fontWeight: "650" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: "7px" }}><span style={{ width: "9px", height: "9px", borderRadius: "50%", background: "var(--crm-rust)" }}>
@@ -2868,8 +2678,8 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         </path>
                       </svg>{v.backPersonLabel}</button>
                   </>)}
-                  <p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.chatOwner}</p>
-                  <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>
+                  
+                  <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>
                     {!!(v.firstDay) && (<><span style={{ alignSelf: "center", padding: "0 0 6px", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{v.firstDay}</span></>)}{!!(v.pinShown) && (<>
                       <div style={{ position: "sticky", top: "-10px", zIndex: "3", margin: "-10px -20px 0", display: "flex", alignItems: "center", gap: "10px", padding: "8px 20px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-rust)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

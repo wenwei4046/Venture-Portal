@@ -3,6 +3,7 @@
  * keeps it (what is open, what is typed, which sheet shows). Data lives in
  * CrmData; this is only what the person is doing on screen.
  */
+import type { CustomFields } from "../shared/custom-book";
 export type SalesTab = "inbox" | "contacts" | "calendar" | "insight" | "profile";
 export type InboxFilter = { type: "status" | "urgency" | "cold" | "label" | "new"; v: string } | null;
 
@@ -20,7 +21,8 @@ export interface OutcomeAsk {
   otherText?: string;
 }
 
-export interface BookState {
+/** Showroom (room, day, slot) or online / elsewhere (shared/custom-book.tsx, 2026-10-24). */
+export interface BookState extends CustomFields {
   customerId: string;
   room: number;
   /** The chosen day, local midnight (ms). */

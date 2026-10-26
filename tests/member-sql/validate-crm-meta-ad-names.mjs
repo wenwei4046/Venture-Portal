@@ -90,4 +90,14 @@ for (const fn of ['crm_ads_to_check', 'crm_meta_ad_status']) {
 }
 await assert.rejects(as('ann', `select public.crm_meta_ad_status('111111', 'x', 'ACTIVE')`), /permission denied/, 'a signed-in person cannot keep a status'); checks++
 
+// ── An ad added before its first lead (mig 20261022150100): CRM · Manage adds it with its run; the sweep checks it ──
+await db.exec((await readFile(new URL('20261022150100_crm_add_ad.sql', dir), 'utf8')).replace(/\r\n/g, '\n'))
+await as('boss', `select public.crm_add_ad('777777', 'Skyline launch', 'pending_review', '2026-10-25T01:00:00Z', '2026-10-30T15:00:00Z')`)
+check((await q(`select name, source, meta_status, added_at is not null as added, starts_at is not null as s, ends_at is not null as e from crm_ad_names where ad_source_id = '777777'`))[0], { name: 'Skyline launch', source: 'meta', meta_status: 'PENDING_REVIEW', added: true, s: true, e: true }, 'added with its name, status and run')
+await as('boss', `select public.crm_add_ad('111111', 'Meta name', 'ACTIVE', null, null)`)
+check((await q(`select name, source, meta_status, added_at is not null as added from crm_ad_names where ad_source_id = '111111'`))[0], { name: 'Renamed by hand', source: 'manual', meta_status: 'ACTIVE', added: true }, 'adding a named ad keeps the manual name')
+check((await q(`select public.crm_ads_to_check() as a`))[0].a.includes('777777'), true, 'the sweep checks an added ad with no lead')
+await assert.rejects(as('ann', `select public.crm_add_ad('888888', 'x', 'ACTIVE', null, null)`), /./, 'a salesperson cannot add an ad'); checks++
+await assert.rejects(as('boss', `select public.crm_add_ad('abc', 'x', 'ACTIVE', null, null)`), /digits/, 'an ad id is digits'); checks++
+
 console.log(`crm meta ad names: ${checks} checks passed`)

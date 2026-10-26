@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses } from './crm-ad-names-meta'
+import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers, metaAdInsights, metaAdDaily } from './crm-ad-names-meta'
 
 // An ad's name from Ads Manager (2026-10-19, mig 20261019100000): a webhook delivery with an ad nobody named asks
 // Graph for it and keeps it as source 'meta'; a named ad is never asked; an ad the token cannot see is not asked
@@ -93,5 +93,80 @@ describe('ad statuses from Ads Manager', () => {
 
   it('does nothing without a token', async () => {
     expect(await refreshAdStatuses(statusDb(['111111']).client, undefined)).toBe(0)
+  })
+})
+
+describe('the ads Meta lists for "+"', () => {
+  it('reads every account, leaves deleted ones to Meta’s filter, running first then newest', async () => {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      const u = String(url)
+      if (u.includes('me/adaccounts')) return new Response(JSON.stringify({ data: [{ id: 'act_1', name: 'IR@The Conts' }, { id: 'bad' }] }), { status: 200 })
+      if (u.includes('act_1/ads')) return new Response(JSON.stringify({ data: [
+        { id: '111111', name: 'Old paused', effective_status: 'PAUSED', created_time: '2026-10-01T00:00:00+0800' },
+        { id: '222222', name: 'New running', effective_status: 'ACTIVE', created_time: '2026-10-19T00:00:00+0800' },
+        { id: 'x', name: 'bad id' },
+      ] }), { status: 200 })
+      return new Response('{}', { status: 400 })
+    }) as unknown as typeof fetch
+    const rows = await listMetaAds('T', f)
+    expect(rows.map(r => [r.id, r.status, r.account])).toEqual([['222222', 'ACTIVE', 'IR@The Conts'], ['111111', 'PAUSED', 'IR@The Conts']])
+    expect(String((f as unknown as ReturnType<typeof vi.fn>).mock.calls[1][0])).toContain('filtering=')
+  })
+  it('throws when Meta refuses the accounts', async () => {
+    await expect(listMetaAds('T', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).rejects.toThrow()
+  })
+})
+
+describe("only the ads sent to the CRM's ad number", () => {
+  it('keeps an ad whose ad set sends people to 018-358 0219, drops the rest', async () => {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      const u = String(url)
+      if (u.includes('me/adaccounts')) return new Response(JSON.stringify({ data: [{ id: 'act_1', name: 'IR@The Conts' }] }), { status: 200 })
+      if (u.includes('act_1/ads')) return new Response(JSON.stringify({ data: [
+        { id: '111111', name: 'Ours', effective_status: 'ACTIVE', adset: { promoted_object: { page_id: '102351059576534', whatsapp_phone_number: '60183580219' } } },
+        { id: '222222', name: 'Other number', effective_status: 'ACTIVE', adset: { promoted_object: { page_id: '478652958664343', whatsapp_phone_number: '601160716133' } } },
+        { id: '333333', name: 'Messenger', effective_status: 'ACTIVE', adset: { promoted_object: { page_id: '478652958664343' } } },
+      ] }), { status: 200 })
+      if (u.includes('fields=name')) return new Response(JSON.stringify({ name: 'The Conts' }), { status: 200 })
+      return new Response('{}', { status: 400 })
+    }) as unknown as typeof fetch
+    const rows = await listMetaAds('T', f, { numbers: crmAdNumbers(undefined) })
+    expect(rows.map(r => r.id)).toEqual(['111111'])
+    expect(rows[0].pageName).toBe('The Conts')
+    expect((await listMetaAds('T', f)).length).toBe(3)
+  })
+  it('reads other numbers from the server when named', () => {
+    expect(crmAdNumbers(undefined)).toEqual(['60183580219'])
+    expect(crmAdNumbers('+60 18-358 0219, 60189079042')).toEqual(['60183580219', '60189079042'])
+  })
+})
+
+describe("an ad's figures from Ads Manager", () => {
+  it('reads spend, delivery and messaging conversations for the range', async () => {
+    const f = vi.fn(async (url: string | URL | Request) => {
+      expect(decodeURIComponent(String(url))).toContain('"since":"2026-10-01","until":"2026-10-22"')
+      return new Response(JSON.stringify({ data: [{ spend: '123.45', impressions: '9000', reach: '4000', inline_link_clicks: '80', clicks: '120', actions: [{ action_type: 'onsite_conversion.messaging_conversation_started_7d', value: '15' }] }] }), { status: 200 })
+    }) as unknown as typeof fetch
+    expect(await metaAdInsights('111111', 'T', '2026-10-01', '2026-10-22', f)).toEqual({ spend: 123.45, impr: 9000, reach: 4000, clicks: 80, allClicks: 120, msgconv: 15 })
+  })
+  it('answers zeros with no delivery, null for an ad the token cannot see', async () => {
+    expect(await metaAdInsights('111111', 'T', '2026-10-01', '2026-10-22', vi.fn(async () => new Response('{"data":[]}', { status: 200 })) as unknown as typeof fetch)).toEqual({ spend: 0, impr: 0, reach: 0, clicks: 0, allClicks: 0, msgconv: 0 })
+    expect(await metaAdInsights('111111', 'T', '2026-10-01', '2026-10-22', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).toBeNull()
+  })
+})
+
+describe("an ad's figures day by day (Ads Performance's chart, 2026-10-23)", () => {
+  it('keys each day by its date and asks Graph for time_increment=1', async () => {
+    const f = vi.fn(async (_url: string | URL | Request) => new Response(JSON.stringify({ data: [
+      { date_start: '2026-10-20', spend: '10.5', impressions: '300', reach: '200', inline_link_clicks: '4', clicks: '9', actions: [{ action_type: 'onsite_conversion.messaging_conversation_started_7d', value: '2' }] },
+      { date_start: '2026-10-21', spend: '7', impressions: '100', reach: '90', inline_link_clicks: '1', clicks: '2' },
+    ] }), { status: 200 })) as unknown as typeof fetch
+    const days = await metaAdDaily('111111', 'T', '2026-10-20', '2026-10-21', f)
+    expect(days).toEqual({ '2026-10-20': { spend: 10.5, impr: 300, reach: 200, clicks: 4, allClicks: 9, msgconv: 2 }, '2026-10-21': { spend: 7, impr: 100, reach: 90, clicks: 1, allClicks: 2, msgconv: 0 } })
+    expect(String((f as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0])).toContain('time_increment=1')
+  })
+  it('answers null for an ad the token cannot see, or a bad id', async () => {
+    expect(await metaAdDaily('111111', 'T', '2026-10-20', '2026-10-21', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).toBeNull()
+    expect(await metaAdDaily('abc', 'T', '2026-10-20', '2026-10-21')).toBeNull()
   })
 })

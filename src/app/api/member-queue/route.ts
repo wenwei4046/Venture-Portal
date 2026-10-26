@@ -6,6 +6,7 @@ import { flushPush } from '@/lib/push/outbox'
 import { sweepHiringLeftovers } from '@/lib/hiring/leftovers'
 import { sweepDataCenterBin } from '@/lib/documentation/drive-bin-sweep'
 import { refreshAdStatuses } from '@/lib/member/crm-ad-names-meta'
+import { sweepFileObjects } from '@/lib/storage/sweep'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,6 +40,22 @@ export async function GET(request: Request) {
     const crmDue = await db.rpc('notify_crm_due')
     if (crmDue.error) console.error('CRM due notices failed', crmDue.error.code ?? 'unknown')
     else if (crmDue.data) console.info('CRM due notices written', crmDue.data)
+    // A probation or a contract ending (mig 20261024223000; both, 30 and again 15 days before, since 20261025046500): each
+    // reminder once to each HR app holder who may still acknowledge it, asked as them — then sent by the flush below. A
+    // count only (the names are people's).
+    const termEnds = await db.rpc('notify_term_ends')
+    if (termEnds.error) console.error('Term end notices failed', termEnds.error.code ?? 'unknown')
+    else if (termEnds.data) console.info('Term end notices written', termEnds.data)
+    // A recurring Marketing product's month (mig 20261025131000 — the user's answer 12: it runs every month on its run
+    // day): made even when nobody works that day, its people told — then sent by the flush below. A count only.
+    const marketingRuns = await db.rpc('mkt_product_runs_due')
+    if (marketingRuns.error) console.error('Marketing monthly runs failed', marketingRuns.error.code ?? 'unknown')
+    else if (marketingRuns.data) console.info('Marketing monthly runs made', marketingRuns.data)
+    // An Ads report's period over and not published (mig 20261026002000 — the user, asked: "can do"): told once, from
+    // 9:00 the office's time, to its owner and whoever keeps the report — then sent by the flush below. A count only.
+    const adsDue = await db.rpc('mkt_ads_due')
+    if (adsDue.error) console.error('Marketing Ads reports due failed', adsDue.error.code ?? 'unknown')
+    else if (adsDue.data) console.info('Marketing Ads reports due told', adsDue.data)
     // Whether each CRM ad is still running (mig 20261022120000): Ads Manager's effective_status, kept for the
     // phone's Assignment tabs (Running | Paused). Best effort — a count only.
     const adStatuses = await refreshAdStatuses(db, process.env.META_SYSTEM_USER_TOKEN?.trim())
@@ -61,6 +78,14 @@ export async function GET(request: Request) {
     else if (dataCenterBin.expired) console.info('Data center bin let go', dataCenterBin.expired, 'after 30 days; files deleted', dataCenterBin.deleted)
     // …and (2026-10-14) objects nobody recorded a day after they went up — an upload or a copy whose record never came.
     if (dataCenterBin?.orphans) console.info('Data center unrecorded objects removed', dataCenterBin.orphans)
+    // Marketing's Library Dustbin (mig 20261025004000 — the user: "60 days , auto clean"): what waited 60 days goes, its
+    // bytes' rows with it (the R2 sweep below takes the bytes), even when nobody touches the Library.
+    const marketingBin = await db.rpc('mkt_lib_purge')
+    if (marketingBin.error) console.error('Marketing Dustbin purge failed', marketingBin.error.code ?? 'unknown')
+    // The buckets in R2 (2026-10-23): a row whose file never arrived, a file no row names, a file sent ahead that no
+    // Server Action took (2026-10-23) — a day old. Counts only.
+    const files = await sweepFileObjects(db).catch(() => null)
+    if (files && (files.rowsWithoutFile || files.filesWithoutRow || files.stagedLeft)) console.info('R2 leftovers cleared', files)
     if (error || !data || !['complete', 'partial', 'skipped'].includes(data.status)) {
       // Log codes only. Never echo SQL errors, credentials or private rows.
       console.error('Member queue worker failed', error?.code ?? 'invalid_result')

@@ -71,6 +71,15 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
 /* Three figures side by side (a repayment's principal, interest, penalty). */
 .trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .trio > * { min-width: 0; }
+/* Two fields side by side in a wide dialog (Create payment, 2026-10-22: Pay to | the date, the bank |
+   the method); one above the other on a phone, at the form's 12px. */
+.pair { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.pair > * { min-width: 0; }
+.pair:empty { display: none; }
+@media (max-width: 767px) {
+  .pair { grid-template-columns: minmax(0, 1fr); }
+}
+:global([data-sheet]) .pair { grid-template-columns: minmax(0, 1fr); }
 
 /* Files: a white card of the chosen files, then a dashed *+ Add files*. */
 .files {

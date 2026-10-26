@@ -17,7 +17,7 @@ const F_OHANA_SALES = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
 const F_SENIOR = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3'
 
 const talent = (id: string, name: string, more: Partial<HiringTalent> = {}): HiringTalent => ({
-  id, no: 'T-001', name, phone: '', email: '', position: 'Sales Executive', department: 'Revenue', fromRequest: null, notes: '',
+  id, no: 'T-001', name, phone: '', email: '', position: 'Sales Executive', department: 'Revenue', fromRequest: null, notes: '', reason: null,
   files: [], savedBy: 'Grace Lim', savedAt: '2026-10-12T08:00:00Z', events: [], ...more,
 })
 
@@ -182,6 +182,14 @@ describe('search', () => {
     expect(searchBank('closer', tree).map(h => h.kind)).toEqual(['talent'])
     expect(searchBank('walk-in', tree).map(h => h.kind)).toEqual(['file'])
     expect(searchBank('  ', tree)).toEqual([])
+  })
+
+  // Why somebody is kept (2026-10-24), in HR's words — the list Form settings keeps (mig 20261025021500).
+  it('finds people by why they are kept, as HR’s list names it', () => {
+    const kept: BankTree = { ...tree, talents: tree.talents.map(t => (t.id === T_MEI ? { ...t, reason: 'r-salary' } : t)) }
+    const reasons = [{ id: 'r-salary', name: 'Salary too high', active: false, used: 1 }]
+    expect(searchBank('salary', kept, reasons).map(h => h.kind === 'talent' && h.talent.name)).toEqual(['Mei'])
+    expect(searchBank('salary', kept)).toEqual([])
   })
 })
 

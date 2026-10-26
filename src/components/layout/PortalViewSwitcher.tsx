@@ -32,6 +32,7 @@ function ViewSelect({ value, viewingAs, submit, onPerson }: { value: UserRole; v
       <option value="principal">Principal</option>
       <option value="finance">Finance view</option>
       <option value="hr">HR view</option>
+      <option value="marketing">Marketing view</option>
       <option value="revenue_member">Revenue View</option>
       {/* Lead View (2026-10-16): Customer Service's inbox — its own pages, not a mask. */}
       <option value="lead">Lead View</option>

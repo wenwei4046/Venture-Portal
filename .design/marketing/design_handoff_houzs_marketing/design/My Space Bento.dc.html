@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><style>
+@keyframes pIdle{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes pNew{0%,100%{transform:translateY(0)}40%{transform:translateY(-12px) scale(1.05)}}
+@keyframes pBusy{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes pOver{0%,100%{transform:translateX(-2px)}50%{transform:translateX(2px)}}
+@keyframes pSleep{0%,100%{transform:scale(1,0.93)}50%{transform:scale(1,1.02)}}
+@keyframes pEat{0%,100%{transform:scale(1,1)}50%{transform:scale(1.07,0.9)}}
+@keyframes pEx{0%,100%{transform:translateY(0) scale(1,1)}15%{transform:translateY(0) scale(1.1,0.85)}50%{transform:translateY(-18px) scale(0.95,1.05)}}
+@keyframes pLvl{0%{transform:rotateY(0) scale(1)}50%{transform:rotateY(180deg) scale(1.25)}100%{transform:rotateY(360deg) scale(1)}}
+@keyframes pHungry{0%,100%{transform:translateY(2px) rotate(-6deg)}50%{transform:translateY(3px) rotate(-2deg)}}
+@keyframes pBub{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes bnIn{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:none}}
+@keyframes bnWiggle{0%,100%{transform:rotate(-0.4deg)}50%{transform:rotate(0.4deg)}}
+</style></helmet>
+<div style="position:relative;display:flex;gap:16px;align-items:flex-start;color:rgb(51 36 27)">
+  <div style="flex:1;min-width:0;border-radius:18px;overflow:hidden;background:{{ pageBg }};border:1px solid rgb(236 231 224);transition:background .3s">
+
+    <sc-if value="{{ isVisiting }}">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:0.9em">
+        <span>👀 You're visiting {{ cover.name }}'s space</span><span style="flex:1"></span>
+        <span onClick="{{ goHome }}" style="padding:5px 12px;border-radius:7px;background:rgb(246 238 230);color:rgb(51 36 27);font-weight:500;cursor:pointer">← Back to mine</span>
+      </div>
+    </sc-if>
+
+    <div style="height:190px;position:relative;background:{{ cover.bg }}">
+      <sc-if value="{{ canEdit }}">
+        <div style="position:absolute;right:14px;top:14px;display:flex;gap:6px">
+          <span onClick="{{ toggleCoverPop }}" style="font-size:0.84em;padding:6px 10px;border-radius:8px;background:rgb(255 255 255 / 0.88);cursor:pointer" style-hover="background:#fff">🖼️ Change cover</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{ coverPop }}">
+        <div style="position:absolute;right:14px;top:50px;z-index:30;width:250px;padding:12px;border-radius:12px;background:#fff;border:1px solid rgb(229 222 211);box-shadow:0 12px 32px rgb(51 36 27 / 0.16);display:flex;flex-direction:column;gap:10px;animation:bnIn .15s ease-out">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+            <sc-for list="{{ coverOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.onClick }}" style="height:40px;border-radius:8px;background:{{ o.bg }};box-shadow:0 0 0 2px {{ o.ring }};cursor:pointer"></div></sc-for>
+          </div>
+          <div onClick="{{ pickCover }}" style="height:34px;border-radius:8px;border:1px dashed rgb(200 186 170);display:flex;align-items:center;justify-content:center;font-size:0.88em;cursor:pointer" style-hover="background:rgb(250 248 244)">⬆ Upload a cover image</div>
+        </div>
+      </sc-if>
+      <div onClick="{{ pickAvatar }}" title="{{ avatarTitle }}" style="position:absolute;left:28px;bottom:-44px;width:96px;height:96px;border-radius:50%;box-sizing:border-box;border:5px solid #fff;background:{{ cover.avBg }};display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:600;overflow:hidden;cursor:{{ avCursor }}">
+        <sc-if value="{{ cover.hasAvatar }}"><div style="width:100%;height:100%;background-image:{{ cover.avatarCss }};background-size:cover;background-position:center"></div></sc-if>
+        <sc-if value="{{ cover.noAvatar }}"><span>{{ cover.initial }}</span></sc-if>
+      </div>
+      <div style="position:absolute;left:112px;bottom:-40px">{{ coverPet }}</div>
+    </div>
+
+    <div style="padding:56px 28px 0;display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px">
+        <div style="font-size:1.6em;font-weight:600;letter-spacing:-0.01em">{{ cover.name }} <span style="font-size:0.56em;font-weight:400;color:rgb(117 100 86)">· {{ cover.role }}</span></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:0.94em;color:rgb(74 64 58);flex-wrap:wrap">
+          <sc-if value="{{ canEdit }}"><input value="{{ cover.status }}" onChange="{{ onStatus }}" placeholder="Set a status" style="border:none;border-bottom:1px dashed rgb(214 206 196);background:transparent;font:inherit;color:inherit;outline:none;padding:2px 0;min-width:0;width:320px" style-focus="border-bottom-color:rgb(176 140 104)"></sc-if>
+          <sc-if value="{{ isVisiting }}"><span>“{{ cover.status }}”</span></sc-if>
+          <span style="color:rgb(117 100 86)">· {{ cover.petLine }}</span>
+        </div>
+      </div>
+      <sc-if value="{{ canEdit }}" hint-placeholder-val="{{ true }}">
+        <div onClick="{{ openLayout }}" style="height:34px;display:flex;align-items:center;gap:6px;padding:0 12px;border-radius:8px;border:1px solid {{ layoutBtnBorder }};background:{{ layoutBtnBg }};color:{{ layoutBtnFg }};font-size:0.92em;font-weight:500;cursor:pointer;white-space:nowrap">✥ Edit layout</div>
+      </sc-if>
+      <sc-if value="{{ isVisiting }}">
+        <div onClick="{{ messageVisit }}" style="height:34px;display:flex;align-items:center;gap:6px;padding:0 14px;border-radius:8px;background:{{ accent }};color:{{ accentFg }};font-size:0.92em;font-weight:500;cursor:pointer;white-space:nowrap">💬 Message {{ cover.name }}</div>
+        <div onClick="{{ waveVisit }}" style="height:34px;display:flex;align-items:center;gap:6px;padding:0 12px;border-radius:8px;border:1px solid rgb(229 222 211);background:#fff;font-size:0.92em;cursor:pointer;white-space:nowrap">👋 Wave</div>
+      </sc-if>
+    </div>
+    <sc-if value="{{ canEdit }}" hint-placeholder-val="{{ true }}"><div style="padding:14px 28px 0;font-size:1em;color:rgb(74 64 58)">Good morning, {{ cover.name }} ☀️ <span style="color:rgb(117 100 86)">— {{ plateLine }}</span></div></sc-if>
+
+    <div style="padding:16px 16px 28px 28px"><div data-board="1" style="position:relative;height:{{ boardH }}px;transition:height .2s">
+      <sc-for list="{{ tiles }}" as="t" hint-placeholder-count="8">
+        <div data-tile="{{ t.id }}" style="position:absolute;left:{{ t.left }};top:{{ t.top }}px;width:{{ t.width }};height:{{ t.height }}px;z-index:{{ t.z }};box-sizing:border-box;transition:{{ t.tr }};border-radius:{{ radius }}px;background:{{ t.bg }};border:1px solid {{ t.border }};overflow:hidden;box-shadow:{{ t.shadow }};outline:{{ t.outline }};outline-offset:-2px;min-width:0">
+
+          <sc-if value="{{ t.isRoom }}">
+            <div data-room="1" style="position:absolute;inset:0;background:{{ t.room.wall }}">
+              <div style="position:absolute;left:7%;top:12%;width:{{ t.room.winW }}%;height:30%;border:6px solid {{ t.room.frame }};border-radius:4px;box-sizing:border-box;background:{{ t.room.sky }}"><span style="position:absolute;right:6px;top:4px;font-size:16px">{{ t.room.skyIcon }}</span></div>
+              <div style="position:absolute;left:0;right:0;bottom:0;height:30%;background:{{ t.room.floorBg }}"></div>
+              <div style="position:absolute;left:0;right:0;bottom:30%;height:6px;background:{{ t.room.base }}"></div>
+              <sc-for list="{{ t.room.items }}" as="f" hint-placeholder-count="5">
+                <div onPointerDown="{{ f.onDown }}" title="{{ f.label }}" style="position:absolute;left:{{ f.x }}%;bottom:{{ f.bottom }}%;transform:translateX(-50%);cursor:{{ f.cursor }};user-select:none;touch-action:none;z-index:{{ f.z }}">
+                  <span style="display:block;font-size:{{ f.size }}px;line-height:1;transform:scaleX({{ f.flip }});filter:drop-shadow(0 3px 0 rgb(0 0 0 / 0.12))">{{ f.emoji }}</span>
+                  <sc-if value="{{ f.selected }}"><div style="height:10px;border-radius:50%;border:2px dashed {{ accent }};margin-top:-4px"></div></sc-if>
+                </div>
+              </sc-for>
+              <div style="position:absolute;left:{{ t.room.petX }}%;bottom:9%;transform:translateX(-50%);transition:left 2.6s ease-in-out;z-index:50;pointer-events:none">{{ t.room.petNode }}</div>
+              <span style="position:absolute;left:12px;top:10px;font-size:0.8em;font-weight:600;padding:3px 9px;border-radius:999px;background:rgb(255 255 255 / 0.9)">🏠 {{ t.room.label }}</span>
+              <sc-if value="{{ t.room.canDecorate }}"><span onClick="{{ openRoom }}" style="position:absolute;right:12px;top:10px;font-size:0.8em;font-weight:500;padding:4px 10px;border-radius:999px;background:rgb(255 255 255 / 0.9);cursor:pointer" style-hover="background:#fff">🎨 Decorate</span></sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isPet }}">
+            <div style="position:absolute;inset:0;padding:10px 12px;display:flex;gap:8px;align-items:center">
+              <div style="width:52px;flex:none;display:flex;justify-content:center;align-items:flex-end;height:100%;padding-bottom:12px;box-sizing:border-box">{{ t.pet.node }}</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;font-size:0.84em">
+                <div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;font-size:1.1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.pet.name }}</span><span style="flex:1"></span><span style="flex:none;white-space:nowrap;font-size:0.9em;font-weight:600;padding:2px 7px;border-radius:999px;background:{{ accent }};color:{{ accentFg }}">Lv {{ t.pet.level }}</span></div>
+                <div style="height:6px;border-radius:3px;background:rgb(236 231 224);overflow:hidden" title="{{ t.pet.xpLabel }}"><div style="height:100%;width:{{ t.pet.xpPct }}%;background:{{ accent }};transition:width .4s"></div></div>
+                <div style="height:6px;border-radius:3px;background:rgb(236 231 224);overflow:hidden" title="Energy"><div style="height:100%;width:{{ t.pet.energy }}%;background:{{ t.pet.enColor }};transition:width .4s"></div></div>
+                <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgb(74 64 58)" title="{{ t.pet.stateLabel }}">{{ t.pet.stateEmoji }} {{ t.pet.stateLabel }}</div>
+                <sc-if value="{{ t.pet.canCare }}">
+                  <div style="display:flex;gap:6px">
+                    <span onClick="{{ feed }}" title="Feed" style="flex:1;min-width:0;height:28px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;white-space:nowrap" style-hover="border-color:rgb(176 140 104)">🍙 {{ t.pet.snacks }}</span>
+                    <span onClick="{{ exercise }}" title="{{ t.pet.exTitle }}" style="flex:1;min-width:0;height:28px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;white-space:nowrap" style-hover="border-color:rgb(176 140 104)">🏃</span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ t.pet.readOnly }}"><div style="color:rgb(117 100 86)">{{ t.pet.formLine }}</div></sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isTasks }}">
+            <div style="position:absolute;inset:0;padding:12px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:7px;flex:none">
+                <span style="font-size:14px">{{ t.tasks.emoji }}</span><span style="font-weight:600;font-size:0.96em;white-space:nowrap">{{ t.tasks.title }}</span>
+                <span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:{{ t.tasks.countBg }};color:{{ t.tasks.countFg }};font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ t.tasks.count }}</span>
+              </div>
+              <sc-if value="{{ t.tasks.isEmpty }}"><div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:0.86em;color:rgb(117 100 86);border:1px dashed rgb(229 222 211);border-radius:10px">Nothing here right now</div></sc-if>
+              <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:grid;grid-template-columns:{{ t.tasks.cols }};align-content:start;gap:8px">
+                <sc-for list="{{ t.tasks.cards }}" as="c" hint-placeholder-count="2">
+                  <div style="background:{{ c.bg }};border:1px solid {{ c.border }};border-radius:10px;padding:9px 10px;display:flex;flex-direction:column;gap:6px;min-width:0">
+                    <div onClick="{{ c.onOpen }}" style="font-weight:600;font-size:0.92em;line-height:1.25;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" style-hover="text-decoration:underline">{{ c.title }}</div>
+                    <div style="display:flex;align-items:center;gap:6px;font-size:0.78em;color:rgb(74 64 58);white-space:nowrap;overflow:hidden">
+                      <span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ c.subDot }}"></span><span style="overflow:hidden;text-overflow:ellipsis">{{ c.metaLine }}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span style="display:flex;align-items:center;gap:5px;font-size:0.76em;font-weight:500;padding:2px 7px;border-radius:999px;background:{{ c.stBg }};color:{{ c.stFg }};border:1px solid {{ c.stBorder }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ c.stDot }}"></span>{{ c.label }}</span>
+                      <span style="flex:1"></span>
+                      <sc-if value="{{ c.isAccept }}"><span onClick="{{ c.onAccept }}" style="flex:none;font-size:0.78em;font-weight:600;padding:4px 10px;border-radius:6px;background:{{ accent }};color:{{ accentFg }};cursor:pointer">Accept</span></sc-if>
+                      <sc-if value="{{ c.isOpen }}"><span onClick="{{ c.onOpen }}" style="flex:none;font-size:0.78em;font-weight:500;padding:4px 10px;border-radius:6px;border:1px solid rgb(229 222 211);background:#fff;cursor:pointer">Open</span></sc-if>
+                      <sc-if value="{{ c.isReview }}"><span onClick="{{ c.onReview }}" style="flex:none;font-size:0.78em;font-weight:600;padding:4px 10px;border-radius:6px;background:{{ accent }};color:{{ accentFg }};cursor:pointer">Review</span></sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isChat }}">
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column">
+              <div style="display:flex;gap:2px;padding:3px;margin:8px 10px 0;background:rgb(246 244 240);border-radius:8px;flex:none">
+                <sc-for list="{{ chatTabs }}" as="o" hint-placeholder-count="2">
+                  <div onClick="{{ o.onClick }}" style="flex:1;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:0.8em;cursor:pointer;white-space:nowrap;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }}">{{ o.label }}<sc-if value="{{ o.unread }}"><span style="width:7px;height:7px;border-radius:50%;background:rgb(200 52 42)"></span></sc-if></div>
+                </sc-for>
+              </div>
+
+              <sc-if value="{{ showDmList }}">
+                <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:6px;display:flex;flex-direction:column;gap:2px">
+                  <sc-for list="{{ dmList }}" as="p" hint-placeholder-count="5">
+                    <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:9px;padding:7px 6px;border-radius:9px;cursor:pointer;min-width:0" style-hover="background:rgb(250 248 244)">
+                      <span style="position:relative;width:30px;height:30px;flex:none;border-radius:50%;background:{{ p.avBg }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">{{ p.initial }}<sc-if value="{{ p.unread }}"><span style="position:absolute;right:-1px;top:-1px;width:9px;height:9px;border-radius:50%;background:rgb(200 52 42);border:1.5px solid #fff"></span></sc-if></span>
+                      <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:baseline;gap:6px"><span style="flex:1;min-width:0;font-size:0.86em;font-weight:{{ p.weight }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</span><span style="font-size:0.7em;color:rgb(117 100 86);flex:none">{{ p.time }}</span></div>
+                        <div style="font-size:0.78em;color:{{ p.previewFg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.preview }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ showConvo }}">
+                <sc-if value="{{ isDmConvo }}">
+                  <div style="display:flex;align-items:center;gap:8px;padding:8px 10px 0;flex:none;min-width:0">
+                    <span onClick="{{ backToList }}" title="All chats" style="width:24px;height:24px;flex:none;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(74 64 58)" style-hover="background:rgb(241 236 228)">←</span>
+                    <span style="width:22px;height:22px;flex:none;border-radius:50%;background:{{ convo.avBg }};display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600">{{ convo.initial }}</span>
+                    <span style="font-weight:600;font-size:0.86em;white-space:nowrap">{{ convo.name }}</span>
+                    <span style="font-size:0.74em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ convo.role }}</span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ isLobbyConvo }}"><div style="padding:8px 12px 0;font-size:0.76em;color:rgb(117 100 86);flex:none">Everyone on the team sees this</div></sc-if>
+                <div ref="{{ msgRef }}" style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;padding:8px 12px;display:flex;flex-direction:column;gap:8px">
+                  <sc-if value="{{ threadEmpty }}"><div style="margin:auto;font-size:0.84em;color:rgb(117 100 86);text-align:center">Say hi or attach a task</div></sc-if>
+                  <sc-for list="{{ msgs }}" as="m" hint-placeholder-count="3">
+                    <div style="display:flex;flex-direction:column;gap:3px;align-items:{{ m.align }}">
+                      <span style="font-size:10px;color:rgb(117 100 86)">{{ m.meta }}</span>
+                      <sc-if value="{{ m.hasText }}"><div style="max-width:92%;box-sizing:border-box;overflow-wrap:anywhere;padding:6px 9px;border-radius:10px;background:{{ m.bg }};color:{{ m.fg }};font-size:0.84em;line-height:1.35;text-wrap:pretty">{{ m.text }}</div></sc-if>
+                      <sc-if value="{{ m.hasTask }}"><div onClick="{{ m.openTask }}" style="max-width:92%;min-width:0;overflow-wrap:anywhere;padding:7px 9px;border-radius:9px;border:1px solid rgb(229 222 211);background:#fff;cursor:pointer;box-sizing:border-box" style-hover="border-color:rgb(176 140 104)"><div style="font-family:'Chivo Mono',Menlo,monospace;font-size:9.5px;color:rgb(117 100 86)">📎 {{ m.task.id }}</div><div style="font-weight:600;font-size:0.84em;margin-top:2px">{{ m.task.title }}</div></div></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+                <sc-if value="{{ attachOpen }}">
+                  <div style="border-top:1px solid rgb(240 236 230);max-height:140px;overflow-y:auto;overflow-x:hidden;padding:4px;background:rgb(252 251 249);flex:none">
+                    <sc-for list="{{ attachList }}" as="a" hint-placeholder-count="3"><div onClick="{{ a.onPick }}" style="padding:6px 8px;border-radius:7px;cursor:pointer;font-size:0.82em" style-hover="background:rgb(241 236 228)"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.title }}</div><div style="font-family:'Chivo Mono',Menlo,monospace;font-size:9.5px;color:rgb(117 100 86)">{{ a.id }}</div></div></sc-for>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ hasPending }}"><div style="margin:6px 10px 0;padding:5px 8px;border-radius:7px;background:rgb(250 248 244);border:1px solid rgb(236 231 224);font-size:0.78em;display:flex;gap:6px;flex:none"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📎 {{ pendingTitle }}</span><span onClick="{{ clearPending }}" style="cursor:pointer;color:rgb(117 100 86)">✕</span></div></sc-if>
+                <div style="display:flex;gap:5px;padding:8px 10px;flex:none">
+                  <span onClick="{{ toggleAttach }}" title="Attach a task" style="width:30px;height:30px;flex:none;border-radius:7px;border:1px solid rgb(229 222 211);background:{{ attachBg }};display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px">📎</span>
+                  <input value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onKey }}" placeholder="Message {{ threadShort }}" style="flex:1;min-width:0;height:30px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:7px;padding:0 8px;font:inherit;font-size:0.86em;outline:none;background:#fff;color:rgb(51 36 27)" style-focus="border-color:rgb(176 140 104)">
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isLobby }}">
+            <div style="position:absolute;inset:0;background:#efe6d8">
+              <div style="position:absolute;left:0;right:0;bottom:0;height:42%;background:repeating-linear-gradient(90deg,#e9dfcf 0 40px,#e1d4c0 40px 42px)"></div>
+              <span style="position:absolute;left:12px;top:10px;font-size:0.8em;font-weight:600;padding:3px 9px;border-radius:999px;background:rgb(255 255 255 / 0.9)">🏛️ Lobby · {{ lobbyCount }}</span>
+              <sc-for list="{{ lobbyPets }}" as="p" hint-placeholder-count="6">
+                <div onClick="{{ p.onClick }}" title="{{ p.title }}" style="position:absolute;left:{{ p.x }}%;bottom:{{ p.y }}%;transform:translateX(-50%);transition:left 2.6s ease-in-out;cursor:pointer;display:flex;flex-direction:column;align-items:center;z-index:{{ p.z }}">
+                  <sc-if value="{{ p.hasSay }}"><span style="max-width:140px;margin-bottom:4px;padding:4px 8px;border-radius:10px;background:#fff;box-shadow:0 2px 6px rgb(51 36 27 / 0.15);font-size:10.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.say }}</span></sc-if>
+                  {{ p.node }}
+                  <span style="font-size:9.5px;font-weight:600;padding:1px 6px;border-radius:999px;background:rgb(255 255 255 / 0.92);white-space:nowrap;margin-top:2px">{{ p.name }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isTrophies }}">
+            <div style="position:absolute;inset:0;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-weight:600;font-size:0.96em">🏆 Trophies</div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;font-size:26px;line-height:1.1"><sc-for list="{{ t.trophies.got }}" as="x" hint-placeholder-count="3"><span>{{ x }}</span></sc-for><sc-for list="{{ t.trophies.locked }}" as="x" hint-placeholder-count="2"><span style="opacity:0.25;filter:grayscale(1)">{{ x }}</span></sc-for></div>
+              <div style="font-size:0.8em;color:rgb(117 100 86);margin-top:auto">{{ t.trophies.line }}</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isWeek }}">
+            <div style="position:absolute;inset:0;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-weight:600;font-size:0.96em">🗓️ This week</div>
+              <sc-if value="{{ weekEmpty }}"><div style="font-size:0.84em;color:rgb(117 100 86)">No due dates this week</div></sc-if>
+              <sc-for list="{{ weekRows }}" as="w" hint-placeholder-count="3">
+                <div onClick="{{ w.onOpen }}" style="display:flex;gap:8px;align-items:baseline;font-size:0.84em;cursor:pointer;min-width:0" style-hover="text-decoration:underline">
+                  <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:{{ w.fg }};white-space:nowrap;width:46px;flex:none">{{ w.when }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.title }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isNotes }}">
+            <div style="position:absolute;inset:0;padding:12px 14px;display:flex;flex-direction:column;gap:6px;background:rgb(255 249 222)">
+              <div style="font-weight:600;font-size:0.96em">📝 Notes</div>
+              <textarea value="{{ t.notes.text }}" onChange="{{ onNotes }}" readOnly="{{ t.notes.ro }}" placeholder="Jot something down" style="flex:1;border:none;background:transparent;font:inherit;font-size:0.88em;line-height:1.5;color:rgb(51 36 27);outline:none;resize:none;padding:0"></textarea>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.isPhoto }}">
+            <div onClick="{{ pickPhoto }}" style="position:absolute;inset:0;background:{{ t.photo.bg }};background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <sc-if value="{{ t.photo.empty }}"><span style="font-size:0.86em;color:rgb(117 100 86);padding:8px 12px;border-radius:8px;border:1px dashed rgb(200 186 170)">🖼️ Add a photo</span></sc-if>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ t.editing }}">
+            <div onPointerDown="{{ t.onMove }}" style="position:absolute;inset:0;background:rgb(255 255 255 / 0.35);z-index:80;cursor:{{ t.moveCursor }};touch-action:none"></div>
+            <span style="position:absolute;left:14px;top:12px;z-index:81;width:26px;height:26px;border-radius:7px;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 0.15);display:flex;align-items:center;justify-content:center;font-size:13px;color:rgb(90 62 43);pointer-events:none">✥</span>
+            <div style="position:absolute;right:16px;top:12px;z-index:85;display:flex;gap:4px">
+              <sc-if value="{{ t.removable }}"><span onClick="{{ t.onRemove }}" onPointerDown="{{ stopEvt }}" title="Remove tile" style="width:26px;height:26px;border-radius:7px;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 0.15);display:flex;align-items:center;justify-content:center;font-size:12px;color:rgb(176 40 34);cursor:pointer">✕</span></sc-if>
+              <sc-if value="{{ t.locked }}"><span title="Always on your space" style="width:26px;height:26px;border-radius:7px;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 0.15);display:flex;align-items:center;justify-content:center;font-size:11px">🔒</span></sc-if>
+            </div>
+            <span style="position:absolute;left:16px;bottom:12px;z-index:81;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 0.15);pointer-events:none">{{ t.name }}</span>
+            <sc-for list="{{ t.handles }}" as="hd" hint-placeholder-count="8">
+              <div onPointerDown="{{ hd.onDown }}" style="position:absolute;left:{{ hd.l }};right:{{ hd.r }};top:{{ hd.t }};bottom:{{ hd.b }};width:{{ hd.w }};height:{{ hd.h }};z-index:84;cursor:{{ hd.cursor }};display:flex;align-items:center;justify-content:center;touch-action:none"><span style="width:{{ hd.bw }}px;height:{{ hd.bh }}px;border-radius:3px;background:{{ accent }};box-shadow:0 0 0 2px #fff"></span></div>
+            </sc-for>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div></div>
+  </div>
+
+  <sc-if value="{{ drawerOpen }}">
+    <div style="width:290px;flex:none;position:sticky;top:12px;border-radius:16px;border:1px solid rgb(236 231 224);background:#fff;box-shadow:0 12px 32px rgb(51 36 27 / 0.08);padding:16px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px;animation:bnIn .18s ease-out;max-height:calc(100vh - 40px);overflow:auto">
+      <div style="display:flex;gap:2px;padding:3px;background:rgb(246 244 240);border-radius:9px">
+        <sc-for list="{{ drawerTabs }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="flex:1;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.9em;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }}">{{ o.label }}</div></sc-for>
+      </div>
+
+      <sc-if value="{{ tabLayout }}" hint-placeholder-val="{{ true }}">
+        <div style="font-size:0.84em;color:rgb(117 100 86);line-height:1.45;margin-top:-6px">Drag a tile anywhere to move it. Drag any edge or corner to resize it freely. My turn and Waiting stay on, so nobody hides their work.</div>
+        <div>
+          <div style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Add a tile</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px">
+            <sc-for list="{{ addable }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.onClick }}" style="padding:9px 8px;border-radius:8px;border:1px solid rgb(236 231 224);background:#fff;font-size:0.86em;cursor:pointer;display:flex;gap:6px;align-items:center" style-hover="border-color:rgb(176 140 104);background:rgb(250 248 244)"><span>{{ o.emoji }}</span>{{ o.label }}</div></sc-for>
+          </div>
+          <sc-if value="{{ noAddable }}"><div style="font-size:0.84em;color:rgb(117 100 86);margin-top:8px">Every tile is already on your space.</div></sc-if>
+        </div>
+        <div>
+          <div style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Page background</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><sc-for list="{{ bgOpts }}" as="o" hint-placeholder-count="5"><div onClick="{{ o.onClick }}" title="{{ o.label }}" style="width:34px;height:34px;border-radius:8px;box-sizing:border-box;background:{{ o.bg }};border:2px solid {{ o.ring }};box-shadow:0 0 0 1px rgb(229 222 211);cursor:pointer"></div></sc-for></div>
+        </div>
+        <div>
+          <div style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Accent</div>
+          <div style="display:flex;gap:8px;margin-top:8px"><sc-for list="{{ accentOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.onClick }}" style="width:26px;height:26px;border-radius:50%;background:{{ o.c }};outline:{{ o.outline }};outline-offset:2px;cursor:pointer"></div></sc-for></div>
+        </div>
+        <div>
+          <div style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Tile corners</div>
+          <div style="display:flex;gap:2px;padding:3px;background:rgb(246 244 240);border-radius:8px;margin-top:8px"><sc-for list="{{ cornerOpts }}" as="o" hint-placeholder-count="3"><div onClick="{{ o.onClick }}" style="flex:1;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.86em;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }}">{{ o.label }}</div></sc-for></div>
+        </div>
+        <div onClick="{{ resetLayout }}" style="font-size:0.86em;color:rgb(117 100 86);cursor:pointer;text-decoration:underline;text-underline-offset:3px">Reset layout and theme</div>
+      </sc-if>
+
+      <sc-if value="{{ tabRoom }}">
+        <div style="font-size:0.84em;color:rgb(117 100 86);line-height:1.45;margin-top:-6px">Drag furniture left or right in the room. Wall items hang higher up.</div>
+        <sc-for list="{{ roomSwatches }}" as="sg" hint-placeholder-count="2">
+          <div>
+            <div style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">{{ sg.label }}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><sc-for list="{{ sg.opts }}" as="o" hint-placeholder-count="5"><div onClick="{{ o.onClick }}" title="{{ o.label }}" style="width:34px;height:34px;border-radius:8px;box-sizing:border-box;background:{{ o.bg }};border:2px solid {{ o.ring }};box-shadow:0 0 0 1px rgb(229 222 211);cursor:pointer"></div></sc-for></div>
+          </div>
+        </sc-for>
+        <div>
+          <div style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Add furniture</div>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:8px">
+            <sc-for list="{{ catalog }}" as="o" hint-placeholder-count="16"><div onClick="{{ o.onClick }}" title="Add {{ o.label }}" style="padding:6px 2px;border-radius:8px;border:1px solid rgb(236 231 224);background:#fff;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer" style-hover="border-color:rgb(176 140 104);background:rgb(250 248 244)"><span style="font-size:20px;line-height:1.2">{{ o.emoji }}</span><span style="font-size:10px;color:rgb(117 100 86);white-space:nowrap">{{ o.label }}</span></div></sc-for>
+          </div>
+        </div>
+        <sc-if value="{{ hasSel }}">
+          <div style="padding:10px 12px;border-radius:10px;background:rgb(250 248 244);border:1px solid rgb(240 236 230);display:flex;align-items:center;gap:8px">
+            <span style="font-size:20px">{{ selEmoji }}</span><span style="flex:1;font-weight:500;font-size:0.9em">{{ selLabel }}</span>
+            <span onClick="{{ flipSel }}" style="height:28px;padding:0 9px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;font-size:0.82em;cursor:pointer">⇋ Flip</span>
+            <span onClick="{{ removeSel }}" style="height:28px;padding:0 9px;border-radius:7px;border:1px solid rgb(236 190 184);background:#fff;color:rgb(176 40 34);display:flex;align-items:center;font-size:0.82em;cursor:pointer">Remove</span>
+          </div>
+        </sc-if>
+        <div>
+          <div style="font-size:0.74em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Your pet</div>
+          <input value="{{ petName }}" onChange="{{ onPetName }}" style="margin-top:8px;width:100%;height:34px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;outline:none;background:#fff;color:rgb(51 36 27)" style-focus="border-color:rgb(176 140 104)">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><sc-for list="{{ speciesOpts }}" as="o" hint-placeholder-count="4"><span onClick="{{ o.onClick }}" style="height:30px;padding:0 10px;border-radius:999px;display:flex;align-items:center;gap:5px;font-size:0.86em;cursor:pointer;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.emoji }} {{ o.label }}</span></sc-for></div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <div onClick="{{ pickPet }}" style="flex:1;height:34px;border-radius:8px;border:1px dashed rgb(200 186 170);display:flex;align-items:center;justify-content:center;font-size:0.86em;cursor:pointer" style-hover="background:rgb(250 248 244)">⬆ Upload your animal</div>
+            <sc-if value="{{ hasPetImg }}"><div onClick="{{ clearPetImg }}" style="height:34px;padding:0 10px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-size:0.84em;cursor:pointer;color:rgb(117 100 86)">Remove</div></sc-if>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:10px">
+            <sc-for list="{{ forms }}" as="f" hint-placeholder-count="3"><div style="padding:6px 2px;border-radius:9px;border:1.5px solid {{ f.border }};display:flex;flex-direction:column;align-items:center;gap:1px;opacity:{{ f.op }}"><span style="font-size:20px">{{ f.emoji }}</span><span style="font-size:10px;font-weight:600">{{ f.name }}</span><span style="font-size:9.5px;color:rgb(117 100 86)">{{ f.lv }}</span></div></sc-for>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><sc-for list="{{ colorChips }}" as="o" hint-placeholder-count="7"><span onClick="{{ o.onClick }}" title="{{ o.label }}" style="width:24px;height:24px;border-radius:50%;background:{{ o.swatch }};cursor:pointer;box-shadow:0 0 0 {{ o.ringW }}px #fff, 0 0 0 {{ o.ringW2 }}px rgb(51 36 27), inset 0 0 0 1px rgb(0 0 0 / 0.08)"></span></sc-for></div>
+          <div onClick="{{ redoSetup }}" style="font-size:0.82em;color:rgb(117 100 86);cursor:pointer;text-decoration:underline;text-underline-offset:3px;margin-top:10px">Redo pet setup</div>
+          <div style="font-size:0.78em;color:rgb(117 100 86);line-height:1.45;margin-top:8px">XP = stages × difficulty (S 1, M 2, L 3) × 10 for each finished task. It evolves at Lv 3 and Lv 5.</div>
+        </div>
+      </sc-if>
+
+      <div onClick="{{ closeDrawer }}" style="height:38px;flex:none;border-radius:9px;background:{{ accent }};color:{{ accentFg }};display:flex;align-items:center;justify-content:center;font-weight:600;cursor:pointer">Done</div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showOnboard }}">
+    <div style="position:fixed;inset:0;z-index:9500;background:rgb(51 36 27 / 0.45);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box">
+      <div style="width:620px;max-width:100%;max-height:100%;overflow:auto;background:#fff;border-radius:20px;box-shadow:0 24px 64px rgb(51 36 27 / 0.3);padding:28px 32px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px;animation:bnIn .25s ease-out">
+        <div style="display:flex;align-items:center;gap:6px">
+          <sc-for list="{{ obSteps }}" as="s" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+              <span style="width:24px;height:24px;flex:none;border-radius:50%;box-sizing:border-box;border:1.5px solid {{ s.ring }};background:{{ s.bg }};color:{{ s.fg }};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600">{{ s.mark }}</span>
+              <span style="font-size:0.8em;font-weight:{{ s.weight }};color:{{ s.color }};white-space:nowrap">{{ s.label }}</span>
+              <sc-if value="{{ s.hasLine }}"><span style="flex:1;height:1.5px;background:{{ s.line }};min-width:8px"></span></sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div>
+          <div style="font-size:1.5em;font-weight:600;letter-spacing:-0.01em">{{ ob.title }}</div>
+          <div style="font-size:0.94em;color:rgb(117 100 86);margin-top:4px;line-height:1.5">{{ ob.sub }}</div>
+        </div>
+
+        <sc-if value="{{ ob.isSpecies }}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px">
+            <sc-for list="{{ obSpecies }}" as="o" hint-placeholder-count="4">
+              <div onClick="{{ o.onClick }}" style="padding:16px 8px 12px;border-radius:14px;border:2px solid {{ o.border }};background:{{ o.bg }};display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer" style-hover="border-color:rgb(176 140 104)">
+                <span style="font-size:48px;line-height:1">{{ o.emoji }}</span>
+                <span style="font-weight:600">{{ o.label }}</span>
+                <span style="font-size:0.78em;color:rgb(117 100 86);letter-spacing:0.04em">{{ o.evo }}</span>
+              </div>
+            </sc-for>
+            <div onClick="{{ obUpload }}" style="padding:16px 8px 12px;border-radius:14px;border:2px dashed {{ obUploadBorder }};background:{{ obUploadBg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;text-align:center" style-hover="border-color:rgb(176 140 104)">
+              <span style="font-size:30px;line-height:1">⬆</span><span style="font-weight:600;font-size:0.92em">My own animal</span><span style="font-size:0.76em;color:rgb(117 100 86)">Upload a picture</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ ob.showPreview }}">
+          <div style="height:150px;border-radius:16px;background:linear-gradient(#f3dcc8 0 66%,#e9cfa8 66%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:18px;box-sizing:border-box">{{ obPreview }}</div>
+        </sc-if>
+
+        <sc-if value="{{ ob.isName }}">
+          <input value="{{ ob.name }}" onChange="{{ obOnName }}" placeholder="Give your pet a name" style="height:44px;box-sizing:border-box;border:1.5px solid rgb(229 222 211);border-radius:10px;padding:0 14px;font:inherit;font-size:1.05em;outline:none;background:#fff;color:rgb(51 36 27)" style-focus="border-color:rgb(176 140 104)">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:-8px"><sc-for list="{{ obNameIdeas }}" as="o" hint-placeholder-count="6"><span onClick="{{ o.onClick }}" style="height:30px;padding:0 12px;border-radius:999px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-size:0.88em;cursor:pointer" style-hover="background:rgb(250 248 244)">{{ o.label }}</span></sc-for></div>
+        </sc-if>
+
+        <sc-if value="{{ ob.isColor }}">
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <sc-for list="{{ obColors }}" as="o" hint-placeholder-count="7">
+              <div onClick="{{ o.onClick }}" style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;width:68px">
+                <span style="width:48px;height:48px;border-radius:50%;background:{{ o.swatch }};box-shadow:0 0 0 {{ o.ringW }}px #fff, 0 0 0 {{ o.ringW2 }}px rgb(51 36 27), inset 0 0 0 1px rgb(0 0 0 / 0.08)"></span>
+                <span style="font-size:0.82em;font-weight:{{ o.weight }}">{{ o.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ ob.colorMissing }}"><div style="font-size:0.86em;color:rgb(176 40 34)">Pick a colour to continue. This one is required.</div></sc-if>
+        </sc-if>
+
+        <sc-if value="{{ ob.isCover }}">
+          <div style="height:110px;border-radius:14px;background:{{ obCoverBg }};position:relative">
+            <div style="position:absolute;left:20px;bottom:-22px;width:60px;height:60px;border-radius:50%;border:4px solid #fff;box-sizing:border-box;background:{{ cover.avBg }};display:flex;align-items:center;justify-content:center;font-weight:600;font-size:20px">{{ cover.initial }}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px">
+            <sc-for list="{{ coverOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.onClick }}" style="height:52px;border-radius:10px;background:{{ o.bg }};box-shadow:0 0 0 2px {{ o.ring }};cursor:pointer"></div></sc-for>
+          </div>
+          <div onClick="{{ pickCover }}" style="height:38px;border-radius:9px;border:1px dashed rgb(200 186 170);display:flex;align-items:center;justify-content:center;font-size:0.9em;cursor:pointer" style-hover="background:rgb(250 248 244)">⬆ Upload your own cover image</div>
+        </sc-if>
+
+        <sc-if value="{{ ob.isAvatar }}">
+          <div style="display:flex;align-items:center;gap:20px">
+            <div onClick="{{ pickAvatarOb }}" style="width:110px;height:110px;flex:none;border-radius:50%;overflow:hidden;background:{{ cover.avBg }};display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:600;cursor:pointer;box-shadow:0 0 0 1px rgb(229 222 211)">
+              <sc-if value="{{ cover.hasAvatar }}"><div style="width:100%;height:100%;background-image:{{ cover.avatarCss }};background-size:cover;background-position:center"></div></sc-if>
+              <sc-if value="{{ cover.noAvatar }}"><span>{{ cover.initial }}</span></sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div onClick="{{ pickAvatarOb }}" style="height:38px;padding:0 16px;border-radius:9px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-size:0.92em;font-weight:500;cursor:pointer" style-hover="background:rgb(250 248 244)">⬆ Upload a photo</div>
+              <span style="font-size:0.84em;color:rgb(117 100 86)">Teammates see this in chat and in the lobby.</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+          <sc-if value="{{ ob.canBack }}"><span onClick="{{ obBack }}" style="height:40px;padding:0 14px;border-radius:9px;display:flex;align-items:center;cursor:pointer;color:rgb(74 64 58)" style-hover="background:rgb(246 246 244)">← Back</span></sc-if>
+          <span style="flex:1"></span>
+          <sc-if value="{{ ob.canSkip }}"><span onClick="{{ obSkip }}" style="height:40px;padding:0 14px;border-radius:9px;display:flex;align-items:center;cursor:pointer;color:rgb(117 100 86)" style-hover="background:rgb(246 246 244)">Skip</span></sc-if>
+          <span onClick="{{ obNext }}" style="height:40px;padding:0 20px;border-radius:9px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:600;cursor:{{ ob.cursor }};opacity:{{ ob.op }}">{{ ob.cta }}</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ hasToast }}"><div style="position:fixed;left:50%;bottom:80px;transform:translateX(-50%);z-index:9000;padding:8px 16px;border-radius:999px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:0.9em;font-weight:500;box-shadow:0 8px 24px rgb(51 36 27 / 0.25);animation:bnIn .2s ease-out">{{ toast }}</div></sc-if>
+  <input type="file" accept="image/*" ref="{{ fileRef }}" onChange="{{ onFile }}" style="display:none">
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:1100},&quot;user&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;rachel&quot;,&quot;mei&quot;,&quot;ali&quot;,&quot;jason&quot;,&quot;siti&quot;,&quot;weilun&quot;],&quot;default&quot;:&quot;rachel&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;plate&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:2,&quot;min&quot;:0,&quot;max&quot;:8,&quot;tsType&quot;:&quot;number&quot;},&quot;red&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:0,&quot;min&quot;:0,&quot;max&quot;:5,&quot;tsType&quot;:&quot;number&quot;},&quot;fresh&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;plateLine&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;you have 2 things on your plate&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;columns&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;any[]&quot;},&quot;onOpenTask&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(id: string) =&gt; void&quot;}}">
+const SPECIES = {
+  cat: { label: 'Cat', forms: ['🐱', '🐈', '🦁'], names: ['Kitten', 'Cat', 'Lion'] },
+  dog: { label: 'Dog', forms: ['🐶', '🐕', '🐺'], names: ['Puppy', 'Dog', 'Wolf'] },
+  bird: { label: 'Bird', forms: ['🐣', '🐦', '🦅'], names: ['Chick', 'Bird', 'Eagle'] },
+  dragon: { label: 'Dragon', forms: ['🥚', '🦎', '🐉'], names: ['Egg', 'Lizard', 'Dragon'] },
+};
+const LEVELS = [0, 100, 250, 450, 700, 1000], SIZE = [30, 34, 38, 42, 46, 52];
+const STATES = {
+  idle: ['Chilling', 'pIdle 2.4s ease-in-out infinite', ''], newTask: ['New task!', 'pNew .6s ease-in-out infinite', '❗'],
+  busy: ['Working', 'pBusy .4s ease-in-out infinite', '💻'], overload: ['Overloaded', 'pOver .16s linear infinite', '💦'],
+  sleeping: ['Sleeping', 'pSleep 3s ease-in-out infinite', '💤'], eating: ['Eating', 'pEat .3s ease-in-out infinite', '🍙'],
+  exercising: ['Working out', 'pEx .55s ease-in-out infinite', '💪'], levelUp: ['Level up!', 'pLvl 1s ease-in-out infinite', '✨'],
+  hungry: ['Hungry', 'pHungry 2s ease-in-out infinite', '🍽️'],
+};
+const CATALOG = {
+  bed: ['🛏️', 'Bed', 64, 0], sofa: ['🛋️', 'Sofa', 58, 0], plant: ['🪴', 'Plant', 46, 0], desk: ['🖥️', 'Computer', 48, 0],
+  chair: ['🪑', 'Chair', 42, 0], books: ['📚', 'Books', 34, 0], teddy: ['🧸', 'Teddy', 36, 0], guitar: ['🎸', 'Guitar', 46, 0],
+  cactus: ['🌵', 'Cactus', 40, 0], tv: ['📺', 'TV', 48, 0], candle: ['🕯️', 'Candle', 30, 0], game: ['🕹️', 'Arcade', 38, 0],
+  tree: ['🎄', 'Tree', 56, 0], frame: ['🖼️', 'Art', 36, 1], clock: ['🕰️', 'Clock', 32, 1], trophy: ['🏆', 'Trophy', 28, 1],
+};
+const WALLS = { peach: ['#f3dcc8', 'Peach'], sage: ['#dfe6d3', 'Sage'], sky: ['#d9e6f0', 'Sky'], blush: ['#f1d9df', 'Blush'], cream: ['#efe6d8', 'Cream'], night: ['#2f2b3d', 'Night'] };
+const FLOORS = { oak: ['#e9cfa8', '#dcbd92', 'Oak'], walnut: ['#b98a62', '#a57650', 'Walnut'], tile: ['#f2efe9', '#e0d9cd', 'Tile'], grass: ['#cfe3b5', '#b9d49c', 'Grass'], carpet: ['#d9cfe6', '#c8bcda', 'Carpet'] };
+const COVERS = [
+  'linear-gradient(135deg,oklch(0.86 0.07 60),oklch(0.84 0.07 20) 50%,oklch(0.82 0.06 330))',
+  'linear-gradient(135deg,oklch(0.87 0.06 200),oklch(0.84 0.07 160))',
+  'linear-gradient(135deg,oklch(0.38 0.06 280),oklch(0.52 0.09 320))',
+  'linear-gradient(135deg,oklch(0.92 0.06 95),oklch(0.85 0.08 55))',
+];
+const BGS = { linen: ['#f6f4f0', 'Linen'], mint: ['#eef6f1', 'Mint'], lilac: ['#f3f0f8', 'Lilac'], sand: ['#f4e9da', 'Sand'], white: ['#ffffff', 'White'] };
+const ACCENTS = ['#EC9B55', 'rgb(90 62 43)', 'oklch(0.52 0.12 235)', 'oklch(0.52 0.13 150)', 'oklch(0.55 0.15 350)'];
+const CORNERS = { square: [6, 'Square'], soft: [14, 'Soft'], round: [24, 'Round'] };
+const TILE = {
+  room: ['🏠', 'Room', [2, 2]], pet: ['🐾', 'Pet', [1, 1]], turn: ['👉', 'My turn', [1, 2]], waiting: ['⏳', 'Waiting', [1, 1]],
+  delegated: ['📤', 'Delegated', [1, 1]], chat: ['💬', 'Chat', [1, 2]], lobby: ['🏛️', 'Lobby', [2, 1]], trophies: ['🏆', 'Trophies', [1, 1]],
+  week: ['🗓️', 'This week', [1, 1]], notes: ['📝', 'Notes', [1, 1]], photo: ['🖼️', 'Photo', [1, 1]],
+};
+const LOCKED = ['turn', 'waiting'];
+const COLORS = {
+  original: ['Original', 'none', 'linear-gradient(135deg,#f2c48d,#d99a5b)'], cocoa: ['Cocoa', 'sepia(0.7) saturate(1.3) brightness(0.75)', 'linear-gradient(135deg,#9a6a48,#5e3b25)'],
+  snow: ['Snow', 'grayscale(1) brightness(1.3)', 'linear-gradient(135deg,#ffffff,#d9d9d9)'], rose: ['Rose', 'hue-rotate(300deg) saturate(1.3)', 'linear-gradient(135deg,#f6b6cf,#e07aa3)'],
+  mint: ['Mint', 'hue-rotate(110deg) saturate(1.1)', 'linear-gradient(135deg,#b8ecd0,#6cc79a)'], sky: ['Sky', 'hue-rotate(180deg) saturate(1.2)', 'linear-gradient(135deg,#bfe0fb,#6faee6)'],
+  midnight: ['Midnight', 'hue-rotate(220deg) saturate(1.4) brightness(0.6)', 'linear-gradient(135deg,#5b5f99,#2b2d52)'],
+};
+const RW = 182, CW = 0.25, MINW = 0.14, MINH = 110;
+const pos = (type, c, r, w, hh) => ({ id: type, type, x: c * CW, y: r * RW, w: w * CW, h: hh * RW, z: 1 });
+const DEFAULT_POS = [pos('room', 0, 0, 2, 2), pos('turn', 2, 0, 1, 2), pos('pet', 3, 0, 1, 1), pos('chat', 3, 1, 1, 3), pos('waiting', 0, 2, 1, 1), pos('delegated', 1, 2, 1, 1), pos('trophies', 2, 2, 1, 1), pos('lobby', 0, 3, 2, 1), pos('week', 2, 3, 1, 1)];
+const VISIT_POS = [pos('room', 0, 0, 2, 2), pos('pet', 2, 0, 1, 1), pos('trophies', 3, 0, 1, 1), pos('notes', 2, 1, 2, 1), pos('lobby', 0, 2, 4, 1)];
+const HANDLES = [['n', '14px', '14px', '0', 'auto', 'auto', '10px', 'ns-resize', 28, 4], ['s', '14px', '14px', 'auto', '0', 'auto', '10px', 'ns-resize', 28, 4], ['w', '0', 'auto', '14px', '14px', '10px', 'auto', 'ew-resize', 4, 28], ['e', 'auto', '0', '14px', '14px', '10px', 'auto', 'ew-resize', 4, 28],
+  ['nw', '0', 'auto', '0', 'auto', '16px', '16px', 'nwse-resize', 8, 8], ['ne', 'auto', '0', '0', 'auto', '16px', '16px', 'nesw-resize', 8, 8], ['sw', '0', 'auto', 'auto', '0', '16px', '16px', 'nesw-resize', 8, 8], ['se', 'auto', '0', 'auto', '0', '16px', '16px', 'nwse-resize', 8, 8]];
+const NAME_IDEAS = ['Mochi', 'Bao', 'Kopi', 'Sambal', 'Teh Tarik', 'Durian'];
+const SIZES = [[1, 1], [2, 1], [1, 2], [2, 2], [4, 1]];
+const DEFAULT_ORDER = [['room', 2, 2], ['turn', 1, 2], ['pet', 1, 1], ['chat', 1, 2], ['waiting', 1, 1], ['delegated', 1, 1], ['lobby', 2, 1], ['trophies', 1, 1], ['week', 1, 1]];
+const I = (k, x, f) => ({ id: `${k}-${x}`, k, x, flip: f ? -1 : 1 });
+const TEAM = {
+  rachel: { name: 'Rachel', role: 'Marketing Manager', av: 'oklch(0.88 0.06 200)', species: 'cat', petName: 'Mochi', xp: 520, state: 'busy', cover: 0, status: 'Q4 mode. Approvals before lunch please 🙏', wall: 'peach', floor: 'oak', trophies: 3,
+    items: [I('bed', 14), I('plant', 32), I('frame', 48), I('desk', 66), I('chair', 80), I('clock', 86)] },
+  mei: { name: 'Mei', role: 'Content (Video)', av: 'oklch(0.88 0.06 20)', species: 'dog', petName: 'Bao', xp: 780, state: 'overload', cover: 1, status: 'Shooting all week 🎬 ping me on WhatsApp', wall: 'sage', floor: 'tile', trophies: 5,
+    items: [I('tv', 16), I('sofa', 34, 1), I('frame', 30), I('plant', 56), I('books', 72), I('cactus', 88)], note: 'Year-End shot list v3 is in Library → Scripts.' },
+  ali: { name: 'Ali', role: 'Editor', av: 'oklch(0.88 0.06 140)', species: 'dragon', petName: 'Rex', xp: 380, state: 'busy', cover: 2, status: 'Rendering… do not disturb 🎧', wall: 'night', floor: 'walnut', trophies: 2,
+    items: [I('game', 14), I('tv', 34), I('guitar', 58), I('desk', 76), I('candle', 90), I('trophy', 70)], note: 'Export presets: 1080×1920, 30fps, -14 LUFS.' },
+  jason: { name: 'Jason', role: 'Social Media', av: 'oklch(0.88 0.06 80)', species: 'bird', petName: 'Kopi', xp: 160, state: 'newTask', cover: 3, status: 'Caption bank updated ✍️', wall: 'sky', floor: 'oak', trophies: 1,
+    items: [I('plant', 12), I('desk', 34), I('chair', 48), I('books', 70), I('bed', 86)], note: 'Hashtag sets are pinned in Library.' },
+  siti: { name: 'Siti', role: 'Design (Graphic)', av: 'oklch(0.88 0.06 330)', species: 'cat', petName: 'Sambal', xp: 60, state: 'idle', cover: 0, status: 'Ask me for Canva templates 🎨', wall: 'blush', floor: 'carpet', trophies: 0,
+    items: [I('frame', 20), I('plant', 14), I('teddy', 40), I('desk', 64), I('chair', 78), I('cactus', 92)] },
+  weilun: { name: 'Wei Lun', role: 'Ads', av: 'oklch(0.88 0.06 270)', species: 'dog', petName: 'Turbo', xp: 1040, state: 'sleeping', cover: 1, status: 'ROAS > 4 or bust 📈', wall: 'cream', floor: 'walnut', trophies: 6,
+    items: [I('tree', 12), I('tv', 32), I('sofa', 50, 1), I('game', 72), I('clock', 60), I('bed', 88)] },
+};
+const TASKS = [
+  ['MKT-CAR-2610-011', 'Year-end sale countdown'], ['MKT-2990-2610-019', 'Red Truck Reels ep.2'], ['MKT-2990-2610-021', 'Deepavali early-bird'],
+  ['MKT-CAR-2610-007', 'Carres Year-End Video'], ['MKT-2990-2610-018', 'Red Truck Reels'], ['MKT-COL-2610-009', 'Resident story: Aisyah'],
+];
+const SEED = {
+  lobby: [{ from: 'mei', text: 'Who has the Carres moodboard? Need it for the Year-End shoot', t: '09:12' }, { from: 'weilun', text: '11.11 ads are live. CTR looking good', task: 'MKT-CAR-2610-011', t: '09:40' }, { from: 'siti', text: 'Bao is running laps in Mei\'s room again 😂', t: '10:02' }],
+  mei: [{ from: 'mei', text: 'Script draft is up. Can you check scene 3?', task: 'MKT-CAR-2610-007', t: 'Yesterday' }],
+  ali: [{ from: 'ali', text: 'Red Truck edit will be done by Saturday', task: 'MKT-2990-2610-018', t: '08:50' }],
+  jason: [{ from: 'jason', text: 'Caption for the Aisyah story is ready for review', task: 'MKT-COL-2610-009', t: '10:05' }],
+};
+const REPLIES = ['👍 Got it', 'On it!', 'Will check after lunch', 'Thanks!', 'Nice, saw it'];
+const TROPHY_SET = ['🏆', '🥇', '🎖️', '🏅', '🥈', '🎗️'];
+const lvOf = xp => LEVELS.filter(x => xp >= x).length;
+const formOf = lv => (lv <= 2 ? 0 : lv <= 4 ? 1 : 2);
+const hs = () => window.__hmStore;
+
+function petNode(key, { emoji, img, size, state, facing, filter }) {
+  const st = STATES[state] || STATES.idle, h = React.createElement;
+  return h('div', { key, style: { position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' } },
+    st[2] ? h('span', { style: { position: 'absolute', left: '60%', bottom: Math.round(size * 0.75), fontSize: 12, lineHeight: 1, background: '#fff', borderRadius: 10, padding: '3px 5px', boxShadow: '0 2px 6px rgb(51 36 27 / 0.15)', animation: 'pBub 1.6s ease-in-out infinite', whiteSpace: 'nowrap' } }, st[2]) : null,
+    h('div', { style: { animation: st[1], transformOrigin: 'bottom center', lineHeight: 1, filter: filter || 'none' } },
+      img ? h('img', { src: img, style: { width: size * 1.25, height: size * 1.25, objectFit: 'contain', display: 'block', transform: `scaleX(${facing})` } })
+        : h('span', { style: { fontSize: size, display: 'block', transform: `scaleX(${facing})` } }, emoji)),
+    h('div', { style: { width: size * 0.7, height: size * 0.16, borderRadius: '50%', background: 'rgb(0 0 0 / 0.14)', marginTop: -2 } }));
+}
+
+class Component extends DCLogic {
+  constructor(p) {
+    super(p);
+    this.msgRef = React.createRef(); this.fileRef = React.createRef(); this.fileField = null;
+    this.petX = {}; this.face = {}; this.clock = 10 * 60 + 14; this.dragId = null;
+    this.state = { ob: { step: 0, species: null, upload: false, name: '', color: null, tried: false }, active: null, drawer: null, visit: null, coverPop: false, overId: null, sel: null, thread: 'lobby', chatTab: 'dm', dmOpen: false, msgs: JSON.parse(JSON.stringify(SEED)), read: {}, draft: '', attach: false, pending: null, flash: null, toast: null, saved: this.load(this.user()) };
+  }
+  user() { return TEAM[this.props.user] ? this.props.user : 'rachel'; }
+  defaults(u) {
+    const t = TEAM[u];
+    return { onboarded: false, color: null, order: DEFAULT_POS.map(x => ({ ...x })), bg: 'linen', accent: 0, corners: 'soft', cover: t.cover, coverImg: null, avatar: null, status: t.status,
+      petName: t.petName, species: t.species, petImg: null, energy: 64, snacks: 3, xpBonus: 0, ex: 0, wall: t.wall, floor: t.floor, items: t.items.map(x => ({ ...x })), notes: '', photo: null };
+  }
+  load(u) { let s = null; try { s = JSON.parse(localStorage.getItem('hm-bento-v2:' + u)); } catch (e) {} return { ...this.defaults(u), ...(s || {}) }; }
+  save(patch) { this.setState(s => ({ saved: { ...s.saved, ...patch } }), () => { try { localStorage.setItem('hm-bento-v2:' + this.user(), JSON.stringify(this.state.saved)); } catch (e) { this.say('That image is too large to save'); } }); }
+  componentDidMount() {
+    this._prevLvl = this._curLvl;
+    this._iv = setInterval(() => this.wander(), 2800);
+    this._u = () => this.forceUpdate(); const go = () => { if (hs()) hs().subs.add(this._u); else if (!this._dead) setTimeout(go, 80); }; go();
+  }
+  componentWillUnmount() { this._dead = true; clearInterval(this._iv); [this._ft, this._tt].forEach(clearTimeout); hs() && hs().subs.delete(this._u); }
+  componentDidUpdate(prev, prevS) {
+    if (prev.user !== this.props.user) { this.setState({ saved: this.load(this.user()), visit: null, drawer: null, sel: null }); return; }
+    if (this._prevLvl != null && this._curLvl > this._prevLvl) {
+      const sp = SPECIES[this.state.saved.species], evo = formOf(this._curLvl) > formOf(this._prevLvl);
+      this.flash('levelUp', 3500); this.say(`${this.state.saved.petName} reached Lv ${this._curLvl}${evo ? ` and evolved into a ${sp.names[formOf(this._curLvl)]}!` : '!'}`);
+    }
+    this._prevLvl = this._curLvl;
+    if (this.msgRef.current && (prevS.msgs !== this.state.msgs || prevS.thread !== this.state.thread || prevS.chatTab !== this.state.chatTab || prevS.dmOpen !== this.state.dmOpen)) this.msgRef.current.scrollTop = this.msgRef.current.scrollHeight;
+  }
+  flash(st, ms) { clearTimeout(this._ft); this.setState({ flash: st }); this._ft = setTimeout(() => this.setState({ flash: null }), ms); }
+  say(text) { clearTimeout(this._tt); this.setState({ toast: text }); this._tt = setTimeout(() => this.setState({ toast: null }), 2800); }
+  stamp() { this.clock += 3; return `${Math.floor(this.clock / 60)}:${String(this.clock % 60).padStart(2, '0')}`; }
+  wander() {
+    if (document.hidden || this._roomDrag) return;
+    const keys = ['room', ...Object.keys(TEAM).map(k => 'lobby-' + k)];
+    keys.forEach(k => {
+      if (Math.random() < 0.4) return;
+      const cur = this.petX[k] ?? 50, nx = Math.max(10, Math.min(90, cur + (Math.random() * 40 - 20)));
+      this.face[k] = nx > cur ? -1 : 1; this.petX[k] = nx;
+    });
+    this.forceUpdate();
+  }
+  pick(field) { this.fileField = field; this.fileRef.current && this.fileRef.current.click(); }
+  onFile(e) {
+    const f = e.target.files && e.target.files[0], field = this.fileField; if (!f || !field) return;
+    const r = new FileReader(); r.onload = () => this.save({ [field]: r.result }); r.readAsDataURL(f); e.target.value = '';
+  }
+  roomDown(id, e) {
+    if (this.state.drawer !== 'room') return;
+    e.preventDefault();
+    const box = e.currentTarget.closest('[data-room]'); if (!box) return;
+    const rect = box.getBoundingClientRect();
+    this.setState({ sel: id }); this._roomDrag = true;
+    const move = ev => { const x = Math.max(4, Math.min(96, ((ev.clientX - rect.left) / rect.width) * 100)); this.setState(s => ({ saved: { ...s.saved, items: s.saved.items.map(i => (i.id === id ? { ...i, x: Math.round(x) } : i)) } })); };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); this._roomDrag = false; this.save({}); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  }
+  openChat(thread) { this.setState(s => ({ thread, chatTab: thread === 'lobby' ? 'lobby' : 'dm', dmOpen: thread !== 'lobby', attach: false, read: { ...s.read, [thread]: (s.msgs[thread] || []).length } })); }
+  post(thread, msg) { this.setState(s => { const list = [...(s.msgs[thread] || []), msg]; return { msgs: { ...s.msgs, [thread]: list }, read: s.thread === thread ? { ...s.read, [thread]: list.length } : s.read }; }); }
+  send() {
+    const { draft, pending, thread } = this.state, text = draft.trim(), me = this.user();
+    if (!text && !pending) return;
+    this.post(thread, { from: me, text, task: pending, t: this.stamp() });
+    this.setState({ draft: '', pending: null, attach: false });
+    const others = Object.keys(TEAM).filter(k => k !== me), who = thread === 'lobby' ? others[Math.floor(Math.random() * others.length)] : thread;
+    setTimeout(() => !this._dead && this.post(thread, { from: who, text: REPLIES[Math.floor(Math.random() * REPLIES.length)], t: this.stamp() }), 1600);
+  }
+  allTasks() {
+    const out = TASKS.map(([id, title]) => ({ id, title }));
+    (hs() ? hs().tasks : []).forEach(t => { if (!out.some(x => x.id === t.topLeft)) out.unshift({ id: t.topLeft, title: t.title }); });
+    return out;
+  }
+  startResize(id, mode, e) {
+    e.preventDefault(); e.stopPropagation();
+    const el = e.currentTarget.closest('[data-tile]'), tl = this.state.saved.order.find(x => x.id === id);
+    if (!el || !tl) return;
+    const rect = el.getBoundingClientRect(), GAP = 12, colW = (rect.width + GAP) / tl.w, rowH = (rect.height + GAP) / tl.h, x0 = e.clientX, y0 = e.clientY;
+    this._resizing = true;
+    const clamp = (v, max) => Math.max(1, Math.min(max, v));
+    const move = ev => {
+      const nw = mode.includes('x') ? clamp(Math.round((rect.width + ev.clientX - x0 + GAP) / colW), 4) : tl.w;
+      const nh = mode.includes('y') ? clamp(Math.round((rect.height + ev.clientY - y0 + GAP) / rowH), 4) : tl.h;
+      const cur = this.state.saved.order.find(x => x.id === id);
+      if (cur && (cur.w !== nw || cur.h !== nh)) this.setState(s => ({ saved: { ...s.saved, order: s.saved.order.map(x => (x.id === id ? { ...x, w: nw, h: nh } : x)) } }));
+    };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); this._resizing = false; this.save({}); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  }
+  startXform(id, mode, e) {
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const board = e.currentTarget.closest('[data-board]'), s0 = this.state.saved.order.find(x => x.id === id);
+    if (!board || !s0) return;
+    const BW = board.getBoundingClientRect().width, x0 = e.clientX, y0 = e.clientY, top = Math.max(1, ...this.state.saved.order.map(x => x.z || 1)) + 1;
+    this.setState(s => ({ active: id, saved: { ...s.saved, order: s.saved.order.map(x => (x.id === id ? { ...x, z: top } : x)) } }));
+    let raf = 0, last = null;
+    const apply = () => {
+      raf = 0; if (!last) return;
+      const dx = (last.clientX - x0) / BW, dy = last.clientY - y0, n = { ...s0 };
+      if (mode === 'move') { n.x = Math.max(0, Math.min(1 - s0.w, s0.x + dx)); n.y = Math.max(0, s0.y + dy); }
+      else {
+        if (mode.includes('e')) n.w = Math.max(MINW, Math.min(1 - s0.x, s0.w + dx));
+        if (mode.includes('w')) { const nx = Math.max(0, Math.min(s0.x + s0.w - MINW, s0.x + dx)); n.w = s0.w + (s0.x - nx); n.x = nx; }
+        if (mode.includes('s')) n.h = Math.max(MINH, s0.h + dy);
+        if (mode.includes('n')) { const ny = Math.max(0, Math.min(s0.y + s0.h - MINH, s0.y + dy)); n.h = s0.h + (s0.y - ny); n.y = ny; }
+      }
+      this.setState(s => ({ saved: { ...s.saved, order: s.saved.order.map(x => (x.id === id ? { ...x, x: n.x, y: n.y, w: n.w, h: n.h } : x)) } }));
+    };
+    const move = ev => { last = ev; if (!raf) raf = requestAnimationFrame(apply); };
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); if (raf) cancelAnimationFrame(raf); apply(); this.setState({ active: null }); this.save({}); };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  }
+  onboardVals(me, T, saved) {
+    const ob = this.state.ob, step = ob.step, setOb = p => this.setState(s => ({ ob: { ...s.ob, ...p } }));
+    const STEPS = [['Pet', 'Choose your pet', 'It lives in your room and grows as you finish tasks.'], ['Name', 'Name your pet', 'You can change it later.'], ['Colour', 'Pick its colour', 'This one is required.'], ['Cover', 'Set a cover image', 'Shown at the top of your space. You can skip this.'], ['Photo', 'Add a profile photo', 'You can skip this and add one later.']];
+    const spKey = ob.species || 'cat', sp = SPECIES[spKey], filt = COLORS[ob.color || 'original'][1];
+    const ok = step === 0 ? !!ob.species || ob.upload : step === 1 ? !!ob.name.trim() : step === 2 ? !!ob.color : true;
+    const finish = () => { this.save({ onboarded: true, species: spKey, petName: ob.name.trim() || T.petName, color: ob.color }); this.say(`Welcome! ${ob.name.trim() || T.petName} moved into your room 🏠`); this.flash('levelUp', 2500); };
+    const next = () => {
+      if (!ok) { setOb({ tried: true }); return; }
+      if (step === 2) this.save({ species: spKey, petName: ob.name.trim(), color: ob.color });
+      if (step >= 4) finish(); else setOb({ step: step + 1, tried: false });
+    };
+    return {
+      showOnboard: !saved.onboarded && !this.state.visit,
+      obSteps: STEPS.map(([label], i) => ({ label, mark: i < step ? '✓' : i + 1, hasLine: i < STEPS.length - 1, ring: i <= step ? 'rgb(51 36 27)' : 'rgb(214 206 196)', bg: i < step ? 'rgb(51 36 27)' : '#fff', fg: i < step ? '#fff' : i === step ? 'rgb(51 36 27)' : 'rgb(160 150 140)', weight: i === step ? 600 : 400, color: i <= step ? 'rgb(51 36 27)' : 'rgb(140 130 120)', line: i < step ? 'rgb(51 36 27)' : 'rgb(229 222 211)' })),
+      ob: { title: STEPS[step][1], sub: step === 0 ? `Hi ${T.name}! ${STEPS[0][2]}` : STEPS[step][2], isSpecies: step === 0, isName: step === 1, isColor: step === 2, isCover: step === 3, isAvatar: step === 4,
+        showPreview: step === 1 || step === 2, name: ob.name, colorMissing: step === 2 && ob.tried && !ob.color,
+        canBack: step > 0, canSkip: step >= 3, cta: step >= 4 ? 'Finish →' : 'Continue →', op: ok ? 1 : 0.45, cursor: ok ? 'pointer' : 'not-allowed' },
+      obSpecies: Object.keys(SPECIES).map(k => { const on = ob.species === k && !ob.upload; return { emoji: SPECIES[k].forms[0], label: SPECIES[k].label, evo: SPECIES[k].forms.join(' → '), border: on ? 'rgb(51 36 27)' : 'rgb(236 231 224)', bg: on ? 'rgb(250 246 240)' : '#fff', onClick: () => { setOb({ species: k, upload: false }); this.save({ petImg: null }); } }; }),
+      obUpload: () => { setOb({ upload: true }); this.pick('petImg'); }, obUploadBorder: ob.upload ? 'rgb(51 36 27)' : 'rgb(214 206 196)', obUploadBg: ob.upload ? 'rgb(250 246 240)' : '#fff',
+      obPreview: petNode('ob-pet', { emoji: sp.forms[0], img: ob.upload ? saved.petImg : null, size: 72, state: step === 2 && ob.color ? 'newTask' : 'idle', facing: 1, filter: filt }),
+      obOnName: e => setOb({ name: e.target.value.slice(0, 16) }), obNameIdeas: NAME_IDEAS.map(n => ({ label: n, onClick: () => setOb({ name: n }) })),
+      obColors: Object.keys(COLORS).map(k => { const on = ob.color === k; return { label: COLORS[k][0], swatch: COLORS[k][2], ringW: on ? 3 : 0, ringW2: on ? 5 : 0, weight: on ? 600 : 400, onClick: () => setOb({ color: k, tried: false }) }; }),
+      obCoverBg: saved.coverImg ? `center / cover no-repeat url(${saved.coverImg})` : COVERS[saved.cover],
+      pickAvatarOb: () => this.pick('avatar'),
+      obBack: () => setOb({ step: Math.max(0, step - 1) }), obNext: next, obSkip: () => (step >= 4 ? finish() : setOb({ step: step + 1 })),
+    };
+  }
+  reorder(from, to) {
+    if (!from || from === to) return;
+    const o = [...this.state.saved.order], fi = o.findIndex(x => x.id === from), ti = o.findIndex(x => x.id === to);
+    if (fi < 0 || ti < 0) return;
+    const [m] = o.splice(fi, 1); o.splice(ti, 0, m); this.save({ order: o });
+  }
+
+  renderVals() {
+    const me = this.user(), T = TEAM[me], { saved, drawer, visit, flash, thread, msgs, read, sel } = this.state;
+    const V = visit && TEAM[visit], viewing = !!V;
+    const plate = this.props.plate ?? 2, red = this.props.red ?? 0, fresh = !!this.props.fresh;
+    let storeXp = 0, snacksEarned = 0;
+    (hs() ? hs().tasks : []).forEach(t => { const diff = t.quick ? 1 : 2; t.stages.forEach((s, i) => { if ((i < t.cur || t.phase === 'done') && hs().owner(t, i) === T.name) { storeXp += diff * 10; snacksEarned++; } }); });
+    const xp = T.xp + saved.xpBonus + storeXp, lvl = lvOf(xp), form = formOf(lvl), sp = SPECIES[saved.species];
+    this._curLvl = lvl;
+    const myState = flash || (saved.energy < 20 ? 'hungry' : red >= 2 || plate >= 4 ? 'overload' : fresh ? 'newTask' : plate >= 1 ? 'busy' : 'sleeping');
+    const petOf = k => {
+      if (k === me) return { emoji: sp.forms[form], img: saved.petImg, lvl, state: myState, name: saved.petName, form, species: saved.species, filter: COLORS[saved.color || 'original'][1] };
+      const t = TEAM[k], l = lvOf(t.xp); return { emoji: SPECIES[t.species].forms[formOf(l)], img: null, lvl: l, state: t.state, name: t.petName, form: formOf(l), species: t.species };
+    };
+    const owner = viewing ? visit : me, P = petOf(owner), O = TEAM[owner];
+    const accent = ACCENTS[saved.accent] || ACCENTS[0], radius = CORNERS[saved.corners][0];
+    const layoutEdit = drawer === 'layout' && !viewing, roomEdit = drawer === 'room' && !viewing;
+
+    const roomSrc = viewing ? { wall: V.wall, floor: V.floor, items: V.items } : saved;
+    const wallC = WALLS[roomSrc.wall][0], night = roomSrc.wall === 'night', fl = FLOORS[roomSrc.floor];
+    const hour = 10;
+    const buildRoom = (wf, hp) => {
+      const w = wf >= 0.45 ? 2 : 1, scale = hp < 240 ? 0.55 : wf < 0.4 ? 0.75 : 1;
+      return {
+        wall: wallC, frame: night ? '#4b4560' : '#fff', sky: night ? 'linear-gradient(#2c3a66,#56679c)' : hour < 18 ? 'linear-gradient(#fbe3b0,#cfe4f2)' : 'linear-gradient(#f5a97f,#6f6aa8)', skyIcon: night ? '🌙' : '🌤️',
+        winW: w >= 2 ? 20 : 34, floorBg: `repeating-linear-gradient(90deg,${fl[0]} 0 56px,${fl[1]} 56px 58px)`, base: night ? '#1f1c2b' : 'rgb(255 255 255 / 0.5)',
+        label: viewing ? `${O.name}'s room` : 'My room', canDecorate: !viewing && !layoutEdit,
+        items: roomSrc.items.map(i => { const c = CATALOG[i.k]; return { x: i.x, emoji: c[0], label: c[1], size: Math.round(c[2] * scale), flip: i.flip, bottom: c[3] ? 56 : 20, z: c[3] ? 1 : 10 + Math.round(i.x / 10), cursor: roomEdit ? 'grab' : 'default', selected: roomEdit && sel === i.id, onDown: e => this.roomDown(i.id, e) }; }),
+        petX: this.petX.room ?? 50,
+        petNode: petNode('room-pet', { emoji: P.emoji, img: P.img, size: Math.round(SIZE[P.lvl - 1] * (scale + 0.15)), state: P.state, facing: this.face.room || 1, filter: P.filter }),
+      };
+    };
+
+    const cols = this.props.columns || [];
+    const colOf = i => (cols[i] || { cards: [] });
+    const anyRed = cards => cards.some(c => c._red);
+    const cardV = c => ({ ...c, subDot: c.subDot || 'rgb(200 192 182)', metaLine: [c.sub || c.parent, c.hasStage ? c.stageText : '', c.hasDue ? c.due : '', c.hasAssignee ? `with ${c.assignee}` : '', c.hasNowWith ? `with ${c.nowWith}` : ''].filter(Boolean).join(' · ') });
+    const taskTile = (i, wf) => { const w = wf >= 0.45 ? 2 : 1; const col = colOf(i), cards = col.cards || []; return { emoji: col.emoji || ['👉', '📤', '⏳'][i], title: col.title || ['My turn', 'Delegated by me', 'Waiting on others'][i], count: cards.length, isEmpty: !cards.length, countBg: anyRed(cards) ? 'rgb(176 40 34)' : 'rgb(236 231 224)', countFg: anyRed(cards) ? '#fff' : 'rgb(117 100 86)', cols: w >= 2 ? 'repeat(2,minmax(0,1fr))' : 'minmax(0,1fr)', cards: cards.map(cardV) }; };
+
+    const order = viewing ? VISIT_POS : saved.order;
+    const boardH = Math.max(RW, ...order.map(x => x.y + x.h)) - 12 + (layoutEdit ? 140 : 0);
+    const tiles = order.map(tl => {
+      const def = TILE[tl.type], over = this.state.overId === tl.id && this.dragId && this.dragId !== tl.id;
+      const base = {
+        id: tl.id, name: `${def[0]} ${def[1]}`, left: `${(tl.x * 100).toFixed(3)}%`, top: Math.round(tl.y), width: `calc(${(tl.w * 100).toFixed(3)}% - 12px)`, height: Math.round(tl.h - 12),
+        z: this.state.active === tl.id ? 500 : tl.z || 1, tr: this.state.active === tl.id ? 'box-shadow .15s' : 'box-shadow .2s, left .2s, top .2s, width .2s, height .2s',
+        moveCursor: this.state.active === tl.id ? 'grabbing' : 'grab',
+        onMove: e => this.startXform(tl.id, 'move', e),
+        handles: HANDLES.map(([m, l, r, tp, b, w, hh, cursor, bw, bh]) => ({ l, r, t: tp, b, w, h: hh, cursor, bw, bh, onDown: e => this.startXform(tl.id, m, e) })),
+        bg: tl.type === 'pet' || tl.type === 'turn' || tl.type === 'waiting' || tl.type === 'delegated' || tl.type === 'week' || tl.type === 'trophies' || tl.type === 'chat' ? '#fff' : 'transparent',
+        border: tl.type === 'waiting' && anyRed(colOf(2).cards || []) ? 'rgb(236 190 184)' : 'rgb(236 231 224)',
+        shadow: this.state.active === tl.id ? '0 18px 40px rgb(51 36 27 / 0.22)' : layoutEdit ? '0 6px 16px rgb(51 36 27 / 0.08)' : '0 1px 2px rgb(51 36 27 / 0.04)',
+        outline: this.state.active === tl.id ? `2px solid ${accent}` : layoutEdit ? '1.5px dashed rgb(200 186 170)' : 'none', anim: layoutEdit ? 'bnWiggle .5s ease-in-out infinite' : 'none',
+        editing: layoutEdit, draggable: layoutEdit, locked: LOCKED.includes(tl.type), removable: layoutEdit && !LOCKED.includes(tl.type),
+        onResizeX: e => this.startResize(tl.id, 'x', e), onResizeY: e => this.startResize(tl.id, 'y', e), onResizeXY: e => this.startResize(tl.id, 'xy', e),
+        onDragStart: e => { if (this._resizing) { e.preventDefault(); return; } this.dragId = tl.id; try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', tl.id); } catch (x) {} },
+        onDragOver: e => { if (!this.dragId) return; e.preventDefault(); if (this.state.overId !== tl.id) this.setState({ overId: tl.id }); },
+        onDrop: e => { e.preventDefault(); this.reorder(this.dragId, tl.id); this.dragId = null; this.setState({ overId: null }); },
+        onDragEnd: () => { this.dragId = null; this.setState({ overId: null }); },
+        onResize: () => { const idx = SIZES.findIndex(s => s[0] === tl.w && s[1] === tl.h), n = SIZES[(idx + 1) % SIZES.length]; this.save({ order: saved.order.map(x => (x.id === tl.id ? { ...x, w: n[0], h: n[1] } : x)) }); },
+        onRemove: () => this.save({ order: saved.order.filter(x => x.id !== tl.id) }),
+        isRoom: false, isPet: false, isTasks: false, isChat: false, isLobby: false, isTrophies: false, isWeek: false, isNotes: false, isPhoto: false,
+      };
+      if (tl.type === 'room') return { ...base, isRoom: true, room: buildRoom(tl.w, tl.h) };
+      if (tl.type === 'pet') {
+        const cur = LEVELS[P.lvl - 1], next = LEVELS[P.lvl], pxp = viewing ? V.xp : xp;
+        return { ...base, isPet: true, pet: {
+          node: petNode('tile-pet', { emoji: P.emoji, img: P.img, size: 50, state: P.state, facing: 1, filter: P.filter }), name: P.name, level: P.lvl,
+          xpPct: next ? Math.round(((pxp - cur) / (next - cur)) * 100) : 100, xpLabel: next ? `${pxp - cur}/${next - cur} XP to Lv ${P.lvl + 1}` : 'Max level',
+          energy: viewing ? 80 : saved.energy, enColor: !viewing && saved.energy < 20 ? 'rgb(200 52 42)' : !viewing && saved.energy < 50 ? 'rgb(214 152 30)' : 'rgb(60 150 90)',
+          stateEmoji: STATES[P.state][2] || '🙂', stateLabel: STATES[P.state][0], snacks: saved.snacks + snacksEarned, exTitle: `Exercise · ${Math.max(0, 3 - saved.ex)}/3 left today`,
+          canCare: !viewing, readOnly: viewing, formLine: `${SPECIES[P.species].names[P.form]} · form ${P.form + 1} of 3` } };
+      }
+      if (tl.type === 'turn') return { ...base, isTasks: true, tasks: taskTile(0, tl.w) };
+      if (tl.type === 'delegated') return { ...base, isTasks: true, tasks: taskTile(1, tl.w) };
+      if (tl.type === 'waiting') return { ...base, isTasks: true, tasks: taskTile(2, tl.w) };
+      if (tl.type === 'chat') return { ...base, isChat: true };
+      if (tl.type === 'lobby') return { ...base, isLobby: true };
+      if (tl.type === 'trophies') { const n = viewing ? V.trophies : T.trophies + (hs() ? hs().tasks.filter(t => t.phase === 'done').length : 0); return { ...base, isTrophies: true, trophies: { got: TROPHY_SET.slice(0, Math.min(6, n)), locked: TROPHY_SET.slice(Math.min(6, n), Math.min(6, n) + 2), line: `${n} project${n === 1 ? '' : 's'} finished this quarter` } }; }
+      if (tl.type === 'week') return { ...base, isWeek: true };
+      if (tl.type === 'notes') return { ...base, isNotes: true, notes: { text: viewing ? (V.note || `${V.name} hasn't written anything yet.`) : saved.notes, ro: viewing } };
+      if (tl.type === 'photo') return { ...base, isPhoto: true, photo: { bg: saved.photo ? `url(${saved.photo})` : 'rgb(250 248 244)', empty: !saved.photo } };
+      return base;
+    });
+
+    const tasks = this.allTasks(), findTask = id => tasks.find(x => x.id === id) || { id, title: id };
+    const lobbyKeys = Object.keys(TEAM);
+    const lobbyMsgs = msgs.lobby || [], lastLobby = lobbyMsgs[lobbyMsgs.length - 1];
+    const lobbyPets = lobbyKeys.map((k, i) => {
+      const p = petOf(k), key = 'lobby-' + k;
+      if (this.petX[key] == null) this.petX[key] = 10 + i * 16;
+      return { x: this.petX[key], y: 8 + (i % 2) * 10, z: 10 - (i % 2), name: k === me ? `${TEAM[k].name} (you)` : TEAM[k].name, title: `${p.name} · Lv ${p.lvl} · ${STATES[p.state][0]}`,
+        node: petNode(key, { emoji: p.emoji, img: p.img, size: 30, state: p.state, facing: this.face[key] || 1, filter: p.filter }),
+        hasSay: !!lastLobby && lastLobby.from === k, say: lastLobby ? (lastLobby.text || '📎 ' + findTask(lastLobby.task).title) : '',
+        onClick: () => (k === me ? this.setState({ visit: null }) : this.setState({ visit: k, drawer: null, coverPop: false })) };
+    });
+
+    const allCards = cols.flatMap(c => c.cards || []);
+    const weekRows = allCards.filter(c => c.hasDue).map(c => ({ when: c.due.replace('Due ', ''), title: c.title, fg: c._red ? 'rgb(176 40 34)' : 'rgb(74 64 58)', onOpen: c.onOpen, n: parseInt((c.due.match(/\d+/) || [99])[0], 10) })).sort((a, b) => a.n - b.n).slice(0, 5);
+
+    const others = Object.keys(TEAM).filter(k => k !== me), threadKeys = ['lobby', ...others];
+    const unreadOf = k => { const l = msgs[k] || []; return l.length > (read[k] || 0) && l[l.length - 1].from !== me; };
+    const list = msgs[thread] || [];
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const ring = on => (on ? accent : '#fff');
+    const chipOn = on => ({ border: on ? 'rgb(51 36 27)' : 'rgb(229 222 211)', bg: on ? 'rgb(51 36 27)' : '#fff', fg: on ? '#fff' : 'rgb(74 64 58)' });
+    const present = new Set(saved.order.map(x => x.type));
+    const selItem = sel && saved.items.find(i => i.id === sel);
+    const coverBg = viewing ? COVERS[V.cover] : saved.coverImg ? `center / cover no-repeat url(${saved.coverImg})` : COVERS[saved.cover];
+
+    return {
+      isVisiting: viewing, canEdit: !viewing, goHome: () => this.setState({ visit: null }),
+      pageBg: viewing ? BGS.linen[0] : BGS[saved.bg][0], accent, radius, accentFg: (saved.accent || 0) === 0 ? 'rgb(43 31 23)' : '#fff',
+      cover: { bg: coverBg, name: O.name, role: O.role, initial: O.name[0], avBg: O.av, hasAvatar: !viewing && !!saved.avatar, noAvatar: viewing || !saved.avatar, avatarCss: saved.avatar ? `url(${saved.avatar})` : 'none',
+        status: viewing ? V.status : saved.status, petLine: `${P.name} Lv ${P.lvl} · ${STATES[P.state][2] || '🙂'} ${STATES[P.state][0]}` },
+      coverPet: petNode('cover-pet', { emoji: P.emoji, img: P.img, size: 44, state: P.state, facing: 1, filter: P.filter }),
+      coverPop: this.state.coverPop && !viewing, toggleCoverPop: () => this.setState(s => ({ coverPop: !s.coverPop })),
+      coverOpts: COVERS.map((bg, i) => ({ bg, ring: !saved.coverImg && saved.cover === i ? accent : 'transparent', onClick: () => { this.save({ cover: i, coverImg: null }); this.setState({ coverPop: false }); } })),
+      pickCover: () => { this.pick('coverImg'); this.setState({ coverPop: false }); },
+      pickAvatar: () => !viewing && this.pick('avatar'), avatarTitle: viewing ? O.name : 'Change profile picture', avCursor: viewing ? 'default' : 'pointer',
+      onStatus: e => this.save({ status: e.target.value.slice(0, 80) }),
+      plateLine: this.props.plateLine || 'your plate is clear',
+      openLayout: () => this.setState(s => ({ drawer: s.drawer === 'layout' ? null : 'layout', sel: null, coverPop: false })),
+      layoutBtnBg: layoutEdit ? 'rgb(51 36 27)' : '#fff', layoutBtnFg: layoutEdit ? '#fff' : 'rgb(51 36 27)', layoutBtnBorder: layoutEdit ? 'rgb(51 36 27)' : 'rgb(229 222 211)',
+      openRoom: () => this.setState({ drawer: 'room', coverPop: false }),
+      messageVisit: () => this.openChat(visit), waveVisit: () => { this.post(visit, { from: me, text: '👋', t: this.stamp() }); this.say(`You waved at ${V.name}`); },
+      tiles,
+      feed: () => {
+        const total = saved.snacks + snacksEarned;
+        if (total <= 0) return this.say('No snacks left. Finish a stage to earn more');
+        if (saved.energy >= 100) return this.say(`${saved.petName} is full`);
+        this.save({ energy: Math.min(100, saved.energy + 20), snacks: saved.snacks - 1 }); this.flash('eating', 2500);
+      },
+      exercise: () => {
+        if (saved.energy < 15) return this.say(`${saved.petName} is too tired. Feed it first`);
+        const gain = saved.ex < 3; this.save({ energy: saved.energy - 15, ex: saved.ex + 1, xpBonus: saved.xpBonus + (gain ? 10 : 0) }); this.flash('exercising', 3000);
+        this.say(gain ? `+10 XP · ${saved.petName} worked out` : '3/3 workouts today. No more XP until tomorrow');
+      },
+      lobbyPets, lobbyCount: lobbyKeys.length,
+      weekRows, weekEmpty: !weekRows.length,
+      onNotes: e => this.save({ notes: e.target.value }), pickPhoto: () => !viewing && !layoutEdit && this.pick('photo'),
+      chatTabs: [['dm', '💬 My chats', others.some(unreadOf)], ['lobby', '🏛️ Lobby', unreadOf('lobby')]].map(([k, label, un]) => ({ label, unread: un && this.state.chatTab !== k, ...seg(this.state.chatTab === k), onClick: () => (k === 'lobby' ? this.openChat('lobby') : this.setState({ chatTab: 'dm', dmOpen: false, attach: false })) })),
+      showDmList: this.state.chatTab === 'dm' && !this.state.dmOpen, showConvo: this.state.chatTab === 'lobby' || this.state.dmOpen,
+      isDmConvo: this.state.chatTab === 'dm' && this.state.dmOpen, isLobbyConvo: this.state.chatTab === 'lobby',
+      backToList: () => this.setState({ dmOpen: false, attach: false, pending: null }),
+      convo: thread !== 'lobby' && TEAM[thread] ? { name: TEAM[thread].name, role: TEAM[thread].role, initial: TEAM[thread].name[0], avBg: TEAM[thread].av } : { name: '', role: '', initial: '', avBg: '#fff' },
+      dmList: others.map(k => { const l = msgs[k] || [], last = l[l.length - 1], un = unreadOf(k); return { k, has: !!last, name: TEAM[k].name, initial: TEAM[k].name[0], avBg: TEAM[k].av, unread: un, weight: un ? 700 : 500,
+        time: last ? last.t : '', preview: last ? `${last.from === me ? 'You: ' : ''}${last.text || '📎 ' + findTask(last.task).title}` : `Say hi to ${TEAM[k].name} 👋`, previewFg: un ? 'rgb(51 36 27)' : 'rgb(117 100 86)', onClick: () => this.openChat(k) }; })
+        .sort((a, b) => (b.has - a.has) || (b.unread - a.unread)),
+      threads: threadKeys.map(k => ({ label: k === 'lobby' ? '# Lobby' : TEAM[k].name, initial: k === 'lobby' ? '#' : TEAM[k].name[0], avBg: k === 'lobby' ? 'rgb(236 229 219)' : TEAM[k].av, ring: thread === k ? accent : '#fff', unread: unreadOf(k) && thread !== k, onClick: () => this.openChat(k) })),
+      threadTitle: thread === 'lobby' ? '# Lobby · everyone' : TEAM[thread].name, threadShort: thread === 'lobby' ? 'the lobby' : TEAM[thread].name, threadEmpty: !list.length, msgRef: this.msgRef,
+      msgs: list.slice(-12).map(m => { const mine = m.from === me, t = TEAM[m.from]; return { align: mine ? 'flex-end' : 'flex-start', meta: `${mine ? 'You' : t.name} · ${m.t}`, hasText: !!m.text, text: m.text, bg: mine ? accent : 'rgb(246 244 240)', fg: mine ? '#fff' : 'rgb(51 36 27)', hasTask: !!m.task, task: m.task ? findTask(m.task) : { id: '', title: '' }, openTask: () => m.task && this.props.onOpenTask && this.props.onOpenTask(m.task) }; }),
+      attachOpen: this.state.attach, toggleAttach: () => this.setState(s => ({ attach: !s.attach })), attachBg: this.state.attach ? 'rgb(236 229 219)' : '#fff',
+      attachList: tasks.map(t => ({ ...t, onPick: () => this.setState({ pending: t.id, attach: false }) })),
+      hasPending: !!this.state.pending, pendingTitle: this.state.pending ? findTask(this.state.pending).title : '', clearPending: () => this.setState({ pending: null }),
+      draft: this.state.draft, onDraft: e => this.setState({ draft: e.target.value }), onKey: e => { if (e.key === 'Enter') this.send(); },
+      drawerOpen: !!drawer && !viewing, closeDrawer: () => this.setState({ drawer: null, sel: null }),
+      drawerTabs: [['layout', '✥ Layout'], ['room', '🎨 Room & pet']].map(([k, label]) => ({ label, ...seg(drawer === k), onClick: () => this.setState({ drawer: k, sel: null }) })),
+      tabLayout: drawer === 'layout', tabRoom: drawer === 'room',
+      addable: Object.keys(TILE).filter(k => !present.has(k)).map(k => ({ emoji: TILE[k][0], label: TILE[k][1], onClick: () => { const y = Math.max(0, ...saved.order.map(x => x.y + x.h)), z = Math.max(1, ...saved.order.map(x => x.z || 1)) + 1; this.save({ order: [...saved.order, { id: k, type: k, x: 0, y, w: TILE[k][2][0] * CW, h: TILE[k][2][1] * RW, z }] }); } })),
+      noAddable: Object.keys(TILE).every(k => present.has(k)),
+      bgOpts: Object.keys(BGS).map(k => ({ label: BGS[k][1], bg: BGS[k][0], ring: ring(saved.bg === k), onClick: () => this.save({ bg: k }) })),
+      accentOpts: ACCENTS.map((c, i) => ({ c, outline: saved.accent === i ? `2px solid ${c}` : 'none', onClick: () => this.save({ accent: i }) })),
+      cornerOpts: Object.keys(CORNERS).map(k => ({ label: CORNERS[k][1], ...seg(saved.corners === k), onClick: () => this.save({ corners: k }) })),
+      resetLayout: () => { const d = this.defaults(me); this.save({ order: d.order, bg: d.bg, accent: d.accent, corners: d.corners }); },
+      roomSwatches: [
+        { label: 'Wall', opts: Object.keys(WALLS).map(k => ({ label: WALLS[k][1], bg: WALLS[k][0], ring: ring(saved.wall === k), onClick: () => this.save({ wall: k }) })) },
+        { label: 'Floor', opts: Object.keys(FLOORS).map(k => ({ label: FLOORS[k][2], bg: `repeating-linear-gradient(90deg,${FLOORS[k][0]} 0 10px,${FLOORS[k][1]} 10px 12px)`, ring: ring(saved.floor === k), onClick: () => this.save({ floor: k }) })) },
+      ],
+      catalog: Object.keys(CATALOG).map(k => ({ emoji: CATALOG[k][0], label: CATALOG[k][1], onClick: () => { const id = `${k}-${Date.now()}`; this.save({ items: [...saved.items, { id, k, x: 20 + Math.round(Math.random() * 60), flip: 1 }] }); this.setState({ sel: id }); } })),
+      hasSel: !!selItem, selEmoji: selItem ? CATALOG[selItem.k][0] : '', selLabel: selItem ? CATALOG[selItem.k][1] : '',
+      flipSel: () => selItem && this.save({ items: saved.items.map(i => (i.id === sel ? { ...i, flip: -i.flip } : i)) }),
+      removeSel: () => { if (selItem) { this.save({ items: saved.items.filter(i => i.id !== sel) }); this.setState({ sel: null }); } },
+      petName: saved.petName, onPetName: e => this.save({ petName: e.target.value.slice(0, 16) }),
+      speciesOpts: Object.keys(SPECIES).map(k => ({ emoji: SPECIES[k].forms[form], label: SPECIES[k].label, ...chipOn(saved.species === k && !saved.petImg), onClick: () => this.save({ species: k, petImg: null }) })),
+      pickPet: () => this.pick('petImg'), hasPetImg: !!saved.petImg, clearPetImg: () => this.save({ petImg: null }),
+      forms: sp.forms.map((emoji, i) => ({ emoji, name: sp.names[i], lv: ['Lv 1–2', 'Lv 3–4', 'Lv 5–6'][i], op: i <= form ? 1 : 0.38, border: i === form ? accent : 'rgb(236 231 224)' })),
+      hasToast: !!this.state.toast, toast: this.state.toast || '', boardH, stopEvt: e => e.stopPropagation(),
+      colorChips: Object.keys(COLORS).map(k => { const on = (saved.color || 'original') === k; return { label: COLORS[k][0], swatch: COLORS[k][2], ringW: on ? 2 : 0, ringW2: on ? 4 : 0, onClick: () => this.save({ color: k }) }; }),
+      redoSetup: () => { this.setState({ drawer: null, ob: { step: 0, species: saved.species, upload: !!saved.petImg, name: saved.petName, color: saved.color, tried: false } }); this.save({ onboarded: false }); },
+      ...this.onboardVals(me, T, saved),
+      fileRef: this.fileRef, onFile: e => this.onFile(e),
+    };
+  }
+}
+</script>
+</body>
+</html>

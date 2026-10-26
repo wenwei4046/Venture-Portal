@@ -9,9 +9,12 @@ import type { WaitingTransferFacts } from '@/lib/commission/waiting-transfer'
 const push = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
 const flash = vi.fn()
-vi.mock('@/components/hrv/toast', () => ({ flash: (m: string) => flash(m) }))
+vi.mock('@/components/hrv/toast', () => ({ flash: (m: string) => flash(m), FLASH_LONG: 8000 }))
 const transferFromWaitingList = vi.hoisted(() => vi.fn())
 vi.mock('../../waiting-transfer-actions', () => ({ transferFromWaitingList }))
+// The letters filed with the status (2026-10-24) go to the Data center once they are an employee.
+const fileLetters = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters }))
 
 import WaitingTransferForm from './WaitingTransferForm'
 
@@ -32,6 +35,7 @@ beforeEach(() => {
   push.mockReset()
   flash.mockReset()
   transferFromWaitingList.mockReset()
+  fileLetters.mockReset()
 })
 afterEach(cleanup)
 
@@ -65,6 +69,12 @@ describe('WaitingTransferForm', () => {
     show()
     fireEvent.click(screen.getByRole('button', { name: 'Senior Revenue Specialist' }))
     fireEvent.click(screen.getByRole('button', { name: 'ANTHONY' }))
+    // Probation, Permanent or Part time (2026-10-23) — a probation with its period, its end shown.
+    expect(screen.queryByRole('group', { name: 'Probation period' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Probation' }))
+    expect(within(screen.getByRole('group', { name: 'Probation period' })).getByRole('button', { name: '3 months' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: '6 months' }))
+    expect(screen.getByText('ends 19 Apr 2027')).toBeInTheDocument()
     fireEvent.change(field(/^NRIC/), { target: { value: '900101-14-5678' } })
     fireEvent.change(field(/^Account 1 bank/), { target: { value: 'Maybank' } })
     fireEvent.change(field(/^Account 1 number/), { target: { value: '1234567890' } })
@@ -73,15 +83,38 @@ describe('WaitingTransferForm', () => {
     })
     expect(transferFromWaitingList).toHaveBeenCalledWith(expect.objectContaining({
       requestId: FACTS.requestId, name: 'Amelia Tan', titleId: 'srs', reportsTo: 'anthony', hireDate: '2026-10-20',
+      employmentStatus: 'probation', probationMonths: 6,
       nric: '900101-14-5678', bankName: 'Maybank', bankAccountNo: '1234567890', contact: '012-345 6789',
     }))
     expect(flash).toHaveBeenCalledWith('Amelia Tan is now an employee in Fair · HV070')
     expect(push).toHaveBeenCalledWith('/team/people')
   })
 
+  // Contract (2026-10-24 — the user: "can add with one is Contract, then need pick time period as well, 6 month, 12
+  // month, 18, 24, until 36").
+  it('files a contract with its period — 12 months to start — and no probation’s', async () => {
+    transferFromWaitingList.mockResolvedValue({ ok: true, staffId: 'new', code: 'HV071' })
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'Contract' }))
+    expect(screen.queryByRole('group', { name: 'Probation period' })).toBeNull()
+    const period = screen.getByRole('group', { name: 'Contract period' })
+    expect(within(period).getAllByRole('button').map(b => b.textContent)).toEqual(['6 months', '12 months', '18 months', '24 months', '30 months', '36 months'])
+    expect(within(period).getByRole('button', { name: '12 months' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(period).getByRole('button', { name: '24 months' }))
+    expect(screen.getByText('ends 19 Oct 2028')).toBeInTheDocument()
+    fireEvent.change(field(/^NRIC/), { target: { value: '900101-14-5678' } })
+    fireEvent.change(field(/^Account 1 bank/), { target: { value: 'Maybank' } })
+    fireEvent.change(field(/^Account 1 number/), { target: { value: '1234567890' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add to company' }))
+    })
+    expect(transferFromWaitingList).toHaveBeenCalledWith(expect.objectContaining({ employmentStatus: 'contract', probationMonths: null, contractMonths: 24 }))
+  })
+
   it('shows the database’s refusal and stays', async () => {
     transferFromWaitingList.mockResolvedValue({ ok: false, reason: 'Fair is full — 28 of 28 places are taken. Raise the limit on Rules › Capacity first.' })
     show()
+    fireEvent.click(screen.getByRole('button', { name: 'Permanent' }))
     fireEvent.change(field(/^NRIC/), { target: { value: '900101145678' } })
     fireEvent.change(field(/^Account 1 bank/), { target: { value: 'Maybank' } })
     fireEvent.change(field(/^Account 1 number/), { target: { value: '1234567890' } })
@@ -92,9 +125,75 @@ describe('WaitingTransferForm', () => {
     expect(push).not.toHaveBeenCalled()
   })
 
+  it('asks the employment status before anything is sent', async () => {
+    show()
+    fireEvent.change(field(/^NRIC/), { target: { value: '900101145678' } })
+    fireEvent.change(field(/^Account 1 bank/), { target: { value: 'Maybank' } })
+    fireEvent.change(field(/^Account 1 number/), { target: { value: '1234567890' } })
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add to company' }))
+    })
+    expect(transferFromWaitingList).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Pick the employment status — Probation, Contract, Permanent or Part time.')
+  })
+
   it('cannot be sent at all while it is blocked', () => {
     show('Fair is full — 28 of 28 places are taken. Raise the limit on Rules › Capacity first.')
     expect(screen.getByRole('button', { name: 'Add to company' })).toBeDisabled()
     expect(within(document.body).getByRole('alert')).toHaveTextContent('Fair is full')
+  })
+
+  // Letters filed with the status (2026-10-24 — the user: "新员工进来的时候，他 put 那个 status，然后能够 attach 他的 offer
+  // letter"): to the new employee's Data center record, once they are one.
+  describe('the letters filed with the status', () => {
+    const TYPES = [{ id: 'offer', name: 'Offer letter', compulsory: true }]
+    const offer = new File(['%PDF'], 'offer-amelia.pdf', { type: 'application/pdf' })
+    const fillAndAdd = async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Permanent' }))
+      fireEvent.change(field(/^NRIC/), { target: { value: '900101145678' } })
+      fireEvent.change(field(/^Account 1 bank/), { target: { value: 'Maybank' } })
+      fireEvent.change(field(/^Account 1 number/), { target: { value: '1234567890' } })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Add to company' }))
+      })
+    }
+    const showWithLetters = () =>
+      render(<WaitingTransferForm facts={FACTS} subSlug="fair" titles={TITLES} managers={MANAGERS} today="2026-10-10" blocked={null} letterTypes={TYPES} />)
+
+    it('files them to the new employee, and says so', async () => {
+      transferFromWaitingList.mockResolvedValue({ ok: true, staffId: 'new', code: 'HV072' })
+      fileLetters.mockResolvedValue({ filed: ['Offer letter'], failed: [] })
+      showWithLetters()
+      expect(screen.getByLabelText('Letter type')).toHaveValue('offer')
+      fireEvent.change(screen.getByLabelText('Letter file'), { target: { files: [offer] } })
+      await fillAndAdd()
+      expect(fileLetters).toHaveBeenCalledWith('new', [expect.objectContaining({ typeId: 'offer', file: offer })], TYPES)
+      expect(flash).toHaveBeenCalledWith("Amelia Tan is now an employee in Fair · HV072 · Offer letter filed to Amelia Tan's record")
+      expect(push).toHaveBeenCalledWith('/team/people')
+    })
+
+    it('a letter that does not go is said — the employee is added all the same', async () => {
+      transferFromWaitingList.mockResolvedValue({ ok: true, staffId: 'new', code: 'HV072' })
+      fileLetters.mockResolvedValue({ filed: [], failed: [{ key: 'k', name: 'Offer letter', reason: 'The file did not arrive. Please upload it again.' }] })
+      showWithLetters()
+      fireEvent.change(screen.getByLabelText('Letter file'), { target: { files: [offer] } })
+      await fillAndAdd()
+      expect(flash).toHaveBeenCalledWith('Amelia Tan is now an employee in Fair · HV072. Offer letter was not filed: The file did not arrive. Please upload it again.')
+      expect(push).toHaveBeenCalledWith('/team/people')
+    })
+
+    it('files nothing without a file, nor before the transfer stands', async () => {
+      transferFromWaitingList.mockResolvedValue({ ok: false, reason: 'Fair is full — 28 of 28 places are taken.' })
+      showWithLetters()
+      fireEvent.change(screen.getByLabelText('Letter file'), { target: { files: [offer] } })
+      await fillAndAdd()
+      expect(fileLetters).not.toHaveBeenCalled()
+      cleanup()
+      transferFromWaitingList.mockResolvedValue({ ok: true, staffId: 'new', code: 'HV072' })
+      showWithLetters()
+      await fillAndAdd()
+      expect(fileLetters).not.toHaveBeenCalled()
+      expect(flash).toHaveBeenCalledWith('Amelia Tan is now an employee in Fair · HV072')
+    })
   })
 })

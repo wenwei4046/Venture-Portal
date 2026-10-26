@@ -28,6 +28,8 @@ import {
   loadPrincipalMemoReceipts,
   loadMemberIncome,
   loadDepartmentIncome,
+  loadDepartmentInsight,
+  loadDepartmentOrderBook,
   loadMemberHonours,
   adminMemberAction as administer,
   type AdminMemberCommand,
@@ -91,6 +93,14 @@ export async function fetchMemberIncome(subDepartmentId: string, period: string,
 }
 export async function fetchDepartmentIncome(subDepartmentId: string, period: string) {
   return loadDepartmentIncome(subDepartmentId, period);
+}
+/** The Principal viewing nobody (2026-10-25): a window's every bill summed, and everybody's own figures. */
+export async function fetchDepartmentInsight(subDepartmentId: string, from: string, until: string) {
+  return loadDepartmentInsight(subDepartmentId, from, until);
+}
+/** …and every bill of the window, with its salesperson. */
+export async function fetchDepartmentOrderBook(subDepartmentId: string, from: string, until: string) {
+  return loadDepartmentOrderBook(subDepartmentId, from, until);
 }
 export async function fetchMemberHonours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
   return loadMemberHonours(subDepartmentId, from, until, context);

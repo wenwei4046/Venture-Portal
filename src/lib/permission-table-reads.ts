@@ -167,6 +167,8 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   service_contracts: ['billing.create', 'billing.edit', 'billing.view'],
   treasury_config: ['approvals.approve', 'categories.view', 'director_salary.approve', 'director_salary.edit', 'hr_costing.approve', 'settings.manage', 'treasury.approve', 'treasury.view'],
   treasury_terms_history: ['reports.export', 'reports.view', 'treasury.create', 'treasury.view'],
+  // A terms change filed for the Principal (mig 20261025110000): the deal's page (Treasury · View) and Amend terms (· Edit, · Approve).
+  treasury_terms_requests: ['treasury.approve', 'treasury.edit', 'treasury.view'],
   // A person's boxes (mig 20261011010100): People › Permissions and the person window.
   user_permission_tabs: ['accounts.manage', 'accounts.view', 'team.view:own'],
   // A person's sub-department ticks (mig 20261016180000): read as their boxes are.
@@ -191,6 +193,16 @@ export const READS_WITHOUT_ACTION: Readonly<Record<string, string>> = {
   user_permission_cells: 'Each person’s own cells, and the permissions pages.',
   member_requests: 'The member app’s own rule (member_requests / member_requests_manage).',
   hr_import_templates: 'Each person’s own saved import mappings.',
+}
+
+/**
+ * Tables whose rows each belong to a BUCKET with policies of its own (2026-10-23, the move to R2): `file_objects` is
+ * storage.objects' twin and carries its policies word for word — one bucket asks Documentation · View, another the
+ * file's owner, another the guest link — so no one list of actions can stand in front of the whole table (it would
+ * close every other bucket). Not registered, like storage.objects never was.
+ */
+export const READS_BY_BUCKET_POLICY: Readonly<Record<string, string>> = {
+  file_objects: 'Each bucket’s own SELECT policy, word for word as on storage.objects (lib/storage/server.ts reads under the caller’s session).',
 }
 
 export function tableReadRows(): Array<{ table: string; actions: Want[] }> {

@@ -5,6 +5,8 @@ import { officeToday } from '@/lib/office-time'
 import Link from 'next/link'
 import { createPaymentVoucher } from '../actions'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
+import { stageInto } from '@/lib/storage/stage'
+import { filesProblem } from '@/components/finv/form-words'
 import { buildRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
 import AccountPicker from '@/components/AccountPicker'
 import {
@@ -355,23 +357,18 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       formData.set('source_pool', sourceRows[0]?.pool ?? '')
     }
 
-    // Guard: attachments go through the Server Action body, capped at 4 MB
-    // (next.config bodySizeLimit). Reject oversized files up front with a clear
-    // message instead of the cryptic "unexpected response from the server".
-    const totalBytes = files.reduce((s, f) => s + f.size, 0)
-    if (totalBytes > 3.8 * 1024 * 1024) {
-      setError(
-        `附件太大(共 ${(totalBytes / 1024 / 1024).toFixed(1)} MB,上限约 4 MB)。请压缩 PDF / 图片或分批上传。`,
-      )
+    // Guard: each attachment is sent ahead of the save (2026-10-23, lib/storage/stage.ts), up to 100 MB a file —
+    // no longer the Server Action body's 4 MB for them all.
+    const tooBig = filesProblem(files)
+    if (tooBig) {
+      setError(tooBig)
       return
     }
-
-    // Append files to formData for server action
-    files.forEach((f, i) => formData.append(`attachment_${i}`, f))
     formData.set('attachment_count', String(files.length))
 
     startTransition(async () => {
       try {
+        for (const [i, f] of files.entries()) await stageInto(formData, `attachment_${i}`, f)
         const result = await createPaymentVoucher(formData)
         if (result?.error) setError(result.error)
       } catch (err) {

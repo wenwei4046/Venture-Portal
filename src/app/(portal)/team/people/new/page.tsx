@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn, requirePage } from '@/lib/auth'
 import { sees } from '@/lib/sensitive'
+import { letterChoicesOn } from '@/lib/documentation/letter-choices'
 import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staff-form'
 import { listSubDepartments } from '../../../revenue/_lib/sub-departments'
 import AddStaffForm, { type AddStaffDepartment } from '../_components/AddStaffForm'
@@ -23,7 +24,7 @@ export default async function NewStaffPage({ searchParams }: { searchParams: Pro
   // segment_key 'director' is the one the Director Salary engine pays, and so
   // the one that offers "Variable pay".
   // Titles are rows since 2026-09-01; only the active ones are on offer.
-  const [{ data: departments }, { data: titles }, subDepartments, { data: roster }, { data: rungs }, nextCode] = await Promise.all([
+  const [{ data: departments }, { data: titles }, subDepartments, { data: roster }, { data: rungs }, nextCode, letterTypes] = await Promise.all([
     supabase
       .from('departments')
       .select('id, name, payroll_source, segment_key')
@@ -63,6 +64,9 @@ export default async function NewStaffPage({ searchParams }: { searchParams: Pro
         r => (typeof r.data === 'string' ? r.data : null),
         () => null,
       ),
+    // The Data center's letter types, for the letters filed with the status (2026-10-24) — none for an adder who may
+    // not file one (Documentation · Create).
+    letterChoicesOn(supabase, '/team/people/new'),
   ])
 
   const titlesByScheme = new Map<string, string[]>()
@@ -114,6 +118,7 @@ export default async function NewStaffPage({ searchParams }: { searchParams: Pro
         managers={managers}
         nextCode={nextCode}
         canSeeBank={sees(viewer, 'bank')}
+        letterTypes={letterTypes}
       />
     </div>
   )

@@ -10,10 +10,16 @@ import { jobTitle } from "../../shared/people";
 import { evenShare, ini, stop, type PanelCtx, type Team } from "./common";
 import type { assignVM } from "./assign";
 import { activeVM, lockedOf, sharedOut } from "../../shared/locked";
-import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM } from "../../desk/vm/tokens";
+import { is100, pctOf, pctShow, pctText, r2 } from "../../shared/pct";
+import { applyOpening, applyToast, applyWindowVM, type ApplyWindowVM } from "../../shared/apply-ads";
+import { adStatusOf } from "@/lib/member/crm-ad-running";
+import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, ST_META } from "../../desk/vm/tokens";
 
 const WK = ["M", "T", "W", "T", "F", "S", "S"], WKL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], A7 = [0, 1, 2, 3, 4, 5, 6];
 type Mode = "even" | "pct" | "cnt";
+type SheetVM = { name: string; c: string; sub: string; ok: boolean; total: string; unit: string; modes: { label: string; pick: () => void; w: number }[]; modeLbl: string;
+  people: { name: string; ini: string; mine: boolean; range: number; max: number; v: string; slide: (e: ChangeEvent<HTMLInputElement>) => void; set: (e: ChangeEvent<HTMLInputElement>) => void; locked: boolean }[];
+  cancel: () => void; apply: (() => void) | undefined };
 type CrmRuleIn = Parameters<PanelCtx["act"]["saveAdRule"]>[2];
 const dig = (e: ChangeEvent<HTMLInputElement>) => parseInt(String(e.target.value).replace(/\D/g, "")) || 0;
 
@@ -138,7 +144,7 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   const isSp = !!E && (E.mode === "split" || E.mode === "people");
   const B = isSp && E ? (ui.bp && ui.bp.adId === E.id ? ui.bp : { adId: E.id, tm: { ...(rule?.tm ?? {}) }, pv: { ...(rule?.pp ?? {}) }, touch: {} as Record<string, string[]> }) : null;
   const takenOf = (adId: string, pid: string) => data.customers.filter(c => c.adId === adId && c.assignedTo === pid).length;
-  const bp = { selAll: (e: FocusEvent<HTMLInputElement> | MouseEvent<HTMLInputElement>) => (e.target as HTMLInputElement).select(), inner: [] as ReturnType<typeof innerOf>[] };
+  const bp = { selAll: (e: FocusEvent<HTMLInputElement> | MouseEvent<HTMLInputElement>) => (e.target as HTMLInputElement).select(), inner: [] as ReturnType<typeof innerOf>[], sheet: null as SheetVM | null };
   let aeSave: { why: string; saveBg: string; save: (() => void) | undefined } | null = null;
   let byTeamRule: CrmRuleIn | null = null;
   function innerOf(t: Team, B0: NonNullable<typeof B>, split: Record<string, number>) {
@@ -153,14 +159,14 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     const val = (p: Team["people"][number], k: number) => (scaled ? scaled[p.id] ?? 0 : stale ? es(k) : B0.pv[p.id] ?? (mode === "pct" ? es(k) : 0));
     const sum = ps.reduce((x, p, k) => x + val(p, k), 0);
     // A team with nobody in it has nothing to split.
-    const ok = !ps.length || mode === "even" || (mode === "pct" ? sum === 100 : sum > 0);
-    const why = ok ? "" : mode === "pct" ? t.name + " adds up to " + sum + "% inside — make it 100%." : t.name + " needs a maximum for at least one person.";
+    const ok = !ps.length || mode === "even" || (mode === "pct" ? is100(sum) : sum > 0);
+    const why = ok ? "" : mode === "pct" ? t.name + " adds up to " + pctShow(sum) + "% inside — make it 100%." : t.name + " needs a maximum for at least one person.";
     const setMode = (m: Mode) => { const pv = { ...B0.pv }; ps.forEach((p, k) => { if (m === "even") delete pv[p.id]; else pv[p.id] = m === "pct" ? es(k) : 0; }); putB({ tm: { ...B0.tm, [t.id]: m }, pv, touch: { ...B0.touch, [t.id]: [] } }); };
     const ftr = data.ftRules.find(f => f.tlId === t.id);
     const ftDays = ftr ? [...new Set(Object.entries(ftr.vals).flatMap(([, v]) => Object.entries(v).filter(([, n]) => Number(n) > 0).map(([d]) => Number(d))))].sort((a, b) => a - b) : [];
     return {
       ok, why, ftNote: ftDays.length ? "On " + ftDays.map(x => WKL[x]).join(", ") + " only the Full time people get leads; other days follow this setting." : "",
-      name: t.name, c: t.c, pct: (split[t.id] || 0) + "%", unit: mode === "pct" ? "%" : "max", isEven: !custom, custom,
+      name: t.name, c: t.c, pct: pctShow(split[t.id] || 0) + "%", unit: mode === "pct" ? "%" : "max", isEven: !custom, custom,
       evenLine: "In turn among " + ps.map(p => p.name.split(" ")[0]).join(", ") + " · Full time days apply",
       modes: ([["even", "Evenly"], ["pct", "By %"], ["cnt", "By max"]] as const).map(([k, label]) => ({ label, pick: () => { if (mode !== k) setMode(k); },
         bg: mode === k ? "#fff" : "transparent", fg: mode === k ? "var(--crm-ink)" : "var(--crm-muted)", w: mode === k ? 650 : 500, sh: mode === k ? "0 1px 3px rgba(42,22,12,.12)" : "none" })),
@@ -175,20 +181,31 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
           if (free.length) {
             let left = 100 - n - fixedSum;
             if (left < 0) { let over = -left; for (const q of fixed) { const cut = Math.min(cur[q.id], over); cur[q.id] -= cut; over -= cut; } left = 0; }
-            const es2 = evenShare(free.length); free.forEach((q, j) => { cur[q.id] = Math.round(left * es2(j) / 100); });
-            const diff = 100 - ps.reduce((x, q) => x + cur[q.id], 0); if (diff && free.length) cur[free[0].id] += diff;
+            const es2 = evenShare(free.length); free.forEach((q, j) => { cur[q.id] = Math.round(left * es2(j)) / 100; });
+            const diff = r2(100 - ps.reduce((x, q) => x + cur[q.id], 0)); if (diff && free.length) cur[free[0].id] = r2(cur[free[0].id] + diff);
           } else if (others.length) {
-            let diff = 100 - ps.reduce((x, q) => x + cur[q.id], 0);
-            if (diff > 0) cur[fixed[0].id] += diff; else for (const q of fixed) { if (!diff) break; const cut = Math.min(cur[q.id], -diff); cur[q.id] -= cut; diff += cut; }
+            let diff = r2(100 - ps.reduce((x, q) => x + cur[q.id], 0));
+            if (diff > 0) cur[fixed[0].id] = r2(cur[fixed[0].id] + diff); else for (const q of fixed) { if (!diff) break; const cut = Math.min(cur[q.id], -diff); cur[q.id] = r2(cur[q.id] - cut); diff = r2(diff + cut); }
           }
-          putB({ pv: { ...B0.pv, ...cur }, touch: { ...B0.touch, [t.id]: [...tch, p.id] } });
+          putB({ pv: { ...B0.pv, ...cur }, touch: { ...B0.touch, [t.id]: [...tch, p.id] }, ty: typed });
         };
-        return { name: p.name, v: String(v), set: (e: ChangeEvent<HTMLInputElement>) => mode === "pct" ? setPct(dig(e)) : putB({ pv: { ...B0.pv, [p.id]: dig(e) } }),
+        let typed: { id: string; text: string } | null = null;
+        const mine = (B0.touch[t.id] ?? []).includes(p.id), max = mode === "pct" ? 100 : Math.max(20, v * 2);
+        return { name: p.name, ini: ini(p.name), mine, range: v, max, w: `${Math.min(100, (v / (mode === "pct" ? 100 : Math.max(1, ...ps.map((q, j) => val(q, j))))) * 100)}%`,
+          txt: mode === "pct" ? pctShow(v) + "%" : v ? "up to " + v : "none",
+          // The box keeps what is typed ("40.") — two decimals for By % (shared/pct.ts); By max is whole leads.
+          v: mode === "pct" && B0.ty?.id === p.id ? B0.ty.text : pctShow(v),
+          slide: (e: ChangeEvent<HTMLInputElement>) => mode === "pct" ? setPct(+e.target.value) : putB({ pv: { ...B0.pv, [p.id]: +e.target.value } }),
+          set: (e: ChangeEvent<HTMLInputElement>) => { if (mode !== "pct") return putB({ pv: { ...B0.pv, [p.id]: dig(e) } }); const tx = pctText(e.target.value); typed = { id: p.id, text: tx }; setPct(pctOf(tx)); },
           note: mode === "cnt" ? (v ? tk + " of " + v + " taken" + (full ? " · full" : "") : "Gets none") : tk + " taken so far", noteFg: full ? "var(--crm-oxblood)" : "var(--crm-muted)", locked: false };
-      }).concat(lockedHere.map(p => ({ name: p.name, v: "", set: () => {}, note: "Locked · no new leads", noteFg: "var(--crm-faint)", locked: true }))),
-      sum: mode === "pct" ? (sum === 100 ? "Adds up to 100%" : "Adds up to " + sum + "%. Make it 100%.") : mode === "cnt" ? (sum ? "Up to " + sum + " leads in this team" : "Set a maximum for at least one person") : "",
+      }).concat(lockedHere.map(p => ({ name: p.name, ini: ini(p.name), mine: false, range: 0, max: 100, w: "0%", txt: "locked", v: "", slide: () => {}, set: () => {}, note: "Locked · no new leads", noteFg: "var(--crm-faint)", locked: true }))),
+      // v3 T04 / T04b: the row's line, Adjust split and its sheet.
+      id: t.id, modeLbl: mode === "even" ? "Evenly" : mode === "pct" ? "By %" : "By max",
+      held: E ? data.customers.filter(c => c.held && c.adId === E.id && c.teamId === t.id && !c.assignedTo).length : 0,
+      count: ps.length, total: mode === "pct" ? pctShow(sum) + "%" : String(sum),
+      adjust: () => patch({ bpSheet: t.id, bpSnap: B0 }),
+      sum: mode === "pct" ? (is100(sum) ? "Adds up to 100%" : "Adds up to " + pctShow(sum) + "%. Make it 100%.") : mode === "cnt" ? (sum ? "Up to " + sum + " leads in this team" : "Set a maximum for at least one person") : "",
       sumFg: ok ? "var(--crm-brown)" : "var(--crm-oxblood)",
-      locked: lockedHere.length ? lockedHere.map(p => p.name.split(" ")[0]).join(", ") + " locked · their share goes to the others" : "",
     };
   }
   if (B && E && asv?.ae) {
@@ -197,7 +214,10 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     const T = asv.adTeams ?? teams;
     const split = E.split;
     bp.inner = T.filter(t => (split[t.id] || 0) > 0).map(t => innerOf(t, B, split));
-    const tot = T.reduce((x, t) => x + (split[t.id] || 0), 0), ok = tot === 100 && bp.inner.every(x => x.ok);
+    const tot = T.reduce((x, t) => x + (split[t.id] || 0), 0), ok = is100(tot) && bp.inner.every(x => x.ok);
+    const sg = ui.bpSheet ? bp.inner.find(x => x.id === ui.bpSheet) : undefined;
+    if (sg) bp.sheet = { ...sg, sub: `${sg.pct} of ${E.label} · ${sg.count} ${sg.count === 1 ? "person" : "people"}`,
+      cancel: () => patch({ bp: ui.bpSnap, bpSheet: null, bpSnap: null }), apply: sg.ok ? () => patch({ bpSheet: null, bpSnap: null, bp: ui.bp ? { ...ui.bp, ty: null } : ui.bp }) : undefined };
     const tm: Record<string, Mode> = {}, pv: Record<string, number> = {};
     T.forEach(t => {
       const m: Mode = B.tm[t.id] ?? "pct"; tm[t.id] = m; if (m === "even") return;
@@ -208,19 +228,23 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     // A locked member keeps their saved value for when they are unlocked (the dealer skips them meanwhile).
     lk.forEach(id => { if (pv[id] == null && B.pv[id] != null) pv[id] = B.pv[id]; });
     if (ok) byTeamRule = { mode: "split", split, pm: "pct", pp: pv, tm };
-    const why = tot !== 100 ? "The teams add up to " + tot + "% — make it 100%." : bp.inner.find(x => !x.ok)?.why ?? "";
+    const why = !is100(tot) ? "The teams add up to " + pctShow(tot) + "% — make it 100%." : bp.inner.find(x => !x.ok)?.why ?? "";
     aeSave = { why, saveBg: ok ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", save: ok ? () => {
       // Saving deals any lead waiting for this ad first, oldest first, inside the team it waits for (the database does it).
+      // Saved on its own with anything changed, an ad leaves the ads counted together (2026-10-24); the toast says so.
+      const was = !!data.adRules.find(r => r.adId === E.id)?.together;
       void act.saveAdRule(E.id, E.label, { mode: "split", split, pm: "pct", pp: pv, tm }).then(ok => {
-        if (ok) patch({ adEd: null, bp: null, toast: E.label + " saved" + (ok.dealt ? " · " + ok.dealt + " waiting lead" + (ok.dealt === 1 ? "" : "s") + " dealt" : "") });
+        if (ok) patch({ adEd: null, bp: null, toast: E.label + " saved" + (was && !ok.together ? " · counted on its own" : "") + (ok.dealt ? " · " + ok.dealt + " waiting lead" + (ok.dealt === 1 ? "" : "s") + " dealt" : "") });
       });
     } : undefined };
   }
 
-  // Round 2 (rev 1011 §8): "Save and apply to all N ads" — this ad's whole setting (the split, every team's inside mode
-  // and values) saved to EVERY ad, each keeping its own name and taken counts; one crm_save_ad_assign per ad, each dealing
-  // its own waiting leads. Off while the draft is not valid (the Save rule). An ad left on the default is saved to none.
-  const aeApply = { applyLabel: "", applyFg: "var(--crm-faint-2)", applyBd: "var(--crm-tint-cold)", applyCur: "default", applyAll: undefined as (() => void) | undefined };
+  // Round 2 (rev 1011 §8): "Save and apply to all" — this ad's whole setting (the split, every team's inside mode and
+  // values) on other ads, each keeping its own name. Since 2026-10-24 it opens a sheet (the owner: "勾选广告，决定哪一个要、
+  // 哪一个不要 … 再选择是 standard 的 apply to all，还是全部总和起来算"): the ads ticked — every ad at first, or the together
+  // ads when this one is counted together — then Standard or Count together (crm_save_ads; shared/apply-ads.ts). Save keeps
+  // an ad apart. Off while the draft is not valid (the Save rule). An ad left on the default is saved to none.
+  const aeApply = { applyLabel: "", applyFg: "var(--crm-faint-2)", applyBd: "var(--crm-tint-cold)", applyCur: "default", applyAll: undefined as (() => void) | undefined, applyWin: null as ApplyWindowVM | null };
   if (E && asv?.ae) {
     const mp = new Map<string, string>();
     data.customers.forEach(c => { if (c.adId) mp.set(c.adId, c.ad); });
@@ -228,13 +252,18 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
     mp.set(E.id, E.label);
     const all = [...mp], okAll = isSp ? !!byTeamRule : !!asv.ae.save;
     const ruleFor = (): CrmRuleIn | null => isSp ? byTeamRule : E.mode === "unset" ? null : { mode: "even", split: { ...E.split }, pm: E.pm, pp: { ...E.pp } };
+    const r = ruleFor(), rm = r?.mode;
+    // Running · Paused · Pending, as the desktop's list says it (adStatusOf).
+    const statusOf = (id: string) => { const cs = data.customers.filter(c => c.adId === id), st = adStatusOf(data.adNames?.[id], cs.map(c => c.createdAt).sort().at(-1) ?? null, now);
+      return { leads: cs.length, status: st ? { label: ST_META[st][0], fg: ST_META[st][4], bg: ST_META[st][3] } : null }; };
     Object.assign(aeApply, {
-      applyLabel: "Save and apply to all " + all.length + " ads", applyFg: okAll ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", applyBd: okAll ? "var(--crm-ink-soft)" : "var(--crm-tint-cold)", applyCur: okAll ? "pointer" : "default",
-      applyAll: okAll ? () => void (async () => {
-        const r = ruleFor();
-        if (r) for (const [id, label] of all) if (!(await act.saveAdRule(id, label, r))) return;
-        patch({ adEd: null, bp: null, toast: "Applied to all " + all.length + " ads · fine-tune any ad on its own" });
-      })() : undefined,
+      applyLabel: "Save and apply to all", applyFg: okAll ? "var(--crm-ink-soft)" : "var(--crm-faint-2)", applyBd: okAll ? "var(--crm-ink-soft)" : "var(--crm-tint-cold)", applyCur: okAll ? "pointer" : "default",
+      applyAll: okAll ? () => { if (r && rm) patch({ applyPick: { ad: E.id, ...applyOpening(E.id, data.adRules, all.map(([id]) => id)) } }); else patch({ adEd: null, bp: null }); } : undefined,
+      applyWin: okAll && r && rm && ui.applyPick?.ad === E.id ? applyWindowVM({ pick: ui.applyPick, openId: E.id, rules: data.adRules,
+        ads: all.map(([id, label]) => ({ id, label, ...statusOf(id) })),
+        set: p => patch({ applyPick: p && { ...p, ad: E.id } }),
+        run: (list, together) => act.saveAds(list.map(a => ({ id: a.id, label: a.label })), together, { ...r, mode: rm })
+          .then(done => { if (done) patch({ adEd: null, bp: null, applyPick: null, toast: applyToast(done, together) }); }) }) : null,
     });
   }
 

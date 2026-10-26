@@ -25,8 +25,12 @@ const mocks = vi.hoisted(() => ({
   approveCreditNote: vi.fn(),
   voidCreditNote: vi.fn(),
   deleteCreditNote: vi.fn(),
+  rpc: vi.fn(),
+  revalidatePath: vi.fn(),
 }))
 vi.mock('@/lib/auth', () => ({ requireActionOn: mocks.requireActionOn, requirePermission: mocks.requirePermission }))
+vi.mock('@/lib/supabase/server', () => ({ createClient: async () => ({ rpc: mocks.rpc }) }))
+vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }))
 vi.mock('../billing/actions', () => ({
   approveInvoice: mocks.approveInvoice,
   approveInvoicesForPeriod: mocks.approveInvoicesForPeriod,
@@ -60,6 +64,8 @@ import {
   hubUpdateInvoice,
   hubDeleteCreditNote,
   hubDeleteDraft,
+  hubImportMarketing,
+  hubMarketingPreview,
   hubSettleInvoices,
   hubVoidCreditNote,
   hubVoidInvoices,
@@ -241,5 +247,35 @@ describe('the credit note and the account', () => {
     expect(sent(mocks.reassignInvoiceGlAccount)).toEqual({ id: 'i40', old_account: '3051,3056', new_account: '5011', reason: 'wrong account' })
     mocks.reassignInvoiceGlAccount.mockResolvedValue({ error: 'The period 2026-09 is closed' })
     expect(await hubChangeAccount({ invoiceId: 'i40', from: [], to: '5011', reason: 'x' })).toEqual({ ok: false, reason: 'The period 2026-09 is closed' })
+  })
+})
+
+// Import Marketing billing (2026-10-26, ②b-2h): the lines Marketing's manager confirmed, read by Billing, imported onto
+// drafts by Billing · Create — the database's own functions, refusals in words.
+describe('Marketing’s billing', () => {
+  it('the preview: Billing, the month’s first day, the lines read', async () => {
+    mocks.rpc.mockResolvedValue({ data: { month: '2026-10-01', locked: false, lines: [], typed: [] }, error: null })
+    expect(await hubMarketingPreview('2026-10')).toEqual({ ok: true, value: { month: '2026-10-01', locked: false, lines: [], typed: [] } })
+    expect(mocks.requirePermission).toHaveBeenCalledWith('billing')
+    expect(mocks.rpc).toHaveBeenCalledWith('mkt_bill_import_preview', { p_month: '2026-10-01' })
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'Billing is not open to your account.' } })
+    expect(await hubMarketingPreview('2026-10')).toEqual({ ok: false, reason: 'Billing is not open to your account.' })
+    expect(await hubMarketingPreview('2026-13')).toEqual({ ok: false, reason: 'Pick the month.' })
+  })
+
+  it('the import: Billing · Create on the invoice’s page, what it did, the pages that show it fresh', async () => {
+    mocks.rpc.mockResolvedValue({ data: { month: '2026-10-01', made: 2, added: 0, lines: 3, invoices: [{ no: 'HV-INV-202610-0040' }, { no: 'HV-INV-202610-0041' }] }, error: null })
+    expect(await hubImportMarketing('2026-10')).toEqual({ ok: true, value: { made: 2, added: 0, lines: 3, invoices: ['HV-INV-202610-0040', 'HV-INV-202610-0041'] } })
+    expect(mocks.requireActionOn).toHaveBeenCalledWith('/invoices/[id]', 'billing', 'create')
+    expect(mocks.rpc).toHaveBeenCalledWith('mkt_bill_import', { p_month: '2026-10-01' })
+    expect(mocks.revalidatePath.mock.calls.map(([p]) => p)).toEqual(['/statements', '/billing', '/marketing/billing'])
+  })
+
+  it('a refused import is its sentence, and nothing is refreshed', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'Period Oct 2026 is closed. Contact Principal to reopen.' } })
+    expect(await hubImportMarketing('2026-10')).toEqual({ ok: false, reason: 'Period Oct 2026 is closed. Contact Principal to reopen.' })
+    expect(mocks.revalidatePath).not.toHaveBeenCalled()
+    expect(await hubImportMarketing('Oct')).toEqual({ ok: false, reason: 'Pick the month.' })
+    expect(mocks.rpc).toHaveBeenCalledTimes(1)
   })
 })

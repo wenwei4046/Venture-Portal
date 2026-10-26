@@ -3,7 +3,7 @@
 // (2026-10-15, "Attendance Prototype Design" README › Sidebar, final order) —
 //
 //   Overview
-//   I.    HIRING             Requests · Insights · Talent Bank
+//   I.    HIRING             Requests · Listing · Insights · Talent Bank
 //   II.   ATTENDANCE         Today · Records · Requests · Leave balances · Month close · Settings · Readiness
 //   III.  HR & PAYROLL       HR Costing · Payroll · Allocation · Payment
 //   IV.   REVENUE            Comm Cal · Sales chart · Members · Waiting list · Replacement list · Rules ·
@@ -13,7 +13,9 @@
 //   VII.  ADMIN              Room schedule · Rooms · Guest Link · Audit Log · Change password
 //   VIII. DIRECTORS          Director Salary · Director Pool
 //
-// A page with tabs is opened on its tab (`?tab=`): Sales Groups' four tabs,
+// A page with tabs is opened on its tab (`?tab=`): Hiring requests' Listing
+// (2026-10-24, the user — a request's own page is Listing's, as its
+// "‹ All requests" says), Sales Groups' four tabs,
 // Member Services' four (dissolved into Revenue — "Request reviews" became
 // Requests), People Management's two, Hierarchy's three (merged into People
 // Management), Documentation's four and Meeting Rooms' two are each a row.
@@ -90,6 +92,7 @@ const seesRevenue = (sub: string | null) => (v: NavViewer) => sub !== null && ca
 export type HrRevenueSubs = Readonly<Record<'cc' | 'sg' | 'rules', string | null>>
 const seesMemberServices = (v: NavViewer) => can(v, 'member_requests_manage') || can(v, 'member_memos_manage')
 
+const HIRE_TABS = ['review', 'listing', 'form'] as const
 const SG_TABS = ['chart', 'members', 'waiting', 'replacement'] as const
 const MEM_TABS = ['requests', 'weeks', 'claims', 'food'] as const
 const HIER_TABS = ['chart', 'roles', 'levels'] as const
@@ -117,6 +120,8 @@ export function hrNavSections(revenueSub: string | null | HrRevenueSubs): HrNavS
   const doc = (tab: (typeof DOC_TABS)[number]) => (tab === 'documents' ? '/team/documentation' : `/team/documentation?tab=${tab}`)
   const docOn = (tab: string) => (p: string, s?: URLSearchParams | null) => onTab(p, s, '/team/documentation', tab, DOC_TABS, 'documents')
   const roomOn = (tab: string) => (p: string, s?: URLSearchParams | null) => onTab(p, s, '/admin/rooms', tab, ROOM_TABS, 'schedule')
+  const hireListing = (p: string, s?: URLSearchParams | null) =>
+    p.startsWith('/hiring/requests/') || onTab(p, s, '/hiring/requests', 'listing', HIRE_TABS, 'review')
   const att = (path: string) => (p: string) => under(p, path)
   return [
     {
@@ -128,7 +133,8 @@ export function hrNavSections(revenueSub: string | null | HrRevenueSubs): HrNavS
       label: 'Hiring',
       tone: 'clay',
       items: [
-        { key: 'hire', label: 'Requests', icon: 'hire', href: '/hiring/requests', match: p => under(p, '/hiring/requests'), visible: canAccessHiring },
+        { key: 'hire', label: 'Requests', icon: 'hire', href: '/hiring/requests', match: (p, s) => under(p, '/hiring/requests') && !hireListing(p, s), visible: canAccessHiring },
+        { key: 'hireList', label: 'Listing', icon: 'invoice', href: '/hiring/requests?tab=listing', match: hireListing, visible: canAccessHiring },
         { key: 'hireIns', label: 'Insights', icon: 'report', href: '/hiring/insights', match: p => under(p, '/hiring/insights'), visible: canAccessHiring },
         { key: 'talent', label: 'Talent Bank', icon: 'staff', href: '/hiring/talent', match: p => under(p, '/hiring/talent'), visible: canAccessHiring },
       ],

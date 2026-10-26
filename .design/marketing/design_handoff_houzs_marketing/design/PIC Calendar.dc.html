@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="./hm-store.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Chivo+Mono:wght@400&display=swap">
+<style>body{margin:0}a{color:rgb(90 62 43)}a:hover{color:rgb(51 36 27)}@keyframes pcIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div style="min-height:100%;background:rgb(246 245 242);font-family:'Inter',system-ui,sans-serif;color:rgb(38 33 29);font-size:14px;line-height:1.45">
+  <div style="background:#fff;border-bottom:1px solid rgb(230 227 222)">
+    <div style="max-width:{{ maxW }}px;margin:0 auto;padding:14px {{ padX }}px;display:flex;align-items:center;gap:10px;box-sizing:border-box">
+      <span style="width:28px;height:28px;border-radius:7px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">H</span>
+      <span style="font-size:14px;font-weight:600">HOUZS Marketing</span>
+      <span style="flex:1"></span>
+      <span style="font-size:12px;color:rgb(110 104 98)">Marketing calendar</span>
+    </div>
+  </div>
+
+  <div style="max-width:{{ maxW }}px;margin:0 auto;padding:18px {{ padX }}px 48px;box-sizing:border-box">
+    <div style="display:flex;align-items:center;gap:10px"><span style="width:9px;height:9px;border-radius:50%;background:oklch(0.70 0.12 235)"></span><span style="font-size:{{ titleSize }}px;font-weight:600;letter-spacing:-0.01em">Carres</span></div>
+    <div style="font-size:12.5px;color:rgb(110 104 98);margin-top:2px">Shared with Kelvin · read-only · updates automatically</div>
+
+    <sc-if value="{{ hasDue }}">
+      <div onClick="{{ openDue }}" style="margin-top:14px;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;background:{{ due.bg }};border:1px solid {{ due.border }};color:{{ due.fg }};cursor:pointer;animation:pcIn .2s ease-out">
+        <span style="width:8px;height:8px;border-radius:50%;background:{{ due.dot }};flex:none"></span>
+        <div style="flex:1;min-width:0"><div style="font-weight:600">{{ due.title }}</div><div style="font-size:13px;margin-top:1px">{{ due.text }}</div></div>
+        <span style="font-size:13px;font-weight:600;white-space:nowrap">Review →</span>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <span style="font-size:16px;font-weight:600;margin-right:4px">{{ title }}</span>
+      <sc-if value="{{ isMonth }}">
+        <span onClick="{{ prev }}" style="width:30px;height:30px;border-radius:8px;border:1px solid rgb(220 216 210);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">‹</span>
+        <span onClick="{{ next }}" style="width:30px;height:30px;border-radius:8px;border:1px solid rgb(220 216 210);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">›</span>
+      </sc-if>
+      <span style="flex:1"></span>
+      <div onClick="{{ toggleKey }}" style="height:32px;padding:0 10px 0 8px;border-radius:8px;border:1px solid rgb(220 216 210);background:#fff;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;white-space:nowrap">
+        <span style="width:28px;height:16px;border-radius:8px;background:{{ keyTrack }};position:relative"><span style="position:absolute;top:2px;left:{{ keyKnob }}px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2);transition:left .2s"></span></span>Key dates
+      </div>
+      <div style="display:flex;gap:2px;padding:3px;background:rgb(236 233 228);border-radius:8px">
+        <sc-for list="{{ views }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="height:26px;padding:0 12px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:12.5px">{{ o.label }}</div></sc-for>
+      </div>
+    </div>
+
+    <sc-if value="{{ isList }}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:14px">
+        <sc-if value="{{ hasCampaigns }}">
+          <div style="background:#fff;border:1px solid rgb(230 227 222);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(110 104 98)">Campaigns running</div>
+            <sc-for list="{{ campList }}" as="c" hint-placeholder-count="2">
+              <div onClick="{{ c.onClick }}" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                <span style="width:4px;align-self:stretch;border-radius:2px;background:{{ c.bar }}"></span>
+                <div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13.5px">{{ c.name }}</div><div style="font-size:12px;color:rgb(110 104 98)">{{ c.range }}</div></div>
+                <div style="width:90px;height:5px;border-radius:3px;background:rgb(236 233 228);overflow:hidden"><div style="height:100%;width:{{ c.pct }}%;background:{{ c.fill }}"></div></div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-for list="{{ days }}" as="d" hint-placeholder-count="8">
+          <div style="display:flex;gap:12px">
+            <div style="width:44px;flex:none;text-align:center;padding-top:4px">
+              <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:{{ d.wdFg }}">{{ d.wd }}</div>
+              <div style="font-size:20px;font-weight:600;line-height:1.2;color:{{ d.numFg }}">{{ d.n }}</div>
+              <div style="font-size:10.5px;color:rgb(110 104 98)">{{ d.mon }}</div>
+            </div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ d.flags }}" as="f" hint-placeholder-count="0"><div style="align-self:flex-start;padding:2px 10px 2px 7px;background:rgb(38 33 29);color:#fff;font-size:11px;font-weight:600;clip-path:polygon(0 0,100% 0,calc(100% - 6px) 50%,100% 100%,0 100%)">⚑ {{ f.name }}</div></sc-for>
+              <sc-for list="{{ d.items }}" as="it" hint-placeholder-count="1">
+                <div onClick="{{ it.onClick }}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:#fff;border:1px solid {{ it.border }};cursor:pointer;box-shadow:{{ it.shadow }}" style-hover="border-color:rgb(190 184 176)">
+                  <span style="width:30px;height:30px;flex:none;border-radius:8px;background:{{ it.iconBg }};color:{{ it.iconFg }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">{{ it.glyph }}</span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:11.5px;font-weight:600;color:{{ it.kindFg }}">{{ it.kind }}</div>
+                    <div style="font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ it.title }}</div>
+                    <sc-if value="{{ it.hasNote }}"><div style="font-size:12px;color:rgb(110 104 98)">{{ it.note }}</div></sc-if>
+                  </div>
+                  <span style="color:rgb(160 154 146);font-size:16px">›</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isMonth }}">
+      <div style="margin-top:12px;background:#fff;border:1px solid rgb(230 227 222);border-radius:12px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:rgb(249 248 246);border-bottom:1px solid rgb(236 233 228)">
+          <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7"><div style="padding:8px 10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgb(110 104 98)">{{ w }}</div></sc-for>
+        </div>
+        <sc-for list="{{ weeks }}" as="wk" hint-placeholder-count="5">
+          <div style="position:relative;border-bottom:{{ wk.bb }}">
+            <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr))">
+              <sc-for list="{{ wk.days }}" as="d" hint-placeholder-count="7">
+                <div style="min-height:{{ wk.minH }}px;padding:5px 6px 6px;box-sizing:border-box;border-right:{{ d.br }};background:{{ d.bg }};display:flex;flex-direction:column;gap:3px">
+                  <div style="display:flex;align-items:center;gap:4px;height:22px">
+                    <sc-for list="{{ d.flags }}" as="f" hint-placeholder-count="0"><span title="{{ f.name }}" style="padding:1px 8px 1px 5px;background:rgb(38 33 29);color:#fff;font-size:9.5px;font-weight:600;white-space:nowrap;overflow:hidden;max-width:90px;clip-path:polygon(0 0,100% 0,calc(100% - 5px) 50%,100% 100%,0 100%)">⚑ {{ f.short }}</span></sc-for>
+                    <span style="flex:1"></span>
+                    <span style="min-width:22px;height:22px;padding:0 4px;box-sizing:border-box;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:{{ d.weight }};background:{{ d.numBg }};color:{{ d.numFg }}">{{ d.n }}</span>
+                  </div>
+                  <div style="height:{{ wk.barSpace }}px;flex:none"></div>
+                  <sc-for list="{{ d.items }}" as="it" hint-placeholder-count="0">
+                    <div onClick="{{ it.onClick }}" title="{{ it.title }}" style="display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:5px;background:{{ it.chipBg }};color:{{ it.chipFg }};border:1px solid {{ it.chipBorder }};font-size:11.5px;cursor:pointer;min-width:0">
+                      <span style="font-size:10px;font-weight:700;flex:none">{{ it.glyph }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500">{{ it.short }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+            <sc-for list="{{ wk.bars }}" as="b" hint-placeholder-count="0">
+              <div onClick="{{ b.onClick }}" title="{{ b.title }}" style="position:absolute;left:calc({{ b.left }}% + 4px);width:calc({{ b.width }}% - 8px);top:{{ b.top }}px;height:20px;border-radius:{{ b.radius }};background:{{ b.bg }};color:{{ b.fg }};font-size:11px;font-weight:600;display:flex;align-items:center;padding:0 8px;box-sizing:border-box;cursor:pointer;white-space:nowrap;overflow:hidden">{{ b.label }}</div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px;font-size:12px;color:rgb(90 84 78)">
+      <sc-for list="{{ legend }}" as="l" hint-placeholder-count="5"><span style="display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="width:18px;height:18px;border-radius:5px;background:{{ l.bg }};color:{{ l.fg }};border:1px solid {{ l.border }};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700">{{ l.g }}</span>{{ l.t }}</span></sc-for>
+    </div>
+    <div style="margin-top:14px;font-size:12px;color:rgb(110 104 98);line-height:1.55">Tap any item to open its tracking page. Dates update automatically when the plan changes. This link is private to Carres.</div>
+  </div>
+
+  <sc-if value="{{ hasToast }}">
+    <div style="position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(38 33 29);color:#fff;font-size:13px">{{ toast }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:1300},&quot;desktop&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;keyDates&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;dueTomorrow&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;},&quot;onOpen&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}">
+// day index: 0 = Mon 26 Oct 2026
+const di = (m, d) => (m === 10 ? d - 26 : m === 11 ? 5 + d : 35 + d);
+const dateOf = i => (i < 6 ? { m: 10, d: 26 + i } : i < 36 ? { m: 11, d: i - 5 } : { m: 12, d: i - 35 });
+const MN = { 10: 'Oct', 11: 'Nov', 12: 'Dec' };
+const WD = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const KIND = {
+  post: { label: 'Post', g: 'P', bg: 'rgb(243 242 239)', fg: 'rgb(74 68 62)', border: 'rgb(226 223 217)' },
+  live: { label: 'Go live', g: '▶', bg: 'rgb(236 240 246)', fg: 'rgb(48 70 110)', border: 'rgb(212 222 236)' },
+  shoot: { label: 'Shoot at your showroom', g: 'S', bg: 'rgb(38 33 29)', fg: '#fff', border: 'rgb(38 33 29)' },
+  shootStudio: { label: 'Shoot day', g: 'S', bg: 'rgb(243 242 239)', fg: 'rgb(74 68 62)', border: 'rgb(226 223 217)' },
+  approve: { label: 'Your approval deadline', g: '!', bg: 'rgb(251 243 225)', fg: 'rgb(122 82 8)', border: 'rgb(224 190 120)' },
+};
+const ITEMS = [
+  { i: di(11, 2), k: 'post', title: 'Rental 101', proj: 'Nov content' },
+  { i: di(11, 4), k: 'post', title: 'Small-space sofa', proj: 'Nov content' },
+  { i: di(11, 5), k: 'shoot', title: 'Year-End Video shoot', note: 'Carres Cheras showroom · 9am – 4pm', proj: 'Carres Year-End Video' },
+  { i: di(11, 6), k: 'post', title: '11.11 teaser', proj: '11.11 Rental Deal' },
+  { i: di(11, 9), k: 'live', title: '11.11 ads go live', proj: '11.11 Rental Deal' },
+  { i: di(11, 11), k: 'approve', title: 'Countdown reel', note: 'Needed before it can post', proj: '11.11 Rental Deal', dueFlag: true },
+  { i: di(11, 11), k: 'post', title: '11.11 is here', proj: '11.11 Rental Deal' },
+  { i: di(11, 13), k: 'post', title: 'Customer home: Cheras', proj: 'Nov content' },
+  { i: di(11, 17), k: 'post', title: 'Weekend showroom', proj: 'Showroom Weekends' },
+  { i: di(11, 19), k: 'shootStudio', title: 'Showroom weekend shoot', note: 'At HOUZS studio', proj: 'Showroom Weekends' },
+  { i: di(11, 20), k: 'post', title: 'Fabric care', proj: 'Nov content' },
+  { i: di(11, 24), k: 'post', title: 'Year-End Video teaser', proj: 'Carres Year-End Video' },
+  { i: di(11, 26), k: 'approve', title: 'December content plan', note: 'Review the plan on your link', proj: 'Dec content' },
+  { i: di(11, 28), k: 'post', title: 'Payday deal', proj: 'Nov content' },
+  { i: di(12, 1), k: 'live', title: 'Year-End Sale opens', proj: 'Year-End Sale' },
+];
+const CAMPS = [
+  { name: '11.11 Rental Deal', s: di(11, 9), e: di(11, 12), range: '9 – 12 Nov', bar: 'rgb(90 62 43)', bg: 'rgb(236 229 219)', fg: 'rgb(75 48 36)' },
+  { name: 'Showroom Weekends', s: di(11, 7), e: di(11, 29), range: '7 – 29 Nov', bar: 'rgb(110 120 136)', bg: 'rgb(232 235 240)', fg: 'rgb(60 70 86)' },
+  { name: 'Year-End Sale', s: di(12, 1), e: di(12, 31), range: '1 – 31 Dec', bar: 'rgb(90 62 43)', bg: 'rgb(236 229 219)', fg: 'rgb(75 48 36)' },
+];
+const KEY = [
+  { i: di(10, 31), short: 'Payday', name: 'Payday' }, { i: di(11, 8), short: 'Deepavali', name: 'Deepavali' }, { i: di(11, 11), short: '11.11', name: '11.11' },
+  { i: di(11, 30), short: 'Payday', name: 'Payday' }, { i: di(12, 12), short: '12.12', name: '12.12' }, { i: di(12, 25), short: 'Christmas', name: 'Christmas' }, { i: di(12, 31), short: 'Payday', name: 'Payday' },
+];
+const MONTHS = [{ name: 'November 2026', first: di(11, 1), days: 30 }, { name: 'December 2026', first: di(12, 1), days: 31 }];
+
+class Component extends DCLogic {
+  componentDidMount() { this._u = () => this.forceUpdate(); const go = () => { if (window.__hmStore) window.__hmStore.subs.add(this._u); else setTimeout(go, 50); }; go(); }
+  componentWillUnmount() { window.__hmStore && window.__hmStore.subs.delete(this._u); }
+  state = { view: this.props.view ?? (this.props.desktop ? 'month' : 'list'), keyOn: this.props.keyDates ?? true, month: 0, toast: '' };
+  componentDidUpdate(prev) { if (prev.desktop !== this.props.desktop) this.setState({ view: this.props.desktop ? 'month' : 'list' }); }
+  renderVals() {
+    const s = this.state, desktop = !!this.props.desktop;
+    const today = this.props.dueTomorrow === false ? di(11, 2) : di(11, 10);
+    const go = it => () => { if (this.props.onOpen) this.props.onOpen(); else { this.setState({ toast: `Opens the tracking page · ${it.proj}` }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2000); } };
+    const deco = it => {
+      const k = KIND[it.k], tomorrow = it.k === 'approve' && it.i === today + 1;
+      const kindLabel = it.k === 'approve' ? (tomorrow ? 'Your approval due tomorrow' : 'Your approval deadline') : k.label;
+      return { ...it, ...k, kind: kindLabel, glyph: k.g, iconBg: k.bg, iconFg: k.fg, kindFg: it.k === 'approve' ? 'rgb(122 82 8)' : it.k === 'shoot' ? 'rgb(38 33 29)' : 'rgb(110 104 98)',
+        border: it.k === 'approve' ? 'rgb(224 190 120)' : it.k === 'shoot' ? 'rgb(120 112 104)' : 'rgb(230 227 222)', shadow: tomorrow ? '0 0 0 3px rgb(251 243 225)' : 'none',
+        hasNote: !!it.note, short: it.k === 'approve' ? `Approve: ${it.title}` : it.k === 'shoot' ? `Shoot here · ${it.title}` : it.title,
+        chipBg: k.bg, chipFg: k.fg, chipBorder: k.border, onClick: go(it) };
+    };
+    const HS = window.__hmStore;
+    const st = HS ? HS.tasks.filter(t => t.sub === 'Carres') : [];
+    const SI = st.flatMap(t => [
+      ...(HS.isPicTurn(t) ? [{ i: today, k: 'approve', title: 'November content plan', note: 'Waiting for your approval — tap to review', proj: t.title, store: true }] : []),
+      ...(t.cur > HS.stageIdx(t, 'plan') || t.phase === 'done' ? t.rows.map(r => ({ i: di(11, r.d), k: 'post', title: r.topic || r.type, note: HS.postStatus(t, r).label, proj: t.title, store: true })) : []),
+    ]);
+    const ALL = [...SI, ...ITEMS];
+    const items = ALL.filter(it => it.i >= today).map(deco).map(it => it.store && this.props.onOpenStore ? { ...it, onClick: () => this.props.onOpenStore() } : it);
+    const allItems = ALL.map(deco).map(it => it.store && this.props.onOpenStore ? { ...it, onClick: () => this.props.onOpenStore() } : it);
+    const dueItem = ITEMS.find(it => it.k === 'approve' && it.i === today + 1);
+
+    const dayIdx = [...new Set([...items.map(x => x.i), ...(s.keyOn ? KEY.filter(k => k.i >= today && k.i <= di(12, 2)).map(k => k.i) : [])])].sort((a, b) => a - b).filter(i => i <= di(12, 2));
+    const days = dayIdx.map(i => { const dt = dateOf(i); const isToday = i === today; return { wd: isToday ? 'Today' : WD[((i % 7) + 7) % 7], n: dt.d, mon: MN[dt.m], wdFg: isToday ? 'rgb(90 62 43)' : 'rgb(110 104 98)', numFg: isToday ? 'rgb(90 62 43)' : 'rgb(38 33 29)', flags: s.keyOn ? KEY.filter(k => k.i === i) : [], items: items.filter(x => x.i === i).sort((a, b) => (b.k === 'approve') - (a.k === 'approve')) }; });
+    const campList = CAMPS.filter(c => c.e >= today && c.s <= di(11, 30) + 1).map(c => ({ ...c, pct: Math.max(0, Math.min(100, ((today - c.s + 1) / (c.e - c.s + 1)) * 100)), fill: c.bar, range: c.s > today ? `${c.range} · starts soon` : `${c.range} · running`, onClick: go({ proj: c.name }) }));
+
+    const M = MONTHS[s.month];
+    const gridStart = M.first - (((M.first % 7) + 7) % 7);
+    const nWeeks = Math.ceil((M.first - gridStart + M.days) / 7);
+    const weeks = [];
+    for (let w = 0; w < nWeeks; w++) {
+      const ws = gridStart + w * 7, we = ws + 6;
+      const wc = CAMPS.filter(c => c.s <= we && c.e >= ws);
+      const bars = wc.map((c, k) => { const a = Math.max(c.s, ws), b = Math.min(c.e, we); return { title: `${c.name} · ${c.range}`, label: `${c.name} · ${c.range}`, left: ((a - ws) / 7) * 100, width: ((b - a + 1) / 7) * 100, top: 30 + k * 23, bg: c.bg, fg: c.fg, radius: `${c.s >= ws ? 5 : 0}px ${c.e <= we ? 5 : 0}px ${c.e <= we ? 5 : 0}px ${c.s >= ws ? 5 : 0}px`, onClick: go({ proj: c.name }) }; });
+      const dd = [];
+      for (let i = ws; i <= we; i++) {
+        const inM = i >= M.first && i < M.first + M.days, dt = dateOf(i), t = i === today;
+        dd.push({ n: dt.d, br: i === we ? 'none' : '1px solid rgb(240 238 234)', bg: inM ? '#fff' : 'rgb(250 249 247)', numBg: t ? 'rgb(90 62 43)' : 'transparent', numFg: t ? '#fff' : inM ? 'rgb(74 68 62)' : 'rgb(190 184 176)', weight: t ? 600 : 400, flags: s.keyOn ? KEY.filter(k => k.i === i) : [], items: allItems.filter(x => x.i === i).sort((a, b) => (b.k === 'approve') - (a.k === 'approve')) });
+      }
+      weeks.push({ days: dd, bars, barSpace: wc.length * 23, minH: 100 + wc.length * 23, bb: w === nWeeks - 1 ? 'none' : '1px solid rgb(236 233 228)' });
+    }
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(0 0 0 / 0.12)' : 'none', weight: on ? 600 : 400 });
+    return {
+      maxW: desktop ? 1080 : 520, padX: desktop ? 32 : 16, titleSize: desktop ? 26 : 22,
+      hasDue: !!dueItem,
+      due: { bg: 'rgb(251 243 225)', border: 'rgb(236 214 164)', fg: 'rgb(110 74 8)', dot: 'rgb(214 152 30)', title: 'Your approval due tomorrow', text: dueItem ? `${dueItem.title} · ${dateOf(dueItem.i).d} ${MN[dateOf(dueItem.i).m]}` : '' },
+      openDue: dueItem ? go(dueItem) : () => {},
+      title: s.view === 'month' ? M.name : 'Coming up',
+      isMonth: s.view === 'month', isList: s.view === 'list',
+      prev: () => this.setState(p => ({ month: Math.max(0, p.month - 1) })), next: () => this.setState(p => ({ month: Math.min(1, p.month + 1) })),
+      toggleKey: () => this.setState(p => ({ keyOn: !p.keyOn })), keyTrack: s.keyOn ? 'rgb(38 33 29)' : 'rgb(210 205 198)', keyKnob: s.keyOn ? 14 : 2,
+      views: [['list', 'List'], ['month', 'Month']].map(([k, label]) => ({ label, ...seg(s.view === k), onClick: () => this.setState({ view: k }) })),
+      hasCampaigns: campList.length > 0, campList, days,
+      weekdays: WD, weeks,
+      legend: ['post', 'live', 'shoot', 'approve'].map(k => ({ g: KIND[k].g, t: KIND[k].label, bg: KIND[k].bg, fg: KIND[k].fg, border: KIND[k].border })).concat([{ g: '⚑', t: 'Key date', bg: 'rgb(38 33 29)', fg: '#fff', border: 'rgb(38 33 29)' }]),
+      hasToast: !!s.toast, toast: s.toast,
+    };
+  }
+  componentWillUnmount() { clearTimeout(this._t); }
+}
+</script>
+</body>
+</html>

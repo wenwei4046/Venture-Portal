@@ -17,7 +17,9 @@ import base from "./base.module.css";
 import s from "./shell.module.css";
 import { greeting, initials, klToday, longDayLabel, monthName, quarterLabel } from "./format";
 import { greetingName } from "@/lib/person-name";
-import { PRODUCTS_PATH, appHref, productsHref, useRoute, type Board, type InsightView, type Route, type Screen } from "./route";
+import { PRODUCTS_PATH, appHref, productsHref, useRoute, visitPath, type Board, type InsightView, type Route, type Screen } from "./route";
+import { useVisits } from "./shell/useVisits";
+import { departmentSource } from "./department-source";
 import { ProductShellContext, type ProductShell } from "./product-shell";
 import { addMonths, isLiveMonth, monthPeriod, periodOf, periodOptions, workingMonth, type MonthState, type PeriodKind } from "./insight/period";
 import { useInsightData } from "./insight/useInsightData";
@@ -95,7 +97,7 @@ import { editChanges, editProblem, revisionForm } from "@/lib/member/request-edi
 import type { WaitingQueue } from "@/lib/member/waiting-queue";
 import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
 import MemosPage, { MemoSheet, type MemoTab } from "./profile/MemosPage";
-import { claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestKindOf, requestRowsVM, teamVM, trackVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
+import { claimClosedMonth, claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestKindOf, requestRowsVM, teamVM, trackVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
 import { foodOpenTo, transportOpenTo, type ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
@@ -273,6 +275,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const live = device === "live";
   const today = fixedToday ?? klToday();
   const period = today.slice(0, 7);
+  // The app's use reaches People's Last seen and Activity as the portal's does (2026-10-22, shell/useVisits.ts) — the
+  // live app only, never the preview's demo or fixtures.
+  useVisits(visitPath(route), live && !initialData.demo && !fixture);
 
   // ── Profile: its pages' choices and the sheet each opens ──
   const [compact, setCompact] = useState(false);
@@ -358,8 +363,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const context = useMemo<MemberReadContext | undefined>(() => (principal && route.staff && membershipId
     ? { staffId: route.staff, subDepartmentId: membershipId } : undefined), [principal, route.staff, membershipId]);
   const viewed = principal && route.staff ? membership?.people.find(p => p.id === route.staff) : undefined;
-  // A Revenue Director's own app (2026-10-14): the sub-department they direct, everybody in it under them.
-  const director = !principal && !!membership?.director;
+  // A Revenue Director's own app (2026-10-14): the sub-department they direct, everybody in it under them — and the
+  // Principal's View as of one (2026-10-23), which reads exactly what their own app does.
+  const director = principal ? !!viewed?.director : !!membership?.director;
 
   const me: Me = useMemo(() => {
     // The greeting's name is the first name (2026-10-17, the user: "只放 first name" — "full name = loo wen wei, wen wei
@@ -374,6 +380,14 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const markViewed = useCallback((snap: MemberArenaSnapshot) => viewedAs(snap, context?.staffId), [context?.staffId]);
   const schemeId = membership?.schemeId ?? "";
   const prevMonth = addMonths(period, -1);
+  // The Principal viewing nobody (2026-10-25 — a salesperson's note the user passed on: "要看销售额的话，就是把全部的加起来
+  // … 要不然一直这样漏单的话，其实很容易让人以为是出 bug"): Today, Insight and the Arena read the WHOLE sub-department
+  // (department-source.ts) — every bill, everybody on the boards, nobody the reader — where they read nothing before.
+  const deptView = principal && !context;
+  const deptSource = useMemo(() => (deptView && membershipId && !fixture && !initialData.demo ? departmentSource(source, membershipId) : null),
+    [deptView, membershipId, fixture, initialData.demo, source]);
+  const boardSource = deptSource ?? source;
+  const boardReadable = deptSource ? memoryReady : readable;
 
   // Last month's and this month's bills: which months are closed, which hold bills.
   const [recent, setRecent] = useState<MemberOrderBook | null>(null);
@@ -410,7 +424,6 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // KPI and Arena, and the two-month book — so it leaves as ONE request: Server Actions run one at a
   // time, and this month's figures used to wait for the book to say which month is being worked (a
   // second round trip, ~1 s on prod). Last month's figures are read only by the pages that show them.
-  const deptView = principal && !context;
   const viewStaff = context?.staffId ?? "";
   const todayKey = fixture || data.demo || !membershipId ? "" : `${membershipId}|${deptView ? "*" : viewStaff}|${period}`;
   // Ids, not the `context` object: a refresh rebuilds it, and this runs the engine. A pull reads it again and
@@ -429,8 +442,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // This month's Insight block, KPI and bills (cut from the two-month book), and its Arena — the boards,
   // this week's fair and the brand weeks still to save.
   const curPeriod = useMemo(() => monthPeriod(period, period), [period]);
-  const now = useInsightData({ source, membershipId, schemeId, context, readable, period: curPeriod, recent, recentFrom: prevMonth, recentUntil: period, recentFailed, gen, track });
-  const arenaCur = useMonthArena({ source, membershipId, context, readable, month: period, mark: markViewed, gen, track });
+  // The whole sub-department reads no two-month book (its every bill): a month's bills are read when Insight shows them.
+  const now = useInsightData({ source: boardSource, membershipId, schemeId, context, readable: boardReadable, period: curPeriod,
+    recent: deptSource ? null : recent, recentFrom: prevMonth, recentUntil: period, recentFailed: recentFailed || !!deptSource,
+    withBook: !deptSource || route.screen === "insight", gen, track });
+  const arenaCur = useMonthArena({ source: boardSource, membershipId, context, readable: boardReadable, month: period, mark: markViewed, gen, track });
   // Last month while it is still being worked: its Arena is read by the pages that show it — the claim
   // form's weekends, the team map — and not on every open. (My brand weeks reads this month's: its history
   // carries the two months before too.)
@@ -441,6 +457,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // The month being worked, and this month while another is: what brand weeks, claims and the team read.
   const arena = working && working !== period ? arenaWork.snapshot : arenaCur.snapshot;
   const arenaNow = working && working !== period ? arenaCur.snapshot : null;
+  // Last month once it is closed, for the claim form alone (2026-10-25 — the user: "关月后还能 claim"): its weekends stay
+  // claimable, paid in the payroll still open.
+  const arenaClosed = useMonthArena({ source, membershipId, context, readable,
+    month: route.screen === "account" && route.pf === "requests" ? claimClosedMonth(period, working) : null, mark: markViewed, gen, track });
 
   const incomes = useMemo(() => data.incomes.filter(i => i.schemeId === schemeId).sort((a, b) => b.period.localeCompare(a.period)), [data.incomes, schemeId]);
   const income = useMemo(() => (!todayKey ? incomes[0]
@@ -758,23 +778,26 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // The KPI rule is the scheme's (Rules), not a month's: this month's summary says it.
   const kpiRule = useMemo(() => ({ enabled: !!now.kpi?.enabled, threshold: now.kpi?.threshold ?? null }), [now.kpi?.enabled, now.kpi?.threshold]);
   const selfId = arenaToday?.selfId || context?.staffId || "";
-  // The reader's place, and who leads — a director is on no board, so their card names the leader.
+  // The reader's place — and, for a reader on no board (a director, the Principal viewing nobody), the standings whose
+  // leader and points the Championship card names, as the Arena's does.
   const champ = useMemo(() => {
     if (!arenaToday) return null;
     const month = championshipMonth({ month: arenaToday.period, people: arenaToday.people, brands: arenaToday.brands.map(b => b.code), tiers: arenaToday.tiers, history: arenaToday.history ?? null, kpi: kpiRule });
     const standings = championshipStandings([month]);
-    return { rank: standings.find(s => s.id === selfId)?.position ?? null, leader: standings.find(s => s.position === 1)?.name ?? null };
+    return { rank: standings.find(s => s.id === selfId)?.position ?? null, standings };
   }, [arenaToday, kpiRule, selfId]);
+  // On no board: a director (2026-10-14), or the Principal viewing nobody (2026-10-25).
+  const onNoBoard = director || !!deptSource;
 
   const todayPay = todayIncome?.month?.pay ?? null;
   const model = useMemo(() => todayModel({
     today, first: me.first, title: me.title, rank: me.rank, income, incomeStatus, salary: todaySalary, pay: todayPay, hidden: hidden || incomeShut,
     department: principal && !viewed && !fixture ? membership?.name ?? "the department" : undefined,
-    team: director ? membership?.name : undefined,
+    team: onNoBoard ? membership?.name : undefined,
     insight: now.block ?? undefined, kpi: now.kpi, arena: arenaToday, book: now.book, bands: data.bands, memos, requests, requestCode,
     metricsLoading: now.loading && !now.block && !data.demo, arenaLoading: arenaCur.loading && !data.demo, shares: shares.waiting,
-  }, champ?.rank ?? null, champ?.leader ?? null), [today, me, income, incomeStatus, todaySalary, todayPay, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
-    now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champ, director, shares.waiting]);
+  }, champ?.rank ?? null, champ?.standings ?? null), [today, me, income, incomeStatus, todaySalary, todayPay, hidden, incomeShut, principal, viewed, fixture, membership?.name, now.block, now.kpi, arenaToday, now.book,
+    now.loading, arenaCur.loading, data.demo, data.bands, memos, requests, champ, onNoBoard, shares.waiting]);
 
   // ── Insight: Month / Quarter / Year, opening on the current month ──
   const [insKind, setInsKind] = useState<PeriodKind>("monthly");
@@ -792,10 +815,13 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // This month is already read for Today; any other period is read when picked — last month's bills
   // are cut from the two-month book, its block and KPI read on their own.
   const sameAsNow = insPeriod.kind === "monthly" && insPeriod.from === period;
-  const picked = useInsightData({ source, membershipId, schemeId, context, readable, period: sameAsNow ? null : insPeriod,
-    recent, recentFrom: prevMonth, recentUntil: period, recentFailed, gen, track });
+  const picked = useInsightData({ source: boardSource, membershipId, schemeId, context, readable: boardReadable, period: sameAsNow ? null : insPeriod,
+    recent: deptSource ? null : recent, recentFrom: prevMonth, recentUntil: period, recentFailed: recentFailed || !!deptSource, gen, track });
   const ins = sameAsNow ? now : picked;
   const insMonthly = insPeriod.kind === "monthly";
+  // The whole sub-department (2026-10-25): everybody's bills, and a tap on a member views them — anybody View as lists.
+  const whole = deptSource ? membership?.name ?? "the department" : undefined;
+  const canView = useMemo(() => (deptSource ? new Set((membership?.people ?? []).map(p => p.id)) : undefined), [deptSource, membership?.people]);
   const insightInput = useMemo<InsightInput>(() => ({
     period: insPeriod,
     book: ins.book,
@@ -807,7 +833,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     bands: data.bands,
     name: me.name,
     title: me.title,
-  }), [insPeriod, ins, insMonthly, now.kpi?.enabled, data.bands, me.name, me.title]);
+    ...(whole ? { whole, canView } : {}),
+  }), [insPeriod, ins, insMonthly, now.kpi?.enabled, data.bands, me.name, me.title, whole, canView]);
   const insMain = useMemo(() => fixture?.insight?.main ?? (ins.book ? insightMain(insightInput) : null), [fixture, ins.book, insightInput]);
   const insBills = useMemo(() => fixture?.insight?.bills ?? (ins.book ? billsView(insightInput) : null), [fixture, ins.book, insightInput]);
   const insKpi = useMemo(() => fixture?.insight?.kpi ?? (ins.book ? kpiView(insightInput, membership?.name ?? "this sub-department") : null), [fixture, ins.book, insightInput, membership?.name]);
@@ -860,7 +887,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // whose fair history every other window reuses.
   const knownArena = arPeriod.kind === "monthly" && arenaWork.snapshot && arPeriod.from === arenaWork.snapshot.period ? arenaWork.snapshot : arenaToday;
   const arData = useArenaData({
-    source, membershipId, context, readable, known: knownArena, kpi: kpiRule, mark: markViewed,
+    source: boardSource, membershipId, context, readable: boardReadable, known: knownArena, kpi: kpiRule, mark: markViewed,
     period: route.screen === "arena" && !fixture?.arena ? arPeriod : null, gen, track,
   });
   const arInput = useMemo(() => ({
@@ -871,8 +898,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     openMonths: arData.snapshot?.openMonths ?? (isLiveMonth(arPeriod.from, period, monthState) ? [arPeriod.from] : []),
     current: period,
     failed: !!arData.failed,
-    director,
-  }), [arPeriod, arData.snapshot, arData.history, arData.standings, selfId, membership?.name, kpiRule.enabled, period, monthState, arData.failed, director]);
+    director: onNoBoard,
+  }), [arPeriod, arData.snapshot, arData.history, arData.standings, selfId, membership?.name, kpiRule.enabled, period, monthState, arData.failed, onNoBoard]);
   const hubVM = useMemo(() => fixture?.arena?.hub[arKind] ?? hubModel(arInput), [fixture, arKind, arInput]);
   const boardVM = useMemo(() => {
     const fx = fixture?.arena;
@@ -882,7 +909,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     }
     return boardModel({ ...arInput, board: route.board, sub: arSub, brand: arBrand });
   }, [fixture, route.board, arKind, arSub, arBrand, arInput]);
-  const recordVM = useMemo(() => fixture?.arena?.record ?? recordModel(arData.history, selfId), [fixture, arData.history, selfId]);
+  const recordVM = useMemo(() => fixture?.arena?.record ?? recordModel(arData.history, selfId, onNoBoard), [fixture, arData.history, selfId, onNoBoard]);
   const arDateLabel = fixture?.arena?.dateLabel[arKind] ?? arPeriod.label;
   const arDateOptions = useMemo(() => fixture?.arena?.dateOptions[arKind] ?? periodOptions(arKind, period, monthState), [fixture, arKind, period, monthState]);
   const setArenaKind = (kind: PeriodKind) => { setArKind(kind); setArFrom(null); };
@@ -1194,8 +1221,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     name: me.name, ini: me.ini, title: me.title, rank: me.rank,
     membership: principal ? undefined : membership,
     rate: principal ? incData?.month.rate ?? null : undefined,
+    director: principal ? director : undefined,
     salary: principal ? undefined : data.profile.salary, bands: data.bands, hidden,
-  }), [me.name, me.ini, me.title, me.rank, membership, principal, incData, data.profile.salary, data.bands, hidden]);
+  }), [me.name, me.ini, me.title, me.rank, membership, principal, incData, director, data.profile.salary, data.bands, hidden]);
 
   // My brand weeks (read only since 2026-10-12): this month and the two before it, newest first, up to this
   // week's weekend and never a later one — where the ERP's Sales Attending puts the person read, else the
@@ -1223,7 +1251,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     if (fxp) return fxp.form;
     return {
       subName: membership?.name ?? "",
-      weeks: claimWeeks([arena, arenaNow], today),
+      weeks: claimWeeks([arena, arenaNow, arenaClosed.snapshot], today),
       rates: claimRates ?? { base: "Klang Valley", perSpot: null, perPaxNight: null, groupMaxPax: 3, groupCapPerNight: null, regions: [], fairs: {} },
       members: team,
       departments: data.departments ?? [],
@@ -1235,7 +1263,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       today,
       foodClaims: myRequests,
     };
-  }, [fxp, membership, arena, arenaNow, today, claimRates, team, data.departments, myRequests, waitingForm, replacementForm]);
+  }, [fxp, membership, arena, arenaNow, arenaClosed.snapshot, today, claimRates, team, data.departments, myRequests, waitingForm, replacementForm]);
   // Requests' ways to start one: a food claim only in Fair, for a title HR picked (2026-10-13) — sent under the
   // same Create as a claim. In View as, the viewed person's title decides.
   // The design preview's form carries the refresh handoff's food sample (2026-10-14), so its Requests offer it too.
@@ -1392,19 +1420,22 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     const openDate = () => setDateOpen(true);
     if (route.ins === "bills") {
       page = <BillsPage vm={insBills} dateLabel={insDateLabel} status={billStatus} week={billWeek} onStatus={setBillStatus} onWeek={setBillWeek}
-        onBill={setSoPick} onBack={back} onDate={openDate} />;
+        onBill={setSoPick} onBack={back} onDate={openDate} whole={whole} />;
     } else if (route.ins === "kpi") {
       page = <KpiPage vm={insKpi} dateLabel={insDateLabel} onBill={setSoPick} onBack={back} onDate={openDate} />;
     } else if (route.ins === "brand") {
       page = <BrandPage vm={insBrandVM} dateLabel={insDateLabel} onBrand={code => { setInsBrand(code); setTiersOpen(false); }}
         onTiers={() => setTiersOpen(true)} onBill={setSoPick} onBack={back} onDate={openDate} />;
     } else {
-      page = <InsightMain vm={insMain} tab={insTab} dateLabel={insDateLabel} actions={{
+      page = <InsightMain vm={insMain} tab={insTab} dateLabel={insDateLabel} whole={whole} actions={{
         openDate, setTab: setInsTab,
         toBills: () => toInsight("bills"),
         toKpi: () => toInsight("kpi"),
         toWaiting: () => toInsight("bills", "waiting"),
         openBrand: code => { setInsBrand(code); toInsight("brand"); },
+        // The whole sub-department (2026-10-25 — "点按过去看全部人的"): a member's row views them on Insight — their own
+        // bills of the same period, read-only, as Profile's View as.
+        openPerson: deptSource ? staffId => { setInsTab("personal"); goScreen("insight", { staff: staffId, department: membershipId }); } : undefined,
       }} />;
     }
   } else if (route.screen === "arena") {
@@ -1439,9 +1470,11 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   } else if (route.screen === "account") {
     const back = () => goScreen("account");
     const pf = route.pf;
-    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "team" && pf !== "crm" && pf !== "rooms" && pf !== "it" && pf !== "itdesk" && pf !== null;
+    // Team & capacity too (2026-10-25): its chart is drawn round one person — viewing nobody, it said "Loading your team…"
+    // for ever.
+    const pick = principal && !viewed && !fxp && pf !== "memos" && pf !== "crm" && pf !== "rooms" && pf !== "it" && pf !== "itdesk" && pf !== null;
     if (pick) {
-      page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : pf === "docs" ? "Documentation" : pf === "track" ? "Waiting list & replacements" : "Requests"}
+      page = <PickSomebody title={pf === "income" || pf === "incOrders" ? "My income" : pf === "honours" ? "My honours" : pf === "brandWeeks" ? "My brand weeks" : pf === "docs" ? "Documentation" : pf === "track" ? "Waiting list & replacements" : pf === "team" ? "Team & capacity" : "Requests"}
         onBack={back} onViewAs={() => setVaOpen(true)} />;
     } else if (pf === "income") {
       page = <IncomePage vm={incomeView} hidden={hidden} message={incomeRead.error} onBack={back} onPeriod={() => setPfDateOpen(true)} onToggleHide={() => setHidden(!hidden)}

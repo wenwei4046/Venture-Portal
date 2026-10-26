@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { withBrowserFileStorage } from '@/lib/storage/browser'
 import { attachable } from './model'
 
 /**
@@ -6,15 +7,16 @@ import { attachable } from './model'
  * browser puts it in the private `hiring-files` bucket under guest/<code>/ —
  * as a stranger (the publishable key, no session, even for somebody signed in
  * to the portal), which one storage policy lets in only while the link is on
- * with Request manpower open. Too big for a Server Action (10 MB); nobody
+ * with Request manpower open. Too big for a Server Action (100 MB); nobody
  * outside reads it back — Hiring opens it by a signed link.
  */
 let stranger: SupabaseClient | null = null
 
 function client(): SupabaseClient {
-  stranger ??= createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+  // Once its bucket is in R2 the file's link is made on the server as this same stranger (lib/storage/browser.ts).
+  stranger ??= withBrowserFileStorage(createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  })
+  }), { stranger: true })
   return stranger
 }
 

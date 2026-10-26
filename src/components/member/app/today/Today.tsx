@@ -111,10 +111,17 @@ export default function Today({ model, hidden, actions }: { model: TodayModel; h
           <div className={s.boards}>
             {model.boards.map(b => (
               <button key={b.id} className={`${s.board} ${BOARD[b.id]}`} onClick={() => openBoard(b.id)} aria-busy={b.state === "loading" || undefined}>
-                <span className={s.boardLabel}>{b.label}</span>
+                {/* Who is first (2026-10-25/26): their figure under the board's name and the name where a place would
+                    stand — the Arena's card. */}
+                <span className={s.boardHead}>
+                  <span className={s.boardLabel}>{b.label}</span>
+                  {b.state === "lead" && b.value && <span className={s.boardValue}>{b.value}</span>}
+                </span>
                 {b.state === "loading" ? <span className={`${s.skel} ${s.boardSkel}`} />
                   : b.state === "unranked" ? <span className={s.boardNone}>Not ranked yet</span>
-                  : b.state === "lead" ? <span className={s.boardNone}>{b.leader ? `${b.leader} leads` : "Nobody placed yet"}</span>
+                  : b.state === "lead" ? (b.leader
+                    ? <span className={s.boardLeaderName}>{b.leader}</span>
+                    : <span className={s.boardNone}>Nobody placed yet</span>)
                   : b.state === "off" ? <span className={s.boardNone}>Not counted</span>
                   : <span className={s.boardRank}><span className={s.boardNum}>{b.rankNum}</span><span className={s.boardSuf}>{b.rankSuf}</span></span>}
               </button>

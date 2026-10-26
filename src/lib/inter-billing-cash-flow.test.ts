@@ -7,6 +7,8 @@ import {
   payrollCustodyAccount,
   INTERBILL_TRANSFER_CODE,
   PAYROLL_XFER_CODE,
+  payrollMonthOf,
+  splitPayrollDrain,
   type TransferSide,
 } from './inter-billing-cash-flow'
 
@@ -133,6 +135,47 @@ describe('payroll custody bridge (mig 20260721)', () => {
     const before = cf(base, undefined).closingCash.current
     const after = cf([...base, ...py], undefined).closingCash.current
     expect(after).toBe(before)
+  })
+})
+
+describe('Revenue’s payroll to HR, by account (2026-10-22 — "可以，只改 Revenue")', () => {
+  // Sep'26 batch #3's accrual (JE-202609-0945): what the round to HR paid for.
+  const SEP: Record<string, number> = { '9030': 51000, '9081': 6180, '9082': 623.95, '9083': 71.3, '9084': 2672, '9090': 4760.27, '9093': 187798.61, '9098': 3469.83 }
+  const total = (parts: { amount: number }[]) => Math.round(parts.reduce((s, p) => s + p.amount, 0) * 100) / 100
+
+  it('splits the whole round as its accrual does — the deductions in Commission & Allowances', () => {
+    expect(splitPayrollDrain(261253.69, 261253.69, SEP)).toEqual([
+      { code: '9030', amount: 51000 },
+      { code: '9081', amount: 6180 },
+      { code: '9082', amount: 623.95 },
+      { code: '9083', amount: 71.3 },
+      { code: '9084', amount: 2672 },
+      { code: '9090', amount: 4760.27 },
+      { code: '9093', amount: 192476.34 },
+      { code: '9098', amount: 3469.83 },
+    ])
+  })
+
+  it('a part of the round takes its share of each, Commission & Allowances the cents', () => {
+    const first = splitPayrollDrain(161253.69, 261253.69, SEP)!
+    const second = splitPayrollDrain(100000, 261253.69, SEP)!
+    expect(total(first)).toBe(161253.69)
+    expect(total(second)).toBe(100000)
+    for (const code of ['9030', '9081', '9090', '9098']) {
+      const both = first.find((p) => p.code === code)!.amount + second.find((p) => p.code === code)!.amount
+      expect(Math.abs(both - SEP[code])).toBeLessThanOrEqual(0.01)
+    }
+  })
+
+  it('keeps one line when there is no accrual, or when the round does not cover it', () => {
+    expect(splitPayrollDrain(1000, 1000, {})).toBeNull()
+    expect(splitPayrollDrain(1000, 1000, { '9030': 2000 })).toBeNull()
+  })
+
+  it('reads the month a round to HR pays for off its pool row', () => {
+    expect(payrollMonthOf('PV HV-PV-202610-0541: Payroll bank transfer — Sep 2026')).toBe('2026-09')
+    expect(payrollMonthOf('PV HV-PV-202609-0400: Payroll bank transfer — Aug 2026 (Marketing)')).toBe('2026-08')
+    expect(payrollMonthOf('PV HV-PV-202609-0401: Director salary bank transfer')).toBeNull()
   })
 })
 

@@ -393,7 +393,21 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-cream-nav-active: #F3DFCC;
   --crm-nav-line: #F0E2D4;
   --crm-hover: #FBF7F3;
+  /* v3 M10: today's visit card — green wash, its border, the bar / TODAY tag / Show up. */
+  --crm-today-bg: #EEF5F0;
+  --crm-today-line: #BFD9C8;
+  --crm-today: #387557;
+  /* v3: the deep sand at the top of the Profile and Insight gradients. */
+  --crm-sand: #EADFD4;
   --crm-audit: #F6E7D8;
+  /* redesign v2 (2026-10-23, docs/design_handoff_crm_redesign_v2 › Global rules): ONE selected colour on white, the nav's
+     active item a step darker on its cream, a selected parent row, and the large summary blocks — cream #FCEEE2 stays for
+     small things only (an avatar, a chip) */
+  --crm-sel: #F5F0EA;
+  --crm-nav-active: #EFE6DD;
+  --crm-sum: #F5F0EA;
+  --crm-sum-line: #ECE3DA;
+  --crm-sum-div: #E6DCD2;
   --crm-audit-line: #E3CDB8;
   /* accents */
   --crm-rust: #BD4A19;
@@ -413,6 +427,8 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-peach-soft: #F9D3BA;
   --crm-hero-line: #EBD6C3;
   --crm-track: #EFE7E1;
+  --crm-track-2: #EEE2D8;
+  --crm-hover-2: #FFFCF9;
   /* channels — these two appear nowhere else */
   --crm-whatsapp: #25D366;
   --crm-messenger: #0A7CFF;
@@ -441,6 +457,22 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-brand-waze: #33CCFF;
   --crm-brand-maps: #34A853;
   --crm-brand-instagram: #C13584;
+  /* Ads Performance's chart and its cards (redesign v2 note 02, 2026-10-23 — replaces the first cut's blue/orange/green):
+     the CRM palette in a fixed order, each with its card tint; text on every card stays ink */
+  --crm-series-1: #422315;
+  --crm-series-2: #BD4A19;
+  --crm-series-3: #6F402C;
+  --crm-series-4: #FFA91F;
+  --crm-series-5: #C29C88;
+  --crm-series-6: #9A6B55;
+  --crm-series-7: #DCC6B8;
+  --crm-series-tint-1: #F3EBE5;
+  --crm-series-tint-2: #FDE3D2;
+  --crm-series-tint-3: #F1E3DA;
+  --crm-series-tint-4: #FFF0D1;
+  --crm-series-tint-5: #F7F0EB;
+  --crm-series-tint-6: #F7F0EB;
+  --crm-series-tint-7: #F7F0EB;
 }
 
 /* ─── The design system's tokens (2026-10-14) ───
@@ -1389,9 +1421,9 @@ html[data-nav-pending] .route-surface {
    app, the Finance app and its sheets (2026-10-15), the guest page — nor in the
    soft dropdown's menu (portaled to <body>), which keep their prototypes' own
    focus (2026-10-11). */
-input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)),
-textarea:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)),
-select:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *)) {
+input:not([type="checkbox"]):not([type="radio"]):focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *)),
+textarea:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *)),
+select:focus:not(:where([data-revenue-app] *, [data-hr-app] *, [data-fin-app] *, [data-sheet] *, [data-guest-page] *, [data-soft-menu] *, [data-mkt-own] *)) {
   border-color: rgb(var(--accent));
   box-shadow: 0 0 0 3px rgb(var(--accent) / 0.12);
   outline: none;
@@ -5639,6 +5671,18 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .sched-alert { color: rgb(150 100 12); }
 .sched-danger { color: rgb(176 40 34); }
 .sched-info { color: rgb(108 104 98); }
+/* A 利滚利 deal's (2026-10-24, the user's tidied LO#7): the four figures over the table, the line where its terms
+   change, its total's sum. Figures in the ledger's mono, as the table's (the user kept Chivo Mono). */
+.sched .sched-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+@media (max-width: 760px) { .sched .sched-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.sched .sched-fact { min-width: 0; padding: 10px 12px; border: 1px solid rgb(var(--hairline)); border-radius: 10px; background: rgb(var(--surface)); }
+.sched .sched-fact-k { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: rgb(var(--graphite)); }
+.sched .sched-fact-v { margin-top: 2px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 500; color: rgb(var(--ink)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sched .sched-fact[data-bad='true'] .sched-fact-v { color: rgb(176 40 34); }
+.sched .sched-fact-s { font-size: 11.5px; color: rgb(var(--graphite)); overflow-wrap: anywhere; }
+.sched .sched-table tr.sched-break td { padding: 6px 12px; background: rgb(var(--surface-2)); color: rgb(var(--graphite)); font-size: 12px; white-space: normal; }
+.sched .sched-table tr.sched-break b { color: rgb(var(--ink)); font-weight: 600; }
+.sched .sched-table td.sched-total-note { font-weight: 400; color: rgb(var(--graphite)); }
 .sched .sched-recorded {
   margin-top: 14px;
   padding: 10px 14px;
@@ -5956,30 +6000,403 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .sheet-rpt tr.sr-total td.sr-num { font-weight: 600; }
 .sheet-rpt tr.sr-total.is-strong td { background: rgb(221 229 240); box-shadow: inset 0 2px 0 rgb(29 43 74); }
 .sheet-rpt tr.sr-total.is-strong td.sr-label { color: rgb(29 43 74); }
-.sheet-rpt tr.sr-txn td { background: rgb(251 250 248); }
-.sheet-rpt tr.sr-txn td.sr-label { color: rgb(117 100 86); white-space: normal; }
-.sheet-rpt .sr-ref { font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; font-size: 11px; }
-.sheet-rpt .sr-txn-text { display: block; margin-top: 2px; font-size: 11px; }
+/* An account opened (2026-10-24, the user's drill-down): its lines as a ledger under it — Date, Description,
+   Other side, Ref. 1, Ref. 2, Debit, Credit, the count and totals at the foot — or, month by month, its months
+   first. The box keeps to the width on screen (SheetReport sizes it) and the sheet's own cell rules are undone
+   inside it. */
+.sheet-rpt tr.can-open { cursor: pointer; }
+.sheet-rpt tr.can-open:hover td.sr-label { color: rgb(46 92 138); }
+.sheet-rpt tr.sr-drill > td { padding: 0; border-bottom: 1px solid rgb(236 234 229); background: rgb(251 250 248); }
+.sheet-rpt .sr-drill-box { position: sticky; left: 0; box-sizing: border-box; max-width: 100%; padding: 10px 14px 14px 36px; overflow-x: auto; }
+.sheet-rpt .sr-drill-title { padding: 0 0 8px; font-size: 12px; color: rgb(90 78 68); }
+.sheet-rpt .sr-drill-title b { font-weight: 600; color: #000; }
+.sheet-rpt .sr-drill-note { margin: 0; padding: 2px 0; font-size: 12px; color: rgb(90 78 68); }
+.sheet-rpt .sr-drill-note.is-error { color: #B02822; }
+.sheet-rpt .sr-drill-note button { margin-left: 6px; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: rgb(46 92 138); text-decoration: underline; cursor: pointer; }
+.sheet-rpt table.sr-dl, .sheet-rpt table.sr-months { width: 100%; border: 1px solid rgb(229 228 223); border-radius: 8px; overflow: hidden; background: #fff; font-size: 11.5px; }
+.sheet-rpt table.sr-dl { min-width: 680px; }
+.sheet-rpt table.sr-months { table-layout: fixed; }
+.sheet-rpt .sr-months col.is-count { width: 84px; }
+.sheet-rpt .sr-months col.is-value { width: 128px; }
+.sheet-rpt .sr-dl-scroll { overflow-x: auto; }
+.sheet-rpt .sr-dl thead th { padding: 7px 10px; border: 0; border-bottom: 1px solid rgb(229 228 223); background: rgb(243 240 234); color: rgb(117 100 86); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; text-align: left; white-space: nowrap; }
+.sheet-rpt .sr-dl tbody td, .sheet-rpt .sr-months tbody td { padding: 6px 10px; border-bottom: 1px solid rgb(236 234 229); background: #fff; color: rgb(60 52 46); line-height: 1.35; vertical-align: top; }
+.sheet-rpt .sr-dl tfoot td, .sheet-rpt .sr-months tfoot td { padding: 7px 10px; border: 0; background: rgb(243 240 234); color: #000; font-weight: 600; }
+.sheet-rpt .sr-dl td.is-mono, .sheet-rpt .sr-months td.is-mono { font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; font-size: 11px; white-space: nowrap; }
+.sheet-rpt .sr-dl .is-num, .sheet-rpt .sr-months .is-num { text-align: right; }
+.sheet-rpt .sr-months td.is-neg { color: #B02822; }
+.sheet-rpt .sr-dl td.sr-dl-desc { min-width: 220px; color: #000; }
+.sheet-rpt .sr-dl td.sr-dl-other { white-space: nowrap; color: rgb(90 78 68); }
+.sheet-rpt .sr-dl-count { font-weight: 400; color: rgb(90 78 68); }
+.sheet-rpt .sr-dl-gl { font-weight: 500; color: rgb(46 92 138); text-decoration: none; }
+.sheet-rpt .sr-dl-gl:hover { text-decoration: underline; }
+.sheet-rpt .sr-months tr.can-open { cursor: pointer; }
+.sheet-rpt .sr-months td.sr-month-name { font-weight: 600; color: #000; white-space: nowrap; }
+.sheet-rpt .sr-months td.sr-month-name button { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.sheet-rpt .sr-months td.sr-month-count { color: rgb(90 78 68); white-space: nowrap; }
+.sheet-rpt .sr-months tr.sr-month-lines > td { padding: 0 10px 10px 22px; background: rgb(251 250 248); }
 .sheet-rpt tr.is-hit td { background: #FFF6D8; }
 .sheet-rpt tr.is-active td.sr-label { box-shadow: inset 3px 0 0 #E99A53; }
 @media (max-width: 767px) {
   .sheet-rpt thead th.sr-corner, .sheet-rpt td.sr-label { min-width: 128px; max-width: 128px; }
   .sheet-rpt td.sr-label { white-space: normal; font-size: 11.5px; }
+  .sheet-rpt .sr-drill-box { padding: 8px 10px 12px; }
 }
+
+/* ═══ A department's charts (2026-10-25, the mockup's twelfth round —
+   dept-pool/statements/[seg]/_components). Money in green #3F7A64, money out
+   orange #E99A53 (in words the darker #A95C15) wherever the two are told
+   apart — the cards, the donuts, the bars, the statement's blocks; the
+   accounts in palette A (lib/dept-charts). ═══ */
+.stat-card[data-tone='in']::before { background: #3F7A64; }
+.stat-card[data-tone='in'] .stat-card-value { color: #3F7A64; }
+.stat-card[data-tone='in'] .stat-card-icon { background: rgb(233 242 237); color: #3F7A64; }
+.stat-card[data-tone='out']::before { background: #E99A53; }
+.stat-card[data-tone='out'] .stat-card-value { color: #A95C15; }
+.stat-card[data-tone='out'] .stat-card-icon { background: rgb(253 241 229); color: #A95C15; }
+
+/* The period row: P&L | Cash Flow, From → To, 6 / 12 months, the star. */
+.dept-period { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: -6px 0 18px; padding: 10px 12px; border: 1px solid rgb(var(--hairline)); border-radius: 12px; background: rgb(247 245 241); }
+.dept-period-rule { width: 1px; align-self: stretch; background: rgb(var(--hairline)); }
+.dept-period-field { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(117 100 86); }
+.dept-period-field select { height: 32px; padding: 0 10px; border: 1px solid rgb(var(--hairline)); border-radius: 6px; background: #fff; color: rgb(var(--ink)); font-size: 13px; font-weight: 400; letter-spacing: normal; text-transform: none; }
+.dept-quick { display: inline-flex; gap: 4px; }
+.dept-quick button { height: 32px; padding: 0 10px; border: 1px solid rgb(229 228 223); border-radius: 6px; background: #fff; color: #000; font-size: 12.5px; font-weight: 500; }
+.dept-quick button[aria-pressed='true'] { background: #E99A53; border-color: #E99A53; }
+.dept-period-hint { font-size: 11.5px; color: rgb(138 119 101); }
+
+/* In vs Out: the Month and its donuts beside the months' bars (1 : 1.6, stacked below 1100px). */
+.dept-charts, .dept-pieces { margin-bottom: 14px; }
+.dept-duo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; }
+.dept-panel, .dept-card { min-width: 0; padding: 16px 18px; border: 1px solid rgb(232 225 216); border-radius: 12px; background: #fff; }
+.dept-panel h4 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.dept-psub { margin: -6px 0 10px; font-size: 11px; color: rgb(117 100 86); }
+.dept-mpicker { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 12px; }
+.dept-chl { margin-right: 2px; font-size: 11px; color: rgb(117 100 86); }
+.dept-mpick { padding: 3px 9px; border: 1px solid rgb(229 228 223); border-radius: 99px; background: #fff; color: rgb(90 78 68); font-size: 11.5px; cursor: pointer; }
+.dept-mpick.is-total { font-weight: 600; }
+.dept-mpick[aria-pressed='true'] { border-color: rgb(43 31 23); background: rgb(43 31 23); color: #fff; }
+.dept-donuts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.dept-dcol { min-width: 0; text-align: center; }
+.dept-dcol h5 { margin: 4px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.dept-dcol h5.is-in { color: #3F7A64; }
+.dept-dcol h5.is-out { color: #A95C15; }
+.dept-donut { display: block; margin: 0 auto; }
+.dept-donut path { cursor: pointer; transition: opacity 150ms ease-out; }
+.dept-donut:hover path { opacity: 0.5; }
+.dept-donut path:hover { opacity: 1; }
+.dept-donut .dl { font-size: 10px; fill: rgb(117 100 86); text-anchor: middle; pointer-events: none; }
+.dept-donut .dv { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 12px; font-weight: 600; text-anchor: middle; pointer-events: none; }
+.dept-donut .dv.is-in { fill: #3F7A64; }
+.dept-donut .dv.is-out { fill: #A95C15; }
+.dept-legend { margin: 6px 0 0; padding: 0; list-style: none; text-align: left; }
+.dept-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 4px; font-size: 11px; color: rgb(90 78 68); }
+.dept-legend li:hover { background: rgb(247 247 245); }
+.dept-legend li span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dept-legend li b { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; font-weight: 500; color: #000; }
+.dept-sw { display: inline-block; flex: none; width: 9px; height: 9px; border-radius: 2px; }
+.dept-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgb(239 235 229); }
+.dept-figs div { min-width: 0; }
+.dept-figs small { display: block; font-size: 10.5px; color: rgb(117 100 86); }
+.dept-figs b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 14px; font-weight: 500; }
+.dept-figs b.is-in { color: #3F7A64; }
+.dept-figs b.is-out { color: #A95C15; }
+.dept-figs b.is-pos { color: rgb(var(--ledger)); }
+.dept-figs b.is-neg { color: #B02822; }
+.dept-host { width: 100%; min-width: 0; }
+.dept-chart { display: block; width: 100%; height: auto; overflow: visible; }
+.dept-chart .grid { stroke: rgb(239 235 229); }
+.dept-chart .zero { stroke: rgb(207 197 183); }
+.dept-chart .yt { font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; fill: rgb(117 100 86); text-anchor: end; }
+.dept-chart .xt { font-size: 11px; font-weight: 600; fill: rgb(31 29 27); text-anchor: middle; }
+.dept-chart .xt.sel { fill: #B8691F; }
+.dept-chart .selbar { fill: #E99A53; }
+/* The month pointed at lifts, the rest fade a little (round 8: not to white). */
+.dept-chart .mcol { cursor: pointer; transition: opacity 200ms ease-out, transform 200ms ease-out; }
+.dept-chart:hover .mcol { opacity: 0.62; }
+.dept-chart .mcol:hover { opacity: 1; transform: translateY(-4px); filter: drop-shadow(0 3px 4px rgb(43 31 23 / 18%)); }
+.dept-chart .hz { fill: #fff; fill-opacity: 0; }
+.dept-chart .nline { fill: none; stroke: rgb(29 43 74); stroke-width: 1.8; pointer-events: none; }
+.dept-chart .ndot { fill: #fff; stroke: rgb(29 43 74); stroke-width: 1.5; pointer-events: none; }
+.dept-keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 6px; font-size: 11px; color: rgb(90 78 68); }
+.dept-keys span { display: inline-flex; align-items: center; gap: 5px; }
+.dept-ln { display: inline-block; width: 16px; height: 2px; border-radius: 2px; background: rgb(29 43 74); }
+
+/* Where it came from and went: the two ranked cards side by side, in left, out right. */
+.dept-pair-cards { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.dept-card-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.dept-card-title h4 { margin: 0; font-size: 14px; font-weight: 600; }
+.dept-card-title h4::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 7px; border-radius: 2px; }
+.dept-card.is-in .dept-card-title h4::before { background: #3F7A64; }
+.dept-card.is-out .dept-card-title h4::before { background: #E99A53; }
+.dept-card-title span { font-size: 11px; color: rgb(117 100 86); }
+.dept-rank { margin-top: 10px; }
+.dept-rank-row { display: grid; grid-template-columns: minmax(84px, 1.5fr) minmax(48px, 1fr) 86px 44px 66px; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid rgb(241 237 231); font-size: 12px; }
+.dept-rank-row:not(.is-head):not(.is-foot):hover { background: rgb(247 247 245); }
+.dept-rank-row.is-head { padding-top: 4px; border-bottom: 1.5px solid rgb(207 197 183); color: rgb(117 100 86); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.dept-rank-row.is-head span:nth-child(3), .dept-rank-row.is-head span:nth-child(4) { text-align: right; }
+.dept-rank-name { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.dept-rank-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dept-rank-bar { height: 11px; overflow: hidden; border-radius: 3px; background: rgb(243 240 235); }
+.dept-rank-bar i { display: block; height: 100%; border-radius: 3px; }
+.dept-card.is-in .dept-rank-bar i { background: #3F7A64; }
+.dept-card.is-out .dept-rank-bar i { background: #E99A53; }
+.dept-rank-amt { text-align: right; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; }
+.dept-rank-amt.is-neg { color: #B02822; }
+.dept-rank-share { text-align: right; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; color: rgb(117 100 86); }
+.dept-rank-spark svg { display: block; width: 66px; height: 17px; }
+.dept-rank-row.is-foot { border-top: 1.5px solid rgb(216 210 200); border-bottom: 0; font-weight: 700; }
+.dept-card.is-in .dept-rank-row.is-foot { color: #3F7A64; }
+.dept-card.is-out .dept-rank-row.is-foot { color: #A95C15; }
+.dept-rank-row.is-foot span:nth-child(3), .dept-rank-row.is-foot span:nth-child(4) { text-align: right; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+.dept-rank-empty { padding: 24px; text-align: center; color: rgb(148 139 128); }
+
+/* The hover box: beside a month's bars, or by the pointer. */
+.dept-tip { position: fixed; z-index: 60; min-width: 230px; max-width: 340px; padding: 10px 12px; border: 1px solid rgb(232 225 216); border-radius: 10px; background: #fff; box-shadow: 0 10px 28px rgb(43 31 23 / 16%); color: #000; font-size: 11.5px; pointer-events: none; }
+.dept-tip h6 { display: flex; justify-content: space-between; gap: 10px; margin: 0 0 4px; font-size: 12px; font-weight: 700; }
+.dept-tip h6 span { color: rgb(117 100 86); font-size: 10.5px; font-weight: 400; white-space: nowrap; }
+.dept-tip table { width: 100%; border-collapse: collapse; }
+.dept-tip td { padding: 1.5px 0; white-space: nowrap; }
+.dept-tip td:first-child { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+.dept-tip td.n { padding-left: 10px; text-align: right; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11px; }
+.dept-tip td.p { padding-left: 8px; text-align: right; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10px; color: rgb(117 100 86); }
+.dept-tip td.is-neg { color: #B02822; }
+.dept-tip td.dim { color: rgb(148 139 128); }
+.dept-tip tr.is-sec td { padding-top: 6px; font-weight: 700; }
+.dept-tip tr.is-sec.is-in td { color: #3F7A64; }
+.dept-tip tr.is-sec.is-out td { color: #A95C15; }
+.dept-tip tr.is-net td { padding-top: 5px; border-top: 1px solid rgb(239 235 229); color: rgb(29 43 74); font-weight: 700; }
+.dept-tip .dept-sw { margin-right: 5px; }
+
+/* The statement in the charts' dress (SheetReport variant="dept"): a warm
+   head, the Total tinted, a firmer rule between months, each block opening
+   on its side's total, a square in the account's chart colour. */
+.dept-st-note { margin: -6px 0 10px; font-size: 11px; color: rgb(117 100 86); }
+.sheet-rpt.is-dept thead th { background: rgb(235 231 224); border-left-color: rgb(211 202 189); color: rgb(43 31 23); }
+.sheet-rpt.is-dept thead th.sr-corner { border-right-color: rgb(207 197 183); border-bottom-color: rgb(207 197 183); }
+.sheet-rpt.is-dept thead th.sr-unit { border-bottom: 1.5px solid rgb(207 197 183); color: rgb(117 100 86); }
+.sheet-rpt.is-dept thead th.is-acc { background: rgb(227 221 211); }
+.sheet-rpt.is-dept thead th.is-now { background: rgb(251 233 216); }
+.sheet-rpt.is-dept thead tr:first-child th.is-now { box-shadow: inset 0 3px 0 #E99A53; }
+.sheet-rpt.is-dept thead th.sr-unit.is-now { box-shadow: none; }
+.sheet-rpt.is-dept td.sr-num { border-left-color: rgb(224 217 206); }
+.sheet-rpt.is-dept td.is-acc { background: rgb(246 243 238); }
+.sheet-rpt.is-dept tr.sr-item td.sr-label { color: rgb(90 78 68); }
+.sheet-rpt.is-dept tr.sr-title td { border-top: 1.5px solid rgb(216 210 200); font-weight: 700; }
+.sheet-rpt.is-dept tr.sr-title td.sr-label { font-size: 11.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+.sheet-rpt.is-dept tr.sr-title.is-in td { background: rgb(233 242 237); color: #3F7A64; }
+.sheet-rpt.is-dept tr.sr-title.is-out td { background: rgb(253 241 229); color: #A95C15; }
+.sheet-rpt.is-dept tr.sr-title.is-in td.sr-label { box-shadow: inset 3px 0 0 #3F7A64; }
+.sheet-rpt.is-dept tr.sr-title.is-out td.sr-label { box-shadow: inset 3px 0 0 #E99A53; }
+.sheet-rpt .sr-sw { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 2px; vertical-align: 0; }
+
+/* By the room the charts get, not the window's (the sidebar takes its share). */
+.dept-charts { container: dept-charts / inline-size; }
+.dept-pieces { container: dept-pieces / inline-size; }
+.dept-panel { container: dept-panel / inline-size; }
+.dept-card { container: dept-card / inline-size; }
+/* Too narrow for the Month's two donuts side by side beside the bars: the Month over the months. */
+@container dept-charts (max-width: 980px) {
+  .dept-duo { grid-template-columns: minmax(0, 1fr); }
+}
+@container dept-pieces (max-width: 720px) {
+  .dept-pair-cards { grid-template-columns: minmax(0, 1fr); }
+}
+@container dept-panel (max-width: 330px) {
+  .dept-donuts { grid-template-columns: minmax(0, 1fr); }
+}
+/* A card of half a narrow page: the month bars go, the names get the room (the hover still lists each month). */
+@container dept-card (max-width: 540px) {
+  .dept-rank-row { grid-template-columns: minmax(118px, 1.6fr) minmax(48px, 1fr) 86px 44px; }
+  .dept-rank-row > span:nth-child(5) { display: none; }
+}
+/* A phone's card: the name wraps rather than losing its end, the bar gives up the room. */
+@container dept-card (max-width: 380px) {
+  .dept-rank-row { grid-template-columns: minmax(0, 1.6fr) minmax(36px, 1fr) 84px 42px; }
+  .dept-rank-text { overflow: visible; white-space: normal; line-height: 1.25; }
+}
+@media (max-width: 760px) {
+  .dept-period-rule { display: none; }
+}
+@media (max-width: 560px) {
+  .dept-panel, .dept-card { padding: 12px; }
+  /* A phone: a long section title and its count take a line each, never wider than the screen. */
+  .dept-page .sect-head { flex-wrap: wrap; gap: 2px 12px; }
+  .dept-page .sect-head .rule { display: none; }
+  .dept-page .sect-head .count { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dept-chart .mcol, .dept-donut path { transition: none; }
+  .dept-chart .mcol:hover { transform: none; }
+}
+
 /* Negatives red wherever Finance's sheet writes them (the handoff: "negative
    numbers are red, in brackets"). */
 .fin-view .neg { color: #B02822; }
 .rpt-field { letter-spacing: 0.05em; }
 .rpt-range-word { font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: rgb(117 100 86); }
-/* The Company Statement's column groups (2026-10-10, the handoff): to collect
-   green, to repay red (the user took the handoff's red over the August
-   orange, 2026-10-10); the total tinted navy. */
-.fin-view .ledger-table thead th.cs-collect { background: rgb(216 236 225); color: #156E4E; }
-.fin-view .ledger-table thead th.cs-repay { background: rgb(246 222 219); color: #B02822; }
-.fin-view .ledger-table thead th.cs-collect-sub { background: rgb(232 243 237); }
-.fin-view .ledger-table thead th.cs-repay-sub { background: rgb(250 235 233); }
-.fin-view .ledger-table tr.cs-total td { background: rgb(221 229 240); box-shadow: inset 0 1.5px 0 rgb(46 92 138); color: rgb(29 43 74); }
-.fin-view .ledger-table tr.cs-total td:first-child { font-weight: 600; }
+/* ═══ The Company Statement (2026-10-26, six rounds of samples with the user — mockups/company-statement-mockup.html).
+   To collect green, to repay red (the user took the handoff's red over the August orange, 2026-10-10), the total
+   tinted navy; a line between every column ("每个 column 之间要有线条"), a darker one where a group starts. ═══ */
+.cs-dim { color: rgb(185 177 166); }
+
+/* Who owes whom: to repay to the left, to collect to the right, the net beside. */
+.cs-who { padding: 12px 16px 10px; border: 1px solid rgb(232 225 216); border-radius: 12px; background: #fff; }
+.cs-who-row { display: grid; grid-template-columns: 108px minmax(40px, 1fr) minmax(112px, 150px) minmax(40px, 1fr) 108px 150px; align-items: center; gap: 10px; padding: 6px; border-bottom: 1px solid rgb(241 237 231); font-size: 12.5px; }
+.cs-who-row[data-cp]:hover { background: rgb(247 247 245); }
+.cs-who-head { padding-top: 2px; border-bottom: 1.5px solid rgb(207 197 183); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(117 100 86); }
+.cs-who-head span:nth-child(1), .cs-who-head span:nth-child(6) { text-align: right; }
+.cs-who-head span:nth-child(3) { text-align: center; }
+.cs-who-bar { display: flex; height: 14px; overflow: hidden; border-radius: 3px; background: rgb(243 240 235); }
+.cs-who-bar.is-repay { justify-content: flex-end; }
+.cs-who-bar i { display: block; height: 100%; border-radius: 3px; }
+.cs-who-bar.is-repay i { background: #C8574B; }
+.cs-who-bar.is-collect i { background: #3F7A64; }
+.cs-who-amt { white-space: nowrap; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+.cs-who-amt.is-repay { text-align: right; color: #B02822; }
+.cs-who-amt.is-collect { color: #156E4E; }
+.cs-who-name { min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: rgb(43 31 23); }
+.cs-who-net { text-align: right; white-space: nowrap; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; color: rgb(90 78 68); }
+.cs-who-net.is-collect { color: #156E4E; }
+.cs-who-net.is-repay { color: #B02822; }
+.cs-who-foot { border-top: 1.5px solid rgb(216 210 200); border-bottom: 0; font-weight: 700; }
+.cs-who-foot .cs-who-amt, .cs-who-foot .cs-who-net { font-weight: 700; }
+.cs-who-keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 8px; font-size: 11px; color: rgb(90 78 68); }
+.cs-who-keys span { display: inline-flex; align-items: center; gap: 5px; }
+.cs-who-keys i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
+.cs-who-keys i.is-collect { background: #3F7A64; }
+.cs-who-keys i.is-repay { background: #C8574B; }
+/* Its hover box is the department charts' box, to repay in red. */
+.dept-tip.cs-tip tr.is-sec.is-collect td { color: #156E4E; }
+.dept-tip.cs-tip tr.is-sec.is-repay td { color: #B02822; }
+.dept-tip.cs-tip td.ind { padding-left: 12px; color: rgb(90 78 68); }
+.dept-tip.cs-tip td.n.is-collect { color: #156E4E; }
+.dept-tip.cs-tip td.n.is-repay { color: #B02822; }
+@media (max-width: 700px) {
+  /* A phone: the name and its net on a line, the two bars under them, their figures under the bars. */
+  .cs-who { padding: 10px 12px; }
+  .cs-who-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3px 8px; padding: 8px 2px; }
+  .cs-who-head { display: none; }
+  .cs-who-row > span:empty { display: none; }
+  .cs-who-name { grid-column: 1; grid-row: 1; text-align: left; }
+  .cs-who-net { grid-column: 2; grid-row: 1; }
+  .cs-who-bar.is-repay { grid-column: 1; grid-row: 2; }
+  .cs-who-bar.is-collect { grid-column: 2; grid-row: 2; }
+  .cs-who-amt.is-repay { grid-column: 1; grid-row: 3; font-size: 11px; }
+  .cs-who-amt.is-collect { grid-column: 2; grid-row: 3; font-size: 11px; }
+}
+
+/* The tools over the table: search, Sort, Show, the export ticks, Expand all. */
+.cs-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.cs-tool-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(117 100 86); }
+.cs-seg { display: inline-flex; overflow: hidden; border: 1px solid rgb(var(--hairline)); border-radius: 7px; background: #fff; }
+.cs-seg button { padding: 5px 10px; border: 0; border-left: 1px solid rgb(var(--hairline)); background: transparent; font-size: 12px; color: rgb(90 78 68); white-space: nowrap; cursor: pointer; }
+.cs-seg button:first-child { border-left: 0; }
+.cs-seg button[aria-pressed='true'] { background: rgb(43 31 23); color: #fff; }
+
+/* The counterparty table. */
+.cs-scroll { overflow-x: auto; border: 1px solid rgb(216 210 200); border-radius: 8px; }
+table.cs-sheet { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
+.cs-sheet th { padding: 7px 10px; border-bottom: 1px solid rgb(221 213 202); background: rgb(235 231 224); font-size: 11px; font-weight: 600; color: rgb(43 31 23); text-align: right; white-space: nowrap; }
+.cs-sheet thead tr:last-child th, .cs-sheet thead th[rowspan] { border-bottom: 1.5px solid rgb(207 197 183); }
+.cs-sheet th.c-name { text-align: left; vertical-align: bottom; }
+.cs-sheet th.cs-collect, .cs-sheet th.cs-repay { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.cs-sheet th.cs-collect[colspan], .cs-sheet th.cs-repay[colspan] { text-align: center; }
+.cs-sheet th.cs-collect { background: rgb(216 236 225); color: #156E4E; box-shadow: inset 0 3px 0 #3F7A64; }
+.cs-sheet th.cs-repay { background: rgb(246 222 219); color: #B02822; box-shadow: inset 0 3px 0 #C8574B; }
+.cs-sheet th.cs-collect-sub { background: rgb(232 243 237); }
+.cs-sheet th.cs-repay-sub { background: rgb(250 235 233); }
+.cs-sheet td { padding: 9px 10px; border-bottom: 1px solid rgb(239 235 229); background: #fff; text-align: right; white-space: nowrap; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: rgb(42 37 34); }
+.cs-sheet td.c-name { min-width: 230px; text-align: left; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 13px; }
+.cs-sheet td.c-name input { margin: 0 8px 0 0; vertical-align: -2px; cursor: pointer; }
+.cs-sheet .cs-tg { display: inline-block; width: 14px; font-size: 10px; color: rgb(148 139 128); }
+.cs-sheet .cs-cnt { margin-left: 10px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; color: rgb(117 100 86); }
+.cs-sheet th + th, .cs-sheet td + td { border-left: 1px solid rgb(239 233 224); }
+.cs-sheet th.cs-rule, .cs-sheet td.cs-rule { border-left: 1px solid rgb(227 220 207); }
+.cs-sheet td.c-tot { font-weight: 600; }
+.cs-sheet td.c-tot.is-collect { background: rgb(246 250 247); color: #156E4E; }
+.cs-sheet td.c-tot.is-repay { background: rgb(253 247 246); color: #B02822; }
+.cs-sheet td.c-net { font-weight: 600; }
+.cs-sheet td.c-net.is-collect { color: #156E4E; }
+.cs-sheet td.c-net.is-repay { color: #B02822; }
+.cs-sheet tr.cs-cp { cursor: pointer; }
+.cs-sheet tr.cs-cp:hover td { background: rgb(255 250 243); }
+.cs-sheet tr.cs-cp.is-open td { background: rgb(255 244 231); }
+.cs-sheet td.cs-empty { padding: 24px; text-align: center; font-family: var(--font-display); font-style: italic; color: rgb(148 139 128); }
+.cs-sheet tr.cs-total td { border-bottom: 0; background: rgb(221 229 240); box-shadow: inset 0 1.5px 0 rgb(46 92 138); color: rgb(29 43 74); font-weight: 700; }
+.cs-sheet tr.cs-detail > td { padding: 6px 12px 16px 28px; border-bottom: 1px solid rgb(233 223 210); background: rgb(255 250 243); text-align: left; white-space: normal; font-family: var(--font-sans), Inter, system-ui, sans-serif; }
+@media (max-width: 767px) {
+  .cs-sheet td.c-name { min-width: 0; white-space: normal; }
+  .cs-sheet .cs-cnt { display: block; margin: 2px 0 0 14px; }
+  .cs-sheet tr.cs-detail > td { padding: 4px 8px 12px; }
+}
+
+/* An opened counterparty: one table for both sides — the columns once, each side opened by a tinted row with its
+   totals under them, its positions newest first, a Net row closing it. Set widths, so a row's figures sit under its
+   side's totals; Terms takes what is left. */
+.cs-pos-wrap { container: cs-pos / inline-size; }
+table.cs-pos { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid rgb(229 228 223); border-radius: 8px; background: #fff; }
+.cs-pos th { padding: 6px 9px; border-bottom: 1px solid rgb(229 228 223); background: rgb(247 247 245); font-size: 10px; font-weight: 600; line-height: 1.3; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(117 100 86); text-align: right; white-space: nowrap; vertical-align: bottom; }
+.cs-pos th.c-date, .cs-pos th.c-terms { text-align: left; }
+.cs-pos td { padding: 8px 9px; border-bottom: 1px solid rgb(240 236 230); vertical-align: top; text-align: right; white-space: nowrap; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; color: rgb(90 78 68); }
+.cs-pos tbody tr:last-child td { border-bottom: 0; }
+.cs-pos th + th, .cs-pos td + td { border-left: 1px solid rgb(235 229 220); }
+.cs-pos th.cs-rule, .cs-pos td.cs-rule { border-left: 1px solid rgb(211 201 186); }
+.cs-pos td.c-date { text-align: left; font-size: 11px; color: rgb(166 154 142); }
+.cs-pos td.c-terms { text-align: left; white-space: normal; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 12.5px; color: rgb(43 31 23); }
+.cs-pos td.c-orig { font-weight: 700; color: #000; }
+.cs-pos td.c-t { font-weight: 600; color: #000; }
+.cs-pos td.c-pay { color: #000; }
+.cs-pos .cs-dim-t { color: rgb(148 139 128); }
+.cs-pos .cs-permo { font-size: 11px; color: rgb(148 139 128); }
+.cs-pos .c-sub { margin-top: 1px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; font-weight: 400; line-height: 15px; white-space: normal; color: rgb(148 139 128); }
+.cs-pos .c-sub.c-day { color: rgb(166 154 142); }
+.cs-pos .c-sub b { font-weight: 700; color: #000; }
+.cs-pos td.c-go { padding-left: 0; padding-right: 4px; text-align: center; }
+.cs-pos a.cs-go { color: rgb(220 194 166); text-decoration: none; }
+.cs-pos tr.cs-pos-row { cursor: pointer; }
+.cs-pos tr.cs-pos-row:hover td { background: rgb(255 250 243); }
+.cs-pos tr.cs-pos-row:hover a.cs-go, .cs-pos a.cs-go:focus-visible { color: #C27A33; }
+.cs-pos tr.cs-sec td { padding-top: 7px; padding-bottom: 7px; border-top: 1.5px solid rgb(216 210 200); font-size: 11.5px; font-weight: 700; }
+.cs-pos tbody tr:first-child td { border-top: 0; }
+.cs-pos tr.cs-sec.is-collect td { background: rgb(234 243 238); color: #156E4E; }
+.cs-pos tr.cs-sec.is-repay td { background: rgb(251 238 236); color: #B02822; }
+.cs-pos tr.cs-sec.is-collect td.c-label { box-shadow: inset 3px 0 0 #3F7A64; }
+.cs-pos tr.cs-sec.is-repay td.c-label { box-shadow: inset 3px 0 0 #C8574B; }
+.cs-pos td.c-label { text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+.cs-pos tr.cs-net td { padding-top: 7px; padding-bottom: 7px; border-top: 1.5px solid rgb(201 211 224); background: rgb(242 245 249); font-size: 11.5px; font-weight: 700; color: rgb(29 43 74); }
+.cs-pos tr.cs-net td.is-collect { color: #156E4E; }
+.cs-pos tr.cs-net td.is-repay { color: #B02822; }
+.cs-pos tr.cs-terms-row td { padding: 6px 12px 8px; background: rgb(250 248 245); text-align: left; white-space: normal; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 12px; color: rgb(90 78 68); }
+.cs-bdg { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid rgb(229 228 223); border-radius: 4px; background: #fff; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9.5px; line-height: 16px; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(46 92 138); white-space: nowrap; vertical-align: 1px; }
+.cs-bdg.is-alert { color: #B8691F; }
+.cs-pos.is-full th.c-date { width: 96px; }
+.cs-pos th.c-orig { width: 104px; }
+.cs-pos th.c-ti { width: 112px; }
+.cs-pos th.c-p { width: 112px; }
+.cs-pos th.c-i { width: 104px; }
+.cs-pos th.c-t { width: 108px; }
+.cs-pos th.c-left { width: 76px; }
+.cs-pos th.c-pay { width: 120px; }
+.cs-pos th.c-go { width: 24px; }
+/* The payoff goes under the total due when the room is short — that column takes its words. */
+.cs-pos.is-compact th.c-t { width: 166px; }
+.cs-pos.is-phone th.c-t { width: 100px; }
+@container cs-pos (max-width: 1000px) {
+  /* A narrower table: tighter widths, the long headings on two lines, the terms wrap. */
+  .cs-pos th { white-space: normal; }
+  .cs-pos th, .cs-pos td { padding-left: 8px; padding-right: 8px; }
+  .cs-pos.is-full th.c-date { width: 84px; }
+  .cs-pos th.c-orig { width: 92px; }
+  .cs-pos th.c-ti { width: 88px; }
+  .cs-pos th.c-p { width: 90px; }
+  .cs-pos th.c-i { width: 90px; }
+  .cs-pos.is-full th.c-t { width: 92px; }
+  .cs-pos th.c-left { width: 72px; }
+  .cs-pos th.c-pay { width: 104px; }
+  .cs-pos th.c-go { width: 18px; }
+  .cs-pos td.c-pay { font-size: 11px; }
+}
 
 /* The handoff's type and colour rules on Finance's pages (2026-10-10): the
    muted greys for secondary text and hints (the sheet keeps them black on
@@ -7231,4 +7648,155 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   --lv-k-text: 74 104 140;
   --lv-k-msg: 128 104 62;
   --lv-k-ai: 150 84 48;
+/* ── Marketing's view (2026-10-23, the Claude Design handoff "HOUZS Marketing Module Setup", `.design/marketing`) ──
+   Its own shell and pages, drawn light whatever the theme, as the prototype draws them (DESIGN.md › Marketing's view).
+   Channels (`r g b`), so a page writes rgb(var(--mk-ink)) or rgb(var(--mk-ink) / .04). */
+.mkt-shell {
+  color-scheme: light;
+  --mk-app: 243 243 241;
+  --mk-side: 248 245 240;
+  --mk-line: 229 222 211;
+  --mk-line-2: 236 231 224;
+  --mk-line-3: 240 236 230;
+  --mk-line-4: 244 241 236;
+  --mk-card-line: 229 228 223;
+  --mk-field-line: 232 225 216;
+  --mk-field-hover: 214 204 190;
+  --mk-ink: 51 36 27;
+  --mk-ink-2: 43 31 23;
+  --mk-text-2: 74 64 58;
+  --mk-text-3: 90 78 68;
+  --mk-muted: 117 100 86;
+  --mk-faint: 160 150 140;
+  --mk-white: 255 255 255;
+  --mk-surface: 250 248 244;
+  --mk-surface-2: 246 244 240;
+  --mk-surface-3: 246 246 244;
+  --mk-surface-4: 251 250 248;
+  --mk-hover: 241 236 228;
+  --mk-active: 236 229 219;
+  --mk-brown: 90 62 43;
+  --mk-rust: 163 78 37;
+  --mk-cream: 246 238 230;
+  --mk-primary: #EC9B55;
+  --mk-primary-hover: #E0893F;
+  /* Statuses (the handoff's README › Status). */
+  --mk-red-bg: 252 236 233; --mk-red-line: 236 190 184; --mk-red: 176 40 34; --mk-red-dot: 200 52 42; --mk-red-soft: 255 247 245;
+  --mk-wait-bg: 251 243 225; --mk-wait-line: 236 214 164; --mk-wait: 138 92 10; --mk-wait-dot: 214 152 30; --mk-wait-soft: 255 250 238;
+  --mk-done-bg: 232 244 235; --mk-done-line: 190 222 199; --mk-done: 40 110 64; --mk-done-dot: 60 150 90;
+  --mk-draft-bg: 243 242 239; --mk-draft-line: 226 223 217; --mk-draft: 98 92 86; --mk-draft-dot: 160 154 146;
+  --mk-risk-dot: 230 170 60; --mk-risk: 150 96 10;
+  /* The sidebar's tile tones. */
+  --mk-tone-sand: 239 228 217;
+  --mk-tone-mist: 230 237 241;
+  --mk-tone-peach: 249 231 216;
+  --mk-tone-cream: 246 238 222;
+  /* A group's colour — a chip's ground and words (since 2026-10-24 a group is a People title, its tone read from its
+     words: lib/marketing/groups.ts › groupTone; the names below are the tones, not teams). */
+  --mk-team-content-bg: oklch(0.94 0.04 295); --mk-team-content: oklch(0.40 0.12 295); --mk-team-content-bar: oklch(0.87 0.07 295);
+  --mk-team-social-bg: oklch(0.94 0.04 235); --mk-team-social: oklch(0.40 0.10 235); --mk-team-social-bar: oklch(0.88 0.06 235);
+  --mk-team-design-bg: oklch(0.94 0.04 350); --mk-team-design: oklch(0.43 0.13 350); --mk-team-design-bar: oklch(0.88 0.07 350);
+  --mk-team-ads-bg: oklch(0.94 0.04 270); --mk-team-ads: oklch(0.40 0.12 270); --mk-team-ads-bar: oklch(0.86 0.07 270);
+  --mk-team-brand-bg: oklch(0.94 0.04 195); --mk-team-brand: oklch(0.38 0.08 195); --mk-team-brand-bar: oklch(0.86 0.06 195);
+  --mk-team-manager-bg: oklch(0.94 0.03 60); --mk-team-manager: oklch(0.42 0.06 60); --mk-team-manager-bar: oklch(0.88 0.04 60);
+  /* A group whose title says nothing the tones know (2026-10-24: groups are People's titles) — a neutral one. */
+  --mk-team-none-bg: oklch(0.95 0.005 60); --mk-team-none: oklch(0.45 0.01 60); --mk-team-none-bar: oklch(0.88 0.008 60);
+  --mk-meet-bg: oklch(0.96 0.025 235); --mk-meet-line: oklch(0.88 0.04 235); --mk-meet: oklch(0.42 0.10 235); --mk-meet-dot: oklch(0.60 0.12 235);
+  /* The Library's six categories (`Library.dc.html`). */
+  --mk-cat-brand: oklch(0.55 0.12 300); --mk-cat-product: oklch(0.50 0.08 175); --mk-cat-photo: oklch(0.58 0.12 50);
+  --mk-cat-video: oklch(0.48 0.04 240); --mk-cat-content: oklch(0.62 0.10 80); --mk-cat-minutes: oklch(0.55 0.01 60);
+  /* A card just put on somebody's plate; an Assignment plan's notice; My Space's first cover. */
+  --mk-new-bg: 255 251 244; --mk-new-line: 214 180 140;
+  --mk-plan-bg: oklch(0.975 0.015 235); --mk-plan-line: oklch(0.92 0.035 235); --mk-plan: oklch(0.45 0.10 235);
+  --mk-cover: linear-gradient(135deg, oklch(0.86 0.07 60), oklch(0.84 0.07 20) 50%, oklch(0.82 0.06 330));
+  /* My Space's own look (⑦-1, `My Space Bento.dc.html`): the board's five backgrounds, the five accents (lettering on
+     an accent: dark on orange, white on the rest), the four covers and the Notes tile. */
+  --mk-sp-linen: 246 244 240; --mk-sp-mint: 238 246 241; --mk-sp-lilac: 243 240 248; --mk-sp-sand: 244 233 218; --mk-sp-white: 255 255 255;
+  --mk-sp-orange: #EC9B55; --mk-sp-walnut: rgb(90 62 43); --mk-sp-blue: oklch(0.52 0.12 235); --mk-sp-green: oklch(0.52 0.13 150);
+  --mk-sp-pink: oklch(0.55 0.15 350);
+  --mk-sp-cover-0: linear-gradient(135deg, oklch(0.86 0.07 60), oklch(0.84 0.07 20) 50%, oklch(0.82 0.06 330));
+  --mk-sp-cover-1: linear-gradient(135deg, oklch(0.87 0.06 200), oklch(0.84 0.07 160));
+  --mk-sp-cover-2: linear-gradient(135deg, oklch(0.38 0.06 280), oklch(0.52 0.09 320));
+  --mk-sp-cover-3: linear-gradient(135deg, oklch(0.92 0.06 95), oklch(0.85 0.08 55));
+  --mk-sp-notes: 255 249 222;
+  /* ⑦-2 — the room's walls, its floors (two tones each), the window's frame and skies, the line under the wall, and the
+     pet's colour swatches (its colour itself is a filter on the pet, in myspace.module.css). */
+  --mk-room-peach: #f3dcc8; --mk-room-sage: #dfe6d3; --mk-room-sky: #d9e6f0; --mk-room-blush: #f1d9df; --mk-room-cream: #efe6d8;
+  --mk-room-night: #2f2b3d;
+  --mk-floor-oak: #e9cfa8; --mk-floor-oak-2: #dcbd92; --mk-floor-walnut: #b98a62; --mk-floor-walnut-2: #a57650;
+  --mk-floor-tile: #f2efe9; --mk-floor-tile-2: #e0d9cd; --mk-floor-grass: #cfe3b5; --mk-floor-grass-2: #b9d49c;
+  --mk-floor-carpet: #d9cfe6; --mk-floor-carpet-2: #c8bcda;
+  --mk-room-frame: #ffffff; --mk-room-frame-night: #4b4560; --mk-room-base: rgb(255 255 255 / .5); --mk-room-base-night: #1f1c2b;
+  --mk-lobby-wall: #efe6d8; --mk-lobby-floor: #e9dfcf; --mk-lobby-floor-2: #e1d4c0;
+  --mk-on-ink: 246 238 230;
+  --mk-sky-day: linear-gradient(#fbe3b0, #cfe4f2); --mk-sky-evening: linear-gradient(#f5a97f, #6f6aa8);
+  --mk-sky-night: linear-gradient(#2c3a66, #56679c);
+  --mk-pet-original: linear-gradient(135deg, #f2c48d, #d99a5b); --mk-pet-cocoa: linear-gradient(135deg, #9a6a48, #5e3b25);
+  --mk-pet-snow: linear-gradient(135deg, #ffffff, #d9d9d9); --mk-pet-rose: linear-gradient(135deg, #f6b6cf, #e07aa3);
+  --mk-pet-mint: linear-gradient(135deg, #b8ecd0, #6cc79a); --mk-pet-sky: linear-gradient(135deg, #bfe0fb, #6faee6);
+  --mk-pet-midnight: linear-gradient(135deg, #5b5f99, #2b2d52);
+  --mk-today-ink: 246 238 230;
+  --mk-shadow-sm: 0 1px 2px rgb(51 36 27 / .04);
+  --mk-shadow-seg: 0 1px 2px rgb(51 36 27 / .14);
+  --mk-shadow-knob: 0 1px 2px rgb(0 0 0 / .2);
+  --mk-shadow-panel: 0 8px 24px rgb(51 36 27 / .08);
+  /* The Calendar's grounds: a day under the pointer, a day picked, today's column; a neighbour month's numbers. */
+  --mk-cell-hover: 252 251 249; --mk-picked: 250 246 240; --mk-today-col: 252 250 246; --mk-out-num: 190 182 172;
+  /* The Tracking Dashboard's: deeper words on a red or waiting tint, a free person, a focused one, the slowest stage. */
+  --mk-red-deep: 160 36 30; --mk-wait-deep: 122 82 8; --mk-stat-hover: 176 140 104;
+  --mk-free-bg: 244 250 245; --mk-focus-bg: 246 240 232; --mk-slow-bg: 255 250 248;
+  --mk-chip-line: 214 190 160;
+  --mk-shadow-hover: 0 6px 18px rgb(51 36 27 / .08);
+  --mk-shadow-drawer: 0 12px 32px rgb(51 36 27 / .08);
+  --mk-shadow-pop: 0 14px 36px rgb(51 36 27 / .18), 0 2px 6px rgb(51 36 27 / .06);
+  --mk-shadow-modal: 0 24px 64px rgb(51 36 27 / .3);
+  --mk-ease: cubic-bezier(.2, .8, .2, 1);
+  --mk-mono: var(--font-mono), Menlo, monospace;
+  /* New Project and the task page (②a, `New Project.dc.html`, `Workflow Builder.dc.html`, `New Task Page.dc.html`). */
+  --mk-hover-line: 150 136 120; --mk-dash: 214 206 196; --mk-dash-2: 220 212 202; --mk-radio: 200 192 182;
+  --mk-handle: 180 170 158; --mk-quiet: 140 130 120; --mk-x: 170 160 150;
+  --mk-miss-line: 220 150 140; --mk-miss-bg: 255 249 248; --mk-req-bg: 245 244 241; --mk-note-bg: 251 247 238;
+  --mk-warn-ink: 110 74 8; --mk-drop: rgb(90 62 43 / .15); --mk-scrim: rgb(51 36 27 / .35);
+  --mk-shadow-dd: 0 14px 34px rgb(51 36 27 / .16); --mk-shadow-dialog: 0 24px 60px rgb(51 36 27 / .25);
+  background: rgb(var(--mk-app));
+}
+/* The PIC's link, /t/<code> (⑤-1, `PIC Link.dc.html`): the client-facing page in the handoff's own cooler palette,
+   drawn light whatever the theme. Channels, as Marketing's. */
+.mkt-pic {
+  color-scheme: light;
+  --pk-page: 246 245 242;
+  --pk-white: 255 255 255;
+  --pk-line: 230 227 222;
+  --pk-line-2: 240 238 234;
+  --pk-line-3: 244 242 238;
+  --pk-ink: 38 33 29;
+  --pk-text-2: 90 84 78;
+  --pk-muted: 110 104 98;
+  --pk-next: 120 114 108;
+  --pk-soft: 250 249 247;
+  --pk-soft-2: 248 247 245;
+  --pk-btn-line: 210 205 198;
+  --pk-rail: 226 222 216;
+  --pk-brown: 90 62 43;
+  --pk-ring: 240 234 226;
+  --pk-miss-line: 220 150 140;
+  --pk-primary: #EC9B55;
+  --pk-primary-hover: #E0893F;
+  --pk-primary-ink: 43 31 23;
+  --pk-wait-bg: 251 243 225; --pk-wait-line: 236 214 164; --pk-wait: 122 82 8; --pk-wait-dot: 214 152 30;
+  --pk-done-bg: 232 244 235; --pk-done-line: 190 222 199; --pk-done: 36 100 58; --pk-done-dot: 60 150 90;
+  --pk-red-bg: 252 236 233; --pk-red-line: 236 190 184; --pk-red: 160 36 30; --pk-red-dot: 200 52 42;
+  --pk-draft-bg: 243 242 239; --pk-draft-line: 226 223 217; --pk-draft: 90 84 78; --pk-draft-dot: 160 154 146;
+  /* The PIC's calendar (⑤-2, `PIC Calendar.dc.html`): a go-live's blue, a campaign's walnut and slate, a day out of the
+     month's number, the view switch, an approval's edge, a shadow. */
+  --pk-live-bg: 236 240 246; --pk-live-line: 212 222 236; --pk-live: 48 70 110;
+  --pk-camp-bg: 236 229 219; --pk-camp: 75 48 36;
+  --pk-slate-bg: 232 235 240; --pk-slate: 60 70 86; --pk-slate-bar: 110 120 136;
+  --pk-faint: 190 184 176; --pk-seg: 236 233 228; --pk-wait-edge: 224 190 120; --pk-shadow: 0 0 0;
+  background: rgb(var(--pk-page));
+}
+@keyframes mkIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes mkSlide { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .mkt-shell *, .mkt-shell *::before, .mkt-shell *::after { transition: none !important; animation: none !important; }
 }

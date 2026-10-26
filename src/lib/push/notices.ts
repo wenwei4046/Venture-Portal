@@ -5,7 +5,7 @@ import type { PushApp } from './config'
  * `app_notifications`): what it is about, and where a tap on it opens — in
  * the app the phone turned notifications on in.
  */
-export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo' | 'it' | 'share'
+export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo' | 'it' | 'share' | 'people'
 /**
  * `crm_contact` / `crm_invite` (2026-10-14, mig 20261014030000): the CRM's own notices — a customer's message, a new
  * lead, a visit, a reminder, an invitation. They reach the phone only: the bells never list them (the CRM keeps its own).
@@ -15,6 +15,13 @@ export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo'
   | 'it_request'
   // Share order (2026-10-21, mig 20261021150100): a bill shared with them, an answer to theirs, HR's decision — Revenue members.
   | 'share_request'
+  // Marketing (2026-10-23, mig 20261023214000): a stage, an approval, a plan — the Marketing view's own bell lists them
+  // (mkt_notices), never the HR or Revenue app's; a push of one opens Marketing's page.
+  | 'mkt_project'
+  // People (2026-10-23, mig 20261024223000): a probation ending — and since mig 20261025046500 a contract, each 30 and
+  // again 15 days before — to whoever may acknowledge it: the person (their People record's id); the HR app's bell
+  // lists it, a tap opens them there.
+  | 'hr_staff'
 
 export interface Notice {
   id: string
@@ -32,8 +39,8 @@ export interface Notices {
   items: Notice[]
 }
 
-const KINDS: readonly NoticeKind[] = ['hiring', 'rooms', 'review', 'memo', 'it', 'share']
-const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request', 'share_request']
+const KINDS: readonly NoticeKind[] = ['hiring', 'rooms', 'review', 'memo', 'it', 'share', 'people']
+const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request', 'share_request', 'hr_staff']
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -80,6 +87,11 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   if (n.refKind === 'it_request') return app === 'revenue' ? `/member?page=account&view=it&it=${id}` : `/?open=it:${id}`
   // A share request (2026-10-21) is the Revenue app's whichever app the phone signed up in: the request, open over Today.
   if (n.refKind === 'share_request') return `/member?share=${id}`
+  // Marketing's (2026-10-23): its project's page — Marketing is the computer's; a phone opens the same page.
+  if (n.refKind === 'mkt_project') return `/marketing/projects/${id}`
+  // A probation or a contract ending (2026-10-23 / 10-24): the person, in the HR app — HR's acts on it there, whichever
+  // app the phone signed up in.
+  if (n.refKind === 'hr_staff') return `/hr-app?open=person:${id}`
   if (app === 'hr') {
     if (n.refKind === 'hiring_request') return `/hr-app?open=hire:${id}`
     if (n.refKind === 'booking') return `/hr-app?open=booking:${id}`
@@ -135,11 +147,14 @@ export function crmPushFromRow(v: unknown): CrmPush | null {
   }
 }
 
-export type OpenTarget = { k: 'hire' | 'booking' | 'req' | 'memo' | 'me' | 'it'; id: string }
+export type OpenTarget = { k: 'hire' | 'booking' | 'req' | 'memo' | 'me' | 'it' | 'person'; id: string }
 
-/** What the HR app's `?open=` names: a hire, a booking, a member request, a memo — or one's own request in Me (`me:`). */
+/**
+ * What the HR app's `?open=` names: a hire, a booking, a member request, a memo, a person (a probation or a contract ending,
+ * 2026-10-23) — or one's own request in Me (`me:`).
+ */
 export function openTarget(raw: string | null | undefined): OpenTarget | null {
-  const m = /^(hire|booking|req|memo|me|it):(.{1,80})$/.exec(raw ?? '')
+  const m = /^(hire|booking|req|memo|me|it|person):(.{1,80})$/.exec(raw ?? '')
   return m ? { k: m[1] as OpenTarget['k'], id: m[2] } : null
 }
 

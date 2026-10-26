@@ -31,6 +31,8 @@ export interface RepaymentSourceRow {
   account_code: string
   /** true while the account is the default we chose; false once Finance picks one. */
   autoAccount: boolean
+  /** The line's own words (2026-10-22), kept with its part. */
+  description?: string
 }
 
 const ROLES: RepaymentRole[] = ['principal', 'interest', 'penalty']
@@ -56,7 +58,7 @@ export function defaultRepaymentAccount(
  *  rows don't line up with the split — one lump row, a stale amount — they
  *  are rebuilt from the split with the default accounts. */
 export function seedRepaymentSourceRows(
-  saved: readonly { pool: string; amount: string; account_code: string }[],
+  saved: readonly { pool: string; amount: string; account_code: string; description?: string }[],
   split: RepaymentSplit,
   fundSourceAccount: string | null | undefined,
   hasAccount: (code: string) => boolean,
@@ -71,7 +73,7 @@ export function seedRepaymentSourceRows(
     const [s] = unmatched.splice(i, 1)
     const def = defaultRepaymentAccount(role, fundSourceAccount, hasAccount)
     const code = s.account_code || def
-    rows.push({ role, pool: s.pool || DEFAULT_REPAYMENT_POOL, amount: amount.toFixed(2), account_code: code, autoAccount: code === def })
+    rows.push({ role, pool: s.pool || DEFAULT_REPAYMENT_POOL, amount: amount.toFixed(2), account_code: code, autoAccount: code === def, description: s.description || undefined })
   }
   // Anything left over means the draft was split some other way — rebuild.
   if (unmatched.length > 0) return buildRepaymentSourceRows([], split, fundSourceAccount, hasAccount)
@@ -96,6 +98,7 @@ export function buildRepaymentSourceRows(
       amount: amount.toFixed(2),
       account_code: keepManual ? existing!.account_code! : defaultRepaymentAccount(role, fundSourceAccount, hasAccount),
       autoAccount: !keepManual,
+      description: existing?.description || undefined,
     })
   }
   return rows

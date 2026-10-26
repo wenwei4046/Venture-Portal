@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { KEY_ACTIONS } from './permission-actions'
-import { READS_WITHOUT_ACTION, TABLE_READS, tableReadRows } from './permission-table-reads'
+import { READS_BY_BUCKET_POLICY, READS_WITHOUT_ACTION, TABLE_READS, tableReadRows } from './permission-table-reads'
 import { TABLE_WRITES } from './permission-table-writes'
 import { DEFINER_RPCS, INVOKER_READS, INVOKER_VIEWS, functionScopes, policyNeeds, readNeeds, type Need } from '@/test/read-paths'
 
@@ -88,7 +88,11 @@ describe('TABLE_READS', () => {
     const opened = later.flatMap(f => [...sqlOf(f).matchAll(
       /CREATE POLICY\s+\S+\s+ON\s+(?:public\.)?([a-z_0-9]+)(?:\s+AS\s+PERMISSIVE)?\s+FOR\s+(?:SELECT|ALL)\b[^;]*?\b(?:has_scope|has_perm)\(/gi,
     )].map(m => m[1]))
-    expect(opened.filter(t => !(t in TABLE_READS) && !(t in READS_WITHOUT_ACTION))).toEqual([])
+    expect(opened.filter(t => !(t in TABLE_READS) && !(t in READS_WITHOUT_ACTION) && !(t in READS_BY_BUCKET_POLICY))).toEqual([])
+  })
+
+  it('a table read by its buckets’ own policies is not registered as well', () => {
+    expect(Object.keys(READS_BY_BUCKET_POLICY).filter(t => t in TABLE_READS || t in READS_WITHOUT_ACTION)).toEqual([])
   })
 
   it('a later view reads under the caller’s own policies', () => {

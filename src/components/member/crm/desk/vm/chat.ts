@@ -70,7 +70,7 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
     const card = m.card, cd = card ? new Date(card.start) : null;
     const appt: ApptCard | null = card && cd && !hide ? {
       dow: cd.toLocaleDateString("en-GB", { weekday: "short" }).toUpperCase(), day: String(cd.getDate()), mon: cd.toLocaleDateString("en-GB", { month: "short" }).replace("Sept", "Sep").toUpperCase(),
-      time: time(card.start).toUpperCase(), place: card.room, addr: card.addr, sent: time(m.at), kind: card.kind.toUpperCase(), deco: card.kind === "Cancelled" ? "line-through" : "none",
+      time: time(card.start).toUpperCase(), place: card.room, addr: card.mode === "online" ? card.link ?? "" : card.addr === card.room ? "" : card.addr, sent: time(m.at), kind: card.kind.toUpperCase(), deco: card.kind === "Cancelled" ? "line-through" : "none",
       go: () => patch({ tab: "calendar", pane: "closed", calView: "month" }),
     } : null;
     const preview = m.text || mediaWord(m);
@@ -95,7 +95,7 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       ...media,
       key: m.id, id: m.id, day: hide ? "" : day, sys: "", inn: !mine && !hide && !appt, out: mine && !hide && !appt,
       text: m.card || mk === "file" ? "" : m.text ?? "", time: time(m.at),
-      starred: star, hasReaction: !!rx, reaction: rx, rxGap: rx ? "14px" : "0",
+      starred: star, hasReaction: !!(rx || m.theirReaction), reaction: rx + (m.theirReaction ?? ""), rxGap: rx || m.theirReaction ? "14px" : "0",
       // The ⌄ button sits 6px outside the bubble: crossing that gap leaves the message, so the button waits a moment before
       // it goes (the owner, 2026-10-15: "mouse 過去，他會消失"); coming back — or reaching the button — keeps it.
       enter: () => { clearTimeout(hoverOut); if (ui.msgHov !== m.id) patch({ msgHov: m.id }); },
@@ -164,7 +164,8 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
     photo: () => pick("image/*,video/*", true),
     // Where the customer came from: the channel, then the ad (its headline is all Meta sends) — the owner, 2026-10-15:
     // "沒有顯示他是從什麼平台過來".
-    head: c ? { avatar: initials(c.name), title: c.name, sub: c.adId ? `${c.channel === "whatsapp" ? "WhatsApp" : "Messenger"} · ${adKindLabel(c)} · ${c.ad}` : c.ad, subColor: "var(--crm-brown)", menu: true } : null,
+    // v2 (frame 02): the ad, then the channel — "Mattress Fair · Mid Valley · Messenger"; a video or image ad keeps its kind first.
+    head: c ? { avatar: initials(c.name), title: c.name, sub: [c.adId && c.adMedia ? adKindLabel(c).replace(/ · .*$/, "") : "", c.ad, c.channel === "whatsapp" ? "WhatsApp" : "Messenger"].filter(Boolean).join(" · "), subColor: "var(--crm-brown)", menu: true } : null,
     owner: c ? (c.assignedTo ? `${ctx.nameOf(c.assignedTo)}'s customer` : "No one yet's customer") : "", reply: c ? `Reply to ${first(c.name)}…` : "",
     // v2: the pinned message's bar, the reply's quote over the box, the + menu.
     pinShown: !!pinned, pinText: pinned ? pinned.text || mediaWord(pinned) : "", unpinMsg: () => { if (c) void act.setPref(c.id, { pinnedMessageId: null }); },

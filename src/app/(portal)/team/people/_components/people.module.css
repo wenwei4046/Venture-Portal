@@ -42,6 +42,39 @@
 .deptFilter[data-picked='true'] { border-color: rgb(var(--hv-accent)); background-color: rgb(var(--hv-peach)); }
 .pills { display: flex; gap: 6px; flex-wrap: wrap; }
 
+/* A column's head sorts each band by it (2026-10-22): the head's own words, an
+   arrow after them — on the column that sorts, which way; faint on hover
+   elsewhere, which way a press would put it. */
+.sortHead {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% + 12px);
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sortHead:hover { background: rgb(var(--hv-head-rule) / 0.45); }
+.sortHead:focus-visible { outline: 2px solid rgb(var(--hv-ink)); outline-offset: 0; }
+.sortArrow { font-size: 8px; opacity: 0; transition: opacity 0.12s; }
+.sortArrow::after { content: '\25BC'; }
+.sortArrow[data-way='asc']::after { content: '\25B2'; }
+.sortHead:hover .sortArrow { opacity: 0.4; }
+.sortHead[data-on='true'] .sortArrow { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .sortArrow { transition: none; }
+}
+
 /* A department's band: walnut rule, the cream wash, ▼ that folds it. */
 .band {
   display: flex;
@@ -111,7 +144,9 @@
 }
 .rate { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10px; }
 .code { padding: 9px 14px; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.empCell { padding: 9px 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; }
+.empCell { padding: 9px 14px; display: flex; align-items: center; gap: 6px; white-space: nowrap; min-width: 0; overflow: hidden; }
+/* The hire date after the status chip (2026-10-23): the code column's face, a step quieter. */
+.hired { flex: none; font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 10.5px; color: rgb(var(--hv-body-2)); }
 .missing {
   padding: 2px 8px;
   border-radius: 999px;

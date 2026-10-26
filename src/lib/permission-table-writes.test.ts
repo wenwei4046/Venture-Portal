@@ -124,6 +124,7 @@ const NOT_A_DOMAIN_TABLE: Readonly<Record<string, string>> = {
   member_honours: 'Written by the server with the service role (lib/member/server.ts).',
   member_honour_months: 'Written by the server with the service role (lib/member/server.ts).',
   member_request_attachments: 'Written by the server with the service role (lib/member/server.ts).',
+  file_objects: 'storage.objects’ twin (2026-10-23): each bucket’s own INSERT / DELETE policy asks its cell, its owner or the guest link, word for word — lib/storage/server.ts writes it under the caller’s session.',
 }
 
 /**

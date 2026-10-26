@@ -9,6 +9,7 @@ import {
   crmWrite, fetchCrmTemplates, reactToMessage, forwardCrmMessage, sendCrmMedia, sendCrmMessage, sendCrmTemplate, type CrmWrite,
 } from "@/app/(member)/member/crm-actions";
 import type { CrmAutoReplySet, CrmCard, CrmChatMessage, CrmData, CrmLabel, CrmPrefs, CrmQuickReply, CrmVisit } from "@/lib/member/crm-data";
+import { apptValues, virtualRoom, visitFromRow, type ApptType, type CrmVisitRow } from "@/lib/member/crm-data";
 import type { WaTemplate } from "@/lib/whatsapp/send";
 import { createClient } from "@/lib/supabase/client";
 import { withMapLinks } from "@/lib/member/crm-maps";
@@ -23,7 +24,7 @@ export interface SalesActions {
   openChat(customerId: string): void;
   /** One's own chat's messages read (crm_mark_read) — from Mine, Team or the desktop, once its newest is on screen (shared/seen.ts). Anybody else's: nothing. */
   readChat(customerId: string): void;
-  /** A TL / STL gives their team's customer to someone in that team (crm_assign_member, 2026-10-14). */
+  /** A TL / STL (2026-10-14), or a TA (2026-10-23), gives a customer to one of their own people (crm_assign_member). */
   assignMember(customerId: string, staffId: string): Promise<boolean>;
   send(customerId: string, text: string, replyTo?: string | null): Promise<boolean>;
   react(messageId: string, emoji: string): Promise<void>;
@@ -37,6 +38,9 @@ export interface SalesActions {
   saveDetails(customerId: string, f: { name: string; phone: string; type: string; size: string; loc: string; req: string; budget: string; extra?: Record<string, string | null> }): Promise<boolean>;
   book(customerId: string, roomId: string, start: string): Promise<boolean>;
   moveVisit(visitId: string, roomId: string, start: string): Promise<boolean>;
+  /** An appointment online or elsewhere (the owner, 2026-10-24): booked, or a visit changed to one. */
+  bookCustom(customerId: string, f: CustomVisit): Promise<boolean>;
+  moveCustom(visitId: string, f: CustomVisit): Promise<boolean>;
   cancelVisit(visitId: string): Promise<boolean>;
   outcome(visitId: string, came: boolean, outcome: "follow_up" | "won" | "lost" | "rebooked", extra?: { amount?: number; reason?: string; note?: string }): Promise<boolean>;
   remind(visitId: string): Promise<boolean>;
@@ -73,16 +77,26 @@ interface Deps {
 const uid = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2));
 
 /** The words a visit card sends the customer (the chat draws them as the card), with the way there. */
+/** An appointment online or somewhere else: its kind, start (ISO), meeting link, place and the salesperson's remarks. */
+/** An appointment of one of the Control panel's types (mig 20261025040000): the type, its start (ISO) and what was typed. */
+export interface CustomVisit { type: ApptType; start: string; answers: Record<string, string> }
+
+/** A visit's card: its room's name and address, and an online / elsewhere one's kind and link. */
+export function visitCard(kind: CrmCard["kind"], v: Pick<CrmVisit, "start" | "kind" | "link">, rm: { name: string; address: string } | undefined): CrmCard {
+  return { kind, start: v.start, room: rm?.name ?? "", addr: rm?.address ?? "", ...(v.kind ? { mode: v.kind } : {}), ...(v.link ? { link: v.link } : {}) };
+}
+
 export function cardText(card: CrmCard): string {
   return withMapLinks(cardWords(card), card);
 }
 function cardWords(card: CrmCard): string {
   const d = new Date(card.start), when = `${dayLabel(d)}, ${timeLabel(d)}`;
-  const where = card.addr ? `${card.room}\n${card.addr}` : card.room;
-  return card.kind === "Cancelled" ? `Your showroom visit on ${when} at ${card.room} is cancelled. Reply here to book another time.`
-    : card.kind === "Reminder" ? `Reminder: your showroom visit is on ${when}.\n${where}`
-      : card.kind === "Updated" ? `Your showroom visit is changed to ${when}.\n${where}`
-        : `Your showroom visit is confirmed for ${when}.\n${where}`;
+  const what = card.mode === "online" ? "online meeting" : card.mode === "other" ? "appointment" : "showroom visit";
+  const where = card.mode === "online" ? (card.link ? `Online meeting\n${card.link}` : "Online meeting") : card.addr && card.addr !== card.room ? `${card.room}\n${card.addr}` : card.room;
+  return card.kind === "Cancelled" ? `Your ${what} on ${when}${card.mode === "online" ? "" : ` at ${card.room}`} is cancelled. Reply here to book another time.`
+    : card.kind === "Reminder" ? `Reminder: your ${what} is on ${when}.\n${where}`
+      : card.kind === "Updated" ? `Your ${what} is changed to ${when}.\n${where}`
+        : `Your ${what} is confirmed for ${when}.\n${where}`;
 }
 
 export function makeSalesActions({ live, me, data, setData, toast }: Deps): SalesActions {
@@ -221,10 +235,35 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       await sendCard(customerId, { kind: "Confirmed", start, room: rm?.name ?? "", addr: rm?.address ?? "" });
       return true;
     },
+    async bookCustom(customerId, f) {
+      const r = await write("crm_book_typed", { p_contact: customerId, p_type: f.type.id, p_start: f.start, p_answers: f.answers, p_minutes: 60 });
+      if (!r.ok) return false;
+      // The database's own row when there is one; else (the demo) worked out here as the database would.
+      const row = r.data as CrmVisitRow | null, val = apptValues(f.type, f.answers);
+      const v: CrmVisit = row?.id ? visitFromRow(row) : { id: uid(), customerId, showroomId: "", start: f.start, minutes: 60, state: "booked", outcome: null, remindedAt: null,
+        kind: val.kind, typeId: f.type.id, label: val.name, answers: f.answers, ...(val.link ? { link: val.link } : {}), ...(val.place ? { place: val.place } : {}), ...(val.remarks ? { remarks: val.remarks } : {}) };
+      const vr = virtualRoom(v);
+      setData(d => ({ ...d, visits: [...d.visits, { ...v, showroomId: vr.id }], rooms: [...d.rooms, vr] }));
+      patchCustomer(customerId, c => ({ ...c, status: "appointment", lost: undefined, previous: undefined }));
+      await sendCard(customerId, visitCard("Confirmed", v, vr));
+      return true;
+    },
+    async moveCustom(visitId, f) {
+      const r = await write("crm_move_typed", { p_appointment: visitId, p_type: f.type.id, p_start: f.start, p_answers: f.answers });
+      if (!r.ok) return false;
+      const old = visit(visitId);
+      if (!old) return true;
+      const row = r.data as CrmVisitRow | null, val = apptValues(f.type, f.answers);
+      const v: CrmVisit = row?.id ? visitFromRow(row) : { ...old, start: f.start, kind: val.kind, typeId: f.type.id, label: val.name, answers: f.answers, link: val.link, place: val.place, remarks: val.remarks };
+      const vr = virtualRoom(v);
+      setData(d => ({ ...d, visits: d.visits.map(x => (x.id === visitId ? { ...v, showroomId: vr.id } : x)), rooms: [...d.rooms.filter(r => r.id !== vr.id), vr] }));
+      await sendCard(old.customerId, visitCard("Updated", v, vr));
+      return true;
+    },
     async moveVisit(visitId, roomId, start) {
       if (!(await write("crm_move_appointment", { p_appointment: visitId, p_start: start, p_showroom: roomId })).ok) return false;
       const v = visit(visitId);
-      setVisit(visitId, x => ({ ...x, start, showroomId: roomId }));
+      setVisit(visitId, x => ({ ...x, start, showroomId: roomId, kind: undefined, link: undefined, place: undefined }));
       const rm = room(roomId);
       if (v) await sendCard(v.customerId, { kind: "Updated", start, room: rm?.name ?? "", addr: rm?.address ?? "" });
       return true;
@@ -237,7 +276,7 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
         const stillBooked = data().visits.some(x => x.customerId === v.customerId && x.id !== visitId && x.state === "booked");
         if (!stillBooked) patchCustomer(v.customerId, c => (c.status === "appointment" ? { ...c, status: "follow_up" } : c));
         const rm = room(v.showroomId);
-        await sendCard(v.customerId, { kind: "Cancelled", start: v.start, room: rm?.name ?? "", addr: rm?.address ?? "" });
+        await sendCard(v.customerId, visitCard("Cancelled", v, rm));
       }
       return true;
     },
@@ -261,7 +300,7 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       const rm = room(v.showroomId), c = data().customers.find(x => x.id === v.customerId);
       if (!c) return false;
       if (windowShut(c, new Date())) { toast(c.channel === "messenger" ? "Messenger's 7-day window is closed — call the customer." : "WhatsApp's 24-hour window is closed — send a template instead."); return false; }
-      await sendCard(v.customerId, { kind: "Reminder", start: v.start, room: rm?.name ?? "", addr: rm?.address ?? "" });
+      await sendCard(v.customerId, visitCard("Reminder", v, rm));
       if (live) await crmWrite("crm_mark_reminded", { p_appointment: visitId }).catch(() => null);
       setVisit(visitId, x => ({ ...x, remindedAt: new Date().toISOString() }));
       return true;
@@ -351,9 +390,15 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       // crm-media straight from the browser (no 4 MB Server Action), then sent by the server from there.
       const kind0 = mediaKindOf((file.type || "").split(";")[0]);
       // A video may be picked bigger: it is shrunk to fit its channel below (shared/video-fit.ts, 2026-10-14).
-      if (kind0 === "video" ? file.size > VIDEO_PICK_MAX : file.size > 25 * 1024 * 1024) { toast(kind0 === "video" ? "A video can be up to 400 MB to start with." : "A photo or file can be up to 25 MB."); return false; }
-      const kind = kind0, shown = kind === "document" ? "file" : kind;
       const channel = data().customers.find(c => c.id === customerId)?.channel ?? "whatsapp";
+      // A document goes as it is, so its channel's own limit (WhatsApp 100 MB since the bucket moved to R2, 2026-10-23;
+      // Messenger 25 MB); a photo is made smaller before it goes, so 25 MB to start with.
+      const pickMax = kind0 === "video" ? VIDEO_PICK_MAX : kind0 === "document" ? mediaLimit(channel, "document") : 25 * 1024 * 1024;
+      if (file.size > pickMax) {
+        toast(kind0 === "video" ? "A video can be up to 400 MB to start with." : kind0 === "document" ? `A file can be up to ${Math.round(pickMax / 1048576)} MB on ${channel === "messenger" ? "Messenger" : "WhatsApp"}.` : "A photo can be up to 25 MB.");
+        return false;
+      }
+      const kind = kind0, shown = kind === "document" ? "file" : kind;
       const local = typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : "";
       const draft: CrmChatMessage = { id: `sending-${uid()}`, from: "me", kind, text: kind === "document" ? file.name : caption, at: new Date().toISOString(), status: live ? "sending" : "sent", by: me,
         ...(local ? { media: { kind: shown, url: local, ...(shown === "file" ? { name: file.name, mime: file.type } : {}) } } : {}) };

@@ -30,7 +30,9 @@ export function journey(ctx: DeskCtx, c: CrmCustomer): CpEvent[] {
     const k = e.kind as string, to = String(e.data.to ?? e.owner ?? ""), mine = e.actor === me.id;
     const add = (kind: string, text: string, st: string | null = null, note: string | null = null) => out.push({ at: e.at, who: e.actor, kind, text, st, note, mine });
     if (k === "assigned") add("assign", `Assigned the chat to ${nameOf(to)}`);
-    else if (k === "moved") add("move", `Moved the chat${e.data.from ? ` from ${nameOf(String(e.data.from))}` : ""} to ${nameOf(to)}`);
+    // Only a Move — a request the direct upline accepted; one CRM · Manage handed on at once (by_manager) is its `assigned`
+    // row above (2026-10-23).
+    else if (k === "moved" && !e.data.by_manager) add("move", `Moved the chat${e.data.from ? ` from ${nameOf(String(e.data.from))}` : ""} to ${nameOf(to)}`);
     else if (k === "shared") add("share", `Shared the chat with ${nameOf(to)}`);
     else if (k === "first_reply") add("reply", "First reply to the customer", "Follow up");
     else if (k === "appt_booked") add("appt", `Booked a visit · ${String(e.data.when ?? "")}${e.data.room ? ` · ${String(e.data.room)}` : ""}`, "Appointment");
@@ -128,7 +130,7 @@ export function chatProgressVM(ctx: DeskCtx, opItem: string) {
         mineTxt: my ? `${my.kind === "assign" ? "You assigned" : my.kind === "move" ? "You moved" : my.kind === "share" ? "You shared" : "You reminded"}${my.text.replace(/^[A-Z][a-z]+ (the chat )?/, " ")} · ${dShort(my.at)}` : "",
         tfg: tc[0], ttint: tc[1], hasSh: !!r.sh.length, shTxt: `Shared with ${r.sh.map(nameOf).join(", ")}`, init: initials(r.c.assignedTo ? nameOf(r.c.assignedTo) : "?"),
         status: r.cur, sbg: SC[r.cur][0], sfg: SC[r.cur][1], last: `${dShort(L.at)} · ${new Date(L.at).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" })}`,
-        lastWho: L.who ? (L.who === me.id ? "by you" : `by ${nameOf(L.who)}`) : "", steps: strip(r, cmp), bg: on ? "var(--crm-cream)" : "#fff",
+        lastWho: L.who ? (L.who === me.id ? "by you" : `by ${nameOf(L.who)}`) : "", steps: strip(r, cmp), bg: on ? "var(--crm-sel)" : "#fff",
         open: () => patch({ stage: "op", cpSel: r.c.id, awChat: null, sendFor: null, frmOpen: false, cltEdit: null }) }; }),
     cpClose: () => patch({ cpSel: null }), cpOpenChat: () => { if (sel) patch({ awChat: sel.c.id, sendFor: null, stage: "op" }); },
     cpName: sel?.c.name ?? "", cpSub: sel ? `${sel.c.ad} · ${sel.c.assignedTo ? nameOf(sel.c.assignedTo) : "No one yet"}` : "", cpStatus: sel?.cur ?? "",

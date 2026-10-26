@@ -32,14 +32,16 @@ export function activeVM(
   draft: Record<string, boolean> | null, setDraft: (d: Record<string, boolean> | null) => void,
   setLocked: (id: string, on: boolean) => Promise<boolean>, told: (msg: string) => void,
 ): ActiveVM {
-  const ini = (n: string) => n.split(/s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+  const ini = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
   const d = draft ?? {}, isLocked = (id: string) => d[id] ?? locked.has(id);
   const changed = Object.keys(d).filter(id => d[id] !== locked.has(id));
   return {
     groups: groups.filter(g => g.people.length).map(g => ({
       name: g.name, color: g.color,
       count: `${g.people.filter(p => !isLocked(p.id)).length} of ${g.people.length} active`,
-      people: g.people.map(p => {
+      // Title order as before, the locked last (the owner, 2026-10-24: "照title排列好了，但lock在下面") — by what is saved, so a
+      // switch flipped in the draft does not jump its row.
+      people: [...g.people.filter(p => !locked.has(p.id)), ...g.people.filter(p => locked.has(p.id))].map(p => {
         const active = !isLocked(p.id);
         return { id: p.id, name: p.name, role: roleOf(p), ini: ini(p.name), active, toggle: () => setDraft({ ...d, [p.id]: active }) };
       }),

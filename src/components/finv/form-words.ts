@@ -34,5 +34,14 @@ export function neededSentence(need: string[], short = false): string | null {
   return `${list.charAt(0).toUpperCase()}${list.slice(1)} ${need.length === 1 ? 'is' : 'are'} needed${short ? '' : ' before you can save'}.`
 }
 
-/** The Server Action body's cap is 4 MB (next.config); the files must leave room for the rest. */
-export const FILES_CAP = 3.8 * 1024 * 1024
+/**
+ * What one file may be (2026-10-23): each is sent ahead of the save to its sender's own folder (lib/storage/stage.ts),
+ * so the cap is the bucket's 100 MB a file — no longer the Server Action body's 4 MB for them all.
+ */
+export const FILE_CAP = 100 * 1024 * 1024
+
+/** The first file too big to go, in words — or null. */
+export function filesProblem(files: readonly File[]): string | null {
+  const big = files.find((f) => f.size > FILE_CAP)
+  return big ? `${big.name} is ${fileSize(big.size)} — a file can be up to 100 MB.` : null
+}

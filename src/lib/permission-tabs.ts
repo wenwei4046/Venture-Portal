@@ -35,7 +35,7 @@ import {
   type SensitiveField,
 } from '@/lib/permission-matrix'
 
-export type TabView = 'hr' | 'fin' | 'pri' | 'dept' | 'rev' | 'lead'
+export type TabView = 'hr' | 'fin' | 'pri' | 'dept' | 'mkt' | 'rev' | 'lead'
 export type TabAction = 'view' | 'create' | 'edit' | 'approve'
 /** `fn.action` — a cell of the function matrix. */
 export type FnAction = `${FunctionKey}.${Action}`
@@ -48,6 +48,9 @@ export const TAB_VIEWS: ReadonlyArray<{ id: TabView; label: string; reach: Scope
   { id: 'fin', label: 'Finance view', reach: 'all' },
   { id: 'pri', label: 'Principal view', reach: 'all' },
   { id: 'dept', label: 'Department view', reach: 'dept' },
+  // Marketing's own view (2026-10-23 — the Claude Design handoff "HOUZS Marketing Module Setup"): the department's work
+  // is the department's, so its reach is the company's.
+  { id: 'mkt', label: 'Marketing view', reach: 'all' },
   { id: 'rev', label: 'Revenue app', reach: 'own' },
   // Lead View (2026-10-16): Customer Service's inbox — every brand's enquiries are the company's.
   { id: 'lead', label: 'Lead View', reach: 'all' },
@@ -94,6 +97,12 @@ const HIRING: Opens = { view: ['hiring.view'], create: ['hiring.create'], edit: 
 const ROOMS: Opens = { view: ['rooms.view'], create: ['rooms.create'], edit: ['rooms.edit'] }
 const ROOMS_KEYS = ['meeting_rooms', 'meeting_rooms_manage']
 const LEADS_KEYS = ['leads']
+// One's own claims (the Department view's, and Marketing's since 2026-10-23).
+const MY_CLAIMS: Opens = { view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'] }
+// Marketing's own view (mig 20261023214000): its pages read with View; Create starts a project; Edit works the stages
+// one is on; Approve decides a stage as its approver; Manage — the manager tools — is each such page's View.
+const MARKETING: Opens = { view: ['marketing.view'], create: ['marketing.create'], edit: ['marketing.edit'], approve: ['marketing.approve'] }
+const MARKETING_MANAGE: Opens = { view: ['marketing.manage'] }
 
 // The Overview is the company's in every view (the dashboard has no narrower reach).
 const tab = (view: TabView, id: string, label: string, keys: readonly string[], opens: Opens, reach?: Scope): PermissionTab => ({
@@ -198,12 +207,27 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('pri', 'settings', 'Settings', ['settings'], { view: ['settings.view'], edit: ['settings.manage'] }),
   tab('pri', 'switch_views', 'Switch views', ['view_switch'], { view: ['view_switch.view'] }),
 
+  // ── Marketing view (2026-10-23 — the handoff's sidebar: My Space, Calendar, Subsidiaries, Projects, Library and the
+  // manager tools; one's own claims and the meeting rooms, which every member of staff keeps) ──
+  tab('mkt', 'overview', 'My Space', [], OVERVIEW),
+  tab('mkt', 'calendar', 'Calendar', ['marketing'], { view: ['marketing.view'] }),
+  tab('mkt', 'projects', 'Projects', ['marketing'], MARKETING),
+  // The manager's tools — the Tracking Dashboard and the builders — one box: a second box for Marketing · Manage would
+  // make the cell narrow, and every write asking it would have to ask the pages first (tab-write-guards).
+  tab('mkt', 'tracking', 'Manager tools', ['marketing'], MARKETING_MANAGE),
+  // One's own claims, listed in Marketing's view for whoever holds Marketing (the key it opens on here, so the move
+  // ticks it for Marketing's templates only — Staff · Basic keeps the Department view's). Marketing's tabs come before
+  // the Department view's: a narrower tab is ticked only for what an earlier one has not given, so a Marketing
+  // template's own claims land here, not there.
+  tab('mkt', 'my_claims', 'My claims', ['marketing'], MY_CLAIMS, 'own'),
+  shared('meeting_rooms', tab('mkt', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
+
   // ── Department view ── Staff · Basic's: the Overview, one's own claims, the rooms. The Dept Manager's
   // own-department boxes (Dept Pool, OPEX, My Billing, Claims, Reports, People at Dept) went with the kind
   // (2026-10-17 — the user: "全删"; each department gets a view of its own later).
   tab('dept', 'overview', 'Overview', [], OVERVIEW),
   // Raising one's own claims — every member of staff's (Staff · Basic).
-  tab('dept', 'my_claims', 'My claims', ['claims'], { view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'] }, 'own'),
+  tab('dept', 'my_claims', 'My claims', ['claims'], MY_CLAIMS, 'own'),
   // The rooms are the company's: booked at the company's reach from the Department view too.
   shared('meeting_rooms', tab('dept', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS, 'all')),
 

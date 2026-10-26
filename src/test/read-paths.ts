@@ -109,6 +109,8 @@ export const DYNAMIC_TABLES: Readonly<Record<string, readonly string[]>> = {
 export const WHOEVER_MAY: Readonly<Record<string, string>> = {
   'src/app/(portal)/audit-log/_lib/ref-labels.ts#loadRefLabels':
     'The names behind the ids in the audit log: a name the reader may not read stays a short id.',
+  'src/lib/terms-change-request.ts#readTermsChange':
+    'A terms change request’s figures (the deal, its terms history, its repayments): a reader the deal is not open to gets the ask in words, the figures left out — only the Principal decides it.',
 }
 
 /** Functions nothing calls (dead code): no session reaches their reads. */
@@ -222,6 +224,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_note_channel_save',
   // Settings › General (mig 20261018100000): crm_me() first — anybody in the CRM reads the reply lines and switches.
   'crm_settings_read',
+  'crm_appt_types_read',
   // An ad's name from Ads Manager (mig 20261019100000): the webhooks' service role alone — EXECUTE for nobody else.
   'crm_ads_unnamed', 'crm_meta_name_ad', 'crm_ads_to_check', 'crm_meta_ad_status',
   // Auto-replies sent (mig 20261019120000): the webhooks' service role alone — EXECUTE for nobody else.
@@ -272,6 +275,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'hr_documentation', 'hr_documentation_file', 'hr_documentation_log', 'hr_document_add', 'hr_document_delete',
   'hr_letter_type_add', 'hr_letter_type_set_compulsory', 'hr_letter_type_delete', 'hr_letter_file',
   'hr_publish_type_add', 'hr_publish_type_delete', 'hr_publish', 'member_documents', 'member_document_open',
+  // The letter types People's forms offer beside the employment status (mig 20261025052000): Documentation · Create.
+  'hr_letter_type_choices',
   // Withdraw letter and files that really go (mig 20261011170000): each asks Documentation · Edit.
   'hr_letter_withdraw', 'hr_documentation_leftovers', 'hr_documentation_files_removed',
   // Withdraw a published memo (mig 20261011200000): Documentation · Edit.
@@ -300,6 +305,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'notify_crm_due',
   // The Revenue app's Waiting list & replacements (mig 20261010190000): member_requests, or member_is_manager for View as.
   'member_waiting_queue',
+  // The Principal's own Revenue app, viewing nobody (mig 20261026014700): the whole sub-department's boards, booths,
+  // Insight and bills — each asks member_principal_department (an active Principal account) first.
+  'member_principal_department_arena', 'member_principal_department_booth_history', 'member_principal_department_insight',
+  'member_principal_department_order_book',
   // People › Permissions by view and tab (migs 20261011010000, 20261011020000): each asks has_perm('permissions_manage').
   'permission_template_tabs_save', 'permission_user_tabs_set', 'permission_template_delete', 'permission_title_move',
   // "+ New template"'s window (mig 20261011233200): has_any_action(accounts.manage), then the two above ask permissions_manage.
@@ -317,6 +326,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'hiring_bank_add_talent', 'hiring_bank_file_add', 'hiring_bank_file_delete', 'hiring_bank_folder_move', 'hiring_bank_move_all',
   // …its Bin (mig 20261013061500): Restore, Delete forever and Empty bin ask Edit.
   'hiring_bank_bin_restore', 'hiring_bank_bin_delete', 'hiring_bank_bin_empty',
+  // …and why somebody is kept there (mig 20261024233700): changed on their page, asking Edit.
+  'hiring_talent_set_reason',
+  // …the reasons themselves, HR's list (mig 20261025021500): added from a picker or Form settings, renamed and
+  // turned off there — all Edit.
+  'hiring_bank_reason_add', 'hiring_bank_reason_rename', 'hiring_bank_reason_set_active',
   // …and Admin › Guest Link's department rename, which takes the bank's people along (guest_link.edit).
   'guest_link_rename_department',
   // The hourly sweep's (api/member-queue, the service role — mig 20261011210000): Hiring's day-old leftovers, and
@@ -357,11 +371,127 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Request to change email (mig 20261016190000): one's own request and latest (their People record), Withdraw
   // through the module's own (their own while it waits); HR's last step on a login's email asks Attendance · Approve.
   'request_my_email_change', 'my_email_change', 'att_cancel_request', 'att_login_email_change',
+  // HR edits a login's email on the person's page (mig 20261022150000): People · Edit on that page, a full-access title
+  // only by whoever manages permissions — asked before the login moves, and again when the record takes it.
+  'person_login_email_move', 'person_login_email_set',
+  // Employment status (mig 20261024214500): HR view's bell reads who is on probation, and Acknowledge writes the
+  // reminder's acknowledgement — both People · Edit with the HR scope; Acknowledge on the person page's box too.
+  'probation_reviews', 'probation_acknowledge',
+  // …a contract's the same way (mig 20261025046500): who is on a contract, and its reminder's acknowledgement.
+  'contract_reviews', 'contract_acknowledge',
+  // …and the phone (mig 20261024223000; a contract's too, 30 and 15 days before, since 20261025046500): the hourly
+  // sweep's notices of a probation or a contract ending, the service role's alone.
+  'notify_term_ends',
   // IT support (mig 20261021020100): a request sent and one's own read by any active sign-in; everybody's and a note's
   // status by IT requests · View / Edit (a sender replies on their own); a file's path to its sender or View; the desk's topic.
   'it_request_submit', 'my_it_requests', 'it_requests_desk', 'it_request_note', 'it_request_file', 'it_desk_listen',
   // An exact request, including older than either list (mig 20261021030000): active sender or IT requests · View.
   'it_request_get',
+  // Marketing's view (mig 20261023214100): its board, sidebar and search by Marketing · View; one's own notices.
+  'mkt_board', 'mkt_shell', 'mkt_search', 'mkt_notices',
+  // Marketing's tasks (mig 20261023234000): started by Marketing · Create; a stage accepted, worked, handed on by
+  // Marketing · Edit as its owner; decided by Marketing · Approve as its approver now; the Free space by Edit on a task
+  // one is on (Manage: any); Nudge and a series paused or ended by Manage; one project read by View.
+  'mkt_task_create', 'mkt_stage_accept', 'mkt_stage_save', 'mkt_stage_submit', 'mkt_stage_decide', 'mkt_free_block', 'mkt_nudge',
+  'mkt_series_set', 'mkt_project',
+  // New Project kept as a draft while it is typed (mig 20261025211000): the login's own drafts listed, opened, saved on
+  // their count and dropped — all Marketing · Create, each the caller's own rows alone.
+  'mkt_new_drafts', 'mkt_new_draft', 'mkt_new_draft_save', 'mkt_new_draft_drop',
+  // A task written with meeting minutes (mig 20261025221000): the templates published, read by Marketing · Create;
+  // mkt_task_create made again with them; a task's minutes written by its owner too, completed by the last signature.
+  'mkt_minutes_picker',
+  // Subtasks (mig 20261025101000): split off the stage now and taken back by its owner, delivered by their assignee
+  // (files sent under subtask/ first), reviewed by the stage's owner — all Marketing · Edit, the database deciding whose.
+  'mkt_subtask_add', 'mkt_subtask_deliver', 'mkt_subtask_review', 'mkt_subtask_remove',
+  // Marketing's Workflow Builder (mig 20261023235500): the templates read, saved, published and cloned — all by
+  // Marketing · Manage.
+  'mkt_workflows', 'mkt_workflow_save', 'mkt_workflow_publish', 'mkt_workflow_clone',
+  // Marketing's Minutes Builder (mig 20261023235800): the minutes templates read, saved and published — all by
+  // Marketing · Manage.
+  'mkt_minutes_templates', 'mkt_minutes_save', 'mkt_minutes_publish',
+  // Marketing's Product Builder (mig 20261023235900): the products — and their prices — read, saved, published, retired
+  // and reactivated, all by Marketing · Manage.
+  'mkt_products', 'mkt_product_save', 'mkt_product_publish', 'mkt_product_status',
+  // Marketing's product projects (mig 20261024002000): the products on sale and a project started by Marketing · Manage;
+  // its page read by View; its intake minutes written and sent, started before approval, resent by Manage; signed by an
+  // attendee (Edit).
+  'mkt_product_picker', 'mkt_product_start', 'mkt_product_project', 'mkt_minutes_fill', 'mkt_minutes_sign', 'mkt_minutes_send',
+  'mkt_project_override', 'mkt_project_resend',
+  // A product project's deliverables (mig 20261025032000): the work started — its deliverables made — and each one's
+  // Assignment Plan saved, both by Marketing · Manage.
+  'mkt_product_begin', 'mkt_deliverable_plan',
+  // The PIC's link (mig 20261024003000): anon's by name, as the guest link's — each checks the project's link code
+  // instead (a product project's, sent; an answer only while it waits for the PIC).
+  'mkt_pic_page', 'mkt_pic_answer',
+  // …and a deliverable's stage the PIC decides on the same link (mig 20261025033000): the code is the deliverable's product
+  // project's, the stage waits for the PIC, at the version they read.
+  'mkt_pic_stage_answer',
+  // …and a file of that work (mig 20261025113000): anon's by name, the code deciding — the stage now's own Files or a File
+  // field the PIC sees; the bucket asks the code again (mkt_pic_may_read) before R2 signs a link.
+  'mkt_pic_file',
+  // …and the PIC's own calendar (mig 20261025161000): anon's by name, the subsidiary's calendar code deciding — open only
+  // while its PIC is the one it was made for, reading only what was sent to that PIC.
+  'mkt_pic_calendar',
+  // Marketing's own clients (mig 20261024004000): added by Marketing · Manage, its code made by the database; a client's
+  // name (its own clients only), PIC and second PIC edited by Manage (mig 20261025034000); a PIC's calendar link made or
+  // made anew by Manage (mig 20261025161000).
+  'mkt_sub_add', 'mkt_sub_edit', 'mkt_sub_cal_link',
+  // A subsidiary's page (mig 20261024005000): its projects' newest trail lines, by Marketing · View.
+  'mkt_sub_feed',
+  // A subsidiary's own key dates (mig 20261025235500): read by Marketing · View, added, changed and deleted by Marketing ·
+  // Edit — everybody in Marketing (the user, 2026-10-25).
+  'mkt_key_dates', 'mkt_key_date_save', 'mkt_key_date_delete',
+  // A project's Ads report (mig 20261025235800): read by Marketing · View; the CRM's ads to pick and what the CRM counts
+  // for them (counts only) by Marketing · Edit; set up, changed and published by Marketing · Edit.
+  'mkt_ads_page', 'mkt_ads_choices', 'mkt_ads_crm', 'mkt_ads_save', 'mkt_ads_publish',
+  // A project's formal log (mig 20261024006000): every line of its trail, by Marketing · View; a record of it corrected
+  // by a record of its own, Marketing · Manage (mig 20261025171000).
+  'mkt_project_log', 'mkt_log_correct',
+  // Marketing's Library (mig 20261024007000): read by View; folders added, files filed, moved, binned and restored by
+  // Edit; folder types made and the Dustbin emptied for good by Manage.
+  'mkt_library', 'mkt_lib_type_add', 'mkt_lib_folder_add', 'mkt_lib_file_add', 'mkt_lib_move', 'mkt_lib_bin', 'mkt_lib_restore',
+  'mkt_lib_delete',
+  // A subsidiary's brand profile in the Library (mig 20261024007200): saved whole by Edit (Manage until mig
+  // 20261025004000 — the user: "人人都能改 · but with audit log").
+  'mkt_lib_profile_save',
+  // A template or a product never published, deleted by Marketing · Manage (mig 20261025004100 — the user's answer 8).
+  'mkt_workflow_delete', 'mkt_minutes_delete', 'mkt_product_delete',
+  // A Library file's or folder's guest link (mig 20261024007300): made, changed and stopped by Edit; the page /l/<code>
+  // and its files read as the stranger — anon's by name, as the PIC's, each checking the link's code.
+  'mkt_lib_share', 'mkt_lib_share_stop', 'mkt_lib_shared', 'mkt_lib_shared_file',
+  // A Library file on a task (mig 20261024007400): a task's files read by View; attached and taken off by Edit.
+  'mkt_task_library', 'mkt_task_attach', 'mkt_task_detach',
+  // Replace Person (mig 20261025036000): who stands where, one person's places and the swap — all Marketing · Manage.
+  'mkt_replace_people', 'mkt_replace_places', 'mkt_replace_person',
+  // My Space's own side (migs 20261024007500 and 20261024007600): the caller's own space read by View; saved — only the
+  // parts sent — by Edit.
+  'mkt_space', 'mkt_space_save',
+  // The pet's levels (mig 20261025037000): the caller's own pet in numbers read by View; fed and worked out by Edit.
+  'mkt_pet', 'mkt_pet_care',
+  // The lobby and a visit (mig 20261025038000): the roster's pets, and a teammate's space — both read by View.
+  'mkt_lobby', 'mkt_space_of',
+  // The chat (mig 20261025039000): one's chats and a thread read by View (a direct message only by its two people); a
+  // message sent and a thread marked read by Edit — the roster's, with a login.
+  'mkt_chat_list', 'mkt_chat_thread', 'mkt_chat_send', 'mkt_chat_read',
+  // Chat review (mig 20261025039500): a direct message opened on a complaint, its older messages, the records — a
+  // full-access title's own login only (the database asks the login, never the shared Principal one), behind Marketing · View.
+  'mkt_chat_review_open', 'mkt_chat_review_more', 'mkt_chat_review_log',
+  // Billing (mig 20261025121000), all Marketing · Manage: the month's lines read, confirmed and withdrawn; a product
+  // project's amount changed, a recurring one stopped; an outside client's billing details read for its page.
+  'mkt_billing', 'mkt_bill_confirm', 'mkt_bill_withdraw', 'mkt_project_bill_set', 'mkt_product_stop', 'mkt_client_bill',
+  // Finance imports them (mig 20261026023000): a product's revenue account set by Marketing · Manage; the month's
+  // confirmed lines read by Billing · View or Create, imported onto drafts by Billing · Create (the invoice page's box).
+  'mkt_product_account', 'mkt_bill_import_preview', 'mkt_bill_import',
+  // A recurring product's months (mig 20261025131000): its run day moved by Marketing · Manage; the months due made by the
+  // hourly sweep (the service role) as by every Marketing write; paused and resumed by Marketing · Manage (mig 20261025181000).
+  'mkt_product_run_day', 'mkt_product_runs_due', 'mkt_product_pause',
+  // An Ads report's period due (mig 20261026002000): told by the hourly sweep — the service role's alone.
+  'mkt_ads_due',
+  // A choice's shared option lists (mig 20261025191000): read by Marketing · View, an option added by Marketing · Edit,
+  // taken off by Marketing · Manage.
+  'mkt_option_lists', 'mkt_option_add', 'mkt_option_remove',
+  // A task's posts (mig 20261025151000): marked posted, or the mark taken back, by its owner or Marketing · Manage.
+  'mkt_post_mark', 'mkt_post_unmark',
   // Share order (mig 20261021150100): a bill's share sheet, a request sent and withdrawn by the salesperson on the bill
   // (the send also asks Profile · Requests · Create); answered by a colleague it names; one's own list (View as: the
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
@@ -393,6 +523,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'set_loan_min_pay_interest', 'set_loan_repayment_start', 'staff_private_fields',
   'team_directory', 'team_org_chart', 'update_manual_journal_voucher', 'void_issued_invoice', 'void_loan_repayment',
   'withdraw_pending_fund_source',
+  // A deal's terms change filed for the Principal (mig 20261025110000): filed and withdrawn on the deal's page
+  // (Treasury · Edit; withdrawn by whoever filed it or the queue's Approve), decided in Approvals (Approve).
+  'approve_terms_change', 'file_terms_change', 'reject_terms_change', 'withdraw_terms_change',
 ])
 
 /**

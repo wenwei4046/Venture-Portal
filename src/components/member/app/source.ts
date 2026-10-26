@@ -6,14 +6,14 @@ import type { MemberHonours, MemberWaitingForm } from "@/lib/member/server";
 import type { WaitingQueue } from "@/lib/member/waiting-queue";
 import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { ArenaWindow, MemberArenaSnapshot } from "@/lib/member/arena";
-import type { MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
+import type { DepartmentInsight, MemberInsightRange, MemberOrderBook } from "@/lib/member/order-book";
 import {
   acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberMemoSignature, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, openMemberMemoFile, submitMemberRequest,
-  type fetchDepartmentIncome, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberReplacementForm, type fetchMemberWaitingForm, type fetchMemberWaitingQueue, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
+  type fetchDepartmentIncome, type fetchDepartmentInsight, type fetchDepartmentOrderBook, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberReplacementForm, type fetchMemberWaitingForm, type fetchMemberWaitingQueue, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
   type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
   type refreshMemberData,
 } from "@/app/(member)/member/actions";
-import type { fetchMemberArena } from "@/app/(member)/member/arena-actions";
+import type { fetchDepartmentArena, fetchMemberArena } from "@/app/(member)/member/arena-actions";
 import type { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-actions";
 import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMemberRooms } from "@/app/(member)/member/rooms-actions";
@@ -66,6 +66,10 @@ export const ask = {
     ({ kind: "insightRange", subDepartmentId, from, until, context }),
   income: (subDepartmentId: string, period: string, context?: MemberReadContext): MemberRead => ({ kind: "income", subDepartmentId, period, context }),
   departmentIncome: (subDepartmentId: string, period: string): MemberRead => ({ kind: "departmentIncome", subDepartmentId, period }),
+  departmentInsight: (subDepartmentId: string, from: string, until: string): MemberRead => ({ kind: "departmentInsight", subDepartmentId, from, until }),
+  departmentBook: (subDepartmentId: string, from: string, until: string): MemberRead => ({ kind: "departmentBook", subDepartmentId, from, until }),
+  departmentArena: (subDepartmentId: string, period: string, window: ArenaWindow, options?: { history?: boolean }): MemberRead =>
+    ({ kind: "departmentArena", subDepartmentId, period, window, options: options?.history === false ? { history: false } : undefined }),
   honours: (subDepartmentId: string, from: string, until: string, context?: MemberReadContext): MemberRead =>
     ({ kind: "honours", subDepartmentId, from, until, context }),
   memoReceipts: (staffId: string): MemberRead => ({ kind: "memoReceipts", staffId }),
@@ -131,6 +135,15 @@ export interface RevenueSource {
   income(subDepartmentId: string, period: string, context?: MemberReadContext): Promise<Outcome<MemberIncome>>;
   /** Today for a Principal viewing nobody: the sub-department's commission this month, before salaries. */
   departmentIncome(subDepartmentId: string, period: string): Promise<Outcome<DepartmentIncome>>;
+  /**
+   * The Principal viewing nobody (2026-10-25, department-source.ts): a window's every bill summed and everybody's own
+   * figures — Today's Sales / Margin / KPI, Insight's block, KPI and team.
+   */
+  departmentInsight?(subDepartmentId: string, from: string, until: string): Promise<Outcome<DepartmentInsight>>;
+  /** …every bill of a window, once each, with its salesperson. */
+  departmentBook?(subDepartmentId: string, from: string, until: string): Promise<Outcome<MemberOrderBook>>;
+  /** …the Arena's boards with nobody the reader, and (unless `history: false`) every fair's booths. */
+  departmentArena?(subDepartmentId: string, period: string, window: ArenaWindow, options?: { history?: boolean }): Promise<Outcome<MemberArenaSnapshot>>;
   /** My honours: the member's finishes over a window of months, and which months are final. */
   honours(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberHonours>>;
   /** View as: the viewed person's memo receipts. */
@@ -266,6 +279,10 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     memoReceipts: staffId => go<Answer<typeof fetchPrincipalMemoReceipts>>(ask.memoReceipts(staffId)),
     income: (subDepartmentId, period, context) => go<Answer<typeof fetchMemberIncome>>(ask.income(subDepartmentId, period, context)),
     departmentIncome: (subDepartmentId, period) => go<Answer<typeof fetchDepartmentIncome>>(ask.departmentIncome(subDepartmentId, period)),
+    departmentInsight: (subDepartmentId, from, until) => go<Answer<typeof fetchDepartmentInsight>>(ask.departmentInsight(subDepartmentId, from, until)),
+    departmentBook: (subDepartmentId, from, until) => go<Answer<typeof fetchDepartmentOrderBook>>(ask.departmentBook(subDepartmentId, from, until)),
+    departmentArena: (subDepartmentId, period, window, options) =>
+      go<Answer<typeof fetchDepartmentArena>>(ask.departmentArena(subDepartmentId, period, window, options)),
     honours: (subDepartmentId, from, until, context) => go<Answer<typeof fetchMemberHonours>>(ask.honours(subDepartmentId, from, until, context)),
     catalogue: () => go<Answer<typeof fetchMemberCatalogue>>(ask.catalogue()),
     rooms: (from, to) => go<Answer<typeof fetchMemberRooms>>(ask.rooms(from, to)),

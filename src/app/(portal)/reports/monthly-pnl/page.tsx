@@ -12,6 +12,7 @@ import { rangeLabel, reportRange } from '@/lib/report-range'
 import { REPORT_SEGMENTS } from '../_components/report-segments'
 import ReportModeSwitch from '../_components/ReportModeSwitch'
 import MonthlyPnlBody from '../_components/MonthlyPnlBody'
+import { openReportRow } from '../drill-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,6 +89,7 @@ export default async function MonthlyPnlPage({ searchParams }: Props) {
         segmentLabel={segName}
         segment={segment}
         segments={segments}
+        drill={{ open: openReportRow.bind(null, 'monthly-pnl'), segment }}
       />
     </div>
   )

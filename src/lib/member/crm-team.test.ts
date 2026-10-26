@@ -4,6 +4,7 @@ import {
   allDownlines, assignEnquiry, canEditTeamRules, leadsBetween, leadsPeople, periodRange, withoutTeam, canReassign, canReply, durationLabel, emptyCounts, firstReplyMinutes, isUnassigned, isWeekendEnquiry, leadsHeld, pickInTeam,
   memberStats, overLimit, pickByShare, pickTeam, setsFullTime, teamHandlers, teamOf, visibleLeads, visibleMembers, visibleTeams,
   dealEnquiry, afterDeal, officeWeekday, type CrmAssignConfig, type CrmDealCounts, type CrmDealFullTime, type CrmDealRule, type CrmMember,
+  countedLeads, dealCounts, officeMonthStart, type CrmDealAd, type CrmDealLead,
 } from "./crm-team";
 
 // Boss → HOD → (Senior TL vacant) → TL A / TL B → TA → RS
@@ -192,7 +193,7 @@ describe("assignment", () => {
   });
 
   it("waits for the Principal or HOD only when there is no team at all", () => {
-    expect(assignEnquiry("x", tuesday, { rules: [], teams: {} }, emptyCounts(), members.filter(m => m.role !== "tl")).assignment).toEqual({ teamId: null, memberId: null });
+    expect(assignEnquiry("x", tuesday, { rules: [], teams: {} }, emptyCounts(), members.filter(m => m.role !== "tl" && m.role !== "ta" && m.role !== "rs")).assignment).toEqual({ teamId: null, memberId: null }); // nobody who takes enquiries (a TA / RS with no TL above heads a team since 2026-10-22)
   });
 });
 
@@ -292,7 +293,8 @@ describe("the CRM adapts to the company chart, never the other way (user 2026-10
   const names = (ms: CrmMember[]) => ms.map(m => m.id);
 
   it("gives the HOD every team and the Team tab though no TL reports to them", () => {
-    expect(names(visibleTeams(as("hod"), chart))).toEqual(["tla", "tlb"]);
+    // A TA or RS reporting to nobody heads a team of their own (2026-10-22, isTeamTop).
+    expect(names(visibleTeams(as("hod"), chart))).toEqual(["tla", "tlb", "loneTa"]);
     expect(leadsPeople(as("hod"), chart)).toBe(true);
   });
 
@@ -307,8 +309,8 @@ describe("the CRM adapts to the company chart, never the other way (user 2026-10
     expect(leadsPeople(as("a1"), chart)).toBe(false);
   });
 
-  it("names the TAs and RS no TL leads, so the Boss and HOD can fix the chart", () => {
-    expect(names(withoutTeam(chart))).toEqual(["loneTa", "loneRs"]);
+  it("leaves nobody without a team: a TA or RS with no TL above heads their own (2026-10-22, isTeamTop)", () => {
+    expect(names(withoutTeam(chart))).toEqual([]);
   });
 });
 
@@ -375,5 +377,63 @@ describe("the dealer, rev 1011 (twin of crm_assign_contact)", () => {
     // Not a chosen day: the team's own rule.
     expect(dealEnquiry("AD-F", tuesday, { mode: "split", split: { tla: 100 }, people: { tla: 1 }, teamModes: { tla: "cnt" } },
       { tla: { days: [(day + 1) % 7], ticked: { a1: { [(day + 1) % 7]: 1 } } } }, zero(), members).memberId).toBe("tla");
+  });
+
+  it("a Full time day: only teams with somebody full time that day get the ad's leads (2026-10-23)", () => {
+    const day = officeWeekday(tuesday);
+    const ft = { tla: { days: [day], ticked: { a1: { [day]: 1 } } } }; // Team B has no Full time
+    // By team 50 / 50: that day all to Team A's full-time person; Team B's share falls to Team A.
+    const { out } = deal(4, "AD-FT", { mode: "split", split: { tla: 50, tlb: 50 }, people: {} }, ft);
+    expect(out.map(d => [d.teamId, d.memberId, d.by])).toEqual(Array(4).fill(["tla", "a1", "full_time"]));
+    // Evenly too.
+    expect(deal(2, "AD-FTE", { mode: "even", split: {}, people: {} }, ft).out.map(d => d.memberId)).toEqual(["a1", "a1"]);
+    // Another day: the split as set.
+    const other = { tla: { days: [(day + 1) % 7], ticked: { a1: { [(day + 1) % 7]: 1 } } } };
+    expect(deal(4, "AD-FT2", { mode: "split", split: { tla: 50, tlb: 50 }, people: {} }, other).out.map(d => d.teamId).sort()).toEqual(["tla", "tla", "tlb", "tlb"]);
+    // None of the ad's teams full time that day: as any other day (a lead never stalls).
+    expect(deal(1, "AD-FT3", { mode: "split", split: { tlb: 100 }, people: {} }, ft).out[0].teamId).toBe("tlb");
+  });
+});
+
+// "Save and apply to all" means calculate together (2026-10-24, mig 20261025121500) — the same cases as
+// tests/member-sql/validate-crm-ads-together.mjs.
+describe("ads counted together (twin of crm_campaign_given)", () => {
+  const rule: CrmDealRule = { mode: "split", split: { tla: 50, tlb: 50 }, people: {}, teamModes: { tla: "even", tlb: "even" } };
+  const now = new Date(Date.UTC(2026, 9, 20, 3)); // Tue 20 Oct 2026, 11:00 in Kuala Lumpur
+  const start = new Date(Date.UTC(2026, 9, 19));
+  /** Leads one after another, each dealt on the leads before it. */
+  const dealAll = (ads: Record<string, CrmDealAd>, order: string[]) => {
+    const leads: CrmDealLead[] = [];
+    for (const [k, ad] of order.entries()) {
+      const at = new Date(now.getTime() + k * 60_000);
+      const d = dealEnquiry(ad, at, rule, {}, dealCounts(ad, ads[ad].startedAt, ads, leads, at), members);
+      leads.push({ ad, at, teamId: d.teamId, memberId: d.memberId, held: d.held });
+    }
+    return leads.map(l => [l.teamId, l.memberId]);
+  };
+
+  it("apart, each ad starts again: a fresh ad's first lead goes the same way every time", () => {
+    expect(dealAll({ X: { startedAt: start }, Y: { startedAt: start } }, ["X", "Y"])).toEqual([["tla", "a1"], ["tla", "a1"]]);
+  });
+
+  it("together, the next lead of any of them goes by all of their leads — Team B's turn on the other ad, a2 after a1", () => {
+    expect(dealAll({ X: { startedAt: start, together: true }, Y: { startedAt: start, together: true } }, ["X", "Y", "Y", "X"]))
+      .toEqual([["tla", "a1"], ["tlb", "b1"], ["tla", "a2"], ["tlb", "tab"]]);
+  });
+
+  it("counts a together ad's leads this month only, each from its own rule's start; an ad apart only its own", () => {
+    const ads = { X: { startedAt: new Date(Date.UTC(2026, 8, 1)), together: true }, Y: { startedAt: new Date(Date.UTC(2026, 9, 10)), together: true }, Z: { startedAt: start } };
+    const lead = (ad: string, at: Date): CrmDealLead => ({ ad, at, teamId: "tla", memberId: "a1" });
+    const leads = [lead("X", new Date(Date.UTC(2026, 8, 25))), lead("X", new Date(Date.UTC(2026, 9, 5))), lead("Y", new Date(Date.UTC(2026, 9, 5))),
+      lead("Y", new Date(Date.UTC(2026, 9, 12))), lead("Z", new Date(Date.UTC(2026, 9, 19, 1)))];
+    // September's lead is out (the count starts again on the 1st); Y's before its own start is out.
+    expect(countedLeads("X", start, ads, leads, now).map(l => l.at.getUTCDate())).toEqual([5, 12]);
+    expect(countedLeads("Z", start, ads, leads, now).map(l => l.ad)).toEqual(["Z"]);
+    expect(dealCounts("X", start, ads, leads, now).given).toEqual({ a1: 2 });
+  });
+
+  it("the office's month: 00:30 on 1 Nov in Kuala Lumpur is already November", () => {
+    expect(officeMonthStart(new Date(Date.UTC(2026, 9, 31, 16, 30))).toISOString()).toBe("2026-10-31T16:00:00.000Z");
+    expect(officeMonthStart(new Date(Date.UTC(2026, 9, 31, 15, 30))).toISOString()).toBe("2026-09-30T16:00:00.000Z");
   });
 });

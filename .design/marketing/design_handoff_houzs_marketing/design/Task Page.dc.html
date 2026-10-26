@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>@keyframes tpPop{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div style="position:relative;color:rgb(51 36 27);min-height:100%">
+
+  <div style="padding:18px 32px 0;background:#fff;border-bottom:1px solid rgb(236 231 224)">
+    <div style="display:flex;align-items:center;gap:10px;font-size:0.92em;color:rgb(117 100 86)">
+      <span onClick="{{ back }}" style="cursor:pointer;color:rgb(74 64 58)" style-hover="color:rgb(51 36 27);text-decoration:underline">← {{ backLabel }}</span>
+      <span>/</span><span>2990 Home</span><span>/</span><span>Red Truck Roadshow</span>
+      <span style="flex:1"></span>
+      <span style="display:flex;align-items:center;gap:6px;font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(74 64 58);border:1px solid rgb(229 222 211);border-radius:6px;padding:4px 8px;white-space:nowrap">{{ versionLabel }}</span>
+    </div>
+
+    <sc-if value="{{ showReturnAlert }}">
+      <div style="margin-top:14px;display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;background:rgb(252 236 233);border:1px solid rgb(236 190 184);color:rgb(176 40 34);font-size:0.96em">
+        <span style="width:8px;height:8px;border-radius:50%;background:rgb(200 52 42);flex:none"></span>
+        <span style="flex:1"><strong style="font-weight:600">Aina's delivery has been returned 3 times.</strong> {{ returnAlertTail }}</span>
+        <sc-if value="{{ isMM }}"><span style="height:28px;padding:0 12px;border-radius:6px;background:rgb(176 40 34);color:#fff;display:flex;align-items:center;font-size:0.92em;font-weight:500;cursor:pointer;white-space:nowrap">Take a look</span></sc-if>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;align-items:flex-start;gap:24px;margin-top:16px">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:12px;color:rgb(74 64 58);letter-spacing:0.02em">MKT-2990-2610-018</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:0.85em;font-weight:500;padding:3px 9px;border-radius:999px;background:{{ st.bg }};color:{{ st.fg }};border:1px solid {{ st.border }};white-space:nowrap"><span style="width:7px;height:7px;border-radius:50%;background:{{ st.dot }}"></span>{{ statusLabel }}</span>
+        </div>
+        <div style="font-size:1.9em;font-weight:600;letter-spacing:-0.01em;margin-top:6px">Red Truck Reels</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none;padding-top:4px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <sc-for list="{{ actions }}" as="a" hint-placeholder-count="2">
+            <div onClick="{{ a.onClick }}" style="height:36px;padding:0 16px;border-radius:8px;display:flex;align-items:center;font-size:0.96em;font-weight:500;white-space:nowrap;cursor:{{ a.cursor }};background:{{ a.bg }};color:{{ a.fg }};border:1px solid {{ a.border }};opacity:{{ a.op }}">{{ a.label }}</div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ hasActionNote }}"><span style="font-size:0.85em;color:{{ actionNoteColor }}">{{ actionNote }}</span></sc-if>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;margin-top:18px;padding:14px 0;border-top:1px solid rgb(244 241 236)">
+      <div><div style="font-size:0.75em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Subsidiary</div><div style="display:flex;align-items:center;gap:7px;margin-top:6px;font-size:0.96em"><span style="width:8px;height:8px;border-radius:50%;background:oklch(0.64 0.15 295)"></span>2990 Home</div></div>
+      <div><div style="font-size:0.75em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Project</div><div style="margin-top:6px;font-size:0.96em">Red Truck Roadshow</div></div>
+      <div><div style="font-size:0.75em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Owner</div><div style="display:flex;align-items:center;gap:7px;margin-top:4px;font-size:0.96em"><span style="width:24px;height:24px;border-radius:50%;background:oklch(0.90 0.05 295);font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">M</span>Mei</div></div>
+      <div><div style="font-size:0.75em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Now with</div><div style="display:flex;align-items:center;gap:7px;margin-top:4px;font-size:0.96em"><span style="width:24px;height:24px;border-radius:50%;background:{{ nowWithBg }};font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ nowWithInitial }}</span>{{ nowWith }}</div></div>
+      <div><div style="font-size:0.75em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Deadline</div><div style="margin-top:6px;font-size:0.96em;color:{{ dueColor }};font-weight:{{ dueWeight }}">{{ dueLabel }}</div></div>
+    </div>
+
+    <div style="display:flex;padding:16px 0 18px;border-top:1px solid rgb(244 241 236)">
+      <sc-for list="{{ stages }}" as="s" hint-placeholder-count="5">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center">
+            <div style="position:relative;width:32px;height:32px;flex:none;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;background:{{ s.nodeBg }};color:{{ s.nodeFg }};border:{{ s.nodeBorder }};box-shadow:{{ s.ring }}">{{ s.nodeText }}</div>
+            <div style="flex:1;height:2px;margin:0 8px;background:{{ s.lineBg }};opacity:{{ s.lineOp }}"></div>
+          </div>
+          <div style="padding-right:12px">
+            <div style="font-size:0.96em;font-weight:{{ s.weight }};color:rgb(51 36 27);white-space:nowrap">{{ s.name }}</div>
+            <div style="font-size:0.88em;color:rgb(74 64 58);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.person }}</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;font-size:0.8em;color:rgb(117 100 86);white-space:nowrap">
+              <span title="{{ s.apprText }}">{{ s.appr }}</span><span title="{{ s.assignText }}">{{ s.assign }}</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px">{{ s.date }}</span>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ hasSubtasks }}">
+      <div style="display:flex;flex-direction:column;gap:6px;padding:0 0 16px">
+        <div style="font-size:0.75em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Subtasks · Edit stage</div>
+        <sc-for list="{{ subtasks }}" as="t" hint-placeholder-count="1">
+          <div style="display:flex;align-items:center;gap:14px;padding:8px 12px;border-radius:8px;border:1px solid {{ t.border }};background:{{ t.bg }};font-size:0.96em">
+            <span style="font-weight:500;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.title }}</span>
+            <span style="color:rgb(74 64 58);white-space:nowrap">→ {{ t.who }}</span>
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86);white-space:nowrap">Due {{ t.due }}</span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:0.88em;font-weight:500;padding:2px 9px;border-radius:999px;background:{{ t.stBg }};color:{{ t.stFg }};border:1px solid {{ t.stBorder }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ t.stDot }}"></span>{{ t.label }}</span>
+            <sc-if value="{{ t.canReview }}"><span onClick="{{ t.onReview }}" style="height:28px;padding:0 12px;border-radius:6px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-size:0.92em;font-weight:500;cursor:pointer;white-space:nowrap">Review delivery</span></sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <div style="display:flex;gap:24px">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+        <div onClick="{{ t.onClick }}" style="padding:8px 2px 11px;margin-bottom:-1px;border-bottom:2px solid {{ t.line }};color:{{ t.color }};font-weight:{{ t.weight }};font-size:0.96em;cursor:pointer;white-space:nowrap">{{ t.label }}</div>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ showEditing }}">
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 32px;background:rgb(246 244 240);border-bottom:1px solid rgb(236 231 224);font-size:0.92em;color:rgb(74 64 58)">
+      <span style="width:22px;height:22px;border-radius:50%;background:oklch(0.90 0.05 295);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ editorInitial }}</span>
+      <span><strong style="font-weight:600">{{ editorName }} is editing…</strong> The Canvas is read-only for you until they finish.</span>
+    </div>
+  </sc-if>
+  <sc-if value="{{ showChanges }}">
+    <div style="margin:18px 32px 0;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:10px;background:rgb(252 236 233);border:1px solid rgb(236 190 184);color:rgb(130 30 25)">
+      <span style="width:8px;height:8px;border-radius:50%;background:rgb(200 52 42);flex:none;margin-top:6px"></span>
+      <div style="flex:1">
+        <div style="font-weight:600;color:rgb(176 40 34)">Changes requested on v2</div>
+        <div style="margin-top:4px">{{ changeBy }}: "{{ changeReason }}"</div>
+      </div>
+      <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(176 40 34);white-space:nowrap">{{ changeWhen }}</span>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isCanvas }}" hint-placeholder-val="{{ true }}">
+    <div style="max-width:1000px;margin:0 auto;padding:28px 32px 80px;display:flex;flex-direction:column;gap:30px">
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:-18px">
+        <sc-if value="{{ canFree }}"><span onClick="{{ openLib }}" style="height:30px;padding:0 12px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;gap:6px;font-size:0.92em;cursor:pointer;background:#fff" style-hover="background:rgb(250 248 244)">📚 Attach from Library</span></sc-if>
+        <sc-if value="{{ canSplit }}"><span onClick="{{ openSplit }}" style="height:30px;padding:0 12px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;gap:6px;font-size:0.92em;cursor:pointer;background:#fff" style-hover="background:rgb(250 248 244)">✂️ Split into subtasks</span></sc-if>
+        <sc-if value="{{ readOnly }}"><span style="height:30px;padding:0 12px;border-radius:8px;background:rgb(246 244 240);display:flex;align-items:center;gap:6px;font-size:0.88em;color:rgb(117 100 86)">👀 View only</span></sc-if>
+      </div>
+
+      <sc-if value="{{ hasLibFiles }}">
+        <div style="display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:10px;border:1px solid rgb(236 231 224);background:rgb(252 251 249)">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">📚</span><span style="font-weight:600;font-size:0.96em">From the Library</span><span style="font-size:0.82em;color:rgb(117 100 86)">linked, not copied — updates when the Library file changes</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <sc-for list="{{ libFiles }}" as="l" hint-placeholder-count="2"><span style="height:30px;padding:0 6px 0 10px;border-radius:7px;background:#fff;border:1px solid rgb(229 222 211);display:flex;align-items:center;gap:7px;font-size:0.88em"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:9.5px;color:rgb(117 100 86)">{{ l.ext }}</span><span style="font-weight:500">{{ l.name }}</span><span style="color:rgb(150 140 130);font-size:0.9em">{{ l.from }}</span><span onClick="{{ l.onRemove }}" style="width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(150 140 130)">×</span></span></sc-for>
+          </div>
+        </div>
+      </sc-if>
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:18px">📋</span><span style="font-size:1.25em;font-weight:600">Requirements</span>
+          <sc-for list="{{ b.req }}" as="x" hint-placeholder-count="2"><span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:rgb(246 244 240);color:rgb(90 78 68);border:1px solid rgb(236 231 224);white-space:nowrap">{{ x }}</span></sc-for>
+        </div>
+        <div style="background:rgb(245 244 241);border-radius:10px;padding:14px 18px;color:rgb(74 64 58);font-size:0.96em;line-height:1.6">
+          <div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);margin-bottom:6px">FROM MEETING MINUTES · 14 OCT · CARMEN, RACHEL, MEI</div>
+          <div>• Promote the red truck roadshow, 19–25 Oct</div>
+          <div>• IG Reels + TikTok, 9:16, 30–45 seconds</div>
+          <div>• Must show the truck wrap, a gift box and the 2990 Home end card</div>
+          <div>• Mood: playful and warm</div>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:18px">✍️</span><span style="font-size:1.25em;font-weight:600">Script</span>
+          <sc-for list="{{ b.script }}" as="x" hint-placeholder-count="2"><span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:rgb(246 244 240);color:rgb(90 78 68);border:1px solid rgb(236 231 224);white-space:nowrap">{{ x }}</span></sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:80px 1fr;gap:8px 16px;font-size:1em;line-height:1.55;color:{{ lockFg }}">
+          <span style="color:rgb(117 100 86);font-size:0.92em">Topic</span><span style="font-weight:500">Spot the red truck</span>
+          <span style="color:rgb(117 100 86);font-size:0.92em">Body</span><span style="text-wrap:pretty">A playful 35-second chase: viewers "spot" the red truck around Klang Valley, step inside, and discover the gift boxes. Ends on where to find us this week.</span>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:18px">🎬</span><span style="font-size:1.25em;font-weight:600">Script table</span>
+          <sc-for list="{{ b.table }}" as="x" hint-placeholder-count="2"><span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:rgb(246 244 240);color:rgb(90 78 68);border:1px solid rgb(236 231 224);white-space:nowrap">{{ x }}</span></sc-for>
+        </div>
+        <div style="border:1px solid rgb(236 231 224);border-radius:10px;overflow-x:auto">
+          <div style="min-width:1240px;display:grid;grid-template-columns:44px 1.4fr 1.7fr 1.4fr 1.1fr 1.1fr 1.3fr 0.9fr">
+            <sc-for list="{{ cols }}" as="c" hint-placeholder-count="8">
+              <div style="padding:8px 10px;background:{{ c.headBg }};border-bottom:1px solid rgb(236 231 224);border-right:1px solid rgb(240 236 230);display:flex;flex-direction:column;gap:4px">
+                <span style="font-size:0.85em;font-weight:600;color:rgb(51 36 27)">{{ c.name }}</span>
+                <span style="align-self:flex-start;font-size:0.72em;padding:1px 6px;border-radius:5px;background:{{ c.badgeBg }};color:{{ c.badgeFg }};white-space:nowrap">{{ c.badge }}</span>
+              </div>
+            </sc-for>
+            <sc-for list="{{ scenes }}" as="r" hint-placeholder-count="4">
+              <div style="padding:10px;font-size:0.92em;background:{{ lk.script }};color:{{ lk.scriptFg }};border-bottom:1px solid rgb(240 236 230);border-right:1px solid rgb(240 236 230);font-family:'Chivo Mono',Menlo,monospace">{{ r.no }}</div>
+              <div style="padding:10px;font-size:0.92em;line-height:1.45;background:{{ lk.script }};color:{{ lk.scriptFg }};border-bottom:1px solid rgb(240 236 230);border-right:1px solid rgb(240 236 230)">{{ r.narr }}</div>
+              <div style="padding:10px;font-size:0.92em;line-height:1.45;background:{{ lk.script }};color:{{ lk.scriptFg }};border-bottom:1px solid rgb(240 236 230);border-right:1px solid rgb(240 236 230)">{{ r.vis }}</div>
+              <div style="padding:10px;background:{{ lk.script }};border-bottom:1px solid rgb(240 236 230);border-right:1px solid rgb(240 236 230);display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start">
+                <sc-for list="{{ r.locs }}" as="l" hint-placeholder-count="1"><span style="font-size:0.8em;padding:2px 7px;border-radius:5px;background:{{ l.bg }};color:{{ l.fg }};white-space:nowrap">{{ l.name }}</span></sc-for>
+              </div>
+              <div style="padding:10px;font-size:0.92em;line-height:1.45;background:{{ lk.shoot }};color:{{ lk.shootFg }};border-bottom:1px solid rgb(240 236 230);border-right:1px solid rgb(240 236 230)">{{ r.dir }}</div>
+              <div style="padding:10px;font-size:0.92em;line-height:1.45;background:{{ lk.shoot }};color:{{ lk.shootFg }};border-bottom:1px solid rgb(240 236 230);border-right:1px solid rgb(240 236 230)">{{ r.vid }}</div>
+              <div style="padding:6px;background:{{ lk.edit }};border-bottom:1px solid rgb(240 236 230);border-right:1px solid rgb(240 236 230)">
+                <textarea disabled="{{ lk.editDisabled }}" placeholder="{{ lk.editPh }}" defaultValue="{{ r.edit }}" style="width:100%;min-height:52px;box-sizing:border-box;border:1px solid {{ lk.editBorder }};border-radius:6px;padding:6px 8px;font:inherit;font-size:0.92em;line-height:1.4;resize:vertical;background:{{ lk.editInput }};color:rgb(51 36 27);outline:none"></textarea>
+              </div>
+              <div style="padding:10px;font-size:0.85em;background:{{ lk.script }};color:{{ lk.scriptFg }};border-bottom:1px solid rgb(240 236 230)">
+                <sc-if value="{{ r.hasRef }}"><span style="display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:5px;border:1px solid rgb(229 222 211);background:#fff;white-space:nowrap">📎 {{ r.ref }}</span></sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:18px">✅</span><span style="font-size:1.25em;font-weight:600">Asset checklist</span>
+          <sc-for list="{{ b.assets }}" as="x" hint-placeholder-count="2"><span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:{{ x.bg }};color:{{ x.fg }};border:1px solid {{ x.border }};white-space:nowrap">{{ x.t }}</span></sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ checklist }}" as="k" hint-placeholder-count="4">
+            <div onClick="{{ k.onClick }}" style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;cursor:{{ k.cursor }}" style-hover="background:rgb(250 248 244)">
+              <span style="width:18px;height:18px;border-radius:5px;box-sizing:border-box;border:1.5px solid {{ k.boxBorder }};background:{{ k.boxBg }};color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;transition:background-color .15s">{{ k.tick }}</span>
+              <span style="font-size:1em;color:{{ k.fg }};text-decoration:{{ k.deco }}">{{ k.label }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:18px">💬</span><span style="font-size:1.25em;font-weight:600">Caption</span>
+          <sc-for list="{{ b.caption }}" as="x" hint-placeholder-count="2"><span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:rgb(246 244 240);color:rgb(90 78 68);border:1px solid rgb(236 231 224);white-space:nowrap">{{ x }}</span></sc-for>
+        </div>
+        <div style="font-size:1.04em;line-height:1.6;color:{{ lockFg }};padding:12px 16px;border-radius:10px;border:1px solid rgb(240 236 230);background:{{ lockBg }}">Have you spotted our red truck yet? 👀🚚🧡 From 19 to 25 Oct, our gift box on wheels is out on the road…</div>
+      </div>
+
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:18px">🎞️</span><span style="font-size:1.25em;font-weight:600">Final production</span>
+          <sc-for list="{{ b.final }}" as="x" hint-placeholder-count="2"><span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:{{ x.bg }};color:{{ x.fg }};border:1px solid {{ x.border }};white-space:nowrap">{{ x.t }}</span></sc-for>
+        </div>
+        <sc-if value="{{ hasVideo }}">
+          <div style="display:flex;gap:16px;align-items:center;padding:12px;border-radius:12px;border:1px solid rgb(236 231 224);animation:tpPop .3s ease-out">
+            <div style="width:96px;height:170px;border-radius:8px;background:repeating-linear-gradient(135deg, rgb(60 48 40) 0 8px, rgb(72 58 48) 8px 16px);display:flex;align-items:center;justify-content:center;color:rgb(246 238 230);font-size:22px">▶</div>
+            <div>
+              <div style="font-weight:600">RedTruck_Reels_v2.mp4</div>
+              <div style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86);margin-top:4px">0:38 · 9:16 · 1080×1920 · 84 MB</div>
+              <div style="font-size:0.88em;color:rgb(117 100 86);margin-top:8px">Uploaded by Ali · 25 Oct</div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ noVideo }}">
+          <div onClick="{{ uploadVideo }}" style="height:150px;border-radius:12px;border:1.5px dashed rgb(214 204 190);background:repeating-linear-gradient(135deg, rgb(250 248 244) 0 10px, rgb(253 252 250) 10px 20px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:{{ uploadCursor }}">
+            <span style="font-size:24px">🎞️</span>
+            <span style="font-size:0.96em;font-weight:500">Drop the final cut here</span>
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">MP4 / MOV · 9:16</span>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+        <div style="flex:1;height:1px;background:rgb(229 222 211)"></div>
+        <span style="font-size:0.81em;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgb(117 100 86)">Free space</span>
+        <div style="flex:1;height:1px;background:rgb(229 222 211)"></div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:-14px">
+        <sc-for list="{{ blocks }}" as="k" hint-placeholder-count="2">
+          <div style="position:relative;display:flex;gap:6px;align-items:flex-start">
+            <span onClick="{{ k.onFormat }}" title="Format block" style="width:20px;height:26px;flex:none;border-radius:4px;display:flex;align-items:center;justify-content:center;color:rgb(190 182 172);cursor:pointer;font-size:12px;letter-spacing:-2px" style-hover="background:rgb(241 236 228);color:rgb(74 64 58)">⋮⋮</span>
+            <div style="flex:1;min-width:0;font-size:{{ k.size }};color:{{ k.color }}">
+              <sc-if value="{{ k.isHeading }}"><div contentEditable="{{ canFree }}" suppressContentEditableWarning="{{ true }}" style="font-size:1.35em;font-weight:600;padding:4px 10px;border-radius:6px;background:{{ k.hl }};outline:none">{{ k.text }}</div></sc-if>
+              <sc-if value="{{ k.isText }}"><div contentEditable="{{ canFree }}" suppressContentEditableWarning="{{ true }}" style="line-height:1.6;padding:3px 0;outline:none"><span style="background:{{ k.hl }};border-radius:3px;padding:0 2px">{{ k.text }}</span></div></sc-if>
+              <sc-if value="{{ k.isDivider }}"><div style="height:1px;background:rgb(229 222 211);margin:12px 0"></div></sc-if>
+              <sc-if value="{{ k.isNumbered }}"><div style="display:flex;flex-direction:column;gap:2px;padding:2px 0;background:{{ k.hl }};border-radius:6px"><sc-for list="{{ k.items }}" as="i" hint-placeholder-count="2"><div style="display:flex;gap:8px;line-height:1.6"><span style="color:rgb(117 100 86);min-width:16px">{{ i.n }}.</span><span contentEditable="{{ canFree }}" suppressContentEditableWarning="{{ true }}" style="outline:none">{{ i.t }}</span></div></sc-for></div></sc-if>
+              <sc-if value="{{ k.isChecklist }}"><div style="display:flex;flex-direction:column;gap:4px;padding:2px 0"><sc-for list="{{ k.items }}" as="i" hint-placeholder-count="2"><div style="display:flex;gap:8px;align-items:center;line-height:1.6"><span style="width:15px;height:15px;border-radius:4px;border:1.5px solid rgb(200 190 178);box-sizing:border-box"></span><span contentEditable="{{ canFree }}" suppressContentEditableWarning="{{ true }}" style="outline:none;background:{{ k.hl }}">{{ i.t }}</span></div></sc-for></div></sc-if>
+              <sc-if value="{{ k.isMedia }}"><div style="height:120px;border-radius:10px;border:1px dashed rgb(214 204 190);background:repeating-linear-gradient(135deg, rgb(250 248 244) 0 10px, rgb(253 252 250) 10px 20px);display:flex;align-items:center;justify-content:center;font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86)">Image / Video / File — drop here</div></sc-if>
+              <sc-if value="{{ k.isCallout }}"><div style="display:flex;gap:10px;padding:12px 14px;border-radius:10px;background:{{ k.calloutBg }};line-height:1.55"><span style="font-size:16px">💡</span><span contentEditable="{{ canFree }}" suppressContentEditableWarning="{{ true }}" style="outline:none">{{ k.text }}</span></div></sc-if>
+              <sc-if value="{{ k.isTable }}">
+                <div style="border:1px solid rgb(236 231 224);border-radius:10px">
+                  <div style="position:relative;display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid rgb(236 231 224)">
+                    <span onClick="{{ k.onIcon }}" title="Change icon" style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer" style-hover="background:rgb(241 236 228)">{{ k.icon }}</span>
+                    <input defaultValue="{{ k.name }}" disabled="{{ k.lockedInput }}" style="border:0;outline:none;font:inherit;font-weight:600;font-size:1.04em;background:transparent;color:rgb(51 36 27);flex:1;min-width:0">
+                    <sc-if value="{{ k.iconOpen }}">
+                      <div style="position:absolute;top:40px;left:6px;z-index:5;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 10px 28px rgb(51 36 27 / 0.15);padding:8px;display:grid;grid-template-columns:repeat(6,32px);gap:2px">
+                        <sc-for list="{{ k.iconChoices }}" as="e" hint-placeholder-count="12"><span onClick="{{ e.onClick }}" style="width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer" style-hover="background:rgb(241 236 228)">{{ e.e }}</span></sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                  <div style="display:grid;grid-template-columns:{{ k.gridCols }}">
+                    <sc-for list="{{ k.cols }}" as="c" hint-placeholder-count="3">
+                      <div style="padding:7px 10px;font-size:0.85em;font-weight:500;color:rgb(90 78 68);background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224);border-right:1px solid rgb(240 236 230);display:flex;gap:6px;align-items:center;white-space:nowrap"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86)">{{ c.glyph }}</span>{{ c.name }}</div>
+                    </sc-for>
+                    <div style="position:relative;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224)">
+                      <span onClick="{{ k.onAddCol }}" title="Add column" style="height:100%;min-height:30px;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);cursor:pointer" style-hover="background:rgb(241 236 228)">+</span>
+                      <sc-if value="{{ k.colMenuOpen }}">
+                        <div style="position:absolute;top:34px;right:0;z-index:5;width:170px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 10px 28px rgb(51 36 27 / 0.15);padding:6px">
+                          <div style="padding:4px 8px 6px;font-size:0.75em;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Column type</div>
+                          <sc-for list="{{ k.colTypes }}" as="t" hint-placeholder-count="7"><div onClick="{{ t.onClick }}" style="display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;font-size:0.92em;cursor:pointer" style-hover="background:rgb(241 236 228)"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;width:16px;color:rgb(117 100 86)">{{ t.glyph }}</span>{{ t.name }}</div></sc-for>
+                        </div>
+                      </sc-if>
+                    </div>
+                    <sc-for list="{{ k.cells }}" as="c" hint-placeholder-count="6">
+                      <div style="padding:7px 10px;font-size:0.92em;border-bottom:1px solid rgb(244 241 236);border-right:1px solid rgb(244 241 236);grid-column:{{ c.span }};min-height:20px">{{ c.v }}</div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <sc-if value="{{ k.fmtOpen }}">
+              <div style="position:absolute;top:28px;left:0;z-index:6;width:230px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 10px 28px rgb(51 36 27 / 0.15);padding:10px;display:flex;flex-direction:column;gap:10px;font-size:13px">
+                <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Size</div>
+                <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px"><sc-for list="{{ k.sizeOpts }}" as="o" hint-placeholder-count="3"><span onClick="{{ o.onClick }}" style="flex:1;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:{{ o.bg }};font-weight:{{ o.w }}">{{ o.l }}</span></sc-for></div>
+                <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Color</div>
+                <div style="display:flex;gap:6px"><sc-for list="{{ k.colorOpts }}" as="o" hint-placeholder-count="5"><span onClick="{{ o.onClick }}" style="width:24px;height:24px;border-radius:50%;background:{{ o.c }};cursor:pointer;box-shadow:{{ o.ring }}"></span></sc-for></div>
+                <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">{{ k.hlLabel }}</div>
+                <div style="display:flex;gap:6px"><sc-for list="{{ k.hlOpts }}" as="o" hint-placeholder-count="5"><span onClick="{{ o.onClick }}" style="width:24px;height:24px;border-radius:6px;background:{{ o.c }};border:1px solid rgb(229 222 211);cursor:pointer;box-shadow:{{ o.ring }}"></span></sc-for></div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+
+        <sc-if value="{{ canFree }}">
+          <div style="position:relative;display:flex;gap:6px;align-items:center;margin-top:4px">
+            <span onClick="{{ toggleSlash }}" title="Add block" style="width:20px;height:26px;flex:none;border-radius:4px;display:flex;align-items:center;justify-content:center;color:rgb(160 150 140);cursor:pointer;font-size:15px" style-hover="background:rgb(241 236 228)">+</span>
+            <input value="{{ slash }}" onChange="{{ onSlash }}" placeholder="Type / for blocks" style="flex:1;border:0;outline:none;font:inherit;font-size:1em;padding:4px 0;background:transparent;color:rgb(51 36 27)">
+            <sc-if value="{{ slashOpen }}">
+              <div style="position:absolute;top:32px;left:26px;z-index:6;width:260px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 12px 32px rgb(51 36 27 / 0.16);padding:6px;animation:tpPop .15s ease-out">
+                <div style="padding:4px 8px 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Blocks</div>
+                <sc-for list="{{ blockMenu }}" as="m" hint-placeholder-count="8">
+                  <div onClick="{{ m.onClick }}" style="display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer" style-hover="background:rgb(241 236 228)">
+                    <span style="width:28px;height:28px;border-radius:6px;border:1px solid rgb(236 231 224);display:flex;align-items:center;justify-content:center;font-size:14px;background:#fff">{{ m.icon }}</span>
+                    <span style="font-size:13px">{{ m.label }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isAuditTab }}">
+    <dc-import name="Audit Trail" hint-size="100%,800px"></dc-import>
+  </sc-if>
+  <sc-if value="{{ isMapTab }}">
+    <dc-import name="Task Map" hint-size="100%,760px"></dc-import>
+  </sc-if>
+  <sc-if value="{{ isOtherTab }}">
+    <div style="max-width:1000px;margin:0 auto;padding:28px 32px 80px">
+      <div style="height:360px;border-radius:12px;border:1px dashed rgb(229 222 211);background:repeating-linear-gradient(135deg, rgb(248 246 242) 0 10px, rgb(252 251 249) 10px 20px);display:flex;align-items:center;justify-content:center">
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86);background:#fff;padding:4px 8px;border-radius:4px;border:1px solid rgb(229 222 211)">{{ tabName }} — designed in a later module</span>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ libOpen }}">
+    <div onClick="{{ closeLib }}" style="position:fixed;inset:0;z-index:210;background:rgb(51 36 27 / 0.35);display:flex;align-items:center;justify-content:center">
+      <div onClick="{{ stop }}" style="width:min(1080px, calc(100vw - 60px));height:min(760px, calc(100vh - 60px));background:#fff;border-radius:14px;box-shadow:0 24px 60px rgb(51 36 27 / 0.25);overflow:auto">
+        <dc-import name="Library" mode="picker" start-co="h2990" on-pick="{{ onLibPick }}" on-close="{{ closeLib }}" hint-size="100%,700px"></dc-import>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ hasModal }}">
+    <div onClick="{{ closeModal }}" style="position:fixed;inset:0;z-index:200;background:rgb(51 36 27 / 0.35);display:flex;align-items:center;justify-content:center">
+      <div onClick="{{ stop }}" style="width:460px;max-width:calc(100vw - 40px);background:#fff;border-radius:14px;box-shadow:0 24px 60px rgb(51 36 27 / 0.25);padding:22px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px;font-size:13px;color:rgb(51 36 27);animation:tpPop .2s ease-out">
+        <div>
+          <div style="font-size:17px;font-weight:600">{{ modalTitle }}</div>
+          <div style="font-size:12.5px;color:rgb(117 100 86);margin-top:4px">{{ modalSub }}</div>
+        </div>
+
+        <sc-if value="{{ mSplit }}">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Assignee</div>
+            <sc-for list="{{ splitPeople }}" as="p" hint-placeholder-count="3">
+              <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;border:1px solid {{ p.border }};background:{{ p.bg }};cursor:pointer">
+                <span style="width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:{{ p.radio }}"></span>
+                <span style="width:24px;height:24px;border-radius:50%;background:oklch(0.92 0.04 350);font-size:10.5px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ p.i }}</span>
+                <span style="font-weight:500">{{ p.name }}</span><span style="color:rgb(117 100 86)">· {{ p.load }} active</span>
+              </div>
+            </sc-for>
+            <div style="font-size:11.5px;color:rgb(117 100 86)">Only people Rachel added to the Edit stage.</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:12px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Deadline</div>
+              <input type="date" value="{{ splitDate }}" onChange="{{ onSplitDate }}" style="height:34px;box-sizing:border-box;border:1px solid {{ splitDateBorder }};border-radius:8px;padding:0 8px;font:inherit;color:rgb(51 36 27)">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Deliverable</div>
+              <input value="{{ splitDeliv }}" onChange="{{ onSplitDeliv }}" placeholder="e.g. Price-tag motion graphics" style="height:34px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;color:rgb(51 36 27);outline:none">
+            </div>
+          </div>
+          <sc-if value="{{ splitDateBad }}"><div style="font-size:12px;color:rgb(176 40 34);margin-top:-8px">Must be on or before 25 Oct — the Edit stage deadline.</div></sc-if>
+        </sc-if>
+
+        <sc-if value="{{ mSubmit }}">
+          <div style="padding:10px 12px;border-radius:8px;background:rgb(246 244 240);font-size:12.5px;color:rgb(74 64 58);line-height:1.5">Next stage <strong style="font-weight:600">Final</strong> is 🔓 Previous stage picks. Choose who takes it before you submit. Mei (👤 Internal approver) reviews this stage; v2 is saved automatically.</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Final stage goes to</div>
+            <sc-for list="{{ nextPeople }}" as="p" hint-placeholder-count="2">
+              <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;border:1px solid {{ p.border }};background:{{ p.bg }};cursor:pointer">
+                <span style="width:16px;height:16px;border-radius:50%;box-sizing:border-box;border:{{ p.radio }}"></span>
+                <span style="font-weight:500">{{ p.name }}</span><span style="color:rgb(117 100 86)">· {{ p.load }} active</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mReview }}">
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid rgb(236 231 224)">
+            <span style="font-size:15px">📎</span><span style="font-weight:500;flex:1">subtitles_BM_EN.srt</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86)">from Siti · 24 Oct</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Reason (required to return)</div>
+            <textarea value="{{ reason }}" onChange="{{ onReason }}" placeholder="What needs to change?" style="min-height:70px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:8px 10px;font:inherit;resize:vertical;outline:none;color:rgb(51 36 27)"></textarea>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ mChanges }}">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:10.5px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Reason (required)</div>
+            <textarea value="{{ reason }}" onChange="{{ onReason }}" placeholder="Tell Ali what to change" style="min-height:80px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:8px 10px;font:inherit;resize:vertical;outline:none;color:rgb(51 36 27)"></textarea>
+          </div>
+        </sc-if>
+
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:4px">
+          <span onClick="{{ closeModal }}" style="height:34px;padding:0 14px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;cursor:pointer">Cancel</span>
+          <sc-for list="{{ modalBtns }}" as="a" hint-placeholder-count="1">
+            <span onClick="{{ a.onClick }}" style="height:34px;padding:0 14px;border-radius:8px;display:flex;align-items:center;font-weight:500;cursor:{{ a.cursor }};background:{{ a.bg }};color:{{ a.fg }};border:1px solid {{ a.border }};opacity:{{ a.op }}">{{ a.label }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:1400},&quot;viewer&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ali&quot;,&quot;mei&quot;,&quot;rachel&quot;,&quot;jason&quot;],&quot;default&quot;:&quot;ali&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;scenario&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;normal&quot;,&quot;submitted&quot;,&quot;changes&quot;,&quot;required&quot;,&quot;editing&quot;,&quot;returned&quot;],&quot;default&quot;:&quot;normal&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;onBack&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}">
+const ST = {
+  draft: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(160 154 146)' },
+  waiting: { bg: 'rgb(251 243 225)', border: 'rgb(236 214 164)', fg: 'rgb(138 92 10)', dot: 'rgb(214 152 30)' },
+  done: { bg: 'rgb(232 244 235)', border: 'rgb(190 222 199)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)' },
+  red: { bg: 'rgb(252 236 233)', border: 'rgb(236 190 184)', fg: 'rgb(176 40 34)', dot: 'rgb(200 52 42)' },
+};
+const AV = { Mei: 'oklch(0.90 0.05 295)', Ali: 'oklch(0.90 0.05 270)', 'Ah Kit': 'oklch(0.90 0.05 195)', Rachel: 'oklch(0.90 0.05 195)' };
+const LOC = {
+  'Showroom': 'oklch(0.94 0.03 235)', 'Marketing Room': 'oklch(0.94 0.03 270)', 'On the road': 'oklch(0.94 0.03 195)',
+  'LRT': 'oklch(0.94 0.03 320)', 'Highway': 'oklch(0.93 0.02 250)', 'Truck Wrapping (Seri Kembangan)': 'oklch(0.94 0.03 350)',
+};
+const SCENES = [
+  { no: '01', narr: 'Have you spotted our red truck yet?', vis: 'Shot: wide, truck turns into frame. Action: kid points. Props: balloons', locs: ['On the road', 'Highway'], dir: 'Open on motion — no static wide.', vid: '4K 60fps, gimbal', edit: 'Speed ramp into title', ref: 'ref_opening.mp4' },
+  { no: '02', narr: 'This week it is out on the road with gift boxes on wheels.', vis: 'Shot: tracking alongside truck, close-up on wrap logo', locs: ['Highway', 'Truck Wrapping (Seri Kembangan)'], dir: 'Logo must be readable.', vid: 'Car-to-car rig', edit: '', ref: '' },
+  { no: '03', narr: 'Step inside — every gift box comes with a surprise.', vis: 'Shot: inside truck. Action: host opens a gift box on the accent chair. Props: chair, gift boxes', locs: ['Showroom'], dir: 'Hold on the chair for 2s.', vid: 'Low angle, 35mm', edit: '', ref: 'chair_ref.jpg' },
+  { no: '04', narr: 'Find us 19–25 Oct. Follow the red truck!', vis: 'End card: route map pins + 2990 Home logo', locs: ['Marketing Room'], dir: 'Use the brand end card.', vid: '—', edit: '', ref: 'endcard.ai' },
+];
+const COLS = [
+  ['No', 'Script'], ['Narration', 'Script'], ['Visuals (Shots, Actions, Locations, Props)', 'Script'], ['Location', 'Script'],
+  ["Director's Note", 'Shoot'], ["Videographer's Notes", 'Shoot'], ['Edit Notes', 'Edit'], ['Reference', 'Script'],
+];
+const TYPES = [['Text', 'Aa'], ['Select', '◉'], ['Multi-select', '☰'], ['Date', '▦'], ['Person', '◎'], ['File', '⎘'], ['Checkbox', '☑']];
+const GLYPH = Object.fromEntries(TYPES);
+const MENU = [
+  ['heading', 'Heading', 'H'], ['text', 'Text', 'Aa'], ['divider', 'Divider', '—'], ['numbered', 'Numbered list', '1.'],
+  ['checklist', 'Checklist', '☑'], ['media', 'Image / Video / File', '🖼️'], ['table', 'Typed table', '▦'], ['callout', 'Callout', '💡'],
+];
+const ICONS = ['🎵', '🎬', '📸', '🗂️', '🎯', '🧡', '🚚', '🎁', '⭐', '📍', '🛋️', '✨'];
+const SIZES = [['S', '0.92em'], ['M', '1em'], ['L', '1.18em']];
+const COLORS = ['rgb(51 36 27)', 'oklch(0.48 0.11 235)', 'oklch(0.47 0.13 295)', 'oklch(0.50 0.14 350)', 'oklch(0.47 0.09 195)'];
+const HLS = ['transparent', 'oklch(0.95 0.03 235)', 'oklch(0.95 0.035 295)', 'oklch(0.95 0.035 350)', 'oklch(0.95 0.03 195)'];
+
+function initState(scn) {
+  const required = scn === 'required';
+  return {
+    scn, tab: 'canvas', modal: null, reason: '', pickNext: null,
+    split: { who: null, date: '2026-10-24', deliv: '' },
+    checks: [true, true, !required, !required],
+    hasVideo: !required,
+    changeBy: 'PIC', changeReason: 'Make the chair bigger in scene 3', changeWhen: 'Carmen · 25 Oct',
+    version: scn === 'changes' ? 2 : 1,
+    subtasks: scn === 'returned'
+      ? [{ id: 'mg', title: 'Motion graphics: price tags', who: 'Aina', due: '24 Oct', returns: 3, st: 'red' }]
+      : [{ id: 'sub', title: 'Subtitles BM + EN', who: 'Siti', due: '24 Oct', returns: 0, st: 'ready' }],
+    blocks: [
+      { id: 1, type: 'callout', text: 'Export 9:16 and 1:1. Keep subtitles inside the safe zone.' },
+      { id: 2, type: 'table', name: 'Music picks', icon: '🎵', cols: [['Track', 'Text'], ['Mood', 'Select'], ['Licensed', 'Checkbox']], rows: [['Sunny Ride', 'Playful', '☑'], ['Truck Stop Funk', 'Upbeat', '☐']] },
+    ],
+    fmt: {}, fmtOpen: null, iconOpen: null, colMenu: null, slash: '', slashOpen: false,
+  };
+}
+
+class Component extends DCLogic {
+  state = initState(this.props.scenario ?? 'normal');
+  componentDidUpdate(prev) {
+    if (prev.scenario !== this.props.scenario) this.setState(initState(this.props.scenario ?? 'normal'));
+  }
+  addBlock(type) {
+    const id = Date.now();
+    const b = { id, type };
+    if (type === 'heading') b.text = 'New heading';
+    if (type === 'text') b.text = 'Start writing…';
+    if (type === 'callout') b.text = 'Something worth flagging';
+    if (type === 'numbered' || type === 'checklist') b.items = ['First item', 'Second item'];
+    if (type === 'table') { b.name = 'Untitled table'; b.icon = '🗂️'; b.cols = [['Name', 'Text'], ['Status', 'Select']]; b.rows = [['', ''], ['', '']]; }
+    this.setState(s => ({ blocks: [...s.blocks, b], slash: '', slashOpen: false }));
+  }
+  updBlock(id, fn) { this.setState(s => ({ blocks: s.blocks.map(b => b.id === id ? fn(b) : b) })); }
+
+  renderVals() {
+    const s = this.state;
+    const viewer = this.props.viewer ?? 'ali';
+    const scn = s.scn;
+    const submitted = scn === 'submitted', approved = scn === 'approved';
+    const nowWith = submitted ? 'Mei' : approved ? (s.pickNext || 'Ali') : 'Ali';
+    const isAli = viewer === 'ali', isMei = viewer === 'mei', isMM = viewer === 'rachel';
+    const lockedByOther = scn === 'editing' && !isMei;
+    const canEdit = isAli && nowWith === 'Ali' && !submitted && !approved && !lockedByOther;
+    const canFree = viewer !== 'jason' && !lockedByOther;
+    const missing = (s.checks.every(Boolean) ? 0 : 1) + (s.hasVideo ? 0 : 1);
+
+    let st = ST.red, statusLabel = '1 day overdue';
+    if (scn === 'changes') statusLabel = 'Changes requested';
+    if (submitted) { st = ST.waiting; statusLabel = "Waiting for Mei's approval"; }
+    if (approved) { st = ST.waiting; statusLabel = 'Final · in progress'; }
+    const overdue = !submitted && !approved;
+
+    const btn = (label, onClick, kind = 'secondary', disabled = false) => ({
+      label, onClick: disabled ? () => {} : onClick,
+      bg: kind === 'primary' ? '#EC9B55' : '#fff',
+      fg: kind === 'primary' ? 'rgb(43 31 23)' : kind === 'danger' ? 'rgb(176 40 34)' : 'rgb(51 36 27)',
+      border: kind === 'primary' ? '#EC9B55' : kind === 'danger' ? 'rgb(236 190 184)' : 'rgb(229 222 211)',
+      op: disabled ? 0.45 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
+    });
+    const actions = [];
+    let actionNote = '', actionNoteColor = 'rgb(117 100 86)';
+    if (canEdit) {
+      actions.push(btn('Submit for approval', () => this.setState({ modal: 'submit', pickNext: null }), 'primary', missing > 0));
+      if (missing > 0) { actionNote = `${missing} required section${missing > 1 ? 's' : ''} left`; actionNoteColor = 'rgb(176 40 34)'; }
+    }
+    if (isAli && submitted) actionNote = 'Submitted · waiting for Mei';
+    if ((isMei || isMM) && submitted) {
+      actions.push(btn('Request changes', () => this.setState({ modal: 'changes', reason: '' }), 'danger'));
+      actions.push(btn('Approve', () => this.setState({ scn: 'approved' }), 'primary'));
+    }
+    if (isMM) actions.unshift(btn('Reassign', () => this.props.onReassign && this.props.onReassign()));
+    if (lockedByOther && isAli) actionNote = 'Read-only while Mei is editing';
+
+    const stageDefs = [
+      { name: 'Script', person: 'Mei', appr: '👤', apprText: 'Internal approver: Rachel', assign: '🔒', assignText: 'Assigned by MM', date: '15 Oct', done: true },
+      { name: 'Shoot', person: 'Ah Kit', appr: '—', apprText: 'No approval', assign: '🔒', assignText: 'Assigned by MM', date: '19 Oct', done: true },
+      { name: 'Raw upload', person: 'Ah Kit', appr: '—', apprText: 'No approval', assign: '🔒', assignText: 'Assigned by MM', date: '20 Oct', done: true },
+      { name: 'Edit', person: 'Ali', appr: '👤', apprText: 'Internal approver: Mei', assign: '🔒', assignText: 'Assigned by MM', date: approved ? '25 Oct' : 'Due 25 Oct', done: approved, current: !approved },
+      { name: 'Final', person: approved || s.pickNext ? (s.pickNext || 'Ali') : 'Picked by Edit', appr: '🔗', apprText: 'PIC approves via link', assign: '🔓', assignText: 'Previous stage picks', date: 'Due 28 Oct', current: approved },
+    ];
+    const stages = stageDefs.map((d, i) => {
+      const redNow = d.current && overdue;
+      return {
+        ...d, weight: d.current ? 600 : 500,
+        nodeText: d.done ? '✓' : d.person[0] === 'P' ? '?' : d.person[0],
+        nodeBg: d.done ? ST.done.bg : d.current ? (AV[d.person] || '#fff') : '#fff',
+        nodeFg: d.done ? ST.done.fg : 'rgb(51 36 27)',
+        nodeBorder: d.done ? `1.5px solid ${ST.done.border}` : d.current ? `2px solid ${redNow ? ST.red.dot : 'rgb(90 62 43)'}` : '1.5px dashed rgb(214 204 190)',
+        ring: d.current ? `0 0 0 4px ${redNow ? 'rgb(252 236 233)' : 'rgb(241 236 228)'}` : 'none',
+        lineBg: d.done ? ST.done.dot : 'rgb(229 222 211)', lineOp: i === 4 ? 0 : 1,
+      };
+    });
+
+    const subtasks = s.subtasks.map(t => {
+      const red = t.returns >= 3;
+      const stt = t.st === 'approved' ? ST.done : red ? ST.red : ST.waiting;
+      const label = t.st === 'approved' ? 'Approved' : red ? `Returned ${t.returns} times` : t.st === 'revising' ? `Returned ${t.returns}× · ${t.who} is revising` : 'Ready';
+      return {
+        ...t, label, stBg: stt.bg, stFg: stt.fg, stBorder: stt.border, stDot: stt.dot,
+        bg: red ? 'rgb(255 247 245)' : '#fff', border: red ? ST.red.border : 'rgb(236 231 224)',
+        canReview: isAli && t.st === 'ready',
+        onReview: () => this.setState({ modal: 'review', reason: '', reviewId: t.id }),
+      };
+    });
+
+    const tabNames = ['Canvas', 'Map', 'Audit trail', 'Versions'];
+    const tabs = tabNames.map(n => {
+      const k = n.toLowerCase(), on = s.tab === k;
+      return { label: n, line: on ? 'rgb(51 36 27)' : 'transparent', color: on ? 'rgb(51 36 27)' : 'rgb(117 100 86)', weight: on ? 600 : 400, onClick: () => this.setState({ tab: k }) };
+    });
+
+    const tag = (t, kind) => kind === 'req' ? { t, ...{ bg: ST.red.bg, fg: ST.red.fg, border: ST.red.border } } : { t, bg: 'rgb(246 244 240)', fg: 'rgb(90 78 68)', border: 'rgb(236 231 224)' };
+    const lockT = canEdit ? [] : ['🔒 Locked'];
+    const notMine = isAli ? ['🔒 Locked'] : [];
+    const assetsMissing = !s.checks.every(Boolean);
+    const b = {
+      req: ['🔒 Locked', '👁 Visible to PIC'],
+      script: [...notMine, '🎯 Belongs to Script'],
+      table: ['🎯 Script · Shoot · Edit', ...(isAli ? ['Only Edit Notes is yours'] : [])],
+      assets: [tag('⭐ Required before submit', assetsMissing && canEdit ? 'req' : ''), tag('🎯 Belongs to Edit'), ...lockT.map(t => tag(t))],
+      caption: [...notMine, '👁 Visible to PIC', '🎯 Belongs to Script'],
+      final: [tag('⭐ Required before submit', !s.hasVideo && canEdit ? 'req' : ''), tag('👁 Visible to PIC'), tag('🎯 Belongs to Edit'), ...lockT.map(t => tag(t))],
+    };
+    const lockedBg = 'rgb(248 247 245)', lockedFg = 'rgb(130 120 110)';
+    const editCol = canEdit;
+    const lk = {
+      script: lockedBg, scriptFg: lockedFg, shoot: lockedBg, shootFg: lockedFg,
+      edit: editCol ? '#fff' : lockedBg, editDisabled: !editCol, editPh: editCol ? 'Add edit note…' : '',
+      editBorder: editCol ? 'rgb(229 222 211)' : 'transparent', editInput: editCol ? '#fff' : 'transparent',
+    };
+    const cols = COLS.map(([name, stage]) => {
+      const mine = editCol && stage === 'Edit';
+      return {
+        name, badge: mine ? 'Edit stage · yours' : `${stage === 'Edit' ? '' : '🔒 '}${stage} stage`,
+        headBg: mine ? 'rgb(250 244 236)' : 'rgb(250 248 244)',
+        badgeBg: mine ? 'rgb(90 62 43)' : 'rgb(240 236 230)', badgeFg: mine ? 'rgb(246 238 230)' : 'rgb(117 100 86)',
+      };
+    });
+    const scenes = SCENES.map(r => ({ ...r, hasRef: !!r.ref, locs: r.locs.map(n => ({ name: n, bg: LOC[n], fg: 'rgb(51 36 27)' })) }));
+
+    const checklistLabels = ['Raw footage synced', 'Logo end card', 'Music licensed', 'Subtitles BM + EN'];
+    const checklist = checklistLabels.map((label, i) => {
+      const on = s.checks[i];
+      return {
+        label, tick: on ? '✓' : '', boxBg: on ? 'rgb(90 62 43)' : '#fff', boxBorder: on ? 'rgb(90 62 43)' : 'rgb(200 190 178)',
+        fg: on ? 'rgb(117 100 86)' : 'rgb(51 36 27)', deco: on ? 'line-through' : 'none', cursor: canEdit ? 'pointer' : 'default',
+        onClick: () => canEdit && this.setState(p => ({ checks: p.checks.map((c, j) => j === i ? !c : c) })),
+      };
+    });
+
+    const blocks = s.blocks.map(bk => {
+      const f = s.fmt[bk.id] || {};
+      const size = (SIZES.find(x => x[0] === (f.size || 'M')) || SIZES[1])[1];
+      const color = COLORS[f.color || 0], hl = HLS[f.hl || 0];
+      const setF = patch => this.setState(p => ({ fmt: { ...p.fmt, [bk.id]: { ...(p.fmt[bk.id] || {}), ...patch } } }));
+      const out = {
+        ...bk, size, color, hl, calloutBg: (f.hl ? HLS[f.hl] : 'rgb(246 244 240)'),
+        isHeading: bk.type === 'heading', isText: bk.type === 'text', isDivider: bk.type === 'divider', isNumbered: bk.type === 'numbered',
+        isChecklist: bk.type === 'checklist', isMedia: bk.type === 'media', isCallout: bk.type === 'callout', isTable: bk.type === 'table',
+        items: (bk.items || []).map((t, i) => ({ t, n: i + 1 })),
+        fmtOpen: s.fmtOpen === bk.id,
+        onFormat: () => canFree && this.setState(p => ({ fmtOpen: p.fmtOpen === bk.id ? null : bk.id, iconOpen: null, colMenu: null })),
+        hlLabel: bk.type === 'heading' ? 'Background' : 'Highlight',
+        sizeOpts: SIZES.map(([l]) => ({ l, bg: (f.size || 'M') === l ? '#fff' : 'transparent', w: (f.size || 'M') === l ? 600 : 400, onClick: () => setF({ size: l }) })),
+        colorOpts: COLORS.map((c, i) => ({ c, ring: (f.color || 0) === i ? '0 0 0 2px #fff, 0 0 0 4px rgb(90 62 43)' : 'none', onClick: () => setF({ color: i }) })),
+        hlOpts: HLS.map((c, i) => ({ c: i === 0 ? '#fff' : c, ring: (f.hl || 0) === i ? '0 0 0 2px #fff, 0 0 0 4px rgb(90 62 43)' : 'none', onClick: () => setF({ hl: i }) })),
+      };
+      if (bk.type === 'table') {
+        const n = bk.cols.length;
+        Object.assign(out, {
+          lockedInput: !canFree,
+          gridCols: `repeat(${n}, minmax(0,1fr)) 36px`,
+          cols: bk.cols.map(([name, type]) => ({ name, glyph: GLYPH[type] })),
+          cells: bk.rows.flatMap(r => bk.cols.map((c, i) => ({ v: r[i] || '', span: i === n - 1 ? `${n} / span 2` : 'auto' }))),
+          iconOpen: s.iconOpen === bk.id, colMenuOpen: s.colMenu === bk.id,
+          onIcon: () => canFree && this.setState(p => ({ iconOpen: p.iconOpen === bk.id ? null : bk.id, colMenu: null, fmtOpen: null })),
+          iconChoices: ICONS.map(e => ({ e, onClick: () => { this.updBlock(bk.id, x => ({ ...x, icon: e })); this.setState({ iconOpen: null }); } })),
+          onAddCol: () => canFree && this.setState(p => ({ colMenu: p.colMenu === bk.id ? null : bk.id, iconOpen: null, fmtOpen: null })),
+          colTypes: TYPES.map(([name, glyph]) => ({ name, glyph, onClick: () => { this.updBlock(bk.id, x => ({ ...x, cols: [...x.cols, [name, name]], rows: x.rows.map(r => [...r, '']) })); this.setState({ colMenu: null }); } })),
+        });
+      }
+      return out;
+    });
+    const q = s.slash.startsWith('/') ? s.slash.slice(1).toLowerCase() : '';
+    const blockMenu = MENU.filter(m => m[1].toLowerCase().includes(q)).map(([k, label, icon]) => ({ label, icon, onClick: () => this.addBlock(k) }));
+
+    // modals
+    const sp = s.split;
+    const splitDateBad = sp.date > '2026-10-25';
+    const splitOk = sp.who && sp.date && !splitDateBad && sp.deliv.trim();
+    const people = [['Siti', 4], ['Aina', 2], ['Hafiz', 3]];
+    const radio = on => ({ border: on ? 'rgb(90 62 43)' : 'rgb(236 231 224)', bg: on ? 'rgb(250 248 244)' : '#fff', radio: on ? '5px solid rgb(90 62 43)' : '1.5px solid rgb(200 190 178)' });
+    let modalTitle = '', modalSub = '', modalBtns = [];
+    if (s.modal === 'split') {
+      modalTitle = 'Split into subtasks'; modalSub = 'Edit stage · stage deadline 25 Oct';
+      modalBtns = [btn('Create subtask', () => this.setState(p => ({ modal: null, subtasks: [...p.subtasks, { id: 'n' + Date.now(), title: sp.deliv, who: sp.who, due: `${parseInt(sp.date.slice(8), 10)} Oct`, returns: 0, st: 'working' }], split: { who: null, date: '2026-10-24', deliv: '' } })), 'primary', !splitOk)];
+    }
+    if (s.modal === 'submit') {
+      modalTitle = 'Submit for approval'; modalSub = 'Red Truck Reels · Edit stage';
+      modalBtns = [btn('Submit v2', () => this.setState(p => ({ modal: null, scn: 'submitted', version: p.version + 1 })), 'primary', !s.pickNext)];
+    }
+    if (s.modal === 'review') {
+      const id = s.reviewId;
+      const hasReason = s.reason.trim().length > 0;
+      modalTitle = 'Review delivery'; modalSub = 'Subtitles BM + EN · from Siti';
+      modalBtns = [
+        btn('Return', () => {
+          this.setState(p => ({ modal: null, subtasks: p.subtasks.map(t => t.id === id ? { ...t, returns: t.returns + 1, st: 'revising' } : t) }));
+          clearTimeout(this._t);
+          this._t = setTimeout(() => this.setState(p => ({ subtasks: p.subtasks.map(t => t.id === id && t.st === 'revising' && t.returns < 3 ? { ...t, st: 'ready' } : t) })), 2500);
+        }, 'danger', !hasReason),
+        btn('Approve', () => this.setState(p => ({ modal: null, subtasks: p.subtasks.map(t => t.id === id ? { ...t, st: 'approved' } : t) })), 'primary'),
+      ];
+    }
+    if (s.modal === 'changes') {
+      modalTitle = 'Request changes'; modalSub = 'v2 · submitted 25 Oct by Ali';
+      modalBtns = [btn('Send back to Ali', () => this.setState(p => ({ modal: null, scn: 'changes', changeBy: isMM ? 'Rachel' : 'Mei', changeReason: p.reason.trim(), changeWhen: `${isMM ? 'Rachel' : 'Mei'} · 25 Oct` })), 'danger', !s.reason.trim())];
+    }
+
+    const subDates = { 1: 'v1 · submitted 21 Oct', 2: 'v2 · submitted 25 Oct', 3: 'v3 · submitted 26 Oct' };
+    return {
+      back: () => this.props.onBack && this.props.onBack(),
+      libOpen: !!s.libOpen, openLib: () => this.setState({ libOpen: true }), closeLib: () => this.setState({ libOpen: false }),
+      onLibPick: files => this.setState(p => ({ libOpen: false, libFiles: [...(p.libFiles || []), ...files.filter(f => !(p.libFiles || []).some(x => x.name === f.name))] })),
+      hasLibFiles: !!(s.libFiles && s.libFiles.length), libFiles: (s.libFiles || []).map((f, i) => ({ ...f, onRemove: () => this.setState(p => ({ libFiles: p.libFiles.filter((_, j) => j !== i) })) })),
+      backLabel: this.props.backLabel ?? 'My Space',
+      versionLabel: subDates[s.version] || `v${s.version}`,
+      showReturnAlert: s.subtasks.some(t => t.returns >= 3),
+      returnAlertTail: isMM ? 'Check in with Aina and Ali before it slips further.' : 'Rachel has been notified.',
+      isMM,
+      st, statusLabel,
+      actions, hasActionNote: !!actionNote, actionNote, actionNoteColor,
+      nowWith, nowWithInitial: nowWith[0], nowWithBg: AV[nowWith] || 'oklch(0.90 0.05 270)',
+      dueLabel: overdue ? 'Due 25 Oct · 1 day overdue' : approved ? 'Due 28 Oct' : 'Due 25 Oct',
+      dueColor: overdue ? ST.red.fg : 'rgb(51 36 27)', dueWeight: overdue ? 600 : 400,
+      stages, subtasks, hasSubtasks: subtasks.length > 0, tabs,
+      showEditing: scn === 'editing', editorName: isMei ? 'Ali' : 'Mei', editorInitial: isMei ? 'A' : 'M',
+      showChanges: scn === 'changes', changeBy: s.changeBy, changeReason: s.changeReason, changeWhen: s.changeWhen,
+      isCanvas: s.tab === 'canvas', isOtherTab: !['canvas', 'map', 'audit trail'].includes(s.tab), isMapTab: s.tab === 'map', isAuditTab: s.tab === 'audit trail', tabName: tabNames.find(n => n.toLowerCase() === s.tab),
+      canSplit: canEdit, openSplit: () => this.setState({ modal: 'split' }),
+      readOnly: !canEdit,
+      b, cols, scenes, lk,
+      lockFg: 'rgb(74 64 58)', lockBg: isAli ? 'rgb(248 247 245)' : '#fff',
+      checklist,
+      hasVideo: s.hasVideo, noVideo: !s.hasVideo, uploadCursor: canEdit ? 'pointer' : 'default',
+      uploadVideo: () => canEdit && this.setState({ hasVideo: true }),
+      blocks, canFree,
+      slash: s.slash, slashOpen: s.slashOpen || s.slash.startsWith('/'),
+      onSlash: e => this.setState({ slash: e.target.value, slashOpen: false }),
+      toggleSlash: () => this.setState(p => ({ slashOpen: !p.slashOpen })),
+      blockMenu,
+      hasModal: !!s.modal, mSplit: s.modal === 'split', mSubmit: s.modal === 'submit', mReview: s.modal === 'review', mChanges: s.modal === 'changes',
+      modalTitle, modalSub, modalBtns,
+      closeModal: () => this.setState({ modal: null }),
+      stop: e => e.stopPropagation(),
+      splitPeople: people.map(([name, load]) => ({ name, load, i: name[0], ...radio(sp.who === name), onClick: () => this.setState(p => ({ split: { ...p.split, who: name } })) })),
+      splitDate: sp.date, splitDateBad, splitDateBorder: splitDateBad ? ST.red.dot : 'rgb(229 222 211)',
+      onSplitDate: e => { const v = e.target.value; this.setState(p => ({ split: { ...p.split, date: v } })); },
+      splitDeliv: sp.deliv, onSplitDeliv: e => { const v = e.target.value; this.setState(p => ({ split: { ...p.split, deliv: v } })); },
+      nextPeople: [['Ali', 3], ['Ah Kit', 2]].map(([name, load]) => ({ name, load, ...radio(s.pickNext === name), onClick: () => this.setState({ pickNext: name }) })),
+      reason: s.reason, onReason: e => this.setState({ reason: e.target.value }),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -9,9 +9,9 @@ import { extraBillingModeOptions, primedRegistryRows } from '@/lib/dept-registry
 import { loadDepartmentMode } from '@/lib/department-mode-server'
 import { fetchAllRowsAsWritten, fetchByKeys } from '@/lib/paginate'
 import { startRead } from '@/lib/start-read'
+import { marketingLinesFromRow, NO_MARKETING } from './marketing-lines'
 import {
   toHubInvoice,
-  type HubContract,
   type HubCreditNote,
   type HubCreditNoteLine,
   type HubMovement,
@@ -57,8 +57,7 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
   const invoicesRead = startRead(
     supabase
       .from('invoices')
-      // contract_id (2026-10-10): a marketing project's row opens its month's invoice.
-      .select(`${INVOICE_COLUMNS}, settlement_voucher_id, contract_id`)
+      .select(`${INVOICE_COLUMNS}, settlement_voucher_id`)
       .eq('period_month', period)
       .order('invoice_no', { ascending: false, nullsFirst: true }),
   )
@@ -76,11 +75,10 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
   )
   const firstReads = startRead(
     Promise.all([
-      supabase
-        .from('service_contracts')
-        .select('id, description, amount, status, start_date, end_date, company_id, approved_by')
-        .eq('billing_mode', 'marketing_project')
-        .order('created_at', { ascending: false }),
+      // Marketing's billing for the month (2026-10-26, ②b-2h): the lines its manager confirmed, by party, with the
+      // invoice each is on — and the month's Marketing invoices typed by hand. It replaced the marketing contracts.
+      // (Marketing's functions are not in the generated types.)
+      supabase.rpc('mkt_bill_import_preview' as never, { p_month: period } as never),
       // Every company and department: an invoice keeps its party's name after it goes inactive (or internal —
       // the own-share invoice bills Venture (Office)); the dialogs offer the active / billable ones.
       supabase.from('companies').select('id, name, short_code, is_active').order('short_code'),
@@ -176,7 +174,7 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
       : { data: [] as never[] },
   ])
   const [
-    { data: contracts },
+    { data: marketingRaw, error: marketingError },
     { data: companies },
     { data: movements },
     { data: departments },
@@ -187,6 +185,8 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
     { data: directorSubmission },
   ] = await firstReads
   if (allocError) console.error('get_staff_billing_allocation failed:', allocError.message)
+  if (marketingError) console.error('mkt_bill_import_preview failed:', marketingError.message)
+  const marketing = (marketingError ? null : marketingLinesFromRow(marketingRaw)) ?? NO_MARKETING(period)
 
   // ── The context every invoice is read against ──
   const companyRows = (companies ?? []) as Array<{ id: string; name: string; short_code: string | null; is_active: boolean | null }>
@@ -256,29 +256,6 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
       }
     })
 
-  // ── Marketing projects, each with its invoice this month ──
-  const invoiceByContract = new Map<string, { id: string; no: string | null }>()
-  for (const inv of hubInvoices) {
-    if (inv.contractId && inv.status !== 'voided' && !invoiceByContract.has(inv.contractId)) invoiceByContract.set(inv.contractId, { id: inv.id, no: inv.no })
-  }
-  const contractRows = (contracts ?? []) as Array<{ id: string; description: string | null; amount: number | null; status: string; start_date: string | null; end_date: string | null; company_id: string | null; approved_by: string | null }>
-  const hubContracts: HubContract[] = contractRows
-    .filter((c) => c.company_id !== null)
-    .map((c) => {
-      const co = companyMap.get(c.company_id!)
-      return {
-        id: c.id,
-        description: c.description ?? '—',
-        amount: c.amount == null ? null : Number(c.amount),
-        status: c.status === 'active' && !c.approved_by ? 'pending approval' : c.status,
-        start: c.start_date,
-        end: c.end_date,
-        company: co ? (co.code ? `${co.name} (${co.code})` : co.name) : '—',
-        companyId: c.company_id!,
-        invoice: invoiceByContract.get(c.id) ?? null,
-      }
-    })
-
   // ── Non-billable: the month's Venture Pool movements that bill nobody ──
   const nonBillable: HubMovement[] = (
     (movements ?? []) as Array<{ id: string; created_at: string; transaction_type: string; amount: number; description: string | null; reference_table: string | null }>
@@ -326,7 +303,7 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
     invoices: monthRows.map((i) => ({ id: i.id, status: i.status, total_amount: i.total_amount, billing_mode: i.billing_mode })),
     lines: ((lineRows ?? []) as Array<{ invoice_id: string; amount: number; segment?: string | null }>).map((l) => ({ invoice_id: l.invoice_id, amount: l.amount, segment: l.segment ?? null })),
   })
-  const activeContracts = contractRows.filter((c) => c.status === 'active').length
+  const marketingLines = marketing.lines.length
   const directorPending = !directorSubmitted && directorFromPayroll <= 0
   type ByCompany = { company_id: string; company_name: string; company_short_code: string; basic?: number | null; kpi?: number | null; allowance?: number | null; epf_er?: number | null; socso_er?: number | null; eis_er?: number | null; total_ctc: number }
   const orNull = (v: number | null | undefined) => (v == null ? null : Number(v))
@@ -346,7 +323,7 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
     note: [
       `HR ${payrollSubmitted && run?.approved_at ? officeTime(run.approved_at).format('D MMM') : 'pending'}`,
       `Director salary ${directorSubmitted && submission?.submitted_at ? officeTime(submission.submitted_at).format('D MMM') : 'pending'}`,
-      `${activeContracts} marketing contract${activeContracts === 1 ? '' : 's'}`,
+      `${marketingLines} Marketing line${marketingLines === 1 ? '' : 's'}`,
     ].join(' · '),
     summary: basisLines.length > 0 ? payrollBasisSummary(basisLines) : 'Nothing from payroll yet',
     lines: [
@@ -382,7 +359,7 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
     invoices: hubInvoices,
     otherOpen,
     creditNotes,
-    contracts: hubContracts,
+    marketing,
     nonBillable,
     banks: ((banks ?? []) as Array<{ id: string; bank_name: string; account_number: string | null }>).map((b) => ({
       id: b.id,

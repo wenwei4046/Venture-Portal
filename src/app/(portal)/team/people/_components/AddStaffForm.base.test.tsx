@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import AddStaffForm, { type AddStaffDepartment } from './AddStaffForm'
 import type { ManagerOption, SubDepartmentOption, TitleOption } from '@/lib/staff-form'
 
 const actions = vi.hoisted(() => ({ addStaff: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 vi.mock('../actions', () => actions)
+// The letters filed with the status (2026-10-24) go to the Data center from the browser.
+const letters = vi.hoisted(() => ({ fileLetters: vi.fn() }))
+vi.mock('@/lib/documentation/file-letters', () => letters)
 // Each test waits for ITS OWN submit (CI flake on #582, 2026-10-20): the submit awaits Malaysia's list before it calls
 // addStaff, so on a busy runner `toHaveBeenCalled` passed on an earlier test's call and read its empty address — and
 // the late call then landed in the next test.
@@ -157,5 +160,148 @@ describe('Add Staff — the address', () => {
     await submit()
     expect(await screen.findByText('Pick the postcode.')).toBeInTheDocument()
     expect(actions.addStaff).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-10-23 — the user: "when people add in, will need to fill up one more, is status, is probation, permanent or part
+// time. then is select probation, needs to select with probation period, so that is can be notice and verify".
+describe('Add Staff — the hire date and the employment status', () => {
+  const status = () => screen.getByLabelText('Employment status') as HTMLSelectElement
+  const hire = () => screen.getByLabelText('Hire date') as HTMLInputElement
+
+  it('asks both, required; Probation, Permanent, Part time', () => {
+    setup()
+    expect(hire()).toBeRequired()
+    expect(status()).toBeRequired()
+    expect(optionsOf(status()).map(o => o.label)).toEqual(['Select...', 'Probation', 'Contract', 'Permanent', 'Part time'])
+    expect(screen.queryByLabelText('Probation period')).toBeNull()
+  })
+
+  it('a probation asks its period — 3 months to start — and shows the day it ends', () => {
+    setup()
+    fireEvent.change(status(), { target: { value: 'probation' } })
+    const months = screen.getByLabelText('Probation period') as HTMLSelectElement
+    expect(months.value).toBe('3')
+    expect(optionsOf(months).map(o => o.label)).toEqual(['1 month', '2 months', '3 months', '4 months', '5 months', '6 months'])
+    expect(screen.getByLabelText('Probation ends')).toHaveValue('Pick the hire date first')
+    fireEvent.change(hire(), { target: { value: '2026-11-02' } })
+    expect(screen.getByLabelText('Probation ends')).toHaveValue('1 Feb 2027')
+    fireEvent.change(months, { target: { value: '6' } })
+    expect(screen.getByLabelText('Probation ends')).toHaveValue('1 May 2027')
+    // Reminded twice (2026-10-24 — "need 30 days and 15 days before remind, 2 reminder").
+    expect(screen.getByText('HR is reminded 30 and 15 days before.')).toBeInTheDocument()
+
+    fireEvent.change(status(), { target: { value: 'permanent' } })
+    expect(screen.queryByLabelText('Probation period')).toBeNull()
+  })
+
+  it('files the three with the rest', async () => {
+    const { department } = setup()
+    fireEvent.change(document.getElementById('staff-name')!, { target: { value: 'Teng Yik' } })
+    fireEvent.change(department, { target: { value: 'marketing' } })
+    fireEvent.change(hire(), { target: { value: '2026-11-02' } })
+    fireEvent.change(status(), { target: { value: 'probation' } })
+    fireEvent.change(screen.getByLabelText('Probation period'), { target: { value: '6' } })
+
+    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Add Staff' }).closest('form')!) })
+    await waitFor(() => expect(actions.addStaff).toHaveBeenCalled())
+    const sent = actions.addStaff.mock.calls.at(-1)![0] as FormData
+    expect(sent.get('hire_date')).toBe('2026-11-02')
+    expect(sent.get('employment_status')).toBe('probation')
+    expect(sent.get('probation_months')).toBe('6')
+    // The end is the database's to keep — a disabled field is not sent.
+    expect(sent.has('probation_end')).toBe(false)
+  })
+
+  // Contract (2026-10-24 — the user: "can add with one is Contract, then need pick time period as well, 6 month, 12
+  // month, 18, 24, until 36").
+  it('a contract asks its period — 12 months to start, 6 to 36 — shows the day it ends, and files it alone', async () => {
+    const { department } = setup()
+    fireEvent.change(document.getElementById('staff-name')!, { target: { value: 'Teng Yik' } })
+    fireEvent.change(department, { target: { value: 'marketing' } })
+    fireEvent.change(status(), { target: { value: 'contract' } })
+    const months = screen.getByLabelText('Contract period') as HTMLSelectElement
+    expect(months.value).toBe('12')
+    expect(optionsOf(months).map(o => o.label)).toEqual(['6 months', '12 months', '18 months', '24 months', '30 months', '36 months'])
+    expect(screen.queryByLabelText('Probation period')).toBeNull()
+    expect(screen.getByLabelText('Contract ends')).toHaveValue('Pick the hire date first')
+    fireEvent.change(hire(), { target: { value: '2026-11-02' } })
+    expect(screen.getByLabelText('Contract ends')).toHaveValue('1 Nov 2027')
+    fireEvent.change(months, { target: { value: '36' } })
+    expect(screen.getByLabelText('Contract ends')).toHaveValue('1 Nov 2029')
+    // A contract's end is reminded the same way as a probation's (2026-10-24).
+    expect(screen.getByLabelText('Contract ends')).toHaveAccessibleDescription('HR is reminded 30 and 15 days before.')
+
+    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Add Staff' }).closest('form')!) })
+    await waitFor(() => expect(actions.addStaff).toHaveBeenCalled())
+    const sent = actions.addStaff.mock.calls.at(-1)![0] as FormData
+    expect(sent.get('employment_status')).toBe('contract')
+    expect(sent.get('contract_months')).toBe('36')
+    expect(sent.has('probation_months')).toBe(false)
+
+    fireEvent.change(status(), { target: { value: 'part_time' } })
+    expect(screen.queryByLabelText('Contract period')).toBeNull()
+  })
+})
+
+// Letters filed with the status (2026-10-24 — the user: "新员工进来的时候，他 put 那个 status，然后能够 attach 他的 offer
+// letter。当然包括 letter 的 type，当他一选了之后，就自动 attach 进 document data center 里面").
+describe('Add Staff — the letters filed with the status', () => {
+  const TYPES = [
+    { id: 'offer', name: 'Offer letter', compulsory: true },
+    { id: 'cfs', name: 'Contract for Service', compulsory: false },
+  ]
+  const draw = (letterTypes: typeof TYPES | null) => {
+    actions.addStaff.mockResolvedValue({ id: 'new-person' })
+    letters.fileLetters.mockReset()
+    letters.fileLetters.mockResolvedValue({ filed: ['Offer letter'], failed: [] })
+    render(<AddStaffForm departments={departments} titles={titles} subDepartments={subDepartments} managers={managers} nextCode="HV068" letterTypes={letterTypes} />)
+    fireEvent.change(document.getElementById('staff-name')!, { target: { value: 'Ana Lim' } })
+  }
+  const submit = async () => {
+    await act(async () => { fireEvent.submit(screen.getByRole('button', { name: 'Add Staff' }).closest('form')!) })
+  }
+
+  it('starts on a row for each compulsory type — the offer letter — its file to choose', () => {
+    draw(TYPES)
+    expect(screen.getByText('Letters')).toBeInTheDocument()
+    expect(screen.getByLabelText('Letter type')).toHaveValue('offer')
+    expect(screen.getByText('Choose a file')).toBeInTheDocument()
+  })
+
+  it('files the letters to the person once they are added', async () => {
+    draw(TYPES)
+    const offer = new File(['%PDF'], 'offer-ana.pdf', { type: 'application/pdf' })
+    fireEvent.change(screen.getByLabelText('Letter file'), { target: { files: [offer] } })
+    await submit()
+    await waitFor(() => expect(letters.fileLetters).toHaveBeenCalled(), { timeout: 5000 })
+    const [staffId, rows, types] = letters.fileLetters.mock.calls[0]
+    expect(staffId).toBe('new-person')
+    expect(rows.map((r: { typeId: string; file: File | null }) => [r.typeId, r.file])).toEqual([['offer', offer]])
+    expect(types).toEqual(TYPES)
+    // The file never rides in the Server Action's form.
+    expect([...(actions.addStaff.mock.calls.at(-1)![0] as FormData).values()].some(v => v instanceof File)).toBe(false)
+  })
+
+  it('files nothing when no file was chosen, and asks a type for a file that has none', async () => {
+    draw(TYPES)
+    await submit()
+    await waitFor(() => expect(actions.addStaff).toHaveBeenCalled(), { timeout: 5000 })
+    expect(letters.fileLetters).not.toHaveBeenCalled()
+
+    cleanup()
+    actions.addStaff.mockClear()
+    draw(TYPES)
+    fireEvent.change(screen.getByLabelText('Letter type'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Letter file'), { target: { files: [new File(['%PDF'], 'scan.pdf', { type: 'application/pdf' })] } })
+    await submit()
+    expect(await screen.findByText('Choose the letter type for scan.pdf.', undefined, { timeout: 5000 })).toBeInTheDocument()
+    expect(actions.addStaff).not.toHaveBeenCalled()
+  })
+
+  it('asks for no letters of an adder who may not file one', () => {
+    draw(null)
+    expect(screen.queryByText('Letters')).toBeNull()
+    expect(screen.queryByLabelText('Letter type')).toBeNull()
   })
 })

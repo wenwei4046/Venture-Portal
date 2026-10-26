@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>@keyframes ctIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 380px;min-height:100%;color:rgb(51 36 27)">
+  <div style="padding:22px 28px 60px;min-width:0">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:1.35em;font-weight:600">{{ cvName }}</span>
+      <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;padding:2px 7px;border-radius:5px;border:1px solid rgb(229 222 211)">{{ cvVer }}</span>
+      <span style="flex:1"></span>
+      <span style="font-size:0.84em;color:rgb(117 100 86)">Click any section, table or column to set it up</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;padding:8px 12px;border-radius:8px;background:rgb(250 248 244);font-size:0.82em;color:rgb(74 64 58)">
+      <span>🔒 Locked — colleagues can't delete</span><span>⭐ Required before submit</span><span>🎯 Belongs to stage</span><sc-if value="{{ showPic }}" hint-placeholder-val="{{ true }}"><span>👁 Visible to PIC</span></sc-if><span>📅 Show on calendar</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:18px;margin-top:22px">
+      <sc-for list="{{ sections }}" as="s" hint-placeholder-count="6">
+        <div style="position:relative;border-radius:12px;border:1.5px solid {{ s.border }};padding:14px 16px;background:#fff;transition:border-color .15s" style-hover="border-color:rgb(214 204 190)">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:12px;color:rgb(190 182 172);letter-spacing:-2px">⋮⋮</span>
+            <span style="font-size:18px">{{ s.emoji }}</span>
+            <span style="font-size:1.15em;font-weight:600">{{ s.title }}</span>
+            <sc-for list="{{ s.badges }}" as="b" hint-placeholder-count="3"><span style="font-size:0.74em;padding:2px 7px;border-radius:6px;background:{{ b.bg }};color:{{ b.fg }};border:1px solid {{ b.border }};white-space:nowrap">{{ b.t }}</span></sc-for>
+            <span style="flex:1"></span>
+            <span onClick="{{ s.onSettings }}" style="height:26px;padding:0 9px;border-radius:7px;border:1px solid {{ s.gearBorder }};background:{{ s.gearBg }};display:flex;align-items:center;gap:5px;font-size:0.82em;cursor:pointer;white-space:nowrap" style-hover="background:rgb(246 244 240)">⚙ Section settings</span>
+          </div>
+
+          <sc-if value="{{ s.isReq }}">
+            <div style="margin-top:10px;padding:10px 14px;border-radius:8px;background:rgb(245 244 241);color:rgb(117 100 86);font-size:0.9em;line-height:1.55;white-space:pre-wrap">{{ reqText }}</div>
+          </sc-if>
+          <sc-if value="{{ s.hasFields }}">
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">
+              <sc-for list="{{ s.fields }}" as="f" hint-placeholder-count="2">
+                <div onClick="{{ f.onClick }}" style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;border:1px solid {{ f.border }};background:{{ f.bg }};cursor:pointer" style-hover="border-color:rgb(180 170 158)">
+                  <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86);width:18px">{{ f.glyph }}</span>
+                  <span style="font-size:0.92em;font-weight:500">{{ f.name }}</span>
+                  <span style="font-size:0.8em;color:rgb(150 140 130)">{{ f.type }}</span>
+                  <span style="flex:1"></span>
+                  <span style="font-size:0.78em;color:rgb(90 78 68);white-space:nowrap">{{ f.flags }}</span>
+                </div>
+                <sc-if value="{{ f.isTbl }}" hint-placeholder-val="{{ false }}"><div style="margin:-2px 0 4px 28px;border:1px solid rgb(236 231 224);border-radius:8px;background:#fff;overflow:hidden">
+                  <div style="overflow-x:auto"><div style="display:grid;grid-template-columns:{{ f.grid }};min-width:max-content;font-size:0.82em">
+                    <sc-for list="{{ f.tcols }}" as="c"><div style="padding:7px 10px;border-right:1px solid rgb(240 236 230);border-bottom:1px solid rgb(240 236 230);background:rgb(250 248 244);display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86)">{{ c.glyph }}</span><span style="font-weight:600">{{ c.name }}</span><span style="color:rgb(150 140 130)">{{ c.type }}</span></div></sc-for>
+                    <sc-for list="{{ f.tcells }}" as="c"><div title="{{ c.tip }}" style="height:32px;padding:3px 5px;box-sizing:border-box;border-right:1px solid rgb(240 236 230);border-bottom:1px solid rgb(244 241 236);background:{{ c.bg }};display:flex;align-items:center"><sc-if value="{{ c.isFixed }}" hint-placeholder-val="{{ false }}"><div style="flex:1;height:100%;box-sizing:border-box;padding:0 6px;display:flex;align-items:center;gap:5px;color:rgb(51 36 27);font-weight:500;white-space:nowrap;overflow:hidden"><span style="font-size:10px;opacity:0.6">🔒</span>{{ c.ph }}</div></sc-if><sc-if value="{{ c.isText }}" hint-placeholder-val="{{ false }}"><input onClick="{{ c.stop }}" type="{{ c.itype }}" value="{{ c.value }}" onChange="{{ c.onChange }}" placeholder="{{ c.ph }}" style="flex:1;min-width:0;width:100%;height:100%;box-sizing:border-box;padding:0 6px;border-radius:5px;border:1px dashed rgb(214 190 160);background:#fff;font:inherit;outline:none;color:rgb(51 36 27)" style-focus="border-style:solid;border-color:rgb(150 120 90)"></sc-if><sc-if value="{{ c.isCheck }}" hint-placeholder-val="{{ false }}"><label onClick="{{ c.stop }}" style="flex:1;height:100%;box-sizing:border-box;border-radius:5px;border:1px dashed rgb(214 190 160);background:#fff;display:flex;align-items:center;padding:0 6px;cursor:pointer"><input type="checkbox" checked="{{ c.checked }}" onChange="{{ c.onCheck }}" style="margin:0;accent-color:rgb(90 62 43)"></label></sc-if></div></sc-for>
+                  </div></div>
+                  <div style="padding:6px 10px;display:flex;gap:6px 14px;flex-wrap:wrap;align-items:center;font-size:0.78em;line-height:1.4;color:rgb(117 100 86)"><span onClick="{{ f.addFillRow }}" style="cursor:pointer;font-weight:500;color:rgb(90 62 43);white-space:nowrap;flex:none">+ Add row</span><span onClick="{{ f.clearFill }}" style="cursor:pointer;opacity:{{ f.clearOp }};white-space:nowrap;flex:none">Clear test entries</span><span style="white-space:nowrap;flex:none;margin-left:auto">🔒 Preset — can't be changed</span><span style="display:flex;align-items:center;gap:5px;white-space:nowrap;flex:none"><span style="width:12px;height:10px;border:1px dashed rgb(196 170 140);border-radius:3px;background:#fff"></span>Blank — filled in by the team</span></div>
+                </div></sc-if>
+                <sc-if value="{{ f.isNote }}" hint-placeholder-val="{{ false }}"><div style="margin:-2px 0 4px 28px;padding:6px 10px;border-radius:7px;background:rgb(251 247 238);font-size:0.82em;font-style:italic;color:rgb(90 62 43)">Read-only note shown to whoever works on this stage.</div></sc-if>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ s.isTable }}">
+            <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+              <span onClick="{{ toggleIcon }}" title="Change icon" style="width:30px;height:30px;border-radius:7px;border:1px solid rgb(236 231 224);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer" style-hover="background:rgb(246 244 240)">{{ tableIcon }}</span>
+              <input value="{{ tableName }}" onChange="{{ onTableName }}" style="border:0;outline:none;font:inherit;font-weight:600;font-size:1em;background:transparent;color:rgb(51 36 27);flex:1;min-width:0">
+              <span style="font-size:0.8em;color:rgb(117 100 86)">Typed table · {{ colCount }} columns</span>
+            </div>
+            <sc-if value="{{ iconOpen }}">
+              <div style="position:absolute;top:88px;left:16px;z-index:20;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 12px 30px rgb(51 36 27 / 0.16);padding:8px;display:grid;grid-template-columns:repeat(6,32px);gap:2px;animation:ctIn .12s ease-out">
+                <sc-for list="{{ icons }}" as="e" hint-placeholder-count="12"><span onClick="{{ e.onClick }}" style="width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer" style-hover="background:rgb(241 236 228)">{{ e.e }}</span></sc-for>
+              </div>
+            </sc-if>
+            <div style="margin-top:8px;border:1px solid rgb(236 231 224);border-radius:10px;overflow-x:auto">
+              <div style="display:flex;min-width:max-content">
+                <sc-for list="{{ cols }}" as="c" hint-placeholder-count="9">
+                  <div onClick="{{ c.onClick }}" style="width:132px;flex:none;padding:8px 10px;box-sizing:border-box;border-right:1px solid rgb(240 236 230);background:{{ c.bg }};cursor:pointer;display:flex;flex-direction:column;gap:5px;box-shadow:{{ c.ring }}" style-hover="background:rgb(246 244 240)">
+                    <div style="display:flex;align-items:center;gap:5px"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86)">{{ c.glyph }}</span><span style="font-size:0.84em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span></div>
+                    <span style="font-size:0.72em;color:rgb(117 100 86);white-space:nowrap">🎯 {{ c.stage }}</span>
+                    <span style="font-size:0.72em;white-space:nowrap;min-height:14px">{{ c.flags }}</span>
+                  </div>
+                </sc-for>
+                <div onClick="{{ addCol }}" style="width:44px;flex:none;display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);cursor:pointer;background:rgb(250 248 244)" style-hover="background:rgb(241 236 228)">+</div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ s.isChecklist }}">
+            <div style="display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:0.92em;color:rgb(74 64 58)">
+              <sc-for list="{{ checkItems }}" as="k" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:8px"><span style="width:14px;height:14px;border-radius:4px;border:1.5px solid rgb(200 190 178);box-sizing:border-box"></span>{{ k }}</div></sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ s.isVideo }}">
+            <div style="margin-top:10px;height:70px;border-radius:10px;border:1.5px dashed rgb(214 204 190);background:repeating-linear-gradient(135deg, rgb(250 248 244) 0 10px, rgb(253 252 250) 10px 20px);display:flex;align-items:center;justify-content:center;font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">Video block · MP4 / MOV</div>
+          </sc-if>
+
+          <sc-if value="{{ s.settingsOpen }}">
+            <div style="position:absolute;top:46px;right:12px;z-index:25;width:300px;background:#fff;border:1px solid rgb(229 222 211);border-radius:12px;box-shadow:0 14px 36px rgb(51 36 27 / 0.16);padding:14px;display:flex;flex-direction:column;gap:10px;font-size:13px;animation:ctIn .12s ease-out">
+              <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Section · {{ s.title }}</span><span onClick="{{ closePop }}" style="cursor:pointer;color:rgb(117 100 86)">×</span></div>
+              <sc-for list="{{ s.toggles }}" as="t" hint-placeholder-count="3">
+                <div onClick="{{ t.onClick }}" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                  <span style="width:30px;height:18px;flex:none;border-radius:9px;background:{{ t.track }};position:relative"><span style="position:absolute;top:2px;left:{{ t.knob }}px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2);transition:left .15s"></span></span>
+                  <span>{{ t.label }}</span>
+                </div>
+              </sc-for>
+              <div style="display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid rgb(244 241 236)">
+                <span>🎯 Which stage fills this in?</span>
+                <div style="display:flex;flex-wrap:wrap;gap:5px"><sc-for list="{{ s.stageOpts }}" as="o" hint-placeholder-count="6"><span onClick="{{ o.onClick }}" style="height:26px;padding:0 9px;border-radius:6px;display:flex;align-items:center;cursor:pointer;font-size:12px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</span></sc-for></div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ s.fieldOpen }}">
+            <div style="position:absolute;top:{{ popTop }}px;right:12px;z-index:25;width:330px;background:#fff;border:1px solid rgb(229 222 211);border-radius:12px;box-shadow:0 14px 36px rgb(51 36 27 / 0.16);padding:14px;display:flex;flex-direction:column;gap:12px;font-size:13px;animation:ctIn .12s ease-out">
+              <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Field settings</span><span onClick="{{ closePop }}" style="cursor:pointer;color:rgb(117 100 86)">×</span></div>
+              <div style="display:flex;flex-direction:column;gap:5px"><span style="font-weight:500">What's this field called?</span><input value="{{ fld.name }}" onChange="{{ onFieldName }}" style="height:32px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:7px;padding:0 9px;font:inherit;outline:none;color:rgb(51 36 27)"></div>
+              <div style="display:flex;flex-direction:column;gap:5px"><span style="font-weight:500">What kind of answer?</span>
+                <div style="display:flex;flex-wrap:wrap;gap:5px"><sc-for list="{{ typeOpts }}" as="o" hint-placeholder-count="7"><span onClick="{{ o.onClick }}" style="height:26px;padding:0 9px;border-radius:6px;display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;opacity:0.7">{{ o.glyph }}</span>{{ o.label }}</span></sc-for></div>
+              </div>
+              <sc-if value="{{ fld.isSelect }}">
+                <div style="display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:8px;background:rgb(250 248 244)">
+                  <span style="font-weight:500">Where do the options come from?</span>
+                  <sc-for list="{{ optSrc }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="display:flex;align-items:flex-start;gap:8px;cursor:pointer"><span style="width:14px;height:14px;flex:none;margin-top:2px;border-radius:50%;box-sizing:border-box;border:{{ o.radio }}"></span><div><div style="font-weight:500">{{ o.label }}</div><div style="font-size:11.5px;color:rgb(117 100 86)">{{ o.hint }}</div></div></div></sc-for>
+                  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:2px"><sc-for list="{{ fld.options }}" as="o" hint-placeholder-count="6"><span style="font-size:11.5px;padding:2px 7px;border-radius:5px;background:{{ o.bg }}">{{ o.n }}</span></sc-for></div>
+                </div>
+              </sc-if>
+              <sc-for list="{{ fieldToggles }}" as="t" hint-placeholder-count="2">
+                <div onClick="{{ t.onClick }}" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                  <span style="width:30px;height:18px;flex:none;border-radius:9px;background:{{ t.track }};position:relative"><span style="position:absolute;top:2px;left:{{ t.knob }}px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2);transition:left .15s"></span></span>
+                  <span>{{ t.label }}</span>
+                </div>
+              </sc-for>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <span>🎯 Which stage fills this in?</span>
+                <div style="display:flex;flex-wrap:wrap;gap:5px"><sc-for list="{{ fieldStageOpts }}" as="o" hint-placeholder-count="5"><span onClick="{{ o.onClick }}" style="height:26px;padding:0 9px;border-radius:6px;display:flex;align-items:center;cursor:pointer;font-size:12px;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</span></sc-for></div>
+              </div>
+              <sc-if value="{{ fld.isDate }}">
+                <div style="display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:8px;background:rgb(250 248 244)">
+                  <div onClick="{{ toggleCal }}" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                    <span style="width:30px;height:18px;flex:none;border-radius:9px;background:{{ cal.track }};position:relative"><span style="position:absolute;top:2px;left:{{ cal.knob }}px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2)"></span></span>
+                    <span style="font-weight:500">📅 Show on calendar</span>
+                  </div>
+                  <sc-if value="{{ cal.on }}">
+                    <div style="display:flex;flex-direction:column;gap:5px"><span style="font-size:12px;color:rgb(74 64 58)">Name on the calendar</span><input value="{{ cal.label }}" onChange="{{ onCalLabel }}" style="height:30px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:7px;padding:0 9px;font:inherit;outline:none;background:#fff;color:rgb(51 36 27)"></div>
+                    <div style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;color:rgb(74 64 58);margin-right:4px">Colour</span><sc-for list="{{ calColors }}" as="c" hint-placeholder-count="5"><span onClick="{{ c.onClick }}" title="{{ c.name }}" style="width:22px;height:22px;border-radius:50%;background:{{ c.c }};cursor:pointer;box-shadow:{{ c.ring }}"></span></sc-for></div>
+                    <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;color:rgb(74 64 58)">Preview</span><span style="display:flex;align-items:center;gap:5px;padding:2px 8px;border-radius:5px;background:{{ cal.chipBg }};color:{{ cal.chipFg }};font-size:12px;font-weight:500">{{ cal.emoji }} {{ cal.label }}</span></div>
+                    <sc-if value="{{ showPic }}" hint-placeholder-val="{{ true }}"><div onClick="{{ togglePicCal }}" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                      <span style="width:30px;height:18px;flex:none;border-radius:9px;background:{{ cal.picTrack }};position:relative"><span style="position:absolute;top:2px;left:{{ cal.picKnob }}px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2)"></span></span>
+                      <span>Visible on PIC calendar</span>
+                    </div></sc-if>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+
+      <div onClick="{{ addSection }}" style="height:42px;border-radius:12px;border:1.5px dashed rgb(214 204 190);display:flex;align-items:center;justify-content:center;color:rgb(117 100 86);cursor:pointer;font-size:0.92em" style-hover="background:rgb(250 248 244);color:rgb(51 36 27)">+ Add section</div>
+
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px;border-radius:12px;background:repeating-linear-gradient(135deg, rgb(250 248 244) 0 10px, rgb(253 252 250) 10px 20px);border:1.5px dashed rgb(214 204 190);text-align:center">
+        <div style="display:flex;align-items:center;gap:12px;width:100%"><span style="flex:1;height:1px;background:rgb(214 204 190)"></span><span style="font-size:0.78em;font-weight:600;text-transform:uppercase;letter-spacing:0.14em;color:rgb(117 100 86)">Free space</span><span style="flex:1;height:1px;background:rgb(214 204 190)"></span></div>
+        <span style="font-size:0.88em;color:rgb(74 64 58)">Always at the bottom 🔒 — the only place colleagues can add their own blocks and tables.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="border-left:1px solid rgb(236 231 224);background:rgb(250 249 247);padding:18px 18px 40px;position:sticky;top:0;align-self:start;max-height:100vh;overflow-y:auto;box-sizing:border-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <span style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Preview</span>
+      <div style="display:flex;gap:2px;padding:3px;background:rgb(240 238 234);border-radius:8px">
+        <sc-for list="{{ pvOpts }}" as="o" hint-placeholder-count="2"><div onClick="{{ o.onClick }}" style="height:26px;padding:0 10px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:12px;white-space:nowrap">{{ o.label }}</div></sc-for>
+      </div>
+    </div>
+
+    <sc-if value="{{ pvStaff }}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top:12px;background:#fff;border:1px solid rgb(236 231 224);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:12px;font-size:12px">
+        <div style="font-size:11px;color:rgb(117 100 86)">As Ali sees it at the <strong style="font-weight:600;color:rgb(51 36 27)">Edit</strong> stage</div>
+        <sc-for list="{{ pvSections }}" as="p" hint-placeholder-count="6">
+          <div style="display:flex;flex-direction:column;gap:6px;opacity:{{ p.op }}">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span>{{ p.emoji }}</span><span style="font-weight:600;font-size:13px">{{ p.title }}</span><sc-for list="{{ p.badges }}" as="b" hint-placeholder-count="2"><span style="font-size:10px;padding:1px 5px;border-radius:4px;background:rgb(246 244 240);color:rgb(90 78 68)">{{ b }}</span></sc-for></div>
+            <sc-if value="{{ p.isTable }}">
+              <div style="display:flex;flex-wrap:wrap;gap:3px"><sc-for list="{{ p.cols }}" as="c" hint-placeholder-count="5"><span style="font-size:10.5px;padding:2px 6px;border-radius:4px;background:{{ c.bg }};color:{{ c.fg }}">{{ c.n }}</span></sc-for></div>
+            </sc-if>
+            <sc-if value="{{ p.hasLine }}"><div style="height:22px;border-radius:5px;background:{{ p.lineBg }}"></div></sc-if>
+          </div>
+        </sc-for>
+        <div style="padding:8px;border-radius:6px;border:1px dashed rgb(214 204 190);text-align:center;font-size:10.5px;letter-spacing:0.1em;color:rgb(117 100 86)">FREE SPACE</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ pvPic }}">
+      <div style="margin-top:12px;background:#fff;border:1px solid rgb(226 223 217);border-radius:10px;overflow:hidden;font-size:12px;animation:ctIn .2s ease-out">
+        <div style="padding:12px 14px;border-bottom:1px solid rgb(236 234 230);display:flex;align-items:center;gap:8px">
+          <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(98 92 86)">houzs.link/t/2990-2610-018</span>
+          <span style="flex:1"></span><span style="font-size:10.5px;color:rgb(98 92 86)">Tracking link</span>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:12px">
+          <div>
+            <div style="font-size:10.5px;color:rgb(98 92 86)">2990 Home · MKT-2990-2610-018</div>
+            <div style="font-size:15px;font-weight:600;margin-top:2px">Red Truck Reels</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11.5px;color:rgb(74 64 58)"><span style="width:6px;height:6px;border-radius:50%;background:rgb(214 152 30)"></span>Content team is editing</div>
+          </div>
+          <sc-for list="{{ picSections }}" as="p" hint-placeholder-count="4">
+            <div style="padding-top:10px;border-top:1px solid rgb(240 238 234);display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgb(98 92 86)">{{ p.title }}</div>
+              <sc-if value="{{ p.isTable }}">
+                <div style="border:1px solid rgb(236 234 230);border-radius:6px;overflow:hidden">
+                  <div style="display:grid;grid-template-columns:{{ p.grid }};background:rgb(248 247 245)"><sc-for list="{{ p.cols }}" as="c" hint-placeholder-count="3"><span style="padding:5px 6px;font-size:10px;font-weight:600;color:rgb(74 64 58);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c }}</span></sc-for></div>
+                  <div style="display:grid;grid-template-columns:{{ p.grid }};border-top:1px solid rgb(236 234 230)"><sc-for list="{{ p.cols }}" as="c" hint-placeholder-count="3"><span style="padding:6px;"><span style="display:block;height:8px;border-radius:3px;background:rgb(236 234 230)"></span></span></sc-for></div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ p.hasLine }}"><div style="height:8px;width:80%;border-radius:3px;background:rgb(236 234 230)"></div><div style="height:8px;width:55%;border-radius:3px;background:rgb(236 234 230)"></div></sc-if>
+              <sc-if value="{{ p.isVideo }}"><div style="height:60px;border-radius:6px;background:rgb(240 238 234);display:flex;align-items:center;justify-content:center;color:rgb(98 92 86);font-size:11px">Video</div></sc-if>
+            </div>
+          </sc-for>
+          <sc-if value="{{ hasPicCal }}">
+            <div style="padding-top:10px;border-top:1px solid rgb(240 238 234)">
+              <div style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgb(98 92 86);margin-bottom:6px">On your calendar</div>
+              <sc-for list="{{ picCal }}" as="c" hint-placeholder-count="1"><div style="display:flex;align-items:center;gap:8px;padding:3px 0"><span style="width:8px;height:8px;border-radius:2px;background:{{ c.c }}"></span><span style="font-weight:500">{{ c.label }}</span><span style="color:rgb(98 92 86)">{{ c.from }}</span></div></sc-for>
+            </div>
+          </sc-if>
+          <div style="display:flex;gap:6px;padding-top:10px;border-top:1px solid rgb(240 238 234)">
+            <span style="flex:1;height:30px;border-radius:6px;background:rgb(51 36 27);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:500">Approve</span>
+            <span style="flex:1;height:30px;border-radius:6px;border:1px solid rgb(226 223 217);display:flex;align-items:center;justify-content:center">Request changes</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:10px;font-size:11.5px;color:rgb(117 100 86);line-height:1.5">Only 👁 sections and columns appear. {{ hiddenNote }}</div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:1300},&quot;preview&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;staff&quot;,&quot;pic&quot;],&quot;default&quot;:&quot;staff&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const STAGES = ['—', 'Script', 'Shoot', 'Raw upload', 'Edit', 'Final'];
+const TYPES = [['Text', 'Aa'], ['Select', '◉'], ['Multi-select', '☰'], ['Date', '▦'], ['Person', '◎'], ['File', '⎘'], ['Checkbox', '☑']];
+const GLYPH = { ...Object.fromEntries(TYPES), Number: '#', Table: '▤', Note: '✎' };
+const SHARED = { Locations: ['Showroom', 'Marketing Room', 'On the road', 'LRT', 'Highway', 'Truck Wrapping (Seri Kembangan)'] };
+const LOC_BG = ['oklch(0.94 0.03 235)', 'oklch(0.94 0.03 270)', 'oklch(0.94 0.03 195)', 'oklch(0.94 0.03 320)', 'oklch(0.93 0.02 250)', 'oklch(0.94 0.03 350)'];
+const CAL_COLORS = [['Social Media', 'oklch(0.88 0.06 235)', 'oklch(0.40 0.10 235)', '🖼️'], ['Content', 'oklch(0.87 0.07 295)', 'oklch(0.40 0.12 295)', '🎥'], ['Design', 'oklch(0.88 0.07 350)', 'oklch(0.43 0.13 350)', '🎨'], ['Ads', 'oklch(0.86 0.07 270)', 'oklch(0.40 0.12 270)', '📣'], ['Brand', 'oklch(0.86 0.06 195)', 'oklch(0.38 0.08 195)', '🏷️']];
+const F = (id, name, type, stage, extra = {}) => ({ id, name, type, stage, required: false, pic: false, ...extra });
+const INIT = {
+  sections: [
+    { id: 'req', emoji: '📋', title: 'Requirements', kind: 'req', locked: true, required: false, stage: '—', pic: true },
+    { id: 'script', emoji: '✍️', title: 'Script', kind: 'fields', locked: true, required: true, stage: 'Script', pic: true, fields: [F('topic', 'Topic', 'Text', 'Script', { required: true, pic: true }), F('body', 'Body', 'Text', 'Script', { required: true, pic: true })] },
+    { id: 'table', emoji: '🎬', title: 'Script table', kind: 'table', locked: true, required: true, stage: 'Script', pic: true },
+    { id: 'assets', emoji: '✅', title: 'Asset checklist', kind: 'checklist', locked: true, required: true, stage: 'Edit', pic: false },
+    { id: 'caption', emoji: '💬', title: 'Caption', kind: 'fields', locked: true, required: true, stage: 'Script', pic: true, fields: [F('cap', 'Caption', 'Text', 'Script', { required: true, pic: true }), F('post', 'Posting date', 'Date', 'Script', { required: true, pic: true, cal: { on: true, label: 'Posting date', color: 0, pic: true } })] },
+    { id: 'final', emoji: '🎞️', title: 'Final production', kind: 'video', locked: true, required: true, stage: 'Edit', pic: true },
+  ],
+  cols: [
+    F('no', 'No', 'Text', 'Script'), F('narr', 'Narration', 'Text', 'Script', { required: true, pic: true }), F('vis', 'Visuals (Shots, Actions, Locations, Props)', 'Text', 'Script', { pic: true }),
+    F('loc', 'Location', 'Multi-select', 'Script', { pic: true, src: 'shared' }), F('shootdate', 'Shoot date', 'Date', 'Shoot', { cal: { on: true, label: 'Shoot day', color: 1, pic: false } }),
+    F('dir', "Director's Note", 'Text', 'Shoot'), F('vid', "Videographer's Notes", 'Text', 'Shoot'), F('edit', 'Edit Notes', 'Text', 'Edit'), F('ref', 'Reference', 'File', 'Script'),
+  ],
+};
+const ICONS = ['🎬', '🎞️', '📸', '🗂️', '🎯', '🧡', '🚚', '🎁', '⭐', '📍', '🛋️', '✨'];
+
+class Component extends DCLogic {
+  state = { ...this.initCanvas(), pv: this.props.preview ?? 'staff', tableName: 'Script table', tableIcon: '🎬', iconOpen: false };
+  initCanvas() {
+    if (this.props.sample !== false && !this.props.isNew) return { ...JSON.parse(JSON.stringify(INIT)), pop: { kind: 'col', sec: 'table', id: 'loc' } };
+    const stages = (this.props.stageNames && this.props.stageNames.length) ? this.props.stageNames : ['Design'];
+    return { cols: [], pop: null, sections: [
+      { id: 'req', emoji: '📋', title: 'Requirements', kind: 'req', locked: true, required: false, stage: '—', pic: true },
+      ...stages.map((n, i) => ({ id: 'st' + i, emoji: '🎯', title: n, kind: 'fields', locked: false, required: true, stage: n, pic: true, fields: this.autoFields(n) })),
+    ] };
+  }
+  _unused = { pop: { kind: 'col', sec: 'table', id: 'loc' }, pv: this.props.preview ?? 'staff', tableName: 'Script table', tableIcon: '🎬', iconOpen: false };
+  autoFields(stage) {
+    const sf = (this.props.stageForms || []).find(x => x.name === stage), form = (sf && sf.form) || [];
+    return form.map(([name, type, ex], j) => F('af' + Math.random().toString(36).slice(2, 7), name, GLYPH[type] ? type : 'Text', stage, { required: type !== 'Note', pic: true, auto: true, cols: ex && ex.cols ? ex.cols.map(x => x.slice()) : undefined, rows: ex && ex.rows ? ex.rows.map(x => x.slice()) : undefined }));
+  }
+  stageList() { const n = this.props.stageNames; return this.props.sample === false && n && n.length ? ['—', ...n] : STAGES; }
+  componentDidUpdate(pp) {
+    if (this.props.sample !== false) return;
+    const n = this.props.stageNames || [], have = new Set(this.state.sections.map(x => x.stage));
+    const add = n.filter(x => !have.has(x));
+    if (add.length) this.setState(s => ({ sections: [...s.sections, ...add.map(x => { const id = 'st' + Math.random().toString(36).slice(2, 7); return { id, emoji: '🎯', title: x, kind: 'fields', locked: false, required: true, stage: x, pic: true, fields: this.autoFields(x) }; })] }));
+    if (JSON.stringify(this.props.stageForms) !== JSON.stringify(pp.stageForms)) this.setState(s => ({ sections: s.sections.map(sec => {
+      if (sec.kind !== 'fields' || !n.includes(sec.stage)) return sec;
+      const auto = this.autoFields(sec.stage), old = Object.fromEntries((sec.fields || []).filter(f => f.auto).map(f => [f.name + '|' + f.type, f]));
+      return { ...sec, fields: [...auto.map(f => old[f.name + '|' + f.type] ? { ...old[f.name + '|' + f.type], cols: f.cols, rows: f.rows } : f), ...(sec.fields || []).filter(f => !f.auto)] };
+    }) }));
+  }
+  updSec(id, patch) { this.setState(s => ({ sections: s.sections.map(x => x.id === id ? { ...x, ...patch } : x) })); }
+  updField(patch) {
+    const p = this.state.pop;
+    if (p.sec === 'table') this.setState(s => ({ cols: s.cols.map(c => c.id === p.id ? { ...c, ...patch } : c) }));
+    else this.setState(s => ({ sections: s.sections.map(x => x.id === p.sec ? { ...x, fields: x.fields.map(f => f.id === p.id ? { ...f, ...patch } : f) } : x) }));
+  }
+  renderVals() {
+    const s = this.state, pop = s.pop;
+    const tog = (on, label, onClick) => ({ label, track: on ? 'rgb(51 36 27)' : 'rgb(214 206 196)', knob: on ? 14 : 2, onClick });
+    const chip = on => ({ border: on ? 'rgb(51 36 27)' : 'rgb(229 222 211)', bg: on ? 'rgb(51 36 27)' : '#fff', fg: on ? '#fff' : 'rgb(51 36 27)' });
+    const noPic = !!this.props.noPic;
+    const flagStr = f => [f.required && '⭐', !noPic && (f.pic ? '👁' : '🔒'), f.cal && f.cal.on && '📅'].filter(Boolean).join(' ');
+    const badge = (t, strong) => ({ t, bg: strong ? 'rgb(250 244 236)' : 'rgb(246 244 240)', fg: 'rgb(90 78 68)', border: 'rgb(236 231 224)' });
+    const curField = pop && pop.kind === 'col' ? (pop.sec === 'table' ? s.cols.find(c => c.id === pop.id) : (s.sections.find(x => x.id === pop.sec).fields || []).find(f => f.id === pop.id)) : null;
+    let popTop = 90;
+    const sections = s.sections.map(sec => {
+      const badges = [sec.locked && badge('🔒 Locked'), sec.required && badge('⭐ Required'), sec.stage !== '—' && sec.kind !== 'table' && badge(`🎯 ${sec.stage}`), sec.kind === 'table' && badge('🎯 per column'), sec.pic && !noPic && badge('👁 PIC')].filter(Boolean);
+      const settingsOpen = pop && pop.kind === 'sec' && pop.sec === sec.id;
+      const fieldOpen = pop && pop.kind === 'col' && pop.sec === sec.id;
+      if (fieldOpen && sec.kind === 'fields') popTop = 46 + 44 * ((sec.fields || []).findIndex(f => f.id === pop.id) + 1);
+      if (fieldOpen && sec.kind === 'table') popTop = 150;
+      return {
+        ...sec, badges, settingsOpen, fieldOpen,
+        border: settingsOpen || fieldOpen ? 'rgb(90 62 43)' : 'rgb(236 231 224)',
+        gearBorder: settingsOpen ? 'rgb(51 36 27)' : 'rgb(229 222 211)', gearBg: settingsOpen ? 'rgb(246 244 240)' : '#fff',
+        isReq: sec.kind === 'req', hasFields: sec.kind === 'fields', isTable: sec.kind === 'table', isChecklist: sec.kind === 'checklist', isVideo: sec.kind === 'video',
+        fields: (sec.fields || []).map(f => { const on = fieldOpen && pop.id === f.id; const tc = f.cols || [];
+          return { ...f, glyph: GLYPH[f.type], isTbl: f.type === 'Table', isNote: f.type === 'Note', grid: tc.map(() => 'minmax(110px,1fr)').join(' ') || '1fr',
+            tcols: tc.map(([n, t]) => ({ name: n, type: t, glyph: GLYPH[t] || 'Aa' })), tcells: (() => { const PH = t => ({ Number: '0', Person: 'Name' })[t] || 'Type here…', fv = (s.fill || {})[f.id] || {}, cells = fv.cells || {};
+              const stop = e => e.stopPropagation();
+              const set = (key, v) => this.setState(p => { const fl = { ...(p.fill || {}) }, cur = fl[f.id] || {}; fl[f.id] = { ...cur, cells: { ...(cur.cells || {}), [key]: v } }; return { fill: fl }; });
+              const fixed = v => ({ ph: v, isFixed: true, tip: 'Preset — the team can\'t change this', bg: 'rgb(248 246 242)' });
+              const open = (t, key) => ({ ph: PH(t), isText: t !== 'Checkbox', isCheck: t === 'Checkbox', itype: ({ Number: 'number', Date: 'date' })[t] || 'text', value: cells[key] || '', checked: !!cells[key], stop,
+                onChange: e => set(key, e.target.value), onCheck: e => set(key, e.target.checked), tip: 'Left blank — the team fills this in', bg: '#fff' });
+              const pre = f.rows || [], extra = 1 + (fv.extra || 0);
+              return [...pre.flatMap((r, ri) => tc.map(([, t], ci) => (r[ci] || '').trim() ? fixed(r[ci]) : open(t, ri + '-' + ci))),
+                ...Array.from({ length: extra }, (_, ei) => tc.map(([, t], ci) => open(t, (pre.length + ei) + '-' + ci))).flat()]; })(),
+            addFillRow: e => { e.stopPropagation(); this.setState(p => { const fl = { ...(p.fill || {}) }, cur = fl[f.id] || {}; fl[f.id] = { ...cur, extra: (cur.extra || 0) + 1 }; return { fill: fl }; }); },
+            clearFill: e => { e.stopPropagation(); this.setState(p => { const fl = { ...(p.fill || {}) }; delete fl[f.id]; return { fill: fl }; }); },
+            clearOp: (s.fill || {})[f.id] ? 1 : 0.4, flags: `🎯 ${f.stage}  ${flagStr(f)}`, border: on ? 'rgb(90 62 43)' : 'rgb(236 231 224)', bg: on ? 'rgb(250 248 244)' : '#fff', onClick: () => this.setState({ pop: { kind: 'col', sec: sec.id, id: f.id } }) }; }),
+        onSettings: () => this.setState(p => ({ pop: p.pop && p.pop.kind === 'sec' && p.pop.sec === sec.id ? null : { kind: 'sec', sec: sec.id }, iconOpen: false })),
+        toggles: [
+          tog(sec.locked, '🔒 Locked — colleagues can\'t delete', () => this.updSec(sec.id, { locked: !sec.locked })),
+          tog(sec.required, '⭐ Required before submit', () => this.updSec(sec.id, { required: !sec.required })),
+          tog(sec.pic, '👁 Visible to PIC', () => this.updSec(sec.id, { pic: !sec.pic })),
+        ].filter(x => !(noPic && x.label === '👁 Visible to PIC')),
+        stageOpts: this.stageList().map(st => ({ label: st === '—' ? 'Any / read-only' : st, ...chip(sec.stage === st), onClick: () => this.updSec(sec.id, { stage: st }) })),
+      };
+    });
+    const cols = s.cols.map(c => { const on = pop && pop.kind === 'col' && pop.sec === 'table' && pop.id === c.id; return { ...c, glyph: GLYPH[c.type], flags: flagStr(c) + (c.src === 'shared' ? ' 🔗 list' : ''), bg: on ? 'rgb(250 244 236)' : c.stage === 'Edit' ? 'rgb(252 251 249)' : '#fff', ring: on ? 'inset 0 -2px 0 rgb(90 62 43)' : 'none', onClick: () => this.setState({ pop: { kind: 'col', sec: 'table', id: c.id }, iconOpen: false }) }; });
+
+    let fld = {}, cal = {};
+    if (curField) {
+      const isSel = curField.type === 'Select' || curField.type === 'Multi-select';
+      const shared = curField.src === 'shared';
+      const opts = shared ? SHARED.Locations : (curField.own || ['Option 1', 'Option 2']);
+      fld = { name: curField.name, isSelect: isSel, isDate: curField.type === 'Date', options: opts.map((n, i) => ({ n, bg: LOC_BG[i % LOC_BG.length] })) };
+      const c = curField.cal || { on: false, label: curField.name, color: 0, pic: false };
+      const col = CAL_COLORS[c.color];
+      cal = { on: c.on, track: c.on ? 'rgb(51 36 27)' : 'rgb(214 206 196)', knob: c.on ? 14 : 2, label: c.label, chipBg: col[1], chipFg: col[2], emoji: col[3], picTrack: c.pic ? 'rgb(51 36 27)' : 'rgb(214 206 196)', picKnob: c.pic ? 14 : 2 };
+    }
+    const calOf = () => curField.cal || { on: false, label: curField.name, color: 0, pic: false };
+
+    // preview
+    const visSections = s.sections.filter(x => x.pic);
+    const picCols = s.cols.filter(c => c.pic).map(c => c.name.replace(/ \(.*\)/, ''));
+    const allDates = [...s.cols, ...s.sections.flatMap(x => x.fields || [])].filter(f => f.type === 'Date' && f.cal && f.cal.on && f.cal.pic);
+    const hiddenSecs = s.sections.filter(x => !x.pic).map(x => x.title);
+    const hiddenCols = s.cols.filter(c => !c.pic).length;
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    return {
+      cvName: this.props.tplName || 'Reels Video', cvVer: this.props.isNew ? 'Canvas template · new · starter' : `Canvas template · draft v${this.props.tplVer || 3}`,
+      sections, cols, colCount: s.cols.length, popTop,
+      tableName: s.tableName, tableIcon: s.tableIcon, onTableName: e => this.setState({ tableName: e.target.value }),
+      iconOpen: s.iconOpen, toggleIcon: () => this.setState(p => ({ iconOpen: !p.iconOpen, pop: null })),
+      icons: ICONS.map(e => ({ e, onClick: () => this.setState({ tableIcon: e, iconOpen: false }) })),
+      addCol: () => this.setState(p => { const id = 'c' + Date.now(); return { cols: [...p.cols, F(id, 'New column', 'Text', 'Edit')], pop: { kind: 'col', sec: 'table', id } }; }),
+      checkItems: ['Raw footage synced', 'Logo end card', 'Music licensed', 'Subtitles BM + EN'],
+      closePop: () => this.setState({ pop: null }),
+      fld, cal,
+      onFieldName: e => this.updField({ name: e.target.value }),
+      typeOpts: TYPES.map(([label, glyph]) => ({ label, glyph, ...chip(curField && curField.type === label), onClick: () => this.updField({ type: label }) })),
+      optSrc: curField ? [
+        { k: 'shared', label: 'Shared option list · Locations', hint: '6 options · used across the group · edit once, updates everywhere' },
+        { k: 'own', label: 'Own options for this field', hint: 'Only this template uses them' },
+      ].map(o => ({ ...o, radio: (curField.src || 'own') === o.k ? '4.5px solid rgb(51 36 27)' : '1.5px solid rgb(200 192 182)', onClick: () => this.updField({ src: o.k }) })) : [],
+      fieldToggles: curField ? [
+        tog(curField.required, '⭐ Required before submit', () => this.updField({ required: !curField.required })),
+        tog(curField.pic, '👁 Visible to PIC', () => this.updField({ pic: !curField.pic })),
+      ] : [],
+      fieldStageOpts: curField ? this.stageList().slice(1).map(st => ({ label: st, ...chip(curField.stage === st), onClick: () => this.updField({ stage: st }) })) : [],
+      toggleCal: () => { const c = calOf(); this.updField({ cal: { ...c, on: !c.on } }); },
+      togglePicCal: () => { const c = calOf(); this.updField({ cal: { ...c, pic: !c.pic } }); },
+      onCalLabel: e => { const c = calOf(); this.updField({ cal: { ...c, label: e.target.value } }); },
+      calColors: CAL_COLORS.map(([name, c], i) => ({ name, c, ring: curField && calOf().color === i ? '0 0 0 2px #fff, 0 0 0 4px rgb(51 36 27)' : 'none', onClick: () => { const cc = calOf(); this.updField({ cal: { ...cc, color: i } }); } })),
+      addSection: () => this.setState(p => ({ sections: [...p.sections, { id: 's' + Date.now(), emoji: '📝', title: 'New section', kind: 'fields', locked: false, required: false, stage: '—', pic: false, fields: [F('f' + Date.now(), 'Notes', 'Text', 'Edit')] }] })),
+
+      showPic: !noPic, reqText: this.props.reqText || 'Pulled in automatically from the meeting minutes intake. Read-only for everyone.',
+      pvOpts: [['staff', 'Staff view'], ...(noPic ? [] : [['pic', 'PIC link view']])].map(([k, label]) => ({ label, ...seg(s.pv === k), onClick: () => this.setState({ pv: k }) })),
+      pvStaff: s.pv === 'staff' || noPic, pvPic: s.pv === 'pic' && !noPic,
+      pvSections: s.sections.map(x => ({
+        emoji: x.kind === 'table' ? s.tableIcon : x.emoji, title: x.kind === 'table' ? s.tableName : x.title, op: x.stage === 'Edit' || x.kind === 'table' || x.kind === 'req' ? 1 : 0.55,
+        badges: [x.locked && '🔒', x.required && '⭐', x.kind !== 'table' && x.stage !== '—' && `🎯 ${x.stage}`, x.pic && !noPic && '👁'].filter(Boolean),
+        isTable: x.kind === 'table', cols: s.cols.map(c => ({ n: c.name.replace(/ \(.*\)/, ''), bg: c.stage === 'Edit' ? 'rgb(90 62 43)' : 'rgb(243 241 237)', fg: c.stage === 'Edit' ? 'rgb(246 238 230)' : 'rgb(130 120 110)' })),
+        hasLine: x.kind !== 'table', lineBg: x.kind === 'req' ? 'rgb(245 244 241)' : x.stage === 'Edit' ? 'rgb(250 244 236)' : 'rgb(248 247 245)',
+      })),
+      picSections: visSections.map(x => ({ title: x.kind === 'table' ? s.tableName : x.title, isTable: x.kind === 'table', cols: picCols, grid: `repeat(${Math.max(1, picCols.length)}, minmax(0,1fr))`, isVideo: x.kind === 'video', hasLine: x.kind !== 'table' && x.kind !== 'video' })),
+      hasPicCal: allDates.length > 0, picCal: allDates.map(f => ({ label: f.cal.label, c: CAL_COLORS[f.cal.color][1], from: `· from ${f.name}` })),
+      hiddenNote: `Hidden: ${hiddenSecs.length ? hiddenSecs.join(', ') + ', ' : ''}${hiddenCols} internal column${hiddenCols === 1 ? '' : 's'}.`,
+    };
+  }
+}
+</script>
+</body>
+</html>

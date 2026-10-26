@@ -59,7 +59,8 @@ export interface VoucherDetail {
   /** A payroll funding voucher charges no bank (cash leaves when staff are paid). */
   noCash: boolean
   /** Deducted from (credited to, on a receipt) — pool by pool. */
-  sources: Array<{ pool: string; account: string; code: string | null; amount: number }>
+  /** Each line: its pool, account and amount, and its own words (2026-10-22) when it has some. */
+  sources: Array<{ pool: string; account: string; code: string | null; amount: number; description: string | null }>
   /** The accounts it books to, and their GL codes. */
   account: string | null
   accountCodes: string | null
@@ -145,7 +146,7 @@ export async function loadVoucherDetail(
     userIds.length > 0 ? supabase.from('users').select('id, name').in('id', userIds) : Promise.resolve({ data: [] }),
     supabase
       .from('payment_voucher_sources')
-      .select('pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
+      .select('pool, amount, account_code, description, chart_of_accounts!pvs_account_code_fk(name)')
       .eq('voucher_id', id)
       .order('amount', { ascending: false }),
     supabase
@@ -181,12 +182,14 @@ export async function loadVoucherDetail(
     pool: string
     amount: number | string
     account_code: string | null
+    description: string | null
     chart_of_accounts: { name: string } | null
   }>).map((r) => ({
     pool: poolLabel(r.pool),
     account: r.chart_of_accounts?.name ?? (r.account_code ? r.account_code.replace(/_/g, ' ') : '—'),
     code: r.account_code,
     amount: Number(r.amount),
+    description: r.description?.trim() || null,
   }))
   const accounts = [...new Set(sourceRows.map((r) => r.account).filter((a) => a !== '—'))]
   const codes = [...new Set(sourceRows.map((r) => r.code).filter((x): x is string => !!x))]

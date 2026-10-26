@@ -51,6 +51,22 @@ describe('a voucher’s Edit — what is sent', () => {
     })
   })
 
+  it('a line’s words are part of it (2026-10-22): changed alone, the lines go, each with its words', () => {
+    const stored = [{ ...ROWS[0], description: 'September rent' }]
+    const was = storedVoucherFields(V, stored, null)
+    expect(voucherEditsNothing(voucherEditForm('pv', 'debit', was, { ...was, rows: [{ ...stored[0], description: ' September rent ' }] }))).toBe(true)
+    const rows = [{ ...stored[0], description: 'October rent' }]
+    expect(rowsChanged(was.rows, rows)).toBe(true)
+    expect(entries(voucherEditForm('pv', 'debit', was, { ...was, rows }))).toEqual({
+      id: 'pv',
+      source_rows_count: '1',
+      'source_rows[0][pool]': 'venture_pool',
+      'source_rows[0][amount]': '1950.00',
+      'source_rows[0][account_code]': '1010',
+      'source_rows[0][description]': 'October rent',
+    })
+  })
+
   it('a receipt sends its pool and account each only when changed', () => {
     const was = storedVoucherFields({ ...V, target_pool: 'venture_pool' }, [], '5000')
     expect(entries(voucherEditForm('pr', 'credit', was, { ...was, accountCode: '5010', notes: 'reclassed' }))).toEqual({ id: 'pr', notes: 'reclassed', account_code: '5010' })

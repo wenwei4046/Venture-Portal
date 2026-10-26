@@ -3,12 +3,15 @@
  * frame around it, and the screen's own state — what is open, drafted, filtered — which the prototype keeps in one
  * object (CrmFrame.dc.html's this.state) and so does this.
  */
+import type { CustomFields } from "../../shared/custom-book";
+import type { ApplyPick } from "../../shared/apply-ads";
 import type { Dispatch, SetStateAction } from "react";
-import type { CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/member/crm-data";
+import type { MetaAdRow, MetaFig } from "@/lib/member/crm-ad-names-meta";
+import type { ApptType, CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../../panel/actions";
 import type { Team } from "../../panel/vm/common";
 
-export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog";
+export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog" | "reports";
 export type PaneMode = "closed" | "empty" | "docked" | "overlay" | "wide" | "wideEmpty";
 export type PaneKind = "chat" | "alerts" | "section" | "info" | "clist" | "metrics" | "team" | "assign" | "book" | "note" | "form" | "move" | "share";
 
@@ -50,7 +53,7 @@ export interface DeskUi {
   /** Insight's Ads Performance cards: the metrics picked with + Metrics (the owner, 2026-10-13), in order. */
   insCards: string[] | null;
   /** What Customise metrics is picking for: Ads Performance's columns, or Insight's ad cards. */
-  mFor: "ads" | "cards";
+  mFor: "ads" | "cards" | "chart";
   // Inbox
   whoSel: string[];
   whoOpen: boolean;
@@ -64,6 +67,11 @@ export interface DeskUi {
   awChat: string | null;
   awMenuOpen: boolean;
   ad: string | null;
+  /** Which ad's saved setting the editor's draft was loaded from (`id|rule` or `id|none`). The open ad is part of the place a
+   *  refresh or Back restores, its draft is not — so a restored ad loads its saved split again (2026-10-24). */
+  adDraftFor?: string | null;
+  /** Save and apply to all's window (2026-10-24): for which ad, the ads ticked, Standard or Count together; null = shut. */
+  applyPick?: (ApplyPick & { ad: string }) | null;
   adMode: "evenly" | "team";
   /** Ads to teams' editor: the ad's name while it is typed (null = as saved). */
   adNameDraft?: string | null;
@@ -87,6 +95,8 @@ export interface DeskUi {
   // Ads Performance
   apSel: string[] | null; mDraft: string[] | null; mDrag: number | null; mq: string; mFold: Record<string, boolean>;
   apStF: string;
+  /** Ads Performance shows the ads hidden by a right click too, dimmed, to show them again (2026-10-24). */
+  apShowHidden?: boolean;
   /** Ads Performance's column widths, dragged at a header's right edge (the owner, 2026-10-13); "name" is the Ad column. */
   apW: Record<string, number>;
   /** Insight's ad table: its sort and dragged column widths (as Ads Performance's). */
@@ -98,6 +108,9 @@ export interface DeskUi {
   srEdit: string | null;
   /** 4a Showrooms: which showroom is on screen (frame 07, one at a time). */
   srAt: number;
+  /** Showrooms' two pages: the showrooms, or Appointment types (2026-10-24), and the types' draft until Save. */
+  srPage: "rooms" | "types";
+  atDraft: ApptType[] | null;
   srDraft: SrDraft | null;
   srTab: "info" | "slots" | "blk";
   srBlkOpen: boolean;
@@ -110,13 +123,48 @@ export interface DeskUi {
   mwt: Record<string, boolean> | null;
   /** Assignment › Active members: switches not saved yet (id → locked), null = as saved. */
   actDraft: Record<string, boolean> | null;
+  /** Ads to teams' "+": open, its search, Meta's ads (null = not read yet, "error" = Meta refused), a typed ad id. */
+  /** Ads to teams: a team share being typed (two decimals). */
+  splitTyping: { id: string; text: string } | null;
+  /** Ads to teams' Split folded to its strip. */
+  adSplitShut: boolean;
+  /** The ad panel's tab (v2 frame 06): Split · Ad performance · Audit log, one panel. */
+  adPane: "split" | "perf" | "audit";
+  /** Split rows set by hand (note 06: dragging one re-balances only the rows not touched) and the teams opened to their people. */
+  splitTouched: string[]; splitOpen: Record<string, boolean>; mvTyping: { key: string; text: string } | null;
+  /** Assignment › Leads by ad: this month or all time. */
+  lbaPer: "month" | "last" | "all" | "custom";
+  /** Leads by ad (v2 06b): Custom's two days, the status filter, the search, the sort, the member picked (its panel folded), the lead opened. */
+  lbaFrom: string | null; lbaTo: string | null; lbaSt: "all" | "running" | "paused" | "ended"; lbaQ: string;
+  lbaSort: { k: "ad" | "status" | "members" | "leads"; dir: "asc" | "desc" } | null;
+  lbaPick: { ad: string; who: string } | null; lbaPickShut: boolean; lbaLead: string | null;
+  /** Leads by ad: an ad's card folded (by ad id), a person's list of leads opened ("ad|person"). */
+  lbaShut: Record<string, boolean>; lbaOpen: Record<string, boolean>;
+  /** Active members / Member work type: a team's card folded (by team name). */
+  teamShut: Record<string, boolean>;
+  /** Reports (2026-10-23): the category on screen, the period of Salespeople / Appointments / Lead sources, Salespeople's sort. */
+  rpCat: import("./reports-page").RpCat; rpPer: import("./reports").RpPeriod; rpSort: { k: string; dir: "asc" | "desc" } | null;
+  /** Reports › Salespeople (v2 12c / 12c·2): the team filter, the search, the person picked (their panel folded), the lead opened. */
+  rpTeam: string; rpQ: string; rpPick: string | null; rpPickShut: boolean; rpLead: string | null;
+  /** Ads Performance: Meta's figures by range ("from|to") and ad (null = one the token cannot see). */
+  apMeta: Record<string, Record<string, MetaFig | null>>;
+  /** Ads Performance's chart (2026-10-23): Meta's figures day by day, by range ("from|to") and ad (null = not readable). */
+  apDaily: Record<string, Record<string, Record<string, MetaFig> | null>>;
+  /** The chart's metrics (its tiles), the ones whose line is hidden, and the chart / the table folded. */
+  /** Ads Performance's table a page at a time (v2 frame 05: "5 rows + pager (Show 5/10/20)"). */
+  apPer: number; apPg: number;
+  /** Insight's own tabs (v2 frames 01 / 01b): Team performance | Ads performance. */
+  insTab: "team" | "ads";
+  apChart: (string | null)[] | null; apChartOff: Record<string, boolean>; apChartShut: boolean; apTableShut: boolean;
+  addAdOpen: boolean; addAdQ: string; addAdList: MetaAdRow[] | null | "error"; addAdId: string;
   mwtSaved: boolean;
   cltF: string; cltFOpen: boolean; cltEdit: string | null; cltDraft: string | null; cltDN: string | null; cltDC: "WhatsApp" | "Messenger" | null; cltIsNew: boolean; cltAsk: string | null; cltMore: boolean; cltVars: string[];
   frmOpen: boolean; frmCur: string | null; frmDraft: FormSection[] | null; frmName: string | null; frmIsNew: boolean; frmExp: string | null; frmOptIn: Record<string, string>;
   ntfTab: "all" | "unread" | "read"; ntfCat: string; ntfSel: boolean; ntfPick: Record<string, boolean>;
   // Screens the design does not draw (BUILD-NOTES.md)
   /** Appointment: showroom, day, time and the 7-day page; as RS's sheet also Week | Month and the month chooser (2026-10-13). */
-  book: { room: number; day: number; slot: string | null; week: number; view?: "week" | "month"; monthOpen?: boolean; pickYear?: number } | null;
+  /** Showroom (room, day, slot) or online / elsewhere (shared/custom-book.tsx, 2026-10-24). */
+  book: ({ room: number; day: number; slot: string | null; week: number; view?: "week" | "month"; monthOpen?: boolean; pickYear?: number } & CustomFields) | null;
   // ── v2 (CrmFrame v2.dc.html): every column, pane and editor is dragged to size, double-click gives it back.
   ibListW: number | null; ibInfoW: number | null; ibCpW: number | null; ibCp: boolean | null;
   paneW: number | null; sheetW: number | null; menuW: number | null; perfW: number | null; mwtLogW: number | null; auditW: number | null;
@@ -156,11 +204,19 @@ export interface DeskUi {
   // Audit log
   auCat: "chat" | "marketing" | "management"; auPer: "today" | "7d" | "month"; auWho: string; auQ: string; auCols: number[] | null; auArea: string; auOpen: "who" | "area" | "per" | null;
   // Customer form (the page): its draft, the preview's device
-  cfDraft: import("./form").FormSectionV2[] | null; cfDev: "phone" | "desktop"; cfNew: Record<string, string>; cfType: string | null;
+  cfDraft: import("./form").FormSectionV2[] | null; cfDev: "phone" | "desktop";
+  /** v2 frame 08: which of the saved forms the editor is on (null = the first, the one Customer info asks); Delete asked again. */
+  cfForm: string | null; cfDelAsk: boolean; cfNew: Record<string, string>; cfType: string | null;
   /** The paged Customer form (2026-10-16): the page open in the editor; what is being dragged (a field or a section) and what it is over. */
   cfPage: number; cfDrag: { k: "f" | "s"; si: number; fi?: number } | null; cfOver: string | null;
   // Channels
-  chTab: "conn" | "page" | "msgr" | "wa" | "tpl" | "ads"; chWaTab: string; chDraft: Record<string, unknown>; chDirty: Record<string, boolean>;
+  chTab: "conn" | "page" | "msgr" | "wa" | "tpl" | "ads"; chWaTab: string;
+  /** v2 frame 09b: the number whose Business profile drawer is open. */
+  chProf: string | null;
+  /** Channels › WhatsApp › Profile: the display name being typed (null = not editing). */
+  chDn: string | null;
+  /** v2: the New chat (Inbox) / Add customer (Contacts) sheet. */
+  addCust: "chat" | "contact" | null; chDraft: Record<string, unknown>; chDirty: Record<string, boolean>;
   chDlg: { kind: string; id: string } | null; chNewOpen: boolean; chNew: { name: string; cat: string; lang: string; body: string } | null; chWaNum: string | null;
   cform: Record<string, string> | null;
   history: HistRow[] | null;
@@ -173,6 +229,8 @@ export interface HistRow { at: string; who: string; table: string; op: string; w
 export interface SrDraft {
   id: string | null; dispName: string; addr: string; gmap: string; waze: string; manual: boolean; photo: string; photoFile: File | null;
   limit: number; times: string[]; off: Record<string, 1>; weekDays: number[]; blocks: SrBlock[];
+  /** v2 frame 07: staff-only remarks (crm_save_showroom_remarks). */
+  remarks: string;
 }
 export interface SrBlock { kind: "date"; from: string; to: string; allDay: boolean; ranges: { f: string; t: string }[]; reason: string }
 export interface SrBlk { days: number[]; from: string; to: string; allDay: boolean; ranges: { f: string; t: string }[]; reason: string; wkReason: string }
@@ -190,8 +248,8 @@ export const initialDeskUi = (): DeskUi => ({
   calTeam: "all", calShowroom: "all", calWho: [], calWhoOpen: false, calRange: null, rangeOpen: false,
   apSel: null, mDraft: null, mDrag: null, mq: "", mFold: {}, apStF: "all", apW: {}, insSort: null, insW: {}, apStOpen: false, apSort: null, apDlOpen: false,
   apRange: 0, apF: "", apT: "", apCF: "", apCT: "", apCmp: false, apCmpMode: null, apPreset: "", dp: null,
-  srEdit: null, srAt: 0, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
-  mwt: null, mwtSaved: false, actDraft: null,
+  srEdit: null, srAt: 0, srPage: "rooms", atDraft: null, srDraft: null, srTab: "info", srBlkOpen: false, srBlk: null, srCal: null, srCalM: 0, srNewT: null, srNewD: null,
+  mwt: null, mwtSaved: false, actDraft: null, splitTyping: null, adSplitShut: false, adPane: "split", splitTouched: [], splitOpen: {}, mvTyping: null, lbaPer: "month", lbaFrom: null, lbaTo: null, lbaSt: "all", lbaQ: "", lbaSort: null, lbaPick: null, lbaPickShut: false, lbaLead: null, lbaShut: {}, lbaOpen: {}, teamShut: {}, rpCat: "ads", rpPer: "month", rpSort: null, rpTeam: "all", rpQ: "", rpPick: null, rpPickShut: false, rpLead: null, apMeta: {}, apDaily: {}, apPer: 5, apPg: 0, insTab: "team", apChart: null, apChartOff: {}, apChartShut: false, apTableShut: false, addAdOpen: false, addAdQ: "", addAdList: null, addAdId: "",
   cltF: "all", cltFOpen: false, cltEdit: null, cltDraft: null, cltDN: null, cltDC: null, cltIsNew: false, cltAsk: null, cltMore: false, cltVars: [],
   frmOpen: false, frmCur: null, frmDraft: null, frmName: null, frmIsNew: false, frmExp: null, frmOptIn: {},
   ntfTab: "all", ntfCat: "all", ntfSel: false, ntfPick: {},
@@ -202,8 +260,8 @@ export const initialDeskUi = (): DeskUi => ({
   calBy: "room",
   ppF: {}, ppBy: "status", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
   auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null, auArea: "all", auOpen: null,
-  cfDraft: null, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
-  chTab: "conn", chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
+  cfDraft: null, cfForm: null, cfDelAsk: false, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
+  chTab: "conn", chProf: null, chDn: null, addCust: null, chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
 });
 
 /** The Revenue app around the CRM: its sidebar pages, top bar and who is signed in. */
@@ -240,12 +298,21 @@ export interface DeskActions {
   addNote(customerId: string, text: string): Promise<boolean>;
   saveForm(form: { id: string | null; name: string; sections: FormSection[] }): Promise<string | false>;
   deleteForm(id: string): Promise<boolean>;
+  /** v2 frame 08: the form every Customer info asks (crm_set_active_form puts it first). */
+  setActiveForm(id: string): Promise<boolean>;
+  /** v2 frames 02 / 03: a customer added by hand on WhatsApp (crm_add_contact) — their id, or false. */
+  addCustomer(name: string, phone: string, assign: string | null): Promise<string | false>;
   saveShowroomExtras(roomId: string, x: { photo: File | null; removePhoto: boolean; gmap: string; waze: string }): Promise<boolean>;
+  /** v2 frame 07: a showroom's staff-only remarks, and deleting it (refused while visits are upcoming). */
+  saveRoomRemarks(roomId: string, remarks: string): Promise<boolean>;
+  deleteRoom(roomId: string): Promise<boolean>;
   /** Channels (v2): link / unlink an asset, its default (crm_set_channel); send a tab to Meta (saveCrmChannel). */
   setChannel(kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean): Promise<boolean>;
   /** One's emoji Recents, kept on the server as the phone keeps them (crm_save_recent_emoji). */
   saveRecents(list: string[]): void;
   saveMeta(s: Parameters<typeof import("@/app/(member)/member/crm-channels-actions").saveCrmChannel>[0]): Promise<boolean>;
+  /** v2 frame 09b: one business profile to the number's WhatsApp and / or Facebook Page, each answered on its own. */
+  saveProfile(form: FormData): Promise<import("@/app/(member)/member/crm-channels-actions").ProfileSaveResult | null>;
 }
 
 export interface DeskCtx {

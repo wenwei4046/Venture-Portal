@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { flash } from '@/components/hrv/toast'
 import { TEMPLATE_ACCEPT, templateRefusal, type MemberFormKind, type WaitingForm } from '@/lib/commission/waiting-form'
+import { stageInto } from '@/lib/storage/stage'
 import {
   removeFormTemplate,
   replacementFormTemplateLink,
@@ -85,8 +86,11 @@ export default function MemberFormTools({
     }
     setUploading(true)
     const data = new FormData()
-    data.set('file', file)
-    const done = kind === 'replacement' ? await uploadReplacementFormTemplate(data) : await uploadWaitingFormTemplate(data)
+    // Sent ahead of the action (2026-10-23, lib/storage/stage.ts) — up to 100 MB, not a body's 4 MB.
+    const done = await stageInto(data, 'file', file).then(
+      () => (kind === 'replacement' ? uploadReplacementFormTemplate(data) : uploadWaitingFormTemplate(data)),
+      (err: unknown) => ({ ok: false as const, reason: err instanceof Error ? err.message : 'The form could not be sent.' }),
+    )
     setUploading(false)
     if (fileRef.current) fileRef.current.value = ''
     if (!done.ok) {

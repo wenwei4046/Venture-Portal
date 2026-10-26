@@ -31,6 +31,8 @@ export type FunctionKey =
   | 'leads'
   // IT support's desk (mig 20261021020000).
   | 'it_requests'
+  // Marketing's own view (mig 20261023214000).
+  | 'marketing'
 
 /** Anybody gates can be asked about: their keys, and their actions when they were loaded. */
 export interface ActionHolder extends PermissionHolder {
@@ -120,6 +122,8 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   leads: ['leads.view', 'leads.create', 'leads.edit', 'leads.manage'],
   // IT support's desk (20261021020000): read everybody's requests; write notes and set their status.
   it_requests: ['it_requests.view', 'it_requests.edit'],
+  // Marketing's own view (20261023214000): its pages, starting projects, working stages, approving, the manager tools.
+  marketing: ['marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve', 'marketing.manage'],
 }
 
 /**
@@ -195,6 +199,14 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'leads.edit': 'all',
   'leads.manage': 'all',
   'leads.view': 'all',
+  // Marketing's view (2026-10-23): the Tracking Dashboard is the manager's; a task started (Create), worked as its
+  // stage's owner (Edit), decided as its approver (Approve) — mig 20261023234000. The formal log's files (④-3b — the
+  // user's answer 18: all of Marketing may export a trail) ask View: the matrix's Marketing row has no Export cell.
+  'marketing.view': 'all',
+  'marketing.create': 'all',
+  'marketing.edit': 'all',
+  'marketing.approve': 'all',
+  'marketing.manage': 'all',
   // Sales Groups › Waiting list's "+" (2026-10-11): Member services · Edit.
   'member.manage': 'all',
   'opex.view': 'all',

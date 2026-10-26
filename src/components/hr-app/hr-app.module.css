@@ -216,9 +216,26 @@
 .trailWho { font-size: 12px; color: var(--ds-ink-2); }
 .trailNote { font-size: 12.5px; color: var(--ds-ink-2); margin-top: 2px; }
 .stageBtn { flex: none; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+/* A hire's Not selected, folded at the Candidates card's foot (2026-10-24): why in red, as the request's page says it. */
+.outFold { width: 100%; min-height: 48px; padding: 0 14px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--ds-ink-2); text-align: left; }
+.outWhy { color: var(--ds-danger); }
 .actBar { flex: none; padding: 12px 16px calc(10px + max(20px, var(--safe-bottom))); background: var(--ds-surface); border-top: 1px solid var(--ds-border); display: flex; gap: 10px; }
 .actBar > button { flex: 1; }
+/* A person's term (2026-10-24): its steps in outline — a probation's Extend · Confirm as permanent on a row of their
+   own — over Acknowledge, or a contract's Renew beside it; the second of a row the wider, as the decide bar's. */
+.termBar { flex: none; padding: 12px 16px calc(10px + max(20px, var(--safe-bottom))); background: var(--ds-surface); border-top: 1px solid var(--ds-border); display: flex; flex-direction: column; gap: 10px; }
+.termRow { display: flex; gap: 10px; }
+.termRow > button { flex: 1 1 0; min-width: 0; }
+.termRow > button + button { flex-grow: 1.4; }
 .meta { font-size: 12.5px; color: var(--ds-ink-2); }
+/* A term's sheet (2026-10-24): a figure it works out (the new end), and a letter's file — the desktop's small drop on
+   the app's edges, the input lying over it. */
+.fieldValue { font-size: 14px; color: var(--ds-ink); }
+.fileDrop { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 12px 6px 7px; border: 1px dashed var(--ds-border); border-radius: 10px; background: var(--ds-surface); font-size: 14px; color: var(--ds-ink-2); box-sizing: border-box; }
+.fileDrop[data-chosen] { border-style: solid; color: var(--ds-ink); }
+.fileTile { flex: none; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--ds-surface-2); color: var(--ds-ink-2); font-family: var(--font-mono), "Chivo Mono", monospace; font-size: 10px; font-weight: 500; }
+.fileName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileInput { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 /* A memo's signature before Acknowledge (2026-10-20, components/memos/SignaturePad) on the app's edges and type. */
 .memoSign { display: flex; flex-direction: column; gap: 8px; }
 .memoSignLabel { font-size: 13px; font-weight: 600; color: var(--ds-ink); }

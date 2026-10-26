@@ -3,6 +3,8 @@ import { closeNodes, dueBy, waitingIn } from '@/lib/attendance/close'
 import { ROUTE_WORDS, amountLabel, bucketOf, flowNodes, kindLabel, sinceLabel, waitingStep, whenLabel, type Bucket } from '@/lib/attendance/requests'
 import type { AttConfig, AttLedger, AttLeaveType, AttMonth, AttPerson, AttRequest } from '@/lib/attendance/types'
 import { correctionNth, quotaFor } from '@/lib/me/requests'
+import { monthsLabel, termEndLine } from '@/lib/employment-status'
+import { TERM_KINDS, TERM_LABEL, ackLine, acknowledged, dueReviews, endingWords, type TermKind, type TermReview } from '@/lib/term-reviews'
 
 /**
  * The HR app's attendance screens (2026-10-17, the Claude Design handoff `design_handoff_hr_mobile` — HR Mobile):
@@ -296,11 +298,56 @@ export function closeView(a: HrAtt): CloseView {
 }
 
 /** Home's line: "4 requests waiting for HR · 2 not in yet · 3 late · October closes 3 Nov." */
-export function homeSummary(waiting: number, today: Record<TodayKey, number> | null, month: string | null): string {
+export function homeSummary(
+  waiting: number,
+  today: Record<TodayKey, number> | null,
+  month: string | null,
+  terms: Partial<Record<TermKind, number>> = {},
+): string {
   const parts = [`${waiting} request${waiting === 1 ? '' : 's'} waiting for HR`]
+  // The probations and contracts still waiting for Acknowledge (2026-10-23 / 10-24) — only while there are some.
+  for (const kind of TERM_KINDS) {
+    const n = terms[kind] ?? 0
+    if (n > 0) parts.push(endingWords(kind, n))
+  }
   if (today) parts.push(`${today.notin} not in yet`, `${today.late} late`)
   if (month) parts.push(`${monthName(month)} closes ${dayMon(dueBy(month))}`)
   return `${parts.join(' · ')}.`
+}
+
+// ── A probation or a contract ending (2026-10-23 — the user: "HR 手机 app 里的提醒和推送"; a contract and a second
+// reminder 2026-10-24: "need 30 days and 15 days before remind, 2 reminder") ──────────
+
+export interface TermRow {
+  id: string
+  name: string
+  /** "Ends 31 Oct 2026 · in 8 days · HR" — the desktop bell's own line. */
+  sub: string
+}
+
+/** Home's *Probation ending* and *Contract ending*: those still waiting for Acknowledge, soonest first — each opens the person. */
+export function termRows(list: readonly TermReview[], today: string): TermRow[] {
+  return dueReviews(list, today).filter(r => !acknowledged(r, today)).map(r => ({
+    id: r.id,
+    name: r.name,
+    sub: [r.endsOn ? termEndLine(r.endsOn, today) : null, r.department].filter(Boolean).join(' · '),
+  }))
+}
+
+/**
+ * A person's page, while they are on probation or a contract: the period and its end, and who acknowledged its
+ * reminder and when — the one standing, or the 30-day one while the second waits (the desktop's Employment well, in
+ * the app's facts).
+ */
+export function termFacts(r: TermReview, today: string): Array<{ k: string; v: string; mono: boolean }> {
+  const facts = [{
+    k: TERM_LABEL[r.kind],
+    v: [r.months ? monthsLabel(r.months) : null, r.endsOn ? termEndLine(r.endsOn, today, true) : 'no end — the hire date is missing'].filter(Boolean).join(' · '),
+    mono: false,
+  }]
+  const said = ackLine(r, today, 'D MMM YYYY')
+  if (said) facts.push({ k: 'Reminder', v: said, mono: false })
+  return facts
 }
 
 // ── Records, the org chart, the levels ──────────────────────────────────────

@@ -1,7 +1,7 @@
 // The handoff's own sample data (Revenue App.dc.html: HIRES, TALENTS, HIRE_FIELDS,
 // HIRE_SOURCES, STAFF) as a HiringBoard — the Hiring tests' one board. Instants are
 // noon in the office (04:00 UTC) of the prototype's days.
-import type { HiringBoard, HiringCandidate, HiringEvent, HiringField, HiringFile, HiringFileType, HiringRequest, HiringTalent } from '@/lib/hiring/types'
+import type { HiringBankReason, HiringBoard, HiringCandidate, HiringEvent, HiringField, HiringFile, HiringFileType, HiringRequest, HiringTalent } from '@/lib/hiring/types'
 
 const MON: Record<string, string> = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' }
 const iso = (d: string) => {
@@ -88,14 +88,23 @@ const requests: HiringRequest[] = RAW.map(r => {
   }
 })
 
-const T = (t: { id: string; name: string; phone: string; email: string; position: string; dept: string; from: string; when: string; by: string; file: string; notes: string; events: Ev[] }): HiringTalent => ({
-  id: t.id, no: t.id, name: t.name, phone: t.phone, email: t.email, position: t.position, department: t.dept, fromRequest: t.from || null, notes: t.notes, files: resumeFile(t.id, t.file, iso(t.when), nameOf(t.by)), savedBy: nameOf(t.by), savedAt: iso(t.when), events: evs(t.events),
+const T = (t: { id: string; name: string; phone: string; email: string; position: string; dept: string; from: string; when: string; by: string; file: string; notes: string; events: Ev[]; reason?: HiringTalent['reason'] }): HiringTalent => ({
+  id: t.id, no: t.id, name: t.name, phone: t.phone, email: t.email, position: t.position, department: t.dept, fromRequest: t.from || null, notes: t.notes, reason: t.reason ?? null, files: resumeFile(t.id, t.file, iso(t.when), nameOf(t.by)), savedBy: nameOf(t.by), savedAt: iso(t.when), events: evs(t.events),
 })
 const talents: HiringTalent[] = [
-  T({ id: 'T-104', name: 'Nur Iman', phone: '012-778 4410', email: 'nur.iman@gmail.com', position: 'Revenue Specialist', dept: 'Revenue', from: 'HR-202', when: '24 Sep 2026', by: 'grace', file: 'Nur_Iman_CV.pdf', notes: 'Runner-up for Team Assistant (HR-202). Very good with walk-in customers at the Mid Valley roadshow trial day; closed two bookings on her own.\n\nWants a sales role more than admin. Available with two weeks notice. Call back for the next Fair opening.', events: [['Saved to Talent Bank', '24 Sep 2026', 'Grace Lim', 'From HR-202 · Team Assistant'], ['Invited to interview', '29 Sep 2026', 'Grace Lim', 'HR-203 · Revenue Specialist']] }),
-  T({ id: 'T-103', name: 'Joyce Tan', phone: '011-2045 6678', email: 'joyce.tan@outlook.com', position: 'HR Executive', dept: 'HR', from: 'HR-201', when: '15 Sep 2026', by: 'grace', file: 'Joyce_Tan_CV.pdf', notes: 'Final round for HR Executive before the request was cancelled. Three years in recruitment at a retail chain; strong on onboarding paperwork.', events: [['Saved to Talent Bank', '15 Sep 2026', 'Grace Lim', 'From HR-201 · request cancelled']] }),
-  T({ id: 'T-102', name: 'Marcus Wong', phone: '017-332 9081', email: 'marcuswong.sales@gmail.com', position: 'Senior Revenue Specialist', dept: 'Revenue', from: 'HR-198', when: '2 Aug 2026', by: 'grace', file: 'Marcus_Wong_Resume.pdf', notes: 'Strong closer, 6 years in mattress retail. Lost out to Melvin on salary expectation (asked RM 4,200). Revisit if IR budget allows.', events: [['Saved to Talent Bank', '2 Aug 2026', 'Grace Lim', 'From HR-198 · Senior Revenue Specialist']] }),
+  T({ id: 'T-104', reason: 'not_right_now', name: 'Nur Iman', phone: '012-778 4410', email: 'nur.iman@gmail.com', position: 'Revenue Specialist', dept: 'Revenue', from: 'HR-202', when: '24 Sep 2026', by: 'grace', file: 'Nur_Iman_CV.pdf', notes: 'Runner-up for Team Assistant (HR-202). Very good with walk-in customers at the Mid Valley roadshow trial day; closed two bookings on her own.\n\nWants a sales role more than admin. Available with two weeks notice. Call back for the next Fair opening.', events: [['Saved to Talent Bank', '24 Sep 2026', 'Grace Lim', 'From HR-202 · Team Assistant'], ['Invited to interview', '29 Sep 2026', 'Grace Lim', 'HR-203 · Revenue Specialist']] }),
+  T({ id: 'T-103', reason: 'other', name: 'Joyce Tan', phone: '011-2045 6678', email: 'joyce.tan@outlook.com', position: 'HR Executive', dept: 'HR', from: 'HR-201', when: '15 Sep 2026', by: 'grace', file: 'Joyce_Tan_CV.pdf', notes: 'Final round for HR Executive before the request was cancelled. Three years in recruitment at a retail chain; strong on onboarding paperwork.', events: [['Saved to Talent Bank', '15 Sep 2026', 'Grace Lim', 'From HR-201 · request cancelled']] }),
+  T({ id: 'T-102', reason: 'failed_interview', name: 'Marcus Wong', phone: '017-332 9081', email: 'marcuswong.sales@gmail.com', position: 'Senior Revenue Specialist', dept: 'Revenue', from: 'HR-198', when: '2 Aug 2026', by: 'grace', file: 'Marcus_Wong_Resume.pdf', notes: 'Strong closer, 6 years in mattress retail. Lost out to Melvin on salary expectation (asked RM 4,200). Revisit if IR budget allows.', events: [['Saved to Talent Bank', '2 Aug 2026', 'Grace Lim', 'From HR-198 · Senior Revenue Specialist']] }),
   T({ id: 'T-101', name: 'Aisyah Rahman', phone: '013-901 2234', email: 'aisyah.r@gmail.com', position: 'Account Executive', dept: 'Finance', from: '', when: '18 Jul 2026', by: 'jason', file: 'Aisyah_Rahman_CV.pdf', notes: 'Walk-in CV. ACCA part-qualified. Jason met her briefly; worth a proper interview for the next Finance role.', events: [['Added to Talent Bank', '18 Jul 2026', 'Jason Ong', 'Walk-in CV']] }),
+]
+
+/** HR's reasons as the list began (mig 20261025021500), with the people kept with each above. */
+export const TALENT_REASONS: HiringBankReason[] = [
+  { id: 'not_shortlisted', name: 'Not shortlisted', active: true, used: 0 },
+  { id: 'failed_interview', name: 'Failed interview', active: true, used: 1 },
+  { id: 'not_right_now', name: 'Not right now', active: true, used: 1 },
+  { id: 'declined_offer', name: 'Declined offer', active: true, used: 0 },
+  { id: 'other', name: 'Other', active: true, used: 1 },
 ]
 
 export const HIRING_BOARD: HiringBoard = {
@@ -107,6 +116,7 @@ export const HIRING_BOARD: HiringBoard = {
     { id: 'transport', label: 'Own transport', type: 'choice', options: 'Yes, No' },
   ],
   fileTypes: FILE_TYPES,
+  talentReasons: TALENT_REASONS,
   people: STAFF,
   requests,
   talents,

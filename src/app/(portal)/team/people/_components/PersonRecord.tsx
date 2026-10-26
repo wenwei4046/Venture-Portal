@@ -18,7 +18,7 @@ import {
 import { btn, Chip } from '@/components/hrv/kit'
 import { NavIcon, type HrIconName } from '@/components/hrv/icons'
 import { Select } from '@/components/hrv/select'
-import { flash } from '@/components/hrv/toast'
+import { FLASH_LONG, flash } from '@/components/hrv/toast'
 import { initialsOf } from '@/lib/people-roster'
 import { keptParts } from '@/lib/person-name'
 import { EPF_PARTS, PCB_CATEGORIES, SOCSO_CATEGORIES, type StaffRow, type TitleRow } from '@/lib/staff-form'
@@ -26,7 +26,6 @@ import type { UplineGroup } from '@/lib/upline-choices'
 import {
   EPF_LABELS,
   BASIC_FROM_COMMISSION,
-  LOGIN_EMAIL_LOCKED,
   PCB_LABELS,
   SOCSO_LABELS,
   asksPay,
@@ -45,8 +44,22 @@ import AddressFields from '@/components/address/AddressFields'
 import { EMPTY_ADDRESS, addressOf, addressRefusal, isEmptyAddress, sameAddress, type Address } from '@/lib/address/address'
 import { addressFormEntries } from '@/lib/address/address-form'
 import { loadMalaysia } from '@/lib/address/malaysia'
+import {
+  CONTRACT_MONTH_CHOICES,
+  DEFAULT_CONTRACT_MONTHS,
+  DEFAULT_PROBATION_MONTHS,
+  EMPLOYMENT_STATUSES,
+  EMPLOYMENT_STATUS_LABEL,
+  PROBATION_MONTH_CHOICES,
+  monthsLabel,
+  type EmploymentStatus,
+  type StatusChip,
+} from '@/lib/employment-status'
+import { failedWords, filedWords, lettersCount, lettersRefusal, type LetterChoice, type PendingLetter } from '@/lib/documentation/attach'
+import { fileLetters } from '@/lib/documentation/file-letters'
 import { updateStaff } from '../actions'
 import PersonWell from '../../_components/PersonWell'
+import AttachLetters from './AttachLetters'
 import s from './person-record.module.css'
 
 /**
@@ -81,6 +94,11 @@ export interface PersonRecordView {
   login: 'active' | 'disabled' | null
   /** Who they report to — `href` only for a reader of the whole roster. */
   reportsTo: { name: string; title: string | null; href: string | null; active: boolean } | null
+  /**
+   * Probation, Permanent or Part time (2026-10-23): the chip for the active, and the card's line ("Probation · 3 months
+   * · ends 31 Dec 2026 · in 9 days"); `status` undefined for a reader not shown it (the directory).
+   */
+  employment: { status: EmploymentStatus | null | undefined; chip: StatusChip; value: string | null }
   /** As the page writes a date ("05 Jan 2026"). */
   hireDate: string | null
   /** How long they have been with the company ("9 months"). */
@@ -114,6 +132,17 @@ export interface PersonEditor {
   reportsTo: string | null
   /** The uplines they may have, a group per department — null while they are not on the active roster. */
   uplines: UplineGroup[] | null
+  /**
+   * Why their login's email is not this editor's to change (2026-10-22): a
+   * full-access title, for whoever does not manage permissions. Absent or
+   * null: theirs to change — the login moves with it.
+   */
+  emailHeld?: string | null
+  /**
+   * The Data center's letter types (2026-10-24): letters filed with the Employment Status — "+ Attach a letter" under
+   * it — when Save is pressed. Absent or null: this editor may not file one (Documentation · Create).
+   */
+  letterTypes?: readonly LetterChoice[] | null
 }
 
 /** The editor while editing; null while the page reads. */
@@ -156,16 +185,23 @@ export default function PersonRecord({
   // turn — and sent whole when it changed, as a bank account is.
   const addressWas = useMemo<Address>(() => (editor ? addressOf(editor.staff) : EMPTY_ADDRESS), [editor])
   const [address, setAddress] = useState<Address>(addressWas)
+  // Letters filed with the Employment Status (2026-10-24, the user: "我们 select 那个 state 的时候，我要他能够 attach 一个
+  // form"): held until Save, then each filed to their Data center record — a letter counts as a change.
+  const [letters, setLetters] = useState<PendingLetter[]>([])
+  // What the save says once the fresh record is in: "Saved", or the letters filed with it.
+  const savedWords = useRef<{ message: string; ms?: number }>({ message: 'Saved' })
 
   const ed = editing ? editor : null
   const addressChanged = ed !== null && !sameAddress(address, addressWas)
-  const count = changed.size + (ed && mode !== initialMode ? 1 : 0) + (addressChanged ? 1 : 0)
+  const fieldsCount = changed.size + (ed && mode !== initialMode ? 1 : 0) + (addressChanged ? 1 : 0)
+  const count = fieldsCount + (ed ? lettersCount(letters) : 0)
   const busy = saving || settling
 
   function enter() {
     setMode(initialMode)
     setChanged(new Set())
     setAddress(addressWas)
+    setLetters([])
     setError(null)
     setEditing(true)
   }
@@ -173,6 +209,7 @@ export default function PersonRecord({
   const leave = useCallback(() => {
     setEditing(false)
     setChanged(new Set())
+    setLetters([])
     setError(null)
     // The old Edit address lands here with ?edit=1 — leaving edit leaves it.
     const url = new URL(window.location.href)
@@ -187,7 +224,7 @@ export default function PersonRecord({
     if (!settling || view === savedFrom.current) return
     setSettling(false)
     leave()
-    flash('Saved')
+    saidSaved(savedWords.current)
   }, [settling, view, leave])
 
   // …and should it never come, the page reads anyway.
@@ -196,7 +233,7 @@ export default function PersonRecord({
     const late = setTimeout(() => {
       setSettling(false)
       leave()
-      flash('Saved')
+      saidSaved(savedWords.current)
     }, 6000)
     return () => clearTimeout(late)
   }, [settling, leave])
@@ -242,6 +279,11 @@ export default function PersonRecord({
     // change made since this page was opened.
     const data = changedFormData(event.currentTarget, changedFields(event.currentTarget), mode !== initialMode ? payModeFields(mode) : {})
     if (addressChanged) for (const [name, value] of addressFormEntries(address)) data.set(name, value)
+    const refusedLetters = editor.letterTypes ? lettersRefusal(letters) : null
+    if (refusedLetters) {
+      setError(refusedLetters)
+      return
+    }
     setError(null)
     startSaving(async () => {
       try {
@@ -251,12 +293,32 @@ export default function PersonRecord({
           setError(refused)
           return
         }
-        const outcome = await updateStaff(editor.staff.id, data)
-        if (outcome.ok) {
-          savedFrom.current = view
+        // The record as it is drawn now: the fresh one is whatever lands after it.
+        savedFrom.current = view
+        if (fieldsCount > 0) {
+          const outcome = await updateStaff(editor.staff.id, data)
+          if (!outcome.ok) {
+            setError(outcome.reason)
+            return
+          }
+        }
+        // Then the letters (2026-10-24), each to their Data center record.
+        const filed = editor.letterTypes && lettersCount(letters) > 0 ? await fileLetters(editor.staff.id, letters, editor.letterTypes) : null
+        const failed = filed ? failedWords(filed.failed) : null
+        const name = editor.staff.employee_name
+        if (fieldsCount > 0) {
+          savedWords.current = failed
+            ? { message: `Saved. ${failed}`, ms: FLASH_LONG }
+            : { message: (filed && filedWords(filed.filed, name)) ? `Saved · ${filedWords(filed.filed, name)}` : 'Saved' }
           setSettling(true)
+        } else if (failed && filed) {
+          // Letters alone, and some did not go: those stay, with why, to be sent again.
+          const kept = new Set(filed.failed.map(f => f.key))
+          setLetters(rows => rows.filter(r => kept.has(r.key)))
+          setError(filed.filed.length ? `${filedWords(filed.filed, name)}. ${failed}` : failed)
         } else {
-          setError(outcome.reason)
+          leave()
+          flash((filed && filedWords(filed.filed, name)) ?? 'Saved')
         }
       } catch {
         setError('Could not save. Check the connection and try again.')
@@ -308,7 +370,7 @@ export default function PersonRecord({
     </>
   ) : null
 
-  // Their login's email reads as theirs: a word beside it, and no field.
+  // Their login's email reads as the one they sign in with: a word beside it.
   const email = view.contact.email ? (
     <>
       {view.contact.email}
@@ -349,9 +411,14 @@ export default function PersonRecord({
         </p>
       ) : null}
       <div className={s.chips}>
-        <Chip tone={view.active ? 'ledger' : 'danger'}>
-          {view.active ? 'Active' : view.resignationDate ? `Resigned ${view.resignationDate}` : 'Inactive'}
-        </Chip>
+        {/* Probation, Permanent or Part time for the active (2026-10-23), as the roster's row reads. */}
+        {view.active ? (
+          <Chip tone={view.employment.chip.tone} title={view.employment.chip.title}>
+            {view.employment.chip.label}
+          </Chip>
+        ) : (
+          <Chip tone="danger">{view.resignationDate ? `Resigned ${view.resignationDate}` : 'Inactive'}</Chip>
+        )}
         <Chip tone={view.login ? (view.login === 'active' ? 'info' : 'danger') : 'plain'}>
           {view.login ? (view.login === 'active' ? 'Has login' : 'Login disabled') : 'No login'}
         </Chip>
@@ -430,6 +497,46 @@ export default function PersonRecord({
             </Select>
           )}
         />
+        {/* Probation, Permanent or Part time (2026-10-23) — a probation with its period; then when they started, which
+            a probation is counted from. Not offered to a reader the directory serves (it carries no status). */}
+        <SideFact
+          label="Employment Status"
+          field="employment_status"
+          value={view.employment.value}
+          edit={
+            view.employment.status === undefined
+              ? undefined
+              : e => (
+                  <>
+                    <EmploymentStatusField
+                      current={e.staff.employment_status ?? null}
+                      months={e.staff.probation_months ?? null}
+                      contractMonths={e.staff.contract_months ?? null}
+                      onSwitch={() => {
+                        if (form.current) setChanged(changedFields(form.current))
+                      }}
+                    />
+                    {/* The letters that come with it — their offer letter, a confirmation — filed on Save (2026-10-24). */}
+                    {e.letterTypes ? (
+                      <div className={s.letters}>
+                        <AttachLetters
+                          types={e.letterTypes}
+                          rows={letters}
+                          onChange={next => {
+                            setLetters(next)
+                            setError(null)
+                          }}
+                          idPrefix="person-letter"
+                          disabled={busy}
+                          selectClassName={s.select}
+                          inputClassName={s.input}
+                        />
+                      </div>
+                    ) : null}
+                  </>
+                )
+          }
+        />
         <SideFact
           label="Hire Date"
           field="hire_date"
@@ -505,15 +612,27 @@ export default function PersonRecord({
           mono
           edit={e => <TextField name="contact_number" type="tel" defaultValue={e.staff.contact_number} mono />}
         />
+        {/* A login's email is the one they sign in with: HR changes it here since 2026-10-22 (the user: "i want the
+            email can be editable, for hr") and the login moves with it — but a full-access title's stays locked for
+            whoever does not manage permissions, who is told why. */}
         <Fact
           label="Email"
-          field={view.login ? undefined : 'email'}
+          field={view.login && editor?.emailHeld ? undefined : 'email'}
           value={email}
           edit={e =>
-            view.login ? (
-              <Locked value={view.contact.email} why={LOGIN_EMAIL_LOCKED} icon tag="Login" />
-            ) : (
+            !view.login ? (
               <TextField name="email" type="email" defaultValue={e.staff.email} />
+            ) : e.emailHeld ? (
+              <Locked value={view.contact.email} why={e.emailHeld} icon tag="Login" />
+            ) : (
+              <span className={s.tagged}>
+                <TextField name="email" type="email" defaultValue={view.contact.email} required />
+                <span className={s.fieldTag}>
+                  <Chip tone="plain" soft>
+                    Login
+                  </Chip>
+                </span>
+              </span>
             )
           }
         />
@@ -787,6 +906,12 @@ export default function PersonRecord({
   )
 }
 
+/** What a save says once it is read again — longer when a letter with it did not go. */
+function saidSaved(words: { message: string; ms?: number }) {
+  if (words.ms) flash(words.message, words.ms)
+  else flash(words.message)
+}
+
 /** A well of the record: its icon and title in caps over its facts, two to a row. */
 function Well({ title, icon, children }: { title: string; icon: HrIconName; children: ReactNode }) {
   return (
@@ -912,6 +1037,84 @@ function UplineField({ current, groups }: { current: string | null; groups: Upli
   )
 }
 
+/**
+ * Employment Status (2026-10-23): Probation, Contract, Permanent or Part time — a probation or a contract (2026-10-24)
+ * with its period beside it. "— Not set" is offered only while it is (a record filed before the status existed). The
+ * three are saved together whenever any changed (lib/person-record.ts › SAVED_TOGETHER); `onSwitch` counts the changes
+ * again once a period comes or goes.
+ */
+function EmploymentStatusField({ current, months, contractMonths, onSwitch }: {
+  current: EmploymentStatus | null; months: number | null; contractMonths: number | null; onSwitch: () => void
+}) {
+  const [status, setStatus] = useState<string>(current ?? '')
+  const onProbation = status === 'probation'
+  const onContract = status === 'contract'
+  const statusDirty = useChanged('employment_status')
+  const monthsDirty = useChanged('probation_months')
+  const contractDirty = useChanged('contract_months')
+  const switched = useRef(false)
+  useLayoutEffect(() => {
+    if (switched.current) onSwitch()
+    switched.current = true
+    // Only when a period comes or goes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onProbation, onContract])
+  // An extended probation may run past the periods Add Staff offers: theirs stays a choice.
+  const periods = [...new Set<number>([...PROBATION_MONTH_CHOICES, ...(months ? [months] : [])])].sort((a, b) => a - b)
+  const contractPeriods = [...new Set<number>([...CONTRACT_MONTH_CHOICES, ...(contractMonths ? [contractMonths] : [])])].sort((a, b) => a - b)
+  return (
+    <span className={s.pair}>
+      <Select
+        id={fieldId('employment_status')}
+        name="employment_status"
+        defaultValue={current ?? ''}
+        onChange={event => setStatus(event.target.value)}
+        data-dirty={statusDirty}
+        className={s.select}
+      >
+        {current ? null : <option value="">— Not set</option>}
+        {EMPLOYMENT_STATUSES.map(st => (
+          <option key={st} value={st}>
+            {EMPLOYMENT_STATUS_LABEL[st]}
+          </option>
+        ))}
+      </Select>
+      {onProbation ? (
+        <Select
+          id={fieldId('probation_months')}
+          name="probation_months"
+          defaultValue={String(months ?? DEFAULT_PROBATION_MONTHS)}
+          data-dirty={monthsDirty}
+          className={s.select}
+          aria-label="Probation period"
+        >
+          {periods.map(n => (
+            <option key={n} value={String(n)}>
+              {monthsLabel(n)}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+      {onContract ? (
+        <Select
+          id={fieldId('contract_months')}
+          name="contract_months"
+          defaultValue={String(contractMonths ?? DEFAULT_CONTRACT_MONTHS)}
+          data-dirty={contractDirty}
+          className={s.select}
+          aria-label="Contract period"
+        >
+          {contractPeriods.map(n => (
+            <option key={n} value={String(n)}>
+              {monthsLabel(n)}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+    </span>
+  )
+}
+
 function CheckField({ name, defaultChecked }: { name: string; defaultChecked: boolean }) {
   return <input type="checkbox" name={name} defaultChecked={defaultChecked} data-dirty={useChanged(name)} className={s.check} />
 }
@@ -934,8 +1137,8 @@ function NameField({ defaultValue }: { defaultValue: string }) {
 /**
  * A value this editor may not change (DESIGN.md › A hidden value): shown as
  * the reader gave it — •••• when on file — with no field behind it, so the
- * save leaves it as it was. Why, on hover. A login's email wears a padlock
- * and its word.
+ * save leaves it as it was. Why, on hover. A login's email held from this
+ * editor (a full-access title's) wears a padlock and its word.
  */
 function Locked({ value, why, icon = false, tag }: { value: string | null; why: string; icon?: boolean; tag?: string }) {
   return (

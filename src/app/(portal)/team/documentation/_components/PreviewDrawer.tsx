@@ -225,6 +225,8 @@ export default function PreviewDrawer({
               ) : kind === 'image' && url ? (
                 // eslint-disable-next-line @next/next/no-img-element -- a short signed link, not a static asset
                 <img src={url} alt={shown.fileName} className={s.vwImg} />
+              ) : kind === 'video' && url ? (
+                <video src={url} controls preload="metadata" className={s.vwVideo} aria-label={shown.fileName} />
               ) : kind === 'sheet' && sheet && sheet.columns > 0 ? (
                 <SheetView sheet={sheet} />
               ) : kind === 'none' || (kind === 'sheet' && (sheetFailed || (sheet && sheet.columns === 0))) ? (

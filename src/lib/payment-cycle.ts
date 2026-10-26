@@ -82,6 +82,12 @@ export interface CyclePerson {
   voucher: CycleVoucher | null
   /** What of each scheme is funded (unified Payroll): statutory PVs pay that, less what is covered. */
   statutory_funded?: Partial<Record<Scheme, number>> | null
+  /**
+   * Their row is open for a Resubmit on HR › Payroll (2026-10-24): what the
+   * batches sent may be the wrong figures, so none of their statutory goes on
+   * a new PV until the resubmit is sent. Absent on an older server.
+   */
+  resubmit_open?: boolean
 }
 
 export interface CycleFunding {
@@ -222,6 +228,7 @@ export function normaliseCycle(raw: unknown): PaymentCycle {
     statutory_funded: p.statutory_funded && typeof p.statutory_funded === 'object'
       ? Object.fromEntries(Object.entries(p.statutory_funded as Record<string, unknown>).map(([k, v]) => [k, n(v)]))
       : null,
+    resubmit_open: p.resubmit_open === true,
   }))
   return {
     period: String(r.period ?? ''),
@@ -543,6 +550,10 @@ export interface StatutoryRow {
   vouchers: CycleStatutoryVoucher[]
   generatedAmount: number
   remainingAmount: number
+  /** Of the remaining, what waits for a resubmit (statutoryHeld) — not offered for a PV. */
+  heldAmount: number
+  /** The people it waits on, for a body to count once across its schemes. */
+  heldRowIds: string[]
   paidAmount: number
   byDepartment: Array<{ key: string; name: string; amount: number }>
 }
@@ -577,6 +588,16 @@ export function statutoryPayable(coverage: readonly StatutoryCoverage[], p: Cycl
   return Math.max(0, round2(funded - coveredStatutory(coverage, p, scheme)))
 }
 
+/**
+ * Waiting for a resubmit (2026-10-24): HR has unlocked them to correct what
+ * was sent — September's KRIS went with PCB 1,821.90 and is being put right
+ * to 647.90 — so a PV raised now would pay the old figure. Generation leaves
+ * them out until HR › Payroll sends the resubmit.
+ */
+export function statutoryHeld(p: Pick<CyclePerson, 'resubmit_open'>): boolean {
+  return p.resubmit_open === true
+}
+
 /** Compatibility for old responses; the current RPC uses sources and exact lines. */
 export function statutoryCoverage(cycle: PaymentCycle): StatutoryCoverage[] {
   const live = cycle.statutory_vouchers.filter(v => v.status !== 'voided')
@@ -606,6 +627,7 @@ export function statutoryRows(cycle: PaymentCycle, groups: DeptGroup[]): Statuto
     // Amounts, not presence: a resubmit's difference is still to raise after
     // the first voucher (unified Payroll, 2026-09-27).
     const remainingAmount = round2(cycle.people.reduce((t, p) => t + statutoryRemaining(coverage, p, s.scheme), 0))
+    const held = cycle.people.filter(p => statutoryHeld(p) && statutoryRemaining(coverage, p, s.scheme) > 0)
     const stage: StatStage = !forPayee.length ? 'not_generated' : remainingAmount > 0 ? 'partial'
       : forPayee.every(v => v.status === 'paid') ? 'paid'
       : forPayee.every(v => v.status === 'paid' || v.status === 'approved') ? 'approved' : 'pending'
@@ -627,6 +649,8 @@ export function statutoryRows(cycle: PaymentCycle, groups: DeptGroup[]): Statuto
       vouchers: forPayee,
       generatedAmount: round2(forPayee.reduce((t, v) => t + v.amount, 0)),
       remainingAmount,
+      heldAmount: round2(held.reduce((t, p) => t + statutoryRemaining(coverage, p, s.scheme), 0)),
+      heldRowIds: held.map(p => p.row_id),
       paidAmount: round2(forPayee.filter(v => v.status === 'paid').reduce((t, v) => t + v.amount, 0)),
       byDepartment: groups.map((g) => ({
         key: g.key,
@@ -914,6 +938,9 @@ interface Progress {
   statApproved: number
   statRemaining: number
   statRemainingAmount: number
+  /** People whose statutory waits for their resubmit (statutoryHeld), and the schemes with anything else to raise. */
+  statWaiting: number
+  statOffered: number
   statDone: boolean
   nextStatDue: string | null
   lastStatPaid: string | null
@@ -965,6 +992,8 @@ function progressOf(groups: DeptGroup[], rows: StatutoryRow[]): Progress {
     statApproved: statutoryVouchers.filter(v => v.status === 'approved').length,
     statRemaining: openRows.filter(r => r.remainingAmount > 0).length,
     statRemainingAmount: round2(openRows.reduce((t, r) => t + r.remainingAmount, 0)),
+    statWaiting: new Set(openRows.flatMap(r => r.heldRowIds)).size,
+    statOffered: openRows.filter(r => round2(r.remainingAmount - r.heldAmount) > 0).length,
     statDone: openRows.length > 0 && openRows.every(r => r.stage === 'paid'),
     nextStatDue: unpaidDue[0] ?? null,
     lastStatPaid: paidStat[paidStat.length - 1] ?? null,
@@ -1098,6 +1127,17 @@ export function cycleHeadline(i: HeadlineInput): Headline {
         due: { label: 'Statutory due', date: due, days: days(due) },
         segments: seg(['done', 'done', 'done', late ? 'late' : 'now']),
         action: { kind: 'approvals', label: 'Open payment vouchers →', href: '/payments' },
+      }
+    }
+    // What is left waits for a resubmit (2026-10-24): it is sent from Payroll, not generated here.
+    if (p.statOffered === 0 && p.statWaiting > 0) {
+      return {
+        word: 'Waiting for a resubmit',
+        detail: `${p.statPaid} statutory PVs paid · ${p.statWaiting} ${p.statWaiting === 1 ? 'person waits' : 'people wait'} for a resubmit on Payroll.`,
+        tone: late ? 'danger' : 'alert',
+        due: { label: 'Statutory due', date: due, days: days(due) },
+        segments: seg(['done', 'done', 'done', late ? 'late' : 'now']),
+        action: { kind: 'payroll', label: 'Open Payroll →', href: `/hr-costing/payroll/${cycle.period}` },
       }
     }
     return {

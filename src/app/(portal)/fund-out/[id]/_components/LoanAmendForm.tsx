@@ -16,6 +16,8 @@ interface Props {
   nextMonth: string
   /** 'YYYY-MM' the current terms took effect, when they were changed before. */
   termsFrom?: string | null
+  /** Treasury · Approve: the change applies now. Without it (Treasury · Edit) a from-month change is filed for the Principal. */
+  direct?: boolean
 }
 
 // Two ways to change an active loan (user 2026-09-21):
@@ -33,6 +35,7 @@ export default function LoanAmendForm({
   compound,
   nextMonth,
   termsFrom,
+  direct = true,
 }: Props) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -41,6 +44,8 @@ export default function LoanAmendForm({
   // 从某月起改成无固定期限 (user 2026-09-22): no monthly principal from X,
   // repayments in any size; the flat interest stays on the principal owed at X.
   const [noFixedTerm, setNoFixedTerm] = useState(false)
+  // What the interest from X is on (2026-10-23 / 24): the principal owed at X, the original principal, or the base the terms before used — one of them.
+  const [interestBasis, setInterestBasis] = useState<'owed' | 'original' | 'kept'>('owed')
 
   const field =
     'w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono tabular text-ink focus:outline-none focus:border-accent-border'
@@ -64,7 +69,7 @@ export default function LoanAmendForm({
       <div className="mb-6 border border-accent-border rounded-md bg-accent-bg p-4">
         <div className="font-serif italic text-accent text-sm">修改贷款条款 · Amend loan terms</div>
         <p className="font-serif text-sm text-graphite mt-1">
-          你是最高审批人,改动会立即生效(系统记录修改时间)。
+          {direct ? '你是最高审批人,改动会立即生效(系统记录修改时间)。' : '提交后等 Principal 在 Approvals 核准,核准后才生效;之前条件不变。'}
           {termsFrom ? <> 现行条件自 <span className="font-mono text-ink">{termsFrom}</span> 起生效。</> : null}
         </p>
       </div>
@@ -77,15 +82,18 @@ export default function LoanAmendForm({
               <input type="radio" name="mode" checked={fromMode} onChange={() => setMode('from')} className="accent-[var(--accent)]" />
               从某月起生效
             </span>
-            <span className="block font-serif italic text-muted text-xs mt-1 ml-5">之前的月份照旧条件,生效月起用新的;利息按生效月初剩余本金算。</span>
+            <span className="block font-serif italic text-muted text-xs mt-1 ml-5">之前的月份照旧条件,生效月起用新的;利息按生效月初剩余本金算（也可以勾选按原本金算）。</span>
           </label>
-          <label className={`border rounded-md p-3 cursor-pointer ${!fromMode ? 'border-accent bg-accent-bg/40' : 'border-hairline'}`}>
-            <span className="flex items-center gap-2 text-sm font-sans text-ink">
-              <input type="radio" name="mode" checked={!fromMode} onChange={() => setMode('whole')} className="accent-[var(--accent)]" />
-              整条重算
-            </span>
-            <span className="block font-serif italic text-muted text-xs mt-1 ml-5">改错用 —— 从放款日起整条照新条件重算。</span>
-          </label>
+          {/* The whole deal again is the Principal's own (a keying-error fix); a filed change is a from-month one. */}
+          {direct ? (
+            <label className={`border rounded-md p-3 cursor-pointer ${!fromMode ? 'border-accent bg-accent-bg/40' : 'border-hairline'}`}>
+              <span className="flex items-center gap-2 text-sm font-sans text-ink">
+                <input type="radio" name="mode" checked={!fromMode} onChange={() => setMode('whole')} className="accent-[var(--accent)]" />
+                整条重算
+              </span>
+              <span className="block font-serif italic text-muted text-xs mt-1 ml-5">改错用 —— 从放款日起整条照新条件重算。</span>
+            </label>
+          ) : null}
         </div>
       </fieldset>
 
@@ -117,6 +125,20 @@ export default function LoanAmendForm({
               <span className="text-sm font-sans text-graphite">
                 改成无固定期限
                 <span className="block font-serif italic text-muted text-xs mt-0.5">生效月起没有每月应还本金，想还多少还多少；利息照生效月初剩余本金 × 利率算，不随本金减少。</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 mt-3 cursor-pointer">
+              <input id="interest_on_original" name="interest_on_original" type="checkbox" checked={interestBasis === 'original'} onChange={(e) => setInterestBasis(e.target.checked ? 'original' : 'owed')} className="h-4 w-4 mt-0.5 accent-[var(--accent)]" />
+              <span className="text-sm font-sans text-graphite">
+                利息按原本金算
+                <span className="block font-serif italic text-muted text-xs mt-0.5">生效月起的利息 = 原本金 × 新利率，不按生效月初剩余本金算；每月本金照旧 = 剩余本金 ÷ 剩余期数。</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 mt-3 cursor-pointer">
+              <input id="interest_keeps_base" name="interest_keeps_base" type="checkbox" checked={interestBasis === 'kept'} onChange={(e) => setInterestBasis(e.target.checked ? 'kept' : 'owed')} className="h-4 w-4 mt-0.5 accent-[var(--accent)]" />
+              <span className="text-sm font-sans text-graphite">
+                利息照之前的本金算
+                <span className="block font-serif italic text-muted text-xs mt-0.5">生效月起的利息 = 之前算利息用的本金 × 新利率，不按生效月初剩余本金算，之后还了本金也不变（例如 1 月起按 51,000 算，10 月改无固定期限后照样按 51,000）。</span>
               </span>
             </label>
           </div>
@@ -174,7 +196,7 @@ export default function LoanAmendForm({
           type="submit" disabled={isPending}
           className="bg-accent hover:bg-accent-hover text-white font-serif italic text-sm px-5 py-2 rounded-md transition-colors disabled:opacity-50"
         >
-          {isPending ? '保存中…' : fromMode ? '从生效月起套用 · Apply' : '保存修改 · Save'}
+          {isPending ? (direct ? '保存中…' : '提交中…') : !direct ? '提交给 Principal 核准 · Submit' : fromMode ? '从生效月起套用 · Apply' : '保存修改 · Save'}
         </button>
         <Link href={`/fund-out/${loanId}`} className="text-sm text-graphite hover:text-ink font-sans transition-colors">Cancel</Link>
       </div>

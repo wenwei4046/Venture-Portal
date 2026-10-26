@@ -11,10 +11,11 @@ import { overdueOf, type OverdueSummary } from '@/lib/repayment-calendar'
 import { dealChangeLine, type DealChange } from '@/lib/deal-audit'
 import { withCode } from '@/lib/fund-hub'
 import { fullDay, type FullStep } from '@/components/finv/FullParts'
-import { allTermsChanges, buildTermsSegments, currentSegment, type TermsChangeComparison, type TermsSegment } from '@/lib/treasury-terms'
+import { allTermsChanges, buildTermsSegments, currentSegment, installmentsInAll, type TermsChangeComparison, type TermsSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isLoanPrincipal, paidByMonthByType, principalPaidByMonth, termsForLoan } from '@/lib/treasury-terms-data'
 import { addMonths } from '../../_lib/loan-hub'
 import type { AmendTerms } from '@/lib/fund-amend'
+import { latestTermsRequest, termsRequestNote, type TermsRequestNote } from '@/lib/terms-change-request'
 
 // A loan's page, read (2026-10-15 — moved out of `/fund-out/[id]/page.tsx`
 // word for word, so the Finance phone app's record reads the same): the loan,
@@ -71,15 +72,19 @@ export interface LoanPageModel {
   audit: Array<{ at: string; who: string; what: string }>
   /** A cancellation filed and waiting for the Principal. */
   pendingCancel: { by: string; at: string } | null
-  /** Amend terms' starting values, as its edit page reads them — an active loan, Treasury · Approve. */
+  /** Its latest terms change filed for the Principal — waiting, or decided within the month. */
+  termsRequest: TermsRequestNote | null
+  /** Amend terms' starting values, as its edit page reads them — an active loan, Treasury · Approve (or · Edit, to file it). */
   amend: AmendTerms | null
   can: {
     /** Treasury · Edit — the repayment settings (funding source, start, minimum pay). */
     edit: boolean
     /** Treasury · Void — cancel, request a cancellation, reverse a repayment. */
     void: boolean
-    /** Treasury · Approve — amend a booked loan's terms, revert a change. */
+    /** Treasury · Approve — amend a booked loan's terms (applied at once), revert a change. */
     amend: boolean
+    /** Treasury · Edit without Approve, on an active loan with none waiting — Amend terms files the change for the Principal. */
+    fileTerms: boolean
     /** Treasury · Create, on an active loan. */
     recordRepayment: boolean
   }
@@ -87,27 +92,34 @@ export interface LoanPageModel {
 
 /** The loan's page, or null when the reader may not see it (or it is not there). */
 export async function loadLoanPage(supabase: Client, user: User, id: string): Promise<LoanPageModel | null> {
-  const { data: loan, error } = await supabase.from('loans').select('*').eq('id', id).single()
+  // audit_changes and treasury_terms_requests postdate database.types.ts — asked through the untyped client.
+  const db = supabase as unknown as SupabaseClient
+  const [{ data: loan, error }, termsRow] = await Promise.all([
+    supabase.from('loans').select('*').eq('id', id).single(),
+    // A terms change filed for the Principal (2026-10-24) — Finance can't see /approvals, so the page says it.
+    latestTermsRequest(db, 'loan', id),
+  ])
   if (error || !loan) return null
 
-  const [{ data: company }, { data: outstanding }, { data: repayments }, { data: approver }, { data: creator }] = await Promise.all([
+  const termsPeople = [termsRow?.created_by, termsRow?.decided_by].filter((x): x is string => !!x)
+  const [{ data: company }, { data: outstanding }, { data: repayments }, { data: approver }, { data: creator }, { data: termsNames }] = await Promise.all([
     supabase.from('companies').select('name, short_code').eq('id', loan.company_id).single(),
     supabase.from('loan_outstanding').select('outstanding, total_principal_paid, total_interest_paid, total_penalty_paid').eq('loan_id', loan.id).single(),
     supabase.from('repayments').select('*').eq('loan_id', loan.id).order('payment_date', { ascending: false }),
     loan.approved_by ? supabase.from('users').select('name').eq('id', loan.approved_by).single() : Promise.resolve({ data: null }),
     supabase.from('users').select('name').eq('id', loan.created_by).single(),
+    termsPeople.length ? supabase.from('users').select('id, name, email').in('id', termsPeople) : Promise.resolve({ data: [] as Array<{ id: string; name: string | null; email: string | null }> }),
   ])
 
   // Terms over time (2026-09-21): segments + each 从某月起 change with its 差价.
   const termsHistory = await fetchTermsHistory(supabase, 'loan', [loan.id])
   const repRows = (repayments ?? []).map((r) => ({ id: loan.id, amount: Number(r.amount), payment_date: r.payment_date as string, payment_type: r.payment_type as string }))
   const terms = termsForLoan(loan, termsHistory.get(loan.id) ?? [])
-  const termsSegments = buildTermsSegments(terms, principalPaidByMonth(repRows, isLoanPrincipal).get(loan.id) ?? {})
+  const principalByMonth = principalPaidByMonth(repRows, isLoanPrincipal).get(loan.id) ?? {}
+  const termsSegments = buildTermsSegments(terms, principalByMonth)
   const termsChanges = allTermsChanges(termsSegments, { currentYM: officeMonth(), paidByMonth: paidByMonthByType(repRows, isLoanPrincipal).get(loan.id) ?? {} })
 
   // A filed-but-not-yet-approved cancellation (Finance can't see /approvals, so the page says it).
-  // audit_changes postdates database.types.ts — asked through the untyped client.
-  const db = supabase as unknown as SupabaseClient
   const [{ data: pendingCancel }, audit] = await Promise.all([
     supabase
       .from('approval_requests')
@@ -128,7 +140,9 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
   const outstandingAmount = Number(outstanding?.outstanding ?? loan.principal)
   const totalPrincipalPaid = Number(outstanding?.total_principal_paid ?? 0)
   const repaymentList = repayments ?? []
-  const tenureMonths = Number(loan.tenure_months ?? 0)
+  // The whole plan's installments: a 从某月起 change left the months from its month on the record.
+  const storedTenure = Number(loan.tenure_months ?? 0)
+  const tenureMonths = storedTenure > 0 ? installmentsInAll(terms.firstDueYM, terms.current.effectiveFrom, storedTenure) : storedTenure
   // No-fixed-term loans store tenure_months=1 as a placeholder (isLoanUnscheduled reads the terms).
   const noFixedTerm = isLoanUnscheduled(loan.repayment_terms as string | null)
 
@@ -184,6 +198,21 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : a.occurred_at > b.occurred_at ? -1 : b.id - a.id))
     .map((c) => ({ at: stamp(c.occurred_at), who: c.actor_name ?? (c.actor_id ? 'Removed account' : 'System'), what: dealChangeLine(c) }))
 
+  // Amend terms: Treasury · Approve changes them at once; Treasury · Edit files the change for the Principal (2026-10-24) — one at a time.
+  const approvesTerms = canDo(user, 'treasury', 'approve')
+  const termsName = new Map(((termsNames ?? []) as Array<{ id: string; name: string | null; email: string | null }>).map((u) => [u.id, u.name ?? u.email ?? '—']))
+  const termsRequest = termsRequestNote({
+    row: termsRow,
+    kind: 'loan',
+    terms,
+    principalByMonth,
+    nameOf: (uid) => (uid ? (termsName.get(uid) ?? null) : null),
+    stamp,
+    readerId: user.id,
+    readerApprovesAll: canDo(user, 'approvals', 'approve'),
+  })
+  const fileTerms = isActive && !approvesTerms && canDo(user, 'treasury', 'edit') && termsRequest?.status !== 'pending'
+
   return {
     id: loan.id as string,
     status: loan.status as string,
@@ -220,8 +249,9 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     trail,
     audit: changes,
     pendingCancel: pendingCancel ? { by: ((pendingCancel.users as { name?: string } | null)?.name) ?? 'Finance', at: stamp(pendingCancel.created_at) } : null,
+    termsRequest,
     amend:
-      isActive && canDo(user, 'treasury', 'approve')
+      isActive && (approvesTerms || fileTerms)
         ? {
             ratePct: (Number(loan.effective_rate) * 100).toString(),
             months: (loan.tenure_months ?? '').toString(),
@@ -236,7 +266,8 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     can: {
       edit: canDo(user, 'treasury', 'edit'),
       void: canDo(user, 'treasury', 'void'),
-      amend: canDo(user, 'treasury', 'approve'),
+      amend: approvesTerms,
+      fileTerms,
       recordRepayment: canDo(user, 'treasury', 'create') && isActive,
     },
   }

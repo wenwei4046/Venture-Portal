@@ -5,13 +5,19 @@
  * customer, History — written in the design's own vocabulary: the pane's back bar, its 18 / 20 px padding, its chips,
  * fields and rust buttons, Inter, the same colours. Behaviour: vm/extras.ts.
  */
-import { Fragment, useState } from "react";
+import { Fragment, useState, type CSSProperties } from "react";
+
+const XBTN: CSSProperties = { border: 0, background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left", margin: 0, boxSizing: "border-box", padding: 0 };
+const TIGHT_X = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 import DX from "./desk-extras.module.css";
 import { InfoValue } from "../shared/AdLink";
 import SalesCustomerForm from "../sales/SalesCustomerForm";
 import type { CustomerFormVM } from "../sales/vm/customer";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
 import type { ActiveVM } from "../shared/locked";
+import type { ApplyWindowVM } from "../shared/apply-ads";
+import { Ic, type Icon4a } from "../shared/icons4a";
+import { Phone4aBookMode, Phone4aCustomBook } from "../shared/custom-book";
 
 const BACK = { flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", textAlign: "left" } as const;
 const BODY = { flex: "1", minHeight: "0", overflow: "auto", padding: "18px 20px", display: "flex", flexDirection: "column", gap: "16px", background: "#fff" } as const;
@@ -27,10 +33,15 @@ export function DeskBook({ v }: { v: ReturnType<typeof bookVM> }) {
     <button type="button" onClick={v.back} style={BACK}><Chev />{v.name} · chat</button>
     <div style={BODY}>
       {v.has && <div style={{ padding: "12px 14px", borderRadius: "14px", background: "var(--crm-tint-cold)", color: "var(--crm-ink-soft)", fontSize: "13px", fontWeight: "600" }}>Booked · {v.current}</div>}
+      <Phone4aBookMode m={v.bkm} />
+      {v.bkm.showroom ? (<>
       <span style={LABEL}>Showroom</span>
       <div style={{ display: "inline-flex", alignSelf: "flex-start", background: "var(--crm-field)", borderRadius: "11px", padding: "3px", gap: "2px", flexWrap: "wrap" }}>
         {v.rooms.map((r, i) => <span key={i} onClick={r.pick} style={{ height: "28px", lineHeight: "28px", padding: "0 12px", borderRadius: "8px", background: r.bg, color: r.fg, fontSize: "13px", fontWeight: "650", boxShadow: r.sh, cursor: "pointer", whiteSpace: "nowrap" }}>{r.label}</span>)}
       </div>
+      {/* v2 frame 07: the showroom's staff-only remarks, for whoever books (never sent to the customer). */}
+      {v.remarks && <div style={{ display: "flex", gap: "8px", padding: "10px 12px", borderRadius: "10px", background: "var(--crm-field)", font: "400 12px/1.5 Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
+        <span style={{ display: "flex", flex: "none", paddingTop: "2px", color: "var(--crm-muted)" }}><Ic name="lock" size={12} /></span><span style={{ whiteSpace: "pre-wrap" }}>{v.remarks}</span></div>}
       {/* Day: the month chip and Week | Month, as the salesperson's sheet (the owner, 2026-10-13). */}
       <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "8px" }}>
         <span style={{ ...LABEL, flex: "none" }}>Day</span>
@@ -79,6 +90,7 @@ export function DeskBook({ v }: { v: ReturnType<typeof bookVM> }) {
           {v.slots.map((s, i) => <span key={i} onClick={s.pick} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px", padding: "10px 4px", borderRadius: "12px", border: `1px solid ${s.bd}`, background: s.bg, color: s.fg, cursor: s.cur, textDecoration: s.deco }}>
             <strong style={{ fontSize: "14px", fontWeight: "650" }}>{s.label}</strong><small style={{ fontSize: "11px", opacity: ".8" }}>{s.sub}</small></span>)}
         </div>)}
+      </>) : <Phone4aCustomBook m={v.bkm} bare />}
     </div>
     <div style={FOOT}>
       {v.has && <button type="button" onClick={v.cancel} style={{ ...GHOST, color: "var(--crm-oxblood)", borderColor: "var(--crm-tint-attention)" }}>Cancel visit</button>}
@@ -195,7 +207,8 @@ export function DeskEmoji({ v }: { v: ReturnType<typeof import("./vm/chat").chat
  * CRM alerts' pane (frame 1d), drawn as the design draws it — its Unread | Read segment, its rows (the kind's dot, the
  * kind and time, the title, the line under it) — with what the owner asked for on 2026-10-15: the tabs work and count,
  * Mark all read, each row says more (what happened, the customer's channel · ad · status · owner, their last words),
- * a tap opens the chat, and Mark as read. Behaviour: vm/inbox.ts › alertsVM.
+ * a tap opens the chat, and Mark as read. Invitations to answer first (2026-10-23: a Move is a request on the computer too)
+ * — the phone's cards, Decline | Accept. Behaviour: vm/inbox.ts › alertsVM.
  */
 export function DeskAlerts({ v }: { v: ReturnType<typeof import("./vm/inbox").alertsVM>["alertsP"] }) {
   return (<>
@@ -208,7 +221,28 @@ export function DeskAlerts({ v }: { v: ReturnType<typeof import("./vm/inbox").al
       {v.markAll && <button type="button" onClick={v.markAll} className={DX.emo} style={{ height: "30px", padding: "0 12px", borderRadius: "15px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", whiteSpace: "nowrap" }}>Mark all read</button>}
     </div>
     <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column" }}>
-      {!v.rows.length && <div style={{ padding: "40px 24px", textAlign: "center", fontSize: "13.5px", color: "var(--crm-muted)" }}>{v.empty}</div>}
+      {!!v.invites.length && <>
+        <div style={{ padding: "14px 16px 6px", fontSize: "11px", fontWeight: "700", letterSpacing: ".1em", color: "var(--crm-muted)" }}>INVITATIONS</div>
+        {v.invites.map(i => (
+          <div key={i.key} style={{ display: "flex", gap: "12px", padding: "12px 16px 14px", background: "var(--crm-page)", borderBottom: "1px solid var(--crm-field)" }}>
+            <span style={{ flex: "0 0 auto", marginTop: "5px", width: "8px", height: "8px", borderRadius: "50%", background: i.color }}></span>
+            <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "3px" }}>
+              <span style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
+                <b style={{ fontSize: "12px", fontWeight: "700", color: i.color }}>{i.kind}</b>
+                <span style={{ flex: "1" }}></span>
+                <small style={{ fontSize: "12px", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{i.time}</small>
+              </span>
+              <strong style={{ fontSize: "14px", fontWeight: "650" }}>{i.title}</strong>
+              {i.sub && <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{i.sub}</span>}
+              <span style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                <button type="button" onClick={i.decline} className={DX.emo} style={{ height: "30px", padding: "0 14px", borderRadius: "15px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer" }}>Decline</button>
+                <button type="button" onClick={i.accept} style={{ height: "30px", padding: "0 14px", borderRadius: "15px", border: "0", background: "var(--crm-rust)", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "#fff", cursor: "pointer" }}>Accept</button>
+              </span>
+            </span>
+          </div>
+        ))}
+      </>}
+      {!v.rows.length && !v.invites.length && <div style={{ padding: "40px 24px", textAlign: "center", fontSize: "13.5px", color: "var(--crm-muted)" }}>{v.empty}</div>}
       {v.rows.map(a => (
         <div key={a.key} onClick={a.open} className={DX.alert} style={{ display: "flex", gap: "12px", padding: "14px 16px", background: a.bg, borderBottom: "1px solid var(--crm-field)", cursor: a.canOpen ? "pointer" : "default" }}>
           <span style={{ flex: "0 0 auto", marginTop: "5px", width: "8px", height: "8px", borderRadius: "50%", background: a.dot }}></span>
@@ -427,7 +461,7 @@ export function DeskRail({ v }: { v: ReturnType<typeof import("./vm/rail").railV
             <div style={{ display: "flex", flexDirection: "column" }}>
               {c.rows.map(b => (
                 <div key={b.label} onClick={b.pick} title={b.pick ? "Click to filter" : undefined} className={b.pick ? DX.alert : undefined}
-                  style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 70px 28px 40px", gap: "8px", alignItems: "center", padding: "6px 6px", margin: "0 -6px", borderRadius: "8px", background: b.on ? "var(--crm-cream)" : "transparent", cursor: b.pick ? "pointer" : "default" }}>
+                  style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 70px 28px 40px", gap: "8px", alignItems: "center", padding: "6px 6px", margin: "0 -6px", borderRadius: "8px", background: b.on ? "var(--crm-sel)" : "transparent", cursor: b.pick ? "pointer" : "default" }}>
                   <span style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "12.5px", fontWeight: b.on ? "700" : "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     <span style={{ flex: "0 0 8px", width: "8px", height: "8px", borderRadius: "50%", background: b.color }}></span>{b.label}</span>
                   <span style={{ display: "block", height: "6px", borderRadius: "3px", background: "var(--crm-field)" }}><span style={{ display: "block", height: "6px", width: `${b.w}%`, borderRadius: "3px", background: b.color }}></span></span>
@@ -460,28 +494,34 @@ export function DeskPager({ v }: { v: ReturnType<typeof import("./vm/people").pe
   }
   const ICO = (d: string) => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d}></path></svg>;
   const cell = (on: boolean) => ({ ...BTN, minWidth: "30px", height: "30px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums",
-    background: on ? "var(--crm-ink)" : "transparent", color: on ? "#fff" : "var(--crm-ink-soft)" } as const);
+    background: on ? "var(--crm-ink)" : "transparent", color: on ? "var(--crm-on-light)" : "var(--crm-ink-soft)" } as const);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "6px", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>
       <span style={{ fontVariantNumeric: "tabular-nums" }}>{v.range}</span>
-      <span style={{ marginLeft: "20px", display: "flex", alignItems: "center", gap: "6px", position: "relative", whiteSpace: "nowrap" }}>Show
-        <button type="button" onClick={() => setOpen(!open)} aria-haspopup="listbox" aria-expanded={open} style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: "4px", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", borderBottom: "1px solid var(--crm-ink)" }}>
-          {cur}{ICO(open ? "m18 15-6-6-6 6" : "m6 9 6 6 6-6")}</button>
+      {/* v2 (frame 03): "Show 20 · 10 · 50" written out, underlined in ink — the page size in use first, each one a click
+          (supersedes 2026-10-16's dropdown: the owner, 2026-10-23, "全部根据新设计"). */}
+      <span style={{ marginLeft: "20px", display: "flex", alignItems: "center", gap: "4px", position: "relative", whiteSpace: "nowrap" }}>Show
+        <span style={{ display: "inline-flex", alignItems: "center", fontWeight: 500, color: "var(--crm-ink)", borderBottom: "1px solid var(--crm-ink)" }}>
+          {[cur, ...v.sizes.map(o => o.n).filter(n => n !== cur)].map((n, i) => (
+            <span key={n} style={{ display: "inline-flex" }}>{i > 0 && <span>&nbsp;·&nbsp;</span>}
+              <button type="button" onClick={() => v.sizes.find(o => o.n === n)?.pick()} aria-pressed={n === cur} style={{ ...BTN, font: "inherit", color: "inherit" }}>{n}</button></span>
+          ))}
+        </span>
         {open && <>
           <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: "0", zIndex: 7 }}></div>
           <div role="listbox" style={{ position: "absolute", bottom: "28px", left: "36px", zIndex: 8, minWidth: "140px", padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
             {v.sizes.map(o => <button key={o.n} type="button" role="option" aria-selected={o.on} onClick={() => { o.pick(); setOpen(false); }}
-              style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "32px", padding: "0 10px", borderRadius: "7px", background: o.on ? "var(--crm-cream)" : "transparent", font: `${o.on ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)" }}>
+              style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "32px", padding: "0 10px", borderRadius: "7px", background: o.on ? "var(--crm-sel)" : "transparent", font: `${o.on ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)" }}>
               <span style={{ flex: 1, textAlign: "left" }}>{o.n} per page</span>{o.on && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-rust)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg>}
             </button>)}
           </div>
         </>}
       </span>
       <div style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
-        <button type="button" onClick={v.prevOff ? undefined : v.prev} disabled={v.prevOff} title="Previous page" style={{ ...cell(false), color: v.prevOff ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}>{ICO("m15 18-6-6 6-6")}</button>
+        <button type="button" onClick={v.prevOff ? undefined : v.prev} disabled={v.prevOff} title="Previous page" style={{ ...cell(false), color: v.prevOff ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}>‹</button>
         {nums.map((n, i) => n === "…" ? <span key={`d${i}`} style={{ ...cell(false), cursor: "default" }}>…</span>
           : <button key={n} type="button" onClick={() => v.go(n)} aria-current={n === v.cur ? "page" : undefined} style={cell(n === v.cur)}>{n + 1}</button>)}
-        <button type="button" onClick={v.nextOff ? undefined : v.next} disabled={v.nextOff} title="Next page" style={{ ...cell(false), color: v.nextOff ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}>{ICO("m9 18 6-6-6-6")}</button>
+        <button type="button" onClick={v.nextOff ? undefined : v.next} disabled={v.nextOff} title="Next page" style={{ ...cell(false), color: v.nextOff ? "var(--crm-faint-2)" : "var(--crm-ink-soft)" }}>›</button>
       </div>
     </div>
   );
@@ -491,13 +531,17 @@ export function DeskPager({ v }: { v: ReturnType<typeof import("./vm/people").pe
  * A panel folded to its 44 px strip, as the Audit log's and the rails' (Assignment's Ad performance — the owner,
  * 2026-10-15): « at the top under a rule, the panel's name running down, the sand of the panel open; a tap opens it.
  */
+/** The shared folded rail (v2 note 04 / 08; the owner, 2026-10-23: "跟 inbox 是一样"): 44 px on the cream nav, the rule on its
+ *  left, a 16 px icon, the panel's name running down, one chevron — the whole rail opens it again. */
+const RAIL_ICON: Record<string, Icon4a> = { Split: "sliders-horizontal", "Ad performance": "trending-up", "Audit log": "history" };
 export function DeskFoldRail({ v }: { v: { title: string; open: () => void } }) {
   return (
-    <aside className={DX.slideIn} style={{ flex: "0 0 44px", width: "44px", boxSizing: "border-box", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <button type="button" onClick={v.open} title={`Open ${v.title}`} className={DX.emo} style={{ flex: "0 0 60px", width: "44px", height: "60px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m11 17-5-5 5-5M18 17l-5-5 5-5"></path></svg></button>
-      <button type="button" onClick={v.open} title={`Open ${v.title}`} style={{ marginTop: "16px", padding: "8px 0", border: "0", background: "transparent", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-muted)", writingMode: "vertical-rl", cursor: "pointer", whiteSpace: "nowrap" }}>{v.title}</button>
-    </aside>
+    <button type="button" onClick={v.open} title={`Open ${v.title}`} aria-label={`Open ${v.title}`} className={DX.slideIn} style={{ ...XBTN, flex: "0 0 44px", width: "44px", alignSelf: "stretch", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px",
+      paddingTop: "20px", background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)" }}>
+      <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name={RAIL_ICON[v.title] ?? "layout-grid"} size={16} /></span>
+      <span style={{ writingMode: "vertical-rl", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)", whiteSpace: "nowrap" }}>{v.title}</span>
+      <span style={{ display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-left" size={13} /></span>
+    </button>
   );
 }
 
@@ -539,42 +583,524 @@ export function DeskFormPages({ v }: { v: ReturnType<typeof import("./vm/formpag
 
 /**
  * Assignment › Active members (2026-10-22, the owner: a member not active for now but still in the company — its own
- * section after Ads to teams). Each person Active (takes new leads) or Locked (off Assignment's lists; their share to the
- * others). Saved by Save, as Member work type (crm_set_locked; shared/locked.ts › activeVM); its cards, in its look.
+ * section after Ads to teams; v2 frame 06c, note 03 / 04): one table card as Approvals — the title, the counts, a search,
+ * All · Active · Locked; Name · Title · Status · Leads this month · New leads, grouped by team (the Revenue Director first),
+ * each group folding at its chevron. A switch changes the draft; Save writes it (crm_set_locked; shared/locked.ts › activeVM)
+ * — the owner's Save (2026-10-22), which the frame does not draw, sits at the card head's right.
  */
-export function DeskActive({ v }: { v: ActiveVM }) {
-  const { groups } = v;
+const ACT_GRID = "minmax(0, 1.8fr) minmax(0, 1.3fr) 120px 130px 80px";
+export function DeskActive({ v }: { v: ActiveVM & { leads?: Record<string, number> } }) {
+  // Folded at first (the owner, 2026-10-24: "member work type & active 默認收起"); `opened` keeps the opened, a search opens all.
+  const [opened, setOpened] = useState<Record<string, boolean>>({});
+  const [q, setQ] = useState(""), [f, setF] = useState<"all" | "active" | "locked">("all");
+  const all = v.groups.flatMap(g => g.people), nOn = all.filter(p => p.active).length;
+  const ql = q.trim().toLowerCase();
+  const shut = (name: string) => !opened[name] && !ql;
+  const groups = v.groups.map(g => ({ ...g, rows: g.people.filter(p => (f === "all" || (f === "active") === p.active) && (!ql || p.name.toLowerCase().includes(ql) || g.name.toLowerCase().includes(ql))) })).filter(g => g.rows.length);
   return (
-    <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "14px", marginTop: "-10px" }}>
-        {v.dirty && <span style={{ fontSize: "13px", color: "var(--crm-brown)", fontWeight: 650 }}>Unsaved changes</span>}
-        {v.dirty && <button type="button" onClick={v.cancel} style={{ height: "40px", padding: "0 18px", borderRadius: "20px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "14px", fontWeight: 600, color: "var(--crm-ink)", cursor: "pointer" }}>Cancel</button>}
-        <button type="button" onClick={v.save} disabled={!v.dirty} style={{ height: "40px", padding: "0 24px", borderRadius: "20px", border: "0", background: v.dirty ? "var(--crm-rust)" : "var(--crm-line)", font: "inherit", fontSize: "14.5px", fontWeight: 650, color: "#fff", cursor: v.dirty ? "pointer" : "default" }}>{v.dirty ? v.saveLabel : "Save"}</button>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px", alignItems: "stretch" }}>
-        {groups.map(g => (
-          <div key={g.name} style={{ background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 16px", borderBottom: "1px solid var(--crm-field)" }}>
-              <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: g.color }} />
-              <strong style={{ flex: "1", fontSize: "14.5px", fontWeight: 700, color: g.color }}>{g.name}</strong>
-              <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{g.count}</span>
-            </div>
-            {g.people.map(p => (
-              <button key={p.id} type="button" onClick={p.toggle} aria-pressed={p.active} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer", opacity: p.active ? 1 : 0.75 }}>
-                <span style={{ flex: "0 0 36px", width: "36px", height: "36px", borderRadius: "50%", background: p.active ? "var(--crm-tint-attention)" : "var(--crm-field)", color: p.active ? "var(--crm-rust)" : "var(--crm-faint)", fontSize: "12px", fontWeight: 700, display: "grid", placeItems: "center" }}>{p.ini}</span>
-                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                  <strong style={{ fontSize: "14.5px", fontWeight: 650 }}>{p.name}</strong>
-                  <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>{p.role}</span>
-                </span>
-                <span style={{ flex: "0 0 auto", height: "24px", padding: "0 10px", borderRadius: "12px", background: p.active ? "var(--crm-tint-follow)" : "var(--crm-tint-attention)", color: p.active ? "var(--crm-brown)" : "var(--crm-oxblood)", fontSize: "12px", fontWeight: 700, display: "inline-flex", alignItems: "center" }}>{p.active ? "Active" : "Locked"}</span>
-                <span style={{ flex: "0 0 auto", width: "40px", height: "24px", borderRadius: "12px", background: p.active ? "var(--crm-brown)" : "var(--crm-line)", position: "relative", display: "block" }}>
-                  <span style={{ position: "absolute", top: "3px", left: p.active ? "19px" : "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.2)" }} />
-                </span>
+    <div style={{ flex: "1 1 auto", minHeight: 0, height: "100%", display: "flex", marginTop: "1px", marginBottom: "-12px", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "#fff", overflow: "hidden" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px" }}>
+          <span style={{ font: `500 16px ${TIGHT_X}`, color: "var(--crm-ink)", whiteSpace: "nowrap" }}>Active members</span>
+          <span style={{ font: "400 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{nOn} active · {all.length - nOn} locked</span>
+          <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>Locked members keep their chats</span>
+          <label style={{ marginLeft: "auto", flex: "none", width: "210px", height: "32px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", color: "var(--crm-faint)" }}>
+            <Ic name="search" size={13} />
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search name or team" aria-label="Search name or team" style={{ flex: 1, minWidth: 0, border: 0, outline: "none", padding: 0, background: "transparent", font: "400 12px Inter, sans-serif", color: "var(--crm-ink)" }} />
+          </label>
+          <div style={{ ...SEG, flex: "none" }}>{([["all", "All"], ["active", "Active"], ["locked", "Locked"]] as const).map(([k, l]) => (
+            <button key={k} type="button" onClick={() => setF(k)} aria-pressed={f === k} style={{ ...segOpt(f === k), padding: "0 10px", gap: "6px" }}>{l}</button>))}</div>
+          {v.dirty && <button type="button" onClick={v.cancel} style={{ ...XBTN, flex: "none", height: "32px", padding: "0 12px", borderRadius: "7px", border: "1px solid var(--crm-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>}
+          <button type="button" onClick={v.save} disabled={!v.dirty} style={{ ...XBTN, flex: "none", height: "32px", padding: "0 14px", borderRadius: "7px", font: "500 12px Inter, sans-serif", color: "#fff", background: v.dirty ? "var(--crm-rust)" : "var(--crm-line)", cursor: v.dirty ? "pointer" : "default" }} className={v.dirty ? "crm4a-primary" : undefined}>{v.dirty ? v.saveLabel : "Save"}</button>
+        </div>
+        <div style={{ flex: "none", display: "grid", gridTemplateColumns: ACT_GRID, gap: "16px", alignItems: "center", height: "36px", padding: "0 16px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-nav-line)",
+          font: "600 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
+          <span>Name</span><span>Title</span><span>Status</span><span style={{ textAlign: "right" }}>Leads this month</span><span style={{ textAlign: "right" }}>New leads</span>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent" }}>
+          {groups.map(g => (
+            <Fragment key={g.name}>
+              <button type="button" onClick={() => setOpened(s => ({ ...s, [g.name]: !s[g.name] }))} aria-expanded={!shut(g.name)} style={{ ...XBTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 16px",
+                background: "var(--crm-hover)", borderTop: "1px solid var(--crm-nav-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
+                <span style={{ display: "flex", color: "var(--crm-muted)", transform: shut(g.name) ? "rotate(-90deg)" : "none", transition: "transform .16s" }}><Ic name="chevron-down" size={12} /></span>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: g.color }} />
+                <span style={{ color: "var(--crm-ink)" }}>{g.name}</span>
+                <span style={{ color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{g.count}</span>
               </button>
-            ))}
-          </div>
-        ))}
+              {!shut(g.name) && g.rows.map(p => {
+                const n = v.leads?.[p.id];
+                return (
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: ACT_GRID, gap: "16px", alignItems: "center", height: "46px", padding: "0 16px", borderTop: "1px solid var(--crm-rule-soft)", font: "400 14px Inter, sans-serif" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                      <span style={{ flex: "none", width: "28px", height: "28px", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 11px ${TIGHT_X}`, background: p.active ? "var(--crm-cream)" : "var(--crm-tint-lost)", color: p.active ? "var(--crm-ink)" : "var(--crm-faint)" }}>{p.ini}</span>
+                      <span style={{ fontWeight: 500, color: p.active ? "var(--crm-ink)" : "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                    </span>
+                    <span style={{ color: "var(--crm-ink-soft)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.role}</span>
+                    <span>{p.active
+                      ? <span style={{ ...STPILL, background: "var(--crm-tint-new)", color: "var(--crm-ink)" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />Active</span>
+                      : <span style={{ ...STPILL, background: "var(--crm-tint-lost)", color: "var(--crm-muted)" }}><Ic name="lock" size={10} />Locked</span>}</span>
+                    <span style={{ textAlign: "right", font: `500 14px ${TIGHT_X}`, fontVariantNumeric: "tabular-nums", color: p.active ? "var(--crm-ink)" : "var(--crm-faint-2)" }}>{p.active ? n ?? 0 : "—"}</span>
+                    <span style={{ textAlign: "right" }}>
+                      <button type="button" role="switch" aria-checked={p.active} aria-label={`${p.name} takes new leads`} onClick={p.toggle} style={{ ...XBTN, width: "36px", height: "20px", borderRadius: "10px", position: "relative", display: "inline-block", verticalAlign: "middle", background: p.active ? "var(--crm-rust)" : "var(--crm-line)", transition: "background .16s" }}>
+                        <span style={{ position: "absolute", top: "2px", left: p.active ? "18px" : "2px", width: "16px", height: "16px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.2)", transition: "left .16s" }} />
+                      </button>
+                    </span>
+                  </div>
+                );
+              })}
+            </Fragment>
+          ))}
+          {!groups.length && <div style={{ padding: "28px 16px", textAlign: "center", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Nobody matches</div>}
+        </div>
       </div>
-    </>
+    </div>
+  );
+}
+
+/**
+ * Ads to teams' "+" (2026-10-22, the owner: "director 能提前先把广告加进来先做分配"): Meta's ads in the connected ad accounts —
+ * running and about-to-run first, each with its run — or an ad id typed from Ads Manager. Picking one adds it
+ * (crm_add_ad) and opens its split.
+ */
+export function DeskAddAd({ v }: { v: { close: () => void; q: string; onQ: (e: { target: { value: string } }) => void; loading: boolean; failed: boolean;
+  rows: { id: string; name: string; account: string; run: string; have: boolean; pick: () => void }[]; typed: string; onTyped: (e: { target: { value: string } }) => void; addTyped: () => void } }) {
+  const field = { height: "38px", boxSizing: "border-box" as const, padding: "0 12px", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "14px", color: "var(--crm-ink)", outline: "none" };
+  return (
+    <div onClick={v.close} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(42,22,12,.28)", display: "grid", placeItems: "center" }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-label="Add an ad" style={{ width: "min(620px, calc(100vw - 48px))", maxHeight: "min(680px, calc(100vh - 80px))", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "16px", boxShadow: "0 20px 50px rgba(42,22,12,.25)", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "16px 20px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <strong style={{ flex: 1, fontSize: "17px", fontWeight: 600, color: "var(--crm-ink)" }}>Add an ad</strong>
+          <button type="button" onClick={v.close} aria-label="Close" style={{ width: "32px", height: "32px", border: 0, borderRadius: "16px", background: "var(--crm-field)", color: "var(--crm-ink)", cursor: "pointer", fontSize: "16px" }}>×</button>
+        </div>
+        <div style={{ padding: "12px 20px", display: "flex", gap: "8px", borderBottom: "1px solid var(--crm-field)" }}>
+          <input value={v.q} onChange={v.onQ} placeholder="Search Meta's ads by name or account" autoFocus style={{ ...field, flex: 1 }} />
+        </div>
+        <div style={{ flex: 1, minHeight: "120px", overflowY: "auto" }}>
+          {v.loading && <div style={{ padding: "28px", textAlign: "center", fontSize: "14px", color: "var(--crm-muted)" }}>Reading Meta&apos;s ads…</div>}
+          {v.failed && <div style={{ padding: "28px", textAlign: "center", fontSize: "14px", color: "var(--crm-oxblood)" }}>Meta&apos;s ads could not be read. Type the ad id below instead.</div>}
+          {!v.loading && !v.failed && !v.rows.length && <div style={{ padding: "28px", textAlign: "center", fontSize: "14px", color: "var(--crm-muted)" }}>No ad matches.</div>}
+          {v.rows.map(r => (
+            <button key={r.id} type="button" onClick={r.pick} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "10px 20px", border: 0, borderBottom: "1px solid var(--crm-field)", background: "#fff", font: "inherit", textAlign: "left", cursor: "pointer" }} className="crm4a-row">
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ fontSize: "14px", fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                <span style={{ fontSize: "12px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.account} · {r.run}</span>
+              </span>
+              <span style={{ flex: "none", fontSize: "12.5px", fontWeight: 600, color: r.have ? "var(--crm-faint)" : "var(--crm-rust)" }}>{r.have ? "In the list · Edit" : "Add"}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "12px 20px", borderTop: "1px solid var(--crm-rule)", background: "var(--crm-page)" }}>
+          <span style={{ fontSize: "13px", color: "var(--crm-muted)" }}>Or an ad id</span>
+          <input value={v.typed} onChange={v.onTyped} inputMode="numeric" placeholder="e.g. 120254841448710368" style={{ ...field, flex: 1 }} />
+          <button type="button" onClick={v.addTyped} disabled={!/^\d{5,32}$/.test(v.typed)} style={{ height: "38px", padding: "0 18px", borderRadius: "19px", border: 0, background: /^\d{5,32}$/.test(v.typed) ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", font: "inherit", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>Add</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Assignment › Leads by ad (2026-10-22, the owner: "我想要有一个独立的功能，可以看到每个广告谁拿到多少个名单"; v2 frames 06b /
+ * 06b·2 / 06b·3, notes 04 / 06 / 08): one table card — the title, its counts and a search; the period (This month · Last
+ * month · All time · Custom) and the status (All · Running · Paused · Ended); Ad · Team · Status · Members · Leads with resize
+ * handles (each column's minimum, widths kept per browser as crm.lba.cols) — an ad opens to who got its leads; a member opens
+ * the panel of those leads (a lead opens to its details with Open chat and Customer info), which folds to the 44 px rail.
+ */
+type LbaSortK = "ad" | "status" | "members" | "leads";
+interface LbaV {
+  title: string; count: string; q: string; setQ: (e: { target: { value: string } }) => void;
+  periods: { label: string; on: boolean; pick: () => void }[];
+  custom: { label: string; from: string; to: string; setFrom: (e: { target: { value: string } }) => void; setTo: (e: { target: { value: string } }) => void } | null;
+  statuses: { label: string; on: boolean; dot: string | null; pick: () => void }[];
+  sort: Record<LbaSortK, { on: boolean; dir: "asc" | "desc"; pick: () => void }>;
+  ads: { id: string; name: string; wa: boolean; total: number; open: boolean; toggle: () => void; teamDots: string[]; teamsLabel: string; status: string; stBg: string; stFg: string; first: string; more: string;
+    rows: { who: string; name: string; ini: string; team: string; teamDot: string; n: number; pct: string; barW: string; on: boolean; none: boolean; pick: () => void }[] }[];
+  empty: boolean;
+  panel: null | { name: string; ini: string; team: string; teamDot: string; n: number; line: string; shut: boolean; fold: () => void; unfold: () => void; close: () => void; rail: string;
+    leads: { id: string; name: string; sub: string; status: string; stBg: string; stFg: string; open: boolean; toggle: () => void; facts: [string, string][]; openChat: () => void; openInfo: () => void }[] };
+}
+const LBA_COLS = ["ad", "team", "status", "members"] as const;
+const LBA_MIN: Record<(typeof LBA_COLS)[number], number> = { ad: 180, team: 110, status: 80, members: 110 };
+const LBA_DEF: Record<(typeof LBA_COLS)[number], string> = { ad: "2.2fr", team: "1.1fr", status: "84px", members: "1.1fr" };
+const SEG: CSSProperties = { height: "32px", padding: "3px", boxSizing: "border-box", borderRadius: "8px", background: "var(--crm-field)", display: "flex", gap: "2px", font: "500 12px Inter, sans-serif", whiteSpace: "nowrap" };
+const segOpt = (on: boolean): CSSProperties => ({ ...XBTN, padding: "0 8px", display: "flex", alignItems: "center", gap: "5px", borderRadius: "6px", font: "inherit",
+  background: on ? "#fff" : "transparent", boxShadow: on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: on ? "var(--crm-ink)" : "var(--crm-muted)" });
+const STPILL: CSSProperties = { height: "22px", padding: "0 9px", borderRadius: "11px", display: "inline-flex", alignItems: "center", gap: "5px", font: "500 11px Inter, sans-serif", whiteSpace: "nowrap" };
+
+function useLbaCols() {
+  const [w, setW] = useState<Partial<Record<(typeof LBA_COLS)[number], number>>>(() => { try { return JSON.parse(localStorage.getItem("crm.lba.cols") ?? "{}"); } catch { return {}; } });
+  const save = (n: typeof w) => { setW(n); try { localStorage.setItem("crm.lba.cols", JSON.stringify(n)); } catch { /* private window */ } };
+  const grid = `24px ${LBA_COLS.map(k => (w[k] ? `${w[k]}px` : k === "status" ? LBA_DEF[k] : `minmax(${LBA_MIN[k]}px, ${LBA_DEF[k]})`)).join(" ")} 52px`;
+  const minW = 28 + 24 + LBA_COLS.reduce((s, k) => s + (w[k] ?? LBA_MIN[k]), 0) + 52 + 12 * 5;
+  const drag = (k: (typeof LBA_COLS)[number]) => (e: React.PointerEvent<HTMLSpanElement>) => {
+    e.preventDefault(); e.stopPropagation();
+    const cell = e.currentTarget.parentElement as HTMLElement, start = cell.getBoundingClientRect().width, x0 = e.clientX;
+    const body = document.body, prev = body.style.cursor; body.style.cursor = "col-resize"; body.style.userSelect = "none";
+    const el = e.currentTarget; el.style.background = "var(--crm-rust)";
+    const move = (ev: PointerEvent) => save({ ...w, [k]: Math.max(LBA_MIN[k], Math.round(start + ev.clientX - x0)) });
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); body.style.cursor = prev; body.style.userSelect = ""; el.style.background = ""; };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  };
+  const reset = (k: (typeof LBA_COLS)[number]) => () => { const n = { ...w }; delete n[k]; save(n); };
+  return { grid, minW, drag, reset };
+}
+
+/** The member's leads panel (v2 06b·2 / 06b·3 / 12c·2): 300 px, folding to the 44 px rail; shared by Leads by ad and Salespeople. */
+export type LeadsPanelV = NonNullable<LbaV["panel"]>;
+export function LeadsPanel({ P }: { P: LeadsPanelV }) {
+  return (<>
+    {P && P.shut && (
+      <button type="button" onClick={P.unfold} title="Open" style={{ ...XBTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", paddingTop: "16px", boxSizing: "border-box",
+        border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "var(--crm-cream-nav)" }}>
+        <span style={{ width: "24px", height: "24px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-cream)", font: `500 9px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{P.ini}</span>
+        <span style={{ writingMode: "vertical-rl", font: "500 12px Inter, sans-serif", letterSpacing: "0.04em", color: "var(--crm-ink-soft)" }}>{P.rail}</span>
+        <span style={{ display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-left" size={13} /></span>
+      </button>
+    )}
+    {P && !P.shut && (
+      <div className={DX.slideIn} style={{ width: "300px", flex: "none", display: "flex", flexDirection: "column", border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "#fff", overflow: "hidden" }}>
+        <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", padding: "14px 16px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-cream)", font: `500 13px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{P.ini}</span>
+            <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+              <span style={{ font: `500 15px ${TIGHT_X}`, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{P.name}</span>
+              {P.team && <span style={{ display: "flex", alignItems: "center", gap: "5px", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: P.teamDot }} />{P.team}</span>}
+            </span>
+            <button type="button" onClick={P.fold} title="Collapse" aria-label="Collapse" style={{ ...XBTN, flex: "none", width: "24px", height: "24px", borderRadius: "6px", display: "grid", placeItems: "center", boxSizing: "border-box", border: "1px solid var(--crm-line)", color: "var(--crm-muted)" }}><Ic name="chevron-right" size={11} /></button>
+            <button type="button" onClick={P.close} title="Close" aria-label="Close" style={{ ...XBTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>
+          </div>
+          <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}><b style={{ font: `600 13px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{P.n} lead{P.n === 1 ? "" : "s"}</b> {P.line}</div>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent" }}>
+          {P.leads.map((l, i) => l.open ? (
+            <div key={l.id} style={{ display: "flex", flexDirection: "column", background: "var(--crm-sel)", boxShadow: "inset 3px 0 0 var(--crm-rust)", borderTop: i ? "1px solid var(--crm-rule-soft)" : undefined }}>
+              <button type="button" onClick={l.toggle} aria-expanded style={{ ...XBTN, display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px" }}>
+                <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+                  <span style={{ font: "600 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{l.name}</span>
+                  <span style={{ font: "400 11px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-muted)" }}>{l.sub}</span>
+                </span>
+                {l.status && <span style={{ ...STPILL, background: l.stBg, color: l.stFg }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />{l.status}</span>}
+                <span style={{ display: "flex", color: "var(--crm-muted)" }}><Ic name="chevron-down" size={12} /></span>
+              </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: "7px", padding: "2px 16px 12px" }}>
+                {l.facts.map(([k, val]) => <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: "10px", font: "400 12px Inter, sans-serif" }}><span style={{ color: "var(--crm-muted)" }}>{k}</span><span style={{ color: "var(--crm-ink)", textAlign: "right" }}>{val}</span></div>)}
+                <div style={{ display: "flex", gap: "8px", paddingTop: "4px" }}>
+                  <button type="button" onClick={l.openChat} style={{ ...XBTN, flex: 1, height: "34px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", background: "var(--crm-rust)", color: "#fff", font: "500 12px Inter, sans-serif" }} className="crm4a-primary"><Ic name="message-circle" size={13} />Open chat</button>
+                  <button type="button" onClick={l.openInfo} style={{ ...XBTN, flex: 1, height: "34px", borderRadius: "7px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline"><Ic name="user-round" size={13} />Customer info</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button key={l.id} type="button" onClick={l.toggle} style={{ ...XBTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px", borderTop: i ? "1px solid var(--crm-rule-soft)" : undefined }} className="crm4a-row">
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+                <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{l.name}</span>
+                <span style={{ font: "400 11px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-faint)" }}>{l.sub}</span>
+              </span>
+              {l.status && <span style={{ ...STPILL, background: l.stBg, color: l.stFg }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />{l.status}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+  </>);
+}
+
+export function DeskLeadsByAd({ v }: { v: LbaV }) {
+  const C = useLbaCols(), P = v.panel;
+  const head = (label: string, k: LbaSortK | null, col: (typeof LBA_COLS)[number] | null, right?: boolean) => (
+    <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "5px", height: "100%", justifyContent: right ? "flex-end" : undefined, minWidth: 0 }}>
+      <button type="button" onClick={k ? v.sort[k].pick : undefined} style={{ ...XBTN, display: "flex", alignItems: "center", gap: "5px", font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", cursor: k ? "pointer" : "default" }}>
+        {label}{k && <span style={{ display: "flex", color: "var(--crm-faint)", opacity: v.sort[k].on ? 1 : 0.45, transform: v.sort[k].on && v.sort[k].dir === "asc" ? "rotate(180deg)" : "none" }}><Ic name="arrow-down" size={10} /></span>}
+      </button>
+      {col && <span title="Drag to resize" onPointerDown={C.drag(col)} onDoubleClick={C.reset(col)} style={{ position: "absolute", top: "8px", bottom: "8px", right: "-8px", width: "3px", borderRadius: "2px", background: "var(--crm-audit-line)", cursor: "col-resize", touchAction: "none" }} />}
+    </div>
+  );
+  const ROW: CSSProperties = { display: "grid", gridTemplateColumns: C.grid, gap: "12px", alignItems: "center", padding: "0 14px", borderTop: "1px solid var(--crm-rule-soft)" };
+  const ell: CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
+  return (
+    <div style={{ flex: "1 1 auto", minHeight: 0, height: "100%", display: "flex", gap: "14px", marginTop: "1px", marginBottom: "-12px", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "#fff", overflow: "hidden" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px 8px" }}>
+          <span style={{ font: `500 16px ${TIGHT_X}`, whiteSpace: "nowrap", color: "var(--crm-ink)" }}>{v.title}</span>
+          <span style={{ font: "400 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{v.count}</span>
+          <label style={{ marginLeft: "auto", width: "200px", height: "32px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", color: "var(--crm-faint)" }}>
+            <Ic name="search" size={13} />
+            <input value={v.q} onChange={v.setQ} placeholder="Search ad or member" aria-label="Search ad or member" style={{ flex: 1, minWidth: 0, border: 0, outline: "none", padding: 0, background: "transparent", font: "400 12px Inter, sans-serif", color: "var(--crm-ink)" }} />
+          </label>
+        </div>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "0 14px 12px" }}>
+          <div style={SEG}>{v.periods.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={segOpt(o.on)}>{o.label}</button>)}</div>
+          {v.custom && (
+            <label style={{ position: "relative", height: "32px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "7px", boxSizing: "border-box", border: "1px solid var(--crm-rust)", font: "500 12px Inter, sans-serif", whiteSpace: "nowrap", color: "var(--crm-ink)" }}>
+              <span style={{ display: "flex", color: "var(--crm-rust)" }}><Ic name="calendar" size={13} /></span>{v.custom.label}
+              <input type="date" value={v.custom.from} onChange={v.custom.setFrom} aria-label="From" style={{ position: "absolute", left: 0, top: 0, width: "50%", height: "100%", opacity: 0, cursor: "pointer" }} />
+              <input type="date" value={v.custom.to} onChange={v.custom.setTo} aria-label="To" style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%", opacity: 0, cursor: "pointer" }} />
+            </label>
+          )}
+          <span style={{ flexBasis: "100%", height: 0 }} />
+          <div style={SEG}>{v.statuses.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={segOpt(o.on)}>
+            {o.dot && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: o.dot }} />}{o.label}</button>)}</div>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflowX: "auto" }}>
+          <div style={{ minWidth: `${C.minW}px`, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <div style={{ ...ROW, flex: "none", height: "36px", borderTop: "1px solid var(--crm-nav-line)", borderBottom: "1px solid var(--crm-nav-line)", background: "var(--crm-cream-nav)",
+              font: "600 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
+              <span />{head("Ad", "ad", "ad")}{head("Team", null, "team")}{head("Status", "status", "status")}{head("Members", "members", "members")}{head("Leads", "leads", null, true)}
+            </div>
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent", marginTop: "-1px" }}>
+              {v.ads.map(a => (
+                <Fragment key={a.id}>
+                  <button type="button" onClick={a.toggle} aria-expanded={a.open} style={{ ...XBTN, ...ROW, width: "100%", height: "50px", background: a.open ? "var(--crm-hover)" : "transparent", font: "400 14px Inter, sans-serif", color: "var(--crm-ink)" }} className={a.open ? undefined : "crm4a-row"}>
+                    <span style={{ display: "flex", color: "var(--crm-muted)" }}><Ic name={a.open ? "chevron-down" : "chevron-right"} size={12} /></span>
+                    <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                      <span style={{ display: "flex", flex: "none", color: a.wa ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name="message-circle" size={14} /></span>
+                      <span style={{ ...ell, fontWeight: 500 }}>{a.name}</span>
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: "8px", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", ...ell }}>
+                      <span style={{ display: "flex", gap: "2px", flex: "none" }}>{a.teamDots.map((d, i) => <span key={i} style={{ width: "8px", height: "8px", borderRadius: "50%", background: d, boxShadow: "0 0 0 2px #fff" }} />)}</span>{a.teamsLabel}
+                    </span>
+                    <span><span style={{ ...STPILL, background: a.stBg, color: a.stFg }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />{a.status}</span></span>
+                    <span style={{ ...ell, color: "var(--crm-ink-soft)" }}>{a.first}{a.more && <span style={{ color: "var(--crm-faint)" }}> {a.more}</span>}</span>
+                    <span style={{ textAlign: "right", font: `600 14px ${TIGHT_X}`, fontVariantNumeric: "tabular-nums" }}>{a.total}</span>
+                  </button>
+                  {a.open && a.rows.map(r => (
+                    <button key={r.who || "none"} type="button" onClick={r.none ? undefined : r.pick} style={{ ...XBTN, ...ROW, width: "100%", height: "44px", font: "400 13px Inter, sans-serif", color: r.none ? "var(--crm-oxblood)" : "var(--crm-ink)",
+                      background: r.on ? "var(--crm-sel)" : "var(--crm-hover-2)", boxShadow: r.on ? "inset 3px 0 0 var(--crm-rust)" : "none", cursor: r.none ? "default" : "pointer" }}>
+                      <span />
+                      <span style={{ display: "flex", alignItems: "center", gap: "10px", paddingLeft: "22px", minWidth: 0 }}>
+                        <span style={{ flex: "none", width: "26px", height: "26px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-cream)", font: `500 10px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{r.ini}</span>
+                        <span style={{ ...ell, fontWeight: 500 }}>{r.name}</span>
+                      </span>
+                      <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "12px", color: "var(--crm-muted)", ...ell }}>{r.team && <span style={{ width: "6px", height: "6px", flex: "none", borderRadius: "50%", background: r.teamDot }} />}{r.team}</span>
+                      <span />
+                      <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+                        <span style={{ flex: 1, height: "5px", borderRadius: "3px", background: "var(--crm-rule-soft)", position: "relative", overflow: "hidden" }}><span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: r.barW, background: "var(--crm-rust)" }} /></span>
+                        <span style={{ width: "34px", textAlign: "right", fontSize: "12px", color: "var(--crm-muted)", fontVariantNumeric: "tabular-nums" }}>{r.pct}</span>
+                      </span>
+                      <span style={{ textAlign: "right", font: `500 13px ${TIGHT_X}`, fontVariantNumeric: "tabular-nums" }}>{r.n}</span>
+                    </button>
+                  ))}
+                </Fragment>
+              ))}
+              {v.empty && <div style={{ padding: "28px 14px", textAlign: "center", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>No ad matches</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+      {P && <LeadsPanel P={P} />}
+    </div>
+  );
+}
+
+/**
+ * v2 frame 09b · Channels › a number's Business profile (note 07): Update on WhatsApp and / or its Facebook Page (both
+ * ticked when there is a Page), the photo, display name, about, description, address, email, website and category, Save —
+ * sent to Meta from the server (saveCrmBusinessProfile), each channel answered on its own, a failed one with Retry. A new
+ * WhatsApp name is a request Meta reviews; the Page's photo, name, category and address are Facebook's to change.
+ */
+type ProfileInit = { name: string; about: string; description: string; address: string; email: string; website: string; vertical: string };
+type ProfileRes = { wa?: { ok: true; nameInReview: boolean; photo: boolean } | { ok: false; error: string }; page?: { ok: true } | { ok: false; error: string } };
+export interface ProfileDrawerV {
+  key: string; title: string; waId: string; waLabel: string; waName: string; pageId: string; pageLabel: string; photo: string | null; nameStatus: string; can: boolean;
+  init: ProfileInit; synced: string; close: () => void; save: (form: FormData) => Promise<ProfileRes | null>;
+}
+const PF_BOX: CSSProperties = { height: "34px", padding: "0 10px", borderRadius: "7px", boxSizing: "border-box", border: "1px solid var(--crm-line)", font: "400 13px/1.45 Inter, sans-serif", color: "var(--crm-ink)", background: "#fff", outline: "none", width: "100%" };
+const PF_LABEL: CSSProperties = { display: "flex", alignItems: "center", gap: "6px", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" };
+export function DeskProfileDrawer({ v, verticals }: { v: ProfileDrawerV; verticals: readonly (readonly [string, string])[] }) {
+  const [f, setF] = useState<ProfileInit>(v.init);
+  const [toWa, setToWa] = useState(true), [toPage, setToPage] = useState(!!v.pageId);
+  const [photo, setPhoto] = useState<File | null>(null), [busy, setBusy] = useState(false), [res, setRes] = useState<ProfileRes | null>(null);
+  const preview = photo ? URL.createObjectURL(photo) : v.photo;
+  const set = (k: keyof ProfileInit) => (e: { target: { value: string } }) => setF(x => ({ ...x, [k]: k === "about" ? e.target.value.slice(0, 139) : e.target.value }));
+  const label = toWa && toPage ? "Save to WhatsApp & Facebook" : toPage ? "Save to Facebook" : "Save to WhatsApp";
+  const send = async (only?: "wa" | "page") => {
+    const wa = only ? only === "wa" : toWa, pg = only ? only === "page" : toPage;
+    if (!wa && !pg) return;
+    const fd = new FormData();
+    Object.entries(f).forEach(([k, val]) => fd.set(k, val));
+    fd.set("curName", v.init.name); fd.set("wa", v.waId); fd.set("waName", v.waName); fd.set("page", v.pageId); fd.set("pageName", v.pageLabel);
+    fd.set("toWa", wa ? "1" : ""); fd.set("toPage", pg ? "1" : "");
+    if (wa && photo) fd.set("photo", photo);
+    setBusy(true);
+    const r = await v.save(fd);
+    setBusy(false);
+    if (r) setRes(x => ({ ...x, ...r }));
+  };
+  const chip = (on: boolean, toggle: () => void, icon: Icon4a, color: string, name: string, sub: string, off?: boolean) => (
+    <button type="button" onClick={off ? undefined : toggle} aria-pressed={on} disabled={off} style={{ ...XBTN, flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "8px", boxSizing: "border-box",
+      border: `1.5px solid ${on ? "var(--crm-rust)" : "var(--crm-line)"}`, background: on ? "#fff" : "var(--crm-hover)", cursor: off ? "not-allowed" : "pointer", opacity: off ? 0.6 : 1 }}>
+      <span style={{ flex: "none", width: "18px", height: "18px", borderRadius: "4px", boxSizing: "border-box", display: "grid", placeItems: "center", color: "#fff",
+        background: on ? "var(--crm-rust)" : "#fff", border: on ? "0" : "1.5px solid var(--crm-faint-2)" }}>{on && <Ic name="check" size={12} />}</span>
+      <span style={{ display: "flex", flex: "none", color }}><Ic name={icon} size={16} /></span>
+      <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{name}</span>
+        <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</span>
+      </span>
+    </button>
+  );
+  const outcome = (k: "wa" | "page", name: string) => { const r = res?.[k]; if (!r) return null;
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "7px", font: "400 12px Inter, sans-serif",
+        background: r.ok ? "var(--crm-tint-new)" : "var(--crm-tint-attention)", color: r.ok ? "var(--crm-ink)" : "var(--crm-oxblood)" }}>
+        <Ic name={r.ok ? "circle-check" : "triangle-alert"} size={13} />
+        <span style={{ flex: 1, minWidth: 0 }}>{r.ok ? `${name} updated${"nameInReview" in r && r.nameInReview ? " · new name in review (1–2 days)" : ""}` : `${name}: ${r.error}`}</span>
+        {!r.ok && <button type="button" onClick={() => void send(k)} disabled={busy} style={{ ...XBTN, font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>Retry</button>}
+      </div>
+    ); };
+  const ini = (v.waName || "?").split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div onClick={v.close} style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(42,22,12,.2)", display: "flex", justifyContent: "flex-end" }}>
+      <div onClick={e => e.stopPropagation()} className={DX.slideIn} style={{ width: "460px", height: "100%", display: "flex", flexDirection: "column", background: "#fff", boxShadow: "-12px 0 32px rgba(42,22,12,.18)" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "16px 22px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
+            <span style={{ font: `500 17px ${TIGHT_X}`, color: "var(--crm-ink)" }}>Business profile</span>
+            <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.title}</span>
+          </div>
+          <button type="button" onClick={v.close} aria-label="Close" style={{ ...XBTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent", display: "flex", flexDirection: "column", gap: "14px", padding: "18px 22px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>Update on <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>· tick one or both</span></div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              {chip(toWa, () => setToWa(x => !x), "phone", "var(--crm-whatsapp)", "WhatsApp", v.waLabel)}
+              {chip(toPage, () => setToPage(x => !x), "message-circle", "var(--crm-messenger)", "Facebook Page", v.pageLabel || "No Page linked to this number", !v.pageId)}
+            </div>
+            <div style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>Saved here and sent to Meta for you. Fields a channel doesn’t have are skipped.</div>
+          </div>
+          {outcome("wa", "WhatsApp")}{outcome("page", "Facebook Page")}
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            {preview
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={preview} alt="" style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", objectFit: "cover" }} />
+              : <span style={{ flex: "none", width: "64px", height: "64px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-ink)", color: "var(--crm-cream)", font: `500 20px ${TIGHT_X}` }}>{ini}</span>}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>Profile photo</span>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <label style={{ ...XBTN, height: "30px", padding: "0 12px", borderRadius: "6px", display: "flex", alignItems: "center", boxSizing: "border-box", border: "1px solid var(--crm-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }}>
+                  Upload<input type="file" accept="image/jpeg,image/png" onChange={e => setPhoto(e.target.files?.[0] ?? null)} style={{ display: "none" }} /></label>
+                {photo && <button type="button" onClick={() => setPhoto(null)} style={{ ...XBTN, height: "30px", padding: "0 4px", font: "500 12px Inter, sans-serif", color: "var(--crm-oxblood)" }}>Remove</button>}
+              </div>
+              <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>Square JPG or PNG, at least 640 px{toPage ? " · Facebook’s photo is changed on Facebook" : ""}</span>
+            </div>
+          </div>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span style={PF_LABEL}>Display name<span style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>{/PENDING|REVIEW/i.test(v.nameStatus) ? "In review" : "WhatsApp reviews name changes · 1–2 days"}</span></span>
+            <input value={f.name} onChange={set("name")} style={PF_BOX} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span style={PF_LABEL}>About<span style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>139 characters max</span></span>
+            <input value={f.about} onChange={set("about")} style={PF_BOX} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span style={PF_LABEL}>Description</span>
+            <textarea value={f.description} onChange={set("description")} rows={2} style={{ ...PF_BOX, height: "auto", minHeight: "56px", padding: "8px 10px", resize: "vertical" }} />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span style={PF_LABEL}>Address{toPage && <span style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>WhatsApp only</span>}</span>
+            <input value={f.address} onChange={set("address")} style={PF_BOX} />
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}><span style={PF_LABEL}>Email</span><input value={f.email} onChange={set("email")} style={PF_BOX} /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}><span style={PF_LABEL}>Website</span><input value={f.website} onChange={set("website")} style={PF_BOX} /></label>
+          </div>
+          <label style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+            <span style={PF_LABEL}>Category{toPage && <span style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>WhatsApp only</span>}</span>
+            <select value={f.vertical || "OTHER"} onChange={set("vertical")} style={PF_BOX}>{verticals.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+          </label>
+        </div>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", padding: "14px 22px", borderTop: "1px solid var(--crm-rule)" }}>
+          <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.synced}</span>
+          <button type="button" onClick={v.close} style={{ ...XBTN, marginLeft: "auto", height: "36px", padding: "0 14px", borderRadius: "7px", display: "flex", alignItems: "center", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>
+          <button type="button" onClick={() => void send()} disabled={busy || !v.can || (!toWa && !toPage)} title={v.can ? "" : "Only CRM · Manage may change the profile"} style={{ ...XBTN, height: "36px", padding: "0 16px", borderRadius: "7px", display: "flex", alignItems: "center",
+            background: busy || !v.can || (!toWa && !toPage) ? "var(--crm-line)" : "var(--crm-rust)", color: "#fff", font: "500 13px Inter, sans-serif" }} className="crm4a-primary">{busy ? "Sending…" : label}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * v2 frames 02 / 03 — New chat (Inbox) and Add customer (Contacts), the owner's "做手动新增客户": a name and a WhatsApp
+ * phone (a Malaysian 01… number is read as 601…), given to oneself — or, for CRM · Manage, to anybody. A phone already in
+ * the CRM opens that customer instead of a second one. Outside WhatsApp's 24 h window the chat opens with a template.
+ */
+export interface AddCustomerV { title: string; go: string; people: { id: string; name: string }[] | null; me: string; close: () => void; save: (name: string, phone: string, assign: string | null) => Promise<boolean> }
+export function DeskAddCustomer({ v }: { v: AddCustomerV }) {
+  const [name, setName] = useState(""), [phone, setPhone] = useState(""), [who, setWho] = useState(v.me), [busy, setBusy] = useState(false);
+  const digits = phone.replace(/\D/g, ""), ok = !!name.trim() && digits.length >= 9 && !busy;
+  const box: CSSProperties = { height: "36px", padding: "0 10px", borderRadius: "7px", boxSizing: "border-box", border: "1px solid var(--crm-line)", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)", background: "#fff", outline: "none", width: "100%" };
+  const label: CSSProperties = { display: "flex", flexDirection: "column", gap: "5px", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" };
+  const go = async () => { if (!ok) return; setBusy(true); const done = await v.save(name, phone, who); setBusy(false); if (!done) return; };
+  return (
+    <div onClick={v.close} style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(42,22,12,.2)", display: "grid", placeItems: "center" }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-label={v.title} style={{ width: "400px", borderRadius: "12px", background: "#fff", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <span style={{ font: `500 17px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{v.title}</span>
+          <button type="button" onClick={v.close} aria-label="Close" style={{ ...XBTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", padding: "18px 20px" }}>
+          <label style={label}>Name<input autoFocus value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Tan Mei Ling" style={box} /></label>
+          <label style={label}>WhatsApp phone<input value={phone} onChange={e => setPhone(e.target.value)} onKeyDown={e => { if (e.key === "Enter") void go(); }} inputMode="tel" placeholder="012-345 6789" style={box} /></label>
+          {v.people && (
+            <label style={label}>Give to
+              <select value={who} onChange={e => setWho(e.target.value)} style={box}>{[{ id: v.me, name: "Me" }, ...v.people.filter(p => p.id !== v.me)].map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+            </label>
+          )}
+          <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>Added on the CRM&apos;s WhatsApp number. Until they write, a message to them goes as an approved template.</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", padding: "14px 20px", borderTop: "1px solid var(--crm-rule)" }}>
+          <button type="button" onClick={v.close} style={{ ...XBTN, height: "36px", padding: "0 14px", borderRadius: "7px", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>
+          <button type="button" onClick={() => void go()} disabled={!ok} style={{ ...XBTN, height: "36px", padding: "0 16px", borderRadius: "7px", background: ok ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", font: "500 13px Inter, sans-serif" }} className={ok ? "crm4a-primary" : undefined}>{busy ? "Adding…" : v.go}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Save and apply to all's window (the owner, 2026-10-24): Standard or Count together, the ads ticked — the ad being edited
+ * always — drawn as the Add customer window. Behaviour: shared/apply-ads.ts.
+ */
+export function DeskApplyAds({ v }: { v: ApplyWindowVM }) {
+  const [busy, setBusy] = useState(false), ok = v.go.ok && !busy;
+  const go = async () => { if (!ok || !v.go.run) return; setBusy(true); try { await v.go.run(); } finally { setBusy(false); } };
+  const tag = (label: string, bg: string, fg: string) => (
+    <span style={{ flex: "none", height: "20px", padding: "0 8px", borderRadius: "10px", display: "inline-flex", alignItems: "center", background: bg, color: fg, font: "500 11px Inter, sans-serif", whiteSpace: "nowrap" }}>{label}</span>);
+  return (
+    <div onClick={v.close} style={{ position: "fixed", inset: 0, zIndex: 40, background: "rgba(42,22,12,.2)", display: "grid", placeItems: "center" }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-label="Save and apply to all" style={{ width: "460px", maxHeight: "calc(100vh - 64px)", borderRadius: "12px", background: "#fff", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid var(--crm-rule)" }}>
+          <span style={{ font: `500 17px ${TIGHT_X}`, color: "var(--crm-ink)" }}>Save and apply to all</span>
+          <button type="button" onClick={v.close} aria-label="Close" style={{ ...XBTN, marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={14} /></button>
+        </div>
+        <div role="radiogroup" aria-label="Apply" style={{ flex: "none", display: "flex", gap: "2px", margin: "16px 20px 6px", padding: "3px", borderRadius: "9px", background: "var(--crm-field)" }}>
+          {v.modes.map(m => (
+            <button key={m.label} type="button" role="radio" aria-checked={m.on} onClick={m.pick} style={{ ...XBTN, flex: 1, height: "32px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif",
+              background: m.on ? "#fff" : "transparent", boxShadow: m.on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: m.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{m.label}</button>))}
+        </div>
+        <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px 6px" }}>
+          <span style={LABEL}>Ads</span>
+          <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>{v.count}</span>
+          <button type="button" onClick={v.all.toggle} style={{ ...XBTN, marginLeft: "auto", font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>{v.all.label}</button>
+        </div>
+        <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent", padding: "0 12px 10px" }}>
+          {v.rows.map(r => (
+            <label key={r.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 8px", borderRadius: "8px", background: r.on ? "var(--crm-sel)" : "transparent", cursor: r.fixed ? "default" : "pointer" }}>
+              <input type="checkbox" checked={r.on} disabled={r.fixed} onChange={r.toggle} aria-label={r.name} style={{ flex: "none", width: "15px", height: "15px", margin: 0, accentColor: "var(--crm-rust)" }} />
+              <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                <span style={{ font: "400 11.5px Inter, sans-serif", color: "var(--crm-muted)" }}>{r.leads}</span>
+              </span>
+              {r.fixed && tag("This ad", "var(--crm-tint-attention)", "var(--crm-ink)")}
+              {r.together && tag("Together", "var(--crm-tint-cold)", "var(--crm-ink-soft)")}
+              {r.status && tag(r.status.label, r.status.bg, r.status.fg)}
+            </label>))}
+        </div>
+        <div style={{ flex: "none", display: "flex", justifyContent: "flex-end", gap: "10px", padding: "14px 20px", borderTop: "1px solid var(--crm-rule)" }}>
+          <button type="button" onClick={v.close} style={{ ...XBTN, height: "36px", padding: "0 14px", borderRadius: "7px", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">Cancel</button>
+          <button type="button" onClick={() => void go()} disabled={!ok} style={{ ...XBTN, height: "36px", padding: "0 16px", borderRadius: "7px", background: ok ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", font: "500 13px Inter, sans-serif" }} className={ok ? "crm4a-primary" : undefined}>{busy ? "Saving…" : v.go.label}</button>
+        </div>
+      </div>
+    </div>
   );
 }

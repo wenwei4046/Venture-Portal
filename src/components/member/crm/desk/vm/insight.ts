@@ -4,12 +4,14 @@
  * by status with a total, and the Ads table (Meta's figures "—" until Meta is connected). Numbers are the phone's
  * (panel/vm/common.ts numbersOf) over the chosen period.
  */
+import { withoutHiddenAds } from "@/lib/member/crm-data";
 import type { CrmCustomer } from "@/lib/member/crm-data";
 import { ALL, crmFigures, fmt } from "./adsperf";
 import { columnSizer } from "./columns";
 import { inRange, numbersOf, pct, periodRange } from "../../panel/vm/common";
 import { isCold, urgencyOf } from "../../sales/vm/common";
 import type { DeskCtx } from "./ctx";
+import { teamLead } from "./names";
 import { chatRows, initials, teamNameOf } from "./data";
 import { DIRECTOR_C, DIRECTOR_TEAM, ST, ST_META, teamColours } from "./tokens";
 import { STATUS } from "../../shared/palette";
@@ -65,7 +67,9 @@ export function wonIn(ctx: Pick<DeskCtx, "data">, r: { a: number; b: number }) {
   return { n: ids.length, amount: Math.round(amount), ids };
 }
 
-export function insightVM(ctx: DeskCtx) {
+export function insightVM(ctx0: DeskCtx) {
+  // An ad hidden from Ads Performance leaves Insight's figures too (2026-10-24).
+  const ctx = { ...ctx0, data: withoutHiddenAds(ctx0.data) };
   const { data, now, patch, teams } = ctx;
   const { r, name } = insightRange(ctx);
   const inR = (iso: string) => { const t = new Date(iso); const d = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime(); return d >= r.a && d <= r.b; };
@@ -119,7 +123,7 @@ export function insightVM(ctx: DeskCtx) {
     { label: "Avg. reply", value: avgV[0], unit: avgV[1], ...(avgNow == null || avgPrev == null ? { d: "—", good: true } : { d: `${avgNow <= avgPrev ? "−" : "+"}${Math.abs(avgNow - avgPrev)} min`, good: avgNow <= avgPrev }), open: openList("Leads") },
     { label: "Won", value: wonRate(wonNow.n, n.leads) == null ? "—" : `${wonRate(wonNow.n, n.leads)}%`, unit: "", ...pts(wonRate(wonNow.n, n.leads), wonRate(wonPrev.n, prevLeads.length)), open: openList("Won") },
   ].map((m, i) => ({ ...m, first: i === 0, deltaColor: m.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)" }));
-  const teamsOut = [...dirRows, ...teams.map((t, k) => ({ name: t.name, lead: t.who, ...rowOf(t.people.map(p => p.id)), dot: teamColours(k)[0],
+  const teamsOut = [...dirRows, ...teams.map((t, k) => ({ name: t.name, lead: teamLead(t), ...rowOf(t.people.map(p => p.id)), dot: teamColours(k)[0],
     open: () => patch({ pane: "overlay", kind: "team", team: t.id, person: null }) }))];
 
   // Leads by status (B4): the chats' own states, with a share and a bar against the biggest.
@@ -165,7 +169,8 @@ export function insightVM(ctx: DeskCtx) {
   const insAdMinW = Math.max(820, 40 + (IW.name ?? 220) + IH.slice(1).reduce((n, [k]) => n + (IW[k] ?? 72) + 12, 0));
   const lt = adPerf.reduce((a, x) => a + x._n, 0), at = adPerf.reduce((a, x) => a + Number(x.appt), 0);
   return {
-    kInsight: ctx.ui.tab === "insight",
+    kInsight: ctx.ui.tab === "insight" && ctx.ui.insTab !== "ads",
+    insTabs: ([["team", "Team performance"], ["ads", "Ads performance"]] as const).map(([k, label]) => ({ label, on: (ctx.ui.insTab ?? "team") === k, pick: () => ctx.patch({ insTab: k }) })),
     hero, heroStats, teams: teamsOut, leadStatus,
     // 4a (frame 01): the hero's six figures, the teams with their people (opened in place), all seven statuses.
     metrics4, status4, statusTotal: tot7,

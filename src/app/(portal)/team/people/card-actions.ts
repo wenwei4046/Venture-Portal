@@ -16,6 +16,7 @@ import { offersVariablePay, type StaffRow, type TitleRow } from '@/lib/staff-for
 import { STAFF_ROW_COLUMNS } from '@/lib/private-columns'
 import { readStaffPrivate } from '@/lib/private-fields'
 import { onFile, sees } from '@/lib/sensitive'
+import { employmentStatusOf } from '@/lib/employment-status'
 import { listSubDepartments } from '../../revenue/_lib/sub-departments'
 import { loadPersonAccess, type PersonAccessData } from '../_lib/person-permissions'
 
@@ -244,6 +245,20 @@ export async function getPersonCard(id: string): Promise<PersonCardData> {
       infotech_code: row.infotech_code ?? null,
       hire_date: row.hire_date ?? null,
       resignation_date: row.resignation_date ?? null,
+      // Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — the staff table's; a directory
+      // row carries none (undefined).
+      employment_status: row.employment_status === undefined ? undefined : employmentStatusOf(row.employment_status),
+      probation_months: row.probation_months ?? null,
+      probation_end: row.probation_end ?? null,
+      contract_months: row.contract_months ?? null,
+      contract_end: row.contract_end ?? null,
+      contract_start: row.contract_start ?? null,
+      probation_ack_end: row.probation_ack_end ?? null,
+      probation_ack_name: row.probation_ack_name ?? null,
+      probation_ack_at: row.probation_ack_at ?? null,
+      contract_ack_end: row.contract_ack_end ?? null,
+      contract_ack_name: row.contract_ack_name ?? null,
+      contract_ack_at: row.contract_ack_at ?? null,
       epf_category: row.epf_category,
       socso_category: row.socso_category,
       is_epf_exempt: !!row.is_epf_exempt,

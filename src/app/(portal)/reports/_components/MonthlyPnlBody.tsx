@@ -5,7 +5,7 @@ import type { loadMonthlyPnl } from '@/lib/monthly-statements'
 import { fromChoices, rangeLabel, toChoices, type ReportRange } from '@/lib/report-range'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import { sheetColumns, sheetFromMatrix } from '@/lib/report-sheet'
-import SheetReport from './SheetReport'
+import SheetReport, { type MonthlyDrill } from './SheetReport'
 import { ReportSearchProvider } from './ReportSearchProvider'
 import ReportToolbar from './ReportToolbar'
 import type { ReportSegmentOption } from './report-segments'
@@ -16,7 +16,8 @@ import type { ReportSegmentOption } from './report-segments'
  * Detail level on one row over the matrix, cut to From with its months
  * separated. Reports' P&L draws it, and so does a department's page under Dept
  * Pool (2026-10-09) — there with no Segment, the page being the segment.
- * The table is the handoff's own since 2026-10-10 (SheetReport).
+ * The table is the handoff's own since 2026-10-10 (SheetReport); its accounts
+ * open onto their months and lines (2026-10-24) through the page's own action.
  */
 export default function MonthlyPnlBody({
   pnl: { data, rows },
@@ -25,6 +26,7 @@ export default function MonthlyPnlBody({
   segmentLabel,
   segment = '',
   segments = [],
+  drill,
 }: {
   pnl: Awaited<ReturnType<typeof loadMonthlyPnl>>
   range: ReportRange
@@ -34,6 +36,8 @@ export default function MonthlyPnlBody({
   segment?: string
   /** Empty = no segment choice. */
   segments?: ReportSegmentOption[]
+  /** The page's action that reads an opened account's lines, and the segment it reads them for. */
+  drill?: Omit<MonthlyDrill, 'report'>
 }) {
   const cost = data.accounts.filter((a) => a.defaultCategory === 'cost' || a.defaultCategory === 'expense')
   const expenses = data.columns.map((_, i) => r2(-cost.reduce((s, a) => s + (a.values[i] ?? 0), 0)))
@@ -74,7 +78,12 @@ export default function MonthlyPnlBody({
             segment={segment}
             segments={segments}
           />
-          <SheetReport columns={sheetColumns(cut.columns, nowYM)} rows={sheetFromMatrix(cut.rows)} pctBase={cut.base} />
+          <SheetReport
+            columns={sheetColumns(cut.columns, nowYM)}
+            rows={sheetFromMatrix(cut.rows)}
+            pctBase={cut.base}
+            monthly={drill ? { ...drill, report: 'pnl' } : undefined}
+          />
         </section>
       </ReportSearchProvider>
     </>

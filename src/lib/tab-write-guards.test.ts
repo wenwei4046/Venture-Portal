@@ -28,6 +28,10 @@ const NOT_GUARDED: Readonly<Record<string, string>> = {
   lead_info: 'a read: General info, for the draft about to be written',
   lead_data_files: 'a read: the Data Center files the agent reads, for the draft about to be written',
   lead_quick_replies: 'a read: the quick replies the agent may reuse, for the draft about to be written',
+  hr_letter_file:
+    'the new contract Renew files (renewContract, 2026-10-24): it rides with the renewal, the write People · Edit ' +
+    'narrows (an UPDATE under the row policies); the letter is Documentation · Create’s, which only the Data ' +
+    'center’s box stands for — unticked, the cell itself goes, and the function asks the cell',
   mint_invoice_no:
     'a number for an invoice made on any of four pages (Invoice, BA, Billing Allocator, the Invoice list): ' +
     'asking all four narrows nothing, and the invoice it numbers is written by the gated write that asked for it',

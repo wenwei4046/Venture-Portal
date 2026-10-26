@@ -1,10 +1,12 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
 import { validateStaffForm, designationForTitle, payPatchForUpdate } from '@/lib/staff-form'
-import { LOGIN_EMAIL_LOCKED, asksPay, payModeOf } from '@/lib/person-record'
+import { asksPay, payModeOf } from '@/lib/person-record'
+import { moveBackUnlessWritten, moveLoginForPerson } from '@/lib/account/login-email'
 import { moveReportingLine } from '@/lib/hierarchy-writes'
 import { saveRecordAndLine } from '@/lib/person-line-save'
 import { readStaffPrivate } from '@/lib/private-fields'
@@ -13,6 +15,7 @@ import { isMasked, sees } from '@/lib/sensitive'
 import { addressRefusal } from '@/lib/address/address'
 import { addressFromForm, addressPatch } from '@/lib/address/address-form'
 import { MALAYSIA_DATA } from '@/lib/address/malaysia-data'
+import { statusColumns } from '@/lib/employment-status'
 import type { TablesUpdate } from '@/lib/supabase/database.types'
 
 /**
@@ -55,8 +58,12 @@ const str = (formData: FormData, key: string): string | null =>
  * what everybody hired before that date got. The reporting line is asked here
  * too, because filing it now is what makes the commission membership the
  * database derives correct on the first write.
+ *
+ * It answers who was filed (2026-10-24): the letters the form took beside the
+ * employment status go to their Data center record once they are on the roster
+ * (lib/documentation/file-letters.ts).
  */
-export async function addStaff(formData: FormData) {
+export async function addStaff(formData: FormData): Promise<{ id: string }> {
   const user = await requireActionOn('/team/people/new', 'team', 'create')
   const supabase = await createClient()
 
@@ -66,6 +73,10 @@ export async function addStaff(formData: FormData) {
     titleId: str(formData, 'title_id'),
     homeSubDepartmentId: str(formData, 'home_sub_department_id'),
     reportsTo: str(formData, 'reports_to'),
+    hireDate: str(formData, 'hire_date'),
+    employmentStatus: str(formData, 'employment_status'),
+    probationMonths: str(formData, 'probation_months'),
+    contractMonths: str(formData, 'contract_months'),
     fullCommission: formData.get('full_commission') === 'on',
     variablePay: formData.get('variable_pay') === 'on',
     basicSalary: str(formData, 'basic_salary'),
@@ -95,7 +106,7 @@ export async function addStaff(formData: FormData) {
     designation = designationForTitle(title, form.departmentId)
   }
 
-  const { error } = await supabase.from('hr_staff_costs').insert({
+  const { data: filed, error } = await supabase.from('hr_staff_costs').insert({
     employee_name: form.name,
     department_id: form.departmentId,
     title_id: form.titleId,
@@ -109,6 +120,13 @@ export async function addStaff(formData: FormData) {
     home_sub_department_id: form.homeSubDepartmentId,
     reports_to: form.reportsTo,
     designation,
+    // When they start, and Probation / Contract / Permanent / Part time with a probation's or a contract's period
+    // (2026-10-23; Contract 2026-10-24): the database works out its last day from the two, and HR is reminded before a
+    // probation's.
+    hire_date: form.hireDate,
+    employment_status: form.employmentStatus,
+    probation_months: form.probationMonths,
+    contract_months: form.contractMonths,
     employment_type: form.employmentType,
     basic_salary: form.basicSalary,
     allowances: form.allowances,
@@ -130,7 +148,7 @@ export async function addStaff(formData: FormData) {
     emergency_contact_phone: form.emergencyContactPhone,
     emergency_contact_relationship: form.emergencyContactRelationship,
     created_by: user.id,
-  })
+  }).select('id').single()
 
   if (error) {
     if (error.code === '23505') throw new Error('Employee already exists')
@@ -145,6 +163,7 @@ export async function addStaff(formData: FormData) {
   revalidatePath('/hr-costing')
   revalidatePath('/team', 'layout')
   revalidatePath('/revenue', 'layout')
+  return { id: filed.id }
 }
 
 /**
@@ -225,13 +244,15 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
 
   const { data: current } = await supabase
     .from('hr_staff_costs')
-    .select('department_id, title_id, employment_type, bank_name, user_id, departments(payroll_source)')
+    .select('department_id, title_id, employment_type, bank_name, user_id, hire_date, employment_status, probation_months, contract_months, departments(payroll_source)')
     .eq('id', id)
     .maybeSingle()
   if (!current) throw new Error('That person is no longer on the roster')
-  // Somebody who signs in signs in with this email: it is theirs to change,
-  // by a request from their app, never HR's here (2026-10-16).
-  if (sent('email') && current.user_id) throw new Error(LOGIN_EMAIL_LOCKED)
+  // Somebody who signs in signs in with this email. HR changes it here since
+  // 2026-10-22 ("i want the email can be editable, for hr") — and their login
+  // with it, below, never in the record's own update: the record, the login
+  // row and the auth server must never part.
+  const loginEmail = sent('email') && current.user_id ? text('email') : null
 
   const patch: TablesUpdate<'hr_staff_costs'> = {}
 
@@ -293,9 +314,29 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
   // it is not ours to keep, and a wrong one would match the wrong file row.
   if (sent('infotech_code')) patch.infotech_code = text('infotech_code').trim() || null
   if (sent('hire_date')) patch.hire_date = text('hire_date') || null
+  // Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — with a probation's or a contract's
+  // period, sent together whenever any changed (lib/person-record.ts); the other status's period is cleared on the same
+  // write. A probation or a contract is counted from the hire date, so a save touching any of them needs one.
+  const statusSent = sent('employment_status') || sent('probation_months') || sent('contract_months')
+  if (statusSent) {
+    Object.assign(
+      patch,
+      statusColumns(
+        sent('employment_status') ? text('employment_status') : current.employment_status,
+        sent('probation_months') ? text('probation_months') : current.probation_months,
+        sent('contract_months') ? text('contract_months') : current.contract_months,
+      ),
+    )
+  }
+  const statusNow = patch.employment_status ?? current.employment_status
+  const hireDate = sent('hire_date') ? patch.hire_date : current.hire_date
+  if ((statusNow === 'probation' || statusNow === 'contract') && !hireDate && (statusSent || sent('hire_date'))) {
+    throw new Error(`A ${statusNow} is counted from the hire date — fill in the hire date too.`)
+  }
   if (sent('resignation_date')) patch.resignation_date = text('resignation_date') || null
   if (writesNric) patch.nric = text('nric').replace(/[-\s]/g, '') || null
   for (const key of ['contact_number', 'email', 'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'] as const) {
+    if (key === 'email' && loginEmail !== null) continue
     if (sent(key)) patch[key] = trimOrNull(formData.get(key))
   }
   // The address, its six parts together (2026-10-20) — the one-line `address` is the database's to put together.
@@ -322,25 +363,53 @@ async function writeStaff(editor: Awaited<ReturnType<typeof requireActionOn>>, i
     Object.assign(patch, { bank_name_2: second.bankName2, bank_account_no_2: second.bankAccountNo2 })
   }
 
+  // Every check above has passed: the login's email goes first, whole — so a
+  // refusal of it leaves the record as it was.
+  if (loginEmail !== null && (await saveLoginEmail(supabase, id, loginEmail)) === 'record') {
+    patch.email = trimOrNull(loginEmail)
+  }
+
   if (Object.keys(patch).length === 0) return
 
   const { error } = await supabase.from('hr_staff_costs').update(patch).eq('id', id)
 
   if (error) {
-    if (error.code === '23505') {
-      throw new Error(
-        error.message.includes('infotech')
+    const reason =
+      error.code === '23505'
+        ? error.message.includes('infotech')
           ? 'That InfoTech No already belongs to somebody else on the roster'
-          : 'Employee code already used by another active staff',
-      )
-    }
-    throw new Error(`Failed to update: ${error.message}`)
+          : 'Employee code already used by another active staff'
+        : `Failed to update: ${error.message}`
+    // Their email stands on its own: the login already signs in with it.
+    throw new Error(loginEmail !== null && !('email' in patch) ? `Their email is saved; the rest is not. ${reason}` : reason)
   }
 
   // A title assigns the rank (user, 2026-09-07), and since 2026-09-10 the
   // database does the assigning: `hr_staff_costs_one_line_sync` raises the
   // commission rank to the new title's floor (never lowers it) in the same
   // statement as the title write. Nothing to call, nothing to report.
+}
+
+/**
+ * A login's email, changed on the person's page (2026-10-22): the login moves
+ * first — the service role's one job (lib/account/login-email.ts), asked of the
+ * database under this editor's session — then the record and the login row
+ * take it together, only because the login signs in with it already; when they
+ * do not, the login moves back. `record`: they have no login after all, so the
+ * email is the record's own and goes with the rest.
+ */
+async function saveLoginEmail(supabase: Awaited<ReturnType<typeof createClient>>, id: string, email: string): Promise<'login' | 'record'> {
+  const move = await moveLoginForPerson(id, email)
+  if (move.kind === 'refused') throw new Error(move.reason)
+  if (move.kind === 'none') return 'record'
+  // The function postdates database.types.ts.
+  const { error } = await (supabase as unknown as SupabaseClient).rpc('person_login_email_set', { p_staff: id, p_email: move.to })
+  if (error) {
+    const stuck = await moveBackUnlessWritten(move, 'Save changes')
+    const reason = (error.code === '42501' || error.code === '22023') && error.message ? error.message : 'Their email could not be saved. Please try again.'
+    throw new Error(stuck ? `${reason} ${stuck}` : reason)
+  }
+  return 'login'
 }
 
 /**

@@ -9,6 +9,7 @@ import { blockHours, type CrmBlock, type CrmRoom } from "@/lib/member/crm-data";
 import { t12 } from "../../sales/vm/chat";
 import type { DeskCtx, SrBlk, SrBlock, SrDraft } from "./ctx";
 import { MON } from "./insight";
+import { apptTypesVM } from "./appt-types";
 
 const DN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], DS = ["M", "T", "W", "T", "F", "S", "S"], DI = [0, 1, 2, 3, 4, 5, 6];
 /** Every half hour a visit may start (the prototype's ALLT) and the hours a blocked time may run (HOURS) — the whole day,
@@ -26,7 +27,7 @@ export function draftOf(r: CrmRoom | null): SrDraft {
   for (const s of r?.slots ?? []) if (s.includes("@")) { const on = s.split("@")[1].split("").map(Number); DI.filter(d => !on.includes(d)).forEach(d => { off[`${t12(s)}|${d}`] = 1; }); }
   return {
     id: r?.id ?? null, dispName: r?.name ?? "", addr: r?.address ?? "", gmap: r?.mapGoogle ?? "", waze: r?.mapWaze ?? "", manual: !!(r?.mapGoogle || r?.mapWaze),
-    photo: r?.photo ?? "", photoFile: null, limit: r?.cap ?? 2, times, off,
+    photo: r?.photo ?? "", photoFile: null, limit: r?.cap ?? 2, times, off, remarks: r?.remarks ?? "",
     weekDays: (r?.weekly ?? []).map(d => (d + 6) % 7).sort(),
     blocks: (r?.blocks ?? []).map(b => ({ kind: "date" as const, from: b.a, to: b.b || b.a, allDay: !blockHours(b).length, ranges: blockHours(b).map(x => ({ f: t12(x.f), t: t12(x.t) })), reason: b.why })),
   };
@@ -96,7 +97,8 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     const results = await Promise.all(targets.map(r => {
       const mine = r.id === en, base = draftOf(r);
       const d: SrDraft = mine ? dr : { ...base, limit: dr.limit, times: [...dr.times], off: { ...dr.off }, blocks: [...dr.blocks], weekDays: [...dr.weekDays] };
-      return ctx.act.saveRoom(roomOf(d)).then(ok => ok && mine ? ctx.deskAct.saveShowroomExtras(r.id, { photo: dr.photoFile, removePhoto: !dr.photo && !!r.photo, gmap: dr.manual ? dr.gmap : "", waze: dr.manual ? dr.waze : "" }) : ok);
+      return ctx.act.saveRoom(roomOf(d)).then(id => !!id).then(ok => ok && mine ? ctx.deskAct.saveShowroomExtras(r.id, { photo: dr.photoFile, removePhoto: !dr.photo && !!r.photo, gmap: dr.manual ? dr.gmap : "", waze: dr.manual ? dr.waze : "" }) : ok)
+        .then(ok => ok && mine && (dr.remarks ?? "") !== (r.remarks ?? "") ? ctx.deskAct.saveRoomRemarks(r.id, dr.remarks) : ok);
     }));
     if (results.every(Boolean)) patch({ srEdit: null, srDraft: null, srBlkOpen: false, toast: all ? `Applied to all ${targets.length} showrooms` : `${dr.dispName || "Showroom"} saved` });
   };
@@ -131,8 +133,37 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     // A new showroom saves on its own (the phone panel's + does the same); an existing one through the editor's save.
     save: () => { if (en === "new" && dr) { void ctx.act.saveRoom(roomOf(dr)).then(ok => { if (ok) patch({ srEdit: null, srDraft: null, srAt: rooms.length, toast: `${dr.dispName || "Showroom"} added` }); }); } else void save(false); },
     dirty: !!en,
+    // v2 frame 07 (note 04): opening hours typed in — All days + Apply to all, then each day on or off with its own hours.
+    // They are the slots the weekly grid draws: a day's hours = its first open slot to the hour after its last.
+    hours: (() => {
+      const hOf = (t: string) => Number(hm(t).slice(0, 2));
+      const rangeOf = (di: number) => { if (d4.weekDays.includes(di)) return null;
+        const hs = d4.times.filter(t => !d4.off[`${t}|${di}`]).map(hOf).sort((a, b) => a - b);
+        return hs.length ? { f: hs[0], t: hs[hs.length - 1] + 1 } : null; };
+      const pad = (h: number) => `${String(h).padStart(2, "0")}:00`;
+      const setDays = (dis: number[], f: number, t: number) => {
+        if (!(t > f)) return;
+        const times = [...d4.times], off = { ...d4.off };
+        for (let h = f; h < t; h++) if (!times.some(x => hOf(x) === h)) { const nt = t12(`${h}:00`); times.push(nt); DI.forEach(x => { off[`${nt}|${x}`] = 1; }); }
+        for (const di of dis) times.forEach(x => { const h = hOf(x); if (h >= f && h < t) delete off[`${x}|${di}`]; else off[`${x}|${di}`] = 1; });
+        edit4({ times: times.sort((a, b) => ALLT.indexOf(a) - ALLT.indexOf(b)), off, weekDays: d4.weekDays.filter(x => !dis.includes(x)) });
+      };
+      const first = DI.map(rangeOf).find(Boolean) ?? { f: 10, t: 21 };
+      return {
+        all: { f: pad(first.f), t: pad(first.t), apply: (f: number, t: number) => setDays(DI.filter(di => !d4.weekDays.includes(di)), f, t) },
+        days: DI.map(di => { const r = rangeOf(di);
+          return { l: DN[di], open: !!r, f: r ? pad(r.f) : "", t: r ? pad(r.t) : "", set: (f: number, t: number) => setDays([di], f, t),
+            toggle: () => (r ? edit4({ weekDays: [...d4.weekDays, di].sort() }) : setDays([di], first.f, first.t)) }; }),
+      };
+    })(),
+    remarks: d4.remarks ?? "", setRemarks: (e: { target: { value: string } }) => edit4({ remarks: e.target.value.slice(0, 1000) }),
+    // Delete showroom: asked again on screen; the database refuses it while visits are upcoming and says how many.
+    canDelete: en !== "new" && !!curRoom,
+    del: () => { if (!curRoom) return; void ctx.deskAct.deleteRoom(curRoom.id).then(ok => { if (ok) patch({ srEdit: null, srDraft: null, srAt: Math.max(0, at - 1), toast: `${curRoom.name} deleted` }); }); },
   };
   return {
+    // Showrooms › Appointment types (2026-10-24).
+    srPage: ui.srPage ?? "rooms", at: apptTypesVM(ctx),
     sr4, srOpen: false && srOpen, srCards, srN: String(rooms.length), srDays: DS.map(l => ({ l })),
     srLinkModes: ([[false, "Auto"], [true, "Paste link"]] as const).map(([v, label]) => { const on = !!dr?.manual === v; return { label, bg: on ? "#fff" : "transparent", sh: on ? "0 1px 3px rgba(42,22,12,.12)" : "none", fg: on ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => upd({ manual: v }) }; }),
     srTabSlots: ui.srTab === "slots", srTabBlk: ui.srTab === "blk", srTabInfo: ui.srTab === "info",

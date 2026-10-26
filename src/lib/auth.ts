@@ -133,7 +133,7 @@ const loadUser = cache(async (surface: ViewSurface): Promise<User | null> => {
   // shell, sidebar and Overview over the account's own keys, actions, tabs and
   // sensitive fields — it edits as it does in its own view. To see the portal
   // exactly as somebody else does is View as a person, read-only.
-  if (canSwitchView && (viewAs === 'hr' || viewAs === 'finance')) {
+  if (canSwitchView && (viewAs === 'hr' || viewAs === 'finance' || viewAs === 'marketing')) {
     return { ...user, role: viewAs, actualRole: user.role, canSwitchView, lens: viewAs }
   }
 

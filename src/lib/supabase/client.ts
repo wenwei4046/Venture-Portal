@@ -1,6 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from './database.types'
 import { VIEW_AS_PERSON_MARK } from '@/lib/view-as'
+import { withBrowserFileStorage } from '@/lib/storage/browser'
 import { readOnly } from './read-only'
 
 /** Is this browser viewing the portal as somebody? The readable mark set beside the httpOnly cookie. */
@@ -17,5 +18,8 @@ export function createClient() {
   // table's column layout, its shared default, an upload — read-only like the
   // server's client (lib/supabase/read-only.ts). The mark can only take writes
   // away from its own session, never give any.
-  return viewingAsSomebody() ? readOnly(client) : client
+  const viewing = viewingAsSomebody()
+  // Files (2026-10-23): `.storage` sends a file to whichever backend holds its
+  // bucket — R2 by a link the server signs (lib/storage/browser.ts).
+  return withBrowserFileStorage(viewing ? readOnly(client) : client, { readOnly: viewing })
 }

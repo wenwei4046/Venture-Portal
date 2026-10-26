@@ -103,3 +103,119 @@ export async function refreshAdStatuses(db: SupabaseClient, token: string | unde
 
 /** For tests: forget the ads Meta would not name. */
 export function forgetAdMisses() { misses.clear() }
+
+/** The Page an ad promotes: its creative's page_id, else the Page half of its post id ("<page>_<post>"). */
+function pageOfCreative(c: { effective_object_story_id?: unknown; object_story_spec?: { page_id?: unknown } } | undefined): string | null {
+  const spec = c?.object_story_spec?.page_id;
+  if (typeof spec === 'string' && /^\d+$/.test(spec)) return spec;
+  const story = c?.effective_object_story_id;
+  const m = typeof story === 'string' ? story.match(/^(\d+)_/) : null;
+  return m ? m[1] : null;
+}
+
+export interface MetaAdRow { id: string; name: string; status: string; account: string; created: string; start: string | null; end: string | null; page: string | null; pageName: string | null; wa: string | null }
+
+/**
+ * The WhatsApp numbers the CRM's ads send people to (2026-10-22, the owner: "只有串接到这个 018 358 0219 WA 号码的才是"); a
+ * server may name others in CRM_AD_WHATSAPP_NUMBERS (comma-separated, with the country code).
+ */
+export function crmAdNumbers(env: string | undefined = process.env.CRM_AD_WHATSAPP_NUMBERS): string[] {
+  const listed = (env ?? '').split(',').map(n => n.replace(/\D/g, '')).filter(n => n.length >= 8);
+  return listed.length ? listed : ['60183580219'];
+}
+
+/**
+ * Every ad of the ad accounts the system user sees (2026-10-22, the desktop's Ads to teams "+": "director 能提前先把广告加进
+ * 来先做分配"; "广告开始跑，或者 pending 要跑（几时开始，几时结束）"): /me/adaccounts, then each account's ads (name,
+ * effective_status, created_time, the ad set's start and end; deleted and archived ones
+ * left out), running first, newest first, at most 300. The server's — the token never leaves it. Throws when Meta refuses.
+ */
+export async function listMetaAds(token: string, fetchImpl: typeof fetch = fetch, own: { numbers: string[] } = { numbers: [] }): Promise<MetaAdRow[]> {
+  const get = async (path: string) => {
+    const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${path}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`Meta answered ${res.status}`);
+    return (await res.json()) as { data?: unknown[] };
+  };
+  const accounts = ((await get('me/adaccounts?fields=id,name&limit=50')).data ?? []) as { id?: unknown; name?: unknown }[];
+  const rows: MetaAdRow[] = [];
+  for (const acc of accounts) {
+    if (typeof acc.id !== 'string' || !/^act_\d+$/.test(acc.id)) continue;
+    const filter = encodeURIComponent(JSON.stringify([{ field: 'effective_status', operator: 'NOT_IN', value: ['DELETED', 'ARCHIVED'] }]));
+    let ads: unknown[] = [];
+    try { ads = (await get(`${acc.id}/ads?fields=id,name,effective_status,created_time,adset{start_time,end_time,promoted_object},creative{effective_object_story_id,object_story_spec{page_id}}&limit=100&filtering=${filter}`)).data ?? []; } catch { continue; }
+    for (const a of ads as { id?: unknown; name?: unknown; effective_status?: unknown; created_time?: unknown; adset?: { start_time?: unknown; end_time?: unknown; promoted_object?: { page_id?: unknown; whatsapp_phone_number?: unknown } }; creative?: { effective_object_story_id?: unknown; object_story_spec?: { page_id?: unknown } } }[]) {
+      if (typeof a.id !== 'string' || !AD_ID.test(a.id)) continue;
+      rows.push({ id: a.id, name: typeof a.name === 'string' ? a.name.trim().slice(0, 120) : `Ad ${a.id}`, status: typeof a.effective_status === 'string' ? a.effective_status.toUpperCase() : '',
+        account: typeof acc.name === 'string' ? acc.name : acc.id, created: typeof a.created_time === 'string' ? a.created_time : '',
+        start: typeof a.adset?.start_time === 'string' ? a.adset.start_time : null, end: typeof a.adset?.end_time === 'string' ? a.adset.end_time : null,
+        page: a.adset?.promoted_object?.page_id && typeof a.adset.promoted_object.page_id === 'string' ? a.adset.promoted_object.page_id : pageOfCreative(a.creative), pageName: null,
+        wa: typeof a.adset?.promoted_object?.whatsapp_phone_number === 'string' ? a.adset.promoted_object.whatsapp_phone_number.replace(/\D/g, '') : null });
+    }
+  }
+  // Only the ads that reach this CRM (2026-10-22, the owner: "这里的广告应该只有 dc & the conts 的不是吗？", then of Dream
+  // Crafter ads sent to other WhatsApp numbers: "应该不是 DC & the conts 的广告", and "只有串接到这个 018 358 0219 WA 号码的才
+  // 是"): an ad whose ad set sends people to one of the CRM's ad numbers (`own.numbers`, digits with the country code).
+  // No numbers given = every ad.
+  const numbers = new Set(own.numbers.map(n => n.replace(/\D/g, '')).filter(Boolean));
+  const kept = rows.filter(r => !numbers.size || (r.wa !== null && numbers.has(r.wa)));
+  // Each Page's name, once (the desktop groups the ads by it: The Conts, Dream Crafter).
+  const names = new Map<string, string | null>();
+  for (const pg of new Set(kept.map(r => r.page).filter((x): x is string => !!x))) {
+    try { const n = (await get(`${pg}?fields=name`)) as { name?: unknown }; names.set(pg, typeof n.name === 'string' ? n.name.slice(0, 120) : null); } catch { names.set(pg, null); }
+  }
+  kept.forEach(r => { r.pageName = r.page ? names.get(r.page) ?? null : null; });
+  return kept.sort((x, y) => Number(y.status === 'ACTIVE') - Number(x.status === 'ACTIVE') || y.created.localeCompare(x.created)).slice(0, 300);
+}
+
+/** An ad's figures from Ads Manager for a range (2026-10-22, Ads Performance: "做花费和每个名单成本"). */
+export interface MetaFig { spend: number; impr: number; reach: number; clicks: number; allClicks: number; msgconv: number }
+
+/**
+ * Meta's insights for one ad over [since, until] (YYYY-MM-DD, the ad account's days): spend, impressions, reach, link
+ * clicks, all clicks and messaging conversations started. An ad with no delivery in the range answers zeros; one the
+ * token cannot see answers null (Ads Performance shows "—"). The server's only (the token never leaves it).
+ */
+export async function metaAdInsights(adId: string, token: string, since: string, until: string, fetchImpl: typeof fetch = fetch): Promise<MetaFig | null> {
+  if (!AD_ID.test(adId) || !/^\d{4}-\d{2}-\d{2}$/.test(since) || !/^\d{4}-\d{2}-\d{2}$/.test(until)) return null;
+  try {
+    const range = encodeURIComponent(JSON.stringify({ since, until }));
+    const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${adId}/insights?fields=spend,impressions,reach,inline_link_clicks,clicks,actions&time_range=${range}`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return null;
+    return figOf((((await res.json()) as { data?: Record<string, unknown>[] }).data ?? [])[0] ?? {});
+  } catch {
+    return null;
+  }
+}
+
+/** One insights row as our figures (messaging conversations started = Meta's 7-day attribution, as Ads Manager shows). */
+function figOf(row: Record<string, unknown>): MetaFig {
+  const num = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? Number(v) || 0 : 0);
+  const actions = Array.isArray(row.actions) ? (row.actions as { action_type?: unknown; value?: unknown }[]) : [];
+  const msg = actions.find(a => a.action_type === 'onsite_conversion.messaging_conversation_started_7d');
+  return { spend: num(row.spend), impr: num(row.impressions), reach: num(row.reach), clicks: num(row.inline_link_clicks), allClicks: num(row.clicks), msgconv: num(msg?.value) };
+}
+
+/**
+ * An ad's figures DAY BY DAY over a range (2026-10-23, Ads Performance's chart — the owner: "加一个数据图（参考谷歌广告的成效
+ * 显示）"): Graph's insights with time_increment=1, keyed by the day ("2026-10-21"); a day with no delivery has no row.
+ * Null when the ad cannot be read (the token cannot see it, a timeout).
+ */
+export async function metaAdDaily(adId: string, token: string, since: string, until: string, fetchImpl: typeof fetch = fetch): Promise<Record<string, MetaFig> | null> {
+  if (!AD_ID.test(adId) || !/^\d{4}-\d{2}-\d{2}$/.test(since) || !/^\d{4}-\d{2}-\d{2}$/.test(until)) return null;
+  try {
+    const range = encodeURIComponent(JSON.stringify({ since, until }));
+    const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${adId}/insights?fields=spend,impressions,reach,inline_link_clicks,clicks,actions&time_increment=1&limit=500&time_range=${range}`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const out: Record<string, MetaFig> = {};
+    for (const row of ((await res.json()) as { data?: Record<string, unknown>[] }).data ?? []) {
+      if (typeof row.date_start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(row.date_start)) out[row.date_start] = figOf(row);
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}

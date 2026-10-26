@@ -117,3 +117,35 @@ export const readTemplates = (waba: string, token: string, f: typeof fetch = fet
     .then(j => (j?.data ? j.data.map(t => ({ name: t.name, category: t.category, language: t.language, status: t.status })) : null));
 export const readPermissions = (token: string, f: typeof fetch = fetch) =>
   getJson<{ data?: MetaPermission[] }>(graph("me/permissions"), token, f).then(j => (j?.data ? j.data : null));
+
+/**
+ * v2 frame 09b (note 07): one business profile, written to the number's WhatsApp and / or its Facebook Page.
+ * WhatsApp takes about (139), description, address, email, one website and the category (vertical); a new display name
+ * is a request Meta reviews (`new_display_name` on the number). The Page takes about, description, its website and email
+ * — not its name, category, address (a structured location) or picture, which stay Facebook's to change.
+ */
+export interface BusinessProfile { name: string; about: string; description: string; address: string; email: string; website: string; vertical: string }
+export const waProfileBody = (p: BusinessProfile, handle?: string | null) => ({
+  messaging_product: "whatsapp", about: p.about.slice(0, 139), description: p.description.slice(0, 512), address: p.address.slice(0, 256),
+  email: p.email.slice(0, 128), websites: p.website.trim() ? [p.website.trim()] : [], vertical: p.vertical || "OTHER",
+  ...(handle ? { profile_picture_handle: handle } : {}),
+});
+export const pageProfileBody = (p: BusinessProfile) => ({
+  about: p.about.slice(0, 255), description: p.description.slice(0, 1000), website: p.website.trim(), emails: p.email.trim() ? [p.email.trim()] : [],
+});
+
+/** A photo for a WhatsApp profile: Meta's Resumable Upload (the app's uploads session, then the bytes), answering its handle. */
+export async function uploadWaPhoto(token: string, bytes: ArrayBuffer, mime: string, fetchImpl: typeof fetch = fetch): Promise<{ ok: true; handle: string } | { ok: false; error: string }> {
+  const dbg = await getJson<{ data?: { app_id?: string } }>(graph(`debug_token?input_token=${encodeURIComponent(token)}`), token, fetchImpl);
+  const app = dbg?.data?.app_id;
+  if (!app) return { ok: false, error: "Meta did not say which app the token belongs to, so the photo could not be sent." };
+  const start = await postJson(graph(`${app}/uploads?file_length=${bytes.byteLength}&file_type=${encodeURIComponent(mime)}`), token, {}, fetchImpl);
+  const id = start.ok ? String(start.data.id ?? "") : "";
+  if (!id) return { ok: false, error: start.ok ? "Meta did not open an upload for the photo." : start.error };
+  try {
+    const r = await fetchImpl(graph(id), { method: "POST", headers: { Authorization: `OAuth ${token}`, file_offset: "0" }, body: bytes, cache: "no-store" });
+    const j = (await r.json().catch(() => null)) as { h?: string; error?: { message?: string } } | null;
+    if (!r.ok || !j?.h) return { ok: false, error: `Meta refused the photo: ${j?.error?.message ?? `error ${r.status}`}`.slice(0, 250) };
+    return { ok: true, handle: j.h };
+  } catch { return { ok: false, error: "Could not reach Meta with the photo. Please try again." }; }
+}

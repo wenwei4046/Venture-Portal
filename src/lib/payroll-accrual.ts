@@ -72,6 +72,13 @@ export function buildAccrualLines(s: AccrualSums, monthLabel: string): JournalLi
   const cr = (accountCode: string, amount: number, label: string) => {
     if (r2(amount) > 0) lines.push({ accountCode, credit: r2(amount), description: `${label} - ${monthLabel}` })
   }
+  // A payable a resubmit lowered — a deduction no PV pays yet (2026-10-24) —
+  // goes back on the debit side: KRIS's PCB 1,821.90 → 647.90 books
+  // Dr 4074 PCB Payable / Cr 4070 Salary Payable 1,174.00.
+  const owed = (accountCode: string, amount: number, label: string) => {
+    if (r2(amount) < 0) dr(accountCode, -amount, label)
+    else cr(accountCode, amount, label)
+  }
   const deductions = s.deductions ?? 0
   const netOf = deductions > 0 ? ` (net of RM ${deductions.toFixed(2)} deductions)` : ''
   const salary = r2(s.basicEtc - deductions)
@@ -93,13 +100,13 @@ export function buildAccrualLines(s: AccrualSums, monthLabel: string): JournalLi
   dr('9081', s.epfEr, 'EPF Employer')
   dr('9082', s.socsoEr, 'SOCSO Employer')
   dr('9083', s.eisEr, 'EIS Employer')
-  cr('4070', s.net, 'Salary Payable')
-  cr('4071', s.epfBoth, 'EPF Payable')
-  cr('4072', s.socsoBoth, 'SOCSO Payable')
-  cr('4072', s.skbbk, 'SKBBK Payable')
-  cr('4073', s.eisBoth, 'EIS Payable')
-  cr('4074', s.pcb, 'PCB Payable')
-  cr('4074', s.withholdingTax ?? 0, 'Withholding Tax Payable')
+  owed('4070', s.net, 'Salary Payable')
+  owed('4071', s.epfBoth, 'EPF Payable')
+  owed('4072', s.socsoBoth, 'SOCSO Payable')
+  owed('4072', s.skbbk, 'SKBBK Payable')
+  owed('4073', s.eisBoth, 'EIS Payable')
+  owed('4074', s.pcb, 'PCB Payable')
+  owed('4074', s.withholdingTax ?? 0, 'Withholding Tax Payable')
   return lines
 }
 

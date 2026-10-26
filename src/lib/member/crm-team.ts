@@ -67,19 +67,30 @@ export function allDownlines(memberId: string, members: CrmMember[]): CrmMember[
 /** People over the limit of direct downlines — the hierarchy should not allow it. */
 export const overLimit = (members: CrmMember[]) => members.filter(m => directDownlines(m.id, members).length > MAX_DOWNLINES);
 
-/** The TL whose team a person is in (a TL is in their own). Above TL: none. */
+/**
+ * A team's top (2026-10-22, mig 20261022170000 crm_is_team_top; the owner: "只要是 report to peter (revenue director)，就是一个
+ * team"): a TL, or a TA / RS whose upline is the Revenue Director or the Boss (or who has none).
+ */
+export function isTeamTop(m: CrmMember, members: CrmMember[]): boolean {
+  if (m.role === "tl") return true;
+  if (m.role !== "ta" && m.role !== "rs") return false;
+  const up = m.uplineId ? members.find(x => x.id === m.uplineId) : undefined;
+  return !up || up.role === "hod" || up.role === "boss";
+}
+
+/** The top whose team a person is in (a top is in their own). Above it: none. */
 export function teamOf(memberId: string, members: CrmMember[]): string | undefined {
   let m = members.find(x => x.id === memberId);
   for (let guard = 0; m && guard < 10; guard++) {
-    if (m.role === "tl") return m.id;
+    if (isTeamTop(m, members)) return m.id;
     if (m.role !== "ta" && m.role !== "rs") return undefined;
     m = members.find(x => x.id === m!.uplineId);
   }
   return undefined;
 }
 
-/** Every TL — one team each. */
-export const allTeams = (members: CrmMember[]) => members.filter(m => m.role === "tl");
+/** Every team's top — one team each. */
+export const allTeams = (members: CrmMember[]) => members.filter(m => isTeamTop(m, members));
 
 /** The people in a TL's team who take enquiries: the TL, their TAs and RS. */
 export const teamHandlers = (tlId: string, members: CrmMember[]) =>
@@ -116,7 +127,7 @@ export function visibleTeams(viewer: CrmMember, members: CrmMember[]): CrmMember
   if (assignsAds(viewer)) return allTeams(members);
   const own = teamOf(viewer.id, members);
   if (own) return members.filter(m => m.id === own);
-  return visibleMembers(viewer, members).filter(m => m.role === "tl");
+  return visibleMembers(viewer, members).filter(m => isTeamTop(m, members));
 }
 
 /**
@@ -334,7 +345,8 @@ export interface CrmDealRule {
 }
 /** One team's Full time lead allocation: the chosen weekdays (0 = Monday) and, per person, the ticked days (1). */
 export interface CrmDealFullTime { days: number[]; ticked: Record<string, Record<string, number>> }
-/** What the next pick balances against, for this ad (since its rule started; 30 days with no rule). */
+/** What the next pick balances against, for this ad (since its rule started; 30 days with no rule) — or, counted together,
+ *  every together ad's this month (dealCounts, 2026-10-24). */
 export interface CrmDealCounts {
   /** Person → this ad's enquiries given to them. */
   given: Record<string, number>;
@@ -397,6 +409,13 @@ export function dealEnquiry(ad: string | null, at: Date, rule: CrmDealRule | und
     const director = fewest(members.filter(m => m.role === "hod").map(m => m.id), id => counts.given[id] ?? 0);
     return director ? { teamId: null, memberId: director, by: "default_director" } : organic;
   }
+  // A Full time day (2026-10-23, mig 20261024230000 — the SQL's crm_fulltime_teams): a weekday some team's Full time ticks for
+  // somebody who can be dealt. That day only those teams get the ad's leads, inside them their ticked people in turn.
+  const ftTeams = tls.filter(t => !!fullTimePick(t, at, fullTime[t], counts, members));
+  if (rule.mode === "even" && ftTeams.length) {
+    const teamId = fewest(ftTeams, id => counts.team[id] ?? 0)!;
+    return { teamId, memberId: fullTimePick(teamId, at, fullTime[teamId], counts, members), by: "full_time" };
+  }
   if (rule.mode === "even") {
     const all = [...new Set(tls.flatMap(t => teamHandlers(t, members).map(m => m.id)))];
     let memberId = fewest(all, id => counts.given[id] ?? 0);
@@ -406,12 +425,52 @@ export function dealEnquiry(ad: string | null, at: Date, rule: CrmDealRule | und
     if (ft) memberId = ft;
     return { teamId, memberId, by: ft ? "full_time" : "even" };
   }
-  const shares = Object.entries(rule.split).filter(([id, n]) => n > 0 && tls.includes(id));
+  const shares0 = Object.entries(rule.split).filter(([id, n]) => n > 0 && tls.includes(id));
+  // …only the ad's teams with somebody full time that day, their shares taking the others' (none: as any other day).
+  const ftShares = shares0.filter(([id]) => ftTeams.includes(id)), shares = ftShares.length ? ftShares : shares0;
   const teamId = fewest(shares.map(([id]) => id), id => ((counts.team[id] ?? 0) + 1) / rule.split[id]); // team = given + held, as the SQL adds them
   if (!teamId) return organic;
   const p = pickInside(teamId, rule.teamModes?.[teamId] ?? "pct", rule.people, at, fullTime[teamId], counts, members);
   if (p.hold) return { teamId, memberId: null, held: true, by: "over_the_limit" };
   return p.memberId ? { teamId, memberId: p.memberId, by: p.by } : organic;
+}
+
+/* ── Ads counted together (2026-10-24, mig 20261025121500) ─────────────── */
+
+/** An ad's rule as the dealer counts it: when its count started, and whether it is counted together ("Save and apply to all"). */
+export interface CrmDealAd { startedAt: Date; together?: boolean }
+/** A lead the counts are made of: its ad, when it came, its team, and who has it (nobody and held: waiting in that team). */
+export interface CrmDealLead { ad: string | null; at: Date; teamId: string | null; memberId: string | null; held?: boolean }
+
+/** The 1st of the month, 00:00 in Kuala Lumpur — the together ads count again from it, as the database does. */
+export function officeMonthStart(at: Date): Date {
+  const kl = new Date(at.getTime() + 8 * 3_600_000);
+  return new Date(Date.UTC(kl.getUTCFullYear(), kl.getUTCMonth(), 1) - 8 * 3_600_000);
+}
+
+/**
+ * The leads the next pick for this ad balances against (the database's crm_campaign_given): an ad apart, its own since
+ * `since` (its rule's start); an ad counted together, every together ad's leads this month (the office's), each from when
+ * its own rule started — so a new ad no longer begins at nothing and the small shares get their turn.
+ */
+export function countedLeads(ad: string, since: Date, ads: Record<string, CrmDealAd>, leads: CrmDealLead[], now: Date): CrmDealLead[] {
+  if (!ads[ad]?.together) return leads.filter(l => l.ad === ad && l.at >= since);
+  const month = officeMonthStart(now).getTime();
+  return leads.filter(l => { const a = l.ad ? ads[l.ad] : undefined; return !!a?.together && l.at.getTime() >= Math.max(a.startedAt.getTime(), month); });
+}
+
+/** What dealEnquiry balances against for this ad, from the leads: per person, per team (given or held), held, and Full time's
+ *  last given — that one from every lead, whatever its ad, as crm_fulltime_pick reads it. */
+export function dealCounts(ad: string, since: Date, ads: Record<string, CrmDealAd>, leads: CrmDealLead[], now: Date): CrmDealCounts {
+  const counts: CrmDealCounts = { given: {}, team: {}, held: {}, lastAt: {} };
+  const add = (r: Record<string, number>, k: string) => { r[k] = (r[k] ?? 0) + 1; };
+  for (const l of countedLeads(ad, since, ads, leads, now)) {
+    if (l.memberId) add(counts.given, l.memberId);
+    if (l.teamId && (l.memberId || l.held)) add(counts.team, l.teamId);
+    if (l.teamId && l.held && !l.memberId) add(counts.held, l.teamId);
+  }
+  for (const l of leads) if (l.memberId && l.at.getTime() > (counts.lastAt[l.memberId] ?? -Infinity)) counts.lastAt[l.memberId] = l.at.getTime();
+  return counts;
 }
 
 /** The counts after a deal — what the next one balances against. */

@@ -11,8 +11,8 @@ const row = (no: number, due: string, installment: number, outstanding: number):
   no, ym: due.slice(0, 7), due, installment, principal: null, interest: installment, balance: 0, outstanding, remark: '', tone: '',
 })
 const plan = (rows: PlanRow[], months: number | null = rows.length): RepaymentPlan => ({
-  kind: 'fixed', rows, months, paidCount: 0, outstandingDue: 0, firstDue: rows[0]?.due ?? null, firstInstallment: rows[0]?.installment ?? 0,
-  totalInterest: 0, principalPaid: 0, interestPaid: 0, principalOwed: 0,
+  kind: 'fixed', rows, months, paidCount: 0, outstandingDue: 0, overdue: 0, overdueSince: null, overdueDays: 0, firstDue: rows[0]?.due ?? null, firstInstallment: rows[0]?.installment ?? 0,
+  totalInterest: 0, principalPaid: 0, interestPaid: 0, principalOwed: 0, compound: null,
 })
 
 const deals: BookDeal[] = [

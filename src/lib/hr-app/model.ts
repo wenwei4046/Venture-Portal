@@ -9,8 +9,10 @@ import { formatIntlDate } from '@/lib/utils'
 import type { Notice, Notices } from '@/lib/push/notices'
 import type { MyMemo } from '@/lib/memos/model'
 import type { MyDocuments } from '@/lib/documentation/personal'
+import type { LetterChoice } from '@/lib/documentation/attach'
 import type { AttConfig, AttLedger, AttMonth, AttRequest } from '@/lib/attendance/types'
-import type { HiringField } from '@/lib/hiring/types'
+import type { HiringBankReason, HiringField } from '@/lib/hiring/types'
+import type { TermReview } from '@/lib/term-reviews'
 
 export type HireStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
 export type CandStage = 'shortlisted' | 'appointment' | 'offered' | 'hired' | 'rejected'
@@ -37,6 +39,8 @@ export interface HrCandidate {
   note?: string
   source?: string
   stage: CandStage
+  /** Not selected: why the Talent Bank keeps them, in HR's words (2026-10-24). */
+  why?: string
 }
 
 export interface HrHire {
@@ -122,6 +126,8 @@ export interface HrTalent {
   from?: string | null
   when: string
   notes: string
+  /** Why they are kept, in words (2026-10-24) — none for somebody kept before it was asked. */
+  reason?: string
 }
 
 export interface HrDocType {
@@ -172,7 +178,32 @@ export interface HrAppData {
     today: boolean; approve: boolean; balances: boolean; close: boolean; records: boolean; people: boolean
   }
   /** The writes behind its buttons, by their page's boxes and the cells: a button they may not use is not drawn. */
-  may: { attDecide: boolean; decide: boolean; hireApprove: boolean; hireEdit: boolean; hireCreate: boolean; talentEdit: boolean; book: boolean }
+  may: {
+    attDecide: boolean; decide: boolean; hireApprove: boolean; hireEdit: boolean; hireCreate: boolean; talentEdit: boolean; book: boolean
+    /**
+     * People · Edit on a person's page: Acknowledge the reminder of a probation's end (2026-10-23) or a contract's
+     * (2026-10-24), and since 2026-10-24 a probation's Confirm as permanent and Extend. Absent reads as no.
+     */
+    termEdit?: boolean
+    /**
+     * Documentation · Create on a person's page (2026-10-24): a letter filed with Confirm as permanent or Extend — and,
+     * with termEdit, Renew, which files the new contract. Absent reads as no.
+     */
+    letters?: boolean
+  }
+  /**
+   * The Data center's letter types a step's letter is filed as (2026-10-24, `hr_letter_type_choices()`): null while
+   * they may not file one. Absent reads as none.
+   */
+  letterTypes?: LetterChoice[] | null
+  /**
+   * The probations HR is reminded of (2026-10-23 — the user: "HR 手机 app 里的提醒和推送"): everybody active on
+   * probation (`probation_reviews()`, lib/term-reviews.ts), for whoever may acknowledge one. Null while they may
+   * not, and while viewing as somebody. Absent reads as none.
+   */
+  probation?: TermReview[] | null
+  /** The contracts, the same way (2026-10-24, `contract_reviews()`). */
+  contract?: TermReview[] | null
   /**
    * HR › Attendance as its own readers answer it (2026-10-17, HR Mobile — Today, Approve, a person, Leave balances,
    * Month close, Records): null while none of those pages is open to them. Absent reads as none.
@@ -186,6 +217,8 @@ export interface HrAppData {
   meLine?: string
   /** Hiring's requester form (Form settings), for "+ New hiring request" — the desktop drawer's fields, in its order. */
   hireFields?: HiringField[]
+  /** Why somebody not selected is kept: HR's reasons (Form settings) — the why sheet offers the ones that are on. */
+  hireReasons?: HiringBankReason[]
   /** Who may be "Requested by": everybody working here today. */
   hirePeople?: Array<{ id: string; name: string; dept: string }>
   /** The reader's own roster row in Hiring (Requested by defaults to them). */
@@ -431,16 +464,25 @@ export function clashOf(bookings: readonly HrBooking[], roomId: string, date: st
 /** A memo's tag (2026-10-12): the olive of Documentation's kind tag. */
 export const MEMO_TAG = { tag: 'MEMO', bg: 'rgb(238 240 226)', fg: 'rgb(88 98 68)' } as const
 
+/** A probation's tag (2026-10-23): the design system's warning pair, as the roster's Probation chip wears it. */
+export const PROBATION_TAG = { tag: 'PROB', bg: 'var(--ds-warning-bg)', fg: 'var(--ds-warning)' } as const
+
+/** A contract's tag (2026-10-24): the design system's accent-soft pair — the peach of the roster's Contract chip. */
+export const CONTRACT_TAG = { tag: 'CONT', bg: 'var(--ds-accent-soft)', fg: 'var(--ds-accent-soft-ink)' } as const
+
 /**
  * A notice's tag, in the Review list's own colours: HIRE (a hiring request), ROOM (a meeting), REQ (a member's
  * request), MEMO (a memo or letter for them — 2026-10-12).
  */
-export function noticeTag(n: Pick<Notice, 'refKind'>): { tag: string; bg: string; fg: string } {
+export function noticeTag(n: Pick<Notice, 'refKind'> & { title?: string }): { tag: string; bg: string; fg: string } {
   if (n.refKind === 'hiring_request') return { tag: 'HIRE', bg: 'rgb(255 244 231)', fg: 'rgb(163 78 37)' }
   if (n.refKind === 'booking') return { tag: 'ROOM', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
   if (n.refKind === 'memo') return { ...MEMO_TAG }
   // An IT request (2026-10-20): the desk's or its sender's — it opens in the Revenue app.
   if (n.refKind === 'it_request') return { tag: 'IT', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
+  // A probation ending (2026-10-23): the person — the amber of the roster's Probation chip; a contract's (2026-10-24,
+  // notify_term_ends titles it so), the peach of its.
+  if (n.refKind === 'hr_staff') return n.title?.startsWith('Contract ending') ? { ...CONTRACT_TAG } : { ...PROBATION_TAG }
   return { tag: 'REQ', bg: 'rgb(240 236 230)', fg: 'rgb(78 52 38)' }
 }
 

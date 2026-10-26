@@ -1,5 +1,366 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-26 p (SHIPPED, #778) — the Company Statement: who owes whom, each side's total, a counterparty in one table
+
+Session 35e03c3c, after o. The user: "company statement 那边我也想要优化" (加图表 · 整理表格 · 点开的明细) → six mockup
+rounds (`OneDrive\Desktop\Claude\Venture\mockups\company-statement-mockup.html`; the choices in memory
+company-statement-charts-sample) → "Payoff 用 A 分两栏，顺序用 A 日期新到旧，照第六版开始做：Who owes whom 横条 + 提示框 A、
+表整理、点开一个表加线条；Month by month 不做" → "上一轮 SQL checks 已经是绿的，现在就合并上线".
+
+- **Who owes whom** (`company-statement/_components/WhoOwesWhom`, between the cards and the table): per counterparty,
+  to repay a red bar to the left, to collect a green bar to the right, the net beside; most to collect first; "—" for a
+  side with nothing; the hover box (the dept charts' `.dept-tip`, portalled) = each side's count / principal /
+  interest / total + the net. Tried and dropped in the samples: donuts, a hover listing each position, a Month by
+  month chart and a "Next 3 months" card (the user: "Month by month 有什么用？").
+- **The counterparty table** (`StatementView`, `table.cs-sheet`): green / red column groups with Principal · Interest ·
+  Total (≥980px of room; the totals alone ≥560; the net alone on a phone — `useWidth` → `colsOf`), the net worded and
+  coloured, "n to collect · n to repay" by the name, Sort (Largest · Net · To collect · To repay · A–Z) and Show (All ·
+  To collect · To repay) — `lib/counterparty-statement-view#shownCounterparties`; a line between every column; search,
+  Expand all, the export ticks and the navy total row (`tr.cs-total`) as before.
+- **A counterparty opened = ONE table** (`PositionsTable`, `table.cs-pos`, fixed widths on its header): Date · Terms ·
+  Original · Total interest ‖ Principal due · Interest due · Total due · Left · Payoff · →; a green To collect row with
+  that side's totals under the columns, its positions newest first (`orderPositions`), the red To repay row the same,
+  a Net row (signed). Left = "n of term", Payoff = the month, "No fixed date" with no schedule; a no-fixed-term deal's
+  monthly interest in Interest due as "x/mo" (in no total); compounding shows its accrued interest as before. Terms
+  read "4%/mo · 6 mo · from May 2026" (the agreed first month only when it is not the month after the date); Original
+  sits after Terms (the user: "倒反回来"). The 差价 rows stay under their deal; the row opens the deal, its arrow the
+  link. Under ~860px the date goes under the terms and the payoff under the total due (`fitOf`); a phone keeps terms +
+  total due.
+- `PositionRow.startDate` (the deal's date, already loaded) feeds the Date column. The Excel / PDF export and the
+  Finance phone app (`lib/fin-app/report-pages`) are unchanged. No overdue / late labels anywhere.
+- **#778 squash-merged `262541cc`** (2026-10-26 06:08 UTC). CI on its head: build, worker + PDF green; SQL checks green
+  on the PR's first push (the second changed one CSS line); Unit tests red ONLY on 3 Marketing tests — ProductProject
+  "Sent 24 Oct 13:00" and PicPage ×2 — which use the real clock against a fixture sent Sat 24 Oct 13:00 and crossed
+  #700's red-after-4-working-hours line on Mon 26 Oct ~13:00 MYT; main fails them too. Not touched (the user: "不用管");
+  the fix is a fixed clock in those tests (`vi.setSystemTime`), Marketing's to do. Our own miss (Georgia on screen in
+  `.cs-empty`, the design-tokens test) was fixed in the PR.
+- Checked before merge: the real components rendered with the lending book (vitest dump + compiled CSS + headless
+  Chrome) at 1180 / 860 / 520px; not seen on the live site (it needs the user's sign-in).
+
+## CHECKPOINT 2026-10-26 o (SHIPPED, #760) — each department's page with its charts; the statement in their dress
+
+Session 35e03c3c, after m (n's drill-down shipped from e73c0205). The user, on Dept Pool's department pages:
+"department 那边我要做成像 venture pool 这样用 diagram 和 chart 的 … 别只是 in 和 out, 可以在细分一点" (their Hookka
+ERP sample) → twelve mockup rounds (`OneDrive\Desktop\Claude\Venture\mockups\dept-charts-mockup.html`; the choices in
+memory dept-charts-design-decided) → "这一版可以了，开始做。" → "CI 全绿就合并上线".
+
+- **Page** (`dept-pool/statements/[seg]`, all 7 departments, both views): title "Marketing - Cash Flow" / "Marketing -
+  Profit & Loss", Excel / PDF by it; a period row (`_components/DeptPeriodBar`) — P&L | Cash Flow, From → To, 6 / 12
+  months, "* = month still running"; cards with money in green and money out orange and positive (StatCard tones `in` /
+  `out`). Default period still the year to date.
+- **Charts** (`_components/DeptCharts`, plain SVG in React, no chart library): In vs Out = a Month (Total first, the
+  default) and two donuts by account (top 5 of ≥4% in palette A, the rest a grey Others with its members) beside each
+  month's in / out bars and the net line — a bar's click picks its month, the hover box (portalled) sits beside the
+  bar; then two ranked-bar cards (top 6 + Others, share, the months as small bars) that follow the Month. Figures:
+  `lib/dept-charts` reads the loaders' own matrix cut by `sliceMatrixMonths`, so every chart figure is a table cell.
+- **Statement**: `SheetReport variant="dept"`, rows from `lib/dept-statement` — each block's title carries its side's
+  total (green / orange) at every level, a group keeps its figure on its own line (no Subtotal), L2 by default with ▶
+  per category (turned per level), a % base per row (Cash Flow: that month's money in / out, Net change of money in,
+  balances "—"; P&L: revenue), 0.0% beside a nil figure, Total + % first, the running month starred, a square in each
+  account's chart colour; the #754 drill unchanged. The dept P&L leaves out a category with nothing in the period and a
+  Gross profit with no cost above it. Reports' tables (no `variant`) are as they were.
+- **Across the year**: `reportRange(…, { crossYear })` (From up to 11 months before To; `buildFrom` when before
+  January) + `monthColumns(year, tm, from)` / `buildMonthlyCashFlowSides` / `buildPnlAccounts` / the loaders' `from`;
+  the Monthly P&L / Cash Flow exports take it too, so Excel / PDF are the months on screen (checked: Accumulated + Oct
+  2026 … Nov 2025, the PDF head "Nov 2025 – Oct 2026" without "FY"); `rangeLabel` reads "Nov 2025 – Oct 2026".
+- Layout follows the room the charts get (container queries — the sidebar counts): the two panels stack under ~980px of
+  content, the ranked cards under 720px, names wrap on a phone; no page scroll sideways at 375px.
+- **#760 squash-merged `30f7dbdf`** (2026-10-26 01:49 UTC) → production deploy success 01:50 UTC. CI 7/7 green; the first
+  Cloudflare worker build failed fetching Google Fonts for `next/font` (main's run a minute later passed; the rebase
+  re-ran it green). No migration.
+- Checked before merge in a local esbuild preview of the real components with Marketing-shaped figures (the COA's real
+  parents and the saved cash-flow layouts); not seen on the live site (it needs the user's sign-in).
+- Open from the mockup, not asked again: two decimals (kept) vs whole numbers; the ledger's Other side keeps codes.
+
+## CHECKPOINT 2026-10-25 n (SHIPPED, #754) — an account opens onto a ledger of its lines; month by month onto its months first
+
+Session e73c0205 (handed off from 35e03c3c after m). The user, on the drill-down: "我想要这样的概念 … monthly 也要能点开
+先别做，先确定" → mockup (the ledger table; Monthly A = row → months, B = a month's figure) → "照样稿做，Monthly 用 A：
+点科目整行，先列每个月，再点月份看明细" → "CI 全绿就合并上线，部署好告诉我".
+
+- **Single month** (P&L, Cash Flow, Receipt & Payment): an account opens on its whole row onto a ledger — Date ·
+  Description · Other side · Ref. 1 (JE) · Ref. 2 (PV / OR / invoice / CN no.) · Debit · Credit; foot `N lines · Open in
+  General Ledger ↗ · Oct 2026` (→ `/reports/ledger?codes=&from=&to=`, new tab; hidden for IB-XFER / PY-XFER) + Dr / Cr
+  totals. The old two-line rows are gone. R&P's 未收 rows still open: the invoice as one line, its number Ref. 2, owed = debit.
+- **Month by month** (Monthly P&L, Monthly Cash Flow, Monthly R&P's cash rows — never the AR_ receivables — and Dept
+  Pool's department statements): row → its months latest first (lines, the row's own figure; a month with neither is
+  skipped) → a month → its ledger; foot = lines over the range · GL link over the range · the Accumulated. Lines are read
+  when the row opens: server actions `reports/drill-actions.ts` (`openReportRow(page, ask)` under each Reports page's own
+  gates, bound per page; `openDeptPoolRow(ask)` under Dept Pool's) → `reports/_lib/drill-reads.ts#readMonthlyDrill` (P&L
+  consolidated = inter-billing eliminated; one segment's cash = with the bridge; payroll folded per `listsPayrollByPerson`).
+  Cached per row and scope (report|segment|from|to): another period or segment starts folded and reads afresh.
+- `lib/gl-reports`: `GlTxn` gained `debit` / `credit` / `otherSide` (`otherSideOf`: the entry's other accounts, largest
+  first, `+n`) / `refNo` (`applyGlRefs` → `ref_no` from `payment_vouchers.voucher_no`, the invoice number,
+  `credit_notes.credit_note_no`; an invoice's words alone as `ref_text`). A **cash** line's debit / credit is the cash it
+  moved (k = |share| / |line|) so the ledger adds up to the row; all-cash entries show the line as booked.
+- `SheetReport`: the ledger sits in a sticky box sized to the sheet (ResizeObserver) so it never scrolls away across the
+  months; the month list has fixed columns and an opened month's ledger scrolls in its own box on a phone.
+- **#754 squash-merged `0b86fe14`** → production deploy success 17:41 UTC (CI 7/7 green). No migration.
+- Checked before merge by headless-Chrome screenshots of an RTL dump (memory: visual-check-headless-chrome).
+- Elsewhere (original session 35e03c3c): the user asked for a Dept Pool department page with diagrams / charts like
+  Venture Pool, finer than in / out — mockup only, not built.
+
+## CHECKPOINT 2026-10-24 m (SHIPPED, #737) — a 利滚利 schedule rolls from the month it turned compounding; tidied
+
+Session 35e03c3c, after l. The user used the new flow for **LO#7** at 09:34–09:35 UTC (Finance Manager filed, Principal
+approved): from 2026-01, 4% /mo, compounding, no fixed term (the A of the old A/B/C choice — the monthly roll). Then, on
+its schedule: "我要如何看total 现在overdue 多少？这些要整理一下，然后英文字体" → mockup (before/after, font A/B) →
+"照整理后的样子做，算法一起修正，数字字体保留 A（Chivo Mono）" → "全绿就合并上线".
+
+- **The figures were wrong**: `compoundPlan` rolled every month as compounding, LO#7's flat 2025 months too (300 → 295 →
+  289.98…), so January rolled from 50,817.88, not the 51,000 `compoundRoll` (Company Statement) rolls from — October
+  read 2,342.88. Now a deal flat before keeps those months as their terms asked (payments before the switch oldest
+  first) and rolls from the switch on the segment's base. LO#7: Apr–Dec 2025 1,300 paid each (59,000 → 51,000); Jan
+  2,040 due / 1,300 paid / 740 to balance … Sep 1,012.74 to balance (58,831.27 = compoundRoll's); Oct **2,353.25 overdue
+  19 days**; owed 61,184.52; 7,831.27 rolled in; due 33,584.52 = 23,400 + 7,831.27 + 2,353.25.
+- **`RepaymentPlan`** gained `overdue` / `overdueSince` / `overdueDays` (overdueOf's rule, rows marked `late`) and
+  `compound` (term breaks, owed now, paid to date, rolled-in interest); 利滚利 rows carry `paid` / `toBalance`; remarks
+  `Part paid · 740.00 to balance`, `Unpaid · x to balance`, `Paid <date> · <ref>`.
+- **Table**: a no-fixed-term head says `· OVERDUE RM x` (every open plan); a 利滚利 deal gets four figures over the table,
+  Due / Paid / To balance / Balance / Overdue, a line where its terms change, and `Due = Paid + To balance + Overdue`.
+  Fixed / flat plans unchanged; figures stay Chivo Mono (the user kept A).
+- **#737 squash-merged `3a611ef2`** → production deploy success 10:24 UTC (CI 7/7 green). No migration.
+- Not changed (raised, the user did not ask): the side panel's *Outstanding* (principal only — LO#7 shows 42,000 while
+  61,184.52 is owed) and the print sheet's columns.
+
+## CHECKPOINT 2026-10-24 l (SHIPPED, #736 + mig 20261025110000) — Finance files a terms change, the Principal approves it
+
+Session 35e03c3c, after k. The user found Fund OUT's terms could not be changed from their account ("fund out 我发现我不能
+自己改term？") — Amend terms needs **Treasury · Approve**, which also approves vouchers / loans / fund sources, so the
+Finance Manager (Treasury · Edit) could change neither side. User: "finance manager 可以改条款，但是经过principal approve
+不就可以了？" → mockup (filed → approved → applied) → "可以" → "好了就跑pr 上线".
+
+- **Migration `20261025110000_terms_change_requests`** applied first (09:09 UTC, one transaction refusing itself unless
+  the four bodies' prosrc md5 = PGlite's: file `a0e117f4…`, approve `23d4798d…`, reject `ff845649…`, withdraw
+  `06845f5e…`; schema_migrations row created_by `claude-terms-requests`; `NOTIFY pgrst`). Adds approval type
+  `terms_change` (no domain → only `approvals.approve`), table `treasury_terms_requests` (one pending per deal; SELECT only
+  for authenticated — Supabase's default privileges grant ALL, revoked; `permission_table_reads` treasury.view/edit/approve;
+  audit `none`), RPCs `file_terms_change` (Treasury · Edit; the amend's checks incl. a loan's base rate), `approve_terms_change`
+  (applies via `amend_*_from` in the same transaction — a refused amend approves nothing; history reason gets
+  `（提交：<filer>）`), `reject_terms_change`, `withdraw_terms_change` (filer or approvals.approve).
+- **#736 squash-merged `93757f92`** → production deploy success 09:26 UTC (CI 7/7 green; merged after the migration and the smoke test). No page
+  had read the new table yet when checked (edge logs: only the two probes).
+- Smoke test on production in one ROLLBACK transaction, as the real accounts: the Finance Manager filed LO#7 at 0.6% from
+  2026-11 (title `Change terms · The Cont [LO#7] · RM 60,000.00 · from 2026-11 · 0.600%/mo`), could not approve it
+  ("you may not decide this request"); the Principal approved → LO#7 0.6%, terms from 2026-11, 41 months left, history
+  2025-04..2026-10 at 0.5% reason `smoke test （提交：Finance Manager）`. Rolled back: LO#7 0.5% · 60 · no history, 0 requests.
+  Live API (publishable key): `rpc/file_terms_change` and `treasury_terms_requests` → 401 permission denied (in the cache).
+- App: Edit-only holders' Amend terms files the from-month change ("提交给 Principal 核准"; 整条重算 stays the
+  Principal's); the deal page shows the waiting / approved / turned-down strip (30 days) with Withdraw / Open in Approvals;
+  Approvals (page, drawer, phone) lays the month's terms now beside as asked (`lib/terms-change-request.ts`).
+- Also answered: Aug–Oct 2026 BI#7 payments of 1,300 are all recorded — oldest-first moves each month's 124.83 shortfall
+  forward (kept as the user said: "这样保留 最早的先抵先").
+- Still the user's: LO#7's terms change (how, not yet said); the Balance-column / OUTSTANDING wording raised in k.
+
+## CHECKPOINT 2026-10-24 k (SHIPPED, #728 + mig 20261025100000 + data) — BI#7 and LO#7 done as the user wants them
+
+Session 35e03c3c, closing j. User: "做" (twice) → in order, each step checked:
+
+- **Migration `20261025100000`** applied first (07:3x UTC, one transaction refusing itself unless prosrc md5 = PGlite's
+  `d0a386a0…` / `eb7b444a…`, anon no EXECUTE, no non-9-arg RPC left; schema_migrations row, created_by
+  `claude-terms-keeps-base`; `NOTIFY pgrst`). → **#728 squash-merged `3d864c58`** (CI 7/7 green after main's lint was
+  fixed by the CRM owner in #729 and a package.json conflict with #711 resolved) → production deploy success 07:36 UTC.
+- **BI#7 data** (one checked transaction, as the system): `revert_terms_change` → `amend_fund_source_from(…, '2026-01-01',
+  0.00833, 51, …)` → `amend_fund_source_from(…, '2026-10-01', null, null, null, …, true, false, true)`. Now history
+  2025-04..2025-12 0.5% × 60, 2026-01..2026-09 0.833% × 51 (kept → true); the record 0.833%, no fixed term from
+  2026-10, first instalment 5 Apr 2025; 38 repayment rows untouched; HC's two rows untouched (4 history rows in all).
+- Live API checked with the publishable key: `treasury_terms_history?select=…,next_interest_keeps_base` 200 (RLS-empty);
+  `rpc/amend_fund_source_from` with 9 args → 401 *permission denied* (found in the schema cache, refused to anon).
+- BI#7 now reads (production rows through the merged code): Apr–Dec 2025 1,300 paid; Jan–Sep 2026 **1,424.83**
+  (oldest first: Jan–Jul paid, Aug part paid 1,026.19 · short 398.64, Sep part paid 1,000 · short 424.83); Oct
+  **424.83** interest only, overdue; owed 1,248.30; balance 41,000.
+- **LO#7** (fund out to The Cont, funded by Liang): first instalment set to 5 Apr 2025 too (`set_loan_repayment_start`,
+  07:13 UTC, after a dry-run) — its 18 payments meet Apr-25..Sep-26, October reads unpaid. Its page's "matures
+  05 Apr 2030" (disbursement + 60) is a month after the last row (5 Mar 2030) — said, not changed. Its terms change:
+  still the user's to define.
+- #730 (my CRM lint PR, opened by mistake) **closed** — CRM is not this user's area.
+- Raised, not changed (the user to decide): a fixed plan's Balance column is "still to collect, principal + interest"
+  (LO#7: 76,700 after row 1) while a no-fixed-term plan's is principal owed; the schedule header's OUTSTANDING
+  (54,600) vs the panel's Outstanding (42,000 principal).
+
+## CHECKPOINT 2026-10-24 j (SUPERSEDED by k) — Liang's BI#7, as the user wants it
+
+Session 35e03c3c, after i. **Supersedes i's "settled" line**: the user then said what BI#7 should be — "interest 1 月重新算，
+10月开始就没有fixed repayment term 和 principal" + "10 月起利息照旧每月 424.83（按 1 月的 51,000 算），不管之后还了多少本金".
+
+- **PR #728 (OPEN, not merged)** — 「从某月起生效」 · 利息照之前的本金算: `treasury_terms_history.next_interest_keeps_base`
+  (mig `20261025100000`, NOT on production yet; dry-run: prosrc md5 `d0a386a0…` / `eb7b444a…`), `p_interest_keeps_base` on
+  both amend RPCs (9 args), `TermsSegment.interestKeepsBase`, forms (desktop + phone), timeline, statement tooltip.
+  Its data step for BI#7, in one checked transaction after the deploy: `revert_terms_change('fund_source', BI#7)` →
+  `amend_fund_source_from(…, '2026-01-01', 0.00833, 51, null, 'Recalculate Interest', false, false, false)` →
+  `amend_fund_source_from(…, '2026-10-01', null, null, null, '10月起无固定期限，利息照1月的51,000算', true, false, true)`.
+  Result: Jan–Sep 2026 1,424.83 (1,000 + 424.83), Oct on 424.83 interest only. **Go-live still needs the user's OK.**
+- **Blocked**: main's "Next.js build check" fails on lint since #726 — `src/components/member/crm/desk/Desk4a.tsx` (a
+  `useState` after an early return). Not ours: **CRM is not this user's area** ("crm 的不是我负责的"). PR #730 (my fix)
+  was opened by misreading "开pr 做" — **do not merge it**; left open, the user may want it closed.
+- **APPLIED 06:38 UTC**: BI#7's first instalment = 5 Apr 2025 (`set_fund_source_repayment_start`, "第一笔是4月") — 19
+  instalments to Oct-26, interest owed 1,248.30 (was 948.30), balance 41,000.
+- Decided: keep **oldest first** ("这样保留 最早的先抵先" — Jan–Jul read paid, the 124.83 a month piles on Aug–Oct);
+  parked: whether the 15 Oct 1,300 (booked 1,000 principal JE-202610-1055 + 300 interest JE-202610-1056) is all interest.
+- **Waiting on the user**: LO#7 (fund out to The Cont, funded by Liang) "要改，等下我确定了怎样改再告诉你". BI#5 / LO#5 /
+  LO#7 also pay from their money's month (first instalment stored a month late) — mentioned, not changed.
+
+## CHECKPOINT 2026-10-24 i (SHIPPED, #720) — a no-fixed-term deal's earlier fixed months ask their principal; Balance counts principal paid before the first month
+
+Session 35e03c3c. User, on BI#7's schedule (Lim Wei Liang, 60,000, fund in): "帮我检查这个installment 是不是显示错了？ 指检查"
+→ shown the findings → "修这两个显示问题：2025 年固定期的 Installment 和 Balance 多 1,000，开 PR 做" → "全绿就合并上线".
+Squash-merged ac08b0e7; production deploy success 05:26 UTC.
+
+- What happened first (not by me): 2026-10-24 04:12 UTC the **Principal** account amended BI#7 (4cb7ee6d) from a month on —
+  2026-01, cost_rate 0.00833, **no fixed term** (history 2025-05..2025-12 at 0.5% × 60, reason "Recalculate Interest").
+  Memory `liang-cont-terms-change-pending` had this side as pending with a different sketch (fixed 1,000 principal on,
+  or no fixed term only from Oct-26) — the user first said "现在的设定是对的：2026 年 1 月起就无固定期限", **then corrected
+  it — see j** (fixed 1,000 a month to Sep-26, no fixed term from Oct with the interest kept on 51,000). Also 0.833% ×
+  51,000 = 424.83, not the 425 of 10% p.a. — the user confirmed 424.83.
+- Display bugs it exposed, fixed in `lib/repayment-plan` `openPlan` (a deal whose CURRENT terms are open is drawn
+  wholly month by month): (1) a month an earlier fixed segment governs, within that segment's schedule, now asks its
+  principal and is set against oldest first as `fixedPlan` does (BI#7 May–Dec 2025: 1,300, had read 300); (2) Balance
+  starts from principal repaid before the first month (BI#7's 5 Apr 2025 payment — first due May; October 41,000,
+  had read 42,000).
+- Only BI#7 changes on production: the other open deals with principal paid before their first month (HC 45,156.32 /
+  140,000 fund sources, The Cont 80,000 / 2990 60,000 loans) were repaid inside that month and draw no rows either way.
+- The screenshot the user sent was taken between 04:12 and 04:15 UTC — before PV-202610-0478 (15 Oct, 1,300) was
+  approved — so it showed October without principal and August "Part paid 26.19".
+- Tests: `repayment-plan.test.ts` +3 (fail on the old code). Local full run: 2 failures, both CRLF false ones
+  (`erp-sync/catalogue.test.ts`; `crm/palette.test.ts` › `sales/wall.ts:7`, a `//` comment with a hex — its strip
+  regex misses the `\r`); CI green.
+
+## CHECKPOINT 2026-10-23 h (SHIPPED, #677) — Fund OUT: a loan's funding source in a Source column of its own
+
+Session 35e03c3c, after g. User, on the Fund OUT list: "fund out 出去的 sc 可以单独一个column 吗？ 确定先" → shown a
+before/after sample (SC column after Description, filter chips) → "栏名用source" → "全绿就合并上线" → (asked to confirm
+it went through a PR) "那就行，做吧". Squash-merged 18d6eb3e; production deploy success 05:18 UTC.
+
+- `FundHub` (desktop hub, Fund OUT only): column `source` · *Source* after `desc` — `r.fundingSource` as recorded
+  (`HC`, `HV (HC)`, `2990s`…), `—` when none; kind `text`, so it sorts, filters by its funnel and ticks off in Columns.
+  The Description is `fundLine(r, false)` (rate · term). Search (`fundHaystack`) still includes the SC; the Finance
+  phone app's line keeps `SC …` (`fundLine` default); the drawer's *Funding source* row stays; Fund IN unchanged.
+- Saved layouts on production for `fin.fund-out`: Principal's (`date, name, desc, rate, amount, outstanding`, hidden
+  status/type) and Finance Manager's — neither hides `source`, so it shows for both, right after Description
+  (`applyOrder`: a column new to a saved order follows its nearest default predecessor). No layout → Name ·
+  Description · Amount as before; Source is ticked on like Date / Rate. No `table_layout_defaults` row exists.
+- Tests: `FundHub.test.tsx` (+2: Source after Description, `HC` / `—`, its funnel filters to HC, search `sc hc`;
+  no Source on Fund IN), `fund-hub.test.ts` (`fundLine(r, false)`). No database change.
+- Also verified for g: the live app's `treasury_terms_history` reads (with `next_interest_on_original`) — 35 × 200
+  after the #671 deploy (edge logs); production has `pgrst_ddl_watch`, so the schema cache reloaded by itself.
+- The repo refuses GitHub auto-merge, and CI must not be polled: with a check still running, finish other work,
+  read `ccd_pr get_status` again, merge when it is all green.
+
+## CHECKPOINT 2026-10-23 g (SHIPPED, #671 + mig 20261024100000 + data) — 从某月起生效 · 利息按原本金算; HC's Conts 60k / 58k
+
+Session 35e03c3c (Finance user; reply in 华语). User: "帮我检查HC 那两笔为什么是part payment" → "5月那期利率本来就是3.5%"
+→ "5月还是用本金*3.5%，6月就变成还是用本金*3%" → "别显示成penalty … 还是算成interest" (the penalty relabel is REJECTED
+— don't re-offer it) → "第2种，确定了开pr 做" → "全绿就上线".
+
+- Why October read part paid on the Repayment Schedule calendar: HC's Conts 60k (dcf15071, due the 2nd) and 58k
+  (32460c13, due the 15th), 6 instalments May–Oct 2026, were 3% from day one; May was paid 2,100 / 2,030 (3.5%), so
+  the extra 300 / 290 carried oldest-first onto October. September was paid late (PV-202610-0449 on 2 Oct,
+  -0450 on 17 Oct — their own "5rd Installment"); October itself is unpaid.
+- A 从某月起 change re-bases the flat interest on the principal still owed at its month (3% from June = 1,500 on the
+  50k left), which is not this deal. **New:** a change may take its interest on the ORIGINAL principal — checkbox
+  `利息按原本金算` on both desktop Amend forms, *Interest on the original principal* on the phone sheet. The flag
+  lives on the history row the change files (`treasury_terms_history.next_interest_on_original`, describing the
+  segment AFTER it, as `reason` does), so revert takes it back. `amend_fund_source_from` / `amend_loan_from` gained
+  `p_interest_on_original` (8 args; the 7-arg ones dropped). `TermsSegment.interestBase / interestOnOriginal`.
+- First 从某月起 change ever on production (0 history rows before), so readers that took the record's months (the
+  months LEFT from the change) as the whole term were fixed: `installmentsInAll` (Fund IN / OUT pages' Term,
+  repaid-by / matures, both lists), Fund IN page's Monthly payment from the current segment (the view's would say
+  13,800), Company Statement term + Total Interest via `planTotals` (6mo, 11,100) — what is LEFT still reads the
+  current segment, as designed 2026-09-21.
+- Live: migration applied first (one transaction, refusing itself unless prosrc md5 = PGlite's `d0e49557…` /
+  `aa693414…`, anon no EXECUTE, no 7-arg left; schema_migrations `20261024100000`, created_by
+  `claude-terms-original-base`) → #671 squash-merged (f4df89c0) → production deploy success 04:17 UTC → data, as the
+  system, through the app's RPCs: `amend_fund_source(id, {"cost_rate":0.035})` then
+  `amend_fund_source_from(id, '2026-06-01', 0.03, null, null, '5月本金×3.5%，6月起本金×3%（利息按原本金）', false, true)`,
+  pre/post-checked in the same transaction. Now: both 3% × 5 from 2026-06; history May 3.5% × 6 flagged; repayment
+  rows untouched.
+- Verified with production's rows through the app's own code (the browser pane is signed out — not looked at
+  there): 60k May 12,100 paid, Jun–Sep 11,800 paid, **Oct 11,800 unpaid (overdue)**; 58k May 11,696.67, Jun–Sep
+  11,406.67, Oct 11,406.65 unpaid; Term 6 months, repaid by 2 / 15 Oct; Statement 6mo, 11,100 / 10,730.
+- Tests: `src/lib/terms-interest-on-original.test.ts` (13), `tests/member-sql/validate-terms-interest-on-original.mjs`
+  (14 checks). Local full unit run: one failure, `erp-sync/catalogue.test.ts` › *the ingest strips…*, a CRLF
+  false failure (passes against the LF blob; CI green).
+
+## CHECKPOINT 2026-10-23 f (OPEN — waiting on the user) — where a report opens onto its ledger lines
+
+Session 0cbfb699 (Finance user; reply in 华语 — memory `reply-in-mandarin-always`) shipped c (#620 hub cards in a
+row), d (#625 Create payment's lines + mig 20261022183000) and e (#627 Revenue's payroll by account in the Cash
+Flow) — all live. Then: "然后关于点看detail ledger 的 我想要优化。顺便确定现在哪里有着点开看detail 的功能？" →
+answered where it is (below) and offered A / B / C → the user: "set a checkpoint 然后move 去下个context window".
+**Next: ask which (or what they want) and show a before / after sample first — nothing built.**
+
+- **Opens onto its lines now (desktop Reports):** P&L, Cash Flow, Receipt & Payment in a single month —
+  `reports/_components/GlReportView.tsx` passes `drill={!asAt}` to `SheetReport.tsx`; an account's ▸ expands its
+  journal lines inline: `JE no · DD MMM`, `description · party`, amount (`report-sheet.ts` `txnsOf`, from
+  `gl-reports.ts` `GlTxn`: entryNo / description / party). The lines are text only — no way on to the voucher or
+  JE. Trial Balance: an account's name links to `/reports/ledger?code=…` (General Ledger, that account). General
+  Ledger: pick accounts + dates → every line.
+- **Does not:** Balance Sheet (As at); Monthly P&L / Monthly Cash Flow / Monthly Receipt & Payment
+  (`MonthlyPnlBody` / `MonthlyCashFlowBody` / `monthly-receipt-payment/page.tsx` render `SheetReport` without
+  `drill`); Dept Pool's per-department P&L | Cash Flow (`dept-pool/statements/[seg]`, the same monthly bodies — the
+  Revenue cash flow the user was reading). The Finance phone app's Report is its own (lib/fin-app/report-pages).
+- **Offered:** A — the monthly reports and Dept Pool's statements open onto their lines too; B — a line opens its
+  voucher / JE; C — what a line says (e.g. the voucher's number rather than the JE's). Or the user's own idea.
+- Loose ends, none asked for: GL override is still on a voucher's Edit (desktop form, phone sheet) — removed only
+  from Create payment, ask before removing more; PETER's RM 4,000 Sep'26 deduction has no reason (the user asks
+  HR; it stays in 9093); `repayment_start_date` and `payroll_batch_commission_split` are recorded in
+  schema_migrations under apply_migration's timestamps (20261012101209, 20261021125636), not their file numbers
+  (20261012190000, 20261021210000).
+
+## CHECKPOINT 2026-10-22 e (SHIPPED, #627) — Cash Flow: Revenue's payroll to HR by account
+
+User, on Revenue's Cash Flow (Oct on 4070 *Accrual - Salary*, Sep on Commission & Allowances): asked why → Sep'26
+was Finance's own PVs HV-PV-202610-0515 / 0516 (Aug pay, by account; Aug's accrual JE-202608-0875 reversed 15 Sep by
+JE-202609-0876), Oct was HR's flow (HV-PV-202610-0541, RM 261,253.69, one 4070 line by the 2026-08-20 rule) → "不能让他
+也跟着科目分开?" → the RM 4,677.73 is 8 payslips' deductions (PETER 4,000 unexplained, from his commission balance; 7
+drop sales) → "那就remain 扣在commission & allowance" → before / after sample → "可以，只改 Revenue，开PR做".
+
+- `lib/inter-billing-cash-flow`: `splitPayrollDrain` / `payrollMonthOf` — Revenue Department's rounds to HR custody
+  split as that month's `payroll_accrual` (segment revenue_department) splits the pay; Commission & Allowances takes the
+  rest (deductions + cents). No accrual / failed read → the one 4070 line. Only the report's rows change.
+- Oct'26 → Basic 51,000 / Commission & Allowances 192,476.34 / Travelling 4,760.27 / Hostel 3,469.83 / Staff Allowance
+  2,672 / EPF·SOCSO·EIS 6,875.25. Other departments unchanged (4070, the 08-20 rule).
+- Tests: inter-billing-cash-flow.test.ts (+4), report-reads.test.ts (+1, reads now include journal_entries).
+
+## CHECKPOINT 2026-10-22 d (SHIPPED, #625 + mig 20261022183000) — Create payment: a line each, with its own words
+
+User, on Create payment: "split pool 这个按钮我不想要，我想maintain之前的add description/line, attachment 就default
+要有" → asked "GL override 是什么？" (shown as two journals, never used: 0 lines) → "每行一个，GL override 拿掉" →
+"帮我开PR做".
+
+- `CreatePaymentDialog` (also the Finance phone app's Create payment): `FinDialog wide` (680px on a desktop);
+  Pay to | date, bank | method, the voucher's Description; **Lines always there** — words / pool / category /
+  amount / ×, + Add line, the total = the voucher's amount; Attachments always shown; small buttons Loan
+  repayment, Internal transfer, Method, Notes (Split pools, Attachments, GL override gone). Phone: fields stack,
+  a line takes three rows (`create.module.css` `.wordsLine`; the phone edit sheet's `.line` untouched).
+- `payment_voucher_sources.description` (mig 20261022183000, applied by execute_sql before the merge, recorded
+  in schema_migrations): the three approve functions write a line's words on its journal debit line — production's
+  bodies swapped in place (`pg_temp.swap_in`, count-checked); no words → "expense - payee (pool)". Dry run on
+  production first: a two-line voucher approved → "Dry run line A" + the old words, bank lines unchanged, rolled back.
+- Carried by Edit (`lib/voucher-edit` rowKey + form), the desktop edit form and the phone sheet (an input under
+  each line), Copy as draft, `lib/repayment-source-rows` (by role); shown on the drawer, the page, the PDF, Approvals.
+- Tests: the dialog rewritten; create / edit actions, voucher-edit, repayment rows, edit form, phone sheet,
+  drawer, page, PDF + route, approval model. DESIGN.md v4.122; finance-view.md note.
+- GL override still exists on a voucher's Edit (desktop form, phone sheet) — the user asked only for Create
+  payment; ask before removing it there.
+
+## CHECKPOINT 2026-10-22 c (SHIPPED, #620) — Finance hubs: the cards in a row above the table on a desktop
+
+User, on Payments' cards: "可以帮我把finance 的这些card move 上去吗" → shown a before/after → "可以，原本的底色不要变，
+电话版本的也不要变" (for all five hubs).
+
+- `components/finv/Hub.tsx` `HubCards` + `hub.module.css`: at 768px and up the hub stacks — the cards in one row
+  above, the table at the hub's whole width; the total first at 1.6 cards, a column a card (175px or more, the
+  figure whole), the Allocator's notice under the row; short of room two rows beside the total, then the old wrap.
+  The cards' own box is a container (`@container hub-cards`, steps of 280px + 185px up to step 9); `cardRowFit`
+  picks the step from the figures (the Allocator's "RM 23,456.78 to bill" needs 208px). Names / lines wrap on a
+  desktop. Colours untouched; the phone's layout compared box for box at 320–767px — identical.
+- On the user's 1613px hub: Payments, Fund IN / OUT, Allocator, Approvals one row; Invoices (8 cards) two rows.
+- Guards: `components/finv/hub-row-css.test.ts` (new), `Hub.test.tsx`. DESIGN.md v4.120; finance-view.md note.
+- Next, waiting on the user: Create payment's dialog — "然后着create payment 这里我也是想要优化" (no specifics);
+  proposed a wider dialog, fields two a row (Amount beside Pay to), `*` on the required ones instead of the
+  hint line, everything else kept — asked yes/no, nothing built.
+
 ## CHECKPOINT 2026-10-22 b (BUILT — app only, waiting on the user to merge) — a receipt is received only once its line is in
 
 a's leftover. User, after "不明白" twice: shown it as one receipt of RM 5,000 settling an invoice, in three

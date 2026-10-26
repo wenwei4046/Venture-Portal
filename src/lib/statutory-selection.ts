@@ -1,4 +1,4 @@
-import { round2, statutoryPayable, type CyclePerson, type Granularity, type Scheme, type StatutoryCoverage } from './payment-cycle'
+import { round2, statutoryHeld, statutoryPayable, type CyclePerson, type Granularity, type Scheme, type StatutoryCoverage } from './payment-cycle'
 
 /** Preview remaining contributions, even when one of PERKESO's schemes exists. */
 export function statutorySelection(
@@ -6,10 +6,11 @@ export function statutorySelection(
   selectedIds: readonly string[] | null, granularity: Granularity,
 ) {
   // What can be raised now: the funded part of each scheme, less what
-  // vouchers already cover — so a resubmit raises only its difference.
+  // vouchers already cover — so a resubmit raises only its difference. A
+  // resubmit still open waits: its figures are being put right (2026-10-24).
   const remaining = (p: CyclePerson, s: Scheme) => statutoryPayable(coverage, p, s)
   const uniqueSchemes = [...new Set(schemes)]
-  const eligible = people.filter(p => uniqueSchemes.some(s => remaining(p, s) > 0))
+  const eligible = people.filter(p => !statutoryHeld(p) && uniqueSchemes.some(s => remaining(p, s) > 0))
   const wanted = selectedIds == null ? null : new Set(selectedIds)
   const selected = wanted == null ? eligible : eligible.filter(p => wanted.has(p.row_id))
   const lines = selected.flatMap(person => uniqueSchemes.filter(s => remaining(person, s) > 0)

@@ -8,7 +8,12 @@
  */
 import type { CrmCustomer } from "@/lib/member/crm-data";
 import type { DeskCtx } from "./ctx";
-import { chatRows, initials } from "./data";
+import { chatRows, initials, teamNameOf } from "./data";
+const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** Frame 03's columns: [min px, share] (Status 108 · Ad 84 · Assigned to 76 · Visit 72 · Added 36). */
+const COL_MIN: Record<string, [number, number]> = { status: [108, 1], ad: [84, 1.3], sp: [76, 1.1], visit: [72, 1], first: [36, 0.6] };
+const dayShort = (iso: string) => { const d = new Date(iso); return `${d.getDate()} ${MON3[d.getMonth()]}`; };
+const hourShort = (iso: string) => new Date(iso).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }).replace(":00", "").toLowerCase();
 import { budgetOf, formV2, SIZES, type FormFieldV2 } from "./form";
 import { mapDrag } from "./columns";
 import { CHANNEL, STATUS_LABEL, lastReal, timeLabel } from "../../sales/vm/common";
@@ -48,6 +53,9 @@ export function peopleVM(ctx: DeskCtx) {
       visit: v ? (v.state === "attended" ? "Showed up" : "Booked") : "No visit", showroom: v ? data.rooms.find(x => x.id === v.showroomId)?.name ?? "None" : "None",
       first: t >= wkA ? "This week" : t >= wkA - 7 * DAY ? "Last 2 weeks" : "Earlier", last: last >= T ? "Today" : last >= wkA ? "This week" : "Earlier",
       filled: c.details.type || c.details.size || c.details.loc || c.details.req || c.details.budget ? "1" : null,
+      // v2 (frame 03): the table shows the visit's day and the day the customer came; the filters keep their groups.
+      team: c.assignedTo ? teamNameOf(ctx, c.assignedTo) : null,
+      visitShow: v ? (v.state === "attended" ? `Came · ${dayShort(v.start)}` : `${dayShort(v.start)}, ${hourShort(v.start)}`) : "—", firstShow: dayShort(c.createdAt),
     };
     for (const [, f] of own) r[f.id] = c.extra?.[f.id] || null;
     return r;
@@ -64,7 +72,7 @@ export function peopleVM(ctx: DeskCtx) {
     ...(field("loc") ? { loc: [lbl("loc", "Unit location"), uniq("loc"), "PROPERTY"] as [string, string[], string] } : {}),
     ...Object.fromEntries(own.filter(([, f]) => f.type === "Choice").map(([g, f]) => [f.id, [f.label, f.opts.split(",").map(x => x.trim()).filter(Boolean), g]])),
     plat: ["Platform", ["WhatsApp", "Messenger"], "LEAD"], ad: ["Ad", uniq("ad"), "LEAD"],
-    status: ["Status", ["New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads"], "LEAD"], sp: ["Salesperson", uniq("sp"), "LEAD"],
+    status: ["Status", ["New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads"], "LEAD"], sp: ["Salesperson", uniq("sp"), "LEAD"], team: ["Team", uniq("team"), "LEAD"],
     visit: ["Visit", ["Showed up", "Booked", "No visit"], "VISIT"], showroom: ["Showroom", [...data.rooms.filter(r => r.active).map(r => r.name), "None"], "VISIT"],
     first: ["First contact", ["This week", "Last 2 weeks", "Earlier"], "CONTACT"], last: ["Last chat", ["Today", "This week", "Earlier"], "CONTACT"],
   };
@@ -77,20 +85,20 @@ export function peopleVM(ctx: DeskCtx) {
   const bars = [...vals.map((v, i) => ({ label: v, n: counts[i], pct: pct(counts[i], tot), w: Math.round((counts[i] / mx) * 100), color: by === "status" ? (STATUS[v as StatusName]?.dot ?? COLS[i % COLS.length]) : COLS[i % COLS.length], on: F[by] === v,
     pick: () => set(u => ({ ...u, ppF: { ...u.ppF, [by]: u.ppF[by] === v ? null : v }, ppPg: 0 })) })),
   ...(propKey ? [{ label: "Not filled yet", n: none, pct: pct(none, tot), w: Math.round((none / mx) * 100), color: "var(--crm-line)", on: false, pick: () => {} }] : [])]
-    .map(b => ({ ...b, fw: b.on ? 700 : 600, bg: b.on ? "var(--crm-cream)" : "transparent" }));
+    .map(b => ({ ...b, fw: b.on ? 700 : 600, bg: b.on ? "var(--crm-sel)" : "transparent" }));
   const two = typeOpts.slice(0, 2), aN = rows.filter(d => d.type === two[0]).length, bN = rows.filter(d => d.type === two[1]).length;
   const bs = rows.map(d => Number(d.budgetN)).filter(n => n > 0).sort((x, y) => x - y), med = bs.length ? bs[Math.floor(bs.length / 2)] : 0;
   const chips = Object.entries(F).filter(([k, v]) => v && KEYS[k]).map(([k, v]) => ({ label: `${KEYS[k][0]}: ${v}`, clear: () => set(u => ({ ...u, ppF: { ...u.ppF, [k]: null }, ppPg: 0 })) }));
   const sel = (k: string) => { const open = ui.ppOpen === k, cur = F[k] || null;
     const base = rows0.filter(d => Object.entries(F).every(([k2, v]) => k2 === k || !v || !KEYS[k2] || d[k2] === v));
     const put = (val: string | null) => set(u => ({ ...u, ppF: { ...u.ppF, [k]: val }, ppOpen: null, ppPg: 0 }));
-    return { label: KEYS[k][0], value: cur || "Any", open, bd: open || cur ? "var(--crm-rust)" : "var(--crm-line)", bg: cur ? "var(--crm-cream)" : "#fff",
+    return { label: KEYS[k][0], value: cur || "Any", open, bd: open || cur ? "var(--crm-rust)" : "var(--crm-line)", bg: cur ? "var(--crm-sel)" : "#fff",
       toggle: () => patch({ ppOpen: open ? null : k }), close: () => patch({ ppOpen: null }),
       opts: [{ v: "Any", n: base.length, on: !cur, pick: () => put(null) }, ...KEYS[k][1].map(v => ({ v, n: base.filter(d => d[k] === v).length, on: cur === v, pick: () => put(v) }))]
-        .map(o => ({ ...o, bg: o.on ? "var(--crm-cream)" : "transparent", w: o.on ? 650 : 500, chk: o.on ? "var(--crm-rust)" : "transparent" })) }; };
+        .map(o => ({ ...o, bg: o.on ? "var(--crm-sel)" : "transparent", w: o.on ? 650 : 500, chk: o.on ? "var(--crm-rust)" : "transparent" })) }; };
   // The table's columns: every field of Customer info but the Contact itself (README: 13 with the design's form).
   const LBL: Record<string, string> = { type: lbl("type", "Property type"), size: lbl("size", "Unit size"), budget: lbl("budget", "Budget"), loc: lbl("loc", "Unit location"), req: lbl("req", "Requirement"),
-    plat: "Platform", ad: "Ad", status: "Status", sp: "Salesperson", visit: "Visit", showroom: "Showroom", first: "First contact", last: "Last chat",
+    plat: "Platform", ad: "Ad", status: "Status", sp: "Assigned to", visit: "Visit", showroom: "Showroom", first: "Added", last: "Last chat",
     ...Object.fromEntries(own.map(([, f]) => [f.id, f.label])) };
   const GRP: Record<string, string> = { type: "Property", size: "Property", budget: "Property", loc: "Property", req: "Property", plat: "Lead", ad: "Lead", status: "Lead", sp: "Lead", visit: "Visit", showroom: "Visit", first: "Contact", last: "Contact",
     ...Object.fromEntries(own.map(([g, f]) => [f.id, g.charAt(0) + g.slice(1).toLowerCase()])) };
@@ -119,21 +127,26 @@ export function peopleVM(ctx: DeskCtx) {
     ppChips: chips, ppHasChips: chips.length > 0, ppClear: () => patch({ ppF: {}, ppQ: "", ppPg: 0 }),
     ppQ: ui.ppQ, setPpQ: (e: { target: { value: string } }) => patch({ ppQ: e.target.value, ppPg: 0 }),
     // 4a (frame 03): the columns share the width as the design's do; one dragged keeps its px.
-    ppGrid: `${CW.contact ? `${CW.contact}px` : "minmax(0,1.6fr)"} ${vis.map(k => (CW[k] ? `${CW[k]}px` : `minmax(0,${({ status: 1.25, ad: 1.35, sp: 1.25, visit: 1.15, first: 0.6 } as Record<string, number>)[k] ?? 1.2}fr)`)).join(" ")} 28px`, ppDragC: mapDrag(set, "ppCW", dw("contact"), "contact", 80, 480), ppReset: () => patch({ ppCW: {} }),
+    // v2 (frame 03, notes 05 / 06): every column has its minimum — Name 170 (note 06), the rest the frame's — a dragged one
+    // keeps its px but never below it, and the table scrolls sideways with Name sticky rather than squeeze.
+    ppGrid: `${CW.contact ? `${Math.max(170, CW.contact)}px` : "minmax(170px,1.6fr)"} ${vis.map(k => { const [mn, fr] = COL_MIN[k] ?? [90, 1.2]; return CW[k] ? `${Math.max(mn, CW[k])}px` : `minmax(${mn}px,${fr}fr)`; }).join(" ")} 20px`,
+    ppKeys: vis,
+    ppMinW: 170 + vis.reduce((n, k) => n + Math.max((COL_MIN[k] ?? [90])[0], CW[k] ?? 0), 0) + 20 + 8 * (vis.length + 1) + 24,
+    ppDragC: mapDrag(set, "ppCW", dw("contact"), "contact", 170, 480), ppReset: () => patch({ ppCW: {} }),
     ppHead: vis.map(k => ({ label: LBL[k].toUpperCase(), arrow: so.k === sk(k) ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === sk(k) ? "var(--crm-ink)" : "var(--crm-muted)",
-      drag: mapDrag(set, "ppCW", dw(k), k, 80, 480), pick: () => toggleSort(sk(k)), remove: () => set(u => ({ ...u, ppVis: (u.ppVis ?? DEF).filter(x => x !== k) })) })),
+      drag: mapDrag(set, "ppCW", dw(k), k, (COL_MIN[k] ?? [90])[0], 480), pick: () => toggleSort(sk(k)), remove: () => set(u => ({ ...u, ppVis: (u.ppVis ?? DEF).filter(x => x !== k) })) })),
     ppSortCols0: [{ arrow: so.k === "name" ? (so.dir > 0 ? "↑" : "↓") : "↕", fg: so.k === "name" ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => toggleSort("name") }],
     ppAddOpen: ui.ppAdd, ppAddToggle: () => patch({ ppAdd: !ui.ppAdd }), ppAddClose: () => patch({ ppAdd: false }),
-    ppAddOpts: ALL.map(k => { const on = vis.includes(k); return { label: LBL[k], grp: GRP[k], chk: on ? "var(--crm-rust)" : "transparent", bd: on ? "var(--crm-rust)" : "var(--crm-line)", bg: on ? "var(--crm-cream)" : "transparent",
+    ppAddOpts: ALL.map(k => { const on = vis.includes(k); return { label: LBL[k], grp: GRP[k], chk: on ? "var(--crm-rust)" : "transparent", bd: on ? "var(--crm-rust)" : "var(--crm-line)", bg: on ? "var(--crm-sel)" : "transparent",
       toggle: () => set(u => { const cur = (u.ppVis ?? DEF).filter(x => ALL.includes(x)); return { ...u, ppVis: cur.includes(k) ? cur.filter(x => x !== k) : ALL.filter(x => cur.includes(x) || x === k) }; }) }; }),
     ppRows: shown.map(d => ({ ini: d.ini, name: d.name, phone: d.phone, avBg: avatarTint(d.name)[0], avFg: avatarTint(d.name)[1],
-      cells: vis.map(k => { const raw = k === "budget" ? (d.budgetN ? `RM ${Number(d.budgetN).toLocaleString("en-MY")}` : null) : d[k]; const v = raw || "—";
+      cells: vis.map(k => { const raw = k === "budget" ? (d.budgetN ? `RM ${Number(d.budgetN).toLocaleString("en-MY")}` : null) : k === "visit" ? d.visitShow : k === "first" ? d.firstShow : d[k]; const v = raw || "—";
         if (k === "status" && raw) { const st = STATUS[raw as StatusName]; if (st) return { pill: true, plain: false, v, bg: st.tint, fg: st.text, dot: st.dot }; }
         if (k === "type") { const isB = d.type && d.type === typeOpts[1]; return { pill: true, plain: false, v, bg: isB ? "var(--crm-tint-attention)" : d.type ? "var(--crm-tint-cold)" : "var(--crm-field)", fg: isB ? "var(--crm-rust)" : d.type ? "var(--crm-ink-soft)" : "var(--crm-faint)" }; }
         return { pill: false, plain: true, v, bg: "transparent", fg: raw ? "var(--crm-ink)" : "var(--crm-faint)" }; }),
       // A row opens the customer in the side panel when the page is wide enough to show it (the owner, 2026-10-15: "右邊的
       // 畫面有點空" → 1); else, as before, the chat in Inbox with Customer info beside it.
-      on: ui.ppSel === d.id, rowBg: ui.ppSel === d.id ? "var(--crm-cream)" : "#fff",
+      on: ui.ppSel === d.id, rowBg: ui.ppSel === d.id ? "var(--crm-sel)" : "#fff",
       open: () => patch({ ppSel: ui.ppSel === d.id && ui.rail ? null : d.id, rail: true }),
       openChat: () => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: d.id, fromTeam: false, inbF: "All", whoSel: [] }) })),
     ppEmpty: !rows.length, ppHas: rows.length > 0,

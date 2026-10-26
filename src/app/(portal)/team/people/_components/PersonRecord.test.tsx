@@ -7,9 +7,11 @@ import type { StaffRow, TitleRow } from '@/lib/staff-form'
 // column"). Edit turns each row's value into its field in the same section;
 // the bar at the foot holds Cancel and Save; a refusal is said there.
 
-const mocks = vi.hoisted(() => ({ updateStaff: vi.fn(), flash: vi.fn() }))
+const mocks = vi.hoisted(() => ({ updateStaff: vi.fn(), flash: vi.fn(), fileLetters: vi.fn() }))
 vi.mock('../actions', () => ({ updateStaff: mocks.updateStaff }))
-vi.mock('@/components/hrv/toast', () => ({ flash: mocks.flash }))
+vi.mock('@/components/hrv/toast', () => ({ flash: mocks.flash, FLASH_LONG: 8000 }))
+// Letters filed with the Employment Status (2026-10-24) go to the Data center from the browser.
+vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters: mocks.fileLetters }))
 
 import PersonRecord, { type PersonEditor, type PersonRecordView } from './PersonRecord'
 import type { UplineGroup } from '@/lib/upline-choices'
@@ -25,6 +27,7 @@ const view = (over: Partial<PersonRecordView> = {}): PersonRecordView => ({
   active: true,
   login: null,
   reportsTo: { name: 'BOSS LADY', title: 'Marketing Manager', href: '/team/people/staff-boss', active: true },
+  employment: { status: 'permanent', chip: { label: 'Permanent', tone: 'ledger' }, value: 'Permanent' },
   hireDate: '05 Jan 2026',
   tenure: '9 months',
   resignationDate: null,
@@ -44,7 +47,7 @@ const staff = (over: Partial<StaffRow> = {}): StaffRow => ({
   id: 'staff-1', employee_name: 'TEST STAFF', first_name: 'TEST', last_name: 'STAFF', designation: 'Executive', department_id: 'd-marketing',
   department_name: 'Marketing', commission_dept: false, director_dept: false, title_id: 't-exec',
   basic_salary: 2500, allowances: 0, non_statutory_allowance: 0, employee_code: 'HV042', infotech_code: null,
-  hire_date: '2026-01-05', resignation_date: null, epf_category: 'A', socso_category: 'first',
+  hire_date: '2026-01-05', resignation_date: null, employment_status: 'permanent', probation_months: null, epf_category: 'A', socso_category: 'first',
   is_epf_exempt: false, pcb_category: 'KA1', children_count: 0, employment_type: 'salaried',
   bank_name: 'Maybank', bank_account_no: '0012345678', bank_name_2: 'CIMB', bank_account_no_2: '0098765432',
   nric: '850101141234', contact_number: '012-345 6789', email: 'test@example.com', address: null,
@@ -78,6 +81,7 @@ const editor = (over: Partial<StaffRow> = {}, canSee = { nric: true, bank: true 
 beforeEach(() => {
   mocks.updateStaff.mockReset()
   mocks.flash.mockReset()
+  mocks.fileLetters.mockReset()
 })
 afterEach(cleanup)
 
@@ -141,9 +145,9 @@ describe('the card', () => {
   const card = () => screen.getByRole('complementary', { name: 'TEST STAFF' })
   const labels = () => Array.from(card().querySelectorAll('dt'), dt => dt.textContent)
 
-  it('reads Department, Reports to, Level, Employment Type and Hire Date — no Account, no Role', () => {
+  it('reads Department, Reports to, Level, Employment Type, Employment Status and Hire Date — no Account, no Role', () => {
     render(<PersonRecord view={view({ login: 'active', contact: { phone: null, email: 'test@example.com', address: null } })} editor={editor()} inviteHref={null} />)
-    expect(labels()).toEqual(['Department', 'Reports to', 'Level', 'Employment Type', 'Hire Date'])
+    expect(labels()).toEqual(['Department', 'Reports to', 'Level', 'Employment Type', 'Employment Status', 'Hire Date'])
     expect(within(card()).getByRole('link', { name: 'BOSS LADY' })).toHaveAttribute('href', '/team/people/staff-boss')
     expect(within(card()).getByText('Marketing Manager')).toBeInTheDocument()
     expect(within(card()).getByText('05 Jan 2026 · 9 months')).toBeInTheDocument()
@@ -154,7 +158,7 @@ describe('the card', () => {
 
   it('edited, the title and the upline are its fields', () => {
     openEditor()
-    expect(labels()).toEqual(['Title', 'Department', 'Reports to', 'Level', 'Employment Type', 'Hire Date'])
+    expect(labels()).toEqual(['Title', 'Department', 'Reports to', 'Level', 'Employment Type', 'Employment Status', 'Hire Date'])
     expect(within(card()).getByLabelText('Title')).toHaveValue('t-exec')
     expect(within(card()).getByLabelText('Hire Date')).toHaveValue('2026-01-05')
   })
@@ -163,6 +167,170 @@ describe('the card', () => {
     render(<PersonRecord view={view({ reportsTo: { name: 'BOSS LADY', title: null, href: null, active: true } })} editor={null} inviteHref={null} />)
     expect(within(card()).getByText('BOSS LADY')).toBeInTheDocument()
     expect(within(card()).queryByRole('link', { name: 'BOSS LADY' })).toBeNull()
+  })
+})
+
+// 2026-10-23 — the user: "for the employment status, i want go with permenant, part time and probation status follow by
+// the hire date start": the chip names it, the card reads it, Edit makes it a field — a probation with its period.
+describe('Employment Status', () => {
+  const card = () => screen.getByRole('complementary', { name: 'TEST STAFF' })
+
+  it('the chip names it where Active was, and the card reads its line', () => {
+    render(
+      <PersonRecord
+        view={view({
+          employment: {
+            status: 'probation',
+            chip: { label: 'Probation · 9d left', tone: 'alert', title: 'Probation ends 1 Nov 2026 · in 9 days' },
+            value: 'Probation · 3 months · ends 1 Nov 2026 · in 9 days',
+          },
+        })}
+        editor={null}
+        inviteHref={null}
+      />,
+    )
+    expect(within(card()).getByText('Probation · 9d left')).toHaveAttribute('title', 'Probation ends 1 Nov 2026 · in 9 days')
+    expect(within(card()).queryByText('Active')).toBeNull()
+    expect(within(card()).getByText('Probation · 3 months · ends 1 Nov 2026 · in 9 days')).toBeInTheDocument()
+  })
+
+  it('edited: Probation brings its period, and the two are sent together', async () => {
+    openEditor()
+    const status = within(card()).getByLabelText('Employment Status') as HTMLSelectElement
+    expect(status).toHaveValue('permanent')
+    expect(Array.from(status.options).map(o => o.text)).toEqual(['Probation', 'Contract', 'Permanent', 'Part time'])
+    expect(screen.queryByLabelText('Probation period')).toBeNull()
+    fireEvent.change(status, { target: { value: 'probation' } })
+    expect(screen.getByLabelText('Probation period')).toHaveValue('3')
+    expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+    expect(await save()).toEqual({ employment_status: 'probation', probation_months: '3' })
+  })
+
+  it('a record not set yet offers “— Not set” until it is, and Permanent goes alone', async () => {
+    openEditor(view({ employment: { status: null, chip: { label: 'Not set', tone: 'plain' }, value: null } }), editor({ employment_status: null }))
+    const status = within(card()).getByLabelText('Employment Status') as HTMLSelectElement
+    expect(status).toHaveValue('')
+    expect(status.options[0].text).toBe('— Not set')
+    fireEvent.change(status, { target: { value: 'permanent' } })
+    expect(await save()).toEqual({ employment_status: 'permanent' })
+  })
+
+  it('an extended probation keeps its period among the choices, and a new period goes with its status', async () => {
+    openEditor(view(), editor({ employment_status: 'probation', probation_months: 9 }))
+    const months = screen.getByLabelText('Probation period') as HTMLSelectElement
+    expect(months).toHaveValue('9')
+    expect(Array.from(months.options).map(o => o.value)).toEqual(['1', '2', '3', '4', '5', '6', '9'])
+    fireEvent.change(months, { target: { value: '6' } })
+    expect(await save()).toEqual({ employment_status: 'probation', probation_months: '6' })
+  })
+
+  // Contract (2026-10-24 — the user: "can add with one is Contract, then need pick time period as well, 6 month, 12
+  // month, 18, 24, until 36").
+  it('edited: Contract brings its period — 12 months to start, 6 to 36 — sent with its status, the probation’s not', async () => {
+    openEditor()
+    const status = within(card()).getByLabelText('Employment Status') as HTMLSelectElement
+    fireEvent.change(status, { target: { value: 'contract' } })
+    const months = screen.getByLabelText('Contract period') as HTMLSelectElement
+    expect(months).toHaveValue('12')
+    expect(Array.from(months.options).map(o => o.value)).toEqual(['6', '12', '18', '24', '30', '36'])
+    expect(screen.queryByLabelText('Probation period')).toBeNull()
+    fireEvent.change(months, { target: { value: '24' } })
+    expect(await save()).toEqual({ employment_status: 'contract', contract_months: '24' })
+  })
+
+  it('a contract’s period changed alone goes with its status', async () => {
+    openEditor(view(), editor({ employment_status: 'contract', contract_months: 12 }))
+    const months = screen.getByLabelText('Contract period') as HTMLSelectElement
+    expect(months).toHaveValue('12')
+    fireEvent.change(months, { target: { value: '18' } })
+    expect(await save()).toEqual({ employment_status: 'contract', contract_months: '18' })
+  })
+
+  it('nothing changed, nothing of it is sent', async () => {
+    openEditor(view(), editor({ employment_status: 'probation', probation_months: 3 }))
+    fireEvent.change(screen.getByLabelText('Reports to'), { target: { value: 'staff-ceo' } })
+    expect(await save()).toEqual({ reports_to: 'staff-ceo' })
+  })
+
+  it('a reader the directory serves has no field for it', () => {
+    openEditor(view({ employment: { status: undefined, chip: { label: 'Active', tone: 'ledger' }, value: null } }))
+    expect(within(card()).queryByLabelText('Employment Status')).toBeNull()
+  })
+
+  // Letters filed with it (2026-10-24 — the user: "我们 select 那个 state 的时候，我要他能够 attach 一个 form … 当然包括
+  // letter 的 type，当他一选了之后，就自动 attach 进 document data center 里面"): held until Save, each a change.
+  describe('letters filed with it', () => {
+    const TYPES = [
+      { id: 'offer', name: 'Offer letter', compulsory: true },
+      { id: 'confirm', name: 'Confirmation letter', compulsory: false },
+    ]
+    const withLetters = (over: Partial<StaffRow> = {}): PersonEditor => ({ ...editor(over), letterTypes: TYPES })
+    const letter = new File(['%PDF'], 'confirmation.pdf', { type: 'application/pdf' })
+    const attach = (type = 'confirm') => {
+      fireEvent.click(within(card()).getByRole('button', { name: '+ Attach a letter' }))
+      fireEvent.change(within(card()).getByLabelText('Letter type'), { target: { value: type } })
+      fireEvent.change(within(card()).getByLabelText('Letter file'), { target: { files: [letter] } })
+    }
+
+    it('are offered under it to an editor who may file one — and to nobody else', () => {
+      const { unmount } = render(<PersonRecord view={view()} editor={withLetters()} inviteHref={null} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+      expect(within(card()).getByRole('button', { name: '+ Attach a letter' })).toBeInTheDocument()
+      unmount()
+      openEditor()
+      expect(screen.queryByRole('button', { name: '+ Attach a letter' })).toBeNull()
+    })
+
+    it('go with the status: the record saved first, then each letter filed to their record', async () => {
+      mocks.fileLetters.mockResolvedValue({ filed: ['Confirmation letter'], failed: [] })
+      openEditor(view(), withLetters({ employment_status: 'probation', probation_months: 3 }))
+      fireEvent.change(within(card()).getByLabelText('Employment Status'), { target: { value: 'permanent' } })
+      attach()
+      expect(within(bar()).getByText(/2 changes/)).toBeInTheDocument()
+      expect(await save()).toEqual({ employment_status: 'permanent' })
+      expect(mocks.fileLetters).toHaveBeenCalledWith('staff-1', [expect.objectContaining({ typeId: 'confirm', file: letter })], TYPES)
+      expect(mocks.updateStaff.mock.invocationCallOrder[0]).toBeLessThan(mocks.fileLetters.mock.invocationCallOrder[0])
+    })
+
+    it('alone, the letter is filed with no save of the record, and the page reads again', async () => {
+      mocks.fileLetters.mockResolvedValue({ filed: ['Confirmation letter'], failed: [] })
+      openEditor(view(), withLetters())
+      attach()
+      expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+      await act(async () => {
+        fireEvent.submit(form())
+      })
+      expect(mocks.updateStaff).not.toHaveBeenCalled()
+      expect(mocks.fileLetters).toHaveBeenCalledTimes(1)
+      expect(mocks.flash).toHaveBeenCalledWith("Confirmation letter filed to TEST STAFF's record")
+      expect(screen.queryByRole('form')).toBeNull()
+    })
+
+    it('one that does not go stays, with why, to be sent again', async () => {
+      mocks.fileLetters.mockImplementation(async (_id: string, rows: Array<{ key: string }>) => ({
+        filed: [],
+        failed: [{ key: rows[0].key, name: 'Confirmation letter', reason: 'The file did not arrive. Please upload it again.' }],
+      }))
+      openEditor(view(), withLetters())
+      attach()
+      await act(async () => {
+        fireEvent.submit(form())
+      })
+      expect(within(bar()).getByRole('alert')).toHaveTextContent('Confirmation letter was not filed: The file did not arrive. Please upload it again.')
+      expect(within(card()).getByText('confirmation.pdf')).toBeInTheDocument()
+    })
+
+    it('a file with no type is asked for before anything is sent', async () => {
+      openEditor(view(), withLetters())
+      fireEvent.click(within(card()).getByRole('button', { name: '+ Attach a letter' }))
+      fireEvent.change(within(card()).getByLabelText('Letter file'), { target: { files: [letter] } })
+      await act(async () => {
+        fireEvent.submit(form())
+      })
+      expect(within(bar()).getByRole('alert')).toHaveTextContent('Choose the letter type for confirmation.pdf.')
+      expect(mocks.updateStaff).not.toHaveBeenCalled()
+      expect(mocks.fileLetters).not.toHaveBeenCalled()
+    })
   })
 })
 
@@ -232,8 +400,11 @@ describe('First Name and Last Name', () => {
   })
 })
 
+// 2026-10-22, the user: "i want the email can be editable, for hr" — HR changes it, and their login moves with it.
 describe('Email follows the login', () => {
+  // The roster's copy may lag the login's; the page shows — and edits from — the email they sign in with.
   const withLogin = view({ login: 'active', contact: { phone: '012-345 6789', email: 'staff@login.example', address: null } })
+  const HELD = 'DIRECTOR is a full-access title (Ultimate full access): only whoever manages permissions changes its login\'s email.'
 
   it('reads with its Login word', () => {
     render(<PersonRecord view={withLogin} editor={editor()} inviteHref={null} />)
@@ -241,18 +412,33 @@ describe('Email follows the login', () => {
     expect(screen.getByText('Login')).toBeInTheDocument()
   })
 
-  it('is locked while editing — shown, never a field, never sent', async () => {
-    openEditor(withLogin)
+  it('edited, is a field holding the email they sign in with, its Login word beside it — a change is sent, alone', async () => {
+    openEditor(withLogin, editor({ email: 'old.copy@example.com' }))
+    const field = screen.getByLabelText('Email')
+    expect(field).toHaveValue('staff@login.example')
+    expect(field).toBeRequired()
+    expect(screen.getByText('Login')).toBeInTheDocument()
+    expect(within(bar()).getByText(/No changes/)).toBeInTheDocument()
+    fireEvent.change(field, { target: { value: 'staff.new@login.example' } })
+    expect(field).toHaveAttribute('data-dirty', 'true')
+    expect(within(bar()).getByText(/1 change/)).toBeInTheDocument()
+    expect(await save()).toEqual({ email: 'staff.new@login.example' })
+  })
+
+  it('a full-access title’s stays locked for an editor who does not manage permissions — shown, never a field, never sent', async () => {
+    openEditor(withLogin, { ...editor(), emailHeld: HELD })
     expect(screen.queryByLabelText('Email')).toBeNull()
     expect(form().elements.namedItem('email')).toBeNull()
-    expect(screen.getByTitle(/the one they sign in with/)).toHaveTextContent('staff@login.example')
+    expect(screen.getByTitle(HELD)).toHaveTextContent('staff@login.example')
     fireEvent.change(screen.getAllByLabelText('Phone')[0], { target: { value: '012-000 1111' } })
     expect(await save()).toEqual({ contact_number: '012-000 1111' })
   })
 
-  it('without a login it is HR’s to edit', () => {
+  it('without a login it is HR’s to edit, as it always was', () => {
     openEditor()
     expect(screen.getByLabelText('Email')).toHaveValue('test@example.com')
+    expect(screen.getByLabelText('Email')).not.toBeRequired()
+    expect(screen.queryByText('Login')).toBeNull()
   })
 })
 

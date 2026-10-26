@@ -17,7 +17,6 @@ import {
   fetchPayrollBillingDelta,
   fetchStaffAllocationByCompany,
   generateConsolidatedPayrollInvoices,
-  generateMonthlyInvoices,
   generateOwnShareInvoice,
   generatePayrollAdjustmentInvoices,
   reassignInvoiceGlAccount,
@@ -36,6 +35,9 @@ import {
 } from '../billing/actions'
 import type { CompanyBillingDelta } from '@/lib/payroll-billing-delta'
 import type { Address } from '@/lib/address/address'
+import { revalidatePath } from 'next/cache'
+import { createClient } from '@/lib/supabase/server'
+import { importResultOf, marketingLinesFromRow, type MarketingLines } from './_lib/marketing-lines'
 
 // Invoice's hub steps, in words (2026-10-14, the Finance revamp v2 — D10). The
 // hub's drawer, its bulk bar and its credit notes call Service Billing's own
@@ -307,17 +309,38 @@ export async function hubChangeAccount(payload: {
   })
 }
 
-// ── The generators (Create invoice ▾ › Generate Marketing invoices; Payroll ▾) ──
+// ── The generators (Create invoice ▾ › Import Marketing billing; Payroll ▾) ──
 
-/** The month's marketing invoices, drafts, from the active projects — issued ones kept. */
-export async function hubGenerateMarketing(month: string): Promise<HubResult<{ generated: number; kept: number }>> {
+const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/
+
+/** What Import Marketing billing brings in for a month: the lines Marketing's manager confirmed, by party, each with the
+ *  invoice it is on — and the month's Marketing invoices typed by hand (2026-10-26, ②b-2h). */
+export async function hubMarketingPreview(month: string): Promise<HubResult<MarketingLines>> {
+  await requirePermission('billing')
+  return attempt(async () => {
+    if (!MONTH_KEY.test(month)) throw new Error('Pick the month.')
+    // Marketing's functions are not in the generated types (lib/marketing calls them untyped).
+    const { data, error } = await (await createClient()).rpc('mkt_bill_import_preview' as never, { p_month: `${month}-01` } as never)
+    if (error) throw new Error(error.message)
+    const lines = marketingLinesFromRow(data)
+    if (!lines) throw new Error('Marketing’s billing could not be read. Close and try again.')
+    return lines
+  })
+}
+
+/** Marketing's confirmed lines on no invoice yet, onto drafts — a party each, added to the draft an import made for it
+ *  this month while that is a draft; no invoice date. Deletes nothing (the generator from contracts it replaced deleted
+ *  the month's Marketing drafts first). */
+export async function hubImportMarketing(month: string): Promise<HubResult<{ made: number; added: number; lines: number; invoices: string[] }>> {
   await requireActionOn('/invoices/[id]', 'billing', 'create')
   return attempt(async () => {
-    const fd = new FormData()
-    fd.set('period_month', `${month}-01`)
-    fd.set('modes', 'marketing_project')
-    const res = await generateMonthlyInvoices(fd)
-    return { generated: res.generated, kept: res.skipped }
+    if (!MONTH_KEY.test(month)) throw new Error('Pick the month.')
+    const { data, error } = await (await createClient()).rpc('mkt_bill_import' as never, { p_month: `${month}-01` } as never)
+    if (error) throw new Error(error.message)
+    revalidatePath('/statements')
+    revalidatePath('/billing')
+    revalidatePath('/marketing/billing')
+    return importResultOf(data)
   })
 }
 

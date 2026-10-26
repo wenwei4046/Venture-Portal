@@ -71,23 +71,25 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('SKU Master price workspace', () => {
+  // 2026-10-25: DEFAULT is a seat the ERP sells — 8211 MODENA's only one — so it is a column like any other,
+  // where the ERP's order puts it, or after the rest when only a saved price knows it.
   it.each([
-    { source: 'ERP sizes', sofaSizes: ['24', 'DEFAULT', '25"'] },
-    { source: 'saved history alone', sofaSizes: ['24', '25"'] },
-  ])('hides DEFAULT from $source, keeps visible size order and resets the model when switching categories', ({ sofaSizes }) => {
+    { source: 'ERP sizes', sofaSizes: ['24', 'DEFAULT', '25"'], seats: ['SEAT 24', 'SEAT DEFAULT', 'SEAT 25"', 'SEAT 75CM'], seat: 'DEFAULT' },
+    { source: 'saved history alone', sofaSizes: ['24', '25"'], seats: ['SEAT 24', 'SEAT 25"', 'SEAT 75CM', 'SEAT Default'], seat: 'Default' },
+  ])('shows DEFAULT from $source, keeps visible size order and resets the model when switching categories', ({ sofaSizes, seats, seat }) => {
     render(<SkuMasterTab skus={fixtures} sofaSizes={sofaSizes} />)
     fireEvent.click(within(screen.getByText('2376-1S').closest('tr')!).getByRole('button', { name: 'View prices' }))
     expect(screen.getByRole('combobox', { name: 'Model' })).toHaveValue('model-a')
     expect(screen.getByRole('button', { name: 'P2' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByText('9999-1S')).not.toBeInTheDocument()
     expect(screen.getAllByRole('columnheader').map(h => h.textContent)).toEqual([
-      'PRODUCT CODE', 'DESCRIPTION', 'MODEL', 'CATEGORY', 'TIER',
-      'SEAT 24', 'SEAT 25"', 'SEAT 75CM',
+      'PRODUCT CODE', 'DESCRIPTION', 'MODEL', 'CATEGORY', 'TIER', ...seats,
     ])
     expect(screen.queryByText('Active')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Edit prices' }))
-    expect(screen.queryByRole('textbox', { name: /default|fallback/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('columnheader', { name: /default|fallback|status/i })).not.toBeInTheDocument()
+    // Its saved P2 price, whichever spelling saved it.
+    expect(screen.getByRole('textbox', { name: `2376-1S at ${seat} PRICE_2` })).toHaveValue('777')
+    expect(screen.queryByRole('columnheader', { name: /fallback|status/i })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     chooseModel('model-b')
     expect(screen.queryByText('2376-1S')).not.toBeInTheDocument()
@@ -107,13 +109,15 @@ describe('SKU Master price workspace', () => {
     expect(screen.getByText('9999-1S')).toBeInTheDocument()
   })
 
-  it('saves drafts across models, tiers and categories while preserving raw labels, hidden defaults and flat fallbacks', async () => {
+  it('saves drafts across models, tiers and categories while preserving raw labels, saved defaults and flat fallbacks', async () => {
     saveSkuPrices.mockResolvedValue({ saved: 3 })
     render(<SkuMasterTab skus={fixtures} sofaSizes={['24', 'DEFAULT', '25"']} />)
     openSofa()
     chooseModel('model-a')
     fireEvent.click(screen.getByRole('button', { name: 'Edit prices' }))
     changePrice('2376-1S at 24 PRICE_2', '1250')
+    // DEFAULT is typed where it stands; the saved cell keeps its own spelling.
+    changePrice('2376-1S at DEFAULT PRICE_2', '780')
     fireEvent.click(screen.getByRole('button', { name: 'P1' }))
     changePrice('2376-1S at 24 PRICE_1', '')
     changePrice('2376-1S at 75CM PRICE_1', '1300')
@@ -121,6 +125,7 @@ describe('SKU Master price workspace', () => {
     changePrice('2376-1S at 25" PRICE_3', '0')
     chooseModel('model-b')
     changePrice('9999-1S at 24 PRICE_3', '650')
+    changePrice('9999-1S at DEFAULT PRICE_3', '700')
     chooseModel('model-a')
     expect(screen.getByRole('textbox', { name: '2376-1S at 25" PRICE_3' })).toHaveValue('0')
     fireEvent.click(screen.getByRole('button', { name: 'P1' }))
@@ -135,7 +140,7 @@ describe('SKU Master price workspace', () => {
         { height: '24', tier: 'PRICE_1', price: '' },
         { height: '24', tier: 'PRICE_2', price: '1250' },
         { height: 'Default', tier: 'PRICE_1', price: '666' },
-        { height: 'DEFAULT', tier: 'PRICE_2', price: '777' },
+        { height: 'DEFAULT', tier: 'PRICE_2', price: '780' },
         { height: 'default', tier: 'PRICE_3', price: '888' },
         { height: '75CM', tier: 'PRICE_2', price: '850' },
         { height: '75CM', tier: 'PRICE_1', price: '1300' },
@@ -144,6 +149,7 @@ describe('SKU Master price workspace', () => {
       { erpId: 'sofa-b', price: null, grid: [
         { height: '25"', tier: 'PRICE_2', price: '555' },
         { height: '24', tier: 'PRICE_3', price: '650' },
+        { height: 'DEFAULT', tier: 'PRICE_3', price: '700' },
       ] },
       { erpId: 'bed', price: '0', grid: null },
     ])

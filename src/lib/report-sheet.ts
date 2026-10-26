@@ -1,6 +1,6 @@
 import type { MatrixColumn, MatrixRow } from './monthly-matrix'
 import type { ReportBlock } from './gl-report-blocks'
-import type { AccountNode } from './gl-reports'
+import type { AccountNode, GlTxn } from './gl-reports'
 
 // The reports' table as the user's Claude Design handoff draws it (2026-10-10,
 // rptSection in the prototype): each block opens on a blue title, lists its
@@ -12,12 +12,33 @@ import type { AccountNode } from './gl-reports'
 
 export interface SheetTxn {
   key: string
-  /** The journal entry's number (empty when it has none). */
+  /** The journal entry's number (empty when it has none) — Ref. 1. */
   ref: string
   date: string
   /** Description · party. */
   text: string
   value: number
+  /** 2026-10-24 (the user's drill-down, "我想要这样的概念"): the line's debit and credit, the entry's other side,
+   *  the source document's number (Ref. 2). */
+  debit: number
+  credit: number
+  otherSide: string | null
+  ref2: string | null
+}
+
+/** A row's journal lines as the drill-down lists them. */
+export function sheetTxnsOf(rowKey: string, txns: GlTxn[]): SheetTxn[] {
+  return txns.map((t, i) => ({
+    key: `${rowKey}:t${i}`,
+    ref: t.entryNo ?? '',
+    date: t.date,
+    text: [t.description, t.party].filter(Boolean).join(' · '),
+    value: t.amount,
+    debit: t.debit,
+    credit: t.credit,
+    otherSide: t.otherSide,
+    ref2: t.refNo,
+  }))
 }
 
 export interface SheetRow {
@@ -35,6 +56,13 @@ export interface SheetRow {
   txns?: SheetTxn[]
   /** A total drawn heavier. */
   strong?: boolean
+  /** A department's page (2026-10-25): the side the row counts — its block tinted green or orange, the side's
+   *  total on its title. */
+  side?: 'in' | 'out'
+  /** Its colour on the page's charts, a square before its name. */
+  swatch?: string
+  /** Its own base for the % beside each figure, one per column (null: none, a dash) — else the sheet's. */
+  pctBase?: number[] | null
 }
 
 /** A column of the table (SheetReport's): now = the current / chosen month,
@@ -140,13 +168,7 @@ function accountLabel(n: AccountNode): string {
 
 function txnsOf(rowKey: string, n: AccountNode): SheetTxn[] | undefined {
   if (n.children.length > 0 || n.txns.length === 0) return undefined
-  return n.txns.map((t, i) => ({
-    key: `${rowKey}:t${i}`,
-    ref: t.entryNo ?? '',
-    date: t.date,
-    text: [t.description, t.party].filter(Boolean).join(' · '),
-    value: t.amount,
-  }))
+  return sheetTxnsOf(rowKey, n.txns)
 }
 
 /** The single-month statements' blocks (GlReportView's), in the handoff's shape. */

@@ -13,7 +13,8 @@ import type { HiringRequest, HiringTalent } from '@/lib/hiring/types'
 import type { MemberRequest } from '@/lib/member/types'
 import type { Booking } from '@/lib/rooms/model'
 import type { User } from '@/types'
-import { appAccess, bookingOf, dataCenterOf, hireOf, memberRequestOf, talentOf } from './server'
+import { appAccess, bookingOf, dataCenterOf, hireOf, hrTopics, memberRequestOf, talentOf } from './server'
+import { TALENT_REASONS } from '@/test/hiring-board'
 
 // HR's account: every Round-2 cell, the keys that open their pages.
 const HR_ACTIONS = {
@@ -29,7 +30,7 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
   it('with nothing unticked, every part and every write their cells hold', () => {
     expect(appAccess(hrUser({}))).toEqual({
       parts: { requests: true, hiring: true, insights: true, talent: true, docs: true, rooms: true, today: false, approve: false, balances: false, close: false, records: false, people: false },
-      may: { attDecide: false, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true },
+      may: { attDecide: false, decide: true, hireApprove: true, hireEdit: true, hireCreate: true, talentEdit: true, book: true, termEdit: false, letters: false },
     })
   })
 
@@ -39,7 +40,7 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
     const closed = ['hr.hiring_requests.view', 'hr.hiring_requests.create', 'hr.hiring_requests.edit', 'hr.hiring_requests.approve', 'hr.talent_bank.edit']
     const access = appAccess(hrUser({ tabs, closed }))
     expect(access.parts).toEqual({ requests: true, hiring: false, insights: true, talent: true, docs: true, rooms: true, today: false, approve: false, balances: false, close: false, records: false, people: false })
-    expect(access.may).toEqual({ attDecide: false, decide: true, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true })
+    expect(access.may).toEqual({ attDecide: false, decide: true, hireApprove: false, hireEdit: false, hireCreate: false, talentEdit: false, book: true, termEdit: false, letters: false })
   })
 
   it('Member services’ Edit unticked: its requests still show, nothing is decided from the app', () => {
@@ -56,6 +57,35 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
     const tabs = ['hr.att_today.view', 'hr.att_requests.view', 'hr.att_balances.view', 'hr.att_close.view', 'hr.att_records.view']
     expect(appAccess({ ...user, tabs, closed: ['hr.att_requests.approve'] }).may.attDecide).toBe(false)
     expect(appAccess(hrUser({})).may.attDecide).toBe(false)
+  })
+
+  // A probation ending (2026-10-23, mig 20261024223000) or a contract (2026-10-24, mig 20261025046500): Acknowledge, and
+  // the topic that tells the phone of either.
+  it('People · Edit on a person’s page: a probation’s or a contract’s Acknowledge — and people.probation, whose notices reach the phone', () => {
+    const people = hrUser({ actions: { ...HR_ACTIONS, 'team.view': 'all', 'team.edit': 'all' }, permissions: [...HR_KEYS, 'team'] })
+    expect(appAccess(people).may.termEdit).toBe(true)
+    expect(hrTopics(people)).toEqual(['hiring.guest', 'rooms.guest', 'member.requests', 'people.probation'])
+    // The person page's Edit unticked, People · View only, or viewing as somebody: neither.
+    for (const user of [
+      { ...people, closed: ['hr.people.edit'] },
+      hrUser({ actions: { ...HR_ACTIONS, 'team.view': 'all' }, permissions: [...HR_KEYS, 'team'] }),
+      { ...people, viewingAs: { id: 'x', name: 'Somebody' } },
+    ]) {
+      expect(appAccess(user).may.termEdit).toBe(false)
+      expect(hrTopics(user)).not.toContain('people.probation')
+    }
+  })
+
+  // The step after the reminder (2026-10-24): Confirm as permanent and Extend by People · Edit; their letters and Renew's
+  // new contract by Documentation · Create on the person's page, as People's own forms ask.
+  it('Documentation · Create on a person’s page files a step’s letter — never without People open, nor while viewing as somebody', () => {
+    const withCells = (cells: Record<string, 'all'>) => hrUser({ actions: { ...HR_ACTIONS, 'team.view': 'all', 'team.edit': 'all', ...cells }, permissions: [...HR_KEYS, 'team'] })
+    const filer = withCells({ 'documentation.create': 'all' })
+    expect(appAccess(filer).may).toMatchObject({ termEdit: true, letters: true })
+    expect(appAccess(withCells({})).may).toMatchObject({ termEdit: true, letters: false })
+    expect(appAccess({ ...filer, viewingAs: { id: 'x', name: 'Somebody' } }).may.letters).toBe(false)
+    // People's pages closed: no person page to file from.
+    expect(appAccess({ ...filer, tabs: ['hr.documentation.view', 'hr.documentation.create'], closed: ['hr.people.view', 'hr.people.edit'] }).may.letters).toBe(false)
   })
 
   it('without the cell, the tab opens nothing', () => {
@@ -77,10 +107,11 @@ const REQUEST: HiringRequest = {
   events: [{ what: 'Submitted', who: 'Kar Jun', note: '', at: '2026-10-09T01:00:00Z' }, { what: 'Acknowledged', who: 'Grace Lim', note: 'Grace Lim owns it', at: '2026-10-09T03:00:00Z' }],
 }
 const PEOPLE = [{ id: 'grace', name: 'Grace Lim', title: 'HR Manager', department: 'HR' }]
+const BOARD = { people: PEOPLE, talents: [] as HiringTalent[], talentReasons: TALENT_REASONS }
 
 describe('a hiring request, as the app draws it', () => {
   it('reads the requester form by the handoff’s field ids, the money grouped, the days as the portal writes them', () => {
-    expect(hireOf(REQUEST, { people: PEOPLE })).toEqual({
+    expect(hireOf(REQUEST, BOARD)).toEqual({
       id: 'HR-205', status: 'acknowledged', position: 'Senior Revenue Specialist', headcount: 2, dept: 'Revenue · IR', budget: '3,200–3,800',
       start: 'Within 1 month', employment: 'Full-time', reason: 'Expansion', age: '25–40', gender: 'Any', race: 'Any', jd: 'Lead fair sales for IR.',
       notes: undefined, ownerName: 'Grace Lim', requester: 'Kar Jun', company: null, when: '9 Oct 2026', hired: null, source: null, cost: null,
@@ -90,17 +121,41 @@ describe('a hiring request, as the app draws it', () => {
   })
 
   it('says who was hired, through what and at what cost once it is filled; one headcount when none is given', () => {
-    const filled = hireOf({ ...REQUEST, status: 'filled', answers: { ...REQUEST.answers, headcount: '' }, hiredNames: ['Melissa Ong', 'Ryan Tan'], hiredThrough: 'Jobstreet', hiringCost: 1450 }, { people: [] })
+    const filled = hireOf({ ...REQUEST, status: 'filled', answers: { ...REQUEST.answers, headcount: '' }, hiredNames: ['Melissa Ong', 'Ryan Tan'], hiredThrough: 'Jobstreet', hiringCost: 1450 }, { ...BOARD, people: [] })
     expect(filled).toMatchObject({ headcount: 1, hired: 'Melissa Ong, Ryan Tan', source: 'Jobstreet', cost: '1,450', ownerName: null })
-    expect(hireOf({ ...REQUEST, requesterCompany: 'HOUZS Interior Sdn Bhd' }, { people: PEOPLE }).company).toBe('HOUZS Interior Sdn Bhd')
+    expect(hireOf({ ...REQUEST, requesterCompany: 'HOUZS Interior Sdn Bhd' }, BOARD).company).toBe('HOUZS Interior Sdn Bhd')
+  })
+
+  // The phone's Not selected fold (2026-10-24): why the Talent Bank keeps them, as the request's page says it.
+  it('a candidate not selected says why the Talent Bank keeps them, in HR’s words', () => {
+    const t: HiringTalent = {
+      id: 't9', no: 'T-009', name: 'Nur Iman', phone: '', email: '', position: 'Senior Revenue Specialist', department: 'Revenue',
+      fromRequest: 'HR-205', notes: '', reason: 'failed_interview', files: [], savedBy: 'Grace Lim', savedAt: '2026-10-20T08:00:00Z', events: [],
+    }
+    const r: HiringRequest = {
+      ...REQUEST,
+      candidates: [...REQUEST.candidates, { id: 'c2', name: 'Nur Iman', phone: '', source: 'Applied', stage: 'rejected', talentId: 't9', answers: {}, note: 'Asked for RM 4,000', files: [] }],
+    }
+    const [running, out] = hireOf(r, { ...BOARD, talents: [t] }).candidates
+    expect(running).not.toHaveProperty('why')
+    expect(out).toEqual({ id: 'c2', name: 'Nur Iman', phone: undefined, note: 'Asked for RM 4,000', source: 'Applied', stage: 'rejected', why: 'Failed interview' })
+    // Renamed in Form settings: the new name.
+    const renamed = TALENT_REASONS.map(x => (x.id === 'failed_interview' ? { ...x, name: 'Interview failed' } : x))
+    expect(hireOf(r, { ...BOARD, talents: [t], talentReasons: renamed }).candidates[1].why).toBe('Interview failed')
+    // No record of theirs in the bank: nothing said.
+    expect(hireOf(r, BOARD).candidates[1].why).toBeUndefined()
   })
 
   it('keeps somebody in the Talent Bank by their own words', () => {
     const t: HiringTalent = {
       id: 't1', no: 'T-001', name: 'Joyce Tan', phone: '', email: 'joyce@example.invalid', position: 'Account Executive', department: 'Finance',
-      fromRequest: 'HR-199', notes: 'Strong on AR.', files: [], savedBy: 'Grace Lim', savedAt: '2026-09-02T08:00:00Z', events: [],
+      fromRequest: 'HR-199', notes: 'Strong on AR.', reason: 'not_right_now', files: [], savedBy: 'Grace Lim', savedAt: '2026-09-02T08:00:00Z', events: [],
     }
-    expect(talentOf(t)).toEqual({ id: 't1', name: 'Joyce Tan', phone: undefined, email: 'joyce@example.invalid', position: 'Account Executive', dept: 'Finance', from: 'HR-199', when: '2 Sep 2026', notes: 'Strong on AR.' })
+    expect(talentOf(t, TALENT_REASONS)).toEqual({ id: 't1', name: 'Joyce Tan', phone: undefined, email: 'joyce@example.invalid', position: 'Account Executive', dept: 'Finance', from: 'HR-199', when: '2 Sep 2026', notes: 'Strong on AR.', reason: 'Not right now' })
+    // Kept before the reason was asked (2026-10-24): none said.
+    expect(talentOf({ ...t, reason: null }, TALENT_REASONS).reason).toBeUndefined()
+    // HR's list says it (2026-10-24, the reasons managed): a reason renamed reads its new name.
+    expect(talentOf(t, TALENT_REASONS.map(r => (r.id === 'not_right_now' ? { ...r, name: 'Maybe next year' } : r))).reason).toBe('Maybe next year')
   })
 })
 
@@ -192,5 +247,33 @@ describe('viewing the app as somebody (the roles audit, 2026-10-11)', () => {
 
     const own = await loadHrAppData(hrUser({}))
     expect(own).toMatchObject({ greetName: 'Principal', viewingAs: null, meId: 'p1', personalLogin: true })
+  })
+})
+
+describe('the letter types a person’s step files its letter as (2026-10-24)', () => {
+  it('are read for whoever may file one — hr_letter_type_choices(), anything malformed left out — and not for anybody else', async () => {
+    const { readRoomsPeople, readRoomsRange } = await import('@/lib/rooms/read')
+    const { adminMemberAction } = await import('@/lib/member/server')
+    const { createClient } = await import('@/lib/supabase/server')
+    const { loadDocumentation } = await import('@/lib/documentation/server')
+    const { loadHiringBoard } = await import('@/lib/hiring/board')
+    vi.mocked(readRoomsRange).mockResolvedValue({ ok: false, reason: 'none' } as never)
+    vi.mocked(readRoomsPeople).mockResolvedValue({ ok: true, data: { me: { name: 'HR Manager', staffId: 'p1' }, account: 'HR', people: [], departments: [] } } as never)
+    vi.mocked(adminMemberAction).mockResolvedValue({ ok: false } as never)
+    vi.mocked(loadDocumentation).mockResolvedValue({ ok: false } as never)
+    vi.mocked(loadHiringBoard).mockResolvedValue({ ok: false } as never)
+    const rpc = vi.fn(async (name: string) => (name === 'hr_letter_type_choices'
+      ? { data: [{ id: 'cfs', name: 'Contract for Service', compulsory: false }, { id: 'x' }], error: null }
+      : { data: null, error: { message: 'none' } }))
+    const from = () => ({ select: () => ({ eq: async () => ({ data: [], error: null }) }) })
+    vi.mocked(createClient).mockResolvedValue({ rpc, from } as never)
+    const { loadHrAppData } = await import('./server')
+    const people = (cells: Record<string, 'all'>) => hrUser({ actions: { ...HR_ACTIONS, 'team.view': 'all', 'team.edit': 'all', ...cells }, permissions: [...HR_KEYS, 'team'] })
+
+    expect((await loadHrAppData(people({ 'documentation.create': 'all' }))).letterTypes).toEqual([{ id: 'cfs', name: 'Contract for Service', compulsory: false }])
+    expect(rpc).toHaveBeenCalledWith('hr_letter_type_choices')
+    rpc.mockClear()
+    expect((await loadHrAppData(people({}))).letterTypes).toBeNull()
+    expect(rpc).not.toHaveBeenCalledWith('hr_letter_type_choices')
   })
 })

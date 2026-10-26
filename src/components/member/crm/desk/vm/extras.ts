@@ -3,6 +3,8 @@
  * cancel a visit — the phone's own rules: the showroom's slots per weekday, its closures, its booking limit), Add note
  * (B6), Edit customer (the form the Principal / Director set, H3) and History (who changed which setting).
  */
+import { DEFAULT_APPT_TYPES } from "@/lib/member/crm-data";
+import { customBookVM, customPrefill } from "../../shared/custom-book";
 import { formV2 } from "./form";
 import { blockHours, type CrmCustomer, type CrmRoom } from "@/lib/member/crm-data";
 import { roomSlots, slotAt } from "../../sales/vm/chat";
@@ -66,7 +68,7 @@ export function bookVM(ctx: DeskCtx, c: CrmCustomer | undefined) {
   // As the salesperson's sheet (rev 1010 apptChange): a booked visit opens on its own showroom, day and time.
   const vd = visit ? new Date(visit.start) : null, vDay = vd ? new Date(vd.getFullYear(), vd.getMonth(), vd.getDate()).getTime() : 0;
   const b = ui.book ?? (vd
-    ? { room: Math.max(0, rooms.findIndex(r => r.id === visit!.showroomId)), day: vDay, slot: timeLabel(vd), week: Math.max(0, Math.floor((vDay - T) / (7 * DAY))) }
+    ? { room: Math.max(0, rooms.findIndex(r => r.id === visit!.showroomId)), day: vDay, slot: timeLabel(vd), week: Math.max(0, Math.floor((vDay - T) / (7 * DAY))), ...customPrefill(visit!) }
     : { room: 0, day: T + DAY, slot: null, week: 0 });
   const room = rooms[b.room] ?? rooms[0];
   const put = (p: Partial<typeof b>) => patch({ book: { ...b, ...p } });
@@ -82,16 +84,23 @@ export function bookVM(ctx: DeskCtx, c: CrmCustomer | undefined) {
       bg: on ? "var(--crm-rust)" : "#fff", fg: on ? "#fff" : off ? "var(--crm-faint-2)" : "var(--crm-ink)", bd: on ? "var(--crm-rust)" : "var(--crm-rule)", deco: off ? "line-through" : "none", cur: off ? "not-allowed" : "pointer",
       pick: () => { if (!off) put({ slot: label }); } }; }) : [];
   const ok = !!room && !!b.slot && !!c;
+  // Showroom · Online · Other, as the phone's (the owner, 2026-10-24: "電腦版也做"); Online / Other book from the footer.
+  const bkm = customBookVM({ b, put, changing: !!visit, now, types: data.apptTypes ?? DEFAULT_APPT_TYPES,
+    save: f => (visit ? act.moveCustom(visit.id, f) : c ? act.bookCustom(c.id, f) : Promise.resolve(false)),
+    done: () => patch({ kind: "chat", book: null, toast: `${b.mode === "online" ? "Online meeting" : "Appointment"} ${visit ? "changed" : "booked"} for ${c?.name ?? ""}` }) });
+  const custom = !bkm.showroom;
   return {
-    name: c?.name ?? "", ini: initials(c?.name ?? "?"), has: !!visit,
+    bkm,
+    name: c?.name ?? "", ini: initials(c?.name ?? "?"), has: !!visit, remarks: room?.remarks ?? "",
     current: visit ? `${new Date(visit.start).toLocaleString("en-MY", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · ${data.rooms.find(r => r.id === visit.showroomId)?.name ?? ""}` : "",
     rooms: rooms.map((r, i) => ({ label: r.name, on: i === b.room, bg: i === b.room ? "#fff" : "transparent", fg: i === b.room ? "var(--crm-ink)" : "var(--crm-muted)", sh: i === b.room ? "0 1px 3px rgba(42,22,12,.14)" : "none", pick: () => put({ room: i, slot: null }) })),
     weekLabel: `${new Date(days[0] ? T + b.week * 7 * DAY : T).toLocaleDateString("en-MY", { day: "numeric", month: "short" })} – ${new Date(T + (b.week * 7 + 6) * DAY).toLocaleDateString("en-MY", { day: "numeric", month: "short" })}`,
     prev: () => put({ week: Math.max(0, b.week - 1) }), next: () => put({ week: Math.min(12, b.week + 1) }), days, slots, noSlots: !slots.length,
     ...monthOf(b, T, room, put),
     // The salesperson's words: "Change to Tue 13 Oct, 5:00 pm" / "Book …", "Pick a time" until there is one.
-    saveLabel: ok ? `${visit ? "Change to" : "Book"} ${dayLabel(new Date(b.day))}, ${b.slot}` : "Pick a time", saveBg: ok ? "var(--crm-rust)" : "var(--crm-line)", saveCur: ok ? "pointer" : "not-allowed",
-    save: () => { if (!ok || !c || !room || !b.slot) return; const at = slotAt(b.day, b.slot).toISOString();
+    saveLabel: custom ? bkm.label : ok ? `${visit ? "Change to" : "Book"} ${dayLabel(new Date(b.day))}, ${b.slot}` : "Pick a time",
+    saveBg: (custom ? bkm.ready : ok) ? "var(--crm-rust)" : "var(--crm-line)", saveCur: (custom ? bkm.ready : ok) ? "pointer" : "not-allowed",
+    save: () => { if (custom) { bkm.confirm?.(); return; } if (!ok || !c || !room || !b.slot) return; const at = slotAt(b.day, b.slot).toISOString();
       void (visit ? act.moveVisit(visit.id, room.id, at) : act.book(c.id, room.id, at)).then(r => { if (r) patch({ kind: "chat", book: null, toast: `${visit ? "Visit changed" : "Visit booked"} for ${c.name}` }); }); },
     cancel: () => { if (visit) void act.cancelVisit(visit.id).then(r => { if (r) patch({ kind: "chat", book: null, toast: `Visit cancelled for ${c?.name ?? ""}` }); }); },
     back: () => patch({ kind: "chat", book: null }),

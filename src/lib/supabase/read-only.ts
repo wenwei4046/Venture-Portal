@@ -53,6 +53,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'hr_documentation', 'hr_documentation_file', 'member_documents',
   // …and the Data center's own folders and files, and one's path (mig 20261012220000).
   'hr_drive', 'hr_drive_file',
+  // …the letter types People's forms offer beside the employment status (mig 20261025052000): STABLE, reading only.
+  'hr_letter_type_choices',
   // …Publish › Preview and a memo's file (mig 20261012210000): both STABLE, reading only.
   'hr_memo_preview', 'memo_attachment',
   // …a letter's signature, and one's own on a memo (mig 20261021013000): both STABLE, reading only.
@@ -69,6 +71,51 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'my_it_requests', 'it_requests_desk', 'it_request_file',
   // Exact notification detail, including older than either list (mig 20261021030000): STABLE, reading only.
   'it_request_get',
+  // Marketing's view (mig 20261023214100): its board, sidebar, search and one's own notices — all STABLE.
+  'mkt_board', 'mkt_shell', 'mkt_search', 'mkt_notices',
+  // Marketing's task page (mig 20261023234000): one project, its stages' work and trail — STABLE.
+  'mkt_project',
+  // Marketing's Workflow Builder (mig 20261023235500): the templates, their drafts and versions — STABLE.
+  'mkt_workflows',
+  // Marketing's shared option lists (mig 20261025191000): every list by its name — STABLE.
+  'mkt_option_lists',
+  // Marketing's Minutes Builder (mig 20261023235800): the minutes templates, their drafts and versions — STABLE.
+  'mkt_minutes_templates',
+  // Marketing's Product Builder (mig 20261023235900): the products, their prices and versions — STABLE.
+  'mkt_products',
+  // Marketing's product projects (mig 20261024002000): the products on sale, a product project's page — STABLE.
+  'mkt_product_picker', 'mkt_product_project',
+  // New Project's drafts (mig 20261025211000): the login's own list, and one with its form — STABLE.
+  'mkt_new_drafts', 'mkt_new_draft',
+  // New Project's meeting minutes (mig 20261025221000): the templates published — STABLE.
+  'mkt_minutes_picker',
+  // A Marketing subsidiary's page (mig 20261024005000): its projects' newest trail lines — STABLE.
+  'mkt_sub_feed',
+  // …and its own key dates (mig 20261025235500) — STABLE.
+  'mkt_key_dates',
+  // A Marketing project's Ads report (mig 20261025235800): its setup and reports, the CRM's ads to pick, what the CRM
+  // counts for them — STABLE.
+  'mkt_ads_page', 'mkt_ads_choices', 'mkt_ads_crm',
+  // A Marketing project's formal log (mig 20261024006000): every line of its trail — STABLE.
+  'mkt_project_log',
+  // Marketing's Library (mig 20261024007000): its folder types, folders, files and Dustbin — STABLE.
+  'mkt_library',
+  // A Marketing task's files from the Library (mig 20261024007400) — STABLE.
+  'mkt_task_library',
+  // My Space's own side (mig 20261024007500): the caller's own space — STABLE.
+  'mkt_space',
+  // The pet's levels (mig 20261025037000): the caller's own pet in numbers — STABLE.
+  'mkt_pet',
+  // The lobby and a visit (mig 20261025038000): the roster's pets, a teammate's space — STABLE.
+  'mkt_lobby', 'mkt_space_of',
+  // The chat (mig 20261025039000): one's chats, a thread — STABLE.
+  'mkt_chat_list', 'mkt_chat_thread',
+  // Replace Person (mig 20261025036000): who stands where, one person's places — STABLE.
+  'mkt_replace_people', 'mkt_replace_places',
+  // Billing (mig 20261025121000): the month's lines, an outside client's billing details — STABLE.
+  'mkt_billing', 'mkt_client_bill',
+  // What Finance's import would bring in (mig 20261026023000) — STABLE; the Invoice hub reads it.
+  'mkt_bill_import_preview',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',

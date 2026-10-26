@@ -51,7 +51,7 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
       {ui.tab === "contacts" && <SalesContacts v={contactsVM(ctx)} />}
       {ui.tab === "calendar" && <SalesCalendar v={calendarVM(ctx)} />}
       {ui.tab === "insight" && <SalesInsight v={insightVM(ctx)} />}
-      {ui.tab === "profile" && <SalesProfile v={profileVM(ctx)} />}
+      {ui.tab === "profile" && <SalesProfile v={profileVM(ctx, onExit)} />}
     </>)}
     {chat && (<>
       <SalesChat v={chat} />

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { HIRING_BOARD } from '@/test/hiring-board'
+import { HIRING_BOARD, TALENT_REASONS } from '@/test/hiring-board'
 import type { HiringBoard, HiringRequest } from '@/lib/hiring/types'
 
 const actions = vi.hoisted(() => ({
@@ -11,6 +11,7 @@ const actions = vi.hoisted(() => ({
   saveHiringCandidate: vi.fn(),
   saveHiringTalent: vi.fn(),
   setCandidateStage: vi.fn(),
+  addTalentReason: vi.fn(),
 }))
 const upload = vi.hoisted(() => ({ uploadHiringFile: vi.fn() }))
 const { push, flash } = vi.hoisted(() => ({ push: vi.fn(), flash: vi.fn() }))
@@ -132,6 +133,143 @@ describe('Hiring › a request › candidates’ files', () => {
     fireEvent.click(win.getByRole('button', { name: 'Add candidate' }))
     await waitFor(() => expect(flash).toHaveBeenCalledWith('A file is a PDF, a Word document or an image.'))
     expect(actions.saveHiringCandidate).not.toHaveBeenCalled()
+  })
+})
+
+// IT-0008 (2026-10-24): "after the candidate is failed with interview or not shortlisted, the candidate will be
+// dissapear within the table ish view, where instead of entirely dissapear the candidate will be placed within the
+// Talent Bank". HR-202 had Siti Aisyah hired and Nur Iman not selected (kept in the bank: Not right now).
+describe('Hiring › a request › Not selected goes to the Talent Bank', () => {
+  const filled = HIRING_BOARD.requests.find(r => r.id === 'HR-202')!
+
+  it('the list counts and shows the ones still in the running; the not selected fold at its foot, each with why', () => {
+    render(<Candidates board={HIRING_BOARD} request={filled} can={{ create: true, edit: true, approve: true }} talentPage />)
+    expect(screen.getByText('Candidates · 1')).toBeInTheDocument()
+    expect(screen.getByText('Siti Aisyah')).toBeInTheDocument()
+    expect(screen.queryByText('Nur Iman')).toBeNull()
+    const fold = screen.getByRole('button', { name: /Not selected · 1/ })
+    expect(fold).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(fold)
+    expect(fold).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Nur Iman')).toBeInTheDocument()
+    expect(screen.getByText('Not right now')).toBeInTheDocument()
+    // Their ⋯ opens them in the bank — or brings them back.
+    fireEvent.click(screen.getByRole('button', { name: 'More for Nur Iman' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Open in Talent Bank/ }))
+    expect(push).toHaveBeenCalledWith('/hiring/talent/T-104')
+  })
+
+  it('Change status ▸ Not selected asks why — the one their stage says first — and keeps them in the bank', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Change status/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Not selected/ }))
+    expect(actions.setCandidateStage).not.toHaveBeenCalled()
+    const why = within(screen.getByRole('group', { name: 'Why not selected' }))
+    expect(why.getAllByRole('menuitem').map(b => b.textContent)).toEqual(['Failed interview', 'Not shortlisted', 'Not right now', 'Declined offer', 'Other'])
+    fireEvent.click(why.getByRole('menuitem', { name: 'Not right now' }))
+    await waitFor(() => expect(actions.setCandidateStage).toHaveBeenCalledWith(daniel.id, 'rejected', 'not_right_now'))
+    expect(flash).toHaveBeenCalledWith('Daniel Lee → Not selected · kept in Talent Bank')
+  })
+
+  it('any other status is set at once, as before', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Change status/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Offered/ }))
+    await waitFor(() => expect(actions.setCandidateStage).toHaveBeenCalledWith(daniel.id, 'offered', undefined))
+    expect(flash).toHaveBeenCalledWith('Daniel Lee → Offered')
+  })
+
+  it('Edit details › Status Not selected asks why too, and sends it', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Edit details/ }))
+    const win = within(screen.getByRole('dialog', { name: 'Edit candidate' }))
+    expect(win.queryByLabelText('Why not selected')).toBeNull()
+    fireEvent.change(win.getByLabelText('Status'), { target: { value: 'rejected' } })
+    const why = win.getByLabelText('Why not selected') as HTMLSelectElement
+    expect(why.value).toBe('failed_interview')
+    fireEvent.change(why, { target: { value: 'declined_offer' } })
+    fireEvent.click(win.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(actions.saveHiringCandidate).toHaveBeenCalled())
+    const form = actions.saveHiringCandidate.mock.calls[0][0] as FormData
+    expect([form.get('stage'), form.get('reason')]).toEqual(['rejected', 'declined_offer'])
+    expect(flash).toHaveBeenCalledWith('Daniel Lee saved · kept in Talent Bank')
+  })
+})
+
+// 2026-10-24 — asked whether HR should manage the reasons like File types, the user: "1, yes do with same". HR has renamed
+// Failed interview and Not right now, turned Not shortlisted off and added Salary too high (mig 20261025021500).
+describe('Hiring › a request › the reasons are HR’s list', () => {
+  const reasons = [
+    ...TALENT_REASONS.map(r =>
+      r.id === 'failed_interview' ? { ...r, name: 'Interview failed' } : r.id === 'not_right_now' ? { ...r, name: 'Maybe next year' } : r.id === 'not_shortlisted' ? { ...r, active: false } : r),
+    { id: 'r-salary', name: 'Salary too high', active: true, used: 0 },
+  ]
+  const managed: HiringBoard = { ...board, talentReasons: reasons }
+  const showManaged = (b: HiringBoard = managed, r: HiringRequest = request) =>
+    render(<Candidates board={b} request={r} can={{ create: true, edit: true, approve: true }} talentPage />)
+
+  it('Not selected ▸ why? offers the ones that are on, in HR’s words, the stage’s first', async () => {
+    showManaged()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Change status/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Not selected/ }))
+    const why = within(screen.getByRole('group', { name: 'Why not selected' }))
+    expect(why.getAllByRole('menuitem').map(b => b.textContent)).toEqual(['Interview failed', 'Maybe next year', 'Declined offer', 'Other', 'Salary too high'])
+    fireEvent.click(why.getByRole('menuitem', { name: 'Salary too high' }))
+    await waitFor(() => expect(actions.setCandidateStage).toHaveBeenCalledWith(daniel.id, 'rejected', 'r-salary'))
+  })
+
+  it('the not selected fold says why in HR’s words', () => {
+    showManaged({ ...HIRING_BOARD, talentReasons: reasons }, HIRING_BOARD.requests.find(r => r.id === 'HR-202')!)
+    fireEvent.click(screen.getByRole('button', { name: /Not selected · 1/ }))
+    expect(screen.getByText('Maybe next year')).toBeInTheDocument()
+  })
+
+  it('Edit details › Not selected: "+ Add a new reason…" names one, made on Save', async () => {
+    actions.addTalentReason.mockResolvedValue({ ok: true, id: 'r-new' })
+    showManaged()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Edit details/ }))
+    const win = within(screen.getByRole('dialog', { name: 'Edit candidate' }))
+    fireEvent.change(win.getByLabelText('Status'), { target: { value: 'rejected' } })
+    const why = win.getByLabelText('Why not selected') as HTMLSelectElement
+    expect([why.value, [...why.options].map(o => o.text)]).toEqual(['failed_interview', ['Interview failed', 'Maybe next year', 'Declined offer', 'Other', 'Salary too high', '+ Add a new reason…']])
+    fireEvent.change(why, { target: { value: '__new' } })
+    fireEvent.click(win.getByRole('button', { name: 'Save' }))
+    expect(flash).toHaveBeenCalledWith('Name the new reason.')
+    expect(actions.saveHiringCandidate).not.toHaveBeenCalled()
+    fireEvent.change(win.getByLabelText('New reason *'), { target: { value: 'Relocating' } })
+    fireEvent.click(win.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(actions.saveHiringCandidate).toHaveBeenCalled())
+    expect(actions.addTalentReason).toHaveBeenCalledWith('Relocating')
+    expect((actions.saveHiringCandidate.mock.calls[0][0] as FormData).get('reason')).toBe('r-new')
+  })
+
+  it('Move to Talent Bank… starts on Not right now while it is on; a new reason is named there too', async () => {
+    actions.addTalentReason.mockResolvedValue({ ok: true, id: 'r-new' })
+    showManaged()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move to Talent Bank/ }))
+    const win = within(screen.getByRole('dialog', { name: 'Move to Talent Bank' }))
+    const why = win.getByLabelText('Reason *') as HTMLSelectElement
+    expect(why.value).toBe('not_right_now')
+    fireEvent.change(why, { target: { value: '__new' } })
+    fireEvent.change(win.getByLabelText('New reason *'), { target: { value: 'Relocating' } })
+    fireEvent.click(win.getByRole('button', { name: 'Save to Talent Bank' }))
+    await waitFor(() => expect(actions.saveHiringTalent).toHaveBeenCalled())
+    expect(actions.addTalentReason).toHaveBeenCalledWith('Relocating')
+    expect((actions.saveHiringTalent.mock.calls[0][0] as FormData).get('reason')).toBe('r-new')
+  })
+
+  it('without Edit, a form offers no "+ Add a new reason…"', () => {
+    render(<Candidates board={managed} request={request} can={{ create: true, edit: false, approve: true }} talentPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'More for Daniel Lee' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move to Talent Bank/ }))
+    const why = within(screen.getByRole('dialog', { name: 'Move to Talent Bank' })).getByLabelText('Reason *') as HTMLSelectElement
+    expect([...why.options].map(o => o.text)).not.toContain('+ Add a new reason…')
   })
 })
 

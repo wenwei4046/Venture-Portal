@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/lib/storage/stage", () => import("@/test/stage-in-place"));
 import { BUILT_FORM_NAME, BUILTIN_FIELDS, REPLACEMENT_BUILTIN_FIELDS, REPLACEMENT_FORM_NAME, type WaitingForm } from "@/lib/commission/waiting-form";
 import RequestForm, { type ClaimWeek, type FormLink, type FormOptions } from "./RequestForm";
 import RequestsPage from "./RequestsPage";

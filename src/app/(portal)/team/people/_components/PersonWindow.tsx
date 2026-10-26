@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import dayjs from 'dayjs'
-import { officeTime } from '@/lib/office-time'
+import { officeTime, officeToday } from '@/lib/office-time'
+import { dayLabel, statusChip } from '@/lib/employment-status'
 import { Chip, HistoryEvent, btn } from '@/components/hrv/kit'
 import { CloseButton, Window } from '@/components/hrv/overlay'
 import { Tabs } from '@/components/hrv/tabs'
@@ -73,9 +74,14 @@ export default function PersonWindow({
           <div className={s.pwLine}>{person ? personLine(person) : ' '}</div>
           {person ? (
             <div className={s.pwChips}>
-              <Chip tone={person.active ? 'ledger' : 'danger'} style={{ gap: 5, fontSize: 10.5 }}>
-                {person.active ? 'Active' : person.resignedOn ? `Resigned ${person.resignedOn}` : 'Inactive'}
-              </Chip>
+              {/* Probation, Permanent or Part time for the active (2026-10-23), as the roster's row reads. */}
+              {person.active ? (
+                <EmploymentChip staff={person.staff} />
+              ) : (
+                <Chip tone="danger" style={{ gap: 5, fontSize: 10.5 }}>
+                  {person.resignedOn ? `Resigned ${person.resignedOn}` : 'Inactive'}
+                </Chip>
+              )}
               <Chip
                 tone={person.account ? (person.account.invitePending ? 'alert' : person.account.isActive ? 'info' : 'danger') : 'plain'}
                 style={{ gap: 5, fontSize: 10.5 }}
@@ -187,6 +193,27 @@ export default function PersonWindow({
         ) : null}
       </div>
     </Window>
+  )
+}
+
+/**
+ * Their employment's chip — a probation's or a contract's names its end ("Probation · ends 31 Dec 2026", "Contract · ends
+ * 30 Sep 2027"), which the window has room for.
+ */
+function EmploymentChip({ staff }: { staff: PersonCardData['staff'] }) {
+  const end = staff.employment_status === 'probation' ? (staff.probation_end ?? null) : null
+  const contractEnd = staff.employment_status === 'contract' ? (staff.contract_end ?? null) : null
+  const ack = staff.employment_status === 'contract'
+    ? { ackEnd: staff.contract_ack_end ?? null, ackAt: staff.contract_ack_at ?? null, ackName: staff.contract_ack_name ?? null }
+    : { ackEnd: staff.probation_ack_end ?? null, ackAt: staff.probation_ack_at ?? null, ackName: staff.probation_ack_name ?? null }
+  const chip = statusChip({ status: staff.employment_status, probationEnd: end, contractEnd, ack }, officeToday())
+  const label = chip.label === 'Probation' && end ? `Probation · ends ${dayLabel(end)}`
+    : chip.label === 'Contract' && contractEnd ? `Contract · ends ${dayLabel(contractEnd)}`
+    : chip.label
+  return (
+    <Chip tone={chip.tone} style={{ gap: 5, fontSize: 10.5 }} title={chip.title}>
+      {label}
+    </Chip>
   )
 }
 

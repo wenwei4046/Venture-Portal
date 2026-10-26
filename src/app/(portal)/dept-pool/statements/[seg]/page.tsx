@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireActionOn, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
@@ -7,10 +6,11 @@ import { officeMonth } from '@/lib/office-time'
 import { primedRegistryRows } from '@/lib/dept-registry'
 import { statementDepts, statementPath, type StatementView } from '@/lib/dept-statements'
 import { loadMonthlyCashFlow, loadMonthlyPnl } from '@/lib/monthly-statements'
-import { rangeLabel, reportRange } from '@/lib/report-range'
+import { rangeLabel, reportRange, toChoices } from '@/lib/report-range'
 import { segmentFilterFor } from '../../../reports/_components/report-segments'
-import MonthlyPnlBody from '../../../reports/_components/MonthlyPnlBody'
-import MonthlyCashFlowBody from '../../../reports/_components/MonthlyCashFlowBody'
+import { openDeptPoolRow } from '../../../reports/drill-actions'
+import DeptPeriodBar from './_components/DeptPeriodBar'
+import { DeptCashFlowBody, DeptPnlBody } from './_components/DeptStatementBody'
 
 // A department's own P&L and Cash Flow, under Dept Pool (2026-10-09, the
 // user: 我要把每个 department 的 cash flow, P&L 放过来 — Venture, Marketing,
@@ -21,6 +21,12 @@ import MonthlyCashFlowBody from '../../../reports/_components/MonthlyCashFlowBod
 //
 // For whoever reads the reports company-wide AND every department's pool
 // (Finance, the Principal).
+//
+// 2026-10-25 (the user: "department 那边我要做成像 venture pool 这样用 diagram
+// 和 chart 的"; the mockup's twelfth round, "这一版可以了，开始做"): the title
+// names the statement ("Marketing - Cash Flow"), the switch sits in the period
+// row with 6 / 12 months — which may reach back across the year — and the
+// charts stand between the cards and the statement.
 
 export const dynamic = 'force-dynamic'
 
@@ -47,12 +53,13 @@ export default async function DeptStatementPage({ params, searchParams }: Props)
   const view: StatementView = sp.view === 'pnl' ? 'pnl' : 'cash-flow'
   const nowYM = officeMonth()
   const period = YM.test(sp.period ?? '') ? (sp.period as string) : nowYM
-  const range = reportRange({ from: sp.from, period }, nowYM)
+  const range = reportRange({ from: sp.from, period }, nowYM, { crossYear: true })
   const args = {
     year: range.year,
     throughMonth: range.throughMonth,
     segment: segmentFilterFor(dept.segment),
     consolidated: false,
+    ...(range.buildFrom ? { from: range.buildFrom } : {}),
   }
   // What the switch keeps: the period as the address gave it.
   const kept = { period: YM.test(sp.period ?? '') ? period : undefined, from: range.wholeYear ? undefined : range.from }
@@ -64,59 +71,56 @@ export default async function DeptStatementPage({ params, searchParams }: Props)
   }
 
   const head = (
-    <div className="page-head">
-      <div className="min-w-0">
-        <div className="page-eyebrow">
-          <em>I.</em> DEPARTMENTS · {dept.label.toUpperCase()} · {rangeLabel(range.from, range.to).toUpperCase()}
-        </div>
-        <h1 className="page-title">{dept.label}</h1>
-      </div>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <div className="rpt-modes" role="group" aria-label="Statement">
-          {([
-            ['pnl', 'P&L'],
-            ['cash-flow', 'Cash Flow'],
-          ] as const).map(([v, label]) => (
-            <Link
-              key={v}
-              href={statementPath(dept.slug, v, kept)}
-              aria-current={view === v ? 'page' : undefined}
-              className={view === v ? 'btn-pri-sheet' : 'btn-quiet-sheet'}
-            >
-              {label}
-            </Link>
-          ))}
+    <>
+      <div className="page-head">
+        <div className="min-w-0">
+          <div className="page-eyebrow">
+            <em>I.</em> DEPARTMENTS · {dept.label.toUpperCase()} · {rangeLabel(range.from, range.to).toUpperCase()}
+          </div>
+          <h1 className="page-title">
+            {dept.label} - {view === 'pnl' ? 'Profit & Loss' : 'Cash Flow'}
+          </h1>
         </div>
         {/* The files for whoever may take them out — the route asks Dept reports · Export (2026-10-16). */}
         {canDo(user, 'dept_reports', 'export') ? (
-          <>
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <a href={exportHref('xlsx')} className="btn-quiet-sheet">
               Excel
             </a>
             <a href={exportHref('pdf')} className="btn-quiet-sheet">
               PDF
             </a>
-          </>
+          </div>
         ) : null}
       </div>
-    </div>
+      <DeptPeriodBar
+        view={view}
+        links={{ pnl: statementPath(dept.slug, 'pnl', kept), 'cash-flow': statementPath(dept.slug, 'cash-flow', kept) }}
+        from={range.from}
+        to={range.to}
+        toOptions={toChoices(nowYM)}
+      />
+    </>
   )
+
+  // An account opens onto its months and lines for this segment (2026-10-24), through this page's own action.
+  const drill = { open: openDeptPoolRow, segment: dept.segment }
 
   if (view === 'cash-flow') {
     const cashFlow = await loadMonthlyCashFlow(supabase, args)
     return (
-      <div>
+      <div className="dept-page">
         {head}
-        <MonthlyCashFlowBody cashFlow={cashFlow} range={range} nowYM={nowYM} segmentLabel={dept.label} />
+        <DeptCashFlowBody cashFlow={cashFlow} range={range} nowYM={nowYM} label={dept.label} drill={drill} />
       </div>
     )
   }
 
   const pnl = await loadMonthlyPnl(supabase, args)
   return (
-    <div>
+    <div className="dept-page">
       {head}
-      <MonthlyPnlBody pnl={pnl} range={range} nowYM={nowYM} segmentLabel={dept.label} />
+      <DeptPnlBody pnl={pnl} range={range} nowYM={nowYM} label={dept.label} drill={drill} />
     </div>
   )
 }

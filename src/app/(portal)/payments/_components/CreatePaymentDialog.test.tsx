@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('@/lib/storage/stage', () => import('@/test/stage-in-place'))
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import type { CreatePaymentOptions } from '../_lib/create-payment-options'
 
-// Create payment (2026-10-14, the Finance revamp v2 — D07 / D08): the
-// prototype's seven fields and two buttons; the rest of today's form behind
-// the small buttons; what is sent is what the form page sent.
+// Create payment (2026-10-14, the Finance revamp v2 — D07 / D08; 2026-10-22,
+// the user: "split pool 这个按钮我不想要，我想maintain之前的add description/line,
+// attachment 就default 要有" → "每行一个，GL override 拿掉"): Pay to, the
+// date, the bank and the voucher's description; then its lines — each its own
+// words, pool, category and amount, + Add line, their total the voucher's —
+// and the attachments, always there. What is sent is what the form page sent,
+// each line's words with it.
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), open: vi.fn(), flash: vi.fn() }))
 vi.mock('../actions', () => ({ createPaymentFromDialog: mocks.create }))
@@ -67,9 +72,14 @@ const dialog = () => screen.getByRole('dialog')
 const sent = (): FormData => mocks.create.mock.calls[0][0] as FormData
 const fill = () => {
   fireEvent.change(screen.getByLabelText('Pay to'), { target: { value: 'Tan Yong Hong' } })
-  fireEvent.change(screen.getByLabelText('Category'), { target: { value: '9087' } })
-  fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '447.68' } })
+  fireEvent.change(screen.getByLabelText('Line 1 category'), { target: { value: '9087' } })
+  fireEvent.change(screen.getByLabelText('Line 1 amount'), { target: { value: '447.68' } })
   fireEvent.change(screen.getByLabelText('Description'), { target: { value: "Claude - Oct'26" } })
+}
+const save = async (name = 'Save draft') => {
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name }))
+  })
 }
 
 beforeEach(() => {
@@ -78,21 +88,32 @@ beforeEach(() => {
   mocks.open.mockResolvedValue({ ok: true, options: OPTIONS })
 })
 
-describe('the dialog, as the design draws it', () => {
-  it('says Create payment · New payment voucher · HV-PV-202610, the seven fields in its order, its two buttons', async () => {
+describe('the dialog', () => {
+  it('says Create payment · New payment voucher · HV-PV-202610, its fields in order — a line ready, the attachments there — and its two buttons', async () => {
     draw()
     await act(async () => undefined)
     expect(within(dialog()).getByText('Create payment')).toBeInTheDocument()
     expect(within(dialog()).getByText('New payment voucher · HV-PV-202610')).toBeInTheDocument()
     const labels = Array.from(dialog().querySelectorAll('label')).map((l) => l.textContent)
-    expect(labels).toEqual(['Pay to', 'Category', 'Pool', 'From bank', 'Amount RM', 'Description', 'Payment date'])
+    expect(labels).toEqual(['Pay to', 'Payment date', 'From bank', 'Description', 'Lines', 'Attachments'])
     expect(screen.getByPlaceholderText('Payee name')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('What is this for?')).toBeInTheDocument()
-    expect((screen.getByLabelText('Pool') as HTMLSelectElement).selectedOptions[0].textContent).toBe('Venture')
+    expect(screen.getByLabelText('Line 1 description')).toHaveAttribute('placeholder', 'What this line is for')
+    expect((screen.getByLabelText('Line 1 pool') as HTMLSelectElement).selectedOptions[0].textContent).toBe('Venture')
+    expect(screen.getByRole('button', { name: '+ Add line' })).toBeInTheDocument()
+    expect(dialog().querySelector('input[type="file"]')).not.toBeNull()
     expect((screen.getByLabelText('From bank') as HTMLSelectElement).selectedOptions[0].textContent).toBe('Hong Leong Bank — 123-456-7890')
     expect(screen.getByRole('button', { name: 'Payment date: Wed, 14 Oct 2026' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save draft' })).toHaveAttribute('data-off', 'true')
     expect(screen.getByRole('button', { name: 'Submit for approval' })).toHaveAttribute('data-off', 'true')
+  })
+
+  it('keeps under the fields only Loan repayment, Internal transfer, Method and Notes — no Split pools, no GL override', async () => {
+    draw()
+    await act(async () => undefined)
+    const more = within(screen.getByRole('group', { name: 'More' })).getAllByRole('button').map((b) => b.textContent)
+    expect(more).toEqual(['Loan repayment', 'Internal transfer', 'Method', 'Notes'])
+    expect(screen.queryByText(/override/i)).toBeNull()
   })
 
   it('says what is still needed — the prototype’s sentence', async () => {
@@ -116,17 +137,23 @@ describe('the dialog, as the design draws it', () => {
     expect(mocks.open).toHaveBeenCalledTimes(1)
     expect((screen.getByLabelText('From bank') as HTMLSelectElement).value).toBe('bank-hl')
   })
+
+  it('a payment begun elsewhere starts its line on the amount and the voucher on its words', async () => {
+    draw({ preset: { title: 'Refund', payee: 'HOUZS Century', companyId: 'hc', amount: 120, description: 'Refund of HV-INV-202610-0003' } })
+    await act(async () => undefined)
+    expect(screen.getByLabelText('Line 1 amount')).toHaveValue('120.00')
+    expect(screen.getByLabelText('Description')).toHaveValue('Refund of HV-INV-202610-0003')
+    expect(screen.getByText('RM 120.00')).toBeInTheDocument()
+  })
 })
 
 describe('saving', () => {
-  it('Save draft sends the voucher the form page sent — one pool, its line — and says what it made', async () => {
+  it('Save draft sends the voucher the form page sent — its one line, no words of its own — and says what it made', async () => {
     const { onClose } = draw()
     await act(async () => undefined)
     fill()
     expect(screen.getByRole('button', { name: 'Save draft' })).not.toHaveAttribute('data-off')
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
-    })
+    await save()
     const form = sent()
     expect(Object.fromEntries(form.entries())).toMatchObject({
       direction: 'debit',
@@ -144,6 +171,7 @@ describe('saving', () => {
       'source_rows[0][account_code]': '9087',
       attachment_count: '0',
     })
+    expect(form.has('source_rows[0][description]')).toBe(false)
     expect(form.has('submit')).toBe(false)
     expect(mocks.flash).toHaveBeenCalledWith('HV-PV-202610-0521 saved as draft')
     expect(onClose).toHaveBeenCalled()
@@ -154,9 +182,7 @@ describe('saving', () => {
     draw()
     await act(async () => undefined)
     fill()
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Submit for approval' }))
-    })
+    await save('Submit for approval')
     expect(sent().get('submit')).toBe('1')
     expect(mocks.flash).toHaveBeenCalledWith('HV-PV-202610-0521 submitted — waiting for Principal')
   })
@@ -164,9 +190,7 @@ describe('saving', () => {
   it('sends nothing while something is missing', async () => {
     draw()
     await act(async () => undefined)
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Submit for approval' }))
-    })
+    await save('Submit for approval')
     expect(mocks.create).not.toHaveBeenCalled()
   })
 
@@ -175,77 +199,73 @@ describe('saving', () => {
     const { onClose } = draw()
     await act(async () => undefined)
     fill()
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
-    })
+    await save()
     expect(screen.getByRole('alert')).toHaveTextContent('Bank account is required for debit (outgoing) vouchers')
     expect(onClose).not.toHaveBeenCalled()
   })
 })
 
-describe('what today’s form also does', () => {
-  it('Pay to offers the companies it matches; picking one links the voucher to it', async () => {
-    draw()
-    await act(async () => undefined)
-    const input = screen.getByLabelText('Pay to')
-    fireEvent.focus(input)
-    fireEvent.change(input, { target: { value: 'houzs' } })
-    fireEvent.mouseDown(screen.getByRole('option', { name: /HOUZS Century/ }))
-    expect(input).toHaveValue('HOUZS Century')
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: '9087' } })
-    fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '10' } })
-    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'x' } })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
-    })
-    expect(sent().get('payee_company_id')).toBe('hc')
-  })
-
-  it('Split pools: a line each, which must add up to the amount', async () => {
+describe('the lines', () => {
+  it('each its own words, pool, category and amount; + Add line; their total is the voucher’s amount', async () => {
     draw()
     await act(async () => undefined)
     fill()
-    fireEvent.click(screen.getByRole('button', { name: 'Split pools' }))
-    expect(screen.getByRole('button', { name: 'Split pools' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByLabelText('Line 1 amount')).toHaveValue('447.68')
-    fireEvent.change(screen.getByLabelText('Line 1 amount'), { target: { value: '400' } })
+    fireEvent.change(screen.getByLabelText('Line 1 description'), { target: { value: 'Claude Team plan' } })
+    fireEvent.click(screen.getByRole('button', { name: '+ Add line' }))
+    fireEvent.change(screen.getByLabelText('Line 2 description'), { target: { value: 'Roadshow flyers' } })
     fireEvent.change(screen.getByLabelText('Line 2 pool'), { target: { value: 'dept_pool_marketing' } })
+    expect(screen.getByText('Each line’s pool, category, amount is needed before you can save.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Line 2 category'), { target: { value: '9087' } })
-    fireEvent.change(screen.getByLabelText('Line 2 amount'), { target: { value: '40' } })
-    expect(screen.getByText('The lines add up to RM 440.00 — the amount is RM 447.68.')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Line 2 amount'), { target: { value: '47.68' } })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+    fireEvent.change(screen.getByLabelText('Line 2 amount'), { target: { value: '52.32' } })
+    expect(screen.getByText('RM 500.00')).toBeInTheDocument()
+    await save()
+    expect(Object.fromEntries(sent().entries())).toMatchObject({
+      amount: '500.00',
+      source_rows_count: '2',
+      'source_rows[0][description]': 'Claude Team plan',
+      'source_rows[0][amount]': '447.68',
+      'source_rows[1][description]': 'Roadshow flyers',
+      'source_rows[1][pool]': 'dept_pool_marketing',
+      'source_rows[1][account_code]': '9087',
+      'source_rows[1][amount]': '52.32',
     })
-    const form = sent()
-    expect(form.get('source_rows_count')).toBe('2')
-    expect(form.get('source_rows[1][pool]')).toBe('dept_pool_marketing')
-    expect(form.get('source_rows[1][amount]')).toBe('47.68')
   })
 
-  it('Loan repayment: the loan picks the lender and the month’s split; a line each, on its own account', async () => {
+  it('a line comes off with its ×; the last one stays', async () => {
+    draw()
+    await act(async () => undefined)
+    expect(screen.queryByRole('button', { name: 'Remove line 1' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '+ Add line' }))
+    fireEvent.change(screen.getByLabelText('Line 2 amount'), { target: { value: '10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Remove line 2' }))
+    expect(screen.queryByLabelText('Line 2 amount')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove line 1' })).toBeNull()
+  })
+
+  it('Loan repayment: the loan picks the lender and the month’s split — a line each, on its own account, its words kept', async () => {
     draw()
     await act(async () => undefined)
     fireEvent.click(screen.getByRole('button', { name: 'Loan repayment' }))
     fireEvent.change(screen.getByLabelText('Repay'), { target: { value: 'fs-hc' } })
     expect(screen.getByLabelText('Pay to')).toHaveValue('HOUZS Century')
-    expect(screen.getByLabelText('Amount RM')).toHaveValue('56,000.00')
+    expect(screen.getByText('RM 56,000.00')).toBeInTheDocument()
     expect(screen.getByLabelText('Line 1 amount')).toHaveValue('50000.00')
     expect((screen.getByLabelText('Line 1 category') as HTMLSelectElement).value).toBe('4054')
     expect((screen.getByLabelText('Line 2 category') as HTMLSelectElement).value).toBe('6000')
+    fireEvent.change(screen.getByLabelText('Line 2 description'), { target: { value: 'October interest' } })
+    fireEvent.change(screen.getByLabelText('Interest RM'), { target: { value: '6100' } })
+    expect(screen.getByLabelText('Line 2 description')).toHaveValue('October interest')
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'HC instalment 2/6' } })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
-    })
-    const form = sent()
-    expect(Object.fromEntries(form.entries())).toMatchObject({
+    await save()
+    expect(Object.fromEntries(sent().entries())).toMatchObject({
       fund_source_id: 'fs-hc',
       repayment_principal: '50000.00',
-      repayment_interest: '6000.00',
+      repayment_interest: '6100.00',
       repayment_penalty: '0.00',
-      amount: '56000.00',
+      amount: '56100.00',
       payee_company_id: 'hc',
       source_rows_count: '2',
+      'source_rows[1][description]': 'October interest',
     })
   })
 
@@ -258,47 +278,55 @@ describe('what today’s form also does', () => {
     fireEvent.change(screen.getByLabelText('Method'), { target: { value: 'cheque' } })
     fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
     fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Alliance for payroll' } })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
-    })
+    await save()
     expect(Object.fromEntries(sent().entries())).toMatchObject({ voucher_type: 'internal_transfer', payment_method: 'cheque', notes: 'Alliance for payroll' })
-  })
-
-  it('GL override: the type, the GL and the reason go with the line — all three, or it waits', async () => {
-    draw()
-    await act(async () => undefined)
-    fill()
-    fireEvent.click(screen.getByRole('button', { name: 'GL override' }))
-    expect((screen.getByLabelText('Override type') as HTMLSelectElement).value).toBe('expense')
-    expect((screen.getByLabelText('Override GL account') as HTMLSelectElement).value).toBe('9087')
-    expect(screen.getByText('An override needs its type, its GL account and a reason.')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('Override type'), { target: { value: 'liability' } })
-    fireEvent.change(screen.getByLabelText('Override GL account'), { target: { value: '4054' } })
-    fireEvent.change(screen.getByLabelText('Override reason'), { target: { value: 'Owed to HC, not spent' } })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
-    })
-    expect(Object.fromEntries(sent().entries())).toMatchObject({
-      'source_rows[0][override_account_type]': 'liability',
-      'source_rows[0][override_gl_account_code]': '4054',
-      'source_rows[0][override_reason]': 'Owed to HC, not spent',
-    })
   })
 
   it('Attachments: the files go with the voucher; too much for one save is said', async () => {
     draw()
     await act(async () => undefined)
     fill()
-    fireEvent.click(screen.getByRole('button', { name: 'Attachments' }))
     const input = dialog().querySelector('input[type="file"]') as HTMLInputElement
     const slip = new File(['x'], 'slip.pdf', { type: 'application/pdf' })
     fireEvent.change(input, { target: { files: [slip] } })
     expect(screen.getByText('slip.pdf')).toBeInTheDocument()
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
-    })
+    await save()
     expect(sent().get('attachment_count')).toBe('1')
     expect((sent().get('attachment_0') as File).name).toBe('slip.pdf')
+  })
+
+  // 2026-10-23: each file goes ahead of the save (lib/storage/stage.ts), so a file may be up to 100 MB — no longer
+  // 4 MB for them all. One past it is named before anything is sent.
+  it('Attachments: a file past 100 MB is named, and nothing is sent', async () => {
+    draw()
+    await act(async () => undefined)
+    fill()
+    const input = dialog().querySelector('input[type="file"]') as HTMLInputElement
+    const scan = new File(['x'], 'scan.pdf', { type: 'application/pdf' })
+    Object.defineProperty(scan, 'size', { value: 150 * 1024 * 1024 })
+    const statement = new File(['x'], 'statement.pdf', { type: 'application/pdf' })
+    Object.defineProperty(statement, 'size', { value: 60 * 1024 * 1024 })
+    fireEvent.change(input, { target: { files: [statement] } })
+    expect(screen.queryByText(/a file can be up to 100 MB/)).not.toBeInTheDocument()
+    fireEvent.change(input, { target: { files: [scan] } })
+    expect(screen.getByText('scan.pdf is 150.0 MB — a file can be up to 100 MB.')).toBeInTheDocument()
+    await save()
+    expect(mocks.create).not.toHaveBeenCalled()
+  })
+
+  it('Pay to offers the companies it matches; picking one links the voucher to it', async () => {
+    draw()
+    await act(async () => undefined)
+    const input = screen.getByLabelText('Pay to')
+    fireEvent.focus(input)
+    fireEvent.change(input, { target: { value: 'houzs' } })
+    fireEvent.mouseDown(screen.getByRole('option', { name: /HOUZS Century/ }))
+    expect(input).toHaveValue('HOUZS Century')
+    fireEvent.change(screen.getByLabelText('Line 1 category'), { target: { value: '9087' } })
+    fireEvent.change(screen.getByLabelText('Line 1 amount'), { target: { value: '10' } })
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'x' } })
+    await save()
+    expect(sent().get('payee_company_id')).toBe('hc')
   })
 
   it('the calendar picks the payment date', async () => {

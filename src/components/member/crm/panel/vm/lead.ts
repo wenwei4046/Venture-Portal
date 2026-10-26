@@ -6,7 +6,9 @@
  * Customer info, Appointment. The database lets the Principal and the
  * Director answer anyone (crm_can_reply).
  */
+import { DEFAULT_APPT_TYPES } from "@/lib/member/crm-data";
 import type { ChangeEvent } from "react";
+import { customBookVM, customPrefill } from "../../shared/custom-book";
 import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/lib/member/crm-data";
 import { chatStripOf, coldLine, DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
 import { avatarTint } from "../../shared/palette";
@@ -14,6 +16,7 @@ import { failNote, roomClosed, roomSlots, slotAt, slotBlocked } from "../../sale
 import { bookingSkipsForm, infoRows } from "../../sales/vm/customer";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
+import { teamAssignees } from "../../shared/people";
 import { oneAtATime } from "../../shared/once";
 import { openCamera } from "../../shared/camera";
 import { cancelVoice, recTime, startVoice, stopVoice } from "../../shared/voice";
@@ -28,15 +31,26 @@ import { actionsOnScreen, closeActions, openActions, type ActionSheet } from "..
 let recTimer: ReturnType<typeof setInterval> | undefined;
 
 /**
- * Send or move a customer, then offer 30 s to undo it (Organic Leads' Send to,
- * Awaiting reply's Move, the chat's Assign to). Saved first, as everywhere.
+ * Send or assign a customer at once (CRM · Manage, crm_send_to), then offer 30 s to undo it (Organic Leads' Send to,
+ * Awaiting reply's Assign, the chat's Assign to). Saved first, as everywhere. "Move" is only ever a request to one's
+ * direct superior (2026-10-23), so none of these is called that.
  */
-export async function reassign(ctx: PanelCtx, c: CrmCustomer, to: string, kind: "send" | "move", extra: Partial<PanelCtxUi> = {}) {
+export async function reassign(ctx: PanelCtx, c: CrmCustomer, to: string, kind: "send" | "assign", extra: Partial<PanelCtxUi> = {}) {
   const prev = c.assignedTo;
   if (!(await ctx.act.sendTo(c.id, to))) return;
-  ctx.set(u => ({ ...u, ...extra, pick: "", toast: "", movedRec: kind === "move" ? { ...u.movedRec, [c.id]: { from: prev, to } } : u.movedRec,
-    undo: { kind, customerId: c.id, prev, name: c.name, to: ctx.nameOf(to), verb: kind === "send" ? "sent to" : "moved to", left: 30 } }));
+  ctx.set(u => ({ ...u, ...extra, pick: "", toast: "", movedRec: kind === "assign" ? { ...u.movedRec, [c.id]: { from: prev, to } } : u.movedRec,
+    undo: { kind, customerId: c.id, prev, name: c.name, to: ctx.nameOf(to), verb: kind === "send" ? "sent to" : "assigned to", left: 30 } }));
 }
+
+/** A TL / STL / TA gives a customer to one of their own people (crm_assign_member) — at once and with no undo, as in Mine. */
+async function assignInTeam(ctx: PanelCtx, c: CrmCustomer, to: string) {
+  if (!(await ctx.act.assignMember(c.id, to))) return;
+  ctx.set(u => ({ ...u, reSheet: false, pick: "" }));
+  ctx.act.toast(`${c.name} assigned to ${ctx.nameOf(to)}`);
+}
+
+/** Whom a chat's ⋮ Assign to offers (PanelCtx.assign): a TL / STL / TA their own people; CRM · Manage everybody. */
+const assignees = (ctx: PanelCtx, c: CrmCustomer | undefined) => (c && ctx.assign === "team" ? teamAssignees(ctx.me, ctx.data.people, c) : []);
 type PanelCtxUi = PanelCtx["ui"];
 
 const NONE = () => {};
@@ -53,8 +67,8 @@ export function leadVM(ctx: PanelCtx) {
   const visitCard = (card: CrmChatMessage["card"]) => {
     const cd = card ? new Date(card.start) : null;
     return { ev: card && cd ? {
-      kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
-      time: timeLabel(cd), room: card.room, addr: card.addr,
+      kind: card.kind, title: card.mode === "online" ? "Online meeting" : card.mode === "other" ? "Appointment" : "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
+      time: timeLabel(cd), room: card.room, addr: card.mode === "online" ? card.link ?? "" : card.addr === card.room ? "" : card.addr,
       bg: card.kind === "Cancelled" ? "var(--crm-field)" : "var(--crm-tint-attention)", fg: card.kind === "Cancelled" ? "var(--crm-muted)" : "var(--crm-rust)", deco: card.kind === "Cancelled" ? "line-through" : "none",
       go: () => patch({ lead: null, tab: "calendar", cView: "grid", cDay: day0(cd), cGM: [cd.getFullYear(), cd.getMonth()] }),
     } : null };
@@ -71,9 +85,11 @@ export function leadVM(ctx: PanelCtx) {
       // flow-root: the bubble holds the floated time (INLINE_TIME).
       vis: al.hidden.has(m.id) ? "none" : "flow-root",
       // The message menu, as in Mine's chat (shared/msg-menu.tsx): a long press — reactions, Reply, Copy, Delete for me.
-      reaction: m.myReaction ?? "", rxGap: m.myReaction ? "14px" : "0", rxSide: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto",
+      reaction: [m.myReaction, m.theirReaction].filter(Boolean).join(""), rxGap: m.myReaction || m.theirReaction ? "14px" : "0", rxSide: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto",
       quote: (() => { const q = m.replyTo ? c?.messages.find(x => x.id === m.replyTo) : undefined; return q ? { who: q.from === "me" ? "You" : c?.name ?? "", text: q.text || mediaWord(q) } : null; })(),
-      press: { "data-msg": m.id, ...pressToOpen(() => openMsgMenu({
+      // data-mine: the quote in our own orange bubble is drawn light, as in Mine's chat (crm.module.css) — it was the dark
+      // default on the orange, unreadable (the owner, 2026-10-23).
+      press: { "data-msg": m.id, ...(mine ? { "data-mine": "1" } : {}), ...pressToOpen(() => openMsgMenu({
         mine, preview: m.text || (m.media ? mediaWord(m) : ""), reaction: m.myReaction ?? "", react: e => void ctx.act.react(m.id, e),
         forward: c ? { chats: forwardChats(ctx.data.customers, c.id, nameOf), send: toId => void ctx.act.forward(m.id, toId) } : undefined,
         info: c ? messageInfo(m, c, nameOf) : undefined,
@@ -105,12 +121,14 @@ export function leadVM(ctx: PanelCtx) {
       // No "· reply window open Xh Ym" under the name (rev 1011 §2.3, as RS rev 1010 §1.4); the cold banner stays.
       windowNote: "",
       msgs, stop,
-      movedTo: c && rec ? `${c.name} moved from ${rec.from ? nameOf(rec.from) : "Organic Leads"} to ${nameOf(rec.to)} · by you` : "",
-      // Assign to (⋮) moves at once, as the design's inbox mode does.
-      groups: c ? pickGroups(ctx, { skip: ow, sel: ui.pick, pick: id => void reassign(ctx, c, id, "move", { reSheet: false }) }) : [],
+      movedTo: c && rec ? `${c.name} reassigned from ${rec.from ? nameOf(rec.from) : "Organic Leads"} to ${nameOf(rec.to)} · by you` : "",
+      // Assign to (⋮), Mine's rule (2026-10-23): CRM · Manage anyone at once (30 s to undo); a TL / STL / TA their own people.
+      groups: c ? (ctx.assign === "team"
+        ? pickGroups(ctx, { only: assignees(ctx, c), skip: ow, sel: ui.pick, pick: id => void assignInTeam(ctx, c, id) })
+        : pickGroups(ctx, { skip: ow, sel: ui.pick, pick: id => void reassign(ctx, c, id, "assign", { reSheet: false }) })) : [],
       pickLabel: ui.pick ? nameOf(ui.pick) : "Choose a person", moveBg: ui.pick ? "var(--crm-rust)" : "var(--crm-line)",
       sheetOpen: on && ui.reSheet, openSheet: () => patch({ reSheet: true }), closeSheet: () => patch({ reSheet: false }),
-      move: c && ui.pick ? () => void reassign(ctx, c, ui.pick, "move", { reSheet: false }) : undefined,
+      move: c && ui.pick ? () => void (ctx.assign === "team" ? assignInTeam(ctx, c, ui.pick) : reassign(ctx, c, ui.pick, "assign", { reSheet: false })) : undefined,
     },
     lx: lxVM(ctx, c, on),
   };
@@ -139,9 +157,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     if (!c || !nextVisit) { openBook(); return; }
     patch({ pMenu: false });
     const v = nextVisit, d = new Date(v.start), rm = data.rooms.find(r => r.id === v.showroomId);
-    const where = `${(rm?.name ?? "Showroom").replace(/ showroom$/i, "")} · ${dayLabel(d)}, ${timeLabel(d)}`;
+    const where = [`${(rm?.name ?? "Showroom").replace(/ showroom$/i, "")} · ${dayLabel(d)}, ${timeLabel(d)}`, v.link, v.remarks].filter(Boolean).join(" · ");
     openActions({ title: "Appointment", sub: where, actions: [
-      { label: "Change", primary: true, run: () => patch({ pBook: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === v.showroomId)), day: day0(d), slot: timeLabel(d), view: "month", visitId: v.id } }) },
+      { label: "Change", primary: true, run: () => patch({ pBook: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === v.showroomId)), day: day0(d), slot: timeLabel(d), view: "month", visitId: v.id, ...customPrefill(v) } }) },
       { label: "Cancel visit", danger: true, run: () => openActions({ title: "Cancel this visit?", sub: `${where}. ${c.name} is told it is cancelled.`, actions: [
         { label: "Yes, cancel visit", danger: true, run: () => { void oneAtATime(`book:${c.id}`, () => act.cancelVisit(v.id)).then(ok => { if (ok) act.toast(`Visit cancelled for ${c.name}`); }); } },
         { label: "Keep it", run: () => {} },
@@ -241,7 +259,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     const wS = new Date(sd); wS.setDate(sd.getDate() - ((sd.getDay() + 6) % 7));
     const open = roomSlots(room, B.day), cap = room?.cap ?? 2;
     return {
-      rooms: rooms.map((r, i) => ({ label: r.name, pick: () => setB({ room: i, slot: null }), bd: B.room === i ? "var(--crm-rust)" : "var(--crm-rule)", bg: B.room === i ? "var(--crm-cream)" : "#fff", dot: B.room === i ? "var(--crm-rust)" : "transparent", ring: B.room === i ? "var(--crm-rust)" : "var(--crm-line)" })),
+      rooms: rooms.map((r, i) => ({ label: r.name, pick: () => setB({ room: i, slot: null }), bd: B.room === i ? "var(--crm-rust)" : "var(--crm-rule)", bg: B.room === i ? "var(--crm-sel)" : "#fff", dot: B.room === i ? "var(--crm-rust)" : "transparent", ring: B.room === i ? "var(--crm-rust)" : "var(--crm-line)" })),
       isMonth: B.view !== "week", isWeek: B.view === "week", vMonth: () => setB({ view: "month" }), vWeek: () => setB({ view: "week" }),
       vMonthBg: B.view !== "week" ? "#fff" : "transparent", vWeekBg: B.view === "week" ? "#fff" : "transparent", vMonthFg: B.view !== "week" ? "var(--crm-ink)" : "var(--crm-muted)", vWeekFg: B.view === "week" ? "var(--crm-ink)" : "var(--crm-muted)",
       monthLbl: firstD.toLocaleDateString("en-GB", { month: "short", year: "numeric" }).replace("Sept", "Sep"),
@@ -256,6 +274,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
           bg: sel ? "var(--crm-rust)" : ok ? "#fff" : "var(--crm-field)", fg: sel ? "#fff" : ok ? "var(--crm-ink)" : "var(--crm-faint-2)", bd: sel ? "var(--crm-rust)" : ok ? "var(--crm-rule)" : "var(--crm-field)" };
       }),
       bookLabel: B.slot ? `${B.visitId ? "Move to" : "Book"} ${dayLabel(new Date(B.day))}, ${B.slot}` : "Pick a time", bookBg: B.slot ? "var(--crm-rust)" : "var(--crm-line)",
+      remarks: room?.remarks?.trim() ?? "",
       confirm: B.slot && c && room ? () => {
         const name = c.name;
         const at = slotAt(B.day, B.slot!).toISOString(), moving = B.visitId;
@@ -307,7 +326,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     cold: on && shut,
     coldMsg: c?.channel === "messenger" ? "the 7-day Messenger reply window has closed. Only template messages can be sent until the customer writes again." : "the 24 h WhatsApp window has closed. Only template messages can be sent until the customer writes again.",
     menu: [
-      { label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "var(--crm-tint-cold)", fg: "var(--crm-ink-soft)", go: () => patch({ pMenu: false, reSheet: true }) },
+      // Assign to only for whom it can work (2026-10-23 — it showed to every leader, and the database refused all but CRM ·
+      // Manage): CRM · Manage, or a TL / STL / TA with somebody in this customer's team below them.
+      ...(ctx.assign === "any" || assignees(ctx, c).length ? [{ label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "var(--crm-tint-cold)", fg: "var(--crm-ink-soft)", go: () => patch({ pMenu: false, reSheet: true }) }] : []),
       { label: "Customer info", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", bg: "var(--crm-tint-follow)", fg: "var(--crm-brown)", go: () => patch({ pMenu: false, pInfo: true }) },
       { label: "Appointment", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", bg: "var(--crm-tint-new)", fg: "var(--crm-ink-soft)", go: appointment },
       // One's own starred messages in this chat (the message menu's Star, 2026-10-14).
@@ -320,6 +341,9 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     rooms: book?.rooms ?? [], isMonth: book?.isMonth ?? true, isWeek: book?.isWeek ?? false, vMonth: book?.vMonth ?? NONE, vWeek: book?.vWeek ?? NONE,
     vMonthBg: book?.vMonthBg ?? "#fff", vWeekBg: book?.vWeekBg ?? "transparent", vMonthFg: book?.vMonthFg ?? "var(--crm-ink)", vWeekFg: book?.vWeekFg ?? "var(--crm-muted)",
     monthLbl: book?.monthLbl ?? "", mPrev: book?.mPrev ?? NONE, mNext: book?.mNext ?? NONE, cells: book?.cells ?? [], wk: book?.wk ?? [], slots: book?.slots ?? [],
-    bookLabel: book?.bookLabel ?? "Pick a time", bookBg: book?.bookBg ?? "var(--crm-line)", confirm: book?.confirm,
+    bkm: B && c ? customBookVM({ b: B, put: p => setB(p), changing: !!B.visitId, now, types: data.apptTypes ?? DEFAULT_APPT_TYPES,
+      save: f => oneAtATime(`book:${c.id}`, () => (B.visitId ? act.moveCustom(B.visitId, f) : act.bookCustom(c.id, f))).then(ok => !!ok),
+      done: () => { patch({ pBook: null }); act.toast(`${B.mode === "online" ? "Online meeting" : "Appointment"} ${B.visitId ? "changed" : "booked"} for ${c.name}`); } }) : null,
+    bookLabel: book?.bookLabel ?? "Pick a time", bookBg: book?.bookBg ?? "var(--crm-line)", confirm: book?.confirm, bookRemarks: book?.remarks ?? "",
   };
 }

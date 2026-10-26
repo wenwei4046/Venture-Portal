@@ -5,11 +5,12 @@ import { DateField } from '@/components/finv/DateField'
 import { DialogButton, DialogForm, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
 import { FilesField } from '@/components/finv/FilesField'
 import { PartyInput } from '@/components/finv/PartyInput'
-import { FILES_CAP, fileSize, neededSentence, num, poolName } from '@/components/finv/form-words'
+import { filesProblem, neededSentence, num, poolName } from '@/components/finv/form-words'
 import fm from '@/components/finv/form.module.css'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { typeLabel, type AccountType } from '@/lib/coa'
+import { stageInto } from '@/lib/storage/stage'
 import { createReceiptFromDialog } from '../../payments/actions'
 import { openCreateReceipt } from '../actions'
 import type { VoucherFormOptions } from '../../payments/_lib/create-payment-options'
@@ -99,9 +100,7 @@ export default function CreateReceiptDialog({ open, onClose, prefix, today }: { 
   if (!account) need.push('a category')
   if (method !== 'netting' && !bankId) need.push('a bank')
   if (!desc.trim()) need.push('a description')
-  const filesBytes = files.reduce((n, f) => n + f.size, 0)
-  const problem =
-    neededSentence(need, true) ?? (filesBytes > FILES_CAP ? `The files come to ${fileSize(filesBytes)} — under 4 MB goes in one save. Compress them or add some later.` : null)
+  const problem = neededSentence(need, true) ?? filesProblem(files)
   const ok = problem === null && !!opts
 
   const save = async () => {
@@ -124,9 +123,10 @@ export default function CreateReceiptDialog({ open, onClose, prefix, today }: { 
     fd.set('target_pool', pool)
     fd.set('source_pool', '')
     fd.set('account_code', account)
-    files.forEach((f, i) => fd.append(`attachment_${i}`, f))
     fd.set('attachment_count', String(files.length))
     try {
+      // Each file sent ahead, the save carrying only its line (2026-10-23 — no longer 4 MB for them all).
+      for (const [i, f] of files.entries()) await stageInto(fd, `attachment_${i}`, f)
       const res = await createReceiptFromDialog(fd)
       if (!res.ok) {
         setError(res.reason)

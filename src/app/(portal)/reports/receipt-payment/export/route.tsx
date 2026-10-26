@@ -113,11 +113,15 @@ export async function GET(req: Request) {
         txns: [
           {
             date: o.invoiceDate ?? o.periodMonth,
-            entryNo: o.invoiceNo,
+            entryNo: null,
             description: `Billed ${o.totalAmount.toFixed(2)}${o.receipts > 0 ? ` · received ${o.receipts.toFixed(2)}` : ''}${o.credits > 0 ? ` · CN -${o.credits.toFixed(2)}` : ''}`,
             segment,
             party: o.companyId ? companyMap.get(o.companyId) ?? null : o.partyFallback,
             amount: o.outstanding,
+            debit: o.outstanding,
+            credit: 0,
+            otherSide: null,
+            refNo: o.invoiceNo,
           },
         ],
         children: [],

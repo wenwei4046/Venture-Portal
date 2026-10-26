@@ -12,6 +12,8 @@ import { redirect } from 'next/navigation'
 import { isPhone, opensFinApp, opensHrAppOnPhone } from '@/lib/one-app'
 import { loginIsPersonal } from '@/lib/account/personal-login'
 import { startRead } from '@/lib/start-read'
+import { MKT_LOOK_COOKIE, MKT_NAV_COOKIE, isMarketingView } from '@/lib/marketing-view'
+import { lookFromCookie } from '@/lib/marketing/look'
 
 export default async function PortalLayout({
   children,
@@ -51,6 +53,8 @@ export default async function PortalLayout({
     navData = { ...navData, deptPoolDepts: statementDepts(primedRegistryRows()) }
   }
   const personalLogin = await personal
+  // Marketing's shell (2026-10-23) keeps its own fold and Appearance.
+  const mkt = isMarketingView(user)
 
   return (
     <PortalFrame
@@ -58,6 +62,8 @@ export default async function PortalLayout({
       navData={navData}
       // HR's sidebar and Finance's (2026-10-14; the Principal's own view's since 2026-10-17) fold alike, on the one cookie.
       hrNavCollapsed={(isHrView(user.role) || isFinanceShell(user)) && jar.get(HR_NAV_COOKIE)?.value === 'collapsed'}
+      mktNavCollapsed={mkt && jar.get(MKT_NAV_COOKIE)?.value === 'collapsed'}
+      mktLook={mkt ? lookFromCookie(jar.get(MKT_LOOK_COOKIE)?.value) : undefined}
       phone={phone}
     >
       {children}

@@ -116,6 +116,10 @@ const PLAN: RepaymentPlan = {
   months: 12,
   paidCount: 1,
   outstandingDue: 20666.66,
+  overdue: 0,
+  overdueSince: null,
+  overdueDays: 0,
+  compound: null,
   firstDue: '2026-04-15',
   firstInstallment: 10333.33,
   totalInterest: 24000,
@@ -187,8 +191,9 @@ const LOAN = (over: Partial<LoanPageModel> = {}): LoanPageModel => ({
   trail: [],
   audit: [{ at: '20 May 2026 · 20:21', who: 'Principal', what: 'Created the loan to Carres (CAR) · RM 100,000.00' }],
   pendingCancel: null,
+  termsRequest: null,
   amend: { ratePct: '2', months: '12', start: '2026-03-15', compound: false, text: 'EMI · 资金来源: King', termsFrom: null, nextMonth: '2026-11' },
-  can: { edit: true, void: true, amend: true, recordRepayment: true },
+  can: { edit: true, void: true, amend: true, fileTerms: false, recordRepayment: true },
   ...over,
 })
 
@@ -228,7 +233,8 @@ const SOURCE = (over: Partial<SourcePageModel> = {}): SourcePageModel => ({
   trail: [],
   audit: [],
   pendingCancel: null,
-  can: { financeEdit: true, void: true, amend: true, recordRepayment: true },
+  termsRequest: null,
+  can: { financeEdit: true, void: true, amend: true, fileTerms: false, recordRepayment: true },
   repay: {
     lender: 'Chai Meng Keat',
     lenderCompanyId: null,
@@ -395,7 +401,7 @@ describe('Fund › Fund out on the phone', () => {
 
   it('without Treasury · Approve there is no Amend terms', async () => {
     await act(async () => {
-      draw({ search: 'id=l1', page: { side: 'out', loan: LOAN({ amend: null, can: { edit: true, void: true, amend: false, recordRepayment: true } }) }, can: { ...CAN, amend: false } })
+      draw({ search: 'id=l1', page: { side: 'out', loan: LOAN({ amend: null, can: { edit: true, void: true, amend: false, fileTerms: false, recordRepayment: true } }) }, can: { ...CAN, amend: false } })
     })
     expect(screen.getByRole('button', { name: 'Record repayment' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Amend terms' })).not.toBeInTheDocument()
@@ -509,7 +515,7 @@ describe('Fund › Fund out on the phone', () => {
 
   it('a loan still waiting: Open in Approvals for whoever decides it, Cancel loan asked first', async () => {
     mocks.cancelPending.mockResolvedValue(undefined)
-    mocks.openLoan.mockResolvedValue({ ok: true, page: LOAN({ id: 'l3', status: 'pending_approval', repayments: [], can: { edit: true, void: true, amend: true, recordRepayment: false } }) })
+    mocks.openLoan.mockResolvedValue({ ok: true, page: LOAN({ id: 'l3', status: 'pending_approval', repayments: [], can: { edit: true, void: true, amend: true, fileTerms: false, recordRepayment: false } }) })
     window.history.replaceState(null, '', '/fin-app/fund/out?f=pending_approval')
     await act(async () => {
       draw({ search: 'f=pending_approval' })
@@ -593,7 +599,7 @@ describe('Fund › Fund in on the phone', () => {
       status: 'pending_approval',
       amend: null,
       repay: null,
-      can: { financeEdit: true, void: true, amend: true, recordRepayment: false },
+      can: { financeEdit: true, void: true, amend: true, fileTerms: false, recordRepayment: false },
       edit: { amount: '80000.00', ratePct: '0.500', months: '', effectiveDate: '2025-05-31', repaymentDate: '2025-06-30', notes: 'lent to: CMI', accountCode: '4056', bankId: '' },
     })
     mocks.openSource.mockResolvedValue({ ok: true, page: pending })

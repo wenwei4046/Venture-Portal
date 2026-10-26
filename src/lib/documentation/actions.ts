@@ -107,8 +107,14 @@ export async function openDocumentationFile(kind: 'document' | 'letter', id: str
 
 // ── Letter types ────────────────────────────────────────────────────────────
 
+/**
+ * Named from the Data center's Upload, and from People's forms (2026-10-24), which take letters beside the employment
+ * status — Add Staff, the waiting list's Transfer (both `/team/people/new`) and a person's card (`/team/people/[id]`;
+ * lib/documentation/attach.ts). No box of People's stands for Documentation · Create or Edit — the Data center's are
+ * the only ones, and unticked they take the cell itself away — so it is named wherever the cell is held.
+ */
 export async function addLetterType(name: string): Promise<DocIdOutcome> {
-  await requireAnyActionOn('/team/documentation', ['documentation', 'create'], ['documentation', 'edit'])
+  await requireAnyActionOn(['/team/documentation', '/team/people/new', '/team/people/[id]'], ['documentation', 'create'], ['documentation', 'edit'])
   const { data, error } = await (await client()).rpc('hr_letter_type_add', { p_name: name })
   if (error) return { ok: false, reason: refusal(error, 'The letter type could not be added. Please try again.') }
   revalidateDocs()
@@ -133,6 +139,10 @@ export async function deleteLetterType(id: string): Promise<DocOutcome> {
 
 // ── A letter on somebody's record ───────────────────────────────────────────
 
+/**
+ * Filed from the Data center's Upload, and from People's forms beside the employment status (2026-10-24 — the user:
+ * "当他一选了之后，就自动 attach 进 document data center 里面"): the same letter either way, its pages as addLetterType's.
+ */
 export async function fileLetter(input: {
   staffId: string
   typeId: string
@@ -141,7 +151,7 @@ export async function fileLetter(input: {
   contentType: string | null
   size: number
 }): Promise<DocIdOutcome> {
-  await requireActionOn('/team/documentation', 'documentation', 'create')
+  await requireActionOn(['/team/documentation', '/team/people/new', '/team/people/[id]'], 'documentation', 'create')
   const { data, error } = await (await client()).rpc('hr_letter_file', {
     p_staff: input.staffId,
     p_type: input.typeId,

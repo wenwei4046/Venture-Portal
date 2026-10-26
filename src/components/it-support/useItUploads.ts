@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type ClipboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from 'react'
 import { IT_LIMITS, isImage, itContentType, itFileRefusal, type ItUpload } from '@/lib/it-requests/model'
 import { removeItUpload, uploadItFile } from '@/lib/it-requests/upload'
 
@@ -97,6 +97,56 @@ export function useItUploads() {
     full: items.length >= IT_LIMITS.files,
     uploads: items.flatMap(item => item.file ? [item.file] : []),
   }
+}
+
+const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes('Files')
+
+/**
+ * Files dragged in from the computer (2026-10-24 — the user: "drag 那个 file 移过来，放空在这个 text blank space 的时候，
+ * 它要能够直接 attach"): dropped on the zone they are added as if picked, and while they are over it `over` says so.
+ * A text drag is left to the browser; while the zone may take none (sending, ten already) the pointer says no.
+ * `guard`, on what holds the zone, keeps a file dropped beside it from being opened in place of the page.
+ */
+export function useFileDrop(add: (files: File[]) => void, enabled: boolean) {
+  const [over, setOver] = useState(false)
+  // dragenter / dragleave fire for every child crossed: over until the last one is left.
+  const depth = useRef(0)
+  const zone = useMemo(() => ({
+    onDragEnter(event: DragEvent) {
+      if (!carriesFiles(event)) return
+      event.preventDefault()
+      depth.current += 1
+      setOver(true)
+    },
+    onDragOver(event: DragEvent) {
+      if (!carriesFiles(event)) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = enabled ? 'copy' : 'none'
+    },
+    onDragLeave(event: DragEvent) {
+      if (!carriesFiles(event)) return
+      depth.current = Math.max(0, depth.current - 1)
+      if (depth.current === 0) setOver(false)
+    },
+    onDrop(event: DragEvent) {
+      if (!carriesFiles(event)) return
+      event.preventDefault()
+      depth.current = 0
+      setOver(false)
+      if (enabled) add([...event.dataTransfer.files])
+    },
+  }), [add, enabled])
+  const guard = useMemo(() => ({
+    onDragOver(event: DragEvent) {
+      if (!carriesFiles(event) || event.isDefaultPrevented()) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'none'
+    },
+    onDrop(event: DragEvent) {
+      if (carriesFiles(event)) event.preventDefault()
+    },
+  }), [])
+  return { over: enabled && over, zone, guard }
 }
 
 /** Closing during a server write waits for its answer before deciding whether uploads can be removed. */

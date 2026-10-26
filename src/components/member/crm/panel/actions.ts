@@ -4,7 +4,10 @@
  * move a customer, undo either, the ad rules and full-time allocation, the
  * showrooms, and which notifications are read. Saved first, as everywhere.
  */
-import { crmWrite, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
+import type { ApptType } from "@/lib/member/crm-data";
+import { crmWrite, fetchMetaAds, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
+import type { MetaAdRow } from "@/lib/member/crm-ad-names-meta";
+import { adToSync } from "@/lib/member/crm-ad-running";
 import type { CrmData, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
 import type { SalesActions } from "../sales/actions";
 import { teamOf } from "../shared/people";
@@ -15,9 +18,22 @@ export interface PanelActions extends SalesActions {
   /** Saved: how many leads waiting Over the limit for this ad the database dealt at once (rev 1011 §6.6); false: not saved. */
   /** Names an ad (crm_name_ad, CRM · Manage); an empty name takes the given name off. */
   nameAd(ad: string, name: string): Promise<boolean>;
+  /** Take an ad off Ads performance, or put it back (crm_hide_ad); its leads stay. */
+  hideAd(ad: string, on: boolean): Promise<boolean>;
+  /** Showrooms › Appointment types, saved whole (crm_save_appt_types). */
+  saveApptTypes(types: ApptType[]): Promise<boolean>;
+  /** Adds an ad before its first lead (crm_add_ad, CRM · Manage; 2026-10-22): it joins Ads to teams with its run. */
+  addAd(ad: { id: string; name: string; status: string; start: string | null; end: string | null; page?: string | null; pageName?: string | null }): Promise<boolean>;
+  /** Meta's ads in the connected ad accounts; also adds, by itself, every one running or about to run (`sync`). */
+  metaAds(sync: boolean): Promise<MetaAdRow[] | null>;
   /** Settings › General (crm_save_settings, CRM · Manage): the reply lines, the template button, auto-assign. */
   saveSettings(s: CrmSettings): Promise<boolean>;
-  saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number }>;
+  /** Save, this ad only; `together`: whether it is still counted with the together ads (saved with anything changed, it leaves them). */
+  saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number; together: boolean }>;
+  /** Save and apply to all's window (crm_save_ads, 2026-10-24): this setting on the ads ticked, each counting its own leads
+   *  (Standard) or all of them together — then they are the together ads, and one together before and not ticked counts on
+   *  its own. How many ads it saved, waiting leads it dealt and ads that left the together ads; or false. */
+  saveAds(ads: { id: string; label: string }[], together: boolean, rule: { mode: "even" | "split"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { saved: number; dealt: number; left: number }>;
   saveFtRule(tlId: string, mode: "cnt" | "pct" | "turns", days: number[], vals: Record<string, Record<string, number>>): Promise<boolean>;
   /** Member work type (rev 1011): full time or part time; part time clears their ticked Full time days. */
   setFullTime(staffId: string, on: boolean): Promise<boolean>;
@@ -30,9 +46,16 @@ export interface PanelActions extends SalesActions {
   /** Meta's review brought in (on opening the page); the changes arrive with the next read. */
   refreshTemplates(): Promise<void>;
   readNotifs(keys: string[], all?: boolean): void;
-  saveRoom(room: Omit<CrmRoom, "id"> & { id: string | null }): Promise<boolean>;
+  /** The saved showroom's id, or false. */
+  saveRoom(room: Omit<CrmRoom, "id"> & { id: string | null }): Promise<string | false>;
   removeRoom(id: string): Promise<boolean>;
+  /** v3 T07: a showroom's staff-only remarks (crm_save_showroom_remarks), as the desktop's frame 07. */
+  saveRoomRemarks(id: string, remarks: string): Promise<boolean>;
 }
+
+/** The same keys with the same values — as the database compares two saved settings (jsonb: a key missing ≠ a key at 0). */
+const sameValues = (a: Record<string, unknown> = {}, b: Record<string, unknown> = {}) =>
+  [...new Set([...Object.keys(a), ...Object.keys(b)])].every(k => a[k] === b[k]);
 
 export function makePanelActions(base: SalesActions, { live, data, setData }: { live: boolean; data: () => CrmData; setData: Dispatch<SetStateAction<CrmData>> }): PanelActions {
   const write = async (name: Parameters<typeof crmWrite>[0], args: Record<string, unknown>) => {
@@ -41,7 +64,7 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     if (!r.ok) { base.toast(r.error); return null; }
     return r;
   };
-  return {
+  const api: PanelActions = {
     ...base,
     async sendTo(customerId, staffId) {
       if (!(await write("crm_send_to", { p_contact: customerId, p_staff: staffId }))) return false;
@@ -50,9 +73,32 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       return true;
     },
     async saveSettings(st) {
-      if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders }))) return false;
+      if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders, p_team_alerts: st.teamAlerts, p_send_auto: st.sendAutoReply }))) return false;
       setData(d => ({ ...d, settings: st }));
       return true;
+    },
+    async addAd(ad) {
+      if (!(await write("crm_add_ad", { p_ad: ad.id, p_name: ad.name, p_status: ad.status || null, p_start: ad.start, p_end: ad.end, p_page: ad.page ?? null, p_page_name: ad.pageName ?? null }))) return false;
+      setData(d => {
+        const cur = d.adNames?.[ad.id];
+        return { ...d, adNames: { ...(d.adNames ?? {}), [ad.id]: { name: cur?.source === "manual" ? cur.name : ad.name || cur?.name || `Ad ${ad.id}`, source: cur?.source ?? "meta",
+          status: ad.status || cur?.status || null, statusAt: new Date().toISOString(), added: true, startAt: ad.start ?? cur?.startAt ?? null, endAt: ad.end, pageId: ad.page ?? cur?.pageId ?? null, pageName: ad.pageName ?? cur?.pageName ?? null } } };
+      });
+      return true;
+    },
+    async metaAds(sync) {
+      if (!live) return null;
+      const r = await fetchMetaAds();
+      if (!r.ok) return null;
+      if (sync) {
+        const now = new Date(), have = data().adNames ?? {};
+        for (const a of r.ads) {
+          const h = have[a.id];
+          if (!adToSync(a, now) || (h?.added && h.status === a.status && (h.startAt ?? null) === a.start && (h.endAt ?? null) === a.end && (h.pageId ?? null) === a.page)) continue;
+          await api.addAd(a);
+        }
+      }
+      return r.ads;
     },
     async nameAd(ad, name) {
       const nm = name.trim();
@@ -65,17 +111,55 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       });
       return true;
     },
+    async saveApptTypes(types) {
+      if (!(await write("crm_save_appt_types", { p_types: types }))) return false;
+      setData(d => ({ ...d, apptTypes: types }));
+      return true;
+    },
+    async hideAd(ad, on) {
+      if (!(await write("crm_hide_ad", { p_ad: ad, p_on: on }))) return false;
+      setData(d => {
+        const names = { ...(d.adNames ?? {}) }, cur = names[ad] ?? { name: d.customers.find(c => c.adId === ad)?.ad ?? `Ad ${ad}`, source: "manual" as const };
+        names[ad] = { ...cur, hidden: on || undefined };
+        return { ...d, adNames: names };
+      });
+      return true;
+    },
     async saveAdRule(ad, label, rule) {
       const tm = rule.mode === "split" ? rule.tm ?? {} : {};
       const r = await write("crm_save_ad_assign", { p_ad: ad, p_label: label, p_mode: rule.mode, p_team_split: rule.split, p_people_mode: rule.pm, p_people: rule.pp, p_team_modes: tm });
       if (!r) return false;
+      // The saved row: an ad saved on its own with anything changed has left the ads counted together (mig 20261025121500);
+      // the demo, which saves nothing, asks the same of the rule it had.
+      const row = r.data as { dealt?: number; together?: boolean } | null, old = data().adRules.find(x => x.adId === ad);
+      const together = live ? !!row?.together
+        : !!old?.together && old.mode === rule.mode && old.pm === rule.pm && sameValues(old.split, rule.split) && sameValues(old.pp, rule.pp) && sameValues(old.tm, tm);
       setData(d => ({
         ...d,
         adRules: [...d.adRules.filter(r => r.adId !== ad),
-          ...(rule.mode ? [{ adId: ad, label, mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, tm, startedAt: d.adRules.find(r => r.adId === ad)?.startedAt ?? new Date().toISOString() }] : [])],
+          ...(rule.mode ? [{ adId: ad, label, mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, tm, startedAt: d.adRules.find(r => r.adId === ad)?.startedAt ?? new Date().toISOString(), ...(together ? { together: true } : {}) }] : [])],
       }));
       // The leads it dealt arrive with the next read (every 5 s); the toast says how many.
-      return { dealt: Number((r.data as { dealt?: number } | null)?.dealt ?? 0) };
+      return { dealt: Number(row?.dealt ?? 0), together };
+    },
+    async saveAds(ads, together, rule) {
+      const tm = rule.mode === "split" ? rule.tm ?? {} : {};
+      const r = await write("crm_save_ads", { p_ads: Object.fromEntries(ads.map(a => [a.id, a.label])), p_together: together, p_mode: rule.mode, p_team_split: rule.split, p_people_mode: rule.pm, p_people: rule.pp, p_team_modes: tm });
+      if (!r) return false;
+      // The ads ticked hold this setting; counted together, they are the together ads and one together before counts alone.
+      // A new mode starts a new count, and so does joining the together ads or leaving them (the database does the same).
+      const ids = ads.map(a => a.id), at = new Date().toISOString(), before = data().adRules;
+      const left = together ? before.filter(x => x.together && !ids.includes(x.adId)).length : 0;
+      setData(d => ({
+        ...d,
+        adRules: [...d.adRules.filter(x => !ids.includes(x.adId)).map(x => (together && x.together ? { ...x, together: false, startedAt: at } : x)), ...ids.map(id => {
+          const old = d.adRules.find(x => x.adId === id);
+          return { adId: id, label: ads.find(a => a.id === id)?.label ?? old?.label ?? "", mode: rule.mode, split: rule.split, pm: rule.pm, pp: rule.pp, tm,
+            startedAt: old && old.mode === rule.mode && !!old.together === together ? old.startedAt : at, ...(together ? { together: true } : {}) };
+        })],
+      }));
+      const got = r.data as { saved?: number; dealt?: number; left?: number } | null;
+      return { saved: Number(got?.saved ?? ids.length), dealt: Number(got?.dealt ?? 0), left: Number(got?.left ?? left) };
     },
     async saveFtRule(tlId, mode, days, vals) {
       if (!(await write("crm_save_fulltime", { p_tl: tlId, p_mode: mode, p_days: days, p_vals: vals }))) return false;
@@ -144,15 +228,21 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       const saved = r.data as { id: string } | null;
       const next: CrmRoom = { ...room, id: saved?.id ?? room.id ?? `r${Date.now()}` };
       setData(d => ({ ...d, rooms: d.rooms.some(x => x.id === next.id) ? d.rooms.map(x => (x.id === next.id ? next : x)) : [...d.rooms, next] }));
+      return next.id;
+    },
+    async saveRoomRemarks(id, remarks) {
+      if (!(await write("crm_save_showroom_remarks", { p_id: id, p_remarks: remarks }))) return false;
+      setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, remarks } : r)) }));
       return true;
     },
-    // Delete = closed for good: off every booking list; its past visits keep their showroom.
+    // Delete = gone from the lists, its past visits keep their showroom; refused while visits are upcoming (crm_delete_showroom,
+    // the desktop's rule — v3 T07 links the two).
     async removeRoom(id) {
-      const room = data().rooms.find(r => r.id === id);
-      if (!room) return false;
-      if (!(await write("crm_save_showroom_full", { p_id: id, p_name: room.name, p_address: room.address, p_slots: room.slots, p_cap: room.cap, p_weekly: room.weekly, p_blocks: room.blocks, p_active: false }))) return false;
-      setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, active: false } : r)) }));
+      if (!data().rooms.some(r => r.id === id)) return false;
+      if (!(await write("crm_delete_showroom", { p_id: id }))) return false;
+      setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, active: false, deleted: true } : r)) }));
       return true;
     },
   };
+  return api;
 }

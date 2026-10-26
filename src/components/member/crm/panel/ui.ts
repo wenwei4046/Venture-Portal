@@ -1,13 +1,17 @@
 import type { CustomerForm } from "../sales/ui";
+import type { CustomFields } from "../shared/custom-book";
+import type { ApplyPick } from "../shared/apply-ads";
 /** The Control panel's screen state (design 1a) — what is open and typed, not data. */
 export type PanelTab = "overview" | "inbox" | "assign" | "calendar" | "profile" | "ads";
 export type Period = "day" | "week" | "month" | "custom";
 export interface Range { a: number; b: number }
 
-export interface AdDraft { id: string; label: string; page: string; leads: number; mode: "even" | "split" | "people" | "unset"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; lockT: string[]; lockP: string[] }
+export interface AdDraft { id: string; label: string; page: string; leads: number; mode: "even" | "split" | "people" | "unset"; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; lockT: string[]; lockP: string[]; /** A team share being typed (two decimals; 2026-10-22). */ typing?: { id: string; text: string } | null }
 export interface FtDraft { tid: string; m: "cnt" | "pct"; on: number[]; v: Record<string, Record<number, number>>; sel: { id: string; days: number[] } | null; lockD: Record<number, string[]> }
 export interface RoomDraft {
   i: number; id: string | null; name: string; addr: string; slots: string[]; cap: number; weekly: number[]; blocks: { a: string; b: string; why: string }[];
+  /** v3 T07: staff-only remarks. */
+  remarks?: string;
   newT: string; newD: number[] | null; bA: string; bB: string; bWhy: string; bAll: boolean; bT1: string; bT2: string; bPick: "t1" | "t2" | null; calFor: "A" | "B" | null; calYM: [number, number] | null;
   /** 4a (T07): a draft begun on the page itself — the page stays in place with a Save bar (the full editor is for closures). */
   quick?: boolean;
@@ -38,12 +42,17 @@ export interface PanelUi {
   /** rev 1011 §5: Calendar › Customer info (a visit, or a list row), and the Leads / Upcoming / Showed up list open. */
   calInfo: string | null;
   cLs: "leads" | "up" | "came" | false;
+  /** The Leads list for these people only (Team Insight's Revenue Director row, 2026-10-24); null = everybody's. */
+  cLsWho?: string[] | null;
   /** Assignment's open section (rev 1011 §6.1); null = the overview. Leaving the tab resets it. */
   asSec: "Org" | "Ads" | "Act" | "Aw" | "Ft" | null;
   /** Full time lead allocation's editor: the team and its draft ticks (staff → weekdays, 0 = Monday). */
   ftx: { tid: string; v: Record<string, number[]> } | null;
   /** By team's inside-team draft for the ad being edited: modes, values, and who was typed in (for the auto-balance). */
-  bp: { adId: string; tm: Record<string, "even" | "pct" | "cnt">; pv: Record<string, number>; touch: Record<string, string[]> } | null;
+  bp: { adId: string; tm: Record<string, "even" | "pct" | "cnt">; pv: Record<string, number>; touch: Record<string, string[]>; ty?: { id: string; text: string } | null } | null;
+  /** v3 T04b: the team whose Adjust split sheet is open, and the inside split as it was when it opened (Cancel puts it back). */
+  bpSheet: string | null;
+  bpSnap: PanelUi["bp"];
   /** The Over the limit page. */
   hlOpen: boolean;
   /** Profile › Member work type and Cold lead templates pages, and a template being edited. */
@@ -52,7 +61,7 @@ export interface PanelUi {
   ftsDraft: Record<string, boolean> | null;
   tplOpen: boolean;
   tplEd: { id: string | null; name: string; ch: "whatsapp" | "messenger"; body: string } | null;
-  pBook: { customerId: string; room: number; day: number; slot: string | null; view?: "week" | "month"; ym?: [number, number]; /** Change: the visit this booking moves. */ visitId?: string } | null;
+  pBook: { customerId: string; room: number; day: number; slot: string | null; view?: "week" | "month"; ym?: [number, number]; /** Change: the visit this booking moves. */ visitId?: string } & CustomFields | null;
   reSheet: boolean;
   pick: string;
   /** What is typed in each chat, by customer — as Mine's (`SalesUi.draft`): words typed in one chat never go to another. */
@@ -74,10 +83,12 @@ export interface PanelUi {
   sdSel: string | null;
   mvFor: string | null;
   mvSel: string | null;
-  undo: { kind: "send" | "move"; customerId: string; prev: string | null; name: string; to: string; verb: string; left: number } | null;
+  undo: { kind: "send" | "assign"; customerId: string; prev: string | null; name: string; to: string; verb: string; left: number } | null;
   /** The last reassignment made here, per customer — the chat keeps saying so after the Undo bar is gone. */
   movedRec: Record<string, { from: string | null; to: string }>;
   adEd: AdDraft | null;
+  /** Save and apply to all's sheet (2026-10-24): for which ad, the ads ticked, Standard or Count together; null = shut. */
+  applyPick?: (ApplyPick & { ad: string }) | null;
   ftEd: FtDraft | null;
   att: boolean;
   attF: "all" | "overdue" | "urgent" | "soon";
@@ -99,6 +110,10 @@ export interface PanelUi {
   adNameDraft: string | null;
   /** Assignment › Ads to teams: running ads or paused ones (2026-10-22; the desktop lists both). */
   adTab: "running" | "paused";
+  /** Work type: the teams opened (folded at first — the owner, 2026-10-23 "這個也可收起", 2026-10-24 "默認收起"). */
+  ftsShut: Record<string, boolean>;
+  /** Insight's Team performance | Ads performance switch (v3 T01): true = Ads performance, drawn on Insight. */
+  ovAds: boolean;
   /** Assignment › Active: switches not saved yet (id → locked), null = as saved. */
   actDraft: Record<string, boolean> | null;
   // Calendar
@@ -106,6 +121,8 @@ export interface PanelUi {
   cTeam: string;
   cPerson: string;
   cpSheet: boolean;
+  /** The summary card's team bars shown (folded at first — the owner, 2026-10-24: "框起來的部分能不能做可展示和收起"). */
+  cTeamsOpen: boolean;
   cDay: number | null;
   cGM: [number, number] | null;
   cRange: Range | null;
@@ -115,8 +132,8 @@ export interface PanelUi {
 export const initialPanelUi = (): PanelUi => ({
   tab: "overview", period: "month", ovRange: null, cmp: null, cmpFold: false, ovSheet: null, openT: {},
   inbTeam: "", inbWho: "", inbCol: 0, pcOpen: false, pcQ: "",
-  lead: null, pMenu: false, pInfo: false, pForm: null, calInfo: null, cLs: false, asSec: null, ftx: null, bp: null, hlOpen: false, ftsOpen: false, ftsDraft: null, tplOpen: false, tplEd: null, pBook: null, reSheet: false, pick: "", pDrafts: {}, pRec: null, toast: "",
+  lead: null, pMenu: false, pInfo: false, pForm: null, calInfo: null, cLs: false, asSec: null, ftx: null, bp: null, bpSheet: null, bpSnap: null, hlOpen: false, ftsOpen: false, ftsDraft: null, tplOpen: false, tplEd: null, pBook: null, reSheet: false, pick: "", pDrafts: {}, pRec: null, toast: "",
   sendFor: null, sdSel: null, mvFor: null, mvSel: null, undo: null, movedRec: {}, adEd: null, ftEd: null, att: false, attF: "all", asgF: null,
-  viewAs: false, vaQ: "", nfOpen: false, nfF: "", nfR: "all", roomsOpen: false, rmEdit: null, rmTP: null, rmDel: null, rmAt: 0, adNameDraft: null, adTab: "running", actDraft: null,
-  cView: "grid", cTeam: "all", cPerson: "", cpSheet: false, cDay: null, cGM: null, cRange: null, crSheet: null,
+  viewAs: false, vaQ: "", nfOpen: false, nfF: "", nfR: "all", roomsOpen: false, rmEdit: null, rmTP: null, rmDel: null, rmAt: 0, adNameDraft: null, adTab: "running", ovAds: false, ftsShut: {}, actDraft: null,
+  cView: "grid", cTeam: "all", cPerson: "", cpSheet: false, cTeamsOpen: false, cDay: null, cGM: null, cRange: null, crSheet: null,
 });

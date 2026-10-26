@@ -15,6 +15,7 @@ import { useReadWhenSeen } from "../shared/seen";
 import { useCloseOnOutside } from "../sales/outside";
 import { DOC_ACCEPT, PICKER_AT } from "../shared/attach-sheet";
 import { InAppCamera } from "../shared/in-app-camera";
+import { Phone4aApplySheet } from "../shared/phone4a";
 
 export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
   const { ui, set } = ctx;
@@ -43,6 +44,8 @@ export default function PanelScreens({ ctx }: { ctx: PanelCtx }) {
   const v = panelAppVM(ctx);
   return (<>
     <PanelApp v={v} />
+    {/* Save and apply to all's sheet (2026-10-24), over the ad editor. */}
+    {v.as?.ae.applyWin && <Phone4aApplySheet s={v.as.ae.applyWin} />}
     {/* The composer's Photos (photos and videos, several at once), Camera and Document open these. */}
     {!!ui.lead && (<>
       <input id="crm-panel-photo" type="file" accept="image/*,video/*" multiple onChange={v.ld.lx.pickVisual} style={PICKER_AT} tabIndex={-1} aria-hidden="true" />

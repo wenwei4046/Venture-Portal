@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500&family=Nunito:wght@700;800&family=Playfair+Display:wght@500;600&family=DM+Serif+Display&family=Space+Grotesk:wght@500;600&display=swap">
+<style>@keyframes lbIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div onClick="{{ closeMenus }}" style="position:relative;display:grid;grid-template-columns:220px minmax(0,1fr);min-height:{{ minH }};color:rgb(51 36 27)">
+  <div style="border-right:1px solid rgb(236 231 224);padding:18px 12px;display:flex;flex-direction:column;gap:2px;background:rgb(252 251 249)">
+    <div style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86);padding:0 8px 6px">Subsidiaries</div>
+    <sc-for list="{{ coList }}" as="c" hint-placeholder-count="9">
+      <div onClick="{{ c.onClick }}" style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:8px;cursor:pointer;background:{{ c.bg }}" style-hover="background:rgb(241 236 228)">
+        <span style="width:22px;height:22px;flex:none;border-radius:6px;background:{{ c.color }};color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ c.initial }}</span>
+        <span style="flex:1;font-size:13px;font-weight:{{ c.weight }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">{{ c.n }}</span>
+      </div>
+    </sc-for>
+    <div style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86);padding:18px 8px 6px">Category</div>
+    <sc-for list="{{ catList }}" as="c" hint-placeholder-count="7">
+      <div onClick="{{ c.onClick }}" style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:8px;cursor:pointer;background:{{ c.bg }}" style-hover="background:rgb(241 236 228)">
+        <span style="width:10px;height:10px;flex:none;border-radius:3px;background:{{ c.color }}"></span>
+        <span style="flex:1;font-size:13px;font-weight:{{ c.weight }}">{{ c.name }}</span>
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">{{ c.n }}</span>
+      </div>
+    </sc-for>
+    <sc-if value="{{ notPicker }}" hint-placeholder-val="{{ true }}">
+      <div style="height:1px;background:rgb(236 231 224);margin:12px 6px"></div>
+      <div onClick="{{ openDustbin }}" style="display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:8px;cursor:pointer;background:{{ dustBg }}" style-hover="background:rgb(241 236 228)">
+        <span style="width:22px;text-align:center;font-size:14px">🗑️</span><span style="flex:1;font-size:13px">Dustbin</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86)">{{ trashCount }}</span>
+      </div>
+    </sc-if>
+  </div>
+
+  <div style="min-width:0;padding:20px 26px 48px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <sc-if value="{{ notPicker }}" hint-placeholder-val="{{ true }}"><span style="font-size:18px">📚</span><span style="font-size:1.5em;font-weight:600">Library</span></sc-if>
+      <sc-if value="{{ isPicker }}"><span style="font-size:1.15em;font-weight:600">Attach from Library</span><span style="font-size:0.88em;color:rgb(117 100 86)">Pick files — brand books, character profiles, references…</span></sc-if>
+      <span style="flex:1"></span>
+      <div style="display:flex;align-items:center;gap:8px;height:34px;width:260px;padding:0 10px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;background:#fff">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="rgb(117 100 86)" stroke-width="1.6"><circle cx="6" cy="6" r="4.5"></circle><line x1="9.4" y1="9.4" x2="13" y2="13"></line></svg>
+        <input value="{{ q }}" onChange="{{ onQ }}" placeholder="Search every folder" style="flex:1;min-width:0;border:0;outline:none;font:inherit;font-size:13px;background:transparent;color:rgb(51 36 27)">
+      </div>
+      <sc-if value="{{ notPicker }}">
+        <div style="position:relative">
+          <div onClick="{{ toggleNew }}" style="height:34px;padding:0 14px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;cursor:pointer" style-hover="background:#E0893F">+ New <span style="font-size:9px">▼</span></div>
+          <sc-if value="{{ newOpen }}">
+            <div onClick="{{ stop }}" style="position:absolute;top:40px;right:0;z-index:40;width:200px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 12px 30px rgb(51 36 27 / 0.16);padding:6px;animation:lbIn .12s ease-out">
+              <div onClick="{{ newFolderFromMenu }}" style="padding:8px 10px;border-radius:6px;font-size:13px;cursor:pointer" style-hover="background:rgb(246 244 240)">📁 New folder</div>
+              <div onClick="{{ upload }}" style="padding:8px 10px;border-radius:6px;font-size:13px;cursor:pointer" style-hover="background:rgb(246 244 240)">⬆️ Upload file</div>
+              <div onClick="{{ addLink }}" style="padding:8px 10px;border-radius:6px;font-size:13px;cursor:pointer" style-hover="background:rgb(246 244 240)">🔗 Add a link (Google Drive…)</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;color:rgb(117 100 86)">
+      <sc-for list="{{ crumbs }}" as="b" hint-placeholder-count="2">
+        <span onClick="{{ b.onClick }}" style="cursor:{{ b.cursor }};color:{{ b.color }};font-weight:{{ b.weight }}">{{ b.label }}</span><sc-if value="{{ b.sep }}"><span>/</span></sc-if>
+      </sc-for>
+      <span style="flex:1"></span>
+      <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px">{{ countLabel }}</span>
+    </div>
+
+    <sc-if value="{{ isAll }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px">
+        <sc-for list="{{ coCards }}" as="c" hint-placeholder-count="8">
+          <div onClick="{{ c.onClick }}" style="border-radius:12px;overflow:hidden;border:1px solid rgb(236 231 224);background:#fff;cursor:pointer;transition:transform .15s, box-shadow .15s" style-hover="transform:translateY(-2px);box-shadow:0 8px 20px rgb(51 36 27 / 0.08)">
+            <div style="height:70px;background:{{ c.banner }};position:relative">
+              <span style="position:absolute;left:14px;bottom:-18px;width:44px;height:44px;border-radius:11px;background:{{ c.color }};border:3px solid #fff;color:#fff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ c.initial }}</span>
+            </div>
+            <div style="padding:24px 14px 14px">
+              <div style="font-family:{{ c.font }};font-size:20px;line-height:1.15">{{ c.name }}</div>
+              <div style="font-size:12px;color:rgb(117 100 86);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.caption }}</div>
+              <div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);margin-top:10px">{{ c.meta }}</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ hasBanner }}">
+      <div style="position:relative;margin-top:14px;border-radius:14px;background:{{ co.bannerCss }};background-size:cover;background-position:center;min-height:120px;padding:22px 22px;display:flex;align-items:center;gap:18px">
+        <span style="width:76px;height:76px;flex:none;border-radius:16px;background:{{ co.avatarCss }};background-size:cover;background-position:center;border:3px solid #fff;box-shadow:0 2px 8px rgb(0 0 0 / 0.12);color:#fff;font-size:30px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ co.avatarText }}</span>
+        <div style="min-width:0">
+          <div style="font-family:{{ co.font }};font-size:36px;line-height:1.1;color:{{ co.nameFg }};letter-spacing:{{ co.ls }}">{{ co.name }}</div>
+          <div style="font-size:13px;color:{{ co.capFg }};margin-top:4px">{{ co.caption }}</div>
+        </div>
+        <sc-if value="{{ canEditCo }}"><span onClick="{{ openEdit }}" title="Edit brand profile" style="position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:8px;background:rgb(255 255 255 / 0.85);border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px" style-hover="background:#fff">✎</span></sc-if>
+      </div>
+      <sc-if value="{{ hasSchedule }}">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86)">Schedule</span>
+          <sc-for list="{{ schedule }}" as="s" hint-placeholder-count="3"><span style="display:flex;align-items:center;gap:7px;padding:4px 10px;border-radius:7px;border:1px solid rgb(236 231 224);background:#fff;font-size:12.5px"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(163 78 37)">{{ s.d }}</span>{{ s.t }}</span></sc-for>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <sc-if value="{{ isCompany }}">
+      <div style="position:relative;display:flex;align-items:center;margin-top:20px">
+        <span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86)">Folders · {{ folderCount }}</span>
+        <span style="flex:1"></span>
+        <sc-if value="{{ notPicker }}"><span onClick="{{ toggleAddFolder }}" title="Add folder" style="width:30px;height:30px;border-radius:8px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;color:rgb(117 100 86)" style-hover="background:rgb(246 244 240)">+</span></sc-if>
+        <sc-if value="{{ addFolderOpen }}">
+          <div onClick="{{ stop }}" style="position:absolute;top:36px;right:0;z-index:40;width:290px;background:#fff;border:1px solid rgb(229 222 211);border-radius:12px;box-shadow:0 14px 34px rgb(51 36 27 / 0.16);padding:8px;animation:lbIn .12s ease-out">
+            <div style="padding:4px 8px 6px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Add folder to {{ co.name }}</div>
+            <div style="max-height:230px;overflow-y:auto">
+              <sc-for list="{{ typeChoices }}" as="t" hint-placeholder-count="8">
+                <div onClick="{{ t.onClick }}" style="display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;cursor:pointer;opacity:{{ t.op }}" style-hover="background:rgb(246 244 240)">
+                  <svg width="16" height="13" viewBox="0 0 16 13"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3.2l1.6 1.6h6.2A1.5 1.5 0 0 1 15 4.1v6.4A1.5 1.5 0 0 1 13.5 12h-11A1.5 1.5 0 0 1 1 10.5z" fill="{{ t.fill }}" stroke="{{ t.color }}" stroke-width="1.2"></path></svg>
+                  <span style="flex:1;font-size:13px">{{ t.name }}</span>
+                  <span style="font-size:11px;color:rgb(150 140 130)">{{ t.note }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="border-top:1px solid rgb(240 236 230);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:11px;color:rgb(117 100 86);padding:0 2px">No matching type? Add a new folder type</div>
+              <div style="display:flex;gap:6px">
+                <input value="{{ newType }}" onChange="{{ onNewType }}" onKeyDown="{{ onNewTypeKey }}" placeholder="New folder type name" style="flex:1;min-width:0;height:32px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:7px;padding:0 9px;font:inherit;font-size:12.5px;outline:none;color:rgb(51 36 27)">
+                <span onClick="{{ createType }}" style="height:32px;padding:0 12px;border-radius:7px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-size:12.5px;font-weight:500;cursor:{{ ntCursor }};opacity:{{ ntOp }}">Create</span>
+              </div>
+              <div style="display:flex;gap:5px;padding:0 2px"><sc-for list="{{ typeColors }}" as="c" hint-placeholder-count="6"><span onClick="{{ c.onClick }}" style="width:18px;height:18px;border-radius:5px;background:{{ c.c }};cursor:pointer;box-shadow:{{ c.ring }}"></span></sc-for></div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:10px">
+        <sc-for list="{{ folders }}" as="f" hint-placeholder-count="6">
+          <div onClick="{{ f.onClick }}" onContextMenu="{{ f.onContext }}" style="position:relative;display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;border:1px solid {{ f.border }};background:#fff;cursor:pointer" style-hover="border-color:rgb(200 190 178)">
+            <sc-if value="{{ f.isLink }}"><span style="font-size:15px;width:20px;text-align:center">↗</span></sc-if>
+            <sc-if value="{{ f.notLink }}"><svg width="20" height="16" viewBox="0 0 16 13"><path d="M1 2.5A1.5 1.5 0 0 1 2.5 1h3.2l1.6 1.6h6.2A1.5 1.5 0 0 1 15 4.1v6.4A1.5 1.5 0 0 1 13.5 12h-11A1.5 1.5 0 0 1 1 10.5z" fill="{{ f.fill }}" stroke="{{ f.color }}" stroke-width="1.2"></path></svg></sc-if>
+            <div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</div><div style="font-size:11.5px;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.meta }}</div></div>
+            <sc-if value="{{ notPickerF }}"><span onClick="{{ f.onMenu }}" style="width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:rgb(150 140 130);cursor:pointer" style-hover="background:rgb(241 236 228)">···</span></sc-if>
+            <sc-if value="{{ f.menuOpen }}">
+              <div onClick="{{ stop }}" style="position:absolute;top:44px;right:6px;z-index:40;width:200px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 12px 30px rgb(51 36 27 / 0.16);padding:6px;animation:lbIn .1s ease-out">
+                <sc-for list="{{ f.menu }}" as="m" hint-placeholder-count="4"><div onClick="{{ m.onClick }}" style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;border-radius:6px;font-size:13px;cursor:pointer;color:{{ m.fg }};border-top:{{ m.bt }}" style-hover="background:rgb(246 244 240)"><span>{{ m.label }}</span><span style="font-size:11px;color:rgb(150 140 130)">{{ m.hint }}</span></div></sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showFiles }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;margin-top:22px;margin-bottom:10px">
+        <span style="font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:rgb(117 100 86)">{{ filesTitle }}</span>
+        <span style="flex:1"></span>
+        <sc-if value="{{ canUpload }}"><span onClick="{{ upload }}" style="height:32px;padding:0 12px;border-radius:8px;background:rgb(51 36 27);color:#fff;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;cursor:pointer">⬆ Upload</span></sc-if>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px">
+        <sc-for list="{{ files }}" as="f" hint-placeholder-count="8">
+          <div onClick="{{ f.onClick }}" onContextMenu="{{ f.onContext }}" style="position:relative;border-radius:12px;border:1.5px solid {{ f.border }};background:#fff;cursor:pointer;transition:box-shadow .15s" style-hover="box-shadow:0 6px 16px rgb(51 36 27 / 0.08)">
+            <div style="height:116px;border-radius:10px 10px 0 0;background:{{ f.thumbBg }};display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden">
+              <sc-if value="{{ f.isVideo }}"><span style="width:34px;height:34px;border-radius:50%;background:rgb(255 255 255 / 0.18);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px">▶</span><span style="position:absolute;right:8px;bottom:6px;font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:#fff">{{ f.dur }}</span></sc-if>
+              <sc-if value="{{ f.isDoc }}"><span style="width:38px;height:48px;border-radius:4px;background:{{ f.docBg }};border:1px solid {{ f.docBorder }};display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;box-sizing:border-box;font-family:'Chivo Mono',Menlo,monospace;font-size:8.5px;font-weight:600;color:{{ f.docFg }}">{{ f.ext }}</span></sc-if>
+              <sc-if value="{{ f.isImage }}"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86);background:rgb(255 255 255 / 0.85);padding:2px 6px;border-radius:4px">{{ f.ext }} · {{ f.imgLabel }}</span></sc-if>
+              <sc-if value="{{ f.isProfile }}"><span style="width:54px;height:54px;border-radius:50%;background:rgb(255 255 255 / 0.7);border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-family:'Chivo Mono',Menlo,monospace;font-size:9px;color:rgb(117 100 86)">photo</span></sc-if>
+              <sc-if value="{{ f.isPicker }}"><span style="position:absolute;top:8px;left:8px;width:20px;height:20px;border-radius:6px;box-sizing:border-box;border:2px solid {{ f.pickBorder }};background:{{ f.pickBg }};color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center">{{ f.pickTick }}</span></sc-if>
+              <sc-if value="{{ f.notPicker }}"><span onClick="{{ f.onMenu }}" style="position:absolute;top:8px;right:8px;width:24px;height:22px;border-radius:6px;background:rgb(255 255 255 / 0.9);border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;font-size:11px;color:rgb(90 78 68)">···</span></sc-if>
+            </div>
+            <div style="padding:10px 12px 12px">
+              <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</div>
+              <div style="font-size:11.5px;color:rgb(117 100 86);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.meta }}</div>
+              <div style="display:flex;margin-top:7px"><span style="font-size:10.5px;padding:1px 7px;border-radius:5px;background:{{ f.catBg }};color:{{ f.catFg }}">{{ f.cat }}</span></div>
+            </div>
+            <sc-if value="{{ f.menuOpen }}">
+              <div onClick="{{ stop }}" style="position:absolute;top:34px;right:8px;z-index:40;width:210px;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 12px 30px rgb(51 36 27 / 0.16);padding:6px;animation:lbIn .1s ease-out">
+                <sc-for list="{{ f.menu }}" as="m" hint-placeholder-count="5"><div onClick="{{ m.onClick }}" style="display:flex;align-items:center;justify-content:space-between;padding:7px 9px;border-radius:6px;font-size:13px;cursor:pointer;color:{{ m.fg }};border-top:{{ m.bt }}" style-hover="background:rgb(246 244 240)"><span>{{ m.label }}</span><span style="font-size:11px;color:rgb(150 140 130)">{{ m.hint }}</span></div></sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ noFiles }}"><div style="padding:36px;text-align:center;border:1.5px dashed rgb(229 222 211);border-radius:12px;color:rgb(117 100 86);font-size:13px">{{ emptyText }}</div></sc-if>
+    </sc-if>
+
+    <sc-if value="{{ isDustbin }}">
+      <div style="margin-top:14px;padding:10px 14px;border-radius:8px;background:rgb(246 244 240);font-size:12.5px;color:rgb(74 64 58)">Items in the Dustbin are deleted automatically after 30 days.</div>
+      <div style="margin-top:10px;border:1px solid rgb(236 231 224);border-radius:10px;overflow:hidden;background:#fff">
+        <sc-for list="{{ trash }}" as="t" hint-placeholder-count="2">
+          <div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) 140px auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid rgb(244 241 236);font-size:13px">
+            <span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.name }}</span>
+            <span style="color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.from }}</span>
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:{{ t.leftFg }}">{{ t.left }}</span>
+            <div style="display:flex;gap:6px"><span onClick="{{ t.onRestore }}" style="height:28px;padding:0 10px;border-radius:7px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-size:12px;cursor:pointer">Restore</span><span onClick="{{ t.onDelete }}" style="height:28px;padding:0 10px;border-radius:7px;border:1px solid rgb(236 190 184);color:rgb(176 40 34);display:flex;align-items:center;font-size:12px;cursor:pointer">Delete now</span></div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ trashEmpty }}"><div style="padding:30px;text-align:center;font-size:13px;color:rgb(117 100 86)">The Dustbin is empty 🧹</div></sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isPicker }}">
+      <div style="position:sticky;bottom:0;margin-top:18px;display:flex;align-items:center;gap:10px;padding:12px 0 0;background:#fff;border-top:1px solid rgb(236 231 224)">
+        <sc-for list="{{ pickedChips }}" as="p" hint-placeholder-count="0"><span style="height:26px;padding:0 9px;border-radius:6px;background:rgb(246 244 240);display:flex;align-items:center;font-size:12px;white-space:nowrap">📎 {{ p }}</span></sc-for>
+        <span style="flex:1"></span>
+        <span onClick="{{ pickCancel }}" style="height:36px;padding:0 14px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-size:13px;cursor:pointer">Cancel</span>
+        <span onClick="{{ pickDone }}" style="height:36px;padding:0 16px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:600;font-size:13px;cursor:{{ pickCursor }};opacity:{{ pickOp }}">{{ pickLabel }}</span>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ hasModal }}">
+    <div onClick="{{ closeModal }}" style="position:fixed;inset:0;z-index:250;background:rgb(51 36 27 / 0.35);display:flex;align-items:center;justify-content:center">
+      <div onClick="{{ stop }}" style="width:{{ modalW }}px;max-height:80vh;background:#fff;border-radius:14px;box-shadow:0 24px 60px rgb(51 36 27 / 0.25);display:flex;flex-direction:column;overflow:hidden;animation:lbIn .18s ease-out">
+        <div style="display:flex;align-items:flex-start;gap:10px;padding:18px 20px 12px;border-bottom:1px solid rgb(240 236 230)">
+          <div style="flex:1"><div style="font-size:17px;font-weight:600">{{ modalTitle }}</div><div style="font-size:12.5px;color:rgb(117 100 86);margin-top:2px">{{ modalSub }}</div></div>
+          <span onClick="{{ closeModal }}" style="width:28px;height:28px;border-radius:7px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer">×</span>
+        </div>
+        <div style="overflow-y:auto;padding:12px 20px 18px">
+          <sc-if value="{{ mMove }}">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ moveTargets }}" as="m" hint-placeholder-count="10">
+                <div onClick="{{ m.onClick }}" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:1px solid {{ m.border }};cursor:{{ m.cursor }};opacity:{{ m.op }}" style-hover="background:rgb(250 248 244)">
+                  <span style="width:22px;height:22px;border-radius:6px;background:{{ m.color }};color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ m.initial }}</span>
+                  <span style="flex:1;font-size:13px">{{ m.label }}</span>
+                  <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86)">{{ m.n }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ mShare }}">
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;background:rgb(246 244 240)"><span style="flex:1;font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ shareUrl }}</span><span onClick="{{ copyShare }}" style="height:28px;padding:0 10px;border-radius:6px;background:rgb(51 36 27);color:#fff;display:flex;align-items:center;font-size:12px;cursor:pointer">{{ copyLabel }}</span></div>
+              <div style="font-size:12.5px;color:rgb(74 64 58)">Anyone with the link can view and download — no account needed.</div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;font-weight:500">Link expires</span>
+                <div style="display:flex;gap:6px"><sc-for list="{{ expiries }}" as="e" hint-placeholder-count="4"><span onClick="{{ e.onClick }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;font-size:12px;cursor:pointer;border:1px solid {{ e.border }};background:{{ e.bg }};color:{{ e.fg }}">{{ e.label }}</span></sc-for></div>
+              </div>
+              <div onClick="{{ toggleDl }}" style="display:flex;align-items:center;gap:10px;cursor:pointer"><span style="width:30px;height:18px;border-radius:9px;background:{{ dlTrack }};position:relative"><span style="position:absolute;top:2px;left:{{ dlKnob }}px;width:14px;height:14px;border-radius:50%;background:#fff"></span></span><span style="font-size:12.5px">Allow download</span></div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ mAttach }}">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <sc-for list="{{ attachTasks }}" as="t" hint-placeholder-count="4">
+                <div onClick="{{ t.onClick }}" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:1px solid rgb(236 231 224);cursor:pointer" style-hover="background:rgb(250 248 244)">
+                  <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86);width:130px">{{ t.id }}</span><span style="flex:1;font-size:13px;font-weight:500">{{ t.title }}</span><span style="font-size:11.5px;color:rgb(117 100 86)">{{ t.stage }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ mEdit }}">
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div style="border-radius:12px;background:{{ ed.bannerCss }};background-size:cover;background-position:center;padding:16px;display:flex;align-items:center;gap:12px">
+                <span style="width:52px;height:52px;border-radius:12px;background:{{ ed.avatarCss }};background-size:cover;border:3px solid #fff;color:#fff;font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ ed.avatarText }}</span>
+                <div><div style="font-family:{{ ed.font }};font-size:26px;line-height:1.1;color:{{ ed.nameFg }}">{{ ed.name }}</div><div style="font-size:12px;color:{{ ed.capFg }}">{{ ed.caption }}</div></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px;font-weight:600">Profile picture</span>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><sc-for list="{{ avColors }}" as="c" hint-placeholder-count="6"><span onClick="{{ c.onClick }}" style="width:24px;height:24px;border-radius:7px;background:{{ c.c }};cursor:pointer;box-shadow:{{ c.ring }}"></span></sc-for></div>
+                  <span onClick="{{ uploadAvatar }}" style="align-self:flex-start;height:28px;padding:0 10px;border-radius:7px;border:1px dashed rgb(214 204 190);display:flex;align-items:center;font-size:12px;cursor:pointer;color:rgb(90 78 68)">{{ avatarBtn }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px;font-weight:600">Background picture</span>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><sc-for list="{{ bgColors }}" as="c" hint-placeholder-count="6"><span onClick="{{ c.onClick }}" style="width:24px;height:24px;border-radius:7px;background:{{ c.c }};border:1px solid rgb(229 222 211);cursor:pointer;box-shadow:{{ c.ring }}"></span></sc-for></div>
+                  <span onClick="{{ uploadBg }}" style="align-self:flex-start;height:28px;padding:0 10px;border-radius:7px;border:1px dashed rgb(214 204 190);display:flex;align-items:center;font-size:12px;cursor:pointer;color:rgb(90 78 68)">{{ bgBtn }}</span>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px;font-weight:600">Brand font</span>
+                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px"><sc-for list="{{ fontOpts }}" as="o" hint-placeholder-count="6"><div onClick="{{ o.onClick }}" style="padding:10px 8px;border-radius:8px;border:1.5px solid {{ o.border }};background:{{ o.bg }};cursor:pointer;text-align:center"><div style="font-family:{{ o.family }};font-size:20px;line-height:1.1;white-space:nowrap;overflow:hidden">{{ o.sample }}</div><div style="font-size:10.5px;color:rgb(117 100 86);margin-top:3px">{{ o.name }}</div></div></sc-for></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px;font-weight:600">Display name</span><input value="{{ ed.name }}" onChange="{{ onEdName }}" style="height:34px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;font-size:13px;outline:none;color:rgb(51 36 27)"></div>
+                <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px;font-weight:600">Caption</span><input value="{{ ed.caption }}" onChange="{{ onEdCaption }}" style="height:34px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;font-size:13px;outline:none;color:rgb(51 36 27)"></div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ hasModalFoot }}">
+          <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px;border-top:1px solid rgb(240 236 230)">
+            <span onClick="{{ closeModal }}" style="height:34px;padding:0 14px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-size:13px;cursor:pointer">Cancel</span>
+            <span onClick="{{ modalOk }}" style="height:34px;padding:0 16px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-size:13px;font-weight:600;cursor:pointer">{{ modalOkLabel }}</span>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ hasToast }}">
+    <div style="position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px;animation:lbIn .2s ease-out">{{ toast }}</div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:1100},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;library&quot;,&quot;picker&quot;],&quot;default&quot;:&quot;library&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;start&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;company&quot;,&quot;all&quot;],&quot;default&quot;:&quot;company&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;startCo&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;carres&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;onPick&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;(files) =&gt; void&quot;},&quot;onClose&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}">
+const FONTS = {
+  Newsreader: "'Newsreader', Georgia, serif", Nunito: "'Nunito', system-ui, sans-serif", Playfair: "'Playfair Display', Georgia, serif",
+  'DM Serif': "'DM Serif Display', Georgia, serif", 'Space Grotesk': "'Space Grotesk', system-ui, sans-serif", Inter: "'Inter', system-ui, sans-serif",
+};
+const CO = [
+  ['carres', 'Carres', 'C', 'rgb(94 60 40)', 'rgb(238 228 216)', 'Newsreader', 'Sofa & living · KJ, PCH'],
+  ['h2990', '2990 Home', '2', 'rgb(44 82 130)', 'rgb(226 234 244)', 'Nunito', 'Home essentials, everyday prices'],
+  ['hc', 'Houzs Century', 'H', 'rgb(40 34 30)', 'rgb(234 232 228)', 'Playfair', 'Premium furniture since 1998'],
+  ['hookka', 'Hookka', 'H', 'rgb(84 96 66)', 'rgb(234 238 226)', 'DM Serif', 'Rugs & soft furnishing'],
+  ['colive', 'Colive', 'C', 'rgb(52 110 110)', 'rgb(224 238 238)', 'Space Grotesk', 'Co-living spaces'],
+  ['dc', 'Dreamcrafter', 'D', 'rgb(166 78 40)', 'rgb(248 228 212)', 'DM Serif', 'Custom furniture'],
+  ['cmi', 'CMI', 'C', 'rgb(90 96 106)', 'rgb(234 236 240)', 'Inter', 'Manufacturing'],
+  ['conts', 'The Conts', 'T', 'rgb(70 90 104)', 'rgb(228 234 238)', 'Space Grotesk', 'Container cafés & retail'],
+].map(([id, name, initial, color, banner, font, caption]) => ({ id, name, initial, color, banner, font, caption, avatarImg: false, bannerImg: false }));
+const CATS = [['Brand', 'oklch(0.55 0.12 300)'], ['Product', 'oklch(0.50 0.08 175)'], ['Photo', 'oklch(0.58 0.12 50)'], ['Video', 'oklch(0.48 0.04 240)'], ['Content', 'oklch(0.62 0.10 80)'], ['Minutes', 'oklch(0.55 0.01 60)']];
+const CATC = Object.fromEntries(CATS);
+const TYPES0 = [
+  ['Brandbook', 'oklch(0.55 0.12 300)'], ['Handbook', 'oklch(0.62 0.10 80)'], ['Product info', 'oklch(0.50 0.08 175)'], ['Product photos', 'oklch(0.58 0.12 50)'],
+  ['Video library', 'oklch(0.48 0.04 240)'], ['Meeting minutes', 'oklch(0.55 0.01 60)'], ['Character library', 'oklch(0.55 0.12 340)'], ['Reference book', 'oklch(0.52 0.09 260)'],
+  ['Campaign planning', 'oklch(0.58 0.10 30)'], ['Storyboard', 'oklch(0.55 0.08 200)'], ['Price lists', 'oklch(0.50 0.08 175)'], ['Legal & contracts', 'oklch(0.45 0.02 60)'], ['Raw footage', 'oklch(0.48 0.04 240)', true],
+];
+const TYPE_COLORS = ['oklch(0.55 0.12 300)', 'oklch(0.58 0.12 50)', 'oklch(0.50 0.08 175)', 'oklch(0.52 0.09 260)', 'oklch(0.62 0.10 80)', 'oklch(0.55 0.12 340)'];
+let FID = 0;
+const fo = (co, type, upd) => ({ id: 'f' + (++FID), co, type, name: type, upd, link: type === 'Raw footage' });
+const FOLDERS0 = [
+  fo('carres', 'Brandbook', '2 Oct'), fo('carres', 'Handbook', '8 Oct'), fo('carres', 'Product info', '14 Oct'), fo('carres', 'Product photos', '15 Oct'), fo('carres', 'Video library', '15 Oct'),
+  fo('carres', 'Meeting minutes', '16 Oct'), fo('carres', 'Character library', '12 Oct'), fo('carres', 'Reference book', '11 Oct'), fo('carres', 'Raw footage', ''),
+  fo('h2990', 'Brandbook', '1 Oct'), fo('h2990', 'Product photos', '20 Oct'), fo('h2990', 'Video library', '25 Oct'), fo('h2990', 'Character library', '17 Oct'), fo('h2990', 'Meeting minutes', '18 Oct'),
+  fo('dc', 'Brandbook', '4 Oct'), fo('dc', 'Product info', '9 Oct'), fo('dc', 'Video library', '13 Oct'), fo('dc', 'Meeting minutes', '10 Oct'),
+  fo('hc', 'Brandbook', '3 Oct'), fo('hc', 'Product photos', '6 Oct'), fo('hookka', 'Brandbook', '5 Oct'), fo('hookka', 'Product photos', '7 Oct'),
+  fo('colive', 'Brandbook', '2 Oct'), fo('colive', 'Reference book', '9 Oct'), fo('cmi', 'Handbook', '1 Oct'), fo('conts', 'Brandbook', '3 Oct'),
+];
+const fid = (co, type) => FOLDERS0.find(f => f.co === co && f.type === type).id;
+let XID = 0;
+const fl = (co, type, name, ext, size, cat, by, date, extra = {}) => ({ id: 'x' + (++XID), co, folder: fid(co, type), name, ext, size, cat, by, date, ...extra });
+const FILES0 = [
+  fl('carres', 'Brandbook', 'Carres brandbook v3', 'PDF', '4.5 MB', 'Brand', 'Rachel', '2 Oct'), fl('carres', 'Brandbook', 'Logo pack', 'ZIP', '20 MB', 'Brand', 'Rachel', '2 Oct'), fl('carres', 'Brandbook', 'Colour & type', 'PDF', '4.6 MB', 'Brand', 'Siti', '2 Oct'),
+  fl('carres', 'Handbook', 'Showroom handbook', 'PDF', '2.1 MB', 'Content', 'Daniel', '8 Oct'), fl('carres', 'Handbook', 'Tone of voice', 'DOCX', '48 KB', 'Content', 'Jason', '8 Oct'),
+  fl('carres', 'Product info', 'Price list Q4', 'XLSX', '73 KB', 'Product', 'Daniel', '14 Oct'), fl('carres', 'Product info', 'Honest-shop FAQ', 'DOCX', '16 KB', 'Product', 'Jason', '13 Oct'), fl('carres', 'Product info', 'Sofa spec sheets', 'PDF', '3.2 MB', 'Product', 'Daniel', '12 Oct'),
+  fl('carres', 'Product photos', 'KJ showroom · wide', 'JPG', '1.1 MB', 'Photo', 'Ah Kit', '15 Oct', { img: 'wide' }), fl('carres', 'Product photos', 'PCH opening · queue', 'JPG', '842 KB', 'Photo', 'Ah Kit', '15 Oct', { img: 'event' }),
+  fl('carres', 'Product photos', 'Velvet sofa · studio', 'JPG', '2.4 MB', 'Photo', 'Ah Kit', '11 Oct', { img: 'studio' }), fl('carres', 'Product photos', 'Lounge set · lifestyle', 'JPG', '1.9 MB', 'Photo', 'Ah Kit', '10 Oct', { img: 'lifestyle' }),
+  fl('carres', 'Video library', 'Owner interview · raw', 'MP4', '82 MB', 'Video', 'Ah Kit', '15 Oct', { dur: '0:57' }), fl('carres', 'Video library', 'PCH rushes · 42 clips', 'MP4', '1.2 GB', 'Video', 'Ah Kit', '14 Oct', { dur: '6:12' }), fl('carres', 'Video library', 'Showroom tour', 'MP4', '101 MB', 'Video', 'Ali', '12 Oct', { dur: '0:31' }),
+  fl('carres', 'Meeting minutes', 'PCH opening debrief', 'DOCX', '34 KB', 'Minutes', 'Rachel', '16 Oct'), fl('carres', 'Meeting minutes', 'Weekly sync · 14 Oct', 'DOCX', '50 KB', 'Minutes', 'Daniel', '14 Oct'), fl('carres', 'Meeting minutes', 'Kickoff · Year-End Video', 'DOCX', '41 KB', 'Minutes', 'Rachel', '20 Oct'),
+  fl('carres', 'Character library', 'Host — Amira (profile)', 'JPG', '620 KB', 'Content', 'Mei', '12 Oct', { profile: true }), fl('carres', 'Character library', 'Mascot — Sofa Bear', 'PNG', '310 KB', 'Content', 'Siti', '9 Oct', { profile: true }),
+  fl('carres', 'Reference book', 'Year-end mood references', 'PDF', '12 MB', 'Content', 'Mei', '11 Oct'),
+  fl('h2990', 'Brandbook', '2990 Home brand sheet', 'PDF', '1.8 MB', 'Brand', 'Rachel', '1 Oct'), fl('h2990', 'Product photos', 'Red truck wrap', 'JPG', '2.2 MB', 'Photo', 'Ah Kit', '20 Oct', { img: 'truck' }), fl('h2990', 'Product photos', 'Gift box set', 'JPG', '1.4 MB', 'Photo', 'Ah Kit', '20 Oct', { img: 'studio' }),
+  fl('h2990', 'Video library', 'RedTruck_Reels_v2', 'MP4', '84 MB', 'Video', 'Ali', '25 Oct', { dur: '0:38' }), fl('h2990', 'Character library', 'Carmen (spokesperson)', 'JPG', '540 KB', 'Content', 'Mei', '17 Oct', { profile: true }),
+  fl('h2990', 'Meeting minutes', 'Red Truck kickoff', 'DOCX', '38 KB', 'Minutes', 'Rachel', '18 Oct'), fl('h2990', 'Video library', 'Truck B-roll', 'MP4', '640 MB', 'Video', 'Ah Kit', '22 Oct', { dur: '4:05' }),
+  fl('dc', 'Brandbook', 'Dreamcrafter brand sheet', 'PDF', '1.5 MB', 'Brand', 'Rachel', '4 Oct'), fl('dc', 'Product info', 'Showroom walkthrough notes', 'DOCX', '48 KB', 'Product', 'Jason', '9 Oct'),
+  fl('dc', 'Video library', 'Raya teaser script v2', 'DOCX', '80 KB', 'Video', 'Mei', '13 Oct'), fl('dc', 'Video library', 'Showroom tour · cut', 'MP4', '101 MB', 'Video', 'Ali', '13 Oct', { dur: '0:31' }), fl('dc', 'Meeting minutes', 'Raya brainstorm', 'DOCX', '35 KB', 'Minutes', 'Rachel', '10 Oct'),
+  fl('hc', 'Brandbook', 'Century brand guide', 'PDF', '6.1 MB', 'Brand', 'Rachel', '3 Oct'), fl('hc', 'Product photos', 'Lounge chair · studio', 'JPG', '2.0 MB', 'Photo', 'Ah Kit', '6 Oct', { img: 'studio' }),
+  fl('hookka', 'Brandbook', 'Hookka logo & colours', 'PDF', '2.3 MB', 'Brand', 'Siti', '5 Oct'), fl('hookka', 'Product photos', 'Rug textures', 'JPG', '3.4 MB', 'Photo', 'Ah Kit', '7 Oct', { img: 'detail' }),
+  fl('colive', 'Brandbook', 'Colive brand kit', 'PDF', '2.6 MB', 'Brand', 'Rachel', '2 Oct'), fl('colive', 'Reference book', 'Room tour references', 'PDF', '8.8 MB', 'Content', 'Mei', '9 Oct'),
+  fl('cmi', 'Handbook', 'Factory safety for shoots', 'PDF', '1.2 MB', 'Content', 'Daniel', '1 Oct'), fl('conts', 'Brandbook', 'The Conts brand sheet', 'PDF', '1.9 MB', 'Brand', 'Rachel', '3 Oct'),
+];
+const TRASH0 = [
+  { id: 't1', name: 'Old logo draft', from: 'Carres / Brandbook', daysLeft: 23 },
+  { id: 't2', name: 'Showroom tour · rough cut', from: 'Dreamcrafter / Video library', daysLeft: 4 },
+];
+const SCHED = { carres: [['Thu 5 Nov', 'Year-End Video shoot'], ['Mon 9 Nov', '11.11 ads go live'], ['Wed 11 Nov', 'Countdown reel approval']], h2990: [['Sun 25 Oct', 'Final video v2 sent'], ['Wed 28 Oct', 'Red Truck Reels go live']], dc: [['Mon 19 Oct', 'Raya storyboard review'], ['Sat 24 Oct', 'Teaser shoot']] };
+const DOC = { PDF: ['rgb(252 236 233)', 'rgb(236 200 194)', 'rgb(176 40 34)'], DOCX: ['rgb(232 238 248)', 'rgb(200 214 236)', 'rgb(44 82 130)'], XLSX: ['rgb(232 244 235)', 'rgb(190 222 199)', 'rgb(40 110 64)'], ZIP: ['rgb(246 240 226)', 'rgb(226 212 180)', 'rgb(125 91 32)'], PNG: ['rgb(242 236 248)', 'rgb(220 208 236)', 'rgb(100 70 150)'] };
+const IMG_BG = { wide: 'oklch(0.90 0.03 60)', event: 'oklch(0.90 0.04 30)', studio: 'oklch(0.92 0.02 80)', lifestyle: 'oklch(0.90 0.03 120)', truck: 'oklch(0.88 0.06 30)', detail: 'oklch(0.90 0.03 100)' };
+const TASKS = [['MKT-2990-2610-018', 'Red Truck Reels', 'Edit'], ['MKT-CAR-2610-007', 'Carres Year-End Video', 'Script'], ['MKT-COL-2610-003', 'Colive Room Tour', 'Script'], ['MKT-CAR-2610-011', 'Year-end sale countdown', 'Approval']];
+const AVC = ['rgb(94 60 40)', 'rgb(44 82 130)', 'rgb(40 34 30)', 'rgb(84 96 66)', 'rgb(52 110 110)', 'rgb(166 78 40)', 'rgb(140 60 90)'];
+const BGC = ['rgb(238 228 216)', 'rgb(226 234 244)', 'rgb(234 232 228)', 'rgb(234 238 226)', 'rgb(248 228 212)', 'rgb(240 228 236)', 'rgb(40 34 30)'];
+const IMG_AV = 'repeating-linear-gradient(135deg, rgb(150 130 112) 0 6px, rgb(170 150 132) 6px 12px)';
+const IMG_BN = 'repeating-linear-gradient(135deg, rgb(214 200 184) 0 12px, rgb(226 214 200) 12px 24px)';
+
+class Component extends DCLogic {
+  state = {
+    view: this.props.mode === 'picker' ? { t: 'co', co: this.props.startCo || 'carres' } : this.props.start === 'all' ? { t: 'all' } : { t: 'co', co: 'carres' },
+    cat: null, q: '', companies: CO, folders: FOLDERS0, files: FILES0, trash: TRASH0, types: TYPES0,
+    menu: null, newOpen: false, addOpen: false, newType: '', newTypeColor: 0, modal: null, target: null, picked: [], edit: null, expiry: '7 days', dl: true, copied: false, toast: '',
+  };
+  flash(t) { this.setState({ toast: t }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  componentWillUnmount() { clearTimeout(this._t); }
+  coOf(id) { return this.state.companies.find(c => c.id === id); }
+  addFolder(type) {
+    const v = this.state.view; if (v.t !== 'co' && v.t !== 'folder') return;
+    const t = this.state.types.find(x => x[0] === type);
+    const f = { id: 'f' + Date.now(), co: v.co, type, name: type, upd: 'just now', link: !!t[2] };
+    this.setState(s => ({ folders: [...s.folders, f], addOpen: false, newType: '' }));
+    this.flash(`Folder "${type}" added to ${this.coOf(v.co).name}`);
+  }
+  trashFile(f) {
+    const fol = this.state.folders.find(x => x.id === f.folder);
+    this.setState(s => ({ files: s.files.filter(x => x.id !== f.id), trash: [{ id: 't' + Date.now(), name: f.name, from: `${this.coOf(f.co).name} / ${fol ? fol.name : ''}`, daysLeft: 30, file: f }, ...s.trash], menu: null }));
+    this.flash(`Moved to Dustbin · deletes automatically in 30 days`);
+  }
+  renderVals() {
+    const s = this.state, picker = this.props.mode === 'picker', v = s.view;
+    const q = s.q.trim().toLowerCase();
+    const filesBase = s.files.filter(f => (!s.cat || f.cat === s.cat) && (!q || f.name.toLowerCase().includes(q)));
+    const countCo = id => s.files.filter(f => f.co === id && (!s.cat || f.cat === s.cat)).length;
+    const coList = [{ id: 'all', name: 'All companies', initial: '•', color: 'rgb(200 186 168)' }, ...s.companies].map(c => {
+      const on = (c.id === 'all' && v.t === 'all') || ((v.t === 'co' || v.t === 'folder') && v.co === c.id);
+      return { ...c, n: c.id === 'all' ? s.files.filter(f => !s.cat || f.cat === s.cat).length : countCo(c.id), bg: on ? 'rgb(255 244 231)' : 'transparent', weight: on ? 600 : 400, onClick: () => this.setState({ view: c.id === 'all' ? { t: 'all' } : { t: 'co', co: c.id }, menu: null }) };
+    });
+    const inScope = f => v.t === 'all' || v.t === 'dust' ? true : f.co === v.co;
+    const catList = [['All categories', 'rgb(214 206 196)', null], ...CATS.map(([n, c]) => [n, c, n])].map(([name, color, k]) => ({ name, color, n: s.files.filter(f => inScope(f) && (!k || f.cat === k)).length, bg: s.cat === k ? 'rgb(255 244 231)' : 'transparent', weight: s.cat === k ? 600 : 400, onClick: () => this.setState({ cat: k }) }));
+    const co = (v.t === 'co' || v.t === 'folder') ? this.coOf(v.co) : null;
+    const coV = c => c && ({ ...c, font: FONTS[c.font], bannerCss: c.bannerImg ? IMG_BN : c.banner, avatarCss: c.avatarImg ? IMG_AV : c.color, avatarText: c.avatarImg ? '' : c.initial, nameFg: c.banner === 'rgb(40 34 30)' && !c.bannerImg ? '#fff' : 'rgb(38 33 29)', capFg: c.banner === 'rgb(40 34 30)' && !c.bannerImg ? 'rgb(220 214 206)' : 'rgb(110 98 86)', ls: c.font === 'Space Grotesk' ? '-0.02em' : '0' });
+    const folderObj = v.t === 'folder' ? s.folders.find(f => f.id === v.folder) : null;
+    const typeColor = t => (s.types.find(x => x[0] === t) || [0, 'rgb(150 140 130)'])[1];
+
+    const fileMenu = f => [
+      { label: 'Attach to task', hint: 'send', onClick: () => this.setState({ modal: 'attach', target: f, menu: null }) },
+      { label: 'Share link', hint: 'guest', onClick: () => this.setState({ modal: 'share', target: f, menu: null, copied: false }) },
+      { label: 'Download', hint: f.size, onClick: () => { this.setState({ menu: null }); this.flash(`Downloading ${f.name}.${f.ext.toLowerCase()}`); } },
+      { label: 'Move to…', hint: '', onClick: () => this.setState({ modal: 'move', target: f, menu: null }) },
+      { label: 'Move to Dustbin', hint: '30 days', fg: 'rgb(176 40 34)', bt: '1px solid rgb(240 236 230)', onClick: () => this.trashFile(f) },
+    ].map(m => ({ fg: 'rgb(51 36 27)', bt: 'none', ...m }));
+    const deco = f => {
+      const fol = s.folders.find(x => x.id === f.folder), c = this.coOf(f.co);
+      const video = f.ext === 'MP4', image = (f.ext === 'JPG' || f.ext === 'PNG') && !f.profile, doc = !video && !image && !f.profile;
+      const d = DOC[f.ext] || DOC.DOCX, sel = s.picked.includes(f.id);
+      return {
+        ...f, meta: `${f.size} · ${c.name} / ${fol ? fol.name : ''}`, isVideo: video, isImage: image, isDoc: doc, isProfile: !!f.profile,
+        thumbBg: video ? 'rgb(52 40 32)' : image ? `repeating-linear-gradient(135deg, ${IMG_BG[f.img] || 'oklch(0.92 0.02 80)'} 0 10px, rgb(250 248 244) 10px 20px)` : f.profile ? 'linear-gradient(180deg, oklch(0.93 0.03 340), oklch(0.96 0.02 60))' : 'rgb(246 244 240)',
+        docBg: d[0], docBorder: d[1], docFg: d[2], imgLabel: f.img || 'image',
+        catBg: `color-mix(in oklch, ${CATC[f.cat]} 16%, white)`, catFg: CATC[f.cat],
+        border: sel ? 'rgb(90 62 43)' : s.menu && s.menu.id === f.id ? 'rgb(214 180 140)' : 'rgb(236 231 224)',
+        isPicker: picker, notPicker: !picker, pickBorder: sel ? 'rgb(90 62 43)' : 'rgb(255 255 255)', pickBg: sel ? 'rgb(90 62 43)' : 'rgb(255 255 255 / 0.7)', pickTick: sel ? '✓' : '',
+        menuOpen: !picker && s.menu && s.menu.id === f.id, menu: fileMenu(f),
+        onMenu: e => { e.stopPropagation(); this.setState(p => ({ menu: p.menu && p.menu.id === f.id ? null : { id: f.id }, newOpen: false, addOpen: false })); },
+        onContext: e => { if (picker) return; e.preventDefault(); e.stopPropagation(); this.setState({ menu: { id: f.id }, newOpen: false, addOpen: false }); },
+        onClick: e => { e.stopPropagation(); if (picker) this.setState(p => ({ picked: p.picked.includes(f.id) ? p.picked.filter(x => x !== f.id) : [...p.picked, f.id] })); else this.setState({ menu: null }); },
+      };
+    };
+    let files = [];
+    if (v.t === 'all') files = filesBase.slice().reverse().slice(0, picker ? 99 : 12);
+    if (v.t === 'co') files = filesBase.filter(f => f.co === v.co).slice().reverse();
+    if (v.t === 'folder') files = filesBase.filter(f => f.folder === v.folder);
+    if (q && v.t !== 'folder') files = filesBase;
+    const folderMenu = f => [
+      { label: 'Open', hint: '', onClick: () => this.setState({ view: { t: 'folder', co: f.co, folder: f.id }, menu: null }) },
+      { label: 'Share link', hint: 'guest', onClick: () => this.setState({ modal: 'share', target: f, menu: null, copied: false }) },
+      { label: 'Download as ZIP', hint: '', onClick: () => { this.setState({ menu: null }); this.flash(`Preparing ${f.name}.zip`); } },
+      { label: 'Move to…', hint: '', onClick: () => this.setState({ modal: 'move', target: { ...f, isFolder: true }, menu: null }) },
+      { label: 'Move to Dustbin', hint: '30 days', fg: 'rgb(176 40 34)', bt: '1px solid rgb(240 236 230)', onClick: () => { this.setState(p => ({ folders: p.folders.filter(x => x.id !== f.id), trash: [{ id: 't' + Date.now(), name: `📁 ${f.name}`, from: this.coOf(f.co).name, daysLeft: 30, folder: f }, ...p.trash], menu: null })); this.flash('Folder moved to Dustbin · 30 days'); } },
+    ].map(m => ({ fg: 'rgb(51 36 27)', bt: 'none', ...m }));
+    const folders = co ? s.folders.filter(f => f.co === co.id).map(f => {
+      const n = s.files.filter(x => x.folder === f.id).length, color = typeColor(f.type);
+      return { ...f, isLink: f.link, notLink: !f.link, color, fill: `color-mix(in oklch, ${color} 14%, white)`, meta: f.link ? 'Google Drive · link' : `${n} file${n === 1 ? '' : 's'}${f.upd ? ` · updated ${f.upd}` : ''}`,
+        border: v.folder === f.id ? 'rgb(90 62 43)' : 'rgb(236 231 224)', menuOpen: !picker && s.menu && s.menu.id === f.id, menu: folderMenu(f),
+        onMenu: e => { e.stopPropagation(); this.setState(p => ({ menu: p.menu && p.menu.id === f.id ? null : { id: f.id }, addOpen: false })); },
+        onContext: e => { if (picker) return; e.preventDefault(); e.stopPropagation(); this.setState({ menu: { id: f.id }, addOpen: false }); },
+        onClick: e => { e.stopPropagation(); if (f.link) return this.flash('Opens Google Drive in a new tab'); this.setState({ view: { t: 'folder', co: f.co, folder: f.id }, menu: null }); } };
+    }) : [];
+    const existingTypes = co ? s.folders.filter(f => f.co === co.id).map(f => f.type) : [];
+    const typeChoices = s.types.map(([name, color, link]) => { const has = existingTypes.includes(name); return { name, color, fill: `color-mix(in oklch, ${color} 14%, white)`, note: has ? 'already here' : link ? 'link' : '', op: has ? 0.45 : 1, onClick: () => !has && this.addFolder(name) }; });
+    const crumbs = [{ label: 'Library', onClick: () => this.setState({ view: { t: 'all' } }) }];
+    if (co) crumbs.push({ label: co.name, onClick: () => this.setState({ view: { t: 'co', co: co.id } }) });
+    if (folderObj) crumbs.push({ label: folderObj.name, onClick: () => {} });
+    if (v.t === 'dust') crumbs.push({ label: 'Dustbin', onClick: () => {} });
+    const crumbV = crumbs.map((c, i) => ({ ...c, sep: i < crumbs.length - 1, cursor: i < crumbs.length - 1 ? 'pointer' : 'default', color: i === crumbs.length - 1 ? 'rgb(51 36 27)' : 'rgb(117 100 86)', weight: i === crumbs.length - 1 ? 600 : 400 }));
+    const t = s.target;
+    const moveTargets = t ? (t.isFolder ? s.companies.map(c => ({ label: c.name, initial: c.initial, color: c.color, n: `${s.folders.filter(f => f.co === c.id).length} folders`, border: c.id === t.co ? 'rgb(90 62 43)' : 'rgb(236 231 224)', cursor: c.id === t.co ? 'default' : 'pointer', op: c.id === t.co ? 0.5 : 1, onClick: () => { if (c.id === t.co) return; this.setState(p => ({ folders: p.folders.map(f => f.id === t.id ? { ...f, co: c.id } : f), files: p.files.map(x => x.folder === t.id ? { ...x, co: c.id } : x), modal: null })); this.flash(`Moved "${t.name}" to ${c.name}`); } }))
+      : s.folders.filter(f => !f.link).map(f => { const c = this.coOf(f.co), cur = f.id === t.folder; return { label: `${c.name} / ${f.name}`, initial: c.initial, color: c.color, n: `${s.files.filter(x => x.folder === f.id).length} files`, border: cur ? 'rgb(90 62 43)' : 'rgb(236 231 224)', cursor: cur ? 'default' : 'pointer', op: cur ? 0.5 : 1, onClick: () => { if (cur) return; this.setState(p => ({ files: p.files.map(x => x.id === t.id ? { ...x, folder: f.id, co: f.co } : x), modal: null })); this.flash(`Moved to ${c.name} / ${f.name}`); } }; })) : [];
+    const ed = s.edit ? coV(s.edit) : {};
+    const chip = on => ({ border: on ? 'rgb(51 36 27)' : 'rgb(229 222 211)', bg: on ? 'rgb(51 36 27)' : '#fff', fg: on ? '#fff' : 'rgb(51 36 27)' });
+    const ring = on => on ? '0 0 0 2px #fff, 0 0 0 4px rgb(90 62 43)' : 'none';
+    const updEd = patch => this.setState(p => ({ edit: { ...p.edit, ...patch } }));
+    let modalTitle = '', modalSub = '', modalW = 520, hasFoot = false, okLabel = '', ok = () => {};
+    if (s.modal === 'move') { modalTitle = `Move "${t.name}"`; modalSub = t.isFolder ? 'Pick a subsidiary for this folder.' : 'Pick any folder in the Library.'; }
+    if (s.modal === 'share') { modalTitle = `Share "${t.name}"`; modalSub = 'Guest link · for people without an account'; modalW = 460; }
+    if (s.modal === 'attach') { modalTitle = `Attach "${t.name}" to a task`; modalSub = 'It appears in the task Canvas as a linked file — no duplicate copy.'; }
+    if (s.modal === 'edit') { modalTitle = `Edit ${s.edit.name} profile`; modalSub = 'Each subsidiary keeps its own brand look in the Library.'; modalW = 600; hasFoot = true; okLabel = 'Save profile'; ok = () => { this.setState(p => ({ companies: p.companies.map(c => c.id === p.edit.id ? p.edit : c), modal: null })); this.flash('Brand profile saved'); }; }
+    const trash = s.trash.map(x => ({ ...x, left: `auto-deletes in ${x.daysLeft} day${x.daysLeft === 1 ? '' : 's'}`, leftFg: x.daysLeft <= 7 ? 'rgb(176 40 34)' : 'rgb(117 100 86)',
+      onRestore: () => { this.setState(p => ({ trash: p.trash.filter(y => y.id !== x.id), files: x.file ? [...p.files, x.file] : p.files, folders: x.folder ? [...p.folders, x.folder] : p.folders })); this.flash(`Restored ${x.name}`); },
+      onDelete: () => { this.setState(p => ({ trash: p.trash.filter(y => y.id !== x.id) })); this.flash('Deleted permanently'); } }));
+    const pickedNames = s.picked.map(id => (s.files.find(f => f.id === id) || {}).name).filter(Boolean);
+    const filesTitle = v.t === 'folder' ? `${folderObj ? folderObj.name : ''} · ${files.length}` : q ? `Search results · ${files.length}` : v.t === 'all' ? 'Recently added · all companies' : 'Recently added';
+    return {
+      minH: picker ? '560px' : '100%', isPicker: picker, notPicker: !picker, notPickerF: !picker,
+      coList, catList, trashCount: s.trash.length, dustBg: v.t === 'dust' ? 'rgb(255 244 231)' : 'transparent',
+      openDustbin: () => this.setState({ view: { t: 'dust' }, menu: null }),
+      q: s.q, onQ: e => this.setState({ q: e.target.value }),
+      newOpen: s.newOpen, toggleNew: e => { e.stopPropagation(); this.setState(p => ({ newOpen: !p.newOpen, menu: null, addOpen: false })); },
+      newFolderFromMenu: () => { if (!co) { this.setState({ newOpen: false }); return this.flash('Open a subsidiary first, then add a folder'); } this.setState({ newOpen: false, addOpen: true }); },
+      upload: e => { e && e.stopPropagation && e.stopPropagation(); const target = folderObj || (co && s.folders.find(f => f.co === co.id && !f.link)); if (!target) { this.setState({ newOpen: false }); return this.flash('Open a subsidiary or folder to upload'); } this.setState(p => ({ newOpen: false, files: [...p.files, { id: 'x' + Date.now(), co: target.co, folder: target.id, name: 'New upload', ext: 'JPG', size: '1.0 MB', cat: 'Photo', by: 'Rachel', date: 'just now', img: 'studio' }] })); this.flash(`Uploaded to ${this.coOf(target.co).name} / ${target.name}`); },
+      addLink: () => { this.setState({ newOpen: false }); this.flash('Paste a Google Drive or Dropbox link to add it as a folder'); },
+      crumbs: crumbV, countLabel: v.t === 'dust' ? `${s.trash.length} items` : `${v.t === 'all' ? s.files.length : files.length} files`,
+      isAll: v.t === 'all' && !q,
+      coCards: s.companies.map(c => ({ ...coV(c), meta: `${s.folders.filter(f => f.co === c.id).length} folders · ${s.files.filter(f => f.co === c.id).length} files`, onClick: () => this.setState({ view: { t: 'co', co: c.id } }) })),
+      hasBanner: !!co, co: coV(co) || {}, canEditCo: !!co && !picker,
+      openEdit: e => { e.stopPropagation(); this.setState({ modal: 'edit', edit: { ...co } }); },
+      hasSchedule: !!co && !!SCHED[co.id] && !picker, schedule: co && SCHED[co.id] ? SCHED[co.id].map(([d, t2]) => ({ d, t: t2 })) : [],
+      isCompany: !!co && v.t === 'co' && !q, folderCount: folders.length, folders,
+      addFolderOpen: s.addOpen, toggleAddFolder: e => { e.stopPropagation(); this.setState(p => ({ addOpen: !p.addOpen, menu: null, newOpen: false })); },
+      typeChoices, newType: s.newType, onNewType: e => this.setState({ newType: e.target.value }),
+      typeColors: TYPE_COLORS.map((c, i) => ({ c, ring: ring(s.newTypeColor === i), onClick: () => this.setState({ newTypeColor: i }) })),
+      ntCursor: s.newType.trim() ? 'pointer' : 'not-allowed', ntOp: s.newType.trim() ? 1 : 0.4,
+      createType: () => { const n = s.newType.trim(); if (!n) return; if (!s.types.some(x => x[0].toLowerCase() === n.toLowerCase())) this.setState(p => ({ types: [...p.types, [n, TYPE_COLORS[p.newTypeColor]]] }), () => this.addFolder(n)); else this.addFolder(s.types.find(x => x[0].toLowerCase() === n.toLowerCase())[0]); this.flash(`New folder type "${n}" saved for every subsidiary`); },
+      onNewTypeKey: e => { if (e.key === 'Enter') e.target.blur(); },
+      showFiles: v.t !== 'dust', files: files.map(deco), noFiles: v.t !== 'dust' && files.length === 0, emptyText: v.t === 'folder' ? 'This folder is empty. Upload the first file.' : 'No files match.',
+      filesTitle, canUpload: v.t === 'folder' && !picker,
+      isDustbin: v.t === 'dust', trash, trashEmpty: s.trash.length === 0,
+      closeMenus: () => (s.menu || s.newOpen || s.addOpen) && this.setState({ menu: null, newOpen: false, addOpen: false }),
+      stop: e => e.stopPropagation(),
+      hasModal: !!s.modal, modalTitle, modalSub, modalW, hasModalFoot: hasFoot, modalOkLabel: okLabel, modalOk: ok,
+      closeModal: () => this.setState({ modal: null }),
+      mMove: s.modal === 'move', mShare: s.modal === 'share', mAttach: s.modal === 'attach', mEdit: s.modal === 'edit',
+      moveTargets,
+      shareUrl: t ? `houzs.link/lib/${(t.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)}` : '',
+      copyLabel: s.copied ? 'Copied ✓' : 'Copy', copyShare: () => { navigator.clipboard && navigator.clipboard.writeText('https://' + (t ? `houzs.link/lib/${t.id}` : '')).catch(() => {}); this.setState({ copied: true }); },
+      expiries: ['24 hours', '7 days', '30 days', 'Never'].map(label => ({ label, ...chip(s.expiry === label), onClick: () => this.setState({ expiry: label }) })),
+      dlTrack: s.dl ? 'rgb(51 36 27)' : 'rgb(214 206 196)', dlKnob: s.dl ? 14 : 2, toggleDl: () => this.setState(p => ({ dl: !p.dl })),
+      attachTasks: TASKS.map(([id, title, stage]) => ({ id, title, stage: `Now at ${stage}`, onClick: () => { this.setState({ modal: null }); this.flash(`Attached "${t.name}" to ${id}`); } })),
+      ed, onEdName: e => updEd({ name: e.target.value }), onEdCaption: e => updEd({ caption: e.target.value }),
+      avColors: AVC.map(c => ({ c, ring: ring(s.edit && !s.edit.avatarImg && s.edit.color === c), onClick: () => updEd({ color: c, avatarImg: false }) })),
+      bgColors: BGC.map(c => ({ c, ring: ring(s.edit && !s.edit.bannerImg && s.edit.banner === c), onClick: () => updEd({ banner: c, bannerImg: false }) })),
+      uploadAvatar: () => updEd({ avatarImg: !s.edit.avatarImg }), avatarBtn: s.edit && s.edit.avatarImg ? '✓ logo.png · remove' : '⬆ Upload logo',
+      uploadBg: () => updEd({ bannerImg: !s.edit.bannerImg }), bgBtn: s.edit && s.edit.bannerImg ? '✓ cover.jpg · remove' : '⬆ Upload cover',
+      fontOpts: Object.keys(FONTS).map(name => ({ name, family: FONTS[name], sample: s.edit ? s.edit.name : 'Aa', border: s.edit && s.edit.font === name ? 'rgb(90 62 43)' : 'rgb(236 231 224)', bg: s.edit && s.edit.font === name ? 'rgb(250 248 244)' : '#fff', onClick: () => updEd({ font: name }) })),
+      pickedChips: pickedNames.slice(0, 3).concat(pickedNames.length > 3 ? [`+${pickedNames.length - 3} more`] : []),
+      pickLabel: s.picked.length ? `Attach ${s.picked.length} file${s.picked.length > 1 ? 's' : ''}` : 'Attach', pickCursor: s.picked.length ? 'pointer' : 'not-allowed', pickOp: s.picked.length ? 1 : 0.4,
+      pickCancel: () => this.props.onClose && this.props.onClose(),
+      pickDone: () => { if (!s.picked.length) return; const out = s.picked.map(id => { const f = s.files.find(x => x.id === id); const fol = s.folders.find(x => x.id === f.folder); return { name: f.name, ext: f.ext, from: `${this.coOf(f.co).name} / ${fol ? fol.name : ''}` }; }); this.props.onPick && this.props.onPick(out); },
+      hasToast: !!s.toast, toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

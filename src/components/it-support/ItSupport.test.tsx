@@ -186,8 +186,11 @@ describe('shared white IT support', () => {
     const request = row({ files: [picture] })
     render(<ItSupport app="finance" initialRequests={[request]} initialRequest={request} initialFileUrls={{ 'file-1': 'https://example.invalid/shot.png' }} />)
     const dialog = await screen.findByRole('dialog', { name: request.title })
+    expect(api.sign).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Annotate shot.png' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Save marked copy' }))
+    // The page's preloaded link may have run out (ten minutes): a fresh one is made at the press (2026-10-24).
+    expect(api.sign).toHaveBeenCalledExactlyOnceWith(['file-1'])
     await waitFor(() => expect(api.upload).toHaveBeenCalledOnce())
     expect(api.upload.mock.calls[0][0].name).toBe('shot-marked.png')
     expect(api.note).not.toHaveBeenCalled()
@@ -207,5 +210,99 @@ describe('shared white IT support', () => {
     expect(within(dialog).getByRole('button', { name: 'Remove shot.png' })).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Remove shot-marked.png' })).toBeInTheDocument()
     expect(api.submit).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-10-24 — the user: "drag 那个 file 移过来，放空在这个 text blank space 的时候，它要能够直接 attach"; and of a filed
+// file's Open: "我不要它跳到另外一个 screen … 直接在这个 floating window 的右边出现一个 preview".
+describe('files dragged in, and filed files opened beside the window', () => {
+  const dragged = (files: File[] = [png()]) => ({ dataTransfer: { files, types: ['Files'] } })
+
+  it('a file dropped on the note attaches as if picked — the box says so while it is over it', async () => {
+    const request = row({ mine: false })
+    render(<ItSupport app="portal" desk canEdit initialRequests={[request]} initialRequest={request} />)
+    const dialog = await screen.findByRole('dialog', { name: request.title })
+    const note = within(dialog).getByRole('textbox', { name: 'Your note' })
+    fireEvent.dragEnter(note, dragged())
+    expect(within(dialog).getByText('Drop to attach')).toBeInTheDocument()
+    // Taken here — the browser would otherwise open the file in place of the page.
+    expect(fireEvent.dragOver(note, dragged())).toBe(false)
+    fireEvent.drop(note, dragged())
+    await within(dialog).findByText('1 KB')
+    expect(api.upload).toHaveBeenCalledOnce()
+    expect(within(dialog).queryByText('Drop to attach')).toBeNull()
+    expect(within(dialog).getByRole('button', { name: 'Remove shot.png' })).toBeInTheDocument()
+    expect(api.note).not.toHaveBeenCalled()
+  })
+
+  it('leaves a text drag to the browser; a file dropped beside the note is neither attached nor opened', async () => {
+    const request = row()
+    render(<ItSupport app="hr" initialRequests={[request]} initialRequest={request} />)
+    const dialog = await screen.findByRole('dialog', { name: request.title })
+    const note = within(dialog).getByRole('textbox', { name: 'Your reply' })
+    expect(fireEvent.dragOver(note, { dataTransfer: { files: [], types: ['text/plain'] } })).toBe(true)
+    expect(within(dialog).queryByText('Drop to attach')).toBeNull()
+    const details = within(dialog).getByText('After opening the app.')
+    expect(fireEvent.dragOver(details, dragged())).toBe(false)
+    expect(fireEvent.drop(details, dragged())).toBe(false)
+    await act(async () => {})
+    expect(api.upload).not.toHaveBeenCalled()
+  })
+
+  it('a file dropped on the new request attaches; leaving clears the box', async () => {
+    render(<ItSupport app="finance" initialRequests={[]} />)
+    const dialog = await createForm()
+    const details = within(dialog).getByRole('textbox', { name: 'Details' })
+    fireEvent.dragEnter(details, dragged())
+    expect(within(dialog).getByText('Drop to attach')).toBeInTheDocument()
+    fireEvent.dragLeave(details, dragged())
+    expect(within(dialog).queryByText('Drop to attach')).toBeNull()
+    fireEvent.drop(details, dragged())
+    await within(dialog).findByText('1 KB')
+    expect(api.upload).toHaveBeenCalledOnce()
+    expect(api.submit).not.toHaveBeenCalled()
+  })
+
+  it('opens a filed picture beside the window from its own link, never a new tab — Esc closes the preview first', async () => {
+    const request = row({ files: [picture] })
+    const tab = vi.spyOn(window, 'open')
+    render(<ItSupport app="portal" desk canEdit initialRequests={[request]} initialRequest={request} initialFileUrls={{ 'file-1': 'https://example.invalid/shot.png' }} />)
+    const dialog = await screen.findByRole('dialog', { name: request.title })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Open shot.png' }))
+    const preview = within(dialog).getByRole('region', { name: 'Preview · shot.png' })
+    expect(within(preview).getByRole('img', { name: 'shot.png' })).toHaveAttribute('src', 'https://example.invalid/shot.png')
+    expect(dialog).toHaveAttribute('data-aside')
+    expect(within(dialog).getByRole('button', { name: 'Open shot.png' })).toHaveAttribute('aria-current', 'true')
+    expect(tab).not.toHaveBeenCalled()
+    expect(api.open).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(within(dialog).queryByRole('region', { name: /^Preview/ })).toBeNull()
+    expect(screen.getByRole('dialog', { name: request.title })).not.toHaveAttribute('data-aside')
+  })
+
+  it('a PDF in place from a link made at the tap; a file no browser draws says so and downloads', async () => {
+    const pdf = { ...picture, id: 'file-2', name: 'invoice.pdf', contentType: 'application/pdf', size: 2048 }
+    const sheet = { ...picture, id: 'file-3', name: 'costs.xlsx', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 4096 }
+    api.open.mockImplementation(async (id: string, mode: string) => ({
+      ok: true, data: { url: mode === 'view' ? 'data:application/pdf;base64,JVBERi0xLjQK' : `https://example.invalid/${id}?download`, fileName: 'costs.xlsx' },
+    }))
+    const request = row({ files: [pdf, sheet] })
+    render(<ItSupport app="finance" initialRequests={[request]} initialRequest={request} initialFileUrls={{}} />)
+    const dialog = await screen.findByRole('dialog', { name: request.title })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Open invoice.pdf' }))
+    const preview = within(dialog).getByRole('region', { name: 'Preview · invoice.pdf' })
+    await waitFor(() => expect(preview.querySelector('iframe')).toHaveAttribute('src', 'data:application/pdf;base64,JVBERi0xLjQK'))
+    expect(preview.querySelector('iframe')).not.toHaveAttribute('sandbox')
+    expect(api.open).toHaveBeenCalledExactlyOnceWith('file-2', 'view')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Open costs.xlsx' }))
+    const other = within(dialog).getByRole('region', { name: 'Preview · costs.xlsx' })
+    expect(within(other).getByText(/No preview for \.xlsx files\./)).toBeInTheDocument()
+    expect(api.open).not.toHaveBeenCalledWith('file-3', 'view')
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    fireEvent.click(within(other).getByRole('button', { name: 'Download' }))
+    await waitFor(() => expect(click).toHaveBeenCalledOnce())
+    expect(api.open).toHaveBeenCalledWith('file-3', 'download')
+    fireEvent.click(within(other).getByRole('button', { name: 'Close preview' }))
+    expect(within(dialog).queryByRole('region', { name: /^Preview/ })).toBeNull()
   })
 })

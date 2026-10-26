@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="./hm-store.js"></script>
+<style>@keyframes ntIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div style="color:rgb(51 36 27)">
+  <sc-if value="{{ missing }}"><div style="padding:60px;text-align:center;color:rgb(117 100 86)">This task is no longer available. Reload the prototype and create it again.</div></sc-if>
+  <sc-if value="{{ ok }}" hint-placeholder-val="{{ true }}">
+  <div style="padding:18px 32px 0;background:#fff;border-bottom:1px solid rgb(236 231 224)">
+    <div style="display:flex;align-items:center;gap:10px;font-size:0.92em;color:rgb(117 100 86)">
+      <span onClick="{{ back }}" style="cursor:pointer;color:rgb(74 64 58)" style-hover="text-decoration:underline">← Back</span><span>/</span><span>{{ t.sub }}</span><span>/</span><span>{{ t.title }}</span>
+      <span style="flex:1"></span>
+      <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;border:1px solid rgb(229 222 211);border-radius:6px;padding:4px 8px">{{ versionLabel }}</span>
+    </div>
+    <div style="display:flex;align-items:flex-start;gap:24px;margin-top:16px">
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:12px;color:rgb(74 64 58)">{{ t.topLeft }}</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:0.85em;font-weight:500;padding:3px 9px;border-radius:999px;background:{{ st.bg }};color:{{ st.fg }};border:1px solid {{ st.border }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ st.dot }}"></span>{{ statusLabel }}</span></div>
+        <div style="font-size:1.9em;font-weight:600;letter-spacing:-0.01em;margin-top:6px">{{ t.title }}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding-top:4px">
+        <div style="display:flex;gap:8px">
+          <sc-for list="{{ actions }}" as="a" hint-placeholder-count="1"><div onClick="{{ a.onClick }}" style="height:36px;padding:0 16px;border-radius:8px;display:flex;align-items:center;font-weight:500;white-space:nowrap;cursor:{{ a.cursor }};opacity:{{ a.op }};background:{{ a.bg }};color:{{ a.fg }};border:1px solid {{ a.border }}">{{ a.label }}</div></sc-for>
+        </div>
+        <span style="font-size:0.85em;color:{{ noteFg }}">{{ note }}</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;margin-top:18px;padding:14px 0;border-top:1px solid rgb(244 241 236)">
+      <sc-for list="{{ meta }}" as="m" hint-placeholder-count="5"><div><div style="font-size:0.75em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">{{ m.k }}</div><div style="margin-top:6px;font-size:0.96em">{{ m.v }}</div></div></sc-for>
+    </div>
+    <div style="display:flex;padding:16px 0 18px;border-top:1px solid rgb(244 241 236)">
+      <sc-for list="{{ stages }}" as="s" hint-placeholder-count="4">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center">
+            <div style="width:32px;height:32px;flex:none;border-radius:50%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;background:{{ s.bg }};color:{{ s.fg }};border:{{ s.border }};box-shadow:{{ s.ring }}">{{ s.mark }}</div>
+            <div style="flex:1;height:2px;margin:0 8px;background:{{ s.line }};opacity:{{ s.lineOp }}"></div>
+          </div>
+          <div style="padding-right:12px"><div style="font-size:0.94em;font-weight:{{ s.weight }}">{{ s.name }}</div><div style="font-size:0.86em;color:rgb(74 64 58);margin-top:2px">{{ s.who }}</div><div style="font-size:0.78em;color:rgb(117 100 86);margin-top:3px">{{ s.appr }} · due {{ s.due }}</div></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ hasBanner }}">
+    <div style="margin:16px 32px 0;padding:11px 14px;border-radius:10px;background:{{ bn.bg }};border:1px solid {{ bn.border }};color:{{ bn.fg }};font-size:0.92em;line-height:1.5;animation:ntIn .25s ease-out">{{ bn.text }}</div>
+  </sc-if>
+
+  <div style="max-width:1040px;margin:0 auto;padding:24px 32px 80px;display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:24px;align-items:start">
+    <div style="display:flex;flex-direction:column;gap:26px;min-width:0">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:18px">📋</span><span style="font-size:1.2em;font-weight:600">Requirements</span><span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:rgb(246 244 240);border:1px solid rgb(236 231 224)">🔒 Locked<sc-if value="{{ notQuick }}" hint-placeholder-val="{{ true }}"> · 👁 PIC</sc-if></span></div>
+        <div style="background:rgb(245 244 241);border-radius:10px;padding:12px 16px;color:rgb(74 64 58);font-size:0.94em;line-height:1.6">
+          <div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);margin-bottom:4px">{{ reqSource }}</div>
+          <div style="white-space:pre-wrap">{{ reqText }}</div>
+        </div>
+      </div>
+
+      <sc-if value="{{ notQuick }}" hint-placeholder-val="{{ true }}"><div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:18px">🗓️</span><span style="font-size:1.2em;font-weight:600">Monthly content plan</span>
+          <span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:{{ planBadgeBg }};color:{{ planBadgeFg }};border:1px solid rgb(236 231 224)">{{ planBadge }}</span>
+          <span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:rgb(246 244 240);border:1px solid rgb(236 231 224)">👁 PIC · 📅 on calendar</span></div>
+        <div style="border:1px solid rgb(236 231 224);border-radius:10px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:96px 150px 92px minmax(0,1fr) minmax(0,1.3fr);background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224);font-size:0.8em;font-weight:600">
+            <span style="padding:8px 10px">Posting</span><span style="padding:8px 10px">Pillar</span><span style="padding:8px 10px">Type</span><span style="padding:8px 10px">Topic</span><span style="padding:8px 10px">Caption</span>
+          </div>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:96px 150px 92px minmax(0,1fr) minmax(0,1.3fr);border-bottom:1px solid rgb(244 241 236);background:{{ planCell }}">
+              <span style="padding:8px 10px;font-family:'Chivo Mono',Menlo,monospace;font-size:11px">{{ r.date }}</span>
+              <span style="padding:8px 10px;font-size:0.86em">{{ r.pillar }}</span>
+              <span style="padding:8px 10px;font-size:0.86em">{{ r.type }}</span>
+              <input value="{{ r.topic }}" onChange="{{ r.onTopic }}" disabled="{{ planLocked }}" placeholder="Topic…" style="border:0;border-left:1px solid rgb(244 241 236);padding:8px 10px;font:inherit;font-size:0.88em;outline:none;background:transparent;color:rgb(51 36 27);min-width:0">
+              <input value="{{ r.caption }}" onChange="{{ r.onCaption }}" disabled="{{ capLocked }}" placeholder="{{ capPh }}" style="border:0;border-left:1px solid rgb(244 241 236);padding:8px 10px;font:inherit;font-size:0.88em;outline:none;background:transparent;color:rgb(51 36 27);min-width:0">
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ canFill }}"><span onClick="{{ fillSample }}" style="display:inline-block;margin-top:8px;font-size:0.84em;color:rgb(117 100 86);cursor:pointer;text-decoration:underline;text-underline-offset:2px">Prototype: fill sample topics</span></sc-if>
+      </div></sc-if>
+      <sc-if value="{{ isQuick }}">
+        <sc-for list="{{ qWork }}" as="w" hint-placeholder-count="1">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:18px">🎯</span><span style="font-size:1.2em;font-weight:600">Stage {{ w.n }} · {{ w.name }}</span>
+              <span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:{{ w.badgeBg }};color:{{ w.badgeFg }};border:1px solid rgb(236 231 224)">{{ w.badge }}</span></div>
+            <div style="border:1px solid rgb(236 231 224);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;background:{{ w.cell }}">
+              <sc-for list="{{ w.fields }}" as="f" hint-placeholder-count="0">
+                <div style="display:flex;flex-direction:column;gap:6px">
+                  <sc-if value="{{ f.isNote }}"><div style="font-size:0.9em;font-style:italic;color:rgb(90 62 43);background:rgb(251 247 238);border-radius:7px;padding:8px 10px">{{ f.label }}</div></sc-if>
+                  <sc-if value="{{ f.notNote }}"><span style="font-size:0.88em;font-weight:500">{{ f.label }} <span style="font-weight:400;color:rgb(117 100 86)">· {{ f.type }}</span></span></sc-if>
+                  <sc-if value="{{ f.isInput }}"><input type="{{ f.inputType }}" value="{{ f.value }}" onChange="{{ f.onChange }}" disabled="{{ w.locked }}" placeholder="{{ w.fph }}" style="height:36px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;font-size:0.94em;outline:none;background:#fff;color:rgb(51 36 27);max-width:420px"></sc-if>
+                  <sc-if value="{{ f.isFile }}"><div style="display:flex;gap:8px;align-items:center"><sc-if value="{{ f.hasFile }}"><span style="height:32px;padding:0 10px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;gap:6px;font-size:0.86em">📎 {{ f.value }}</span></sc-if><sc-if value="{{ f.canUpload }}"><span onClick="{{ f.onUpload }}" style="height:32px;padding:0 12px;border-radius:7px;border:1.5px dashed rgb(214 206 196);display:flex;align-items:center;font-size:0.86em;cursor:pointer;color:rgb(117 100 86)">+ Upload</span></sc-if></div></sc-if>
+                  <sc-if value="{{ f.isCheck }}"><span onClick="{{ f.onToggle }}" style="width:18px;height:18px;border-radius:4px;box-sizing:border-box;border:1.5px solid {{ f.box }};background:{{ f.fill }};color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer">{{ f.tick }}</span></sc-if>
+                  <sc-if value="{{ f.isTable }}"><span style="font-size:0.86em;color:rgb(117 100 86)">▤ {{ f.cols }}</span></sc-if>
+                </div>
+              </sc-for>
+              <sc-if value="{{ w.noFields }}"><div style="display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">What you did</span>
+                <textarea value="{{ w.notes }}" onChange="{{ w.onNotes }}" disabled="{{ w.locked }}" rows="3" placeholder="{{ w.ph }}" style="box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:8px 10px;font:inherit;font-size:0.94em;outline:none;background:#fff;color:rgb(51 36 27);resize:vertical;line-height:1.5"></textarea></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:0.88em;font-weight:500">Files</span>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <sc-for list="{{ w.files }}" as="f" hint-placeholder-count="0"><span style="height:32px;padding:0 10px;border-radius:7px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;gap:6px;font-size:0.86em">📎 {{ f.n }}</span></sc-for>
+                  <sc-if value="{{ w.canUpload }}"><span onClick="{{ w.upload }}" style="height:32px;padding:0 12px;border-radius:7px;border:1.5px dashed rgb(214 206 196);display:flex;align-items:center;font-size:0.86em;cursor:pointer;color:rgb(117 100 86)" style-hover="border-color:rgb(150 136 120);color:rgb(51 36 27)">+ Upload</span></sc-if>
+                  <sc-if value="{{ w.noFiles }}"><span style="font-size:0.86em;color:rgb(140 130 120);align-self:center">No files</span></sc-if>
+                </div></div>
+              </div></sc-if>
+            </div>
+          </div>
+        </sc-for>
+      </sc-if>
+
+      <sc-if value="{{ showGraphics }}">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap"><span style="font-size:18px">🎨</span><span style="font-size:1.2em;font-weight:600">Graphics</span><span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:{{ gBadgeBg }};color:{{ gBadgeFg }};border:1px solid rgb(236 231 224)">{{ gBadge }}</span><span style="flex:1"></span>
+            <sc-if value="{{ canDesign }}"><span onClick="{{ uploadAll }}" style="height:28px;padding:0 10px;border-radius:7px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-size:0.84em;cursor:pointer">⬆ Upload all</span></sc-if></div>
+          <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px">
+            <sc-for list="{{ graphics }}" as="g" hint-placeholder-count="6">
+              <div onClick="{{ g.onClick }}" style="aspect-ratio:4 / 5;border-radius:8px;border:1.5px {{ g.bstyle }} {{ g.bcolor }};background:{{ g.bg }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:{{ g.cursor }};font-size:0.76em;color:rgb(90 78 68);text-align:center;padding:4px;box-sizing:border-box">
+                <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px">{{ g.date }}</span><span>{{ g.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showSchedule }}">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:18px">📲</span><span style="font-size:1.2em;font-weight:600">Schedule & post</span><span style="font-size:0.75em;padding:2px 7px;border-radius:6px;background:rgb(246 244 240);border:1px solid rgb(236 231 224)">Facebook + Instagram</span></div>
+          <div style="border:1px solid rgb(236 231 224);border-radius:10px;overflow:hidden">
+            <sc-for list="{{ sched }}" as="r" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:96px minmax(0,1fr) 130px auto;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid rgb(244 241 236)">
+                <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px">{{ r.date }}</span>
+                <span style="font-size:0.9em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><strong style="font-weight:500">{{ r.topic }}</strong> <span style="color:rgb(117 100 86)">· {{ r.type }}</span></span>
+                <span style="display:flex"><span style="display:flex;align-items:center;gap:6px;font-size:0.82em;font-weight:500;padding:2px 8px;border-radius:999px;background:{{ r.stBg }};color:{{ r.stFg }};border:1px solid {{ r.stBorder }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.dot }}"></span>{{ r.stLabel }}</span></span>
+                <div style="display:flex;gap:6px;justify-content:flex-end">
+                  <sc-if value="{{ r.canAct }}"><span onClick="{{ r.onPost }}" style="height:28px;padding:0 10px;border-radius:7px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-size:0.82em;cursor:pointer">Post now</span><span onClick="{{ r.onSchedule }}" style="height:28px;padding:0 10px;border-radius:7px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-size:0.82em;cursor:pointer">Schedule</span></sc-if>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showBoost }}">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:18px">📣</span><span style="font-size:1.2em;font-weight:600">Ads boost</span></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px;border-radius:10px;border:1px solid rgb(236 231 224)">
+            <span style="font-size:0.9em">Boost the two Reels with</span>
+            <sc-for list="{{ budgets }}" as="b" hint-placeholder-count="3"><span onClick="{{ b.onClick }}" style="height:30px;padding:0 12px;border-radius:7px;display:flex;align-items:center;font-size:0.86em;cursor:{{ b.cursor }};border:1px solid {{ b.border }};background:{{ b.bg }};color:{{ b.fg }}">{{ b.label }}</span></sc-for>
+          </div>
+        </div>
+      </sc-if>
+      <div style="display:flex;align-items:center;gap:12px"><div style="flex:1;height:1px;background:rgb(229 222 211)"></div><span style="font-size:0.81em;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgb(117 100 86)">Free space</span><div style="flex:1;height:1px;background:rgb(229 222 211)"></div></div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-top:-14px">
+        <sc-if value="{{ freeEmpty }}"><div style="font-size:0.9em;color:rgb(140 130 120);padding:4px 0">Anything extra for this task: notes, links, checklists. Everyone on the task can see and add to it.</div></sc-if>
+        <sc-for list="{{ freeBlocks }}" as="k" hint-placeholder-count="0">
+          <div style="display:flex;gap:8px;align-items:flex-start" style-hover="background:rgb(252 251 249)">
+            <div style="flex:1;min-width:0">
+              <sc-if value="{{ k.isHeading }}"><input value="{{ k.text }}" onChange="{{ k.onText }}" placeholder="Heading" style="width:100%;box-sizing:border-box;border:0;outline:none;background:transparent;font:inherit;font-size:1.25em;font-weight:600;color:rgb(51 36 27);padding:4px 0"></sc-if>
+              <sc-if value="{{ k.isText }}"><textarea value="{{ k.text }}" onChange="{{ k.onText }}" rows="2" placeholder="Write something…" style="width:100%;box-sizing:border-box;border:0;outline:none;background:transparent;font:inherit;font-size:0.96em;line-height:1.6;color:rgb(51 36 27);padding:3px 0;resize:vertical"></textarea></sc-if>
+              <sc-if value="{{ k.isCheck }}"><div style="display:flex;align-items:center;gap:10px;padding:3px 0"><span onClick="{{ k.onToggle }}" style="width:16px;height:16px;flex:none;border-radius:4px;box-sizing:border-box;border:1.5px solid {{ k.box }};background:{{ k.fill }};color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer">{{ k.tick }}</span><input value="{{ k.text }}" onChange="{{ k.onText }}" placeholder="To-do" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:0.96em;color:{{ k.fg }};text-decoration:{{ k.deco }}"></div></sc-if>
+              <sc-if value="{{ k.isDivider }}"><div style="height:1px;background:rgb(229 222 211);margin:12px 0"></div></sc-if>
+            </div>
+            <span onClick="{{ k.onRemove }}" title="Remove" style="width:22px;height:22px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(170 160 150);font-size:12px;margin-top:4px" style-hover="background:rgb(241 236 228);color:rgb(51 36 27)">✕</span>
+          </div>
+        </sc-for>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <sc-for list="{{ freeAdds }}" as="a" hint-placeholder-count="4"><span onClick="{{ a.onClick }}" style="height:28px;padding:0 10px;border-radius:7px;border:1px solid rgb(229 222 211);display:flex;align-items:center;gap:6px;font-size:0.84em;cursor:pointer;color:rgb(74 64 58);background:#fff" style-hover="border-color:rgb(150 136 120);color:rgb(51 36 27)">{{ a.label }}</span></sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="position:sticky;top:12px;border:1px solid rgb(236 231 224);border-radius:12px;background:#fff;padding:12px 14px">
+      <div style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86);margin-bottom:6px">Audit trail</div>
+      <sc-for list="{{ history }}" as="h" hint-placeholder-count="3">
+        <div style="padding:7px 0;border-top:1px solid rgb(246 244 240);font-size:0.82em;line-height:1.45"><div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86)">{{ h.t }}</div>{{ h.text }}</div>
+      </sc-for>
+    </div>
+  </div>
+
+  <sc-if value="{{ modal }}">
+    <div onClick="{{ closeModal }}" style="position:fixed;inset:0;z-index:200;background:rgb(51 36 27 / 0.35);display:flex;align-items:center;justify-content:center">
+      <div onClick="{{ stop }}" style="width:440px;background:#fff;border-radius:14px;padding:22px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px;font-size:13px;box-shadow:0 24px 60px rgb(51 36 27 / 0.25);animation:ntIn .2s ease-out">
+        <div><div style="font-size:17px;font-weight:600">{{ mTitle }}</div><div style="font-size:12.5px;color:rgb(117 100 86);margin-top:4px">{{ mSub }}</div></div>
+        <sc-if value="{{ mPick }}">
+          <div style="padding:10px 12px;border-radius:8px;background:rgb(246 244 240);font-size:12.5px;line-height:1.5">Next stage <strong style="font-weight:600">{{ nextName }}</strong> is 🔓 Previous stage picks. Choose who does it.</div>
+          <sc-for list="{{ cands }}" as="c" hint-placeholder-count="3">
+            <div onClick="{{ c.onClick }}" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:1px solid {{ c.border }};background:{{ c.bg }};cursor:pointer">
+              <span style="width:15px;height:15px;border-radius:50%;box-sizing:border-box;border:{{ c.radio }}"></span>
+              <span style="font-weight:500">{{ c.name }}</span><span style="color:rgb(117 100 86)">· {{ c.load }} active</span>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{ mReason }}">
+          <textarea value="{{ reason }}" onChange="{{ onReason }}" placeholder="What should change? (required)" style="min-height:80px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:8px 10px;font:inherit;resize:vertical;outline:none"></textarea>
+        </sc-if>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <span onClick="{{ closeModal }}" style="height:34px;padding:0 14px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;cursor:pointer">Cancel</span>
+          <span onClick="{{ mOk }}" style="height:34px;padding:0 14px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:500;cursor:{{ mCursor }};opacity:{{ mOp }}">{{ mOkLabel }}</span>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ hasToast }}"><div style="position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px">{{ toast }}</div></sc-if>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:1300},&quot;taskId&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;viewer&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Jason&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;onBack&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;() =&gt; void&quot;}}">
+const ST = {
+  draft: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(160 154 146)' },
+  waiting: { bg: 'rgb(251 243 225)', border: 'rgb(236 214 164)', fg: 'rgb(138 92 10)', dot: 'rgb(214 152 30)' },
+  done: { bg: 'rgb(232 244 235)', border: 'rgb(190 222 199)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)' },
+  red: { bg: 'rgb(252 236 233)', border: 'rgb(236 190 184)', fg: 'rgb(176 40 34)', dot: 'rgb(200 52 42)' },
+};
+const LOAD = { Siti: 4, Aina: 2, Hafiz: 3, Ali: 3, 'Ah Kit': 2, Jason: 5 };
+const SAMPLE = [['11.11 Rental Deal is live', 'Rent your dream sofa from RM 3/day. 11.11 only! 🛋️'], ['3 ways to style a small living room', 'Small space, big comfort. Save this for later 💡'], ['Showroom Weekends: behind the scenes', 'Come say hi at Carres KJ this weekend ✨'], ['New velvet collection', 'Soft, deep, and made for slow Sundays.'], ['Customer home: Cheras', '"Best decision for our first home" — Amira 🤍'], ['Year-end teaser', 'Something big is coming in December 👀']];
+const hs = () => window.__hmStore;
+
+class Component extends DCLogic {
+  state = { modal: null, pick: null, reason: '', toast: '', budget: null };
+  componentDidMount() { this._u = () => this.forceUpdate(); const go = () => { if (hs()) hs().subs.add(this._u); else setTimeout(go, 50); }; go(); }
+  componentWillUnmount() { hs() && hs().subs.delete(this._u); clearTimeout(this._tt); }
+  flash(t) { this.setState({ toast: t }); clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast: '' }), 2600); }
+  renderVals() {
+    const S = hs(), id = this.props.taskId, me = this.props.viewer || 'Jason';
+    const t = S && S.get(id);
+    if (!t) return { ok: false, missing: !!S, t: {} };
+    const s = this.state, cur = t.stages[t.cur], kind = S.kind(cur), owner = S.owner(t), done = t.phase === 'done';
+    const amOwner = owner === me && !done, working = amOwner && (t.phase === 'accepted' || t.phase === 'changes');
+    const approver = S.approver(t), amApprover = t.phase === 'review' && approver === me;
+    const rows = t.rows;
+    const upd = (i, k, v) => S.upd(id, x => ({ rows: x.rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)) }));
+    // per-stage completion check
+    const filled = rows.filter(r => r.topic.trim()).length;
+    const gDone = t.graphics.filter(Boolean).length;
+    const captioned = rows.filter(r => r.caption.trim()).length;
+    const handled = rows.filter(r => r.posted || r.scheduled).length;
+    let ready = false, need = '';
+    if (kind === 'plan') { ready = filled >= rows.length; need = `Fill all topics (${filled}/${rows.length})`; }
+    if (kind === 'design') { ready = gDone === rows.length; need = `Upload all graphics (${gDone}/${rows.length})`; }
+    if (kind === 'schedule') { ready = captioned === rows.length && handled === rows.length; need = captioned < rows.length ? `Finish captions (${captioned}/${rows.length})` : `Post or schedule every post (${handled}/${rows.length})`; }
+    if (kind === 'boost') { ready = !!s.budget; need = 'Pick a boost budget'; }
+    const quick = !!t.quick, W = t.work || {}, cw = W[t.cur] || { notes: '', files: [] };
+    const cf = quick ? (cur.form || []).filter(f => f[1] !== 'Note' && f[1] !== 'Table') : [];
+    if (quick) { const vals = cw.vals || {}; const left = cf.filter(f => !String(vals[f[0]] ?? '').trim() || vals[f[0]] === false); ready = cf.length ? left.length === 0 : (!!(cw.notes || '').trim() || (cw.files || []).length > 0); need = cf.length ? `Fill in ${left.map(f => f[0]).join(', ')}` : 'Add a note or upload a file'; }
+    const hasAppr = (cur.apprRaw || []).length > 0;
+    const nextI = t.cur + 1, next = t.stages[nextI];
+    const needPick = next && next.picked && !(t.picks || {})[nextI];
+    const btn = (label, onClick, kindB = 'primary', disabled = false) => ({ label, onClick: disabled ? () => {} : onClick, cursor: disabled ? 'not-allowed' : 'pointer', op: disabled ? 0.45 : 1, bg: kindB === 'primary' ? '#EC9B55' : '#fff', fg: kindB === 'primary' ? 'rgb(43 31 23)' : kindB === 'danger' ? 'rgb(176 40 34)' : 'rgb(51 36 27)', border: kindB === 'primary' ? '#EC9B55' : kindB === 'danger' ? 'rgb(236 190 184)' : 'rgb(229 222 211)' });
+    const doSubmit = () => {
+      if (needPick) return this.setState({ modal: 'pick', pick: null });
+      const extra = kind === 'boost' ? { boost: s.budget } : {};
+      S.submit(id, extra);
+      this.flash(hasAppr ? `Submitted · sent to ${S.apprAt(t, 0)}` : next ? `Done · ${next.name} opens for ${S.owner({ ...t, cur: nextI }) || 'the next person'}` : 'Task complete 🎉');
+    };
+    const actions = [];
+    let note = '', noteFg = 'rgb(117 100 86)';
+    if (amOwner && t.phase === 'todo') { actions.push(btn('Accept', () => { S.accept(id); this.flash('Accepted — it’s yours'); })); note = 'New · just assigned to you'; }
+    if (working) { actions.push(btn(hasAppr ? 'Submit for approval' : 'Complete stage', doSubmit, 'primary', !ready)); note = ready ? 'Ready' : need; noteFg = ready ? 'rgb(117 100 86)' : 'rgb(176 40 34)'; }
+    if (amApprover) { actions.push(btn('Request changes', () => this.setState({ modal: 'reject', reason: '' }), 'danger')); actions.push(btn('Approve', () => { S.approve(id, me); this.flash(`Approved · ${next ? next.name + ' opens next' : 'done'}`); })); }
+    if (!actions.length) note = done ? 'All stages done' : t.phase === 'review' ? `Waiting for ${approver}` : `Now with ${owner || '—'}`;
+    // status
+    let stKey = 'waiting', statusLabel = `Stage ${t.cur + 1} · ${cur.name}`;
+    if (t.phase === 'todo') statusLabel = `Waiting for ${owner} to Accept`;
+    if (t.phase === 'accepted') statusLabel = `In progress · ${owner}`;
+    if (t.phase === 'review') statusLabel = `Waiting for ${approver}`;
+    if (t.phase === 'changes') { stKey = 'red'; statusLabel = 'Changes requested'; }
+    if (done) { stKey = 'done'; statusLabel = quick ? 'Done' : 'Done · posts live & scheduled'; }
+    const nowWith = done ? '—' : t.phase === 'review' ? approver : owner;
+    const stages = t.stages.map((x, i) => {
+      const isDone = i < t.cur || done, isCur = i === t.cur && !done;
+      const who = x.picked ? ((t.picks || {})[i] ? `${t.picks[i]} (picked)` : `🔓 picks from ${x.cands.join(' / ')}`) : x.who;
+      return { name: x.name, who, appr: (x.apprRaw || []).length ? x.apprRaw.map(a => a[1] === 'PIC' ? `🔗 ${t.pic}` : `👤 ${a[1]}`).join(' → ') : '— no approval', due: x.due,
+        mark: isDone ? '✓' : isCur ? ((owner || '?')[0]) : i + 1, weight: isCur ? 600 : 500,
+        bg: isDone ? ST.done.bg : isCur ? 'rgb(241 236 228)' : '#fff', fg: isDone ? ST.done.fg : 'rgb(51 36 27)',
+        border: isDone ? `1.5px solid ${ST.done.border}` : isCur ? '2px solid rgb(90 62 43)' : '1.5px dashed rgb(214 204 190)', ring: isCur ? '0 0 0 4px rgb(241 236 228)' : 'none',
+        line: isDone ? ST.done.dot : 'rgb(229 222 211)', lineOp: i === t.stages.length - 1 ? 0 : 1 };
+    });
+    let bn = null;
+    if (t.phase === 'changes' && t.changes) bn = { ...ST.red, text: `Changes requested by ${t.changes.by}: "${t.changes.reason}" — fix and resubmit.` };
+    else if (amOwner && t.phase === 'todo') bn = { ...ST.waiting, text: `You're up: ${cur.name}. Accept to start — due ${cur.due}.` };
+    else if (working && quick) bn = { ...ST.waiting, text: `Do the job, note what you changed or upload the file, then ${hasAppr ? 'submit for Rachel to review' : 'complete it'}.` };
+    else if (working) bn = { ...ST.waiting, text: { plan: 'Fill in a topic for every post, then Submit for approval. It goes to Kelvin (PIC) on the link.', design: 'Make one graphic per post and upload them, then Submit — Rachel approves.', schedule: 'Write the captions, then Post now or Schedule each post. Posts show on the Carres calendar.', boost: 'Pick a boost budget for the Reels and complete the task.' }[kind] || 'Do the work, then submit.' };
+    else if (amApprover) bn = { ...ST.waiting, text: `${owner} submitted ${cur.name} v${t.ver} for your approval.` };
+    else if (t.phase === 'review' && S.isPicTurn(t)) bn = { bg: 'rgb(246 244 240)', border: 'rgb(236 231 224)', fg: 'rgb(74 64 58)', text: `v${t.ver} is on Kelvin's tracking link. Switch "View as" to Kelvin · PIC link to approve it.` };
+    else if (done && quick) bn = { ...ST.done, text: `All ${t.stages.length} stages done.` };
+    else if (done) bn = { ...ST.done, text: 'All 4 stages done. Every post is posted or scheduled — see Carres → calendar.' };
+    const planEditable = working && kind === 'plan';
+    const capEditable = working && (kind === 'plan' || kind === 'schedule');
+    const designI = S.stageIdx(t, 'design'), schedI = S.stageIdx(t, 'schedule'), boostI = S.stageIdx(t, 'boost');
+    const radio = on => ({ border: on ? 'rgb(51 36 27)' : 'rgb(236 231 224)', bg: on ? 'rgb(250 248 244)' : '#fff', radio: on ? '5px solid rgb(51 36 27)' : '1.5px solid rgb(200 192 182)' });
+    let mTitle = '', mSub = '', mOk = () => {}, mOkLabel = '', mEnabled = true;
+    if (s.modal === 'pick') { mTitle = hasAppr ? 'Submit for approval' : 'Complete stage'; mSub = hasAppr ? `Goes to ${S.apprAt(t, 0)} · v${(t.ver || 0) + 1} saved automatically` : 'Hands over to the next stage'; mOkLabel = hasAppr ? `Submit v${(t.ver || 0) + 1}` : 'Complete'; mEnabled = !!s.pick;
+      mOk = () => { if (!s.pick) return; S.save(id, { picks: { ...(t.picks || {}), [nextI]: s.pick } }); this.setState({ modal: null }); setTimeout(() => { S.submit(id); this.flash(hasAppr ? `Submitted · ${s.pick} takes ${next.name} after approval` : `${next.name} opens for ${s.pick}`); }, 0); }; }
+    if (s.modal === 'reject') { mTitle = 'Request changes'; mSub = `${cur.name} v${t.ver} · back to ${owner}`; mOkLabel = 'Send back'; mEnabled = !!s.reason.trim(); mOk = () => { if (!s.reason.trim()) return; S.reject(id, me, s.reason.trim()); this.setState({ modal: null }); }; }
+    return {
+      ...(() => { const fb = t.free || [], setFb = fn => S.upd(id, x => ({ free: fn(x.free || []) })), mod = (bid, patch) => setFb(a => a.map(b => (b.id === bid ? { ...b, ...patch } : b)));
+        return { freeEmpty: !fb.length, freeBlocks: fb.map(b => ({ ...b, isHeading: b.type === 'heading', isText: b.type === 'text', isCheck: b.type === 'check', isDivider: b.type === 'divider',
+            onText: e => mod(b.id, { text: e.target.value }), onToggle: () => mod(b.id, { done: !b.done }), onRemove: () => setFb(a => a.filter(x => x.id !== b.id)),
+            box: b.done ? 'rgb(51 36 27)' : 'rgb(200 192 182)', fill: b.done ? 'rgb(51 36 27)' : '#fff', tick: b.done ? '✓' : '', fg: b.done ? 'rgb(140 130 120)' : 'rgb(51 36 27)', deco: b.done ? 'line-through' : 'none' })),
+          freeAdds: [['text', '+ Text'], ['heading', '+ Heading'], ['check', '+ Checklist'], ['divider', '+ Divider']].map(([type, label]) => ({ label, onClick: () => setFb(a => [...a, { id: Math.random().toString(36).slice(2, 8), type, text: '', done: false }]) })) }; })(),
+      ok: true, missing: false, t, back: () => this.props.onBack && this.props.onBack(),
+      versionLabel: t.ver ? `${cur.name} · v${t.ver}` : 'No version yet',
+      st: ST[stKey], statusLabel, actions, note, noteFg,
+      meta: quick ? [{ k: 'Subsidiary', v: t.sub }, { k: 'Owner', v: 'Rachel' }, { k: 'Now with', v: nowWith }, { k: 'Type', v: `⚡ Quick task · ${t.qType}` }, { k: 'Deadline', v: t.due }] : [{ k: 'Subsidiary', v: t.sub }, { k: 'Owner', v: 'Rachel' }, { k: 'Now with', v: nowWith }, { k: 'PIC', v: `${t.pic} · via link` }, { k: 'Deadline', v: t.due }],
+      isQuick: quick, notQuick: !quick,
+      reqSource: quick ? (t.minutes ? `FROM MEETING MINUTES · ${t.minutes.toUpperCase()} · RACHEL` : 'WHAT NEEDS TO BE DONE · FROM RACHEL')  : 'FROM MEETING MINUTES · KICKOFF · KELVIN, RACHEL',
+      reqText: quick ? (t.minutes ? (t.brief || `Recorded in the ${t.minutes} minutes for this task.`) : (t.brief || 'No extra details.')) : '• 4 image posts + 2 videos for November · push the 11.11 Rental Deal and Showroom Weekends · Facebook + Instagram',
+      qWork: quick ? t.stages.map((x, i) => ({ i, x })).filter(({ i }) => i <= t.cur || done).map(({ x, i }) => {
+        const w = W[i] || { notes: '', files: [] }, isCur = i === t.cur && !done, edit = isCur && working, fin = i < t.cur || done;
+        const save = patch => S.upd(id, tt => { const ww = tt.work || {}; return { work: { ...ww, [i]: { ...(ww[i] || { notes: '', files: [] }), ...patch } } }; });
+        return { n: i + 1, name: x.name, notes: w.notes, locked: !edit, cell: edit ? '#fff' : 'rgb(250 249 247)', ph: edit ? 'e.g. Updated price on the banner, exported 1080×1350' : '—',
+          badge: fin ? '✓ Done' : t.phase === 'review' && isCur ? 'In review' : `${x.who} · due ${x.due}`, badgeBg: fin ? ST.done.bg : 'rgb(246 244 240)', badgeFg: fin ? ST.done.fg : 'rgb(51 36 27)',
+          files: (w.files || []).map(n => ({ n })), canUpload: edit, noFiles: !(w.files || []).length && !edit,
+          fields: (x.form || []).map(([label, type, ex]) => { const vals = w.vals || {}, v = vals[label] ?? '', setV = val => save({ vals: { ...vals, [label]: val } });
+            return { label, type, isNote: type === 'Note', notNote: type !== 'Note', isTable: type === 'Table', isFile: type === 'File', isCheck: type === 'Checkbox',
+              isInput: ['Text', 'Number', 'Date', 'Person', 'Select', 'Multi-select'].includes(type), inputType: type === 'Number' ? 'number' : type === 'Date' ? 'date' : 'text',
+              value: v, onChange: e => setV(e.target.value), hasFile: !!v, canUpload: edit && !v, onUpload: () => setV(`${label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.png`),
+              box: v ? 'rgb(51 36 27)' : 'rgb(200 192 182)', fill: v ? 'rgb(51 36 27)' : '#fff', tick: v ? '✓' : '', onToggle: () => edit && setV(v ? '' : 'yes'),
+              cols: ex && ex.cols ? ex.cols.map(c => c[0]).join(' · ') : 'Table' }; }),
+          noFields: !(x.form || []).length, fph: edit ? 'Fill in…' : '—',
+          onNotes: e => save({ notes: e.target.value }), upload: () => save({ files: [...(w.files || []), `stage${i + 1}_${(w.files || []).length + 1}.png`] }) };
+      }).reverse() : [],
+      stages, hasBanner: !!bn, bn: bn || {},
+      planBadge: t.cur > 0 || done ? '✓ Approved by PIC' : '⭐ Required · 🎯 Stage 1', planBadgeBg: t.cur > 0 || done ? ST.done.bg : 'rgb(246 244 240)', planBadgeFg: t.cur > 0 || done ? ST.done.fg : 'rgb(51 36 27)',
+      planLocked: !planEditable, capLocked: !capEditable, capPh: capEditable ? 'Caption…' : '—', planCell: planEditable || capEditable ? '#fff' : 'rgb(250 249 247)',
+      canFill: planEditable || (working && kind === 'schedule' && captioned < rows.length),
+      fillSample: () => S.save(id, { rows: rows.map((r, i) => ({ ...r, topic: r.topic || SAMPLE[i][0], caption: kind === 'schedule' || r.caption ? (r.caption || SAMPLE[i][1]) : r.caption })) }),
+      rows: rows.map((r, i) => ({ ...r, onTopic: e => upd(i, 'topic', e.target.value), onCaption: e => upd(i, 'caption', e.target.value) })),
+      showGraphics: !quick && designI >= 0 && (t.cur >= designI || done), canDesign: working && kind === 'design',
+      gBadge: t.cur > designI || done ? '✓ Approved by Rachel' : `🎯 Stage ${designI + 1} · ${gDone}/${rows.length} uploaded`, gBadgeBg: t.cur > designI || done ? ST.done.bg : 'rgb(246 244 240)', gBadgeFg: t.cur > designI || done ? ST.done.fg : 'rgb(51 36 27)',
+      uploadAll: () => S.save(id, { graphics: rows.map(() => true) }),
+      graphics: rows.map((r, i) => { const up = t.graphics[i]; return { date: r.date.replace(/^\w+ /, ''), label: up ? `✓ ${r.type.toLowerCase()}_${i + 1}.png` : working && kind === 'design' ? '+ Upload' : 'Waiting', bg: up ? `repeating-linear-gradient(135deg, oklch(0.93 0.03 ${40 + i * 50}) 0 8px, rgb(252 250 247) 8px 16px)` : 'rgb(250 248 244)', bstyle: up ? 'solid' : 'dashed', bcolor: up ? 'rgb(214 204 190)' : 'rgb(220 212 202)', cursor: working && kind === 'design' ? 'pointer' : 'default', onClick: () => working && kind === 'design' && S.upd(id, tt => ({ graphics: tt.graphics.map((g, j) => (j === i ? !g : g)) })) }; }),
+      showSchedule: !quick && schedI >= 0 && (t.cur >= schedI || done),
+      sched: rows.map((r, i) => { const ps = S.postStatus(t, r), stv = ST[ps.st]; const can = working && kind === 'schedule' && !r.posted && !r.scheduled && !!r.caption.trim(); return { ...r, topic: r.topic || '(no topic)', stLabel: ps.label === 'Posted' ? `Posted · ${r.postedAt || ''}` : ps.label, stBg: stv.bg, stFg: stv.fg, stBorder: stv.border, dot: stv.dot, canAct: can,
+        onPost: () => { const at = S.stamp().slice(7); S.upd(id, tt => ({ rows: tt.rows.map((x, j) => (j === i ? { ...x, posted: true, postedAt: at } : x)) })); this.flash(`Posted to Facebook + Instagram · ${r.topic}`); },
+        onSchedule: () => { S.upd(id, tt => ({ rows: tt.rows.map((x, j) => (j === i ? { ...x, scheduled: true } : x)) })); this.flash(`Scheduled for ${r.date}`); } }; }),
+      showBoost: !quick && boostI >= 0 && (t.cur >= boostI || done),
+      budgets: ['RM 300', 'RM 500', 'RM 800'].map(label => { const on = (t.boost || s.budget) === label, can = working && kind === 'boost'; return { label, cursor: can ? 'pointer' : 'default', border: on ? 'rgb(51 36 27)' : 'rgb(229 222 211)', bg: on ? 'rgb(51 36 27)' : '#fff', fg: on ? '#fff' : 'rgb(51 36 27)', onClick: () => can && this.setState({ budget: label }) }; }),
+      history: [...(t.history || [])].reverse(),
+      modal: !!s.modal, mPick: s.modal === 'pick', mReason: s.modal === 'reject', mTitle, mSub, mOk, mOkLabel, mCursor: mEnabled ? 'pointer' : 'not-allowed', mOp: mEnabled ? 1 : 0.4,
+      nextName: next ? next.name : '', cands: (next && next.cands || []).map(n => ({ name: n, load: LOAD[n] || 2, ...radio(s.pick === n), onClick: () => this.setState({ pick: n }) })),
+      reason: s.reason, onReason: e => this.setState({ reason: e.target.value }),
+      closeModal: () => this.setState({ modal: null }), stop: e => e.stopPropagation(),
+      hasToast: !!s.toast, toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

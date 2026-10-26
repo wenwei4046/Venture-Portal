@@ -7,6 +7,7 @@ import fm from '@/components/finv/form.module.css'
 import { Select } from '@/components/hrv/select'
 import { baLimitWarning, baMissing, baTermsOf, type BaTermsFields } from '@/lib/ba'
 import { dayWords, f2 } from '@/lib/fin-app/page-model'
+import { stagedOnce } from '@/lib/storage/stage'
 import type { BankOption, BaRow, CompanyOption, LimitRow } from '@/app/(portal)/ba/_components/BaView'
 import { createBa, extractBaFromDocument, generateBaPv, setBaLimit, updateBa, uploadBaAttachment, type BaInput } from '@/app/(portal)/ba/actions'
 
@@ -148,6 +149,8 @@ export function BaFormSheet({
   const [borrowerName, setBorrowerName] = useState('')
   const [notes, setNotes] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  // Read, then kept on save: one staged copy of the bank's advice for both (lib/storage/stage.ts, 2026-10-23).
+  const [stage] = useState(() => stagedOnce())
   const fileRef = useRef<HTMLInputElement>(null)
   const [readNote, setReadNote] = useState<string | null>(null)
   const [reading, setReading] = useState(false)
@@ -181,8 +184,8 @@ export function BaFormSheet({
     setReadNote(null)
     setReading(true)
     const fd = new FormData()
-    fd.set('file', file)
     try {
+      fd.set('file', await stage(file))
       const r = await extractBaFromDocument(fd)
       if (r.error) return setError(r.error)
       const x = r.fields
@@ -239,8 +242,13 @@ export function BaFormSheet({
       if (!id) return setError('Saved, but the financing could not be found. Refresh the page.')
       if (file) {
         const fd = new FormData()
-        fd.set('file', file)
-        const up = await uploadBaAttachment(id, fd)
+        const up = await stage(file).then(
+          (line) => {
+            fd.set('file', line)
+            return uploadBaAttachment(id, fd)
+          },
+          (err: unknown) => ({ error: err instanceof Error ? err.message : 'the document could not be sent' }),
+        )
         if (up.error) {
           // Saved: say what did not go, and leave — saving again would make it twice.
           onDone(id, `Saved — the document did not upload: ${up.error}`)

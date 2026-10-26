@@ -1,6 +1,7 @@
 'use client'
 
 import { useId, useState, useTransition, type DragEvent } from 'react'
+import { stageInto } from '@/lib/storage/stage'
 import { uploadStatement } from '../actions'
 
 // The statement upload (2026-08-08). 2026-10-10 — the handoff draws it as the
@@ -35,9 +36,10 @@ export default function UploadStatementForm({
     const fd = new FormData()
     fd.set('bank_account_id', bankId)
     fd.set('period_month', month)
-    fd.set('file', file)
     startTransition(async () => {
       try {
+        // Sent ahead of the action (2026-10-23, lib/storage/stage.ts) — a statement past a body's 4 MB goes too.
+        await stageInto(fd, 'file', file)
         const r = await uploadStatement(fd)
         if (r?.error) setError(r.error)
       } catch (err) {

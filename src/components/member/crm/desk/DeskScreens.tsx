@@ -8,14 +8,16 @@
  * writes (PROPOSALS.md B1–B6) — each a database function that asks who may, as every CRM write does.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { crmWrite, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
-import { fetchCrmChannels, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
+import { crmWrite, fetchAdDaily, fetchAdInsights, fetchCrmHistory, saveCrmShowroomExtras } from "@/app/(member)/member/crm-actions";
+import { fetchCrmChannels, saveCrmBusinessProfile, saveCrmChannel, type MetaChannels } from "@/app/(member)/member/crm-channels-actions";
 import type { CrmData, CrmEvent, CrmForm, CrmNote, CrmPerson } from "@/lib/member/crm-data";
 import type { PanelActions } from "../panel/actions";
 import type { Team } from "../panel/vm/common";
 import DeskApp from "./DeskApp";
+import { DeskApplyAds } from "./DeskExtras";
 import R from "./desk-root.module.css";
 import { deskVM } from "./vm/app";
+import { titleData, titleName, titleTeams } from "./vm/names";
 import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type DeskUi } from "./vm/ctx";
 import { historyRows } from "./vm/history";
 import { useDeskPlace, withSavedPlace } from "./nav";
@@ -151,9 +153,35 @@ export default function DeskScreens(p: DeskScreensProps) {
         });
         return id;
       },
+      async addCustomer(name, phone, assign) {
+        const r = await call("crm_add_contact", { p_name: name, p_phone: phone, p_assign: assign });
+        if (!r) return false;
+        const id = live ? String(r.data ?? "") : `demo-${Date.now()}`;
+        if (!id) return false;
+        // Shown at once; the next read (≤ 5 s) brings the row as the database keeps it.
+        const d = phone.replace(/D/g, "").replace(/^0/, "60"), at = new Date().toISOString();
+        setData(x => (x.customers.some(c => c.id === id) ? x : { ...x, customers: [{ id, name: name.trim(), phone: `+${d}`, channel: "whatsapp", adId: null, ad: "", status: "new", wonAmount: null,
+          assignedTo: assign ?? me, teamId: null, lastCustomerAt: null, createdAt: at, unread: 0, details: { type: "", size: "", loc: "", req: "", budget: "" }, detailsSaved: false, messages: [] }, ...x.customers] }));
+        return id;
+      },
+      async setActiveForm(id) {
+        if (!(await call("crm_set_active_form", { p_id: id }))) return false;
+        setData(d => { const list = d.forms ?? []; const f = list.find(x => x.id === id); return f ? { ...d, forms: [f, ...list.filter(x => x.id !== id)] } : d; });
+        return true;
+      },
       async deleteForm(id) {
         if (!(await call("crm_delete_form", { p_id: id }))) return false;
         setData(d => ({ ...d, forms: (d.forms ?? []).filter(x => x.id !== id) }));
+        return true;
+      },
+      async saveRoomRemarks(roomId, remarks) {
+        if (!(await call("crm_save_showroom_remarks", { p_id: roomId, p_remarks: remarks }))) return false;
+        setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === roomId ? { ...r, remarks } : r)) }));
+        return true;
+      },
+      async deleteRoom(roomId) {
+        if (!(await call("crm_delete_showroom", { p_id: roomId }))) return false;
+        setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === roomId ? { ...r, active: false, deleted: true } : r)) }));
         return true;
       },
       async saveShowroomExtras(roomId, x) {
@@ -180,6 +208,12 @@ export default function DeskScreens(p: DeskScreensProps) {
         let timer: ReturnType<typeof setTimeout> | null = null;
         return (list: string[]) => { if (timer) clearTimeout(timer); timer = setTimeout(() => { timer = null; void call("crm_save_recent_emoji", { p_emoji: list }); }, 1200); };
       })(),
+      async saveProfile(form) {
+        if (!live) { patch({ toast: "The preview does not send anything to Meta" }); return null; }
+        const r = await saveCrmBusinessProfile(form);
+        if (!r.ok) { patch({ toast: r.error }); return null; }
+        return r.result;
+      },
       async saveMeta(s) {
         if (!live) { patch({ toast: "The preview does not send anything to Meta" }); return false; }
         const r = await saveCrmChannel(s);
@@ -205,11 +239,23 @@ export default function DeskScreens(p: DeskScreensProps) {
   useEffect(() => { setOrigin(window.location.origin); }, []);
   const meta = useMemo(() => ({ data: metaData, loading: onChannels && !metaData && !metaErr, error: metaErr, reload: () => setMetaN(n => n + 1), origin }), [metaData, onChannels, metaErr, origin]);
 
+  // People and teams in Title Case on the desktop (v2 › note 03) — display only; the writes take ids.
+  const shown = useMemo(() => ({ data: titleData(data), me: { ...p.me, name: titleName(p.me.name) }, teams: titleTeams(p.teams), directors: p.directors.map(d => ({ ...d, name: titleName(d.name) })) }), [data, p.me, p.teams, p.directors]);
+  const nameOf = useCallback((id: string | null | undefined) => titleName(p.nameOf(id)), [p]);
   const ctx = {
-    data, me: p.me, now: p.now, live, ui, set: setUi, patch, act, deskAct, teams: p.teams, directors: p.directors, nameOf: p.nameOf,
+    data: shown.data, me: shown.me, now: p.now, live, ui, set: setUi, patch, act, deskAct, teams: shown.teams, directors: shown.directors, nameOf,
     slotCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, exit: p.exit, meta,
   };
   const v = deskVM(ctx);
+  // Inbox opens on its first chat, so the page is never an empty "Pick a chat" (the owner, 2026-10-24: "能不能默認打開第一個信息，
+  // 就不會顯得很空") — once each time Inbox is entered; a chat closed by hand stays closed.
+  const firstChat = ui.tab === "inbox" && !ui.chat ? v.list4?.rows[0] : undefined;
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (ui.tab !== "inbox") { autoOpened.current = false; return; }
+    if (!autoOpened.current && !ui.chat && firstChat) { autoOpened.current = true; firstChat.open(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ui.tab, ui.chat, firstChat?.id]);
   // The audit trail (audit_changes) is read when Assignment or the Audit log opens (their logs), and again after a
   // setting is saved (a write sets history back to null); CRM · Manage only, as History was.
   const histOn = data.can.manage && (ui.tab === "assignment" || ui.tab === "auditlog");
@@ -231,6 +277,53 @@ export default function DeskScreens(p: DeskScreensProps) {
   const lastSig = useRef(settingsSig);
   useEffect(() => { if (lastSig.current === settingsSig) return; lastSig.current = settingsSig; if (histOn) patch({ history: null }); }, [settingsSig, histOn, patch]);
 
+  // Assignment brings in, by itself, every Meta ad running or about to run (2026-10-22, the owner: "广告开始跑，或者 pending
+  // 要跑（几时开始，几时结束），在 desktop 都要看到") — CRM · Manage, at most every 10 minutes (act.metaAds(true) → crm_add_ad).
+  const synced = useRef(0);
+  useEffect(() => {
+    if (ui.tab !== "assignment" || !live || !data.can.manage || Date.now() - synced.current < 10 * 60_000) return;
+    synced.current = Date.now();
+    void act.metaAds(true).then(rows => { if (rows) patch({ addAdList: rows }); });
+  }, [ui.tab, live, data.can.manage, act, patch]);
+
+  // Ads Performance reads Ads Manager's figures for the range on screen (and the compare range) — spend, cost per lead …
+  // (2026-10-22, the owner: "做花费和每个名单成本"); each range and ad once (ui.apMeta), CRM · Manage, the server's token.
+  // …and Assignment's Ad performance tab, for the ad open there (2026-10-23).
+  const needs = [...((v.apNeed ?? []) as { key: string; since: string; until: string; ids: string[] }[]), ...(ui.tab === "assignment" && ui.adPane === "perf" ? v.adMetaNeed ?? [] : [])];
+  const apNeedKey = JSON.stringify(needs);
+  // …on Ads Performance, and on Reports › Ads performance, which draws the same table (2026-10-23).
+  const adsOn = ui.tab === "adsperf" || (ui.tab === "insight" && ui.insTab === "ads") || (ui.tab === "reports" && ui.rpCat === "ads") || (ui.tab === "assignment" && ui.adPane === "perf");
+  const asked = useRef(new Set<string>());
+  useEffect(() => {
+    if (!adsOn || !live || !data.can.manage) return;
+    for (const n of needs) {
+      const ids = n.ids.filter(id => !asked.current.has(`${n.key}|${id}`));
+      if (!ids.length) continue;
+      ids.forEach(id => asked.current.add(`${n.key}|${id}`));
+      void fetchAdInsights(ids, n.since, n.until).then(r => {
+        const figs = r.ok ? r.figs : Object.fromEntries(ids.map(id => [id, null]));
+        setUi(u => ({ ...u, apMeta: { ...u.apMeta, [n.key]: { ...(u.apMeta[n.key] ?? {}), ...figs } } }));
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adsOn, live, data.can.manage, apNeedKey]);
+
+  // …and its chart, the same figures day by day for the range on screen (2026-10-23; ui.apDaily), each range and ad once.
+  const dayNeed = v.apDayNeed as { key: string; since: string; until: string; ids: string[] } | null | undefined;
+  const dayNeedKey = JSON.stringify(dayNeed ?? null);
+  const askedDays = useRef(new Set<string>());
+  useEffect(() => {
+    if (!adsOn || !live || !data.can.manage || !dayNeed) return;
+    const ids = dayNeed.ids.filter(id => !askedDays.current.has(`${dayNeed.key}|${id}`));
+    if (!ids.length) return;
+    ids.forEach(id => askedDays.current.add(`${dayNeed.key}|${id}`));
+    void fetchAdDaily(ids, dayNeed.since, dayNeed.until).then(r => {
+      const days = r.ok ? r.days : Object.fromEntries(ids.map(id => [id, null]));
+      setUi(u => ({ ...u, apDaily: { ...u.apDaily, [dayNeed.key]: { ...(u.apDaily[dayNeed.key] ?? {}), ...days } } }));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adsOn, live, data.can.manage, dayNeedKey]);
+
   // Entering Ads to teams opens its first ad, Full time its first team (v2) — once per entering, not after a close.
   const seeded = useRef("");
   const seedKey = `${ui.tab}:${ui.pick}:${ui.stage}`;
@@ -239,6 +332,13 @@ export default function DeskScreens(p: DeskScreensProps) {
     if (v.adSeed) { seeded.current = seedKey; v.openAdById(v.adSeed); }
     else if (v.ftSeed) { seeded.current = seedKey; v.ftSeed(); }
   }, [seedKey, v.adSeed, v.ftSeed, v.openAdById, patch]);
+
+  // An ad the place brought back (a refresh, Back) has no draft — load its saved split, or Save would write the default
+  // even one (2026-10-24); again once the read brings a rule it lacked.
+  const reloadAdDraft = v.reloadAdDraft;
+  useEffect(() => {
+    if (ui.ad && v.adDraftWant && ui.adDraftFor !== v.adDraftWant) reloadAdDraft(ui.ad);
+  }, [ui.ad, ui.adDraftFor, v.adDraftWant, reloadAdDraft]);
 
   // The prototype's keyboard: ↑ ↓ walk the number fields of the open editor; Esc closes the menu, then the pane.
   const closeRef = useRef(v.closePane);
@@ -266,6 +366,8 @@ export default function DeskScreens(p: DeskScreensProps) {
   return (
     <div ref={boxRef} className={R.root} data-revenue-app="" style={{ position: "fixed", inset: 0, zIndex: 10, overflow: "auto" }}>
       <DeskApp v={v} />
+      {/* Save and apply to all's window (2026-10-24): over the split editor, drawn as the Add customer window. */}
+      {v.applyWin && <DeskApplyAds v={v.applyWin} />}
       {/* The phone's photo / video / document viewer and the message dialogs (Forward, Info, Starred), shared. */}
       <MediaViewer />
       <MessageMenu />

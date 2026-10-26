@@ -8,9 +8,11 @@ import { ANY_TIME_LABEL, isAnyTime } from '@/lib/member/waiting-start'
 import { readRoomsPeople, readRoomsRange } from '@/lib/rooms/read'
 import { loadDocumentation } from '@/lib/documentation/server'
 import { deptLabel, liveLetters, type Documentation } from '@/lib/documentation/model'
+import { letterChoicesFromRow } from '@/lib/documentation/attach'
 import { loadHiringBoard } from '@/lib/hiring/board'
 import { dayLabel as hiringDay, hrOwners } from '@/lib/hiring/view'
-import type { HiringBoard, HiringRequest, HiringTalent } from '@/lib/hiring/types'
+import { reasonLabel } from '@/lib/hiring/reasons'
+import type { HiringBankReason, HiringBoard, HiringRequest, HiringTalent } from '@/lib/hiring/types'
 import { noticesFromRow } from '@/lib/push/notices'
 import { bookerName, type Booking } from '@/lib/rooms/model'
 import { officeToday } from '@/lib/office-time'
@@ -22,6 +24,7 @@ import { loadMyMemos } from '@/lib/memos/server'
 import { NO_MEMOS } from '@/lib/memos/model'
 import { loadMyDocuments } from '@/lib/documentation/my-docs'
 import { loadBoard, loadLedger, loadRequests } from '@/lib/attendance/server'
+import { reviewsFromRow, seesTermReminders } from '@/lib/term-reviews'
 import type { User } from '@/types'
 import { hrAppViewOf, shiftDay, type HrAppData, type HrBooking, type HrHire, type HrMemberRequest, type HrTalent, type MemberKind } from './model'
 
@@ -95,8 +98,12 @@ export function bookingOf(b: Booking): HrBooking {
 /** "3200–3800" → "3,200–3,800": a range answer as the app writes money. */
 const grouped = (v: string) => v.split('–').map(x => x.trim()).map(x => (/^\d+(\.\d+)?$/.test(x) ? Number(x).toLocaleString('en-US') : x)).join('–')
 
-/** A hiring request as the app draws it — the requester form's answers by the handoff's own field ids. */
-export function hireOf(r: HiringRequest, board: Pick<HiringBoard, 'people'>): HrHire {
+/**
+ * A hiring request as the app draws it — the requester form's answers by the handoff's own field ids; a candidate not
+ * selected says why the Talent Bank keeps them, in HR's words, as the request's page does (2026-10-24).
+ */
+export function hireOf(r: HiringRequest, board: Pick<HiringBoard, 'people' | 'talents' | 'talentReasons'>): HrHire {
+  const why = (talentId: string | null) => reasonLabel(board.talentReasons, board.talents.find(t => t.id === talentId)?.reason) || undefined
   const a = (id: string) => (r.answers[id] ?? '').trim()
   const n = Number(a('headcount'))
   return {
@@ -121,16 +128,19 @@ export function hireOf(r: HiringRequest, board: Pick<HiringBoard, 'people'>): Hr
     hired: r.hiredNames.length ? r.hiredNames.join(', ') : null,
     source: r.hiredThrough,
     cost: r.hiringCost === null ? null : r.hiringCost.toLocaleString('en-US', { maximumFractionDigits: 2 }),
-    candidates: r.candidates.map(c => ({ id: c.id, name: c.name, phone: c.phone || undefined, note: c.note || undefined, source: c.source, stage: c.stage })),
+    candidates: r.candidates.map(c => ({
+      id: c.id, name: c.name, phone: c.phone || undefined, note: c.note || undefined, source: c.source, stage: c.stage,
+      ...(c.stage === 'rejected' ? { why: why(c.talentId) } : {}),
+    })),
     events: r.events.map(e => ({ what: e.what, when: hiringDay(e.at), who: e.who, note: e.note || undefined })),
   }
 }
 
-/** Somebody in the Talent Bank as the app draws them. */
-export function talentOf(t: HiringTalent): HrTalent {
+/** Somebody in the Talent Bank as the app draws them — why they are kept in the words of HR's `reasons`. */
+export function talentOf(t: HiringTalent, reasons: readonly HiringBankReason[]): HrTalent {
   return {
     id: t.id, name: t.name, phone: t.phone || undefined, email: t.email || undefined, position: t.position, dept: t.department,
-    from: t.fromRequest, when: hiringDay(t.savedAt), notes: t.notes,
+    from: t.fromRequest, when: hiringDay(t.savedAt), notes: t.notes, reason: reasonLabel(reasons, t.reason) || undefined,
   }
 }
 
@@ -174,6 +184,9 @@ export const PART_PAGE = {
   people: '/team/people',
 } as const satisfies Record<keyof HrAppData['parts'], PageRoute>
 
+/** A person's page, whose boxes People's writes about one person follow — the HR app's person page writes as it. */
+const PERSON_PAGE: PageRoute = '/team/people/[id]'
+
 /** The account as one page of the portal sees it: its writes narrowed to that page's open boxes. */
 export function onPage(user: User, route: PageRoute): User {
   return user.closed?.length ? { ...user, actions: actionsOnPage(user.actions ?? {}, user.closed, route) } : user
@@ -208,13 +221,24 @@ export function appAccess(user: User): Pick<HrAppData, 'parts' | 'may'> {
       hireCreate: parts.hiring && canDo(onPage(user, PART_PAGE.hiring), 'hiring', 'create'),
       talentEdit: parts.talent && canDo(onPage(user, PART_PAGE.talent), 'hiring', 'edit'),
       book: parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'create'),
+      // A probation's reminder (2026-10-23) or a contract's (2026-10-24) acknowledged, and since 2026-10-24 a probation
+      // confirmed as permanent or extended: People · Edit on a person's page, as HR view's bell asks — never while
+      // viewing as somebody.
+      termEdit: parts.people && seesTermReminders(user),
+      // A letter filed to their record with that step, and Renew's new contract (2026-10-24): Documentation · Create on
+      // the person's page, as People's own forms ask (lib/documentation/letter-choices.ts).
+      letters: parts.people && !user.viewingAs && canDo(onPage(user, PERSON_PAGE), 'documentation', 'create'),
     },
   }
 }
 
 /**
  * What HR's new work they are told of (2026-10-11, mig 20261011180000): the parts the app shows them and may act
- * in. The database keeps only those their own actions hold (`notification_topics_sync`).
+ * in. The database keeps only those their own actions hold (`notification_topics_sync`). A probation ending
+ * (2026-10-23, mig 20261024223000) or a contract (2026-10-24 — the same topic, `notify_term_ends`): whoever may
+ * acknowledge it. Since 2026-10-24 (mig 20261025003000) every topic is
+ * asked again, as its holder, whenever it tells (`notification_topic_may`), so no permission change forgets one —
+ * a page's tab, which the database cannot ask, is asked here.
  */
 export function hrTopics(user: User): string[] {
   const { parts, may } = appAccess(user)
@@ -222,6 +246,7 @@ export function hrTopics(user: User): string[] {
     ...(may.hireApprove ? ['hiring.guest'] : []),
     ...(parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'edit') ? ['rooms.guest'] : []),
     ...(may.decide ? ['member.requests'] : []),
+    ...(may.termEdit ? ['people.probation'] : []),
   ]
 }
 
@@ -250,7 +275,15 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
   const today = officeToday()
   const { parts, may } = appAccess(user)
   const readsHiring = parts.hiring || parts.insights || parts.talent
-  const [attRead, phones] = await Promise.all([attendanceOf(parts, today), parts.people ? mobiles() : Promise.resolve({})])
+  const [attRead, phones, probationRead, contractRead, letterRead] = await Promise.all([
+    attendanceOf(parts, today),
+    parts.people ? mobiles() : Promise.resolve({}),
+    // The probations and contracts HR is reminded of (2026-10-23 / 10-24): read only for whoever may acknowledge one.
+    may.termEdit ? (async () => (await client()).rpc('probation_reviews'))() : Promise.resolve(null),
+    may.termEdit ? (async () => (await client()).rpc('contract_reviews'))() : Promise.resolve(null),
+    // The letter types a step files its letter as (2026-10-24): only for whoever may file one.
+    may.letters ? (async () => (await client()).rpc('hr_letter_type_choices'))() : Promise.resolve(null),
+  ])
   const [members, factsRead, range, people, docs, hiring, notices, personal, mine, myDocs] = await Promise.all([
     parts.requests ? adminMemberAction({ action: 'list' }) : Promise.resolve(null),
     parts.requests ? (async () => (await client()).rpc('member_admin_request_facts'))() : Promise.resolve(null),
@@ -306,17 +339,21 @@ export async function loadHrAppData(user: User): Promise<HrAppData> {
     rooms,
     bookings,
     sources: board ? board.sources.filter(x => x.active).map(x => x.name) : [],
-    talents: board && parts.talent ? board.talents.map(talentOf) : [],
+    talents: board && parts.talent ? board.talents.map(t => talentOf(t, board.talentReasons)) : [],
     docTypes: center?.docTypes ?? [],
     letters: center?.letters ?? [],
     documents: center?.documents ?? [],
     hireFields: board && parts.hiring ? board.fields : [],
+    hireReasons: board && parts.hiring ? board.talentReasons : [],
     hirePeople: board && parts.hiring ? board.people.map(p => ({ id: p.id, name: p.name, dept: p.department ?? '' })) : [],
     hireMe: board?.me.staffId ?? null,
     bookDepts: (who?.departments ?? []).map(d => ({ id: d.id, name: d.name })),
     parts,
     may,
     notices: notices && !notices.error ? noticesFromRow(notices.data) : { unread: 0, items: [] },
+    probation: probationRead && !probationRead.error ? reviewsFromRow(probationRead.data, 'probation') : null,
+    contract: contractRead && !contractRead.error ? reviewsFromRow(contractRead.data, 'contract') : null,
+    letterTypes: letterRead && !letterRead.error ? letterChoicesFromRow(letterRead.data) : null,
     views: user.canSwitchView && !user.viewingAs ? { current: hrAppViewOf(user.role) } : null,
     personalLogin: personal,
     memos: mine.memos,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readInsightRange, readOrderBook } from "./order-book";
+import { readDepartmentInsight, readInsightRange, readOrderBook } from "./order-book";
 
 const raw = () => ({
   from: "2026-09", through: "2026-09", asOf: "2026-10-04T12:00:00Z", paysFrom: "2026-09", closedMonths: ["2026-08", "bad"],
@@ -60,5 +60,35 @@ describe("readInsightRange", () => {
   });
   it("refuses a score with a missing number", () => {
     expect(readInsightRange({ from: "2026-07", through: "2026-09", asOf: "x", me: { ...score, sales: "10" }, downline: [] })).toBeNull();
+  });
+});
+
+// The Principal viewing nobody (2026-10-25, mig 20261026014700): the whole sub-department's Insight, and its bills with
+// whose each is.
+describe("the whole sub-department", () => {
+  const score = { sales: 10, held: 0, orders: 1, kpiQty: 0, marginRevenue: 10, marginCost: 6, blindOrders: 0 };
+  const whole = () => ({
+    membershipId: "fair", schemeId: "s", department: "Fair", from: "2026-10", through: "2026-10", asOf: "x", live: true, team: score,
+    people: [{ ...score, staffId: "s1", name: "LUCAS", title: "TL", uplineId: null, depth: 1, lastOrder: null, salary: 3500 }],
+    kpi: { enabled: false, threshold: 30 },
+  });
+  it("reads every bill summed and everybody's own figures — nothing else the RPC might add", () => {
+    const d = readDepartmentInsight(whole())!;
+    expect(d.team).toEqual(score);
+    expect(d.people[0]).toMatchObject({ staffId: "s1", name: "LUCAS", depth: 1 });
+    expect(d.people[0]).not.toHaveProperty("salary");
+    // KPI off: no threshold to speak of.
+    expect(d.kpi).toEqual({ enabled: false, threshold: null });
+    expect(readDepartmentInsight({ ...whole(), kpi: { enabled: true, threshold: 30 } })!.kpi).toEqual({ enabled: true, threshold: 30 });
+    expect(readDepartmentInsight({ ...whole(), team: null })).toBeNull();
+    expect(readDepartmentInsight({ ...whole(), from: "Oct" })).toBeNull();
+  });
+  it("a bill names its salesperson on the whole book only", () => {
+    expect(readOrderBook(raw())!.orders[0]).not.toHaveProperty("seller");
+    const all = raw();
+    Object.assign(all.orders[0], { own: false, seller: { id: "lucas", name: "LUCAS" } });
+    expect(readOrderBook(all)!.orders[0]).toMatchObject({ own: false, seller: { id: "lucas", name: "LUCAS" } });
+    Object.assign(all.orders[0], { seller: null });
+    expect(readOrderBook(all)!.orders[0].seller).toBeNull();
   });
 });

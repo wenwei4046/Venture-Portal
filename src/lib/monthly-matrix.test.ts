@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildHierarchyRows, type HierAccount } from './monthly-matrix'
+import { buildHierarchyRows, monthColumns, type HierAccount } from './monthly-matrix'
 
 const acc = (
   code: string,
@@ -83,5 +83,25 @@ describe('buildHierarchyRows', () => {
 
   it('returns nothing for an empty account list', () => {
     expect(buildHierarchyRows([], 'cat', 1)).toEqual([])
+  })
+})
+
+// 2026-10-25 — a department's "12 months" runs Nov – Oct: a From before January starts the months there.
+describe('monthColumns', () => {
+  it('lays out Accumulated, then January to To, latest first', () => {
+    const { months, columns, accPeriod } = monthColumns(2026, 3)
+    expect(months).toEqual(['2026-03', '2026-02', '2026-01'])
+    expect(columns.map((c) => c.label)).toEqual(['Accumulated', 'Mar 2026', 'Feb 2026', 'Jan 2026'])
+    expect(accPeriod).toEqual({ from: '2026-01-01', to: '2026-03-31' })
+  })
+
+  it('reaches back across the year from a From before January', () => {
+    const { months, accPeriod } = monthColumns(2026, 2, '2025-11')
+    expect(months).toEqual(['2026-02', '2026-01', '2025-12', '2025-11'])
+    expect(accPeriod).toEqual({ from: '2025-11-01', to: '2026-02-28' })
+  })
+
+  it('leaves a From within the year to the page’s own cut', () => {
+    expect(monthColumns(2026, 3, '2026-02').months).toEqual(['2026-03', '2026-02', '2026-01'])
   })
 })

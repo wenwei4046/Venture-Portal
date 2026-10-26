@@ -6,6 +6,7 @@
  * Show-up rate = showed ÷ visits already due (crm.ts).
  */
 import { createElement, type ChangeEvent, type MouseEvent, type ReactNode } from "react";
+import { customPrefill } from "../../shared/custom-book";
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import { BORDER, gb, day0, DAY, dayLabel, firstName, ini, money, stop, timeLabel, type PEvent, type SalesCtx } from "./common";
 import type { OutcomeAsk } from "../ui";
@@ -72,7 +73,7 @@ export function calendarVM(ctx: SalesCtx) {
   const ask = (a: Shown, mode?: "noshow"): OutcomeAsk => ({ visitId: a.v.id, customerId: a.c.id, name: a.c.name, when: vLabel(a), room: a.room, ...(mode ? { mode } : {}) });
   const change = (a: Shown) => () => {
     const ri = Math.max(0, data.rooms.filter(r => r.active).findIndex(r => r.id === a.v.showroomId));
-    set(u => ({ ...u, tab: "inbox", chat: a.c.id, book: { customerId: a.c.id, room: ri, day: day0(a.at), slot: timeLabel(a.at), visitId: a.v.id }, hist: [...u.hist, u.tab].slice(-20) }));
+    set(u => ({ ...u, tab: "inbox", chat: a.c.id, book: { customerId: a.c.id, room: ri, day: day0(a.at), slot: timeLabel(a.at), visitId: a.v.id, ...customPrefill(a.v) }, hist: [...u.hist, u.tab].slice(-20) }));
   };
 
   // ── The outcome popup ──
@@ -140,6 +141,7 @@ export function calendarVM(ctx: SalesCtx) {
   // 4a (M10): the month's own line (‹ October 2026 ›), a dot per day with visits (orange ahead, sand gone by), and the
   // lists' time split in two lines and their day as a kicker.
   const ap = (d: Date) => { const s = timeLabel(d); const m = /^(.*?)\s?([ap]m)$/i.exec(s); return m ? { t: m[1], ap: m[2].toLowerCase() } : { t: s, ap: "" }; };
+  const soonLabel = (ms: number) => { const m = Math.max(1, Math.round(ms / 60_000)); return m < 60 ? `in ${m} min` : `in ${Math.round(m / 60)} h`; };
   const kick = (d: Date) => gb(d, { weekday: "short", day: "numeric", month: "short" }).toUpperCase();
   const cal4 = { month: first.toLocaleDateString("en-GB", { month: "long", year: "numeric" }), prev: () => shiftMonth(-1), next: () => shiftMonth(1), today: kick(now) };
   return {
@@ -169,7 +171,7 @@ export function calendarVM(ctx: SalesCtx) {
     calCells: Array.from({ length: weeks * 7 }, (_, k) => {
       const d = new Date(ym[0], ym[1], 1 - lead0 + k), t = d.getTime(), inM = d.getMonth() === ym[1], isT = t === T, isS = t === sel, ev = evOn(t);
       return { n: d.getDate(), pick: guard(() => patch({ calSel: t, calYM: [d.getFullYear(), d.getMonth()] })), edge: k % 7 ? "1px solid var(--crm-rule-soft)" : "0",
-        bg: isS && !isT ? "var(--crm-cream)" : "transparent", dotBg: isT ? "var(--crm-rust)" : "transparent", fg: isT ? "#fff" : inM ? "var(--crm-ink)" : "var(--crm-faint-2)", weight: isT || isS ? 700 : 500,
+        bg: isS && !isT ? "var(--crm-sel)" : "transparent", dotBg: isT ? "var(--crm-rust)" : "transparent", fg: isT ? "#fff" : inM ? "var(--crm-ink)" : "var(--crm-faint-2)", weight: isT || isS ? 700 : 500,
         isT, isS, inM, has: ev.length > 0, evC: t >= T ? "var(--crm-orange)" : "var(--crm-st-lost)",
         ev: ev.slice(0, 2).map(a => ({ t: timeLabel(a.at).replace(":00", "").replace(" ", "") + " " + firstName(a.c.name), bg: colOf(a), open: openInfo(a.c) as ((e: MouseEvent<HTMLElement>) => void) | undefined }))
           // "+N" keeps the cell's select-day.
@@ -188,7 +190,7 @@ export function calendarVM(ctx: SalesCtx) {
     weekLabel,
     weekCols: Array.from({ length: 7 }, (_, k) => {
       const d = wd(k), t = d.getTime(), isT = t === T, isS = t === sel;
-      return { wk: d.toLocaleDateString("en-GB", { weekday: "short" }), n: d.getDate(), edge: k ? "1px solid var(--crm-rule-soft)" : "0", bg: isS && !isT ? "var(--crm-cream)" : "transparent",
+      return { wk: d.toLocaleDateString("en-GB", { weekday: "short" }), n: d.getDate(), edge: k ? "1px solid var(--crm-rule-soft)" : "0", bg: isS && !isT ? "var(--crm-sel)" : "transparent",
         dotBg: isT ? "var(--crm-rust)" : "transparent", fg: isT ? "#fff" : "var(--crm-ink)", weight: isT || isS ? 700 : 500, pick: guard(() => setSel(t)),
         ev: evOn(t).map(a => ({ time: timeLabel(a.at), name: firstName(a.c.name), bg: colOf(a), open: openInfo(a.c) })) };
     }),
@@ -200,6 +202,8 @@ export function calendarVM(ctx: SalesCtx) {
     hasToday: todayV.length > 0 && inView(now), todayCount: earlier ? `${today} today · ${earlier} to mark` : `${todayV.length} today`,
     todayList: todayV.map(a => ({
       name: a.c.name, room: a.room, open: openInfo(a.c), due: day0(a.at) !== T, kick: kick(a.at), ...ap(a.at),
+      // v3 M10: a visit still to come today says how soon ("in 2 h", "in 40 min").
+      soon: a.at > now ? soonLabel(+a.at - +now) : "",
       time: day0(a.at) === T ? timeLabel(a.at) : `${gb(a.at, { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(a.at)}`,
       change: change(a), came: () => patch({ outcomeAsk: ask(a) }), noShow: () => patch({ outcomeAsk: ask(a, "noshow") }),
     })),
@@ -212,7 +216,7 @@ export function calendarVM(ctx: SalesCtx) {
     upList: upV.map(a => {
       const done = !!a.v.remindedAt;
       return { kick: kick(a.at), t: ap(a.at).t, ap: ap(a.at).ap, done, name: a.c.name, ini: ini(a.c.name), time: timeLabel(a.at), room: a.room, wk: a.at.toLocaleDateString("en-GB", { weekday: "short" }), dn: a.at.getDate(),
-        open: openInfo(a.c), isToday: false, later: true, came: () => patch({ outcomeAsk: ask(a) }),
+        open: openInfo(a.c), isToday: false, later: true, came: () => patch({ outcomeAsk: ask(a) }), change: change(a),
         // Sent once, it may go again (the owner, 2026-10-14: "upcoming 的 reminder 發過之後還可以再發"): the button keeps
         // its green "sent" look and reads Send again; one at a time per visit (a double tap sent twice before).
         rLabel: done ? "Send again" : "Send reminder", rIcon: done ? "m5 12 5 5 9-10" : "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z",

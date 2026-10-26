@@ -48,4 +48,9 @@ export const AUDIT_READ_KEYS = [
  * tables in the CRM desktop's Settings › History (CRM Desktop rev 1, mig 20261013100000) — the Revenue Director's
  * template holds it and has no portal page.
  */
-export const IN_APP_HISTORY_KEYS = ['crm_manage'] as const satisfies readonly Permission[]
+export const IN_APP_HISTORY_KEYS = [
+  'crm_manage',
+  // Marketing's subsidiaries and clients, and its roster (2026-10-23, mig 20261023214100): read in Marketing's own view —
+  // its staff never had the portal's Audit Log, and Marketing · View is not a reason to give it them.
+  'marketing',
+] as const satisfies readonly Permission[]

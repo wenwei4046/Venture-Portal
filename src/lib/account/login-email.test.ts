@@ -22,7 +22,7 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }))
 
-import { moveBackUnlessApproved, moveLoginForApproval } from './login-email'
+import { moveBackUnlessApproved, moveBackUnlessWritten, moveLoginForApproval, moveLoginForPerson } from './login-email'
 
 const facts = { user_id: 'u-ann', from: 'ann@x.my', to: 'Ann.New@Mail.com' }
 
@@ -91,6 +91,72 @@ describe('moveBackUnlessApproved', () => {
   })
 })
 
+// 2026-10-22, the user: "i want the email can be editable, for hr" — the same job from the person's page.
+describe('moveLoginForPerson', () => {
+  it('asks the database under the editor’s session, then moves the login, confirmed', async () => {
+    expect(await moveLoginForPerson('s-ann', 'Ann.New@Mail.com')).toEqual({ kind: 'moved', userId: 'u-ann', from: 'ann@x.my', to: 'ann.new@mail.com' })
+    expect(m.rpc).toHaveBeenCalledWith('person_login_email_move', { p_staff: 's-ann', p_email: 'Ann.New@Mail.com' })
+    expect(m.updateUserById).toHaveBeenCalledWith('u-ann', { email: 'ann.new@mail.com', email_confirm: true })
+  })
+
+  it('moves nothing for somebody with no login — the email is the record’s own', async () => {
+    m.rpc.mockResolvedValue({ data: null, error: null })
+    expect(await moveLoginForPerson('s-bob', 'bob@x.my')).toEqual({ kind: 'none' })
+    expect(m.updateUserById).not.toHaveBeenCalled()
+  })
+
+  it('leaves the auth server alone when the login signs in with it already', async () => {
+    m.rpc.mockResolvedValue({ data: { user_id: 'u-ann', from: 'Ann@X.my', to: 'ann@x.my' }, error: null })
+    expect(await moveLoginForPerson('s-ann', 'ann@x.my')).toEqual({ kind: 'moved', userId: 'u-ann', from: 'Ann@X.my', to: 'ann@x.my' })
+    expect(m.updateUserById).not.toHaveBeenCalled()
+  })
+
+  it('passes on the database’s refusals — who may and what may be asked — and moves nothing', async () => {
+    const held = 'DIRECTOR is a full-access title (Ultimate full access): only whoever manages permissions changes its login\'s email.'
+    m.rpc.mockResolvedValue({ data: null, error: { code: '42501', message: held } })
+    expect(await moveLoginForPerson('s-boss', 'x@y.my')).toEqual({ kind: 'refused', reason: held })
+    m.rpc.mockResolvedValue({ data: null, error: { code: '22023', message: 'That email already belongs to another login.' } })
+    expect(await moveLoginForPerson('s-ann', 'hr@x.my')).toEqual({ kind: 'refused', reason: 'That email already belongs to another login.' })
+    m.rpc.mockResolvedValue({ data: null, error: { code: 'XX000', message: 'internal' } })
+    expect(await moveLoginForPerson('s-ann', 'x@y.my')).toEqual({ kind: 'refused', reason: 'Their email could not be saved. Please try again.' })
+    expect(m.updateUserById).not.toHaveBeenCalled()
+  })
+
+  it('never while viewing as somebody — not even the question', async () => {
+    m.viewing = true
+    expect(await moveLoginForPerson('s-ann', 'x@y.my')).toEqual({ kind: 'refused', reason: READ_ONLY_MESSAGE })
+    expect(m.rpc).not.toHaveBeenCalled()
+    expect(m.updateUserById).not.toHaveBeenCalled()
+  })
+
+  it('says why the auth server refused, and that nothing was saved', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    m.updateUserById.mockResolvedValue({ data: null, error: { code: 'email_exists', status: 422, message: 'exists' } })
+    expect(await moveLoginForPerson('s-ann', 'x@y.my')).toEqual({ kind: 'refused', reason: 'That email already belongs to another login. Nothing was saved.' })
+  })
+})
+
+describe('moveBackUnlessWritten', () => {
+  const moved = { kind: 'moved' as const, userId: 'u-ann', from: 'ann@x.my', to: 'ann.new@mail.com' }
+
+  it('moves the login back when the record did not take the new email, and names the button to try again', async () => {
+    m.loginRow = { email: 'ann@x.my' }
+    expect(await moveBackUnlessWritten(moved, 'Save changes')).toBeNull()
+    expect(m.updateUserById).toHaveBeenCalledWith('u-ann', { email: 'ann@x.my', email_confirm: true })
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    m.updateUserById.mockResolvedValue({ data: null, error: { code: 'unexpected_failure', status: 500 } })
+    expect(await moveBackUnlessWritten(moved, 'Save changes')).toBe(
+      'Their login could not be moved back — they sign in with ann.new@mail.com until it is. Try Save changes again.',
+    )
+  })
+
+  it('moves nothing back when nothing was moved', async () => {
+    m.loginRow = { email: 'ann@x.my' }
+    expect(await moveBackUnlessWritten({ ...moved, to: 'ann@x.my' }, 'Save changes')).toBeNull()
+    expect(m.updateUserById).not.toHaveBeenCalled()
+  })
+})
+
 describe('loginMoveOf / loginMoveRefusal', () => {
   it('reads the database’s answer', () => {
     expect(loginMoveOf(null)).toBeNull()
@@ -100,5 +166,8 @@ describe('loginMoveOf / loginMoveRefusal', () => {
   it('words the auth server’s refusals', () => {
     expect(loginMoveRefusal('user_not_found')).toBe('Their login is no longer there. Nothing was decided.')
     expect(loginMoveRefusal(undefined)).toBe('Their login could not be moved to the new email, so nothing was decided. Please try again.')
+    // …and on the person's page, where a save is what did not happen (2026-10-22).
+    expect(loginMoveRefusal('email_exists', 'saved')).toBe('That email already belongs to another login. Nothing was saved.')
+    expect(loginMoveRefusal(undefined, 'saved')).toBe('Their login could not be moved to the new email, so nothing was saved. Please try again.')
   })
 })

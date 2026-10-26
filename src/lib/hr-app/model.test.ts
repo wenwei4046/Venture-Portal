@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  budgetLabel, clashOf, daysToFill, hm, hourFrom, initials, missingFor, pipeline, positionLabel, requestStatusLabel, requestTitle, reviewItems, shiftDay, slotAt,
+  budgetLabel, clashOf, daysToFill, hm, hourFrom, initials, missingFor, noticeTag, pipeline, positionLabel, requestStatusLabel, requestTitle, reviewItems, shiftDay, slotAt,
   type HrBooking, type HrHire, type HrMemberRequest,
 } from './model'
 
@@ -103,5 +103,14 @@ describe('the HR app model', () => {
   it('steps days on the calendar and spells initials', () => {
     expect(shiftDay('2026-10-31', 1)).toBe('2026-11-01')
     expect(initials('Daniel Lee')).toBe('DL')
+  })
+
+  it('tags a notice by what it is about — a probation ending in the roster’s amber (2026-10-23)', () => {
+    expect(noticeTag({ refKind: 'hr_staff' })).toEqual({ tag: 'PROB', bg: 'var(--ds-warning-bg)', fg: 'var(--ds-warning)' })
+    expect(noticeTag({ refKind: 'hr_staff', title: 'Probation ending · LI SEAN' }).tag).toBe('PROB')
+    // A contract ending (2026-10-24 — notify_term_ends titles it so): the peach of the roster's Contract chip.
+    expect(noticeTag({ refKind: 'hr_staff', title: 'Contract ending · LI SEAN' })).toEqual({ tag: 'CONT', bg: 'var(--ds-accent-soft)', fg: 'var(--ds-accent-soft-ink)' })
+    expect(noticeTag({ refKind: 'hiring_request' }).tag).toBe('HIRE')
+    expect(noticeTag({ refKind: 'member_request' }).tag).toBe('REQ')
   })
 })

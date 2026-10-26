@@ -4,6 +4,7 @@
 // `invite.ts` is. Pure: it normalises as well as checks, so the action writes
 // exactly what came back and nothing it re-derives itself.
 import { validateSecondaryStaffBankAccount } from './staff-bank-accounts'
+import { statusColumns, type EmploymentStatus } from './employment-status'
 
 /**
  * `hr_employment_type`. `variable` (2026-09-11) is the Director department's:
@@ -36,6 +37,15 @@ export interface RawStaffForm {
   homeSubDepartmentId?: string | null
   /** Who they report to. Blank is allowed: a line can be drawn later on the chart. */
   reportsTo?: string | null
+  /**
+   * When they start (2026-10-23): required — a probation is counted from it, and the roster shows it beside their
+   * employment status.
+   */
+  hireDate?: string | null
+  /** Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — and, for a probation or a contract, its period in months. */
+  employmentStatus?: string | null
+  probationMonths?: string | null
+  contractMonths?: string | null
   basicSalary?: string | null
   allowances?: string | null
   nonStatutoryAllowance?: string | null
@@ -56,6 +66,10 @@ export interface ValidStaffForm {
   titleId: string | null
   homeSubDepartmentId: string | null
   reportsTo: string | null
+  hireDate: string
+  employmentStatus: EmploymentStatus
+  probationMonths: number | null
+  contractMonths: number | null
   employmentType: StaffEmploymentType
   basicSalary: number
   allowances: number
@@ -74,6 +88,14 @@ export interface ValidStaffForm {
 function clean(value: string | null | undefined): string | null {
   const trimmed = (value ?? '').trim()
   return trimmed === '' ? null : trimmed
+}
+
+/** A real YYYY-MM-DD day — what a date field sends — not 2026-02-30. */
+function isCalendarDay(value: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!m) return false
+  const day = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+  return day.toISOString().slice(0, 10) === value
 }
 
 /**
@@ -95,6 +117,10 @@ export function validateStaffForm(raw: RawStaffForm): ValidStaffForm {
 
   const departmentId = clean(raw.departmentId)
   if (!departmentId) throw new Error('Pick a department')
+
+  const hireDate = clean(raw.hireDate)
+  if (!hireDate || !isCalendarDay(hireDate)) throw new Error('Pick the hire date')
+  const status = statusColumns(raw.employmentStatus, raw.probationMonths, raw.contractMonths)
 
   const fullCommission = raw.fullCommission === true
   // The form offers one tick or the other, never both; should both arrive,
@@ -124,6 +150,10 @@ export function validateStaffForm(raw: RawStaffForm): ValidStaffForm {
     titleId: clean(raw.titleId),
     homeSubDepartmentId: clean(raw.homeSubDepartmentId),
     reportsTo: clean(raw.reportsTo),
+    hireDate,
+    employmentStatus: status.employment_status,
+    probationMonths: status.probation_months,
+    contractMonths: status.contract_months,
     employmentType: fullCommission ? 'commission_eligible' : variablePay ? 'variable' : 'salaried',
     basicSalary,
     allowances,
@@ -257,6 +287,25 @@ export interface StaffRow {
   infotech_code?: string | null
   hire_date: string | null
   resignation_date: string | null
+  /**
+   * Probation, Permanent or Part time (2026-10-23, lib/employment-status.ts) — null until HR sets it. A probation's
+   * period and its last day (the database's, generated from the hire date), and the reminder's acknowledgement.
+   */
+  employment_status?: EmploymentStatus | null
+  probation_months?: number | null
+  probation_end?: string | null
+  /** A contract's period and its last day (2026-10-24, mig 20261025013000 — the database's, generated). */
+  contract_months?: number | null
+  contract_end?: string | null
+  /** The first day of the contract they are on now, once renewed (2026-10-24, mig 20261025052000) — null: the hire date. */
+  contract_start?: string | null
+  probation_ack_end?: string | null
+  probation_ack_name?: string | null
+  probation_ack_at?: string | null
+  /** A contract's reminder, acknowledged for which end, by whom and when (2026-10-24, mig 20261025046500). */
+  contract_ack_end?: string | null
+  contract_ack_name?: string | null
+  contract_ack_at?: string | null
   epf_category: string
   socso_category: string
   is_epf_exempt: boolean

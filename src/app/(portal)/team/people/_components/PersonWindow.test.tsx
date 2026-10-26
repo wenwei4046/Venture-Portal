@@ -106,3 +106,29 @@ describe('the person window', () => {
     expect(onClose).toHaveBeenCalledTimes(2)
   })
 })
+
+// 2026-10-23: the window's first chip is the roster's — Probation, Permanent or Part time; a probation names its end.
+describe('the window’s employment chip', () => {
+  it('a probation names its end, a permanent reads Permanent, not set reads Not set', async () => {
+    const { dialog } = await open(card({}, { employment_status: 'probation', probation_months: 3, probation_end: '2027-12-31' }))
+    expect(dialog).toHaveTextContent('Probation · ends 31 Dec 2027')
+    expect(within(dialog).queryByText('Active')).toBeNull()
+    cleanup()
+
+    expect((await open(card({}, { employment_status: 'permanent' }))).dialog).toHaveTextContent('Permanent')
+    cleanup()
+    expect((await open(card({}, { employment_status: null }))).dialog).toHaveTextContent('Not set')
+  })
+
+  // Contract (2026-10-24): names its end too.
+  it('a contract names its end', async () => {
+    const { dialog } = await open(card({}, { employment_status: 'contract', contract_months: 12, contract_end: '2027-09-30' }))
+    expect(dialog).toHaveTextContent('Contract · ends 30 Sep 2027')
+  })
+
+  it('an inactive person keeps Resigned', async () => {
+    const { dialog } = await open(card({ active: false, resignedOn: '30 Sep 2026' }, { employment_status: 'permanent' }))
+    expect(dialog).toHaveTextContent('Resigned 30 Sep 2026')
+    expect(within(dialog).queryByText('Permanent')).toBeNull()
+  })
+})

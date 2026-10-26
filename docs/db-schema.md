@@ -702,11 +702,116 @@ hr_staff_costs (
     eis_er          decimal(15,2)
     total_ctc       decimal(15,2)                    -- 系统加总
     status          enum ('active','inactive') DEFAULT 'active'
+    employment_status text NULL                      -- 'probation' | 'contract' | 'permanent' | 'part_time'（2026-10-23；contract
+                                                     --   2026-10-24）；NULL = 还没设（那天之前的人都是 NULL，HR 逐个设）。
+                                                     --   不是 employment_type（那是 pay basis）
+    probation_months smallint NULL                   -- 试用期几个月，1–24；只在 probation 时有（CHECK）
+    probation_end   date GENERATED ALWAYS             -- 试用期最后一天 = hire_date + months − 1 天（1 Oct + 3 → 31 Dec）；
+                                                     --   不是 probation 或没 hire_date 就 NULL
+    probation_ack_end date NULL                      -- HR 在铃铛 / 个人页按 Acknowledge 时的那个 end；延长后 ≠ probation_end → 再提醒
+    probation_ack_by uuid FK → users NULL            --   谁、几时、名字（probation_acknowledge() 写，trigger 拒绝直接写；不是 probation 就清空）
+    probation_ack_name text NULL
+    probation_ack_at timestamptz NULL
+    contract_months smallint NULL                    -- 合约几个月，1–36（表单给 6/12/18/24/30/36）；只在 contract 时有（CHECK，2026-10-24）
+    contract_start  date NULL                        -- 现在这一期合约的第一天；NULL = hire_date（Renew 才写，2026-10-24）；
+                                                     --   不是 contract 就清空（trigger hr_staff_costs_contract_start + CHECK）
+    contract_end    date GENERATED ALWAYS             -- 合约最后一天 = coalesce(contract_start, hire_date) + months − 1 天（1 Oct + 12 → 30 Sep）；
+                                                     --   不是 contract 或没 hire_date 就 NULL；到期前 30 天、15 天各提醒一次（2026-10-24）
+    contract_ack_end date NULL                       -- 合约提醒的 Acknowledge，跟 probation_ack_* 一样（2026-10-24）：那个 end；续约后 ≠ → 再提醒
+    contract_ack_by uuid FK → users NULL             --   谁、几时、名字（contract_acknowledge() 写，trigger 拒绝直接写；不是 contract 就清空）
+    contract_ack_name text NULL
+    contract_ack_at timestamptz NULL                 --   这一刻的办公室日子决定它回应第几次提醒（≤ 15 天 = 第二次，否则第一次）
     created_by      uuid FK → users NOT NULL
     created_at      timestamptz DEFAULT now()
     updated_at      timestamptz DEFAULT now()
 )
 ```
+**Employment status and the probation reminder (2026-10-23, migration `20261024214500_people_employment_status`).**
+Add Staff and the waiting list's Transfer ask the status (and a probation's
+period); a person's page edits it, *Confirm as permanent* and *Extend* are its
+updates. HR view's bell reads `probation_reviews()` (DEFINER, STABLE: People ·
+Edit with the HR scope — everybody active on probation, their end and its
+acknowledgement) and lists those ending within 15 days (14 until 2026-10-24) or past
+(`lib/employment-status.ts` › `PROBATION_NOTICE_DAYS`); `probation_acknowledge(staff)`
+(DEFINER, the person page's box via `tab_write_guard`) writes the
+acknowledgement for the end it stands at, under `app.probation_ack`, the one
+door trigger `hr_staff_costs_probation_ack` leaves open. `member_transfer_waiting`
+has a 12-argument overload (production's body with the two columns in its
+INSERT); the 10-argument one calls it with neither.
+
+**Contract (2026-10-24, migration `20261025013000_people_contract_status`).**
+A fourth status with its period: `contract_months` (CHECK
+`hr_staff_costs_contract_months_check` — 1–36 while on a contract, NULL
+otherwise) and `contract_end` generated as `probation_end` is; both granted to
+`authenticated` column by column. ~~Nobody is reminded of a contract's end.~~
+(Reminded since the same day's next migration, below.)
+`member_transfer_waiting` has a 13-argument overload (production's 12-argument
+body with `contract_months` in its INSERT); the 12-argument one now calls it with
+none. The same day `notify_probation_due` counts 15 days, not 14 (migration
+`20261025012000_probation_notice_15_days`).
+
+**Two reminders before a probation or a contract ends — 30 days, then 15 (2026-10-24, migration `20261025046500_people_term_end_reminders`).**
+A contract's acknowledgement as a probation's: `contract_ack_end / _by / _name /
+_at` (granted to `authenticated`), written only by `contract_acknowledge(staff)`
+(DEFINER; People · Edit with the HR scope and the person page's box via
+`tab_write_guard`) under `app.contract_ack` — trigger
+`hr_staff_costs_contract_ack` refuses a straight write and clears them off a
+contract. `contract_reviews()` (DEFINER, STABLE; the same gate) is
+`probation_reviews()`'s twin. Each term is reminded twice, and an
+acknowledgement answers the reminder that stood on the office's day it was given
+(`*_ack_at`: 15 days or fewer before the end the second, else the first) — so
+nothing new is stored for a probation. The hourly sweep is
+`notify_term_ends(p_now)` (DEFINER, the service role's): both terms,
+`data.due = '<probation|contract>:<staff>:<end>:<30|15>'` (a probation's second
+also counts the old `probation:<staff>:<end>`), titles *Probation ending · …* /
+*Contract ending · …*, the same holders and helper as below.
+`notify_probation_due` is left for the sweep deployed before; nothing calls it
+after (dropped by `20261025052000`, below).
+
+**Renew a contract; the letter types People's forms offer (2026-10-24, migration `20261025052000_people_contract_renew`).**
+`contract_start` (granted to `authenticated`) is the first day of the contract
+they are on now — NULL = the hire date, as every contract was counted before —
+written by Renew on the person's page (`renewContract`: an UPDATE under the
+session's row policies, over the period and end the page read) with the new
+`contract_months`; `contract_end` is now generated from
+`coalesce(contract_start, hire_date)` (`ALTER COLUMN … SET EXPRESSION`). Off a
+contract it is cleared (trigger `hr_staff_costs_contract_start`, CHECK
+`hr_staff_costs_contract_start_check`). A renewal moves the end, so its
+acknowledgement no longer matches and both reminders come again before the new
+end. `hr_letter_type_choices()` (DEFINER, STABLE; Documentation · Create) lists
+the live letter types — id, name, compulsory — for Add Staff, the waiting list's
+Transfer, a person's card and Renew, whose letters are filed by `hr_letter_file`
+as the Data center's Upload files one. `notify_probation_due` is dropped.
+
+**…and on the phone (2026-10-23, migration `20261024223000_probation_push`).**
+`notify_probation_due(p_now)` (DEFINER, the service role's alone — the hourly
+sweep, `app/api/member-queue`) writes `app_notifications` (kind `people`, ref
+`hr_staff` → the person, `data.due = 'probation:<staff>:<end>'`, once per
+person told per end; from 9:00 the office's time) for a probation whose last day
+is 15 days away or nearer (14 until `20261025012000`), not past, not acknowledged for that end — to each
+holder of the topic `people.probation` whom `probation_notice_may(user)` (DEFINER,
+the service role's) still finds able to acknowledge it, asked as them: the HR
+scope, People · Edit and `tab_write_open('/team/people/[id]', team.edit)`, with
+`auth.uid()` pointed at them and put back. Never the person on probation.
+`notification_topics_sync` keeps `people.probation` (by that helper) and now
+deletes only the topics it manages (it took `it.requests` before);
+`notification_topics_forget` spares `people.probation`. Checks widened:
+`app_notifications` kind + `people`, ref_kind + `hr_staff`; `notification_topics`
+topic + `people.probation`.
+
+**Every topic asked again when it tells (2026-10-24, migration `20261025003000_topics_asked_at_send`).**
+`notification_topic_may(user, topic)` (DEFINER, the service role's — other
+functions' helper) answers, as that account (`auth.uid()` pointed at them and put
+back), whether they may hold the topic now: `hiring.guest` Hiring · Approve +
+`tab_write_open('/hiring/requests', hiring.approve)`; `rooms.guest` Meeting rooms ·
+Edit + `tab_write_open('/admin/rooms', rooms.edit)`; `member.requests`
+`member_is_manager('member_requests_manage')` + `tab_write_open('/member-admin',
+member.manage)`; `it.requests` IT requests · View; `people.probation`
+`probation_notice_may`. `notify_topic` tells only the holders it finds able;
+`notification_topics_sync` keeps a topic by the same question;
+`notification_topics_forget` (its triggers unchanged) now deletes only the topics
+of accounts switched off — a permission change no longer empties the list.
+
 **Employee codes (2026-09-12, migration `20260915040000_staff_code_sequence`).**
 `employee_code` is `HV` + at least three digits, and the database hands it
 out: `hr_staff_costs_assign_code` (BEFORE INSERT OR UPDATE OF employee_code)
@@ -916,3 +1021,4 @@ Rate 不固定： fund_sources 每笔手动填 rate，loan 创建时锁定 rate
 PCB： 查 Jadual PCB 表，HR 可手动 override（payroll_pcb 字段直接改）
 Audit trail： 所有表有 created_by + created_at，Settings 有 updated_by
 Supabase RLS： 用 role + department_id 做 Row Level Security
+档案（2026-10-23，搬到 Cloudflare R2）： file_buckets（每个 bucket 的大小上限、类型、公开与否、backend supabase|r2、public_url）+ file_objects（每个档案一行：bucket_id, name, owner, owner_id, metadata{size,mimetype}, created_at — storage.objects 的双胞胎，34 条 policy 原样）。档案本身在 R2；谁能上传 / 看 / 删由 file_objects 的 policy 决定 → .claude/rules/portal-wide/storage.md

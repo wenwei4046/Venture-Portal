@@ -14,7 +14,14 @@
 //            still owed at the start of X (ACTUAL principal repaid, not the
 //            scheduled amount), principal/month = base ÷ remaining months,
 //            interest/month = base × new rate — flat on that base for the
-//            whole segment.
+//            whole segment. A change that says "interest on the original
+//            principal" (user 2026-10-23 — HC's Conts 60k / 58k: 3.5% in May,
+//            3% from June, both on the whole 60k / 58k) keeps the principal
+//            re-based and takes the interest on the original principal. One
+//            that keeps the interest's base (user 2026-10-24 — BI#7: 0.833% on
+//            the 51,000 owed in January, no fixed term from October, the
+//            interest "照旧每月 424.83（按 1 月的 51,000 算）") takes it on the
+//            base the segment before it used.
 //   compound the balance rolls month by month; the rate switches at X.
 //   nothing already recorded (PVs, repayment rows, GL) moves — the only thing
 //   that changes is what each month is DUE, and the statement shows the
@@ -51,6 +58,11 @@ export interface TermsHistoryRow {
   months: number | null
   compounding: boolean
   reason?: string | null
+  /** The change that ended this segment took the next one's interest on the
+   *  original principal — like `reason`, it belongs to the segment after. */
+  nextInterestOnOriginal?: boolean
+  /** …or kept the next one's interest on the base this one used. */
+  nextInterestKeepsBase?: boolean
 }
 
 export interface PositionTerms {
@@ -82,6 +94,10 @@ export interface TermsSegment {
   months: number | null
   /** Flat base the segment's figures are computed on. */
   base: number
+  /** What the flat interest is on: `base`, or the original principal / the segment before's base when the change said so. */
+  interestBase?: number
+  interestOnOriginal?: boolean
+  interestKeepsBase?: boolean
   principalPerMonth: number
   interestPerMonth: number
   /** Scheduled last installment month by the segment's OWN count (from + months − 1). */
@@ -114,6 +130,8 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
         compounding: t.current.compounding,
         months,
         base: t.principal,
+        interestBase: t.principal,
+        interestOnOriginal: false,
         principalPerMonth: months ? r2(t.principal / Math.max(1, months)) : 0,
         interestPerMonth: r2(t.principal * t.current.rate),
         scheduledEndYM: null,
@@ -123,7 +141,7 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
     ]
   }
 
-  const raw: { fromYM: string; toYM: string | null; rate: number; months: number | null; compounding: boolean; changed: boolean; reason?: string | null }[] = []
+  const raw: { fromYM: string; toYM: string | null; rate: number; months: number | null; compounding: boolean; changed: boolean; reason?: string | null; onOriginal: boolean; keepsBase: boolean }[] = []
   // A history row is written when a change ENDS a segment, so its reason
   // belongs to the segment that follows it.
   const hist = [...t.history].sort((a, b) => a.validFrom.localeCompare(b.validFrom))
@@ -136,6 +154,8 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
       compounding: h.compounding,
       changed: i > 0,
       reason: i > 0 ? hist[i - 1].reason ?? null : null,
+      onOriginal: i > 0 && hist[i - 1].nextInterestOnOriginal === true,
+      keepsBase: i > 0 && hist[i - 1].nextInterestKeepsBase === true,
     })
   })
   const curFrom = t.current.effectiveFrom ?? (hist.length > 0 ? addMonthsYM(hist[hist.length - 1].validTo, 1) : start)
@@ -147,6 +167,8 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
     compounding: t.current.compounding,
     changed: hist.length > 0 || t.current.effectiveFrom != null,
     reason: (hist.length > 0 ? hist[hist.length - 1].reason : null) ?? t.current.reason ?? null,
+    onOriginal: hist.length > 0 && hist[hist.length - 1].nextInterestOnOriginal === true,
+    keepsBase: hist.length > 0 && hist[hist.length - 1].nextInterestKeepsBase === true,
   })
 
   const out: TermsSegment[] = []
@@ -157,6 +179,12 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
     // change that keeps the old end month is materialised by the amend RPC
     // as an explicit count, so nothing is inherited here.
     const months = seg.months
+    // A compounding segment rolls its own balance; the switches are flat ones — and keeping the base needs a flat
+    // segment before to keep it from.
+    const onOriginal = seg.onOriginal && !seg.compounding
+    const before = i > 0 ? out[i - 1] : null
+    const keepsBase = seg.keepsBase && !seg.compounding && !onOriginal && !!before && !before.compounding
+    const interestBase = onOriginal ? t.principal : keepsBase ? (before!.interestBase ?? before!.base) : base
     const scheduledEndYM = months ? addMonthsYM(seg.fromYM, months - 1) : null
     // Flat: a segment ends where the next one starts or at its own schedule end.
     const toYM = seg.toYM ?? (seg.compounding ? null : scheduledEndYM)
@@ -167,8 +195,11 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
       compounding: seg.compounding,
       months,
       base,
+      interestBase,
+      interestOnOriginal: onOriginal,
+      interestKeepsBase: keepsBase,
       principalPerMonth: months ? r2(base / months) : 0,
-      interestPerMonth: r2(base * seg.rate),
+      interestPerMonth: r2(interestBase * seg.rate),
       scheduledEndYM,
       changed: seg.changed,
       reason: seg.reason ?? null,
@@ -193,6 +224,31 @@ export function segmentAt(segments: TermsSegment[], ym: string): TermsSegment | 
  *  it will run on). */
 export function currentSegment(segments: TermsSegment[], currentYM: string): TermsSegment {
   return segmentAt(segments, currentYM) ?? (currentYM < segments[0].fromYM ? segments[0] : segments[segments.length - 1])
+}
+
+/** A fixed-term deal's installments counted from its first. Once a 从某月起
+ *  change wrote the record's months, they count from `effectiveFromYM`; the
+ *  months before it belong to the earlier terms (HC's Conts 60k: May at 3.5%,
+ *  then 5 from June = 6, its last on 2 Oct — not "5 months", repaid by 2 Sep). */
+export function installmentsInAll(firstDueYM: string | null, effectiveFromYM: string | null, months: number): number {
+  if (!firstDueYM || !effectiveFromYM || effectiveFromYM <= firstDueYM) return months
+  return monthsBetweenYM(firstDueYM, effectiveFromYM) + months
+}
+
+/** The whole plan, segment by segment: its installments and the interest they
+ *  ask — null when a segment compounds or runs open-ended (no whole-deal
+ *  figure exists then). */
+export function planTotals(segments: TermsSegment[]): { months: number; interest: number } | null {
+  let months = 0
+  let interest = 0
+  for (const s of segments) {
+    const end = s.toYM ?? s.scheduledEndYM
+    if (s.compounding || !s.months || !end) return null
+    const n = monthsBetweenYM(s.fromYM, end) + 1
+    months += n
+    interest += n * s.interestPerMonth
+  }
+  return { months, interest: r2(interest) }
 }
 
 /** Monthly rate for compounding accrual in `ym`. Months before the first
@@ -346,7 +402,7 @@ export interface TermsChangeMonthRow {
 export interface TermsChangeComparison {
   fromYM: string
   old: { rate: number; months: number | null; principalPerMonth: number; interestPerMonth: number; endYM: string | null; compounding: boolean }
-  new: { rate: number; months: number | null; principalPerMonth: number; interestPerMonth: number; endYM: string | null; compounding: boolean; base: number }
+  new: { rate: number; months: number | null; principalPerMonth: number; interestPerMonth: number; endYM: string | null; compounding: boolean; base: number; interestOnOriginal?: boolean; interestKeepsBase?: boolean; interestBase?: number }
   reason: string | null
   rows: TermsChangeMonthRow[]
   totals: {
@@ -420,7 +476,7 @@ export function compareTermsChange(
   return {
     fromYM: x,
     old: { rate: prev.rate, months: prev.months, principalPerMonth: prev.principalPerMonth, interestPerMonth: prev.interestPerMonth, endYM: oldEnd, compounding: prev.compounding },
-    new: { rate: seg.rate, months: seg.months, principalPerMonth: seg.principalPerMonth, interestPerMonth: seg.interestPerMonth, endYM: seg.scheduledEndYM, compounding: seg.compounding, base: seg.base },
+    new: { rate: seg.rate, months: seg.months, principalPerMonth: seg.principalPerMonth, interestPerMonth: seg.interestPerMonth, endYM: seg.scheduledEndYM, compounding: seg.compounding, base: seg.base, interestOnOriginal: seg.interestOnOriginal, interestKeepsBase: seg.interestKeepsBase, interestBase: seg.interestBase },
     reason: seg.reason ?? null,
     rows,
     totals,

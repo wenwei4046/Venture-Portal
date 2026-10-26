@@ -14,14 +14,14 @@ import { PayrollBasisBody } from '@/app/(portal)/statements/_components/PayrollB
 import { useInvoiceWork } from '@/app/(portal)/statements/_components/invoice-work'
 import CreatePaymentDialog, { type PaymentPreset } from '@/app/(portal)/payments/_components/CreatePaymentDialog'
 import { openInvoiceRefund } from '@/app/(portal)/payments/create-actions'
-import { ContractSheet, SettleReceiptSheet } from './InvoiceSheets'
+import { SettleReceiptSheet } from './InvoiceSheets'
+import { mktSummary } from '@/app/(portal)/statements/_lib/marketing-lines'
 import { INVOICE_CARD, invoiceCards, isStatusCard } from '@/app/(portal)/statements/_lib/invoice-cards'
 import {
   invoicedTotal,
   onCard,
   returnedNote,
   settleSelection,
-  type HubContract,
   type HubCreditNote,
   type HubInvoice,
   type InvoiceCardKey,
@@ -39,7 +39,7 @@ import s from './fin-app.module.css'
 // pill, a stacked card per list, Create invoice ▾ · Payroll ▾ · Export ▾), a
 // card's list (its month, search and *Select* — tick one payer's issued
 // invoices, a dark bar settles them on one receipt), the credit notes,
-// marketing projects and non-billable lines, the payroll basis, and an
+// Marketing's billing lines and non-billable lines, the payroll basis, and an
 // invoice — the drawer's parts with what the full page adds, since on a phone
 // this screen is the invoice's page. Every figure is the desktop hub's
 // (`loadInvoiceHub`, `invoiceCards`), every step and window the desktop's
@@ -208,11 +208,10 @@ export default function InvoiceApp({
   const mayTick = (can.create || can.void || can.docExport) && (listCard === 'all' || listCard === 'issued')
 
   // ── The voucher page's work, as sheets (part E4b): a pool's settle by netting, a paid invoice's refund,
-  // a non-billable expense — and a marketing contract, new or edited ──
+  // a non-billable expense ──
   const [settleFor, setSettleFor] = useState<HubInvoice | null>(null)
   const [payment, setPayment] = useState<{ key: string; preset: PaymentPreset } | null>(null)
   const [paying, setPaying] = useState(false)
-  const [contractFor, setContractFor] = useState<{ id: string | null } | null>(null)
   const startRefund = (inv: HubInvoice) => {
     void openInvoiceRefund(inv.id).then(
       (res) => {
@@ -375,29 +374,21 @@ export default function InvoiceApp({
       }))
       group = <ItemGroup title="Credit notes" count={plural(hub.creditNotes.length, 'credit note', 'credit notes')} items={items} empty={`No credit notes in ${monthLong}.`} />
     } else if (card === 'mkt') {
-      const datesOf = (c: HubContract) => {
-        const a = c.start ? fd(c.start) : null
-        const b = c.end ? fd(c.end) : null
-        if (a && b) return a.slice(-4) === b.slice(-4) ? `${a.slice(0, -5)} – ${b}` : `${a} – ${b}`
-        return a ? `from ${a}` : b ? `to ${b}` : ''
-      }
-      const items: ItemLine[] = hub.contracts.map((c) => ({
-        key: c.id,
-        label: c.description,
-        sub: [c.company, datesOf(c)].filter(Boolean).join(' · '),
-        value: c.amount == null ? '—' : f2(c.amount),
-        chip: { text: c.status, tone: c.status === 'active' ? 'ledger' : 'def' },
-        action: c.invoice
-          ? { label: 'Invoice', onClick: () => go({ kind: 'record', id: c.invoice!.id, from: 'mkt' }) }
-          : {
-              label: 'Invoice',
-              off: true,
-              onClick: () => flash(`No invoice for this project in ${monthLong} yet — Create invoice ▾ › Generate Marketing invoices raises them.`),
-            },
-        onOpen: can.edit ? () => setContractFor({ id: c.id }) : undefined,
+      // Marketing billing (2026-10-26, ②b-2h): the lines Marketing's manager confirmed; Import puts those on no invoice
+      // yet onto drafts.
+      const mkt = mktSummary(hub.marketing)
+      const items: ItemLine[] = hub.marketing.lines.map((l) => ({
+        key: l.bill,
+        label: l.words,
+        sub: [l.party.name, l.track, l.account ? l.account.code : 'no account'].join(' · '),
+        value: f2(l.amount),
+        chip: l.invoice ? { text: l.invoice.status === 'paid_via_netting' ? 'paid via netting' : l.invoice.status, tone: 'ledger' } : { text: 'to import', tone: 'def' },
+        action: l.invoice
+          ? { label: 'Invoice', onClick: () => go({ kind: 'record', id: l.invoice!.id, from: 'mkt' }) }
+          : { label: 'Invoice', off: true, onClick: () => flash('Not on an invoice yet — Create invoice ▾ › Import Marketing billing puts it on its draft.') },
       }))
-      group = <ItemGroup title="Marketing projects" count={plural(hub.contracts.length, 'project', 'projects')} items={items} empty="No marketing projects yet." />
-      if (can.create) bar = [{ key: 'new', label: '+ New contract', kind: 'primary', onClick: () => setContractFor({ id: null }) }]
+      group = <ItemGroup title="Marketing billing" count={plural(mkt.lines, 'line', 'lines')} items={items} empty={`Nothing confirmed by Marketing for ${monthLong} yet.`} />
+      if (can.create && mkt.toImport > 0) bar = [{ key: 'import', label: `Import · ${mkt.toImport}`, kind: 'primary', onClick: () => work.openDialog('marketing') }]
     } else {
       const items: ItemLine[] = hub.nonBillable.map((t) => ({
         key: t.id,
@@ -524,7 +515,6 @@ export default function InvoiceApp({
     )
   }
 
-  const contractOn = contractFor?.id ? (hub.contracts.find((c) => c.id === contractFor.id) ?? null) : null
   return (
     <>
       {screen}
@@ -548,31 +538,6 @@ export default function InvoiceApp({
           today={today}
           preset={payment.preset}
           onSaved={() => router.refresh()}
-        />
-      ) : null}
-      {contractFor ? (
-        <ContractSheet
-          key={contractFor.id ?? 'new'}
-          open
-          onClose={() => setContractFor(null)}
-          onDone={(message) => {
-            flash(message)
-            router.refresh()
-          }}
-          contract={
-            contractOn
-              ? {
-                  id: contractOn.id,
-                  companyId: contractOn.companyId,
-                  description: contractOn.description === '—' ? '' : contractOn.description,
-                  amount: contractOn.amount == null ? '' : contractOn.amount.toFixed(2),
-                  startDate: contractOn.start ?? '',
-                  endDate: contractOn.end ?? '',
-                }
-              : null
-          }
-          companies={hub.companies}
-          today={today}
         />
       ) : null}
     </>

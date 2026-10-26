@@ -17,6 +17,9 @@ const ok: RawStaffForm = {
   name: '  Lim Mei Ling ',
   departmentId: 'dept-marketing',
   titleId: 'title-1',
+  hireDate: '2026-11-02',
+  employmentStatus: 'probation',
+  probationMonths: '3',
   fullCommission: false,
   basicSalary: '3500',
   allowances: '200.5',
@@ -39,6 +42,10 @@ describe('validateStaffForm', () => {
       employmentType: 'salaried',
       homeSubDepartmentId: null,
       reportsTo: null,
+      hireDate: '2026-11-02',
+      employmentStatus: 'probation',
+      probationMonths: 3,
+      contractMonths: null,
       basicSalary: 3500,
       allowances: 200.5,
       nonStatutoryAllowance: 0,
@@ -154,6 +161,26 @@ describe('validateStaffForm', () => {
   it('demands a name and a department', () => {
     expect(() => validateStaffForm({ ...ok, name: '   ' })).toThrow(/Name is required/)
     expect(() => validateStaffForm({ ...ok, departmentId: '' })).toThrow(/Pick a department/)
+  })
+
+  // 2026-10-23 — the user: "when people add in, will need to fill up one more, is status … then is select probation,
+  // needs to select with probation period".
+  it('demands the hire date and the employment status — and a probation’s period', () => {
+    expect(() => validateStaffForm({ ...ok, hireDate: '' })).toThrow(/Pick the hire date/)
+    expect(() => validateStaffForm({ ...ok, hireDate: '2026-02-30' })).toThrow(/Pick the hire date/)
+    expect(() => validateStaffForm({ ...ok, employmentStatus: '' })).toThrow(/Pick the employment status/)
+    expect(() => validateStaffForm({ ...ok, probationMonths: '' })).toThrow(/Pick the probation period/)
+  })
+
+  it('a permanent or part-time hire carries no period, whatever the hidden field held', () => {
+    expect(validateStaffForm({ ...ok, employmentStatus: 'permanent', probationMonths: '3', contractMonths: '12' })).toMatchObject({ employmentStatus: 'permanent', probationMonths: null, contractMonths: null })
+    expect(validateStaffForm({ ...ok, employmentStatus: 'part_time', probationMonths: null })).toMatchObject({ employmentStatus: 'part_time', probationMonths: null, contractMonths: null })
+  })
+
+  // Contract (2026-10-24 — the user: "can add with one is Contract, then need pick time period as well").
+  it('a contract hire carries its period, never a probation’s — and is refused without one', () => {
+    expect(validateStaffForm({ ...ok, employmentStatus: 'contract', probationMonths: '3', contractMonths: '18' })).toMatchObject({ employmentStatus: 'contract', probationMonths: null, contractMonths: 18 })
+    expect(() => validateStaffForm({ ...ok, employmentStatus: 'contract', contractMonths: '' })).toThrow(/Pick the contract period/)
   })
 })
 

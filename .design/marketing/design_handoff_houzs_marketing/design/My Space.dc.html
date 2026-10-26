@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="./hm-store.js"></script>
+<style>
+@keyframes mkConfetti{0%{transform:translate(0,0) rotate(0);opacity:1}100%{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+@keyframes mkFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes mkPop{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}
+</style>
+</helmet>
+<div style="max-width:1240px;margin:0 auto;padding:20px 28px 64px;box-sizing:border-box;color:rgb(51 36 27)">
+
+  <sc-if value="{{ showTabs }}">
+    <div style="display:flex;gap:24px;border-bottom:1px solid rgb(236 231 224);margin-bottom:28px">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2">
+        <div onClick="{{ t.onClick }}" style="display:flex;align-items:center;gap:7px;padding:8px 2px 10px;margin-bottom:-1px;border-bottom:2px solid {{ t.line }};color:{{ t.color }};font-weight:{{ t.weight }};font-size:1em;cursor:pointer;white-space:nowrap">
+          <span style="font-size:14px">{{ t.emoji }}</span><span>{{ t.label }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+    <sc-for list="{{ storeNotices }}" as="sn" hint-placeholder-count="0">
+      <div style="margin-top:20px;display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;background:oklch(0.975 0.015 235);border:1px solid oklch(0.92 0.035 235);animation:mkPop .3s ease-out">
+        <span style="font-size:17px">📋</span>
+        <span style="font-size:0.81em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:oklch(0.45 0.10 235);white-space:nowrap">Assignment plan</span>
+        <span style="font-size:1em;color:rgb(51 36 27)">{{ sn.text }}</span>
+      </div>
+    </sc-for>
+    <sc-if value="{{ hasNotice }}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top:20px;display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;background:oklch(0.975 0.015 295);border:1px solid oklch(0.92 0.035 295)">
+        <span style="font-size:17px">🎬</span>
+        <span style="font-size:0.81em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:oklch(0.45 0.12 295);white-space:nowrap">Assignment plan</span>
+        <span style="font-size:1em;color:rgb(51 36 27)">You're on the plan for "Carres Year-End Video" — Stage 3, starts 12 Nov</span>
+      </div>
+    </sc-if>
+
+    <div style="margin-top:16px"><dc-import name="My Space Bento" user="{{ roomUser }}" plate="{{ roomPlate }}" red="{{ roomRed }}" fresh="{{ roomFresh }}" plate-line="{{ plateLine }}" columns="{{ columns }}" on-open-task="{{ roomOpenTask }}" hint-size="100%,1000px"></dc-import></div>
+  </sc-if>
+
+  <sc-if value="{{ isCalendar }}">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="font-size:1.6em;font-weight:600;letter-spacing:-0.01em">October 2026</span>
+      <div style="display:flex;gap:4px">
+        <span style="width:30px;height:30px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(74 64 58)" style-hover="background:rgb(250 248 244)">‹</span>
+        <span style="width:30px;height:30px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(74 64 58)" style-hover="background:rgb(250 248 244)">›</span>
+      </div>
+      <span style="height:30px;padding:0 12px;border-radius:8px;border:1px solid rgb(229 222 211);display:flex;align-items:center;font-size:0.92em;cursor:pointer" style-hover="background:rgb(250 248 244)">Today</span>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px">
+        <sc-for list="{{ viewOpts }}" as="o" hint-placeholder-count="2">
+          <div onClick="{{ o.onClick }}" style="height:28px;padding:0 14px;border-radius:6px;display:flex;align-items:center;gap:6px;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.92em">{{ o.label }}</div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:16px 0 18px;font-size:0.88em;color:rgb(74 64 58)">
+      <sc-for list="{{ pillars }}" as="p" hint-placeholder-count="4"><span style="display:flex;align-items:center;gap:6px;white-space:nowrap"><span style="font-size:13px">{{ p.emoji }}</span>{{ p.name }}</span></sc-for>
+      <span style="flex:1"></span>
+      <span style="color:rgb(117 100 86)">Status follows each post's workflow</span>
+      <sc-for list="{{ statusLegend }}" as="s" hint-placeholder-count="4"><span style="display:flex;align-items:center;gap:5px;white-space:nowrap"><span style="width:7px;height:7px;border-radius:50%;background:{{ s.dot }}"></span>{{ s.label }}</span></sc-for>
+    </div>
+
+    <sc-if value="{{ isMonth }}" hint-placeholder-val="{{ true }}">
+      <div style="border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224)">
+          <sc-for list="{{ weekdays }}" as="w" hint-placeholder-count="7"><div style="padding:8px 10px;font-size:0.81em;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">{{ w }}</div></sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr))">
+          <sc-for list="{{ cells }}" as="d" hint-placeholder-count="35">
+            <div style="min-height:122px;padding:6px;box-sizing:border-box;border-right:{{ d.br }};border-bottom:{{ d.bb }};background:{{ d.bg }};display:flex;flex-direction:column;gap:4px">
+              <div style="display:flex;justify-content:flex-end;padding:2px 2px 0">
+                <span style="min-width:22px;height:22px;padding:0 4px;box-sizing:border-box;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:0.85em;font-weight:{{ d.weight }};background:{{ d.numBg }};color:{{ d.numFg }}">{{ d.n }}</span>
+              </div>
+              <sc-for list="{{ d.posts }}" as="p" hint-placeholder-count="0">
+                <div title="{{ p.title }}" style="display:flex;flex-direction:column;gap:2px;padding:5px 7px;border-radius:6px;background:{{ p.bg }};border:1px solid {{ p.border }};cursor:pointer;min-width:0" style-hover="filter:brightness(0.98)">
+                  <div style="display:flex;align-items:center;gap:5px;min-width:0">
+                    <span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ p.dot }}"></span>
+                    <span style="font-size:0.85em;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgb(51 36 27)">{{ p.title }}</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:5px;font-size:0.78em;color:rgb(90 78 68);white-space:nowrap;overflow:hidden">
+                    <span style="width:6px;height:6px;border-radius:2px;flex:none;background:{{ p.subDot }}"></span>
+                    <span>{{ p.pillarEmoji }}</span><span style="overflow:hidden;text-overflow:ellipsis">{{ p.type }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isList }}">
+      <div style="border:1px solid rgb(236 231 224);border-radius:12px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:96px minmax(0,2.2fr) minmax(0,1.2fr) minmax(0,1.7fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,1.6fr);gap:12px;padding:10px 16px;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224);font-size:0.81em;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:rgb(117 100 86)">
+          <span>Posting</span><span>Post</span><span>Subsidiary</span><span>Pillar</span><span>Type</span><span>Now with</span><span>Status</span>
+        </div>
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+          <div style="padding:14px 16px 6px;display:flex;align-items:center;gap:8px;font-size:0.92em;font-weight:600;color:{{ g.color }}"><span>{{ g.emoji }}</span><span>{{ g.title }}</span><span style="font-weight:400;color:rgb(117 100 86)">{{ g.count }}</span></div>
+          <sc-for list="{{ g.rows }}" as="p" hint-placeholder-count="3">
+            <div style="display:grid;grid-template-columns:96px minmax(0,2.2fr) minmax(0,1.2fr) minmax(0,1.7fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,1.6fr);gap:12px;align-items:center;padding:0 16px;min-height:52px;border-top:1px solid rgb(244 241 236);background:{{ p.rowBg }};font-size:0.96em;cursor:pointer" style-hover="background:rgb(250 248 244)">
+              <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11.5px;color:rgb(74 64 58)">{{ p.dateLabel }}</span>
+              <div style="min-width:0">
+                <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.title }}</div>
+                <div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10.5px;color:rgb(117 100 86);margin-top:2px">{{ p.trackId }}</div>
+              </div>
+              <span style="display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ p.subDot }}"></span>{{ p.sub }}</span>
+              <span style="display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span>{{ p.pillarEmoji }}</span>{{ p.pillar }}</span>
+              <span>{{ p.type }}</span>
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgb(74 64 58)">{{ p.nowWith }}</span>
+              <div style="display:flex"><span style="display:flex;align-items:center;gap:6px;font-size:0.88em;font-weight:500;padding:3px 9px;border-radius:999px;background:{{ p.bg }};color:{{ p.fg }};border:1px solid {{ p.border }};white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:{{ p.dot }}"></span>{{ p.statusLabel }}</span></div>
+            </div>
+          </sc-for>
+        </sc-for>
+      </div>
+    </sc-if>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:1100},&quot;user&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;mei&quot;,&quot;jason&quot;],&quot;default&quot;:&quot;mei&quot;,&quot;tsType&quot;:&quot;'mei'|'jason'&quot;},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;overview&quot;,&quot;calendar&quot;],&quot;default&quot;:&quot;overview&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;month&quot;,&quot;list&quot;],&quot;default&quot;:&quot;month&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;empty&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const ST = {
+  draft: { bg: 'rgb(243 242 239)', border: 'rgb(226 223 217)', fg: 'rgb(98 92 86)', dot: 'rgb(160 154 146)' },
+  waiting: { bg: 'rgb(251 243 225)', border: 'rgb(236 214 164)', fg: 'rgb(138 92 10)', dot: 'rgb(214 152 30)' },
+  done: { bg: 'rgb(232 244 235)', border: 'rgb(190 222 199)', fg: 'rgb(40 110 64)', dot: 'rgb(60 150 90)' },
+  red: { bg: 'rgb(252 236 233)', border: 'rgb(236 190 184)', fg: 'rgb(176 40 34)', dot: 'rgb(200 52 42)' },
+};
+const DEPT = {
+  ads: { label: 'Ads', bg: 'oklch(0.95 0.035 270)', fg: 'oklch(0.45 0.12 270)' },
+  video: { label: 'Content (Video)', bg: 'oklch(0.95 0.035 295)', fg: 'oklch(0.45 0.12 295)' },
+  design: { label: 'Design (Graphic)', bg: 'oklch(0.95 0.035 350)', fg: 'oklch(0.47 0.13 350)' },
+  social: { label: 'Social Media', bg: 'oklch(0.95 0.035 235)', fg: 'oklch(0.45 0.10 235)' },
+};
+const SUBDOT = {
+  Carres: 'oklch(0.70 0.12 235)', '2990 Home': 'oklch(0.64 0.15 295)', 'Houzs Century': 'oklch(0.52 0.06 55)',
+  Hookka: 'oklch(0.70 0.13 345)', Colive: 'oklch(0.66 0.10 195)', Dreamcrafter: 'oklch(0.56 0.15 270)',
+  CMI: 'oklch(0.60 0.03 250)', 'The Conts': 'oklch(0.62 0.12 320)',
+};
+const PILLARS = [
+  { name: 'Brand World', emoji: '🌏' }, { name: 'Product Universe', emoji: '🛋️' },
+  { name: 'Audience Value', emoji: '💡' }, { name: 'Social Proof & Community', emoji: '🤝' },
+];
+const PE = Object.fromEntries(PILLARS.map(p => [p.name, p.emoji]));
+
+const DATA = {
+  mei: {
+    first: 'Mei',
+    myTurn: [
+      { id: 'car7', topLeft: 'MKT-CAR-2610-007', title: 'Carres Year-End Video', sub: 'Carres', stage: 1, of: 5, stageName: 'Script', due: 'Due 21 Oct', st: 'red', label: 'Overdue 1 day', action: 'open', dept: 'video' },
+      { id: 'hc11', topLeft: 'MKT-HC-2610-011', title: 'Raya Reels', sub: 'Houzs Century', stage: 1, of: 5, stageName: 'Script', st: 'red', label: 'Not accepted · 5 working hours', action: 'accept', dept: 'video' },
+      { id: 'col3', topLeft: 'MKT-COL-2610-003', title: 'Colive Room Tour', sub: 'Colive', stage: 1, of: 5, stageName: 'Script', st: 'waiting', label: 'New', action: 'accept', dept: 'video' },
+    ],
+    delegated: [
+      { id: 'sb', topLeft: 'Subtask → Aina', title: 'Storyboard sketch', parent: 'Carres Year-End Video', assignee: 'Aina', st: 'waiting', label: 'In progress · due 20 Oct', action: 'none', dept: 'design' },
+      { id: 'srb', topLeft: 'Subtask → Hafiz', title: 'Shot reference board', assignee: 'Hafiz', st: 'waiting', label: 'Ready', action: 'review', dept: 'design' },
+    ],
+    waiting: [
+      { id: 'rtr', topLeft: 'MKT-2990-2610-018', title: 'Red Truck Reels', sub: '2990 Home', nowWith: 'Carmen', st: 'waiting', label: 'Waiting for PIC · 1 day', action: 'none', dept: 'video' },
+    ],
+    pages: [
+      { emoji: '📁', name: 'Scripts', meta: '4 pages' },
+      { emoji: '📁', name: 'Shot lists', meta: '2 pages' },
+      { emoji: '📝', name: 'Year-End Video — director notes', meta: 'Edited yesterday' },
+      { emoji: '📝', name: 'Raya Reels moodboard', meta: 'Edited 3 days ago' },
+    ],
+  },
+  ali: {
+    first: 'Ali',
+    myTurn: [
+      { id: 'rt18', topLeft: 'MKT-2990-2610-018', title: 'Red Truck Reels', sub: '2990 Home', stage: 4, of: 5, stageName: 'Edit', due: 'Due 25 Oct', st: 'red', label: '1 day overdue', action: 'open', dept: 'video' },
+    ],
+    delegated: [
+      { id: 'sub1', topLeft: 'Subtask → Siti', title: 'Subtitles BM + EN', parent: 'Red Truck Reels', assignee: 'Siti', st: 'waiting', label: 'Ready', action: 'review', dept: 'design' },
+    ],
+    waiting: [],
+    pages: [
+      { emoji: '📁', name: 'Export presets', meta: '3 pages' },
+      { emoji: '📝', name: 'LUT notes', meta: 'Edited 2 days ago' },
+    ],
+  },
+  siti: { first: 'Siti', myTurn: [], delegated: [], waiting: [], pages: [{ emoji: '📁', name: 'Carres templates', meta: '5 pages' }] },
+  weilun: { first: 'Wei Lun', myTurn: [], delegated: [], waiting: [], pages: [{ emoji: '📁', name: 'Ad set notes', meta: '3 pages' }] },
+  rachel: {
+    first: 'Rachel',
+    myTurn: [
+      { id: 'car11', topLeft: 'MKT-CAR-2610-011', title: 'Year-end sale countdown', sub: 'Carres', stage: 3, of: 4, stageName: 'Approval', due: 'Due 23 Oct', st: 'waiting', label: 'Waiting for your approval', action: 'open', dept: 'social' },
+      { id: 'rt19', topLeft: 'MKT-2990-2610-019', title: 'Red Truck Reels ep.2', sub: '2990 Home', stage: 3, of: 4, stageName: 'Approval', due: 'Due 31 Oct', st: 'waiting', label: 'Waiting for your approval', action: 'open', dept: 'social' },
+    ],
+    delegated: [],
+    waiting: [
+      { id: 'dv', topLeft: 'MKT-2990-2610-021', title: 'Deepavali early-bird', sub: '2990 Home', nowWith: 'Carmen', st: 'red', label: 'Overdue · Waiting for PIC · 2 days', action: 'none', dept: 'social' },
+    ],
+    pages: [
+      { emoji: '📁', name: 'Q4 planning', meta: '6 pages' },
+      { emoji: '📝', name: 'Team 1:1 notes', meta: 'Edited today' },
+    ],
+  },
+  jason: {
+    first: 'Jason',
+    myTurn: [
+      { id: 'col9', topLeft: 'MKT-COL-2610-009', title: 'Resident story: Aisyah', sub: 'Colive', stage: 1, of: 4, stageName: 'Caption', due: 'Due 27 Oct', st: 'waiting', label: 'In progress', action: 'open', dept: 'social' },
+    ],
+    delegated: [],
+    waiting: [
+      { id: 'dv', topLeft: 'MKT-2990-2610-021', title: 'Deepavali early-bird', sub: '2990 Home', nowWith: 'Carmen', st: 'red', label: 'Overdue · Waiting for PIC · 2 days', action: 'none', dept: 'social' },
+    ],
+    pages: [
+      { emoji: '📁', name: 'Caption bank', meta: '12 pages' },
+      { emoji: '📝', name: 'Hashtag sets', meta: 'Edited today' },
+    ],
+  },
+};
+
+const POSTS = [
+  { d: 2, title: 'Showroom morning light', sub: 'Carres', tid: 'MKT-CAR-2610-002', pillar: 'Brand World', type: 'Post', st: 'done', label: 'Posted', now: '—' },
+  { d: 6, title: 'Red Truck Reels ep.1', sub: '2990 Home', tid: 'MKT-2990-2610-004', pillar: 'Product Universe', type: 'Reels', st: 'done', label: 'Posted', now: '—' },
+  { d: 9, title: '3 tips for small rooms', sub: 'Colive', tid: 'MKT-COL-2610-002', pillar: 'Audience Value', type: 'Tip', st: 'done', label: 'Posted', now: '—' },
+  { d: 13, title: 'Customer home: Puchong', sub: 'Hookka', tid: 'MKT-HK-2610-005', pillar: 'Social Proof & Community', type: 'Testimonial', st: 'done', label: 'Posted', now: '—' },
+  { d: 16, title: 'Century lounge teaser', sub: 'Houzs Century', tid: 'MKT-HC-2610-008', pillar: 'Product Universe', type: 'Launch', st: 'done', label: 'Posted', now: '—' },
+  { d: 20, title: 'Kids room makeover', sub: 'Dreamcrafter', tid: 'MKT-DC-2610-004', pillar: 'Audience Value', type: 'Reels', st: 'done', label: 'Posted', now: '—' },
+  { d: 21, title: 'Deepavali early-bird', sub: '2990 Home', tid: 'MKT-2990-2610-021', pillar: 'Product Universe', type: 'Offer', st: 'red', label: 'Overdue · Waiting for PIC', now: 'Carmen (PIC)' },
+  { d: 23, title: 'Year-end sale countdown', sub: 'Carres', tid: 'MKT-CAR-2610-011', pillar: 'Product Universe', type: 'Offer', st: 'waiting', label: 'Waiting for approval', now: 'Rachel' },
+  { d: 24, title: 'Behind the factory', sub: 'CMI', tid: 'MKT-CMI-2610-003', pillar: 'Brand World', type: 'Reels', st: 'waiting', label: 'Waiting · Editing', now: 'Ali' },
+  { d: 27, title: 'Resident story: Aisyah', sub: 'Colive', tid: 'MKT-COL-2610-009', pillar: 'Social Proof & Community', type: 'Testimonial', st: 'draft', label: 'Draft', now: 'Jason' },
+  { d: 29, title: 'Container café launch', sub: 'The Conts', tid: 'MKT-TC-2610-002', pillar: 'Brand World', type: 'Launch', st: 'draft', label: 'Draft', now: 'Jason' },
+  { d: 30, title: 'Rug care tip', sub: 'Hookka', tid: 'MKT-HK-2610-007', pillar: 'Audience Value', type: 'Tip', st: 'draft', label: 'Draft', now: 'Jason' },
+  { d: 31, title: 'Red Truck Reels ep.2', sub: '2990 Home', tid: 'MKT-2990-2610-019', pillar: 'Product Universe', type: 'Reels', st: 'waiting', label: 'Waiting for approval', now: 'Rachel' },
+];
+const WD = ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed'];
+const TODAY = 22;
+
+function confetti() {
+  const cols = ['oklch(0.80 0.10 235)', 'oklch(0.78 0.12 295)', 'oklch(0.80 0.11 350)', 'oklch(0.75 0.12 270)', 'oklch(0.80 0.09 195)'];
+  const pieces = Array.from({ length: 18 }, (_, i) => {
+    const a = (i / 18) * Math.PI * 2;
+    const r = 60 + (i % 3) * 22;
+    return React.createElement('span', {
+      key: i,
+      style: {
+        position: 'absolute', left: '50%', top: '70%', width: i % 2 ? 6 : 8, height: i % 2 ? 10 : 6, borderRadius: 2,
+        background: cols[i % cols.length], '--dx': `${Math.cos(a) * r}px`, '--dy': `${Math.sin(a) * r - 30}px`, '--r': `${i * 40}deg`,
+        animation: `mkConfetti 900ms cubic-bezier(0.2,0.8,0.2,1) ${i * 12}ms forwards`,
+      },
+    });
+  });
+  return React.createElement('div', { style: { position: 'absolute', inset: 0, pointerEvents: 'none' } }, pieces);
+}
+
+function emptyArt() {
+  const e = (ch, style) => React.createElement('span', { style: { position: 'absolute', lineHeight: 1, ...style } }, ch);
+  return React.createElement('div', { style: { position: 'relative', width: 180, height: 150 } },
+    React.createElement('div', { style: { position: 'absolute', left: 20, top: 10, width: 140, height: 140, borderRadius: '50%', background: 'oklch(0.95 0.03 235)' } }),
+    e('☕', { left: 52, top: 36, fontSize: 76, animation: 'mkFloat 3.2s ease-in-out infinite' }),
+    e('🍞', { left: 6, top: 98, fontSize: 30, transform: 'rotate(-12deg)' }),
+    e('✨', { left: 138, top: 12, fontSize: 24, animation: 'mkFloat 2.4s ease-in-out .6s infinite' }),
+    e('🌿', { left: 142, top: 104, fontSize: 24 }),
+  );
+}
+
+const hs = () => window.__hmStore;
+class Component extends DCLogic {
+  componentDidMount() { this._u = () => this.forceUpdate(); const go = () => { if (hs()) hs().subs.add(this._u); else setTimeout(go, 50); }; go(); }
+  componentWillUnmount() { hs() && hs().subs.delete(this._u); }
+  state = { tab: this.props.tab ?? 'overview', view: this.props.view ?? 'month', accepted: {}, reviewed: {} };
+
+  card(c, col) {
+    const { accepted, reviewed } = this.state;
+    let st = c.st, label = c.label, action = c.action, note = '', conf = null;
+    if (accepted[c.id]) { st = 'waiting'; label = 'In progress'; action = 'open'; note = "✓ Accepted — it's yours now"; }
+    if (reviewed[c.id]) { st = 'done'; label = 'Delivery approved'; action = 'none'; note = 'Nice work, Hafiz 🎉'; conf = confetti(); }
+    const s = ST[st], d = DEPT[c.dept], red = st === 'red';
+    return {
+      ...c, label, note, hasNote: !!note, confetti: conf,
+      bg: red ? 'rgb(255 247 245)' : c.isNew && !accepted[c.id] ? 'rgb(255 251 244)' : '#fff', border: red ? 'rgb(236 190 184)' : c.isNew && !accepted[c.id] ? 'rgb(214 180 140)' : 'rgb(236 231 224)',
+      stBg: s.bg, stFg: s.fg, stBorder: s.border, stDot: s.dot,
+      dept: d.label, deptBg: d.bg, deptFg: d.fg,
+      hasParent: !!c.parent, hasSub: !!c.sub, subDot: SUBDOT[c.sub],
+      hasAssignee: !!c.assignee, assigneeInitial: (c.assignee || '')[0],
+      hasNowWith: !!c.nowWith, hasDue: !!c.due,
+      hasStage: !!c.stage, stageText: c.stage ? `Stage ${c.stage}/${c.of} · ${c.stageName}` : '',
+      segs: c.stage ? Array.from({ length: c.of }, (_, i) => ({ bg: i < c.stage ? 'rgb(90 62 43)' : 'rgb(232 225 216)' })) : [],
+      isAccept: action === 'accept', isOpen: action === 'open', isReview: action === 'review',
+      onAccept: () => { if (c.store && hs()) { hs().accept(c.topLeft); this.props.onOpenTask && setTimeout(() => this.props.onOpenTask(c.topLeft), 250); return; } this.setState(p => ({ accepted: { ...p.accepted, [c.id]: true } })); },
+      onReview: () => this.setState(p => ({ reviewed: { ...p.reviewed, [c.id]: true } })),
+      onOpen: () => this.props.onOpenTask && this.props.onOpenTask(c.topLeft),
+      _red: red,
+    };
+  }
+
+  renderVals() {
+    const key = this.props.user ?? 'mei';
+    const data = DATA[key];
+    const empty = !!this.props.empty;
+    const { tab, view } = this.state;
+    const sortRed = arr => arr.map((c, i) => ({ c, i })).sort((a, b) => (b.c._red - a.c._red) || a.i - b.i).map(x => x.c);
+    const S = hs(), me = data.first, fresh = [], freshWait = [];
+    (S ? S.tasks : []).forEach(t => {
+      if (t.phase === 'done') return;
+      const st0 = t.stages[t.cur], owner = S.owner(t), appr = S.approver(t);
+      const base = { id: t.topLeft + ':' + t.cur + ':' + t.phase, topLeft: t.topLeft, title: t.title, sub: t.sub, stage: t.cur + 1, of: t.stages.length, stageName: st0.name, due: 'Due ' + st0.due, dept: st0.dept || 'social', store: true };
+      if (owner === me && t.phase === 'todo') fresh.push({ ...base, st: 'waiting', label: 'New · just assigned', action: 'accept', isNew: true });
+      else if (owner === me && t.phase === 'accepted') fresh.push({ ...base, st: 'waiting', label: 'In progress', action: 'open' });
+      else if (owner === me && t.phase === 'changes') fresh.push({ ...base, st: 'red', label: 'Changes requested · ' + t.changes.by, action: 'open' });
+      else if (t.phase === 'review' && appr === me) fresh.push({ ...base, st: 'waiting', label: 'Waiting for your approval', action: 'open' });
+      else if (t.phase === 'review' && owner === me) freshWait.push({ ...base, st: 'waiting', label: 'Waiting for ' + appr, action: 'open' });
+    });
+    const lists = empty && !fresh.length ? { myTurn: [], delegated: [], waiting: [] } : empty ? { myTurn: fresh, delegated: [], waiting: freshWait } : { ...data, myTurn: [...fresh, ...data.myTurn], waiting: [...freshWait, ...data.waiting] };
+    const storeNotices = (S ? S.notices : []).filter(n => n.forUser === me);
+    const mk = (emoji, title, hint, arr) => {
+      const cards = sortRed(arr.map(c => this.card(c)));
+      const anyRed = cards.some(c => c._red);
+      return {
+        emoji, title, hint, cards, count: cards.length, isEmpty: cards.length === 0,
+        countBg: anyRed ? 'rgb(176 40 34)' : 'rgb(236 231 224)', countFg: anyRed ? '#fff' : 'rgb(117 100 86)',
+      };
+    };
+    const columns = [
+      mk('👉', 'My turn', "It's on you — red first", lists.myTurn),
+      mk('📤', 'Delegated by me', 'Comes back to you for Review delivery', lists.delegated),
+      mk('⏳', 'Waiting on others', 'Submitted, waiting for approval', lists.waiting),
+    ];
+    const n = lists.myTurn.length;
+    const isJason = key === 'jason';
+
+    const cells = [];
+    const lead = [28, 29, 30];
+    lead.forEach(n => cells.push({ n, out: true, posts: [] }));
+    for (let d = 1; d <= 31; d++) cells.push({ n: d, posts: POSTS.filter(p => p.d === d) });
+    cells.push({ n: 1, out: true, posts: [] });
+    const cellVals = cells.map((c, i) => {
+      const today = !c.out && c.n === TODAY;
+      return {
+        n: c.n,
+        br: (i % 7) === 6 ? 'none' : '1px solid rgb(240 236 230)',
+        bb: i >= 28 ? 'none' : '1px solid rgb(240 236 230)',
+        bg: c.out ? 'rgb(251 250 248)' : '#fff',
+        numBg: today ? 'rgb(90 62 43)' : 'transparent',
+        numFg: today ? 'rgb(246 238 230)' : (c.out ? 'rgb(190 182 172)' : 'rgb(74 64 58)'),
+        weight: today ? 600 : 400,
+        posts: c.posts.map(p => ({ ...p, ...ST[p.st], subDot: SUBDOT[p.sub], pillarEmoji: PE[p.pillar] })),
+      };
+    });
+    const row = p => ({ ...p, ...ST[p.st], statusLabel: p.label, subDot: SUBDOT[p.sub], pillarEmoji: PE[p.pillar], trackId: p.tid, nowWith: p.now, dateLabel: `${WD[(p.d - 1) % 7]} ${p.d} Oct`, rowBg: p.st === 'red' ? 'rgb(255 247 245)' : 'transparent' });
+    const groups = [
+      { emoji: '🔴', title: 'Needs attention', color: 'rgb(176 40 34)', rows: POSTS.filter(p => p.st === 'red').map(row) },
+      { emoji: '🗓️', title: 'Coming up', color: 'rgb(51 36 27)', rows: POSTS.filter(p => p.d >= TODAY && p.st !== 'red').map(row) },
+      { emoji: '✅', title: 'Posted', color: 'rgb(51 36 27)', rows: POSTS.filter(p => p.d < TODAY && p.st !== 'red').map(row).reverse() },
+    ].map(g => ({ ...g, count: g.rows.length }));
+    const seg = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const tabDef = (k, emoji, label) => ({ emoji, label, line: tab === k ? 'rgb(51 36 27)' : 'transparent', color: tab === k ? 'rgb(51 36 27)' : 'rgb(117 100 86)', weight: tab === k ? 600 : 400, onClick: () => this.setState({ tab: k }) });
+
+    return {
+      showTabs: isJason,
+      tabs: [tabDef('overview', '🏠', 'Overview'), tabDef('calendar', '🗓️', 'Content Calendar')],
+      isOverview: !isJason || tab === 'overview', isCalendar: isJason && tab === 'calendar',
+      firstName: data.first,
+      roomUser: key, roomPlate: empty && !fresh.length ? 0 : n, roomRed: columns[0].cards.filter(c => c._red).length, roomFresh: columns[0].cards.some(c => c.isAccept),
+      roomOpenTask: id => this.props.onOpenTask && this.props.onOpenTask(id),
+      plateLine: empty || n === 0 ? 'your plate is clear' : `you have ${n} thing${n > 1 ? 's' : ''} on your plate`,
+      columns, hasAny: !empty, allEmpty: empty, emptyArt: emptyArt(),
+      hasNotice: !empty && key === 'mei',
+      storeNotices, hasStoreNotices: storeNotices.length > 0,
+      hasAny: !empty || fresh.length > 0, allEmpty: empty && !fresh.length,
+      pages: data.pages,
+      viewOpts: [['month', '▦ Month'], ['list', '☰ List']].map(([k, l]) => ({ label: l, ...seg(view === k), onClick: () => this.setState({ view: k }) })),
+      isMonth: view === 'month', isList: view === 'list',
+      pillars: PILLARS,
+      statusLegend: [['draft', 'Draft'], ['waiting', 'Waiting'], ['done', 'Approved / Done'], ['red', 'Overdue']].map(([k, l]) => ({ label: l, dot: ST[k].dot })),
+      weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      cells: cellVals, groups,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -102,7 +102,7 @@ export default function FinanceVoucherPage({ detail: v, extras, canCopy }: { det
                 </div>
                 {v.sources.map((r, i) => (
                   <div key={i} className={s.tRow}>
-                    <span className={s.tCol}>{r.pool}</span>
+                    <span className={s.tCol}>{r.description ? `${r.pool} · ${r.description}` : r.pool}</span>
                     <span className={s.tCol} data-sub="true">
                       {r.account}
                     </span>

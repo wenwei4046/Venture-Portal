@@ -10,9 +10,11 @@
  * replies · Auto replies) · Camera in one pill, the mic held to record or Send;
  * "/" for quick replies; after the reply window, approved templates only.
  */
+import { DEFAULT_APPT_TYPES } from "@/lib/member/crm-data";
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
+import { customBookVM, customPrefill, type CustomBook } from "../../shared/custom-book";
 import { DEFAULT_QUICK_REPLIES, blockHours, type CrmChatMessage, type CrmCustomer, type CrmRoom, type CrmVisit } from "@/lib/member/crm-data";
-import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf } from "../../shared/people";
+import { personOf, teamOf, teamName, downlineOf, jobTitle, titleOf, teamAssignees } from "../../shared/people";
 import { BORDER, chatStripOf, coldLine, gb, CHANNEL, day0, DAY, daySep, dayLabel, firstName, ini, msgTime, money, stop, timeLabel, windowShut, type SalesCtx } from "./common";
 import { bookingSkipsForm, customerFormVM, infoRows } from "./customer";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
@@ -109,12 +111,10 @@ export function failNote(error: string | null | undefined): string {
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
 
-/** Who a TL / STL may give this customer to in their own CRM: their downline in the customer's team (none otherwise). */
+/** Who a TL / STL / TA may give this customer to in their own CRM: their downline in the customer's team (none otherwise). */
 export function leaderAssignees(ctx: SalesCtx, c: CrmCustomer | undefined) {
-  const { owner, data } = ctx;
-  if (!c || !c.teamId || ctx.viewingOther || ctx.embedded?.assignTo || (owner.role !== "tl" && owner.role !== "stl")) return [];
-  return downlineOf(owner.id, data.people).map(id => personOf(id, data.people)!)
-    .filter(p => p && p.id !== c.assignedTo && ["stl", "tl", "ta", "rs"].includes(p.role) && teamOf(p.id, data.people)?.id === c.teamId);
+  if (!c || ctx.viewingOther || ctx.embedded?.assignTo) return [];
+  return teamAssignees(ctx.owner, ctx.data.people, c);
 }
 
 export function chatVM(ctx: SalesCtx) {
@@ -163,12 +163,12 @@ export function chatVM(ctx: SalesCtx) {
     const by = mine && m.by && m.by !== c.assignedTo && !m.auto ? nameOf(m.by) : m.auto ? "Auto-reply" : "";
     return {
       // An album's other photos are drawn in its first message (shared/chat-media.ts › albumsOf).
-      sep, plain: !al.hidden.has(key), align: mine ? "flex-end" : "flex-start", max: "80%", rowDir: mine ? ("row-reverse" as const) : ("row" as const), rxGap: m.myReaction ? "14px" : "0",
+      sep, plain: !al.hidden.has(key), align: mine ? "flex-end" : "flex-start", max: "80%", rowDir: mine ? ("row-reverse" as const) : ("row" as const), rxGap: m.myReaction || m.theirReaction ? "14px" : "0",
       radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px", bg: mine ? MINE_BG : "#fff", borderStyle: "solid", border: mine ? MINE_BG : "#fff",
       textAlign: "left" as const, fg: mine ? "#fff" : INK, quote: q ? { who: q.from === "me" ? "You" : c.name, text: plain(q.text) } : null,
       ev: card && cd ? {
-        kind: card.kind, title: "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
-        time: timeLabel(cd), room: card.room, addr: card.addr,
+        kind: card.kind, title: card.mode === "online" ? "Online meeting" : card.mode === "other" ? "Appointment" : "Showroom visit", wk: cd.toLocaleDateString("en-GB", { weekday: "short" }), dn: String(cd.getDate()), mon: gb(cd, { month: "short" }),
+        time: timeLabel(cd), room: card.room, addr: card.mode === "online" ? card.link ?? "" : card.addr === card.room ? "" : card.addr,
         bg: card.kind === "Cancelled" ? "var(--crm-field)" : "var(--crm-tint-attention)", fg: card.kind === "Cancelled" ? "var(--crm-muted)" : "var(--crm-rust)", deco: card.kind === "Cancelled" ? "line-through" : "none",
         // Tap the card → Calendar on the visit's date.
         go: () => set(u => ({ ...u, chat: null, tab: "calendar", calView: "month", calSel: day0(cd), calYM: [cd.getFullYear(), cd.getMonth()], hist: [...u.hist, u.tab].slice(-20) })),
@@ -203,7 +203,8 @@ export function chatVM(ctx: SalesCtx) {
         });
       }, () => { patch({ reply: { msgId: key, from: m.from, text: m.text || (m.media ? mediaWord(m) : "") }, menu: null, hover: null }); focusDraft(); }) },
       openReact: () => patch({ menu: { msgId: key, full: false, from: m.from, text: m.text } }),
-      reaction: m.myReaction ?? "", rxLeft: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto", rbLeft: mine ? "-38px" : "auto", rbRight: mine ? "auto" : "-38px",
+      // Ours and the customer's side by side (2026-10-24: their reaction was an empty bubble).
+      reaction: [m.myReaction, m.theirReaction].filter(Boolean).join(""), rxLeft: mine ? "auto" : "10px", rxRight: mine ? "10px" : "auto", rbLeft: mine ? "-38px" : "auto", rbRight: mine ? "auto" : "-38px",
     };
   });
 
@@ -230,7 +231,7 @@ export function chatVM(ctx: SalesCtx) {
   const ss = hm.ssel ?? [];
   // The Principal / Director in someone's chat: Assign to anyone, beside Share and Move (user 2026-10-09: 3个功能都要有). Their Move goes to the owner's superior (crm_invite).
   // Offered only with CRM · Manage (CrmApp hands it over then).
-  // A TL / STL in their own CRM assigns their team's customer to someone in that team (the owner, 2026-10-14: "只有上級能
+  // A TL / STL / TA in their own CRM assigns their team's customer to someone in that team (the owner, 2026-10-14: "只有上級能
   //給自己的下級"; crm_assign_member asks the same) — their downline in the customer's team.
   const leaderList = leaderAssignees(ctx, c);
   const assigner = ctx.embedded?.assignTo ?? (leaderList.length ? (cid: string, sid: string) => act.assignMember(cid, sid) : null);
@@ -264,9 +265,10 @@ export function chatVM(ctx: SalesCtx) {
     ] as [string, string, () => void, string, string, string][]).map(([label, icon, go, sub, bg, fg]) => ({ label, icon, go, sub, bg, fg })),
     apptOpen: !!hm.appt, apptHas: !!nextVisit, apptNone: !nextVisit,
     apptRoom: nextVisit ? (roomOf(nextVisit.showroomId)?.name ?? "").replace(/ showroom$/i, "") : "",
-    apptWhen: nextVisit ? `${dayLabel(new Date(nextVisit.start))}, ${timeLabel(new Date(nextVisit.start))}` : "",
+    // An online / elsewhere visit carries its link and the salesperson's remarks here too (2026-10-24).
+    apptWhen: nextVisit ? [`${dayLabel(new Date(nextVisit.start))}, ${timeLabel(new Date(nextVisit.start))}`, nextVisit.link, nextVisit.remarks].filter(Boolean).join(" · ") : "",
     apptCal: () => { if (!nextVisit) return; const d = new Date(nextVisit.start); set(u => ({ ...u, hm: null, chat: null, tab: "calendar", calView: "month", calSel: day0(d), calYM: [d.getFullYear(), d.getMonth()] })); },
-    apptChange: () => { if (!nextVisit) return; const d = new Date(nextVisit.start); set(u => ({ ...u, hm: null, book: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === nextVisit.showroomId)), day: day0(d), slot: timeLabel(d), visitId: nextVisit.id } })); },
+    apptChange: () => { if (!nextVisit) return; const d = new Date(nextVisit.start); set(u => ({ ...u, hm: null, book: { customerId: c.id, room: Math.max(0, rooms.findIndex(r => r.id === nextVisit.showroomId)), day: day0(d), slot: timeLabel(d), visitId: nextVisit.id, ...customPrefill(nextVisit) } })); },
     apptCancel: () => { if (nextVisit) set(u => ({ ...u, hm: null, cancelAsk: nextVisit.id })); },
     apptBook: goBook,
     infoOpen: !!hm.info, edit: () => set(u => ({ ...u, hm: null, cform: { customerId: c.id, edit: true } })), rows: infoRows(c, data),
@@ -318,7 +320,9 @@ export function chatVM(ctx: SalesCtx) {
     days: [] as { wk: string; n: number; pick?: () => void; bg: string; fg: string; border: string }[], wkHead: [] as string[],
     monthCells: [] as { n: number | string; pick?: () => void; cursor: string; weight: number; deco: string; bg: string; fg: string; border: string }[],
     slots: [] as { t: string; left: string; pick?: () => void; cursor: string; deco: string; bg: string; fg: string; border: string; weight: number }[],
-    confirmLabel: "", confirmBg: RUST, confirmBook: undefined as undefined | (() => void),
+    bookRemarks: "", confirmLabel: "", confirmBg: RUST, confirmBook: undefined as undefined | (() => void),
+    // Showroom · Online · Other (2026-10-24).
+    bkm: null as CustomBook | null,
     dateLeft: (_: MouseEvent) => {}, dateRight: (_: MouseEvent) => {}, dateWheel: (_: WheelEvent<HTMLElement>) => {}, dateDown: (_: RPointerEvent<HTMLElement>) => {}, dateMove: (_: RPointerEvent<HTMLElement>) => {}, dateUp: (_: RPointerEvent<HTMLElement>) => {}, dateClickGuard: (_: MouseEvent) => {},
     mDown: (_: RPointerEvent<HTMLElement>) => {}, mUp: (_: RPointerEvent<HTMLElement>) => {}, mCancel: () => {}, mClickGuard: (_: MouseEvent) => {},
   };
@@ -355,7 +359,15 @@ export function chatVM(ctx: SalesCtx) {
     const py = b.pickYear ?? dd.getFullYear(), curIdx = (dd.getFullYear() - now.getFullYear()) * 12 + dd.getMonth() - now.getMonth();
     book = {
       ...book, bookOpen: true,
-      rooms: rooms.map((r, i) => ({ name: r.name, addr: r.address, border: b.room === i ? RUST : BD, bg: b.room === i ? "var(--crm-cream)" : "#fff", dot: b.room === i ? RUST : "transparent",
+      bkm: customBookVM({ b, put, changing: !!b.visitId, now, types: data.apptTypes ?? DEFAULT_APPT_TYPES,
+        save: f => oneAtATime(`book:${c.id}`, async () => {
+          if (b.visitId) return act.moveCustom(b.visitId, f);
+          const rb = ui.rebookFor;
+          if (rb && !(await act.outcome(rb.visitId, false, "rebooked"))) return false;
+          return act.bookCustom(c.id, f);
+        }).then(ok => !!ok),
+        done: () => { set(u => ({ ...u, book: null, rebookFor: null })); scrollDown(); } }),
+      rooms: rooms.map((r, i) => ({ name: r.name, addr: r.address, border: b.room === i ? RUST : BD, bg: b.room === i ? "var(--crm-sel)" : "#fff", dot: b.room === i ? RUST : "transparent",
         pick: () => put({ room: i, slot: null, ...(roomClosed(r, b.day) ? { day: firstOpenDay(i, T) } : {}) }) })),
       monthLabel: gb(dd, { month: "short", year: "numeric" }), monthOpen: !!b.monthOpen,
       toggleMonth: () => put({ monthOpen: !b.monthOpen, pickYear: dd.getFullYear() }),
@@ -391,6 +403,8 @@ export function chatVM(ctx: SalesCtx) {
         return { t, left: leftOf(b.day, t), pick: off ? undefined : () => put({ slot: t }), cursor: off ? "not-allowed" : "pointer", deco: off ? "line-through" : "none",
           bg: on ? RUST : off ? "var(--crm-cream-nav)" : "#fff", fg: on ? "#fff" : off ? "var(--crm-faint)" : INK, border: on ? RUST : off ? "var(--crm-cream-nav)" : BD, weight: on ? 650 : 500 };
       }),
+      // The showroom's staff-only remarks under the times (the owner, 2026-10-23: "book visit 下方如果有remarks的話要顯示出來").
+      bookRemarks: room?.remarks?.trim() ?? "",
       confirmLabel: ready ? `${b.visitId ? "Change to" : "Book"} ${dLabel}, ${b.slot}` : "Pick a time",
       confirmBg: ready ? RUST : "var(--crm-line)",
       confirmBook: ready && room ? () => void oneAtATime(`book:${c.id}`, async () => {

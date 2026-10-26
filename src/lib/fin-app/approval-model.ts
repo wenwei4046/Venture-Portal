@@ -13,6 +13,7 @@ import { officeTime } from '@/lib/office-time'
 import { requestTypeLabel, splitVoucherTitle, type ApprovalRequestRow, type QueueMember, type QueueRow, type QueueSummary } from '@/lib/approval-queue'
 import { formatPoolLabel, formatSourcesLabel, type VoucherDetailContext } from '@/lib/voucher-detail'
 import { voucherUpstreamHref, voucherUpstreamLabel } from '@/lib/voucher-upstream-href'
+import type { TermsChangeContext } from '@/lib/terms-change-request'
 
 export type ApprovalCardKey = 'pending' | 'exec' | 'decided'
 
@@ -338,7 +339,17 @@ export interface ApprovalRecordModel {
     /** What raised it, where it has a page: in the app (a loan, a fund source) or the portal's (a payroll run) — and its portal page, for the computer's drawer. */
     upstream: { label: string; href: string; portalHref: string } | null
   } | null
-  /** Any other request's own record in the app (a fund source's, a loan's cancellation). */
+  /** A terms change filed for the Principal (2026-10-24): the month it asks from, each line now and as asked, why. */
+  terms: {
+    fromLabel: string
+    /** What it asks, in words — there whether or not the figures could be laid out. */
+    words: string
+    reason: string | null
+    rows: Array<{ label: string; now: string; asked: string; changed: boolean }>
+    /** Why the figures are not laid out (the deal changed since, the change was taken back). */
+    why: string | null
+  } | null
+  /** Any other request's own record in the app (a fund source's, a loan's cancellation, its terms change). */
   open: AppRecordRef | null
 }
 
@@ -387,6 +398,7 @@ export function approvalRecordModel(read: {
   verdict: { may: true } | { may: false; why: string }
   loanContext: { company_name?: string; principal?: number; effective_rate?: number; base_rate?: number; risk_premium?: number; loan_id: string } | null
   voucherContext: VoucherDetailContext | null
+  termsContext?: TermsChangeContext | null
   insufficientBalance: boolean
 }): ApprovalRecordModel {
   const a = read.approval
@@ -433,10 +445,14 @@ export function approvalRecordModel(read: {
           short: read.insufficientBalance,
           pool: vc.voucher.direction === 'credit' ? formatPoolLabel(vc.voucher.target_pool) : formatSourcesLabel(vc.sources, vc.voucher.source_pool),
           description: vc.voucher.description,
-          sources: vc.sources.map((s) => ({ pool: formatPoolLabel(s.pool) ?? s.pool, account: s.account_label, amount: Number(s.amount) })),
+          // A line's own words (2026-10-22) before its account, as the voucher's drawer says it.
+          sources: vc.sources.map((s) => ({ pool: formatPoolLabel(s.pool) ?? s.pool, account: s.description ? [s.description, s.account_label].filter(Boolean).join(' · ') : s.account_label, amount: Number(s.amount) })),
           files: vc.attachments.map((f) => ({ id: f.id, name: f.file_name, size: f.file_size })),
           upstream: upstreamHref ? { label: voucherUpstreamLabel(vc.voucher.reference_type) ?? 'Upstream record', href: inApp(upstreamHref), portalHref: upstreamHref } : null,
         }
+      : null,
+    terms: read.termsContext
+      ? { fromLabel: read.termsContext.fromLabel, words: read.termsContext.words, reason: read.termsContext.reason, rows: read.termsContext.rows, why: read.termsContext.why }
       : null,
     open: vc || loan ? null : recordOf(table, a.reference_id),
   }

@@ -4,11 +4,11 @@ import type { CSSProperties, ReactNode } from 'react'
 import type { HrIconName } from '@/components/hrv/icons'
 import { CHIP_C, type GenPage, type GenRow } from '@/lib/hr-app/gen-pages'
 import {
-  TODAY_ST, avatarOf, type ApproveRow, type BalanceRow, type CloseView, type PersonView, type RequestView, type TodayKey, type TodayRow,
+  TODAY_ST, avatarOf, type ApproveRow, type BalanceRow, type CloseView, type PersonView, type TermRow, type RequestView, type TodayKey, type TodayRow,
 } from '@/lib/hr-app/hr-view'
 import {
-  CAND_STAGE, MAJOR_EVENTS, MEMBER_KIND, budgetLabel, candChip, hireChip, initials, noticeAgo, noticeTag, requestStatusLabel, requestTitle,
-  type CandStage, type HrHire, type HrMemberRequest, type HrTalent,
+  CAND_STAGE, CONTRACT_TAG, MAJOR_EVENTS, MEMBER_KIND, PROBATION_TAG, budgetLabel, candChip, hireChip, initials, noticeAgo, noticeTag, requestStatusLabel, requestTitle,
+  type CandStage, type HrCandidate, type HrHire, type HrMemberRequest, type HrTalent,
 } from '@/lib/hr-app/model'
 import type { Notice } from '@/lib/push/notices'
 import { ackedLine, memoDay, memoFileExt, memoParas, memoUnread, memoWaiting, memoWhen, type MyMemo } from '@/lib/memos/model'
@@ -46,7 +46,7 @@ export interface HomeItem {
   go: () => void
 }
 
-export function HomeScreen({ first, summary, quick, cats, memos, openMemo }: {
+export function HomeScreen({ first, summary, quick, cats, memos, openMemo, probation = [], contract = [], openPerson }: {
   first: string
   summary: string
   quick: HomeItem[]
@@ -54,6 +54,11 @@ export function HomeScreen({ first, summary, quick, cats, memos, openMemo }: {
   /** Their memos still to acknowledge (the old Home's "Waiting for you", 2026-10-12): drawn only while there are some. */
   memos: MyMemo[]
   openMemo: (id: string) => void
+  /** The probations still waiting for Acknowledge (2026-10-23): drawn only while there are some — each opens the person. */
+  probation?: TermRow[]
+  /** The contracts, the same way (2026-10-24). */
+  contract?: TermRow[]
+  openPerson?: (id: string) => void
 }) {
   return (
     <div className={s.home}>
@@ -73,6 +78,19 @@ export function HomeScreen({ first, summary, quick, cats, memos, openMemo }: {
           </Card>
         </div>
       ) : null}
+      {([['Probation ending', probation, PROBATION_TAG], ['Contract ending', contract, CONTRACT_TAG]] as const).map(([label, rows, tag]) =>
+        rows.length && openPerson ? (
+          <div key={label} className={s.group}>
+            <SectHead label={label} count={rows.length} />
+            <Card>
+              {rows.map((p, i) => (
+                <Row key={p.id} first={i === 0} onClick={() => openPerson(p.id)} title={p.name} sub={p.sub} right={<Chev />}
+                  lead={<Avatar bg={tag.bg} fg={tag.fg} font={9.5}>{tag.tag}</Avatar>} />
+              ))}
+            </Card>
+          </div>
+        ) : null,
+      )}
       <div className={s.group}>
         <SectHead label="Quick actions" />
         <div className={s.grid4}>
@@ -439,14 +457,31 @@ export function DeskScreen({ title, icon, text = 'This page works best on a bigg
 
 // ── Hiring: a request, a talent ─────────────────────────────────────────────
 
-export function HireScreen({ hr, mayEdit, mayCreate, onStage, onAdd }: {
+export function HireScreen({ hr, mayEdit, mayCreate, outOpen, onOut, onStage, onAdd }: {
   hr: HrHire
   mayEdit: boolean
   mayCreate: boolean
+  /** The Not selected fold is open — the app holds it, for this hire. */
+  outOpen: boolean
+  onOut: () => void
   onStage: (cid: string, name: string, cur: CandStage) => void
   onAdd: () => void
 }) {
   const ch = hireChip(hr.status)
+  // Not selected leave the list for the Talent Bank (2026-10-24, IT-0008), as on the request's page — folded at the
+  // card's foot, each with why, a tap from the status sheet that brings them back.
+  const running = hr.candidates.filter(c => c.stage !== 'rejected')
+  const out = hr.candidates.filter(c => c.stage === 'rejected')
+  const cand = (c: HrCandidate, first: boolean) => {
+    const cc = candChip(c.stage)
+    const line = [c.source, c.phone, c.stage === 'rejected' ? '' : c.note].filter(Boolean).join(' · ')
+    return (
+      <Row key={c.id} first={first} lead={<Avatar bg={cc.bg} fg={cc.fg} ini={initials(c.name)} />} title={c.name}
+        sub={c.why ? <><span className={s.outWhy}>{c.why}</span>{line ? ` · ${line}` : ''}</> : line}
+        onClick={mayEdit ? () => onStage(c.id, c.name, c.stage) : undefined}
+        right={<span className={s.stageBtn} style={{ background: cc.bg, color: cc.fg }}>{cc.label}{mayEdit ? ' ▾' : ''}</span>} />
+    )
+  }
   const facts = ([
     ['Department', hr.dept], ['Requested by', hr.requester], ['Owner', hr.ownerName ?? 'No owner yet'], ['Employment', hr.employment], ['Reason', hr.reason],
     ['Age', hr.age], ['Gender', hr.gender],
@@ -472,17 +507,17 @@ export function HireScreen({ hr, mayEdit, mayCreate, onStage, onAdd }: {
         </div>
       ))}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <SectHead label="Candidates" count={hr.candidates.length} />
+        <SectHead label="Candidates" count={running.length} />
         <Card>
-          {hr.candidates.map((c, i) => {
-            const cc = candChip(c.stage)
-            return (
-              <Row key={c.id} first={i === 0} lead={<Avatar bg={cc.bg} fg={cc.fg} ini={initials(c.name)} />} title={c.name} sub={[c.source, c.phone, c.note].filter(Boolean).join(' · ')}
-                onClick={mayEdit ? () => onStage(c.id, c.name, c.stage) : undefined}
-                right={<span className={s.stageBtn} style={{ background: cc.bg, color: cc.fg }}>{cc.label}{mayEdit ? ' ▾' : ''}</span>} />
-            )
-          })}
+          {running.map((c, i) => cand(c, i === 0))}
           {hr.candidates.length === 0 ? <Empty>No candidates yet.</Empty> : null}
+          {out.length ? (
+            <button type="button" className={s.outFold} aria-expanded={outOpen} onClick={onOut} style={{ borderTop: running.length ? '1px solid var(--ds-border)' : 0 }}>
+              <span aria-hidden="true">{outOpen ? '▾' : '▸'}</span>
+              <span>Not selected · {out.length} · in Talent Bank</span>
+            </button>
+          ) : null}
+          {outOpen ? out.map(c => cand(c, false)) : null}
         </Card>
         {mayCreate ? <button type="button" className={`${s.act}`} onClick={onAdd}>+ Add a candidate</button> : null}
       </div>
@@ -511,7 +546,7 @@ export function HireScreen({ hr, mayEdit, mayCreate, onStage, onAdd }: {
 export const STAGES = Object.keys(CAND_STAGE) as CandStage[]
 
 export function TalentScreen({ t, notes, setNotes, saveNotes, mayEdit }: { t: HrTalent; notes: string; setNotes: (x: string) => void; saveNotes: () => void; mayEdit: boolean }) {
-  const facts = ([['Good fit for', t.position], ['Department', t.dept], ['Phone', t.phone], ['Email', t.email], ['Saved from', t.from || 'Added directly'], ['Saved', t.when]] as Array<[string, string | null | undefined]>)
+  const facts = ([['Good fit for', t.position], ['Reason', t.reason], ['Department', t.dept], ['Phone', t.phone], ['Email', t.email], ['Came from', t.from || 'Added in Talent Bank'], ['Saved', t.when]] as Array<[string, string | null | undefined]>)
     .filter(([, v]) => v).map(([k, v]) => ({ k, v: v as string }))
   const a = avatarOf(t.name)
   return (

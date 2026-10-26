@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import type { AttConfig, AttLedger, AttMonth, AttRequest, AttStep } from '@/lib/attendance/types'
 import type { HrAppData } from '@/lib/hr-app/model'
+import type { TermReview } from '@/lib/term-reviews'
 
 const itSupport = vi.hoisted(() => ({ render: vi.fn() }))
 vi.mock('@/components/it-support/ItSupport', () => ({
@@ -313,6 +314,324 @@ describe('the bell (2026-10-11)', () => {
     render(<HrApp data={{ ...data, personalLogin: false }} actions={actions} />)
     expect(screen.queryByTestId('me')).toBeNull()
     expect(window.location.search).toBe('')
+  })
+})
+
+// A probation ending (2026-10-23, mig 20261024223000 — the user: "HR 手机 app 里的提醒和推送"): Home lists the ones
+// waiting, the person's page acknowledges one, a tapped push or a bell notice opens the person.
+describe('a probation ending (2026-10-23)', () => {
+  const review = (over: Partial<TermReview> = {}): TermReview => ({
+    kind: 'probation', id: 's2', name: 'Nurul Huda', code: 'HV040', department: 'HR', title: 'HR Executive', hireDate: '2026-07-23', months: 3,
+    endsOn: '2026-10-22', ackEnd: null, ackName: null, ackAt: null, ...over,
+  })
+  const acked = review({ id: 's3', name: 'Kar Jun', endsOn: '2026-10-20', ackEnd: '2026-10-20', ackName: 'Grace Lim', ackAt: '2026-10-14T01:00:00Z' })
+  const withProbation = (over: Partial<HrAppData> = {}): HrAppData =>
+    ({ ...data, probation: [review(), acked], may: { ...data.may, termEdit: true }, ...over })
+
+  it('Home lists those waiting and its line counts them; one opens the person, whose page acknowledges it', async () => {
+    const ack = vi.fn(async () => ({ ok: true as const }))
+    render(<HrApp data={withProbation()} actions={{ ...actions, probationAck: ack }} />)
+    expect(screen.getByText('1 request waiting for HR · 1 probation ending · 1 not in yet · 1 late · October closes 3 Nov.')).toBeInTheDocument()
+    expect(screen.getByText('Probation ending')).toBeInTheDocument()
+    const row = screen.getByRole('button', { name: /Nurul Huda/ })
+    expect(row).toHaveTextContent('Ends 22 Oct 2026 · in 8 days · HR')
+    // Acknowledged already: not on Home.
+    expect(screen.queryByRole('button', { name: /Kar Jun.*Ends/ })).toBeNull()
+    fireEvent.click(row)
+    expect(screen.getByRole('heading', { name: 'Nurul Huda' })).toBeInTheDocument()
+    expect(screen.getByText('3 months · ends 22 Oct 2026 · in 8 days')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }))
+    await waitFor(() => expect(ack).toHaveBeenCalledWith('s2'))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Acknowledged'))
+    expect(actions.refresh).toHaveBeenCalled()
+  })
+
+  it('acknowledged for its end: who and when, no button — and none without the box, nor while viewing as somebody', () => {
+    render(<HrApp data={withProbation()} actions={{ ...actions, probationAck: done }} />)
+    tab('People')
+    fireEvent.click(screen.getByRole('button', { name: /Kar Jun/ }))
+    expect(screen.getByText('Acknowledged by Grace Lim · 14 Oct 2026')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+    cleanup()
+    render(<HrApp data={withProbation({ may: { ...data.may, termEdit: false } })} actions={{ ...actions, probationAck: done }} />)
+    tab('People')
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.getByText('3 months · ends 22 Oct 2026 · in 8 days')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Acknowledge' })).toBeNull()
+    cleanup()
+    render(<HrApp data={withProbation({ viewingAs: 'Grace Lim' })} actions={{ ...actions, probationAck: done }} />)
+    expect(screen.queryByText('Probation ending')).toBeNull()
+  })
+
+  it('a tapped push opens the person (?open=person:…), then forgets the address; the bell’s notice is tagged PROB and opens them', () => {
+    window.history.pushState(null, '', '/hr-app?open=person:s2')
+    render(<HrApp data={withProbation()} actions={{ ...actions, probationAck: done }} />)
+    expect(screen.getByRole('heading', { name: 'Nurul Huda' })).toBeInTheDocument()
+    expect(window.location.search).toBe('')
+    cleanup()
+    const notices = { unread: 1, items: [{ id: 'n9', kind: 'people' as const, title: 'Probation ending · Nurul Huda', body: 'Ends 22 Oct 2026 · in 8 days · HR',
+      refKind: 'hr_staff' as const, refId: 's2', at: new Date().toISOString(), read: false }] }
+    render(<HrApp data={withProbation({ notices })} actions={{ ...actions, probationAck: done }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 1 new' }))
+    expect(screen.getByText('PROB')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Probation ending · Nurul Huda'))
+    expect(screen.getByRole('heading', { name: 'Nurul Huda' })).toBeInTheDocument()
+  })
+
+  // A contract (2026-10-24 — "need 30 days and 15 days before remind, 2 reminder"): its own list on Home, its own
+  // Acknowledge and tag — and each term is reminded 30 days before its end, then again 15.
+  it('a contract ending: Home’s own list and line; the person’s page acknowledges it by its own action', async () => {
+    const ack = vi.fn(async () => ({ ok: true as const }))
+    const probationAck = vi.fn(async () => ({ ok: true as const }))
+    const contract = [review({ kind: 'contract', months: 12, endsOn: '2026-11-03' })] // 20 days from 14 Oct: the first reminder
+    render(<HrApp data={withProbation({ probation: [], contract })} actions={{ ...actions, probationAck, contractAck: ack }} />)
+    expect(screen.getByText('1 request waiting for HR · 1 contract ending · 1 not in yet · 1 late · October closes 3 Nov.')).toBeInTheDocument()
+    expect(screen.getByText('Contract ending')).toBeInTheDocument()
+    expect(screen.queryByText('Probation ending')).toBeNull()
+    expect(screen.getByText('CONT')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.getByText('12 months · ends 3 Nov 2026 · in 20 days')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Acknowledge' }))
+    await waitFor(() => expect(ack).toHaveBeenCalledWith('s2'))
+    expect(probationAck).not.toHaveBeenCalled()
+  })
+
+  it('the first reminder’s acknowledgement does not answer the second: listed and offered again', () => {
+    // Acknowledged on 1 Oct, 21 days before its end — the first reminder's; 8 days left on 14 Oct, the second stands.
+    const first = review({ ackEnd: '2026-10-22', ackName: 'Grace Lim', ackAt: '2026-10-01T02:00:00Z' })
+    render(<HrApp data={withProbation({ probation: [first] })} actions={{ ...actions, probationAck: done }} />)
+    expect(screen.getByText('Probation ending')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.getByText('30-day reminder acknowledged by Grace Lim · 1 Oct 2026')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument()
+  })
+
+  it('a contract’s notice is tagged CONT', () => {
+    const notices = { unread: 1, items: [{ id: 'n10', kind: 'people' as const, title: 'Contract ending · Nurul Huda', body: 'Ends 3 Nov 2026 · in 20 days · HR',
+      refKind: 'hr_staff' as const, refId: 's2', at: new Date().toISOString(), read: false }] }
+    render(<HrApp data={withProbation({ probation: [], notices })} actions={{ ...actions, probationAck: done }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 1 new' }))
+    expect(screen.getByText('CONT')).toBeInTheDocument()
+    expect(screen.queryByText('PROB')).toBeNull()
+  })
+
+  // The step after the reminder (2026-10-24 — the user: "do for hr app as well"): a contract's Renew, its new contract
+  // required and filed with it; a probation's Confirm as permanent and Extend, each with a letter, optional.
+  const TYPES = [
+    { id: 'offer', name: 'Offer letter', compulsory: true },
+    { id: 'cfs', name: 'Contract for Service', compulsory: false },
+    { id: 'conf', name: 'Confirmation letter', compulsory: false },
+  ]
+  const withSteps = (over: Partial<HrAppData> = {}): HrAppData => withProbation({ may: { ...data.may, termEdit: true, letters: true }, letterTypes: TYPES, ...over })
+  const pdf = (name: string) => new File(['%PDF'], name, { type: 'application/pdf' })
+  const contract = [review({ kind: 'contract', months: 12, endsOn: '2026-11-03' })]
+
+  it('a contract: Renew beside Acknowledge opens on the day after its end, its months and the contract’s type; the new contract is asked for, then renewed and filed', async () => {
+    const renew = vi.fn(async () => ({ ok: true as const, endsOn: '2027-05-03', filed: 'Contract for Service' }))
+    render(<HrApp data={withSteps({ probation: [], contract })} actions={{ ...actions, contractAck: done, contractRenew: renew }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Renew' }))
+    const sheet = screen.getByRole('dialog', { name: 'Renew the contract' })
+    expect(within(sheet).getByText('This one ends 3 Nov 2026')).toBeInTheDocument()
+    expect(within(sheet).getByLabelText('New contract starts')).toHaveValue('2026-11-04')
+    expect(within(sheet).getByLabelText('Period')).toHaveValue('12')
+    expect(within(sheet).getByText('3 Nov 2027')).toBeInTheDocument()
+    expect(within(sheet).getByLabelText('Letter type')).toHaveValue('cfs')
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Renew' }))
+    expect(within(sheet).getByRole('alert')).toHaveTextContent('Attach the new contract.')
+    expect(renew).not.toHaveBeenCalled()
+    const file = pdf('contract-2027.pdf')
+    fireEvent.change(within(sheet).getByLabelText('New contract'), { target: { files: [file] } })
+    expect(within(sheet).getByText('contract-2027.pdf')).toBeInTheDocument()
+    fireEvent.change(within(sheet).getByLabelText('Period'), { target: { value: '6' } })
+    expect(within(sheet).getByText('3 May 2027')).toBeInTheDocument()
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Renew' }))
+    await waitFor(() => expect(renew).toHaveBeenCalledWith({ staffId: 's2', start: '2026-11-04', months: 6, endsWas: '2026-11-03' }, { typeId: 'cfs', newType: '', file }, TYPES))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent("Contract renewed to 3 May 2027 · Contract for Service filed to Nurul Huda's record"))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(actions.refresh).toHaveBeenCalled()
+  })
+
+  it('Renew: a start before this contract’s is refused here; the server’s refusal stays on the sheet', async () => {
+    const renew = vi.fn(async () => ({ ok: false as const, reason: 'Their contract changed since this page was opened — reload it.' }))
+    render(<HrApp data={withSteps({ probation: [], contract })} actions={{ ...actions, contractAck: done, contractRenew: renew }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Renew' }))
+    const sheet = screen.getByRole('dialog', { name: 'Renew the contract' })
+    fireEvent.change(within(sheet).getByLabelText('New contract'), { target: { files: [pdf('c.pdf')] } })
+    fireEvent.change(within(sheet).getByLabelText('New contract starts'), { target: { value: '2026-07-01' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Renew' }))
+    expect(within(sheet).getByRole('alert')).toHaveTextContent('The new contract starts after this one did (23 Jul 2026).')
+    expect(renew).not.toHaveBeenCalled()
+    fireEvent.change(within(sheet).getByLabelText('New contract starts'), { target: { value: '2026-11-04' } })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Renew' }))
+    await waitFor(() => expect(within(sheet).getByRole('alert')).toHaveTextContent('Their contract changed since this page was opened — reload it.'))
+    expect(screen.getByRole('dialog', { name: 'Renew the contract' })).toBeInTheDocument()
+  })
+
+  it('no Renew without Documentation · Create — its contract could not be filed — nor for a contract with no end to count from', () => {
+    render(<HrApp data={withSteps({ probation: [], contract, may: { ...data.may, termEdit: true, letters: false } })} actions={{ ...actions, contractAck: done, contractRenew: vi.fn() }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Renew' })).toBeNull()
+    cleanup()
+    render(<HrApp data={withSteps({ probation: [], contract: [review({ kind: 'contract', months: 12, hireDate: null, endsOn: null })] })} actions={{ ...actions, contractAck: done, contractRenew: vi.fn() }} />)
+    tab('People')
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    expect(screen.queryByRole('button', { name: 'Renew' })).toBeNull()
+  })
+
+  it('a probation: Extend and Confirm as permanent over Acknowledge; Confirm files its letter once confirmed', async () => {
+    const confirm = vi.fn(async () => ({ ok: true as const }))
+    const filed = vi.fn(async () => ({ filed: ['Confirmation letter'], failed: [] }))
+    render(<HrApp data={withSteps()} actions={{ ...actions, probationAck: done, probationConfirm: confirm, probationExtend: done, lettersFile: filed }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    for (const name of ['Extend', 'Confirm as permanent', 'Acknowledge']) expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm as permanent' }))
+    const sheet = screen.getByRole('dialog', { name: 'Confirm as permanent' })
+    expect(within(sheet).getByText('Their probation ends here')).toBeInTheDocument()
+    expect(within(sheet).getByLabelText('Letter type')).toHaveValue('conf')
+    const file = pdf('confirmation.pdf')
+    fireEvent.change(within(sheet).getByLabelText('Letter'), { target: { files: [file] } })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith('s2'))
+    await waitFor(() => expect(filed).toHaveBeenCalledWith('s2', [expect.objectContaining({ typeId: 'conf', newType: '', file })], TYPES))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent("Nurul Huda · confirmed as permanent · Confirmation letter filed to Nurul Huda's record"))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('Extend: by 1–3 months, the new end worked out; with no letter chosen only the step is sent', async () => {
+    const extend = vi.fn(async () => ({ ok: true as const }))
+    const filed = vi.fn()
+    render(<HrApp data={withSteps()} actions={{ ...actions, probationAck: done, probationConfirm: done, probationExtend: extend, lettersFile: filed }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Extend' }))
+    const sheet = screen.getByRole('dialog', { name: 'Extend the probation' })
+    expect(within(sheet).getByText('It ends 22 Oct 2026')).toBeInTheDocument()
+    expect(within(sheet).getByText('22 Nov 2026')).toBeInTheDocument()
+    fireEvent.change(within(sheet).getByLabelText('Extend by'), { target: { value: '2' } })
+    expect(within(sheet).getByText('22 Dec 2026')).toBeInTheDocument()
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Extend' }))
+    await waitFor(() => expect(extend).toHaveBeenCalledWith('s2', 2))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Probation extended to 22 Dec 2026'))
+    expect(filed).not.toHaveBeenCalled()
+  })
+
+  it('a letter that is not filed is said; the step stands — and without Documentation · Create the steps take none', async () => {
+    const filed = vi.fn(async () => ({ filed: [], failed: [{ key: 'confirm', name: 'Confirmation letter', reason: 'The file did not arrive. Please upload it again.' }] }))
+    render(<HrApp data={withSteps()} actions={{ ...actions, probationAck: done, probationConfirm: done, probationExtend: done, lettersFile: filed }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm as permanent' }))
+    let sheet = screen.getByRole('dialog', { name: 'Confirm as permanent' })
+    fireEvent.change(within(sheet).getByLabelText('Letter'), { target: { files: [pdf('confirmation.pdf')] } })
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Confirm' }))
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(
+      'Nurul Huda · confirmed as permanent · Confirmation letter was not filed: The file did not arrive. Please upload it again.'))
+    cleanup()
+    render(<HrApp data={withSteps({ may: { ...data.may, termEdit: true, letters: false } })} actions={{ ...actions, probationAck: done, probationConfirm: done, probationExtend: done, lettersFile: filed }} />)
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm as permanent' }))
+    sheet = screen.getByRole('dialog', { name: 'Confirm as permanent' })
+    expect(within(sheet).queryByLabelText('Letter type')).toBeNull()
+    expect(within(sheet).queryByLabelText('Letter')).toBeNull()
+  })
+
+  it('none of the steps without People · Edit on the person’s page, nor while viewing as somebody', () => {
+    const steps = { ...actions, probationAck: done, probationConfirm: done, probationExtend: done, lettersFile: vi.fn(), contractAck: done, contractRenew: vi.fn() }
+    render(<HrApp data={withSteps({ may: { ...data.may, termEdit: false, letters: true } })} actions={steps} />)
+    tab('People')
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    for (const name of ['Extend', 'Confirm as permanent', 'Acknowledge', 'Renew']) expect(screen.queryByRole('button', { name })).toBeNull()
+    cleanup()
+    render(<HrApp data={withSteps({ viewingAs: 'Grace Lim' })} actions={steps} />)
+    tab('People')
+    fireEvent.click(screen.getByRole('button', { name: /Nurul Huda/ }))
+    for (const name of ['Extend', 'Confirm as permanent', 'Acknowledge', 'Renew']) expect(screen.queryByRole('button', { name })).toBeNull()
+  })
+})
+
+// IT-0008 (2026-10-24): a candidate not selected leaves the list for the Talent Bank — on the phone as on the request page.
+describe('a hire’s candidates: Not selected goes to the Talent Bank', () => {
+  const hire = {
+    id: 'HR-205', status: 'acknowledged', position: 'Revenue Specialist', headcount: 1, dept: 'Revenue · Fair', budget: '', start: '', ownerName: null,
+    requester: 'Kar Jun', when: '9 Oct 2026', events: [],
+    candidates: [{ id: 'c1', name: 'Daniel Lee', source: 'Applied', stage: 'appointment' }, { id: 'c2', name: 'Nur Iman', source: 'Applied', stage: 'rejected' }],
+  } as unknown as HrAppData['hires'][number]
+
+  it('lists the ones still in the running; Not selected asks why — the one their stage says first — then keeps them in the bank', async () => {
+    const stage = vi.fn(async () => ({ ok: true as const }))
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [hire], parts: { ...data.parts, hiring: true }, may: { ...data.may, hireEdit: true } }} actions={{ ...actions, candStage: stage }} />)
+    expect(screen.getByText('Daniel Lee')).toBeInTheDocument()
+    expect(screen.queryByText('Nur Iman')).toBeNull()
+    fireEvent.click(screen.getByText('Daniel Lee'))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Not selected/ }))
+    expect(stage).not.toHaveBeenCalled()
+    expect(screen.getByText('Not selected · Daniel Lee')).toBeInTheDocument()
+    const why = ['Failed interview', 'Not shortlisted', 'Not right now', 'Declined offer', 'Other']
+    expect(screen.getAllByRole('button').map(b => b.textContent).filter(t => why.includes(t ?? ''))).toEqual(why)
+    fireEvent.click(screen.getByRole('button', { name: 'Not right now' }))
+    await waitFor(() => expect(stage).toHaveBeenCalledWith('HR-205', 'c1', 'rejected', 'not_right_now'))
+  })
+
+  // HR's list (2026-10-24, "do with same" as File types): the sheet offers the ones that are on, in HR's words.
+  it('Not selected asks why from HR’s list — renamed, turned off and added as Form settings left it', async () => {
+    const stage = vi.fn(async () => ({ ok: true as const }))
+    const hireReasons = [
+      { id: 'not_shortlisted', name: 'Not shortlisted', active: true, used: 0 },
+      { id: 'failed_interview', name: 'Interview failed', active: true, used: 2 },
+      { id: 'not_right_now', name: 'Not right now', active: false, used: 4 },
+      { id: 'r-salary', name: 'Salary too high', active: true, used: 0 },
+    ]
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [hire], hireReasons, parts: { ...data.parts, hiring: true }, may: { ...data.may, hireEdit: true } }} actions={{ ...actions, candStage: stage }} />)
+    fireEvent.click(screen.getByText('Daniel Lee'))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /^Not selected/ }))
+    const offered = ['Interview failed', 'Not shortlisted', 'Salary too high']
+    const words = screen.getAllByRole('button').map(b => b.textContent ?? '')
+    expect(words.filter(t => [...offered, 'Not right now', 'Failed interview'].includes(t))).toEqual(offered)
+    fireEvent.click(screen.getByRole('button', { name: 'Salary too high' }))
+    await waitFor(() => expect(stage).toHaveBeenCalledWith('HR-205', 'c1', 'rejected', 'r-salary'))
+  })
+
+  it('everybody not selected: the card is their fold alone', () => {
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [{ ...hire, candidates: hire.candidates.slice(1) }], parts: { ...data.parts, hiring: true } }} actions={actions} />)
+    expect(screen.getByRole('button', { name: 'Not selected · 1 · in Talent Bank' })).toBeInTheDocument()
+    expect(screen.queryByText('No candidates yet.')).toBeNull()
+  })
+
+  // The user, asked whether the phone should bring somebody back as the desktop's fold does: "can" (2026-10-24).
+  const kept = { ...hire, candidates: [hire.candidates[0], { ...hire.candidates[1], phone: '012-111 2222', note: 'Asked for RM 4,000', why: 'Not right now' }] }
+
+  it('the not selected fold at the card’s foot: each says why; a tap opens the status sheet that brings them back', async () => {
+    const stage = vi.fn(async () => ({ ok: true as const }))
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [kept], parts: { ...data.parts, hiring: true }, may: { ...data.may, hireEdit: true } }} actions={{ ...actions, candStage: stage }} />)
+    const fold = screen.getByRole('button', { name: 'Not selected · 1 · in Talent Bank' })
+    expect(fold).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Nur Iman')).toBeNull()
+    fireEvent.click(fold)
+    expect(fold).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Nur Iman')).toBeInTheDocument()
+    expect(screen.getByText('Not right now')).toBeInTheDocument()
+    // Why in place of the note, as on the request's page.
+    expect(screen.queryByText(/Asked for RM 4,000/)).toBeNull()
+    fireEvent.click(screen.getByText('Nur Iman'))
+    const sheet = screen.getByRole('dialog', { name: 'Status · Nur Iman' })
+    expect(within(sheet).getByRole('button', { name: /^Not selected/ })).toHaveTextContent('✓')
+    fireEvent.click(within(sheet).getByRole('button', { name: /^Shortlisted/ }))
+    await waitFor(() => expect(stage).toHaveBeenCalledWith('HR-205', 'c2', 'shortlisted'))
+  })
+
+  it('without Hiring · Edit the fold still says who and why, and a tap changes nothing', () => {
+    window.history.pushState(null, '', '/hr-app?open=hire:HR-205')
+    render(<HrApp data={{ ...data, hires: [kept], parts: { ...data.parts, hiring: true } }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Not selected · 1 · in Talent Bank' }))
+    expect(screen.getByText('Not right now')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Nur Iman'))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
 

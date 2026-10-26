@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>@keyframes wbIn{0%{transform:translateY(4px);opacity:0}100%{transform:none;opacity:1}}</style>
+</helmet>
+<div onClick="{{ closeDD }}" style="display:flex;flex-direction:column;min-height:100%;color:rgb(51 36 27)">
+  <div style="display:flex;align-items:center;gap:14px;padding:18px 24px;border-bottom:1px solid rgb(236 231 224);flex-wrap:wrap">
+    <sc-if value="{{ notQuick }}" hint-placeholder-val="{{ true }}"><span style="font-size:18px">🧩</span>
+    <div>
+      <div style="font-size:1.3em;font-weight:600">Workflow Builder</div>
+      <div style="font-size:0.86em;color:rgb(117 100 86)">Build the stages each kind of task goes through. Straight line only — run things in parallel with subtasks.</div>
+    </div></sc-if>
+    <sc-if value="{{ isQuick }}"><div>
+      <div style="font-size:1.05em;font-weight:600">Stages</div>
+      <div style="font-size:0.84em;color:rgb(117 100 86)">Same as a workflow template, just for this task. Each stage has its own person, approval and time.</div>
+    </div></sc-if>
+    <div style="display:flex;gap:2px;padding:3px;background:rgb(246 246 244);border-radius:8px;margin-left:12px">
+      <sc-for list="{{ mainTabs }}" as="o" hint-placeholder-count="2">
+        <div onClick="{{ o.onClick }}" style="height:30px;padding:0 14px;border-radius:6px;display:flex;align-items:center;cursor:pointer;background:{{ o.bg }};box-shadow:{{ o.shadow }};font-weight:{{ o.weight }};font-size:0.92em;white-space:nowrap">{{ o.label }}</div>
+      </sc-for>
+    </div>
+    <span style="flex:1"></span>
+    <sc-if value="{{ showLock }}" hint-placeholder-val="{{ true }}">
+    <div onClick="{{ toggleLock }}" style="height:34px;padding:0 12px 0 10px;border-radius:8px;border:1px solid {{ lockBorder }};background:{{ lockBg }};display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9em;white-space:nowrap">
+      <span style="width:28px;height:16px;border-radius:8px;background:{{ lockTrack }};position:relative;transition:background-color .2s"><span style="position:absolute;top:2px;left:{{ lockKnob }}px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2);transition:left .2s"></span></span>
+      <span>🔒 Lock whole workflow</span>
+    </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ isCanvasTab }}">
+    <sc-for list="{{ canvasKeys }}" as="ck" hint-placeholder-count="1"><dc-import name="Canvas Template Editor" key="{{ ck.key }}" tpl-name="{{ ck.name }}" tpl-ver="{{ ck.ver }}" is-new="{{ ck.isNew }}" sample="{{ ck.sample }}" stage-forms="{{ ck.forms }}" stage-names="{{ ck.stages }}" no-pic="{{ isQuick }}" req-text="{{ reqText }}" hint-size="100%,1300px"></dc-import></sc-for>
+  </sc-if>
+  <sc-if value="{{ isStagesTab }}" hint-placeholder-val="{{ true }}">
+  <div style="display:grid;grid-template-columns:{{ gridCols }};flex:1;min-height:0">
+    <sc-if value="{{ notQuick }}" hint-placeholder-val="{{ true }}"><div style="border-right:1px solid rgb(236 231 224);padding:16px 12px;display:flex;flex-direction:column;gap:4px;background:rgb(252 251 249)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px 6px 8px">
+        <span style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Actions</span>
+        <span onClick="{{ toggleActAdd }}" title="New action" style="width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:1.05em;line-height:1;color:rgb(51 36 27);cursor:pointer;border:1px solid rgb(229 222 211);background:#fff" style-hover="background:rgb(240 235 228)">+</span>
+      </div>
+      <sc-if value="{{ actAddOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;gap:6px;padding:0 4px 8px">
+          <input autoFocus="{{ true }}" value="{{ actDraft }}" onChange="{{ onActDraft }}" onKeyDown="{{ onActKey }}" placeholder="New action, e.g. Design photo" style="flex:1;min-width:0;height:30px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:7px;padding:0 9px;font:inherit;font-size:0.86em;outline:none;background:#fff;color:rgb(51 36 27)" style-focus="border-color:rgb(150 136 120)">
+          <span onClick="{{ addAction }}" style="height:30px;padding:0 10px;border-radius:7px;display:flex;align-items:center;font-weight:600;font-size:0.84em;background:rgb(51 36 27);color:#fff;cursor:pointer;opacity:{{ actOp }}">Add</span>
+        </div>
+      </sc-if>
+      <sc-for list="{{ actions }}" as="a" hint-placeholder-count="6">
+        <div style="display:flex;flex-direction:column;gap:2px;padding-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 4px">
+            <span style="font-size:14px">{{ a.emoji }}</span>
+            <span style="flex:1;min-width:0;font-weight:600;font-size:0.94em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.name }}</span>
+            <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86)">{{ a.count }}</span>
+          </div>
+          <sc-for list="{{ a.tpls }}" as="t">
+            <div onClick="{{ t.onClick }}" style="display:flex;align-items:center;gap:8px;padding:7px 8px 7px 30px;border-radius:8px;cursor:pointer;background:{{ t.bg }}" style-hover="background:rgb(241 236 228)">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:0.9em;font-weight:{{ t.weight }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.name }}</div>
+                <div style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86);margin-top:1px">{{ t.ver }} · {{ t.stages }} stages</div>
+              </div>
+              <span onClick="{{ t.onClone }}" title="Clone as a new template of this action" style="height:22px;padding:0 7px;border-radius:5px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;font-size:10.5px;color:rgb(74 64 58)" style-hover="border-color:rgb(150 136 120)">Clone</span>
+            </div>
+          </sc-for>
+          <span onClick="{{ a.addTpl }}" style="padding:4px 8px 4px 30px;font-size:0.84em;color:rgb(117 100 86);cursor:pointer" style-hover="color:rgb(51 36 27)">+ Add template</span>
+        </div>
+      </sc-for>
+    </div></sc-if>
+
+    <div style="padding:20px 24px 28px;min-width:0;overflow-y:auto">
+      <sc-if value="{{ notQuick }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span style="font-size:1.35em;font-weight:600">{{ actName }}</span><span style="font-size:1.1em;color:rgb(160 150 140)">/</span><input value="{{ tName }}" onChange="{{ onTName }}" style="font:inherit;font-size:1.15em;font-weight:500;border:1px solid transparent;border-radius:6px;padding:1px 6px;outline:none;background:transparent;color:rgb(51 36 27);width:200px;min-width:0" style-hover="border-color:rgb(229 222 211)" style-focus="border-color:rgb(150 136 120);background:#fff">
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;padding:2px 7px;border-radius:5px;border:1px solid rgb(229 222 211)">Draft v{{ nextVer }}</span>
+        <span style="font-size:0.86em;color:rgb(117 100 86)">{{ tplSub }}</span>
+      </div></sc-if>
+      <sc-if value="{{ locked }}"><div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:rgb(246 244 240);font-size:0.86em;color:rgb(74 64 58)">Whole workflow locked — every stage is assigned by MM. No 🔓 handoffs, no subtasks.</div></sc-if>
+
+      <div style="display:flex;flex-direction:column;gap:0;margin-top:16px">
+        <sc-for list="{{ stages }}" as="s" hint-placeholder-count="5">
+          <div onDragOver="{{ s.onDragOver }}" onDrop="{{ s.onDrop }}" style="display:flex;flex-direction:column">
+            <div style="height:{{ s.dropH }}px;border-radius:6px;background:rgb(90 62 43 / 0.15);transition:height .12s;margin-bottom:{{ s.dropGap }}px"></div>
+            <div draggable="true" onDragStart="{{ s.onDragStart }}" onDragEnd="{{ s.onDragEnd }}" onClick="{{ s.onClick }}" style="display:flex;gap:12px;align-items:stretch;padding:12px 14px;border-radius:12px;background:#fff;border:1.5px solid {{ s.border }};box-shadow:{{ s.shadow }};cursor:pointer;opacity:{{ s.op }};transition:border-color .15s, box-shadow .15s" style-hover="border-color:rgb(180 170 158)">
+              <div style="display:flex;flex-direction:column;align-items:center;gap:6px;color:rgb(180 170 158);flex:none">
+                <span title="Drag to reorder" style="font-size:12px;letter-spacing:-2px;cursor:grab">⋮⋮</span>
+                <span style="width:24px;height:24px;border-radius:50%;background:rgb(246 244 240);font-size:11px;font-weight:600;color:rgb(51 36 27);display:flex;align-items:center;justify-content:center">{{ s.n }}</span>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="font-size:1.04em;font-weight:600">{{ s.name }}</span>
+                  <span style="font-size:0.75em;padding:2px 7px;border-radius:5px;background:{{ s.deptBg }};color:{{ s.deptFg }}">{{ s.dept }}</span>
+                  <sc-if value="{{ s.hasForm }}"><span style="font-size:0.75em;padding:2px 7px;border-radius:5px;background:rgb(246 244 240);color:rgb(90 78 68)">📝 {{ s.formCount }} form fields</span></sc-if>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px 16px;font-size:0.88em;color:rgb(74 64 58);align-items:center">
+                  <span style="display:flex;align-items:center;gap:6px"><span style="color:rgb(117 100 86)">Who</span><span style="font-weight:500">{{ s.who }}</span></span>
+                  <span style="display:flex;align-items:center;gap:6px"><span style="color:rgb(117 100 86)">SLA</span><span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px">{{ s.sla }}</span></span>
+                  <sc-if value="{{ s.hasDue }}"><span style="display:flex;align-items:center;gap:6px"><span style="color:rgb(117 100 86)">Due</span><span style="font-weight:500">{{ s.due }}</span></span></sc-if>
+                  <span style="display:flex;align-items:center;gap:6px"><span style="color:rgb(117 100 86)">Approval</span><span style="font-weight:500">{{ s.appr }}</span></span>
+                  <sc-if value="{{ s.showSplit }}"><span style="display:flex;align-items:center;gap:6px"><span style="color:rgb(117 100 86)">Subtasks</span><span style="font-weight:500">{{ s.split }}</span></span></sc-if>
+                </div>
+                <sc-if value="{{ s.hasNote }}"><div style="font-size:0.82em;color:rgb(117 100 86)">{{ s.note }}</div></sc-if>
+              </div>
+            </div>
+            <sc-if value="{{ s.hasConnector }}"><div style="width:1.5px;height:14px;background:rgb(214 206 196);margin-left:26px"></div></sc-if>
+          </div>
+        </sc-for>
+        <div onDragOver="{{ endDragOver }}" onDrop="{{ endDrop }}" style="height:{{ endDropH }}px;border-radius:6px;background:rgb(90 62 43 / 0.15);margin-top:6px"></div>
+        <div onClick="{{ addStage }}" style="margin-top:12px;height:44px;border-radius:12px;border:1.5px dashed rgb(214 204 190);display:flex;align-items:center;justify-content:center;gap:8px;color:rgb(117 100 86);cursor:pointer;font-size:0.94em" style-hover="background:rgb(250 248 244);color:rgb(51 36 27)">+ Add stage</div>
+      </div>
+    </div>
+
+    <div style="border-left:1px solid rgb(236 231 224);background:#fff;overflow-y:auto">
+      <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:16px 18px 24px;display:flex;flex-direction:column;gap:18px;animation:wbIn .15s ease-out">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:0.72em;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgb(117 100 86)">Stage {{ sel.n }} settings</span>
+            <span onClick="{{ removeStage }}" style="font-size:0.84em;color:rgb(176 40 34);cursor:pointer">Remove stage</span>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:0.92em;font-weight:600">What's this stage called?</span>
+            <input value="{{ sel.name }}" onChange="{{ onName }}" style="height:36px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;font-size:0.94em;outline:none;color:rgb(51 36 27)">
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:0.92em;font-weight:600">Who does it?</span>
+            <div style="position:relative">
+              <div onClick="{{ whoDD.toggle }}" style="min-height:40px;box-sizing:border-box;padding:6px 10px;border-radius:8px;border:1px solid {{ whoDD.border }};background:#fff;display:flex;align-items:center;gap:10px;cursor:pointer">
+                <span style="width:24px;text-align:center;font-size:13px">{{ whoDD.icon }}</span>
+                <div style="flex:1;min-width:0"><div style="font-size:0.92em;font-weight:500">{{ whoDD.label }}</div><div style="font-size:0.78em;color:rgb(117 100 86)">{{ whoDD.hint }}</div></div>
+                <span style="font-size:9px;color:rgb(117 100 86)">▼</span>
+              </div>
+              <sc-if value="{{ whoDD.open }}">
+                <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:40;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 14px 34px rgb(51 36 27 / 0.16);padding:6px;max-height:280px;overflow-y:auto;animation:wbIn .12s ease-out">
+                  <sc-for list="{{ whoOpts }}" as="o" hint-placeholder-count="2">
+                    <div onClick="{{ o.onClick }}" title="{{ o.title }}" style="display:flex;align-items:flex-start;gap:10px;padding:8px 9px;border-radius:7px;cursor:{{ o.cursor }};opacity:{{ o.op }};background:{{ o.bg }}" style-hover="background:rgb(246 244 240)">
+                      <span style="width:16px;text-align:center;font-size:12px;margin-top:1px">{{ o.tick }}</span>
+                      <div style="flex:1;min-width:0"><div style="font-size:0.9em;font-weight:500">{{ o.label }}</div><div style="font-size:0.78em;color:rgb(117 100 86);margin-top:1px">{{ o.hint }}</div></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <sc-if value="{{ showCandidates }}">
+              <div style="display:flex;flex-direction:column;gap:5px;margin-top:4px">
+                <div style="font-size:0.82em;color:rgb(74 64 58)">Who can they pick from? <span style="color:{{ candFg }}">{{ candHint }}</span></div>
+                <div style="position:relative">
+                  <div onClick="{{ candDD.toggle }}" style="min-height:40px;box-sizing:border-box;padding:6px 10px;border-radius:8px;border:1px solid {{ candDD.border }};background:#fff;display:flex;align-items:center;gap:10px;cursor:pointer">
+                    <div style="display:flex;align-items:center">
+                      <sc-for list="{{ candPicked }}" as="p" hint-placeholder-count="3"><span style="margin-right:-6px;display:flex"><span onClick="{{ p.onAvatar }}" title="{{ p.avTitle }}" style="width:24px;height:24px;flex:none;border-radius:50%;background:{{ p.avBg }};color:rgb(51 36 27);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:{{ p.avCursor }};box-shadow:0 0 0 1.5px #fff">{{ p.avText }}</span></span></sc-for>
+                    </div>
+                    <span style="flex:1;min-width:0;font-size:0.9em;padding-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ candDD.label }}</span>
+                    <span style="font-size:9px;color:rgb(117 100 86)">▼</span>
+                  </div>
+                  <sc-if value="{{ candDD.open }}">
+                    <div onClick="{{ stopProp }}" style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:40;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 14px 34px rgb(51 36 27 / 0.16);padding:6px;max-height:280px;overflow-y:auto;animation:wbIn .12s ease-out">
+                      <sc-for list="{{ candChips }}" as="p" hint-placeholder-count="6">
+                        <div onClick="{{ p.onClick }}" style="display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:7px;cursor:pointer" style-hover="background:rgb(246 244 240)">
+                          <span style="width:16px;height:16px;flex:none;border-radius:4px;box-sizing:border-box;border:1.5px solid {{ p.box }};background:{{ p.fill }};color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center">{{ p.tickMark }}</span>
+                          <span onClick="{{ p.onAvatar }}" title="{{ p.avTitle }}" style="width:24px;height:24px;flex:none;border-radius:50%;background:{{ p.avBg }};color:rgb(51 36 27);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:{{ p.avCursor }};box-shadow:0 0 0 1.5px #fff">{{ p.avText }}</span>
+                          <span style="flex:1;font-size:0.9em;font-weight:500">{{ p.name }}</span>
+                          <span style="font-size:0.78em;color:rgb(117 100 86)">{{ p.load }} active</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:0.92em;font-weight:600">Who approves it?</span>
+            <sc-for list="{{ apprLevels }}" as="a" hint-placeholder-count="1">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="font-size:0.78em;font-weight:600;color:rgb(117 100 86)">Level {{ a.n }}</span><span style="font-size:10.5px;color:rgb(117 100 86)">🔒 always locked</span><span style="flex:1"></span><sc-if value="{{ a.canRemove }}"><span onClick="{{ a.onRemove }}" style="font-size:0.8em;color:rgb(117 100 86);cursor:pointer">Remove</span></sc-if></div>
+                <div style="position:relative">
+                  <div onClick="{{ a.toggle }}" style="min-height:40px;box-sizing:border-box;padding:6px 10px;border-radius:8px;border:1px solid {{ a.border }};background:#fff;display:flex;align-items:center;gap:10px;cursor:pointer">
+                    <sc-if value="{{ a.cur.isPerson }}"><span onClick="{{ a.cur.onAvatar }}" title="{{ a.cur.avTitle }}" style="width:24px;height:24px;flex:none;border-radius:50%;background:{{ a.cur.avBg }};color:rgb(51 36 27);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:{{ a.cur.avCursor }};box-shadow:0 0 0 1.5px #fff">{{ a.cur.avText }}</span></sc-if>
+                    <sc-if value="{{ a.cur.notPerson }}"><span style="width:24px;text-align:center;font-size:13px">{{ a.cur.icon }}</span></sc-if>
+                    <span style="flex:1;min-width:0;font-size:0.92em;font-weight:500">{{ a.cur.label }}</span>
+                    <span style="font-size:9px;color:rgb(117 100 86)">▼</span>
+                  </div>
+                  <sc-if value="{{ a.open }}">
+                    <div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:40;background:#fff;border:1px solid rgb(229 222 211);border-radius:10px;box-shadow:0 14px 34px rgb(51 36 27 / 0.16);padding:6px;max-height:280px;overflow-y:auto;animation:wbIn .12s ease-out">
+                      <sc-for list="{{ a.opts }}" as="o" hint-placeholder-count="6">
+                        <div onClick="{{ o.onClick }}" style="display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:7px;cursor:pointer;background:{{ o.bg }};border-top:{{ o.bt }}" style-hover="background:rgb(246 244 240)">
+                          <sc-if value="{{ o.isPerson }}"><span onClick="{{ o.onAvatar }}" title="{{ o.avTitle }}" style="width:24px;height:24px;flex:none;border-radius:50%;background:{{ o.avBg }};color:rgb(51 36 27);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:{{ o.avCursor }};box-shadow:0 0 0 1.5px #fff">{{ o.avText }}</span></sc-if>
+                          <sc-if value="{{ o.notPerson }}"><span style="width:24px;text-align:center;font-size:13px">{{ o.icon }}</span></sc-if>
+                          <span style="flex:1;font-size:0.9em;font-weight:500">{{ o.label }}</span>
+                          <span style="font-size:0.78em;color:rgb(117 100 86)">{{ o.hint }}</span>
+                          <span style="width:14px;font-size:12px">{{ o.tick }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ canAddLevel }}"><span onClick="{{ addLevel }}" style="align-self:flex-start;font-size:0.86em;font-weight:500;cursor:pointer;text-decoration:underline;text-underline-offset:2px">+ Add another approval level</span></sc-if>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:0.92em;font-weight:600">How long?</span>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="display:flex;align-items:center;border:1px solid rgb(229 222 211);border-radius:8px;height:34px">
+                <span onClick="{{ slaDown }}" style="width:30px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgb(246 244 240)">−</span>
+                <span style="min-width:34px;text-align:center;font-family:'Chivo Mono',Menlo,monospace;font-size:12px">{{ sel.slaN }}</span>
+                <span onClick="{{ slaUp }}" style="width:30px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgb(246 244 240)">+</span>
+              </div>
+              <span style="font-size:0.88em;color:rgb(117 100 86)">{{ sel.slaUnit }}</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ notQuick }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:0.92em;font-weight:600">What does PIC see on the link?</span>
+            <input value="{{ sel.picText }}" onChange="{{ onPicText }}" style="height:36px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:8px;padding:0 10px;font:inherit;font-size:0.94em;outline:none;color:rgb(51 36 27)">
+            <span style="font-size:0.8em;color:rgb(117 100 86)">Department-level words only. No names, no prices.</span>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <span style="font-size:0.92em;font-weight:600">Can this stage be split into subtasks?</span>
+            <div onClick="{{ toggleSplit }}" title="{{ splitTitle }}" style="width:36px;height:20px;flex:none;border-radius:10px;background:{{ splitTrack }};position:relative;cursor:{{ splitCursor }};opacity:{{ splitOp }}"><span style="position:absolute;top:2px;left:{{ splitKnob }}px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 0.2);transition:left .2s"></span></div>
+          </div>
+          <sc-if value="{{ sel.hasSubNote }}"><div style="font-size:0.82em;color:rgb(117 100 86);margin-top:-10px">{{ sel.subNote }}</div></sc-if></sc-if>
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:0.92em;font-weight:600">If changes are requested, go back to which stage?</span>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              <sc-for list="{{ backOpts }}" as="o" hint-placeholder-count="3"><span onClick="{{ o.onClick }}" style="height:28px;padding:0 10px;border-radius:7px;display:flex;align-items:center;cursor:pointer;font-size:0.86em;border:1px solid {{ o.border }};background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</span></sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:0.92em;font-weight:600">What does this stage fill in?</span>
+            <div style="border:1px solid rgb(236 231 224);border-radius:8px;overflow:hidden">
+              <sc-for list="{{ formFields }}" as="f" hint-placeholder-count="0"><div style="border-bottom:1px solid rgb(244 241 236);background:{{ f.bg }}">
+                <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;font-size:0.88em">
+                  <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:10px;color:rgb(117 100 86);width:18px;padding-top:3px">{{ f.glyph }}</span>
+                  <span style="flex:1;min-width:0;font-weight:{{ f.weight }};font-style:{{ f.fstyle }};color:{{ f.fg }};text-wrap:pretty">{{ f.name }}</span>
+                  <span style="font-size:0.85em;color:rgb(117 100 86);white-space:nowrap">{{ f.typeLabel }}</span>
+                  <span onClick="{{ f.onRemove }}" style="cursor:pointer;color:rgb(150 140 130)">×</span>
+                </div>
+                <sc-if value="{{ f.isTable }}" hint-placeholder-val="{{ false }}"><div style="padding:0 10px 10px 36px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="flex:1;min-width:0;font-size:0.8em;color:rgb(117 100 86);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.colSummary }}</span>
+                  <span onClick="{{ f.openTbl }}" style="height:26px;padding:0 10px;border-radius:6px;border:1px solid rgb(229 222 211);background:#fff;display:flex;align-items:center;font-size:0.82em;font-weight:600;cursor:pointer;color:rgb(51 36 27)" style-hover="background:rgb(246 244 240)">Edit table</span>
+                </div></sc-if>
+              </div></sc-for>
+              <div style="display:flex;gap:6px;padding:8px 10px;background:rgb(250 248 244)">
+                <input value="{{ fieldDraft }}" onChange="{{ onFieldDraft }}" onKeyDown="{{ onFieldKey }}" placeholder="{{ fieldPh }}" style="flex:1;min-width:0;height:28px;box-sizing:border-box;border:1px solid rgb(229 222 211);border-radius:6px;padding:0 8px;font:inherit;font-size:0.86em;outline:none;color:rgb(51 36 27)">
+                <select value="{{ fieldType }}" onChange="{{ onFieldType }}" style="height:28px;border:1px solid rgb(229 222 211);border-radius:6px;font:inherit;font-size:0.84em;background:#fff;color:rgb(51 36 27)">
+                  <sc-for list="{{ fieldTypes }}" as="t" hint-placeholder-count="7"><option value="{{ t }}">{{ t }}</option></sc-for>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ noSel }}">
+        <div style="padding:40px 24px;text-align:center;color:rgb(117 100 86);font-size:0.92em">Click a stage to set it up.</div>
+      </sc-if>
+    </div>
+  </div>
+
+  <div style="position:sticky;bottom:0;display:flex;align-items:center;gap:16px;padding:12px 24px;border-top:1px solid rgb(236 231 224);background:rgb(255 255 255 / 0.97);flex-wrap:wrap">
+    <span style="font-size:0.94em"><span style="color:rgb(117 100 86)">Total</span> <strong style="font-weight:600">{{ total }}</strong></span>
+    <span style="width:1px;height:16px;background:rgb(229 222 211)"></span>
+    <span style="font-size:0.94em"><span style="color:rgb(117 100 86)">PIC approves</span> <strong style="font-weight:600">{{ picTimes }}×</strong></span>
+    <sc-if value="{{ notQuick }}" hint-placeholder-val="{{ true }}"><span style="width:1px;height:16px;background:rgb(229 222 211)"></span>
+    <span style="font-size:0.94em"><span style="color:rgb(117 100 86)">Product promise</span> <strong style="font-weight:600">{{ promise }}</strong></span></sc-if>
+    <sc-if value="{{ isQuick }}"><span style="width:1px;height:16px;background:rgb(229 222 211)"></span>
+    <span style="font-size:0.94em"><span style="color:rgb(117 100 86)">Finishes</span> <strong style="font-weight:600">{{ finishes }}</strong></span></sc-if>
+    <sc-for list="{{ warnings }}" as="w" hint-placeholder-count="0">
+      <span style="height:26px;padding:0 10px;border-radius:999px;background:rgb(251 243 225);border:1px solid rgb(236 214 164);color:rgb(110 74 8);display:flex;align-items:center;gap:6px;font-size:0.84em;white-space:nowrap">⚠️ {{ w }}</span>
+    </sc-for>
+    <sc-if value="{{ noWarnings }}"><span style="font-size:0.86em;color:rgb(40 110 64)">No warnings</span></sc-if>
+    <span style="flex:1"></span>
+    <sc-if value="{{ notQuick }}" hint-placeholder-val="{{ true }}"><span style="font-size:0.86em;color:rgb(117 100 86)">{{ activeNote }}</span>
+    <div onClick="{{ publish }}" style="height:38px;padding:0 18px;border-radius:8px;background:#EC9B55;color:rgb(43 31 23);display:flex;align-items:center;font-weight:600;font-size:0.94em;cursor:pointer;white-space:nowrap" style-hover="background:#E0893F">Publish v{{ nextVer }}</div></sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ hasToast }}">
+    <div style="position:fixed;left:50%;bottom:76px;transform:translateX(-50%);z-index:300;padding:10px 16px;border-radius:8px;background:rgb(51 36 27);color:rgb(246 238 230);font-size:13px;animation:wbIn .2s ease-out">{{ toast }}</div>
+  </sc-if>
+
+  <sc-if value="{{ tblOpen }}" hint-placeholder-val="{{ false }}"><div onClick="{{ closeTbl }}" style="position:fixed;inset:0;z-index:50;background:rgb(40 30 22 / 0.32);display:flex;align-items:center;justify-content:center;padding:24px">
+    <div onClick="{{ stop }}" style="width:min(880px,100%);max-height:calc(100vh - 48px);box-sizing:border-box;background:#fff;border-radius:14px;box-shadow:0 24px 60px rgb(40 30 22 / 0.25);display:flex;flex-direction:column;overflow:hidden;animation:wbIn .18s ease-out">
+      <div style="display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid rgb(236 231 224)">
+        <span style="font-family:'Chivo Mono',Menlo,monospace;font-size:11px;color:rgb(117 100 86)">▤</span>
+        <input value="{{ tm.name }}" onChange="{{ tm.onRename }}" placeholder="Table name" style="flex:1;min-width:0;height:32px;box-sizing:border-box;border:1px solid transparent;border-radius:7px;padding:0 8px;font:inherit;font-size:1.1em;font-weight:600;outline:none;color:rgb(51 36 27)" style-focus="border-color:rgb(229 222 211)">
+        <span style="font-size:0.84em;color:rgb(117 100 86);white-space:nowrap">{{ tm.typeLabel }} · {{ tblStage }}</span>
+        <span onClick="{{ closeTbl }}" style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(117 100 86)" style-hover="background:rgb(246 244 240)">×</span>
+      </div>
+      <div style="padding:18px 20px;overflow:auto;display:flex;flex-direction:column;gap:8px">
+        <div style="border:1px solid rgb(229 222 211);border-radius:8px;overflow-x:auto;background:#fff">
+                    <div style="display:flex;flex-direction:column;min-width:max-content">
+                      <div style="display:flex;background:rgb(250 248 244);border-bottom:1px solid rgb(236 231 224)">
+                        <sc-for list="{{ tm.cols }}" as="c"><div style="width:160px;flex:none;box-sizing:border-box;padding:5px;border-right:1px solid rgb(236 231 224);display:flex;flex-direction:column;gap:4px">
+                          <div style="display:flex;align-items:center;gap:2px"><input value="{{ c.name }}" onChange="{{ c.onName }}" placeholder="Column" style="flex:1;min-width:0;height:24px;box-sizing:border-box;border:1px solid transparent;border-radius:5px;padding:0 5px;font:inherit;font-size:0.84em;font-weight:600;outline:none;background:transparent;color:rgb(51 36 27)" style-focus="border-color:rgb(176 140 104);background:#fff"><span onClick="{{ c.onRemove }}" title="Remove column" style="width:14px;text-align:center;cursor:pointer;color:rgb(150 140 130);opacity:{{ c.delOp }}">×</span></div>
+                          <select value="{{ c.type }}" onChange="{{ c.onType }}" style="height:22px;border:1px solid rgb(229 222 211);border-radius:5px;font:inherit;font-size:0.76em;background:#fff;color:rgb(90 62 43)"><sc-for list="{{ colTypes }}" as="t"><option value="{{ t }}">{{ t }}</option></sc-for></select>
+                        </div></sc-for>
+                        <div onClick="{{ tm.addCol }}" title="Add column" style="width:34px;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(90 62 43);font-size:1.1em" style-hover="background:rgb(241 236 228)">+</div>
+                      </div>
+                      <sc-for list="{{ tm.rows }}" as="r"><div style="display:flex;border-bottom:1px solid rgb(244 241 236)">
+                        <sc-for list="{{ r.cells }}" as="cell"><div style="width:160px;flex:none;box-sizing:border-box;padding:3px 5px;border-right:1px solid rgb(244 241 236)"><input value="{{ cell.value }}" onChange="{{ cell.onChange }}" placeholder="Blank — team fills in" style="width:100%;height:24px;box-sizing:border-box;border:1px solid transparent;border-radius:5px;padding:0 5px;font:inherit;font-size:0.84em;outline:none;background:transparent;color:rgb(51 36 27)" style-focus="border-color:rgb(176 140 104);background:#fff"></div></sc-for>
+                        <div onClick="{{ r.onRemove }}" title="Remove row" style="width:34px;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgb(150 140 130)">×</div>
+                      </div></sc-for>
+                      <div onClick="{{ tm.addRow }}" style="padding:6px 10px;font-size:0.82em;font-weight:500;color:rgb(90 62 43);cursor:pointer" style-hover="background:rgb(250 248 244)">+ Add row</div>
+                    </div>
+                  </div>
+                  
+        <span style="font-size:0.82em;color:rgb(117 100 86)">Set columns across with +, preset rows down with + Add row. Cells you fill in are locked for the team; cells you leave blank are for the team to fill in. People can still add more rows.</span>
+      </div>
+      <div style="display:flex;justify-content:flex-end;padding:12px 20px;border-top:1px solid rgb(236 231 224)">
+        <span onClick="{{ closeTbl }}" style="height:34px;padding:0 16px;border-radius:8px;background:rgb(51 36 27);color:#fff;display:flex;align-items:center;font-weight:600;cursor:pointer">Done</span>
+      </div>
+    </div>
+  </div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1170,&quot;height&quot;:900}}">
+const PEOPLE = { Rachel: 'MM', Daniel: 'AMM', Mei: 'Director', 'Ah Kit': 'Videographer', Ali: 'Editor', Jason: 'Social Media', Siti: 'Graphic', Aina: 'Graphic', Hafiz: 'Graphic', 'Wei Lun': 'Ads' };
+const LOAD = { Rachel: 6, Daniel: 5, Mei: 3, 'Ah Kit': 2, Ali: 3, Jason: 5, Siti: 4, Aina: 2, Hafiz: 3, 'Wei Lun': 2 };
+const DEPT = { content: ['Content', 'oklch(0.94 0.04 295)', 'oklch(0.40 0.12 295)'], social: ['Social Media', 'oklch(0.94 0.04 235)', 'oklch(0.40 0.10 235)'], design: ['Design', 'oklch(0.94 0.04 350)', 'oklch(0.43 0.13 350)'], ads: ['Ads', 'oklch(0.94 0.04 270)', 'oklch(0.40 0.12 270)'], brand: ['Brand', 'oklch(0.94 0.04 195)', 'oklch(0.38 0.08 195)'] };
+const GLYPH = { Table: '▤', Note: '✎', Text: 'Aa', Select: '◉', 'Multi-select': '☰', Date: '▦', Person: '◎', File: '⎘', Checkbox: '☑', Number: '#' };
+const S = (name, dept, who, sla, appr, split, extra = {}) => ({ id: Math.random().toString(36).slice(2), name, dept, who, sla, appr, split, delivs: [], form: [], back: 'prev', picText: '', ...extra });
+const TPL = {
+  reels: { action: 'Reels video', tname: 'Full production', name: 'Reels Video', emoji: '🎞️', ver: 2, active: 12, promise: 10, sub: 'Used by Ads and Social Media', stages: () => [
+    S('Script', 'content', { mode: 'person', person: 'Mei' }, 2, [{ kind: 'person', who: 'Rachel' }], false, { delivs: ['Script doc'], picText: 'Content team is writing the script' }),
+    S('Shoot', 'content', { mode: 'person', person: 'Ah Kit', extra: '+ talent' }, 1, [], false, { delivs: ['Shot list'], picText: 'Content team is shooting' }),
+    S('Raw upload', 'content', { mode: 'person', person: 'Ah Kit' }, 1, [], false, { delivs: ['Raw footage link'], picText: 'Content team is uploading footage' }),
+    S('Edit', 'content', { mode: 'person', person: 'Ali' }, 3, [], true, { delivs: ['Edit draft'], picText: 'Content team is editing' }),
+    S('Final', 'content', { mode: 'person', person: 'Ali' }, 1, [{ kind: 'person', who: 'Rachel' }, { kind: 'pic' }], false, { delivs: ['Final video'], back: 3, picText: 'Ready for your approval' }),
+  ] },
+  social: { action: 'Social media monthly', tname: 'Standard', name: 'Social Media Monthly', emoji: '📣', ver: 4, active: 8, promise: 6, sub: 'Recurring · opens on the 15th', stages: () => [
+    S('Content plan & captions', 'social', { mode: 'person', person: 'Jason' }, 2, [{ kind: 'pic' }], false, { delivs: ['Content plan'], picText: 'Social team is preparing the plan' }),
+    S('Design graphics', 'design', { mode: 'prev', cands: ['Siti', 'Aina', 'Hafiz'] }, 3, [{ kind: 'person', who: 'Rachel' }], true, { delivs: ['Graphics folder'], picText: 'Design team is working on visuals' }),
+    S('Schedule & post', 'social', { mode: 'person', person: 'Jason' }, 1, [], false, { delivs: ['Post links'], picText: 'Social team is scheduling' }),
+  ] },
+  media: { action: 'Media buying', tname: 'Standard', name: 'Media Buying Campaign', emoji: '📈', ver: 3, active: 5, promise: 9, sub: 'Ads team', stages: () => [
+    S('Direction', 'ads', { mode: 'person', person: 'Wei Lun' }, 2, [{ kind: 'pic' }], false, { delivs: ['Direction brief'], picText: 'Ads team is setting direction', form: [['Direction', 'Text'], ['Budget', 'Number'], ['KPI · Cost per lead', 'Number'], ['KPI · Min ROAS', 'Number'], ['KPI · Appointment rate', 'Number'], ['KPI · Conversion rate', 'Number']] }),
+    S('Creative production', 'ads', { mode: 'person', person: 'Wei Lun' }, 5, [], true, { delivs: ['Creative set'], picText: 'Creative is in production', subNote: 'Opens Design / Content subtasks. Subtasks are checked internally only.' }),
+    S('Compile & review', 'ads', { mode: 'person', person: 'Wei Lun' }, 1, [{ kind: 'person', who: 'Rachel' }, { kind: 'pic' }], false, { delivs: ['Campaign deck'], back: 1, picText: 'Ready for your approval' }),
+    S('Go live', 'ads', { mode: 'person', person: 'Wei Lun' }, 1, [], false, { delivs: ['Live ad links'], picText: 'Ads are going live' }),
+    S('Report', 'ads', { mode: 'person', person: 'Wei Lun' }, 14, [], false, { recurring: true, delivs: ['Ads report'], picText: 'Report published to your link', subNote: 'Repeats every 2 weeks. Each report is sent to the PIC tracking link automatically.' }),
+  ] },
+  graphic: { action: 'Design photo', tname: 'Simple', name: 'Graphic Post', emoji: '🖼️', ver: 1, active: 3, promise: 3, sub: '', stages: () => [S('Design', 'design', { mode: 'assign' }, 2, [{ kind: 'pic' }], false), S('Publish', 'social', { mode: 'person', person: 'Jason' }, 1, [], false)] },
+  brand: { action: 'Brand book', tname: 'Standard', name: 'Brand Book', emoji: '📘', ver: 2, active: 1, promise: 15, sub: '', stages: () => [S('Discovery', 'brand', { mode: 'person', person: 'Rachel' }, 3, [{ kind: 'pic' }], false), S('Design system', 'design', { mode: 'assign' }, 8, [{ kind: 'person', who: 'Rachel' }], true), S('Final book', 'design', { mode: 'assign' }, 2, [{ kind: 'pic' }], false)] },
+  vm: { action: 'Showroom VM', tname: 'Standard', name: 'Showroom VM', emoji: '🛋️', ver: 1, active: 2, promise: 12, sub: '', stages: () => [S('Concept', 'brand', { mode: 'assign' }, 3, [{ kind: 'pic' }], false), S('Props & sourcing', 'brand', { mode: 'assign' }, 5, [], true), S('Install', 'brand', { mode: 'assign' }, 2, [], false), S('Handover', 'brand', { mode: 'assign' }, 1, [{ kind: 'pic' }], false)] },
+};
+TPL.reelsQuick = { action: 'Reels video', tname: 'Quick edit', emoji: '🎞️', ver: 1, active: 4, promise: 5, sub: 'No shoot · uses existing footage', stages: () => TPL.reels.stages().filter(x => ['Script', 'Edit', 'Final'].includes(x.name)) };
+TPL.graphicFull = { action: 'Design photo', tname: 'With revisions', emoji: '🖼️', ver: 1, active: 2, promise: 6, sub: 'For campaign key visuals', stages: () => [S('Brief', 'design', { mode: 'assign' }, 1, [{ kind: 'person', who: 'Rachel' }], false), S('Design', 'design', { mode: 'assign' }, 2, [{ kind: 'person', who: 'Rachel' }], true), S('Revisions', 'design', { mode: 'prev' }, 1, [{ kind: 'pic' }], false), S('Publish', 'social', { mode: 'assign' }, 1, [], false)] };
+TPL.quick = { action: 'Quick task', tname: 'This task', emoji: '⚡', ver: 0, active: 0, promise: 99, sub: '', stages: () => [
+  S('First draft · Canva template', 'social', { mode: 'person', person: 'Rachel' }, 1, [], false, { form: [['Canva template link', 'Text'], ['Draft notes', 'Text']] }),
+  S('Redesign', 'design', { mode: 'person', person: 'Siti' }, 1, [{ kind: 'person', who: 'Rachel' }], false, { back: 0, form: [['Final artwork', 'File']] }),
+  S('Publish', 'social', { mode: 'person', person: 'Jason' }, 1, [], false, { form: [['Post link', 'Text'], ['Posted on', 'Date']] }),
+] };
+const TODAY = new Date('2026-10-21T00:00');
+const addWork = (d, n) => { const x = new Date(d); let left = n; while (left > 0) { x.setDate(x.getDate() + 1); if (x.getDay() !== 0 && x.getDay() !== 6) left--; } return x; };
+const fmtD = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+const ORDER = ['graphic', 'graphicFull', 'reels', 'reelsQuick', 'social', 'media', 'brand', 'vm'];
+Object.values(TPL).forEach(t => { t.name = t.action + ' · ' + t.tname; });
+const PHOTO = { Rachel: true, Mei: true, Ali: true, Siti: true };
+const AVC = { Rachel: 'oklch(0.90 0.05 195)', Daniel: 'oklch(0.90 0.05 60)', Mei: 'oklch(0.90 0.05 295)', 'Ah Kit': 'oklch(0.90 0.05 195)', Ali: 'oklch(0.90 0.05 270)', Jason: 'oklch(0.90 0.05 235)', Siti: 'oklch(0.92 0.04 350)', Aina: 'oklch(0.92 0.04 350)', Hafiz: 'oklch(0.92 0.04 350)', 'Wei Lun': 'oklch(0.90 0.05 270)' };
+const PHOTO_BG = n => `repeating-linear-gradient(135deg, color-mix(in oklch, ${AVC[n]} 70%, rgb(120 100 84)) 0 3px, ${AVC[n]} 3px 6px)`;
+const FIELD_TYPES = ['Text', 'Number', 'Select', 'Multi-select', 'Date', 'Person', 'File', 'Checkbox', 'Table', 'Note'];
+const COL_TYPES = ['Text', 'Number', 'Checkbox', 'Date', 'Person'];
+
+class Component extends DCLogic {
+  state = this.initState();
+  mk(action, tname, extra = {}) {
+    const k = 't_' + (action + '_' + tname).toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    if (!TPL[k]) { TPL[k] = { action, tname, name: action + ' · ' + tname, emoji: '✨', ver: 0, active: 0, promise: 2, sub: '', stages: () => [S(action, 'design', { mode: 'assign' }, 2, [{ kind: 'pic' }], false)], ...extra }; ORDER.push(k); }
+    return k;
+  }
+  initState() {
+    if (this.props.quick) return this.load('quick');
+    const a = (this.props.newName || '').trim(), t = (this.props.newTpl || 'Standard').trim();
+    if (!a) return this.load('graphic');
+    const hit = Object.keys(TPL).find(k => TPL[k].action.toLowerCase() === a.toLowerCase() && TPL[k].tname.toLowerCase() === t.toLowerCase());
+    if (hit) return this.load(hit);
+    const k = this.mk(a, t, { sub: this.props.newSub || '' });
+    return { ...this.load(k), toast: `New template “${t}” created under action “${a}” · add stages, then set up its canvas` };
+  }
+  emitQuick() { if (!this.props.quick || !this.props.onChange) return; let d = TODAY; this.props.onChange(this.state.stages.map(x => { d = addWork(d, x.sla); return { name: x.name, who: x.who.mode === 'person' ? x.who.person : '', appr: x.appr, sla: x.sla, form: x.form, dept: x.dept, due: fmtD(d) }; })); }
+  componentDidUpdate(pp, ps) { if (ps.stages !== this.state.stages) this.emitQuick(); }
+  componentDidMount() { this.emitQuick(); if (this.state.toast) { clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 3200); } }
+  load(k) { return { tpl: k, stages: TPL[k].stages(), sel: 0, locked: false, drag: null, over: null, delivDraft: '', fieldDraft: '', fieldType: 'Text', toast: '', published: {}, clones: [] }; }
+  av(name) {
+    return { avBg: PHOTO[name] ? PHOTO_BG(name) : (AVC[name] || '#eee'), avText: PHOTO[name] ? '' : name[0], avTitle: `Open ${name}'s workspace`, avCursor: 'pointer',
+      onAvatar: e => { e.stopPropagation(); this.props.onOpenPerson ? this.props.onOpenPerson(name) : this.flash(`Opening ${name}'s workspace…`); } };
+  }
+  dd(k) { this.setState(p => ({ dd: p.dd === k ? null : k })); }
+  upd(patch) { this.setState(s => ({ stages: s.stages.map((x, i) => i === s.sel ? { ...x, ...patch } : x) })); }
+  flash(t) { this.setState({ toast: t }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  componentWillUnmount() { clearTimeout(this._t); }
+  move(from, to) {
+    this.setState(s => {
+      const arr = [...s.stages]; const [x] = arr.splice(from, 1); const t = to > from ? to - 1 : to; arr.splice(t, 0, x);
+      return { stages: arr, sel: t, drag: null, over: null };
+    });
+  }
+  renderVals() {
+    const s = this.state, T = TPL[s.tpl], quick = !!this.props.quick, locked = s.locked && !quick;
+    const addAction = () => { const n = (s.actDraft || '').trim(); if (!n) return; const k = this.mk(n, 'Standard'); this.setState({ ...this.load(k), actDraft: '', actAddOpen: false }); this.flash(`Action “${n}” created with a Standard template`); };
+    const eff = s.stages.map(st => {
+      const w = st.who.mode === 'person' && !quick ? { mode: 'assign' } : st.who;
+      return locked ? { ...st, split: false, who: w.mode === 'prev' ? { mode: 'assign' } : w } : { ...st, who: w };
+    });
+    const whoText = st => quick && st.who.mode !== 'person' ? '⚠ Pick a person' : st.who.mode === 'person' ? `${st.who.person}${st.who.extra ? ' ' + st.who.extra : ''}` : st.who.mode === 'prev' ? `🔓 ${eff[eff.indexOf(st) - 1] ? eff[eff.indexOf(st) - 1].who.person || 'Previous stage' : 'Previous stage'} picks from ${(st.who.cands || []).join(' / ') || '…'}` : 'Pick at assignment';
+    const apprText = st => !st.appr.length ? '— No approval' : st.appr.map(a => a.kind === 'pic' ? '🔗 PIC' : a.kind === 'assign' ? '👤 Pick at assignment' : `👤 ${a.who}`).join(' → ');
+    const ver = (s.published[s.tpl] || T.ver) + 1;
+    let qd = TODAY; const dues = eff.map(x => { qd = addWork(qd, x.sla); return fmtD(qd); });
+    const stages = eff.map((st, i) => {
+      const d = DEPT[st.dept], on = i === s.sel;
+      return { hasDue: quick, due: dues[i], showSplit: !quick,
+        n: i + 1, name: st.name || 'Untitled stage', dept: d[0], deptBg: d[1], deptFg: d[2],
+        who: whoText(st), sla: st.recurring ? 'every 2 weeks' : `${st.sla}d`, appr: apprText(st), split: st.split ? '✓' : '✗',
+        hasForm: st.form.length > 0, formCount: st.form.length, hasNote: !!st.subNote, note: st.subNote,
+        border: on ? 'rgb(90 62 43)' : 'rgb(236 231 224)', shadow: on ? '0 6px 18px rgb(51 36 27 / 0.08)' : 'none', op: s.drag === i ? 0.4 : 1,
+        hasConnector: i < eff.length - 1,
+        dropH: s.drag !== null && s.over === i && s.drag !== i && s.drag !== i - 1 ? 6 : 0, dropGap: s.drag !== null && s.over === i && s.drag !== i && s.drag !== i - 1 ? 6 : 0,
+        onClick: () => this.setState({ sel: i }),
+        onDragStart: e => { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch (_) {} this.setState({ drag: i }); },
+        onDragEnd: () => this.setState({ drag: null, over: null }),
+        onDragOver: e => { e.preventDefault(); if (s.over !== i) this.setState({ over: i }); },
+        onDrop: e => { e.preventDefault(); if (s.drag !== null) this.move(s.drag, i); },
+      };
+    });
+    const st = eff[s.sel], raw = s.stages[s.sel];
+    let selVals = {};
+    if (st) {
+      const radio = on => ({ border: on ? 'rgb(51 36 27)' : 'rgb(236 231 224)', bg: on ? 'rgb(250 248 244)' : '#fff', radio: on ? '5px solid rgb(51 36 27)' : '1.5px solid rgb(200 192 182)' });
+      const prevPerson = null;
+      const whoOpts = quick ? Object.keys(PEOPLE).map(n => { const on = st.who.mode === 'person' && st.who.person === n; return { label: n === 'Rachel' ? 'Me (Rachel)' : n, hint: `${PEOPLE[n]} · ${LOAD[n]} active`, tick: on ? '✓' : '', bg: on ? 'rgb(250 248 244)' : 'transparent', cursor: 'pointer', op: 1, title: '', onClick: () => { this.upd({ who: { mode: 'person', person: n } }); this.setState({ dd: null }); } }; }) : [
+        { k: 'assign', label: 'Pick at assignment', hint: 'MM chooses when planning each project' },
+        { k: 'prev', label: '🔓 Previous stage picks', hint: s.sel === 0 ? 'Not available on the first stage' : locked ? 'Off — whole workflow is locked' : `${prevPerson || 'Previous stage'} chooses from a list you set` },
+      ].map(o => {
+        const disabled = o.k === 'prev' && (s.sel === 0 || locked);
+        const on = st.who.mode === o.k;
+        return { ...o, tick: on ? '✓' : '', bg: on ? 'rgb(250 248 244)' : 'transparent', cursor: disabled ? 'not-allowed' : 'pointer', op: disabled ? 0.5 : 1, title: o.hint, onClick: () => { if (disabled) return; this.upd({ who: o.k === 'prev' ? { mode: 'prev', cands: raw.who.cands || [] } : { mode: 'assign' } }); this.setState({ dd: null }); } };
+      });
+      const chip = on => ({ border: on ? 'rgb(51 36 27)' : 'rgb(229 222 211)', bg: on ? 'rgb(51 36 27)' : '#fff', fg: on ? '#fff' : 'rgb(51 36 27)' });
+      const cands = st.who.cands || [];
+      const ddB = k => s.dd === k ? 'rgb(90 62 43)' : 'rgb(229 222 211)';
+      const apprLevels = (st.appr.length ? st.appr : [{ kind: 'none' }]).map((a, li) => ({
+        n: li + 1, canRemove: li > 0, open: s.dd === 'appr' + li, border: ddB('appr' + li), toggle: e => { e.stopPropagation(); this.dd('appr' + li); },
+        cur: a.kind === 'person' ? { isPerson: true, notPerson: false, label: a.who, ...this.av(a.who) } : { isPerson: false, notPerson: true, icon: a.kind === 'pic' ? '🔗' : a.kind === 'assign' ? '👤' : '—', label: a.kind === 'pic' ? 'PIC via link' : a.kind === 'assign' ? 'Pick at assignment' : 'No approval' },
+        onRemove: () => this.upd({ appr: raw.appr.filter((_, j) => j !== li) }),
+        opts: [['none', 'No approval', '—', ''], ['person:Rachel', 'Rachel', '', 'MM'], ['person:Daniel', 'Daniel', '', 'AMM'], ['person:Mei', 'Mei', '', 'Director'], ['pic', 'PIC via link', '🔗', 'external'], ['assign', 'Pick at assignment', '👤', 'MM chooses']]
+          .filter(([k]) => (li === 0 || k !== 'none') && !(quick && (k === 'assign' || k === 'pic')))
+          .map(([k, label, icon, hint], oi) => {
+            const cur = a.kind === 'person' ? `person:${a.who}` : a.kind;
+            const person = k.startsWith('person:');
+            return { label, hint, icon, isPerson: person, notPerson: !person, ...(person ? this.av(label) : {}), tick: cur === k ? '✓' : '', bg: cur === k ? 'rgb(250 248 244)' : 'transparent', bt: k === 'pic' ? '1px solid rgb(240 236 230)' : 'none', onClick: () => {
+              this.setState({ dd: null });
+              const next = [...raw.appr];
+              if (k === 'none') return this.upd({ appr: [] });
+              const val = k.startsWith('person:') ? { kind: 'person', who: k.slice(7) } : { kind: k };
+              if (!next.length) next.push(val); else next[li] = val;
+              this.upd({ appr: next });
+            } };
+          }),
+      }));
+      selVals = {
+        sel: { n: s.sel + 1, name: raw.name, slaN: raw.recurring ? 2 : raw.sla, slaUnit: raw.recurring ? 'weeks · repeats' : 'working days', picText: raw.picText, hasSubNote: !!raw.subNote, subNote: raw.subNote },
+        whoOpts, showPerson: false, showCandidates: st.who.mode === 'prev',
+        whoDD: quick ? { open: s.dd === 'who', border: st.who.mode === 'person' ? ddB('who') : 'rgb(220 150 140)', toggle: e => { e.stopPropagation(); this.dd('who'); }, icon: '👤', label: st.who.mode === 'person' ? (st.who.person === 'Rachel' ? 'Me (Rachel)' : st.who.person) : 'Pick a person…', hint: st.who.mode === 'person' ? PEOPLE[st.who.person] : 'Required' } : { open: s.dd === 'who', border: ddB('who'), toggle: e => { e.stopPropagation(); this.dd('who'); }, icon: st.who.mode === 'prev' ? '🔓' : '👤', label: st.who.mode === 'prev' ? 'Previous stage picks' : 'Pick at assignment', hint: st.who.mode === 'prev' ? 'They choose from the list below' : 'MM chooses when planning each project' },
+        candDD: { open: s.dd === 'cand', border: ddB('cand'), toggle: e => { e.stopPropagation(); this.dd('cand'); }, label: cands.length ? cands.join(' / ') : 'Choose candidates…' },
+        candPicked: cands.map(n => ({ name: n, ...this.av(n) })),
+        personChips: Object.keys(PEOPLE).filter(n => n !== 'Rachel' && n !== 'Daniel').map(n => ({ name: n, load: LOAD[n], ...chip(st.who.person === n), onClick: () => this.upd({ who: { ...raw.who, mode: 'person', person: n } }) })),
+        candChips: ['Siti', 'Aina', 'Hafiz', 'Ali', 'Ah Kit', 'Jason'].map(n => { const on = cands.includes(n); return { name: n, load: LOAD[n], ...this.av(n), tickMark: on ? '✓' : '', box: on ? 'rgb(51 36 27)' : 'rgb(200 192 182)', fill: on ? 'rgb(51 36 27)' : '#fff', onClick: () => this.upd({ who: { ...raw.who, cands: on ? cands.filter(x => x !== n) : [...cands, n] } }) }; }),
+        candHint: cands.length ? `${cands.length} candidates` : 'Pick at least one', candFg: cands.length ? 'rgb(117 100 86)' : 'rgb(176 40 34)',
+        apprLevels, canAddLevel: st.appr.length > 0 && st.appr.length < 3,
+        addLevel: () => this.upd({ appr: [...raw.appr, quick ? { kind: 'person', who: 'Rachel' } : { kind: 'pic' }] }),
+        slaUp: () => this.upd(raw.recurring ? {} : { sla: Math.min(30, raw.sla + 1) }), slaDown: () => this.upd(raw.recurring ? {} : { sla: Math.max(1, raw.sla - 1) }),
+        delivs: raw.delivs.map((t, j) => ({ t, onRemove: () => this.upd({ delivs: raw.delivs.filter((_, k) => k !== j) }) })),
+        splitTrack: st.split ? 'rgb(51 36 27)' : 'rgb(214 206 196)', splitKnob: st.split ? 18 : 2, splitCursor: locked ? 'not-allowed' : 'pointer', splitOp: locked ? 0.5 : 1,
+        splitTitle: locked ? 'Off — whole workflow is locked' : '', toggleSplit: () => !locked && this.upd({ split: !raw.split }),
+        backOpts: [{ k: 'prev', label: 'Stay on this stage' }, ...eff.slice(0, s.sel).map((x, j) => ({ k: j, label: `${j + 1}. ${x.name}` }))].map(o => ({ label: o.label, ...chip(raw.back === o.k || (o.k === 'prev' && raw.back === 'prev')), onClick: () => this.upd({ back: o.k }) })),
+        formFields: raw.form.map(([name, type, ex], j) => { const isNote = type === 'Note', isTable = type === 'Table', cols = (ex && ex.cols) || [];
+          const rows = (ex && ex.rows) || [];
+          const setEx = fn => this.upd({ form: raw.form.map((x, k) => { if (k !== j) return x; const e2 = { cols: ((x[2] && x[2].cols) || []).map(c => c.slice()), rows: ((x[2] && x[2].rows) || []).map(r => r.slice()) }; fn(e2); return [x[0], x[1], e2]; }) });
+          const setCols = fn => setEx(e2 => { e2.cols = fn(e2.cols); });
+          return { name, type, glyph: GLYPH[type], isTable, typeLabel: isNote ? 'Note · read-only' : isTable ? `Table · ${cols.length} × ${rows.length}` : type,
+            bg: isNote ? 'rgb(251 247 238)' : 'transparent', weight: isNote ? 400 : 500, fstyle: isNote ? 'italic' : 'normal', fg: isNote ? 'rgb(90 62 43)' : 'rgb(51 36 27)',
+            cols: cols.map(([cn, ct], ci) => ({ name: cn, type: ct, delOp: cols.length < 2 ? 0.3 : 1,
+              onName: e => { const v = e.target.value; setCols(cs => { cs[ci][0] = v; if (cs[ci][1] === 'Text' && /date|due|deadline/i.test(v)) cs[ci][1] = 'Date'; return cs; }); },
+              onType: e => { const v = e.target.value; setCols(cs => { cs[ci][1] = v; return cs; }); },
+              onRemove: () => cols.length > 1 && setEx(e2 => { e2.cols.splice(ci, 1); e2.rows.forEach(r => r.splice(ci, 1)); }) })),
+            addCol: () => setEx(e2 => { e2.cols.push(['Column ' + (e2.cols.length + 1), 'Text']); e2.rows.forEach(r => r.push('')); }),
+            rows: rows.map((r, ri) => ({ cells: cols.map(([, ct], ci) => ({ value: r[ci] || '', ph: ({ Number: '0', Checkbox: '☐', Date: 'dd/mm/yyyy', Person: 'Name' })[ct] || 'Preset value',
+              onChange: e => { const v = e.target.value; setEx(e2 => { e2.rows[ri][ci] = v; }); } })), onRemove: () => setEx(e2 => { e2.rows.splice(ri, 1); }) })),
+            addRow: () => setEx(e2 => { e2.rows.push(e2.cols.map(() => '')); }),
+            colSummary: cols.map(c => c[0]).join(' · ') + (rows.length ? ` — ${rows.length} preset row${rows.length > 1 ? 's' : ''}` : ''),
+            openTbl: () => this.setState({ tblEdit: j }),
+            onRename: e => { const v = e.target.value; this.upd({ form: raw.form.map((x, k) => k === j ? [v, ...x.slice(1)] : x) }); },
+            onRemove: () => this.upd({ form: raw.form.filter((_, k) => k !== j) }) }; }),
+      };
+    }
+    const total = eff.reduce((a, x) => a + (x.recurring ? 0 : x.sla), 0);
+    const picTimes = eff.reduce((a, x) => a + x.appr.filter(p => p.kind === 'pic').length, 0);
+    const anyAppr = eff.some(x => x.appr.length);
+    const warnings = [];
+    if (picTimes >= 3) warnings.push('PIC approves 3+ times');
+    if (!anyAppr && !quick) warnings.push('No approval in this workflow');
+    if (quick && eff.some(x => x.who.mode !== 'person')) warnings.push('A stage has no person');
+    if (!quick && total > T.promise) warnings.push(`Longer than product promise (${total} > ${T.promise} days)`);
+    if (eff.some(x => x.who.mode === 'prev' && !(x.who.cands || []).length)) warnings.push('A 🔓 stage has no candidates');
+    const hasReport = eff.some(x => x.recurring);
+    const seg2 = on => ({ bg: on ? '#fff' : 'transparent', shadow: on ? '0 1px 2px rgb(51 36 27 / 0.14)' : 'none', weight: on ? 600 : 400 });
+    const mt = s.mainTab || 'stages';
+    const tm = selVals.formFields && s.tblEdit != null ? selVals.formFields[s.tblEdit] : null;
+    return {
+      stopProp: e => e.stopPropagation(), stop: e => e.stopPropagation(),
+      tblOpen: !!(tm && tm.isTable), tm: tm || {}, tblStage: st ? st.name : '', closeTbl: () => this.setState({ tblEdit: null }),
+      closeDD: () => s.dd && this.setState({ dd: null }),
+      mainTabs: [['stages', 'Workflow stages'], ['canvas', 'Canvas template']].map(([k, label]) => ({ label, ...seg2(mt === k), onClick: () => this.setState({ mainTab: k }) })),
+      isStagesTab: mt === 'stages', isCanvasTab: mt === 'canvas',
+      isQuick: quick, notQuick: !quick,
+      reqText: !quick ? '' : this.props.reqMinutes ? `Pulled in from the ${this.props.reqMinutes} minutes. Read-only for everyone.` : (this.props.reqBrief || '').trim() ? `From "What needs to be done":\n${this.props.reqBrief.trim()}` : 'Shows what you write in "What needs to be done". Read-only for everyone.', showLock: mt === 'stages' && !quick, gridCols: quick ? 'minmax(0,1fr) 340px' : '230px minmax(0,1fr) 360px', finishes: dues[dues.length - 1] || '—',
+      canvasKeys: [{ key: s.tpl, name: T.action + ' · ' + T.tname, ver: (s.published[s.tpl] || T.ver) + 1, isNew: !T.ver, sample: s.tpl === 'reels', stages: s.stages.map(x => x.name), forms: s.stages.map(x => ({ name: x.name, form: x.form })) }],
+      actions: [...new Set(ORDER.map(k => TPL[k].action))].map(an => { const ks = ORDER.filter(k => TPL[k].action === an); return { name: an, emoji: TPL[ks[0]].emoji, count: ks.length,
+        addTpl: () => { const k = this.mk(an, 'Template ' + (ks.length + 1)); this.setState(this.load(k)); this.flash(`New template added to “${an}”`); },
+        tpls: ks.map(k => { const t = TPL[k]; return { name: t.tname, ver: t.ver ? `v${s.published[k] || t.ver}` : 'draft', stages: k === s.tpl ? s.stages.length : t.stages().length, bg: k === s.tpl ? 'rgb(236 229 219)' : 'transparent', weight: k === s.tpl ? 600 : 400, onClick: () => this.setState(this.load(k)),
+          onClone: e => { e.stopPropagation(); const cur = k === s.tpl ? s.stages : null; const nk = this.mk(an, t.tname + ' copy', { emoji: t.emoji, stages: () => (cur || t.stages()).map(x => ({ ...x, id: Math.random().toString(36).slice(2) })) }); this.setState(this.load(nk)); this.flash(`Cloned “${t.tname}” · rename it, then publish`); } }; }) }; }),
+      actDraft: s.actDraft || '', onActDraft: e => this.setState({ actDraft: e.target.value }), actOp: (s.actDraft || '').trim() ? 1 : 0.45,
+      onActKey: e => { if (e.key === 'Enter') addAction(); if (e.key === 'Escape') this.setState({ actAddOpen: false, actDraft: '' }); }, addAction,
+      actAddOpen: !!s.actAddOpen, toggleActAdd: () => this.setState({ actAddOpen: !s.actAddOpen, actDraft: '' }),
+      actName: T.action, tName: T.tname, onTName: e => { T.tname = e.target.value; T.name = T.action + ' · ' + T.tname; this.forceUpdate(); },
+      library: Object.entries(TPL).map(([k, t]) => ({ name: t.name, emoji: t.emoji, ver: `v${s.published[k] || t.ver}`, stages: k === s.tpl ? s.stages.length : t.stages().length, bg: k === s.tpl ? 'rgb(236 229 219)' : 'transparent', weight: k === s.tpl ? 600 : 400, onClick: () => this.setState(this.load(k)), onClone: e => { e.stopPropagation(); this.setState(this.load(k)); this.flash(`Cloned "${t.name}" — rename it and publish as a new template`); } })),
+      tplName: T.name, tplSub: T.sub, nextVer: ver,
+      locked, toggleLock: () => this.setState(p => ({ locked: !p.locked })),
+      lockBorder: locked ? 'rgb(51 36 27)' : 'rgb(229 222 211)', lockBg: locked ? 'rgb(246 244 240)' : '#fff', lockTrack: locked ? 'rgb(51 36 27)' : 'rgb(214 206 196)', lockKnob: locked ? 14 : 2,
+      stages, hasSel: !!st, noSel: !st, ...selVals,
+      endDragOver: e => { e.preventDefault(); if (s.over !== 'end') this.setState({ over: 'end' }); },
+      endDrop: e => { e.preventDefault(); if (s.drag !== null) this.move(s.drag, s.stages.length); },
+      endDropH: s.drag !== null && s.over === 'end' ? 6 : 0,
+      addStage: () => this.setState(p => ({ stages: [...p.stages, S('New stage', p.stages[p.stages.length - 1] ? p.stages[p.stages.length - 1].dept : 'content', quick ? { mode: 'none' } : { mode: 'assign' }, 1, [], false)], sel: p.stages.length })),
+      removeStage: () => this.setState(p => ({ stages: p.stages.filter((_, i) => i !== p.sel), sel: Math.max(0, p.sel - 1) })),
+      onName: e => this.upd({ name: e.target.value }), onPicText: e => this.upd({ picText: e.target.value }),
+      delivDraft: s.delivDraft, onDelivDraft: e => this.setState({ delivDraft: e.target.value }),
+      onDelivKey: e => { if (e.key === 'Enter' && s.delivDraft.trim()) { this.upd({ delivs: [...raw.delivs, s.delivDraft.trim()] }); this.setState({ delivDraft: '' }); } },
+      fieldDraft: s.fieldDraft, onFieldDraft: e => this.setState({ fieldDraft: e.target.value }), fieldType: s.fieldType, onFieldType: e => this.setState({ fieldType: e.target.value }), colTypes: COL_TYPES, fieldPh: s.fieldType === 'Note' ? '+ Note for this stage, Enter' : s.fieldType === 'Table' ? '+ Table name, Enter' : '+ Field name, Enter', fieldTypes: FIELD_TYPES,
+      onFieldKey: e => { if (e.key === 'Enter' && s.fieldDraft.trim()) { this.upd({ form: [...raw.form, s.fieldType === 'Table' ? [s.fieldDraft.trim(), 'Table', { cols: [['Item', 'Text'], ['Qty', 'Number'], ['Done', 'Checkbox']], rows: [] }] : [s.fieldDraft.trim(), s.fieldType]] }); this.setState({ fieldDraft: '', tblEdit: s.fieldType === 'Table' ? raw.form.length : null }); } },
+      total: `${total} working days${hasReport ? ' + report every 2 weeks' : ''}`, picTimes, promise: `${T.promise} days`,
+      warnings, noWarnings: warnings.length === 0,
+      activeNote: `${T.active} active tasks stay on v${ver - 1}`,
+      publish: () => { this.setState(p => ({ published: { ...p.published, [p.tpl]: ver } })); this.flash(`Published ${T.name} v${ver} · new tasks use v${ver}, ${T.active} active tasks stay on v${ver - 1}`); },
+      hasToast: !!s.toast, toast: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

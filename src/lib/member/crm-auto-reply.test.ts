@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { afterHours, autoReplyTexts, sendAutoReplies } from './crm-auto-reply'
+import { afterHours, autoReplyTexts, inAway, sendAutoReplies } from './crm-auto-reply'
 
 // Auto-replies, sent (2026-10-19, mig 20261019120000): the chat's person's welcome / after hours / keywords, on the
 // office's clock, each claimed once in the database before it goes from the number the customer wrote to.
@@ -82,3 +82,20 @@ describe('sending them', () => {
     expect(d.calls).toHaveLength(0)
   })
 })
+
+describe("away / holiday (2026-10-24)", () => {
+  const set = { welcome: { on: false, text: "" }, after: { on: true, text: "After hours", from: "08:00", to: "20:00" },
+    away: { on: true, text: "On holiday", from: "2026-12-24T18:00", to: "2027-01-02T09:00" }, kws: [] };
+  it("inside the period: the away reply, in place of after hours", () => {
+    expect(autoReplyTexts(set, { body: "hi", sentAt: "2026-12-25T15:00:00Z", first: false })).toEqual(["On holiday"]);
+  });
+  it("outside it: as before", () => {
+    expect(autoReplyTexts(set, { body: "hi", sentAt: "2026-12-20T15:00:00Z", first: false })).toEqual(["After hours"]);
+    expect(autoReplyTexts({ ...set, away: { ...set.away, on: false } }, { body: "hi", sentAt: "2026-12-25T15:00:00Z", first: false })).toEqual(["After hours"]);
+  });
+  it("the times are the office's (UTC+8)", () => {
+    expect(inAway(new Date("2026-12-24T09:59:00Z"), "2026-12-24T18:00", "2026-12-25T00:00")).toBe(false);
+    expect(inAway(new Date("2026-12-24T10:00:00Z"), "2026-12-24T18:00", "2026-12-25T00:00")).toBe(true);
+    expect(inAway(new Date("2026-12-24T10:00:00Z"), "", "")).toBe(false);
+  });
+});

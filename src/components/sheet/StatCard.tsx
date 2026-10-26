@@ -14,7 +14,10 @@ import { SheetIcon, type SheetIconName } from './SheetIcon'
 
 // `wait` (2026-10-09, the Finance revamp): something waiting on someone —
 // pending, awaiting the Principal, maturing — in blue.
-export type StatTone = 'default' | 'primary' | 'danger' | 'alert' | 'ledger' | 'wait'
+// `in` / `out` (2026-10-25, a department's charts): money in green, money out
+// orange, as the charts beside them draw the two — out is no problem, so not
+// `danger`'s red.
+export type StatTone = 'default' | 'primary' | 'danger' | 'alert' | 'ledger' | 'wait' | 'in' | 'out'
 
 /** How many cards sit side by side: all of them up to six, then two even
  *  rows (eight → 4 + 4) rather than a seventh squeezed in or one left over. */

@@ -6,12 +6,14 @@ import { getMemberUser } from "@/lib/auth";
 import { isPrincipalAccount } from "@/lib/view-as";
 import { createClient } from "@/lib/supabase/server";
 import { adminClient } from "@/lib/supabase/admin";
+import { dropStaged, formFile } from "@/lib/storage/staged";
+import { parseStagedRef } from "@/lib/storage/staging";
 import { calculateQuote, cents, customerQuote } from "./calculator";
 import { quoteCostRules, quoteKpiItems } from "./quote-rules";
 import { isCompatibleGift, productImageUrl, quoteLineKey } from "./catalog";
 import { catalogueModelsOf, pricedCatalogueOf } from "./priced-catalogue";
 import { principalReadContext } from "./read-access";
-import { readInsightRange, readOrderBook, type MemberInsightRange, type MemberOrderBook } from "./order-book";
+import { readDepartmentInsight, readInsightRange, readOrderBook, type DepartmentInsight, type MemberInsightRange, type MemberOrderBook } from "./order-book";
 import { closedIncome, liveIncome, type DepartmentIncome, type IncomeMonth, type IncomePast, type IncomePayLine, type MemberIncome, type OverrideFacts } from "./income";
 import { memberPay, salaryFromRow, salaryFromSchedule, taxModeOf, type PayrollRowFacts, type PaySalary } from "./income-pay";
 import { parseCloseSummary } from "@/lib/commission/closes";
@@ -108,7 +110,9 @@ export interface AdminMemberData {
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const MAX_INVOICE = 3 * 1024 * 1024;
+// 100 MB since 2026-10-23 (3 MB until then): the file goes ahead of the request (lib/storage/stage.ts), and
+// member_request_attachments keeps up to that much (mig 20261024006800).
+const MAX_INVOICE = 100 * 1024 * 1024;
 const uuid = (value: unknown, label: string): string => {
   if (typeof value !== "string" || !UUID.test(value))
     throw new Error(`Invalid ${label}. Refresh and try again.`);
@@ -680,6 +684,45 @@ export async function loadDepartmentIncome(subDepartmentId: string, period: stri
   });
 }
 
+/**
+ * The Principal's own app, viewing nobody (2026-10-25 — a salesperson's note the user passed on: "要看销售额的话，就是把
+ * 全部的加起来 … 直接 show 全部人的单"): the WHOLE sub-department's Insight over a month, a quarter or a year — every bill
+ * summed, everybody who sits there or wrote a bill with their own figures, whether KPI counts (mig 20261026014700).
+ * Sales and margin only: nobody's commission, rate or salary. The Principal's own session; the database asks again
+ * (`member_principal_department`).
+ */
+export async function loadDepartmentInsight(subDepartmentId: string, from: string, until: string): Promise<MemberOutcome<DepartmentInsight>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active || !isPrincipalAccount(user)) throw new Error("Only Principal can see a whole department's sales.");
+    insightWindow(subDepartmentId, from, until);
+    const client = await session("member_insight", true);
+    const read = readDepartmentInsight(await rpc<unknown>(client, "member_principal_department_insight", {
+      p_sub_department: subDepartmentId, p_from: from, p_until: until,
+    }));
+    if (!read) throw new Error("Performance information is temporarily unavailable.");
+    return { ...read, people: read.people.map((row) => ({ ...row, title: legacyLabel(row.title) })) };
+  });
+}
+
+/**
+ * …and every bill of the window, once each, with its salesperson — Insight's bills, KPI and brand pages for the whole
+ * sub-department. No cost: a bill carries its layer-2 margin percentage only, as a member's own.
+ */
+export async function loadDepartmentOrderBook(subDepartmentId: string, from: string, until: string): Promise<MemberOutcome<MemberOrderBook>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active || !isPrincipalAccount(user)) throw new Error("Only Principal can see a whole department's bills.");
+    insightWindow(subDepartmentId, from, until);
+    const client = await session("member_insight", true);
+    const book = readOrderBook(await rpc<unknown>(client, "member_principal_department_order_book", {
+      p_sub_department: subDepartmentId, p_from: from, p_until: until,
+    }));
+    if (!book) throw new Error("The bills are temporarily unavailable.");
+    return { ...book, orders: book.orders.map((order) => ({ ...order, brand: legacyLabel(order.brand) })) };
+  });
+}
+
 export interface MemberHonours {
   finishes: { period: string; board: HonourBoard; title: string; sub: string; place: number }[];
   /** Months of the window that are final — their finishes stand; the rest are still moving. */
@@ -1056,12 +1099,23 @@ async function invoice(form: FormData): Promise<VerifiedInvoice> {
  * uploads keep). An invoice stays a JPG, PNG or PDF.
  */
 async function verifiedUpload(form: FormData, fieldName: string, noun: string, word = false): Promise<VerifiedInvoice> {
-  const file = form.get(fieldName);
-  if (!file || typeof file === "string" || file.size < 1)
+  // Sent ahead to the member's own folder since 2026-10-23 (lib/storage/staging.ts — a Server Action's body stops at
+  // 4 MB), or the File itself from an older page. Read here once; the staged copy goes straight after.
+  const db = (await createClient()) as unknown as SupabaseClient;
+  const sent = await formFile(db, form, fieldName);
+  if (!sent.ok) throw new Error(sent.reason);
+  const file = sent.file;
+  if (!file || file.size < 1)
     throw new Error(noun === "invoice" ? "Upload an invoice." : `Upload the ${noun}.`);
-  if (file.size > MAX_INVOICE)
-    throw new Error(`The ${noun} must be 3 MB or smaller.`);
-  const bytes = new Uint8Array(await file.arrayBuffer());
+  let read: Uint8Array | null = null;
+  try {
+    if (file.size > MAX_INVOICE)
+      throw new Error(`The ${noun} must be 100 MB or smaller.`);
+    read = await file.bytes();
+  } finally {
+    await dropStaged(db, [file]);
+  }
+  const bytes = read;
   if (word) {
     const kind = letterKind(bytes, file.type);
     if (kind === "macros") throw new Error(WORD_MACROS_REFUSAL);
@@ -1336,8 +1390,9 @@ export async function submitMemberRequest(
       answers = waitingAnswersFrom(field(form, "answers", 40000));
       const version = Number(field(form, "formVersion"));
       if (Number.isInteger(version) && version > 0) detail.formVersion = version;
+      // A file in the form, or (2026-10-23) the line of one sent ahead.
       const signedFile = form.get("signedForm");
-      if (signedFile && typeof signedFile !== "string" && signedFile.size > 0) {
+      if (signedFile && (typeof signedFile === "string" ? parseStagedRef(signedFile) !== null : signedFile.size > 0)) {
         signedForm = await verifiedUpload(form, "signedForm", kind === "waiting" ? "signed application form" : "signed replacement form", true);
         detail.signedFormName = signedForm.name;
         detail.signedFormHash = createHash("sha256").update(signedForm.bytes).digest("hex");

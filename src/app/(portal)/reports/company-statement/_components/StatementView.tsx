@@ -1,237 +1,306 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+// The Company Statement's counterparties (2026-10-26, six rounds of samples with the user —
+// mockups/company-statement-mockup.html): To collect green, To repay red, each with its principal, interest and total
+// (only the totals when the room is short), the net worded and coloured, a line between every column ("每个 column
+// 之间要有线条"); Sort and Show over it, search, Expand all and the export ticks as before.
+//
+// A counterparty opens into ONE table for both sides ("可以一个表"): the columns once — Date · Terms · Original ·
+// Total interest ‖ Principal due · Interest due · Total due · Left · Payoff; a green To collect row with that side's
+// totals under them, its positions newest first ("顺序用 A 日期新到旧"); the red To repay row the same; a Net row.
+// A terms change keeps its 差价 under its position (2026-09-21). UI is English-only per user 2026-08-06.
+
+import { Fragment, useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
 import Link from 'next/link'
 import { formatMoneyBare } from '@/lib/utils'
-import type {
-  CounterpartyRow,
-  PositionRow,
-  StatementTotals,
-} from '@/lib/counterparty-statement'
+import type { CounterpartyRow, PositionRow, StatementSide, StatementTotals } from '@/lib/counterparty-statement'
+import {
+  dayText,
+  leftText,
+  monthlyReference,
+  orderPositions,
+  payoffMonth,
+  shownCounterparties,
+  sideTotals,
+  termsText,
+  totalDueOf,
+  totalInterestOf,
+  type CounterpartyShow,
+  type CounterpartySort,
+} from '@/lib/counterparty-statement-view'
 import { TermsChangeSummary, TermsChangeTable } from '@/components/treasury/TermsChangeTable'
 
-function num(v: number, opts?: { danger?: boolean }) {
-  if (!v) return <span className="num text-muted">—</span>
-  return <span className={'num ' + (opts?.danger ? 'text-danger' : '')}>{formatMoneyBare(v)}</span>
+const r2 = (n: number) => Math.round(n * 100) / 100
+const nil = (n: number) => Math.abs(n) < 0.005
+const Dash = () => <span className="cs-dim">—</span>
+const money = (n: number) => (nil(n) ? <Dash /> : formatMoneyBare(n))
+const signed = (n: number) => (nil(n) ? <Dash /> : `${n > 0 ? '+' : '−'}${formatMoneyBare(Math.abs(n))}`)
+const netText = (n: number) => (nil(n) ? 'Even' : `${n > 0 ? 'Collect' : 'Repay'} ${formatMoneyBare(Math.abs(n))}`)
+const netTone = (n: number) => (nil(n) ? '' : n > 0 ? 'is-collect' : 'is-repay')
+const sideWord = (side: StatementSide) => (side === 'collect' ? 'To collect' : 'To repay')
+
+/** The statement's width, to choose its columns by — a computer's until it is measured (and while it measures 0, hidden). */
+function useWidth(ref: RefObject<HTMLElement | null>): number {
+  const [width, setWidth] = useState(1200)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const read = () => {
+      if (el.clientWidth > 0) setWidth(Math.floor(el.clientWidth))
+    }
+    read()
+    const watch = new ResizeObserver(read)
+    watch.observe(el)
+    return () => watch.disconnect()
+  }, [ref])
+  return width
 }
+
+/** The counterparty table's columns by its room: each side's principal, interest and total; each side's total; the net alone (a phone). */
+type Cols = 'wide' | 'totals' | 'net'
+const colsOf = (width: number): Cols => (width >= 980 ? 'wide' : width >= 560 ? 'totals' : 'net')
+/** An opened counterparty's columns by its room: all; the date under the terms and the payoff under the total due;
+ *  on a phone the terms and the total due, the rest on a line under the terms. */
+type Fit = 'full' | 'compact' | 'phone'
+const fitOf = (width: number): Fit => (width >= 860 ? 'full' : width >= 680 ? 'compact' : 'phone')
 
 // collect side: SC = the loan's 资金来源 remark (from repayment_terms).
-// repay side: LENT TO = where the borrowed-in money was lent onward (the fund
-// source's notes — user 2026-08-06). UI is English-only per user 2026-08-06
-// ("整体显示英文，不要华语"), matching the exports.
-function SourceBadge({ source, side }: { source?: string | null; side: 'collect' | 'repay' }) {
-  if (!source) return null
-  const label = side === 'collect' ? `SC ${source}` : `LENT TO ${source}`
+// repay side: LENT TO = where the borrowed-in money was lent onward (the fund source's notes — user 2026-08-06).
+function Badges({ item }: { item: PositionRow }) {
   return (
-    <span
-      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-      title={side === 'collect' ? `Source of capital: ${source}` : `Lent to: ${source}`}
-    >
-      {label}
-    </span>
+    <>
+      {item.source ? (
+        <span className="cs-bdg" title={item.side === 'collect' ? `Source of capital: ${item.source}` : `Lent to: ${item.source}`}>
+          {item.side === 'collect' ? `SC ${item.source}` : `Lent to ${item.source}`}
+        </span>
+      ) : null}
+      {item.termsFrom ? (
+        <span
+          className="cs-bdg is-alert"
+          title={`Terms changed — current terms from ${item.termsFrom}, on RM ${formatMoneyBare(item.termsBase ?? 0)} still owed then${item.termsInterestOnOriginal ? `, interest on the original RM ${formatMoneyBare(item.principal)}` : item.termsInterestKeptOn != null ? `, interest on RM ${formatMoneyBare(item.termsInterestKeptOn)} as before` : ''}`}
+        >
+          Terms from {item.termsFrom}
+        </span>
+      ) : null}
+      {item.minPayInterest ? (
+        <span className="cs-bdg" title="最低还息单 — 本金可以慢慢还，但每月利息一定要还">
+          Min interest RM {formatMoneyBare(item.monthlyInterest)}/mo
+        </span>
+      ) : null}
+    </>
   )
 }
 
-function pct(rate: number): string {
-  return `${(rate * 100).toFixed(3)}%/mo`
+const hrefOf = (item: PositionRow) => (item.side === 'collect' ? `/fund-out/${item.id}` : `/fund-in/${item.id}`)
+/** The payoff in words, where it goes under another figure: "Oct 2026 · 1 of 6 left", or no date. */
+const payoffWords = (item: PositionRow) => {
+  const month = payoffMonth(item)
+  return month ? `${month} · ${leftText(item)} left` : 'No fixed date'
+}
+/** Interest due: what is still owed; a no-fixed-term deal shows its interest a month instead, in no total. */
+function InterestDue({ item }: { item: PositionRow }) {
+  if (item.kind !== 'no_term') return money(item.interestOutstanding)
+  const perMonth = monthlyReference(item)
+  return perMonth ? <span className="cs-permo">{formatMoneyBare(perMonth)}/mo</span> : <Dash />
 }
 
-function kindLabel(item: PositionRow): string {
-  if (item.kind === 'compound') return 'compounding'
-  if (item.kind === 'no_term') return 'no fixed term'
-  return `${item.tenureMonths}mo`
-}
+/** An opened counterparty: both sides in one table, each opened by its totals; the net under them. */
+function PositionsTable({ g, fit }: { g: CounterpartyRow; fit: Fit }) {
+  const collect = orderPositions(g.items.filter((i) => i.side === 'collect'))
+  const repay = orderPositions(g.items.filter((i) => i.side === 'repay'))
+  const full = fit === 'full'
+  const phone = fit === 'phone'
+  const columns = full ? 10 : phone ? 3 : 7
+  const labelSpan = full ? 2 : 1
+  // The whole row opens the deal, as its arrow does (the arrow is the link, for a keyboard or a new tab).
+  const open = (e: MouseEvent<HTMLTableRowElement>) => {
+    if ((e.target as HTMLElement).closest('a')) return
+    e.currentTarget.querySelector<HTMLAnchorElement>('a.cs-go')?.click()
+  }
 
-function finishCell(item: PositionRow) {
-  if (item.kind === 'no_term') {
+  const row = (item: PositionRow) => {
+    const totalInterest = totalInterestOf(item)
+    const perMonth = monthlyReference(item)
+    const date = item.startDate ? dayText(item.startDate) : '—'
+    const interestWords =
+      item.kind === 'no_term' ? (perMonth ? `${formatMoneyBare(perMonth)}/mo` : '—') : nil(item.interestOutstanding) ? '—' : formatMoneyBare(item.interestOutstanding)
     return (
-      <span className="font-mono text-xs text-muted">
-        TBD · ~RM {formatMoneyBare(item.monthlyInterest)}/mo interest
-      </span>
+      <Fragment key={item.id}>
+        <tr className="cs-pos-row" onClick={open}>
+          {full ? <td className="c-date">{date}</td> : null}
+          <td className="c-terms">
+            <span>{termsText(item)}</span>
+            <Badges item={item} />
+            {!full ? (
+              <div className="c-sub c-day">
+                {date}
+                {phone ? (
+                  <>
+                    {' · '}
+                    <b>{formatMoneyBare(item.principal)}</b>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+            {phone ? (
+              <div className="c-sub">
+                {totalInterest ? `Total interest ${formatMoneyBare(totalInterest)} · ` : ''}Principal {formatMoneyBare(item.principalOutstanding)} · Interest {interestWords} ·{' '}
+                {payoffWords(item)}
+              </div>
+            ) : null}
+          </td>
+          {!phone ? (
+            <>
+              <td className="c-orig">{formatMoneyBare(item.principal)}</td>
+              <td className="c-ti">{totalInterest ? formatMoneyBare(totalInterest) : <Dash />}</td>
+              <td className="c-p cs-rule">{money(item.principalOutstanding)}</td>
+              <td className="c-i">
+                <InterestDue item={item} />
+              </td>
+            </>
+          ) : null}
+          <td className="c-t">
+            {formatMoneyBare(totalDueOf(item))}
+            {fit === 'compact' ? <div className="c-sub">{payoffWords(item)}</div> : null}
+          </td>
+          {full ? (
+            <>
+              <td className="c-left">{leftText(item) ?? <Dash />}</td>
+              <td className="c-pay">{payoffMonth(item) ?? <span className="cs-dim-t">No fixed date</span>}</td>
+            </>
+          ) : null}
+          <td className="c-go">
+            <Link href={hrefOf(item)} className="cs-go" aria-label={`Open the ${item.side === 'collect' ? 'loan' : 'fund source'} of ${date}`}>
+              →
+            </Link>
+          </td>
+        </tr>
+        {/* 差价 of each 从某月起 change (user 2026-09-21: "主要是 company statement 那边") — old plan vs new,
+            month by month, with what was already paid. */}
+        {(item.termsChanges ?? []).map((c) => (
+          <tr key={`${item.id}-terms-${c.fromYM}`} className="cs-terms-row">
+            <td colSpan={columns}>
+              <details>
+                <summary className="cursor-pointer">
+                  <TermsChangeSummary c={c} />
+                </summary>
+                <TermsChangeTable c={c} />
+              </details>
+            </td>
+          </tr>
+        ))}
+      </Fragment>
     )
   }
-  if (item.kind === 'compound') {
-    return <span className="font-mono text-xs text-muted">TBD · compounds monthly</span>
-  }
-  return (
-    <span className="font-mono text-xs text-ink">
-      {item.remainingPeriods} left{item.finishYM ? ` · by ${item.finishYM}` : ''}
-    </span>
-  )
-}
 
-// One side's positions with side-appropriate wording (已收/未收/几时收完 vs
-// 已还/未还/几时还完 — user 2026-08-06: "展开只是会显示要还的…要收的看没有")
-// and its own subtotal that ties back to the summary row.
-function DetailSection({ items, side }: { items: PositionRow[]; side: 'collect' | 'repay' }) {
-  // Column set per user 2026-08-06: original + whole-deal interest, a divider,
-  // then what's still owed (principal / interest / total) and the payoff.
-  // Total Interest only exists for fixed-term flat deals — compounding and
-  // no-term positions are open-ended.
-  const r2 = (n: number) => Math.round(n * 100) / 100
-  const totalInterestOf = (i: PositionRow) =>
-    i.kind === 'flat' && i.tenureMonths ? r2(i.tenureMonths * i.monthlyInterest) : null
-  const oweTotalOf = (i: PositionRow) => r2(i.principalOutstanding + i.interestOutstanding)
-  const sub = items.reduce(
-    (acc, i) => ({
-      principal: r2(acc.principal + i.principal),
-      totalInterest: r2(acc.totalInterest + (totalInterestOf(i) ?? 0)),
-      outstanding: r2(acc.outstanding + i.principalOutstanding),
-      interest: r2(acc.interest + i.interestOutstanding),
-      oweTotal: r2(acc.oweTotal + oweTotalOf(i)),
-    }),
-    { principal: 0, totalInterest: 0, outstanding: 0, interest: 0, oweTotal: 0 },
+  const tail = (
+    <>
+      {full ? (
+        <>
+          <td className="c-left" />
+          <td className="c-pay" />
+        </>
+      ) : null}
+      <td className="c-go" />
+    </>
   )
+  const section = (side: StatementSide, items: PositionRow[]) => {
+    if (items.length === 0) return null
+    const t = sideTotals(items)
+    return (
+      <Fragment key={side}>
+        <tr className={`cs-sec is-${side}`}>
+          <td className="c-label" colSpan={labelSpan}>
+            {sideWord(side)} · {t.count}
+          </td>
+          {!phone ? (
+            <>
+              <td className="c-orig">{formatMoneyBare(t.original)}</td>
+              <td className="c-ti">{money(t.totalInterest)}</td>
+              <td className="c-p cs-rule">{money(t.principal)}</td>
+              <td className="c-i">{money(t.interest)}</td>
+            </>
+          ) : null}
+          <td className="c-t">{formatMoneyBare(t.total)}</td>
+          {tail}
+        </tr>
+        {items.map(row)}
+      </Fragment>
+    )
+  }
+  let net = null
+  if (collect.length > 0 && repay.length > 0) {
+    const c = sideTotals(collect)
+    const r = sideTotals(repay)
+    const n = { principal: r2(c.principal - r.principal), interest: r2(c.interest - r.interest), total: r2(c.total - r.total) }
+    net = (
+      <tr className="cs-net">
+        <td className="c-label" colSpan={labelSpan}>
+          Net · {n.total >= 0 ? 'collect' : 'repay'}
+        </td>
+        {!phone ? (
+          <>
+            <td className="c-orig" />
+            <td className="c-ti" />
+            <td className={`c-p cs-rule ${netTone(n.principal)}`}>{signed(n.principal)}</td>
+            <td className={`c-i ${netTone(n.interest)}`}>{signed(n.interest)}</td>
+          </>
+        ) : null}
+        <td className={`c-t ${netTone(n.total)}`}>{signed(n.total)}</td>
+        {tail}
+      </tr>
+    )
+  }
+
   return (
-    // 用格子围起来 + 底色分色 (user 2026-08-06): 要收绿底 — and 要还 red since
-    // 2026-10-10 (the user took the handoff's red over the August orange).
-    <div
-      className={
-        'rounded-md border p-3 ' +
-        (side === 'collect' ? 'border-ledger/40 bg-ledger/[0.06]' : 'border-danger/30 bg-danger/[0.045]')
-      }
-    >
-      <div
-        className={
-          'font-mono text-sm font-semibold uppercase tracking-wider inline-block rounded px-2.5 py-1 mb-2 border ' +
-          (side === 'collect'
-            ? 'text-ledger border-ledger/40 bg-ledger/10'
-            : 'text-danger border-danger/30 bg-danger/[0.08]')
-        }
-      >
-        {side === 'collect' ? 'TO COLLECT' : 'TO REPAY'} · {items.length}
-      </div>
-      <table className="w-full text-sm cf-plain">
+    <div className="cs-pos-wrap">
+      <table className={`cs-pos is-${fit}`}>
         <thead>
-          <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline">
-            <th className="text-left py-1.5 px-3 font-medium">Position</th>
-            <th className="text-right py-1.5 px-3 font-medium hidden md:table-cell">Original</th>
-            <th className="text-right py-1.5 px-3 font-medium hidden md:table-cell">Total Interest</th>
-            <th className="text-right py-1.5 px-3 font-medium border-l border-hairline hidden md:table-cell">
-              Principal Due
+          <tr>
+            {full ? <th className="c-date">Date</th> : null}
+            <th className="c-terms">Terms</th>
+            {!phone ? (
+              <>
+                <th className="c-orig">Original</th>
+                <th className="c-ti">Total interest</th>
+                <th className="c-p cs-rule">Principal due</th>
+                <th className="c-i">Interest due</th>
+              </>
+            ) : null}
+            <th className="c-t">Total due</th>
+            {full ? (
+              <>
+                <th className="c-left">Left</th>
+                <th className="c-pay">Payoff</th>
+              </>
+            ) : null}
+            <th className="c-go">
+              <span className="sr-only">Open</span>
             </th>
-            <th className="text-right py-1.5 px-3 font-medium hidden md:table-cell">Interest Due</th>
-            <th className="text-right py-1.5 px-3 font-medium border-l border-hairline">
-              Total Due
-            </th>
-            <th className="text-right py-1.5 px-3 font-medium hidden md:table-cell">Payoff</th>
-            <th className="py-1.5 px-3" />
           </tr>
         </thead>
         <tbody>
-          {items.map(item => {
-            const totalInterest = totalInterestOf(item)
-            const changes = item.termsChanges ?? []
-            return (
-              <Fragment key={item.id}>
-              <tr className="border-b border-hairline/60">
-                <td className="py-1.5 px-3">
-                  <span className="font-serif text-ink">
-                    {pct(item.monthlyRate)} · {kindLabel(item)}
-                    {item.startYM ? ` · starts ${item.startYM}` : ''}
-                  </span>
-                  <SourceBadge source={item.source} side={item.side} />
-                  {item.termsFrom ? (
-                    <span
-                      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-alert border border-hairline rounded px-1.5 py-0.5"
-                      title={`Terms changed — current terms from ${item.termsFrom}, on RM ${formatMoneyBare(item.termsBase ?? 0)} still owed then`}
-                    >
-                      Terms from {item.termsFrom}
-                    </span>
-                  ) : null}
-                  {item.minPayInterest ? (
-                    <span
-                      className="ml-2 font-mono text-[10px] uppercase tracking-wider text-info border border-hairline rounded px-1.5 py-0.5"
-                      title="最低还息单 — 本金可以慢慢还，但每月利息一定要还"
-                    >
-                      Min interest RM {formatMoneyBare(item.monthlyInterest)}/mo
-                    </span>
-                  ) : null}
-                </td>
-                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
-                  {formatMoneyBare(item.principal)}
-                </td>
-                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
-                  {totalInterest == null ? (
-                    <span className="text-muted">—</span>
-                  ) : (
-                    formatMoneyBare(totalInterest)
-                  )}
-                </td>
-                <td className="py-1.5 px-3 text-right font-mono tabular text-ink border-l border-hairline hidden md:table-cell">
-                  {formatMoneyBare(item.principalOutstanding)}
-                </td>
-                <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
-                  {item.kind === 'no_term' ? (
-                    <span className="text-muted">—</span>
-                  ) : (
-                    formatMoneyBare(item.interestOutstanding)
-                  )}
-                </td>
-                <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline">
-                  {formatMoneyBare(oweTotalOf(item))}
-                </td>
-                <td className="py-1.5 px-3 text-right hidden md:table-cell">{finishCell(item)}</td>
-                <td className="py-1.5 px-3 text-right">
-                  <Link
-                    href={item.side === 'collect' ? `/fund-out/${item.id}` : `/fund-in/${item.id}`}
-                    className="text-xs text-accent hover:text-accent-hover font-serif italic whitespace-nowrap"
-                  >
-                    View →
-                  </Link>
-                </td>
-              </tr>
-              {/* 差价 of each 从某月起 change (user 2026-09-21: "主要是 company
-                  statement 那边") — old plan vs new, month by month, with
-                  what was already paid. */}
-              {changes.map(c => (
-                <tr key={`${item.id}-terms-${c.fromYM}`} className="border-b border-hairline/60 bg-surface/40">
-                  <td colSpan={8} className="py-2 px-3">
-                    <details>
-                      <summary className="cursor-pointer">
-                        <TermsChangeSummary c={c} />
-                      </summary>
-                      <TermsChangeTable c={c} />
-                    </details>
-                  </td>
-                </tr>
-              ))}
-              </Fragment>
-            )
-          })}
-          <tr className="bg-surface/40">
-            <td className="py-1.5 px-3 font-serif italic text-graphite">Subtotal</td>
-            <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
-              {formatMoneyBare(sub.principal)}
-            </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular text-graphite hidden md:table-cell">
-              {formatMoneyBare(sub.totalInterest)}
-            </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline hidden md:table-cell">
-              {formatMoneyBare(sub.outstanding)}
-            </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink hidden md:table-cell">
-              {formatMoneyBare(sub.interest)}
-            </td>
-            <td className="py-1.5 px-3 text-right font-mono tabular font-semibold text-ink border-l border-hairline">
-              {formatMoneyBare(sub.oweTotal)}
-            </td>
-            <td className="py-1.5 px-3" colSpan={2} />
-          </tr>
+          {section('collect', collect)}
+          {section('repay', repay)}
+          {net}
         </tbody>
       </table>
     </div>
   )
 }
 
-function DetailTable({ items }: { items: PositionRow[] }) {
-  const collect = items.filter(i => i.side === 'collect')
-  const repay = items.filter(i => i.side === 'repay')
+function Seg<T extends string>({ label, value, options, onPick }: { label: string; value: T; options: Array<[T, string]>; onPick: (v: T) => void }) {
   return (
-    <div className="space-y-4 py-1">
-      {collect.length > 0 ? <DetailSection items={collect} side="collect" /> : null}
-      {repay.length > 0 ? <DetailSection items={repay} side="repay" /> : null}
-    </div>
+    <span className="flex items-center gap-2">
+      <span className="cs-tool-label">{label}</span>
+      <span className="cs-seg" role="group" aria-label={label}>
+        {options.map(([v, text]) => (
+          <button key={v} type="button" aria-pressed={value === v} onClick={() => onPick(v)}>
+            {text}
+          </button>
+        ))}
+      </span>
+    </span>
   )
 }
 
@@ -247,8 +316,12 @@ export default function StatementView({
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [q, setQ] = useState('')
+  const [sort, setSort] = useState<CounterpartySort>('size')
+  const [show, setShow] = useState<CounterpartyShow>('all')
   // Ticked counterparties → export only those (user 2026-08-06).
   const [sel, setSel] = useState<Set<string>>(new Set())
+  const frame = useRef<HTMLElement>(null)
+  const width = useWidth(frame)
 
   // The handoff's section head (2026-10-10): the counterparties, how many shown.
   const head = (shownCount: number, filtered: boolean) => (
@@ -273,52 +346,65 @@ export default function StatementView({
     )
   }
 
-  const needle = q.trim().toLowerCase()
-  const shown = needle
-    ? rows.filter(g => g.counterparty.toLowerCase().includes(needle))
-    : rows
-  // Filtered view sums what's on screen so the footer always ties to the
-  // rows above it; with no search this equals the server totals.
-  const shownTotals: StatementTotals = needle
+  const needle = q.trim()
+  const filtered = !!needle || show !== 'all'
+  const shown = shownCounterparties(rows, { needle, show, sort })
+  // A filtered view sums what's on screen so the total always ties to the rows above it; unfiltered it is the server's.
+  const shownTotals: StatementTotals = filtered
     ? shown.reduce(
         (acc, g) => ({
-          collectPrincipal: acc.collectPrincipal + g.collectPrincipal,
-          collectInterest: acc.collectInterest + g.collectInterest,
-          repayPrincipal: acc.repayPrincipal + g.repayPrincipal,
-          repayInterest: acc.repayInterest + g.repayInterest,
-          net: acc.net + g.net,
+          collectPrincipal: r2(acc.collectPrincipal + g.collectPrincipal),
+          collectInterest: r2(acc.collectInterest + g.collectInterest),
+          repayPrincipal: r2(acc.repayPrincipal + g.repayPrincipal),
+          repayInterest: r2(acc.repayInterest + g.repayInterest),
+          net: r2(acc.net + g.net),
         }),
         { collectPrincipal: 0, collectInterest: 0, repayPrincipal: 0, repayInterest: 0, net: 0 },
       )
     : totals
-  const allOpen = shown.length > 0 && shown.every(g => open[g.counterparty])
+  const allOpen = shown.length > 0 && shown.every((g) => open[g.counterparty])
+  const cols = colsOf(width)
+  const fit = fitOf(width - 44)
+  const span = cols === 'wide' ? 8 : cols === 'totals' ? 4 : 2
+  const figures = (o: { collectPrincipal: number; collectInterest: number; repayPrincipal: number; repayInterest: number }) => {
+    const c = r2(o.collectPrincipal + o.collectInterest)
+    const r = r2(o.repayPrincipal + o.repayInterest)
+    if (cols === 'net') return null
+    if (cols === 'totals') {
+      return (
+        <>
+          <td className="c-tot is-collect cs-rule">{money(c)}</td>
+          <td className="c-tot is-repay cs-rule">{money(r)}</td>
+        </>
+      )
+    }
+    return (
+      <>
+        <td className="cs-rule">{money(o.collectPrincipal)}</td>
+        <td>{money(o.collectInterest)}</td>
+        <td className="c-tot is-collect">{money(c)}</td>
+        <td className="cs-rule">{money(o.repayPrincipal)}</td>
+        <td>{money(o.repayInterest)}</td>
+        <td className="c-tot is-repay">{money(r)}</td>
+      </>
+    )
+  }
 
   return (
-    <section className="mb-6">
-      {head(shown.length, !!needle)}
-      {/* ── Search + expand-all ── */}
-      <div className="flex items-center gap-3 mb-3 flex-wrap">
+    <section className="mb-6" ref={frame}>
+      {head(shown.length, filtered)}
+      {/* ── Search, Sort, Show, expand-all, the export ticks ── */}
+      <div className="cs-tools">
         <input
           type="text"
           value={q}
-          onChange={e => setQ(e.target.value)}
+          onChange={(e) => setQ(e.target.value)}
           placeholder="Search counterparty…"
           className="bg-paper border border-hairline rounded-md px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:border-accent-border w-56"
         />
-        <button
-          type="button"
-          onClick={() =>
-            setOpen(allOpen ? {} : Object.fromEntries(shown.map(g => [g.counterparty, true])))
-          }
-          className="text-xs font-sans text-graphite hover:text-ink border border-hairline rounded-md px-3 py-1.5 bg-surface hover:bg-surface-2 transition-colors"
-        >
-          {allOpen ? 'Collapse all' : 'Expand all'}
-        </button>
-        {needle ? (
-          <span className="font-mono text-xs text-muted">
-            {shown.length} / {rows.length} shown
-          </span>
-        ) : null}
+        <Seg label="Sort" value={sort} onPick={setSort} options={[['size', 'Largest'], ['net', 'Net'], ['collect', 'To collect'], ['repay', 'To repay'], ['name', 'A–Z']]} />
+        <Seg label="Show" value={show} onPick={setShow} options={[['all', 'All'], ['collect', 'To collect'], ['repay', 'To repay']]} />
+        <span className="flex-1" />
         {canExport && sel.size > 0 ? (
           <span className="flex items-center gap-2 text-xs font-sans text-graphite border border-accent/40 bg-surface rounded-md px-3 py-1.5">
             {sel.size} selected · Export:
@@ -334,144 +420,119 @@ export default function StatementView({
             >
               PDF
             </a>
-            <button
-              type="button"
-              onClick={() => setSel(new Set())}
-              className="text-muted hover:text-ink transition-colors"
-            >
+            <button type="button" onClick={() => setSel(new Set())} className="text-muted hover:text-ink transition-colors">
               Clear
             </button>
           </span>
         ) : null}
+        <button
+          type="button"
+          onClick={() => setOpen(allOpen ? {} : Object.fromEntries(shown.map((g) => [g.counterparty, true])))}
+          className="text-xs font-sans text-graphite hover:text-ink border border-hairline rounded-md px-3 py-1.5 bg-surface hover:bg-surface-2 transition-colors"
+        >
+          {allOpen ? 'Collapse all' : 'Expand all'}
+        </button>
       </div>
 
-      <div className="overflow-x-auto">
-      <table className="ledger-table">
-        {/* ledger-table's own `thead th` rule out-specifies Tailwind's
-            text-* utilities — use its `right` class / inline centering. */}
-        <thead>
-          <tr className="text-[11px] uppercase tracking-wide text-muted font-sans">
-            <th className="py-2 px-3 font-medium" rowSpan={2}>
-              Counterparty
-            </th>
-            <th
-              className="cs-collect py-1 px-3 font-medium border-b border-hairline m-hide"
-              style={{ textAlign: 'center' }}
-              colSpan={2}
-            >
-              To collect
-            </th>
-            <th
-              className="cs-repay py-1 px-3 font-medium border-b border-hairline m-hide"
-              style={{ textAlign: 'center' }}
-              colSpan={2}
-            >
-              To repay
-            </th>
-            <th className="right py-2 px-3 font-medium" rowSpan={2}>
-              Net
-            </th>
-          </tr>
-          {/* Sub-headers for the four principal/interest columns — all four
-              fold away on a phone, so the whole row goes with them. This table
-              already expands rows on tap for detail; it does not get a second
-              chevron. */}
-          <tr className="text-[11px] uppercase tracking-wide text-muted font-sans border-b border-hairline m-hide">
-            <th className="right cs-collect-sub py-1 px-3 font-medium">Principal</th>
-            <th className="right cs-collect-sub py-1 px-3 font-medium">Interest</th>
-            <th className="right cs-repay-sub py-1 px-3 font-medium">Principal</th>
-            <th className="right cs-repay-sub py-1 px-3 font-medium">Interest</th>
-          </tr>
-        </thead>
-        <tbody>
-          {shown.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="py-6 px-3 text-center font-serif italic text-muted">
-                No counterparty matches &ldquo;{q.trim()}&rdquo;
-              </td>
-            </tr>
-          ) : null}
-          {shown.map(g => {
-            const isOpen = !!open[g.counterparty]
-            return (
-              <Fragment key={g.counterparty}>
-                <tr
-                  onClick={() => setOpen(prev => ({ ...prev, [g.counterparty]: !isOpen }))}
-                  className="border-b border-hairline cursor-pointer hover:bg-surface-2/40 transition-colors"
-                >
-                  <td className="py-2 px-3">
-                    {canExport ? (
-                      <span className="mr-2" onClick={e => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={sel.has(g.counterparty)}
-                          onChange={() =>
-                            setSel(prev => {
-                              const next = new Set(prev)
-                              if (next.has(g.counterparty)) next.delete(g.counterparty)
-                              else next.add(g.counterparty)
-                              return next
-                            })
-                          }
-                          title="Tick to export only selected counterparties"
-                          className="h-3.5 w-3.5 accent-[var(--accent)] align-middle"
-                        />
-                      </span>
-                    ) : null}
-                    <span className="font-mono text-[10px] text-muted mr-2">
-                      {isOpen ? '▾' : '▸'}
-                    </span>
-                    <span className="font-semibold text-ink">{g.counterparty}</span>
-                    <span className="font-mono text-[10px] text-muted ml-2">
-                      {g.items.length} positions
-                    </span>
-                  </td>
-                  <td className="py-2 px-3 text-right font-mono tabular m-hide">{num(g.collectPrincipal)}</td>
-                  <td className="py-2 px-3 text-right font-mono tabular m-hide">{num(g.collectInterest)}</td>
-                  <td className="py-2 px-3 text-right font-mono tabular m-hide">{num(g.repayPrincipal)}</td>
-                  <td className="py-2 px-3 text-right font-mono tabular m-hide">{num(g.repayInterest)}</td>
-                  <td className="py-2 px-3 text-right font-mono tabular font-semibold">
-                    <span className={g.net >= 0 ? 'text-ledger' : 'text-danger'}>
-                      {g.net >= 0 ? 'Collect ' : 'Repay '}
-                      {formatMoneyBare(Math.abs(g.net))}
-                    </span>
-                  </td>
+      <div className="cs-scroll">
+        <table className={`cs-sheet is-${cols}`}>
+          <thead>
+            {cols === 'wide' ? (
+              <>
+                <tr>
+                  <th className="c-name" rowSpan={2}>
+                    Counterparty
+                  </th>
+                  <th className="cs-collect cs-rule" colSpan={3}>
+                    To collect
+                  </th>
+                  <th className="cs-repay cs-rule" colSpan={3}>
+                    To repay
+                  </th>
+                  <th className="c-net cs-rule" rowSpan={2}>
+                    Net
+                  </th>
                 </tr>
-                {isOpen ? (
-                  <tr className="border-b border-hairline bg-paper/60">
-                    <td colSpan={6} className="px-4 py-2">
-                      <DetailTable items={g.items} />
-                    </td>
-                  </tr>
+                <tr>
+                  <th className="cs-collect-sub cs-rule">Principal</th>
+                  <th className="cs-collect-sub">Interest</th>
+                  <th className="cs-collect-sub">Total</th>
+                  <th className="cs-repay-sub cs-rule">Principal</th>
+                  <th className="cs-repay-sub">Interest</th>
+                  <th className="cs-repay-sub">Total</th>
+                </tr>
+              </>
+            ) : (
+              <tr>
+                <th className="c-name">Counterparty</th>
+                {cols === 'totals' ? (
+                  <>
+                    <th className="cs-collect cs-rule">To collect</th>
+                    <th className="cs-repay cs-rule">To repay</th>
+                  </>
                 ) : null}
-              </Fragment>
-            )
-          })}
-          <tr className="cs-total">
-            <td className="py-2.5 px-3">
-              Total{needle ? ' (filtered)' : ''}
-            </td>
-            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink m-hide">
-              {formatMoneyBare(shownTotals.collectPrincipal)}
-            </td>
-            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink m-hide">
-              {formatMoneyBare(shownTotals.collectInterest)}
-            </td>
-            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink m-hide">
-              {formatMoneyBare(shownTotals.repayPrincipal)}
-            </td>
-            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold text-ink m-hide">
-              {formatMoneyBare(shownTotals.repayInterest)}
-            </td>
-            <td className="py-2.5 px-3 text-right font-mono tabular font-semibold">
-              <span className={shownTotals.net >= 0 ? 'text-ledger' : 'text-danger'}>
-                {shownTotals.net >= 0 ? 'Collect ' : 'Repay '}
-                {formatMoneyBare(Math.abs(shownTotals.net))}
-              </span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                <th className="c-net cs-rule">Net</th>
+              </tr>
+            )}
+          </thead>
+          <tbody>
+            {shown.length === 0 ? (
+              <tr>
+                <td colSpan={span} className="cs-empty">
+                  {needle ? <>No counterparty matches &ldquo;{needle}&rdquo;</> : <>No counterparty has anything {show === 'collect' ? 'to collect' : 'to repay'}</>}
+                </td>
+              </tr>
+            ) : null}
+            {shown.map((g) => {
+              const isOpen = !!open[g.counterparty]
+              const nCollect = g.items.filter((i) => i.side === 'collect').length
+              const nRepay = g.items.length - nCollect
+              return (
+                <Fragment key={g.counterparty}>
+                  <tr className={`cs-cp${isOpen ? ' is-open' : ''}`} onClick={() => setOpen((prev) => ({ ...prev, [g.counterparty]: !isOpen }))}>
+                    <td className="c-name">
+                      {canExport ? (
+                        <span onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={sel.has(g.counterparty)}
+                            onChange={() =>
+                              setSel((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(g.counterparty)) next.delete(g.counterparty)
+                                else next.add(g.counterparty)
+                                return next
+                              })
+                            }
+                            title="Tick to export only selected counterparties"
+                            className="h-3.5 w-3.5 accent-[var(--accent)] align-middle"
+                          />
+                        </span>
+                      ) : null}
+                      <span className="cs-tg">{isOpen ? '▾' : '▸'}</span>
+                      <span className="font-semibold text-ink">{g.counterparty}</span>
+                      <span className="cs-cnt">{[nCollect ? `${nCollect} to collect` : '', nRepay ? `${nRepay} to repay` : ''].filter(Boolean).join(' · ')}</span>
+                    </td>
+                    {figures(g)}
+                    <td className={`c-net cs-rule ${netTone(g.net)}`}>{netText(g.net)}</td>
+                  </tr>
+                  {isOpen ? (
+                    <tr className="cs-detail">
+                      <td colSpan={span}>
+                        <PositionsTable g={g} fit={fit} />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              )
+            })}
+            <tr className="cs-total">
+              <td className="c-name">{filtered ? `Total · ${shown.length} shown` : 'Total'}</td>
+              {figures(shownTotals)}
+              <td className={`c-net cs-rule ${netTone(shownTotals.net)}`}>{netText(shownTotals.net)}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
   )

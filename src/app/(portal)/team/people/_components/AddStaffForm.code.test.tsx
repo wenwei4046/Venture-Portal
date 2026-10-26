@@ -4,6 +4,8 @@ import AddStaffForm from './AddStaffForm'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }))
 vi.mock('../actions', () => ({ addStaff: vi.fn() }))
+// The letters filed with the status (2026-10-24) go to the Data center from the browser.
+vi.mock('@/lib/documentation/file-letters', () => ({ fileLetters: vi.fn() }))
 
 /**
  * The employee code (2026-09-12) is the database's to hand out — HV + the

@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
 import { createClient } from '@/lib/supabase/server'
-import { requireActionOn, requirePermission } from '@/lib/auth'
+import { requireActionOn, requireAnyActionOn, requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
 import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeToday } from '@/lib/office-time'
 import { postJournalEntry } from '@/lib/journal'
@@ -742,15 +743,16 @@ async function amendLoanWork(formData: FormData): Promise<{ error: string } | un
 
 // ─── 「从某月起生效」 (user 2026-09-21) ────────────────────────────────────────
 // Principal-only like amendLoan, but the months before the chosen one keep
-// their old terms (treasury_terms_history + lib/treasury-terms).
+// their old terms (treasury_terms_history + lib/treasury-terms). Treasury · Edit
+// without Approve FILES the change for the Principal (file_terms_change, 2026-10-24).
 export async function amendLoanFrom(formData: FormData): Promise<{ error: string } | undefined> {
-  await requireActionOn('/fund-out', 'treasury', 'approve')
-  const refused = await amendLoanFromWork(formData)
+  const user = await requireAnyActionOn('/fund-out', ['treasury', 'approve'], ['treasury', 'edit'])
+  const refused = await amendLoanFromWork(formData, canDo(user, 'treasury', 'approve'))
   if (refused) return refused
   redirect(`/fund-out/${formData.get('loan_id') as string}`)
 }
 
-async function amendLoanFromWork(formData: FormData): Promise<{ error: string } | undefined> {
+async function amendLoanFromWork(formData: FormData, direct = true): Promise<{ error: string } | undefined> {
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -774,7 +776,32 @@ async function amendLoanFromWork(formData: FormData): Promise<{ error: string } 
   }
   const reason = ((formData.get('reason') as string) ?? '').trim()
   const noFixedTerm = formData.get('no_fixed_term') === 'on'
+  const interestOnOriginal = formData.get('interest_on_original') === 'on'
+  const interestKeepsBase = formData.get('interest_keeps_base') === 'on'
+  if (interestOnOriginal && interestKeepsBase) return { error: '利息按原本金算、照之前的本金算，只能选一个' }
 
+  if (!direct) {
+    const { error: fileErr } = await supabase.rpc('file_terms_change' as never, {
+      p_record_kind: 'loan',
+      p_record_id: loanId,
+      p_effective_from: `${fromYM}-01`,
+      p_rate: rate,
+      p_remaining_months: noFixedTerm ? null : remaining,
+      p_compound_interest: compoundSent(formData),
+      p_no_fixed_term: noFixedTerm,
+      p_interest_on_original: interestOnOriginal,
+      p_interest_keeps_base: interestKeepsBase,
+      p_reason: reason || null,
+    } as never)
+    if (fileErr) return { error: `没有提交: ${fileErr.message}` }
+    revalidatePath(`/fund-out/${loanId}`)
+    revalidatePath('/fund-out')
+    revalidatePath('/approvals')
+    return undefined
+  }
+
+  // Applied at once is Treasury · Approve's — the RPC asks it too.
+  await requireActionOn('/fund-out', 'treasury', 'approve')
   const { error } = await supabase.rpc('amend_loan_from', {
     p_loan_id: loanId,
     p_effective_from: `${fromYM}-01`,
@@ -784,6 +811,8 @@ async function amendLoanFromWork(formData: FormData): Promise<{ error: string } 
     p_compound_interest: compoundSent(formData),
     p_reason: reason || null,
     p_no_fixed_term: noFixedTerm,
+    p_interest_on_original: interestOnOriginal,
+    p_interest_keeps_base: interestKeepsBase,
   })
   if (error) return { error: `修改失败: ${error.message}` }
 
@@ -801,11 +830,15 @@ async function amendLoanFromWork(formData: FormData): Promise<{ error: string } 
  * the same gate and work as `amendLoan` / `amendLoanFrom`, without the
  * redirect to the portal's page — the app stays on its own screen.
  */
-export async function amendLoanInWords(mode: 'from' | 'whole', formData: FormData): Promise<{ ok: true } | { ok: false; reason: string }> {
-  await requireActionOn('/fund-out', 'treasury', 'approve')
+export async function amendLoanInWords(mode: 'from' | 'whole', formData: FormData): Promise<{ ok: true; filed?: boolean } | { ok: false; reason: string }> {
+  // Treasury · Edit files a from-month change for the Principal; the whole deal again stays Approve's.
+  const user = mode === 'whole'
+    ? await requireActionOn('/fund-out', 'treasury', 'approve')
+    : await requireAnyActionOn('/fund-out', ['treasury', 'approve'], ['treasury', 'edit'])
+  const direct = canDo(user, 'treasury', 'approve')
   try {
-    const refused = mode === 'from' ? await amendLoanFromWork(formData) : await amendLoanWork(formData)
-    return refused ? { ok: false, reason: refused.error } : { ok: true }
+    const refused = mode === 'from' ? await amendLoanFromWork(formData, direct) : await amendLoanWork(formData)
+    return refused ? { ok: false, reason: refused.error } : { ok: true, filed: !direct }
   } catch (e) {
     return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The terms could not be changed.' }
   }

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { formatMoneyBare } from '@/lib/utils'
-import { BODIES, shortDate, type BodyKey, type DeptGroup, type Granularity, type StatutoryRow } from '@/lib/payment-cycle'
+import { BODIES, round2, shortDate, type BodyKey, type DeptGroup, type Granularity, type StatutoryRow } from '@/lib/payment-cycle'
 import PayWindow from './PayWindow'
 
 export default function StatutoryWindow({ body, rows, groups, periodLabel, today, onGenerate, onSaveDate, busy, error, onClose }: {
@@ -14,10 +14,12 @@ export default function StatutoryWindow({ body, rows, groups, periodLabel, today
   const [dates, setDates] = useState<Record<string, string>>({})
   const def = BODIES.find(item => item.key === body)!
   const total = rows.reduce((sum, row) => sum + row.total, 0)
-  const remaining = rows.reduce((sum, row) => sum + row.remainingAmount, 0)
+  // What a PV can take now; a resubmit still open waits for HR › Payroll (2026-10-24).
+  const remaining = round2(rows.reduce((sum, row) => sum + row.remainingAmount - row.heldAmount, 0))
+  const waiting = new Set(rows.flatMap(row => row.heldRowIds)).size
   const paid = rows.reduce((sum, row) => sum + row.paidAmount, 0)
   return <PayWindow eyebrow={`STATUTORY · ${periodLabel.toUpperCase()}`} title={<>{body} <span>· {def.portal}</span></>} onClose={onClose}>
-    <div className="tiles"><div className="tile"><div className="l">Total contributions</div><div className="v">{formatMoneyBare(total)}</div></div><div className="tile"><div className="l">Paid</div><div className="v">{formatMoneyBare(paid)}</div></div><div className="tile"><div className="l">To generate</div><div className="v">{formatMoneyBare(remaining)}</div></div></div>
+    <div className="tiles"><div className="tile"><div className="l">Total contributions</div><div className="v">{formatMoneyBare(total)}</div></div><div className="tile"><div className="l">Paid</div><div className="v">{formatMoneyBare(paid)}</div></div><div className="tile"><div className="l">To generate</div><div className="v">{formatMoneyBare(remaining)}</div>{waiting > 0 ? <small>{waiting} waiting for a resubmit</small> : null}</div></div>
     {error ? <p className="err" role="alert">{error}</p> : null}
     {remaining > 0 ? <div className="sheet-toolbar pay-section-toolbar"><span className="pay-muted">Include a department or select employees.</span><div className="pay-row-actions"><button type="button" className="pay-btn pri" onClick={() => onGenerate('department')} disabled={busy != null}>Generate by Department</button><button type="button" className="pay-btn text" onClick={() => onGenerate('employee')} disabled={busy != null} title="One PV per person — for an exception">Manual generate</button></div></div> : null}
     <div className="pay-table-wrap"><table className="pay-statement-table"><thead><tr><th>PV</th><th>Scheme</th><th className="right">Amount</th><th>Payment date</th><th>Status</th><th></th></tr></thead>

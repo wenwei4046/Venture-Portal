@@ -4423,6 +4423,20 @@ export type Database = {
           infotech_code: string | null
           employee_name: string
           employment_type: Database["public"]["Enums"]["hr_employment_type"]
+          employment_status: string | null
+          probation_ack_at: string | null
+          probation_ack_by: string | null
+          probation_ack_end: string | null
+          probation_ack_name: string | null
+          probation_end: string | null
+          probation_months: number | null
+          contract_ack_at: string | null
+          contract_ack_by: string | null
+          contract_ack_end: string | null
+          contract_ack_name: string | null
+          contract_end: string | null
+          contract_months: number | null
+          contract_start: string | null
           epf_category: Database["public"]["Enums"]["epf_part"]
           epf_er: number | null
           first_name: string | null
@@ -4475,6 +4489,18 @@ export type Database = {
           infotech_code?: string | null
           employee_name: string
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
+          employment_status?: string | null
+          probation_ack_at?: string | null
+          probation_ack_by?: string | null
+          probation_ack_end?: string | null
+          probation_ack_name?: string | null
+          probation_months?: number | null
+          contract_ack_at?: string | null
+          contract_ack_by?: string | null
+          contract_ack_end?: string | null
+          contract_ack_name?: string | null
+          contract_months?: number | null
+          contract_start?: string | null
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
           first_name?: string | null
@@ -4527,6 +4553,18 @@ export type Database = {
           infotech_code?: string | null
           employee_name?: string
           employment_type?: Database["public"]["Enums"]["hr_employment_type"]
+          employment_status?: string | null
+          probation_ack_at?: string | null
+          probation_ack_by?: string | null
+          probation_ack_end?: string | null
+          probation_ack_name?: string | null
+          probation_months?: number | null
+          contract_ack_at?: string | null
+          contract_ack_by?: string | null
+          contract_ack_end?: string | null
+          contract_ack_name?: string | null
+          contract_months?: number | null
+          contract_start?: string | null
           epf_category?: Database["public"]["Enums"]["epf_part"]
           epf_er?: number | null
           first_name?: string | null
@@ -5461,6 +5499,7 @@ export type Database = {
           account_code: string
           amount: number
           created_at: string
+          description: string | null
           id: string
           override_account_type:
             | Database["public"]["Enums"]["account_type"]
@@ -5475,6 +5514,7 @@ export type Database = {
           account_code: string
           amount: number
           created_at?: string
+          description?: string | null
           id?: string
           override_account_type?:
             | Database["public"]["Enums"]["account_type"]
@@ -5489,6 +5529,7 @@ export type Database = {
           account_code?: string
           amount?: number
           created_at?: string
+          description?: string | null
           id?: string
           override_account_type?:
             | Database["public"]["Enums"]["account_type"]
@@ -8436,6 +8477,8 @@ export type Database = {
           p_cost_rate: number | null
           p_effective_from: string
           p_fund_source_id: string
+          p_interest_on_original?: boolean
+          p_interest_keeps_base?: boolean
           p_no_fixed_term?: boolean
           p_reason: string | null
           p_remaining_months: number | null
@@ -8448,6 +8491,8 @@ export type Database = {
           p_effective_from: string
           p_effective_rate: number | null
           p_loan_id: string
+          p_interest_on_original?: boolean
+          p_interest_keeps_base?: boolean
           p_no_fixed_term?: boolean
           p_reason: string | null
           p_remaining_months: number | null
@@ -8496,6 +8541,7 @@ export type Database = {
         | "payroll_run"
         | "dept_payment_request"
         | "loan_cancel"
+        | "terms_change"
       approval_status: "pending" | "approved" | "rejected"
       approval_workflow_state:
         | "submitted"
@@ -8800,6 +8846,7 @@ export const Constants = {
         "payroll_run",
         "dept_payment_request",
         "loan_cancel",
+        "terms_change",
       ],
       approval_status: ["pending", "approved", "rejected"],
       approval_workflow_state: [

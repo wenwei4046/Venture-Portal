@@ -1,12 +1,14 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { HIRING_BOARD } from '@/test/hiring-board'
+import { HIRING_BOARD, TALENT_REASONS } from '@/test/hiring-board'
 import type { Bank } from '@/lib/hiring/bank'
+import type { HiringBoard } from '@/lib/hiring/types'
 
 const actions = vi.hoisted(() => ({
   addHiringFileType: vi.fn(), hiringFileLink: vi.fn(), removeHiringTalent: vi.fn(), addBankFolder: vi.fn(), renameBankFolder: vi.fn(),
   deleteBankFolder: vi.fn(), moveBankTalent: vi.fn(), addBankTalent: vi.fn(), saveBankFile: vi.fn(), deleteBankFile: vi.fn(),
   moveBankFolder: vi.fn(), moveBankEveryone: vi.fn(), restoreBankItem: vi.fn(), deleteBankItemForever: vi.fn(), emptyBankBin: vi.fn(),
+  setTalentReason: vi.fn(), addTalentReason: vi.fn(),
 }))
 const upload = vi.hoisted(() => ({ uploadHiringFile: vi.fn() }))
 const { push, flash } = vi.hoisted(() => ({ push: vi.fn(), flash: vi.fn() }))
@@ -57,8 +59,8 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-const view = (can = { create: true, edit: true }, initialAt?: string, bank: Bank = BANK) =>
-  render(<TalentBankView board={HIRING_BOARD} bank={bank} bankError={null} can={can} initialAt={initialAt} />)
+const view = (can = { create: true, edit: true }, initialAt?: string, bank: Bank = BANK, board: HiringBoard = HIRING_BOARD) =>
+  render(<TalentBankView board={board} bank={bank} bankError={null} can={can} initialAt={initialAt} />)
 const openCard = (name: RegExp) => fireEvent.click(screen.getByRole('button', { name }))
 const sections = () => [...document.querySelectorAll('[class*="sectHead"]')].map(h => h.textContent)
 const path = () => within(screen.getByRole('navigation', { name: 'Folder path' })).getAllByText(/./).map(x => x.textContent).filter(Boolean)
@@ -77,7 +79,7 @@ describe('Hiring › Talent Bank as a Drive', () => {
     openCard(/^Revenue/)
     expect(path()).toEqual(['Talent Bank', 'HOUZS Venture', 'Revenue'])
     expect(sections()).toEqual(['Folders 1', 'People 1'])
-    expect(screen.getByRole('button', { name: /^Nur Iman/ }).textContent).toContain('Revenue Specialist · Interviewing · HR-203')
+    expect(screen.getByRole('button', { name: /^Nur Iman/ }).textContent).toContain('Interviewing · HR-203 · Revenue Specialist')
     openCard(/^Seniors/)
     expect(screen.getByRole('button', { name: /^Marcus Wong/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'HOUZS Venture' }))
@@ -251,6 +253,72 @@ describe('Hiring › Talent Bank as a Drive', () => {
   })
 })
 
+// 2026-10-24 (IT-0008; the user: "最好的是它可以显示 candidate 是从哪里来的 … 包括 upload 的时候，最好能放一个 drop 掉的原因
+// … 做成一个 dropdown"): why somebody is kept, and where they came from.
+describe('why somebody is kept in the Talent Bank', () => {
+  it('a card says first why they are kept — while a request has them, that they are interviewing; kept before it was asked, as before', () => {
+    view(undefined, 'dept:hv:HR')
+    expect(screen.getByRole('button', { name: /^Joyce Tan/ }).textContent).toContain('Other · HR Executive')
+    cleanup()
+    view(undefined, `folder:${SENIORS}`)
+    expect(screen.getByRole('button', { name: /^Marcus Wong/ }).textContent).toContain('Failed interview · Senior Revenue Specialist')
+    cleanup()
+    view(undefined, 'dept:hv:Revenue')
+    expect(screen.getByRole('button', { name: /^Nur Iman/ }).textContent).toContain('Interviewing · HR-203 · Revenue Specialist')
+    cleanup()
+    view(undefined, 'dept:hv:Finance')
+    expect(screen.getByRole('button', { name: /^Aisyah Rahman/ }).textContent).toContain('Available · Account Executive')
+  })
+
+  it('the panel says why and where they came from; Edit changes why, as it is picked', async () => {
+    actions.setTalentReason.mockResolvedValue({ ok: true })
+    view(undefined, `folder:${SENIORS}`)
+    fireEvent.click(screen.getByRole('button', { name: /^Marcus Wong/ }))
+    const panel = within(screen.getByRole('dialog'))
+    expect(panel.getByText('HR-198 · Senior Revenue Specialist')).toBeInTheDocument()
+    const why = panel.getByLabelText('Why Marcus Wong is kept') as HTMLSelectElement
+    expect([why.value, [...why.options].map(o => o.text)]).toEqual(['failed_interview', ['Not shortlisted', 'Failed interview', 'Not right now', 'Declined offer', 'Other']])
+    fireEvent.change(why, { target: { value: 'not_right_now' } })
+    await waitFor(() => expect(actions.setTalentReason).toHaveBeenCalledWith('T-102', 'not_right_now'))
+    expect(flash).toHaveBeenCalledWith('Marcus Wong · Not right now')
+  })
+
+  it('somebody added in the bank came from it; kept before the reason was asked, Edit picks one; without Edit it is words', () => {
+    view(undefined, 'dept:hv:Finance')
+    fireEvent.click(screen.getByRole('button', { name: /^Aisyah Rahman/ }))
+    let panel = within(screen.getByRole('dialog'))
+    expect(panel.getByText('Added in Talent Bank')).toBeInTheDocument()
+    expect((panel.getByLabelText('Why Aisyah Rahman is kept') as HTMLSelectElement).value).toBe('')
+    expect(panel.getByRole('option', { name: 'Pick a reason…' })).toBeInTheDocument()
+    cleanup()
+    view({ create: false, edit: false }, 'dept:hv:HR')
+    fireEvent.click(screen.getByRole('button', { name: /^Joyce Tan/ }))
+    panel = within(screen.getByRole('dialog'))
+    expect(panel.queryByLabelText('Why Joyce Tan is kept')).toBeNull()
+    expect(panel.getByText('Other')).toBeInTheDocument()
+  })
+
+  it('+ New › Add talent asks why they are kept — Not right now unless another is picked', async () => {
+    view(undefined, 'dept:hv:Finance')
+    pressNew('Add talent')
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Lee Mei' } })
+    fireEvent.change(screen.getByLabelText('Good fit for (position)'), { target: { value: 'Driver' } })
+    const why = screen.getByLabelText('Reason *') as HTMLSelectElement
+    expect(why.value).toBe('not_right_now')
+    fireEvent.change(why, { target: { value: 'failed_interview' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save talent' }))
+    await waitFor(() => expect(actions.addBankTalent).toHaveBeenCalled())
+    expect((actions.addBankTalent.mock.calls[0][1] as FormData).get('reason')).toBe('failed_interview')
+  })
+
+  it('the search finds people by why they are kept', () => {
+    view()
+    fireEvent.change(screen.getByLabelText('Search the Talent Bank'), { target: { value: 'failed interview' } })
+    expect(screen.getByRole('button', { name: /Marcus Wong · Senior Revenue Specialist/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Joyce Tan/ })).toBeNull()
+  })
+})
+
 // 2026-10-13, the user: "make a bin, then that bin will last for 30 days. file that last for more than 30days in bin,
 // will auto delete".
 describe('the Talent Bank’s Bin', () => {
@@ -344,5 +412,75 @@ describe('the Talent Bank’s Bin', () => {
     expect(sections()).toEqual(['Folders 1', 'People 1', 'Files 2'])
     expect(screen.queryByRole('button', { name: 'More actions for Interns' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Empty bin/ })).toBeNull()
+  })
+})
+
+// 2026-10-24 — asked whether HR should manage the reasons like File types, the user: "1, yes do with same". HR has renamed
+// Failed interview, turned Not right now off and added Salary too high (mig 20261025021500).
+describe('the reasons are HR’s list', () => {
+  const managed: HiringBoard = {
+    ...HIRING_BOARD,
+    talentReasons: [
+      ...TALENT_REASONS.map(r => (r.id === 'failed_interview' ? { ...r, name: 'Interview failed' } : r.id === 'not_right_now' ? { ...r, active: false } : r)),
+      { id: 'r-salary', name: 'Salary too high', active: true, used: 0 },
+    ],
+  }
+  const choices = (select: HTMLElement) => [...(select as HTMLSelectElement).options].map(o => o.text)
+
+  it('a reason renamed reads its new name; one turned off leaves the picker, the person kept with it keeps it', () => {
+    view(undefined, `folder:${SENIORS}`, BANK, managed)
+    expect(screen.getByRole('button', { name: /^Marcus Wong/ }).textContent).toContain('Interview failed · Senior Revenue Specialist')
+    fireEvent.click(screen.getByRole('button', { name: /^Marcus Wong/ }))
+    expect(choices(within(screen.getByRole('dialog')).getByLabelText('Why Marcus Wong is kept')))
+      .toEqual(['Not shortlisted', 'Interview failed', 'Declined offer', 'Other', 'Salary too high'])
+    cleanup()
+    view(undefined, 'dept:hv:Revenue', BANK, managed)
+    fireEvent.click(screen.getByRole('button', { name: /^Nur Iman/ }))
+    const hers = within(screen.getByRole('dialog')).getByLabelText('Why Nur Iman is kept') as HTMLSelectElement
+    expect([hers.value, choices(hers)]).toEqual(['not_right_now', ['Not shortlisted', 'Interview failed', 'Not right now', 'Declined offer', 'Other', 'Salary too high']])
+  })
+
+  it('+ New › Add talent starts on the first that is on, and "+ Add a new reason…" names one — made on Save', async () => {
+    actions.addTalentReason.mockResolvedValue({ ok: true, id: 'r-new' })
+    view(undefined, 'dept:hv:Finance', BANK, managed)
+    pressNew('Add talent')
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Lee Mei' } })
+    fireEvent.change(screen.getByLabelText('Good fit for (position)'), { target: { value: 'Driver' } })
+    const why = screen.getByLabelText('Reason *') as HTMLSelectElement
+    expect([why.value, choices(why)]).toEqual(['not_shortlisted', ['Not shortlisted', 'Interview failed', 'Declined offer', 'Other', 'Salary too high', '+ Add a new reason…']])
+    fireEvent.change(why, { target: { value: '__new' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save talent' }))
+    expect(screen.getByText('Name the new reason.')).toBeInTheDocument()
+    expect(actions.addBankTalent).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByLabelText('New reason *'), { target: { value: 'Relocating' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save talent' }))
+    await waitFor(() => expect(actions.addBankTalent).toHaveBeenCalled())
+    expect(actions.addTalentReason).toHaveBeenCalledWith('Relocating')
+    expect((actions.addBankTalent.mock.calls[0][1] as FormData).get('reason')).toBe('r-new')
+  })
+
+  it('a new name the list has on already is that reason — nothing is added', async () => {
+    view(undefined, 'dept:hv:Finance', BANK, managed)
+    pressNew('Add talent')
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Lee Mei' } })
+    fireEvent.change(screen.getByLabelText('Good fit for (position)'), { target: { value: 'Driver' } })
+    fireEvent.change(screen.getByLabelText('Reason *'), { target: { value: '__new' } })
+    fireEvent.change(screen.getByLabelText('New reason *'), { target: { value: ' salary TOO high' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save talent' }))
+    await waitFor(() => expect(actions.addBankTalent).toHaveBeenCalled())
+    expect(actions.addTalentReason).not.toHaveBeenCalled()
+    expect((actions.addBankTalent.mock.calls[0][1] as FormData).get('reason')).toBe('r-salary')
+  })
+
+  it('without Edit there is no "+ Add a new reason…"', () => {
+    view({ create: true, edit: false }, 'dept:hv:Finance', BANK, managed)
+    pressNew('Add talent')
+    expect(choices(screen.getByLabelText('Reason *'))).not.toContain('+ Add a new reason…')
+  })
+
+  it('the search finds people by HR’s words for why they are kept', () => {
+    view(undefined, undefined, BANK, managed)
+    fireEvent.change(screen.getByLabelText('Search the Talent Bank'), { target: { value: 'interview failed' } })
+    expect(screen.getByRole('button', { name: /Marcus Wong · Senior Revenue Specialist/ })).toBeInTheDocument()
   })
 })

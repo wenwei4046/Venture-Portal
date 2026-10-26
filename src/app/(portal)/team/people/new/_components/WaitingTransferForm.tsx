@@ -4,10 +4,25 @@ import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { btn, hv } from '@/components/hrv/kit'
-import { flash } from '@/components/hrv/toast'
+import { FLASH_LONG, flash } from '@/components/hrv/toast'
+import { failedWords, filedWords, lettersRefusal, lettersToFile, startingLetters, type LetterChoice, type PendingLetter } from '@/lib/documentation/attach'
+import { fileLetters } from '@/lib/documentation/file-letters'
+import AttachLetters from '../../_components/AttachLetters'
 import { BANK_NAMES } from '@/lib/banks'
 import { revenuePath } from '@/lib/revenue'
 import { defaultHireDate, missingFields, transferBanner, transferRefusal, type TransferInput, type WaitingTransferFacts } from '@/lib/commission/waiting-transfer'
+import {
+  CONTRACT_MONTH_CHOICES,
+  DEFAULT_CONTRACT_MONTHS,
+  DEFAULT_PROBATION_MONTHS,
+  EMPLOYMENT_STATUSES,
+  EMPLOYMENT_STATUS_LABEL,
+  PROBATION_MONTH_CHOICES,
+  contractEnd,
+  dayLabel,
+  monthsLabel,
+  probationEnd,
+} from '@/lib/employment-status'
 import { transferFromWaitingList } from '../../waiting-transfer-actions'
 import type { TransferChoice } from '../_lib/waiting-transfer'
 import s from './waiting-transfer.module.css'
@@ -26,6 +41,7 @@ export default function WaitingTransferForm({
   managers,
   today,
   blocked,
+  letterTypes = null,
 }: {
   facts: WaitingTransferFacts
   subSlug: string
@@ -35,12 +51,21 @@ export default function WaitingTransferForm({
   today: string
   /** Why it cannot be sent at all (the sub-department is full, the title cannot see NRIC) — or null. */
   blocked: string | null
+  /** The Data center's letter types, for the letters filed with the status (2026-10-24); null: none asked. */
+  letterTypes?: readonly LetterChoice[] | null
 }) {
   const router = useRouter()
   const [name, setName] = useState(facts.newPerson ?? '')
   const [titleId, setTitleId] = useState(titles[0]?.id ?? '')
   const [reportsTo, setReportsTo] = useState<string | null>(managers.find(m => m.submittedIt)?.id ?? null)
   const [hireDate, setHireDate] = useState(defaultHireDate(facts.start, today))
+  // Probation, Contract, Permanent or Part time (2026-10-23; Contract 2026-10-24) — asked as on Add Staff; a probation
+  // or a contract with its period.
+  const [employmentStatus, setEmploymentStatus] = useState('')
+  const [probationMonths, setProbationMonths] = useState<number>(DEFAULT_PROBATION_MONTHS)
+  const [contractMonths, setContractMonths] = useState<number>(DEFAULT_CONTRACT_MONTHS)
+  // The letters filed with the status (2026-10-24), as on Add Staff: a row for each compulsory type to start.
+  const [letters, setLetters] = useState<PendingLetter[]>(() => (letterTypes ? startingLetters(letterTypes) : []))
   const [nric, setNric] = useState('')
   const [phone, setPhone] = useState(facts.contact ?? '')
   const [email, setEmail] = useState('')
@@ -54,7 +79,12 @@ export default function WaitingTransferForm({
   const backHref = `${revenuePath(subSlug, 'hierarchy')}?tab=waiting`
   const input: TransferInput = {
     requestId: facts.requestId, name, titleId, reportsTo, hireDate, nric, bankName, bankAccountNo: account, contact: phone, email,
+    employmentStatus,
+    probationMonths: employmentStatus === 'probation' ? probationMonths : null,
+    contractMonths: employmentStatus === 'contract' ? contractMonths : null,
   }
+  const probationEnds = employmentStatus === 'probation' ? probationEnd(hireDate, probationMonths) : null
+  const contractEnds = employmentStatus === 'contract' ? contractEnd(hireDate, contractMonths) : null
   const missing = tried ? new Set(missingFields(input)) : new Set<string>()
 
   async function add() {
@@ -65,6 +95,11 @@ export default function WaitingTransferForm({
       setError(refused)
       return
     }
+    const refusedLetters = letterTypes ? lettersRefusal(letters) : null
+    if (refusedLetters) {
+      setError(refusedLetters)
+      return
+    }
     setBusy(true)
     setError(null)
     const done = await transferFromWaitingList(input)
@@ -73,7 +108,16 @@ export default function WaitingTransferForm({
       setError(done.reason)
       return
     }
-    flash(`${name.trim()} is now an employee in ${sub}${done.code ? ` · ${done.code}` : ''}`)
+    const added = `${name.trim()} is now an employee in ${sub}${done.code ? ` · ${done.code}` : ''}`
+    // An employee now: the letters go to their record — one that does not is said, and left for the Data center.
+    if (letterTypes && lettersToFile(letters).length > 0) {
+      const filed = await fileLetters(done.staffId, letters, letterTypes)
+      const failed = failedWords(filed.failed)
+      if (failed) flash(`${added}. ${failed}`, FLASH_LONG)
+      else flash([added, filedWords(filed.filed, name.trim())].filter(Boolean).join(' · '))
+    } else {
+      flash(added)
+    }
     router.push('/team/people')
   }
 
@@ -122,6 +166,50 @@ export default function WaitingTransferForm({
 
             <label className={s.label} htmlFor="transfer-hire">Hire date</label>
             <input id="transfer-hire" type="date" className={s.date} value={hireDate} onChange={e => setHireDate(e.target.value)} />
+
+            <span className={s.label} id="transfer-status">Employment status</span>
+            <div className={s.choices} role="group" aria-labelledby="transfer-status">
+              {EMPLOYMENT_STATUSES.map(st => (
+                <button key={st} type="button" className={hv.choice} aria-pressed={employmentStatus === st} onClick={() => setEmploymentStatus(st)}>
+                  {EMPLOYMENT_STATUS_LABEL[st]}
+                </button>
+              ))}
+            </div>
+
+            {employmentStatus === 'probation' ? (
+              <>
+                <span className={s.label} id="transfer-probation">Probation period</span>
+                <div className={s.choices} role="group" aria-labelledby="transfer-probation">
+                  {PROBATION_MONTH_CHOICES.map(n => (
+                    <button key={n} type="button" className={hv.choice} aria-pressed={probationMonths === n} onClick={() => setProbationMonths(n)}>
+                      {monthsLabel(n)}
+                    </button>
+                  ))}
+                  {probationEnds ? <span className={s.basisNote}>ends {dayLabel(probationEnds)}</span> : null}
+                </div>
+              </>
+            ) : null}
+
+            {employmentStatus === 'contract' ? (
+              <>
+                <span className={s.label} id="transfer-contract">Contract period</span>
+                <div className={s.choices} role="group" aria-labelledby="transfer-contract">
+                  {CONTRACT_MONTH_CHOICES.map(n => (
+                    <button key={n} type="button" className={hv.choice} aria-pressed={contractMonths === n} onClick={() => setContractMonths(n)}>
+                      {monthsLabel(n)}
+                    </button>
+                  ))}
+                  {contractEnds ? <span className={s.basisNote}>ends {dayLabel(contractEnds)}</span> : null}
+                </div>
+              </>
+            ) : null}
+
+            {letterTypes ? (
+              <>
+                <span className={s.label}>Letters</span>
+                <AttachLetters types={letterTypes} rows={letters} onChange={setLetters} idPrefix="transfer-letter" disabled={busy} />
+              </>
+            ) : null}
 
             <span className={s.label}>Pay basis</span>
             <span>

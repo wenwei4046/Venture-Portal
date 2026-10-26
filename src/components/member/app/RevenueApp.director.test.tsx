@@ -9,7 +9,7 @@ import RevenueApp from "./RevenueApp";
 
 // A Revenue Director in the app (2026-10-14 — the user, on PETER's login: "why as revenue director log in, peter,
 // cant switch to fair view"): the switcher lists the sub-departments they direct; Today's figures are the whole
-// sub-department's, the Arena's cards name who leads.
+// sub-department's, the Arena's cards name who leads (the first three since 2026-10-25).
 const nav = vi.hoisted(() => ({ router: { push: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {}, back: () => {}, forward: () => {} } }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/member",
@@ -75,6 +75,11 @@ function source() {
   } satisfies RevenueSource;
 }
 
+// Today's Sales and Margin cards as they read (2026-10-25/26, the user: "就放第一名是谁就好了"; "跟 Arena 的 Hero Card 是一样的")
+// — who is first, their figure over the name.
+const firsts = () => within(screen.getByRole("heading", { name: "Your Arena" }).closest("section")!)
+  .getAllByRole("button").map(b => b.textContent).filter(t => t !== "All boards").slice(0, 2);
+
 beforeEach(() => { vi.stubGlobal("ResizeObserver", NoResize); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -101,9 +106,70 @@ describe("a Revenue Director's app", () => {
     // Sales, Margin and KPI.
     expect(screen.getAllByText("All of Fair")).toHaveLength(3);
     expect(screen.getByText("RM 930.3k")).toBeInTheDocument();
-    // Sales (ANNA's RM 120k) and Margin (BEN's 44.4%); a director is on no board.
-    expect(screen.getAllByText("ANNA leads").length).toBeGreaterThan(0);
-    expect(screen.getByText("BEN leads")).toBeInTheDocument();
+    // Sales (ANNA RM 120k, BEN RM 90k) and Margin (BEN 44.4%, ANNA 40.0%): who is first; a director is on no board.
+    expect(firsts()).toEqual(["SalesRM 120,000ANNA", "Margin44.4%BEN"]);
+    expect(screen.queryByText("Not ranked yet")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "This week" })).not.toBeInTheDocument();
+  });
+});
+
+// The Principal's View as finds the Revenue Director (2026-10-23 — the user: "找不到我的 revenue director 了。By right
+// 它应该是能够找得到的"): the snapshot lists each sub-department's directors after its seats, and viewing one reads
+// exactly what their own app does.
+function principalData(): MemberData {
+  const director = (id: string, name: string, rank: string) => ({ id, name, title: "Revenue Director", rank, parentId: null, self: false, director: true });
+  const sub = (id: string, name: string, people: MemberMembership["people"]): MemberMembership => ({
+    id, schemeId: `s-${id}`, name, code: name.toUpperCase(), title: "Principal", rank: "All members", rate: 0, calculator: id === "fair",
+    effective: "2026-01-01", capacity: null, occupied: 2, people,
+  });
+  return { ...memberDemo(), demo: false, principalView: true, memos: [], requests: [], incomes: [],
+    profile: { id: "principal", userId: "u-principal", name: "Principal", email: "principal@x", salary: null },
+    memberships: [
+      sub("fair", "Fair", [
+        { id: "anna", name: "ANNA", title: "Team Leader", rank: "Rank A", parentId: null, self: false },
+        { id: "ben", name: "BEN", title: "Revenue Specialist", rank: "Rank E", parentId: "anna", self: false },
+        director("kris", "KRIS", "Rank SS"), director("peter", "PETER", "Rank SS"),
+      ]),
+      sub("ir", "IR", [
+        { id: "carl", name: "CARL", title: "Team Leader", rank: "Rank A", parentId: null, self: false },
+        director("peter", "PETER", ""),
+      ]),
+    ] };
+}
+
+async function openAsPrincipal(search: string) {
+  window.history.replaceState({}, "", `/member${search}`);
+  const live = { ...source(), refresh: vi.fn(async () => ({ ok: true as const, data: principalData() })) };
+  render(<RevenueApp initialData={principalData()} initialSearch={search} today="2026-10-14" source={live} />);
+  await act(async () => {});
+  return live;
+}
+
+describe("the Principal's View as of a Revenue Director", () => {
+  it("lists each sub-department's directors first, then the top of each tree, then everybody below", async () => {
+    await openAsPrincipal("?page=account");
+    fireEvent.click(screen.getByRole("button", { name: /View as a team member/ }));
+    const page = screen.getByRole("dialog", { name: "View as" });
+    const group = (title: string) => {
+      const section = within(page).getByText(title).closest("section")!;
+      return within(section).getAllByRole("button").map(b => b.textContent);
+    };
+    expect(group("FAIR · 4")).toEqual([
+      "KRKRISRevenue Director · Leads FairView", "PEPETERRevenue Director · Leads FairView",
+      "ANANNATeam Leader · Rank AView", "BEBENRevenue Specialist · Rank EView",
+    ]);
+    expect(group("IR · 2")).toEqual(["PEPETERRevenue Director · Leads IRView", "CACARLTeam Leader · Rank AView"]);
+    fireEvent.change(within(page).getByRole("textbox", { name: "Search name or title" }), { target: { value: "director" } });
+    expect(within(page).getAllByRole("button").filter(b => b.textContent?.endsWith("View")).map(b => b.textContent))
+      .toEqual(["KRKRISRevenue Director · Leads FairView", "PEPETERRevenue Director · Leads FairView", "PEPETERRevenue Director · Leads IRView"]);
+  });
+
+  it("viewing PETER in Fair reads as his own app: the whole Fair's figures, the Arena's leaders, no week of his own", async () => {
+    const live = await openAsPrincipal("?department=fair&staff=peter");
+    expect(live.insight).toHaveBeenCalledWith("2026-10", { staffId: "peter", subDepartmentId: "fair" });
+    expect(screen.getAllByText("All of Fair")).toHaveLength(3);
+    expect(screen.getByText("RM 930.3k")).toBeInTheDocument();
+    expect(firsts()).toEqual(["SalesRM 120,000ANNA", "Margin44.4%BEN"]);
     expect(screen.queryByText("Not ranked yet")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "This week" })).not.toBeInTheDocument();
   });

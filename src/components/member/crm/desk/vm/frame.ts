@@ -30,7 +30,9 @@ export function lists(ctx: DeskCtx): Record<string, [string, string, string][]> 
     // Chat progress is Inbox's fourth column; Member work type moved here from Settings). No Organic Leads (2026-10-13).
     assignment: [
       ["Ads to teams", `${adIds.length} ads · ` + (held ? `${held} ${held === 1 ? "lead" : "leads"} over the limit` : unset ? `${unset} on the default (evenly)` : "all set"), "megaphone"],
-      ["Active members", data.lockedStaff?.length ? `${data.lockedStaff.length} locked · no new leads for now` : "Everyone takes new leads", "users"],
+      // v2 (06b / 06c): no line under the tabs — the table card carries its own title and counts.
+      ["Leads by ad", "", "users"],
+      ["Active members", "", "users"],
       ["Full time lead allocation", ftTeams ? `On for ${ftTeams} of ${ctx.teams.length} teams` : "Not set for any team", "users"],
       ["Member work type", "Full time or part time for each member", "briefcase"],
     ],
@@ -167,7 +169,7 @@ export function frameVM(ctx: DeskCtx) {
   // 4a: the docked editor (frame 06). On Ads to teams it stands beside Ad performance's and the Audit log's strips, so it
   // starts narrower and the ad list keeps room for the names (the owner, 2026-10-18: "调一下 Split 宽度"); a drag still sets it.
   const adsOp = opItem[0] === "Ads to teams";
-  const sheetW = ui.sheetW ?? (adsOp ? (W1440 ? 384 : 336) : W1440 ? 461 : 420), menuW = ui.menuW ?? (W1440 ? 340 : 310);
+  const sheetW = ui.sheetW ?? (adsOp ? (W1440 ? 460 : 400) : W1440 ? 461 : 420), menuW = ui.menuW ?? (W1440 ? 340 : 310);
   const alertsN = alertsUnreadN(ctx);
   return {
     W, H, sbW, sbOpen: !collapsed, sbClosed: collapsed, sections, appTop, appBottom, crmItems, crmGroups,
@@ -181,8 +183,9 @@ export function frameVM(ctx: DeskCtx) {
     ibCols: ibOn, ibInfoW, ibCpW, ibHas, ibNone: !ibHas,
     // Customer info folds to a strip and back (the owner, 2026-10-16: "右邊的 customer info 做也能收起的功能，但是 default 是開著的").
     ibInfoShut: infoShut, ibInfoFold: () => patch({ ibInfoShut: true }), ibInfoRail: { title: "Customer info", open: () => patch({ ibInfoShut: false, ...(BOTH ? {} : { ibCp: false }) }) },
-    dragList: edgeDrag(set, "ibListW", ibListW, 1, 260, ibListW + ibSpare), dragInfo: edgeDrag(set, "ibInfoW", ibInfoW, -1, 220, Math.min(440, ibInfoW + ibSpare)),
-    dragCp: edgeDrag(set, "ibCpW", ibCpW, -1, 240, ibCpDock ? Math.min(440, ibCpW + ibSpare) : 440),
+    // v2 (note 06): the list 300–480 px, the Audit log 240–520 px, the chat keeping at least 420 (ibSpare).
+    dragList: edgeDrag(set, "ibListW", ibListW, 1, 290, Math.min(480, ibListW + ibSpare)), dragInfo: edgeDrag(set, "ibInfoW", ibInfoW, -1, 220, Math.min(440, ibInfoW + ibSpare)),
+    dragCp: edgeDrag(set, "ibCpW", ibCpW, -1, 240, ibCpDock ? Math.min(520, ibCpW + ibSpare) : 520),
     resetList: () => patch({ ibListW: null }), resetInfo: () => patch({ ibInfoW: null }), resetCp: () => patch({ ibCpW: null }),
     ibCpOpen: ibOn && ibCpOpen, ibCpClosed: ibOn && !ibCpDock,
     ibCpStyle: (ibCpDock ? { position: "relative", flex: `0 0 ${ibCpW}px`, width: ibCpW, boxSizing: "border-box", background: "#fff", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", minHeight: 0 }
@@ -210,14 +213,14 @@ export function frameVM(ctx: DeskCtx) {
     showKicker: tab !== "showrooms" && tab !== "forms", // The section pill ("All assignment ⌄") is gone (the owner, 2026-10-13): the right menu already switches sections.
     showOpChip: false,
     isAdsOp: opItem[0] === "Ads to teams", notAdsOp: opItem[0] !== "Ads to teams" && opItem[0] !== "Full time lead allocation",
-    isFtOp: opItem[0] === "Full time lead allocation", isMwtOp: opItem[0] === "Member work type", isActOp: opItem[0] === "Active members", isHistOp: false, isSrOp: opItem[0] === "Showrooms", isCltOp: opItem[0] === "Cold lead templates",
+    isFtOp: opItem[0] === "Full time lead allocation", isMwtOp: opItem[0] === "Member work type", isActOp: opItem[0] === "Active members", isLbaOp: opItem[0] === "Leads by ad", isHistOp: false, isSrOp: opItem[0] === "Showrooms", isCltOp: opItem[0] === "Cold lead templates",
     isCpOp: opItem[0] === "Chat progress", isFrmOp: opItem[0] === "Forms" && tab !== "forms", isNtfOp: tab === "settings" && opItem[0] === "Notifications", isGenOp: tab === "settings" && opItem[0] === "General",
     // v2's page padding and title size: Ads to teams and Full time take the frame's whole width.
     // 4a: the pages' gutter under the head (frames 06–11): 16 px down, 36 px in.
     pagePad: tab === "forms" ? "0" : opItem[0] === "Ads to teams" ? "16px 28px 20px 36px" : tab === "settings" && opItem[0] === "General" ? "6px 36px 32px" : "16px 36px 32px",
     h1Size: opItem[0] === "Full time lead allocation" || opItem[0] === "Ads to teams" ? "22px" : "34px",
     kAudit: tab === "auditlog", kPeople: tab === "people", kCh: tab === "channels", cfOn: tab === "forms",
-    plainOp: !["Ads to teams", "Active members", "Full time lead allocation", "Member work type", "Cold lead templates", "Showrooms", "Forms"].includes(opItem[0]) && !(tab === "settings" && (opItem[0] === "Notifications" || opItem[0] === "General")),
+    plainOp: !["Ads to teams", "Leads by ad", "Active members", "Full time lead allocation", "Member work type", "Cold lead templates", "Showrooms", "Forms"].includes(opItem[0]) && !(tab === "settings" && (opItem[0] === "Notifications" || opItem[0] === "General")),
     opItem: opItem[0],
     showToast: !!ui.toast, toastText: ui.toast, canUndo: !!undo && undo.until > ctx.now.getTime(),
     // The Revenue app's own top bar (desk-patches.cjs).

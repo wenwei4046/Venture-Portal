@@ -36,6 +36,8 @@ export interface VoucherDetailContext {
     amount: string | number
     account_code: string | null
     account_label: string | null
+    /** The line's own words (2026-10-22). */
+    description?: string | null
   }>
   attachments: Array<{
     id: string
@@ -70,7 +72,7 @@ export async function getVoucherDetailContext(
     await Promise.all([
       supabase
         .from('payment_voucher_sources')
-        .select('pool, amount, account_code, chart_of_accounts!pvs_account_code_fk(name)')
+        .select('pool, amount, account_code, description, chart_of_accounts!pvs_account_code_fk(name)')
         .eq('voucher_id', voucherId)
         .order('amount', { ascending: false }),
       supabase
@@ -114,6 +116,7 @@ export async function getVoucherDetailContext(
       pool: string
       amount: string | number
       account_code: string | null
+      description?: string | null
       chart_of_accounts: { name: string } | null
     }
     return {
@@ -123,6 +126,7 @@ export async function getVoucherDetailContext(
       account_label:
         raw.chart_of_accounts?.name ??
         (raw.account_code ? raw.account_code.replace(/_/g, ' ') : null),
+      description: raw.description?.trim() || null,
     }
   })
 

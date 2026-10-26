@@ -109,3 +109,54 @@ describe("Insight › KPI, brand, the order sheet", () => {
     expect(orderSheet(shared, "8")).toMatchObject({ own: false, share: { line: "LUCAS 50% · ANTHONY 50%", sub: "LUCAS’s bill · your part 50% · RM 2,150 in your sales" } });
   });
 });
+
+// The Principal viewing nobody (2026-10-25 — a salesperson's note the user passed on: "直接 show 全部人的单 … 或者点按过去看
+// 全部人的"): everybody's bills, each naming its salesperson; everybody on the team, a tap viewing them.
+describe("Insight › the whole sub-department", () => {
+  const seller = (id: string, name: string) => ({ own: false, seller: { id, name } });
+  const ALL = [
+    order({ id: "1", revenue: 1000, margin: 40, ...seller("lucas", "LUCAS TAN") }),
+    order({ id: "2", revenue: 500, margin: null, customer: "", ...seller("shawn", "SHAWN") }),
+    order({ id: "3", brand: "ZANOTTI", booth: "ZANOTTI", revenue: 2000, margin: 35, venue: "IOI CITY MALL", ...seller("yuny", "YUNY") }),
+    order({ id: "4", revenue: 800, total: 800, margin: 41, cleared: false, paid: 100, depositNeeded: 240, venue: "MVEC", own: false, seller: null }),
+  ];
+  const row = (staffId: string, name: string, sales: number, kpiQty = 0) =>
+    ({ staffId, name, title: "Team Leader", uplineId: null, depth: 1, sales, held: 0, orders: 1, kpiQty, marginRevenue: sales, marginCost: sales * 0.6, blindOrders: 0, lastOrder: null });
+  const whole = (over: Partial<InsightInput> = {}) => input({
+    book: book(ALL), whole: "Fair", target: null, canView: new Set(["lucas", "yuny"]),
+    me: { staffId: "", sales: 0, held: 0, orders: 0, kpiQty: 0, marginRevenue: 0, marginCost: 0, blindOrders: 0, lastOrder: null },
+    downline: [row("yuny", "YUNY", 2000, 4), row("lucas", "LUCAS TAN", 1000, 1), row("kris", "KRIS", 500)],
+    ...over,
+  });
+
+  it("the first tab is every bill added up, nothing held against a person's tier", () => {
+    const vm = insightMain(whole());
+    expect(vm.personal.sales).toMatchObject({ amount: "RM 3,500", right: "Counted sales", bar: null, sub: "3 orders · RM 800 waiting for deposit" });
+    expect(vm.personal.notice).toBeNull();
+    expect(vm.personal.brands.map(b => b.name)).toEqual(["Zanotti", "Akemi"]);
+  });
+  it("the team is everybody, with no \"you\" — a tap views those View as can open", () => {
+    const vm = insightMain(whole());
+    expect(vm.team.rows.map(r => [r.name, r.sales, r.open ?? false])).toEqual([["YUNY", "RM 2,000", true], ["LUCAS TAN", "RM 1,000", true], ["KRIS", "RM 500", false]]);
+    expect(vm.team.members).toEqual({ value: "3", sub: "Everybody in Fair" });
+    expect(vm.team.sales.amount).toBe("RM 3,500");
+  });
+  it("counts everybody's KPI items, never against a person's threshold", () => {
+    const kpi = { schemeId: "s", period: "2026-09", asOf: "x", enabled: true, items: [], total: 5, threshold: 30, hit: null };
+    expect(insightMain(whole({ kpi })).personal.kpi).toMatchObject({ value: "5", pill: "All of Fair", pillTone: "neutral" });
+    expect(kpiView(whole({ kpi }), "Fair")).toMatchObject({ total: "5", pill: "All of Fair", hit: false, marker: null, need: "Every KPI item sold in Fair", above: "" });
+    // …while the team says who hit their own.
+    expect(insightMain(whole({ kpi })).team.kpiHit).toEqual({ value: "0 of 3", sub: "3 still pending" });
+  });
+  it("each bill names its salesperson; a week is every booth's", () => {
+    const vm = billsView(whole());
+    expect(vm.weeks["2026-09-11"].bills.map(b => b.sub)).toEqual([
+      "LUCAS TAN · Mdm Lee · 1 line", "SHAWN · Walk-in · 1 line", "YUNY · Mdm Lee · 1 line", "No salesperson · Mdm Lee · 1 line",
+    ]);
+    expect(vm.waitBills[0].sub).toBe("No salesperson · Mdm Lee · Week 2 · MVEC");
+    // Akemi and Zanotti at IOI City Mall, Akemi at MVEC.
+    expect(vm.tabs.find(t => t.key === "2026-09-11")).toMatchObject({ brand: "3 booths" });
+    expect(vm.weeks["2026-09-11"]).toMatchObject({ brandWeek: "All of Fair", place: "3 booths · IOI CITY MALL · MVEC" });
+    expect(orderSheet(whole(), "1")).toMatchObject({ cust: "LUCAS TAN · Mdm Lee" });
+  });
+});

@@ -133,7 +133,7 @@ export function VoucherDetailBody({
         empty={v.sources.length === 0 ? 'No pool on record.' : undefined}
       >
         {v.sources.map((r, i) => (
-          <Line key={i} label={r.pool} value={rm(r.amount)} sub={r.account} mono />
+          <Line key={i} label={r.pool} value={rm(r.amount)} sub={r.description ? `${r.description} · ${r.account}` : r.account} mono />
         ))}
       </Group>
       <Group n="IV." title="Booking">

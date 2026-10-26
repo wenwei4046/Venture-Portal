@@ -5,6 +5,12 @@
 
 export type HiringStatus = 'submitted' | 'needs_info' | 'acknowledged' | 'filled' | 'cancelled' | 'declined'
 export type CandidateStage = 'shortlisted' | 'appointment' | 'offered' | 'hired' | 'rejected'
+/**
+ * Why somebody is kept in the Talent Bank: a row of HR's list (mig 20261025021500). The five it began with keep
+ * their keys — not_shortlisted · failed_interview · not_right_now · declined_offer · other — the stage's default
+ * names them; what HR adds has an id of its own.
+ */
+export type TalentReason = string
 export type HiringFieldType = 'text' | 'number' | 'longtext' | 'select' | 'range'
 export type CandidateFieldType = 'text' | 'number' | 'date' | 'choice'
 
@@ -60,6 +66,16 @@ export interface HiringFileType {
   /** Off in Form settings (mig 20261011210000): out of the picker; the files filed under it keep it. */
   active: boolean
   /** Files filed under it. */
+  used: number
+}
+
+/** A reason in HR's list (Form settings › Talent Bank reasons — mig 20261025021500). */
+export interface HiringBankReason {
+  id: TalentReason
+  name: string
+  /** Off in Form settings: out of the pickers; the people kept with it keep it. */
+  active: boolean
+  /** People in the bank kept with it. */
   used: number
 }
 
@@ -129,6 +145,8 @@ export interface HiringTalent {
   department: string
   fromRequest: string | null
   notes: string
+  /** Why they are kept (2026-10-24); null for somebody kept before it was asked. */
+  reason: TalentReason | null
   /** Résumé first, then by type, then as added. */
   files: HiringFile[]
   savedBy: string
@@ -142,6 +160,8 @@ export interface HiringBoard {
   candidateFields: CandidateField[]
   /** In their order: Résumé, IC, Certificate, then what HR added. */
   fileTypes: HiringFileType[]
+  /** Why somebody is kept, in their order: the five it began with, then what HR added. */
+  talentReasons: HiringBankReason[]
   people: HiringPerson[]
   requests: HiringRequest[]
   talents: HiringTalent[]

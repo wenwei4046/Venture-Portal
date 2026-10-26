@@ -231,6 +231,10 @@ try {
   await reject(`SELECT public.hr_drive_folder_delete($1)`, [CARRES], /Empty it first\./, 'a folder with a live folder in it stays')
   await one(`SELECT public.hr_drive_file_delete($1)`, [CV.id])
   await one(`SELECT public.hr_drive_folder_delete($1)`, [ALI])
+  // Moved one right after another, two can share PGlite's millisecond, and the Bin's order then falls to their random
+  // ids (CV.pdf came out above Ali Tan on CI, 2026-10-23): a second apart each, in the order they went in.
+  await q(`UPDATE public.hr_drive_bin SET deleted_at = now() - make_interval(secs => CASE WHEN file_id = $1 THEN 3 WHEN file_id = $2 THEN 2 ELSE 1 END)
+    WHERE file_id IN ($1, $2) OR folder_id = $3`, [IC.id, CV.id, ALI])
   check((await folderRow(ALI)).deleted_at !== null, true, 'its files all in the Bin, the folder goes — deleted softly, as before')
   const aliBin = await binOf({ folder: ALI })
   check([aliBin.kind, aliBin.name, aliBin.deleted_by_name], ['folder', 'Ali Tan', 'Grace Lim'], 'and it is in the Bin')
