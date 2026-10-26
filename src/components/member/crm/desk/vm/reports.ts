@@ -45,16 +45,16 @@ export function salespeopleReport(cs: CrmCustomer[], visits: CrmVisit[], range: 
   for (const v of visits) if (v.state !== "cancelled") live.set(v.customerId, [...(live.get(v.customerId) ?? []), v]);
   const leads = cs.filter(c => inRange(c.createdAt, range));
   const figures = (id: string, name: string, team: string, list: CrmCustomer[]): SalesRow => {
-    let replied = 0, mins = 0, timed = 0, appt = 0, showed = 0, apptN = 0;
+    let replied = 0, mins = 0, timed = 0, appt = 0, showed = 0;
     for (const c of list) {
       const firstLead = c.messages.find(m => m.from === "lead"), firstOurs = c.messages.find(m => m.from === "me" && !m.auto && (!firstLead || m.at >= firstLead.at));
       if (firstOurs) { replied++; if (firstLead) { mins += Math.max(0, (new Date(firstOurs.at).getTime() - new Date(firstLead.at).getTime()) / 60000); timed++; } }
       const vs = live.get(c.id) ?? [];
-      if (vs.length) { appt++; apptN += vs.length; showed += vs.filter(v => v.state === "attended").length; }
+      if (vs.length) { appt++; if (vs.some(v => v.state === "attended")) showed++; }
     }
     const won = list.filter(c => c.status === "won").length, lost = list.filter(c => c.status === "lost").length;
     return { id, name, team, leads: list.length, replied, replyRate: rate(replied, list.length), firstReplyMin: timed ? mins / timed : null,
-      appt, apptRate: rate(appt, list.length), showed, showRate: rate(showed, apptN), won, winRate: rate(won, list.length), lost };
+      appt, apptRate: rate(appt, list.length), showed, showRate: rate(showed, appt), won, winRate: rate(won, list.length), lost };
   };
   const by = new Map<string, CrmCustomer[]>();
   for (const c of leads) by.set(c.assignedTo ?? "", [...(by.get(c.assignedTo ?? "") ?? []), c]);
@@ -64,17 +64,21 @@ export function salespeopleReport(cs: CrmCustomer[], visits: CrmVisit[], range: 
 }
 
 /** Appointments & show-ups: visits by their own day — the figures, then by showroom, weekday, time, salesperson and outcome. */
-export interface ApptVisit { at: Date; room: string; rep: string; outcome: string }
+export interface ApptVisit { at: Date; room: string; rep: string; outcome: string; who?: string }
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const OUTCOMES = ["Upcoming", "To mark", "Showed up", "Won", "Follow up", "Lost", "No show", "Cancelled"];
 export function appointmentsReport(vs: ApptVisit[]) {
   const n = (o: string) => vs.filter(v => v.outcome === o).length;
-  const showed = n("Showed up") + n("Won") + n("Follow up") + n("Lost"), marked = showed + n("No show");
+  const showed = n("Showed up") + n("Won") + n("Follow up") + n("Lost");
+  // The rate counts a customer once (2026-10-27): came at least once, of those who came or were marked No show.
+  const whoOf = (v: ApptVisit, i: number) => v.who ?? `#${i}`, CAME = ["Showed up", "Won", "Follow up", "Lost"];
+  const cameC = new Set(vs.map((v, i) => CAME.includes(v.outcome) ? whoOf(v, i) : null).filter(Boolean));
+  const markedC = new Set([...cameC, ...vs.map((v, i) => v.outcome === "No show" ? whoOf(v, i) : null).filter(Boolean)]);
   const times = [...new Set(vs.map(v => v.at.getHours() * 60 + v.at.getMinutes()))].sort((a, b) => a - b)
     .map(m => new Date(2000, 0, 1, Math.floor(m / 60), m % 60).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }));
   const timeOf = (v: ApptVisit) => v.at.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
   return {
-    figures: { booked: vs.length - n("Cancelled"), upcoming: n("Upcoming"), showed, noShow: n("No show"), toMark: n("To mark"), cancelled: n("Cancelled"), showRate: rate(showed, marked) },
+    figures: { booked: vs.length - n("Cancelled"), upcoming: n("Upcoming"), showed, noShow: n("No show"), toMark: n("To mark"), cancelled: n("Cancelled"), showRate: rate(cameC.size, markedC.size) },
     byRoom: breakdown(vs, v => v.room), byDow: breakdown(vs, v => DOW[(v.at.getDay() + 6) % 7], DOW), byTime: breakdown(vs, timeOf, times),
     byRep: breakdown(vs, v => v.rep), byOutcome: breakdown(vs, v => v.outcome, OUTCOMES),
   };

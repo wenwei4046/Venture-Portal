@@ -56,7 +56,7 @@ export function dailySeries(keys: string[], days: string[], cs: CrmCustomer[], v
     leads[i]++;
     const vs = live.get(c.id) ?? [];
     if (vs.length) appt[i]++;
-    showup[i] += vs.filter(v => v.state === "attended").length;
+    if (vs.some(v => v.state === "attended")) showup[i]++;
     if (c.status === "won") won[i]++;
   }
   const read = meta.filter((m): m is Record<string, MetaFig> => !!m);

@@ -44,7 +44,7 @@ export function crmFigures(cs: CrmCustomer[], ctx: DeskCtx, a: number, b: number
   const inR = (iso: string) => { const t = new Date(iso).getTime(); return t >= a && t < b + DAY; };
   const leads = cs.filter(c => inR(c.createdAt)), ids = new Set(leads.map(c => c.id));
   const vs = ctx.data.visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled");
-  const appt = new Set(vs.map(v => v.customerId)).size, showup = vs.filter(v => v.state === "attended").length, won = leads.filter(c => c.status === "won").length;
+  const appt = new Set(vs.map(v => v.customerId)).size, showup = new Set(vs.filter(v => v.state === "attended").map(v => v.customerId)).size, won = leads.filter(c => c.status === "won").length;
   return { leads: leads.length, appt, showup, won, apptrate: leads.length ? (appt / leads.length) * 100 : null, showrate: appt ? (showup / appt) * 100 : null, winrate: leads.length ? (won / leads.length) * 100 : null };
 }
 /**
