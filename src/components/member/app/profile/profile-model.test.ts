@@ -148,7 +148,7 @@ describe("teamVM", () => {
   const person = (id: string, sales: number, blindOrders = 0): ArenaPerson => ({
     id, name: id, self: false, sales, held: 0, orders: 1, kpiQty: 0, marginRevenue: sales, marginCost: 0, blindOrders, brands: {},
   });
-  it("draws the directors and the line above, the member, then two levels below", () => {
+  it("draws the directors and the line above, the member, then everybody below", () => {
     const vm = teamVM({ map, departmentId: "fair", subName: "Fair", staffId: "me", people: [person("me", 1000), person("k1", 500, 1)],
       month: "2026-09", kpi: { enabled: false, threshold: null }, capacity: 27, occupied: 26, ranks: new Map([["me", "Rank B"]]) })!;
     expect(vm.ups.map(u => [u.level, u.nodes.map(n => n.name)])).toEqual([["DIRECTOR", ["PETER"]], ["UPLINE", ["MARCUS"]]]);
@@ -171,7 +171,7 @@ describe("teamVM", () => {
       { id: "d:d0", name: "KRIS", title: "Revenue Director", ini: "KR", dot: "up" },
       { id: "d:d1", name: "PETER", title: "Revenue Director", ini: "PE", dot: "up" },
     ] }]);
-    expect(top.count).toBe("2 above · 2 below");
+    expect(top.count).toBe("2 above · 3 below");
     expect(top.sheets["n-top"].reportsTo).toBe("Reports to KRIS · PETER");
     expect(top.sheets["d:d0"]).toMatchObject({ role: "Revenue Director", reportsTo: "Leads Fair" });
   });
@@ -190,10 +190,29 @@ describe("teamVM", () => {
     expect(peter.ups).toEqual([]);
     expect(peter.me).toEqual({ id: "d:d1", name: "PETER", title: "You · Revenue Director", ini: "PE", dot: "up" });
     expect(peter.kids).toMatchObject([{ name: "MARCUS", kids: [{ name: "JIA HUI" }] }]);
-    expect(peter.count).toBe("0 above · 2 below");
     expect(peter.sheets["d:d1"]).toMatchObject({ name: "PETER", role: "Revenue Director", self: true, reportsTo: "Leads Fair" });
     expect(peter.sheets["n-top"].reportsTo).toBe("Reports to you");
     expect(peter.sheets["n-me"].reportsTo).toBe("Reports to MARCUS");
+  });
+  // 2026-10-27 — the user: "let all people can view their own full tree". The chart stopped two levels down, so a
+  // director never saw the people of a team leader's team assistant (PEI FEN and WEI SHUN under SALLY, under SHAWN).
+  it("draws everybody below, every level down, and counts them all", () => {
+    const peter = fairTeam("d1");
+    expect(peter.kids).toMatchObject([{ name: "MARCUS", kids: [{ name: "JIA HUI", kids: [{ name: "DARREN", kids: [{ name: "KELVIN", kids: [] }] }] }] }]);
+    expect(peter.count).toBe("0 above · 4 below");
+    expect(peter.sheets["n-k1"].reportsTo).toBe("Reports to JIA HUI");
+    expect(peter.sheets["n-g1"].reportsTo).toBe("Reports to DARREN");
+  });
+  it("draws a person once, so a line of the map that loops back ends", () => {
+    const loop: MemberOrgMap = { ...map, people: [
+      { id: "n-a", staffId: "a", departmentId: "fair", schemeId: "s", name: "ADA", code: null, title: "Team Leader", parentId: "n-c", self: true, mine: true },
+      { id: "n-b", staffId: "b", departmentId: "fair", schemeId: "s", name: "BEN", code: null, title: "Executive", parentId: "n-a", self: false, mine: true },
+      { id: "n-c", staffId: "c", departmentId: "fair", schemeId: "s", name: "CY", code: null, title: "Executive", parentId: "n-b", self: false, mine: true },
+    ] };
+    const vm = teamVM({ map: loop, departmentId: "fair", subName: "Fair", staffId: "a", people: [], month: "2026-09",
+      kpi: { enabled: false, threshold: null }, capacity: null, occupied: 0, ranks: new Map() })!;
+    expect(vm.kids).toEqual([]);
+    expect(vm.count).toMatch(/· 0 below$/);
   });
   it("a seat whose upline holds none here is one of the director's tops too", () => {
     const stray = { ...twoDirectors, people: [...twoDirectors.people,
