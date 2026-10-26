@@ -95,8 +95,8 @@ const CHARGE_WORD: Record<string, string> = {
  * (`cost_detail.charges`, 20261005010000; every option since 20261006050000):
  * the customer's price for each, out of the margin and in the commission. A
  * sofa is charged once per sofa and the set's charge spread over its pieces
- * (`cost_detail.charge_set`), which the words say; a sofa special at what the
- * bill's special order charges for it (2026-10-26, `special_order`) says so.
+ * (`cost_detail.charge_set`), which the words say; a sofa special charged by
+ * quantity once per compartment (2026-10-27, `by_quantity`, `count`) says how many.
  */
 export function chargeText(detail: unknown): string {
   const d: Detail = detail && typeof detail === 'object' && !Array.isArray(detail) ? (detail as Detail) : {}
@@ -105,8 +105,9 @@ export function chargeText(detail: unknown): string {
     const pool = text((c as Detail).pool)
     const value = text((c as Detail).value)
     const word = pool ? CHARGE_WORD[pool] : undefined
-    const billed = (c as Detail).special_order === true ? ' (special order)' : ''
-    return word !== undefined && value ? [`${word}${value}${billed}`] : []
+    const count = Number((c as Detail).count)
+    const times = (c as Detail).by_quantity === true && Number.isInteger(count) && count > 0 ? ` ×${count}` : ''
+    return word !== undefined && value ? [`${word}${value}${times}`] : []
   })
   const base = words.length ? `for ${words.join(' · ')}` : 'for its options'
   const set = d.charge_set && typeof d.charge_set === 'object' && !Array.isArray(d.charge_set) ? (d.charge_set as Detail) : null

@@ -227,6 +227,21 @@ export function moduleInfo(code: string): { desc: string; seats: number; chaise:
   return { desc: raw, seats: 0, chaise: false, rank: [3, 8, 0, 0] };
 }
 
+/**
+ * A module's back cushions — its compartments (2026-10-27, the Houzs ERP's `SOFA_MODULES`
+ * `cushions`; the user: "每一个 compartment 只会有一个 back cushion（1A 是一个 back cushion，2A 就是
+ * 两个 back cushion）"): a 1A / 1B / 1NA / 1S one, a 2A / 2B / 2NA / 2S two, a 3S three; a chaise or a
+ * corner one; a console or a stool none; a whole sofa (`6FT`) or anything else one ("都当 1 个").
+ * A special charged by quantity counts these — on a bill (`catalogue_apply_sofa_charges`) and
+ * as the Quote's first +.
+ */
+export function moduleCushions(code: string): number {
+  const base = (code.trim().match(/^[^()\s]*/)?.[0] ?? "").toUpperCase();
+  const fam = base.match(/^(\d)(A|B|NA|S)$/);
+  if (fam) return Number(fam[1]);
+  return base === "CONSOLE" || base === "STOOL" || base === "OTT" ? 0 : 1;
+}
+
 function compareRank(a: number[], b: number[]): number {
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
     const d = (a[i] ?? 0) - (b[i] ?? 0);
@@ -827,6 +842,8 @@ export interface SofaBuildPick {
   picked: string[];
   /** How many of each picked special charged by quantity, as the list spells it. */
   qty: Record<string, number>;
+  /** The back cushions of every sofa in the cart and of what this sheet adds — where a special charged by quantity starts. */
+  compartments: number;
 }
 
 /**
@@ -853,9 +870,13 @@ export function sofaPick(
   const tier = wantedTier && tiers.includes(wantedTier) ? wantedTier : tiers[0] ?? null;
   const options = sofaChoicesIn(catalog, [sh.key, ...cartSofaKeys(cart)]);
   const picked = offeredAll(sh.specials, options.specials.map(o => o.value));
+  const inCartCushions = cart.filter(l => l.kind === "sofa")
+    .reduce((sum, l) => sum + moduleCushions(moduleOf(catalog, l.productId)?.code ?? "") * l.qty, 0);
+  const sheetCushions = sh.qty * (model?.modules.reduce((sum, x) => sum + moduleCushions(x.code) * (sh.mods[x.code] ?? 0), 0) ?? 0);
   return {
     graded, heights: choices.heights, tiers, height, tier, clash: graded && chosen.length > 0 && !choices.heights.length,
     legs: options.legs, specials: options.specials,
     leg: offeredOne(sh.leg, options.legs.map(o => o.value)), picked, qty: countedOf(options.specials, picked, sh.specialQty),
+    compartments: inCartCushions + sheetCushions,
   };
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BedframeBuild, MemberProduct } from "@/lib/member/types";
 import {
   EMPTY_MEMORY, NO_SOFA_BUILD, accOnlyTitle, accOrder, accVariants, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
-  modelMatches, moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
+  modelMatches, moduleCushions, moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
   type CartLine, type QCatalog, type SheetState,
 } from "./quote-model";
 
@@ -60,6 +60,17 @@ describe("moduleInfo — the ERP's module vocabulary", () => {
   it("a chaise is wider in the strip", () => {
     expect(moduleInfo("L(LHF)").chaise).toBe(true);
     expect(moduleInfo("2S").chaise).toBe(false);
+  });
+});
+
+// 2026-10-27, the user: "每一个 compartment 只会有一个 back cushion（1A 是一个 back cushion，2A 就是两个 back cushion）";
+// a whole sofa "都当 1 个". The ERP's SOFA_MODULES `cushions` — catalogue_apply_sofa_charges counts the same.
+describe("moduleCushions — a module's back cushions, its compartments", () => {
+  it.each([
+    ["1A(LHF)", 1], ["2A(RHF)", 2], ["1B(LHF)", 1], ["2B(LHF)", 2], ["1NA", 1], ["2NA", 2], ["1S", 1], ["2S", 2], ["3S", 3],
+    ["1A(P)(RHF)", 1], ["1NA(L)", 1], ["1S(R)", 1], ["L(RHF)", 1], ["CNR", 1], ["Console", 0], ["STOOL", 0], ["6FT", 1], ["", 1],
+  ])("%s has %i", (code, cushions) => {
+    expect(moduleCushions(code)).toBe(cushions);
   });
 });
 
@@ -486,6 +497,13 @@ describe("a sofa special charged by quantity", () => {
     // Picked with no quantity yet counts 1; a quantity for a special not picked is not one.
     expect(sofaPick(sheet([BACK.value]), z(), [], NO_SOFA_BUILD).qty).toEqual({ [BACK.value]: 1 });
     expect(sofaPick(sheet([SEAT.value], { [BACK.value]: 4 }), z(), [], NO_SOFA_BUILD).qty).toEqual({});
+  });
+
+  it("knows the compartments a count starts at: the sofas in the cart and what the sheet adds (2026-10-27)", () => {
+    expect(sofaPick(sheet([]), z(), [], NO_SOFA_BUILD).compartments).toBe(2);
+    expect(sofaPick({ ...sheet([]), qty: 2 }, z(), [], NO_SOFA_BUILD).compartments).toBe(4);
+    expect(sofaPick(sheet([]), z(), [inCart("m-810", "810-2s", 2)], NO_SOFA_BUILD).compartments).toBe(2 + 4);
+    expect(sofaPick({ ...sheet([]), mods: {} }, z(), [], NO_SOFA_BUILD).compartments).toBe(0);
   });
 
   it("charges it each, times the quantity, once for the cart — the rest once per sofa", () => {
