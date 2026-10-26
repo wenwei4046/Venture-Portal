@@ -409,6 +409,24 @@ export interface CrmMessageRowX extends CrmMessageRow {
   their_reaction?: string | null;
   card?: CrmCard | null;
 }
+/**
+ * Show-up counts a customer ONCE (the owner, 2026-10-27: "appt rate, show up rate 一个客户只记录一次"): of the visits given
+ * (cancelled ones already left out), the customers with one already due (marked, or past its time), the customers who came
+ * at least once, and the customers marked No show who never came.
+ */
+export function showUpOnce(vs: CrmVisit[], now: Date): { due: Set<string>; came: Set<string>; noshow: Set<string> } {
+  const due = new Set(vs.filter(v => v.state !== "booked" || new Date(v.start) <= now).map(v => v.customerId));
+  const came = new Set(vs.filter(v => v.state === "attended").map(v => v.customerId));
+  const noshow = new Set(vs.filter(v => v.state === "no_show" && !came.has(v.customerId)).map(v => v.customerId));
+  return { due, came, noshow };
+}
+/** A calendar's Show-up %, a customer once: came ÷ came or marked No show (pastAsNo: a past visit not marked counts as not come). */
+export function showRateOnce(vs: CrmVisit[], now: Date, pastAsNo = false): string {
+  const { came, noshow } = showUpOnce(vs, now);
+  const no = pastAsNo ? new Set(vs.filter(v => new Date(v.start) < now && !came.has(v.customerId)).map(v => v.customerId)) : noshow;
+  return came.size + no.size ? `${Math.round((came.size / (came.size + no.size)) * 100)}%` : "—";
+}
+
 export interface CrmVisitRow {
   id: string; contact_id: string; showroom: string; start_at: string; minutes: number; state: CrmVisitState;
   outcome?: CrmVisit["outcome"]; reminded_at?: string | null;

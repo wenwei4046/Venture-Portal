@@ -3,6 +3,7 @@
  * showroom and a date range; the dark figures open their customers. Ported from the prototype on the real calendar:
  * its "October 2026", "today = 12" are the office's month and day.
  */
+import { showRateOnce } from "@/lib/member/crm-data";
 import type { DeskCtx } from "./ctx";
 import { initials, visitRows, type VisitRow } from "./data";
 import { calendarAnalysisVM } from "./analysis";
@@ -113,7 +114,7 @@ export function calendarVM(ctx: DeskCtx) {
     // The analysis card over the calendar (the owner, 2026-10-15), folded until opened.
     calAn: calendarAnalysisVM(ctx, vs),
     calStats: ([[String(leads.length), "Leads", "#fff", "Leads"], [String(upcoming.length), "Upcoming", "var(--crm-peach)", "Upcoming"], [String(showed), "Showed up", "#fff", "Showed up"],
-      [showed + noShow ? `${Math.round((showed / (showed + noShow)) * 100)}%` : "—", "Show-up", "#fff", "Show-up"],
+      [showRateOnce(vs.map(v => v.v), now), "Show-up", "#fff", "Show-up"],
       // v2: No show (past visits not showed up) and Not reminded (tomorrow's visits with no reminder sent).
       [String(vs.filter(v => day0(v.at) < T && v.v.state !== "attended").length), "No show", "var(--crm-rust-meta)", "No show"],
       [String(all.filter(v => v.v.state === "booked" && !v.v.remindedAt && day0(v.at) === T + DAY).length), "Not reminded", "var(--crm-amber-line)", "Not reminded"]] as const)
@@ -153,7 +154,7 @@ export function calendarVM(ctx: DeskCtx) {
       const max = Math.max(1, ...groups.map(g => g.n));
       return {
         stats: [["Visits", String(vs.length), "var(--crm-ink)", "Leads"], ["Came", String(came), "var(--crm-ink)", "Showed up"], ["No-show", String(noShowN), "var(--crm-oxblood)", "No show"],
-          ["Still to come", String(toCome), "var(--crm-ink)", "Upcoming"], ["Show-up", came + noShowN ? `${Math.round((came / (came + noShowN)) * 100)}%` : "—", "var(--crm-ink)", "Show-up"],
+          ["Still to come", String(toCome), "var(--crm-ink)", "Upcoming"], ["Show-up", showRateOnce(vs.map(v => v.v), now, true), "var(--crm-ink)", "Show-up"],
           ["Not reminded", String(all.filter(v => v.v.state === "booked" && !v.v.remindedAt && day0(v.at) === T + DAY).length), "var(--crm-ink)", "Not reminded"]]
           .map(([k, val, c, list]) => ({ k, v: val, c, open: open(list) })),
         byLabel: byRoom ? "By showroom" : "By team", flip: () => patch({ calBy: byRoom ? "team" : "room" }), flipTo: byRoom ? "By team" : "By showroom",

@@ -2,12 +2,12 @@
  * Insight (design 3b): Month · Week · Day · Range (tap or drag across days).
  * Every figure from the customers and visits themselves:
  *   Appt rate   = leads in the period that booked a visit ÷ leads in the period
- *   Show-up     = showed ÷ visits in the period already due (No shows counted)
- *   Won rate    = visits won ÷ visits showed
+ *   Show-up     = customers who came ÷ customers with a visit already due (No shows counted) — a customer once (2026-10-27)
+ *   Won rate    = customers won at a visit ÷ customers who came
  *   Avg. reply  = customer's message → our next reply (auto-replies don't count)
  */
 import type { MouseEvent, PointerEvent as RPointerEvent } from "react";
-import type { CrmCustomer } from "@/lib/member/crm-data";
+import { showUpOnce, type CrmCustomer } from "@/lib/member/crm-data";
 import { downlineOf } from "../../shared/people";
 import { BORDER, gb, day0, DAY, ini, isCold, lastReal, stop, timeLabel, urgencyOf, type SalesCtx } from "./common";
 import { customerFormVM, infoRows, phoneLabel } from "./customer";
@@ -30,10 +30,10 @@ export function insightVM(ctx: SalesCtx) {
   const ids = new Set(mine.map(c => c.id));
   const leads = mine.filter(c => inR(c.createdAt));
   const visits = data.visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled" && inR(v.start));
-  const due = visits.filter(v => v.state !== "booked" || new Date(v.start) <= now);
-  const showed = visits.filter(v => v.state === "attended").length, noshow = visits.filter(v => v.state === "no_show").length;
+  // One customer counts once, however many visits they booked or came to (showUpOnce).
+  const once = showUpOnce(visits, now), due = [...once.due], showed = once.came.size, noshow = once.noshow.size;
   const upcoming = visits.filter(v => v.state === "booked" && new Date(v.start) > now).length;
-  const wonV = visits.filter(v => v.state === "attended" && v.outcome === "won").length;
+  const wonV = new Set(visits.filter(v => v.state === "attended" && v.outcome === "won").map(v => v.customerId)).size;
   const bookedLeads = leads.filter(c => data.visits.some(v => v.customerId === c.id && v.state !== "cancelled")).length;
   const cold = leads.filter(c => isCold(c, now)).length;
   // Customer's message → our next reply, replies made in the period.
@@ -63,10 +63,10 @@ export function insightVM(ctx: SalesCtx) {
   const rates = (lo: number, hi: number) => {
     const inP = (iso: string) => { const t = day0(new Date(iso)); return t >= lo && t <= hi; };
     const ls = mine.filter(c => inP(c.createdAt)), vs = data.visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled" && inP(v.start));
-    const dueP = vs.filter(v => v.state !== "booked" || new Date(v.start) <= now), sh = vs.filter(v => v.state === "attended").length;
+    const o = showUpOnce(vs, now), sh = o.came.size;
     const bk = ls.filter(c => data.visits.some(v => v.customerId === c.id && v.state !== "cancelled")).length;
     const r = (a: number, b: number) => (b ? (a / b) * 100 : null);
-    return [r(Math.min(bk, ls.length), ls.length), r(sh, dueP.length), r(vs.filter(v => v.state === "attended" && v.outcome === "won").length, sh)];
+    return [r(Math.min(bk, ls.length), ls.length), r(sh, o.due.size), r(new Set(vs.filter(v => v.state === "attended" && v.outcome === "won").map(v => v.customerId)).size, sh)];
   };
   const len = R1 - R0 + DAY;
   const [P0, P1] = per === "month" ? [new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), new Date(now.getFullYear(), now.getMonth(), 0).getTime()] : [R0 - len, R0 - DAY];
@@ -176,7 +176,7 @@ export function insightVM(ctx: SalesCtx) {
     pHero: {
       rate: pct(Math.min(bookedLeads, leads.length), leads.length), rateNote: `${Math.min(bookedLeads, leads.length)} of ${leads.length} leads booked`,
       show: pct(showed, due.length), showNote: due.length ? `${showed} of ${due.length} came${noshow ? ` · ${noshow} no show` : ""}` : "None due yet",
-      won: pct(wonV, showed), wonNote: showed ? `${wonV} of ${showed} visits won` : "No visits yet",
+      won: pct(wonV, showed), wonNote: showed ? `${wonV} of ${showed} won` : "No visits yet",
       leads: leads.length, appts: visits.length, up: upcoming,
       reply: fmtM(reply), replyNote: gaps.length ? `across ${gaps.length} replies` : "No replies yet", replyFg: reply != null && reply > 60 ? "var(--crm-peach)" : "var(--crm-page)",
     },

@@ -77,7 +77,7 @@ export function reportsVM(ctx: DeskCtx) {
     const outcome = v.state === "cancelled" ? "Cancelled" : v.state === "no_show" ? "No show"
       : v.state === "attended" ? (v.outcome === "won" ? "Won" : v.outcome === "lost" ? "Lost" : v.outcome === "follow_up" ? "Follow up" : "Showed up")
         : at <= now ? "To mark" : "Upcoming";
-    return { at, outcome, room: data.rooms.find(r => r.id === v.showroomId)?.name ?? "Showroom", rep: c?.assignedTo ? nameOf(c.assignedTo) : "No one yet" };
+    return { at, outcome, room: data.rooms.find(r => r.id === v.showroomId)?.name ?? "Showroom", rep: c?.assignedTo ? nameOf(c.assignedTo) : "No one yet", who: v.customerId };
   });
   const ar = appointmentsReport(visits), af = ar.figures;
   const appt = {
