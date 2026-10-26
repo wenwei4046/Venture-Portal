@@ -6000,47 +6000,63 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .sheet-rpt tr.sr-total td.sr-num { font-weight: 600; }
 .sheet-rpt tr.sr-total.is-strong td { background: rgb(221 229 240); box-shadow: inset 0 2px 0 rgb(29 43 74); }
 .sheet-rpt tr.sr-total.is-strong td.sr-label { color: rgb(29 43 74); }
-/* An account opened (2026-10-24, the user's drill-down): its lines as a ledger under it — Date, Description,
-   Other side, Ref. 1, Ref. 2, Debit, Credit, the count and totals at the foot — or, month by month, its months
-   first. The box keeps to the width on screen (SheetReport sizes it) and the sheet's own cell rules are undone
-   inside it. */
+/* An account opened (2026-10-24, the user's drill-down). A single month's: its lines as a ledger under it — Date,
+   Description, Other side, Ref. 1, Ref. 2, Debit, Credit, the count and totals at the foot; the box keeps to the
+   width on screen (SheetReport sizes it) and the sheet's own cell rules are undone inside it. */
 .sheet-rpt tr.can-open { cursor: pointer; }
 .sheet-rpt tr.can-open:hover td.sr-label { color: rgb(46 92 138); }
 .sheet-rpt tr.sr-drill > td { padding: 0; border-bottom: 1px solid rgb(236 234 229); background: rgb(251 250 248); }
 .sheet-rpt .sr-drill-box { position: sticky; left: 0; box-sizing: border-box; max-width: 100%; padding: 10px 14px 14px 36px; overflow-x: auto; }
-.sheet-rpt .sr-drill-title { padding: 0 0 8px; font-size: 12px; color: rgb(90 78 68); }
-.sheet-rpt .sr-drill-title b { font-weight: 600; color: #000; }
-.sheet-rpt .sr-drill-note { margin: 0; padding: 2px 0; font-size: 12px; color: rgb(90 78 68); }
-.sheet-rpt .sr-drill-note.is-error { color: #B02822; }
-.sheet-rpt .sr-drill-note button { margin-left: 6px; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: rgb(46 92 138); text-decoration: underline; cursor: pointer; }
-.sheet-rpt table.sr-dl, .sheet-rpt table.sr-months { width: 100%; border: 1px solid rgb(229 228 223); border-radius: 8px; overflow: hidden; background: #fff; font-size: 11.5px; }
-.sheet-rpt table.sr-dl { min-width: 680px; }
-.sheet-rpt table.sr-months { table-layout: fixed; }
-.sheet-rpt .sr-months col.is-count { width: 84px; }
-.sheet-rpt .sr-months col.is-value { width: 128px; }
-.sheet-rpt .sr-dl-scroll { overflow-x: auto; }
+.sheet-rpt table.sr-dl { width: 100%; min-width: 680px; border: 1px solid rgb(229 228 223); border-radius: 8px; overflow: hidden; background: #fff; font-size: 11.5px; }
 .sheet-rpt .sr-dl thead th { padding: 7px 10px; border: 0; border-bottom: 1px solid rgb(229 228 223); background: rgb(243 240 234); color: rgb(117 100 86); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; text-align: left; white-space: nowrap; }
-.sheet-rpt .sr-dl tbody td, .sheet-rpt .sr-months tbody td { padding: 6px 10px; border-bottom: 1px solid rgb(236 234 229); background: #fff; color: rgb(60 52 46); line-height: 1.35; vertical-align: top; }
-.sheet-rpt .sr-dl tfoot td, .sheet-rpt .sr-months tfoot td { padding: 7px 10px; border: 0; background: rgb(243 240 234); color: #000; font-weight: 600; }
-.sheet-rpt .sr-dl td.is-mono, .sheet-rpt .sr-months td.is-mono { font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; font-size: 11px; white-space: nowrap; }
-.sheet-rpt .sr-dl .is-num, .sheet-rpt .sr-months .is-num { text-align: right; }
-.sheet-rpt .sr-months td.is-neg { color: #B02822; }
+.sheet-rpt .sr-dl tbody td { padding: 6px 10px; border-bottom: 1px solid rgb(236 234 229); background: #fff; color: rgb(60 52 46); line-height: 1.35; vertical-align: top; }
+.sheet-rpt .sr-dl tfoot td { padding: 7px 10px; border: 0; background: rgb(243 240 234); color: #000; font-weight: 600; }
+.sheet-rpt .sr-dl td.is-mono { font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; font-size: 11px; white-space: nowrap; }
+.sheet-rpt .sr-dl .is-num { text-align: right; }
 .sheet-rpt .sr-dl td.sr-dl-desc { min-width: 220px; color: #000; }
+/* Who first, in bold (2026-10-26, the user: "先名字再到 description", "名字变粗体"). */
+.sheet-rpt .sr-dl .sr-dl-party { font-weight: 700; color: #000; }
+.sheet-rpt .sr-dl .sr-dl-sep { color: rgb(160 150 138); }
 .sheet-rpt .sr-dl td.sr-dl-other { white-space: nowrap; color: rgb(90 78 68); }
 .sheet-rpt .sr-dl-count { font-weight: 400; color: rgb(90 78 68); }
 .sheet-rpt .sr-dl-gl { font-weight: 500; color: rgb(46 92 138); text-decoration: none; }
 .sheet-rpt .sr-dl-gl:hover { text-decoration: underline; }
-.sheet-rpt .sr-months tr.can-open { cursor: pointer; }
-.sheet-rpt .sr-months td.sr-month-name { font-weight: 600; color: #000; white-space: nowrap; }
-.sheet-rpt .sr-months td.sr-month-name button { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
-.sheet-rpt .sr-months td.sr-month-count { color: rgb(90 78 68); white-space: nowrap; }
-.sheet-rpt .sr-months tr.sr-month-lines > td { padding: 0 10px 10px 22px; background: rgb(251 250 248); }
+/* Month by month (2026-10-26, the mockup's fifth round): an opened account's lines are rows of the sheet, newest
+   first — "date · NAME · what it was · document", the date pale and monospace (A), the name bold — each figure in the
+   Total and under its own month; the first column widens while lines show. */
+@media (min-width: 768px) {
+  .sheet-rpt.has-lines thead th.sr-corner, .sheet-rpt.has-lines td.sr-label { min-width: 560px; max-width: 560px; }
+}
+.sheet-rpt tr.sr-ln td { padding-top: 5px; padding-bottom: 5px; border-bottom: 1px dashed rgb(229 225 218); background: rgb(251 250 248); }
+.sheet-rpt tr.sr-ln td.sr-label { font-size: 11.5px; line-height: 1.4; white-space: normal; color: rgb(60 52 46); }
+.sheet-rpt tr.sr-ln td.sr-num { font-size: 11.5px; color: rgb(60 52 46); }
+.sheet-rpt tr.sr-ln td.sr-num.is-neg { color: #B02822; }
+.sheet-rpt tr.sr-ln td.is-nil { color: rgb(205 198 188); }
+.sheet-rpt tr.sr-ln td.is-now { background: rgb(253 246 239); }
+.sheet-rpt.is-dept tr.sr-ln td.is-acc { background: rgb(244 240 234); }
+.sheet-rpt tr.sr-ln:hover td { background: rgb(255 246 234); }
+.sheet-rpt .sr-ln-date { margin-right: 8px; font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; font-size: 10.5px; color: rgb(166 154 142); }
+.sheet-rpt .sr-ln-party { font-weight: 700; color: #000; }
+.sheet-rpt .sr-ln-sep { color: rgb(160 150 138); }
+.sheet-rpt .sr-ln-desc { font-weight: 400; color: rgb(40 34 30); }
+.sheet-rpt .sr-ln-ref { margin-left: 8px; font-family: var(--font-mono), "Chivo Mono", Menlo, monospace; font-size: 10.5px; color: rgb(160 150 138); }
+.sheet-rpt tr.sr-ln-foot td { padding: 4px 10px 9px; border-bottom: 1px solid rgb(229 225 218); background: rgb(251 250 248); font-size: 11px; color: rgb(117 100 86); }
+.sheet-rpt tr.sr-ln-foot td.sr-label { white-space: normal; }
+.sheet-rpt tr.sr-ln-foot.is-error td.sr-label { color: #B02822; }
+.sheet-rpt tr.sr-ln-foot button { padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: rgb(46 92 138); text-decoration: underline; cursor: pointer; }
+.sheet-rpt td.sr-label.sr-ln-label { padding-left: var(--ln-indent, 50px); }
+.sheet-rpt tr.is-opened td.sr-label { color: rgb(46 92 138); }
 .sheet-rpt tr.is-hit td { background: #FFF6D8; }
 .sheet-rpt tr.is-active td.sr-label { box-shadow: inset 3px 0 0 #E99A53; }
 @media (max-width: 767px) {
   .sheet-rpt thead th.sr-corner, .sheet-rpt td.sr-label { min-width: 128px; max-width: 128px; }
   .sheet-rpt td.sr-label { white-space: normal; font-size: 11.5px; }
   .sheet-rpt .sr-drill-box { padding: 8px 10px 12px; }
+  /* A line on a phone takes the narrow column whole: its date on a line, two lines of its words, no document. */
+  .sheet-rpt td.sr-label.sr-ln-label { padding-left: 12px; }
+  .sheet-rpt .sr-ln-date { display: block; margin: 0 0 1px; white-space: nowrap; }
+  .sheet-rpt .sr-ln-text { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .sheet-rpt .sr-ln-ref { display: none; }
 }
 
 /* ═══ A department's charts (2026-10-25, the mockup's twelfth round —

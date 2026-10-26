@@ -237,7 +237,8 @@ describe('applyGlRefs', () => {
     voucherPayees: new Map([['pv-1', 'TNB Berhad']]),
   }
 
-  it('enriches invoice JEs with invoice no + description + bill-to party', () => {
+  // 2026-10-26: the line keeps its own words; the invoice's stand beside them (lib/line-words picks).
+  it('enriches invoice JEs with the invoice no, its words and the bill-to party', () => {
     const line: GlLine = {
       ...entry('2026-06-01', [['5000', 0, 100]])[0],
       ref_type: 'invoice',
@@ -245,8 +246,12 @@ describe('applyGlRefs', () => {
       description: 'Service billing revenue recognised',
     }
     const [enriched] = applyGlRefs([line], refs)
-    expect(enriched.description).toBe("HV-INV-202605-0044 · Salary - HR - May'26")
-    expect(enriched.party).toBe('HC')
+    expect(enriched).toMatchObject({
+      description: 'Service billing revenue recognised',
+      doc_text: "Salary - HR - May'26",
+      ref_no: 'HV-INV-202605-0044',
+      party: 'HC',
+    })
   })
 
   it('enriches voucher JEs with the payee, leaving the description alone', () => {

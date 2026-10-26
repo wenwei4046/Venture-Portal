@@ -45,7 +45,7 @@ function Statement({ title, label, range, note, columns, rows, monthly }: {
 }) {
   return (
     // L2 to begin with: the blocks and their categories, each opened by its ▶ (round 11).
-    <ReportSearchProvider level={2}>
+    <ReportSearchProvider level={2} levels={4}>
       <section className="mb-6">
         <div className="sect-head">
           <h2>{title}</h2>

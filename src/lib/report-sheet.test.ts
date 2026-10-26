@@ -172,7 +172,7 @@ describe('the single-month rows', () => {
     const rows = sheetFromBlocks(pnl, false)
     expect(rows[3].txns).toEqual([
       {
-        key: 'revenue:4100:t0', ref: 'HV-JV-202610-0012', date: '2026-10-05', text: 'Loan interest · HOUZS Century', value: 10,
+        key: 'revenue:4100:t0', ref: 'HV-JV-202610-0012', date: '2026-10-05', text: 'Loan interest', party: 'HOUZS Century', value: 10,
         debit: 0, credit: 10, otherSide: '3000 · Cash & Bank - Hong Leong', ref2: null,
       },
     ])

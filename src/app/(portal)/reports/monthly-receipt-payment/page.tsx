@@ -163,7 +163,8 @@ export default async function MonthlyReceiptPaymentPage({ searchParams }: Props)
         />
       </StatCards>
 
-      <ReportSearchProvider level={3}>
+      {/* L4: every cash row opened onto its lines (2026-10-26). */}
+      <ReportSearchProvider level={3} levels={4}>
         <section className="mb-6">
           <div className="sect-head">
             <h2>Monthly receipt &amp; payment</h2>

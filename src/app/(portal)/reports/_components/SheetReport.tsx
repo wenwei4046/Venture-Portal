@@ -1,11 +1,11 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import dayjs from 'dayjs'
 import { formatMoneyBare } from '@/lib/utils'
 import { matchesAccount } from '@/lib/report-search'
 import { rangeLabel } from '@/lib/report-range'
-import type { SheetColumn, SheetRow, SheetTxn } from '@/lib/report-sheet'
+import { drillRowKey, type SheetColumn, type SheetRow, type SheetTxn } from '@/lib/report-sheet'
 import type { MonthlyDrillAsk } from '../_lib/drill-reads'
 import type { MonthlyDrillAnswer } from '../drill-actions'
 import Highlight from './Highlight'
@@ -22,10 +22,13 @@ import { useReportSearch } from './ReportSearchProvider'
  * a match and the groups above it always show. Level and Find come from the
  * page's control row (ReportSearchProvider).
  *
- * An account opens on its whole row (2026-10-24, the user's drill-down — "我想要这样的概念", then "照样稿做，Monthly
- * 用 A"): a single month's (`drill`) onto its journal lines as a ledger — Date, Description, Other side, Ref. 1 (the
- * entry), Ref. 2 (the document), Debit, Credit, the count and totals under them with the General Ledger a click away;
- * a month-by-month sheet's (`monthly`) onto its months, read when it opens, each month onto its own lines.
+ * An account opens on its whole row (2026-10-24, the user's drill-down — "我想要这样的概念"): a single month's (`drill`)
+ * onto its journal lines as a ledger — Date, Description, Other side, Ref. 1 (the entry), Ref. 2 (the document),
+ * Debit, Credit, the count and totals under them with the General Ledger a click away. A month-by-month sheet's
+ * (`monthly`, 2026-10-26, the mockup's fifth round — "点开看 detail 可以那个 amount 在那个月份下面吗？… 然后加多一个 L4")
+ * onto its lines AS ROWS OF THE SHEET, newest first: "date · NAME · what it was · document", its figure in the
+ * Total and under its own month, a dash in the other months; read when it opens; L4 opens every account so, in one
+ * read, a click closing one.
  *
  * A department's page (`variant="dept"`, 2026-10-25, the mockup's rounds 11–12) dresses it as its charts: a block's
  * title carries its side's total, green or orange, at every level; a group keeps its figure on its own line (no
@@ -49,9 +52,10 @@ type Line =
   | { type: 'group' | 'item'; row: SheetRow; open: boolean; toggles: boolean }
   | { type: 'subtotal'; row: SheetRow }
   | { type: 'drill'; row: SheetRow }
+  | { type: 'lines'; row: SheetRow }
 
 /** A month-by-month account's lines, as far as they are read. */
-type Read = { state: 'reading' } | { state: 'failed'; reason: string } | { state: 'ready'; lines: SheetTxn[] }
+type Read = { state: 'failed'; reason: string } | { state: 'ready'; lines: SheetTxn[] }
 
 const INDENT = (depth: number) => (depth <= 1 ? 28 : 50 + (depth - 2) * 20)
 const MONTH = /^\d{4}-\d{2}$/
@@ -65,6 +69,21 @@ const monthEnd = (ym: string) => dayjs(`${ym}-01`).endOf('month').format('YYYY-M
 /** The General Ledger on this account over these days — a chart account only (not the bridge's IB-XFER / PY-XFER). */
 const ledgerHref = (code: string | undefined, from: string, to: string) =>
   code && /^\d/.test(code) ? `/reports/ledger?${new URLSearchParams({ codes: code, from, to }).toString()}` : null
+
+/** What a line was, its name first in bold (2026-10-26, the user: "先名字再到 description", "名字变粗体"). */
+function Said({ t, party, sep, text }: { t: SheetTxn; party: string; sep: string; text: string }) {
+  return (
+    <>
+      {t.party ? (
+        <>
+          <span className={party}>{t.party}</span>
+          {t.text ? <span className={sep}> · </span> : null}
+        </>
+      ) : null}
+      {t.text || !t.party ? <span className={text}>{t.text || '—'}</span> : null}
+    </>
+  )
+}
 
 /** "9 lines · Open in General Ledger ↗ · Oct 2026". */
 function Count({ n, href, label }: { n: number; href: string | null; label: string }) {
@@ -81,7 +100,7 @@ function Count({ n, href, label }: { n: number; href: string | null; label: stri
   )
 }
 
-/** One account's journal lines as a ledger. */
+/** One account's journal lines as a ledger (a single month's). */
 function DrillTable({ lines, href, label }: { lines: SheetTxn[]; href: string | null; label: string }) {
   return (
     <table className="sr-dl">
@@ -100,7 +119,9 @@ function DrillTable({ lines, href, label }: { lines: SheetTxn[]; href: string | 
         {lines.map((t) => (
           <tr key={t.key}>
             <td className="is-mono">{t.date}</td>
-            <td className="sr-dl-desc">{t.text || '—'}</td>
+            <td className="sr-dl-desc">
+              <Said t={t} party="sr-dl-party" sep="sr-dl-sep" text="sr-dl-text" />
+            </td>
             <td className="sr-dl-other">{t.otherSide ?? '—'}</td>
             <td className="is-mono">{t.ref || '—'}</td>
             <td className="is-mono">{t.ref2 ?? '—'}</td>
@@ -122,134 +143,14 @@ function DrillTable({ lines, href, label }: { lines: SheetTxn[]; href: string | 
   )
 }
 
-/** A month-by-month account opened (Monthly A): its months, latest first, each opening onto its lines. */
-function MonthList({
-  row,
-  columns,
-  read,
-  openMonths,
-  onMonth,
-  onRetry,
-}: {
-  row: SheetRow
-  columns: SheetColumn[]
-  read: Read | undefined
-  openMonths: ReadonlySet<string>
-  onMonth: (ym: string) => void
-  onRetry: () => void
-}) {
-  const months = columns
-    .map((c, i) => ({ key: c.key, label: c.label, value: row.values[i] ?? 0 }))
-    .filter((c) => MONTH.test(c.key))
-    .sort((a, b) => b.key.localeCompare(a.key))
-  const range = months.length > 0 ? rangeLabel(months[months.length - 1].key, months[0].key) : ''
-  const head = (
-    <div className="sr-drill-title">
-      <b>{row.label}</b> · {range} · month by month
-    </div>
-  )
-  if (!read || read.state === 'reading') {
-    return (
-      <>
-        {head}
-        <p className="sr-drill-note" role="status">
-          Reading the lines…
-        </p>
-      </>
-    )
-  }
-  if (read.state === 'failed') {
-    return (
-      <>
-        {head}
-        <p className="sr-drill-note is-error" role="alert">
-          {read.reason}{' '}
-          <button type="button" onClick={onRetry}>
-            Try again
-          </button>
-        </p>
-      </>
-    )
-  }
-  const listed = months
-    .map((m) => ({ ...m, lines: read.lines.filter((t) => t.date.startsWith(m.key)) }))
-    .filter((m) => m.lines.length > 0 || Math.abs(m.value) >= 0.005)
-  const acc = columns.findIndex((c) => c.key === 'acc')
-  const sum = acc >= 0 ? row.values[acc] ?? 0 : listed.reduce((s, m) => s + m.value, 0)
-  const count = listed.reduce((s, m) => s + m.lines.length, 0)
-  const first = months[months.length - 1]?.key
-  const last = months[0]?.key
-  return (
-    <>
-      {head}
-      <table className="sr-months">
-        {/* Fixed columns, so an opened month's ledger scrolls in its own box and never pushes the figures off a phone. */}
-        <colgroup>
-          <col />
-          <col className="is-count" />
-          <col className="is-value" />
-        </colgroup>
-        <tbody>
-          {listed.length === 0 ? (
-            <tr>
-              <td colSpan={3} className="sr-drill-note">
-                No lines in {range}.
-              </td>
-            </tr>
-          ) : null}
-          {listed.map((m) => {
-            const open = openMonths.has(`${row.key}|${m.key}`)
-            const opens = m.lines.length > 0
-            const name = (
-              <>
-                <span className="sr-chev" aria-hidden>
-                  {opens ? (open ? '▾' : '▸') : ''}
-                </span>
-                {m.label}
-              </>
-            )
-            return (
-              <Fragment key={m.key}>
-                <tr data-kind="month" className={opens ? 'can-open' : undefined} onClick={opens ? () => onMonth(m.key) : undefined}>
-                  <td className="sr-month-name">
-                    {opens ? (
-                      <button type="button" aria-expanded={open}>
-                        {name}
-                      </button>
-                    ) : (
-                      name
-                    )}
-                  </td>
-                  <td className="sr-month-count">
-                    {m.lines.length} {m.lines.length === 1 ? 'line' : 'lines'}
-                  </td>
-                  <td className={`is-mono is-num${m.value < 0 ? ' is-neg' : ''}`}>{money(m.value)}</td>
-                </tr>
-                {open ? (
-                  <tr className="sr-month-lines">
-                    <td colSpan={3}>
-                      <div className="sr-dl-scroll">
-                        <DrillTable lines={m.lines} href={ledgerHref(row.code, `${m.key}-01`, monthEnd(m.key))} label={m.label} />
-                      </div>
-                    </td>
-                  </tr>
-                ) : null}
-              </Fragment>
-            )
-          })}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={2}>
-              <Count n={count} href={first && last ? ledgerHref(row.code, `${first}-01`, monthEnd(last)) : null} label={range} />
-            </td>
-            <td className={`is-mono is-num${sum < 0 ? ' is-neg' : ''}`}>{money(sum)}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </>
-  )
-}
+/** A line's hover: who and what, the entry and the document, its other side, its debit and credit. */
+const hoverOf = (t: SheetTxn) =>
+  [
+    `${t.date} · ${[t.party, t.text].filter(Boolean).join(' · ') || '—'}`,
+    `Ref. 1 ${t.ref || '—'} · Ref. 2 ${t.ref2 ?? '—'}`,
+    `Other side ${t.otherSide ?? '—'}`,
+    `Debit ${formatMoneyBare(t.debit)} · Credit ${formatMoneyBare(t.credit)}`,
+  ].join('\n')
 
 export default function SheetReport({
   columns,
@@ -268,7 +169,7 @@ export default function SheetReport({
   drill?: boolean
   /** That month, 'YYYY-MM' — the lines' General Ledger link and label. */
   drillMonth?: string
-  /** A month-by-month sheet: an account opens onto its months, read when it opens. */
+  /** A month-by-month sheet: an account opens onto its lines as rows of the sheet, read when it opens. */
   monthly?: MonthlyDrill
   /** A department's page: its charts' dress (see above). */
   variant?: 'dept'
@@ -280,6 +181,8 @@ export default function SheetReport({
   const setHitCount = ctx?.setHitCount
   const jump = ctx?.jump ?? 0
   const inline = variant === 'dept'
+  // L3 and L4 open every group (L4 every account onto its lines too).
+  const deep = level >= 3
   // The groups turned by hand: closed ones on Reports (L3 opens them all); on a department's page, at the level
   // they were turned at — L2 opens, L3 closes, a new level starts afresh.
   const [closed, setClosed] = useState<{ level: number; keys: ReadonlySet<string> }>(() => ({ level, keys: NONE }))
@@ -292,23 +195,22 @@ export default function SheetReport({
   const lastMonth = monthKeys.length > 0 ? monthKeys.reduce((a, b) => (b > a ? b : a)) : null
   // What an opened account belongs to: another period or segment starts the sheet folded again, and reads afresh.
   const scope = monthly ? `${monthly.report}|${monthly.segment}|${firstMonth}|${lastMonth}` : (drillMonth ?? '')
-  const [opened, setOpened] = useState<{ scope: string; rows: ReadonlySet<string>; months: ReadonlySet<string> }>(() => ({ scope, rows: NONE, months: NONE }))
+  // The accounts turned by hand, at the level they were turned at: below L4 the ones opened, at L4 the ones closed.
+  const [opened, setOpened] = useState<{ scope: string; level: number; rows: ReadonlySet<string> }>(() => ({ scope, level, rows: NONE }))
   const [reads, setReads] = useState<{ scope: string; byRow: Readonly<Record<string, Read>> }>(() => ({ scope, byRow: {} }))
-  const openRows = opened.scope === scope ? opened.rows : NONE
-  const openMonths = opened.scope === scope ? opened.months : NONE
+  const handled = opened.scope === scope && opened.level === level ? opened.rows : NONE
   const readOf = (key: string): Read | undefined => (reads.scope === scope ? reads.byRow[key] : undefined)
 
-  // An opened account's ledger keeps to the width on screen, however wide the months make the sheet.
+  // A single month's ledger keeps to the width on screen, however wide the columns make the sheet.
   const wrap = useRef<HTMLDivElement>(null)
   const [boxWidth, setBoxWidth] = useState<number | null>(null)
-  const drills = drill || !!monthly
   useEffect(() => {
     const el = wrap.current
-    if (!drills || !el || typeof ResizeObserver === 'undefined') return
+    if (!drill || !el || typeof ResizeObserver === 'undefined') return
     const watch = new ResizeObserver(() => setBoxWidth(Math.floor(el.clientWidth)))
     watch.observe(el)
     return () => watch.disconnect()
-  }, [drills])
+  }, [drill])
 
   // Find: the matching accounts, and every group above one (forced open).
   const { hits, hitOrder, forced } = useMemo(() => {
@@ -340,12 +242,17 @@ export default function SheetReport({
   }, [activeKey, jump])
 
   // Which accounts open: a single month's with lines; a month-by-month sheet's leaf accounts — any on the P&L, the
-  // cash rows on the Cash Flow and Receipt & Payment (never the receivables under them).
-  const { monthlyOpens, opens } = useMemo(() => {
+  // cash rows on the Cash Flow and Receipt & Payment (never the receivables under them) — and whether one is open:
+  // at L4 unless closed by hand, below it when opened by hand.
+  const { monthlyOpens, opens, isOpen } = useMemo(() => {
     const monthlyOpens = (r: SheetRow) =>
       !!monthly && !!firstMonth && r.kind === 'account' && !r.isParent && !!r.code && (monthly.report === 'pnl' || /^(in|out):/.test(r.key))
-    return { monthlyOpens, opens: (r: SheetRow) => (drill && !r.isParent && !!r.txns?.length) || monthlyOpens(r) }
-  }, [drill, monthly, firstMonth])
+    return {
+      monthlyOpens,
+      opens: (r: SheetRow) => (drill && !r.isParent && !!r.txns?.length) || monthlyOpens(r),
+      isOpen: (r: SheetRow) => (monthlyOpens(r) && level === 4 ? !handled.has(r.key) : handled.has(r.key)),
+    }
+  }, [drill, monthly, firstMonth, level, handled])
 
   // What is on screen, in order: a group's Subtotal follows its last item; an opened account's lines follow it.
   const lines = useMemo(() => {
@@ -369,18 +276,18 @@ export default function SheetReport({
       const parent = stack[stack.length - 1]
       const onPath = hits.has(r.key) || forced.has(r.key)
       const shown = parent ? parent.shown && parent.open : level >= 2 || onPath
-      const byHand = inline ? level >= 2 && (level === 3) !== turned.has(r.key) : level === 3 && !turned.has(r.key)
+      const byHand = inline ? level >= 2 && deep !== turned.has(r.key) : deep && !turned.has(r.key)
       const open = !!r.isParent && (forced.has(r.key) || byHand)
       if (shown) {
         const drills = opens(r)
-        out.push({ type: r.depth <= 1 ? 'group' : 'item', row: r, open, toggles: (!!r.isParent && (inline ? level >= 2 : level === 3)) || drills })
-        if (drills && openRows.has(r.key)) out.push({ type: 'drill', row: r })
+        out.push({ type: r.depth <= 1 ? 'group' : 'item', row: r, open, toggles: (!!r.isParent && (inline ? level >= 2 : deep)) || drills })
+        if (drills && isOpen(r)) out.push({ type: monthlyOpens(r) ? 'lines' : 'drill', row: r })
       }
       stack.push({ row: r, open, shown })
     }
     flush(0)
     return out
-  }, [rows, level, inline, turned, openRows, hits, forced, opens])
+  }, [rows, level, inline, deep, turned, hits, forced, opens, isOpen, monthlyOpens])
 
   const flip = (set: ReadonlySet<string>, key: string): Set<string> => {
     const next = new Set(set)
@@ -389,26 +296,48 @@ export default function SheetReport({
     return next
   }
 
-  // A month-by-month account's lines, read for the sheet's months; an answer for another period is dropped.
-  const readRow = (r: SheetRow) => {
-    if (!monthly || !r.code || !firstMonth || !lastMonth) return
-    const at = scope
-    const put = (read: Read) => setReads((prev) => (prev.scope === at ? { scope: at, byRow: { ...prev.byRow, [r.key]: read } } : prev))
-    setReads((prev) => ({ scope: at, byRow: { ...(prev.scope === at ? prev.byRow : {}), [r.key]: { state: 'reading' } } }))
-    const side = monthly.report === 'pnl' ? null : r.key.startsWith('in:') ? 'in' : 'out'
-    monthly
-      .open({ report: monthly.report, segment: monthly.segment, from: firstMonth, to: lastMonth, code: r.code, side })
-      .then((answer) => put(answer.ok ? { state: 'ready', lines: answer.lines } : { state: 'failed', reason: answer.reason || NOT_READ }))
-      .catch(() => put({ state: 'failed', reason: NOT_READ }))
-  }
+  // The opened accounts' lines, read for the sheet's months — every one on show and not read yet in ONE ask (L4 asks
+  // for them all); an answer for another period or segment is dropped.
+  const asking = useRef(new Set<string>())
+  const unread = useMemo(
+    () => lines.flatMap((l) => (l.type === 'lines' && !(reads.scope === scope && reads.byRow[l.row.key]) ? [l.row] : [])),
+    [lines, reads, scope],
+  )
+  const readRows = useCallback(
+    (want: SheetRow[]) => {
+      if (!monthly || !firstMonth || !lastMonth) return
+      const at = scope
+      const sideOf = (r: SheetRow) => (monthly.report === 'pnl' ? null : r.key.startsWith('in:') ? ('in' as const) : ('out' as const))
+      const put = (byRow: Record<string, Read>) =>
+        setReads((prev) => (prev.scope === at ? { scope: at, byRow: { ...prev.byRow, ...byRow } } : { scope: at, byRow }))
+      const each = (answerOf: (r: SheetRow) => Read) => Object.fromEntries(want.map((r) => [r.key, answerOf(r)]))
+      monthly
+        .open({ report: monthly.report, segment: monthly.segment, from: firstMonth, to: lastMonth, rows: want.map((r) => ({ code: r.code ?? '', side: sideOf(r) })) })
+        .then((answer) =>
+          put(each((r) => (answer.ok ? { state: 'ready', lines: answer.lines[drillRowKey(r.code ?? '', sideOf(r))] ?? [] } : { state: 'failed', reason: answer.reason || NOT_READ }))),
+        )
+        .catch(() => put(each(() => ({ state: 'failed', reason: NOT_READ }))))
+        .finally(() => {
+          for (const r of want) asking.current.delete(`${at}|${r.key}`)
+        })
+    },
+    [monthly, scope, firstMonth, lastMonth],
+  )
+  useEffect(() => {
+    const want = unread.filter((r) => !asking.current.has(`${scope}|${r.key}`))
+    if (want.length === 0) return
+    for (const r of want) asking.current.add(`${scope}|${r.key}`)
+    readRows(want)
+  }, [unread, scope, readRows])
+  // Try again: the row's failure forgotten, so it is read afresh.
+  const retry = (r: SheetRow) =>
+    setReads((prev) => {
+      const byRow = { ...prev.byRow }
+      delete byRow[r.key]
+      return { ...prev, byRow }
+    })
 
-  const toggleRow = (r: SheetRow) => {
-    const rowsOpen = flip(openRows, r.key)
-    setOpened({ scope, rows: rowsOpen, months: openMonths })
-    const read = readOf(r.key)
-    if (rowsOpen.has(r.key) && monthlyOpens(r) && (!read || read.state === 'failed')) readRow(r)
-  }
-  const toggleMonth = (r: SheetRow, ym: string) => setOpened({ scope, rows: openRows, months: flip(openMonths, `${r.key}|${ym}`) })
+  const toggleRow = (r: SheetRow) => setOpened({ scope, level, rows: flip(handled, r.key) })
 
   // The column's own wash: the month still running, or the Accumulated (a department's Total).
   const tone = (i: number) => (columns[i]?.tone === 'now' ? ' is-now' : columns[i]?.tone === 'acc' ? ' is-acc' : '')
@@ -441,11 +370,27 @@ export default function SheetReport({
         {showPct ? values ? pct(values[i] ?? 0, i, row) : <td className={`sr-pct${tone(i)}`} /> : null}
       </Fragment>
     ))
+  // A line's cells: its figure in the Total and under its own month, a dash elsewhere, no %.
+  const lineCells = (t: SheetTxn, sign: number) =>
+    columns.map((c, i) => (
+      <Fragment key={c.key}>
+        {c.key === 'acc' || t.date.startsWith(c.key) ? fig(t.value * sign, i) : <td className={`sr-num is-nil${tone(i)}`}>—</td>}
+        {showPct ? <td className={`sr-pct${tone(i)}`} /> : null}
+      </Fragment>
+    ))
+  const empty = () =>
+    columns.map((c, i) => (
+      <Fragment key={c.key}>
+        <td className={`sr-num${tone(i)}`} />
+        {showPct ? <td className={`sr-pct${tone(i)}`} /> : null}
+      </Fragment>
+    ))
   const span = 1 + columns.length * (showPct ? 2 : 1)
   const sideOf = (r: SheetRow) => (r.side ? ` is-${r.side}` : '')
+  const anyLines = lines.some((l) => l.type === 'lines')
 
   return (
-    <div className={`sheet-rpt${inline ? ' is-dept' : ''}`} ref={wrap}>
+    <div className={`sheet-rpt${inline ? ' is-dept' : ''}${anyLines ? ' has-lines' : ''}`} ref={wrap}>
       <table>
         <thead>
           <tr>
@@ -503,30 +448,77 @@ export default function SheetReport({
                 <tr key={`${r.key}:drill`} data-kind="drill" className="sr-drill">
                   <td colSpan={span}>
                     <div className="sr-drill-box" style={boxWidth ? { width: boxWidth } : undefined}>
-                      {monthly ? (
-                        <MonthList
-                          row={r}
-                          columns={columns}
-                          read={readOf(r.key)}
-                          openMonths={openMonths}
-                          onMonth={(ym) => toggleMonth(r, ym)}
-                          onRetry={() => readRow(r)}
-                        />
-                      ) : (
-                        <DrillTable
-                          lines={r.txns ?? []}
-                          href={drillMonth ? ledgerHref(r.code, `${drillMonth}-01`, monthEnd(drillMonth)) : null}
-                          label={drillMonth ? rangeLabel(drillMonth, drillMonth) : columns[0]?.label ?? ''}
-                        />
-                      )}
+                      <DrillTable
+                        lines={r.txns ?? []}
+                        href={drillMonth ? ledgerHref(r.code, `${drillMonth}-01`, monthEnd(drillMonth)) : null}
+                        label={drillMonth ? rangeLabel(drillMonth, drillMonth) : columns[0]?.label ?? ''}
+                      />
                     </div>
                   </td>
                 </tr>
               )
             }
+            if (l.type === 'lines') {
+              const r = l.row
+              const read = readOf(r.key)
+              // The lines sit one level in; a phone gives them the whole narrow column (CSS).
+              const pad = { ['--ln-indent' as string]: `${INDENT(r.depth + 1)}px` } as CSSProperties
+              if (!read) {
+                return (
+                  <tr key={`${r.key}:reading`} data-kind="line-note" className="sr-ln-foot">
+                    <td className="sr-label sr-ln-label" style={pad} role="status">
+                      Reading the lines…
+                    </td>
+                    {empty()}
+                  </tr>
+                )
+              }
+              if (read.state === 'failed') {
+                return (
+                  <tr key={`${r.key}:failed`} data-kind="line-note" className="sr-ln-foot is-error">
+                    <td className="sr-label sr-ln-label" style={pad} role="alert">
+                      {read.reason}{' '}
+                      <button type="button" onClick={() => retry(r)}>
+                        Try again
+                      </button>
+                    </td>
+                    {empty()}
+                  </tr>
+                )
+              }
+              // On a department's page money out reads positive; its lines with it.
+              const sign = inline && r.side === 'out' ? -1 : 1
+              const href = firstMonth && lastMonth ? ledgerHref(r.code, `${firstMonth}-01`, monthEnd(lastMonth)) : null
+              return (
+                <Fragment key={`${r.key}:lines`}>
+                  {/* Newest first, as the months run. */}
+                  {[...read.lines].reverse().map((t) => {
+                    const doc = t.ref2 ?? (t.ref || null)
+                    return (
+                      <tr key={t.key} data-kind="line" className="sr-ln" title={hoverOf(t)}>
+                        <td className="sr-label sr-ln-label" style={pad}>
+                          <span className="sr-ln-date">{t.date}</span>
+                          <span className="sr-ln-text">
+                            <Said t={t} party="sr-ln-party" sep="sr-ln-sep" text="sr-ln-desc" />
+                          </span>
+                          {doc ? <span className="sr-ln-ref">{doc}</span> : null}
+                        </td>
+                        {lineCells(t, sign)}
+                      </tr>
+                    )
+                  })}
+                  <tr data-kind="line-foot" className="sr-ln-foot">
+                    <td className="sr-label sr-ln-label" style={pad}>
+                      <Count n={read.lines.length} href={href} label={firstMonth && lastMonth ? rangeLabel(firstMonth, lastMonth) : ''} />
+                    </td>
+                    {empty()}
+                  </tr>
+                </Fragment>
+              )
+            }
             const r = l.row
             const drills = opens(r)
-            const expanded = drills ? openRows.has(r.key) : l.open
+            const expanded = drills ? isOpen(r) : l.open
             const arrow = !l.toggles ? '' : drills ? (expanded ? '▾' : '▸') : expanded ? '▼' : '▶'
             const label = (
               <>
@@ -537,7 +529,7 @@ export default function SheetReport({
                 <Highlight text={r.label} query={search} />
               </>
             )
-            const mark = `${hits.has(r.key) ? ' is-hit' : ''}${activeKey === r.key ? ' is-active' : ''}${drills ? ' can-open' : ''}${sideOf(r)}`
+            const mark = `${hits.has(r.key) ? ' is-hit' : ''}${activeKey === r.key ? ' is-active' : ''}${drills ? ' can-open' : ''}${drills && expanded ? ' is-opened' : ''}${sideOf(r)}`
             return (
               <tr
                 key={r.key}

@@ -53,7 +53,8 @@ export default function MonthlyCashFlowBody({
         <StatCard label="Closing cash" value={formatMoney(pick(data.closingByCol, 'CLOSING_CASH'))} icon="bank" tone="primary" note="End of period" />
       </StatCards>
 
-      <ReportSearchProvider level={3}>
+      {/* L4 where the accounts open onto their lines (2026-10-26). */}
+      <ReportSearchProvider level={3} levels={drill ? 4 : 3}>
         <section className="mb-6">
           <div className="sect-head">
             <h2>Monthly cash flow</h2>

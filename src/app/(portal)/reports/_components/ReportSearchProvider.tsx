@@ -24,15 +24,20 @@ interface ReportSearchValue {
   jump: number
   /** The detail level, when the page's control row holds it (2026-10-09, the
    *  Finance revamp handoff); null = no level buttons, the sheet opens at L3. */
-  level: 1 | 2 | 3 | null
-  setLevel: (level: 1 | 2 | 3) => void
+  level: ReportLevel | null
+  setLevel: (level: ReportLevel) => void
+  /** The deepest level the row offers: L4 (2026-10-26) where the accounts open
+   *  onto their lines — a month-by-month sheet — every one opened so. */
+  levels: 3 | 4
 }
+
+export type ReportLevel = 1 | 2 | 3 | 4
 
 const Ctx = createContext<ReportSearchValue | null>(null)
 
-export function ReportSearchProvider({ children, level: initialLevel }: { children: React.ReactNode; level?: 1 | 2 | 3 }) {
-  const [level, setLevelRaw] = useState<1 | 2 | 3 | null>(initialLevel ?? null)
-  const setLevel = useCallback((l: 1 | 2 | 3) => setLevelRaw(l), [])
+export function ReportSearchProvider({ children, level: initialLevel, levels = 3 }: { children: React.ReactNode; level?: 1 | 2 | 3; levels?: 3 | 4 }) {
+  const [level, setLevelRaw] = useState<ReportLevel | null>(initialLevel ?? null)
+  const setLevel = useCallback((l: ReportLevel) => setLevelRaw(l), [])
   const [search, setSearchRaw] = useState('')
   const [hitCount, setHitCount] = useState(0)
   const [activeHit, setActiveHit] = useState(0)
@@ -55,8 +60,8 @@ export function ReportSearchProvider({ children, level: initialLevel }: { childr
   )
 
   const value = useMemo(
-    () => ({ search, setSearch, hitCount, setHitCount, activeHit, step, jump, level, setLevel }),
-    [search, setSearch, hitCount, activeHit, step, jump, level, setLevel],
+    () => ({ search, setSearch, hitCount, setHitCount, activeHit, step, jump, level, setLevel, levels }),
+    [search, setSearch, hitCount, activeHit, step, jump, level, setLevel, levels],
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

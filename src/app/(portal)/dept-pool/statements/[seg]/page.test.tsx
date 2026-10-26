@@ -186,7 +186,7 @@ describe('a department’s own P&L under Dept Pool', () => {
   it('opens an account onto the department’s own lines', async () => {
     render(await page('marketing', { view: 'pnl' }))
     fireEvent.click(screen.getByRole('button', { name: /Service fees/ }))
-    expect(mocks.openDeptPoolRow).toHaveBeenCalledWith({ report: 'pnl', segment: 'marketing', from: '2026-07', to: '2026-10', code: '4000', side: null })
+    expect(mocks.openDeptPoolRow).toHaveBeenCalledWith({ report: 'pnl', segment: 'marketing', from: '2026-07', to: '2026-10', rows: [{ code: '4000', side: null }] })
   })
 })
 
