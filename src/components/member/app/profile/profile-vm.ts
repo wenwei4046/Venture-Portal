@@ -165,8 +165,9 @@ export interface TeamLevelVM {
   /** Peers, drawn side by side: every director of the sub-department shares one level. */
   nodes: TeamNodeVM[];
 }
+/** Somebody below the member, with their own people — every level down (2026-10-27). */
 export interface TeamKidVM extends TeamNodeVM {
-  kids: TeamNodeVM[];
+  kids: TeamKidVM[];
 }
 export interface PersonSheetVM {
   name: string;
