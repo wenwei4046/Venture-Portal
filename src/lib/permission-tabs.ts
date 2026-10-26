@@ -35,7 +35,7 @@ import {
   type SensitiveField,
 } from '@/lib/permission-matrix'
 
-export type TabView = 'hr' | 'fin' | 'pri' | 'dept' | 'mkt' | 'rev'
+export type TabView = 'hr' | 'fin' | 'pri' | 'dept' | 'mkt' | 'rev' | 'lead'
 export type TabAction = 'view' | 'create' | 'edit' | 'approve'
 /** `fn.action` — a cell of the function matrix. */
 export type FnAction = `${FunctionKey}.${Action}`
@@ -52,6 +52,8 @@ export const TAB_VIEWS: ReadonlyArray<{ id: TabView; label: string; reach: Scope
   // is the department's, so its reach is the company's.
   { id: 'mkt', label: 'Marketing view', reach: 'all' },
   { id: 'rev', label: 'Revenue app', reach: 'own' },
+  // Lead View (2026-10-16): Customer Service's inbox — every brand's enquiries are the company's.
+  { id: 'lead', label: 'Lead View', reach: 'all' },
 ]
 
 export interface PermissionTab {
@@ -94,6 +96,7 @@ const REVENUE_APP_SENDS: Opens = { view: ['revenue_app.view'], create: ['revenue
 const HIRING: Opens = { view: ['hiring.view'], create: ['hiring.create'], edit: ['hiring.edit'], approve: ['hiring.approve'] }
 const ROOMS: Opens = { view: ['rooms.view'], create: ['rooms.create'], edit: ['rooms.edit'] }
 const ROOMS_KEYS = ['meeting_rooms', 'meeting_rooms_manage']
+const LEADS_KEYS = ['leads']
 // One's own claims (the Department view's, and Marketing's since 2026-10-23).
 const MY_CLAIMS: Opens = { view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'] }
 // Marketing's own view (mig 20261023214000): its pages read with View; Create starts a project; Edit works the stages
@@ -255,6 +258,30 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // IT support's desk (2026-10-20, mig 20261021020000): everybody's IT requests — read them; write notes, set their status.
   // Sending one and following one's own need no box (open to all, as Memos).
   tab('rev', 'it_requests', 'IT requests', ['it_requests'], { view: ['it_requests.view'], edit: ['it_requests.edit'] }, 'all'),
+
+  // ── Lead View (2026-10-16, mig 20261016300000): one tab a page ──
+  tab('lead', 'inbox', 'Inbox', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.edit'] }),
+  tab('lead', 'leads', 'Leads', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.edit'] }),
+  tab('lead', 'insight', 'Insight', LEADS_KEYS, { view: ['leads.view'] }),
+  // Campaigns (mig 20261016340000): a brand's message to many customers — sent and scheduled with Manage, by its Edit.
+  tab('lead', 'campaigns', 'Campaigns', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // Flows (phase 2, mig 20261016310000): the button flows, set up as Settings is (Manage, with its Edit).
+  tab('lead', 'flows', 'Reply templates', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // Reply rules and the Step library (redesign v2 step 4, mig 20261023100010): set up as Settings is (Manage, with its Edit).
+  tab('lead', 'rules', 'Reply rules', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  tab('lead', 'library', 'Step library', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // AI Agent and its Data Center (mig 20261016330000): the soul and the cards it may quote, set up as Settings is.
+  tab('lead', 'ai', 'AI Agent', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  tab('lead', 'knowledge', 'Data Center', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // AI corrections (redesign v2 step 5, mig 20261023200000): the drafts CS changed; a fixed answer saved with Manage.
+  tab('lead', 'corrections', 'AI corrections', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // General info and Business hours (redesign v2 step 3, mig 20261022230000): set up as Settings is (Manage, with its Edit).
+  tab('lead', 'info', 'General info', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  tab('lead', 'hours', 'Business hours', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // Audit log (redesign v2 step 6, mig 20261023400000): Lead View's own history, read through audit_changes(); nothing to write.
+  tab('lead', 'audit', 'Audit log', LEADS_KEYS, { view: ['leads.view'] }),
+  // Settings: the brands and their salespeople (Manage, with its Edit), and the test enquiry (Create).
+  tab('lead', 'settings', 'Settings', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.manage'] }),
 ]
 
 export const TAB_BY_ID: ReadonlyMap<string, PermissionTab> = new Map(PERMISSION_TABS.map(t => [t.id, t]))

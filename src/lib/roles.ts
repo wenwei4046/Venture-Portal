@@ -161,6 +161,11 @@ export function canAccessAttendance(u: PermissionHolder): boolean {
   return can(u, 'attendance')
 }
 
+/** Lead View (2026-10-16): Customer Service's inbox for the brands' enquiries. */
+export function canAccessLeads(u: PermissionHolder): boolean {
+  return can(u, 'leads')
+}
+
 export function canAccessGuestLink(u: PermissionHolder): boolean {
   return can(u, 'guest_link')
 }

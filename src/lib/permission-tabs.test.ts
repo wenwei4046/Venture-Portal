@@ -115,7 +115,8 @@ describe('moving the templates onto tabs loses nothing', () => {
   })
 
   it('puts each template in the views its pages are in — the company-wide ones out of the Department view', () => {
-    expect(views(moved('full'))).toEqual(['hr', 'fin', 'pri', 'mkt', 'rev'])
+    // Full access holds Lead View whole (mig 20261016300000).
+    expect(views(moved('full'))).toEqual(['hr', 'fin', 'pri', 'mkt', 'rev', 'lead'])
     // Marketing's two templates (2026-10-23): worked out from their cells, Staff · Basic's claims and rooms tick the
     // Department view's tabs beside Marketing's (one reach, side by side) — so the migration stores their ticks.
     expect(views(moved('mkt_staff'))).toEqual(['dept', 'mkt'])

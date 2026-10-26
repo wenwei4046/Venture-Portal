@@ -103,6 +103,21 @@ export const PAGE_TABS = {
   '/attendance/close': ['hr.att_close'],
   '/attendance/settings': ['hr.att_settings'],
   '/attendance/readiness': ['hr.att_ready'],
+  // Lead View (2026-10-16): one tab a page.
+  '/leads': ['lead.inbox'],
+  '/leads/list': ['lead.leads'],
+  '/leads/insight': ['lead.insight'],
+  '/leads/campaigns': ['lead.campaigns'],
+  '/leads/flows': ['lead.flows'],
+  '/leads/rules': ['lead.rules'],
+  '/leads/library': ['lead.library'],
+  '/leads/ai': ['lead.ai'],
+  '/leads/knowledge': ['lead.knowledge'],
+  '/leads/corrections': ['lead.corrections'],
+  '/leads/info': ['lead.info'],
+  '/leads/hours': ['lead.hours'],
+  '/leads/audit': ['lead.audit'],
+  '/leads/settings': ['lead.settings'],
   // Changes: what it shows follows the reader's other boxes (each view's Audit Log).
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],
   // Admin › Meeting Rooms (2026-10-11): every view books a room.

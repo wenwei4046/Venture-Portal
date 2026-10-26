@@ -21,6 +21,8 @@ import RouteFreshener from './RouteFreshener'
 import HrSidebar from './HrSidebar'
 import HrTopBar from './HrTopBar'
 import FinSidebar from './FinSidebar'
+import LeadShell from './LeadShell'
+import { isLeadViewPath } from './lead-nav'
 import ViewingAsBanner from './ViewingAsBanner'
 import { isHrView } from '@/lib/hr-view'
 import { lensNav } from '@/lib/view-as'
@@ -70,7 +72,9 @@ export default function PortalFrame({
   // switcher on its head picks it; the layout's cookie covers every other page).
   const navData = useMemo(() => withPathRevenueSub(layoutNav, pathname ?? ''), [layoutNav, pathname])
   // HR's view (2026-10-10, the HR revamp handoff): its own shell.
-  const hr = isHrView(user.role)
+  // Lead View (2026-10-16): its pages draw its own shell, whatever view the account is in.
+  const lead = isLeadViewPath(pathname)
+  const hr = isHrView(user.role) && !lead
   const wide = pathname?.startsWith('/reports/monthly-') ?? false
   // The white sheet (DESIGN.md › "Sheet theme"): HR's pages sit on one rounded
   // panel in the Comm Cal month's tone, the shell around it unchanged. Drawn
@@ -89,8 +93,8 @@ export default function PortalFrame({
   // Marketing's own shell (2026-10-23, the handoff "HOUZS Marketing Module Setup"): the Principal's Marketing lens
   // and an account whose template opens Marketing's view (lib/marketing-view.ts) — on a computer; a phone keeps the
   // portal's phone shell until Marketing's app is made.
-  const mkt = isMarketingView(user) && !phone
-  const finShell = !hr && !mkt && isFinanceShell(user) && !phone
+  const mkt = !lead && isMarketingView(user) && !phone
+  const finShell = !hr && !lead && !mkt && isFinanceShell(user) && !phone
   const principalShell = finShell && isPrincipalView(user)
   const mainRef = useRef<HTMLElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
@@ -126,6 +130,24 @@ export default function PortalFrame({
   // The menus of HR's / Finance's view list that view's tabs (2026-10-11): the
   // view is a lens over the account's own power, which still opens every page.
   const navUser = useMemo(() => lensNav(user), [user])
+
+  if (lead) {
+    // Lead View's own shell (2026-10-22, the redesign v2 handoff): the dark sidebar and its top bar, its theme and
+    // faces. On a phone the portal's top bar and tab bar, as every view.
+    return (
+      <>
+        <div className="print:hidden contents md:hidden">
+          <TopBar user={user} fin={false} />
+        </div>
+        <LeadShell user={user} initialCollapsed={hrNavCollapsed}>{children}</LeadShell>
+        <BottomTabBar role={user.role} viewer={navUser} moreOpen={moreOpen} onMoreClick={() => setMoreOpen((o) => !o)} fin={false} />
+        <MoreSheet user={navUser} navData={navData} open={moreOpen} onClose={() => setMoreOpen(false)} push={push} />
+        <Suspense fallback={null}>
+          <RouteFreshener />
+        </Suspense>
+      </>
+    )
+  }
 
   if (mkt) {
     return (

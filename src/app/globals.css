@@ -7601,6 +7601,71 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
   [data-me] *, [data-me] *::before, [data-me] *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   LEAD VIEW — the third theme (2026-10-22, the redesign v2 handoff
+   `docs/design_handoff_lead_view_inbox`; DESIGN.md › Three views, one system).
+   Customer Service's inbox: a dark walnut sidebar, a warm paper page, Lora for
+   every word and Cormorant Garamond for titles. Drawn by LeadShell on
+   `[data-lead-view]`, which also carries the two faces (lead-fonts.ts), so
+   nothing outside Lead View reads these. Light in either mode, as the sheet.
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-lead-view] {
+  color-scheme: light;
+  --lv-font: var(--font-lora), 'Lora', var(--font-cjk), serif;
+  --lv-font-title: var(--font-cormorant), 'Cormorant Garamond', var(--font-lora), var(--font-cjk), serif;
+  --lv-ink: 43 33 28;
+  --lv-page: 243 240 236;
+  --lv-white: 255 255 255;
+  --lv-hair: 235 230 224;
+  --lv-border: 230 224 217;
+  --lv-frame: 218 210 200;
+  --lv-muted: 242 238 233;
+  --lv-hover: 246 243 239;
+  --lv-chat: 248 246 243;
+  --lv-chat-head: 250 248 245;
+  --lv-text-2: 88 76 68;
+  --lv-text-3: 104 92 84;
+  --lv-text-4: 120 108 100;
+  --lv-text-5: 150 140 130;
+  --lv-accent: 199 111 70;
+  --lv-accent-text: 176 92 54;
+  --lv-tint: 252 240 232;
+  --lv-tint-2: 246 240 232;
+  --lv-cream: 240 226 206;
+  --lv-out: 250 234 224;
+  --lv-out-edge: 240 208 190;
+  --lv-green: 76 110 80;
+  --lv-green-bg: 230 240 231;
+  /* Insight's second series (the handoff's "sand": phones, templates). */
+  --lv-sage: 141 165 143;
+  --lv-amber: 214 150 40;
+  --lv-amber-bg: 249 238 214;
+  --lv-amber-text: 110 74 10;
+  --lv-red: 168 60 40;
+  --lv-red-bg: 250 232 226;
+  --lv-nav: 46 33 26;
+  --lv-nav-text: 255 244 235;
+  --lv-nav-hover: 244 212 166;
+  --lv-nav-count: 177 165 107;
+  --lv-avatar: 140 6 16;
+  --lv-shadow-card: 0 1px 2px rgb(43 33 28 / 0.05);
+  --lv-shadow-menu: 0 10px 28px rgb(43 33 28 / 0.16);
+  font-family: var(--lv-font);
+  color: rgb(var(--lv-ink));
+  background: rgb(var(--lv-page));
+}
+[data-lead-view] :is(button, input, textarea, select):focus-visible {
+  outline: 2px solid rgb(var(--lv-accent));
+  outline-offset: 1px;
+}
+
+/* Lead View › Reply templates (step 4): the step types' colours the canvas strokes its cards and lines with. */
+[data-lead-view] {
+  --lv-k-text: 74 104 140;
+  --lv-k-msg: 128 104 62;
+  --lv-k-ai: 150 84 48;
+}
+
 /* ── Marketing's view (2026-10-23, the Claude Design handoff "HOUZS Marketing Module Setup", `.design/marketing`) ──
    Its own shell and pages, drawn light whatever the theme, as the prototype draws them (DESIGN.md › Marketing's view).
    Channels (`r g b`), so a page writes rgb(var(--mk-ink)) or rgb(var(--mk-ink) / .04). */

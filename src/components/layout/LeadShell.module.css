@@ -1,0 +1,207 @@
+/* Lead View's shell (2026-10-22, the redesign v2 handoff — `Inbox v2.dc.html`'s aside and header, value for value). */
+
+.root {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+/* ── The sidebar ── */
+.nav {
+  flex: none;
+  width: 216px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  overflow: hidden auto;
+  scrollbar-width: none;
+  background: rgb(var(--lv-nav));
+  color: rgb(var(--lv-white));
+  transition: width 0.18s;
+}
+.nav[data-collapsed] { width: 62px; }
+@media (max-width: 767px) { .nav { display: none; } }
+
+.brand { display: flex; align-items: center; gap: 9px; padding: 2px 6px 8px; }
+.logo {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: rgb(var(--lv-accent));
+  color: rgb(var(--lv-white));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+}
+.brandText, .meText { display: flex; flex-direction: column; gap: 1px; white-space: nowrap; transition: opacity 0.18s; }
+.brandName { font-weight: 600; font-size: 14px; }
+.brandSub, .meSub { font-size: 12px; color: rgb(var(--lv-nav-text) / 0.55); }
+
+.group { display: flex; flex-direction: column; gap: 1px; }
+.groupLabel {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: rgb(var(--lv-nav-text) / 0.45);
+  padding: 10px 10px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.18s;
+}
+.group:nth-of-type(2) .groupLabel { padding-top: 12px; }
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgb(var(--lv-nav-text) / 0.72);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+.item:hover { background: rgb(var(--lv-nav-text) / 0.08); color: rgb(var(--lv-nav-hover)); text-decoration: none; }
+.item[aria-current='page'] {
+  background: rgb(var(--lv-white) / 0.08);
+  box-shadow: inset 3px 0 0 rgb(var(--lv-accent));
+  color: rgb(var(--lv-white));
+  font-weight: 600;
+}
+.item[aria-disabled='true'] { cursor: default; color: rgb(var(--lv-nav-text) / 0.38); }
+.item[aria-disabled='true']:hover { background: transparent; color: rgb(var(--lv-nav-text) / 0.38); }
+.itemLabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; transition: opacity 0.18s; }
+.soon {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgb(var(--lv-nav-text) / 0.2);
+  color: rgb(var(--lv-nav-text) / 0.45);
+  transition: opacity 0.18s;
+}
+.spacer { flex: 1; min-height: 12px; }
+/* Collapse sits at the top, under the brand (the user, 2026-10-23: "collapse 放在上方就行"). */
+.item[data-fold] { color: rgb(var(--lv-nav-text) / 0.55); font-size: 13px; padding-top: 4px; padding-bottom: 4px; margin-bottom: 2px; border-bottom: 1px solid rgb(var(--lv-nav-text) / 0.1); border-radius: 6px 6px 0 0; }
+
+.me {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px 2px;
+  border-top: 1px solid rgb(var(--lv-nav-text) / 0.14);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.avatar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgb(var(--lv-avatar));
+  color: rgb(var(--lv-nav-hover));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+.meText { flex: 1; min-width: 0; }
+.meName { font-weight: 500; font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
+.version { font-size: 11px; color: rgb(var(--lv-nav-text) / 0.45); transition: opacity 0.18s; }
+
+.nav[data-collapsed] :is(.brandText, .groupLabel, .itemLabel, .soon, .meText, .version) { opacity: 0; }
+.nav[data-collapsed] .groupLabel { height: 12px; padding: 0; }
+
+/* ── The column: the top bar over the page ── */
+.column { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 10px; gap: 8px; }
+.bar {
+  height: 56px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 16px;
+  background: rgb(var(--lv-white));
+  border: 1px solid rgb(var(--lv-border));
+  border-radius: 10px;
+  box-shadow: var(--lv-shadow-card);
+}
+.search {
+  flex: 1;
+  max-width: 480px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: rgb(var(--lv-page));
+  color: rgb(var(--lv-text-3));
+}
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: rgb(var(--lv-ink));
+}
+.fill { flex: 1; }
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgb(var(--lv-text-2));
+  background: rgb(var(--lv-muted));
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.pillDot { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--lv-text-2)); }
+.date { font-size: 13px; color: rgb(var(--lv-text-2)); white-space: nowrap; }
+.bell {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgb(var(--lv-border));
+  background: rgb(var(--lv-white));
+  color: rgb(var(--lv-text-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.signOut {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: rgb(var(--lv-text-2));
+  cursor: pointer;
+  white-space: nowrap;
+}
+.signOut:hover { color: rgb(var(--lv-accent-text)); text-decoration: underline; }
+@media (max-width: 767px) {
+  .search, .date, .pill { display: none; }
+}
+
+.frame { flex: 1; min-height: 0; display: flex; position: relative; }
+.main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.bare { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+.sheet { flex: 1 1 auto; min-width: 0; overflow-y: auto; border-radius: 10px; }

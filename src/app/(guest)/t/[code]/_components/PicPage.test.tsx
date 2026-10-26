@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { picPageFromRow, type PicPage as Page } from '@/lib/marketing/pic'
 
@@ -27,6 +27,16 @@ function page(over: Record<string, unknown> = {}): Page {
   }) as Page
 }
 
+// The page turns its banner to "overdue" once 4 working hours pass after the minutes were sent (workingHours, from
+// the real clock): a test that reads the waiting banner runs an hour after sentAt, or it fails once that day is past.
+const anHourAfterSending = () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-24T03:00:00Z'))
+}
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 beforeEach(() => {
   answerPic.mockReset()
   answerPicStage.mockReset()
@@ -40,6 +50,7 @@ describe('the PIC’s link', () => {
   })
 
   it('shows the minutes they are asked to approve, and who to ask', () => {
+    anHourAfterSending()
     render(<PicPage code={CODE} initial={page()} />)
     expect(screen.getByRole('heading', { name: 'Carres · Social Media Package A · Oct 2026' })).toBeTruthy()
     expect(screen.getAllByText('Waiting for your approval')).toHaveLength(2)
@@ -99,6 +110,7 @@ describe('the PIC’s link', () => {
   })
 
   it('waiting again: says what the team changed after they approved, or what they asked', () => {
+    anHourAfterSending()
     const { unmount } = render(<PicPage code={CODE} initial={page({ updated: { fields: 'Objective', at: 'x' } })} />)
     expect(screen.getByText('Updated after your approval — please review again')).toBeTruthy()
     expect(screen.getByText('The team changed Objective.')).toBeTruthy()

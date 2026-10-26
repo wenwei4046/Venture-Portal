@@ -8,6 +8,8 @@ import type { User } from '@/types'
 // viewing as a person (read-only), never on a computer.
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/dashboard' }))
+// Lead View's faces come from next/font, which only the Next build provides.
+vi.mock('./lead-fonts', () => ({ lora: { variable: '' }, cormorant: { variable: '' } }))
 vi.mock('./Sidebar', () => ({ default: () => <aside>sidebar</aside> }))
 vi.mock('./TopBar', () => ({ default: () => <div /> }))
 vi.mock('./BottomTabBar', () => ({ default: () => <nav /> }))

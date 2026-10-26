@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { adsPageFromRow } from '@/lib/marketing/ads'
 import { productProjectFromRow, type ProductProjectPage } from '@/lib/marketing/project'
@@ -65,6 +65,16 @@ const MANAGER = { edit: true, manage: true }
 const ready = { vals: { Attendees: [RACHEL, SITI], 'Meeting date': '2026-10-24', Objective: 'Year-end walk-ins' }, signed: { [RACHEL]: { at: 'x' }, [SITI]: { at: 'y' } } }
 const waiting = { status: 'waiting_pic', link: 'abc123', linkSentAt: '2026-10-24T05:00:00Z' }
 
+// "Sent …" turns into the late line once 4 working hours pass after linkSentAt (workingHours, from the real clock): a
+// test that reads it runs an hour after the link went, or it fails once that day is past.
+const anHourAfterTheLink = () => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-10-24T06:00:00Z'))
+}
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 beforeEach(() => {
   for (const f of Object.values(actions)) f.mockReset()
   let rev = 3
@@ -94,6 +104,7 @@ describe('a product project, for the manager who writes its minutes', () => {
   })
 
   it('sends the minutes: the link to copy and share on WhatsApp, waiting for the PIC', async () => {
+    anHourAfterTheLink()
     render(<ProductProject initial={page(RACHEL, {}, ready)} can={MANAGER} />)
     expect(screen.getByText('5/5')).toBeTruthy()
     actions.sendMktMinutes.mockResolvedValue({ ok: true, page: page(RACHEL, waiting, { ...ready, status: 'sent', rev: 4 }) })

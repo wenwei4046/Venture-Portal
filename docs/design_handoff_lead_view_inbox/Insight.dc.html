@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="hz-select.js"></script>
+<style>
+body{margin:0;background:rgb(243,240,236);}
+*{box-sizing:border-box;}
+a{color:rgb(176,92,54);text-decoration:none;}
+a:hover{text-decoration:underline;}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid rgb(199,111,70);outline-offset:1px;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:rgb(230,224,217);border-radius:4px;}
+</style>
+</helmet>
+
+<div style="width:1440px;height:900px;display:flex;font-family:'Lora',Georgia,serif;font-size:15px;color:rgb(43,33,28);line-height:1.45;background:rgb(243,240,236);position:relative;overflow:hidden;">
+  <aside style="width:216px;flex:none;display:flex;flex-direction:column;padding:16px 12px;gap:2px;background:rgb(46,33,26);color:rgb(255,255,255);">
+    <div style="display:flex;align-items:center;gap:10px;padding:4px 6px 18px;">
+      <div style="width:34px;height:34px;border-radius:7px;background:rgb(199,111,70);color:rgb(255,255,255);display:flex;align-items:center;justify-content:center;font-family:'Lora',Georgia,serif;font-weight:700;font-size:17px;">H</div>
+      <div style="display:flex;flex-direction:column;gap:1px;"><div style="font-weight:600;font-size:15px;">HOUZS Venture</div><div style="font-size:13px;color:rgba(255,244,235,.55);">Internal ledger</div></div>
+    </div>
+    <a href="Inbox v2.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="inbox" style="width:16px;height:16px;"></i></span>Inbox</a>
+    <a href="Leads.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="users" style="width:16px;height:16px;"></i></span>Leads</a>
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;background:rgba(255,255,255,.08);border:1px solid transparent;box-shadow:inset 3px 0 0 rgb(199,111,70);font-weight:600;color:rgb(255,255,255);"><span style="display:flex;"><i data-lucide="chart-column" style="width:16px;height:16px;"></i></span>Insight</div>
+    <a href="Campaigns.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="megaphone" style="width:16px;height:16px;"></i></span>Campaigns</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:18px 10px 6px;">REPLIES</div>
+    <a href="Auto Reply.dc.html?view=routing" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="split" style="width:16px;height:16px;"></i></span>Reply rules</a>
+    <a href="Auto Reply.dc.html?view=template" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="workflow" style="width:16px;height:16px;"></i></span>Reply templates</a>
+    <a href="Auto Reply.dc.html?view=library" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="blocks" style="width:16px;height:16px;"></i></span>Step library</a>
+    <a href="Auto Reply.dc.html?view=ai" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="sparkles" style="width:16px;height:16px;"></i></span>AI Agent</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;">FILES</div>
+    <a href="Basic Info.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="book-open" style="width:16px;height:16px;"></i></span>General info</a>
+    <a href="Data Center.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="library" style="width:16px;height:16px;"></i></span>Data Center</a>
+    <a href="Auto Reply.dc.html?view=corrections" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="history" style="width:16px;height:16px;"></i></span>AI corrections</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;">ADMIN</div>
+    <a href="Business Hours.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="clock" style="width:16px;height:16px;"></i></span>Business hours</a>
+    <a href="Audit Log.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="scroll-text" style="width:16px;height:16px;"></i></span>Audit log</a>
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;"><span style="display:flex;"><i data-lucide="settings" style="width:16px;height:16px;"></i></span>Settings</div>
+    <div style="flex:1;"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px;border-top:1px solid rgba(255,244,235,.14);">
+      <div style="width:30px;height:30px;border-radius:50%;background:rgb(140,6,16);color:rgb(244,212,166);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;">ML</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:1px;"><div style="font-weight:500;">Mei Ling</div><div style="font-size:13px;color:rgba(255,244,235,.55);">Customer Service</div></div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgba(255,244,235,.45);">v0.3</div>
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px;">
+    <header style="height:56px;flex:none;background:rgb(255,255,255);border:1px solid rgb(230,224,217);border-radius:10px;display:flex;align-items:center;padding:0 16px;gap:18px;box-shadow:0 1px 2px rgba(43,33,28,.05);">
+      <div style="flex:1;max-width:480px;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:8px;background:rgb(243,240,236);color:rgb(104,92,84);">
+        <span style="display:flex;"><i data-lucide="search" style="width:15px;height:15px;"></i></span>
+        <input placeholder="Search customers, phone numbers or chats" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);"></input>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgb(88,76,68);background:rgb(242,238,233);padding:4px 10px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:rgb(88,76,68);"></span>Test mode</div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(88,76,68);">Mon 19 Oct 2026</div>
+      <button title="Notifications" style="white-space:nowrap;flex-shrink:0;position:relative;cursor:pointer;width:34px;height:34px;border-radius:8px;border:1px solid rgb(230,224,217);background:rgb(255,255,255);color:rgb(88,76,68);display:flex;align-items:center;justify-content:center;"><span style="display:flex;"><i data-lucide="bell" style="width:16px;height:16px;"></i></span><span style="position:absolute;top:6px;right:7px;width:7px;height:7px;border-radius:50%;background:rgb(199,111,70);border:1.5px solid rgb(255,255,255);"></span></button>
+      <a href="#" style="font-size:13px;color:rgb(88,76,68);">Sign out</a>
+    </header>
+
+    <main style="flex:1;min-height:0;background:transparent;border:none;display:flex;flex-direction:column;padding:16px 8px 0;">
+      <div style="flex:none;display:flex;align-items:flex-end;gap:12px;padding-bottom:14px;border-bottom:1px solid rgb(230,224,217);">
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.14em;color:rgb(88,76,68);">LEAD VIEW</div>
+          <h1 style="align-self:flex-start;margin:0;line-height:1.15;letter-spacing:-.01em;font-family:'Cormorant Garamond',Georgia,serif;font-size:32px;font-weight:600;">Insight</h1>
+        </div>
+        <div style="display:flex;border:1px solid rgb(218,210,200);border-radius:6px;overflow:hidden;">
+          <sc-for list="{{ brandOpts }}" as="o" hint-placeholder-count="4"><button onClick="{{ o.onClick }}" style="white-space:nowrap;cursor:pointer;border:none;border-right:1px solid rgb(235,230,224);padding:6px 12px;font-family:'Lora',Georgia,serif;font-size:14px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button></sc-for>
+        </div>
+        <div style="display:flex;border:1px solid rgb(218,210,200);border-radius:6px;overflow:hidden;">
+          <sc-for list="{{ rangeOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.onClick }}" style="white-space:nowrap;cursor:pointer;border:none;border-right:1px solid rgb(235,230,224);padding:6px 12px;font-family:'Lora',Georgia,serif;font-size:14px;background:{{ o.bg }};color:{{ o.fg }};">{{ o.label }}</button></sc-for>
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:0;overflow-y:auto;padding:18px 0 28px;display:flex;flex-direction:column;gap:28px;">
+        <section style="flex:none;display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:baseline;gap:12px;"><div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:22px;">From message to sale</div><div style="font-size:14px;color:rgb(88,76,68);">{{ rangeLabel }} · {{ brandLabel }}</div></div>
+          <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);">
+            <sc-for list="{{ funnel }}" as="f" hint-placeholder-count="5">
+              <div style="padding:14px 16px 16px;border-right:1px solid rgb(235,230,224);display:flex;flex-direction:column;gap:6px;">
+                <div style="font-size:14px;color:rgb(88,76,68);">{{ f.label }}</div>
+                <div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:36px;line-height:1;font-feature-settings:'tnum';">{{ f.n }}</div>
+                <div style="height:6px;border-radius:3px;background:rgb(242,238,233);"><div style="height:6px;border-radius:3px;background:{{ f.color }};width:{{ f.w }};"></div></div>
+                <div style="font-family:'Lora',Georgia,serif;font-size:13px;color:{{ f.rateFg }};">{{ f.rate }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+
+        <section style="flex:none;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:baseline;gap:12px;"><div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:22px;">By ad</div><div style="font-size:14px;color:rgb(88,76,68);">Spend comes from Ads Manager. Sort by any column.</div></div>
+          <div style="border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);overflow:hidden;">
+            <div style="display:grid;grid-template-columns:minmax(0,2fr) repeat(7,minmax(0,.8fr));gap:10px;padding:9px 14px;border-bottom:1px solid rgb(230,224,217);background:rgb(250,248,245);">
+              <sc-for list="{{ adCols }}" as="c" hint-placeholder-count="8"><button onClick="{{ c.onClick }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;border:none;background:transparent;padding:0;text-align:{{ c.align }};font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.1em;color:{{ c.fg }};">{{ c.label }}</button></sc-for>
+            </div>
+            <sc-for list="{{ adRows }}" as="r" hint-placeholder-count="5">
+              <div style="display:grid;grid-template-columns:minmax(0,2fr) repeat(7,minmax(0,.8fr));gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid rgb(235,230,224);font-feature-settings:'tnum';">
+                <div style="min-width:0;display:flex;align-items:center;gap:6px;"><span style="flex:none;font-family:'Lora',Georgia,serif;font-size:9px;padding:2px 4px;border-radius:3px;color:rgb(255,255,255);background:{{ r.chBg }};">{{ r.ch }}</span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;">{{ r.name }}</span><span style="flex:none;font-family:'Lora',Georgia,serif;font-size:11px;padding:1px 5px;border-radius:3px;background:{{ r.bBg }};color:{{ r.bFg }};">{{ r.brand }}</span></div>
+                <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:14px;">{{ r.conv }}</span>
+                <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:14px;">{{ r.phones }}</span>
+                <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:14px;color:{{ r.rateFg }};">{{ r.rate }}</span>
+                <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:14px;">{{ r.came }}</span>
+                <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:14px;">{{ r.closed }}</span>
+                <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(88,76,68);">{{ r.spendShown }}</span>
+                <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;color:{{ r.cpcFg }};">{{ r.cpc }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+
+        <div style="flex:none;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;">
+          <section style="display:flex;flex-direction:column;gap:10px;">
+            <div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:22px;">Who replied first</div>
+            <div style="border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);">
+              <div style="display:grid;grid-template-columns:minmax(0,1.2fr) repeat(3,minmax(0,1fr));gap:10px;padding:9px 14px;border-bottom:1px solid rgb(230,224,217);font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.1em;color:rgb(88,76,68);"><span></span><span style="text-align:right;">CHATS</span><span style="text-align:right;">GOT PHONE</span><span style="text-align:right;">FIRST REPLY</span></div>
+              <sc-for list="{{ byReply }}" as="r" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:minmax(0,1.2fr) repeat(3,minmax(0,1fr));gap:10px;align-items:center;padding:11px 14px;border-bottom:1px solid rgb(235,230,224);">
+                  <div style="display:flex;align-items:center;gap:8px;"><span style="width:8px;height:8px;border-radius:2px;background:{{ r.color }};"></span><span style="font-weight:500;">{{ r.label }}</span></div>
+                  <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:14px;">{{ r.conv }}</span>
+                  <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;"><div style="width:60px;height:6px;border-radius:3px;background:rgb(242,238,233);"><div style="height:6px;border-radius:3px;background:{{ r.color }};width:{{ r.w }};"></div></div><span style="font-family:'Lora',Georgia,serif;font-size:14px;width:34px;text-align:right;">{{ r.rate }}</span></div>
+                  <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:14px;">{{ r.speed }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font-size:14px;line-height:1.5;color:rgb(43,33,28);">{{ replyNote }}</div>
+          </section>
+
+          <section style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:baseline;gap:10px;"><div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:22px;">Where customers drop off</div>
+              <select value="{{ flowSel }}" data-v="{{ flowSel }}" onChange="{{ onFlow }}" style="height:28px;border:1px solid rgb(218,210,200);border-radius:5px;padding:0 6px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"><sc-for list="{{ flowOpts }}" as="o" hint-placeholder-count="2"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+            </div>
+            <div style="border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+              <sc-for list="{{ drop }}" as="s" hint-placeholder-count="5">
+                <div style="display:grid;grid-template-columns:20px 120px minmax(0,1fr) 44px;gap:8px;align-items:center;font-size:14px;">
+                  <span style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ s.n }}</span>
+                  <span>{{ s.label }}</span>
+                  <div style="height:14px;border-radius:3px;background:rgb(243,240,236);"><div style="height:14px;border-radius:3px;background:{{ s.color }};width:{{ s.w }};"></div></div>
+                  <span style="text-align:right;font-family:'Lora',Georgia,serif;font-size:13px;">{{ s.pct }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="font-size:14px;line-height:1.5;color:rgb(43,33,28);">{{ dropNote }} <a href="Auto Reply.dc.html">Edit template ↗</a></div>
+          </section>
+        </div>
+
+        
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const K = { dark:'rgb(43,33,28)', cream:'rgb(240,226,206)', accent:'rgb(199,111,70)', peach:'rgb(246,243,239)', otext:'rgb(88,76,68)', frame:'rgb(218,210,200)', brown:'rgb(88,76,68)', faint:'rgb(120,108,100)', blue:'rgb(176,92,54)', blueBg:'rgb(242,238,233)', green:'rgb(76,110,80)', red:'rgb(199,111,70)', white:'rgb(255,255,255)', ig:'rgb(104,92,84)', sand:'rgb(141,165,143)' };
+const BRAND = { '2990s':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'}, '2990s mini':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'}, 'Carress':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'} };
+// 30-day base
+const ADS = [
+  { name:'Oct Sofa Week (video)', brand:'2990s', ch:'FB', conv:142, phones:66, handed:61, came:24, closed:14, spend:4200, rev:39800 },
+  { name:'Dining Set Promo', brand:'2990s', ch:'FB', conv:58, phones:17, handed:15, came:5, closed:2, spend:1800, rev:4980 },
+  { name:'L-shape Reel', brand:'2990s', ch:'IG', conv:76, phones:21, handed:19, came:6, closed:3, spend:1500, rev:8670 },
+  { name:'100-night Mattress Trial', brand:'Carress', ch:'FB', conv:64, phones:31, handed:29, came:12, closed:7, spend:2100, rev:19830 },
+  { name:'King Size Sale', brand:'Carress', ch:'IG', conv:39, phones:9, handed:8, came:2, closed:1, spend:1300, rev:3890 },
+  { name:'Organic · 2990s', brand:'2990s', ch:'FB', conv:88, phones:30, handed:27, came:9, closed:5, spend:0, rev:13200, organic:true },
+  { name:'Organic · 2990s mini', brand:'2990s mini', ch:'IG', conv:61, phones:24, handed:22, came:8, closed:4, spend:0, rev:6400, organic:true },
+  { name:'Organic · Carress', brand:'Carress', ch:'IG', conv:34, phones:12, handed:11, came:4, closed:2, spend:0, rev:5980, organic:true }
+];
+const REPLY = { Person:{ conv:0.42, rate:0.36, speed:'6 min', color:K.dark }, Template:{ conv:0.33, rate:0.44, speed:'instant', color:K.sand }, 'AI Agent':{ conv:0.25, rate:0.39, speed:'instant', color:K.accent } };
+const FLOWS = { 'Sofa enquiry':[['Welcome',100],['Sofa type',81],['Table size',0],['Ask for phone',66],['Gave phone',43],['Catalogue',42],['To a person',41]], 'After-hours reply':[['Closed notice',100],['Gave phone',38],['What for',35],['To a person',33]] };
+const SALES = [
+  { name:'Daniel Chew', brand:'2990s', handed:34, came:12, closed:7, speed:1.2, stale:0 },
+  { name:'Sharon Lee', brand:'2990s', handed:31, came:10, closed:6, speed:3.8, stale:2 },
+  { name:'Ahmad Faiz', brand:'2990s', handed:28, came:9, closed:4, speed:2.1, stale:0 },
+  { name:'Kimberly Tan', brand:'2990s mini', handed:12, came:5, closed:3, speed:0.9, stale:0 },
+  { name:'Hafiz Ismail', brand:'2990s mini', handed:10, came:3, closed:1, speed:2.6, stale:1 },
+  { name:'Alvin Goh', brand:'Carress', handed:26, came:10, closed:6, speed:5.4, stale:3 },
+  { name:'Michelle Wong', brand:'Carress', handed:22, came:8, closed:4, speed:1.6, stale:0 }
+];
+const RANGES = { '7 days':0.24, '30 days':1, 'This quarter':1.7 };
+const rm = n => 'RM ' + Math.round(n).toLocaleString('en-MY');
+const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
+
+class Component extends DCLogic {
+  state = { brand:'All', range:'30 days', sort:'cpc', dir:1, flow:'Sofa enquiry' };
+  componentDidMount(){ this.icons(); this.sync(); }
+  componentDidUpdate(){ this.icons(); this.sync(); }
+  icons(){ if (window.lucide) window.lucide.createIcons(); else setTimeout(() => this.icons(), 300); }
+  sync(){ requestAnimationFrame(() => document.querySelectorAll('select[data-v]').forEach(s => { if (s.dataset.v && s.value !== s.dataset.v) s.value = s.dataset.v; })); }
+  renderVals(){
+    const st = this.state, f = RANGES[st.range], sc = n => Math.round(n * f);
+    const ads = ADS.filter(a => st.brand === 'All' || a.brand === st.brand).map(a => ({ ...a, conv:sc(a.conv), phones:sc(a.phones), handed:sc(a.handed), came:sc(a.came), closed:Math.max(a.closed ? 1 : 0, sc(a.closed)), spend:a.spend * f, rev:a.rev * f }));
+    const sum = k => ads.reduce((t, a) => t + a[k], 0);
+    const T = { conv:sum('conv'), phones:sum('phones'), handed:sum('handed'), came:sum('came'), closed:sum('closed'), spend:sum('spend'), rev:sum('rev') };
+    const stages = [['Conversations','conv',K.frame],['Gave a phone','phones',K.sand],['Handed to sales','handed',K.accent],['Came to showroom','came',K.blue],['Bought','closed',K.green]];
+    const funnel = stages.map(([label, k, color], i) => ({ label, n:T[k].toLocaleString('en-MY'), color, w: Math.max(2, T[k] / Math.max(T.conv, 1) * 100) + '%',
+      rate: i === 0 ? 'all chats' : pct(T[k], T[stages[i-1][1]]) + ' of previous', rateFg: i === 0 ? K.faint : K.brown }));
+    const cols = [['name','AD','left'],['conv','CHATS','right'],['phones','PHONES','right'],['rate','PHONE RATE','right'],['came','CAME','right'],['closed','BOUGHT','right'],['spend','SPEND','right'],['cpc','COST / SALE','right']];
+    const val = (a, k) => k === 'rate' ? a.phones / Math.max(a.conv,1) : k === 'cpc' ? (a.organic ? Infinity : a.spend / Math.max(a.closed, 1)) : k === 'name' ? a.name : a[k];
+    const sorted = [...ads].sort((a, b) => { const x = val(a, st.sort), y = val(b, st.sort); return (x > y ? 1 : x < y ? -1 : 0) * st.dir; });
+    const best = Math.min(...ads.filter(a => !a.organic && a.closed).map(a => a.spend / a.closed));
+    const brandSales = SALES.filter(s => st.brand === 'All' || s.brand === st.brand);
+    const r = Object.entries(REPLY);
+    const bestReply = r.reduce((b, x) => x[1].rate > b[1].rate ? x : b);
+    const steps = FLOWS[st.flow].filter(s => s[1] > 0);
+    const biggest = steps.slice(1).reduce((b, s, i) => { const d = steps[i][1] - s[1]; return d > b.d ? { d, from:steps[i][0], to:s[0] } : b; }, { d:0 });
+    return {
+      brandOpts: ['All','2990s','2990s mini','Carress'].map(b => ({ label:b, onClick:() => this.setState({brand:b}), bg: st.brand === b ? K.dark : K.white, fg: st.brand === b ? K.cream : K.brown })),
+      rangeOpts: Object.keys(RANGES).map(k => ({ label:k, onClick:() => this.setState({range:k}), bg: st.range === k ? K.dark : K.white, fg: st.range === k ? K.cream : K.brown })),
+      rangeLabel: st.range === 'This quarter' ? '1 Oct – 18 Oct 2026' : 'Last ' + st.range, brandLabel: st.brand === 'All' ? 'All brands' : st.brand,
+      funnel, revenue: rm(T.rev), spend: rm(T.spend), roas: T.spend ? (T.rev / T.spend).toFixed(1) + '×' : '—',
+      adCols: cols.map(([k, label, align]) => ({ label: label + (st.sort === k ? (st.dir > 0 ? ' ↑' : ' ↓') : ''), align, fg: st.sort === k ? K.dark : K.brown, onClick:() => this.setState(s => ({ sort:k, dir: s.sort === k ? -s.dir : (k === 'cpc' || k === 'name' ? 1 : -1) })) })),
+      adRows: sorted.map(a => { const c = a.organic ? null : a.spend / Math.max(a.closed, 1); return { ...a, chBg: a.ch === 'IG' ? K.ig : K.blue, bBg:BRAND[a.brand].bg, bFg:BRAND[a.brand].fg,
+        rate: pct(a.phones, a.conv), rateFg: a.phones / a.conv >= 0.4 ? K.green : a.phones / a.conv < 0.28 ? K.red : 'rgb(0,0,0)',
+        spendShown: a.organic ? '—' : rm(a.spend), cpc: a.organic ? 'free' : rm(c), cpcFg: a.organic ? K.faint : Math.abs(c - best) < 1 ? K.green : c > best * 2.5 ? K.red : 'rgb(0,0,0)' }; }),
+      byReply: r.map(([label, v]) => ({ label, color:v.color, conv: Math.round(T.conv * v.conv).toLocaleString('en-MY'), rate: Math.round(v.rate * 100) + '%', w: Math.round(v.rate * 100 / 0.5) + '%', speed:v.speed })),
+      replyNote: bestReply[0] + ' gets a phone number most often (' + Math.round(bestReply[1].rate * 100) + '%). People reply in 6 minutes on average during working hours; customers who wait longer than 15 minutes give a phone half as often.',
+      flowSel: st.flow, flowOpts: Object.keys(FLOWS), onFlow: e => this.setState({flow:e.target.value}),
+      drop: steps.map((s, i) => ({ n:i+1, label:s[0], pct:s[1] + '%', w:s[1] + '%', color: s[0] === biggest.to ? K.red : K.sand })),
+      dropNote: 'Most customers leave between “' + biggest.from + '” and “' + biggest.to + '” (' + biggest.d + '% of chats). Try a shorter question there, or ask for the phone earlier.',
+      salesRows: brandSales.map(s => ({ ...s, bBg:BRAND[s.brand].bg, bFg:BRAND[s.brand].fg, handed:sc(s.handed), came:sc(s.came), closed:Math.max(s.closed ? 1 : 0, sc(s.closed)),
+        speed: s.speed < 1 ? Math.round(s.speed * 60) + ' min' : s.speed.toFixed(1) + ' h', speedFg: s.speed > 4 ? K.red : s.speed < 1.5 ? K.green : 'rgb(0,0,0)',
+        stale: s.stale ? s.stale + ' leads' : '—', staleFg: s.stale ? K.red : K.faint }))
+    };
+  }
+}
+</script>
+</body>
+</html>

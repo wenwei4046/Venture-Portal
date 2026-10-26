@@ -27,6 +27,8 @@ export type FunctionKey =
   | 'documentation' | 'hiring' | 'rooms' | 'guest_link'
   // HR › Attendance (mig 20261015030000).
   | 'attendance'
+  // Lead View (mig 20261016300000).
+  | 'leads'
   // IT support's desk (mig 20261021020000).
   | 'it_requests'
   // Marketing's own view (mig 20261023214000).
@@ -116,6 +118,8 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   guest_link: ['guest_link.view', 'guest_link.edit'],
   // HR › Attendance (20261015030000).
   attendance: ['attendance.view', 'attendance.create', 'attendance.edit', 'attendance.approve'],
+  // Lead View (20261016300000).
+  leads: ['leads.view', 'leads.create', 'leads.edit', 'leads.manage'],
   // IT support's desk (20261021020000): read everybody's requests; write notes and set their status.
   it_requests: ['it_requests.view', 'it_requests.edit'],
   // Marketing's own view (20261023214000): its pages, starting projects, working stages, approving, the manager tools.
@@ -190,6 +194,11 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'hiring.create': 'all',
   'hiring.edit': 'all',
   'hiring.view': 'all',
+  // Lead View (2026-10-16).
+  'leads.create': 'all',
+  'leads.edit': 'all',
+  'leads.manage': 'all',
+  'leads.view': 'all',
   // Marketing's view (2026-10-23): the Tracking Dashboard is the manager's; a task started (Create), worked as its
   // stage's owner (Edit), decided as its approver (Approve) — mig 20261023234000. The formal log's files (④-3b — the
   // user's answer 18: all of Marketing may export a trail) ask View: the matrix's Marketing row has no Export cell.

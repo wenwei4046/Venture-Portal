@@ -26,7 +26,12 @@ import s from './HrTopBar.module.css'
 // words ARE the switcher, drawn as the words. Finance's view wears the same
 // bar since 2026-10-14 (the Finance revamp v2), its words "Finance view".
 
-export default function HrTopBar({ user, viewLabel = 'HR view' }: { user: User; viewLabel?: string }) {
+export default function HrTopBar({ user, viewLabel = 'HR view', viewValue }: {
+  user: User
+  viewLabel?: string
+  /** What the switcher shows when it is not the account's role — 'lead' on Lead View's pages (2026-10-16). */
+  viewValue?: 'lead'
+}) {
   const router = useRouter()
   const clock = officeClock()
   const displayName = user.name || getRoleLabel(user.role)
@@ -59,7 +64,7 @@ export default function HrTopBar({ user, viewLabel = 'HR view' }: { user: User; 
             the shared hr@ too. */}
         {(personal || terms) ? <MemoBell memos={personal} terms={terms} /> : null}
         {user.canSwitchView ? (
-          <ViewSwitch value={user.role} viewingAs={user.viewingAs?.name} />
+          <ViewSwitch value={viewValue ?? user.role} viewingAs={user.viewingAs?.name} />
         ) : (
           <div className={s.view}>
             <span className={s.dot} aria-hidden="true" />
@@ -79,7 +84,7 @@ export default function HrTopBar({ user, viewLabel = 'HR view' }: { user: User; 
   )
 }
 
-function ViewSelect({ value, viewingAs, submit, onPerson }: { value: UserRole; viewingAs?: string; submit: () => void; onPerson: () => void }) {
+function ViewSelect({ value, viewingAs, submit, onPerson }: { value: UserRole | 'lead'; viewingAs?: string; submit: () => void; onPerson: () => void }) {
   const { pending } = useFormStatus()
   const current = viewingAs ? VIEWING : value
   // The prototype draws "HR view" as words, so the field stays words (plain);
@@ -107,12 +112,13 @@ function ViewSelect({ value, viewingAs, submit, onPerson }: { value: UserRole; v
       <option value="hr">HR view</option>
       <option value="marketing">Marketing view</option>
       <option value="revenue_member">Revenue View</option>
+      <option value="lead">Lead View</option>
       <option value="person">View as a person…</option>
     </Select>
   )
 }
 
-function ViewSwitch({ value, viewingAs }: { value: UserRole; viewingAs?: string }) {
+export function ViewSwitch({ value, viewingAs }: { value: UserRole | 'lead'; viewingAs?: string }) {
   const form = useRef<HTMLFormElement>(null)
   const [picking, setPicking] = useState(false)
   return (
