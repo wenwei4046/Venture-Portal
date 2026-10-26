@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261027150000_it_request_sender_closes.sql
+-- 20261026183719_it_request_sender_closes.sql
 -- IT support: Closed is the sender's (2026-10-27 — the user: "我这边写已经 fix 了，所以那个 close 是不需要的。等我这边按了
 -- 已经 fix，这个 close 其实应该是由提出这个 request / support 的人去操作。他那边去 try 了功能之后，就可以在自己那边
 -- close，然后我这边这个 ticket 就 automatically close 了").

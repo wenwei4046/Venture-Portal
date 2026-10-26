@@ -34,7 +34,7 @@ export const STATUS_LABEL: Readonly<Record<ItStatus, string>> = { new: 'New', in
 /**
  * What IT sets (2026-10-27 — the user: "我这边写已经 fix 了，所以那个 close 是不需要的。等我这边按了已经 fix，这个 close
  * 其实应该是由提出这个 request / support 的人去操作"): New, In progress, Fixed. Closed is its sender's — once IT has marked
- * it Fixed, they try it and close it, and the desk reads it closed (mig 20261027150000).
+ * it Fixed, they try it and close it, and the desk reads it closed (mig 20261026183719).
  */
 export const IT_DESK_STATUSES: ReadonlyArray<{ id: ItStatus; label: string }> = IT_STATUSES.filter(s => s.id !== 'closed')
 /** Its sender may close it: IT has marked it Fixed. */

@@ -53,7 +53,7 @@ describe('what is refused before it is sent', () => {
 })
 
 // 2026-10-27 — the user: "我这边写已经 fix 了，所以那个 close 是不需要的。等我这边按了已经 fix，这个 close 其实应该是由提出这个
-// request / support 的人去操作" (mig 20261027150000 asks the same).
+// request / support 的人去操作" (mig 20261026183719 asks the same).
 describe('who closes it', () => {
   it('gives IT New, In progress and Fixed; Closed stays a status to read and filter by', () => {
     expect(IT_DESK_STATUSES.map(s => s.label)).toEqual(['New', 'In progress', 'Fixed'])

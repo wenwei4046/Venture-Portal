@@ -122,7 +122,7 @@ await db.exec(file) // twice: nothing changes, nothing breaks
 await db.exec(await readFile(new URL('20261021030000_it_request_get.sql', migrations), 'utf8'))
 // Closed is the sender's (2026-10-27): it_request_note from production's body, three statements swapped — twice, and
 // every check below runs against it.
-const closes = (await readFile(new URL('20261027150000_it_request_sender_closes.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+const closes = (await readFile(new URL('20261026183719_it_request_sender_closes.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(closes)
 await db.exec(closes)
 
