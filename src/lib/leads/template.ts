@@ -1,5 +1,5 @@
 // Lead View › Reply templates and the Step library (2026-10-23, the redesign v2 handoff `Auto Reply.dc.html`;
-// mig 20261023100000): a template's steps as the canvas draws them, the twin of lead_template_problem, the canvas's
+// mig 20261023100010): a template's steps as the canvas draws them, the twin of lead_template_problem, the canvas's
 // lines and "Tidy up", the Test-as-customer walk (twin of lead_flow_send / lead_flow_on_message), and copying to and
 // from the library. Pure, tested in template.test.ts.
 

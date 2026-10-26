@@ -355,6 +355,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'lead_ai_try_context', 'lead_ai_log_draft', 'lead_ai_draft_outcome', 'lead_campaigns', 'lead_campaign_audience', 'lead_consent', 'lead_insight_more',
   'lead_save_campaign', 'lead_send_campaign', 'lead_remove_campaign', 'lead_set_opt_in',
   'lead_ads', 'lead_name_ad', 'lead_save_meta_ads', 'lead_test_ad',
+  // Messenger connected (mig 20261026110000): a reply's target and what Meta said ask leads.create; the ingest and the
+  // outbox are the webhook's service role alone — EXECUTE for nobody else.
+  'lead_reply_target', 'lead_reply_sent', 'lead_ingest_messenger', 'lead_outbox', 'lead_outbox_done',
   // Me (mig 20261017100000): each answers for the caller's own People record only — one's month, today, line, team,
   // record and paid payslips — and writes only one's own (the punch notice read, one's photo); one's punch and an MC
   // filed on one's own request ask their own staff record (mig 20261015200000).

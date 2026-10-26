@@ -97,7 +97,7 @@ export default function AgentView({ personas, more, files, today, connected, rea
           <span className={s.eyebrow}>REPLIES</span>
           <h1 className={s.title}>AI Agent</h1>
         </div>
-        <span className={s.status}><span className={s.dot} aria-hidden="true" />{connected ? 'Copilot · it drafts, CS sends' : 'AI not connected (no API key)'} · Meta not connected</span>
+        <span className={s.status}><span className={s.dot} aria-hidden="true" />{connected ? 'Copilot · it drafts, CS sends' : 'AI not connected (no API key)'} · Messenger connected</span>
         {canManage ? <button type="button" className={s.btn} data-strong="" disabled={!dirty || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
       </div>
       <div className={s.panel}>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { countAudience, removeCampaign, saveCampaign, sendCampaign } from '@/lib/leads/actions'
+import { countAudience, removeCampaign, saveCampaign } from '@/lib/leads/actions'
 import {
   DEFAULT_AUDIENCE, audienceOf, campaignProblem, consentTotals, personalize, resultSteps,
   type Audience, type AudienceCount, type Campaign, type CampaignChannel, type ConsentRow,
@@ -19,7 +19,7 @@ import s from './campaigns.module.css'
  * gets it, 2 · message, 3 · when), a sent one with its results (Sent · Read · Replied · Gave a phone · Bought) — and the
  * Messenger preview on the right. Meta's rule stays the database's (lead_audience): whoever wrote in 24 hours, else only
  * who agreed to promotions, never who unsubscribed. Held until Meta is connected, drawn and saying so: the Meta template,
- * a photo or video, Send test, Read. Meta is not connected: Send now records the message on each conversation; a
+ * a photo or video, Send test, Read. Send now waits for campaign sending through Meta (off for the go-live); it recorded the message on each conversation; a
  * schedule is kept but nothing sends it yet. The two "did not buy" filters and Bought need mig 20261023400000.
  */
 
@@ -152,17 +152,7 @@ function Editor({ start, brands, ready, canManage, onDone }: { start: Form; bran
     if (!r.ok) { setError(r.reason); return }
     done(r.data, msg)
   })
-  const sendNow = () => {
-    if (!window.confirm(`Send “${form.name}” to ${reach} customer${reach === 1 ? '' : 's'} now? It is recorded on each conversation — Meta is not connected.`)) return
-    startBusy(async () => {
-      setError(null)
-      const saved = await saveCampaign(form.id, data(null))
-      if (!saved.ok) { setError(saved.reason); return }
-      const r = await sendCampaign(saved.data)
-      if (!r.ok) setError(r.reason)
-      done(saved.data, '')
-    })
-  }
+
   const remove = () => {
     if (!form.id || !window.confirm(`Remove “${form.name}”?`)) return
     startBusy(async () => {
@@ -270,7 +260,9 @@ function Editor({ start, brands, ready, canManage, onDone }: { start: Form; bran
           <button type="button" className={s.btn} disabled title="Comes with Meta">Send test to me</button>
           {start.day && start.id ? <button type="button" className={s.btn} disabled={busy} onClick={() => save(null, 'Schedule cancelled — it is a draft again.')}>Cancel schedule</button> : null}
           <button type="button" className={s.btn} disabled={busy || !!problem} onClick={() => save(null, 'Saved as a draft.')}>Save draft</button>
-          <button type="button" className={s.btn} disabled={busy || !!problem || reach === 0} onClick={sendNow} title="Recorded on each conversation — Meta is not connected">Send now</button>
+          {/* Go-live 2026-10-28: a campaign only records its message on each conversation — Meta does not send it yet, so a
+              real customer would be shown a message they never got. Send now comes back with campaign sending. */}
+          <button type="button" className={s.btn} disabled title="Not sent through Meta yet — comes after the go-live">Send now</button>
           <button type="button" className={s.btn} data-strong="" disabled={busy || !!problem || !scheduledIso || reach === 0}
             title={!scheduledIso ? 'Pick a day and time' : undefined} onClick={() => save(scheduledIso, 'Scheduled.')}>
             {start.day && start.id ? 'Update schedule' : `Schedule for ${reach}`}

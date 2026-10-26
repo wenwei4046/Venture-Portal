@@ -80,7 +80,7 @@ export function loadHours(): Promise<Read<BusinessHours>> {
   return rpc<BusinessHours>('lead_business_hours', undefined, 'The business hours')
 }
 
-/** Reply rules: by ad, and by page and channel (mig 20261023100000). */
+/** Reply rules: by ad, and by page and channel (mig 20261023100010). */
 export function loadReplyRules(): Promise<Read<ReplyRules>> {
   return rpc<ReplyRules>('lead_reply_rules', undefined, 'The reply rules')
 }

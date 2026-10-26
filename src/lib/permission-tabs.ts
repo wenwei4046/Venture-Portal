@@ -267,7 +267,7 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('lead', 'campaigns', 'Campaigns', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
   // Flows (phase 2, mig 20261016310000): the button flows, set up as Settings is (Manage, with its Edit).
   tab('lead', 'flows', 'Reply templates', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
-  // Reply rules and the Step library (redesign v2 step 4, mig 20261023100000): set up as Settings is (Manage, with its Edit).
+  // Reply rules and the Step library (redesign v2 step 4, mig 20261023100010): set up as Settings is (Manage, with its Edit).
   tab('lead', 'rules', 'Reply rules', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
   tab('lead', 'library', 'Step library', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
   // AI Agent and its Data Center (mig 20261016330000): the soul and the cards it may quote, set up as Settings is.

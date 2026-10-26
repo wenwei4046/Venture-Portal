@@ -66,7 +66,7 @@ export default function InsightView({ contacts, onlyTests, range, brands, more, 
         </span>
       </div>
       <div className={s.scroll}>
-        {onlyTests ? <div className={s.note}>Only test conversations so far (Meta is not connected): these numbers come from tests.</div> : null}
+        {onlyTests ? <div className={s.note}>Only test conversations so far: these numbers come from tests.</div> : null}
 
         <section className={s.section}>
           <div className={s.sectHead}><h2 className={s.h2}>From message to sale</h2><span className={s.sub}>{range.label} · {brandName}</span></div>

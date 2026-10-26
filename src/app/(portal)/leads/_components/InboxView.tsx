@@ -23,7 +23,8 @@ import s from './inbox.module.css'
  * where they stand), the chat (who replies NOW, where the customer came from, the messages, the composer with the
  * AI draft) and the customer (the phone card, the hand-over, what the salesperson needs, the timeline).
  *
- * Meta is not connected yet: a reply is recorded, not sent, and conversations arrive only through Settings › Test.
+ * Messenger is connected (2026-10-26): a brand’s Page brings its customers in, and a reply is recorded, then sent through
+ * Meta — a reply Meta refused says why under it. Instagram is not connected yet.
  * What the handoff draws that needs the database first is drawn and held, saying so: switching who replies, photos
  * and files. The General info menu inserts the brand's live cards (step 3).
  */
@@ -144,7 +145,7 @@ export default function InboxView({
       <div className={s.head}>
         <h1 className={s.title}>Inbox</h1>
         <div className={s.status}>
-          <span className={s.dot} aria-hidden="true" />Meta not connected · only test conversations · replies are recorded, not sent
+          <span className={s.dot} aria-hidden="true" />Messenger connected · Instagram not yet · replies outside 24 hours are not sent
         </div>
       </div>
 
@@ -333,6 +334,8 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
       setUsed(null)
       setText('')
       onSent()
+      // Saved, but Messenger did not take it (the window, the connection): say why — the message shows "not sent".
+      if (r.data.notSent) setError('Saved but not sent: ' + r.data.notSent)
     })
   }
   const askDraft = () => {
@@ -514,7 +517,7 @@ function MessageLabel({ m }: { m: LeadMessage }) {
   )
 }
 
-/** Under a message: its time — and, for ours, whether it was only recorded (Meta not connected) or not sent. */
+/** Under a message: its time — and, for ours, whether Meta took it, or it was only recorded (a test, Instagram), or not sent. */
 function metaOf(m: LeadMessage): string {
   if (m.direction === 'in') return timeOf(m.at)
   return [timeOf(m.at), m.delivery === 'recorded' ? 'recorded' : m.delivery === 'failed' ? 'not sent' : 'sent'].join(' · ')

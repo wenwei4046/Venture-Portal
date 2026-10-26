@@ -556,8 +556,8 @@ const lockedInfo = await q(`select count(*)::int n from information_schema.role_
   where table_name in ('lead_info_cats','lead_info_cards','lead_business_hours') and grantee in ('anon','authenticated')`)
 check(lockedInfo[0].n, 0, 'no grants on the new tables')
 
-// ── Reply rules, Reply templates and the Step library (mig 20261023100000; the registry rows are production's, left out here) ──
-const replySql = (await readFile(new URL('../../supabase/migrations/20261023100000_lead_reply.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+// ── Reply rules, Reply templates and the Step library (mig 20261023100010; the registry rows are production's, left out here) ──
+const replySql = (await readFile(new URL('../../supabase/migrations/20261023100010_lead_reply.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
 await db.exec(replySql.slice(0, replySql.indexOf('-- ── The two new pages, by name')))
 await db.exec((await readFile(new URL('../../supabase/migrations/20261023100100_lead_reply_guards.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
 await as(CS_USER, ALL)
@@ -797,6 +797,77 @@ await db.exec(`
   await db.exec(`insert into public.file_objects (bucket_id, name) values ('lead-data', '${r2Path}')`)
   const r2File = (await q(`select public.lead_save_data_file(null, $1::jsonb) id`, [JSON.stringify({ kind: 'file', name: 'Price list', path: r2Path, mime: 'application/pdf', sizeBytes: 1200 })]))[0].id
   check(typeof r2File, 'string', 'a file in file_objects is saved')
+}
+
+// ── Messenger connected (mig 20261026110000 + its guards): the webhook's ingest, the templates' outbox, a reply sent ──
+{
+  const msgr = f => readFile(new URL(`../../supabase/migrations/${f}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  await db.exec(await msgr('20261026110000_lead_messenger.sql'))
+  await db.exec(await msgr('20261026110100_lead_messenger_guards.sql'))
+  const P2990 = '946946021838962', PCARRES = '504171022789980'
+  await db.exec(`update public.lead_brands set fb_page_id = '${P2990}' where id = '${b2990}';
+    update public.lead_brands set fb_page_id = '${PCARRES}' where id = '${bCarress}';
+    update public.lead_brands set fb_page_id = null where id = '${bMini}'`)
+  const ingest = async msgs => (await q('select public.lead_ingest_messenger($1::jsonb) r', [JSON.stringify(msgs)]))[0].r
+  const msg = (mid, pageId, psid, body, extra = {}) => ({ externalId: mid, pageId, psid, name: 'Nur Iman', kind: 'text', body, sentAt: '2026-10-28T03:00:00Z', ad: null, ...extra })
+  const contactOf = async psid => (await q(`select id, brand_id, page_id, name, is_test, phone, phone_state from public.lead_contacts where channel = 'messenger' and external_id = $1`, [psid]))
+
+  // A new customer from a "mini" ad on the 2990s Page is 2990s mini's; their next message finds the same conversation.
+  const r1 = await ingest([msg('m.001', P2990, '7700001', '你好', { ad: { sourceId: '120210000000077', headline: 'Mini Sofa Week', sourceUrl: null, media: 'video' } })])
+  check([r1.messages, r1.ignored, r1.contacts.length], [1, 0, 1], 'one message, one conversation')
+  const [iman] = await contactOf('7700001')
+  check([iman.brand_id, iman.page_id, iman.name, iman.is_test], [bMini, P2990, 'Nur Iman', false], 'a mini ad’s customer is 2990s mini’s, with the Page kept')
+  const r2 = await ingest([msg('m.002', P2990, '7700001', '我的號碼 012-338 4721'), msg('m.002', P2990, '7700001', 'again')])
+  check([r2.messages, r2.ignored], [1, 1], 'the same mid twice is taken once')
+  const after2 = await contactOf('7700001')
+  check(after2.length, 1, 'the next message finds the same conversation')
+  check([after2[0].phone, after2[0].phone_state], ['0123384721', 'detected'], 'a phone in the message is found')
+  const events = (await q(`select what from public.lead_events where contact_id = $1 order by id`, [iman.id])).map(e => e.what)
+  check([events.includes('Came in from the ad Mini Sofa Week'), events.includes('Phone found in the message')], [true, true], 'the timeline says how they came and the phone')
+
+  // An attachment with no words, a Page no brand names, a PSID that is not one, and Carress's own Page.
+  const r3 = await ingest([
+    msg('m.003', PCARRES, '7700002', null, { kind: 'image' }),
+    msg('m.004', '999999999', '7700003', 'hi'),
+    msg('m.005', P2990, 'abc', 'hi'),
+  ])
+  check([r3.messages, r3.ignored], [1, 2], 'an unknown Page and a bad PSID are ignored')
+  const [carres] = await contactOf('7700002')
+  check(carres.brand_id, bCarress, 'Carress’s Page is Carress’s')
+  check((await q(`select body from public.lead_messages where external_id = 'm.003'`))[0].body, '[Photo]', 'a photo with no words reads [Photo]')
+
+  // The outbox: what a template wrote in the last ten minutes, real Messenger conversations only; Meta's answer kept.
+  await db.exec(`insert into public.lead_messages (contact_id, direction, sender, body, buttons)
+    values ('${iman.id}', 'out', 'flow', 'Which one?', '["3-seater","L-shape"]'::jsonb)`)
+  const out = (await q('select public.lead_outbox($1::uuid[]) o', [[iman.id, carres.id]]))[0].o
+  const ours = out.filter(o => o.body === 'Which one?')
+  check(ours.map(o => [o.pageId, o.psid, o.buttons]), [[P2990, '7700001', ['3-seater', 'L-shape']]], 'the template’s message, with its Page, customer and buttons')
+  check(out.every(o => o.pageId && o.psid && o.lastInAt), true, 'every outgoing message knows where it goes and the window')
+  await q('select public.lead_outbox_done($1::jsonb)', [JSON.stringify([...out.filter(o => o !== ours[0]).map(o => ({ id: o.id, error: 'Outside the window' })), { id: ours[0].id, mid: 'm_out_1' }])])
+  check((await q(`select delivery, external_id from public.lead_messages where id = $1`, [ours[0].id]))[0], { delivery: 'sent', external_id: 'm_out_1' }, 'sent: Meta’s id kept')
+  check((await q('select public.lead_outbox($1::uuid[]) o', [[iman.id, carres.id]]))[0].o, [], 'nothing goes twice')
+  await db.exec(`update public.lead_contacts set is_test = true where id = '${carres.id}';
+    insert into public.lead_messages (contact_id, direction, sender, body) values ('${carres.id}', 'out', 'flow', 'test only')`)
+  check((await q('select public.lead_outbox($1::uuid[]) o', [[carres.id]]))[0].o, [], 'a test conversation sends nothing')
+
+  // Customer Service's reply: recorded first, then where it goes, then what Meta said — the caller's own reply only.
+  await as(CS_USER, ALL)
+  const reply = (await q(`select public.lead_reply($1, 'Ya, ada stok') r`, [iman.id]))[0].r
+  const replyId = typeof reply === 'object' && reply !== null ? reply.id : reply
+  const target = (await q('select public.lead_reply_target($1::bigint) t', [replyId]))[0].t
+  check([target.channel, target.pageId, target.psid, target.isTest], ['messenger', P2990, '7700001', false], 'the reply goes to the customer through their Page')
+  await as(OTHER, ALL)
+  check((await q('select public.lead_reply_target($1::bigint) t', [replyId]))[0].t, null, 'somebody else’s reply is not theirs to send')
+  await q(`select public.lead_reply_sent($1::bigint, 'm_x', null)`, [replyId])
+  check((await q(`select delivery from public.lead_messages where id = $1`, [replyId]))[0].delivery, 'recorded', 'nor theirs to mark sent')
+  await as(CS_USER, ['leads.view'])
+  await refuses(`select public.lead_reply_sent($1::bigint, 'm_x', null)`, [replyId], /Lead View · Create/, 'marking it sent needs Create')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_reply_sent($1::bigint, null, 'More than 24 hours since the customer’s last message')`, [replyId])
+  check((await q(`select delivery, delivery_error from public.lead_messages where id = $1`, [replyId]))[0], { delivery: 'failed', delivery_error: 'More than 24 hours since the customer’s last message' }, 'not sent: why is kept')
+  check((await q('select public.lead_reply_target($1::bigint) t', [replyId]))[0].t, null, 'an answered reply is not sent again')
+  const src = (await q(`select prosrc from pg_proc where proname = 'lead_reply_sent'`))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.create']);`), true, 'lead_reply_sent asks the Inbox')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

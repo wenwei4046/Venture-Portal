@@ -9,6 +9,7 @@ import { askModel, type AgentDocument } from './ai-model'
 import { agentCards, agentReads, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile, type FixedAnswer, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
 import { quickProblem, type QuickReply } from './quick'
+import { deliver } from './messenger'
 import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
 import type { BusinessHours, InfoCard, InfoCat, LeadInfo } from './info'
@@ -53,10 +54,31 @@ export async function readThread(contactId: string): Promise<LeadOutcome<LeadThr
   return { ok: true, data: data as LeadThread | null }
 }
 
-/** Customer Service replies (recorded only until Meta is connected). */
-export async function replyToLead(contactId: string, body: string) {
+/**
+ * Customer Service replies: recorded first (lead_reply), then — on a real Messenger conversation — sent through the
+ * brand's Page (lib/leads/messenger.ts, mig 20261026110000) and Meta's answer kept (lead_reply_sent). A test
+ * conversation is only recorded. The reply is saved whatever Meta says; `notSent` says why it did not go.
+ */
+export async function replyToLead(contactId: string, body: string): Promise<LeadOutcome<{ id: number; notSent: string | null }>> {
   await requireActionOn('/leads', 'leads', 'create')
-  return call<number>('lead_reply', { p_contact: contactId, p_body: body }, 'The reply was not saved.')
+  const saved = await call<number>('lead_reply', { p_contact: contactId, p_body: body }, 'The reply was not saved.')
+  if (!saved.ok) return saved
+  return { ok: true, data: { id: saved.data, notSent: await deliverReply(saved.data) } }
+}
+
+/** Send a reply just recorded; null when it went (or is a test's, kept here only), else why not. */
+async function deliverReply(messageId: number): Promise<string | null> {
+  const target = await quiet<{ isTest: boolean; channel: string; pageId: string | null; psid: string; body: string; lastInAt: string | null } | null>(
+    'lead_reply_target', { p_message: messageId }, '')
+  // Before mig 20261026110000 (no lead_reply_target), or a test conversation: recorded, as it always was.
+  if (!target.ok || !target.data || target.data.isTest) return null
+  const t = target.data
+  const result = t.channel === 'messenger'
+    ? await deliver({ pageId: t.pageId, psid: t.psid, body: t.body, lastInAt: t.lastInAt }, process.env.META_SYSTEM_USER_TOKEN?.trim())
+    : { error: 'Instagram is not connected yet — reply in the Instagram app.' }
+  await quiet<null>('lead_reply_sent', { p_message: messageId, p_mid: 'mid' in result ? result.mid : null, p_error: 'error' in result ? result.error : null }, '')
+  revalidatePath('/leads', 'layout')
+  return 'error' in result ? result.error : null
 }
 
 /** The customer card: name, phone, interest, budget, showroom, time, note. */

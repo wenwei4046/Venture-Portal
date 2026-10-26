@@ -1,4 +1,4 @@
--- Lead View › Reply rules, Reply templates and the Step library (2026-10-23, mig 20261023100000): their writes ask
+-- Lead View › Reply rules, Reply templates and the Step library (2026-10-23, mig 20261023100010): their writes ask
 -- their own pages, as the app's gates in lib/leads/actions.ts name them — Reply templates' Edit (/leads/flows), Reply
 -- rules' Edit (/leads/rules) and the Step library's Edit (/leads/library; a library save also from a template's canvas, so both), each Lead View · Manage. The guard goes in
 -- right after each function's own check (`PERFORM public.lead_need(…);`, once).

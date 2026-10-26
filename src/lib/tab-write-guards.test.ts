@@ -28,6 +28,7 @@ const NOT_GUARDED: Readonly<Record<string, string>> = {
   lead_info: 'a read: General info, for the draft about to be written',
   lead_data_files: 'a read: the Data Center files the agent reads, for the draft about to be written',
   lead_quick_replies: 'a read: the quick replies the agent may reuse, for the draft about to be written',
+  lead_reply_target: 'a read: the reply just saved, for Meta to send — its write (lead_reply) and its answer (lead_reply_sent) ask the page',
   hr_letter_file:
     'the new contract Renew files (renewContract, 2026-10-24): it rides with the renewal, the write People · Edit ' +
     'narrows (an UPDATE under the row policies); the letter is Documentation · Create’s, which only the Data ' +
