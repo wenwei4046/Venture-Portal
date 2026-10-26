@@ -230,16 +230,16 @@ export function moduleInfo(code: string): { desc: string; seats: number; chaise:
 /**
  * A module's back cushions — its compartments (2026-10-27, the Houzs ERP's `SOFA_MODULES`
  * `cushions`; the user: "每一个 compartment 只会有一个 back cushion（1A 是一个 back cushion，2A 就是
- * 两个 back cushion）"): a 1A / 1B / 1NA / 1S one, a 2A / 2B / 2NA / 2S two, a 3S three; a chaise or a
- * corner one; a console or a stool none; a whole sofa (`6FT`) or anything else one ("都当 1 个").
- * A special charged by quantity counts these — on a bill (`catalogue_apply_sofa_charges`) and
- * as the Quote's first +.
+ * 两个 back cushion）"): a 1A / 1B / 1NA / 1S one, a 2A / 2B / 2NA / 2S two, a 3S three; a chaise
+ * one; a corner none (the user: "cnr , put = 0"), a console or a stool none; a whole sofa (`6FT`)
+ * or anything else one ("都当 1 个"). A special charged by quantity counts these — on a bill
+ * (`catalogue_apply_sofa_charges`) and as the Quote's first +.
  */
 export function moduleCushions(code: string): number {
   const base = (code.trim().match(/^[^()\s]*/)?.[0] ?? "").toUpperCase();
   const fam = base.match(/^(\d)(A|B|NA|S)$/);
   if (fam) return Number(fam[1]);
-  return base === "CONSOLE" || base === "STOOL" || base === "OTT" ? 0 : 1;
+  return base === "CNR" || base === "CONSOLE" || base === "STOOL" || base === "OTT" ? 0 : 1;
 }
 
 function compareRank(a: number[], b: number[]): number {

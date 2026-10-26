@@ -1,16 +1,16 @@
-// Local PostgreSQL regression for 20261027020300 (2026-10-27 — the user, showing the ERP's New Sales Order, its
-// Special Orders ticked from a list: "只要他的 description 能 match 到 … 在这边就自然而然从 sales order 那边扣除那个
-// Special Order 的 total amount", "有些是 full set 的，直接用它的价钱减 300 块 … 如果有些是 by seat / by compartment，就看它
-// 有哪几个 compartment … 1A 是一个 back cushion，2A 就是两个 back cushion"; a whole sofa "都当 1 个"; the special
-// order's own money "只照 Maintenance").
+// Local PostgreSQL regression for 20261027020300 and 20261027024500 (2026-10-27 — the user, showing the ERP's New Sales
+// Order, its Special Orders ticked from a list: "只要他的 description 能 match 到 … 在这边就自然而然从 sales order 那边扣除
+// 那个 Special Order 的 total amount", "有些是 full set 的，直接用它的价钱减 300 块 … 如果有些是 by seat / by compartment，
+// 就看它有哪几个 compartment … 1A 是一个 back cushion，2A 就是两个 back cushion"; a whole sofa "都当 1 个"; the special
+// order's own money "只照 Maintenance"; then, of the corner: "cnr , put = 0").
 // Production's own bodies — the repo's last copies, md5-checked against production's — run over stand-ins for the
-// tables they read; 20261026173700 brings catalogue_apply_sofa_charges to what production runs today (cbab7a6e…);
-// then 20261027020300 runs VERBATIM, twice. What is under test: on a bill each special any piece of a sofa names is
-// charged Maintenance's price, matched by name — a Full set one once per sofa × the sofas, a By quantity one once per
-// compartment (each piece's back cushions, the ERP's SOFA_MODULES, × its quantity: 1A / 1B / 1NA / 1S one, 2A / 2NA /
-// 2S two, 3S three, a chaise or a corner one, a console or a stool none, a whole sofa one); the leg height still once
-// per sofa; the bill's own special-order money never read; a re-delivery without the special lets go; idempotent; what
-// landed is the md5 the file names. No live I/O.
+// tables they read; 20261026173700 brings catalogue_apply_sofa_charges to what production ran on 2026-10-26
+// (cbab7a6e…); then 20261027020300 runs VERBATIM, twice, and 20261027024500 after it, twice. What is under test: on a
+// bill each special any piece of a sofa names is charged Maintenance's price, matched by name — a Full set one once per
+// sofa × the sofas, a By quantity one once per compartment (each piece's back cushions × its quantity: 1A / 1B / 1NA /
+// 1S one, 2A / 2NA / 2S two, 3S three, a chaise one, a corner, a console or a stool none, a whole sofa one); the leg
+// height still once per sofa; the bill's own special-order money never read; a re-delivery without the special lets
+// go; idempotent; what landed is the md5 each file names. No live I/O.
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -121,7 +121,11 @@ check(await bodyMd5(APPLY), 'cbab7a6e35a7b1c8dbd391326311ec70', 'catalogue_apply
 const mig = await migration('20261027020300_sofa_specials_by_compartment')
 await db.exec(mig)
 await db.exec(mig)
-check(await bodyMd5(APPLY), 'c0146d4639ed8963daf6b9f6479af167', 'catalogue_apply_sofa_charges: the file’s body')
+check(await bodyMd5(APPLY), 'c0146d4639ed8963daf6b9f6479af167', 'catalogue_apply_sofa_charges: 20261027020300’s body')
+const corner = await migration('20261027024500_sofa_corner_has_no_back_cushion')
+await db.exec(corner)
+await db.exec(corner)
+check(await bodyMd5(APPLY), 'cefb19e6d7f7b7479dd752e5d9ac9d60', 'catalogue_apply_sofa_charges: 20261027020300’s, one statement swapped')
 
 // ── The catalogue as production has it on 2026-10-27 ────────────────────────
 for (const code of ['9028-2A(LHF)', '9028-L(RHF)', '9058-L(LHF)', '8030-1A(LHF)', '8030-1NA', '8030-1A(RHF)', '8030-CNR',
@@ -220,13 +224,19 @@ check(got[1].cost_detail.charge_set, { sets: 2, compartments: 6, total: 2200, li
 check(got[1].cost_detail.charges.map(c => [c.value, c.count]), [['5"', 2], ['Change 8030 Backcushion', 6], ['Seat Base Fully Cover with no Leg', 2]],
   'each part says how many times')
 
-// Every module the ERP's SOFA_MODULES names: a corner one, a console and a stool none, a 3S three, a powered 1A one, a
-// 2NA two, a 1S one, a 2S two — 10 compartments.
+// Every module the ERP's SOFA_MODULES names: a corner, a console and a stool none (the corner the user's: "cnr , put =
+// 0"), a 3S three, a powered 1A one, a 2NA two, a 1S one, a 2S two — 9 compartments.
 const C = await bill(3, ['8030-CNR', '8030-Console', '8030-STOOL', '8030-3S', '8030-1A(P)(LHF)', '8030-2NA', '8030-1S', '8030-2S']
   .map((code, i) => piece(code, { amount: i === 3 ? 9000 : 0, specials: ['Change 8030 Backcushion'] })))
 await apply(C)
-check((await lines(C))[3].cost_detail.charge_set.compartments, 10, 'CNR 1, Console 0, Stool 0, 3S 3, 1A(P)(LHF) 1, 2NA 2, 1S 1, 2S 2')
-check((await lines(C)).reduce((a, l) => a + l.charge, 0), 2000, 'RM 200 × 10')
+check((await lines(C))[3].cost_detail.charge_set.compartments, 9, 'CNR 0, Console 0, Stool 0, 3S 3, 1A(P)(LHF) 1, 2NA 2, 1S 1, 2S 2')
+check((await lines(C)).reduce((a, l) => a + l.charge, 0), 1800, 'RM 200 × 9')
+
+// HC-SO-013497's shape: 9058 1A(LHF) + 1A(RHF) + 1NA + CNR with Change 8030 Backcushion — three compartments, not four.
+const C2 = await bill(8, ['8030-1A(LHF)', '8030-1A(RHF)', '8030-1NA', '8030-CNR']
+  .map((code, i) => piece(code, { amount: i === 0 ? 7000 : 0, specials: ['Change 8030 Backcushion'] })))
+await apply(C2)
+check((await lines(C2)).map(l => l.charge), [600, 0, 0, 0], 'a corner adds no compartment: RM 200 × 3')
 
 // A whole sofa (no module of the ERP's): one — the user: "都当 1 个".
 const D = await bill(4, [piece('8211-6FT', { qty: 1, amount: 3000, specials: ['Change 8030 Backcushion', 'Seat Base Fully Cover with no Leg'] })])
