@@ -403,9 +403,10 @@ export interface TeamInput {
 const CAP_NOTE = "Waiting-list matches use eligibility, start dates and open places. Direct-report capacity is checked separately.";
 
 /**
- * The family chart: everybody above (to the department's directors), the member, two levels below. A Revenue
- * Director (2026-10-14) holds no seat: on the department's rail, they are the top of the chart and the top of every
- * tree reports to them — the other directors are their peers, never drawn above them.
+ * The family chart: everybody above (to the department's directors), the member, and everybody below them, every
+ * level down (2026-10-27 — the user: "let all people can view their own full tree"; two levels until then). A
+ * Revenue Director (2026-10-14) holds no seat: on the department's rail, they are the top of the chart and the top of
+ * every tree reports to them — the other directors are their peers, never drawn above them.
  */
 export function teamVM(input: TeamInput): TeamVM | null {
   const people = input.map.people.filter(p => p.departmentId === input.departmentId);
@@ -450,10 +451,14 @@ export function teamVM(input: TeamInput): TeamVM | null {
     ...[...chain].reverse().map(p => ({ level: "UPLINE", nodes: [{ id: p.id, name: p.name, title: titleOf(p), ini: initials(p.name), dot: "up" as const }] })),
   ];
   const above = directors.length + chain.length;
-  const kids: TeamKidVM[] = childrenOf(me.id).map(k => ({
-    id: k.id, name: k.name, title: k.title, ini: initials(k.name), dot: status(k.staffId)[1],
-    kids: childrenOf(k.id).map(g => ({ id: g.id, name: g.name, title: g.title, ini: initials(g.name), dot: status(g.staffId)[1] })),
-  }));
+  // Everybody below, every level down. A person stands once: a line of the map that loops back ends there.
+  const placed = new Set([me.id, ...chain.map(p => p.id)]);
+  const under = (nodeId: string): TeamKidVM[] => childrenOf(nodeId).filter(k => !placed.has(k.id)).map(k => {
+    placed.add(k.id);
+    return { id: k.id, name: k.name, title: k.title, ini: initials(k.name), dot: status(k.staffId)[1], kids: under(k.id) };
+  });
+  const kids = under(me.id);
+  const everyone = (nodes: TeamKidVM[]): number => nodes.reduce((n, k) => n + 1 + everyone(k.kids), 0);
 
   const sales = (staffId: string) => {
     const p = score.get(staffId);
@@ -482,12 +487,15 @@ export function teamVM(input: TeamInput): TeamVM | null {
   const upline = me.parentId ? byNode.get(me.parentId) : undefined;
   if (lead) sheets[me.id] = directorSheet(lead, true);
   else own(me, upline ? `Reports to ${upline.name}` : directors.length ? `Reports to ${directors.map(d => d.name).join(" · ")}` : "Top of the team", true);
-  for (const k of childrenOf(me.id)) {
-    own(k, "Reports to you");
-    for (const g of childrenOf(k.id)) own(g, `Reports to ${k.name}`);
-  }
+  const sheetsBelow = (nodes: TeamKidVM[], reportsTo: string) => {
+    for (const k of nodes) {
+      const p = byNode.get(k.id);
+      if (p) own(p, reportsTo);
+      sheetsBelow(k.kids, `Reports to ${k.name}`);
+    }
+  };
+  sheetsBelow(kids, "Reports to you");
 
-  const below = kids.length + kids.reduce((a, k) => a + k.kids.length, 0);
   const cap = input.capacity;
   const open = cap !== null ? cap - input.occupied : null;
   const meNode: TeamNodeVM = lead
@@ -502,7 +510,7 @@ export function teamVM(input: TeamInput): TeamVM | null {
       full: open !== null && open <= 0,
       note: CAP_NOTE,
     },
-    count: `${above} above · ${below} below`,
+    count: `${above} above · ${everyone(kids)} below`,
     legend: [input.kpi.enabled ? "KPI hit" : "Selling", "Pending", "Upline"],
     ups,
     me: meNode,

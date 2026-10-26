@@ -608,35 +608,14 @@
 .nodeTitle { font-size: calc(11px * var(--rv-type)); color: var(--rv-sub); line-height: 1.25; }
 .stem { display: block; width: 2px; background: var(--rv-tree-line); }
 .kids { display: flex; justify-content: center; width: 100%; }
-/* 145 = the prototype's 580 shared by four; fewer stay that close together under "you" */
-.kid { flex: none; width: 145px; display: flex; flex-direction: column; align-items: center; }
+/* A person below you and their own people under them, every level down (2026-10-27): its width is TeamPage's — 145
+   for a direct report (the prototype's 580 shared by four; fewer stay that close together under "you"), 132 further
+   down, or its people's row when that is wider */
+.kid { flex: none; display: flex; flex-direction: column; align-items: center; }
 .bus { display: flex; width: 100%; height: 2px; }
 .busHalf { flex: 1; background: var(--rv-tree-line); }
 .busGap { background: transparent; }
 .busMid { width: 2px; background: var(--rv-tree-line); }
-.grand { display: flex; flex-direction: column; align-items: center; gap: 0; }
-.grandWrap { display: flex; flex-direction: column; align-items: center; }
-/* The prototype's 112px, grown to its name and title up to the column (145 less a gap), wrapped past that */
-.grandNode {
-  min-width: 112px;
-  max-width: 137px;
-  box-sizing: border-box;
-  border-radius: 14px;
-  border: 1px dashed var(--rv-tree-line);
-  background: var(--rv-white);
-  padding: 8px 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-align: left;
-  color: var(--rv-ink);
-  white-space: normal;
-  overflow-wrap: break-word;
-}
-.grandAv { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; background: var(--rv-sand); color: var(--rv-brown); font-size: max(10px, calc(10.5px * var(--rv-type))); font-weight: 700; display: grid; place-items: center; }
-.grandText { min-width: 0; }
-.grandName { display: block; font-size: calc(11.5px * var(--rv-type)); font-weight: 650; line-height: 1.2; }
-.grandTitle { display: block; font-size: max(10px, calc(10px * var(--rv-type))); color: var(--rv-sub); margin-top: 1px; }
 .swipe { font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
 .psWho { display: flex; align-items: center; gap: 14px; }
 .psAv { flex: 0 0 52px; width: 52px; height: 52px; border-radius: 50%; background: var(--rv-sand); color: var(--rv-brown); font-size: calc(16px * var(--rv-type)); font-weight: 750; display: grid; place-items: center; }
@@ -701,8 +680,10 @@
   text-align: left;
   color: var(--rv-ink);
 }
-.reqTitle { display: block; font-size: calc(14.5px * var(--rv-type)); font-weight: 600; }
-.reqSub { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); margin-top: 2px; }
+/* The app's buttons never wrap (the prototype's own rule); a row's title and line must — a long IT request's title
+   ran under its status chip (2026-10-27) */
+.reqTitle { display: block; font-size: calc(14.5px * var(--rv-type)); font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.reqSub { display: block; font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); margin-top: 2px; white-space: normal; overflow-wrap: anywhere; }
 .status { font-size: calc(11.5px * var(--rv-type)); font-weight: 650; border-radius: 8px; padding: 3px 8px; white-space: nowrap; }
 .rdTitle { display: block; font-family: var(--font-display-rv); font-size: calc(20px * var(--rv-type)); font-weight: 700; letter-spacing: -.02em; }
 .rdId { display: block; font-size: calc(13px * var(--rv-type)); color: var(--rv-sub); margin-top: 3px; }
