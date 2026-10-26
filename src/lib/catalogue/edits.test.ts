@@ -373,6 +373,27 @@ describe('validateOptionPrices', () => {
     ])
   })
 
+  // 2026-10-26: a sofa special is charged once per sofa or by quantity — only a sofa special.
+  it('says how a sofa special is charged, and only when told', () => {
+    expect(validateOptionPrices('sofa_specials', [
+      { value: 'Change 8030 Backcushion', price: '200', byQuantity: true },
+      { value: 'Seat Base Fully Cover', price: '300', byQuantity: false },
+      { value: 'Wooden Arm', price: '120' },
+    ]).upserts).toEqual([
+      { pool: 'sofa_specials', value: 'Change 8030 Backcushion', price: 200, by_quantity: true },
+      { pool: 'sofa_specials', value: 'Seat Base Fully Cover', price: 300, by_quantity: false },
+      // Not told (a page from before): the saved choice stands.
+      { pool: 'sofa_specials', value: 'Wooden Arm', price: 120 },
+    ])
+    expect(() => validateOptionPrices('bedframe_specials', [{ value: 'Hydraulic', price: '300', byQuantity: true }]))
+      .toThrow('Hydraulic: only a sofa special is charged by quantity')
+    expect(() => validateOptionPrices('sofa_leg_heights', [{ value: '6"', price: '100', byQuantity: true }]))
+      .toThrow('only a sofa special is charged by quantity')
+    // A leg's "not by quantity" is no choice at all: nothing is written for it.
+    expect(validateOptionPrices('sofa_leg_heights', [{ value: '6"', price: '100', byQuantity: false }]).upserts)
+      .toEqual([{ pool: 'sofa_leg_heights', value: '6"', price: 100 }])
+  })
+
   it.each(['sofa_sizes'])('refuses a price on %s — that list carries no price', pool => {
     expect(() => validateOptionPrices(pool, [{ value: '12"', price: '5' }])).toThrow('That list carries no price')
   })

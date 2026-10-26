@@ -136,7 +136,8 @@ export type Pool = (typeof POOLS)[number]
  *              margin on both sides, in the commissionable sales, never KPI.
  *              A bed frame's divan, leg, gap, total height and specials, per
  *              frame (`lineCharge`); a sofa's leg height and specials, ONCE
- *              PER SOFA however many pieces (`sofaSetCharges`).
+ *              PER SOFA however many pieces (`sofaSetCharges`) — or a special
+ *              BY QUANTITY on the Quote (`specialQtyCharges`, 2026-10-26).
  *   null     — no price: a sofa's seat size, which is the grid's own axis.
  *
  * No option adds to a line's COST any more (catalogue_line_surcharge answers 0).
@@ -279,7 +280,10 @@ export interface SofaSetCharge {
  * is charged once (priced above zero), times the sets — the smallest quantity
  * among the pieces. A group nothing is charged for is left out. (The SQL then
  * spreads each set's total over its lines by what they sell for; a quote needs
- * only the total.)
+ * only the total.) Since 2026-10-26 the Quote passes only the specials charged
+ * once per sofa (one charged by quantity is `specialQtyCharges`), and a bill's
+ * specials are what its special order charges — the run reads the leg alone
+ * at Maintenance's price.
  */
 export function sofaSetCharges(lines: readonly SofaSetLine[], prices: OptionPrices): SofaSetCharge[] {
   const groups = new Map<string, SofaSetLine[]>()
@@ -305,6 +309,35 @@ export function sofaSetCharges(lines: readonly SofaSetLine[], prices: OptionPric
     if (!(unit > 0)) continue
     const sets = Math.max(1, Math.floor(Math.min(...members.map(m => m.qty))))
     out.push({ group, sets, unit, total: roundCents(unit * sets), parts })
+  }
+  return out
+}
+
+/** A special charged by quantity: its price each, how many, and what that comes to. */
+export interface SpecialQtyCharge {
+  value: string
+  price: number
+  qty: number
+  total: number
+}
+
+/**
+ * A sofa's specials charged BY QUANTITY (Product List › Maintenance, 2026-10-26 — the user:
+ * "change 8030 back cushion，一个沙发可能有三个 compartment（三个 seat），所以这个东西应该要乘三"):
+ * each priced above zero, times the quantity the member set — for the cart, never again per
+ * sofa. The Quote's figure alone: on a bill, what the ERP writes as the special order is what
+ * is charged (catalogue_apply_sofa_charges), so the run has no twin of this.
+ */
+export function specialQtyCharges(specials: readonly { value: string; qty: number }[], prices: OptionPrices): SpecialQtyCharge[] {
+  const out: SpecialQtyCharge[] = []
+  const seen = new Set<string>()
+  for (const s of specials) {
+    const k = valueKey(s.value)
+    if (k === null || seen.has(k) || !Number.isInteger(s.qty) || s.qty < 1) continue
+    seen.add(k)
+    const price = prices.get('sofa_specials', s.value)
+    if (price === null || !(price > 0)) continue
+    out.push({ value: s.value.trim(), price, qty: s.qty, total: roundCents(price * s.qty) })
   }
   return out
 }

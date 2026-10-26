@@ -576,6 +576,23 @@
 }
 .cellInput[data-edited] { border-color: var(--rv-accent); background: var(--rv-cream); }
 .cellInput::placeholder { color: var(--rv-placeholder); }
+/* A choice in a cell (Maintenance › Sofa › Specials' CHARGED): CellInput's box, left-aligned. */
+.cellSelect {
+  width: 140px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--rv-line-strong);
+  background: var(--rv-white);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--rv-ink);
+  outline: 0;
+  box-sizing: border-box;
+}
+.cellSelect[data-edited] { border-color: var(--rv-accent); background: var(--rv-cream); }
+.cellSelect:disabled { color: var(--rv-sub); }
 .cellLink {
   height: 28px;
   padding: 0;

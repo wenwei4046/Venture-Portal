@@ -1042,6 +1042,20 @@ function quoteBuild(raw: unknown): QuoteInput["build"] {
   if (leg) build.leg = leg;
   const specials = options(b.specials, "sofa specials");
   if (specials) build.specials = specials;
+  // How many of each special charged by quantity (2026-10-26): whole numbers 1–100.
+  if (b.specialQty !== undefined && b.specialQty !== null) {
+    const raw = b.specialQty;
+    if (typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).length > 20)
+      throw new Error("The sofa special quantities are invalid.");
+    const quantities: Record<string, number> = {};
+    for (const [sp, n] of Object.entries(raw as Record<string, unknown>)) {
+      const value = option(sp, "sofa special");
+      if (!value || typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > 100)
+        throw new Error("The sofa special quantities are invalid.");
+      quantities[value] = n;
+    }
+    if (Object.keys(quantities).length) build.specialQty = quantities;
+  }
   const frame = bedframeBuild(b.bedframe);
   if (frame) build.bedframe = frame;
   return build;

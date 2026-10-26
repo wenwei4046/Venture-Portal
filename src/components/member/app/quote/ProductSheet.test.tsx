@@ -160,3 +160,53 @@ describe("a sofa's accessories", () => {
     expect(screen.getByText("Sofa accessories")).toBeInTheDocument();
   });
 });
+
+// 2026-10-26, the user: "比如 change 8030 back cushion … 应该要乘三。所以它需要在 quotation 那边的 quantity 可以放 plus 和 minus".
+describe("a sofa special charged by quantity", () => {
+  const BACK = { value: "Change 8030 Backcushion", charge: 200, byQuantity: true };
+  const SEAT = { value: "Seat Base Fully Cover", charge: 300 };
+  const catalogWith = (specials: typeof SEAT[]): QCatalog => ({
+    brand: "ZANOTTI", name: "Zanotti", sofa: true, frames: [], kpis: [], accSummary: "0 items", accs: [],
+    models: [{ key: "8030", name: "SOFFIO", desc: "8030", sizes: {}, choices: { legs: [], specials }, modules: [
+      { code: "1A(LHF)", desc: "1-seat · left arm", seats: 1, chaise: false, productId: "s-1a", options: [] },
+    ] }],
+  });
+
+  function drawSofa(specials: typeof SEAT[]) {
+    const patches: Partial<SheetState>[] = [];
+    function Harness() {
+      const [sheet, setSheet] = useState<SheetState>({ mode: "sofa", key: "8030", layout: "C", mods: { "1A(LHF)": 1 }, qty: 1, kpi: [], height: null, tier: null,
+        leg: null, specials: [], specialQty: {}, acc: {}, accAll: false });
+      return <ProductSheet sheet={sheet} catalog={catalogWith(specials)} memory={EMPTY_MEMORY} cart={[]} build={NO_SOFA_BUILD} readOnly={false}
+        actions={{
+          close: vi.fn(), patch: patch => { patches.push(patch); setSheet(s => ({ ...s, ...patch } as SheetState)); },
+          patchFrame: vi.fn(), openBf: vi.fn(), editBf: vi.fn(), removeBf: vi.fn(), backToMattress: vi.fn(), applyFrame: vi.fn(), add: vi.fn(),
+        }} />;
+    }
+    render(<Harness />);
+    return patches;
+  }
+
+  it("counts it with − and +, each at its price, beside the specials charged once per sofa", () => {
+    const patches = drawSofa([SEAT, BACK]);
+    expect(screen.getByText("Not in margin")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Seat Base Fully Cover/ })).toHaveTextContent("+ RM 300 per sofa");
+    const row = screen.getByRole("group", { name: BACK.value });
+    expect(row).toHaveTextContent("+ RM 200 each");
+    expect(within(row).getByText("0")).toBeInTheDocument();
+    for (let i = 0; i < 3; i++) fireEvent.click(within(row).getByRole("button", { name: "Add one" }));
+    expect(within(row).getByText("3")).toBeInTheDocument();
+    expect(patches.at(-1)).toEqual({ specials: [BACK.value], specialQty: { [BACK.value]: 3 } });
+    fireEvent.click(within(row).getByRole("button", { name: "Remove one" }));
+    fireEvent.click(within(row).getByRole("button", { name: "Remove one" }));
+    fireEvent.click(within(row).getByRole("button", { name: "Remove one" }));
+    expect(within(row).getByText("0")).toBeInTheDocument();
+    expect(patches.at(-1)).toEqual({ specials: [], specialQty: {} });
+  });
+
+  it("keeps the once-per-sofa words when nothing is counted", () => {
+    drawSofa([SEAT]);
+    expect(screen.getByText("Once per sofa · not in margin")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Seat Base Fully Cover/ })).toHaveTextContent(/^Seat Base Fully Cover\+ RM 300$/);
+  });
+});

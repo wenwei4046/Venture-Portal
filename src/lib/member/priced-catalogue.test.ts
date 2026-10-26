@@ -82,6 +82,21 @@ describe("reading the calculator's catalogue", () => {
     expect(catalogueModelsOf(null)).toEqual([]);
   });
 
+  // 2026-10-26: a sofa special Maintenance charges by quantity says so — and only `true` says it.
+  it("keeps a special charged by quantity", () => {
+    expect(
+      catalogueModelsOf([{ id: "s1", kind: "SOFA", options: {}, charges: { specials: [
+        { value: "Change 8030 Backcushion", charge: 200, byQuantity: true },
+        { value: "Seat Base Fully Cover", charge: 300, byQuantity: "yes" },
+        { value: "Wooden Arm", charge: 120 },
+      ] } }])[0].charges?.specials,
+    ).toEqual([
+      { value: "Change 8030 Backcushion", charge: 200, byQuantity: true },
+      { value: "Seat Base Fully Cover", charge: 300 },
+      { value: "Wooden Arm", charge: 120 },
+    ]);
+  });
+
   it("reads surcharges (negative allowed) and priced combos", () => {
     const { products, pricing } = pricedCatalogueOf({
       products: [row, { bad: true }],

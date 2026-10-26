@@ -10,7 +10,7 @@ import MaintenanceTab from './MaintenanceTab'
 
 function option(overrides: Partial<MaintenanceOption> = {}): MaintenanceOption {
   return { pool: 'bedframe_divan_heights', value: '24"', label: '24 inch', sortOrder: 0,
-    active: true, removed: false, isNew: false, price: 80, ...overrides }
+    active: true, removed: false, isNew: false, price: 80, byQuantity: false, ...overrides }
 }
 function fabric(overrides: Partial<FabricRow> = {}): FabricRow {
   return { erpId: 'fabric-a', code: 'FAB-A', description: 'Fine fabric', series: 'Linen', category: 'Imported',
@@ -87,11 +87,11 @@ describe('Maintenance workspace', () => {
     changePrice('24 inch sofa leg charge', '40')
     click('Bedframe')
     expect(screen.getByRole('textbox', { name: '24 inch charge' })).toHaveValue('0')
-    click('Save 3 prices')
+    click('Save 3 changes')
     await waitFor(() => expect(saveOptionPrices).toHaveBeenCalledTimes(2))
     expect(saveOptionPrices).toHaveBeenNthCalledWith(1, 'bedframe_divan_heights', [{ value: '24"', price: '0' }, { value: 'DEFAULT', price: '' }])
     expect(saveOptionPrices).toHaveBeenNthCalledWith(2, 'sofa_leg_heights', [{ value: '24"', price: '40' }])
-    expect(await screen.findByRole('status')).toHaveTextContent('3 prices saved.')
+    expect(await screen.findByRole('status')).toHaveTextContent('3 changes saved.')
     expect(refresh).toHaveBeenCalledOnce()
     // Zero is a charge of nothing; a cleared divan height is free of charge.
     expect(screen.getByText('0.00')).toBeInTheDocument()
@@ -107,7 +107,7 @@ describe('Maintenance workspace', () => {
     sofaLegs()
     click('Edit charges')
     changePrice('24 inch sofa leg charge', '-40')
-    click('Save 1 price')
+    click('Save 1 change')
     expect(screen.getByRole('alert')).toHaveTextContent('a price cannot be negative')
     expect(saveOptionPrices).not.toHaveBeenCalled()
   })
@@ -118,7 +118,7 @@ describe('Maintenance workspace', () => {
     changePrice('24 inch charge', '100')
     sofaLegs()
     changePrice('24 inch sofa leg charge', 'abc')
-    click('Save 2 prices')
+    click('Save 2 changes')
     expect(screen.getByRole('alert')).toHaveTextContent('is not an amount')
     expect(saveOptionPrices).not.toHaveBeenCalled()
     expect(screen.getByRole('textbox', { name: '24 inch sofa leg charge' })).toHaveValue('abc')
@@ -133,17 +133,17 @@ describe('Maintenance workspace', () => {
     changePrice('24 inch charge', '120')
     sofaLegs()
     changePrice('24 inch sofa leg charge', '55')
-    click('Save 2 prices')
+    click('Save 2 changes')
     expect(await screen.findByRole('alert')).toHaveTextContent('Connection lost')
-    expect(screen.getByRole('status')).toHaveTextContent('1 price saved. Remaining changes are kept for retry.')
+    expect(screen.getByRole('status')).toHaveTextContent('1 change saved. Remaining changes are kept for retry.')
     expect(screen.getByRole('textbox', { name: '24 inch sofa leg charge' })).toHaveValue('55')
     await saveSettled()
     click('Bedframe')
     expect(screen.getByRole('textbox', { name: '24 inch charge' })).toHaveValue('120')
-    click('Save 1 price')
+    click('Save 1 change')
     await waitFor(() => expect(saveOptionPrices).toHaveBeenCalledTimes(3))
     expect(saveOptionPrices).toHaveBeenNthCalledWith(3, 'sofa_leg_heights', [{ value: '24"', price: '55' }])
-    expect(await screen.findByRole('status')).toHaveTextContent('1 price saved.')
+    expect(await screen.findByRole('status')).toHaveTextContent('1 change saved.')
   })
 
   it('disables navigation, inputs and cancel during a save; cancel otherwise clears all pool drafts', async () => {
@@ -152,7 +152,7 @@ describe('Maintenance workspace', () => {
     render(<MaintenanceTab options={options} fabrics={[]} />)
     click('Edit charges')
     changePrice('24 inch charge', '101')
-    click('Save 1 price')
+    click('Save 1 change')
     expect(screen.getByRole('button', { name: 'Fabrics' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Sofa' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Total Heights' })).toBeDisabled()
@@ -204,7 +204,7 @@ describe('Maintenance workspace', () => {
     const { rerender } = render(<MaintenanceTab options={initialOptions} fabrics={[]} />)
     click('Edit charges')
     changePrice('24 inch charge', '101')
-    click('Save 1 price')
+    click('Save 1 change')
     expect(await screen.findByText('101.00')).toBeInTheDocument()
     rerender(<MaintenanceTab options={[option({ price: 102 })]} fabrics={[]} />)
     expect(screen.getByText('102.00')).toBeInTheDocument()
@@ -268,6 +268,43 @@ describe('Maintenance workspace', () => {
     expect(screen.getByText('FAB-DEFAULT')).toBeInTheDocument()
     expect(screen.queryByText('FAB-SHARED')).not.toBeInTheDocument()
     expect(screen.queryByText('FAB-OVERRIDE')).not.toBeInTheDocument()
+  })
+
+  // 2026-10-26, the user: "在 sofa special 这里的 maintenance，我要它能够选择两种：一种是整 set 沙发的 … 另一种是 by quantity 的".
+  it('says how a sofa special is charged — Full set or By quantity — and saves the choice with its price', async () => {
+    const specials = [
+      option({ pool: 'sofa_specials', value: 'Change 8030 Backcushion', label: 'Change 8030 Backcushion', price: 200, byQuantity: true }),
+      option({ pool: 'sofa_specials', value: 'Seat Base Fully Cover', label: 'Seat Base Fully Cover', sortOrder: 1, price: 300 }),
+      option({ pool: 'sofa_specials', value: 'Nylon Fabric', label: 'Nylon Fabric', sortOrder: 2, price: null }),
+    ]
+    render(<MaintenanceTab options={[...options, ...specials]} fabrics={[]} />)
+    click('Sofa')
+    click('Specials')
+    expect(screen.getByRole('columnheader', { name: 'CHARGED' })).toBeInTheDocument()
+    const charged = () => within(screen.getByRole('table')).getAllByRole('row').slice(1).map(row => within(row).getAllByRole('cell')[3].textContent)
+    expect(charged()).toEqual(['By quantity', 'Full set', '—'])
+    expect(screen.getByText(/Full set: once per sofa; By quantity: each, times the quantity the member sets/)).toBeInTheDocument()
+    // A bed frame's specials are charged per frame: no such column there.
+    click('Bedframe')
+    click('Specials')
+    expect(screen.queryByRole('columnheader', { name: 'CHARGED' })).not.toBeInTheDocument()
+
+    click('Sofa')
+    click('Specials')
+    click('Edit charges')
+    // No price, nothing to choose.
+    expect(screen.getByRole('combobox', { name: 'Nylon Fabric charged' })).toBeDisabled()
+    select('Seat Base Fully Cover charged', 'qty')
+    changePrice('Change 8030 Backcushion charge', '180')
+    click('Save 2 changes')
+    await waitFor(() => expect(saveOptionPrices).toHaveBeenCalledTimes(1))
+    // Each sent whole: a typed price keeps how it is charged, a choice keeps its price.
+    expect(saveOptionPrices).toHaveBeenCalledWith('sofa_specials', [
+      { value: 'Seat Base Fully Cover', price: '300', byQuantity: true },
+      { value: 'Change 8030 Backcushion', price: '180', byQuantity: true },
+    ])
+    await saveSettled()
+    expect(charged()).toEqual(['By quantity', 'By quantity', '—'])
   })
 
   it('makes every fabric reachable past the former 400-row cutoff and searches the full list', () => {

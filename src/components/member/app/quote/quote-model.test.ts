@@ -434,11 +434,11 @@ describe("a sofa's leg height and specials", () => {
 
   it("asks the server only for what every sofa in the cart still takes", () => {
     const build = { height: "60cm", tier: "PRICE_1", leg: '4"', specials: ["Wooden Arm", "Seat Add 1ft"] };
-    expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s")])).toEqual(build);
+    expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s")])).toEqual({ ...build, specialQty: {} });
     expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s"), inCart("m-810", "810-2s")]))
-      .toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: ["Wooden Arm"] });
+      .toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: ["Wooden Arm"], specialQty: {} });
     // Turned OFF on Modular (or no longer charged) since: it drops out.
-    expect(sofaBuildToSend(build, zanotti(), [inCart("m-2376", "2376-2s")])).toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [] });
+    expect(sofaBuildToSend(build, zanotti(), [inCart("m-2376", "2376-2s")])).toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [], specialQty: {} });
     expect(sofaBuildToSend({ ...build, specials: ["Pillow Back", "Seat Add 1ft"] }, z(), [inCart("m-2376", "2376-2s")]).specials).toEqual(["Seat Add 1ft"]);
   });
 
@@ -453,9 +453,56 @@ describe("a sofa's leg height and specials", () => {
   });
 
   it("reads a build an older phone kept (seat height and tier only)", () => {
-    expect(sofaBuildOf({ height: "60cm", tier: "PRICE_1" })).toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [] });
+    expect(sofaBuildOf({ height: "60cm", tier: "PRICE_1" })).toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [], specialQty: {} });
     expect(sofaBuildOf(undefined)).toEqual(NO_SOFA_BUILD);
-    expect(sofaBuildOf({ leg: '6"', specials: ["Wooden Arm", 3 as unknown as string] })).toEqual({ height: null, tier: null, leg: '6"', specials: ["Wooden Arm"] });
+    expect(sofaBuildOf({ leg: '6"', specials: ["Wooden Arm", 3 as unknown as string] })).toEqual({ height: null, tier: null, leg: '6"', specials: ["Wooden Arm"], specialQty: {} });
+    // Quantities (2026-10-26): whole numbers 1–100 only.
+    expect(sofaBuildOf({ specials: ["Back"], specialQty: { Back: 3, Bad: 0, Worse: 1.5, Wrong: "2" as unknown as number } }).specialQty).toEqual({ Back: 3 });
+  });
+});
+
+// 2026-10-26, the user: "一种是整 set 沙发的 … 另一种是 by quantity 的。比如 change 8030 back cushion，一个沙发可能有三个
+// compartment（三个 seat），所以这个东西应该要乘三。所以它需要在 quotation 那边的 quantity 可以放 plus 和 minus".
+describe("a sofa special charged by quantity", () => {
+  const SOFAS: MemberProduct[] = [
+    ...PRODUCTS,
+    product({ id: "810-2s", name: "810", brand: "ZANOTTI", kind: "SOFA", category: "Sofa", size: "2S", moduleCode: "2S", modelId: "m-810" }),
+  ];
+  const BACK = { value: "Change 8030 Backcushion", charge: 200, byQuantity: true };
+  const SEAT = { value: "Seat Base Fully Cover with no Leg", charge: 300 };
+  const MODELS = [
+    { id: "m-2376", kind: "SOFA" as const, options: { specials: [BACK.value, SEAT.value] }, charges: { specials: [BACK, SEAT] } },
+    { id: "m-810", kind: "SOFA" as const, options: { specials: [BACK.value] }, charges: { specials: [BACK] } },
+  ];
+  const z = () => catalogFromProducts(SOFAS, "ZANOTTI", "Zanotti", [], MODELS);
+  const inCart = (key: string, productId: string, qty = 1): CartLine => ({ id: `s-${productId}`, kind: "sofa", key, name: key, size: "", qty, productId });
+  const sheet = (specials: string[], specialQty: Record<string, number> = {}): Extract<SheetState, { mode: "sofa" }> =>
+    ({ mode: "sofa", key: "m-2376", layout: "C", mods: { "2S": 1 }, qty: 1, kpi: [], height: null, tier: null, leg: null, specials, specialQty, acc: {}, accAll: false });
+
+  it("keeps what Maintenance says of each special, and how many of one charged by quantity", () => {
+    expect(z().models.find(m => m.key === "m-2376")?.choices.specials).toEqual([BACK, SEAT]);
+    expect(sofaPick(sheet([BACK.value, SEAT.value], { [BACK.value]: 3 }), z(), [], NO_SOFA_BUILD))
+      .toMatchObject({ picked: [BACK.value, SEAT.value], qty: { [BACK.value]: 3 } });
+    // Picked with no quantity yet counts 1; a quantity for a special not picked is not one.
+    expect(sofaPick(sheet([BACK.value]), z(), [], NO_SOFA_BUILD).qty).toEqual({ [BACK.value]: 1 });
+    expect(sofaPick(sheet([SEAT.value], { [BACK.value]: 4 }), z(), [], NO_SOFA_BUILD).qty).toEqual({});
+  });
+
+  it("charges it each, times the quantity, once for the cart — the rest once per sofa", () => {
+    const build = { height: null, tier: null, leg: null, specials: [BACK.value, SEAT.value], specialQty: { [BACK.value]: 3 } };
+    expect(sofaCartCharge(z(), [inCart("m-2376", "2376-2s")], build)).toBe(3 * 200 + 300);
+    // Two sofas (×2): the special charged once per sofa twice, the counted one as counted.
+    expect(sofaCartCharge(z(), [inCart("m-2376", "2376-2s", 2)], build)).toBe(3 * 200 + 2 * 300);
+    expect(sofaCartCharge(z(), [inCart("m-2376", "2376-2s")], { ...build, specials: [BACK.value], specialQty: {} })).toBe(200);
+  });
+
+  it("asks the server with the quantity of each counted special still offered", () => {
+    const build = { height: null, tier: null, leg: null, specials: [BACK.value, SEAT.value], specialQty: { [BACK.value]: 3, [SEAT.value]: 9 } };
+    expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s")]))
+      .toMatchObject({ specials: [BACK.value, SEAT.value], specialQty: { [BACK.value]: 3 } });
+    // 810 takes the counted one only: the other drops out, its quantity with it.
+    expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s"), inCart("m-810", "810-2s")]))
+      .toMatchObject({ specials: [BACK.value], specialQty: { [BACK.value]: 3 } });
   });
 });
 
