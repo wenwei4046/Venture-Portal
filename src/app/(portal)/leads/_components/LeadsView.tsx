@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { markLeadLost, reopenLead, setLeadStage } from '@/lib/leads/actions'
 import { adLabel } from '@/lib/leads/ads'
+import { handedTo } from '@/lib/leads/handoff'
 import { formatPhone, whatsAppLink } from '@/lib/leads/phone'
 import {
   PROGRESS, RANGES, STAGE_LABEL, STAGE_ORDER, STAGE_TABS, followUp, lastUpdate, leadsCsv, readSaleValue, stageDays, stageOf, stageReached,
@@ -65,13 +66,13 @@ export default function LeadsView({ config, contacts, range, from, to, today, no
 
   const brands = useMemo(() => new Map(config.brands.map(b => [b.id, b])), [config.brands])
   const brandName = (id: string) => brands.get(id)?.name ?? '—'
-  const salesNames = useMemo(() => [...new Set(contacts.map(c => c.handedSalesName).filter((n): n is string => !!n))].sort(), [contacts])
+  const salesNames = useMemo(() => [...new Set(contacts.map(c => handedTo(c)).filter((n): n is string => !!n))].sort(), [contacts])
   const adNames = useMemo(() => [...new Set(contacts.map(c => adLabel(c)).filter(Boolean))].sort(), [contacts])
 
   const needle = q.trim().toLowerCase()
   const digits = needle.replace(/[\s-]/g, '')
   const base = contacts.filter(c => (brand === 'all' || c.brandId === brand)
-    && (sales === 'all' || c.handedSalesName === sales)
+    && (sales === 'all' || handedTo(c) === sales)
     && (source === 'all' || (source === 'organic' ? !adLabel(c) : source === 'ads' ? !!adLabel(c) : adLabel(c) === source))
     && (!needle || `${c.name} ${c.interest}`.toLowerCase().includes(needle) || (/^\d{3,}$/.test(digits) && (c.phone ?? '').includes(digits))))
   const staleCount = base.filter(c => followUp(c, now)).length
@@ -82,7 +83,7 @@ export default function LeadsView({ config, contacts, range, from, to, today, no
   }, [base])
 
   const sortValue = (c: LeadContact, k: number): string | number => k === 0 ? c.name.toLowerCase() : k === 1 ? brandName(c.brandId)
-    : k === 2 ? (adLabel(c) || 'Organic') : k === 3 ? c.interest : k === 4 ? (c.handedSalesName ?? '￿')
+    : k === 2 ? (adLabel(c) || 'Organic') : k === 3 ? c.interest : k === 4 ? (handedTo(c) ?? '￿')
       : k === 5 ? STAGE_ORDER.indexOf(stageOf(c)) : Date.parse(lastUpdate(c))
   const shownAll = base.filter(c => (tab === 'all' || stageOf(c) === tab) && (!staleOnly || followUp(c, now)))
     .sort((a, b) => {
@@ -207,7 +208,7 @@ export default function LeadsView({ config, contacts, range, from, to, today, no
                 <span className={`${s.cut} ${ad ? '' : s.small}`}>{ad || 'Organic'}</span>
               </span>
               <span className={s.cut}>{c.interest || <span className={s.quiet}>—</span>}</span>
-              <span className={`${s.cut} ${c.handedSalesName ? '' : s.quiet}`}>{c.handedSalesName ?? '—'}</span>
+              <span className={`${s.cut} ${handedTo(c) ? '' : s.quiet}`}>{handedTo(c) ?? '—'}</span>
               <span className={s.status} data-stage={st}>{STAGE_LABEL[st]}</span>
               <span className={s.two}>
                 <span className={s.small}>{whenFull(lastUpdate(c))}</span>
@@ -300,7 +301,7 @@ function LeadDrawer({ lead, brandName, salesPhone, canEdit, onClose, onSaved }: 
     run(() => setLeadStage(lead.id, 'closed', v))
   }
   const timeline = [
-    ...PROGRESS.filter(x => days[x.id]).map(x => ({ at: days[x.id]!, text: x.id === 'handed' && lead.handedSalesName ? `${x.label} · ${lead.handedSalesName}` : x.label })),
+    ...PROGRESS.filter(x => days[x.id]).map(x => ({ at: days[x.id]!, text: x.id === 'handed' && handedTo(lead) ? `${x.label} · ${handedTo(lead)}` : x.label })),
     ...(lead.lostAt ? [{ at: lead.lostAt, text: `Marked lost · ${lead.lostReason || 'No reason'}` }] : []),
   ].sort((a, b) => b.at.localeCompare(a.at))
   const remind = salesPhone && lead.handedSalesName
@@ -364,7 +365,7 @@ function LeadDrawer({ lead, brandName, salesPhone, canEdit, onClose, onSaved }: 
           <div className={s.section}>
             <span className={s.caps}>FOR THE SALESPERSON</span>
             <div className={s.facts}>
-              <span>Salesperson</span><span>{lead.handedSalesName ?? 'Not handed yet'}</span>
+              <span>Salesperson</span><span>{handedTo(lead) ?? 'Not handed yet'}</span>
               <span>Handed</span><span>{lead.handedAt ? whenFull(lead.handedAt) : '—'}</span>
               <span>Interest</span><span>{lead.interest || '—'}</span>
               <span>Budget</span><span>{lead.budget || '—'}</span>

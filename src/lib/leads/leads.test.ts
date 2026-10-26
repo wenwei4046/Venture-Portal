@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { findPhone, formatPhone, whatsAppLink } from './phone'
-import { handoffText, inboxState, suggestedSales, visitDay } from './handoff'
+import { handedTo, handoffText, inboxState, SALES_GROUP, suggestedSales, visitDay } from './handoff'
 import { leadInsight, rate } from './insight'
 import type { LeadContact, LeadSales } from './types'
 
@@ -66,6 +66,17 @@ describe('handing a lead over', () => {
     expect(inboxState(contact())).toBe('waiting')
     expect(inboxState(contact({ lastDir: 'out' }))).toBe('answered')
     expect(inboxState(contact({ handedAt: '2026-10-16T07:00:00Z' }))).toBe('handed')
+  })
+})
+
+describe('handing a lead to the sales group (no salesperson named)', () => {
+  it('writes the message to the team', () => {
+    expect(handoffText(contact(), '2990s', null, 'Mei Ling').split('\n')[0]).toBe('Hi team, new lead from Lead View / 新客户')
+  })
+  it('names who it went to: the salesperson, else the sales group once handed, else nobody', () => {
+    expect(handedTo({ handedAt: '2026-10-27T02:00:00Z', handedSalesName: 'Daniel' })).toBe('Daniel')
+    expect(handedTo({ handedAt: '2026-10-27T02:00:00Z', handedSalesName: null })).toBe(SALES_GROUP)
+    expect(handedTo({ handedAt: null, handedSalesName: null })).toBeNull()
   })
 })
 

@@ -919,4 +919,34 @@ await db.exec(`
   check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_instagram(jsonb)', 'execute') a`))[0].a, false, 'the Instagram ingest is the service role’s alone')
 }
 
+// ── Handed to the sales group (mig 20261027120000 + its guards): nobody named, still handed, the page asked ──
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  await db.exec(await f('20261027120000_lead_handoff_group.sql'))
+  await db.exec(await f('20261027120100_lead_handoff_group_guards.sql'))
+  await as(CS_USER, ALL)
+  const g = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'grp.1', pageId: '946946021838962', psid: '7700201', name: 'Group Lead', kind: 'text', body: 'hi', sentAt: '2026-10-28T03:00:00Z', ad: null },
+  ])]))[0].r.contacts[0]
+  await refuses(`select public.lead_handoff_group($1)`, [g], /phone before handing/, 'no phone, no hand-over')
+  await q(`select public.lead_ingest_messenger($1::jsonb)`, [JSON.stringify([
+    { externalId: 'grp.2', pageId: '946946021838962', psid: '7700201', name: 'Group Lead', kind: 'text', body: '012-338 4721', sentAt: '2026-10-28T03:01:00Z', ad: null },
+  ])])
+  await as(CS_USER, ['leads.view', 'leads.create'])
+  await refuses(`select public.lead_handoff_group($1)`, [g], /Lead View · Edit/, 'handing over needs Edit')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_handoff_group($1)`, [g])
+  const row = (await q(`select handed_sales_id, handed_at is not null handed, phone_state, handed_by_name from public.lead_contacts where id = $1`, [g]))[0]
+  check([row.handed_sales_id, row.handed, row.phone_state], [null, true, 'confirmed'], 'handed with nobody named, the phone confirmed')
+  check((await q(`select what from public.lead_events where contact_id = $1 order by id desc limit 1`, [g]))[0].what, 'Handed to the sales group', 'the timeline says so')
+  await q(`select public.lead_handoff_group($1)`, [g])
+  check((await q(`select what from public.lead_events where contact_id = $1 order by id desc limit 1`, [g]))[0].what, 'Handed again, to the sales group', 'handed again says again')
+  const card = (await q(`select public.lead_thread($1) t`, [g]))[0].t
+  const contact = card.contact ?? card
+  check([!!contact.handedAt, contact.handedSalesName ?? null], [true, null], 'the card reads handed with no salesperson')
+  await refuses(`update public.lead_contacts set handed_sales_id = (select id from public.lead_sales limit 1), handed_at = null where id = $1`, [g], /lead_contacts_handed|check constraint/, 'a salesperson is never named on a lead not handed')
+  const src = (await q(`select prosrc from pg_proc where proname = 'lead_handoff_group'`))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.edit']);`), true, 'it asks the Inbox')
+}
+
 console.log(`validate-leads: ${checks} checks passed`)

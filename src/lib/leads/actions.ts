@@ -93,6 +93,12 @@ export async function handLeadOver(contactId: string, salesId: string) {
   return call<{ id: string; name: string; phone: string }>('lead_handoff', { p_contact: contactId, p_sales: salesId }, 'The lead was not handed over.')
 }
 
+/** Hand the lead to the brand's sales group (CS pastes the message into the WhatsApp group; nobody named). */
+export async function handLeadToGroup(contactId: string) {
+  await requireActionOn('/leads', 'leads', 'edit')
+  return call<null>('lead_handoff_group', { p_contact: contactId }, 'The lead was not handed over.')
+}
+
 /** What came of a handed lead. */
 export async function setLeadOutcome(contactId: string, appt: Appt, shown: Shown) {
   await requireActionOn('/leads', 'leads', 'edit')
