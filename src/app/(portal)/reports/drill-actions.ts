@@ -7,20 +7,26 @@ import { createClient } from '@/lib/supabase/server'
 import type { SheetTxn } from '@/lib/report-sheet'
 import { readMonthlyDrill, type MonthlyDrillAsk } from './_lib/drill-reads'
 
-// A month-by-month report's row, opened (2026-10-24, Monthly A — the row lists its months, a month its lines): the
-// lines are read when the row opens, so the sheet itself stays as light as it was. Each answers for its own page and
-// asks what that page asks: Reports' three month-by-month reports whoever reads the reports company-wide; a
-// department's own statements under Dept Pool whoever its page opens to.
+// A month-by-month report's rows, opened (2026-10-24; as rows of the sheet with L4, 2026-10-26): the lines are read
+// when a row opens — every row on show at once at L4 — so the sheet itself stays as light as it was. Each answers for
+// its own page and asks what that page asks: Reports' three month-by-month reports whoever reads the reports
+// company-wide; a department's own statements under Dept Pool whoever its page opens to.
 
-export type MonthlyDrillAnswer = { ok: true; lines: SheetTxn[] } | { ok: false; reason: string }
+/** Each row's lines, filed by `drillRowKey`. */
+export type MonthlyDrillAnswer = { ok: true; lines: Record<string, SheetTxn[]> } | { ok: false; reason: string }
+
+/** As many rows as a sheet has, never more. */
+const MAX_ROWS = 600
 
 const asked = (ask: MonthlyDrillAsk): MonthlyDrillAsk => ({
   report: ask.report === 'cash-flow' ? 'cash-flow' : 'pnl',
   segment: typeof ask.segment === 'string' ? ask.segment : '',
   from: String(ask.from ?? ''),
   to: String(ask.to ?? ''),
-  code: String(ask.code ?? ''),
-  side: ask.side === 'in' || ask.side === 'out' ? ask.side : null,
+  rows: (Array.isArray(ask.rows) ? ask.rows : []).slice(0, MAX_ROWS).map((r) => ({
+    code: String(r?.code ?? '').slice(0, 40),
+    side: r?.side === 'in' || r?.side === 'out' ? r.side : null,
+  })),
 })
 
 const failed = (e: unknown): MonthlyDrillAnswer => ({ ok: false, reason: e instanceof Error && e.message ? e.message : 'The lines could not be read just now. Try again.' })

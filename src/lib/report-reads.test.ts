@@ -663,7 +663,7 @@ describe('fetchGlRefs — every invoice, voucher and credit note', () => {
       entry_no: null, entry_description: null, segment: 'corporate', ref_type, ref_id,
     })
     const [sale, payment] = applyGlRefs([line('invoice', 'inv01003'), line('payment_voucher', 'pv01001')], refs)
-    expect(sale).toMatchObject({ description: 'INV-1003 · Sale 1003', party: 'ALP' })
+    expect(sale).toMatchObject({ ref_no: 'INV-1003', doc_text: 'Sale 1003', party: 'ALP' })
     expect(payment).toMatchObject({ party: 'Payee 1001' })
   })
 
@@ -756,6 +756,9 @@ describe('salary lines by department', () => {
     const refsByPerson = await fetchGlRefs(pocketPostgrest(tables).client)
     const refsByDepartment = await fetchGlRefs(pocketPostgrest(tables).client, { payrollByPerson: false })
     expect(refsByPerson.payrollByDepartment).toBeUndefined()
+    // A salary voucher's own words (2026-10-26, what a drill-down line says) are never kept for a department reader.
+    expect([...(refsByPerson.voucherTexts?.keys() ?? [])].sort()).toEqual(['pv-rent', 'pv0', 'pv1', 'pv2'])
+    expect([...(refsByDepartment.voucherTexts?.keys() ?? [])]).toEqual(['pv-rent'])
     const asPerson = applyGlRefs(lines, refsByPerson)
     const asDepartment = applyGlRefs(lines, refsByDepartment)
     expect(JSON.stringify(asPerson)).toMatch(NAMES)

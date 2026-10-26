@@ -10,6 +10,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { ACCOUNT_TYPES, type AccountType, type CashFlowCategory, defaultCashFlowCategoryFor, rangeFor } from './coa'
 import { fetchAllRows, fetchAllRowsParallel } from './paginate'
 import { payrollFoldOf, type PayrollVoucherText } from './payroll-vouchers'
+import { lineWords } from './line-words'
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100
@@ -34,8 +35,9 @@ export interface GlLine {
   party?: string | null
   /** The source document's number — the invoice, the voucher (PV / OR), the credit note (applyGlRefs). */
   ref_no?: string | null
-  /** An invoice line's words without its number — applyGlRefs keeps "number · words" as its description. */
-  ref_text?: string | null
+  /** The source document's own words — the invoice's, the voucher's purpose, the credit note's reason (applyGlRefs);
+   *  what a line says when its own words are the system's (lib/line-words, 2026-10-26). */
+  doc_text?: string | null
 }
 
 export interface CoaAccount {
@@ -118,11 +120,15 @@ export interface GlRefs {
   voucherPayees: Map<string, string>
   /** payment voucher id → its number, the drill-down's Ref. 2 (2026-10-24) — optional so hand-built refs stay valid. */
   voucherNos?: Map<string, string>
+  /** payment voucher id → its purpose as written (2026-10-26) — a salary voucher's left out where payroll folds. */
+  voucherTexts?: Map<string, string>
   /** credit note id → the parent invoice's bill-to (CN v2, 2026-08-20) —
    *  optional so hand-built refs (tests) stay valid. */
   creditNoteParties?: Map<string, string>
   /** credit note id → its number (Ref. 2). */
   creditNoteNos?: Map<string, string>
+  /** credit note id → its reason (2026-10-26). */
+  creditNoteTexts?: Map<string, string>
   /** Set only for a reader who sees payroll by department (2026-10-13,
    *  fetchGlRefs `payrollByPerson: false`): salary voucher id → the batch and
    *  department its lines fold into (applyGlRefs). */
@@ -163,7 +169,7 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
         (from, to) =>
           supabase
             .from('payment_vouchers')
-            .select('id, voucher_no, payee_name, invoice_id')
+            .select('id, voucher_no, payee_name, invoice_id, description, reference_type')
             .order('id', { ascending: true })
             .range(from, to),
         'fetchGlRefs vouchers',
@@ -172,8 +178,8 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
       // parent invoice's bill-to. Errors tolerated (a reader whose RLS blocks
       // credit_notes) — those lines just keep a null party.
       fetchAllRows((from, to) =>
-        supabase.from('credit_notes').select('id, invoice_id, credit_note_no').order('id', { ascending: true }).range(from, to),
-      ).catch(() => [] as Array<{ id: string; invoice_id: string; credit_note_no?: string | null }>),
+        supabase.from('credit_notes').select('id, invoice_id, credit_note_no, reason').order('id', { ascending: true }).range(from, to),
+      ).catch(() => [] as Array<{ id: string; invoice_id: string; credit_note_no?: string | null; reason?: string | null }>),
       // The salary vouchers — their batch and department — only for a reader
       // who sees payroll by department (2026-10-13).
       foldPayroll
@@ -242,6 +248,14 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
     voucherNos: new Map(
       (vouchers ?? []).flatMap((v) => ((v.voucher_no as string | null) ? [[v.id as string, v.voucher_no as string] as [string, string]] : [])),
     ),
+    // A salary voucher's words stay out where its lines fold by department: no name is ever looked up there.
+    voucherTexts: new Map(
+      (vouchers ?? []).flatMap((v) => {
+        const text = ((v.description as string | null) ?? '').trim()
+        if (!text || (foldPayroll && v.reference_type === 'payroll_disbursement')) return []
+        return [[v.id as string, text] as [string, string]]
+      }),
+    ),
     creditNoteParties: new Map(
       (creditNotes ?? []).flatMap((cn) => {
         const billTo = invoiceBillTo.get(cn.invoice_id as string) ?? null
@@ -250,6 +264,9 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
     ),
     creditNoteNos: new Map(
       (creditNotes ?? []).flatMap((cn) => (cn.credit_note_no ? [[cn.id as string, cn.credit_note_no as string] as [string, string]] : [])),
+    ),
+    creditNoteTexts: new Map(
+      (creditNotes ?? []).flatMap((cn) => (cn.reason?.trim() ? [[cn.id as string, cn.reason.trim()] as [string, string]] : [])),
     ),
     ...(payrollByDepartment ? { payrollByDepartment } : {}),
   }
@@ -314,34 +331,36 @@ export function foldPayrollGlLines(lines: GlLine[], byVoucher: ReadonlyMap<strin
   return out
 }
 
-/** Enrich drill-down lines: invoice JEs get "invoice_no · description" plus the
- *  bill-to company as the counterparty; voucher JEs (PV/OR) get the payee as
- *  the counterparty (pay-out to / received from). Each also carries its source
- *  document's number (`ref_no` — the drill-down's Ref. 2, 2026-10-24) and an
- *  invoice its words without the number (`ref_text`). Pure — returns new objects.
+/** Enrich drill-down lines: invoice JEs get the bill-to company as the
+ *  counterparty; voucher JEs (PV/OR) get the payee (pay-out to / received
+ *  from). Each also carries its source document's number (`ref_no` — the
+ *  drill-down's Ref. 2, 2026-10-24) and its words (`doc_text`, 2026-10-26),
+ *  the line keeping its own. Pure — returns new objects.
  *  With `refs.payrollByDepartment` (a reader who sees payroll by department)
  *  the salary vouchers' lines are folded first: no name is ever looked up. */
 export function applyGlRefs(lines: GlLine[], refs: GlRefs): GlLine[] {
   const source = refs.payrollByDepartment ? foldPayrollGlLines(lines, refs.payrollByDepartment) : lines
   return source.map((l) => {
     if (!l.ref_id) return l
+    // The line keeps its own words; the document's stand beside them (lib/line-words picks, 2026-10-26).
     if (l.ref_type === 'invoice') {
       const ref = refs.invoices.get(l.ref_id)
       if (!ref?.invoice_no) return l
-      const label = ref.description ? `${ref.invoice_no} · ${ref.description}` : ref.invoice_no
-      return { ...l, description: label, party: ref.billTo, ref_no: ref.invoice_no, ref_text: ref.description || l.description }
+      return { ...l, party: ref.billTo, ref_no: ref.invoice_no, ...(ref.description ? { doc_text: ref.description } : {}) }
     }
     if (l.ref_type === 'payment_voucher' || l.ref_type === 'payment_voucher_void') {
       const payee = refs.voucherPayees.get(l.ref_id)
       const no = refs.voucherNos?.get(l.ref_id) ?? null
-      if (!payee && !no) return l
-      return { ...l, ...(payee ? { party: payee } : {}), ...(no ? { ref_no: no } : {}) }
+      const text = refs.voucherTexts?.get(l.ref_id) ?? null
+      if (!payee && !no && !text) return l
+      return { ...l, ...(payee ? { party: payee } : {}), ...(no ? { ref_no: no } : {}), ...(text ? { doc_text: text } : {}) }
     }
     if (l.ref_type === 'credit_note') {
       const party = refs.creditNoteParties?.get(l.ref_id)
       const no = refs.creditNoteNos?.get(l.ref_id) ?? null
-      if (!party && !no) return l
-      return { ...l, ...(party ? { party } : {}), ...(no ? { ref_no: no } : {}) }
+      const text = refs.creditNoteTexts?.get(l.ref_id) ?? null
+      if (!party && !no && !text) return l
+      return { ...l, ...(party ? { party } : {}), ...(no ? { ref_no: no } : {}), ...(text ? { doc_text: text } : {}) }
     }
     return l
   })
@@ -413,14 +432,15 @@ export function otherSideOf(lines: GlLine[], accounts: ReadonlyMap<string, { nam
   }
 }
 
-/** A journal line as a drill-down line: its words (an invoice's without its number), the party, its debit and credit, its other side, its document. */
+/** A journal line as a drill-down line: what it was and who with (lib/line-words), its debit and credit, its other side, its document. */
 function txnOf(l: GlLine, amount: number, otherSide: (l: GlLine) => string | null): GlTxn {
+  const says = lineWords(l)
   return {
     date: l.date,
-    entryNo: l.entry_no,
-    description: (l.ref_text ?? l.description) || l.entry_description || '',
+    entryNo: says.entryNo,
+    description: says.text,
     segment: l.segment,
-    party: l.party ?? null,
+    party: says.party,
     amount,
     debit: l.debit,
     credit: l.credit,

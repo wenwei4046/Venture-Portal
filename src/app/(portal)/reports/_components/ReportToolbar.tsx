@@ -190,17 +190,20 @@ export default function ReportToolbar({
         <div className="rpt-field">
           <span>Detail level</span>
           <div className="rpt-levels">
-            {([1, 2, 3] as const).map((l) => (
-              <button
-                key={l}
-                type="button"
-                aria-pressed={find.level === l}
-                onClick={() => find.setLevel(l)}
-                title={l === 1 ? 'Totals only' : l === 2 ? '+ top-level accounts' : 'All account levels'}
-              >
-                L{l}
-              </button>
-            ))}
+            {/* L4 where the accounts open onto their lines (2026-10-26): every one opened so. */}
+            {([1, 2, 3, 4] as const)
+              .filter((l) => l <= find.levels)
+              .map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  aria-pressed={find.level === l}
+                  onClick={() => find.setLevel(l)}
+                  title={l === 1 ? 'Totals only' : l === 2 ? '+ top-level accounts' : l === 3 ? 'All account levels' : '+ every line, under its month'}
+                >
+                  L{l}
+                </button>
+              ))}
           </div>
         </div>
       ) : null}

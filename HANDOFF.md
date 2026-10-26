@@ -1,5 +1,35 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-26 q (SHIPPED, #779) — an opened account's lines as rows of the sheet, under their months; L4; clearer words
+
+Session e73c0205 (the #754 session). The user, showing #754's drill: "我点开了还是这样" — the fifth-round design
+(`mockups/drill-inline-mockup.html`, decided in 35e03c3c, "别做先") had not been built → "照第五版做：Monthly 和部门报表的
+明细直接放进表格（金额在自己的月份下面、加 L4、新的在前），单月的明细表保留，只把说明改清楚" → "CI 全绿就合并上线".
+
+- **Month by month** (Reports' Monthly P&L / Cash Flow / R&P cash rows — never the AR_ receivables — and Dept Pool's
+  department statements): an opened account's journal lines are ROWS of the sheet (`SheetReport` line type `lines`),
+  newest first — `date · NAME · words · doc no.` (date pale Chivo Mono, name bold) — each figure in the Total and under
+  its own month, "—" elsewhere, % blank; foot `N lines · Open in General Ledger ↗ · range`; hover = Ref. 1 / Ref. 2 /
+  other side / Debit · Credit. #754's month box (MonthList, `.sr-months`) is gone. `.sheet-rpt.has-lines` widens the
+  label column to 560px ≥768px; a phone keeps 128px (date on its own line, 2 lines of words, no doc no.).
+- **L4**: `ReportSearchProvider levels={4}` (MonthlyPnlBody / MonthlyCashFlowBody when they drill, monthly R&P,
+  DeptStatementBody) — ReportToolbar shows L4 only there. Every unread open row is read in ONE server-action call
+  (`MonthlyDrillAsk.rows[]` → `{ ok, lines: Record<drillRowKey, SheetTxn[]> }`, `drillRowKey = side ?? 'pnl' : code`,
+  ≤600 rows); hand turns kept per scope + level (below L4 = opened, at L4 = closed).
+- Signs: `readMonthlyDrill` returns P&L lines as credit − debit (lib/pnl-custom's display sign), cash as the share;
+  the dept variant flips side `out` rows' lines with their rows. Lines add up to the row per month.
+- **Words** (`src/lib/line-words.ts#lineWords`, single-month ledger too): own words unless GENERIC (`expense - X
+  (pool|code)`, `AR — invoice`, `AR cleared —`, `Payment received —`, `Service billing revenue recognised`,
+  `Inter-billing`, `Reclass yyyy-mm-dd`); else `doc_text` — `payment_vouchers.description` (a claim's item naming the
+  amount, else all items for a PV), invoice description's first line, `credit_notes.reason`; pre-system
+  `PV|JV|I|OR-nnn — X` gives Ref. 1 and (PV/OR, not BANK) the party; party de-duplicated from the words. `applyGlRefs`
+  no longer overwrites invoice line words (`ref_text` → `doc_text`); `SheetTxn.party` separate, shown first in bold
+  (also in the single-month ledger's Description — my call, said to the user). Salary vouchers' words are skipped when
+  payroll folds (`voucherTexts`, test in report-reads).
+- **#779 squash-merged `0b7cbcf4`** → production deploy success 07:12 UTC (CI: build, worker, SQL green; Unit tests red only on the 3 Marketing date tests — the user: "只做我的part"). No migration.
+- Checked before merge by headless-Chrome screenshots of an RTL dump with the app's `.sheet-rpt` rules (Reports'
+  Monthly P&L, a department's money out, the single-month ledger; desktop + 358px). Not seen on the live site (sign-in).
+
 ## CHECKPOINT 2026-10-26 p (SHIPPED, #778) — the Company Statement: who owes whom, each side's total, a counterparty in one table
 
 Session 35e03c3c, after o. The user: "company statement 那边我也想要优化" (加图表 · 整理表格 · 点开的明细) → six mockup

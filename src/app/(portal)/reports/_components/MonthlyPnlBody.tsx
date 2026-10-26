@@ -61,7 +61,8 @@ export default function MonthlyPnlBody({
         <StatCard label="Net margin · accumulated" value={margin} icon="percent" note="Against accumulated sales" />
       </StatCards>
 
-      <ReportSearchProvider level={3}>
+      {/* L4 where the accounts open onto their lines (2026-10-26). */}
+      <ReportSearchProvider level={3} levels={drill ? 4 : 3}>
         <section className="mb-6">
           <div className="sect-head">
             <h2>Monthly P&amp;L</h2>
