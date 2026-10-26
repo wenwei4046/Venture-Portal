@@ -6235,15 +6235,168 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .fin-view .neg { color: #B02822; }
 .rpt-field { letter-spacing: 0.05em; }
 .rpt-range-word { font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: rgb(117 100 86); }
-/* The Company Statement's column groups (2026-10-10, the handoff): to collect
-   green, to repay red (the user took the handoff's red over the August
-   orange, 2026-10-10); the total tinted navy. */
-.fin-view .ledger-table thead th.cs-collect { background: rgb(216 236 225); color: #156E4E; }
-.fin-view .ledger-table thead th.cs-repay { background: rgb(246 222 219); color: #B02822; }
-.fin-view .ledger-table thead th.cs-collect-sub { background: rgb(232 243 237); }
-.fin-view .ledger-table thead th.cs-repay-sub { background: rgb(250 235 233); }
-.fin-view .ledger-table tr.cs-total td { background: rgb(221 229 240); box-shadow: inset 0 1.5px 0 rgb(46 92 138); color: rgb(29 43 74); }
-.fin-view .ledger-table tr.cs-total td:first-child { font-weight: 600; }
+/* ═══ The Company Statement (2026-10-26, six rounds of samples with the user — mockups/company-statement-mockup.html).
+   To collect green, to repay red (the user took the handoff's red over the August orange, 2026-10-10), the total
+   tinted navy; a line between every column ("每个 column 之间要有线条"), a darker one where a group starts. ═══ */
+.cs-dim { color: rgb(185 177 166); }
+
+/* Who owes whom: to repay to the left, to collect to the right, the net beside. */
+.cs-who { padding: 12px 16px 10px; border: 1px solid rgb(232 225 216); border-radius: 12px; background: #fff; }
+.cs-who-row { display: grid; grid-template-columns: 108px minmax(40px, 1fr) minmax(112px, 150px) minmax(40px, 1fr) 108px 150px; align-items: center; gap: 10px; padding: 6px; border-bottom: 1px solid rgb(241 237 231); font-size: 12.5px; }
+.cs-who-row[data-cp]:hover { background: rgb(247 247 245); }
+.cs-who-head { padding-top: 2px; border-bottom: 1.5px solid rgb(207 197 183); font-size: 10.5px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(117 100 86); }
+.cs-who-head span:nth-child(1), .cs-who-head span:nth-child(6) { text-align: right; }
+.cs-who-head span:nth-child(3) { text-align: center; }
+.cs-who-bar { display: flex; height: 14px; overflow: hidden; border-radius: 3px; background: rgb(243 240 235); }
+.cs-who-bar.is-repay { justify-content: flex-end; }
+.cs-who-bar i { display: block; height: 100%; border-radius: 3px; }
+.cs-who-bar.is-repay i { background: #C8574B; }
+.cs-who-bar.is-collect i { background: #3F7A64; }
+.cs-who-amt { white-space: nowrap; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+.cs-who-amt.is-repay { text-align: right; color: #B02822; }
+.cs-who-amt.is-collect { color: #156E4E; }
+.cs-who-name { min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: rgb(43 31 23); }
+.cs-who-net { text-align: right; white-space: nowrap; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 11.5px; color: rgb(90 78 68); }
+.cs-who-net.is-collect { color: #156E4E; }
+.cs-who-net.is-repay { color: #B02822; }
+.cs-who-foot { border-top: 1.5px solid rgb(216 210 200); border-bottom: 0; font-weight: 700; }
+.cs-who-foot .cs-who-amt, .cs-who-foot .cs-who-net { font-weight: 700; }
+.cs-who-keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 8px; font-size: 11px; color: rgb(90 78 68); }
+.cs-who-keys span { display: inline-flex; align-items: center; gap: 5px; }
+.cs-who-keys i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
+.cs-who-keys i.is-collect { background: #3F7A64; }
+.cs-who-keys i.is-repay { background: #C8574B; }
+/* Its hover box is the department charts' box, to repay in red. */
+.dept-tip.cs-tip tr.is-sec.is-collect td { color: #156E4E; }
+.dept-tip.cs-tip tr.is-sec.is-repay td { color: #B02822; }
+.dept-tip.cs-tip td.ind { padding-left: 12px; color: rgb(90 78 68); }
+.dept-tip.cs-tip td.n.is-collect { color: #156E4E; }
+.dept-tip.cs-tip td.n.is-repay { color: #B02822; }
+@media (max-width: 700px) {
+  /* A phone: the name and its net on a line, the two bars under them, their figures under the bars. */
+  .cs-who { padding: 10px 12px; }
+  .cs-who-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 3px 8px; padding: 8px 2px; }
+  .cs-who-head { display: none; }
+  .cs-who-row > span:empty { display: none; }
+  .cs-who-name { grid-column: 1; grid-row: 1; text-align: left; }
+  .cs-who-net { grid-column: 2; grid-row: 1; }
+  .cs-who-bar.is-repay { grid-column: 1; grid-row: 2; }
+  .cs-who-bar.is-collect { grid-column: 2; grid-row: 2; }
+  .cs-who-amt.is-repay { grid-column: 1; grid-row: 3; font-size: 11px; }
+  .cs-who-amt.is-collect { grid-column: 2; grid-row: 3; font-size: 11px; }
+}
+
+/* The tools over the table: search, Sort, Show, the export ticks, Expand all. */
+.cs-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.cs-tool-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(117 100 86); }
+.cs-seg { display: inline-flex; overflow: hidden; border: 1px solid rgb(var(--hairline)); border-radius: 7px; background: #fff; }
+.cs-seg button { padding: 5px 10px; border: 0; border-left: 1px solid rgb(var(--hairline)); background: transparent; font-size: 12px; color: rgb(90 78 68); white-space: nowrap; cursor: pointer; }
+.cs-seg button:first-child { border-left: 0; }
+.cs-seg button[aria-pressed='true'] { background: rgb(43 31 23); color: #fff; }
+
+/* The counterparty table. */
+.cs-scroll { overflow-x: auto; border: 1px solid rgb(216 210 200); border-radius: 8px; }
+table.cs-sheet { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
+.cs-sheet th { padding: 7px 10px; border-bottom: 1px solid rgb(221 213 202); background: rgb(235 231 224); font-size: 11px; font-weight: 600; color: rgb(43 31 23); text-align: right; white-space: nowrap; }
+.cs-sheet thead tr:last-child th, .cs-sheet thead th[rowspan] { border-bottom: 1.5px solid rgb(207 197 183); }
+.cs-sheet th.c-name { text-align: left; vertical-align: bottom; }
+.cs-sheet th.cs-collect, .cs-sheet th.cs-repay { font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.cs-sheet th.cs-collect[colspan], .cs-sheet th.cs-repay[colspan] { text-align: center; }
+.cs-sheet th.cs-collect { background: rgb(216 236 225); color: #156E4E; box-shadow: inset 0 3px 0 #3F7A64; }
+.cs-sheet th.cs-repay { background: rgb(246 222 219); color: #B02822; box-shadow: inset 0 3px 0 #C8574B; }
+.cs-sheet th.cs-collect-sub { background: rgb(232 243 237); }
+.cs-sheet th.cs-repay-sub { background: rgb(250 235 233); }
+.cs-sheet td { padding: 9px 10px; border-bottom: 1px solid rgb(239 235 229); background: #fff; text-align: right; white-space: nowrap; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 12px; font-variant-numeric: tabular-nums; color: rgb(42 37 34); }
+.cs-sheet td.c-name { min-width: 230px; text-align: left; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 13px; }
+.cs-sheet td.c-name input { margin: 0 8px 0 0; vertical-align: -2px; cursor: pointer; }
+.cs-sheet .cs-tg { display: inline-block; width: 14px; font-size: 10px; color: rgb(148 139 128); }
+.cs-sheet .cs-cnt { margin-left: 10px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; color: rgb(117 100 86); }
+.cs-sheet th + th, .cs-sheet td + td { border-left: 1px solid rgb(239 233 224); }
+.cs-sheet th.cs-rule, .cs-sheet td.cs-rule { border-left: 1px solid rgb(227 220 207); }
+.cs-sheet td.c-tot { font-weight: 600; }
+.cs-sheet td.c-tot.is-collect { background: rgb(246 250 247); color: #156E4E; }
+.cs-sheet td.c-tot.is-repay { background: rgb(253 247 246); color: #B02822; }
+.cs-sheet td.c-net { font-weight: 600; }
+.cs-sheet td.c-net.is-collect { color: #156E4E; }
+.cs-sheet td.c-net.is-repay { color: #B02822; }
+.cs-sheet tr.cs-cp { cursor: pointer; }
+.cs-sheet tr.cs-cp:hover td { background: rgb(255 250 243); }
+.cs-sheet tr.cs-cp.is-open td { background: rgb(255 244 231); }
+.cs-sheet td.cs-empty { padding: 24px; text-align: center; font-family: var(--font-serif), Georgia, serif; font-style: italic; color: rgb(148 139 128); }
+.cs-sheet tr.cs-total td { border-bottom: 0; background: rgb(221 229 240); box-shadow: inset 0 1.5px 0 rgb(46 92 138); color: rgb(29 43 74); font-weight: 700; }
+.cs-sheet tr.cs-detail > td { padding: 6px 12px 16px 28px; border-bottom: 1px solid rgb(233 223 210); background: rgb(255 250 243); text-align: left; white-space: normal; font-family: var(--font-sans), Inter, system-ui, sans-serif; }
+@media (max-width: 767px) {
+  .cs-sheet td.c-name { min-width: 0; white-space: normal; }
+  .cs-sheet .cs-cnt { display: block; margin: 2px 0 0 14px; }
+  .cs-sheet tr.cs-detail > td { padding: 4px 8px 12px; }
+}
+
+/* An opened counterparty: one table for both sides — the columns once, each side opened by a tinted row with its
+   totals under them, its positions newest first, a Net row closing it. Set widths, so a row's figures sit under its
+   side's totals; Terms takes what is left. */
+.cs-pos-wrap { container: cs-pos / inline-size; }
+table.cs-pos { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid rgb(229 228 223); border-radius: 8px; background: #fff; }
+.cs-pos th { padding: 6px 9px; border-bottom: 1px solid rgb(229 228 223); background: rgb(247 247 245); font-size: 10px; font-weight: 600; line-height: 1.3; letter-spacing: 0.05em; text-transform: uppercase; color: rgb(117 100 86); text-align: right; white-space: nowrap; vertical-align: bottom; }
+.cs-pos th.c-date, .cs-pos th.c-terms { text-align: left; }
+.cs-pos td { padding: 8px 9px; border-bottom: 1px solid rgb(240 236 230); vertical-align: top; text-align: right; white-space: nowrap; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 12px; line-height: 18px; font-variant-numeric: tabular-nums; color: rgb(90 78 68); }
+.cs-pos tbody tr:last-child td { border-bottom: 0; }
+.cs-pos th + th, .cs-pos td + td { border-left: 1px solid rgb(235 229 220); }
+.cs-pos th.cs-rule, .cs-pos td.cs-rule { border-left: 1px solid rgb(211 201 186); }
+.cs-pos td.c-date { text-align: left; font-size: 11px; color: rgb(166 154 142); }
+.cs-pos td.c-terms { text-align: left; white-space: normal; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 12.5px; color: rgb(43 31 23); }
+.cs-pos td.c-orig { font-weight: 700; color: #000; }
+.cs-pos td.c-t { font-weight: 600; color: #000; }
+.cs-pos td.c-pay { color: #000; }
+.cs-pos .cs-dim-t { color: rgb(148 139 128); }
+.cs-pos .cs-permo { font-size: 11px; color: rgb(148 139 128); }
+.cs-pos .c-sub { margin-top: 1px; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 10.5px; font-weight: 400; line-height: 15px; white-space: normal; color: rgb(148 139 128); }
+.cs-pos .c-sub.c-day { color: rgb(166 154 142); }
+.cs-pos .c-sub b { font-weight: 700; color: #000; }
+.cs-pos td.c-go { padding-left: 0; padding-right: 4px; text-align: center; }
+.cs-pos a.cs-go { color: rgb(220 194 166); text-decoration: none; }
+.cs-pos tr.cs-pos-row { cursor: pointer; }
+.cs-pos tr.cs-pos-row:hover td { background: rgb(255 250 243); }
+.cs-pos tr.cs-pos-row:hover a.cs-go, .cs-pos a.cs-go:focus-visible { color: #C27A33; }
+.cs-pos tr.cs-sec td { padding-top: 7px; padding-bottom: 7px; border-top: 1.5px solid rgb(216 210 200); font-size: 11.5px; font-weight: 700; }
+.cs-pos tbody tr:first-child td { border-top: 0; }
+.cs-pos tr.cs-sec.is-collect td { background: rgb(234 243 238); color: #156E4E; }
+.cs-pos tr.cs-sec.is-repay td { background: rgb(251 238 236); color: #B02822; }
+.cs-pos tr.cs-sec.is-collect td.c-label { box-shadow: inset 3px 0 0 #3F7A64; }
+.cs-pos tr.cs-sec.is-repay td.c-label { box-shadow: inset 3px 0 0 #C8574B; }
+.cs-pos td.c-label { text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+.cs-pos tr.cs-net td { padding-top: 7px; padding-bottom: 7px; border-top: 1.5px solid rgb(201 211 224); background: rgb(242 245 249); font-size: 11.5px; font-weight: 700; color: rgb(29 43 74); }
+.cs-pos tr.cs-net td.is-collect { color: #156E4E; }
+.cs-pos tr.cs-net td.is-repay { color: #B02822; }
+.cs-pos tr.cs-terms-row td { padding: 6px 12px 8px; background: rgb(250 248 245); text-align: left; white-space: normal; font-family: var(--font-sans), Inter, system-ui, sans-serif; font-size: 12px; color: rgb(90 78 68); }
+.cs-bdg { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid rgb(229 228 223); border-radius: 4px; background: #fff; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; font-size: 9.5px; line-height: 16px; letter-spacing: 0.08em; text-transform: uppercase; color: rgb(46 92 138); white-space: nowrap; vertical-align: 1px; }
+.cs-bdg.is-alert { color: #B8691F; }
+.cs-pos.is-full th.c-date { width: 96px; }
+.cs-pos th.c-orig { width: 104px; }
+.cs-pos th.c-ti { width: 112px; }
+.cs-pos th.c-p { width: 112px; }
+.cs-pos th.c-i { width: 104px; }
+.cs-pos th.c-t { width: 108px; }
+.cs-pos th.c-left { width: 76px; }
+.cs-pos th.c-pay { width: 120px; }
+.cs-pos th.c-go { width: 24px; }
+/* The payoff goes under the total due when the room is short — that column takes its words. */
+.cs-pos.is-compact th.c-t { width: 166px; }
+.cs-pos.is-phone th.c-t { width: 100px; }
+@container cs-pos (max-width: 1000px) {
+  /* A narrower table: tighter widths, the long headings on two lines, the terms wrap. */
+  .cs-pos th { white-space: normal; }
+  .cs-pos th, .cs-pos td { padding-left: 8px; padding-right: 8px; }
+  .cs-pos.is-full th.c-date { width: 84px; }
+  .cs-pos th.c-orig { width: 92px; }
+  .cs-pos th.c-ti { width: 88px; }
+  .cs-pos th.c-p { width: 90px; }
+  .cs-pos th.c-i { width: 90px; }
+  .cs-pos.is-full th.c-t { width: 92px; }
+  .cs-pos th.c-left { width: 72px; }
+  .cs-pos th.c-pay { width: 104px; }
+  .cs-pos th.c-go { width: 18px; }
+  .cs-pos td.c-pay { font-size: 11px; }
+}
 
 /* The handoff's type and colour rules on Finance's pages (2026-10-10): the
    muted greys for secondary text and hints (the sheet keeps them black on
