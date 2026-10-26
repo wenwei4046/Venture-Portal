@@ -1,5 +1,42 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-26 p (SHIPPED, #778) — the Company Statement: who owes whom, each side's total, a counterparty in one table
+
+Session 35e03c3c, after o. The user: "company statement 那边我也想要优化" (加图表 · 整理表格 · 点开的明细) → six mockup
+rounds (`OneDrive\Desktop\Claude\Venture\mockups\company-statement-mockup.html`; the choices in memory
+company-statement-charts-sample) → "Payoff 用 A 分两栏，顺序用 A 日期新到旧，照第六版开始做：Who owes whom 横条 + 提示框 A、
+表整理、点开一个表加线条；Month by month 不做" → "上一轮 SQL checks 已经是绿的，现在就合并上线".
+
+- **Who owes whom** (`company-statement/_components/WhoOwesWhom`, between the cards and the table): per counterparty,
+  to repay a red bar to the left, to collect a green bar to the right, the net beside; most to collect first; "—" for a
+  side with nothing; the hover box (the dept charts' `.dept-tip`, portalled) = each side's count / principal /
+  interest / total + the net. Tried and dropped in the samples: donuts, a hover listing each position, a Month by
+  month chart and a "Next 3 months" card (the user: "Month by month 有什么用？").
+- **The counterparty table** (`StatementView`, `table.cs-sheet`): green / red column groups with Principal · Interest ·
+  Total (≥980px of room; the totals alone ≥560; the net alone on a phone — `useWidth` → `colsOf`), the net worded and
+  coloured, "n to collect · n to repay" by the name, Sort (Largest · Net · To collect · To repay · A–Z) and Show (All ·
+  To collect · To repay) — `lib/counterparty-statement-view#shownCounterparties`; a line between every column; search,
+  Expand all, the export ticks and the navy total row (`tr.cs-total`) as before.
+- **A counterparty opened = ONE table** (`PositionsTable`, `table.cs-pos`, fixed widths on its header): Date · Terms ·
+  Original · Total interest ‖ Principal due · Interest due · Total due · Left · Payoff · →; a green To collect row with
+  that side's totals under the columns, its positions newest first (`orderPositions`), the red To repay row the same,
+  a Net row (signed). Left = "n of term", Payoff = the month, "No fixed date" with no schedule; a no-fixed-term deal's
+  monthly interest in Interest due as "x/mo" (in no total); compounding shows its accrued interest as before. Terms
+  read "4%/mo · 6 mo · from May 2026" (the agreed first month only when it is not the month after the date); Original
+  sits after Terms (the user: "倒反回来"). The 差价 rows stay under their deal; the row opens the deal, its arrow the
+  link. Under ~860px the date goes under the terms and the payoff under the total due (`fitOf`); a phone keeps terms +
+  total due.
+- `PositionRow.startDate` (the deal's date, already loaded) feeds the Date column. The Excel / PDF export and the
+  Finance phone app (`lib/fin-app/report-pages`) are unchanged. No overdue / late labels anywhere.
+- **#778 squash-merged `262541cc`** (2026-10-26 06:08 UTC). CI on its head: build, worker + PDF green; SQL checks green
+  on the PR's first push (the second changed one CSS line); Unit tests red ONLY on 3 Marketing tests — ProductProject
+  "Sent 24 Oct 13:00" and PicPage ×2 — which use the real clock against a fixture sent Sat 24 Oct 13:00 and crossed
+  #700's red-after-4-working-hours line on Mon 26 Oct ~13:00 MYT; main fails them too. Not touched (the user: "不用管");
+  the fix is a fixed clock in those tests (`vi.setSystemTime`), Marketing's to do. Our own miss (Georgia on screen in
+  `.cs-empty`, the design-tokens test) was fixed in the PR.
+- Checked before merge: the real components rendered with the lending book (vitest dump + compiled CSS + headless
+  Chrome) at 1180 / 860 / 520px; not seen on the live site (it needs the user's sign-in).
+
 ## CHECKPOINT 2026-10-26 o (SHIPPED, #760) — each department's page with its charts; the statement in their dress
 
 Session 35e03c3c, after m (n's drill-down shipped from e73c0205). The user, on Dept Pool's department pages:
