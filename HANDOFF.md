@@ -1,5 +1,40 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-26 o (SHIPPED, #760) — each department's page with its charts; the statement in their dress
+
+Session 35e03c3c, after m (n's drill-down shipped from e73c0205). The user, on Dept Pool's department pages:
+"department 那边我要做成像 venture pool 这样用 diagram 和 chart 的 … 别只是 in 和 out, 可以在细分一点" (their Hookka
+ERP sample) → twelve mockup rounds (`OneDrive\Desktop\Claude\Venture\mockups\dept-charts-mockup.html`; the choices in
+memory dept-charts-design-decided) → "这一版可以了，开始做。" → "CI 全绿就合并上线".
+
+- **Page** (`dept-pool/statements/[seg]`, all 7 departments, both views): title "Marketing - Cash Flow" / "Marketing -
+  Profit & Loss", Excel / PDF by it; a period row (`_components/DeptPeriodBar`) — P&L | Cash Flow, From → To, 6 / 12
+  months, "* = month still running"; cards with money in green and money out orange and positive (StatCard tones `in` /
+  `out`). Default period still the year to date.
+- **Charts** (`_components/DeptCharts`, plain SVG in React, no chart library): In vs Out = a Month (Total first, the
+  default) and two donuts by account (top 5 of ≥4% in palette A, the rest a grey Others with its members) beside each
+  month's in / out bars and the net line — a bar's click picks its month, the hover box (portalled) sits beside the
+  bar; then two ranked-bar cards (top 6 + Others, share, the months as small bars) that follow the Month. Figures:
+  `lib/dept-charts` reads the loaders' own matrix cut by `sliceMatrixMonths`, so every chart figure is a table cell.
+- **Statement**: `SheetReport variant="dept"`, rows from `lib/dept-statement` — each block's title carries its side's
+  total (green / orange) at every level, a group keeps its figure on its own line (no Subtotal), L2 by default with ▶
+  per category (turned per level), a % base per row (Cash Flow: that month's money in / out, Net change of money in,
+  balances "—"; P&L: revenue), 0.0% beside a nil figure, Total + % first, the running month starred, a square in each
+  account's chart colour; the #754 drill unchanged. The dept P&L leaves out a category with nothing in the period and a
+  Gross profit with no cost above it. Reports' tables (no `variant`) are as they were.
+- **Across the year**: `reportRange(…, { crossYear })` (From up to 11 months before To; `buildFrom` when before
+  January) + `monthColumns(year, tm, from)` / `buildMonthlyCashFlowSides` / `buildPnlAccounts` / the loaders' `from`;
+  the Monthly P&L / Cash Flow exports take it too, so Excel / PDF are the months on screen (checked: Accumulated + Oct
+  2026 … Nov 2025, the PDF head "Nov 2025 – Oct 2026" without "FY"); `rangeLabel` reads "Nov 2025 – Oct 2026".
+- Layout follows the room the charts get (container queries — the sidebar counts): the two panels stack under ~980px of
+  content, the ranked cards under 720px, names wrap on a phone; no page scroll sideways at 375px.
+- **#760 squash-merged `30f7dbdf`** (2026-10-26 01:49 UTC) → production deploy success 01:50 UTC. CI 7/7 green; the first
+  Cloudflare worker build failed fetching Google Fonts for `next/font` (main's run a minute later passed; the rebase
+  re-ran it green). No migration.
+- Checked before merge in a local esbuild preview of the real components with Marketing-shaped figures (the COA's real
+  parents and the saved cash-flow layouts); not seen on the live site (it needs the user's sign-in).
+- Open from the mockup, not asked again: two decimals (kept) vs whole numbers; the ledger's Other side keeps codes.
+
 ## CHECKPOINT 2026-10-25 n (SHIPPED, #754) — an account opens onto a ledger of its lines; month by month onto its months first
 
 Session e73c0205 (handed off from 35e03c3c after m). The user, on the drill-down: "我想要这样的概念 … monthly 也要能点开
