@@ -169,13 +169,15 @@ describe("a sofa special charged by quantity", () => {
     brand: "ZANOTTI", name: "Zanotti", sofa: true, frames: [], kpis: [], accSummary: "0 items", accs: [],
     models: [{ key: "8030", name: "SOFFIO", desc: "8030", sizes: {}, choices: { legs: [], specials }, modules: [
       { code: "1A(LHF)", desc: "1-seat · left arm", seats: 1, chaise: false, productId: "s-1a", options: [] },
+      { code: "2A(LHF)", desc: "2-seat · left arm", seats: 2, chaise: false, productId: "s-2a", options: [] },
+      { code: "L(RHF)", desc: "Chaise · right", seats: 1, chaise: true, productId: "s-l", options: [] },
     ] }],
   });
 
-  function drawSofa(specials: typeof SEAT[]) {
+  function drawSofa(specials: typeof SEAT[], mods: Record<string, number> = { "1A(LHF)": 1 }) {
     const patches: Partial<SheetState>[] = [];
     function Harness() {
-      const [sheet, setSheet] = useState<SheetState>({ mode: "sofa", key: "8030", layout: "C", mods: { "1A(LHF)": 1 }, qty: 1, kpi: [], height: null, tier: null,
+      const [sheet, setSheet] = useState<SheetState>({ mode: "sofa", key: "8030", layout: "C", mods, qty: 1, kpi: [], height: null, tier: null,
         leg: null, specials: [], specialQty: {}, acc: {}, accAll: false });
       return <ProductSheet sheet={sheet} catalog={catalogWith(specials)} memory={EMPTY_MEMORY} cart={[]} build={NO_SOFA_BUILD} readOnly={false}
         actions={{
@@ -202,6 +204,19 @@ describe("a sofa special charged by quantity", () => {
     fireEvent.click(within(row).getByRole("button", { name: "Remove one" }));
     expect(within(row).getByText("0")).toBeInTheDocument();
     expect(patches.at(-1)).toEqual({ specials: [], specialQty: {} });
+  });
+
+  // 2026-10-27, the user: "就看它有哪几个 compartment … 1A 是一个 back cushion，2A 就是两个 back cushion".
+  it("starts at the sofa's compartments — 2A two, the chaise one — then counts one at a time", () => {
+    const patches = drawSofa([BACK], { "2A(LHF)": 1, "L(RHF)": 1 });
+    const row = screen.getByRole("group", { name: BACK.value });
+    fireEvent.click(within(row).getByRole("button", { name: "Add one" }));
+    expect(within(row).getByText("3")).toBeInTheDocument();
+    expect(patches.at(-1)).toEqual({ specials: [BACK.value], specialQty: { [BACK.value]: 3 } });
+    fireEvent.click(within(row).getByRole("button", { name: "Add one" }));
+    expect(within(row).getByText("4")).toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: "Remove one" }));
+    expect(patches.at(-1)).toEqual({ specials: [BACK.value], specialQty: { [BACK.value]: 3 } });
   });
 
   it("keeps the once-per-sofa words when nothing is counted", () => {

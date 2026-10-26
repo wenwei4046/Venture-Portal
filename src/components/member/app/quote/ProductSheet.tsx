@@ -322,7 +322,8 @@ function SpecialChips({ specials, picked, per = "", onToggle }: {
 /**
  * A sofa's specials: one charged once per sofa is a chip (2026-10-06); one Maintenance charges
  * BY QUANTITY is a row with − / + (2026-10-26, the user: "所以它需要在 quotation 那边的
- * quantity 可以放 plus 和 minus"), its count for the whole cart, 0 = not chosen.
+ * quantity 可以放 plus 和 minus"), its count for the whole cart, 0 = not chosen. The first +
+ * counts the sofas' compartments, as a bill is charged (2026-10-27: "就看它有哪几个 compartment").
  */
 function SofaSpecials({ n, pick, specialQty, onPatch }: {
   n: number;
@@ -356,7 +357,8 @@ function SofaSpecials({ n, pick, specialQty, onPatch }: {
             <div className={`${s.accStep} ${q ? s.accStepOn : ""}`}>
               <button className={s.accBtn} aria-label="Remove one" onClick={() => q && setQty(o.value, q - 1)}>−</button>
               <span className={s.accQty}>{q}</span>
-              <button className={s.accBtn} aria-label="Add one" onClick={() => setQty(o.value, Math.min(MAX_QTY, q + 1))}>+</button>
+              <button className={s.accBtn} aria-label="Add one"
+                onClick={() => setQty(o.value, Math.min(MAX_QTY, q ? q + 1 : Math.max(1, pick.compartments)))}>+</button>
             </div>
           </div>
         );

@@ -69,14 +69,17 @@ describe('what a line’s options were charged for', () => {
       .toBe('for leg 6" · Nylon Fabric — RM 150.00 once for the sofa')
   })
 
-  // 2026-10-26: a sofa's special is charged what the bill's special order says.
-  it('says a sofa special came from the bill’s special order', () => {
+  // 2026-10-27: a sofa special charged by quantity, once per compartment, says how many.
+  it('says how many compartments a special charged by quantity was charged for', () => {
     expect(chargeText({
       charges: [
-        { pool: 'sofa_leg_heights', value: '5"', price: 200 },
-        { pool: 'sofa_specials', value: 'Change 8030 Backcushion', price: 600, special_order: true },
+        { pool: 'sofa_specials', value: 'Change 8030 Backcushion', price: 200, count: 3, by_quantity: true },
+        { pool: 'sofa_specials', value: 'Seat and Backcushion Firmer', price: 300, count: 1 },
       ],
-      charge_set: { unit: 200, sets: 1, special_order: 600, total: 800, lines: 2 },
-    })).toBe('for leg 5" · Change 8030 Backcushion (special order) — RM 800.00 once for the sofa, spread over its 2 pieces')
+      charge_set: { sets: 1, compartments: 3, total: 900, lines: 2 },
+    })).toBe('for Change 8030 Backcushion ×3 · Seat and Backcushion Firmer — RM 900.00 once for the sofa, spread over its 2 pieces')
+    // A part from 2026-10-26 (the bill's special order) reads as its name alone.
+    expect(chargeText({ charges: [{ pool: 'sofa_specials', value: 'Change 8030 Backcushion', price: 600, special_order: true }] }))
+      .toBe('for Change 8030 Backcushion')
   })
 })
