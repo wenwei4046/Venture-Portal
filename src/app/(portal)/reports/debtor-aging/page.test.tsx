@@ -238,17 +238,47 @@ describe('the Company Statement on the sheet', () => {
   })
 
   // 2026-10-10 — the user took the handoff's red for what is to repay (it was
-  // the August orange).
-  it('boxes what is to repay in red when a counterparty opens', async () => {
-    const pos = { side: 'repay', counterparty: 'HOUZS Mattress', kind: 'flat', principal: 600000, monthlyRate: 0.01, tenureMonths: 12, principalPaid: 0, principalOutstanding: 600000, interestOutstanding: 14400, monthlyInterest: 6000, remainingPeriods: 12, finishYM: '2027-09', startYM: '2026-10', minPayInterest: false }
+  // the August orange). 2026-10-26 — both sides in one table, each opened by a
+  // row of its totals ("可以一个表").
+  const mattress = () => {
+    const pos = { side: 'repay', counterparty: 'HOUZS Mattress', kind: 'flat', principal: 600000, monthlyRate: 0.01, tenureMonths: 12, principalPaid: 0, principalOutstanding: 600000, interestOutstanding: 14400, monthlyInterest: 6000, remainingPeriods: 12, finishYM: '2027-09', startYM: '2026-10', startDate: '2026-09-14', minPayInterest: false }
     mocks.fetchCounterpartyStatement.mockResolvedValue({
       rows: [{ counterparty: 'HOUZS Mattress', collectPrincipal: 0, collectInterest: 0, repayPrincipal: 600000, repayInterest: 14400, net: -614400, items: [{ id: 'fs1', ...pos }] }],
       totals: { collectPrincipal: 0, collectInterest: 0, repayPrincipal: 600000, repayInterest: 14400, net: -614400 },
     })
+  }
+
+  it('opens a counterparty on a red To repay row holding that side’s totals', async () => {
+    mattress()
     render(await CompanyStatementPage())
-    fireEvent.click(screen.getByText('HOUZS Mattress'))
-    const tag = screen.getByText(/TO REPAY · 1/)
-    expect(tag).toHaveClass('text-danger')
-    expect(tag.parentElement).toHaveClass('border-danger/30')
+    const section = screen.getByRole('heading', { level: 2, name: 'Counterparties' }).closest('section') as HTMLElement
+    fireEvent.click(within(section).getByText('HOUZS Mattress'))
+    const side = within(section).getByText('To repay · 1').closest('tr') as HTMLElement
+    expect(side).toHaveClass('cs-sec', 'is-repay')
+    // Original · Total interest · Principal due · Interest due · Total due
+    expect([...side.querySelectorAll('td')].map((td) => td.textContent)).toEqual(['To repay · 1', '600,000.00', '72,000.00', '600,000.00', '14,400.00', '614,400.00', '', '', ''])
+    const row = within(section).getByText('1%/mo · 12 mo').closest('tr') as HTMLElement
+    expect(row).toHaveTextContent('14 Sep 2026')
+    expect(row.querySelector('td.c-left')).toHaveTextContent('12 of 12')
+    expect(row.querySelector('td.c-pay')).toHaveTextContent('Sep 2027')
+    expect(within(row).getByRole('link')).toHaveAttribute('href', '/fund-in/fs1')
+  })
+
+  // 2026-10-26 — the samples' Who owes whom ("这个可以，但是没有 amount 的要显示 '-'"), its hover box the user's A.
+  it('draws who owes whom: "—" where a side has nothing, each side’s figures on hover', async () => {
+    mattress()
+    render(await CompanyStatementPage())
+    const who = screen.getByRole('region', { name: 'Who owes whom' })
+    const row = who.querySelector('[data-cp="HOUZS Mattress"]') as HTMLElement
+    expect(row.querySelector('.cs-who-amt.is-collect')).toHaveTextContent('—')
+    expect(row.querySelector('.cs-who-amt.is-repay')).toHaveTextContent('614,400.00')
+    expect(row.querySelector('.cs-who-net')).toHaveTextContent('Repay 614,400.00')
+    fireEvent.mouseMove(row, { clientX: 20, clientY: 20 })
+    const tip = screen.getByRole('tooltip')
+    expect(within(tip).getByText('To collect · 0').closest('tr')).toHaveTextContent('—')
+    expect(within(tip).getByText('To repay · 1').closest('tr')).toHaveTextContent('614,400.00')
+    expect(within(tip).getByText('Interest').closest('tr')).toHaveTextContent('14,400.00')
+    fireEvent.mouseLeave(row)
+    expect(screen.queryByRole('tooltip')).toBeNull()
   })
 })

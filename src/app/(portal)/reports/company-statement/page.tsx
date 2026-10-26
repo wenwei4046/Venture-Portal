@@ -12,6 +12,7 @@ import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { fetchCounterpartyStatement } from '@/lib/counterparty-statement-data'
 import StatementView from './_components/StatementView'
+import WhoOwesWhom from './_components/WhoOwesWhom'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 
@@ -77,6 +78,8 @@ export default async function CompanyStatementPage() {
         />
       </StatCards>
 
+      {/* Who owes whom (2026-10-26, the samples): each counterparty's two sides as bars, before the table. */}
+      <WhoOwesWhom rows={rows} totals={totals} />
       <StatementView rows={rows} totals={totals} canExport={canDo(user, 'reports', 'export')} />
     </div>
   )

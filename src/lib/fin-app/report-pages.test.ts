@@ -94,6 +94,7 @@ describe('companyStatementModel', () => {
     remainingPeriods: 3,
     finishYM: '2026-12',
     startYM: '2026-10',
+    startDate: '2026-09-15',
     minPayInterest: false,
     ...over,
   })
