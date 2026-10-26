@@ -37,7 +37,7 @@ export const NAV_GROUPS: [string, import("./ctx").DeskTab[]][] = [["", ["insight
  * CRM · Manage's pages (rev 1 dev changes), with v2's Customer form and Audit log (a setting and its history). Contacts
  * reads (View at All, as Inbox); Channels shows read-only to whoever cannot manage (README §7).
  */
-export const MANAGE_TABS = new Set(["assignment", "adsperf", "showrooms", "settings", "forms", "auditlog", "reports"]);
+export const MANAGE_TABS = new Set(["assignment", "adsperf", "showrooms", "settings", "forms", "auditlog", "reports", "channels"]);
 export const PANE_MODE = { adsperf: "closed", insight: "closed", calendar: "closed", inbox: "empty", assignment: "wideEmpty", settings: "wideEmpty", showrooms: "wideEmpty", people: "closed", forms: "wideEmpty", channels: "closed", auditlog: "closed", reports: "closed" } as const;
 export const LI: Record<string, string> = {
   sprout: "M7 20h10M10 20c5.5-2.5.8-6.4 3-10M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8zM14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z",

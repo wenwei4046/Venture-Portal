@@ -278,7 +278,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   // A leader (STL / TL / TA with a downline, rev 1011): the Control panel scoped to their whole downline — the database
   // already gives them only their line — beside their own CRM.
   const leads = !full && data.people.some(p => p.uplineId === me.id);
-  const mode = hodMode ?? (full ? "panel" : "crm");
+  // On a computer a leader opens on their Team side's desktop, as the Director does (2026-10-26); on a phone, their own CRM.
+  const mode = hodMode ?? (full || (desk && leads) ? "panel" : "crm");
   const nameOf = (id: string | null | undefined) => personOf(id, data.people)?.name ?? "—";
   const openCrmOf = (staffId: string, customerId?: string) => {
     setTeamAs(null);
@@ -320,8 +321,10 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       assign: data.can.manage ? "any" : panelFor.id === me.id && ["tl", "stl", "ta"].includes(me.role) ? "team" : undefined,
     };
     // On a computer, whoever holds View at All (the Principal and the Director — user 2026-10-12) gets the desktop
-    // Control panel: CRM Desktop rev 1, built to its prototype (2026-10-13), on the same data and writes.
-    if (desk && full && panelFor.id === me.id && deskApp) {
+    // Control panel: CRM Desktop rev 1, built to its prototype (2026-10-13), on the same data and writes. A leader too
+    // (the owner, 2026-10-26: "team leader 的desktop 版本，畫面跟principal, Revenue director一樣，只是權限上有差別"): the same
+    // screens on their own line — the database gives them only that — and none of CRM · Manage's pages (MANAGE_TABS).
+    if (desk && (full || leads) && panelFor.id === me.id && deskApp) {
       return (
         <DeskScreens data={data} me={me} now={now} live={live} act={panelAct} setData={setDataSafe} teams={teams} directors={pctx.directors}
           nameOf={nameOf} app={deskApp} exit={onExit} toMine={pctx.toMyCrm} problem={problem} actToast={panelUi.toast} />
