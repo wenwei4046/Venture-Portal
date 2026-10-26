@@ -870,4 +870,28 @@ await db.exec(`
   check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.create']);`), true, 'lead_reply_sent asks the Inbox')
 }
 
+// ── 2990s mini by the ad's ad account (mig 20261027100000): the account's name decides, the headline still does ──
+{
+  const src0 = (await q(`select md5(prosrc) m from pg_proc where oid = 'public.lead_ingest_messenger(jsonb)'::regprocedure`))[0].m
+  check(src0, 'ccd998d3be8787fed944ba376ab48600', 'lead_ingest_messenger here is production’s body (the swap is written against it)')
+  const mig = (await readFile(new URL('../../supabase/migrations/20261027100000_lead_mini_by_ad_account.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(mig)
+  await db.exec(mig) // twice: the second finds it in place
+  const P = '946946021838962'
+  const one = async (mid, psid, ad) => (await q('select public.lead_ingest_messenger($1::jsonb) r', [JSON.stringify([
+    { externalId: mid, pageId: P, psid, name: 'Customer ' + psid, kind: 'text', body: 'hi', sentAt: '2026-10-28T03:00:00Z', ad },
+  ])]))[0].r
+  const brandOf = async psid => (await q(`select brand_id from public.lead_contacts where channel = 'messenger' and external_id = $1`, [psid]))[0]?.brand_id
+  await one('m.101', '7700101', { sourceId: '120210000000101', headline: 'Chat with us', sourceUrl: null, media: 'video', account: "2990's Mini@Kelana Jaya" })
+  check(await brandOf('7700101'), bMini, 'an ad from a Mini ad account is 2990s mini’s, whatever its headline')
+  await one('m.102', '7700102', { sourceId: '120210000000102', headline: 'Chat with us', sourceUrl: null, media: 'video', account: '2990s Main' })
+  check(await brandOf('7700102'), b2990, 'an ad from another account stays the Page’s brand')
+  await one('m.103', '7700103', { sourceId: '120210000000103', headline: '2990’s mini 来 Kelana Jaya 啦', sourceUrl: null, media: 'image', account: null })
+  check(await brandOf('7700103'), bMini, 'no account known: the headline still decides')
+  await one('m.104', '7700104', null)
+  check(await brandOf('7700104'), b2990, 'no ad: the Page’s brand')
+  await one('m.105', '7700101', { sourceId: '120210000000555', headline: 'x', sourceUrl: null, media: null, account: '2990s Main' })
+  check(await brandOf('7700101'), bMini, 'a conversation already begun stays where it began')
+}
+
 console.log(`validate-leads: ${checks} checks passed`)

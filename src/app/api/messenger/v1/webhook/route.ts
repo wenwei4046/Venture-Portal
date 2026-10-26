@@ -8,6 +8,7 @@ import { signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 import { parseMessengerDelivery } from '@/lib/messenger/webhook'
 import { pageToken, profileName } from '@/lib/messenger/send'
 import { sendLeadOutbox } from '@/lib/leads/messenger-outbox'
+import { adAccountName } from '@/lib/leads/ad-account'
 
 /**
  * /api/messenger/v1/webhook — the Callback URL for our Facebook Pages'
@@ -101,7 +102,11 @@ export async function POST(request: Request) {
   // delivery, and both sides keep a message by Meta's id, so a retry takes nothing twice.
   let leadsFailed = false
   if (leadMessages.length) {
-    const lead = await client().rpc('lead_ingest_messenger', { p_messages: leadMessages })
+    // Which brand an ad's customer is: the ad account's name decides 2990s mini (lib/leads/ad-account.ts).
+    const forLeads = await Promise.all(leadMessages.map(async m => m.ad?.sourceId
+      ? { ...m, ad: { ...m.ad, account: await adAccountName(m.ad.sourceId, systemToken) } }
+      : m))
+    const lead = await client().rpc('lead_ingest_messenger', { p_messages: forLeads })
     if (lead.error) {
       console.error('lead_ingest_messenger failed:', lead.error.message)
       leadsFailed = true
