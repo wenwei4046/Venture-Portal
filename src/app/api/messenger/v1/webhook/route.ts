@@ -10,6 +10,7 @@ import { pageToken, profileName } from '@/lib/messenger/send'
 import { sendLeadOutbox } from '@/lib/leads/messenger-outbox'
 import { adAccountName } from '@/lib/leads/ad-account'
 import { parseInstagramDelivery, takeInstagram } from '@/lib/leads/instagram'
+import { leadPageEvents } from '@/lib/leads/page-events'
 
 /**
  * /api/messenger/v1/webhook — the Callback URL for our Facebook Pages'
@@ -92,13 +93,15 @@ export async function POST(request: Request) {
   const ours = <T extends { pageId: string }>(rows: T[]) => (pages.size ? rows.filter(r => pages.has(r.pageId)) : rows)
   const messages = ours(delivery.messages)
   const reads = ours(delivery.reads)
-  // Every other Page's messages are Lead View's (a brand's Page); with no CRM Pages set, the CRM takes them all, as before.
-  const leadMessages = pages.size ? delivery.messages.filter(m => !pages.has(m.pageId)) : []
+  // Every other Page's messages are Lead View's (a brand's Page) — standby ones too, and the Page's own replies sent from
+  // Business Suite (lib/leads/page-events.ts); with no CRM Pages set, the CRM takes them all, as before.
+  const leadEvents = pages.size ? leadPageEvents(body, pages, process.env.META_APP_ID?.trim()) : { messages: [], replies: [] }
+  const leadMessages = leadEvents.messages
   const ignored = delivery.ignored + (delivery.reads.length - reads.length)
 
   // Names: Messenger does not send them. Asked once per customer per delivery, best effort.
   const systemToken = process.env.META_SYSTEM_USER_TOKEN?.trim()
-  if (systemToken && delivery.messages.length) {
+  if (systemToken && (messages.length || leadMessages.length)) {
     const tokens = new Map<string, string | null>()
     const names = new Map<string, string | null>()
     for (const m of [...messages, ...leadMessages]) {
@@ -124,6 +127,14 @@ export async function POST(request: Request) {
     } else {
       const contacts = ((lead.data as { contacts?: string[] } | null)?.contacts ?? []).filter(Boolean)
       if (contacts.length) after(() => sendLeadOutbox(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => undefined))
+    }
+  }
+  // The Page's own replies, after its customers' messages (a reply joins a conversation Lead View already has).
+  if (!leadsFailed && leadEvents.replies.length) {
+    const replies = await client().rpc('lead_ingest_page_replies', { p_messages: leadEvents.replies })
+    if (replies.error) {
+      console.error('lead_ingest_page_replies failed:', replies.error.message)
+      leadsFailed = true
     }
   }
 

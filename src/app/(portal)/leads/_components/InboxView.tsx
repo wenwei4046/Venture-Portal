@@ -500,11 +500,12 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
   )
 }
 
-/** Who wrote an outgoing message: CS (dark), a template or a campaign (AUTO), the AI Agent (AI). */
+/** Who wrote an outgoing message: CS (dark), a template or a campaign (AUTO), the AI Agent (AI), the Page from Business Suite (PAGE). */
 function MessageLabel({ m }: { m: LeadMessage }) {
   const [tag, who, label] = m.sender === 'cs' ? ['CS', 'cs', m.byName]
     : m.sender === 'ai' ? ['AI', 'ai', 'AI Agent']
       : m.sender === 'campaign' ? ['AUTO', 'auto', `Campaign · ${m.byName}`]
+        : m.sender === 'page' ? ['PAGE', 'auto', m.byName || 'Business Suite']
         : ['AUTO', 'auto', `Template · ${m.byName}`]
   return (
     <div className={s.label}>

@@ -949,4 +949,24 @@ await db.exec(`
   check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.edit']);`), true, 'it asks the Inbox')
 }
 
+// ── The Page's own replies (mig 20261027130000): kept on a conversation Lead View has, as sent, Answered ──
+{
+  await db.exec((await readFile(new URL('../../supabase/migrations/20261027130000_lead_page_replies.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
+  const P = '946946021838962'
+  const r0 = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'pr.in.1', pageId: P, psid: '7700301', name: 'Lee Hwa Ong', kind: 'text', body: 'Where is the store located?', sentAt: '2026-10-27T01:50:00Z', ad: null },
+  ])]))[0].r
+  const c = r0.contacts[0]
+  const pr = async rows => (await q(`select public.lead_ingest_page_replies($1::jsonb) r`, [JSON.stringify(rows)]))[0].r
+  const reply = (mid, psid, extra = {}) => ({ externalId: mid, pageId: P, psid, kind: 'text', body: "We're in PJ New Town!", sentAt: '2026-10-27T01:53:00Z', ...extra })
+  const r1 = await pr([reply('pr.out.1', '7700301'), reply('pr.out.1', '7700301'), reply('pr.out.2', '7700399'), { ...reply('pr.out.3', '7700301'), pageId: '999999999' }])
+  check([r1.messages, r1.ignored], [1, 3], 'kept once; a customer Lead View lacks and a Page no brand names are left out')
+  const m = (await q(`select direction, sender, by_name, delivery, external_id from public.lead_messages where external_id = 'pr.out.1'`))[0]
+  check([m.direction, m.sender, m.by_name, m.delivery], ['out', 'page', 'Business Suite', 'sent'], 'kept as the Page’s, sent')
+  check((await q(`select last_dir from public.lead_contacts where id = $1`, [c]))[0].last_dir, 'out', 'the conversation reads answered')
+  await pr([{ ...reply('pr.out.4', '7700301'), body: null, kind: 'image' }])
+  check((await q(`select body from public.lead_messages where external_id = 'pr.out.4'`))[0].body, '[Photo]', 'a photo with no words reads [Photo]')
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_page_replies(jsonb)', 'execute') a`))[0].a, false, 'the service role’s alone')
+}
+
 console.log(`validate-leads: ${checks} checks passed`)

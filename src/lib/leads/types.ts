@@ -90,7 +90,8 @@ export interface LeadContact {
 export interface LeadMessage {
   id: number
   direction: 'in' | 'out'
-  sender: 'customer' | 'cs' | 'ai' | 'flow' | 'campaign'
+  /** page = the Page replied outside Lead View — Business Suite, its AI, the phone (mig 20261027130000). */
+  sender: 'customer' | 'cs' | 'ai' | 'flow' | 'campaign' | 'page'
   byName: string
   body: string
   phoneFound: string | null
