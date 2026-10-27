@@ -45,7 +45,7 @@ describe('a pending fund source’s Edit', () => {
 
   it('a blank account, bank or period clears it — the defaults at approval, no fixed term', () => {
     const edit = sourceEditPatch(ROW, form({ account_code: '', bank_account_id: '', lock_in_months: '' }), '2026-10-16', NOW)
-    expect(edit.ok && edit.patch).toEqual({ account_code: null, bank_account_id: null, lock_in_months: null, updated_at: NOW })
+    expect(edit.ok && edit.patch).toEqual({ account_code: null, bank_account_id: null, lock_in_months: null, principal_per_month: null, updated_at: NOW })
   })
 
   it('checks the row as it will stand, in updateFundSource’s words', () => {

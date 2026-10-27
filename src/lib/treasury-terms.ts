@@ -63,6 +63,9 @@ export interface TermsHistoryRow {
   nextInterestOnOriginal?: boolean
   /** …or kept the next one's interest on the base this one used. */
   nextInterestKeepsBase?: boolean
+  /** The segment's own fixed principal a month (2026-10-27, Repayment type "A fixed amount a month"); null = equal
+   *  parts of its months. */
+  principalPerMonth?: number | null
 }
 
 export interface PositionTerms {
@@ -79,6 +82,8 @@ export interface PositionTerms {
     /** 'YYYY-MM' the current terms took effect; null = unchanged since day one. */
     effectiveFrom: string | null
     reason?: string | null
+    /** A fixed principal a month (2026-10-27); null = equal parts of `months`. */
+    principalPerMonth?: number | null
   }
   history: TermsHistoryRow[]
 }
@@ -99,6 +104,9 @@ export interface TermsSegment {
   interestOnOriginal?: boolean
   interestKeepsBase?: boolean
   principalPerMonth: number
+  /** The fixed principal a month the terms ask (2026-10-27): `months` are what clears `base` at it, the last month
+   *  taking what is left (51,000 at 1,300: 39 × 1,300, then 300). Null = `base` in equal parts of `months`. */
+  fixedPrincipal?: number | null
   interestPerMonth: number
   /** Scheduled last installment month by the segment's OWN count (from + months − 1). */
   scheduledEndYM: string | null
@@ -106,6 +114,12 @@ export interface TermsSegment {
   changed: boolean
   reason?: string | null
 }
+
+/** A fixed amount a month as the terms read it — a positive figure, or none. */
+const fixedOf = (v: number | null | undefined): number | null => (v != null && Number.isFinite(Number(v)) && Number(v) > 0 ? r2(Number(v)) : null)
+
+/** The months a fixed amount a month takes to clear `base`; none once nothing is owed. */
+const monthsToClear = (base: number, fixed: number): number | null => (base > 0.005 ? Math.max(1, Math.ceil(base / fixed - 1e-9)) : null)
 
 /** Sum of principal repaid in months strictly before `ym`. */
 function principalPaidBefore(byMonth: Record<string, number>, ym: string): number {
@@ -121,7 +135,8 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
   const start = t.firstDueYM ?? t.startYM
   if (!start) {
     // No dates at all — a single segment anchored nowhere; callers treat it as legacy.
-    const months = t.current.months
+    const fixed = fixedOf(t.current.principalPerMonth)
+    const months = fixed ? monthsToClear(t.principal, fixed) : t.current.months
     return [
       {
         fromYM: '0000-00',
@@ -132,7 +147,8 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
         base: t.principal,
         interestBase: t.principal,
         interestOnOriginal: false,
-        principalPerMonth: months ? r2(t.principal / Math.max(1, months)) : 0,
+        principalPerMonth: fixed ? (months ? Math.min(fixed, t.principal) : 0) : months ? r2(t.principal / Math.max(1, months)) : 0,
+        fixedPrincipal: fixed,
         interestPerMonth: r2(t.principal * t.current.rate),
         scheduledEndYM: null,
         changed: false,
@@ -141,7 +157,7 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
     ]
   }
 
-  const raw: { fromYM: string; toYM: string | null; rate: number; months: number | null; compounding: boolean; changed: boolean; reason?: string | null; onOriginal: boolean; keepsBase: boolean }[] = []
+  const raw: { fromYM: string; toYM: string | null; rate: number; months: number | null; fixed: number | null; compounding: boolean; changed: boolean; reason?: string | null; onOriginal: boolean; keepsBase: boolean }[] = []
   // A history row is written when a change ENDS a segment, so its reason
   // belongs to the segment that follows it.
   const hist = [...t.history].sort((a, b) => a.validFrom.localeCompare(b.validFrom))
@@ -151,6 +167,7 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
       toYM: h.validTo,
       rate: h.rate,
       months: h.months,
+      fixed: fixedOf(h.principalPerMonth),
       compounding: h.compounding,
       changed: i > 0,
       reason: i > 0 ? hist[i - 1].reason ?? null : null,
@@ -164,6 +181,7 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
     toYM: null,
     rate: t.current.rate,
     months: t.current.months,
+    fixed: fixedOf(t.current.principalPerMonth),
     compounding: t.current.compounding,
     changed: hist.length > 0 || t.current.effectiveFrom != null,
     reason: (hist.length > 0 ? hist[hist.length - 1].reason : null) ?? t.current.reason ?? null,
@@ -177,8 +195,9 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
     // months null = NO fixed term from here on (user 2026-09-22: repayments
     // come in any size, the flat interest stays base × rate). A rate-only
     // change that keeps the old end month is materialised by the amend RPC
-    // as an explicit count, so nothing is inherited here.
-    const months = seg.months
+    // as an explicit count, so nothing is inherited here. A fixed amount a month (2026-10-27) counts its own months —
+    // what clears the base at it — off the principal owed then, however many the record says.
+    const months = seg.fixed ? monthsToClear(base, seg.fixed) : seg.months
     // A compounding segment rolls its own balance; the switches are flat ones — and keeping the base needs a flat
     // segment before to keep it from.
     const onOriginal = seg.onOriginal && !seg.compounding
@@ -198,7 +217,8 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
       interestBase,
       interestOnOriginal: onOriginal,
       interestKeepsBase: keepsBase,
-      principalPerMonth: months ? r2(base / months) : 0,
+      principalPerMonth: seg.fixed ? (months ? Math.min(seg.fixed, base) : 0) : months ? r2(base / months) : 0,
+      fixedPrincipal: seg.fixed,
       interestPerMonth: r2(interestBase * seg.rate),
       scheduledEndYM,
       changed: seg.changed,
@@ -209,6 +229,20 @@ export function buildTermsSegments(t: PositionTerms, principalPaidByMonth: Recor
 }
 
 export const termsChanged = (segments: TermsSegment[]): boolean => segments.some((s) => s.changed)
+
+/** The segments, not the deal's own columns, give its figures: its terms changed, or a fixed amount a month splits its
+ *  principal (2026-10-27) — the columns' arithmetic knows only equal parts. */
+export const segmentsGovern = (segments: TermsSegment[]): boolean => segments.some((s) => s.changed || s.fixedPrincipal != null)
+
+/** The principal a segment asks in `ym`: its amount a month, the last month of a fixed amount a month taking what is
+ *  left (51,000 at 1,300 asks 300 in its 40th). Equal parts keep their one figure here, as every reading of them did. */
+export function principalDueIn(seg: TermsSegment, ym: string): number {
+  if (!seg.months || seg.principalPerMonth <= 0) return 0
+  if (seg.fixedPrincipal != null && seg.scheduledEndYM && ym === seg.scheduledEndYM) {
+    return r2(Math.max(0, seg.base - seg.principalPerMonth * (seg.months - 1)))
+  }
+  return seg.principalPerMonth
+}
 
 /** The segment governing `ym`, or null before the first / after the last. */
 export function segmentAt(segments: TermsSegment[], ym: string): TermsSegment | null {
@@ -347,7 +381,7 @@ export function segmentedUnpaid(args: { segments: TermsSegment[]; asOfYM: string
   while (ym <= args.asOfYM && guard < 1200) {
     const seg = segmentAt(args.segments, ym)
     if (!seg) break // past the last scheduled installment
-    const installment = r2(seg.principalPerMonth + seg.interestPerMonth)
+    const installment = r2(principalDueIn(seg, ym) + seg.interestPerMonth)
     if (installment > 0) {
       const applied = Math.min(paidLeft, installment)
       paidLeft = r2(paidLeft - applied)
@@ -437,9 +471,9 @@ export function compareTermsChange(
       const oldOn = oldEnd != null && ym <= oldEnd
       const s = segmentAt(segments, ym)
       const newOn = !!s && ym >= x
-      const oldP = oldOn ? prev.principalPerMonth : 0
+      const oldP = oldOn ? principalDueIn(prev, ym) : 0
       const oldI = oldOn ? prev.interestPerMonth : 0
-      const newP = newOn ? s!.principalPerMonth : 0
+      const newP = newOn ? principalDueIn(s!, ym) : 0
       const newI = newOn ? s!.interestPerMonth : 0
       const row: TermsChangeMonthRow = {
         ym,

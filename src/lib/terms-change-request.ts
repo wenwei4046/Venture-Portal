@@ -30,6 +30,10 @@ export interface TermsAsk {
    * month and `remainingMonths` the terms' periods, instead of new terms from a later month. Absent = a later month.
    */
   wholeDeal?: boolean
+  /** A fixed principal a month (2026-10-27, Repayment type); null = as it is, or the months asked. */
+  principalPerMonth?: number | null
+  /** 'YYYY-MM' — the fixed term ends then, the interest kept on the same amount (BI#7's October, asked with January's terms). */
+  openFromYM?: string | null
 }
 
 /** A `treasury_terms_requests` row. */
@@ -54,10 +58,13 @@ export interface TermsRequestRow {
   decision_note: string | null
   /** mig 20261027140000; absent on a row read before it. */
   whole_deal?: boolean
+  /** mig 20261027210000. */
+  principal_per_month?: number | string | null
+  open_from?: string | null
 }
 
 const COLUMNS =
-  'id, record_kind, record_id, effective_from, rate, remaining_months, compound_interest, no_fixed_term, interest_on_original, interest_keeps_base, reason, status, approval_id, created_by, created_at, decided_by, decided_at, decision_note, whole_deal'
+  'id, record_kind, record_id, effective_from, rate, remaining_months, compound_interest, no_fixed_term, interest_on_original, interest_keeps_base, reason, status, approval_id, created_by, created_at, decided_by, decided_at, decision_note, whole_deal, principal_per_month, open_from'
 
 /** A decided request stays on its deal's page this long. */
 export const DECIDED_SHOWN_DAYS = 30
@@ -78,6 +85,8 @@ export function askOf(r: TermsRequestRow): TermsAsk {
     interestOnOriginal: r.interest_on_original === true,
     interestKeepsBase: r.interest_keeps_base === true,
     wholeDeal: r.whole_deal === true,
+    principalPerMonth: r.principal_per_month == null || !(Number(r.principal_per_month) > 0) ? null : Number(r.principal_per_month),
+    openFromYM: r.open_from ? r.open_from.slice(0, 7) : null,
   }
 }
 
@@ -90,7 +99,14 @@ export function askWords(a: TermsAsk): string {
   return [
     scope.charAt(0).toUpperCase() + scope.slice(1),
     a.rate != null ? `${pct(a.rate)} /mo` : null,
-    a.noFixedTerm ? 'no fixed term' : a.remainingMonths != null ? `${a.remainingMonths} months${a.wholeDeal ? '' : ' left'}` : null,
+    a.noFixedTerm
+      ? 'no fixed term'
+      : a.principalPerMonth != null
+        ? `${rm(a.principalPerMonth)} a month`
+        : a.remainingMonths != null
+          ? `${a.remainingMonths} months${a.wholeDeal ? '' : ' left'}`
+          : null,
+    a.openFromYM ? `no fixed term from ${monthWords(a.openFromYM)}` : null,
     a.compounding === true ? 'compounding' : a.compounding === false ? 'not compounding' : null,
     a.interestOnOriginal ? 'interest on the original principal' : a.interestKeepsBase ? 'interest on the principal it was on before' : null,
   ]
@@ -104,17 +120,22 @@ export function askWords(a: TermsAsk): string {
  * a loan once without a fixed term stays so (its terms' words say it, and the amend never takes them back).
  */
 export function termsAfterAsk(kind: TermsRecordKind, t: PositionTerms, ask: TermsAsk): PositionTerms {
+  // A loan once without a fixed term stays so; otherwise an amount a month asked, or — neither months nor no fixed
+  // term asked — the one the terms had (the amend keeps it).
+  const open = ask.noFixedTerm || (kind === 'loan' && t.current.months == null)
+  const fixed = open || ask.remainingMonths != null ? null : (ask.principalPerMonth ?? t.current.principalPerMonth ?? null)
   if (ask.wholeDeal) {
     // The terms in force themselves, from when they began (amend_fund_source / amend_loan): no new segment, no history.
-    const months = ask.noFixedTerm || (kind === 'loan' && t.current.months == null) ? null : (ask.remainingMonths ?? t.current.months)
-    return { ...t, current: { ...t.current, rate: ask.rate ?? t.current.rate, months, compounding: ask.compounding ?? t.current.compounding } }
+    const months = open ? null : (ask.remainingMonths ?? t.current.months)
+    const whole = { ...t, current: { ...t.current, rate: ask.rate ?? t.current.rate, months, compounding: ask.compounding ?? t.current.compounding, principalPerMonth: fixed } }
+    return ask.openFromYM ? endsFixedTermFrom(whole, ask.openFromYM) : whole
   }
   const segFrom = t.current.effectiveFrom ?? t.firstDueYM ?? t.startYM ?? ask.fromYM
   const kept = t.current.months ? Math.max(1, monthsBetweenYM(ask.fromYM, addMonthsYM(segFrom, t.current.months - 1)) + 1) : null
-  const months = ask.noFixedTerm || (kind === 'loan' && t.current.months == null) ? null : (ask.remainingMonths ?? kept)
-  return {
+  const months = open ? null : (ask.remainingMonths ?? kept)
+  const next: PositionTerms = {
     ...t,
-    current: { rate: ask.rate ?? t.current.rate, months, compounding: ask.compounding ?? t.current.compounding, effectiveFrom: ask.fromYM },
+    current: { rate: ask.rate ?? t.current.rate, months, compounding: ask.compounding ?? t.current.compounding, effectiveFrom: ask.fromYM, principalPerMonth: fixed },
     history: [
       ...t.history,
       {
@@ -123,8 +144,33 @@ export function termsAfterAsk(kind: TermsRecordKind, t: PositionTerms, ask: Term
         rate: t.current.rate,
         months: t.current.months,
         compounding: t.current.compounding,
+        principalPerMonth: t.current.principalPerMonth ?? null,
         nextInterestOnOriginal: ask.interestOnOriginal,
         nextInterestKeepsBase: ask.interestKeepsBase,
+      },
+    ],
+  }
+  return ask.openFromYM ? endsFixedTermFrom(next, ask.openFromYM) : next
+}
+
+/** The terms' fixed term ended from `ym` — what the approval's second amend does: no principal falls due from then,
+ *  the interest kept on the amount it was on (amend_*_from with no fixed term, keeping the base). */
+function endsFixedTermFrom(t: PositionTerms, ym: string): PositionTerms {
+  const segFrom = t.current.effectiveFrom ?? t.firstDueYM ?? t.startYM ?? ym
+  return {
+    ...t,
+    current: { rate: t.current.rate, months: null, compounding: t.current.compounding, effectiveFrom: ym, principalPerMonth: null },
+    history: [
+      ...t.history,
+      {
+        validFrom: segFrom,
+        validTo: addMonthsYM(ym, -1),
+        rate: t.current.rate,
+        months: t.current.months,
+        compounding: t.current.compounding,
+        principalPerMonth: t.current.principalPerMonth ?? null,
+        nextInterestOnOriginal: false,
+        nextInterestKeepsBase: true,
       },
     ],
   }
@@ -149,7 +195,8 @@ export function termsAskView(
     const now = buildTermsSegments(t, principalByMonth)
     const next = buildTermsSegments(termsAfterAsk(kind, t, ask), principalByMonth)
     if (!now.length || !next.length) return { ok: false, why: 'The deal has no start date yet.' }
-    return { ok: true, before: now[now.length - 1], after: next[next.length - 1] }
+    // The terms asked are the ones from the month — a fixed term ended later follows them.
+    return { ok: true, before: now[now.length - 1], after: segmentAt(next, ask.fromYM) ?? next[next.length - 1] }
   }
   if (status === 'approved') {
     const segs = buildTermsSegments(t, principalByMonth)
@@ -161,12 +208,12 @@ export function termsAskView(
   if (ask.fromYM <= segFrom) return { ok: false, why: `Its terms changed from ${monthWords(segFrom)} since — the month asked has to come after that.` }
   const now = buildTermsSegments(t, principalByMonth)
   const next = buildTermsSegments(termsAfterAsk(kind, t, ask), principalByMonth)
-  return { ok: true, before: segmentAt(now, ask.fromYM) ?? currentSegment(now, ask.fromYM), after: next[next.length - 1] }
+  return { ok: true, before: segmentAt(now, ask.fromYM) ?? currentSegment(now, ask.fromYM), after: segmentAt(next, ask.fromYM) ?? next[next.length - 1] }
 }
 
 /** The new terms in a line: "0.833% /mo · no fixed term · interest RM 424.83 a month on RM 51,000.00 as before". */
 export function askLine(s: TermsSegment): string {
-  const parts = [`${pct(s.rate)} /mo`, s.months == null ? 'no fixed term' : `${s.months} months`]
+  const parts = [`${pct(s.rate)} /mo`, s.months == null ? 'no fixed term' : s.fixedPrincipal != null ? `${rm(s.fixedPrincipal)} a month, ${s.months} months` : `${s.months} months`]
   if (s.compounding) {
     parts.push('compounding')
   } else {
@@ -192,8 +239,10 @@ export interface TermsFigures {
   basis: 'owed' | 'original' | 'kept'
 }
 
-export function figuresAt(s: TermsSegment, fromYM: string): TermsFigures {
-  const end = s.months == null ? null : s.scheduledEndYM
+export function figuresAt(s: TermsSegment, fromYM: string, endsBefore: string | null = null): TermsFigures {
+  // A fixed term ended from a later month (`endsBefore`) runs to the month before it.
+  const own = s.months == null ? null : s.scheduledEndYM
+  const end = own && endsBefore && addMonthsYM(endsBefore, -1) < own ? addMonthsYM(endsBefore, -1) : own
   return {
     rate: s.rate,
     months: end == null ? null : Math.max(0, monthsBetweenYM(fromYM, end) + 1),
@@ -207,7 +256,7 @@ export function figuresAt(s: TermsSegment, fromYM: string): TermsFigures {
 }
 
 /** The Approvals request's table: each line now and as asked, and whether the change moves it. */
-export function comparisonRows(now: TermsFigures, asked: TermsFigures): Array<{ label: string; now: string; asked: string; changed: boolean }> {
+export function comparisonRows(now: TermsFigures, asked: TermsFigures, openFromYM: string | null = null): Array<{ label: string; now: string; asked: string; changed: boolean }> {
   const term = (f: TermsFigures, left: boolean) => (f.months == null ? 'No fixed term' : `${f.months} months${left ? ' left' : ''}${f.endYM ? ` · to ${monthWords(f.endYM)}` : ''}`)
   const principal = (f: TermsFigures) => (f.months == null ? 'None falls due' : rm(f.principalPerMonth))
   const interest = (f: TermsFigures) =>
@@ -220,6 +269,7 @@ export function comparisonRows(now: TermsFigures, asked: TermsFigures): Array<{ 
     ['Interest a month', interest(now), interest(asked)],
     ['Each month', each(now), each(asked)],
   ]
+  if (openFromYM) rows.push(['After that', '—', `No fixed term from ${monthWords(openFromYM)} · interest ${rm(asked.interestPerMonth)} a month on ${rm(asked.interestBase)}`])
   return rows.map(([label, n, a]) => ({ label, now: n, asked: a, changed: n !== a }))
 }
 
@@ -289,7 +339,9 @@ export function termsRequestNote(args: {
     status: row.status,
     fromYM: ask.fromYM,
     whole: ask.wholeDeal === true,
-    line: view.ok ? askLine(view.after) : askWords(ask).replace(/^(?:Whole deal from|From) [A-Za-z]{3} \d{4}(?: · )?/, ''),
+    line: view.ok
+      ? askLine(view.after) + (ask.openFromYM ? ` · no fixed term from ${monthWords(ask.openFromYM)}` : '')
+      : askWords(ask).replace(/^(?:Whole deal from|From) [A-Za-z]{3} \d{4}(?: · )?/, ''),
     reason: row.reason,
     by: args.nameOf(row.created_by) ?? 'Finance',
     at: args.stamp(row.created_at),
@@ -342,11 +394,11 @@ export async function readTermsChange(supabase: SupabaseClient, approvalId: stri
   const loan = row.record_kind === 'loan'
   const [{ data: deal }, { data: history }, { data: reps }] = await Promise.all([
     loan
-      ? supabase.from('loans').select('principal, effective_rate, tenure_months, compound_interest, disbursement_date, repayment_start_month, terms_effective_from, repayment_terms').eq('id', row.record_id).maybeSingle()
-      : supabase.from('fund_sources').select('amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from').eq('id', row.record_id).maybeSingle(),
+      ? supabase.from('loans').select('principal, effective_rate, tenure_months, compound_interest, disbursement_date, repayment_start_month, terms_effective_from, repayment_terms, principal_per_month').eq('id', row.record_id).maybeSingle()
+      : supabase.from('fund_sources').select('amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, terms_effective_from, principal_per_month').eq('id', row.record_id).maybeSingle(),
     supabase
       .from('treasury_terms_history')
-      .select('record_id, valid_from, valid_to, rate, months, compound_interest, reason, next_interest_on_original, next_interest_keeps_base')
+      .select('record_id, valid_from, valid_to, rate, months, compound_interest, reason, next_interest_on_original, next_interest_keeps_base, principal_per_month')
       .eq('record_kind', row.record_kind)
       .eq('record_id', row.record_id)
       .order('valid_from', { ascending: true }),
@@ -363,5 +415,5 @@ export async function readTermsChange(supabase: SupabaseClient, approvalId: stri
   ).get(row.record_id) ?? {}
   const view = termsAskView(row.record_kind, terms, paid, ask, row.status)
   if (!view.ok) return { ...base, rows: [], why: view.why }
-  return { ...base, rows: comparisonRows(figuresAt(view.before, ask.fromYM), figuresAt(view.after, ask.fromYM)), why: null }
+  return { ...base, rows: comparisonRows(figuresAt(view.before, ask.fromYM), figuresAt(view.after, ask.fromYM, ask.openFromYM ?? null), ask.openFromYM ?? null), why: null }
 }

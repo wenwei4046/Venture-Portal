@@ -33,7 +33,7 @@
 // A repaid deal's month-by-month rows stop at the month it was repaid.
 
 import dayjs from 'dayjs'
-import { addMonthsYM, buildTermsSegments, type PositionTerms, type TermsSegment } from './treasury-terms'
+import { addMonthsYM, buildTermsSegments, principalDueIn, type PositionTerms, type TermsSegment } from './treasury-terms'
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 const EPS = 0.005
@@ -338,7 +338,7 @@ function openPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, dueD
     const seg = segmentFor(segments, ym)
     const interest = seg.interestPerMonth
     // A month an earlier fixed segment governs, within its schedule, still asks that segment's principal.
-    const scheduled = seg.months && !seg.compounding && (!seg.scheduledEndYM || ym <= seg.scheduledEndYM) ? seg.principalPerMonth : 0
+    const scheduled = seg.months && !seg.compounding && (!seg.scheduledEndYM || ym <= seg.scheduledEndYM) ? principalDueIn(seg, ym) : 0
     const installment = r2(scheduled + interest)
     cumI = r2(cumI + interest)
     cumP = r2(cumP + scheduled)
@@ -443,7 +443,7 @@ function compoundPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, 
         const next = segments.find((s) => s.fromYM > ym)
         breaks.push({ no: rows.length + 1, ...termsBreak(seg, addMonthsYM(next ? next.fromYM : rollYM, -1), null) })
       }
-      const scheduled = seg.months && (!seg.scheduledEndYM || ym <= seg.scheduledEndYM) ? seg.principalPerMonth : 0
+      const scheduled = seg.months && (!seg.scheduledEndYM || ym <= seg.scheduledEndYM) ? principalDueIn(seg, ym) : 0
       const interest = seg.interestPerMonth
       const installment = r2(scheduled + interest)
       cumP = r2(cumP + scheduled)

@@ -10,7 +10,7 @@ import { officeMonth, officeToday } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled, loanMonthlyInstallment } from '@/lib/treasury-schedule'
-import { buildTermsSegments, currentSegment, principalPaidSince, resolveFirstDueYM, segmentedUnpaid, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
+import { buildTermsSegments, currentSegment, principalPaidSince, resolveFirstDueYM, segmentedUnpaid, segmentRemainingPeriods, segmentsGovern, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { fundSourceStart, loanStart } from '@/lib/repayment-start'
@@ -105,7 +105,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient, opts: { asO
   ] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, repayment_start_date, terms_effective_from')
+      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, repayment_start_date, terms_effective_from, principal_per_month')
       .in('status', past ? ['active', 'fully_repaid'] : ['active']),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, name, short_code'),
@@ -114,7 +114,7 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient, opts: { asO
     ),
     supabase
       .from('fund_sources')
-      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, repayment_date, terms_effective_from')
+      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, repayment_date, terms_effective_from, principal_per_month')
       .in('status', past ? ['active', 'matured', 'repaid'] : ['active', 'matured']),
     supabase.from('fund_source_outstanding').select('fund_source_id, outstanding, total_principal_paid'),
     fetchAllRows((lo, hi) =>
@@ -203,9 +203,10 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient, opts: { asO
     const startMonth = (l as { repayment_start_month?: string | null }).repayment_start_month ?? null
     const firstDueYM = resolveFirstDueYM(startMonth, l.disbursement_date as string | null)
     const segments = buildTermsSegments(termsForLoan(l, loanHist.get(l.id as string) ?? []), loanPrincipalByMonth.get(l.id as string) ?? {})
-    const changed = termsChanged(segments)
+    // The segments give the figures once the terms changed or a fixed amount a month splits the principal (2026-10-27).
+    const changed = segmentsGovern(segments)
     const seg = changed ? currentSegment(segments, currentYM) : null
-    const termsTag = seg ? ` · terms from ${seg.fromYM}` : ''
+    const termsTag = seg && termsChanged(segments) ? ` · terms from ${seg.fromYM}` : ''
 
     if (compounding || unscheduled || !(tenure > 0)) {
       if (outstanding > 0.005) {
@@ -283,9 +284,9 @@ export async function fetchLoanMonitorData(supabase: SupabaseClient, opts: { asO
     const startMonth = (s as { repayment_start_month?: string | null }).repayment_start_month ?? null
     const firstDueYM = resolveFirstDueYM(startMonth, s.effective_date as string | null)
     const segments = buildTermsSegments(termsForFundSource(s, fsHist.get(s.id as string) ?? []), fsPrincipalByMonth.get(s.id as string) ?? {})
-    const changed = termsChanged(segments)
+    const changed = segmentsGovern(segments)
     const seg = changed ? currentSegment(segments, currentYM) : null
-    const termsTag = seg ? ` · terms from ${seg.fromYM}` : ''
+    const termsTag = seg && termsChanged(segments) ? ` · terms from ${seg.fromYM}` : ''
 
     if (compounding || !lockIn || lockIn <= 0) {
       if (outstanding > 0.005) {

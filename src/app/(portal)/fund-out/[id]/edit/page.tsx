@@ -59,6 +59,7 @@ export default async function LoanEditPage({ params }: Props) {
         loanId={loan.id}
         ratePct={(Number(loan.effective_rate) * 100).toString()}
         tenureMonths={(loan.tenure_months ?? '').toString()}
+        principalPerMonth={loan.principal_per_month == null ? '' : String(loan.principal_per_month)}
         disbursementDate={(loan.disbursement_date as string | null) ?? ''}
         repaymentTerms={(loan.repayment_terms as string | null) ?? ''}
         compound={(loan as { compound_interest?: boolean }).compound_interest === true}

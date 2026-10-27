@@ -53,6 +53,8 @@
 }
 /* A form with fields side by side (Create payment, 2026-10-22). */
 .dialog[data-wide] { width: min(680px, 100%); }
+/* A form in parts with what it adds up to beside them (Record fund in / Create fund out, 2026-10-27). */
+.dialog[data-xwide] { width: min(1040px, 100%); }
 .dialogRoot[data-shown='true'] .dialogScrim,
 .dialogRoot[data-shown='true'] .dialog { opacity: 1; }
 .dialogRoot[data-shown='true'] .dialog { transform: scale(1); }

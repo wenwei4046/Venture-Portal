@@ -8,7 +8,9 @@ import {
   draftOfForm,
   explainAmendRefusal,
   laterYM,
+  openFromSent,
   owedAtStart,
+  principalPerMonthSent,
   wholeChoiceName,
   type AmendTerms,
 } from './fund-amend'
@@ -127,5 +129,49 @@ describe('Amend terms — the whole terms filed by Finance', () => {
     expect(d.start).toBe(SOURCE.start)
     expect(d.text).toBe(SOURCE.text)
     expect(entries(amendFormData('in', 's1', SOURCE, d))).toEqual({ fund_source_id: 's1', cost_rate_percent: '0.833', reason: 'agreed from the start' })
+  })
+})
+
+describe('Repayment type — what the desktop form sends (2026-10-27)', () => {
+  const form = (pairs: Array<[string, string]>) => {
+    const fd = new FormData()
+    for (const [k, v] of pairs) fd.set(k, v)
+    return fd
+  }
+
+  it('from a month: an amount a month and when the fixed term ends; months left; none', () => {
+    const d = amendDraftOf(LOAN)
+    expect(entries(amendFormData('out', 'l1', LOAN, { ...d, repayment: 'amount', principalPerMonth: '1,000.00', openFrom: '2027-03' }))).toEqual({
+      loan_id: 'l1',
+      effective_from: '2026-11',
+      principal_per_month: '1000.00',
+      open_from: '2027-03',
+    })
+    expect(entries(amendFormData('out', 'l1', LOAN, { ...d, repayment: 'months', remaining: '24' }))).toEqual({ loan_id: 'l1', effective_from: '2026-11', remaining_months: '24' })
+    expect(entries(amendFormData('out', 'l1', LOAN, { ...d, repayment: 'none', openFrom: '2027-03' }))).toEqual({ loan_id: 'l1', effective_from: '2026-11', no_fixed_term: 'on' })
+  })
+
+  it('the whole terms: months are sent even unchanged — they take over from an amount a month; none sends the periods blank', () => {
+    const d = { ...amendDraftOf(SOURCE), mode: 'whole' as const }
+    expect(entries(amendFormData('in', 's1', SOURCE, { ...d, repayment: 'months', months: '' }))).toEqual({ fund_source_id: 's1' })
+    expect(entries(amendFormData('in', 's1', { ...SOURCE, months: '12' }, { ...d, repayment: 'months', months: '12' }))).toEqual({ fund_source_id: 's1', lock_in_months: '12' })
+    expect(entries(amendFormData('in', 's1', SOURCE, { ...d, repayment: 'amount', principalPerMonth: '500' }))).toEqual({ fund_source_id: 's1', principal_per_month: '500' })
+    expect(entries(amendFormData('in', 's1', { ...SOURCE, months: '12' }, { ...d, repayment: 'none' }))).toEqual({ fund_source_id: 's1', lock_in_months: '' })
+  })
+
+  it('reads the form back: the choice, the amount and the month — none chosen is the sheet’s reading', () => {
+    const chosen = draftOfForm('in', form([['repayment_type', 'amount'], ['principal_per_month', '1,000'], ['open_from', '2026-10'], ['effective_from', '2026-01']]), 'from', SOURCE)
+    expect(chosen).toMatchObject({ repayment: 'amount', principalPerMonth: '1,000', openFrom: '2026-10', noFixedTerm: false })
+    const none = draftOfForm('in', form([['effective_from', '2026-01'], ['cost_rate_percent', '0.85'], ['compound_interest', 'on']]), 'from', SOURCE)
+    expect(none.repayment).toBeNull()
+    expect(entries(amendFormData('in', 's1', SOURCE, none))).toEqual({ fund_source_id: 's1', effective_from: '2026-01' })
+  })
+
+  it('the actions read the amount and the month, or refuse them in words', () => {
+    expect(principalPerMonthSent(form([['principal_per_month', '1,300.505']]))).toEqual({ ok: true, value: 1300.51 })
+    expect(principalPerMonthSent(form([]))).toEqual({ ok: true, value: null })
+    expect(principalPerMonthSent(form([['principal_per_month', '-5']]))).toEqual({ ok: false, error: 'The principal a month is an amount above 0.' })
+    expect(openFromSent(form([['open_from', '2026-10']]))).toBe('2026-10')
+    expect(openFromSent(form([['open_from', 'October']]))).toBeNull()
   })
 })

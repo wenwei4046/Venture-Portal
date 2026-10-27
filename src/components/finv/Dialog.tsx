@@ -35,6 +35,7 @@ export function FinDialog({
   locked = false,
   tall = false,
   wide = false,
+  xwide = false,
   aside = null,
   children,
 }: {
@@ -50,6 +51,11 @@ export function FinDialog({
   tall?: boolean
   /** 680px on a desktop for a form with fields side by side (Create payment, 2026-10-22); a phone's sheet ignores it. */
   wide?: boolean
+  /**
+   * 1040px on a desktop for a form in parts with what it adds up to beside them (Record fund in / Create fund out,
+   * 2026-10-27 — the user: "只针对 desktop 版的"); a phone's sheet ignores it.
+   */
+  xwide?: boolean
   /**
    * A panel beside the window (2026-10-24 — IT support's file preview, the user: "直接在这个 floating window 的右边出现
    * 一个 preview"): on a desktop the two stand centred together, the window moving left by half of what the panel takes;
@@ -99,6 +105,7 @@ export function FinDialog({
         className={s.dialog}
         data-tall={sheet && tall ? '' : undefined}
         data-wide={!sheet && wide ? '' : undefined}
+        data-xwide={!sheet && xwide ? '' : undefined}
         data-aside={aside ? '' : undefined}
       >
         {sheet ? (

@@ -18,7 +18,7 @@ import {
 } from '@/lib/loans-coa'
 import type { PaymentType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
-import { compoundSent, explainAmendRefusal } from '@/lib/fund-amend'
+import { amendMonthWords, compoundSent, explainAmendRefusal, openFromSent, principalPerMonthSent } from '@/lib/fund-amend'
 import { loadNewLoanOptions, type NewLoanOptions } from './_lib/new-loan-options'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
@@ -80,7 +80,11 @@ async function createLoanInner(formData: FormData): Promise<{ error: string } | 
   // from the loan start date. Match the existing no-term convention — store
   // tenure_months=1 as a placeholder and mark repayment_terms 未定 so
   // isLoanUnscheduled() routes it to the compounding / no-fixed-term bucket.
-  const noFixedTerm = rawTenure.trim() === ''
+  // Repayment type "A fixed amount a month" (2026-10-27) sends no tenure: it is
+  // worked out from the amount below.
+  const ppm = principalPerMonthSent(formData)
+  if (!ppm.ok) return { error: ppm.error }
+  const noFixedTerm = rawTenure.trim() === '' && ppm.value === null
   let repaymentTerms = (formData.get('repayment_terms') as string) ?? ''
   const loanStartDate = (formData.get('loan_start_date') as string) ?? ''
   const disbursementAccountCode = ((formData.get('disbursement_account_code') as string) ?? '').trim()
@@ -93,8 +97,13 @@ async function createLoanInner(formData: FormData): Promise<{ error: string } | 
     return { error: 'Principal exceeds RM 100M ceiling' }
   }
   // 1..120 like fund sources (2026-09-22, mig 20260922020000 lifted the RPC's 12).
-  if (!noFixedTerm && (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 120)) {
+  if (!noFixedTerm && ppm.value === null && (isNaN(tenureMonths) || tenureMonths < 1 || tenureMonths > 120)) {
     return { error: 'Repayment period must be between 1 and 120 months (or leave blank for no fixed term)' }
+  }
+  // A fixed amount a month: the months that clear the principal at it, the last taking what is left.
+  const fixedMonths = ppm.value !== null ? Math.max(1, Math.ceil(principal / ppm.value - 1e-9)) : null
+  if (fixedMonths !== null && fixedMonths > 120) {
+    return { error: `At RM ${ppm.value!.toLocaleString('en-MY', { minimumFractionDigits: 2 })} a month the principal takes ${fixedMonths} months — the most is 120.` }
   }
   if (!loanStartDate || !dayjs(loanStartDate).isValid()) {
     return { error: 'Loan start date is required' }
@@ -108,7 +117,7 @@ async function createLoanInner(formData: FormData): Promise<{ error: string } | 
       return { error: 'Expected repayment date must be on or after the loan start date' }
     }
   }
-  const effectiveTenure = noFixedTerm ? 1 : tenureMonths
+  const effectiveTenure = noFixedTerm ? 1 : (fixedMonths ?? tenureMonths)
   if (noFixedTerm) {
     // Ensure the schedule treats it as unscheduled even if the user left
     // Repayment terms blank (isLoanUnscheduled keys on this text).
@@ -229,18 +238,19 @@ async function createLoanInner(formData: FormData): Promise<{ error: string } | 
   // doesn't take them, so flag the just-created loan. Safe: it's still
   // pending_approval (no GL/cash yet), and both flags only affect the
   // schedule/tracking math, not the disbursement.
-  const creationFlags: { compound_interest?: boolean; min_pay_interest?: boolean; repayment_start_month?: string } = {}
+  const creationFlags: { compound_interest?: boolean; min_pay_interest?: boolean; repayment_start_month?: string; principal_per_month?: number } = {}
   if (formData.get('compound_interest') === 'on') creationFlags.compound_interest = true
   if (formData.get('min_pay_interest') === 'on') creationFlags.min_pay_interest = true
   // First installment month, same field the detail page's 还款起始月 editor sets.
   if (repaymentStartDate) creationFlags.repayment_start_month = dayjs(repaymentStartDate).startOf('month').format('YYYY-MM-DD')
+  if (ppm.value !== null) creationFlags.principal_per_month = ppm.value
   if (Object.keys(creationFlags).length > 0) {
     const { error: cErr } = await supabase
       .from('loans')
       .update(creationFlags)
       .eq('id', loanId as string)
       .eq('status', 'pending_approval')
-    if (cErr) return { error: `The loan was filed, but its compound interest / minimum pay / first repayment were not set: ${cErr.message} — set them on its page.` }
+    if (cErr) return { error: `The loan was filed, but its compound interest / minimum pay / first repayment / amount a month were not set: ${cErr.message} — set them on its page.` }
   }
 
   return { id: loanId as string }
@@ -725,8 +735,13 @@ async function fileWholeLoan(formData: FormData): Promise<{ error: string } | un
     tenure = n
   }
   const compound = compoundSent(formData)
-  if (rate === null && tenure === null && compound === null) {
-    return { error: 'Nothing was changed — change the rate, the tenure or compounding first.' }
+  // A fixed amount a month (2026-10-27), and the month the fixed term ends.
+  const ppm = principalPerMonthSent(formData)
+  if (!ppm.ok) return { error: ppm.error }
+  if (ppm.value !== null && tenure !== null) return { error: 'Choose a fixed amount a month, a number of months or no fixed term — one of them.' }
+  const openFrom = openFromSent(formData)
+  if (rate === null && tenure === null && compound === null && ppm.value === null && !openFrom) {
+    return { error: 'Nothing was changed — change the rate, the repayment or compounding first.' }
   }
   const reason = ((formData.get('reason') as string) ?? '').trim()
 
@@ -740,6 +755,8 @@ async function fileWholeLoan(formData: FormData): Promise<{ error: string } | un
     p_compound_interest: compound,
     p_reason: reason || null,
     p_whole: true,
+    p_principal_per_month: ppm.value,
+    p_open_from: openFrom ? `${openFrom}-01` : null,
   } as never)
   if (error) return { error: `Not submitted: ${error.message}` }
   revalidatePath(`/fund-out/${loanId}`)
@@ -776,11 +793,35 @@ async function amendLoanWork(formData: FormData): Promise<{ error: string } | un
     if (isNaN(tenure) || tenure < 1 || tenure > 120) return { error: 'The tenure is a whole number of months from 1 to 120.' }
     payload.tenure_months = tenure
   }
+  // A fixed amount a month (2026-10-27): its months are worked out from what the terms began on.
+  const ppm = principalPerMonthSent(formData)
+  if (!ppm.ok) return { error: ppm.error }
+  if (ppm.value !== null) {
+    if ('tenure_months' in payload) return { error: 'Choose a fixed amount a month, a number of months or no fixed term — one of them.' }
+    payload.principal_per_month = ppm.value
+  }
   if (disbursementDate) payload.disbursement_date = disbursementDate
   if (repaymentTerms.trim()) payload.repayment_terms = repaymentTerms.trim()
 
   const { error } = await supabase.rpc('amend_loan', { p_loan_id: loanId, p_payload: payload })
   if (error) return { error: `Not saved: ${error.message}` }
+  // No fixed term from a later month: the terms just saved end their fixed term there, the interest kept on the same amount.
+  const openFrom = openFromSent(formData)
+  if (openFrom) {
+    const { error: openErr } = await supabase.rpc('amend_loan_from', {
+      p_loan_id: loanId,
+      p_effective_from: `${openFrom}-01`,
+      p_effective_rate: null,
+      p_remaining_months: null,
+      p_compound_interest: null,
+      p_reason: ((formData.get('reason') as string) ?? '').trim() || null,
+      p_no_fixed_term: true,
+      p_interest_keeps_base: true,
+    })
+    if (openErr) {
+      return { error: `The terms were saved, but their fixed term was not ended from ${amendMonthWords(openFrom)}: ${explainAmendRefusal(openErr.message) ?? openErr.message}` }
+    }
+  }
 
   revalidatePath(`/fund-out/${loanId}`)
   revalidatePath('/fund-out')
@@ -827,6 +868,13 @@ async function amendLoanFromWork(formData: FormData, direct = true): Promise<{ e
   const interestOnOriginal = formData.get('interest_on_original') === 'on'
   const interestKeepsBase = formData.get('interest_keeps_base') === 'on'
   if (interestOnOriginal && interestKeepsBase) return { error: 'Choose one amount for the interest to be charged on.' }
+  // A fixed amount a month (2026-10-27), and the month the fixed term ends.
+  const ppm = principalPerMonthSent(formData)
+  if (!ppm.ok) return { error: ppm.error }
+  if (ppm.value !== null && (noFixedTerm || remaining !== null)) return { error: 'Choose a fixed amount a month, a number of months or no fixed term — one of them.' }
+  const openFrom = openFromSent(formData)
+  if (openFrom && noFixedTerm) return { error: 'With no fixed term there is no fixed term to end later.' }
+  if (openFrom && openFrom <= fromYM) return { error: `No fixed term from has to come after ${amendMonthWords(fromYM)}, when the new terms start.` }
 
   if (!direct) {
     const { error: fileErr } = await supabase.rpc('file_terms_change' as never, {
@@ -840,6 +888,8 @@ async function amendLoanFromWork(formData: FormData, direct = true): Promise<{ e
       p_interest_on_original: interestOnOriginal,
       p_interest_keeps_base: interestKeepsBase,
       p_reason: reason || null,
+      p_principal_per_month: ppm.value,
+      p_open_from: openFrom ? `${openFrom}-01` : null,
     } as never)
     if (fileErr) return { error: `Not submitted: ${explainAmendRefusal(fileErr.message) ?? fileErr.message}` }
     revalidatePath(`/fund-out/${loanId}`)
@@ -861,8 +911,25 @@ async function amendLoanFromWork(formData: FormData, direct = true): Promise<{ e
     p_no_fixed_term: noFixedTerm,
     p_interest_on_original: interestOnOriginal,
     p_interest_keeps_base: interestKeepsBase,
+    p_principal_per_month: ppm.value,
   })
   if (error) return { error: `Not saved: ${explainAmendRefusal(error.message) ?? error.message}` }
+  // No fixed term from a later month: the terms just applied end their fixed term there, the interest kept on the same amount.
+  if (openFrom) {
+    const { error: openErr } = await supabase.rpc('amend_loan_from', {
+      p_loan_id: loanId,
+      p_effective_from: `${openFrom}-01`,
+      p_effective_rate: null,
+      p_remaining_months: null,
+      p_compound_interest: null,
+      p_reason: reason || null,
+      p_no_fixed_term: true,
+      p_interest_keeps_base: true,
+    })
+    if (openErr) {
+      return { error: `The new terms were applied, but their fixed term was not ended from ${amendMonthWords(openFrom)}: ${explainAmendRefusal(openErr.message) ?? openErr.message}` }
+    }
+  }
 
   revalidatePath(`/fund-out/${loanId}`)
   revalidatePath('/fund-out')

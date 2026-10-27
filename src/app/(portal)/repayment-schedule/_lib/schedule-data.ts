@@ -3,7 +3,7 @@ import { officeMonth, officeToday } from '@/lib/office-time'
 import { fetchAllRows } from '@/lib/paginate'
 import { loanMonthlyInstallment, isLoanUnscheduled, isBeforeFirstInstallment, compoundInterestState, minInterestStatus } from '@/lib/treasury-schedule'
 import { resolveFirstDueYM } from '@/lib/loan-monitor'
-import { buildTermsSegments, compoundRoll, currentSegment, principalPaidSince, segmentRemainingPeriods, termsChanged, type TermsSegment } from '@/lib/treasury-terms'
+import { buildTermsSegments, compoundRoll, currentSegment, principalDueIn, principalPaidSince, segmentRemainingPeriods, segmentsGovern, termsChanged, type TermsSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
 import { buildRepaymentPlan } from '@/lib/repayment-plan'
 import { fundSourceStart, loanStart } from '@/lib/repayment-start'
@@ -53,7 +53,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   const [{ data: loans }, { data: loanOut }, { data: companies }, { data: loanReps }] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, min_pay_interest, repayment_start_month, repayment_start_date, terms_effective_from')
+      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, min_pay_interest, repayment_start_month, repayment_start_date, terms_effective_from, principal_per_month')
       .in('status', ['active', 'fully_repaid']),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, short_code, name'),
@@ -106,9 +106,9 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     const counterparty = co?.short_code ?? co?.name ?? '—'
     const principal = Number(l.principal)
     const segments = buildTermsSegments(termsForLoan(l, loanHist.get(l.id as string) ?? []), loanPrincipalByMonth.get(l.id as string) ?? {})
-    const seg = termsChanged(segments) ? currentSegment(segments, currentYM) : null
+    const seg = segmentsGovern(segments) ? currentSegment(segments, currentYM) : null
     const rate = seg ? seg.rate : Number(l.effective_rate)
-    const termsTag = seg ? ` · terms from ${seg.fromYM}` : ''
+    const termsTag = seg && termsChanged(segments) ? ` · terms from ${seg.fromYM}` : ''
     const source = fundingSourceFromTerms(l.repayment_terms as string | null)
     // Loan fully repaid: it no longer has a scheduled installment, but if the
     // settlement happened THIS month surface it as a 已收 row (full-plan view)
@@ -206,7 +206,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     }
     const inst = seg
       ? {
-          principalDue: seg.principalPerMonth,
+          principalDue: principalDueIn(seg, currentYM),
           interestDue: seg.interestPerMonth,
           remainingPeriods: segmentRemainingPeriods(seg, principalPaidSince(loanPrincipalByMonth.get(l.id as string) ?? {}, seg.fromYM)),
         }
@@ -236,7 +236,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   // ── 应付 (fund sources) + repayment history + compounding meta + pending PVs ──
   const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }, { data: fsDepts }, { data: fsDirectors }] = await Promise.all([
     listPayableFundSources({ includeSettledInMonth: currentYM }),
-    supabase.from('fund_sources').select('id, status, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from'),
+    supabase.from('fund_sources').select('id, status, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from, principal_per_month'),
     fetchAllRows((lo, hi) => supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     supabase
       .from('payment_vouchers')
@@ -248,22 +248,22 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     // A director's fund source goes by the director's name (2026-10-12).
     supabase.from('directors').select('id, name'),
   ])
-  const fsMeta = new Map((fsMetaRows ?? []).map((m) => [m.id as string, m as { compound_interest?: boolean; effective_date?: string | null; min_pay_interest?: boolean; repayment_start_month?: string | null; amount?: number | string; cost_rate?: number | string; lock_in_months?: number | null; terms_effective_from?: string | null }]))
+  const fsMeta = new Map((fsMetaRows ?? []).map((m) => [m.id as string, m as { compound_interest?: boolean; effective_date?: string | null; min_pay_interest?: boolean; repayment_start_month?: string | null; amount?: number | string; cost_rate?: number | string; lock_in_months?: number | null; terms_effective_from?: string | null; principal_per_month?: number | string | null }]))
   const fsHist = await fetchTermsHistory(supabase, 'fund_source', (fsMetaRows ?? []).map((m) => m.id as string))
   const fsPrincipalByMonth = principalPaidByMonth(
     (fsReps ?? []).map((rp) => ({ id: rp.fund_source_id as string, amount: Number(rp.amount), payment_date: rp.payment_date as string, payment_type: rp.payment_type as string })),
     (t) => t === 'principal' || t === 'netting',
   )
-  // Segments of a fund source whose terms changed (compounding rows roll per
+  // Segments of a fund source whose terms changed or that repays a fixed amount a month (compounding rows roll per
   // lib/treasury-terms compoundRoll); null when unchanged.
   const fsSegments = (id: string): TermsSegment[] | null => {
     const m = fsMeta.get(id)
-    if (!m || !m.terms_effective_from) return null
+    if (!m || (!m.terms_effective_from && m.principal_per_month == null)) return null
     const segs = buildTermsSegments(
-      termsForFundSource({ amount: m.amount ?? 0, cost_rate: m.cost_rate ?? 0, lock_in_months: m.lock_in_months ?? null, compound_interest: m.compound_interest, effective_date: m.effective_date ?? null, repayment_start_month: m.repayment_start_month, terms_effective_from: m.terms_effective_from }, fsHist.get(id) ?? []),
+      termsForFundSource({ amount: m.amount ?? 0, cost_rate: m.cost_rate ?? 0, lock_in_months: m.lock_in_months ?? null, compound_interest: m.compound_interest, effective_date: m.effective_date ?? null, repayment_start_month: m.repayment_start_month, terms_effective_from: m.terms_effective_from, principal_per_month: m.principal_per_month }, fsHist.get(id) ?? []),
       fsPrincipalByMonth.get(id) ?? {},
     )
-    return termsChanged(segs) ? segs : null
+    return segmentsGovern(segs) ? segs : null
   }
   const fsCompound = (id: string, principal: number, rate: number, startYM: string) => {
     const segs = fsSegments(id)
@@ -478,6 +478,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
           effective_date: (m.effective_date as string | null) ?? null,
           repayment_start_month: (m.repayment_start_month as string | null) ?? null,
           terms_effective_from: (m.terms_effective_from as string | null) ?? null,
+          principal_per_month: (m.principal_per_month as number | string | null) ?? null,
         },
         fsHist.get(id) ?? [],
       ),
