@@ -26,6 +26,12 @@ export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
   ["From this CRM", "Revenue app", [["leads", "Leads", "Chats that came in from the ad", "n"], ["cpl", "Cost per lead", "Amount spent ÷ leads", "rm2"], ["appt", "Appointments", "Leads who booked a visit", "n"], ["showup", "Showed up", "Visits marked as showed up", "n"], ["won", "Won", "Leads marked won", "n"], ["apptrate", "Appointment rate", "Appointments ÷ leads", "pct"], ["cpappt", "Cost per appointment", "Amount spent ÷ appointments", "rm2"], ["showrate", "Show-up rate", "Showed up ÷ appointments", "pct"], ["winrate", "Win rate", "Won ÷ leads", "pct"], ["cpwon", "Cost per won", "Amount spent ÷ won", "rm2"]]],
 ];
 export const ALL = METRICS.flatMap(g => g[2]);
+
+/** Column order's drag: the row held (`from`, as the state has it now) moved to where the pointer is; null when it is there already. */
+export function moveHeld(list: string[], from: number | null | undefined, to: number): string[] | null {
+  if (from == null || from === to || from < 0 || from >= list.length) return null;
+  const c = [...list]; const [x] = c.splice(from, 1); c.splice(to, 0, x); return c;
+}
 /** The chart's metrics are the table's (2026-10-23, the owner: "他的资料跟下方的 + 是一样的"), less Delivery. */
 const CHART_METRICS = ALL.filter(m => m[3] !== "t").map(m => [m[0], m[1], chartFmtOf(m[3])] as const);
 // 4a's columns (frame 05): Leads, Appts, Appt rate, Show-up, Won, Won rate, Spend, Per lead — the rest from +. Spend and Per
@@ -272,8 +278,11 @@ export function adsPerfVM(ctx: DeskCtx) {
         sh: dragging ? "0 6px 18px rgba(42,22,12,.22)" : "none", bd: dragging ? "transparent" : "var(--crm-field)", z: dragging ? 2 : 1,
         up: () => { if (i > 0) mvTo(i - 1); }, down: () => { if (i < dcols.length - 1) mvTo(i + 1); },
         rm: () => set(u => ({ ...u, mDraft: (u.mDraft ?? baseOf(u)).filter(k => k !== m[0]) })),
-        dStart: (e: { dataTransfer: DataTransfer }) => { e.dataTransfer.effectAllowed = "move"; patch({ mDrag: i }); },
-        dOver: (e: { preventDefault(): void }) => { e.preventDefault(); const f = ui.mDrag; if (f == null || f === i) return; set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(f, 1); c.splice(i, 0, x); return { ...u, mDraft: c, mDrag: i }; }); },
+        // The row held is read from the state itself, not this render's copy: a drag's dragover events come faster than the
+        // list redraws, and a stale index swapped the row straight back (the owner, 2026-10-27: "拉住无法调整"). setData:
+        // Firefox starts no drag without it.
+        dStart: (e: { dataTransfer: DataTransfer }) => { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(i)); } catch { /* not every browser lets it */ } patch({ mDrag: i }); },
+        dOver: (e: { preventDefault(): void; dataTransfer?: DataTransfer }) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "move"; set(u => { const c = moveHeld((u.mDraft ?? baseOf(u)).filter(k => ALL.some(x => x[0] === k)), u.mDrag, i); return c ? { ...u, mDraft: c, mDrag: i } : u; }); },
         dDrop: (e: { preventDefault(): void }) => { e.preventDefault(); patch({ mDrag: null }); }, dEnd: () => patch({ mDrag: null }) }; }),
     mOrdOpen: !ui.mFold.__order, mOrdRot: ui.mFold.__order ? -90 : 0, mOrdFold: () => set(u => ({ ...u, mFold: { ...u.mFold, __order: !u.mFold.__order } })),
     syncedNote: "Not connected to Meta Ads yet",
