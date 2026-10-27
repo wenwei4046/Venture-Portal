@@ -9,7 +9,7 @@ import { askModel, type AgentDocument } from './ai-model'
 import { agentCards, agentReads, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile, type FixedAnswer, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
 import { quickProblem, type QuickReply } from './quick'
-import { deliver } from './messenger'
+import { deliver, deliverFile } from './messenger'
 import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
 import type { BusinessHours, InfoCard, InfoCat, LeadInfo } from './info'
@@ -79,6 +79,50 @@ async function deliverReply(messageId: number): Promise<string | null> {
   await quiet<null>('lead_reply_sent', { p_message: messageId, p_mid: 'mid' in result ? result.mid : null, p_error: 'error' in result ? result.error : null }, '')
   revalidatePath('/leads', 'layout')
   return 'error' in result ? result.error : null
+}
+
+/**
+ * A photo or file Customer Service sends (mig 20261027140000): the browser has put it in the bucket lead-media under
+ * chat/<conversation>/; lead_reply_media records it as a reply (the caption, else "[Photo]" / "[File] name"), then — on
+ * a real Messenger conversation — it goes through the brand's Page as an attachment and Meta's answer is kept, as a
+ * text reply's is.
+ */
+export async function sendLeadMedia(contactId: string, path: string, mime: string, caption: string): Promise<LeadOutcome<{ id: number; notSent: string | null }>> {
+  await requireActionOn('/leads', 'leads', 'create')
+  const saved = await call<number>('lead_reply_media', { p_contact: contactId, p_path: path, p_mime: mime, p_caption: caption }, 'The file was not saved.')
+  if (!saved.ok) return saved
+  return { ok: true, data: { id: saved.data, notSent: await deliverMedia(saved.data, path, mime) } }
+}
+
+/** Send a photo or file just recorded; null when it went (or is a test's), else why not. */
+async function deliverMedia(messageId: number, path: string, mime: string): Promise<string | null> {
+  const target = await quiet<{ isTest: boolean; channel: string; pageId: string | null; psid: string; lastInAt: string | null } | null>(
+    'lead_reply_target', { p_message: messageId }, '')
+  if (!target.ok || !target.data || target.data.isTest) return null
+  const t = target.data
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const { data: file, error } = await supabase.storage.from('lead-media').download(path)
+  const filename = path.replace(/^.*\//, '').replace(/^[0-9a-f-]{36}-/, '')
+  const result = error || !file
+    ? { error: 'The file could not be read back to send it.' }
+    : await deliverFile({ pageId: t.pageId, psid: t.psid, lastInAt: t.lastInAt }, file, filename, mime, process.env.META_SYSTEM_USER_TOKEN?.trim())
+  await quiet<null>('lead_reply_sent', { p_message: messageId, p_mid: 'mid' in result ? result.mid : null, p_error: 'error' in result ? result.error : null }, '')
+  revalidatePath('/leads', 'layout')
+  return 'error' in result ? result.error : null
+}
+
+/** Short-lived links (an hour) to the photos and files sent in a conversation, by their paths. */
+export async function leadMediaLinks(paths: string[]): Promise<LeadOutcome<Record<string, string>>> {
+  await requireActionOn('/leads', 'leads', 'view')
+  const wanted = [...new Set(paths)].filter(p => /^chat\/[0-9a-f-]{36}\/[^/]{1,200}$/.test(p)).slice(0, 100)
+  if (!wanted.length) return { ok: true, data: {} }
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const links: Record<string, string> = {}
+  await Promise.all(wanted.map(async p => {
+    const { data } = await supabase.storage.from('lead-media').createSignedUrl(p, 3600)
+    if (data?.signedUrl) links[p] = data.signedUrl
+  }))
+  return { ok: true, data: links }
 }
 
 /** The customer card: name, phone, interest, budget, showroom, time, note. */

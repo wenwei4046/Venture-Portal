@@ -969,4 +969,34 @@ await db.exec(`
   check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_page_replies(jsonb)', 'execute') a`))[0].a, false, 'the service role’s alone')
 }
 
+// ── Photos and files (mig 20261027140000 + its guards): a sent file on its reply, a customer's attachment kept ──
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  const before = (await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_thread','lead_ingest_messenger','lead_ingest_instagram') order by 1`)).map(r => [r.proname, r.m])
+  check(before, [['lead_ingest_instagram', '95240bef30c3140ab143b940f1f77ffd'], ['lead_ingest_messenger', '816bacb8113b7a232f43035efb411aef'], ['lead_thread', 'cf7fc34fc94286819682cd3a08bd1e51']], 'the three bodies here are production’s (the swaps are written against them)')
+  await db.exec(await f('20261027140000_lead_media.sql'))
+  await db.exec(await f('20261027140100_lead_media_guards.sql'))
+  const P = '946946021838962'
+  await as(CS_USER, ALL)
+  const c = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'md.in.1', pageId: P, psid: '7700501', name: 'Photo Lead', kind: 'image', body: null, mediaUrl: 'https://scontent.xx.fbcdn.net/v/t1/abc.jpg', sentAt: '2026-10-27T03:00:00Z', ad: null },
+  ])]))[0].r.contacts[0]
+  check((await q(`select body, media_url from public.lead_messages where external_id = 'md.in.1'`))[0], { body: '[Photo]', media_url: 'https://scontent.xx.fbcdn.net/v/t1/abc.jpg' }, 'a customer’s photo keeps Meta’s address')
+  const path = `chat/${c}/11111111-1111-4111-8111-111111111111-floor plan.pdf`
+  await refuses(`select public.lead_reply_media($1, $2, 'application/pdf', '')`, [c, path], /did not finish uploading/, 'a file not in the bucket has not arrived')
+  await db.exec(`insert into public.file_objects (bucket_id, name) values ('lead-media', '${path.replace(/'/g, "''")}')`)
+  await refuses(`select public.lead_reply_media($1, $2, 'application/pdf', '')`, [c, `chat/${'0'.repeat(8)}-0000-4000-8000-${'0'.repeat(12)}/x.pdf`], /not this conversation/, 'another conversation’s file is refused')
+  const id = (await q(`select public.lead_reply_media($1, $2, 'application/pdf', '') id`, [c, path]))[0].id
+  const m = (await q(`select direction, sender, body, media_path, media_mime, delivery from public.lead_messages where id = $1`, [id]))[0]
+  check([m.direction, m.sender, m.body, m.media_path, m.media_mime, m.delivery], ['out', 'cs', '[File] floor plan.pdf', path, 'application/pdf', 'recorded'], 'recorded as CS’s reply with its file')
+  const t = (await q(`select public.lead_thread($1) t`, [c]))[0].t
+  const last = t.messages[t.messages.length - 1]
+  check([last.mediaPath, last.mediaMime, t.messages[0].mediaUrl], [path, 'application/pdf', 'https://scontent.xx.fbcdn.net/v/t1/abc.jpg'], 'the thread hands the files to the screen')
+  await as(CS_USER, ['leads.view'])
+  await refuses(`select public.lead_reply_media($1, $2, 'application/pdf', 'hi')`, [c, path], /Lead View · Create/, 'sending a file needs Create')
+  await as(CS_USER, ALL)
+  const src = (await q(`select prosrc from pg_proc where proname = 'lead_reply_media'`))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.create']);`), true, 'it asks the Inbox')
+}
+
 console.log(`validate-leads: ${checks} checks passed`)

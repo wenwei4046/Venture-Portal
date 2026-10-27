@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent } from 'react'
-import { draftLeadReply, quickReplyUsed, readThread, replyToLead, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
+import { draftLeadReply, leadMediaLinks, quickReplyUsed, readThread, replyToLead, sendLeadMedia, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
+import { FILE_LIMIT, TOO_BIG } from '@/lib/leads/messenger'
+import { createClient } from '@/lib/supabase/client'
 import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
 import { outcomeOf } from '@/lib/leads/ai'
 import { adLabel, adsManagerLink } from '@/lib/leads/ads'
@@ -312,6 +314,17 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
   const [whoOpen, setWhoOpen] = useState(false)
   const end = useRef<HTMLDivElement>(null)
   const count = thread?.messages.length ?? 0
+  // Photos and files (mig 20261027140000): picked from the camera (photos, videos) or the paperclip (anything), put in
+  // the bucket lead-media, then sent as a reply — the reply box's words as its caption.
+  const photoPick = useRef<HTMLInputElement>(null)
+  const filePick = useRef<HTMLInputElement>(null)
+  const [links, setLinks] = useState<Record<string, string>>({})
+  const paths = useMemo(() => (thread?.messages ?? []).map(m => m.mediaPath).filter((x): x is string => !!x), [thread])
+  useEffect(() => {
+    const missing = paths.filter(x => !links[x])
+    if (!missing.length) return
+    void leadMediaLinks(missing).then(r => { if (r.ok) setLinks(l => ({ ...l, ...r.data })) })
+  }, [paths, links])
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }) }, [count])
 
   const now = replyingNow(contact, csName)
@@ -332,6 +345,23 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
       setText('')
       onSent()
       // Saved, but Messenger did not take it (the window, the connection): say why — the message shows "not sent".
+      if (r.data.notSent) setError('Saved but not sent: ' + r.data.notSent)
+    })
+  }
+  const sendFile = (file: File | undefined) => {
+    if (!file || sending || botOn) return
+    setError(null)
+    if (file.size > FILE_LIMIT) { setError(TOO_BIG); return }
+    const caption = text.trim()
+    startSending(async () => {
+      const name = file.name.replace(/[\\/]/g, '_').slice(-120) || 'file'
+      const path = `chat/${contact.id}/${crypto.randomUUID()}-${name}`
+      const up = await createClient().storage.from('lead-media').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
+      if (up.error) { setError('The file could not be uploaded — 25 MB at most.'); return }
+      const r = await sendLeadMedia(contact.id, path, file.type || 'application/octet-stream', caption)
+      if (!r.ok) { setError(r.reason); return }
+      setText('')
+      onSent()
       if (r.data.notSent) setError('Saved but not sent: ' + r.data.notSent)
     })
   }
@@ -428,7 +458,8 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
             <div key={m.id} className={s.msg} data-out={m.direction === 'out' || undefined}>
               {newDay ? <div className={s.day} style={{ alignSelf: 'stretch' }}>{day}</div> : null}
               {m.direction === 'out' ? <MessageLabel m={m} /> : null}
-              <div className={s.bubble}>{m.body}</div>
+              {m.mediaPath || m.mediaUrl ? <MessageMedia m={m} link={m.mediaPath ? links[m.mediaPath] : m.mediaUrl ?? undefined} /> : null}
+              {m.mediaPath && /^\[(Photo|Video|File)\]/.test(m.body) ? null : <div className={s.bubble}>{m.body}</div>}
               {m.buttons?.length ? (
                 <div className={s.buttons}>{m.buttons.map(b => <span key={b} className={s.button}>{b}</span>)}</div>
               ) : null}
@@ -479,8 +510,10 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
               }} />
             <div className={s.tools}>
               <span className={s.row6} style={{ gap: 2 }}>
-                <button type="button" className={s.iconBtn} disabled title="Camera — photos come with Meta"><LeadIcon name="camera" /></button>
-                <button type="button" className={s.iconBtn} disabled title="Photo, video or file — comes with Meta"><LeadIcon name="paperclip" /></button>
+                <button type="button" className={s.iconBtn} disabled={botOn || sending} title="Send a photo or video" onClick={() => photoPick.current?.click()}><LeadIcon name="camera" /></button>
+                <button type="button" className={s.iconBtn} disabled={botOn || sending} title="Send a file" onClick={() => filePick.current?.click()}><LeadIcon name="paperclip" /></button>
+                <input ref={photoPick} type="file" accept="image/*,video/*" hidden onChange={e => { sendFile(e.target.files?.[0]); e.target.value = '' }} />
+                <input ref={filePick} type="file" hidden onChange={e => { sendFile(e.target.files?.[0]); e.target.value = '' }} />
               </span>
               <span className={s.rule} aria-hidden="true" />
               <InfoMenu info={info} brandId={contact.brandId} today={today} disabled={botOn}
@@ -498,6 +531,19 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
       ) : null}
     </>
   )
+}
+
+/** A message's photo, video or file: shown in place; a file (or a customer's attachment Meta keeps) opens in a tab. */
+function MessageMedia({ m, link }: { m: LeadMessage; link: string | undefined }) {
+  const kind = m.mediaMime?.startsWith('image/') || (!m.mediaMime && /^\[(Photo|Sticker)\]/.test(m.body)) ? 'image'
+    : m.mediaMime?.startsWith('video/') || (!m.mediaMime && m.body.startsWith('[Video]')) ? 'video' : 'file'
+  if (!link) return <div className={s.mediaWait}>{kind === 'image' ? 'Photo' : kind === 'video' ? 'Video' : 'File'} · loading…</div>
+  // A short-lived signed link (or Meta's): nothing for next/image to optimise.
+  // eslint-disable-next-line @next/next/no-img-element
+  if (kind === 'image') return <a href={link} target="_blank" rel="noopener noreferrer"><img className={s.mediaImg} src={link} alt={m.body} /></a>
+  if (kind === 'video') return <video className={s.mediaImg} src={link} controls preload="metadata" />
+  const name = m.mediaPath ? m.mediaPath.replace(/^.*\//, '').replace(/^[0-9a-f-]{36}-/, '') : 'Attachment'
+  return <a className={s.mediaFile} href={link} target="_blank" rel="noopener noreferrer"><LeadIcon name="paperclip" size={14} />{name}</a>
 }
 
 /** Who wrote an outgoing message: CS (dark), a template or a campaign (AUTO), the AI Agent (AI), the Page from Business Suite (PAGE). */

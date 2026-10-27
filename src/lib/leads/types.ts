@@ -99,6 +99,11 @@ export interface LeadMessage {
   at: string
   /** A flow question's buttons, as the customer saw them. */
   buttons?: string[] | null
+  /** A photo or file CS sent (bucket lead-media, mig 20261027140000), and its type. */
+  mediaPath?: string | null
+  mediaMime?: string | null
+  /** A customer's photo / video / voice note / file: Meta's own address (it expires after a while). */
+  mediaUrl?: string | null
 }
 
 export interface LeadEvent {
