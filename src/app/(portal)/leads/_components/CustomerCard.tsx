@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react'
 import { officeTime } from '@/lib/office-time'
 import { saveLeadCard, setLeadOutcome } from '@/lib/leads/actions'
 import { isVisitDate, phoneStage, phoneSteps } from '@/lib/leads/inbox'
-import { handedTo } from '@/lib/leads/handoff'
+import { copyText } from '@/lib/leads/clipboard'
+import { handedTo, handoffText } from '@/lib/leads/handoff'
 import { formatPhone } from '@/lib/leads/phone'
 import { whenFull } from '@/lib/leads/time'
 import type { Appt, LeadBrand, LeadCardFields, LeadContact, LeadLabel, Shown } from '@/lib/leads/types'
@@ -39,6 +40,13 @@ export default function CustomerCard({ contact, brand, canEdit, canManage = fals
   const [error, setError] = useState<string | null>(null)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [handing, setHanding] = useState(false)
+  // Copy for sales before there is a confirmed phone (2026-10-27 — the user: "没有…电话号码也可以复制"): the hand-over's
+  // message, to paste into the sales group; nothing is recorded — the hand-over itself still waits for the phone.
+  const [copied, setCopied] = useState<'done' | 'failed' | null>(null)
+  const copyForSales = async () => {
+    setCopied((await copyText(handoffText(contact, brand?.name ?? '', null, csName))) ? 'done' : 'failed')
+    window.setTimeout(() => setCopied(null), 2500)
+  }
 
   const stage = phoneStage(contact)
   const set = (k: keyof typeof start) => (e: { target: { value: string } }) => { setSavedAt(null); setForm(f => ({ ...f, [k]: e.target.value })) }
@@ -117,6 +125,11 @@ export default function CustomerCard({ contact, brand, canEdit, canManage = fals
               Hand over to {brand.name} sales
             </button>
             {hint ? <span className={s.handHint}>{hint}</span> : null}
+            {stage !== 'confirmed' ? (
+              <button type="button" className={s.textLink} style={{ alignSelf: 'center' }} onClick={copyForSales}>
+                {copied === 'done' ? 'Copied — paste it to the sales group' : copied === 'failed' ? 'Could not copy — try again' : 'Copy details for sales'}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
