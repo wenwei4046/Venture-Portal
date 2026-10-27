@@ -6,7 +6,8 @@
 // migration then runs VERBATIM, twice. What is under test: a named grid priced at PRICE_1 alone moves to PRICE_2 cell
 // for cell (seat, price and order kept, a 0 still no price), and costs every tier of bill exactly as before; a ladder
 // with another tier, a Console priced at both tiers, and a named grid that has gained another tier are left alone.
-// No live I/O.
+// Then 20261027231000 (the user: "help me delete the consolse price first"), verbatim, twice: the Consoles' 700 at
+// PRICE_1 goes from every seat, their own PRICE_2 / PRICE_3 and STD ladders stay. No live I/O.
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -49,8 +50,8 @@ const SOFFIO = ['mfg-23702a685c37', '8030-1A(LHF)', '8030', [
 const MODENA = ['mfg-79cb847d88f9', '8211-4FT', '8211', [at('PRICE_1', 720, 'DEFAULT')]]
 // A ladder the migration does not name: P1 < P2 < P3 at seat 28.
 const LADDER = ['mfg-test-8039-1a', '8039-1A(LHF)', '8039', [at('PRICE_1', 750, '28'), at('PRICE_2', 800, '28'), at('PRICE_3', 850, '28')]]
-// A Console priced at both tiers, not named: the user's to settle.
-const CONSOLE = ['mfg-test-8030-console', '8030-Console', '8030', [
+// A Console priced at both tiers, not named: the user's to settle (a stand-in; the real ones are below).
+const CONSOLE = ['mfg-test-8060-console', '8060-Console', '8060', [
   at('PRICE_1', 700, '24'), at('PRICE_2', 360, '24'), at('PRICE_3', 380, '24'), at('PRICE_1', 700, '26'),
 ]]
 // Named, but it has gained a PRICE_2 cell since the list was taken: left alone.
@@ -131,7 +132,45 @@ try {
   check(await cost('8211-4FT', 'DEFAULT', 'PRICE_2'), [720, 'grid'], '8211 at DEFAULT')
   check(await cost('8039-1A(LHF)', '28', 'PRICE_2'), [800, 'grid'], "the ladder's PRICE_2 is its own")
 
-  console.log(`PASS: ${checks} sofa-prices-price-2 SQL checks. Production's bodies verbatim; the migration verbatim, twice. No live database connection.`)
+  // ── 20261027231000: the Consoles' 700 at PRICE_1 goes ──
+  const seats = ['24', '25"', '26', '28', '32']
+  const CONSOLES = [
+    // 8030-Console as on production: 700 at PRICE_1 on every seat, 360 / 380 at PRICE_2 / PRICE_3 on some.
+    ['mfg-d6803a91b16e', '8030-Console', '8030', [
+      ...seats.map(h => at('PRICE_1', 700, h)),
+      ...['24', '28', '32'].flatMap(h => [at('PRICE_2', 360, h), at('PRICE_3', 380, h)]),
+    ]],
+    // 8038-Console: 700 at PRICE_1 on every seat beside its own STD ladder, whose PRICE_1 is 360.
+    ['mfg-82d7682b99a8', '8038-Console', '8038', [
+      ...seats.map(h => at('PRICE_1', 700, h)),
+      at('PRICE_1', 360, 'STD'), at('PRICE_2', 380, 'STD'), at('PRICE_3', 400, 'STD'),
+    ]],
+    // Not named: 9058-Console, moved to PRICE_2 by 20261027230000 at 700 — the user's to decide.
+    ['mfg-d1b717f64e16', '9058-Console', '9058', seats.map(h => at('PRICE_2', 700, h))],
+  ]
+  for (const [erpId, code, model, cells] of CONSOLES) {
+    await q(`INSERT INTO public.erp_products(erp_id, item_code, category, base_model, module_code) VALUES ($1, $2, 'SOFA', $3, 'Console')`, [erpId, code, model])
+    await q(`INSERT INTO public.catalogue_skus(erp_product_id, offered, price_grid) VALUES ($1, true, $2::jsonb)`, [erpId, JSON.stringify(cells)])
+  }
+  check(await cost('8030-Console', '26', 'PRICE_2'), [700, 'grid'], 'before: a PRICE_2 bill at a seat with no PRICE_2 fell back to the 700')
+
+  const consoleFile = await migration('20261027231000_sofa_console_price_1_700_removed')
+  await db.exec(consoleFile)
+  const cleared = await Promise.all(CONSOLES.map(([erpId]) => gridOf(erpId)))
+  check(cleared[0], CONSOLES[0][3].filter(c => c.tier !== 'PRICE_1'), "8030-Console keeps its 360 / 380 and nothing at PRICE_1")
+  check(cleared[1], [at('PRICE_1', 360, 'STD'), at('PRICE_2', 380, 'STD'), at('PRICE_3', 400, 'STD')], "8038-Console keeps its STD ladder, its PRICE_1 360 too")
+  check(cleared[2], CONSOLES[2][3], 'a Console the migration does not name keeps its grid')
+  await db.exec(consoleFile)
+  check(await Promise.all(CONSOLES.map(([erpId]) => gridOf(erpId))), cleared, 'a second run changes nothing')
+
+  check(await cost('8030-Console', '28', 'PRICE_2'), [360, 'grid'], "a PRICE_2 bill at 28 costs 8030-Console's 360 as before")
+  check(await cost('8030-Console', '28', 'PRICE_1'), [360, 'grid'], '…and a PRICE_1 bill (the Quote) now 360, not 700')
+  check(await cost('8030-Console', '26', 'PRICE_2'), [null, 'no_height'], 'a seat that only the 700 priced has no price now')
+  check(await cost('8038-Console', '32', 'PRICE_2'), [null, 'no_height'], '8038-Console is priced at STD alone')
+  check(await cost('8038-Console', null, 'PRICE_2'), [380, 'grid'], '…which a bill naming no seat reads')
+  check(await cost('8038-Console', 'STD', 'PRICE_1'), [360, 'grid'], 'its STD ladder keeps its PRICE_1')
+
+  console.log(`PASS: ${checks} sofa-prices-price-2 SQL checks. Production's bodies verbatim; both migrations verbatim, twice each. No live database connection.`)
 } finally {
   await db.close()
 }
