@@ -342,6 +342,8 @@ export interface ApprovalRecordModel {
   /** A terms change filed for the Principal (2026-10-24): the month it asks from, each line now and as asked, why. */
   terms: {
     fromLabel: string
+    /** "from Oct 2026", or "whole deal from Apr 2026" for the terms in force recalculated (2026-10-27). */
+    scope: string
     /** What it asks, in words — there whether or not the figures could be laid out. */
     words: string
     reason: string | null
@@ -452,7 +454,14 @@ export function approvalRecordModel(read: {
         }
       : null,
     terms: read.termsContext
-      ? { fromLabel: read.termsContext.fromLabel, words: read.termsContext.words, reason: read.termsContext.reason, rows: read.termsContext.rows, why: read.termsContext.why }
+      ? {
+          fromLabel: read.termsContext.fromLabel,
+          scope: read.termsContext.scope,
+          words: read.termsContext.words,
+          reason: read.termsContext.reason,
+          rows: read.termsContext.rows,
+          why: read.termsContext.why,
+        }
       : null,
     open: vc || loan ? null : recordOf(table, a.reference_id),
   }

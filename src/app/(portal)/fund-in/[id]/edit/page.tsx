@@ -2,12 +2,13 @@ import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { notFound, redirect } from 'next/navigation'
-import { requireAnyActionOn, requirePage } from '@/lib/auth'
+import { requireActionOn, requireAnyActionOn, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import type { AccountType } from '@/lib/coa'
 import { fundSourceStart } from '@/lib/repayment-start'
 import { latestTermsRequest } from '@/lib/terms-change-request'
+import { fundSourceAmendFacts } from '@/lib/amend-facts'
 import type { AccountOption } from '@/components/AccountPicker'
 import EditFundSourceForm from './_components/EditFundSourceForm'
 import AmendFundSourceForm from './_components/AmendFundSourceForm'
@@ -74,25 +75,28 @@ export default async function EditFundSourcePage({ params }: Props) {
   }
 
   if (isActiveAmend) {
+    // When the money came, the first instalment, where the terms in force began, and the amounts the interest can be on —
+    // read off the deal's repayments and terms history, which its viewers read (Treasury · View).
+    await requireActionOn('/fund-in/[id]/edit', 'treasury', 'view')
+    const facts = await fundSourceAmendFacts(supabase as unknown as SupabaseClient, source as Parameters<typeof fundSourceAmendFacts>[1], fromLabel)
     return (
       <div>
         <Link href={`/fund-in/${id}`} className="text-sm text-muted hover:text-accent font-sans transition-colors">← Back to fund source</Link>
         <div className="page-head">
           <div>
-            <div className="page-eyebrow"><em>I.</em> TREASURY · 修改资金来源条款</div>
+            <div className="page-eyebrow"><em>I.</em> TREASURY · AMEND TERMS</div>
             <h1 className="page-title">{fromLabel}</h1>
           </div>
         </div>
         <AmendFundSourceForm
           id={source.id}
-          fromLabel={fromLabel}
           ratePct={(Number(source.cost_rate) * 100).toString()}
           lockInMonths={(source.lock_in_months ?? '').toString()}
           repaymentDate={(source.repayment_date as string | null) ?? (source.effective_date as string)}
           compound={(source as { compound_interest?: boolean }).compound_interest === true}
           notes={source.notes ?? ''}
           nextMonth={officeTime().add(1, 'month').format('YYYY-MM')}
-          termsFrom={((source as { terms_effective_from?: string | null }).terms_effective_from ?? null)?.slice(0, 7) ?? null}
+          facts={facts}
           direct={canApprove}
         />
       </div>

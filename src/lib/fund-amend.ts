@@ -1,8 +1,10 @@
 // Amend terms — a booked deal's terms changed by whoever holds Treasury ·
-// Approve (2026-09-21): the two ways its form offers — from a month on (the
-// months before keep their terms; the new rate and the months left apply from
-// it, on the principal still owed then) or the whole deal recalculated (a
-// keying-error fix) — and what each sends to the page's actions. Since
+// Approve (2026-09-21), or filed for them by Treasury · Edit (a later month
+// since 2026-10-24, the whole terms since 2026-10-27): the two ways its form
+// offers — from a later month (the months before keep their terms; the new
+// rate and the months left apply from it, on the amount the interest is
+// charged on) or the terms in force recalculated from when they began ("From
+// the first instalment") — and what each sends to the page's actions. Since
 // 2026-10-16 only what was changed is sent (the user's rule of 2026-10-14:
 // the shared logins open one deal on two screens, and a form sent whole puts
 // back what the other changed); the four RPCs keep whatever is not sent. The
@@ -102,7 +104,82 @@ export function amendFormData(side: DealSide, id: string, was: AmendTerms, d: Am
   if (d.months.trim() !== was.months.trim()) fd.set(n.months, d.months.trim())
   if (d.start !== was.start) fd.set(n.start, d.start)
   if (d.text.trim() !== was.text.trim()) fd.set(n.text, d.text.trim())
+  // A filed whole-terms change says why, as a from-month one does (the Principal's own save has no reason to keep).
+  if (d.reason.trim()) fd.set('reason', d.reason.trim())
   return fd
+}
+
+/**
+ * Where a deal's terms can change from (2026-10-27, the user: "表格也写清楚最早能选哪个月"): the terms in force
+ * began at the first instalment — or the month they were last changed from — and a change from a later month starts
+ * the month after that at the earliest (file_terms_change / amend_*_from refuse anything earlier). Recalculating the
+ * terms in force themselves is the other choice, from the month they began.
+ */
+export interface AmendWindow {
+  /** `YYYY-MM` the first instalment falls in. */
+  firstDueYM: string
+  /** `YYYY-MM` the terms in force began. */
+  termsFromYM: string
+  /** They were changed before: they began after the first instalment. */
+  changed: boolean
+  /** `YYYY-MM` — the earliest month a change from a later month may take effect. */
+  earliestYM: string
+}
+
+const nextYM = (ym: string): string => {
+  const [y, m] = ym.split('-').map(Number)
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
+}
+
+export function amendWindow(firstDueYM: string, termsEffectiveFrom: string | null | undefined): AmendWindow {
+  const changed = !!termsEffectiveFrom && termsEffectiveFrom.slice(0, 7) !== firstDueYM
+  const termsFromYM = termsEffectiveFrom ? termsEffectiveFrom.slice(0, 7) : firstDueYM
+  return { firstDueYM, termsFromYM, changed, earliestYM: nextYM(termsFromYM) }
+}
+
+/** What the Amend terms page knows of the deal for its form. */
+export interface AmendFacts {
+  /** A fund source's lender, a loan's borrower. */
+  party: string
+  /** `YYYY-MM-DD` the money moved: a fund source received, a loan disbursed. */
+  moneyDate: string | null
+  /** `YYYY-MM-DD` the first instalment falls due. */
+  firstDue: string | null
+  window: AmendWindow
+  /** The deal's amount. */
+  principal: number
+  /** Principal repaid in each month, `YYYY-MM` → amount: what is owed at the start of a month follows. */
+  paidByMonth: Record<string, number>
+  /** What the interest in force is worked out on. */
+  currentBase: number
+}
+
+/** Principal still owed when a month starts: the amount less what was repaid in the months before it. */
+export function owedAtStart(f: Pick<AmendFacts, 'principal' | 'paidByMonth'>, ym: string): number {
+  const paid = Object.entries(f.paidByMonth).reduce((s, [m, v]) => (m < ym ? s + v : s), 0)
+  return Math.round(Math.max(0, f.principal - paid) * 100) / 100
+}
+
+/** What the whole-terms choice is called on a deal: from its first instalment, or from when its terms were last changed. */
+export const wholeChoiceName = (w: Pick<AmendWindow, 'changed'>): string => (w.changed ? 'From when these terms began' : 'From the first instalment')
+
+/** The later of two `YYYY-MM` — the form's month starts on next month, never before the earliest it may take. */
+export const laterYM = (a: string, b: string): string => (a >= b ? a : b)
+
+const MONTH_WORDS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+/** `YYYY-MM` → "Apr 2026". */
+export const amendMonthWords = (ym: string): string =>
+  /^\d{4}-\d{2}$/.test(ym) ? `${MONTH_WORDS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}` : ym
+
+/**
+ * The database's refusal of a month too early, in words a reader can act on — the form keeps the month from going
+ * earlier, so this is the fallback. Null when the message is some other refusal.
+ */
+export function explainAmendRefusal(message: string): string | null {
+  const m = /Effective month (\d{4}-\d{2}) must be after the month the current terms took effect \((\d{4}-\d{2})\)/.exec(message)
+  if (!m) return null
+  const began = m[2]
+  return `${amendMonthWords(began)} is when the terms in force began, so a change from a later month can start ${amendMonthWords(nextYM(began))} at the earliest. To change from ${amendMonthWords(began)} itself, choose the option that recalculates the terms in force.`
 }
 
 /** The whole deal's form sends nothing but the deal: nothing to save. */
@@ -123,11 +200,12 @@ export function draftOfForm(side: DealSide, fd: FormData, mode: AmendMode, was: 
     noFixedTerm: fd.get('no_fixed_term') === 'on',
     interestOnOriginal: fd.get('interest_on_original') === 'on',
     interestKeepsBase: fd.get('interest_keeps_base') === 'on',
-    months: whole ? s(n.months) : was.months,
-    start: whole ? s(n.start) : was.start,
+    // A field the form did not show (a filed whole-terms change leaves the start and the words alone) stays as it was.
+    months: whole && fd.has(n.months) ? s(n.months) : was.months,
+    start: whole && fd.has(n.start) ? s(n.start) : was.start,
     compound: fd.get('compound_interest') === 'on',
     reason: s('reason'),
-    text: whole ? s(n.text) : was.text,
+    text: whole && fd.has(n.text) ? s(n.text) : was.text,
   }
 }
 
