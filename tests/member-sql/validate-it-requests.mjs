@@ -120,6 +120,11 @@ await db.exec(file)
 await db.exec(file) // twice: nothing changes, nothing breaks
 // The new exact reader is additive and deliberately refuses an existing function of the same signature.
 await db.exec(await readFile(new URL('20261021030000_it_request_get.sql', migrations), 'utf8'))
+// Closed is the sender's (2026-10-27): it_request_note from production's body, three statements swapped — twice, and
+// every check below runs against it.
+const closes = (await readFile(new URL('20261026183719_it_request_sender_closes.sql', migrations), 'utf8')).replace(/\r\n/g, '\n')
+await db.exec(closes)
+await db.exec(closes)
 
 // ── The notices' kinds and the desk's topic: widened, nothing dropped ──────────
 const def = name => one(`SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = $1`, [name])
@@ -326,5 +331,45 @@ await as(DESK, EDIT, 'authenticated')
 const cappedDesk = await one(`SELECT public.it_requests_desk()`)
 check([cappedDesk.length, cappedDesk.some(r => r.id === r1.id)], [300, false], 'the old request is outside the 300 desk rows')
 check([(await detail(r1.id)).ref, (await detail(r1.id)).files.length], ['IT-0001', 2], 'the desk still opens the old notification with its files')
+
+// ── Closed is the sender's, once IT has marked it Fixed (2026-10-27 — the user: "等我这边按了已经 fix，这个 close 其实应该是
+// 由提出这个 request / support 的人去操作。他那边去 try 了功能之后，就可以在自己那边 close，然后我这边这个 ticket 就
+// automatically close 了") ────────────────────────────────────────────────────────────────────────────────────────────
+await clearNotices()
+await as(SENDER, [], 'authenticated')
+await refuses(`SELECT public.it_request_note($1, '', '[]', 'closed')`, [r1.id], /once IT has marked it Fixed/, 'the sender closes nothing IT has not fixed')
+await as(DESK, EDIT, 'authenticated')
+check((await note(r1.id, 'Fixed for good.', [], 'fixed')).status, 'fixed', 'IT marks it Fixed')
+await clearNotices()
+await as(DESK, EDIT, 'authenticated')
+await refuses(`SELECT public.it_request_note($1, 'Closing it.', '[]', 'closed')`, [r1.id], /Its sender closes it/, 'IT closes nothing: Closed is the sender’s')
+await as(OTHER, [], 'authenticated')
+await refuses(`SELECT public.it_request_note($1, '', '[]', 'closed')`, [r1.id], /not yours/, 'nor does a colleague')
+await as(SENDER, [], 'authenticated')
+const closed = await note(r1.id, 'Works now, thanks.', [], 'closed')
+check([closed.status, closed.statusByName], ['closed', 'CHEA HUAN'], 'the sender tried it and closed it')
+check(closed.notes.at(-1), { ...closed.notes.at(-1), side: 'sender', authorName: 'CHEA HUAN', body: 'Works now, thanks.', statusFrom: 'fixed', statusTo: 'closed', mine: true },
+  'the close is the sender’s own note')
+check((await notices(DESK)).map(n => [n.title, n.body]), [['IT-0001 · CHEA HUAN closed it', 'Quote page freezes — “Works now, thanks.”']], 'the desk is told it is closed')
+check((await notices(VIEWER)).map(n => n.title), ['IT-0001 · CHEA HUAN closed it'], 'whoever listens is told')
+check(await notices(SENDER), [], 'never the sender')
+await clearNotices()
+await as(VIEWER, ['it_requests.view'], 'authenticated')
+check([(await detail(r1.id)).status, (await detail(r1.id)).statusByName], ['closed', 'CHEA HUAN'], 'the desk reads it closed at once — it is the same request')
+await as(SENDER, [], 'authenticated')
+await refuses(`SELECT public.it_request_note($1, '', '[]', 'closed')`, [r1.id], /Write a note, attach a file or change the status/, 'closed again moves nothing')
+await refuses(`SELECT public.it_request_note($1, '', '[]', 'in_progress')`, [r1.id], /Only IT sets/, 'the sender opens it again with nothing but a reply')
+await as(DESK, EDIT, 'authenticated')
+check((await note(r1.id, 'Back on it.', [], 'in_progress')).status, 'in_progress', 'IT opens a closed one again')
+check((await notices(SENDER)).map(n => n.title), ['IT-0001 · In progress'], '…and its sender is told')
+await clearNotices()
+// The desk's own request: IT closes it as its sender, once it is fixed.
+await as(DESK, EDIT, 'authenticated')
+check((await note(own.id, '', [], 'fixed')).notes.at(-1).side, 'it', 'IT marks its own request Fixed as IT')
+const ownClosed = await note(own.id, '', [], 'closed')
+check([ownClosed.status, ownClosed.notes.at(-1).side, ownClosed.notes.at(-1).statusTo], ['closed', 'sender', 'closed'], '…and closes it as its sender')
+check((await notices(VIEWER)).map(n => n.title), ['IT-0002 · ANTHONY closed it'], 'the other listener hears it')
+check(await notices(DESK), [], 'never the one closing it')
+await clearNotices()
 
 console.log(`validate-it-requests: ${checks} checks passed`)

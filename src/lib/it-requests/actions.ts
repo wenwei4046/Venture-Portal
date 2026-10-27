@@ -134,13 +134,16 @@ export interface ItNoteInput {
   id: string;
   body: string;
   files: ItUpload[];
-  /** A status IT sets; null for words alone (a sender never sets one). */
+  /** A status IT sets; null for words alone. A sender sets one only: Closed, once IT has marked it Fixed (2026-10-27). */
   status: ItStatus | null;
   /** Its status as the screen shows it: the same again moves nothing. */
   current: ItStatus;
 }
 
-/** A reply from its sender, or IT's note — and, for IT requests · Edit, its status. Its sender, or the desk, is told. */
+/**
+ * A reply from its sender, or IT's note — and, for IT requests · Edit, its status: New, In progress, Fixed. Closed is the
+ * sender's, once it is Fixed (the database asks both). Its sender, or the desk, is told.
+ */
 export async function noteItRequest(input: ItNoteInput): Promise<Outcome<ItRequest>> {
   try {
     if (!isId(input?.id)) return { ok: false, error: "That request is not there." };
@@ -152,7 +155,8 @@ export async function noteItRequest(input: ItNoteInput): Promise<Outcome<ItReque
     const problem = noteProblem({ body, files: files.length, status: status as ItStatus | null, current: current as ItStatus });
     if (problem) return { ok: false, error: problem };
     const db = await signedIn();
-    if (status !== null) {
+    // Closed is its sender's to set, whoever they are; the database asks that it is theirs and Fixed.
+    if (status !== null && status !== "closed") {
       const account = await getAccountUser();
       if (!canDo(account, "it_requests", "edit")) return { ok: false, error: "Only IT sets a request's status." };
     }

@@ -304,6 +304,36 @@ describe("A request, read", () => {
     await waitFor(() => expect(p.onNote).toHaveBeenCalledWith({ id: "r1", body: "", files: [], status: "fixed", current: "new" }));
   });
 
+  // 2026-10-27 — the user: "我这边写已经 fix 了，所以那个 close 是不需要的。等我这边按了已经 fix，这个 close 其实应该是由提出
+  // 这个 request / support 的人去操作。他那边去 try 了功能之后，就可以在自己那边 close".
+  it("gives IT New, In progress and Fixed — Closed is its sender's", () => {
+    sheet(request({ mine: false, status: "fixed" }), { canEdit: true });
+    const status = screen.getByRole("group", { name: "Status" });
+    expect(within(status).getAllByRole("button").map(b => b.textContent)).toEqual(["New", "In progress", "Fixed"]);
+    expect(screen.queryByRole("button", { name: "Close request" })).toBeNull();
+  });
+
+  it("lets its sender close it once IT has marked it Fixed, with their words if any", async () => {
+    const p = sheet(request({ status: "fixed", statusAt: "2026-10-21T03:00:00Z", statusByName: "ANTHONY" }));
+    const box = screen.getByRole("dialog", { name: "The Quote freezes on step 2" });
+    fireEvent.change(within(box).getByRole("textbox", { name: "Your note" }), { target: { value: "Works now, thanks." } });
+    fireEvent.click(within(box).getByRole("button", { name: "Close request" }));
+    await waitFor(() => expect(p.onNote).toHaveBeenCalledWith({ id: "r1", body: "Works now, thanks.", files: [], status: "closed", current: "fixed" }));
+    // Words alone are still a reply.
+    vi.mocked(p.onNote).mockClear();
+    fireEvent.change(within(box).getByRole("textbox", { name: "Your note" }), { target: { value: "Not yet on Android." } });
+    fireEvent.click(within(box).getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(p.onNote).toHaveBeenCalledWith({ id: "r1", body: "Not yet on Android.", files: [], status: null, current: "fixed" }));
+  });
+
+  it.each(["new", "in_progress", "closed"] as const)("offers no Close request while it is %s, nor in View as", status => {
+    sheet(request({ status }));
+    expect(screen.queryByRole("button", { name: "Close request" })).toBeNull();
+    cleanup();
+    sheet(request({ status: "fixed" }), { readOnly: true });
+    expect(screen.queryByRole("button", { name: "Close request" })).toBeNull();
+  });
+
   it("says a refusal where it was sent", async () => {
     sheet(request(), { onNote: vi.fn(async () => ({ ok: false as const, error: "That request is not yours to write on." })) });
     fireEvent.change(screen.getByRole("textbox", { name: "Your note" }), { target: { value: "Hello" } });
