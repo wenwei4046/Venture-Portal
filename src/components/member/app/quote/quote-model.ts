@@ -193,10 +193,12 @@ export const MAX_QTY = 100;
 
 /**
  * What a module code says, in the ERP's own vocabulary (Houzs ERP
- * `SOFA_MODULES`, sofa-build.ts): seats = its cushions; LHF / RHF = the arm on
- * the left / right; B = a wide arm; NA = no arms; S = both arms; L = a chaise;
- * (P) power, (R) recliner, (L) power leg. Worded the prototype's way
- * (`1-seat · left arm`).
+ * `SOFA_MODULES`, sofa-build.ts): seats = its back cushions — a seat has one, a
+ * corner none (2026-10-27, the user: "一个 seat 有一个 back cushion，然后 corner 是没有
+ * back cushion 的", so 1A(LHF) + 1NA + CNR + 1A(RHF) is 3 seats; the ERP counts the
+ * corner one); LHF / RHF = the arm on the left / right; B = a wide arm; NA = no
+ * arms; S = both arms; L = a chaise; (P) power, (R) recliner, (L) power leg.
+ * Worded the prototype's way (`1-seat · left arm`).
  */
 export function moduleInfo(code: string): { desc: string; seats: number; chaise: boolean; rank: number[] } {
   const raw = code.trim();
@@ -221,7 +223,7 @@ export function moduleInfo(code: string): { desc: string; seats: number; chaise:
     return { desc, seats, chaise: false, rank: [sideRank, familyRank, seats, mechRank] };
   }
   if (base === "L" || base === "CHS") return { desc: parts("Chaise", side), seats: 1, chaise: true, rank: [sideRank, 4, 1, mechRank] };
-  if (base === "CNR") return { desc: "Corner", seats: 1, chaise: false, rank: [1, 5, 1, 0] };
+  if (base === "CNR") return { desc: "Corner", seats: 0, chaise: false, rank: [1, 5, 1, 0] };
   if (base === "CONSOLE") return { desc: "Wood console", seats: 0, chaise: false, rank: [3, 6, 0, 0] };
   if (base === "STOOL" || base === "OTT") return { desc: "Ottoman / stool", seats: 0, chaise: false, rank: [3, 7, 0, 0] };
   return { desc: raw, seats: 0, chaise: false, rank: [3, 8, 0, 0] };
