@@ -263,4 +263,118 @@ await as(null)
 check(await q(`select r.status rs, a.notes from treasury_terms_requests r join approval_requests a on a.id = r.approval_id where r.id = $1`, [req4]),
   [{ rs: 'withdrawn', notes: 'Withdrawn by the Principal' }], 'the Principal may withdraw one — and its approval says so')
 
+// ── 20261027140000: Finance files the whole terms too (2026-10-27, the mockup terms-first-month-mockup.html — "照这个样稿做：
+// 名字用 “From the first instalment” 和 “From a later month”，Finance 提交时不改 Repayment start"). Chai Meng Keat's 5,000
+// received 26 Mar 2026 at 0%, no fixed term: 0.833% asked from the first instalment. The whole-terms amends as production
+// holds them (amend_fund_source / amend_loan), then the migration VERBATIM.
+const MKD = '00000000-0000-4000-8000-0000000000d2'
+const MK = '00000000-0000-4000-8000-000000000035'
+await db.exec(`
+  alter table public.fund_sources add column if not exists repayment_date date;
+  insert into public.directors values ('${MKD}', 'Chai Meng Keat', 'MK');
+  insert into public.fund_sources (id, status, amount, cost_rate, lock_in_months, effective_date, from_director_id) values
+    ('${MK}', 'active', 5000, 0, null, '2026-03-26', '${MKD}');
+  create function public.amend_fund_source(p_fund_source_id uuid, p_payload jsonb) returns void
+  language plpgsql security definer set search_path = public as $$
+  begin
+    PERFORM public.tab_write_guard(ARRAY['/fund-in'], ARRAY['treasury.approve']);
+    IF auth.uid() IS NOT NULL AND NOT public.has_any_action(ARRAY['treasury.approve']) THEN RAISE EXCEPTION 'amend_fund_source: needs Treasury · Approve' USING ERRCODE = '42501';
+    end if;
+    if not exists (select 1 from fund_sources where id = p_fund_source_id and status = 'active') then
+      raise exception 'Fund source % is not active', p_fund_source_id;
+    end if;
+    update fund_sources set
+      cost_rate         = coalesce((p_payload->>'cost_rate')::numeric, cost_rate),
+      lock_in_months    = case when p_payload ? 'lock_in_months' then nullif(p_payload->>'lock_in_months', '')::int else lock_in_months end,
+      repayment_date    = coalesce((p_payload->>'repayment_date')::date, repayment_date),
+      maturity_date     = coalesce((p_payload->>'repayment_date')::date, maturity_date),
+      compound_interest = coalesce((p_payload->>'compound_interest')::boolean, compound_interest),
+      notes             = coalesce(p_payload->>'notes', notes),
+      updated_at        = now()
+    where id = p_fund_source_id;
+  end $$;
+  create function public.amend_loan(p_loan_id uuid, p_payload jsonb) returns void
+  language plpgsql security definer set search_path = public as $$
+  begin
+    PERFORM public.tab_write_guard(ARRAY['/fund-out'], ARRAY['treasury.approve']);
+    IF auth.uid() IS NOT NULL AND NOT public.has_any_action(ARRAY['treasury.approve']) THEN RAISE EXCEPTION 'amend_loan: needs Treasury · Approve' USING ERRCODE = '42501';
+    end if;
+    if not exists (select 1 from loans where id = p_loan_id and status = 'active') then
+      raise exception 'Loan % is not active', p_loan_id;
+    end if;
+    update loans set
+      effective_rate    = coalesce((p_payload->>'effective_rate')::numeric, effective_rate),
+      risk_premium      = coalesce((p_payload->>'effective_rate')::numeric - base_rate, risk_premium),
+      tenure_months     = coalesce((p_payload->>'tenure_months')::int, tenure_months),
+      disbursement_date = coalesce((p_payload->>'disbursement_date')::date, disbursement_date),
+      repayment_terms   = coalesce(p_payload->>'repayment_terms', repayment_terms),
+      compound_interest = coalesce((p_payload->>'compound_interest')::boolean, compound_interest),
+      updated_at        = now()
+    where id = p_loan_id;
+  end $$;
+`)
+await db.exec(await text(new URL('20261027140000_terms_change_whole_deal.sql', migrations)))
+
+check((await q(`select count(*)::int n from pg_proc where proname = 'file_terms_change'`))[0].n, 1, 'one file_terms_change: the old signature is gone')
+const SIG11 = 'file_terms_change(text,uuid,date,numeric,integer,boolean,boolean,boolean,boolean,text,boolean)'
+const [g11] = await q(`select has_function_privilege('anon', $1, 'execute') anon, has_function_privilege('authenticated', $1, 'execute') auth,
+                              has_function_privilege('service_role', $1, 'execute') svc, p.prosecdef definer
+                         from pg_proc p where p.oid = $1::regprocedure`, [`public.${SIG11}`])
+check(g11, { anon: false, auth: true, svc: true, definer: true }, `${SIG11}: DEFINER, signed-in and service only`)
+
+const whole = (args) =>
+  q(`select public.file_terms_change(p_record_kind => $1, p_record_id => $2, p_effective_from => $3, p_rate => $4, p_remaining_months => $5,
+       p_compound_interest => null, p_no_fixed_term => $6, p_interest_keeps_base => $7, p_reason => $8, p_whole => true) id`,
+    [args.kind, args.id, args.from ?? '2026-10-27', args.rate ?? null, args.months ?? null, args.noTerm ?? false, args.keeps ?? false, args.reason ?? null])
+
+await as(FINANCE)
+const [{ id: w1 }] = await whole({ kind: 'fund_source', id: MK, rate: 0.00833, noTerm: true, reason: '0.833% agreed from the start' })
+await as(null)
+check(await q(`select status, whole_deal, to_char(effective_from, 'YYYY-MM-DD') ef, rate::text, remaining_months, no_fixed_term from treasury_terms_requests where id = $1`, [w1]),
+  [{ status: 'pending', whole_deal: true, ef: '2026-04-01', rate: '0.008330', remaining_months: null, no_fixed_term: true }],
+  'the whole terms filed: from the first instalment — the month after the money came — whatever date was sent')
+check((await q(`select a.description from approval_requests a join treasury_terms_requests r on r.approval_id = a.id where r.id = $1`, [w1]))[0].description,
+  'Change terms · Chai Meng Keat · RM 5,000.00 · whole deal from 2026-04 · 0.833%/mo · no fixed term', 'its title says the whole deal')
+check(await q(`select cost_rate::text, lock_in_months from fund_sources where id = $1`, [MK]), [{ cost_rate: '0.000000', lock_in_months: null }], 'filed, the deal is as it was')
+
+await as(FINANCE)
+await refuses(`select public.file_terms_change(p_record_kind => 'fund_source', p_record_id => $1, p_effective_from => '2026-10-27', p_interest_keeps_base => true, p_whole => true)`,
+  [BI7], /chosen with a change from a later month/, 'the interest’s base belongs to a later month, not the whole terms')
+await refuses(`select public.file_terms_change(p_record_kind => 'loan', p_record_id => $1, p_effective_from => '2026-10-27', p_no_fixed_term => true, p_whole => true)`,
+  [LO7], /fixed term ends with a change from a later month/, 'a loan’s fixed term is not ended by the whole terms')
+await as(null)
+
+const [{ approval_id: wa1 }] = await q(`select approval_id from treasury_terms_requests where id = $1`, [w1])
+await as(PRINCIPAL)
+await q(`select public.approve_terms_change($1)`, [wa1])
+await as(null)
+check(await q(`select cost_rate::text, lock_in_months, terms_effective_from from fund_sources where id = $1`, [MK]),
+  [{ cost_rate: '0.008330', lock_in_months: null, terms_effective_from: null }], 'approved: the whole terms at 0.833%, no fixed term — nothing split off')
+check((await q(`select count(*)::int n from treasury_terms_history where record_id = $1`, [MK]))[0].n, 0, 'and no history row: the terms in force themselves changed')
+check(await q(`select r.status rs, a.status::text st, a.approved_by::text by from treasury_terms_requests r join approval_requests a on a.id = r.approval_id where r.id = $1`, [w1]),
+  [{ rs: 'approved', st: 'approved', by: PRINCIPAL }], 'both rows approved, by the Principal')
+
+// LO#7, changed from December by the Principal above: its whole terms run from December — 0.6% over 24 months asked.
+await as(FINANCE)
+const [{ id: w2 }] = await whole({ kind: 'loan', id: LO7, rate: 0.006, months: 24 })
+await as(null)
+check(await q(`select to_char(effective_from, 'YYYY-MM') ef, remaining_months from treasury_terms_requests where id = $1`, [w2]), [{ ef: '2026-12', remaining_months: 24 }],
+  'a loan changed before: the whole terms from when they began')
+check((await q(`select a.description from approval_requests a join treasury_terms_requests r on r.approval_id = a.id where r.id = $1`, [w2]))[0].description,
+  'Change terms · The Cont [LO#7] · RM 60,000.00 · whole deal from 2026-12 · 0.600%/mo · 24 months', 'a loan’s whole terms in its title')
+const [{ approval_id: wa2 }] = await q(`select approval_id from treasury_terms_requests where id = $1`, [w2])
+await as(PRINCIPAL)
+await q(`select public.approve_terms_change($1)`, [wa2])
+await as(null)
+check(await q(`select effective_rate::text, risk_premium::text, tenure_months, to_char(terms_effective_from, 'YYYY-MM') tef from loans where id = $1`, [LO7]),
+  [{ effective_rate: '0.006000', risk_premium: '0.003000', tenure_months: 24, tef: '2026-12' }], 'approved: LO#7’s terms in force at 0.6% over 24 months, its base rate kept')
+check((await q(`select count(*)::int n from treasury_terms_history where record_id = $1`, [LO7]))[0].n, 2, 'its history as it was')
+
+// A later month still files as before.
+await as(FINANCE)
+const [{ id: w3 }] = await file({ kind: 'fund_source', id: BI7, from: '2027-01-01', rate: 0.01 })
+await as(null)
+check(await q(`select whole_deal, to_char(effective_from, 'YYYY-MM') ef from treasury_terms_requests where id = $1`, [w3]), [{ whole_deal: false, ef: '2027-01' }],
+  'a later month: not the whole terms, its own month')
+
 console.log(`validate-terms-change-requests: ${checks} checks passed`)
