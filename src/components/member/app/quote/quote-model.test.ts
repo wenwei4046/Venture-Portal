@@ -3,7 +3,7 @@ import type { BedframeBuild, MemberProduct } from "@/lib/member/types";
 import {
   EMPTY_MEMORY, NO_SOFA_BUILD, accOnlyTitle, accOrder, accVariants, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
   modelMatches, moduleCushions, moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
-  type CartLine, type QCatalog, type SheetState,
+  type CartLine, type QCatalog, type QModule, type SheetState,
 } from "./quote-model";
 
 const product = (p: Partial<MemberProduct> & Pick<MemberProduct, "id" | "name">): MemberProduct => ({
@@ -46,7 +46,7 @@ describe("moduleInfo — the ERP's module vocabulary", () => {
     ["1S", "1-seater · both arms", 1],
     ["3S", "3-seater · both arms", 3],
     ["L(RHF)", "Chaise · right", 1],
-    ["CNR", "Corner", 1],
+    ["CNR", "Corner", 0],
     ["Console", "Wood console", 0],
     ["STOOL", "Ottoman / stool", 0],
     ["1A(R)(LHF)", "1-seat · left arm · recliner", 1],
@@ -60,6 +60,19 @@ describe("moduleInfo — the ERP's module vocabulary", () => {
   it("a chaise is wider in the strip", () => {
     expect(moduleInfo("L(LHF)").chaise).toBe(true);
     expect(moduleInfo("2S").chaise).toBe(false);
+  });
+
+  // 2026-10-27, the user, shown VERANO 1A(LHF) + 1NA + CNR + 1A(RHF) read "4 seats" while its counted
+  // special's first + filled 3: "use 3 … 一个 seat 有一个 back cushion，然后 corner 是没有 back cushion 的".
+  it("counts a seat per back cushion — a corner has none", () => {
+    const codes = ["1A(LHF)", "1NA", "CNR", "1A(RHF)"];
+    const modules: QModule[] = codes.map(code => {
+      const info = moduleInfo(code);
+      return { code, desc: info.desc, seats: info.seats, chaise: info.chaise, productId: code, options: [] };
+    });
+    const mods = Object.fromEntries(codes.map(code => [code, 1]));
+    expect(sofaSeats(modules, mods)).toBe(3);
+    expect(sofaSeats(modules, mods)).toBe(codes.reduce((a, code) => a + moduleCushions(code), 0));
   });
 });
 
