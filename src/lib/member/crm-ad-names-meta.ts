@@ -236,19 +236,21 @@ const metaImage = (u: unknown): string | null =>
 /**
  * Each ad's picture (Workspace's report, 2026-10-27: "每个广告的截图"): its creative's image, else the thumbnail Meta draws
  * of it (a video's first frame). Asked ad by ad, four at a time (Graph v26 refuses `?ids=`), up to 40; an ad the token
- * cannot see is left out.
+ * cannot see is left out. Full size (2026-10-27, the owner: "截图改成大图"): Meta's thumbnail is 64 px unless asked for a
+ * size, so it is asked at 800 px, and a video's own cover or a link ad's picture — both full size — come before it.
  */
 export async function metaAdThumbs(adIds: string[], token: string, fetchImpl: typeof fetch = fetch): Promise<Record<string, string>> {
   const ids = [...new Set(adIds)].filter(id => AD_ID.test(id)).slice(0, 40)
   const out: Record<string, string> = {}
   const one = async (id: string) => {
     try {
-      const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${id}?fields=creative{image_url,thumbnail_url}`, {
+      const fields = encodeURIComponent('creative.thumbnail_width(800).thumbnail_height(800){image_url,thumbnail_url,object_story_spec{video_data{image_url},link_data{picture}}}')
+      const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${id}?fields=${fields}`, {
         headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000),
       })
       if (!res.ok) return
-      const c = ((await res.json()) as { creative?: { image_url?: unknown; thumbnail_url?: unknown } }).creative
-      const u = metaImage(c?.image_url) ?? metaImage(c?.thumbnail_url)
+      const c = ((await res.json()) as { creative?: { image_url?: unknown; thumbnail_url?: unknown; object_story_spec?: { video_data?: { image_url?: unknown }; link_data?: { picture?: unknown } } } }).creative
+      const u = metaImage(c?.image_url) ?? metaImage(c?.object_story_spec?.video_data?.image_url) ?? metaImage(c?.object_story_spec?.link_data?.picture) ?? metaImage(c?.thumbnail_url)
       if (u) out[id] = u
     } catch { /* left out */ }
   }
