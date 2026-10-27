@@ -870,4 +870,103 @@ await db.exec(`
   check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.create']);`), true, 'lead_reply_sent asks the Inbox')
 }
 
+// ── 2990s mini by the ad's ad account (mig 20261027100000): the account's name decides, the headline still does ──
+{
+  const src0 = (await q(`select md5(prosrc) m from pg_proc where oid = 'public.lead_ingest_messenger(jsonb)'::regprocedure`))[0].m
+  check(src0, 'ccd998d3be8787fed944ba376ab48600', 'lead_ingest_messenger here is production’s body (the swap is written against it)')
+  const mig = (await readFile(new URL('../../supabase/migrations/20261027100000_lead_mini_by_ad_account.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(mig)
+  await db.exec(mig) // twice: the second finds it in place
+  const P = '946946021838962'
+  const one = async (mid, psid, ad) => (await q('select public.lead_ingest_messenger($1::jsonb) r', [JSON.stringify([
+    { externalId: mid, pageId: P, psid, name: 'Customer ' + psid, kind: 'text', body: 'hi', sentAt: '2026-10-28T03:00:00Z', ad },
+  ])]))[0].r
+  const brandOf = async psid => (await q(`select brand_id from public.lead_contacts where channel = 'messenger' and external_id = $1`, [psid]))[0]?.brand_id
+  await one('m.101', '7700101', { sourceId: '120210000000101', headline: 'Chat with us', sourceUrl: null, media: 'video', account: "2990's Mini@Kelana Jaya" })
+  check(await brandOf('7700101'), bMini, 'an ad from a Mini ad account is 2990s mini’s, whatever its headline')
+  await one('m.102', '7700102', { sourceId: '120210000000102', headline: 'Chat with us', sourceUrl: null, media: 'video', account: '2990s Main' })
+  check(await brandOf('7700102'), b2990, 'an ad from another account stays the Page’s brand')
+  await one('m.103', '7700103', { sourceId: '120210000000103', headline: '2990’s mini 来 Kelana Jaya 啦', sourceUrl: null, media: 'image', account: null })
+  check(await brandOf('7700103'), bMini, 'no account known: the headline still decides')
+  await one('m.104', '7700104', null)
+  check(await brandOf('7700104'), b2990, 'no ad: the Page’s brand')
+  await one('m.105', '7700101', { sourceId: '120210000000555', headline: 'x', sourceUrl: null, media: null, account: '2990s Main' })
+  check(await brandOf('7700101'), bMini, 'a conversation already begun stays where it began')
+}
+
+// ── Instagram Direct (mig 20261027110000): the brand by its Instagram account, the Page kept for replies, the outbox ──
+{
+  const o0 = (await q(`select md5(prosrc) m from pg_proc where oid = 'public.lead_outbox(uuid[])'::regprocedure`))[0].m
+  check(o0, 'c1ca0feb687a89ec8e960d7579687979', 'lead_outbox here is production’s body (the swap is written against it)')
+  const mig = (await readFile(new URL('../../supabase/migrations/20261027110000_lead_instagram.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+  await db.exec(mig)
+  await db.exec(mig) // twice: the outbox swap finds itself in place
+  const IG = '17841400000000001', P = '946946021838962'
+  await db.exec(`update public.lead_brands set ig_account_id = '${IG}' where id = '${b2990}'`)
+  const ig = async msgs => (await q('select public.lead_ingest_instagram($1::jsonb) r', [JSON.stringify(msgs)]))[0].r
+  const msg = (mid, psid, extra = {}) => ({ externalId: mid, pageId: IG, psid, name: 'insta_' + psid, kind: 'text', body: 'hi', sentAt: '2026-10-28T03:00:00Z', ad: null, ...extra })
+  const row = async psid => (await q(`select id, brand_id, channel, page_id, name from public.lead_contacts where channel = 'instagram' and external_id = $1`, [psid]))[0]
+  const r1 = await ig([msg('ig.1', '8800001'), msg('ig.1', '8800001'), { ...msg('ig.2', '8800009'), pageId: '17841499999999999' }])
+  check([r1.messages, r1.ignored], [1, 2], 'one taken: the same mid twice and an account no brand names are ignored')
+  const c1 = await row('8800001')
+  check([c1.brand_id, c1.channel, c1.page_id, c1.name], [b2990, 'instagram', P, 'insta_8800001'], 'the brand by its Instagram account, its Facebook Page kept for replies')
+  await ig([msg('ig.3', '8800002', { ad: { sourceId: '120210000000301', headline: 'Chat with us', sourceUrl: null, media: 'video', account: "2990's Mini@Kelana Jaya" } })])
+  check((await row('8800002')).brand_id, bMini, 'a mini ad account’s Instagram customer is 2990s mini’s')
+  check((await q(`select what from public.lead_events where contact_id = $1 order by id limit 1`, [c1.id]))[0].what, 'Came in on Instagram', 'the timeline says Instagram')
+  await db.exec(`insert into public.lead_messages (contact_id, direction, sender, body) values ('${c1.id}', 'out', 'flow', 'Hello on IG')`)
+  const out = (await q('select public.lead_outbox($1::uuid[]) o', [[c1.id]]))[0].o
+  check(out.filter(x => x.body === 'Hello on IG').map(x => [x.pageId, x.psid]), [[P, '8800001']], 'the outbox sends Instagram conversations through the Page')
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_instagram(jsonb)', 'execute') a`))[0].a, false, 'the Instagram ingest is the service role’s alone')
+}
+
+// ── Handed to the sales group (mig 20261027120000 + its guards): nobody named, still handed, the page asked ──
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  await db.exec(await f('20261027120000_lead_handoff_group.sql'))
+  await db.exec(await f('20261027120100_lead_handoff_group_guards.sql'))
+  await as(CS_USER, ALL)
+  const g = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'grp.1', pageId: '946946021838962', psid: '7700201', name: 'Group Lead', kind: 'text', body: 'hi', sentAt: '2026-10-28T03:00:00Z', ad: null },
+  ])]))[0].r.contacts[0]
+  await refuses(`select public.lead_handoff_group($1)`, [g], /phone before handing/, 'no phone, no hand-over')
+  await q(`select public.lead_ingest_messenger($1::jsonb)`, [JSON.stringify([
+    { externalId: 'grp.2', pageId: '946946021838962', psid: '7700201', name: 'Group Lead', kind: 'text', body: '012-338 4721', sentAt: '2026-10-28T03:01:00Z', ad: null },
+  ])])
+  await as(CS_USER, ['leads.view', 'leads.create'])
+  await refuses(`select public.lead_handoff_group($1)`, [g], /Lead View · Edit/, 'handing over needs Edit')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_handoff_group($1)`, [g])
+  const row = (await q(`select handed_sales_id, handed_at is not null handed, phone_state, handed_by_name from public.lead_contacts where id = $1`, [g]))[0]
+  check([row.handed_sales_id, row.handed, row.phone_state], [null, true, 'confirmed'], 'handed with nobody named, the phone confirmed')
+  check((await q(`select what from public.lead_events where contact_id = $1 order by id desc limit 1`, [g]))[0].what, 'Handed to the sales group', 'the timeline says so')
+  await q(`select public.lead_handoff_group($1)`, [g])
+  check((await q(`select what from public.lead_events where contact_id = $1 order by id desc limit 1`, [g]))[0].what, 'Handed again, to the sales group', 'handed again says again')
+  const card = (await q(`select public.lead_thread($1) t`, [g]))[0].t
+  const contact = card.contact ?? card
+  check([!!contact.handedAt, contact.handedSalesName ?? null], [true, null], 'the card reads handed with no salesperson')
+  await refuses(`update public.lead_contacts set handed_sales_id = (select id from public.lead_sales limit 1), handed_at = null where id = $1`, [g], /lead_contacts_handed|check constraint/, 'a salesperson is never named on a lead not handed')
+  const src = (await q(`select prosrc from pg_proc where proname = 'lead_handoff_group'`))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.edit']);`), true, 'it asks the Inbox')
+}
+
+// ── The Page's own replies (mig 20261027130000): kept on a conversation Lead View has, as sent, Answered ──
+{
+  await db.exec((await readFile(new URL('../../supabase/migrations/20261027130000_lead_page_replies.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n'))
+  const P = '946946021838962'
+  const r0 = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'pr.in.1', pageId: P, psid: '7700301', name: 'Lee Hwa Ong', kind: 'text', body: 'Where is the store located?', sentAt: '2026-10-27T01:50:00Z', ad: null },
+  ])]))[0].r
+  const c = r0.contacts[0]
+  const pr = async rows => (await q(`select public.lead_ingest_page_replies($1::jsonb) r`, [JSON.stringify(rows)]))[0].r
+  const reply = (mid, psid, extra = {}) => ({ externalId: mid, pageId: P, psid, kind: 'text', body: "We're in PJ New Town!", sentAt: '2026-10-27T01:53:00Z', ...extra })
+  const r1 = await pr([reply('pr.out.1', '7700301'), reply('pr.out.1', '7700301'), reply('pr.out.2', '7700399'), { ...reply('pr.out.3', '7700301'), pageId: '999999999' }])
+  check([r1.messages, r1.ignored], [1, 3], 'kept once; a customer Lead View lacks and a Page no brand names are left out')
+  const m = (await q(`select direction, sender, by_name, delivery, external_id from public.lead_messages where external_id = 'pr.out.1'`))[0]
+  check([m.direction, m.sender, m.by_name, m.delivery], ['out', 'page', 'Business Suite', 'sent'], 'kept as the Page’s, sent')
+  check((await q(`select last_dir from public.lead_contacts where id = $1`, [c]))[0].last_dir, 'out', 'the conversation reads answered')
+  await pr([{ ...reply('pr.out.4', '7700301'), body: null, kind: 'image' }])
+  check((await q(`select body from public.lead_messages where external_id = 'pr.out.4'`))[0].body, '[Photo]', 'a photo with no words reads [Photo]')
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_page_replies(jsonb)', 'execute') a`))[0].a, false, 'the service role’s alone')
+}
+
 console.log(`validate-leads: ${checks} checks passed`)

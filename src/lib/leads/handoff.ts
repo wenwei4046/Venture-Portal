@@ -19,11 +19,11 @@ export function suggestedSales(brand: Pick<LeadBrand, 'sales'>): LeadSales | nul
  * The WhatsApp message to the salesperson, as Inbox v2 writes it (2026-10-22, the redesign v2 handoff): one line a
  * field, English and Chinese labels, '-' for what is not known so they know to ask.
  */
-export function handoffText(contact: LeadContact, _brandName: string, sales: Pick<LeadSales, 'name'>, csName: string): string {
+export function handoffText(contact: LeadContact, _brandName: string, sales: Pick<LeadSales, 'name'> | null, csName: string): string {
   const or = (v: string) => (v.trim() ? v.trim() : '-')
   const ad = adLabel(contact)
   return [
-    `Hi ${sales.name}, new lead from Lead View / 新客户`,
+    `Hi ${sales ? sales.name : 'team'}, new lead from Lead View / 新客户`,
     `Name 姓名: ${or(contact.name)}`,
     `Phone 电话: ${contact.phone ? formatPhone(contact.phone) : '-'}`,
     `Interest 兴趣: ${or(contact.interest)}`,
@@ -44,6 +44,15 @@ export function visitDay(value: string): string {
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
   return d.toLocaleDateString('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' })
 }
+
+/**
+ * Who a handed lead went to: its salesperson, or — handed with nobody named (mig 20261027120000, the brand's WhatsApp
+ * group) — the sales group; null while not handed.
+ */
+export function handedTo(c: Pick<LeadContact, 'handedAt' | 'handedSalesName'>): string | null {
+  return c.handedSalesName ?? (c.handedAt ? SALES_GROUP : null)
+}
+export const SALES_GROUP = 'Sales group'
 
 export type InboxState = 'waiting' | 'answered' | 'handed'
 

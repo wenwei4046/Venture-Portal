@@ -80,7 +80,6 @@ export default function CorrectionsView({ brands, brandId, days, corrections, mo
           <span className={s.eyebrow}>FILES</span>
           <h1 className={s.title}>AI corrections</h1>
         </div>
-        <span className={s.status}><span className={s.dot} aria-hidden="true" />Messenger connected · auto replies reach real customers</span>
         {canManage ? <button type="button" className={s.btn} data-strong="" disabled={!pending.length || busy || !ready} onClick={saveNext}>Save changes</button> : null}
       </div>
       <div className={s.panel}>

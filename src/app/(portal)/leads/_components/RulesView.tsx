@@ -70,7 +70,6 @@ export default function RulesView({ rules, ads, templates, brands, ready, canEdi
           <span className={s.eyebrow}>REPLIES</span>
           <h1 className={s.title}>Reply rules</h1>
         </div>
-        <span className={s.status}><span className={s.dot} aria-hidden="true" />Messenger connected · auto replies reach real customers</span>
         {canEdit ? <button type="button" className={s.btn} data-strong="" disabled={!dirty || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
       </div>
       <div className={s.panel}>

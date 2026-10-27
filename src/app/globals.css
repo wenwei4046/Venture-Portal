@@ -1812,7 +1812,8 @@ tr:hover .icon-btn { opacity: 1; }
   text-transform: none;
   letter-spacing: 0.01em;
 }
-h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title {
+/* Lead View draws its own titles (Cormorant Garamond, `[data-lead-view]`, 2026-10-27): left out here as the two apps are. */
+h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *, [data-lead-view] *)), .page-title {
   font-family: var(--font-display);
   font-weight: 400;
   font-style: normal;
@@ -2067,7 +2068,7 @@ table.ledger-table tr.lt-detail {
   .statement-amount, .num-hero { font-size: 23px; }
 }
 @media (max-width: 680px) {
-  h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *)), .page-title { font-size: 30px; }
+  h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *, [data-lead-view] *)), .page-title { font-size: 30px; }
   .statement-amount, .num-hero { font-size: 21px; }
 }
 

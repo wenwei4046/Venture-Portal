@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { officeTime } from '@/lib/office-time'
 import { saveLeadCard, setLeadOutcome } from '@/lib/leads/actions'
 import { isVisitDate, phoneStage, phoneSteps } from '@/lib/leads/inbox'
+import { handedTo } from '@/lib/leads/handoff'
 import { formatPhone } from '@/lib/leads/phone'
 import { whenFull } from '@/lib/leads/time'
 import type { Appt, LeadBrand, LeadCardFields, LeadContact, Shown } from '@/lib/leads/types'
@@ -98,7 +99,7 @@ export default function CustomerCard({ contact, brand, canEdit, csName, onSaved 
           <div className={s.phoneBody} style={{ gap: 10 }}>
             <span className={s.number} data-ok="">{formatPhone(contact.phone)}</span>
             <div className={s.handedBox}>
-              <span className={s.handedTitle}>Handed to {contact.handedSalesName}</span>
+              <span className={s.handedTitle}>Handed to {handedTo(contact)}</span>
               <span className={s.sub} style={{ color: 'rgb(var(--lv-text-2))' }}>{contact.handedAt ? whenFull(contact.handedAt) : ''} · by {contact.handedByName} · via WhatsApp</span>
             </div>
             <Outcome contact={contact} canEdit={canEdit} onSaved={onSaved} />

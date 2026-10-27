@@ -3,6 +3,7 @@
 // keeps the steps' days (mig 20261022220000).
 
 import { adLabel } from './ads'
+import { handedTo } from './handoff'
 import { formatPhone } from './phone'
 import type { LeadContact } from './types'
 
@@ -127,7 +128,7 @@ export function leadsCsv(rows: LeadContact[], brandName: (id: string) => string,
     const ad = adLabel(c)
     return [
       c.name, c.phone ? formatPhone(c.phone) : '', brandName(c.brandId), c.channel === 'instagram' ? 'Instagram' : 'Messenger',
-      ad || 'Organic', c.interest, c.budget, c.showroom, c.handedSalesName ?? '', STAGE_LABEL[stageOf(c)],
+      ad || 'Organic', c.interest, c.budget, c.showroom, handedTo(c) ?? '', STAGE_LABEL[stageOf(c)],
       c.saleValue == null || c.saleValue === '' ? '' : String(c.saleValue), when(lastUpdate(c)),
     ]
   })

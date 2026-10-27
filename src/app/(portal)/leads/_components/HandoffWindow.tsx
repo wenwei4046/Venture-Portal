@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { handLeadOver } from '@/lib/leads/actions'
-import { handoffText, suggestedSales } from '@/lib/leads/handoff'
+import { handLeadOver, handLeadToGroup } from '@/lib/leads/actions'
+import { handoffText, SALES_GROUP, suggestedSales } from '@/lib/leads/handoff'
 import { formatPhone, whatsAppLink } from '@/lib/leads/phone'
 import type { LeadBrand, LeadContact } from '@/lib/leads/types'
 import { LeadIcon } from '@/components/layout/lead-icons'
@@ -13,7 +13,13 @@ import s from './inbox.module.css'
  * rotation's NEXT is the one with the fewest leads this week, picked to start; Customer Service may pick anybody.
  * The WhatsApp message is filled in and may be changed, or copied. *Mark as handed* records it (lead_handoff) and
  * opens WhatsApp to the salesperson with it — the hand-over the KPI counts.
+ *
+ * Or the brand's SALES GROUP (2026-10-27 — the user: no salespeople in Lead View for now, CS pastes the lead into the
+ * brand's WhatsApp group): the message to "team", copied by *Copy & mark as handed*, which records the hand-over with
+ * nobody named (lead_handoff_group). Picked to start when the brand has no salespeople.
  */
+const GROUP = 'group'
+
 export default function HandoffWindow({ contact, brand, csName, onClose, onDone }: {
   contact: LeadContact
   csName: string
@@ -22,9 +28,10 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
   onDone: () => void
 }) {
   const next = suggestedSales(brand)
-  const [pick, setPick] = useState<string | null>(next?.id ?? null)
+  const [pick, setPick] = useState<string>(next?.id ?? GROUP)
   const chosen = brand.sales.find(x => x.id === pick) ?? null
-  const [text, setText] = useState(() => (next ? handoffText(contact, brand.name, next, csName) : ''))
+  const toGroup = pick === GROUP
+  const [text, setText] = useState(() => handoffText(contact, brand.name, next, csName))
   const [busy, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -39,9 +46,8 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
 
   // Picking somebody writes the message to them afresh, as the handoff does.
   const choose = (id: string) => {
-    const who = brand.sales.find(x => x.id === id)
     setPick(id)
-    if (who) setText(handoffText(contact, brand.name, who, csName))
+    setText(handoffText(contact, brand.name, brand.sales.find(x => x.id === id) ?? null, csName))
   }
   const copy = async () => {
     try {
@@ -61,6 +67,16 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
     copiedTimer.current = setTimeout(() => setCopied(false), 1200)
   }
   const go = () => {
+    if (toGroup) {
+      setError(null)
+      void copy() // at the click, while the browser still lets the page write the clipboard
+      start(async () => {
+        const r = await handLeadToGroup(contact.id)
+        if (!r.ok) { setError(r.reason); return }
+        onDone()
+      })
+      return
+    }
     if (!chosen) return
     setError(null)
     // Opened now, while the click still counts, so the browser does not block it; pointed at WhatsApp once saved.
@@ -92,9 +108,7 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
         <div className={s.windowBody}>
           <div className={s.people} role="radiogroup" aria-label="Salesperson">
             <span className={s.caps} style={{ paddingBottom: 4 }}>SALESPERSON · IN TURN</span>
-            {brand.sales.length === 0 ? (
-              <div className={s.error}>{brand.name} has no salespeople yet — add them in Settings.</div>
-            ) : brand.sales.map(x => (
+            {brand.sales.map(x => (
               <button key={x.id} type="button" role="radio" aria-checked={x.id === pick} className={s.person} onClick={() => choose(x.id)}>
                 <span className={s.radio} aria-hidden="true" />
                 <span className={s.personText}>
@@ -104,17 +118,24 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
                 <span className={s.week}>{x.week} this wk</span>
               </button>
             ))}
+            <button type="button" role="radio" aria-checked={toGroup} className={s.person} onClick={() => choose(GROUP)}>
+              <span className={s.radio} aria-hidden="true" />
+              <span className={s.personText}>
+                <span className={s.personName}>{SALES_GROUP}</span>
+                <span className={s.personSub}>{`Copy the message, paste it in ${brand.name}'s WhatsApp group`}</span>
+              </span>
+            </button>
           </div>
           <div className={s.message}>
             <div className={s.messageHead}>
               <span className={s.caps}>WHATSAPP MESSAGE · YOU CAN EDIT IT</span>
               <button type="button" className={s.close} onClick={copy} disabled={!text} title="Copy message" aria-label="Copy message"><LeadIcon name="copy" size={15} /></button>
             </div>
-            <textarea className={s.waText} rows={11} value={text} onChange={e => setText(e.target.value)} disabled={!chosen} aria-label="WhatsApp message" />
+            <textarea className={s.waText} rows={11} value={text} onChange={e => setText(e.target.value)} disabled={!chosen && !toGroup} aria-label="WhatsApp message" />
             {error ? <div className={s.error} role="alert">{error}</div> : null}
             <div className={s.windowFoot}>
-              <span className={s.hint}>Opens WhatsApp to {chosen?.name ?? 'them'} with this message.</span>
-              <button type="button" className={s.markBtn} onClick={go} disabled={!chosen || busy || !text.trim()}>{busy ? 'Handing over…' : 'Mark as handed'}</button>
+              <span className={s.hint}>{toGroup ? `Copies this message — paste it in ${brand.name}'s sales group on WhatsApp.` : `Opens WhatsApp to ${chosen?.name ?? 'them'} with this message.`}</span>
+              <button type="button" className={s.markBtn} onClick={go} disabled={(!chosen && !toGroup) || busy || !text.trim()}>{busy ? 'Handing over…' : toGroup ? 'Copy & mark as handed' : 'Mark as handed'}</button>
             </div>
           </div>
         </div>

@@ -8,6 +8,9 @@ import { signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 import { parseMessengerDelivery } from '@/lib/messenger/webhook'
 import { pageToken, profileName } from '@/lib/messenger/send'
 import { sendLeadOutbox } from '@/lib/leads/messenger-outbox'
+import { adAccountName } from '@/lib/leads/ad-account'
+import { parseInstagramDelivery, takeInstagram } from '@/lib/leads/instagram'
+import { leadPageEvents } from '@/lib/leads/page-events'
 
 /**
  * /api/messenger/v1/webhook — the Callback URL for our Facebook Pages'
@@ -74,19 +77,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'invalid JSON' }, { status: 400 })
   }
 
+  // Instagram Direct (object "instagram") is Lead View's alone — the CRM takes no Instagram (lib/leads/instagram.ts).
+  if ((body as { object?: string } | null)?.object === 'instagram') {
+    const taken = await takeInstagram(client(), parseInstagramDelivery(body), process.env.META_SYSTEM_USER_TOKEN?.trim(), job => after(() => job().then(() => undefined)))
+    if (!taken.ok) {
+      console.error('lead_ingest_instagram failed:', taken.error)
+      return NextResponse.json({ ok: false, error: 'ingest failed' }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true, result: taken.data })
+  }
+
   const delivery = parseMessengerDelivery(body)
   // Our Pages only.
   const pages = new Set((process.env.META_PAGE_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean))
   const ours = <T extends { pageId: string }>(rows: T[]) => (pages.size ? rows.filter(r => pages.has(r.pageId)) : rows)
   const messages = ours(delivery.messages)
   const reads = ours(delivery.reads)
-  // Every other Page's messages are Lead View's (a brand's Page); with no CRM Pages set, the CRM takes them all, as before.
-  const leadMessages = pages.size ? delivery.messages.filter(m => !pages.has(m.pageId)) : []
+  // Every other Page's messages are Lead View's (a brand's Page) — standby ones too, and the Page's own replies sent from
+  // Business Suite (lib/leads/page-events.ts); with no CRM Pages set, the CRM takes them all, as before.
+  const leadEvents = pages.size ? leadPageEvents(body, pages, process.env.META_APP_ID?.trim()) : { messages: [], replies: [] }
+  const leadMessages = leadEvents.messages
   const ignored = delivery.ignored + (delivery.reads.length - reads.length)
 
   // Names: Messenger does not send them. Asked once per customer per delivery, best effort.
   const systemToken = process.env.META_SYSTEM_USER_TOKEN?.trim()
-  if (systemToken && delivery.messages.length) {
+  if (systemToken && (messages.length || leadMessages.length)) {
     const tokens = new Map<string, string | null>()
     const names = new Map<string, string | null>()
     for (const m of [...messages, ...leadMessages]) {
@@ -101,13 +116,25 @@ export async function POST(request: Request) {
   // delivery, and both sides keep a message by Meta's id, so a retry takes nothing twice.
   let leadsFailed = false
   if (leadMessages.length) {
-    const lead = await client().rpc('lead_ingest_messenger', { p_messages: leadMessages })
+    // Which brand an ad's customer is: the ad account's name decides 2990s mini (lib/leads/ad-account.ts).
+    const forLeads = await Promise.all(leadMessages.map(async m => m.ad?.sourceId
+      ? { ...m, ad: { ...m.ad, account: await adAccountName(m.ad.sourceId, systemToken) } }
+      : m))
+    const lead = await client().rpc('lead_ingest_messenger', { p_messages: forLeads })
     if (lead.error) {
       console.error('lead_ingest_messenger failed:', lead.error.message)
       leadsFailed = true
     } else {
       const contacts = ((lead.data as { contacts?: string[] } | null)?.contacts ?? []).filter(Boolean)
       if (contacts.length) after(() => sendLeadOutbox(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => undefined))
+    }
+  }
+  // The Page's own replies, after its customers' messages (a reply joins a conversation Lead View already has).
+  if (!leadsFailed && leadEvents.replies.length) {
+    const replies = await client().rpc('lead_ingest_page_replies', { p_messages: leadEvents.replies })
+    if (replies.error) {
+      console.error('lead_ingest_page_replies failed:', replies.error.message)
+      leadsFailed = true
     }
   }
 

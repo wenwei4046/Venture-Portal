@@ -2,7 +2,7 @@
 
 .page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px 8px 4px; }
 .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 14px; }
-.title { margin: 0; font-family: var(--lv-font-title); font-size: 32px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
+.title { margin: 0; font-family: var(--lv-font-title); font-size: 26px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
 .status { display: flex; align-items: center; gap: 8px; font-size: 14px; color: rgb(var(--lv-text-2)); background: rgb(var(--lv-muted)); padding: 6px 12px; border-radius: 999px; }
 .status[data-on] { color: rgb(var(--lv-green)); background: rgb(var(--lv-green-bg)); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }

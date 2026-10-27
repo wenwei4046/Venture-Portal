@@ -23,6 +23,8 @@
   transition: width 0.18s;
 }
 .nav[data-collapsed] { width: 62px; }
+/* A sidebar taller than the window scrolls; nothing in it shrinks (the user, 2026-10-27: the brand and Collapse ran into each other). */
+.nav > * { flex-shrink: 0; }
 @media (max-width: 767px) { .nav { display: none; } }
 
 .brand { display: flex; align-items: center; gap: 9px; padding: 2px 6px 8px; }

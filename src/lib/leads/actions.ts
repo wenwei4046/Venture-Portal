@@ -73,9 +73,9 @@ async function deliverReply(messageId: number): Promise<string | null> {
   // Before mig 20261026110000 (no lead_reply_target), or a test conversation: recorded, as it always was.
   if (!target.ok || !target.data || target.data.isTest) return null
   const t = target.data
-  const result = t.channel === 'messenger'
-    ? await deliver({ pageId: t.pageId, psid: t.psid, body: t.body, lastInAt: t.lastInAt }, process.env.META_SYSTEM_USER_TOKEN?.trim())
-    : { error: 'Instagram is not connected yet — reply in the Instagram app.' }
+  // Messenger and Instagram Direct both go through the brand's Facebook Page (mig 20261027110000 keeps it on an
+  // Instagram conversation); the PSID is the Instagram-scoped id there.
+  const result = await deliver({ pageId: t.pageId, psid: t.psid, body: t.body, lastInAt: t.lastInAt }, process.env.META_SYSTEM_USER_TOKEN?.trim())
   await quiet<null>('lead_reply_sent', { p_message: messageId, p_mid: 'mid' in result ? result.mid : null, p_error: 'error' in result ? result.error : null }, '')
   revalidatePath('/leads', 'layout')
   return 'error' in result ? result.error : null
@@ -91,6 +91,12 @@ export async function saveLeadCard(contactId: string, fields: LeadCardFields) {
 export async function handLeadOver(contactId: string, salesId: string) {
   await requireActionOn('/leads', 'leads', 'edit')
   return call<{ id: string; name: string; phone: string }>('lead_handoff', { p_contact: contactId, p_sales: salesId }, 'The lead was not handed over.')
+}
+
+/** Hand the lead to the brand's sales group (CS pastes the message into the WhatsApp group; nobody named). */
+export async function handLeadToGroup(contactId: string) {
+  await requireActionOn('/leads', 'leads', 'edit')
+  return call<null>('lead_handoff_group', { p_contact: contactId }, 'The lead was not handed over.')
 }
 
 /** What came of a handed lead. */
