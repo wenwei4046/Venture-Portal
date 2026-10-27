@@ -177,7 +177,36 @@ export async function listMetaAds(token: string, fetchImpl: typeof fetch = fetch
 }
 
 /** An ad's figures from Ads Manager for a range (2026-10-22, Ads Performance: "做花费和每个名单成本"). */
-export interface MetaFig { spend: number; impr: number; reach: number; clicks: number; allClicks: number; msgconv: number }
+export interface MetaFig { spend: number; impr: number; reach: number; clicks: number; allClicks: number; msgconv: number; budget?: MetaBudget | null }
+
+/**
+ * An ad's budget as set in Ads Manager today (2026-10-27, the owner: "让系统读取每支广告的日预算"): its ad set's daily or
+ * lifetime budget, else its campaign's (Advantage campaign budget — one budget shared by every ad set under it). In
+ * ringgit (Graph answers the account currency's smallest unit). `key` is whoever holds it ("adset:…" / "campaign:…"),
+ * so a total counts a shared budget once.
+ */
+export interface MetaBudget { daily: number | null; lifetime: number | null; key: string; level: 'adset' | 'campaign' }
+
+export async function metaAdBudget(adId: string, token: string, fetchImpl: typeof fetch = fetch): Promise<MetaBudget | null> {
+  if (!AD_ID.test(adId)) return null
+  try {
+    const fields = encodeURIComponent('adset{id,daily_budget,lifetime_budget},campaign{id,daily_budget,lifetime_budget}')
+    const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${adId}?fields=${fields}`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000),
+    })
+    if (!res.ok) return null
+    type Holder = { id?: unknown; daily_budget?: unknown; lifetime_budget?: unknown }
+    const body = (await res.json()) as { adset?: Holder; campaign?: Holder }
+    const rm = (v: unknown) => { const n = typeof v === 'string' || typeof v === 'number' ? Number(v) : NaN; return Number.isFinite(n) && n > 0 ? n / 100 : null }
+    for (const [level, h] of [['adset', body.adset], ['campaign', body.campaign]] as const) {
+      const daily = rm(h?.daily_budget), lifetime = rm(h?.lifetime_budget)
+      if ((daily || lifetime) && typeof h?.id === 'string') return { daily, lifetime, key: `${level}:${h.id}`, level }
+    }
+    return null
+  } catch {
+    return null
+  }
+}
 
 /**
  * Meta's insights for one ad over [since, until] (YYYY-MM-DD, the ad account's days): spend, impressions, reach, link

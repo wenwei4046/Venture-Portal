@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { metaFigures, moveHeld } from "./adsperf";
+import { dailyBudget, metaFigures, moveHeld } from "./adsperf";
 
 describe("Ads Performance's Meta figures", () => {
   it("sums the ads read and builds the costs with the CRM's own counts", () => {
@@ -26,5 +26,17 @@ describe("Customise metrics › Column order, dragged (2026-10-27: \"拉住无�
   it("does nothing with no row held or over itself", () => {
     expect(moveHeld(["a", "b"], null, 1)).toBeNull();
     expect(moveHeld(["a", "b"], 1, 1)).toBeNull();
+  });
+});
+
+describe("Daily budget (2026-10-27)", () => {
+  const fig = (budget: { daily: number | null; key: string }) => ({ spend: 0, impr: 0, reach: 0, clicks: 0, allClicks: 0, msgconv: 0, budget: { lifetime: null, level: "adset" as const, ...budget } });
+  it("adds each ad set's budget, a shared campaign budget once", () => {
+    expect(dailyBudget([fig({ daily: 70, key: "adset:1" }), fig({ daily: 70, key: "adset:2" })])).toBe(140);
+    expect(dailyBudget([fig({ daily: 400, key: "campaign:5" }), fig({ daily: 400, key: "campaign:5" })])).toBe(400);
+    expect(dailyBudget([fig({ daily: null, key: "adset:3" }), null])).toBeNull();
+  });
+  it("is one of the figures the table reads", () => {
+    expect(metaFigures([fig({ daily: 70, key: "adset:1" })], {}).dbudget).toBe(70);
   });
 });

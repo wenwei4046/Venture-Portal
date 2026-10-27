@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers, crmPages, metaAdInsights, metaAdDaily, metaAdThumbs } from './crm-ad-names-meta'
+import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers, crmPages, metaAdInsights, metaAdDaily, metaAdThumbs, metaAdBudget } from './crm-ad-names-meta'
 
 // An ad's name from Ads Manager (2026-10-19, mig 20261019100000): a webhook delivery with an ad nobody named asks
 // Graph for it and keeps it as source 'meta'; a named ad is never asked; an ad the token cannot see is not asked
@@ -201,5 +201,20 @@ describe("each ad's picture, full size (2026-10-27: \"截图改成大图\")", ()
     expect(await metaAdThumbs([id], 't', answer({ thumbnail_url: fb('th'), object_story_spec: { link_data: { picture: fb('pic') } } }))).toEqual({ [id]: fb('pic') })
     expect(await metaAdThumbs([id], 't', answer({ thumbnail_url: fb('th') }))).toEqual({ [id]: fb('th') })
     expect(await metaAdThumbs([id], 't', answer({ image_url: 'https://evil.example.com/x.jpg' }))).toEqual({})
+  })
+})
+
+describe("an ad's daily budget (2026-10-27: \"让系统读取每支广告的日预算\")", () => {
+  const answer = (body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status: 200 })) as unknown as typeof fetch
+  const id = '120251332896640103'
+  it("reads the ad set's budget, in ringgit", async () => {
+    expect(await metaAdBudget(id, 't', answer({ adset: { id: '9', daily_budget: '7000' }, campaign: { id: '5' } }))).toEqual({ daily: 70, lifetime: null, key: 'adset:9', level: 'adset' })
+  })
+  it("falls back to the campaign's when the campaign holds it", async () => {
+    expect(await metaAdBudget(id, 't', answer({ adset: { id: '9' }, campaign: { id: '5', daily_budget: '40000' } }))).toEqual({ daily: 400, lifetime: null, key: 'campaign:5', level: 'campaign' })
+  })
+  it('keeps a lifetime budget, and gives nothing for an ad it cannot read', async () => {
+    expect(await metaAdBudget(id, 't', answer({ adset: { id: '9', lifetime_budget: '150000' } }))).toEqual({ daily: null, lifetime: 1500, key: 'adset:9', level: 'adset' })
+    expect(await metaAdBudget(id, 't', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).toBeNull()
   })
 })

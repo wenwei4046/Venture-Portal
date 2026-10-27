@@ -17,7 +17,7 @@ import { adPageInSource, BRAND_LABEL, brandOf, inSource, SOURCE_PICKS, sourceLab
 
 type Fmt = "rm" | "rm2" | "n" | "pct" | "x" | "t";
 export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
-  ["Popular", "Meta Ads", [["spend", "Amount spent", "Total charged in the period", "rm"], ["impr", "Impressions", "Times the ad was on screen", "n"], ["reach", "Reach", "People who saw the ad at least once", "n"], ["results", "Results", "Messaging conversations started", "n"], ["cpr", "Cost per result", "Amount spent ÷ results", "rm2"], ["delivery", "Delivery", "Running, paused or in review", "t"]]],
+  ["Popular", "Meta Ads", [["spend", "Amount spent", "Total charged in the period", "rm"], ["dbudget", "Daily budget", "Set in Ads Manager today: the ad set's, else its campaign's (shared by its ad sets)", "rm"], ["impr", "Impressions", "Times the ad was on screen", "n"], ["reach", "Reach", "People who saw the ad at least once", "n"], ["results", "Results", "Messaging conversations started", "n"], ["cpr", "Cost per result", "Amount spent ÷ results", "rm2"], ["delivery", "Delivery", "Running, paused or in review", "t"]]],
   ["Delivery", "Meta Ads", [["freq", "Frequency", "Impressions ÷ reach", "x"], ["cpm", "CPM", "Cost per 1,000 impressions", "rm2"], ["cpp", "Cost per 1,000 reached", "Amount spent ÷ reach × 1,000", "rm2"]]],
   ["Messaging", "Meta Ads", [["msgconv", "Messaging conversations started", "Chats opened from the ad", "n"], ["cpmsg", "Cost per conversation started", "Amount spent ÷ conversations started", "rm2"], ["newmsg", "New messaging contacts", "People who messaged the page for the first time", "n"], ["msgreply", "Conversations replied", "Chats where the page replied", "n"], ["blocks", "Messaging blocks", "People who blocked the page after the ad", "n"]]],
   ["Clicks", "Meta Ads", [["clicks", "Link clicks", "Clicks on the ad link", "n"], ["cpc", "Cost per link click", "Amount spent ÷ link clicks", "rm2"], ["ctr", "CTR (link)", "Link clicks ÷ impressions", "pct"], ["allclk", "Clicks (all)", "Every click on the ad, incl. profile and likes", "n"], ["ctrall", "CTR (all)", "Clicks (all) ÷ impressions", "pct"], ["cpcall", "CPC (all)", "Amount spent ÷ clicks (all)", "rm2"], ["outclk", "Outbound clicks", "Clicks that left Facebook or Instagram", "n"]]],
@@ -33,7 +33,8 @@ export function moveHeld(list: string[], from: number | null | undefined, to: nu
   const c = [...list]; const [x] = c.splice(from, 1); c.splice(to, 0, x); return c;
 }
 /** The chart's metrics are the table's (2026-10-23, the owner: "他的资料跟下方的 + 是一样的"), less Delivery. */
-const CHART_METRICS = ALL.filter(m => m[3] !== "t").map(m => [m[0], m[1], chartFmtOf(m[3])] as const);
+// The daily budget is today's setting, not a day-by-day figure, so the chart leaves it out.
+const CHART_METRICS = ALL.filter(m => m[3] !== "t" && m[0] !== "dbudget").map(m => [m[0], m[1], chartFmtOf(m[3])] as const);
 // 4a's columns (frame 05): Leads, Appts, Appt rate, Show-up, Won, Won rate, Spend, Per lead — the rest from +. Spend and Per
 // lead say RM in their heads (2026-10-23, the owner: "spend（加RM） & per lead （加RM）").
 export const DEF = ["leads", "appt", "apptrate", "showrate", "won", "winrate", "spend", "cpl"];
@@ -58,6 +59,12 @@ export function crmFigures(cs: CrmCustomer[], ctx: DeskCtx, a: number, b: number
  * Meta's figures for a set of ads over a range, summed (null when none of them could be read), and every metric built
  * from them with the CRM's own (2026-10-22, the owner: "做花费和每个名单成本"): cost per lead / appointment / won.
  */
+/** The daily budgets of some ads, a shared (campaign) budget counted once; null when none of them has a daily budget. */
+export function dailyBudget(figs: (MetaFig | null | undefined)[]): number | null {
+  const by = new Map<string, number>();
+  for (const f of figs) if (f?.budget?.daily) by.set(f.budget.key, f.budget.daily);
+  return by.size ? [...by.values()].reduce((a, b) => a + b, 0) : null;
+}
 export function metaFigures(figs: (MetaFig | null | undefined)[], crm: Record<string, number | null>): Record<string, number | null> {
   const got = figs.filter((f): f is MetaFig => !!f);
   if (!got.length) return {};
@@ -67,7 +74,7 @@ export function metaFigures(figs: (MetaFig | null | undefined)[], crm: Record<st
   return { spend: s.spend, impr: s.impr, reach: s.reach, results: s.msgconv, msgconv: s.msgconv, cpr: per(s.msgconv), cpmsg: per(s.msgconv),
     freq: s.reach ? s.impr / s.reach : null, cpm: s.impr ? (s.spend / s.impr) * 1000 : null, cpp: s.reach ? (s.spend / s.reach) * 1000 : null,
     clicks: s.clicks, cpc: per(s.clicks), ctr: s.impr ? (s.clicks / s.impr) * 100 : null, allclk: s.allClicks, ctrall: s.impr ? (s.allClicks / s.impr) * 100 : null, cpcall: per(s.allClicks),
-    cpl: per(crm.leads), cpappt: per(crm.appt), cpwon: per(crm.won) };
+    cpl: per(crm.leads), cpappt: per(crm.appt), cpwon: per(crm.won), dbudget: dailyBudget(got) };
 }
 export const fmt = (v: number | null | undefined, t: Fmt) => (v == null ? "—" : t === "rm" ? Math.round(v).toLocaleString("en-MY") : t === "rm2" ? v.toFixed(2) : t === "pct" ? `${v.toFixed(2)}%` : t === "x" ? v.toFixed(2) : Math.round(v).toLocaleString("en-MY"));
 
@@ -267,9 +274,9 @@ export function adsPerfVM(ctx: DeskCtx) {
     mq: ui.mq, setMq: (e: { target: { value: string } }) => patch({ mq: e.target.value }), resetMetrics: () => patch({ mDraft: [...(forCards ? INS_CARDS : forChart ? CHART_DEF.filter((k): k is string => !!k) : DEF)] }),
     mFoldAllLabel: METRICS.every(g => ui.mFold[g[0]]) ? "Expand all" : "Collapse all",
     mFoldAll: () => set(u => { const all = METRICS.every(g => u.mFold[g[0]]); return { ...u, mFold: { ...u.mFold, ...Object.fromEntries(METRICS.map(g => [g[0], !all])) } }; }),
-    mGroups: METRICS.map(([label, src, items]) => ({ label, src, open: !!q || !ui.mFold[label], rot: !!q || !ui.mFold[label] ? 0 : -90, nSel: `${items.filter(m => dsel.includes(m[0])).length} of ${items.filter(m => !(forChart && m[3] === "t")).length}`,
+    mGroups: METRICS.map(([label, src, items]) => ({ label, src, open: !!q || !ui.mFold[label], rot: !!q || !ui.mFold[label] ? 0 : -90, nSel: `${items.filter(m => dsel.includes(m[0])).length} of ${items.filter(m => !(forChart && (m[3] === "t" || m[0] === "dbudget"))).length}`,
       fold: () => set(u => ({ ...u, mFold: { ...u.mFold, [label]: !u.mFold[label] } })),
-      items: items.filter(m => (!q || m[1].toLowerCase().includes(q)) && !(forChart && m[3] === "t")).map(m => { const on = dsel.includes(m[0]);
+      items: items.filter(m => (!q || m[1].toLowerCase().includes(q)) && !(forChart && (m[3] === "t" || m[0] === "dbudget"))).map(m => { const on = dsel.includes(m[0]);
         return { label: m[1], hint: m[2], on, bg: on ? "var(--crm-rust)" : "#fff", bd: on ? "var(--crm-rust)" : "var(--crm-faint-2)",
           toggle: () => set(u => { const c = u.mDraft ?? baseOf(u); if (!c.includes(m[0]) && u.mFor === "chart" && c.length >= CHART_MAX) return u; return { ...u, mDraft: c.includes(m[0]) ? c.filter(x => x !== m[0]) : [...c, m[0]] }; }) }; }) })).filter(g => g.items.length),
     mOrder: dcols.map((m, i) => { const mvTo = (j: number) => set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(i, 1); c.splice(j, 0, x); return { ...u, mDraft: c, mDrag: null }; });
