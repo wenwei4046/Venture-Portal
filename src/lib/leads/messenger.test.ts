@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { attachmentKind, deliver, deliverFile, FILE_LIMIT, messageOf, NO_PAGE, NOT_CONNECTED, NO_PAGE_TOKEN, TOO_BIG, WINDOW_SHUT } from './messenger'
+import { attachmentKind, deliver, deliverFile, FILE_LIMIT, messageOf, NO_PAGE, NOT_CONNECTED, NO_PAGE_TOKEN, sendReaction, TOO_BIG, WINDOW_SHUT } from './messenger'
 
 const now = new Date('2026-10-28T03:00:00Z')
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -73,5 +73,31 @@ describe('Lead View › a photo or file out', () => {
     expect(JSON.parse(String(form.get('message')))).toEqual({ attachment: { type: 'file', payload: { is_reusable: false } } })
     // The file rides along (the test DOM drops a Blob's filename; Node's FormData keeps it).
     expect(form.get('filedata')).toBeInstanceOf(Blob)
+  })
+})
+
+describe('Lead View › answering one message, and reacting (mig 20261027220000)', () => {
+  const page = (calls: Array<{ url: string; body?: string }>, answer: unknown = { message_id: 'm_2' }) => vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), body: init?.body as string | undefined })
+    return String(url).includes('fields=access_token') ? json(200, { access_token: 'PAGE' }) : json(200, answer)
+  }) as unknown as typeof fetch
+
+  it('sends a reply with Meta’s reply_to beside the message', async () => {
+    const calls: Array<{ url: string; body?: string }> = []
+    const r = await deliver({ pageId: '946946021838962', psid: '7654321', body: 'Queen or King?', lastInAt: '2026-10-28T02:30:00Z', replyToMid: 'm_q' }, 'SYS-r', now, page(calls))
+    expect(r).toEqual({ mid: 'm_2' })
+    const sent = JSON.parse(calls.find(c => c.url.endsWith('/messages'))!.body!)
+    expect(sent).toMatchObject({ recipient: { id: '7654321' }, message: { text: 'Queen or King?' }, reply_to: { mid: 'm_q' } })
+  })
+
+  it('reacts with one emoji, takes it away with unreact, and says why when it cannot', async () => {
+    const calls: Array<{ url: string; body?: string }> = []
+    expect(await sendReaction({ pageId: '946946021838962', psid: '7654321', mid: 'm_c' }, '❤️', 'SYS-x', page(calls, { recipient_id: '7654321' }))).toBe(null)
+    expect(JSON.parse(calls.find(c => c.url.endsWith('/messages'))!.body!)).toEqual({ recipient: { id: '7654321' }, sender_action: 'react', payload: { message_id: 'm_c', reaction: '❤️' } })
+    const off: Array<{ url: string; body?: string }> = []
+    expect(await sendReaction({ pageId: '946946021838962', psid: '7654321', mid: 'm_c' }, null, 'SYS-y', page(off, {}))).toBe(null)
+    expect(JSON.parse(off.find(c => c.url.endsWith('/messages'))!.body!)).toEqual({ recipient: { id: '7654321' }, sender_action: 'unreact', payload: { message_id: 'm_c' } })
+    expect(await sendReaction({ pageId: null, psid: '1', mid: 'm' }, '👍', 'SYS-z')).toBe(NO_PAGE)
+    expect(await sendReaction({ pageId: '1', psid: '1', mid: 'm' }, '👍', undefined)).toBe(NOT_CONNECTED)
   })
 })

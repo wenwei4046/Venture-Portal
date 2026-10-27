@@ -1148,6 +1148,66 @@ await db.exec(`
   await as(OTHER, ALL)
   check(await unreadOf(), 1, 'for somebody who has not opened it, the question after the old greeting is unread')
   await as(CS_USER, ALL)
+
+  // ── Meta's own times (mig 20261027210000): Ray Ng's case — his message arrives after the Page's answer to it ──
+  check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_ingest_messenger', 'lead_ingest_instagram', 'lead_ingest_page_replies') order by 1`)).map(r => [r.proname, r.m]),
+    [['lead_ingest_instagram', '67351ec9be16f60519634ecf6363b9bb'], ['lead_ingest_messenger', 'b7644cce739f2f6bf6b33e6ee41cad54'], ['lead_ingest_page_replies', '00a667a6e2455f712a20a1cf382b0b25']], 'the three ingests here are production’s')
+  await db.exec(await f('20261027210000_lead_meta_times.sql'))
+  await db.exec(await f('20261027210000_lead_meta_times.sql'))
+  const sent = (s) => new Date(Date.now() - s * 1000).toISOString()
+  const ray = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'ray.1', pageId: P, psid: '7700901', name: 'Ray Test', kind: 'text', body: 'mattress', sentAt: sent(600), ad: null },
+  ])]))[0].r.contacts[0]
+  // The Page answers at -10 s, and that echo reaches us first …
+  await q(`select public.lead_ingest_page_replies($1::jsonb)`, [JSON.stringify([{ externalId: 'ray.p', pageId: P, psid: '7700901', body: 'Hi, sofa or mattress?', sentAt: sent(10) }])])
+  // … then his message sent at -12 s arrives.
+  await q(`select public.lead_ingest_messenger($1::jsonb)`, [JSON.stringify([
+    { externalId: 'ray.2', pageId: P, psid: '7700901', name: 'Ray Test', kind: 'text', body: "I'd like to learn more", sentAt: sent(12), ad: null },
+  ])])
+  const rt = (await q(`select public.lead_thread($1) t`, [ray]))[0].t
+  check(rt.messages.map(m => m.body), ['mattress', "I'd like to learn more", 'Hi, sofa or mattress?'], 'his message sits before the answer it got')
+  check([rt.contact.lastDir, rt.contact.lastText], ['out', 'Hi, sofa or mattress?'], 'and the chat reads answered')
+  // A time Meta could not have sent (a year back) falls back to the arrival time.
+  await q(`select public.lead_ingest_messenger($1::jsonb)`, [JSON.stringify([
+    { externalId: 'ray.3', pageId: P, psid: '7700901', name: 'Ray Test', kind: 'text', body: 'still there?', sentAt: '2025-01-01T00:00:00Z', ad: null },
+  ])])
+  const rt2 = (await q(`select public.lead_thread($1) t`, [ray]))[0].t
+  check([rt2.messages.at(-1).body, rt2.contact.lastDir], ['still there?', 'in'], 'an unreadable or far-off time is taken as now')
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_meta_time(text)', 'execute') a`))[0].a, false, 'the helper is nobody’s to call')
+
+  // ── Reply to one message, react with an emoji (migs 20261027220000 + its guards) ──
+  check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_thread', 'lead_ingest_messenger', 'lead_ingest_page_replies') order by 1`)).map(r => [r.proname, r.m]),
+    [['lead_ingest_messenger', '6202f20169e982c58a2d0acf5de9b67d'], ['lead_ingest_page_replies', 'f0a9ea37771b5e711163815721f3da34'], ['lead_thread', 'ecf0ec961ca624dfb01d33445b965215']], 'the three bodies here are production’s')
+  await db.exec(await f('20261027220000_lead_reply_to_react.sql'))
+  await db.exec(await f('20261027220000_lead_reply_to_react.sql'))
+  await db.exec(await f('20261027220100_lead_reply_to_react_guards.sql'))
+  await as(CS_USER, ALL)
+  const q1 = (await q(`select id from public.lead_messages where external_id = 'ray.1'`))[0].id
+  const r1 = (await q(`select public.lead_reply_to($1, 'Which size?', $2) r`, [ray, q1]))[0].r
+  check(r1.replyToMid, 'ray.1', 'a reply carries the mid of the message it answers')
+  const t3 = (await q(`select public.lead_thread($1) t`, [ray]))[0].t
+  const mine = t3.messages.find(m => m.id === r1.id)
+  check([mine.replyToMid, mine.body, t3.messages.find(m => m.mid === 'ray.1')?.body], ['ray.1', 'Which size?', 'mattress'], 'the chat hands the quote and each message’s mid')
+  await refuses(`select public.lead_reply_to($1, 'x', $2)`, [c, q1], /not in this conversation/, 'a message of another conversation cannot be answered')
+  // The customer quotes the Page's answer back (Meta's reply_to on his message).
+  await q(`select public.lead_ingest_messenger($1::jsonb)`, [JSON.stringify([
+    { externalId: 'ray.4', pageId: P, psid: '7700901', name: 'Ray Test', kind: 'text', body: 'Queen', replyToMid: 'ray.p', sentAt: new Date().toISOString(), ad: null },
+  ])])
+  check((await q(`select reply_to_mid from public.lead_messages where external_id = 'ray.4'`))[0].reply_to_mid, 'ray.p', 'a customer’s quoted reply keeps what it quotes')
+  const q4 = (await q(`select id from public.lead_messages where external_id = 'ray.4'`))[0].id
+  const re = (await q(`select public.lead_react($1, '👍') r`, [q4]))[0].r
+  check([re.mid, re.psid, re.before], ['ray.4', '7700901', null], 'reacting hands back where it goes')
+  await q(`select public.lead_react($1, '❤️')`, [q4])
+  check((await q(`select reaction from public.lead_messages where id = $1`, [q4]))[0].reaction, '❤️', 'reacting again replaces it')
+  await q(`select public.lead_react($1, null)`, [q4])
+  check((await q(`select reaction from public.lead_messages where id = $1`, [q4]))[0].reaction, null, 'and null takes it away')
+  await refuses(`select public.lead_react($1, '👍')`, [r1.id], /Only a customer/, 'only a customer’s message is reacted to')
+  await as(CS_USER, ['leads.view'])
+  await refuses(`select public.lead_react($1, '👍')`, [q4], /Lead View · Create/, 'reacting needs Create')
+  await as(CS_USER, ALL)
+  for (const fn of ['lead_reply_to', 'lead_react']) {
+    check((await q(`select prosrc from pg_proc where proname = $1`, [fn]))[0].prosrc.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.create']);`), true, `${fn} asks the Inbox`)
+  }
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

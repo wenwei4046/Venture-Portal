@@ -4,7 +4,8 @@
 // this adds Lead View's rules: Meta's window (24 hours; Human Agent waits for App Review), a template's buttons, and the
 // answer the database keeps — Meta's id, or why it was not sent. Every token stays on the server.
 
-import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from '@/lib/messenger/send'
+import { messengerError, messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from '@/lib/messenger/send'
+import { GRAPH_VERSION } from '@/lib/whatsapp/send'
 
 export interface Outgoing {
   pageId: string | null
@@ -14,6 +15,8 @@ export interface Outgoing {
   buttons?: string[] | null
   /** When the customer last wrote — Meta's window runs from it. */
   lastInAt: string | null
+  /** Meta's id of the message this reply answers (mig 20261027220000); Meta quotes it above the reply. */
+  replyToMid?: string | null
 }
 
 export type Delivered = { mid: string } | { error: string }
@@ -39,8 +42,34 @@ export async function deliver(o: Outgoing, systemToken: string | undefined, now:
   if (!systemToken) return { error: NOT_CONNECTED }
   const token = await pageToken(o.pageId, systemToken, fetchImpl)
   if (!token) return { error: NO_PAGE_TOKEN }
-  const r = await sendMessengerText({ pageId: o.pageId, psid: o.psid, body: o.body, token, window, message: messageOf(o.body, o.buttons) }, fetchImpl)
+  const r = await sendMessengerText({ pageId: o.pageId, psid: o.psid, body: o.body, token, window, message: messageOf(o.body, o.buttons), replyToMid: o.replyToMid }, fetchImpl)
   return r.ok ? { mid: r.mid } : { error: r.error }
+}
+
+/**
+ * The Page's emoji on a customer's message (mig 20261027220000): Meta's sender action `react` (one emoji; reacting
+ * again replaces it) or `unreact` (emoji null). Null when Meta took it, else why not — never throws.
+ */
+export async function sendReaction(
+  o: { pageId: string | null; psid: string; mid: string }, emoji: string | null, systemToken: string | undefined, fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  if (!o.pageId) return NO_PAGE
+  if (!systemToken) return NOT_CONNECTED
+  const token = await pageToken(o.pageId, systemToken, fetchImpl)
+  if (!token) return NO_PAGE_TOKEN
+  const body = emoji
+    ? { recipient: { id: o.psid }, sender_action: 'react', payload: { message_id: o.mid, reaction: emoji } }
+    : { recipient: { id: o.psid }, sender_action: 'unreact', payload: { message_id: o.mid } }
+  let res: Response
+  try {
+    res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(o.pageId)}/messages`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    })
+  } catch {
+    return 'Could not reach Messenger. Try again.'
+  }
+  if (res.ok) return null
+  return messengerError(res.status, await res.json().catch(() => null))
 }
 
 /** Messenger takes an attachment up to 25 MB. */

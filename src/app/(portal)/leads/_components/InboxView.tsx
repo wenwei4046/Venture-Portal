@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { assignLead, draftLeadReply, leadAgents, leadMediaLinks, quickReplyUsed, readThread, replyToLead, sendLeadMedia, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
+import { assignLead, draftLeadReply, leadAgents, leadMediaLinks, quickReplyUsed, reactToMessage, readThread, replyToLead, replyToMessage, sendLeadMedia, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
 import { FILE_LIMIT, TOO_BIG } from '@/lib/leads/messenger'
 import { createClient } from '@/lib/supabase/client'
 import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
@@ -368,6 +368,19 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
   const [used, setUsed] = useState<DraftForInbox | null>(null)
   const [drafting, startDrafting] = useTransition()
   const [whoOpen, setWhoOpen] = useState(false)
+  // Answering one message, and the Page's emoji on a customer's message (mig 20261027220000).
+  const [replyingTo, setReplyingTo] = useState<LeadMessage | null>(null)
+  const [reacting, setReacting] = useState<number | null>(null)
+  const byMid = useMemo(() => new Map((thread?.messages ?? []).filter(m => m.mid).map(m => [m.mid!, m])), [thread])
+  const react = (m: LeadMessage, emoji: string | null) => {
+    setReacting(null)
+    setError(null)
+    startSending(async () => {
+      const r = await reactToMessage(m.id, emoji)
+      if (!r.ok) { setError(r.reason); return }
+      onSent()
+    })
+  }
   const end = useRef<HTMLDivElement>(null)
   const count = thread?.messages.length ?? 0
   // Photos and files (mig 20261027140000): picked from the camera (photos, videos) or the paperclip (anything), put in
@@ -394,10 +407,11 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
     if (!body || sending || botOn) return
     setError(null)
     startSending(async () => {
-      const r = await replyToLead(contact.id, body)
+      const r = replyingTo ? await replyToMessage(contact.id, body, replyingTo.id) : await replyToLead(contact.id, body)
       if (!r.ok) { setError(r.reason); return }
       if (used) void setDraftOutcome(used.id, outcomeOf(used.reply, body), body)
       setUsed(null)
+      setReplyingTo(null)
       setText('')
       onSent()
       // Saved, but Messenger did not take it (the window, the connection): say why — the message shows "not sent".
@@ -515,8 +529,33 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
             <div key={m.id} className={s.msg} data-out={m.direction === 'out' || undefined}>
               {newDay ? <div className={s.day} style={{ alignSelf: 'stretch' }}>{day}</div> : null}
               {m.direction === 'out' ? <MessageLabel m={m} /> : null}
+              {m.replyToMid ? <Quote m={byMid.get(m.replyToMid) ?? null} /> : null}
               {m.mediaPath || m.mediaUrl ? <MessageMedia m={m} link={m.mediaPath ? links[m.mediaPath] : m.mediaUrl ?? undefined} /> : null}
-              {(m.mediaPath || m.mediaUrl) && isMediaPlaceholder(m.body) ? null : <div className={s.bubble}>{m.body}</div>}
+              <div className={s.bubbleRow}>
+                {(m.mediaPath || m.mediaUrl) && isMediaPlaceholder(m.body) ? null : <div className={s.bubble}>{m.body}</div>}
+                {canReply && m.mid && !contact.isTest ? (
+                  <span className={s.msgActions}>
+                    {m.direction === 'in' ? (
+                      <span className={s.nowWrap}>
+                        <button type="button" className={s.msgAction} title="React" aria-label="React" onClick={() => setReacting(r => (r === m.id ? null : m.id))} disabled={sending}><LeadIcon name="smile" size={15} /></button>
+                        {reacting === m.id ? (
+                          <>
+                            <div className={s.scrim} onClick={() => setReacting(null)} aria-hidden="true" />
+                            <div className={s.reactMenu} role="menu" aria-label="React">
+                              {QUICK_REACTIONS.map(e => (
+                                <button key={e} type="button" className={s.emojiBtn} aria-pressed={m.reaction === e} onClick={() => react(m, m.reaction === e ? null : e)}>{e}</button>
+                              ))}
+                              {m.reaction ? <button type="button" className={s.textLink} style={{ fontSize: 12, padding: '0 4px' }} onClick={() => react(m, null)}>Remove</button> : null}
+                            </div>
+                          </>
+                        ) : null}
+                      </span>
+                    ) : null}
+                    <button type="button" className={s.msgAction} title="Reply" aria-label="Reply" onClick={() => { setReplyingTo(m); replyBox.current?.focus() }}><LeadIcon name="reply" size={15} /></button>
+                  </span>
+                ) : null}
+              </div>
+              {m.reaction ? <span className={s.reaction} title="The Page's reaction">{m.reaction}</span> : null}
               {m.buttons?.length ? (
                 <div className={s.buttons}>{m.buttons.map(b => <span key={b} className={s.button}>{b}</span>)}</div>
               ) : null}
@@ -531,6 +570,15 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
       {canReply ? (
         <div className={s.composeArea}>
           {error ? <div className={s.error} role="alert">{error}</div> : null}
+          {replyingTo ? (
+            <div className={s.replyBar}>
+              <span className={s.replyBarText}>
+                <span className={s.replyBarWho}>Replying to {replyingTo.direction === 'in' ? (contact.name || 'the customer') : 'the Page'}</span>
+                <span className={s.ellipsis}>{replyingTo.body}</span>
+              </span>
+              <button type="button" className={s.iconBtn} onClick={() => setReplyingTo(null)} aria-label="Cancel the reply">×</button>
+            </div>
+          ) : null}
           {draft ? (
             <div className={s.draft}>
               <div className={s.draftHead}>
@@ -677,6 +725,19 @@ function MessageLabel({ m }: { m: LeadMessage }) {
 function metaOf(m: LeadMessage): string {
   if (m.direction === 'in' || m.delivery === 'sent') return timeOf(m.at)
   return [timeOf(m.at), m.delivery === 'recorded' ? 'recorded' : 'not sent'].join(' · ')
+}
+
+/** Quick reactions, as Messenger's row; the Page's emoji on a customer's message (mig 20261027220000). */
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏']
+
+/** The message a reply answers, quoted above it as Messenger does (only one Lead View has is drawn in full). */
+function Quote({ m }: { m: LeadMessage | null }) {
+  return (
+    <div className={s.quote}>
+      <span className={s.quoteWho}>↩ {m ? (m.direction === 'in' ? 'Customer' : 'Page') : 'Replied to a message'}</span>
+      {m ? <span className={s.quoteText}>{m.body}</span> : null}
+    </div>
+  )
 }
 
 /** WhatsApp's ticks (mig 20261027190000): ✓ sent, ✓✓ delivered, blue ✓✓ read — from Meta's receipts. */
