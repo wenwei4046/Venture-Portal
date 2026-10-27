@@ -3884,6 +3884,7 @@ export type Database = {
           lock_in_months: number | null
           maturity_date: string | null
           min_pay_interest: boolean
+          principal_per_month: number | null
           notes: string | null
           penalty_on_early: number | null
           repaid_at: string | null
@@ -3915,6 +3916,7 @@ export type Database = {
           lock_in_months?: number | null
           maturity_date?: string | null
           min_pay_interest?: boolean
+          principal_per_month?: number | null
           notes?: string | null
           penalty_on_early?: number | null
           repaid_at?: string | null
@@ -3946,6 +3948,7 @@ export type Database = {
           lock_in_months?: number | null
           maturity_date?: string | null
           min_pay_interest?: boolean
+          principal_per_month?: number | null
           notes?: string | null
           penalty_on_early?: number | null
           repaid_at?: string | null
@@ -5114,6 +5117,7 @@ export type Database = {
           effective_rate: number
           id: string
           min_pay_interest: boolean
+          principal_per_month: number | null
           principal: number
           repayment_start_month: string | null
           repayment_start_date: string | null
@@ -5137,6 +5141,7 @@ export type Database = {
           effective_rate: number
           id?: string
           min_pay_interest?: boolean
+          principal_per_month?: number | null
           principal: number
           repayment_start_month?: string | null
           repayment_start_date?: string | null
@@ -5160,6 +5165,7 @@ export type Database = {
           effective_rate?: number
           id?: string
           min_pay_interest?: boolean
+          principal_per_month?: number | null
           principal?: number
           repayment_start_month?: string | null
           repayment_start_date?: string | null
@@ -8480,6 +8486,7 @@ export type Database = {
           p_interest_on_original?: boolean
           p_interest_keeps_base?: boolean
           p_no_fixed_term?: boolean
+          p_principal_per_month?: number | null
           p_reason: string | null
           p_remaining_months: number | null
         }
@@ -8494,6 +8501,7 @@ export type Database = {
           p_interest_on_original?: boolean
           p_interest_keeps_base?: boolean
           p_no_fixed_term?: boolean
+          p_principal_per_month?: number | null
           p_reason: string | null
           p_remaining_months: number | null
         }

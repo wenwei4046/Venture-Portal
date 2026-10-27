@@ -11,11 +11,11 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { officeMonth, officeToday } from '@/lib/office-time'
 import type { FundSourceType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
-import { buildTermsSegments, currentSegment, principalPaidSince, segmentRemainingPeriods, termsChanged } from '@/lib/treasury-terms'
+import { buildTermsSegments, currentSegment, principalDueIn, principalPaidSince, segmentRemainingPeriods, segmentsGovern, termsChanged } from '@/lib/treasury-terms'
 import { fetchTermsHistory, termsForFundSource } from '@/lib/treasury-terms-data'
 import { remainingPeriods } from '@/lib/loan-monitor'
 import { loadNewSourceOptions, type NewSourceOptions } from './_lib/new-source-options'
-import { compoundSent, explainAmendRefusal } from '@/lib/fund-amend'
+import { amendMonthWords, compoundSent, explainAmendRefusal, openFromSent, principalPerMonthSent } from '@/lib/fund-amend'
 import { sourceEditPatch } from '@/lib/fund-source-edit'
 
 // ─── Amend an ACTIVE fund source: the terms in force recalculated ─────────────
@@ -59,8 +59,13 @@ async function fileWholeFundSource(formData: FormData): Promise<{ error: string 
     }
   }
   const compound = compoundSent(formData)
-  if (rate === null && periods === null && !noFixedTerm && compound === null) {
-    return { error: 'Nothing was changed — change the rate, the periods or compounding first.' }
+  // A fixed amount a month (2026-10-27), and the month the fixed term ends.
+  const ppm = principalPerMonthSent(formData)
+  if (!ppm.ok) return { error: ppm.error }
+  if (ppm.value !== null && (periods !== null || noFixedTerm)) return { error: 'Choose a fixed amount a month, a number of months or no fixed term — one of them.' }
+  const openFrom = openFromSent(formData)
+  if (rate === null && periods === null && !noFixedTerm && compound === null && ppm.value === null && !openFrom) {
+    return { error: 'Nothing was changed — change the rate, the repayment or compounding first.' }
   }
   const reason = ((formData.get('reason') as string) ?? '').trim()
 
@@ -75,6 +80,8 @@ async function fileWholeFundSource(formData: FormData): Promise<{ error: string 
     p_no_fixed_term: noFixedTerm,
     p_reason: reason || null,
     p_whole: true,
+    p_principal_per_month: ppm.value,
+    p_open_from: openFrom ? `${openFrom}-01` : null,
   } as never)
   if (error) return { error: `Not submitted: ${error.message}` }
   revalidatePath(`/fund-in/${id}`)
@@ -116,11 +123,35 @@ async function amendFundSourceWork(formData: FormData): Promise<{ error: string 
       payload.lock_in_months = n
     }
   }
+  // A fixed amount a month (2026-10-27): its months are worked out from what the terms began on.
+  const ppm = principalPerMonthSent(formData)
+  if (!ppm.ok) return { error: ppm.error }
+  if (ppm.value !== null) {
+    if ('lock_in_months' in payload) return { error: 'Choose a fixed amount a month, a number of months or no fixed term — one of them.' }
+    payload.principal_per_month = ppm.value
+  }
   if (repaymentDate) payload.repayment_date = repaymentDate
   if (notes.trim()) payload.notes = notes.trim()
 
   const { error } = await supabase.rpc('amend_fund_source', { p_fund_source_id: id, p_payload: payload })
   if (error) return { error: `Not saved: ${error.message}` }
+  // No fixed term from a later month: the terms just saved end their fixed term there, the interest kept on the same amount.
+  const openFrom = openFromSent(formData)
+  if (openFrom) {
+    const { error: openErr } = await supabase.rpc('amend_fund_source_from', {
+      p_fund_source_id: id,
+      p_effective_from: `${openFrom}-01`,
+      p_cost_rate: null,
+      p_remaining_months: null,
+      p_compound_interest: null,
+      p_reason: ((formData.get('reason') as string) ?? '').trim() || null,
+      p_no_fixed_term: true,
+      p_interest_keeps_base: true,
+    })
+    if (openErr) {
+      return { error: `The terms were saved, but their fixed term was not ended from ${amendMonthWords(openFrom)}: ${explainAmendRefusal(openErr.message) ?? openErr.message}` }
+    }
+  }
 
   revalidatePath(`/fund-in/${id}`)
   revalidatePath('/fund-in')
@@ -169,6 +200,13 @@ async function amendFundSourceFromWork(formData: FormData, direct = true): Promi
   const interestOnOriginal = formData.get('interest_on_original') === 'on'
   const interestKeepsBase = formData.get('interest_keeps_base') === 'on'
   if (interestOnOriginal && interestKeepsBase) return { error: 'Choose one amount for the interest to be charged on.' }
+  // A fixed amount a month (2026-10-27), and the month the fixed term ends.
+  const ppm = principalPerMonthSent(formData)
+  if (!ppm.ok) return { error: ppm.error }
+  if (ppm.value !== null && (noFixedTerm || remaining !== null)) return { error: 'Choose a fixed amount a month, a number of months or no fixed term — one of them.' }
+  const openFrom = openFromSent(formData)
+  if (openFrom && noFixedTerm) return { error: 'With no fixed term there is no fixed term to end later.' }
+  if (openFrom && openFrom <= fromYM) return { error: `No fixed term from has to come after ${amendMonthWords(fromYM)}, when the new terms start.` }
 
   if (!direct) {
     const { error: fileErr } = await supabase.rpc('file_terms_change' as never, {
@@ -182,6 +220,8 @@ async function amendFundSourceFromWork(formData: FormData, direct = true): Promi
       p_interest_on_original: interestOnOriginal,
       p_interest_keeps_base: interestKeepsBase,
       p_reason: reason || null,
+      p_principal_per_month: ppm.value,
+      p_open_from: openFrom ? `${openFrom}-01` : null,
     } as never)
     if (fileErr) return { error: `Not submitted: ${explainAmendRefusal(fileErr.message) ?? fileErr.message}` }
     revalidatePath(`/fund-in/${id}`)
@@ -203,8 +243,25 @@ async function amendFundSourceFromWork(formData: FormData, direct = true): Promi
     p_no_fixed_term: noFixedTerm,
     p_interest_on_original: interestOnOriginal,
     p_interest_keeps_base: interestKeepsBase,
+    p_principal_per_month: ppm.value,
   })
   if (error) return { error: `Not saved: ${explainAmendRefusal(error.message) ?? error.message}` }
+  // No fixed term from a later month: the terms just applied end their fixed term there, the interest kept on the same amount.
+  if (openFrom) {
+    const { error: openErr } = await supabase.rpc('amend_fund_source_from', {
+      p_fund_source_id: id,
+      p_effective_from: `${openFrom}-01`,
+      p_cost_rate: null,
+      p_remaining_months: null,
+      p_compound_interest: null,
+      p_reason: reason || null,
+      p_no_fixed_term: true,
+      p_interest_keeps_base: true,
+    })
+    if (openErr) {
+      return { error: `The new terms were applied, but their fixed term was not ended from ${amendMonthWords(openFrom)}: ${explainAmendRefusal(openErr.message) ?? openErr.message}` }
+    }
+  }
 
   revalidatePath(`/fund-in/${id}`)
   revalidatePath('/fund-in')
@@ -371,6 +428,17 @@ async function createFundSourceInner(formData: FormData, userId: string): Promis
   if (isNaN(raw.cost_rate_percent) || raw.cost_rate_percent < 0 || raw.cost_rate_percent >= 100) {
     throw new Error('Interest rate must be between 0 and 100%')
   }
+  // Repayment type "A fixed amount a month" (2026-10-27): its periods are what clears the amount at it, the last
+  // month taking what is left — no more than the 120 a number of months may be.
+  const ppm = principalPerMonthSent(formData)
+  if (!ppm.ok) throw new Error(ppm.error)
+  if (ppm.value !== null) {
+    const months = Math.max(1, Math.ceil(raw.amount / ppm.value - 1e-9))
+    if (months > 120) {
+      throw new Error(`At RM ${ppm.value.toLocaleString('en-MY', { minimumFractionDigits: 2 })} a month the amount takes ${months} months — the most is 120.`)
+    }
+    raw.lock_in_months = months
+  }
   // Repayment period is OPTIONAL (2026-06-12): blank = 无固定期限. Interest
   // still accrues from the effective date; the deposit lands in the schedule's
   // "Compounding & no fixed term" tab until terms are set via the edit form.
@@ -435,6 +503,7 @@ async function createFundSourceInner(formData: FormData, userId: string): Promis
     min_pay_interest: minPayInterest,
     // Blank → null (无固定期限). NaN (blank number) is falsy → null.
     lock_in_months: !isNaN(raw.lock_in_months) && raw.lock_in_months >= 1 ? raw.lock_in_months : null,
+    principal_per_month: ppm.value,
     effective_date: raw.effective_date,
     repayment_date: raw.repayment_date || null,
     // Its month is also the schedule's first installment month (2026-09-22:
@@ -929,7 +998,7 @@ export async function listPayableFundSources(
     supabase
       .from('fund_source_outstanding')
       .select('fund_source_id, source_type, from_company_id, from_director_id, from_department_id, original_amount, cost_rate, lock_in_months, outstanding, monthly_payment, total_principal_paid'),
-    supabase.from('fund_sources').select('id, status, from_freetext_name, account_code, effective_date, repayment_start_month, compound_interest, terms_effective_from'),
+    supabase.from('fund_sources').select('id, status, from_freetext_name, account_code, effective_date, repayment_start_month, compound_interest, terms_effective_from, principal_per_month'),
     supabase.from('companies').select('id, name, short_code'),
     // is_internal=false — the 'Venture Office' pseudo-dept is not a fund source.
     supabase.from('departments').select('id, name').eq('is_internal', false),
@@ -947,9 +1016,10 @@ export async function listPayableFundSources(
   // The GL account the source is owed on (4054 / 4058 …) — the repayment PV
   // form defaults its principal row to it (lib/repayment-source-rows).
   const accountMap = new Map((sources ?? []).map((s) => [s.id, (s as { account_code: string | null }).account_code ?? null]))
-  const sourceById = new Map((sources ?? []).map((s) => [s.id, s as unknown as { effective_date: string | null; repayment_start_month: string | null; compound_interest: boolean | null; terms_effective_from: string | null }]))
+  const sourceById = new Map((sources ?? []).map((s) => [s.id, s as unknown as { effective_date: string | null; repayment_start_month: string | null; compound_interest: boolean | null; terms_effective_from: string | null; principal_per_month: number | string | null }]))
   // Terms that changed mid-life (2026-09-21): the monthly figures come from
-  // the segment in force now, not the day-one terms.
+  // the segment in force now, not the day-one terms — as they do for a fixed
+  // amount a month (2026-10-27), whose principal the view's equal parts miss.
   const history = await fetchTermsHistory(supabase, 'fund_source', (sources ?? []).map((s) => s.id))
   const principalByMonth = new Map<string, Record<string, number>>()
   for (const r of repayments ?? []) {
@@ -1007,19 +1077,20 @@ export async function listPayableFundSources(
       const meta = sourceById.get(o.fund_source_id)
       if (meta) {
         const segs = buildTermsSegments(
-          termsForFundSource({ amount, cost_rate: o.cost_rate ?? 0, lock_in_months: o.lock_in_months, compound_interest: meta.compound_interest, effective_date: meta.effective_date, repayment_start_month: meta.repayment_start_month, terms_effective_from: meta.terms_effective_from }, history.get(o.fund_source_id) ?? []),
+          termsForFundSource({ amount, cost_rate: o.cost_rate ?? 0, lock_in_months: o.lock_in_months, compound_interest: meta.compound_interest, effective_date: meta.effective_date, repayment_start_month: meta.repayment_start_month, terms_effective_from: meta.terms_effective_from, principal_per_month: meta.principal_per_month }, history.get(o.fund_source_id) ?? []),
           principalByMonth.get(o.fund_source_id) ?? {},
         )
-        if (termsChanged(segs)) {
+        if (segmentsGovern(segs)) {
           const seg = currentSegment(segs, officeMonth())
           rate = seg.rate
           months = seg.months ?? months
-          monthlyPrincipal = seg.principalPerMonth
+          // The month's own principal: a fixed amount's last month asks what is left.
+          monthlyPrincipal = principalDueIn(seg, officeMonth())
           monthlyInterest = seg.interestPerMonth
           monthlyPayment = Number((monthlyPrincipal + monthlyInterest).toFixed(2))
           remaining = seg.months ? segmentRemainingPeriods(seg, principalPaidSince(principalByMonth.get(o.fund_source_id) ?? {}, seg.fromYM)) : remaining
           periodsPaid = seg.months ? seg.months - remaining : periodsPaid
-          termsFrom = seg.fromYM
+          termsFrom = termsChanged(segs) ? seg.fromYM : null
         }
       }
 

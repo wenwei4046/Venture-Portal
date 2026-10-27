@@ -24,6 +24,7 @@ import {
   planTotals,
   principalPaidSince,
   segmentRemainingPeriods,
+  segmentsGovern,
   termsChanged,
   type TermsChangeComparison,
   type TermsSegment,
@@ -123,8 +124,9 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
   // Terms changed mid-life (2026-09-21): every figure below reads the segment
   // in force now — base, rate, per-month amounts, remaining count — and the
   // row carries the change comparisons for the statement to show.
+  // A fixed amount a month (2026-10-27) splits the principal its own way, so its segment gives the figures as well.
   const changed = !!p.segments && termsChanged(p.segments)
-  const seg = changed ? currentSegment(p.segments!, currentYM) : null
+  const seg = p.segments && segmentsGovern(p.segments) ? currentSegment(p.segments, currentYM) : null
   const monthlyRate = seg ? seg.rate : p.monthlyRate
   const monthlyInterest = seg ? seg.interestPerMonth : r2(p.principal * p.monthlyRate)
   // The term and Total Interest read the whole plan (2026-10-23 — HC's Conts 60k: 6mo, 2,100 + 5 × 1,800);
@@ -144,7 +146,7 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
     startDate: p.startDate ?? null,
     minPayInterest: p.minPayInterest === true,
     source: p.source ?? null,
-    ...(seg
+    ...(seg && changed
       ? {
           termsFrom: seg.fromYM,
           termsBase: seg.base,

@@ -52,7 +52,7 @@ export async function fetchCounterpartyStatement(
     supabase
       .from('loans')
       .select(
-        'id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, min_pay_interest, terms_effective_from',
+        'id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, min_pay_interest, terms_effective_from, principal_per_month',
       )
       .eq('status', 'active'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
@@ -67,7 +67,7 @@ export async function fetchCounterpartyStatement(
     supabase
       .from('fund_sources')
       .select(
-        'id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, notes, min_pay_interest, terms_effective_from',
+        'id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, notes, min_pay_interest, terms_effective_from, principal_per_month',
       )
       .in('status', ['active', 'matured']),
     supabase.from('fund_source_outstanding').select('fund_source_id, outstanding, total_principal_paid'),

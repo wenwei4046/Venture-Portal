@@ -1,0 +1,192 @@
+/* Record fund in / Create fund out on a desktop (2026-10-27 — the user's mockup fund-forms-desktop-mockup.html: "照这个
+   样稿做：分块 OK，Record fund in / Create fund out 用加宽的弹出窗口"): the form's parts each a white card on the window's
+   cream — numbered, a title and a line under it — and beside them what the deal adds up to: its summary and the
+   schedule its terms make. The phone's sheet keeps its own form. The kit's tokens only (finv.module.css). */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 899px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+}
+.parts { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* A part: its card, its number, its title and line. */
+.part {
+  background: var(--ds-surface);
+  border: 1px solid var(--ds-border);
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+}
+.head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+.no {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: rgb(var(--fv-peach));
+  color: var(--ds-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.title { font-size: 14px; font-weight: 600; color: rgb(var(--hvs-ink)); display: flex; align-items: center; gap: 8px; }
+.note { margin-top: 1px; font-size: 12px; color: rgb(var(--hvs-muted)); }
+.tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--ds-accent);
+  color: var(--ds-ink);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* Fields side by side, and three of them. */
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.pair + .pair { margin-top: 12px; }
+.pair > *,
+.trio > * { min-width: 0; }
+
+/* A figure the form works out, in a field's place. */
+.fixed {
+  box-sizing: border-box;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
+  background: rgb(var(--hvs-nav));
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 14px;
+  color: rgb(var(--hvs-graphite));
+}
+.calc { margin-top: 10px; font-size: 12.5px; color: rgb(var(--hvs-graphite)); }
+.calc b { color: var(--ds-ink); font-weight: 600; }
+
+/* Type, as pills. */
+.pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.pill {
+  height: 32px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  background: var(--ds-surface);
+  font-family: inherit;
+  font-size: 13px;
+  color: rgb(var(--hvs-graphite));
+  cursor: pointer;
+}
+.pill[aria-checked='true'] { border-color: var(--ds-accent); background: rgb(var(--fv-peach)); color: var(--ds-ink); font-weight: 500; }
+
+/* The switches, each a card with its line. */
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.check {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: rgb(var(--hvs-ink));
+  cursor: pointer;
+}
+.check input { flex: none; width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--ds-accent); cursor: pointer; }
+.checkNote { display: block; margin-top: 2px; font-size: 12px; color: rgb(var(--hvs-muted)); }
+
+/* Repayment type: three cards, the chosen one opens its boxes. */
+.typeLabel { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 12px; font-weight: 500; color: var(--ds-ink-2); }
+.type { margin-top: 8px; border: 1px solid var(--ds-border); border-radius: 10px; background: var(--ds-surface); }
+.type[data-on='true'] { border-color: var(--ds-accent); }
+.type[data-off='true'] { opacity: 0.55; }
+.typeHead {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: rgb(var(--hvs-ink));
+  cursor: pointer;
+}
+.type[data-on='true'] .typeHead { background: rgb(var(--fv-peach)); border-radius: 10px 10px 0 0; }
+.typeHead input { flex: none; width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--ds-accent); cursor: pointer; }
+.typeNote { display: block; margin-top: 2px; font-size: 12px; color: rgb(var(--hvs-muted)); }
+.typeBody { padding: 12px 14px 14px 37px; border-top: 1px dashed var(--ds-border); }
+.narrow { max-width: 256px; }
+.worked { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: rgb(var(--hvs-graphite)); }
+.worked b { color: var(--ds-ink); font-weight: 600; }
+.worked[data-wait='true'] { font-style: italic; color: rgb(var(--hvs-muted)); }
+.pick { margin: 8px 0 0; font-size: 12px; font-style: italic; color: rgb(var(--hvs-muted)); }
+
+/* Where it is booked, folded to a line until changed. */
+.acct {
+  padding: 11px 14px;
+  border: 1px dashed rgb(var(--hvs-quiet));
+  border-radius: 10px;
+  background: var(--ds-surface);
+  font-size: 13px;
+  color: rgb(var(--hvs-graphite));
+}
+.acct b { color: rgb(var(--hvs-ink)); font-weight: 500; }
+.link {
+  margin: 0 0 0 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ds-ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Beside the parts: the summary and the schedule. */
+.side { position: sticky; top: 0; }
+.sum { background: var(--ds-surface); border: 1px solid var(--ds-border); border-radius: 12px; overflow: hidden; }
+.sumHead { padding: 12px 14px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgb(var(--hvs-muted)); }
+.sumRow { display: flex; justify-content: space-between; gap: 12px; padding: 7px 14px; border-top: 1px solid var(--ds-border); font-size: 12.5px; }
+.sumKey { flex: none; color: rgb(var(--hvs-muted)); }
+.sumVal { min-width: 0; text-align: right; color: rgb(var(--hvs-ink)); }
+.sumVal[data-mono='true'] { font-family: var(--font-mono), 'Chivo Mono', monospace; }
+.todo { font-style: italic; color: var(--ds-warning); }
+.sched { padding: 0 14px 12px; border-top: 1px solid var(--ds-border); }
+.sched .sumHead { padding: 12px 0 4px; }
+.table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.table th {
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--ds-border);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: right;
+  color: rgb(var(--hvs-muted));
+}
+.table th:first-child { text-align: left; }
+.table td {
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--ds-border);
+  vertical-align: top;
+  text-align: right;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  white-space: nowrap;
+}
+.table td:first-child { text-align: left; font-family: inherit; white-space: normal; }
+.table tr[data-last='true'] td { background: rgb(var(--fv-peach)); }
+.schedNote { margin-top: 8px; font-size: 12px; color: rgb(var(--hvs-graphite)); }
+.empty { margin: 4px 0 2px; font-size: 12.5px; font-style: italic; color: rgb(var(--hvs-muted)); }
+.sumFoot { padding: 10px 14px; border-top: 1px solid var(--ds-border); background: rgb(var(--fv-peach)); font-size: 12px; color: rgb(var(--hvs-graphite)); }
+
+/* The foot's line beside the buttons: what is still needed, or that it is ready. */
+.footNote { margin-right: auto; align-self: center; font-size: 12px; color: rgb(var(--hvs-muted)); }
+.footNote[data-need='true'] { color: var(--ds-danger); }

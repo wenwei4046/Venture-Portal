@@ -14,6 +14,11 @@
 
 export type DealSide = 'out' | 'in'
 export type AmendMode = 'from' | 'whole'
+/**
+ * How the principal is repaid (2026-10-27, Repayment type — the mockups principal-input-mockup.html and
+ * fund-forms-desktop-mockup.html, "照这个样稿做"): a fixed amount a month, over a number of months, or none.
+ */
+export type RepaymentChoice = 'amount' | 'months' | 'none'
 
 /** A deal's terms as its edit page starts the form. */
 export interface AmendTerms {
@@ -51,6 +56,15 @@ export interface AmendDraft {
   compound: boolean
   reason: string
   text: string
+  /**
+   * The desktop form's Repayment type (2026-10-27). Left out — the Finance phone app's sheet, or nothing chosen — the
+   * months and no-fixed-term fields above say it, as they always did; chosen, it decides what is sent.
+   */
+  repayment?: RepaymentChoice | null
+  /** A fixed principal a month, with `repayment` 'amount'. */
+  principalPerMonth?: string
+  /** `YYYY-MM`: no fixed term from then on, the interest kept on the same amount — with an amount or months; '' none. */
+  openFrom?: string
 }
 
 const NAMES = {
@@ -94,19 +108,57 @@ export function amendFormData(side: DealSide, id: string, was: AmendTerms, d: Am
   if (d.compound !== was.compound) fd.set('compound_interest', d.compound ? 'on' : 'off')
   if (d.mode === 'from') {
     fd.set('effective_from', d.effectiveFrom)
-    if (d.noFixedTerm) fd.set('no_fixed_term', 'on')
+    if (d.repayment) repaymentSent(fd, d, 'remaining_months')
+    else if (d.noFixedTerm) fd.set('no_fixed_term', 'on')
     else if (d.remaining.trim()) fd.set('remaining_months', d.remaining.trim())
     if (d.interestOnOriginal) fd.set('interest_on_original', 'on')
     else if (d.interestKeepsBase) fd.set('interest_keeps_base', 'on')
     if (d.reason.trim()) fd.set('reason', d.reason.trim())
     return fd
   }
-  if (d.months.trim() !== was.months.trim()) fd.set(n.months, d.months.trim())
+  if (d.repayment) repaymentSent(fd, d, n.months)
+  else if (d.months.trim() !== was.months.trim()) fd.set(n.months, d.months.trim())
   if (d.start !== was.start) fd.set(n.start, d.start)
   if (d.text.trim() !== was.text.trim()) fd.set(n.text, d.text.trim())
   // A filed whole-terms change says why, as a from-month one does (the Principal's own save has no reason to keep).
   if (d.reason.trim()) fd.set('reason', d.reason.trim())
   return fd
+}
+
+/**
+ * A Repayment type chosen, as the actions read it: no fixed term (a later month's switch, or a whole-terms periods
+ * sent blank), the months (`monthsName` — a later month's months left, a whole-terms periods / tenure — sent even when
+ * unchanged, so an amount a month gives way to them), or the amount a month; with either of the last two, the month the
+ * fixed term ends.
+ */
+function repaymentSent(fd: FormData, d: AmendDraft, monthsName: string): void {
+  if (d.repayment === 'none') {
+    if (monthsName === 'remaining_months') fd.set('no_fixed_term', 'on')
+    else fd.set(monthsName, '')
+    return
+  }
+  if (d.repayment === 'months') {
+    const months = (monthsName === 'remaining_months' ? d.remaining : d.months).trim()
+    if (months) fd.set(monthsName, months)
+  } else if (d.repayment === 'amount' && (d.principalPerMonth ?? '').trim()) {
+    fd.set('principal_per_month', (d.principalPerMonth ?? '').replace(/[,\s]/g, ''))
+  }
+  if ((d.openFrom ?? '').trim()) fd.set('open_from', (d.openFrom ?? '').trim())
+}
+
+/** The amount a month an action was sent: none, a figure above 0, or a refusal in words. */
+export function principalPerMonthSent(fd: FormData): { ok: true; value: number | null } | { ok: false; error: string } {
+  const raw = ((fd.get('principal_per_month') as string | null) ?? '').replace(/[,\s]/g, '')
+  if (raw === '') return { ok: true, value: null }
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) return { ok: false, error: 'The principal a month is an amount above 0.' }
+  return { ok: true, value: Math.round(n * 100) / 100 }
+}
+
+/** The month the fixed term ends an action was sent (`YYYY-MM`), or null. */
+export function openFromSent(fd: FormData): string | null {
+  const raw = ((fd.get('open_from') as string | null) ?? '').trim()
+  return /^\d{4}-\d{2}$/.test(raw) ? raw : null
 }
 
 /**
@@ -192,12 +244,15 @@ export function draftOfForm(side: DealSide, fd: FormData, mode: AmendMode, was: 
   const n = NAMES[side]
   const s = (k: string) => (fd.get(k) as string | null) ?? ''
   const whole = mode === 'whole'
+  // The Repayment type, when one was chosen; none chosen leaves the principal as it is.
+  const choice = s('repayment_type')
+  const repayment: RepaymentChoice | null = choice === 'amount' || choice === 'months' || choice === 'none' ? choice : null
   return {
     mode,
     effectiveFrom: s('effective_from'),
     ratePct: s(n.rate),
     remaining: s('remaining_months'),
-    noFixedTerm: fd.get('no_fixed_term') === 'on',
+    noFixedTerm: repayment ? repayment === 'none' : fd.get('no_fixed_term') === 'on',
     interestOnOriginal: fd.get('interest_on_original') === 'on',
     interestKeepsBase: fd.get('interest_keeps_base') === 'on',
     // A field the form did not show (a filed whole-terms change leaves the start and the words alone) stays as it was.
@@ -206,6 +261,9 @@ export function draftOfForm(side: DealSide, fd: FormData, mode: AmendMode, was: 
     compound: fd.get('compound_interest') === 'on',
     reason: s('reason'),
     text: whole && fd.has(n.text) ? s(n.text) : was.text,
+    repayment,
+    principalPerMonth: s('principal_per_month'),
+    openFrom: s('open_from'),
   }
 }
 

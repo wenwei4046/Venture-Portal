@@ -12,7 +12,7 @@ import { fetchDeptRegistry } from '@/lib/dept-registry'
 import { paymentPoolOptions, registryPoolOptions } from '@/lib/payment-pools'
 import { INTEREST_EXPENSE_ACCOUNT, PENALTY_EXPENSE_ACCOUNT } from '@/lib/repayment-source-rows'
 import { fullDay, type FullStep } from '@/components/finv/FullParts'
-import { allTermsChanges, buildTermsSegments, currentSegment, installmentsInAll, termsChanged, type TermsChangeComparison, type TermsSegment } from '@/lib/treasury-terms'
+import { allTermsChanges, buildTermsSegments, currentSegment, installmentsInAll, segmentsGovern, type TermsChangeComparison, type TermsSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, paidByMonthByType, principalPaidByMonth, termsForFundSource } from '@/lib/treasury-terms-data'
 import type { AmendTerms } from '@/lib/fund-amend'
 import type { SourceEditFields } from '@/lib/fund-source-edit'
@@ -228,8 +228,9 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
   const totalPrincipalPaid = Number(outstandingRow?.total_principal_paid ?? 0)
   // Monthly interest = the rate on the principal — or, once the terms changed mid-life, the current segment's figure.
   // So is the monthly payment: the view's reads the record's rate and months on the whole amount, which a change
-  // re-bases (HC's Conts 60k from 2026-06: 10,000 + 1,800, not the view's 13,800 on 5 months).
-  const nowSeg = termsChanged(termsSegments) ? currentSegment(termsSegments, officeMonth()) : null
+  // re-bases (HC's Conts 60k from 2026-06: 10,000 + 1,800, not the view's 13,800 on 5 months) — and a fixed amount a
+  // month (2026-10-27) splits the principal its own way.
+  const nowSeg = segmentsGovern(termsSegments) ? currentSegment(termsSegments, officeMonth()) : null
   const monthlyInterest = nowSeg ? nowSeg.interestPerMonth : amount * Number(source.cost_rate)
   const monthlyPayment = nowSeg && nowSeg.months ? Math.round((nowSeg.principalPerMonth + nowSeg.interestPerMonth) * 100) / 100 : Number(outstandingRow?.monthly_payment ?? 0)
   const repaymentsList = repayments ?? []

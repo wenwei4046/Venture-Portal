@@ -92,6 +92,7 @@ export default async function EditFundSourcePage({ params }: Props) {
           id={source.id}
           ratePct={(Number(source.cost_rate) * 100).toString()}
           lockInMonths={(source.lock_in_months ?? '').toString()}
+          principalPerMonth={source.principal_per_month == null ? '' : String(source.principal_per_month)}
           repaymentDate={(source.repayment_date as string | null) ?? (source.effective_date as string)}
           compound={(source as { compound_interest?: boolean }).compound_interest === true}
           notes={source.notes ?? ''}

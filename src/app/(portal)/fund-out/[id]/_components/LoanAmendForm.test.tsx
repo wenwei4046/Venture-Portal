@@ -45,6 +45,9 @@ describe('a loan’s Amend terms', () => {
     fireEvent.click(screen.getByRole('radio', { name: /From the first instalment/ }))
     expect(screen.queryByLabelText('Disbursement date')).toBeNull()
     expect(screen.queryByLabelText('Repayment terms (words)')).toBeNull()
+    // The tenure is the Repayment type's months; a loan's no fixed term is from a later month only.
+    expect(screen.getByRole('radio', { name: /None — no fixed term/ })).toBeDisabled()
+    fireEvent.click(screen.getByRole('radio', { name: /Over a number of months/ }))
     fireEvent.change(screen.getByLabelText('Tenure (months)'), { target: { value: '12' } })
     fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'twelve months agreed' } })
     fireEvent.submit(document.querySelector('form')!)
@@ -58,6 +61,17 @@ describe('a loan’s Amend terms', () => {
     expect(screen.getByLabelText('Disbursement date')).toHaveValue('2026-02-15')
     expect(screen.getByLabelText('Repayment terms (words)')).toHaveValue('EMI · [LO#3] · 资金来源: HC-58k')
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+  })
+
+  it('a later month at a fixed amount a month, its fixed term ended later', async () => {
+    render(<LoanAmendForm {...PROPS} direct={false} nextMonth="2026-06" />)
+    fireEvent.click(screen.getByRole('radio', { name: /A fixed amount a month/ }))
+    fireEvent.change(screen.getByLabelText('Principal a month (RM)'), { target: { value: '10000' } })
+    expect(screen.getByTestId('repayment-worked')).toHaveTextContent('5 × RM 10,000.00, then RM 8,000.00 in Nov 2026 — 6 months to clear RM 58,000.00.')
+    fireEvent.change(screen.getByLabelText(/No fixed term from/), { target: { value: '2026-09' } })
+    fireEvent.submit(document.querySelector('form')!)
+    await waitFor(() => expect(mocks.amendLoanFrom).toHaveBeenCalled())
+    expect(sent(mocks.amendLoanFrom)).toEqual({ loan_id: 'lo-3', effective_from: '2026-06', principal_per_month: '10000', open_from: '2026-09' })
   })
 
   it('a later month starts the month after the first instalment at the earliest', () => {

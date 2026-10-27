@@ -21,7 +21,7 @@ export interface ReceivableLoans {
 
 export async function loadReceivableLoans(supabase: Awaited<ReturnType<typeof createClient>>): Promise<ReceivableLoans> {
   const [{ data: loans }, { data: loanOut }, { data: cos }, { data: banks }, { data: suspenseAccts }, { data: suspenseLines }] = await Promise.all([
-    supabase.from('loans').select('id, company_id, principal, effective_rate, tenure_months, repayment_terms, disbursement_date, compound_interest, repayment_start_month, terms_effective_from').eq('status', 'active'),
+    supabase.from('loans').select('id, company_id, principal, effective_rate, tenure_months, repayment_terms, disbursement_date, compound_interest, repayment_start_month, terms_effective_from, principal_per_month').eq('status', 'active'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, short_code, name'),
     supabase.from('bank_accounts').select('id, bank_name, account_number, current_balance').eq('status', 'active').order('is_primary', { ascending: false }),
