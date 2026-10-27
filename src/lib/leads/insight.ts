@@ -85,15 +85,19 @@ const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct
 const dayLabel = (day: string) => `${Number(day.slice(8))} ${MON[Number(day.slice(5, 7)) - 1]}`
 
 /** ?r= → the office days it covers (today included) and how the page says it. 30 days is the default. */
-export function insightRange(raw: string | undefined, today: string): { key: InsightRange; from: string; to: string; label: string } {
+/**
+ * The period, both days included. `listTo` is the day after `to`: lead_list's end is exclusive, so handing it `to` left
+ * today's conversations out — on Lead View's first live day Insight read 0 (2026-10-27).
+ */
+export function insightRange(raw: string | undefined, today: string): { key: InsightRange; from: string; to: string; listTo: string; label: string } {
   const key: InsightRange = raw === '7' || raw === 'q' ? raw : '30'
   if (key === 'q') {
     const m = Number(today.slice(5, 7))
     const from = `${today.slice(0, 4)}-${String(m - ((m - 1) % 3)).padStart(2, '0')}-01`
-    return { key, from, to: today, label: `${dayLabel(from)} – ${dayLabel(today)} ${today.slice(0, 4)}` }
+    return { key, from, to: today, listTo: addDays(today, 1), label: `${dayLabel(from)} – ${dayLabel(today)} ${today.slice(0, 4)}` }
   }
   const n = key === '7' ? 7 : 30
-  return { key, from: addDays(today, -(n - 1)), to: today, label: `Last ${n} days` }
+  return { key, from: addDays(today, -(n - 1)), to: today, listTo: addDays(today, 1), label: `Last ${n} days` }
 }
 
 const came = (c: LeadContact) => !!c.cameAt || c.shown === 'came'

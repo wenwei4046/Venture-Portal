@@ -30,6 +30,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
       initialQuery={q?.slice(0, 80) ?? ''}
       canReply={canDo(user, 'leads', 'create')}
       canEdit={canDo(user, 'leads', 'edit')}
+      canManage={canDo(user, 'leads', 'manage')}
       csName={user.name || 'Customer Service'}
       // An API key for the AI Agent (never its value) — without one the composer says so.
       aiConnected={!!process.env.ANTHROPIC_API_KEY}

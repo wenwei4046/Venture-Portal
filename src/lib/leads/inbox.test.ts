@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, readPanels, replyingNow, RIGHT_W } from './inbox'
+import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, isMediaPlaceholder, mediaKind, readPanels, replyingNow, RIGHT_W, unreadLabel } from './inbox'
 
 describe('the Inbox columns the browser keeps', () => {
   it('starts at the handoff widths', () => {
@@ -46,5 +46,30 @@ describe('the right-hand panels', () => {
     expect(readPanels('oops')).toEqual({ card: true, log: false })
     expect(readPanels(JSON.stringify({ card: false, log: true }))).toEqual({ card: false, log: true })
     expect(readPanels(JSON.stringify({ card: 'no', log: 1 }))).toEqual({ card: true, log: false })
+  })
+})
+
+describe('unreadLabel', () => {
+  it('writes the number, 99+ past 99, as WhatsApp does', () => {
+    expect(unreadLabel(1)).toBe('1')
+    expect(unreadLabel(99)).toBe('99')
+    expect(unreadLabel(100)).toBe('99+')
+  })
+})
+
+describe('a message’s photo or file, as Messenger shows it', () => {
+  it('knows the kind by the type Lead View sent, else by Meta’s label', () => {
+    expect(mediaKind('image/jpeg', 'look')).toBe('image')
+    expect(mediaKind('application/pdf', '[File] plan.pdf')).toBe('file')
+    expect(mediaKind(null, '[Photo]')).toBe('image')
+    expect(mediaKind(null, '[Video]')).toBe('video')
+    expect(mediaKind(null, '[Voice message]')).toBe('audio')
+    expect(mediaKind(undefined, '[File]')).toBe('file')
+  })
+  it('hides only a label standing for the file, never words written with it', () => {
+    expect(isMediaPlaceholder('[Photo]')).toBe(true)
+    expect(isMediaPlaceholder('[File] floor plan.pdf')).toBe(true)
+    expect(isMediaPlaceholder('Here is the bed [Photo]')).toBe(false)
+    expect(isMediaPlaceholder('Our showroom')).toBe(false)
   })
 })

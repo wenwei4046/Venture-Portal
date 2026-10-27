@@ -83,3 +83,19 @@ export function phoneSteps(stage: PhoneStage): Array<{ label: 'Found' | 'Confirm
 export function isVisitDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
 }
+
+/** The list's unread badge (mig 20261027160000), as WhatsApp writes it: the number, 99+ past 99. */
+export function unreadLabel(n: number): string {
+  return n > 99 ? '99+' : String(n)
+}
+
+/** What a message's file is, to draw it as Messenger does: by its type when Lead View sent it, else by Meta's label. */
+export function mediaKind(mime: string | null | undefined, body: string): 'image' | 'video' | 'audio' | 'file' {
+  if (mime) return mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : mime.startsWith('audio/') ? 'audio' : 'file'
+  return /^\[(Photo|Sticker)\]/.test(body) ? 'image' : body.startsWith('[Video]') ? 'video' : body.startsWith('[Voice message]') ? 'audio' : 'file'
+}
+
+/** Only a label standing for the file ("[Photo]", "[File] plan.pdf") — not shown beside the file itself, as Messenger shows none. */
+export function isMediaPlaceholder(body: string): boolean {
+  return /^\[(Photo|Video|Voice message|Sticker|File)\]( [^\n]*)?$/.test(body.trim())
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adBatches, adLabel, adLinkOf, adsManagerLink, adsRequestUrl, graphRefusal, parseAds } from './ads'
+import { adBatches, askAds, type AskGraph, adLabel, adLinkOf, adsManagerLink, adsRequestUrl, graphRefusal, parseAds } from './ads'
 
 describe('asking Ads Manager', () => {
   it('reads ads in batches of 50, digits only, each once', () => {
@@ -47,5 +47,32 @@ describe('what the screens show', () => {
   it('opens Ads Manager on the ad when its account is known', () => {
     expect(adsManagerLink('1234567', '99999')).toBe('https://adsmanager.facebook.com/adsmanager/manage/ads?act=1234567&selected_ad_ids=99999')
     expect(adsManagerLink('', '99999')).toBe('')
+  })
+})
+
+describe('askAds', () => {
+  // Meta refuses a whole ?ids= batch when one ad is on an account the system user cannot see (2026-10-27: 8 of 9).
+  const seen = new Set(['52648804920808'])
+  const meta = (calls: string[]): AskGraph => async url => {
+    calls.push(url)
+    if (url.includes('?ids=')) return { ok: false, error: { code: 100, error_subcode: 33 } }
+    const id = url.match(/\/(\d+)\?fields/)![1]
+    return seen.has(id) ? { ok: true, json: { name: 'Sofa one price', account_id: '2173506546903527' } } : { ok: false, error: { code: 100, error_subcode: 33 } }
+  }
+  it('asks a refused batch one ad at a time and keeps the ads Meta answers for', async () => {
+    const calls: string[] = []
+    const r = await askAds(['52648804920808', '120254632709340085', '120249937202470254'], meta(calls))
+    expect(r).toMatchObject({ ok: true, refused: 2, ads: [{ adId: '52648804920808', name: 'Sofa one price', accountId: '2173506546903527' }] })
+    expect(calls).toHaveLength(4)
+  })
+  it('says why when Meta answers for none', async () => {
+    const r = await askAds(['120254632709340085'], meta([]))
+    expect(r).toEqual({ ok: false, reason: expect.stringContaining('give the system user the ad accounts') })
+  })
+  it('stops at once on an expired token', async () => {
+    const calls: string[] = []
+    const r = await askAds(['1200000001', '1200000002'], async u => { calls.push(u); return { ok: false, error: { code: 190 } } })
+    expect(r).toEqual({ ok: false, reason: expect.stringContaining('expired') })
+    expect(calls).toHaveLength(1)
   })
 })

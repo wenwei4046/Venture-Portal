@@ -23,7 +23,7 @@ export default function AdsPanel({ ads, brands, canManage }: { ads: LeadAd[]; br
   const fetchAll = () => start(async () => {
     setMsg(null)
     const r = await fetchAdNames(ads.map(a => a.adId))
-    setMsg(r.ok ? { ok: true, text: `Meta answered for ${r.data} of ${ads.length} ads` } : { ok: false, text: r.reason })
+    setMsg(r.ok ? { ok: true, text: `Meta answered for ${r.data.named} of ${ads.length} ads` + (r.data.refused ? ` — ${r.data.refused} are on ad accounts the system user cannot see (or partnership ads): give it those accounts, or name them here.` : '') } : { ok: false, text: r.reason })
   })
   return (
     <section className={s.panel} aria-label="Ads">

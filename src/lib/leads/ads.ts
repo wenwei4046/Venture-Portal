@@ -97,6 +97,43 @@ export function graphRefusal(error: { code?: number; error_subcode?: number; mes
   return 'Meta refused the request — check the system user and its ad accounts.'
 }
 
+type GraphError = { code?: number; error_subcode?: number }
+/** One Graph read: its JSON on success, else Meta's error (or none when Meta could not be reached). */
+export type AskGraph = (url: string) => Promise<{ ok: true; json: unknown } | { ok: false; error?: GraphError; unreachable?: boolean }>
+
+/** Graph's read of one ad. */
+export function adRequestUrl(id: string): string {
+  return `https://graph.facebook.com/${GRAPH_VERSION}/${encodeURIComponent(id)}?fields=${encodeURIComponent(AD_FIELDS)}`
+}
+
+/**
+ * Every ad Meta will show, in batches of 50. Meta refuses a WHOLE `?ids=` batch when one ad in it is on an ad account
+ * the system user cannot see (2026-10-27: 8 of 9 ads — 2990s' and Carres' accounts not assigned, partnership ads),
+ * so a refused batch is asked again one ad at a time and the ads Meta answers for are kept. An expired token or an
+ * unreachable Meta stops at once; a run where Meta answered for none says why.
+ */
+export async function askAds(ids: string[], ask: AskGraph): Promise<{ ok: true; ads: MetaAd[]; refused: number } | { ok: false; reason: string }> {
+  const ads: MetaAd[] = []
+  let refused = 0
+  let firstError: GraphError | undefined
+  for (const batch of adBatches(ids)) {
+    const all = await ask(adsRequestUrl(batch))
+    if (all.ok) { ads.push(...parseAds(all.json)); continue }
+    if (all.unreachable) return { ok: false, reason: 'Meta could not be reached — try again.' }
+    if (all.error?.code === 190) return { ok: false, reason: graphRefusal(all.error) }
+    for (const id of batch) {
+      const one = await ask(adRequestUrl(id))
+      if (one.ok) { ads.push(...parseAds({ [id]: one.json })); continue }
+      if (one.unreachable) return { ok: false, reason: 'Meta could not be reached — try again.' }
+      if (one.error?.code === 190) return { ok: false, reason: graphRefusal(one.error) }
+      refused++
+      firstError ??= one.error
+    }
+  }
+  if (ads.length === 0 && refused > 0) return { ok: false, reason: graphRefusal(firstError) }
+  return { ok: true, ads, refused }
+}
+
 /** Ads Manager, opened on this ad. */
 export function adsManagerLink(accountId: string, adId: string): string {
   return accountId && adId ? `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${accountId}&selected_ad_ids=${adId}` : ''

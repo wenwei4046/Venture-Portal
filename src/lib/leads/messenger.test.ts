@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { deliver, messageOf, NO_PAGE, NOT_CONNECTED, NO_PAGE_TOKEN, WINDOW_SHUT } from './messenger'
+import { attachmentKind, deliver, deliverFile, FILE_LIMIT, messageOf, NO_PAGE, NOT_CONNECTED, NO_PAGE_TOKEN, TOO_BIG, WINDOW_SHUT } from './messenger'
 
 const now = new Date('2026-10-28T03:00:00Z')
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -43,5 +43,35 @@ describe('Lead View › Messenger out', () => {
       String(url).includes('fields=access_token') ? json(200, { access_token: 'PAGE' }) : json(400, { error: { code: 10, error_subcode: 2018278 } })) as unknown as typeof fetch
     const r = await deliver({ pageId: '222222', psid: '123456', body: 'Hi', lastInAt: '2026-10-28T02:30:00Z' }, 'SYS-c', now, refused)
     expect(r).toEqual({ error: 'Outside Messenger’s reply window for this customer.'.replace('’', "'") })
+  })
+})
+
+describe('Lead View › a photo or file out', () => {
+  it('names the attachment by its type', () => {
+    expect([attachmentKind('image/jpeg'), attachmentKind('video/mp4'), attachmentKind('audio/ogg'), attachmentKind('application/pdf')]).toEqual(['image', 'video', 'audio', 'file'])
+  })
+
+  it('refuses before asking Meta: shut window, too big', async () => {
+    const f = vi.fn()
+    const small = new Blob(['x'], { type: 'image/png' })
+    expect(await deliverFile({ pageId: '946946021838962', psid: '7700001', lastInAt: '2026-10-27T01:00:00Z' }, small, 'a.png', 'image/png', 'SYS', now, f)).toEqual({ error: WINDOW_SHUT })
+    const big = { size: FILE_LIMIT + 1, type: 'application/pdf' } as Blob
+    expect(await deliverFile({ pageId: '946946021838962', psid: '7700001', lastInAt: '2026-10-28T02:30:00Z' }, big, 'a.pdf', 'application/pdf', 'SYS', now, f)).toEqual({ error: TOO_BIG })
+    expect(f).not.toHaveBeenCalled()
+  })
+
+  it('uploads the file with the message to the Page and keeps Meta’s id', async () => {
+    const bodies: unknown[] = []
+    const f = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('fields=access_token')) return json(200, { access_token: 'PAGE' })
+      bodies.push(init?.body)
+      return json(200, { message_id: 'm_file' })
+    }) as unknown as typeof fetch
+    const r = await deliverFile({ pageId: '946946021838962', psid: '7700001', lastInAt: '2026-10-28T02:30:00Z' }, new Blob(['%PDF'], { type: 'application/pdf' }), 'floor plan.pdf', 'application/pdf', 'SYS-file', now, f)
+    expect(r).toEqual({ mid: 'm_file' })
+    const form = bodies[0] as FormData
+    expect(JSON.parse(String(form.get('message')))).toEqual({ attachment: { type: 'file', payload: { is_reusable: false } } })
+    // The file rides along (the test DOM drops a Blob's filename; Node's FormData keeps it).
+    expect(form.get('filedata')).toBeInstanceOf(Blob)
   })
 })

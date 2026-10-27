@@ -11,6 +11,9 @@ describe('Insight v2', () => {
   it('reads the range from the address, office days, today included', () => {
     expect(insightRange(undefined, '2026-10-23')).toMatchObject({ key: '30', from: '2026-09-24', to: '2026-10-23', label: 'Last 30 days' })
     expect(insightRange('7', '2026-10-23')).toMatchObject({ from: '2026-10-17', to: '2026-10-23' })
+    // lead_list's end is exclusive: today's conversations count (Insight read 0 on the first live day).
+    expect(insightRange(undefined, '2026-10-27').listTo).toBe('2026-10-28')
+    expect(insightRange('q', '2026-12-31').listTo).toBe('2027-01-01')
     expect(insightRange('q', '2026-10-23')).toMatchObject({ from: '2026-10-01', label: '1 Oct – 23 Oct 2026' })
     expect(insightRange('q', '2026-12-05').from).toBe('2026-10-01')
   })

@@ -84,6 +84,12 @@ export interface LeadContact {
   lostAt?: string | null
   lostReason?: string
   stageByName?: string
+  /** The CS who handles it (mig 20261027150000): taken by their first reply, or given by Lead View · Manage. */
+  assignedTo?: string | null
+  assignedName?: string
+  assignedAt?: string | null
+  /** The Inbox list only (mig 20261027160000): the customer's messages since the last one that went out to them. */
+  unread?: number
   updatedAt?: string
 }
 
@@ -99,6 +105,11 @@ export interface LeadMessage {
   at: string
   /** A flow question's buttons, as the customer saw them. */
   buttons?: string[] | null
+  /** A photo or file CS sent (bucket lead-media, mig 20261027140000), and its type. */
+  mediaPath?: string | null
+  mediaMime?: string | null
+  /** A customer's photo / video / voice note / file: Meta's own address (it expires after a while). */
+  mediaUrl?: string | null
 }
 
 export interface LeadEvent {

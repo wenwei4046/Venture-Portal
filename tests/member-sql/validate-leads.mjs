@@ -870,11 +870,11 @@ await db.exec(`
   check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.create']);`), true, 'lead_reply_sent asks the Inbox')
 }
 
-// ── 2990s mini by the ad's ad account (mig 20261027100000): the account's name decides, the headline still does ──
+// ── 2990s mini by the ad's ad account (mig 20261027100010): the account's name decides, the headline still does ──
 {
   const src0 = (await q(`select md5(prosrc) m from pg_proc where oid = 'public.lead_ingest_messenger(jsonb)'::regprocedure`))[0].m
   check(src0, 'ccd998d3be8787fed944ba376ab48600', 'lead_ingest_messenger here is production’s body (the swap is written against it)')
-  const mig = (await readFile(new URL('../../supabase/migrations/20261027100000_lead_mini_by_ad_account.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+  const mig = (await readFile(new URL('../../supabase/migrations/20261027100010_lead_mini_by_ad_account.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
   await db.exec(mig)
   await db.exec(mig) // twice: the second finds it in place
   const P = '946946021838962'
@@ -967,6 +967,128 @@ await db.exec(`
   await pr([{ ...reply('pr.out.4', '7700301'), body: null, kind: 'image' }])
   check((await q(`select body from public.lead_messages where external_id = 'pr.out.4'`))[0].body, '[Photo]', 'a photo with no words reads [Photo]')
   check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_page_replies(jsonb)', 'execute') a`))[0].a, false, 'the service role’s alone')
+}
+
+// ── Photos and files (mig 20261027140000 + its guards): a sent file on its reply, a customer's attachment kept ──
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  const before = (await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_thread','lead_ingest_messenger','lead_ingest_instagram') order by 1`)).map(r => [r.proname, r.m])
+  check(before, [['lead_ingest_instagram', '95240bef30c3140ab143b940f1f77ffd'], ['lead_ingest_messenger', '816bacb8113b7a232f43035efb411aef'], ['lead_thread', 'cf7fc34fc94286819682cd3a08bd1e51']], 'the three bodies here are production’s (the swaps are written against them)')
+  await db.exec(await f('20261027140000_lead_media.sql'))
+  await db.exec(await f('20261027140100_lead_media_guards.sql'))
+  const P = '946946021838962'
+  await as(CS_USER, ALL)
+  const c = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'md.in.1', pageId: P, psid: '7700501', name: 'Photo Lead', kind: 'image', body: null, mediaUrl: 'https://scontent.xx.fbcdn.net/v/t1/abc.jpg', sentAt: '2026-10-27T03:00:00Z', ad: null },
+  ])]))[0].r.contacts[0]
+  check((await q(`select body, media_url from public.lead_messages where external_id = 'md.in.1'`))[0], { body: '[Photo]', media_url: 'https://scontent.xx.fbcdn.net/v/t1/abc.jpg' }, 'a customer’s photo keeps Meta’s address')
+  const path = `chat/${c}/11111111-1111-4111-8111-111111111111-floor plan.pdf`
+  await refuses(`select public.lead_reply_media($1, $2, 'application/pdf', '')`, [c, path], /did not finish uploading/, 'a file not in the bucket has not arrived')
+  await db.exec(`insert into public.file_objects (bucket_id, name) values ('lead-media', '${path.replace(/'/g, "''")}')`)
+  await refuses(`select public.lead_reply_media($1, $2, 'application/pdf', '')`, [c, `chat/${'0'.repeat(8)}-0000-4000-8000-${'0'.repeat(12)}/x.pdf`], /not this conversation/, 'another conversation’s file is refused')
+  const id = (await q(`select public.lead_reply_media($1, $2, 'application/pdf', '') id`, [c, path]))[0].id
+  const m = (await q(`select direction, sender, body, media_path, media_mime, delivery from public.lead_messages where id = $1`, [id]))[0]
+  check([m.direction, m.sender, m.body, m.media_path, m.media_mime, m.delivery], ['out', 'cs', '[File] floor plan.pdf', path, 'application/pdf', 'recorded'], 'recorded as CS’s reply with its file')
+  const t = (await q(`select public.lead_thread($1) t`, [c]))[0].t
+  const last = t.messages[t.messages.length - 1]
+  check([last.mediaPath, last.mediaMime, t.messages[0].mediaUrl], [path, 'application/pdf', 'https://scontent.xx.fbcdn.net/v/t1/abc.jpg'], 'the thread hands the files to the screen')
+  await as(CS_USER, ['leads.view'])
+  await refuses(`select public.lead_reply_media($1, $2, 'application/pdf', 'hi')`, [c, path], /Lead View · Create/, 'sending a file needs Create')
+  await as(CS_USER, ALL)
+  const src = (await q(`select prosrc from pg_proc where proname = 'lead_reply_media'`))[0].prosrc
+  check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.create']);`), true, 'it asks the Inbox')
+}
+
+// ── Each conversation's own CS (mig 20261027150000): a mark — everybody still sees everything ──
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  await db.exec(`alter table public.users add column if not exists is_active boolean not null default true`)
+  await db.exec(await f('20261027150000_lead_owner.sql'))
+  const CS = ['leads.view', 'leads.create', 'leads.edit']
+  const P = '946946021838962'
+  const c = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'own.1', pageId: P, psid: '7700601', name: 'Owner Test', kind: 'text', body: 'hi', sentAt: '2026-10-27T03:00:00Z', ad: null },
+  ])]))[0].r.contacts[0]
+  await as(OTHER, CS)
+  await q(`select public.lead_reply($1, 'Hi, I can help')`, [c])
+  check((await q(`select assigned_to from public.lead_contacts where id = $1`, [c]))[0].assigned_to, OTHER, 'the first CS to reply takes it')
+  check((await q(`select what from public.lead_events where contact_id = $1 order by id desc limit 1`, [c]))[0].what.startsWith('Taken by '), true, 'the timeline says who took it')
+  await as(CS_USER, CS)
+  check(((await q(`select public.lead_inbox() i`))[0].i).some(x => x.id === c), true, 'another CS still sees it')
+  await q(`select public.lead_reply($1, 'me too')`, [c])
+  check((await q(`select assigned_to from public.lead_contacts where id = $1`, [c]))[0].assigned_to, OTHER, 'and replying does not take it from its CS')
+  await refuses(`select public.lead_assign($1, $2)`, [c, CS_USER], /Lead View · Manage/, 'only Manage gives a conversation')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_assign($1, $2)`, [c, CS_USER])
+  const t = (await q(`select public.lead_thread($1) t`, [c]))[0].t
+  check([t.contact.assignedTo, !!t.contact.assignedName], [CS_USER, true], 'given to another CS; the card says who')
+  await q(`select public.lead_assign($1, null)`, [c])
+  check((await q(`select assigned_to from public.lead_contacts where id = $1`, [c]))[0].assigned_to, null, 'given back to nobody')
+  await q(`select public.lead_reply($1, 'Principal here')`, [c])
+  check((await q(`select assigned_to from public.lead_contacts where id = $1`, [c]))[0].assigned_to, null, 'Manage replying takes nothing')
+}
+
+// ── The Inbox's unread count (mig 20261027160000): the customer's messages since the last one that went out ──
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  const before = (await q(`select md5(prosrc) m from pg_proc where proname = 'lead_inbox'`))[0].m
+  check(before, '68e0e08f58deaba5ffe0466f283e6483', 'lead_inbox here is production’s body')
+  await db.exec(await f('20261027160000_lead_unread.sql'))
+  await db.exec(await f('20261027160000_lead_unread.sql'))
+  const P = '946946021838962'
+  const say = (id, body) => q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: id, pageId: P, psid: '7700701', name: 'Unread Test', kind: 'text', body, sentAt: '2026-10-27T04:00:00Z', ad: null },
+  ])])
+  const c = (await say('un.1', 'hi'))[0].r.contacts[0]
+  await say('un.2', 'price?')
+  await say('un.3', 'anyone?')
+  await as(CS_USER, ALL)
+  const unread = async () => ((await q(`select public.lead_inbox() i`))[0].i).find(x => x.id === c).unread
+  check(await unread(), 3, 'three from the customer, nothing back: 3')
+  await q(`select public.lead_reply($1, 'Hi! Which sofa?')`, [c])
+  check(await unread(), 0, 'answered: 0')
+  await say('un.4', 'L shape')
+  check(await unread(), 1, 'a new message after the answer: 1')
+  await q(`select public.lead_ingest_page_replies($1::jsonb)`, [JSON.stringify([{ externalId: 'un.p1', pageId: P, psid: '7700701', body: 'From Business Suite', sentAt: '2026-10-27T04:05:00Z' }])])
+  check(await unread(), 0, 'the Page answering from Business Suite clears it too')
+
+  // ── Opening a chat clears it for whoever opened it (mig 20261027170000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_inbox'`))[0].m, '195d52d07d2f977a82ad8fb13c66d5a1', 'lead_inbox here is production’s body after 160000')
+  await db.exec(await f('20261027170000_lead_seen.sql'))
+  await db.exec(await f('20261027170000_lead_seen.sql'))
+  await say('un.5', 'hello?')
+  await say('un.6', 'still there?')
+  check(await unread(), 2, 'two new: 2')
+  await q(`select public.lead_mark_seen($1)`, [c])
+  check(await unread(), 0, 'opened: 0, no answer needed')
+  await as(OTHER, ALL)
+  check(await unread(), 2, 'somebody else who has not opened it still sees 2')
+  await as(CS_USER, ALL)
+  await say('un.7', 'ok thanks')
+  check(await unread(), 1, 'a message after opening: 1')
+  await as(CS_USER, [])
+  await refuses(`select public.lead_mark_seen($1)`, [c], /Lead View · View/, 'marking needs Lead View · View')
+  await as(CS_USER, ALL)
+  check((await q(`select has_function_privilege('anon', 'public.lead_mark_seen(uuid)', 'execute') a`))[0].a, false, 'not the publishable key’s')
+  check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = 'lead_seen' and grantee in ('anon','authenticated')`))[0].n, 0, 'the table has no grants')
+
+  // ── The Page's own photos show in the chat (mig 20261027180000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_ingest_page_replies'`))[0].m, '54726b97802abfe23f9a78e0ae8a68a6', 'lead_ingest_page_replies here is production’s body')
+  // One kept before the change, whose address is still in the delivery log.
+  await q(`select public.lead_ingest_page_replies($1::jsonb)`, [JSON.stringify([{ externalId: 'un.p2', pageId: P, psid: '7700701', kind: 'image', body: null, sentAt: '2026-10-27T04:10:00Z' }])])
+  // The CRM's delivery log, as production has it (the CRM's migrations are not loaded here).
+  await db.exec(`create table if not exists public.crm_channel_events (id bigserial primary key, received_at timestamptz not null default now(),
+    channel text not null, status text not null, message text, counts jsonb, payload jsonb)`)
+  await db.exec(`insert into public.crm_channel_events (channel, status, payload) values ('messenger', 'ok', '${JSON.stringify({ object: 'page', entry: [{ id: P, standby: [
+    { sender: { id: P }, recipient: { id: '7700701' }, message: { mid: 'un.p2', is_echo: true, attachments: [{ type: 'image', payload: { url: 'https://scontent.xx.fbcdn.net/v/old.jpg' } }] } },
+    { sender: { id: P }, recipient: { id: '7700701' }, message: { mid: 'un.1', attachments: [{ type: 'image', payload: { url: 'https://evil.example.com/x.jpg' } }] } },
+  ] }] })}'::jsonb)`)
+  await db.exec(await f('20261027180000_lead_page_media.sql'))
+  await db.exec(await f('20261027180000_lead_page_media.sql'))
+  check((await q(`select media_url from public.lead_messages where external_id = 'un.p2'`))[0].media_url, 'https://scontent.xx.fbcdn.net/v/old.jpg', 'a photo kept before gets its address from the log')
+  check((await q(`select media_url from public.lead_messages where external_id = 'un.1'`))[0].media_url, null, 'never an address off Meta’s CDN')
+  await q(`select public.lead_ingest_page_replies($1::jsonb)`, [JSON.stringify([{ externalId: 'un.p3', pageId: P, psid: '7700701', kind: 'image', body: null, mediaUrl: 'https://scontent.xx.fbcdn.net/v/new.jpg', sentAt: '2026-10-27T04:12:00Z' }])])
+  check((await q(`select body, media_url from public.lead_messages where external_id = 'un.p3'`))[0], { body: '[Photo]', media_url: 'https://scontent.xx.fbcdn.net/v/new.jpg' }, 'a photo the Page sends now keeps its address')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

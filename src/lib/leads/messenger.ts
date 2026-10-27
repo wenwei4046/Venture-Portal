@@ -4,7 +4,7 @@
 // this adds Lead View's rules: Meta's window (24 hours; Human Agent waits for App Review), a template's buttons, and the
 // answer the database keeps — Meta's id, or why it was not sent. Every token stays on the server.
 
-import { messengerWindow, pageToken, sendMessengerText } from '@/lib/messenger/send'
+import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from '@/lib/messenger/send'
 
 export interface Outgoing {
   pageId: string | null
@@ -40,5 +40,31 @@ export async function deliver(o: Outgoing, systemToken: string | undefined, now:
   const token = await pageToken(o.pageId, systemToken, fetchImpl)
   if (!token) return { error: NO_PAGE_TOKEN }
   const r = await sendMessengerText({ pageId: o.pageId, psid: o.psid, body: o.body, token, window, message: messageOf(o.body, o.buttons) }, fetchImpl)
+  return r.ok ? { mid: r.mid } : { error: r.error }
+}
+
+/** Messenger takes an attachment up to 25 MB. */
+export const FILE_LIMIT = 25 * 1024 * 1024
+export const TOO_BIG = 'Messenger takes a photo or file up to 25 MB.'
+
+/** What Messenger calls a file by its type. */
+export function attachmentKind(mime: string): 'image' | 'video' | 'audio' | 'file' {
+  return mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : mime.startsWith('audio/') ? 'audio' : 'file'
+}
+
+/** Send one photo or file (2026-10-27, mig 20261027140000); Meta's id or why not — never throws. */
+export async function deliverFile(
+  o: Pick<Outgoing, 'pageId' | 'psid' | 'lastInAt'>, file: Blob, filename: string, mime: string,
+  systemToken: string | undefined, now: Date = new Date(), fetchImpl: typeof fetch = fetch,
+): Promise<Delivered> {
+  if (!o.pageId) return { error: NO_PAGE }
+  const window = messengerWindow(o.lastInAt, now)
+  if (window === 'shut') return { error: WINDOW_SHUT }
+  if (!systemToken) return { error: NOT_CONNECTED }
+  if (file.size > FILE_LIMIT) return { error: TOO_BIG }
+  const token = await pageToken(o.pageId, systemToken, fetchImpl)
+  if (!token) return { error: NO_PAGE_TOKEN }
+  const typed = file.type ? file : new Blob([file], { type: mime || 'application/octet-stream' })
+  const r = await sendMessengerAttachment({ pageId: o.pageId, psid: o.psid, token, window, kind: attachmentKind(mime), file: typed, filename }, fetchImpl)
   return r.ok ? { mid: r.mid } : { error: r.error }
 }

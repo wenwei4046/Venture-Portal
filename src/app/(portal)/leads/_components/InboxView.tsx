@@ -1,12 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent } from 'react'
-import { draftLeadReply, quickReplyUsed, readThread, replyToLead, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
+import { assignLead, draftLeadReply, leadAgents, leadMediaLinks, quickReplyUsed, readThread, replyToLead, sendLeadMedia, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
+import { FILE_LIMIT, TOO_BIG } from '@/lib/leads/messenger'
+import { createClient } from '@/lib/supabase/client'
 import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
 import { outcomeOf } from '@/lib/leads/ai'
 import { adLabel, adsManagerLink } from '@/lib/leads/ads'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
-import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
+import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, mediaKind, isMediaPlaceholder, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
 import { whenFull } from '@/lib/leads/time'
 import { formatPhone } from '@/lib/leads/phone'
 import { dayLabel, timeOf, whenShort } from '@/lib/leads/time'
@@ -45,6 +47,7 @@ export default function InboxView({
   initialQuery = '',
   canReply,
   canEdit,
+  canManage = false,
   csName,
   aiBrands,
   aiConnected,
@@ -58,6 +61,8 @@ export default function InboxView({
   initialQuery?: string
   canReply: boolean
   canEdit: boolean
+  /** Lead View · Manage: may give a conversation to a CS (mig 20261027150000). */
+  canManage?: boolean
   /** Who is signed in — the hand-over's text and the NOW pill name them. */
   csName: string
   /** Brands whose AI agent is a copilot. */
@@ -114,11 +119,17 @@ export default function InboxView({
   }, [searched])
   const shown = searched.filter(c => filter === 'all' || inboxState(c) === filter)
 
+  // Read here since its last message (readThread marks it seen, mig 20261027170000): its unread badge goes at once,
+  // before the list is read again.
+  const [readAt, setReadAt] = useState<Record<string, string>>({})
   const load = useCallback((id: string) => {
     startLoading(async () => {
       const r = await readThread(id)
       if (!r.ok) setError(r.reason)
-      else if (r.data) setThreads(t => ({ ...t, [id]: r.data! }))
+      else if (r.data) {
+        setThreads(t => ({ ...t, [id]: r.data! }))
+        setReadAt(m => ({ ...m, [id]: r.data!.contact.lastAt }))
+      }
     })
   }, [])
   const pick = (id: string) => {
@@ -126,7 +137,8 @@ export default function InboxView({
     setError(null)
     // The address names the conversation, so a refresh (and a link) opens it again.
     window.history.replaceState(null, '', `/leads?c=${id}`)
-    if (!threads[id]) load(id)
+    // Always read: the cached copy shows at once, and the read marks the chat seen.
+    load(id)
   }
   // The list changed under us (a write, a refresh): read the open conversation again.
   const lastAt = contacts.find(c => c.id === selected)?.lastAt
@@ -178,6 +190,7 @@ export default function InboxView({
               </div>
             ) : shown.map(c => {
               const st = inboxState(c)
+              const unread = c.id === selected || readAt[c.id] === c.lastAt ? 0 : c.unread
               return (
                 <button key={c.id} type="button" className={s.row} aria-current={c.id === selected} data-waiting={st === 'waiting' || undefined} onClick={() => pick(c.id)}>
                   <span className={s.avatarWrap} aria-hidden="true">
@@ -187,10 +200,13 @@ export default function InboxView({
                   <span className={s.rowBody}>
                     <span className={s.rowTop}>
                       <span className={s.rowName}>{c.name || '—'}</span>
-                      {st === 'waiting' ? <span className={s.waitDot} aria-label="Waiting" /> : null}
-                      <span className={s.rowTime}>{whenShort(c.lastAt, config.today)}</span>
+                      {st === 'waiting' && c.unread === undefined ? <span className={s.waitDot} aria-label="Waiting" /> : null}
+                      <span className={s.rowTime} data-unread={unread ? '' : undefined}>{whenShort(c.lastAt, config.today)}</span>
                     </span>
-                    <span className={s.rowText}>{c.lastDir === 'out' ? '↩ ' : ''}{c.lastText}</span>
+                    <span className={s.rowLine}>
+                      <span className={s.rowText}>{c.lastDir === 'out' ? '↩ ' : ''}{c.lastText}</span>
+                      {unread ? <span className={s.unread} aria-label={`${unread} unread`}>{unreadLabel(unread)}</span> : null}
+                    </span>
                     <span className={s.chips}>
                       <span className={s.chip}>{brands.get(c.brandId)?.name ?? '—'}</span>
                       {c.flowState === 'running' ? <span className={s.chip} data-tone="quiet">Template</span> : null}
@@ -207,7 +223,7 @@ export default function InboxView({
         <section className={s.chat} aria-label="Chat">
           {contact ? (
             <Chat key={contact.id} contact={contact} thread={thread} brand={brandOf} csName={csName}
-              canReply={canReply} aiOn={aiBrands.includes(contact.brandId)} aiConnected={aiConnected} info={info} quick={quick} today={config.today}
+              canReply={canReply} canManage={canManage} aiOn={aiBrands.includes(contact.brandId)} aiConnected={aiConnected} info={info} quick={quick} today={config.today}
               loading={loading && !thread} onSent={() => load(contact.id)} />
           ) : (
             <div className={s.empty}>Pick a conversation.</div>
@@ -281,12 +297,13 @@ function useDrag(layout: InboxLayout, setLayout: (next: InboxLayout | ((l: Inbox
   }
 }
 
-function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, info, quick, today, loading, onSent }: {
+function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiConnected, info, quick, today, loading, onSent }: {
   contact: LeadContact
   thread: LeadThread | null
   brand: LeadBrand | undefined
   csName: string
   canReply: boolean
+  canManage: boolean
   aiOn: boolean
   aiConnected: boolean
   info: LeadInfo | null
@@ -312,6 +329,17 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
   const [whoOpen, setWhoOpen] = useState(false)
   const end = useRef<HTMLDivElement>(null)
   const count = thread?.messages.length ?? 0
+  // Photos and files (mig 20261027140000): picked from the camera (photos, videos) or the paperclip (anything), put in
+  // the bucket lead-media, then sent as a reply — the reply box's words as its caption.
+  const photoPick = useRef<HTMLInputElement>(null)
+  const filePick = useRef<HTMLInputElement>(null)
+  const [links, setLinks] = useState<Record<string, string>>({})
+  const paths = useMemo(() => (thread?.messages ?? []).map(m => m.mediaPath).filter((x): x is string => !!x), [thread])
+  useEffect(() => {
+    const missing = paths.filter(x => !links[x])
+    if (!missing.length) return
+    void leadMediaLinks(missing).then(r => { if (r.ok) setLinks(l => ({ ...l, ...r.data })) })
+  }, [paths, links])
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }) }, [count])
 
   const now = replyingNow(contact, csName)
@@ -332,6 +360,23 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
       setText('')
       onSent()
       // Saved, but Messenger did not take it (the window, the connection): say why — the message shows "not sent".
+      if (r.data.notSent) setError('Saved but not sent: ' + r.data.notSent)
+    })
+  }
+  const sendFile = (file: File | undefined) => {
+    if (!file || sending || botOn) return
+    setError(null)
+    if (file.size > FILE_LIMIT) { setError(TOO_BIG); return }
+    const caption = text.trim()
+    startSending(async () => {
+      const name = file.name.replace(/[\\/]/g, '_').slice(-120) || 'file'
+      const path = `chat/${contact.id}/${crypto.randomUUID()}-${name}`
+      const up = await createClient().storage.from('lead-media').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
+      if (up.error) { setError('The file could not be uploaded — 25 MB at most.'); return }
+      const r = await sendLeadMedia(contact.id, path, file.type || 'application/octet-stream', caption)
+      if (!r.ok) { setError(r.reason); return }
+      setText('')
+      onSent()
       if (r.data.notSent) setError('Saved but not sent: ' + r.data.notSent)
     })
   }
@@ -401,6 +446,7 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
             </>
           ) : null}
         </div>
+        <OwnerPicker contact={thread?.contact ?? contact} canManage={canManage} onChanged={onSent} />
         <span className={s.stateTag} data-state={state}>{STATE_LABEL[state]}</span>
       </div>
 
@@ -428,7 +474,8 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
             <div key={m.id} className={s.msg} data-out={m.direction === 'out' || undefined}>
               {newDay ? <div className={s.day} style={{ alignSelf: 'stretch' }}>{day}</div> : null}
               {m.direction === 'out' ? <MessageLabel m={m} /> : null}
-              <div className={s.bubble}>{m.body}</div>
+              {m.mediaPath || m.mediaUrl ? <MessageMedia m={m} link={m.mediaPath ? links[m.mediaPath] : m.mediaUrl ?? undefined} /> : null}
+              {(m.mediaPath || m.mediaUrl) && isMediaPlaceholder(m.body) ? null : <div className={s.bubble}>{m.body}</div>}
               {m.buttons?.length ? (
                 <div className={s.buttons}>{m.buttons.map(b => <span key={b} className={s.button}>{b}</span>)}</div>
               ) : null}
@@ -479,8 +526,10 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
               }} />
             <div className={s.tools}>
               <span className={s.row6} style={{ gap: 2 }}>
-                <button type="button" className={s.iconBtn} disabled title="Camera — photos come with Meta"><LeadIcon name="camera" /></button>
-                <button type="button" className={s.iconBtn} disabled title="Photo, video or file — comes with Meta"><LeadIcon name="paperclip" /></button>
+                <button type="button" className={s.iconBtn} disabled={botOn || sending} title="Send a photo or video" onClick={() => photoPick.current?.click()}><LeadIcon name="camera" /></button>
+                <button type="button" className={s.iconBtn} disabled={botOn || sending} title="Send a file" onClick={() => filePick.current?.click()}><LeadIcon name="paperclip" /></button>
+                <input ref={photoPick} type="file" accept="image/*,video/*" hidden onChange={e => { sendFile(e.target.files?.[0]); e.target.value = '' }} />
+                <input ref={filePick} type="file" hidden onChange={e => { sendFile(e.target.files?.[0]); e.target.value = '' }} />
               </span>
               <span className={s.rule} aria-hidden="true" />
               <InfoMenu info={info} brandId={contact.brandId} today={today} disabled={botOn}
@@ -498,6 +547,73 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
       ) : null}
     </>
   )
+}
+
+/**
+ * The CS who handles the conversation (mig 20261027150000): taken by their first reply, or given here by Lead View ·
+ * Manage — the list is everybody whose permissions give Lead View › Inbox's Create. Everybody still sees every chat.
+ */
+function OwnerPicker({ contact, canManage, onChanged }: { contact: LeadContact; canManage: boolean; onChanged: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [agents, setAgents] = useState<Array<{ id: string; name: string }> | null>(null)
+  const [busy, start] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const label = contact.assignedTo ? (contact.assignedName || 'a colleague') : 'No CS yet'
+  if (!canManage) return <span className={s.owner} title="Who handles this chat">CS · {label}</span>
+  const toggle = () => {
+    setOpen(o => !o)
+    if (!agents) void leadAgents().then(r => { if (r.ok) setAgents(r.data); else setError(r.reason) })
+  }
+  const give = (id: string | null) => start(async () => {
+    setError(null)
+    const r = await assignLead(contact.id, id)
+    if (!r.ok) { setError(r.reason); return }
+    setOpen(false)
+    onChanged()
+  })
+  return (
+    <span className={s.nowWrap}>
+      <button type="button" className={s.owner} data-button="" onClick={toggle} aria-haspopup="menu" aria-expanded={open} disabled={busy} title="Give this chat to a CS">
+        CS · {label}<LeadIcon name="chevronDown" size={12} />
+      </button>
+      {open ? (
+        <>
+          <div className={s.scrim} onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className={s.menu} role="menu" aria-label="Give this chat to">
+            <div className={s.menuKicker}>GIVE THIS CHAT TO</div>
+            {agents === null && !error ? <div className={s.menuNote}>Loading…</div> : null}
+            {(agents ?? []).map(a => (
+              <button key={a.id} type="button" role="menuitemradio" aria-checked={contact.assignedTo === a.id} className={s.menuItem} onClick={() => give(a.id)} disabled={busy}>
+                <span style={{ flex: 1 }}>{a.name}</span><span className={s.menuTick}>{contact.assignedTo === a.id ? '✓' : ''}</span>
+              </button>
+            ))}
+            {agents && !agents.length ? <div className={s.menuNote}>Nobody yet — a person whose permissions tick Lead View › Inbox (Create) shows here.</div> : null}
+            <button type="button" role="menuitemradio" aria-checked={!contact.assignedTo} className={s.menuItem} onClick={() => give(null)} disabled={busy}>
+              <span style={{ flex: 1 }}>Nobody</span><span className={s.menuTick}>{contact.assignedTo ? '' : '✓'}</span>
+            </button>
+            {error ? <div className={s.menuNote} role="alert">{error}</div> : null}
+          </div>
+        </>
+      ) : null}
+    </span>
+  )
+}
+
+/** A message's photo, video or file: shown in place; a file (or a customer's attachment Meta keeps) opens in a tab. */
+function MessageMedia({ m, link }: { m: LeadMessage; link: string | undefined }) {
+  const kind = mediaKind(m.mediaMime, m.body)
+  // Meta's addresses expire after a while (a signed link after an hour): say so instead of a broken picture.
+  const [gone, setGone] = useState(false)
+  const what = kind === 'image' ? 'Photo' : kind === 'video' ? 'Video' : kind === 'audio' ? 'Voice message' : 'File'
+  if (!link) return <div className={s.mediaWait}>{what} · loading…</div>
+  if (gone) return <div className={s.mediaWait}>{what} · no longer available from Meta</div>
+  // A short-lived signed link (or Meta's): nothing for next/image to optimise.
+  // eslint-disable-next-line @next/next/no-img-element
+  if (kind === 'image') return <a href={link} target="_blank" rel="noopener noreferrer"><img className={s.mediaImg} src={link} alt={m.body} onError={() => setGone(true)} /></a>
+  if (kind === 'video') return <video className={s.mediaImg} src={link} controls preload="metadata" onError={() => setGone(true)} />
+  if (kind === 'audio') return <audio className={s.mediaAudio} src={link} controls preload="metadata" onError={() => setGone(true)} />
+  const name = m.mediaPath ? m.mediaPath.replace(/^.*\//, '').replace(/^[0-9a-f-]{36}-/, '') : 'Attachment'
+  return <a className={s.mediaFile} href={link} target="_blank" rel="noopener noreferrer"><LeadIcon name="paperclip" size={14} />{name}</a>
 }
 
 /** Who wrote an outgoing message: CS (dark), a template or a campaign (AUTO), the AI Agent (AI), the Page from Business Suite (PAGE). */
