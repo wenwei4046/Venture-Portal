@@ -522,7 +522,7 @@ export function chatVM(ctx: SalesCtx) {
   async function openTpl() { patch({ tpl: true }); if (c!.channel === "whatsapp" && ui.templates == null) { const t = await act.loadTemplates(); patch({ templates: t ?? [] }); } }
 
   return {
-    cl: { name: c.name, ad: c.ad, first, ini: ini(c.name), chanName: sourceOf(c).label, chanFg: ch.fg, chanIcon: ch.icon, avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], strip: chatStripOf(c, ctx.now) },
+    cl: { name: c.name, ad: [sourceOf(c).brandLabel, c.ad].filter(Boolean).join(" · "), first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], strip: chatStripOf(c, ctx.now) },
     wallBg: CHAT_WALL.bg, wallImg: CHAT_WALL.img, wallSize: CHAT_WALL.size,
     // Leaving a chat folds the composer's panel away, so the next chat opens tidy (the owner, 2026-10-13).
     closeChat: () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, hm: null, reply: null, cmp: null, pick: null })),

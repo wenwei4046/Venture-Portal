@@ -9,6 +9,7 @@
  * through the phone's send (24 h window, Messenger's Human Agent), with the quote a reply answers; the + menu is the
  * phone's + sheet's choices (shared/attach-sheet.tsx › ATTACH_TILES), quick replies and auto replies listed in it.
  */
+import { sourceOf } from "@/lib/member/crm-source";
 import type { CrmChatMessage, CrmCustomer } from "@/lib/member/crm-data";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { first, initials } from "./data";
@@ -165,7 +166,7 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
     // Where the customer came from: the channel, then the ad (its headline is all Meta sends) — the owner, 2026-10-15:
     // "沒有顯示他是從什麼平台過來".
     // v2 (frame 02): the ad, then the channel — "Mattress Fair · Mid Valley · Messenger"; a video or image ad keeps its kind first.
-    head: c ? { avatar: initials(c.name), title: c.name, sub: [c.adId && c.adMedia ? adKindLabel(c).replace(/ · .*$/, "") : "", c.ad, c.channel === "whatsapp" ? "WhatsApp" : "Messenger"].filter(Boolean).join(" · "), subColor: "var(--crm-brown)", menu: true } : null,
+    head: c ? { avatar: initials(c.name), title: c.name, sub: [sourceOf(c).brandLabel, c.adId && c.adMedia ? adKindLabel(c).replace(/ · .*$/, "") : "", c.ad, c.channel === "whatsapp" ? "WhatsApp" : "Messenger"].filter(Boolean).join(" · "), subColor: "var(--crm-brown)", menu: true } : null,
     owner: c ? (c.assignedTo ? `${ctx.nameOf(c.assignedTo)}'s customer` : "No one yet's customer") : "", reply: c ? `Reply to ${first(c.name)}…` : "",
     // v2: the pinned message's bar, the reply's quote over the box, the + menu.
     pinShown: !!pinned, pinText: pinned ? pinned.text || mediaWord(pinned) : "", unpinMsg: () => { if (c) void act.setPref(c.id, { pinnedMessageId: null }); },
