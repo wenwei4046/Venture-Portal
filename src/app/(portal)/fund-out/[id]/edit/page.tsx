@@ -2,10 +2,11 @@ import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { notFound, redirect } from 'next/navigation'
-import { requireAnyActionOn, requirePage } from '@/lib/auth'
+import { requireActionOn, requireAnyActionOn, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { latestTermsRequest } from '@/lib/terms-change-request'
+import { loanAmendFacts } from '@/lib/amend-facts'
 import LoanAmendForm from '../_components/LoanAmendForm'
 
 interface Props {
@@ -19,11 +20,8 @@ export default async function LoanEditPage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const { data: loan, error } = await supabase
-    .from('loans')
-    .select('id, status, effective_rate, tenure_months, disbursement_date, repayment_terms, compound_interest, company_id')
-    .eq('id', id)
-    .single()
+  // The whole row: its terms (and where they began, its repayment start) feed the form's facts.
+  const { data: loan, error } = await supabase.from('loans').select('*').eq('id', id).single()
 
   if (error || !loan) notFound()
   // Only active loans can be amended in-app. Pending ones are edited via the
@@ -40,6 +38,10 @@ export default async function LoanEditPage({ params }: Props) {
     .select('name, short_code')
     .eq('id', loan.company_id)
     .single()
+  // When it was disbursed, the first instalment, where the terms in force began, and the amounts the interest can be on —
+  // read off the loan's repayments and terms history, which its viewers read (Treasury · View).
+  await requireActionOn('/fund-out/[id]/edit', 'treasury', 'view')
+  const facts = await loanAmendFacts(supabase as unknown as SupabaseClient, loan as Parameters<typeof loanAmendFacts>[1], company?.name ?? '—')
 
   return (
     <div>
@@ -48,7 +50,7 @@ export default async function LoanEditPage({ params }: Props) {
       </Link>
       <div className="page-head">
         <div>
-          <div className="page-eyebrow"><em>I.</em> TREASURY · 修改贷款条款</div>
+          <div className="page-eyebrow"><em>I.</em> TREASURY · AMEND TERMS</div>
           <h1 className="page-title">{company?.name ?? '—'}</h1>
         </div>
       </div>
@@ -61,7 +63,7 @@ export default async function LoanEditPage({ params }: Props) {
         repaymentTerms={(loan.repayment_terms as string | null) ?? ''}
         compound={(loan as { compound_interest?: boolean }).compound_interest === true}
         nextMonth={officeTime().add(1, 'month').format('YYYY-MM')}
-        termsFrom={((loan as { terms_effective_from?: string | null }).terms_effective_from ?? null)?.slice(0, 7) ?? null}
+        facts={facts}
         direct={direct}
       />
     </div>

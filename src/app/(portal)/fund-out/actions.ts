@@ -18,7 +18,7 @@ import {
 } from '@/lib/loans-coa'
 import type { PaymentType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
-import { compoundSent } from '@/lib/fund-amend'
+import { compoundSent, explainAmendRefusal } from '@/lib/fund-amend'
 import { loadNewLoanOptions, type NewLoanOptions } from './_lib/new-loan-options'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
@@ -690,19 +690,67 @@ export async function amendRepaymentDate(
   return { old: res.old, newDate: res.new ?? newDate }
 }
 
-// ─── Amend an active loan (Principal — self-service, direct apply) ────────────
+// ─── Amend an active loan: the terms in force recalculated ────────────────────
 // Principal is the top approval authority, so edits apply immediately via the
 // amend_loan SECURITY DEFINER RPC (audited by loans.updated_at). Only the
-// fields the form sends are changed. Finance-initiated edits that route through
-// the approval queue are a separate follow-up.
+// fields the form sends are changed. Treasury · Edit without Approve
+// (2026-10-27, the user: "Finance 也能提交「从第一期起重算」给 Principal 核准")
+// FILES the same change for the Principal — the rate, the tenure, compounding —
+// and the approval applies it (file_terms_change p_whole).
 export async function amendLoan(formData: FormData): Promise<{ error: string } | undefined> {
-  await requireActionOn('/fund-out', 'treasury', 'approve')
-  const refused = await amendLoanWork(formData)
+  const user = await requireAnyActionOn('/fund-out', ['treasury', 'approve'], ['treasury', 'edit'])
+  const refused = canDo(user, 'treasury', 'approve') ? await amendLoanWork(formData) : await fileWholeLoan(formData)
   if (refused) return refused
   redirect(`/fund-out/${formData.get('loan_id') as string}`)
 }
 
+/** The whole terms filed for the Principal: the rate, the tenure, compounding — never the disbursement or the terms' words. */
+async function fileWholeLoan(formData: FormData): Promise<{ error: string } | undefined> {
+  const supabase = await createClient()
+
+  const loanId = (formData.get('loan_id') as string) ?? ''
+  if (!loanId) return { error: 'Loan id is required' }
+  const ratePctRaw = ((formData.get('effective_rate_percent') as string) ?? '').trim()
+  let rate: number | null = null
+  if (ratePctRaw !== '') {
+    const ratePct = parseFloat(ratePctRaw)
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: 'The rate must be from 0 to 100%.' }
+    rate = Math.round((ratePct / 100) * 1e6) / 1e6
+  }
+  const tenureRaw = ((formData.get('tenure_months') as string) ?? '').trim()
+  let tenure: number | null = null
+  if (tenureRaw !== '') {
+    const n = parseInt(tenureRaw, 10)
+    if (isNaN(n) || n < 1 || n > 120) return { error: 'The tenure is a whole number of months from 1 to 120.' }
+    tenure = n
+  }
+  const compound = compoundSent(formData)
+  if (rate === null && tenure === null && compound === null) {
+    return { error: 'Nothing was changed — change the rate, the tenure or compounding first.' }
+  }
+  const reason = ((formData.get('reason') as string) ?? '').trim()
+
+  const { error } = await supabase.rpc('file_terms_change' as never, {
+    p_record_kind: 'loan',
+    p_record_id: loanId,
+    // The database takes the month the terms in force began; a date is asked all the same.
+    p_effective_from: officeToday(),
+    p_rate: rate,
+    p_remaining_months: tenure,
+    p_compound_interest: compound,
+    p_reason: reason || null,
+    p_whole: true,
+  } as never)
+  if (error) return { error: `Not submitted: ${error.message}` }
+  revalidatePath(`/fund-out/${loanId}`)
+  revalidatePath('/fund-out')
+  revalidatePath('/approvals')
+  return undefined
+}
+
 async function amendLoanWork(formData: FormData): Promise<{ error: string } | undefined> {
+  // Applied at once is Treasury · Approve's — the RPC asks it too.
+  await requireActionOn('/fund-out', 'treasury', 'approve')
   const supabase = await createClient()
 
   const loanId = (formData.get('loan_id') as string) ?? ''
@@ -720,19 +768,19 @@ async function amendLoanWork(formData: FormData): Promise<{ error: string } | un
 
   if (ratePctRaw.trim() !== '') {
     const ratePct = parseFloat(ratePctRaw)
-    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: '利率必须在 0–100% 之间' }
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: 'The rate must be from 0 to 100%.' }
     payload.effective_rate = Math.round((ratePct / 100) * 1e6) / 1e6
   }
   if (tenureRaw.trim() !== '') {
     const tenure = parseInt(tenureRaw, 10)
-    if (isNaN(tenure) || tenure < 1 || tenure > 120) return { error: '期数必须在 1–120 之间' }
+    if (isNaN(tenure) || tenure < 1 || tenure > 120) return { error: 'The tenure is a whole number of months from 1 to 120.' }
     payload.tenure_months = tenure
   }
   if (disbursementDate) payload.disbursement_date = disbursementDate
   if (repaymentTerms.trim()) payload.repayment_terms = repaymentTerms.trim()
 
   const { error } = await supabase.rpc('amend_loan', { p_loan_id: loanId, p_payload: payload })
-  if (error) return { error: `修改失败: ${error.message}` }
+  if (error) return { error: `Not saved: ${error.message}` }
 
   revalidatePath(`/fund-out/${loanId}`)
   revalidatePath('/fund-out')
@@ -758,27 +806,27 @@ async function amendLoanFromWork(formData: FormData, direct = true): Promise<{ e
   const loanId = (formData.get('loan_id') as string) ?? ''
   if (!loanId) return { error: 'Loan id is required' }
   const fromYM = ((formData.get('effective_from') as string) ?? '').trim()
-  if (!/^\d{4}-\d{2}$/.test(fromYM)) return { error: '请选生效月' }
+  if (!/^\d{4}-\d{2}$/.test(fromYM)) return { error: 'Choose the month it takes effect.' }
 
   const ratePctRaw = ((formData.get('effective_rate_percent') as string) ?? '').trim()
   let rate: number | null = null
   if (ratePctRaw !== '') {
     const ratePct = parseFloat(ratePctRaw)
-    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: '利率必须在 0–100% 之间' }
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: 'The rate must be from 0 to 100%.' }
     rate = Math.round((ratePct / 100) * 1e6) / 1e6
   }
   const remainingRaw = ((formData.get('remaining_months') as string) ?? '').trim()
   let remaining: number | null = null
   if (remainingRaw !== '') {
     const n = parseInt(remainingRaw, 10)
-    if (isNaN(n) || n < 1 || n > 120) return { error: '剩余期数必须在 1–120,或留空保持原到期月' }
+    if (isNaN(n) || n < 1 || n > 120) return { error: 'The months left are a whole number from 1 to 120, or blank to keep the end month.' }
     remaining = n
   }
   const reason = ((formData.get('reason') as string) ?? '').trim()
   const noFixedTerm = formData.get('no_fixed_term') === 'on'
   const interestOnOriginal = formData.get('interest_on_original') === 'on'
   const interestKeepsBase = formData.get('interest_keeps_base') === 'on'
-  if (interestOnOriginal && interestKeepsBase) return { error: '利息按原本金算、照之前的本金算，只能选一个' }
+  if (interestOnOriginal && interestKeepsBase) return { error: 'Choose one amount for the interest to be charged on.' }
 
   if (!direct) {
     const { error: fileErr } = await supabase.rpc('file_terms_change' as never, {
@@ -793,7 +841,7 @@ async function amendLoanFromWork(formData: FormData, direct = true): Promise<{ e
       p_interest_keeps_base: interestKeepsBase,
       p_reason: reason || null,
     } as never)
-    if (fileErr) return { error: `没有提交: ${fileErr.message}` }
+    if (fileErr) return { error: `Not submitted: ${explainAmendRefusal(fileErr.message) ?? fileErr.message}` }
     revalidatePath(`/fund-out/${loanId}`)
     revalidatePath('/fund-out')
     revalidatePath('/approvals')
@@ -814,7 +862,7 @@ async function amendLoanFromWork(formData: FormData, direct = true): Promise<{ e
     p_interest_on_original: interestOnOriginal,
     p_interest_keeps_base: interestKeepsBase,
   })
-  if (error) return { error: `修改失败: ${error.message}` }
+  if (error) return { error: `Not saved: ${explainAmendRefusal(error.message) ?? error.message}` }
 
   revalidatePath(`/fund-out/${loanId}`)
   revalidatePath('/fund-out')
@@ -831,13 +879,11 @@ async function amendLoanFromWork(formData: FormData, direct = true): Promise<{ e
  * redirect to the portal's page — the app stays on its own screen.
  */
 export async function amendLoanInWords(mode: 'from' | 'whole', formData: FormData): Promise<{ ok: true; filed?: boolean } | { ok: false; reason: string }> {
-  // Treasury · Edit files a from-month change for the Principal; the whole deal again stays Approve's.
-  const user = mode === 'whole'
-    ? await requireActionOn('/fund-out', 'treasury', 'approve')
-    : await requireAnyActionOn('/fund-out', ['treasury', 'approve'], ['treasury', 'edit'])
+  // Treasury · Edit files either change for the Principal (the whole terms since 2026-10-27); Approve applies it.
+  const user = await requireAnyActionOn('/fund-out', ['treasury', 'approve'], ['treasury', 'edit'])
   const direct = canDo(user, 'treasury', 'approve')
   try {
-    const refused = mode === 'from' ? await amendLoanFromWork(formData, direct) : await amendLoanWork(formData)
+    const refused = mode === 'from' ? await amendLoanFromWork(formData, direct) : direct ? await amendLoanWork(formData) : await fileWholeLoan(formData)
     return refused ? { ok: false, reason: refused.error } : { ok: true, filed: !direct }
   } catch (e) {
     return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The terms could not be changed.' }

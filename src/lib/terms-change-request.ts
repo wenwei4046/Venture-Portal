@@ -25,6 +25,11 @@ export interface TermsAsk {
   noFixedTerm: boolean
   interestOnOriginal: boolean
   interestKeepsBase: boolean
+  /**
+   * The terms in force recalculated from when they began (2026-10-27, "From the first instalment"): `fromYM` is that
+   * month and `remainingMonths` the terms' periods, instead of new terms from a later month. Absent = a later month.
+   */
+  wholeDeal?: boolean
 }
 
 /** A `treasury_terms_requests` row. */
@@ -47,10 +52,12 @@ export interface TermsRequestRow {
   decided_by: string | null
   decided_at: string | null
   decision_note: string | null
+  /** mig 20261027140000; absent on a row read before it. */
+  whole_deal?: boolean
 }
 
 const COLUMNS =
-  'id, record_kind, record_id, effective_from, rate, remaining_months, compound_interest, no_fixed_term, interest_on_original, interest_keeps_base, reason, status, approval_id, created_by, created_at, decided_by, decided_at, decision_note'
+  'id, record_kind, record_id, effective_from, rate, remaining_months, compound_interest, no_fixed_term, interest_on_original, interest_keeps_base, reason, status, approval_id, created_by, created_at, decided_by, decided_at, decision_note, whole_deal'
 
 /** A decided request stays on its deal's page this long. */
 export const DECIDED_SHOWN_DAYS = 30
@@ -70,15 +77,20 @@ export function askOf(r: TermsRequestRow): TermsAsk {
     noFixedTerm: r.no_fixed_term === true,
     interestOnOriginal: r.interest_on_original === true,
     interestKeepsBase: r.interest_keeps_base === true,
+    wholeDeal: r.whole_deal === true,
   }
 }
 
+/** Where it asks from, in words: "from Oct 2026", or "whole deal from Apr 2026" for the terms in force recalculated. */
+export const askScope = (a: Pick<TermsAsk, 'fromYM' | 'wholeDeal'>): string => `${a.wholeDeal ? 'whole deal from' : 'from'} ${monthWords(a.fromYM)}`
+
 /** What it asks, in words — off the row alone (the queue's title says the same). */
 export function askWords(a: TermsAsk): string {
+  const scope = askScope(a)
   return [
-    `From ${monthWords(a.fromYM)}`,
+    scope.charAt(0).toUpperCase() + scope.slice(1),
     a.rate != null ? `${pct(a.rate)} /mo` : null,
-    a.noFixedTerm ? 'no fixed term' : a.remainingMonths != null ? `${a.remainingMonths} months left` : null,
+    a.noFixedTerm ? 'no fixed term' : a.remainingMonths != null ? `${a.remainingMonths} months${a.wholeDeal ? '' : ' left'}` : null,
     a.compounding === true ? 'compounding' : a.compounding === false ? 'not compounding' : null,
     a.interestOnOriginal ? 'interest on the original principal' : a.interestKeepsBase ? 'interest on the principal it was on before' : null,
   ]
@@ -92,6 +104,11 @@ export function askWords(a: TermsAsk): string {
  * a loan once without a fixed term stays so (its terms' words say it, and the amend never takes them back).
  */
 export function termsAfterAsk(kind: TermsRecordKind, t: PositionTerms, ask: TermsAsk): PositionTerms {
+  if (ask.wholeDeal) {
+    // The terms in force themselves, from when they began (amend_fund_source / amend_loan): no new segment, no history.
+    const months = ask.noFixedTerm || (kind === 'loan' && t.current.months == null) ? null : (ask.remainingMonths ?? t.current.months)
+    return { ...t, current: { ...t.current, rate: ask.rate ?? t.current.rate, months, compounding: ask.compounding ?? t.current.compounding } }
+  }
   const segFrom = t.current.effectiveFrom ?? t.firstDueYM ?? t.startYM ?? ask.fromYM
   const kept = t.current.months ? Math.max(1, monthsBetweenYM(ask.fromYM, addMonthsYM(segFrom, t.current.months - 1)) + 1) : null
   const months = ask.noFixedTerm || (kind === 'loan' && t.current.months == null) ? null : (ask.remainingMonths ?? kept)
@@ -126,6 +143,14 @@ export function termsAskView(
   ask: TermsAsk,
   status: TermsRequestStatus,
 ): TermsAskView {
+  if (ask.wholeDeal) {
+    // Applied, the terms in force read as asked and what they were is not kept; waiting, the terms in force beside them recalculated.
+    if (status === 'approved') return { ok: false, why: 'Applied — the terms in force now read as asked.' }
+    const now = buildTermsSegments(t, principalByMonth)
+    const next = buildTermsSegments(termsAfterAsk(kind, t, ask), principalByMonth)
+    if (!now.length || !next.length) return { ok: false, why: 'The deal has no start date yet.' }
+    return { ok: true, before: now[now.length - 1], after: next[next.length - 1] }
+  }
   if (status === 'approved') {
     const segs = buildTermsSegments(t, principalByMonth)
     const k = segs.findIndex((s, i) => i > 0 && s.changed && s.fromYM === ask.fromYM)
@@ -220,6 +245,8 @@ export interface TermsRequestNote {
   approvalId: string | null
   status: 'pending' | 'approved' | 'rejected'
   fromYM: string
+  /** The terms in force recalculated from `fromYM`, not new terms from a later month. */
+  whole: boolean
   /** What it asks from then, in a line. */
   line: string
   reason: string | null
@@ -261,7 +288,8 @@ export function termsRequestNote(args: {
     approvalId: row.approval_id,
     status: row.status,
     fromYM: ask.fromYM,
-    line: view.ok ? askLine(view.after) : askWords(ask).replace(/^From [A-Za-z]{3} \d{4}(?: · )?/, ''),
+    whole: ask.wholeDeal === true,
+    line: view.ok ? askLine(view.after) : askWords(ask).replace(/^(?:Whole deal from|From) [A-Za-z]{3} \d{4}(?: · )?/, ''),
     reason: row.reason,
     by: args.nameOf(row.created_by) ?? 'Finance',
     at: args.stamp(row.created_at),
@@ -281,6 +309,8 @@ export interface TermsChangeContext {
   fromYM: string
   /** "Oct 2026". */
   fromLabel: string
+  /** "from Oct 2026", or "whole deal from Apr 2026" — what the request's heads say. */
+  scope: string
   reason: string | null
   /** The ask in words — there whether or not the figures could be laid out. */
   words: string
@@ -298,7 +328,16 @@ export async function readTermsChange(supabase: SupabaseClient, approvalId: stri
   const row = (data as TermsRequestRow | null) ?? null
   if (!row) return null
   const ask = askOf(row)
-  const base = { kind: row.record_kind, dealId: row.record_id, status: row.status, fromYM: ask.fromYM, fromLabel: monthWords(ask.fromYM), reason: row.reason, words: askWords(ask) }
+  const base = {
+    kind: row.record_kind,
+    dealId: row.record_id,
+    status: row.status,
+    fromYM: ask.fromYM,
+    fromLabel: monthWords(ask.fromYM),
+    scope: askScope(ask),
+    reason: row.reason,
+    words: askWords(ask),
+  }
 
   const loan = row.record_kind === 'loan'
   const [{ data: deal }, { data: history }, { data: reps }] = await Promise.all([

@@ -141,3 +141,63 @@ describe('what the deal’s page says', () => {
     expect(note(null, { id: 'fin', approves: false })).toBeNull()
   })
 })
+
+// The terms in force recalculated, filed by Finance (2026-10-27, the mockup terms-first-month-mockup.html — "From the
+// first instalment"): Chai Meng Keat's 5,000 received 26 Mar 2026 at 0%, no fixed term, its first instalment April —
+// 0.833% from the first instalment asked.
+describe('a change of the whole terms', () => {
+  const CHAI: PositionTerms = {
+    principal: 5000,
+    startYM: '2026-03',
+    firstDueYM: '2026-04',
+    current: { rate: 0, months: null, compounding: false, effectiveFrom: null },
+    history: [],
+  }
+  const WHOLE: TermsAsk = {
+    fromYM: '2026-04',
+    rate: 0.00833,
+    remainingMonths: null,
+    compounding: null,
+    noFixedTerm: true,
+    interestOnOriginal: false,
+    interestKeepsBase: false,
+    wholeDeal: true,
+  }
+
+  it('says it is the whole deal, from when the terms in force began', () => {
+    expect(askWords(WHOLE)).toBe('Whole deal from Apr 2026 · 0.833% /mo · no fixed term')
+    expect(askWords({ ...WHOLE, noFixedTerm: false, remainingMonths: 12 })).toBe('Whole deal from Apr 2026 · 0.833% /mo · 12 months')
+    expect(askWords(OCTOBER)).toMatch(/^From Oct 2026 · /)
+  })
+
+  it('recalculates the terms in force in place — no new segment, no history', () => {
+    const after = termsAfterAsk('fund_source', CHAI, WHOLE)
+    expect(after.history).toEqual([])
+    expect(after.current).toEqual({ rate: 0.00833, months: null, compounding: false, effectiveFrom: null })
+  })
+
+  it('while it waits: the terms in force beside them recalculated; approved: the words alone', () => {
+    const view = termsAskView('fund_source', CHAI, {}, WHOLE, 'pending')
+    expect(view.ok).toBe(true)
+    if (view.ok) {
+      expect(view.before.rate).toBe(0)
+      expect(view.after).toMatchObject({ rate: 0.00833, months: null, interestPerMonth: 41.65 })
+    }
+    expect(termsAskView('fund_source', CHAI, {}, WHOLE, 'approved')).toEqual({ ok: false, why: 'Applied — the terms in force now read as asked.' })
+  })
+
+  it('the deal’s page says it is the whole deal', () => {
+    const note = termsRequestNote({
+      row: row({ whole_deal: true, effective_from: '2026-04-01', rate: 0.00833, interest_keeps_base: false, reason: null }),
+      kind: 'fund_source',
+      terms: CHAI,
+      principalByMonth: {},
+      nameOf: () => 'Finance Manager',
+      stamp: () => '27 Oct 2026 · 11:00',
+      readerId: 'fin',
+      readerApprovesAll: false,
+    })
+    expect(note).toMatchObject({ whole: true, fromYM: '2026-04', status: 'pending' })
+    expect(note?.line).toMatch(/^0\.833% \/mo · no fixed term/)
+  })
+})

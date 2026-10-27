@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { amendDraftOf, amendFormData, amendsNothing, compoundSent, draftOfForm, type AmendTerms } from './fund-amend'
+import {
+  amendDraftOf,
+  amendFormData,
+  amendWindow,
+  amendsNothing,
+  compoundSent,
+  draftOfForm,
+  explainAmendRefusal,
+  laterYM,
+  owedAtStart,
+  wholeChoiceName,
+  type AmendTerms,
+} from './fund-amend'
 
 // Amend terms sends only what changed (2026-10-16 — the user's rule of
 // 2026-10-14: shared logins open one deal on two screens, and a form sent
@@ -67,5 +79,53 @@ describe('Amend terms — what is sent', () => {
     expect(amendsNothing(amendFormData('out', 'l1', LOAN, d))).toBe(true)
     fd.set('compound_interest', 'on')
     expect(entries(amendFormData('out', 'l1', LOAN, draftOfForm('out', fd, 'whole', LOAN)))).toEqual({ loan_id: 'l1', compound_interest: 'on' })
+  })
+})
+
+// Where a change can start (2026-10-27, the user: "表格也写清楚最早能选哪个月"; Chai Meng Keat's 5,000 received
+// 26 Mar 2026 — its first instalment April, so a change from a later month starts May at the earliest).
+describe('Amend terms — where a change can start', () => {
+  it('a deal never changed: its terms run from the first instalment; a later month starts the month after', () => {
+    const w = amendWindow('2026-04', null)
+    expect(w).toEqual({ firstDueYM: '2026-04', termsFromYM: '2026-04', changed: false, earliestYM: '2026-05' })
+    expect(wholeChoiceName(w)).toBe('From the first instalment')
+  })
+
+  it('a deal changed before: from the month it was changed, across the year end', () => {
+    const w = amendWindow('2025-05', '2025-12-01')
+    expect(w).toEqual({ firstDueYM: '2025-05', termsFromYM: '2025-12', changed: true, earliestYM: '2026-01' })
+    expect(wholeChoiceName(w)).toBe('From when these terms began')
+  })
+
+  it('the form starts on next month, never before the earliest', () => {
+    expect(laterYM('2026-11', '2026-05')).toBe('2026-11')
+    expect(laterYM('2026-03', '2026-05')).toBe('2026-05')
+  })
+
+  it('the database’s refusal of a month too early, in words a reader can act on', () => {
+    expect(explainAmendRefusal('Effective month 2026-04 must be after the month the current terms took effect (2026-04)')).toBe(
+      'Apr 2026 is when the terms in force began, so a change from a later month can start May 2026 at the earliest. To change from Apr 2026 itself, choose the option that recalculates the terms in force.',
+    )
+    expect(explainAmendRefusal('Rate must be between 0 and 100%')).toBeNull()
+  })
+
+  it('what is owed when a month starts: the amount less what was repaid in the months before it', () => {
+    const f = { principal: 60000, paidByMonth: { '2025-04': 1000, '2026-09': 1000, '2026-10': 1000 } }
+    expect(owedAtStart(f, '2026-10')).toBe(58000)
+    expect(owedAtStart(f, '2025-04')).toBe(60000)
+  })
+})
+
+describe('Amend terms — the whole terms filed by Finance', () => {
+  it('leaves the start and the words alone when the form does not show them, and says why', () => {
+    const fd = new FormData()
+    fd.set('cost_rate_percent', '0.833')
+    fd.set('lock_in_months', '')
+    fd.set('compound_interest', 'on')
+    fd.set('reason', 'agreed from the start ')
+    const d = draftOfForm('in', fd, 'whole', SOURCE)
+    expect(d.start).toBe(SOURCE.start)
+    expect(d.text).toBe(SOURCE.text)
+    expect(entries(amendFormData('in', 's1', SOURCE, d))).toEqual({ fund_source_id: 's1', cost_rate_percent: '0.833', reason: 'agreed from the start' })
   })
 })

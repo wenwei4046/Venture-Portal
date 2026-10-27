@@ -126,7 +126,7 @@ export function RequestBody({ r, openFile }: { r: ApprovalRecordModel; openFile:
 
       {/* A terms change: each line as asked from the month, what it is now beneath the ones it moves. */}
       {r.terms ? (
-        <Group n={roman()} title={`Terms change · from ${r.terms.fromLabel}`}>
+        <Group n={roman()} title={`Terms change · ${r.terms.scope}`}>
           {r.terms.rows.map((row) => (
             <Line key={row.label} label={row.label} value={row.asked} sub={row.changed ? `Now ${row.now}` : 'As it is'} />
           ))}
