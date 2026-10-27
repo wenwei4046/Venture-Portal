@@ -9,13 +9,15 @@ import { inSource, type SourcePick } from "@/lib/member/crm-source";
 
 const DAY = 86_400_000;
 export type Range = { a: number; b: number };
-export type ReportPeriod = "week" | "lastweek" | "month" | "lastmonth";
+export type ReportPeriod = "week" | "lastweek" | "month" | "lastmonth" | "custom";
 export type ReportSection = "totals" | "byAd" | "shots" | "reps" | "props" | "questions";
 
 export interface WorkspaceReport {
   id: string;
   name: string;
   period: ReportPeriod;
+  /** A custom period's first and last day, "YYYY-MM-DD" (the owner, 2026-10-27: "让我custome 日期"). */
+  from?: string; to?: string;
   src: SourcePick;
   metrics: string[];
   sections: ReportSection[];
@@ -25,8 +27,13 @@ export const SECTIONS: [ReportSection, string][] = [
   ["totals", "Totals vs the period before"], ["byAd", "Each ad's figures"], ["shots", "Each ad's picture"],
   ["reps", "Who the leads went to"], ["props", "Properties asked about"], ["questions", "What customers asked most"],
 ];
-export const PERIODS: [ReportPeriod, string][] = [["week", "This week"], ["lastweek", "Last week"], ["month", "This month"], ["lastmonth", "Last month"]];
-export const REPORT_METRICS = ["spend", "leads", "cpl", "appt", "apptrate", "showup", "showrate", "won", "winrate", "cpappt", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm"];
+export const PERIODS: [ReportPeriod, string][] = [["week", "This week"], ["lastweek", "Last week"], ["month", "This month"], ["lastmonth", "Last month"], ["custom", "Custom"]];
+/**
+ * Every metric a report can work out (2026-10-27, the owner: "我要可以加指标得功能"): Meta's that the server reads
+ * (metaFigures) and the CRM's own — the rest of Ads Performance's list (engagement, video) Meta's figures do not carry.
+ */
+export const REPORT_METRICS = ["spend", "impr", "reach", "results", "cpr", "freq", "cpm", "cpp", "msgconv", "cpmsg", "clicks", "cpc", "ctr", "allclk", "ctrall", "cpcall",
+  "leads", "cpl", "appt", "apptrate", "cpappt", "showup", "showrate", "won", "winrate", "cpwon"];
 const DEF_METRICS = ["spend", "leads", "cpl", "appt", "apptrate", "showup", "showrate"];
 const ALL_SECTIONS = SECTIONS.map(s => s[0]);
 
@@ -38,8 +45,18 @@ export const DEFAULT_REPORTS: WorkspaceReport[] = [
 const day0 = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
 /** The period (Monday to Sunday; the 1st to the month's end — up to today while it runs) and the same length before it. */
-export function periodRanges(p: ReportPeriod, now: Date): { cur: Range; prev: Range } {
+export function periodRanges(p: ReportPeriod, now: Date, custom?: { from?: string; to?: string }): { cur: Range; prev: Range } {
   const today = day0(now.getTime());
+  if (p === "custom") {
+    // Custom: the days picked (either way round), against as many days just before them.
+    const at = (s?: string) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00`).getTime() : NaN);
+    let a = at(custom?.from), b = at(custom?.to);
+    if (Number.isNaN(a)) a = Number.isNaN(b) ? today - 6 * DAY : b;
+    if (Number.isNaN(b)) b = a;
+    if (a > b) [a, b] = [b, a];
+    const n = Math.round((b - a) / DAY) + 1;
+    return { cur: { a, b }, prev: { a: day0(a - n * DAY + DAY / 2), b: day0(a - DAY + DAY / 2) } };
+  }
   if (p === "week" || p === "lastweek") {
     const mon = today - ((new Date(today).getDay() + 6) % 7) * DAY;
     const a = p === "week" ? mon : mon - 7 * DAY, b = p === "week" ? today : mon - DAY;

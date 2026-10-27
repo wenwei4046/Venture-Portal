@@ -11,7 +11,7 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adPageInSource, BRAND_LABEL, brandOf, SOURCE_PICKS, sourceLabel, sourceOf, type SourcePick } from "@/lib/member/crm-source";
 import { fetchAdInsights, fetchAdThumbs } from "@/app/(member)/member/crm-actions";
-import { ALL, metaFigures } from "./vm/adsperf";
+import { ALL, METRICS, metaFigures } from "./vm/adsperf";
 import { chartFmt, chartFmtOf, isoOf } from "./vm/adschart";
 import {
   changeOf, crmFigures, leadsByRep, loadReports, periodRanges, PERIODS, propertyRanking, questionTopics, REPORT_METRICS,
@@ -30,6 +30,7 @@ export interface WorkspaceIn {
 const BTN: CSSProperties = { border: 0, background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left", margin: 0, padding: 0, boxSizing: "border-box" };
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const CARD: CSSProperties = { background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "12px", padding: "16px 18px", boxSizing: "border-box" };
+const DATE: CSSProperties = { height: "30px", borderRadius: "8px", border: "1px solid var(--crm-line)", padding: "0 8px", font: "500 12.5px Inter, sans-serif", background: "#fff", color: "var(--crm-ink)" };
 const META = new Set(["spend", "cpl", "cpappt", "cpwon", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm"]);
 const defOf = (k: string) => ALL.find(m => m[0] === k);
 const labelOf = (k: string) => defOf(k)?.[1] ?? k;
@@ -52,7 +53,7 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
   });
   const removeReport = () => setReports(list => { if (list.length < 2) return list; const next = list.filter(r => r.id !== rep.id); saveReports(next); setPick(next[0].id); return next; });
 
-  const { cur, prev } = useMemo(() => periodRanges(rep.period, w.now), [rep.period, w.now]);
+  const { cur, prev } = useMemo(() => periodRanges(rep.period, w.now, { from: rep.from, to: rep.to }), [rep.period, rep.from, rep.to, w.now]);
   const src = rep.src;
   const on = (s: ReportSection) => rep.sections.includes(s);
   const leads = useMemo(() => reportLeads(w.customers, cur, src), [w.customers, cur, src]);
@@ -78,7 +79,9 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
   const [metaNote, setMetaNote] = useState("");
   useEffect(() => {
     if (!wantMeta) return;
+    // Another period's figures are never shown as this one's while Meta answers ("—" meanwhile).
     let live = true;
+    setFigA({}); setFigB({}); setMetaNote("");
     void fetchAdInsights(ids, isoOf(cur.a), isoOf(cur.b)).then(x => { if (!live) return; if (x.ok) setFigA(x.figs); else setMetaNote(x.error); });
     void fetchAdInsights(ids, isoOf(prev.a), isoOf(prev.b)).then(x => { if (live && x.ok) setFigB(x.figs); });
     return () => { live = false; };
@@ -131,7 +134,7 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
         <span style={{ fontSize: "11px", fontWeight: 600, letterSpacing: ".08em", color: "var(--crm-faint)", padding: "4px 8px" }}>MY REPORTS</span>
         {reports.map(r => (
           <button key={r.id} type="button" onClick={() => { setPick(r.id); setEditing(false); }} style={{ ...BTN, padding: "10px 12px", borderRadius: "8px", fontSize: "13.5px", fontWeight: r.id === rep.id ? 650 : 500, background: r.id === rep.id ? "var(--crm-tint-attention)" : "transparent" }}>
-            {r.name}<span style={{ display: "block", fontSize: "11.5px", fontWeight: 400, color: "var(--crm-muted)" }}>{PERIODS.find(p => p[0] === r.period)?.[1]} · {sourceLabel(r.src)}</span>
+            {r.name}<span style={{ display: "block", fontSize: "11.5px", fontWeight: 400, color: "var(--crm-muted)" }}>{r.period === "custom" ? `${r.from ?? ""} – ${r.to ?? ""}` : PERIODS.find(p => p[0] === r.period)?.[1]} · {sourceLabel(r.src)}</span>
           </button>
         ))}
         <button type="button" onClick={addReport} style={{ ...BTN, padding: "10px 12px", borderRadius: "8px", border: "1px dashed var(--crm-line)", fontSize: "13px", fontWeight: 600, color: "var(--crm-rust)" }}>+ New report</button>
@@ -141,7 +144,14 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
         {/* The report's controls */}
         <div data-ws-noprint style={{ ...CARD, display: "flex", flexDirection: "column", gap: "12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-            {PERIODS.map(([k, l]) => <button key={k} type="button" onClick={() => update({ period: k })} style={chip(rep.period === k)}>{l}</button>)}
+            {PERIODS.map(([k, l]) => <button key={k} type="button" onClick={() => update(k === "custom" && !rep.from ? { period: k, from: isoOf(cur.a), to: isoOf(cur.b) } : { period: k })} style={chip(rep.period === k)}>{l}</button>)}
+            {rep.period === "custom" && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "var(--crm-muted)" }}>
+                <input type="date" aria-label="From" value={rep.from ?? ""} max={rep.to || undefined} onChange={e => update({ from: e.target.value })} style={DATE} />
+                to
+                <input type="date" aria-label="To" value={rep.to ?? ""} min={rep.from || undefined} onChange={e => update({ to: e.target.value })} style={DATE} />
+              </span>
+            )}
             <span style={{ width: "1px", height: "22px", background: "var(--crm-rule)", margin: "0 4px" }} />
             <select value={src} onChange={e => update({ src: e.target.value as SourcePick })} aria-label="Source" style={{ height: "30px", borderRadius: "8px", border: "1px solid var(--crm-line)", padding: "0 8px", font: "500 12.5px Inter, sans-serif", background: "#fff", color: "var(--crm-ink)" }}>
               {SOURCE_PICKS.map(p => <option key={p.v} value={p.v}>{p.sub ? `  ${p.label}` : p.label}</option>)}
@@ -173,7 +183,8 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
                       <button type="button" aria-label={`Remove ${labelOf(k)}`} onClick={() => update({ metrics: rep.metrics.filter(x => x !== k) })} style={{ ...BTN, opacity: 0.8 }}>×</button>
                     </span>
                   ))}
-                  {REPORT_METRICS.filter(k => !rep.metrics.includes(k)).map(k => <button key={k} type="button" onClick={() => update({ metrics: [...rep.metrics, k] })} style={chip(false)}>+ {labelOf(k)}</button>)}
+                  <MetricPicker have={rep.metrics} add={k => update({ metrics: [...rep.metrics, k] })} />
+                  {rep.metrics.length > 0 && <button type="button" onClick={() => update({ metrics: [] })} style={{ ...BTN, fontSize: "12px", fontWeight: 600, color: "var(--crm-muted)", padding: "0 6px" }}>Clear all</button>}
                 </div>
               </div>
               {reports.length > 1 && <button type="button" onClick={removeReport} style={{ ...BTN, alignSelf: "flex-start", fontSize: "12.5px", fontWeight: 600, color: "var(--crm-oxblood)" }}>Delete this report</button>}
@@ -290,5 +301,38 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/** + Add metric: every metric a report can work out, grouped as Ads Performance's Customise metrics, searchable; one tap adds it. */
+function MetricPicker({ have, add }: { have: string[]; add: (k: string) => void }) {
+  const [open, setOpen] = useState(false), [q, setQ] = useState("");
+  const needle = q.trim().toLowerCase();
+  const groups = METRICS.map(([g, , ms]) => [g, ms.filter(m => REPORT_METRICS.includes(m[0]) && !have.includes(m[0])
+    && (!needle || `${m[1]} ${m[2]}`.toLowerCase().includes(needle)))] as const).filter(([, ms]) => ms.length);
+  return (
+    <span style={{ position: "relative", display: "inline-flex" }}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "15px", border: "1px dashed var(--crm-rust)", fontSize: "12.5px", fontWeight: 650, color: "var(--crm-rust)", whiteSpace: "nowrap" }}>+ Add metric</button>
+      {open && (<>
+        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 7 }} />
+        <div role="dialog" aria-label="Add a metric" style={{ position: "absolute", top: "36px", left: 0, zIndex: 8, width: "340px", maxHeight: "420px", display: "flex", flexDirection: "column", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", padding: "8px", boxSizing: "border-box" }}>
+          <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search metrics" aria-label="Search metrics" style={{ height: "32px", borderRadius: "8px", border: "1px solid var(--crm-line)", padding: "0 10px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)", marginBottom: "6px" }} />
+          <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
+            {!groups.length && <div style={{ padding: "10px", fontSize: "12.5px", color: "var(--crm-faint)" }}>{needle ? "No metric matches." : "Every metric is in the report."}</div>}
+            {groups.map(([g, ms]) => (
+              <div key={g} style={{ display: "flex", flexDirection: "column", padding: "4px 0" }}>
+                <span style={{ fontSize: "10.5px", fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--crm-faint)", padding: "4px 8px" }}>{g}</span>
+                {ms.map(m => (
+                  <button key={m[0]} type="button" onClick={() => add(m[0])} style={{ ...BTN, display: "flex", flexDirection: "column", padding: "7px 8px", borderRadius: "7px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 550, color: "var(--crm-ink)" }}>{m[1]}</span>
+                    <span style={{ fontSize: "11.5px", color: "var(--crm-muted)" }}>{m[2]}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </>)}
+    </span>
   );
 }
