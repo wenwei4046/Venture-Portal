@@ -85,6 +85,8 @@ export default function InboxView({
   const [filter, setFilter] = useState<Filter>(initialQuery ? 'all' : 'waiting')
   const [query, setQuery] = useState(initialQuery)
   const [label, setLabel] = useState<string>('')
+  // Quick filters, as Business Suite's chips (the user, 2026-10-27): Unread, and one label at a time — a click again clears.
+  const [unreadOnly, setUnreadOnly] = useState(false)
   const [selected, setSelected] = useState<string | null>(initialThread?.contact.id ?? contacts[0]?.id ?? null)
   const [threads, setThreads] = useState<Record<string, LeadThread>>(initialThread ? { [initialThread.contact.id]: initialThread } : {})
   const [loading, startLoading] = useTransition()
@@ -118,6 +120,7 @@ export default function InboxView({
   const labelsOf = (c: LeadContact) => threads[c.id]?.contact.labels ?? c.labels ?? []
   const found = contacts.filter(c => {
     if (label && !labelsOf(c).some(l => l.id === label)) return false
+    if (unreadOnly && !(c.unread ?? 0)) return false
     if (!q) return true
     const hay = `${c.name} ${c.phone ?? ''} ${c.phone ? formatPhone(c.phone) : ''} ${c.lastText} ${adLabel(c)}`.toLowerCase()
     return hay.includes(q) || (qDigits.length >= 3 && /^\d+$/.test(qDigits) && (c.phone ?? '').includes(qDigits))
@@ -197,12 +200,13 @@ export default function InboxView({
               <LeadIcon name="search" size={14} />
               <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Name, phone, message or ad" aria-label="Search conversations" />
             </label>
-            {labels.length ? (
-              <select className={s.labelFilter} value={label} onChange={e => setLabel(e.target.value)} aria-label="Label">
-                <option value="">All labels</option>
-                {labels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-              </select>
-            ) : null}
+            <div className={s.quickChips} role="group" aria-label="Filter">
+              <button type="button" className={s.quickChip} aria-pressed={unreadOnly} onClick={() => setUnreadOnly(u => !u)}>Unread</button>
+              {labels.map(l => (
+                <button key={l.id} type="button" className={s.quickChip} data-tone={l.tone} aria-pressed={label === l.id}
+                  onClick={() => setLabel(cur => (cur === l.id ? '' : l.id))}>{l.name}</button>
+              ))}
+            </div>
             <div className={s.states} role="group" aria-label="Where they stand">
               {FILTERS.map(f => (
                 <button key={f.id} type="button" className={s.stateTab} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>

@@ -1127,6 +1127,27 @@ await db.exec(`
   check(Date.parse((await card()).readAt), Date.parse('2030-01-01T00:00:00Z'), 'an older watermark never moves it back')
   check(!!outMid, true, 'the message out is there')
   check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_receipts(jsonb)', 'execute') a`))[0].a, false, 'receipts are the service role’s alone')
+
+  // ── In the order it was written (mig 20261027200000): a message filled in later, at its own time ──
+  check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_thread', 'lead_inbox') order by 1`)).map(r => [r.proname, r.m]),
+    [['lead_inbox', 'bb29724939997dee9a552adab8756de1'], ['lead_thread', 'ee6b0c5c2e53cba1ea639afb2f08247a']], 'both bodies here are production’s')
+  await db.exec(await f('20261027200000_lead_order_by_time.sql'))
+  await db.exec(await f('20261027200000_lead_order_by_time.sql'))
+  await as(CS_USER, ALL)
+  const g = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'ord.1', pageId: P, psid: '7700801', name: 'Order Test', kind: 'text', body: 'first question', sentAt: '2026-10-27T05:00:00Z', ad: null },
+  ])]))[0].r.contacts[0]
+  await q(`select public.lead_mark_seen($1)`, [g])
+  // The Page's answer, filled in afterwards (a higher id) at the time it was really sent — before the question.
+  await db.exec(`insert into public.lead_messages (contact_id, direction, sender, by_name, body, delivery, external_id, created_at)
+    values ('${g}', 'out', 'page', 'Business Suite', 'an older greeting', 'sent', 'ord.p', now() - interval '1 day')`)
+  const th = (await q(`select public.lead_thread($1) t`, [g]))[0].t
+  check(th.messages.map(m => m.body), ['an older greeting', 'first question'], 'the chat reads in the order it was written')
+  const unreadOf = async () => ((await q(`select public.lead_inbox() i`))[0].i).find(x => x.id === g).unread
+  check(await unreadOf(), 0, 'opened after the question: 0, an older reply filled in changes nothing')
+  await as(OTHER, ALL)
+  check(await unreadOf(), 1, 'for somebody who has not opened it, the question after the old greeting is unread')
+  await as(CS_USER, ALL)
 }
 
 console.log(`validate-leads: ${checks} checks passed`)
