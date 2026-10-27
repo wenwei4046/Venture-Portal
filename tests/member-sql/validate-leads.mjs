@@ -870,11 +870,11 @@ await db.exec(`
   check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.create']);`), true, 'lead_reply_sent asks the Inbox')
 }
 
-// ── 2990s mini by the ad's ad account (mig 20261027100000): the account's name decides, the headline still does ──
+// ── 2990s mini by the ad's ad account (mig 20261027100010): the account's name decides, the headline still does ──
 {
   const src0 = (await q(`select md5(prosrc) m from pg_proc where oid = 'public.lead_ingest_messenger(jsonb)'::regprocedure`))[0].m
   check(src0, 'ccd998d3be8787fed944ba376ab48600', 'lead_ingest_messenger here is production’s body (the swap is written against it)')
-  const mig = (await readFile(new URL('../../supabase/migrations/20261027100000_lead_mini_by_ad_account.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+  const mig = (await readFile(new URL('../../supabase/migrations/20261027100010_lead_mini_by_ad_account.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
   await db.exec(mig)
   await db.exec(mig) // twice: the second finds it in place
   const P = '946946021838962'
