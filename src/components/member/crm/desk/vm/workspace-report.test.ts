@@ -65,3 +65,16 @@ describe("a property read off an ad's name", () => {
     expect(propertyRanking(cs)).toEqual({ rows: [{ label: "Astrum Ampang", n: 2, fromAd: 2 }], notFilled: 1 });
   });
 });
+
+describe("a custom period (2026-10-27: \"让我custome 日期\")", () => {
+  it("runs over the days picked, against as many days just before them", () => {
+    const { cur, prev } = periodRanges("custom", new Date("2026-10-27T12:00:00"), { from: "2026-10-10", to: "2026-10-16" });
+    expect([cur.a, cur.b]).toEqual([day("2026-10-10"), day("2026-10-16")]);
+    expect([prev.a, prev.b]).toEqual([day("2026-10-03"), day("2026-10-09")]);
+  });
+  it("takes the days either way round, and one day alone", () => {
+    expect(periodRanges("custom", new Date(), { from: "2026-10-16", to: "2026-10-10" }).cur).toEqual({ a: day("2026-10-10"), b: day("2026-10-16") });
+    const one = periodRanges("custom", new Date(), { from: "2026-10-05" });
+    expect([one.cur.a, one.cur.b, one.prev.a]).toEqual([day("2026-10-05"), day("2026-10-05"), day("2026-10-04")]);
+  });
+});
