@@ -1582,8 +1582,14 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
         </div>
         <input value={S.name} onChange={S.setName} placeholder="Showroom name" aria-label="Showroom name" style={{ marginTop: "20px", width: "100%", border: 0, outline: "none", padding: 0, background: "transparent",
           font: `500 26px ${TIGHT}`, letterSpacing: "-0.02em", color: "var(--crm-ink)" }} />
-        <textarea value={S.addr} onChange={S.setAddr} placeholder="Address" aria-label="Address" rows={2} style={{ marginTop: "6px", width: "100%", border: 0, outline: "none", padding: 0, resize: "none", background: "transparent",
-          font: "400 14px/1.5 Inter, sans-serif", color: "var(--crm-ink-soft)" }} />
+        {/* The address as a field of its own, seen and changed in place (the owner, 2026-10-27: "能不能有个可以看到我输入地址，可修改的地方？" —
+            it was a borderless box the page drew blank). It is the visit card's location and the maps links' search. */}
+        <label style={{ display: "block", marginTop: "14px", font: "500 12px Inter, sans-serif", color: "var(--crm-muted)" }}>
+          Address
+          <textarea value={S.addr} onChange={S.setAddr} placeholder="Type the showroom's address" aria-label="Address" rows={3}
+            style={{ ...FIELD, display: "block", marginTop: "6px", width: "100%", height: "auto", minHeight: "64px", padding: "8px 10px", resize: "vertical",
+              font: "400 13px/1.5 Inter, sans-serif" }} />
+        </label>
         <div style={{ display: "flex", gap: "16px", marginTop: "6px", font: "500 13px Inter, sans-serif" }}>
           {([["Google Maps", S.links.g], ["Waze", S.links.w]] as const).map(([l, u]) => u
             ? <a key={l} href={u} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: "4px", color: "var(--crm-ink)", textDecoration: "underline", textUnderlineOffset: "3px" }}>{l}<Ic name="external-link" size={12} /></a>
