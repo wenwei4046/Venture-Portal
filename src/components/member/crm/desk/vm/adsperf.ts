@@ -13,6 +13,7 @@ import { INS_CARDS, MON } from "./insight";
 import { columnSizer } from "./columns";
 import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES, SERIES_TINT } from "./adschart";
 import { ST_META } from "./tokens";
+import { adPageInSource, BRAND_LABEL, brandOf, inSource, SOURCE_PICKS, sourceLabel, sourceOf, type SourcePick } from "@/lib/member/crm-source";
 
 type Fmt = "rm" | "rm2" | "n" | "pct" | "x" | "t";
 export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
@@ -104,8 +105,12 @@ export function adsPerfVM(ctx: DeskCtx) {
   // An ad hidden by a right click on its name (crm_hide_ad, CRM · Manage; the owner, 2026-10-24: "hide ads 的部分只需要在電腦版，
   // 你幫我做右鍵點擊廣告名稱可以選擇hide") is left out — the list and the total — unless *Hidden ads · show* is on.
   const hiddenN = new Set([...data.customers.map(c => c.adId ?? ""), ...added].filter(id => id && data.adNames?.[id]?.hidden)).size;
-  const ads = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].filter(id => ui.apShowHidden || !data.adNames?.[id]?.hidden).map(id => { const cs = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id);
-    return { id, name: cs[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !cs.length || cs.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs }; });
+  // The source picked (the owner, 2026-10-27: DC and The Conts, each WhatsApp · Messenger): an ad's leads from that source, an ad
+  // with none yet by its Page; the list, the chart and the total all follow it.
+  const src = (ui.apSrc ?? "all") as SourcePick;
+  const ads = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].filter(id => ui.apShowHidden || !data.adNames?.[id]?.hidden).map(id => { const all = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id), cs = all.filter(c => inSource(c, src));
+    const s0 = all[0] ? sourceOf(all[0]) : null, brand = s0?.brandLabel || (brandOf(data.adNames?.[id]?.pageId) ? BRAND_LABEL[brandOf(data.adNames?.[id]?.pageId)!] : "");
+    return { id, name: all[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !all.length || all.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs, brand, keep: src === "all" || cs.length > 0 || (!all.length && adPageInSource(data.adNames?.[id]?.pageId, src)) }; }).filter(a => a.keep);
   const apStF = ui.apStF;
   const AD = ads.filter(a => apStF === "all" || status(a.id) === apStF);
   const val = (cs: CrmCustomer[], ids: string[], k: string, a: number, b: number): number | null => { const crm = crmFigures(cs, ctx, a, b); return crm[k] ?? metaFigures(metaOf(ids, a, b), crm)[k] ?? null; };
@@ -213,7 +218,7 @@ export function adsPerfVM(ctx: DeskCtx) {
         custom: k === "custom", pick: () => { if (k !== "custom") patch({ apRange: k }); } })),
       cols: cols.map(m => ({ id: m[0], label: SHORT[m[0]] ?? m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: srt?.k === m[0] ? (srt.dir === "asc" ? "↑" : "↓") : "", num: m[3] !== "t",
         sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) })),
-      rows: ADs.slice(pg * per, pg * per + per).map(a => ({ name: a.name, headline: a.cs.find(c => c.adHeadline)?.adHeadline ?? "", ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
+      rows: ADs.slice(pg * per, pg * per + per).map(a => ({ name: a.name, headline: [a.brand, a.cs.find(c => c.adHeadline)?.adHeadline ?? ""].filter(Boolean).join(" · "), ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
         // The ad itself (the newest https link Meta sent with its leads, else Ads Manager), and hiding it from this list.
         url: a.id.startsWith("ch:") ? "" : [...a.cs].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).find(c => c.adUrl?.startsWith("https://"))?.adUrl ?? `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${a.id}`,
         hidden: !!data.adNames?.[a.id]?.hidden,
@@ -223,6 +228,8 @@ export function adsPerfVM(ctx: DeskCtx) {
       total: { label: `All ${AD.length} ads`, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, "", AD.map(x => x.id)))) },
       cmp,
     },
+    apSrcOpen: !!ui.apSrcOpen, apSrcToggle: () => set(u => ({ ...u, apSrcOpen: !u.apSrcOpen, apStOpen: false })), apSrcCur: { label: sourceLabel(src), n: AD.length },
+    apSrcOpts: SOURCE_PICKS.map(p => { const on = src === p.v; return { label: p.label, sub: p.sub, bg: on ? "var(--crm-tint-attention)" : "transparent", w: on ? 700 : 550, pad: p.sub ? "22px" : "10px", pick: () => patch({ apSrc: p.v, apSrcOpen: false, apPg: 0 } as Partial<typeof ui>) }; }),
     apStOpen: ui.apStOpen, apStToggle: () => set(u => ({ ...u, apStOpen: !u.apStOpen })), apStCur: { label: ST_META[apStF][0], dot: ST_META[apStF][1], n: AD.length },
     apStOpts: (["all", "Running", "Paused", "Pending"] as const).map(k => { const on = apStF === k, n = k === "all" ? ads.length : ads.filter(a => status(a.id) === k).length;
       return { label: ST_META[k][0], dot: ST_META[k][1], n, bg: on ? ST_META[k][3] : "transparent", fg: on ? ST_META[k][4] : "var(--crm-ink)", w: on ? 700 : 550, pick: () => patch({ apStF: k, apStOpen: false }) }; }),

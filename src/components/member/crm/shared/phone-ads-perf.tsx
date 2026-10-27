@@ -6,6 +6,7 @@
  * a day-by-day chart of them, and every ad with those figures. The CRM's own figures always; Meta's (spend, cost per lead …)
  * read from Ads Manager on the server, as the desktop's (fetchAdInsights / fetchAdDaily, CRM · Manage).
  */
+import { inSource, SOURCE_PICKS, type SourcePick } from "@/lib/member/crm-source";
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
@@ -56,16 +57,18 @@ function keptSet(k: string, v: unknown) { try { const all = JSON.parse(localStor
 
 export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: Record<string, { name: string; hidden?: boolean }>; now: Date; live: boolean; manage: boolean;
   range: Range; cmp: Range | null; chips: { label: string; on: boolean; pick: () => void }[]; custom: boolean; openDates: () => void; openCompare: () => void; clearCompare: () => void }; head?: ReactNode }) {
-  const cmp = !!p.cmp, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null);
+  const cmp = !!p.cmp, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null), [src, setSrc] = useState<SourcePick>("all");
+  // The source picked (the owner, 2026-10-27): The Conts / DC, each by WhatsApp · Messenger — the ads, tiles and chart follow it.
+  const customers = useMemo(() => p.customers.filter(c => inSource(c, src)), [p.customers, src]);
   // Insight's period and comparison (the panel's sheet: Period · Compare to); with no comparison picked, the period before.
   const r = p.range, rb = p.cmp ?? before(r);
   // Every ad a lead came from in the two periods, or one Ads Manager lists (adNames), most leads first.
   const ads = useMemo(() => {
-    const ids = new Set<string>(); p.customers.forEach(c => { if (c.adId) ids.add(c.adId); });
-    return [...ids].map(id => { const cs = p.customers.filter(c => c.adId === id); return { id, name: p.adNames[id]?.name ?? cs[0]?.ad ?? id, cs, hidden: !!p.adNames[id]?.hidden,
+    const ids = new Set<string>(); customers.forEach(c => { if (c.adId) ids.add(c.adId); });
+    return [...ids].map(id => { const cs = customers.filter(c => c.adId === id); return { id, name: p.adNames[id]?.name ?? cs[0]?.ad ?? id, cs, hidden: !!p.adNames[id]?.hidden,
       // The ad itself: the link Meta sent with its leads, else Ads Manager (the owner, 2026-10-24: "加個按鈕可以導入去看那隻廣告").
       url: [...cs].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).find(c => c.adUrl?.startsWith("https://"))?.adUrl ?? `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${id}` }; });
-  }, [p.customers, p.adNames]);
+  }, [customers, p.adNames]);
   // An ad hidden earlier (crm_hide_ad) stays out of the list and the totals.
   const hidIds = new Set(ads.filter(a => a.hidden).map(a => a.id));
   const ids = ads.filter(a => !a.hidden).map(a => a.id), si = isoOf(r.a), ui = isoOf(r.b), sb = isoOf(rb.a), ub = isoOf(rb.b);
@@ -87,7 +90,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   }, [wantMeta, idKey, si, ui, sb, ub, cmp]);
 
   const figsOf = (cs: CrmCustomer[], rr: Range, metaIds: string[], fig: Record<string, MetaFig | null>) => { const c = crmFigs(cs, p.visits, rr); return { ...c, ...metaFigures(metaIds.map(i => fig[i]), c) }; };
-  const all = p.customers.filter(c => c.adId && !hidIds.has(c.adId));
+  const all = customers.filter(c => c.adId && !hidIds.has(c.adId));
   const tot = figsOf(all, r, ids, figA), totB = figsOf(all, rb, ids, figB);
   const days = daysOf(r.a, r.b), series = dailySeries(keys, days, all, p.visits, ids.map(i => daily[i]));
   const rows = ads.filter(a => !a.hidden).map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA), fb: cmp ? figsOf(a.cs, rb, [a.id], figB) : null })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
@@ -112,6 +115,9 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
           <span style={{ marginLeft: "auto" }} />
           {/* One button: its sheet has Period and Compare to (the owner, 2026-10-24, of a second compare button: "刪掉右邊的"). */}
           <button type="button" aria-label="Pick dates" title="Pick dates" aria-pressed={p.custom} onClick={p.openDates} style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: p.custom ? "var(--crm-ink)" : "#fff", color: p.custom ? "#fff" : "var(--crm-ink)" }}><Ic name="calendar" size={14} /></button>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", overflowX: "auto", scrollbarWidth: "none" }}>
+          {SOURCE_PICKS.map(s => <button key={s.v} type="button" onClick={() => setSrc(s.v)} style={{ ...chip(src === s.v), height: "28px", fontSize: fs(12) }}>{s.label}</button>)}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: fs(12), color: "var(--crm-muted)" }}>
           <span>{short(r.a)}{r.a !== r.b ? ` – ${short(r.b)}` : ""}</span>

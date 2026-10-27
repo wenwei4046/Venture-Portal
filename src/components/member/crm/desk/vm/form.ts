@@ -14,8 +14,9 @@
  * Property, the built-ins and own questions in their order. The phone reads the same row (sales/vm/customer.ts formOf):
  * a built-in left out is not asked, the own questions follow Budget under their section's name.
  */
+import { sourceOf } from "@/lib/member/crm-source";
 import type { CrmCustomer, CrmData, CrmForm, CrmFormField } from "@/lib/member/crm-data";
-import { CHANNEL, STATUS_LABEL, lastReal, timeLabel } from "../../sales/vm/common";
+import { STATUS_LABEL, lastReal, timeLabel } from "../../sales/vm/common";
 import { phoneLabel } from "../../sales/vm/customer";
 import { adKindLabel } from "../../shared/AdLink";
 
@@ -142,7 +143,7 @@ export function answerOf(data: CrmData, c: CrmCustomer, f: FormFieldV2, nameOf: 
     case "status": return STATUS_LABEL[c.status] ?? "—";
     case "first": return dmy(new Date(c.createdAt));
     case "last": { const l = lastReal(c); return l ? dmy(new Date(l.at)) : "—"; }
-    case "plat": return CHANNEL[c.channel].name;
+    case "plat": return sourceOf(c).label;
     case "ad": return c.adId ? `${adKindLabel(c)} · ${c.ad}` : c.ad || "—";
     case "sp": return c.assignedTo ? nameOf(c.assignedTo) : "—";
     case "visit": return visit ? `${new Date(visit.start).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(new Date(visit.start))}` : "—";

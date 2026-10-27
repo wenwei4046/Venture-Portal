@@ -93,7 +93,7 @@ export function reportsVM(ctx: DeskCtx) {
     tiles: [["Leads", String(sf.leads), ""], ["From ads", String(sf.fromAds), pctLabel(sf.leads ? sf.fromAds / sf.leads : null)], ["Won", String(sf.won), pctLabel(sf.leads ? sf.won / sf.leads : null)], ["Lost", String(sf.lost), pctLabel(sf.leads ? sf.lost / sf.leads : null)]]
       .map(([k, v, pct]) => ({ k, v, pct })),
     // v2 (12b): By ad is a full-width table (channel, status, leads, share); the mini cards are status, channel, property type, why lost.
-    cards: [card("By status", srcR.byStatus), card("By channel", srcR.byChannel), card("By property type", srcR.byType, ["var(--crm-brown)", "var(--crm-series-5)", "var(--crm-series-7)", "var(--crm-amber)"]),
+    cards: [card("By status", srcR.byStatus), card("By source", srcR.bySource), card("By property type", srcR.byType, ["var(--crm-brown)", "var(--crm-series-5)", "var(--crm-series-7)", "var(--crm-amber)"]),
       card("Why they were lost", srcR.lostWhy, ["var(--crm-oxblood)", "var(--crm-rust)", "var(--crm-series-5)", "var(--crm-series-7)"])],
     ads: (() => {
       const inR = data.customers.filter(c => { const t = new Date(c.createdAt).getTime(); return c.adId && t >= range[0] && t <= range[1]; });

@@ -6,6 +6,7 @@
  * Its fields ARE the Customer form's (vm/form.ts): a question added there is a column here, and a Choice question a
  * filter and a chart grouping too; a removed one leaves. The figures are the CRM's own customers, all of them.
  */
+import { sourceOf } from "@/lib/member/crm-source";
 import type { CrmCustomer } from "@/lib/member/crm-data";
 import type { DeskCtx } from "./ctx";
 import { chatRows, initials, teamNameOf } from "./data";
@@ -16,7 +17,7 @@ const dayShort = (iso: string) => { const d = new Date(iso); return `${d.getDate
 const hourShort = (iso: string) => new Date(iso).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }).replace(":00", "").toLowerCase();
 import { budgetOf, formV2, SIZES, type FormFieldV2 } from "./form";
 import { mapDrag } from "./columns";
-import { CHANNEL, STATUS_LABEL, lastReal, timeLabel } from "../../sales/vm/common";
+import { STATUS_LABEL, lastReal, timeLabel } from "../../sales/vm/common";
 import { mediaWord } from "../../shared/chat-media";
 import { answerOf } from "./form";
 import { phoneLabel } from "../../sales/vm/customer";
@@ -49,7 +50,7 @@ export function peopleVM(ctx: DeskCtx) {
       id: c.id, name: c.name, phone: phoneLabel(c.phone) || "—", ini: initials(c.name),
       type: c.details.type || null, size: c.details.size || null, loc: c.details.loc || null, req: c.details.req || null,
       budget: b != null ? (BUDGET.find(x => b >= x[1] && b < x[2]) ?? BUDGET[3])[0] : null, budgetN: b != null ? String(b) : null,
-      plat: CHANNEL[c.channel].name, ad: c.ad || null, status: status.get(c.id) ?? null, sp: c.assignedTo ? nameOf(c.assignedTo) : null,
+      plat: sourceOf(c).label, ad: c.ad || null, status: status.get(c.id) ?? null, sp: c.assignedTo ? nameOf(c.assignedTo) : null,
       visit: v ? (v.state === "attended" ? "Showed up" : "Booked") : "No visit", showroom: v ? data.rooms.find(x => x.id === v.showroomId)?.name ?? "None" : "None",
       first: t >= wkA ? "This week" : t >= wkA - 7 * DAY ? "Last 2 weeks" : "Earlier", last: last >= T ? "Today" : last >= wkA ? "This week" : "Earlier",
       filled: c.details.type || c.details.size || c.details.loc || c.details.req || c.details.budget ? "1" : null,
@@ -71,7 +72,7 @@ export function peopleVM(ctx: DeskCtx) {
     ...(field("budget") ? { budget: [lbl("budget", "Budget"), BUDGET.map(x => x[0]), "PROPERTY"] as [string, string[], string] } : {}),
     ...(field("loc") ? { loc: [lbl("loc", "Unit location"), uniq("loc"), "PROPERTY"] as [string, string[], string] } : {}),
     ...Object.fromEntries(own.filter(([, f]) => f.type === "Choice").map(([g, f]) => [f.id, [f.label, f.opts.split(",").map(x => x.trim()).filter(Boolean), g]])),
-    plat: ["Platform", ["WhatsApp", "Messenger"], "LEAD"], ad: ["Ad", uniq("ad"), "LEAD"],
+    plat: ["Source", ["The Conts · WhatsApp", "The Conts · Messenger", "DC · WhatsApp", "DC · Messenger", "WhatsApp", "Messenger"], "LEAD"], ad: ["Ad", uniq("ad"), "LEAD"],
     status: ["Status", ["New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads"], "LEAD"], sp: ["Salesperson", uniq("sp"), "LEAD"], team: ["Team", uniq("team"), "LEAD"],
     visit: ["Visit", ["Showed up", "Booked", "No visit"], "VISIT"], showroom: ["Showroom", [...data.rooms.filter(r => r.active).map(r => r.name), "None"], "VISIT"],
     first: ["First contact", ["This week", "Last 2 weeks", "Earlier"], "CONTACT"], last: ["Last chat", ["Today", "This week", "Earlier"], "CONTACT"],
@@ -98,7 +99,7 @@ export function peopleVM(ctx: DeskCtx) {
         .map(o => ({ ...o, bg: o.on ? "var(--crm-sel)" : "transparent", w: o.on ? 650 : 500, chk: o.on ? "var(--crm-rust)" : "transparent" })) }; };
   // The table's columns: every field of Customer info but the Contact itself (README: 13 with the design's form).
   const LBL: Record<string, string> = { type: lbl("type", "Property type"), size: lbl("size", "Unit size"), budget: lbl("budget", "Budget"), loc: lbl("loc", "Unit location"), req: lbl("req", "Requirement"),
-    plat: "Platform", ad: "Ad", status: "Status", sp: "Assigned to", visit: "Visit", showroom: "Showroom", first: "Added", last: "Last chat",
+    plat: "Source", ad: "Ad", status: "Status", sp: "Assigned to", visit: "Visit", showroom: "Showroom", first: "Added", last: "Last chat",
     ...Object.fromEntries(own.map(([, f]) => [f.id, f.label])) };
   const GRP: Record<string, string> = { type: "Property", size: "Property", budget: "Property", loc: "Property", req: "Property", plat: "Lead", ad: "Lead", status: "Lead", sp: "Lead", visit: "Visit", showroom: "Visit", first: "Contact", last: "Contact",
     ...Object.fromEntries(own.map(([g, f]) => [f.id, g.charAt(0) + g.slice(1).toLowerCase()])) };
@@ -188,7 +189,7 @@ function sideVM(ctx: DeskCtx, id: string | null, missing: string[]) {
   const edit = (cid: string) => patch({ tab: "inbox", pane: "docked", kind: "form", chat: cid, cform: null, fromTeam: false, inbF: "All", whoSel: [] });
   const todo = missing.map(mid => data.customers.find(x => x.id === mid)).filter((x): x is CrmCustomer => !!x)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 30)
-    .map(x => ({ id: x.id, ini: initials(x.name), name: x.name, sub: [CHANNEL[x.channel].name, x.assignedTo ? nameOf(x.assignedTo) : "No one yet"].join(" · "),
+    .map(x => ({ id: x.id, ini: initials(x.name), name: x.name, sub: [sourceOf(x).label, x.assignedTo ? nameOf(x.assignedTo) : "No one yet"].join(" · "),
       pick: () => patch({ ppSel: x.id }), fill: (e: { stopPropagation(): void }) => { e.stopPropagation(); edit(x.id); } }));
   const todoTitle = missing.length ? `Property info missing · ${missing.length}` : "Every contact here has property info";
   const empty = { has: false as boolean, todo, todoTitle, hasTodo: todo.length > 0, ini: "", name: "", phone: "", ch: "", ad: "", adUrl: null as string | null, status: "", owner: "", visit: "", lastAt: "",
@@ -200,7 +201,7 @@ function sideVM(ctx: DeskCtx, id: string | null, missing: string[]) {
     at: timeLabel(new Date(m.at)), mine: m.from === "me" }));
   const last = lastReal(c);
   return { ...empty, has: true,
-    ini: initials(c.name), name: c.name, phone: phoneLabel(c.phone) || "—", ch: CHANNEL[c.channel].name, ad: c.adId ? `${adKindLabel(c)} · ${c.ad}` : c.ad || "No ad", adUrl: adHref(c.adUrl),
+    ini: initials(c.name), name: c.name, phone: phoneLabel(c.phone) || "—", ch: sourceOf(c).label, ad: c.adId ? `${adKindLabel(c)} · ${c.ad}` : c.ad || "No ad", adUrl: adHref(c.adUrl),
     status: STATUS_LABEL[c.status], owner: c.assignedTo ? nameOf(c.assignedTo) : "No one yet",
     visit: visit ? `${new Date(visit.start).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(new Date(visit.start))} · ${data.rooms.find(r => r.id === visit.showroomId)?.name ?? ""}` : "",
     lastAt: last ? new Date(last.at).toLocaleString("en-MY", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—",

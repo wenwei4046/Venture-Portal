@@ -31,6 +31,10 @@ apCmpOn
 apCmpShort
 apMainShort
 apRangeLabel
+apSrcCur
+apSrcOpen
+apSrcOpts
+apSrcToggle
 apStCur
 apStOpen
 apStOpts

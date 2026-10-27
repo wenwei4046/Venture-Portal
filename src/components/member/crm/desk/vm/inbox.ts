@@ -3,6 +3,7 @@
  * once) and the status chips; a chat opens docked beside the list. Also the team / person pane Insight opens, Customer
  * info, Assign to, and CRM alerts. The rows are the phone's (data.ts › chatRows); writes are the phone's actions.
  */
+import { sourceOf } from "@/lib/member/crm-source";
 import { panelNotifs, type PanelNotif } from "../../panel/vm/notifs";
 import { infoRows } from "../../sales/vm/customer";
 import { CHANNEL, STATUS_LABEL, lastReal, urgencyOf } from "../../sales/vm/common";
@@ -81,7 +82,7 @@ export function inboxVM(ctx: DeskCtx) {
         ["Lost", x => x.key === "Lost", false], ["Cold leads", isCold, false]];
       const cur = T4.find(t => t[0] === ui.inbF) ?? T4[0];
       const q = (ui.ibQ ?? "").trim().toLowerCase();
-      const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q);
+      const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q) || sourceOf(x.c).label.toLowerCase().includes(q);
       const rows = [...shown.filter(cur[1]).filter(hit)].sort((a, b) => Number(!!pref(b.id)?.pinned) - Number(!!pref(a.id)?.pinned));
       const DAY_MS = 86400000, fmtVisit = (t: Date) => `${t.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, ${t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase()}`;
       return {
@@ -95,7 +96,7 @@ export function inboxVM(ctx: DeskCtx) {
             : visit ? { text: `Visit · ${fmtVisit(new Date(visit.start))}`, kind: "calm" }
               : isCold(x) && lastIn ? { text: `Cold · ${Math.max(1, Math.floor((now.getTime() - lastIn) / DAY_MS))} d`, kind: "mute" } : null;
           const sel = ui.pane === "docked" && ui.chat === x.id;
-          return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: x.ad, msg: x.msg, time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
+          return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: [sourceOf(x.c).brandLabel, x.ad].filter(Boolean).join(" · "), msg: x.msg, time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
             hot: n > 0 || dot, owner: x.owner, pinned: !!p?.pinned, muted: !!p?.muted, sel,
             note: note?.text ?? "", noteColor: !note ? "" : note.kind === "hot" ? "var(--crm-oxblood)" : note.kind === "warm" ? "var(--crm-ink)" : note.kind === "calm" ? "var(--crm-ink-soft)" : "var(--crm-faint)",
             noteWeight: note?.kind === "hot" ? 600 : 500, noteIcon: !note ? null : note.kind === "calm" ? "calendar" : note.kind === "hot" && u.level === "overdue" ? "triangle-alert" : "clock",
@@ -234,7 +235,7 @@ export function alertsVM(ctx: DeskCtx) {
       line: n.kind === "overdue" ? `Waiting ${Math.floor(urgencyOf(c ?? ({} as never), now).waitingMinutes / 60) || 9} h for ${n.lead === "a reply" ? "a reply" : `${n.lead}'s reply`}`
         : [n.who, n.text.replace(/ ·$/, ""), n.tail.trim()].filter(Boolean).join(" "),
       extra: n.extra,
-      sub: c ? [CHANNEL[c.channel].name, c.ad, STATUS_LABEL[c.status], c.assignedTo ? ctx.nameOf(c.assignedTo) : "No one yet"].filter(Boolean).join(" · ") : "",
+      sub: c ? [sourceOf(c).label, c.ad, STATUS_LABEL[c.status], c.assignedTo ? ctx.nameOf(c.assignedTo) : "No one yet"].filter(Boolean).join(" · ") : "",
       quote: last ? `${last.from === "me" ? "You: " : ""}${last.text || mediaWord(last)}` : "", hasQuote: !!last,
       canOpen: !!c || !!n.adId, open,
       markRead: unr ? (e?: { stopPropagation(): void }) => { e?.stopPropagation(); act.readNotifs([n.key]); } : null };
