@@ -7,9 +7,10 @@ import { isVisitDate, phoneStage, phoneSteps } from '@/lib/leads/inbox'
 import { handedTo } from '@/lib/leads/handoff'
 import { formatPhone } from '@/lib/leads/phone'
 import { whenFull } from '@/lib/leads/time'
-import type { Appt, LeadBrand, LeadCardFields, LeadContact, Shown } from '@/lib/leads/types'
+import type { Appt, LeadBrand, LeadCardFields, LeadContact, LeadLabel, Shown } from '@/lib/leads/types'
 import { CHANNEL_LABEL } from './bits'
 import HandoffWindow from './HandoffWindow'
+import LabelPicker from './LabelPicker'
 import s from './inbox.module.css'
 
 /**
@@ -18,11 +19,14 @@ import s from './inbox.module.css'
  * salesperson needs (a note the customer never sees). Since 2026-10-23 (the user) the TIMELINE is its own panel on the
  * Inbox's right, folded until opened, and Promotions consent is off the card (a test's consent is no longer set by hand).
  */
-export default function CustomerCard({ contact, brand, canEdit, csName, onSaved }: {
+export default function CustomerCard({ contact, brand, canEdit, canManage = false, labels = [], csName, onSaved }: {
   contact: LeadContact
   csName: string
   brand: LeadBrand | undefined
   canEdit: boolean
+  canManage?: boolean
+  /** Customer Service's labels (mig 20261027190000). */
+  labels?: LeadLabel[]
   onSaved: () => void
 }) {
   const start: Required<Omit<LeadCardFields, 'phone'>> = {
@@ -51,7 +55,7 @@ export default function CustomerCard({ contact, brand, canEdit, csName, onSaved 
   const saveForm = () => save(Object.fromEntries(changed.map(k => [k, form[k]])) as LeadCardFields, () => setSavedAt(officeTime().format('HH:mm')))
   const rooms = [...new Set([...(brand?.sales ?? []).map(x => x.showroom).filter(Boolean), ...(form.showroom ? [form.showroom] : [])])]
   const datebox = !form.preferredTime || isVisitDate(form.preferredTime)
-  const hint = stage === 'none' ? 'Get the phone first' : stage === 'detected' ? 'Confirm the number first' : !brand ? '' : brand.sales.length === 0 ? `${brand.name} has no salespeople yet — add them in Settings` : ''
+  const hint = stage === 'none' ? 'Get the phone first' : stage === 'detected' ? 'Confirm the number first' : !brand ? '' : brand.sales.length === 0 ? 'No salespeople yet — the message is copied for the sales group' : ''
 
   return (
     <>
@@ -109,13 +113,15 @@ export default function CustomerCard({ contact, brand, canEdit, csName, onSaved 
 
         {stage !== 'handed' && canEdit && brand ? (
           <div className={s.phoneBody} style={{ paddingTop: 0, gap: 6 }}>
-            <button type="button" className={s.handBtn} onClick={() => setHanding(true)} disabled={stage !== 'confirmed' || brand.sales.length === 0}>
+            <button type="button" className={s.handBtn} onClick={() => setHanding(true)} disabled={stage !== 'confirmed'}>
               Hand over to {brand.name} sales
             </button>
             {hint ? <span className={s.handHint}>{hint}</span> : null}
           </div>
         ) : null}
       </div>
+
+      <LabelPicker contact={contact} labels={labels} canEdit={canEdit} canManage={canManage} onSaved={onSaved} />
 
       <div className={s.form}>
         <span className={s.caps}>FOR THE SALESPERSON</span>

@@ -29,14 +29,21 @@ type Ev = {
 
 const KINDS: Record<string, MsgKind> = { image: 'image', video: 'video', audio: 'audio', file: 'document', location: 'location' }
 
-/** The Lead View Pages' customer messages (messaging and standby) and the Page's own replies sent from elsewhere. */
-export function leadPageEvents(body: unknown, crmPages: Set<string>, ourAppId: string | undefined): { messages: MsgInbound[]; replies: PageReply[] } {
+/** Meta's receipts for the brands' Pages (mig 20261027190000): messages delivered (their ids) and read (a watermark). */
+export interface PageReceipts {
+  delivered: { externalId: string }[]
+  reads: { pageId: string; psid: string; watermark: string }[]
+}
+
+/** The Lead View Pages' customer messages (messaging and standby), the Page's own replies sent from elsewhere, and receipts. */
+export function leadPageEvents(body: unknown, crmPages: Set<string>, ourAppId: string | undefined): { messages: MsgInbound[]; replies: PageReply[]; receipts: PageReceipts } {
   const b = body as { object?: string; entry?: Array<{ id?: string; time?: number; messaging?: Ev[]; standby?: Ev[] }> } | null
-  if (b?.object !== 'page' || !Array.isArray(b.entry)) return { messages: [], replies: [] }
+  if (b?.object !== 'page' || !Array.isArray(b.entry)) return { messages: [], replies: [], receipts: { delivered: [], reads: [] } }
   const entries = b.entry
     .filter(e => e?.id && !crmPages.has(e.id))
     .map(e => ({ ...e, messaging: [...(Array.isArray(e.messaging) ? e.messaging : []), ...(Array.isArray(e.standby) ? e.standby : [])] }))
-  const messages = parseMessengerDelivery({ object: 'page', entry: entries }).messages
+  const parsed = parseMessengerDelivery({ object: 'page', entry: entries })
+  const messages = parsed.messages
   const replies: PageReply[] = []
   for (const e of entries) {
     for (const ev of e.messaging) {
@@ -52,5 +59,5 @@ export function leadPageEvents(body: unknown, crmPages: Set<string>, ourAppId: s
       })
     }
   }
-  return { messages, replies }
+  return { messages, replies, receipts: { delivered: parsed.delivered, reads: parsed.reads } }
 }

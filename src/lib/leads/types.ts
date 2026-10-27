@@ -90,8 +90,20 @@ export interface LeadContact {
   assignedAt?: string | null
   /** The Inbox list only (mig 20261027160000): the customer's messages since the last one that went out to them. */
   unread?: number
+  /** Meta's receipts (mig 20261027190000): every message out at or before them reached / was read by the customer. */
+  deliveredAt?: string | null
+  readAt?: string | null
+  /** Customer Service's labels on this customer (mig 20261027190000). */
+  labels?: LeadLabelChip[]
   updatedAt?: string
 }
+
+export type LabelTone = 'grey' | 'amber' | 'green' | 'red' | 'clay' | 'blue'
+export const LABEL_TONES: LabelTone[] = ['grey', 'amber', 'green', 'red', 'clay', 'blue']
+/** A label on a customer. */
+export interface LeadLabelChip { id: string; name: string; tone: LabelTone }
+/** A label in Customer Service's list, with how many customers carry it. */
+export interface LeadLabel extends LeadLabelChip { used: number }
 
 export interface LeadMessage {
   id: number

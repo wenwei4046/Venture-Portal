@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, isMediaPlaceholder, mediaKind, readPanels, replyingNow, RIGHT_W, unreadLabel } from './inbox'
+import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, brandCounts, isMediaPlaceholder, mediaKind, receiptOf, readPanels, replyingNow, RIGHT_W, unreadLabel } from './inbox'
 
 describe('the Inbox columns the browser keeps', () => {
   it('starts at the handoff widths', () => {
@@ -71,5 +71,27 @@ describe('a message’s photo or file, as Messenger shows it', () => {
     expect(isMediaPlaceholder('[File] floor plan.pdf')).toBe(true)
     expect(isMediaPlaceholder('Here is the bed [Photo]')).toBe(false)
     expect(isMediaPlaceholder('Our showroom')).toBe(false)
+  })
+})
+
+describe('read ticks, as WhatsApp', () => {
+  const out = (at: string, delivery: 'sent' | 'recorded' | 'failed' = 'sent') => ({ direction: 'out' as const, delivery, at })
+  it('one tick sent, two delivered, two blue read — by Meta’s receipts', () => {
+    const c = { deliveredAt: '2026-10-27T05:00:00Z', readAt: '2026-10-27T04:00:00Z' }
+    expect(receiptOf(out('2026-10-27T03:00:00Z'), c)).toBe('read')
+    expect(receiptOf(out('2026-10-27T04:30:00Z'), c)).toBe('delivered')
+    expect(receiptOf(out('2026-10-27T06:00:00Z'), c)).toBe('sent')
+    expect(receiptOf(out('2026-10-27T03:00:00Z'), { deliveredAt: null, readAt: null })).toBe('sent')
+  })
+  it('a message recorded or refused says so; a customer’s has no tick', () => {
+    expect(receiptOf(out('2026-10-27T03:00:00Z', 'failed'), null)).toBe('failed')
+    expect(receiptOf(out('2026-10-27T03:00:00Z', 'recorded'), null)).toBe('recorded')
+    expect(receiptOf({ direction: 'in', delivery: 'recorded', at: '2026-10-27T03:00:00Z' }, null)).toBe(null)
+  })
+})
+
+describe('brandCounts', () => {
+  it('counts each brand and all', () => {
+    expect(brandCounts([{ brandId: 'a' }, { brandId: 'b' }, { brandId: 'a' }])).toEqual({ all: 3, a: 2, b: 1 })
   })
 })

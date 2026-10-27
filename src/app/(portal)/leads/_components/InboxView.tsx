@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import { assignLead, draftLeadReply, leadAgents, leadMediaLinks, quickReplyUsed, readThread, replyToLead, sendLeadMedia, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
 import { FILE_LIMIT, TOO_BIG } from '@/lib/leads/messenger'
 import { createClient } from '@/lib/supabase/client'
@@ -8,12 +9,12 @@ import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
 import { outcomeOf } from '@/lib/leads/ai'
 import { adLabel, adsManagerLink } from '@/lib/leads/ads'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
-import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, mediaKind, isMediaPlaceholder, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
+import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, mediaKind, isMediaPlaceholder, brandCounts, receiptOf, type Receipt, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
 import { EMOJI_GROUPS, insertAt, withRecent } from '@/lib/leads/emoji'
 import { whenFull } from '@/lib/leads/time'
 import { formatPhone } from '@/lib/leads/phone'
 import { dayLabel, timeOf, whenShort } from '@/lib/leads/time'
-import type { LeadBrand, LeadConfig, LeadContact, LeadMessage, LeadThread } from '@/lib/leads/types'
+import type { LeadBrand, LeadConfig, LeadContact, LeadLabel, LeadMessage, LeadThread } from '@/lib/leads/types'
 import { infoEntries, type LeadInfo } from '@/lib/leads/info'
 import { LeadIcon } from '@/components/layout/lead-icons'
 import { CHANNEL_LABEL, initials } from './bits'
@@ -33,12 +34,14 @@ import s from './inbox.module.css'
  */
 
 type Filter = InboxState | 'all'
+// All first (the user, 2026-10-27); the list still opens on Waiting.
 const FILTERS: Array<{ id: Filter; label: string }> = [
+  { id: 'all', label: 'All' },
   { id: 'waiting', label: 'Waiting' },
   { id: 'answered', label: 'Answered' },
   { id: 'handed', label: 'Handed' },
-  { id: 'all', label: 'All' },
 ]
+const LIST_REFRESH_MS = 15_000
 const STATE_LABEL: Readonly<Record<InboxState, string>> = { waiting: 'Waiting', answered: 'Answered', handed: 'Handed' }
 
 export default function InboxView({
@@ -54,6 +57,7 @@ export default function InboxView({
   aiConnected,
   info,
   quick = [],
+  labels = [],
 }: {
   config: LeadConfig
   contacts: LeadContact[]
@@ -74,10 +78,13 @@ export default function InboxView({
   info: LeadInfo | null
   /** The Data Center's quick replies: typing "/" in the reply box offers them. */
   quick?: QuickReply[]
+  /** Customer Service's labels (mig 20261027190000; empty before it). */
+  labels?: LeadLabel[]
 }) {
   const [brand, setBrand] = useState<string>('all')
   const [filter, setFilter] = useState<Filter>(initialQuery ? 'all' : 'waiting')
   const [query, setQuery] = useState(initialQuery)
+  const [label, setLabel] = useState<string>('')
   const [selected, setSelected] = useState<string | null>(initialThread?.contact.id ?? contacts[0]?.id ?? null)
   const [threads, setThreads] = useState<Record<string, LeadThread>>(initialThread ? { [initialThread.contact.id]: initialThread } : {})
   const [loading, startLoading] = useTransition()
@@ -107,12 +114,17 @@ export default function InboxView({
   const brands = useMemo(() => new Map(config.brands.map(b => [b.id, b])), [config.brands])
   const q = query.trim().toLowerCase()
   const qDigits = q.replace(/[\s-]/g, '')
-  const inBrand = contacts.filter(c => brand === 'all' || c.brandId === brand)
-  const searched = inBrand.filter(c => {
+  // A customer's labels: the open conversation's as just read (a label set a moment ago), else the list's.
+  const labelsOf = (c: LeadContact) => threads[c.id]?.contact.labels ?? c.labels ?? []
+  const found = contacts.filter(c => {
+    if (label && !labelsOf(c).some(l => l.id === label)) return false
     if (!q) return true
     const hay = `${c.name} ${c.phone ?? ''} ${c.phone ? formatPhone(c.phone) : ''} ${c.lastText} ${adLabel(c)}`.toLowerCase()
     return hay.includes(q) || (qDigits.length >= 3 && /^\d+$/.test(qDigits) && (c.phone ?? '').includes(qDigits))
   })
+  // Each brand's number: its conversations under the status tab picked (the user: numbers beside the brands).
+  const perBrand = brandCounts(found.filter(c => filter === 'all' || inboxState(c) === filter))
+  const searched = found.filter(c => brand === 'all' || c.brandId === brand)
   const counts = useMemo(() => {
     const n: Record<Filter, number> = { waiting: 0, answered: 0, handed: 0, all: searched.length }
     for (const c of searched) n[inboxState(c)]++
@@ -141,6 +153,15 @@ export default function InboxView({
     // Always read: the cached copy shows at once, and the read marks the chat seen.
     load(id)
   }
+  // The list stays live (2026-10-27 — the user: a row still showed 12:53 while the chat had 12:55): the page's data is
+  // read again every 15 s while this tab is in view, and at once when it comes back. A refresh keeps what is typed.
+  const router = useRouter()
+  useEffect(() => {
+    const fresh = () => { if (document.visibilityState === 'visible') router.refresh() }
+    const timer = window.setInterval(fresh, LIST_REFRESH_MS)
+    document.addEventListener('visibilitychange', fresh)
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', fresh) }
+  }, [router])
   // The list changed under us (a write, a refresh): read the open conversation again.
   const lastAt = contacts.find(c => c.id === selected)?.lastAt
   const seen = useRef(lastAt)
@@ -167,15 +188,21 @@ export default function InboxView({
         <section className={s.list} aria-label="Conversations">
           <div className={s.listHead}>
             <div className={s.brands} role="group" aria-label="Brand">
-              <button type="button" className={s.brandTab} aria-pressed={brand === 'all'} onClick={() => setBrand('all')}>All</button>
+              <button type="button" className={s.brandTab} aria-pressed={brand === 'all'} onClick={() => setBrand('all')}>All<span className={s.brandCount}>{perBrand.all ?? 0}</span></button>
               {config.brands.map(b => (
-                <button key={b.id} type="button" className={s.brandTab} aria-pressed={brand === b.id} onClick={() => setBrand(b.id)}>{b.name}</button>
+                <button key={b.id} type="button" className={s.brandTab} aria-pressed={brand === b.id} onClick={() => setBrand(b.id)}>{b.name}<span className={s.brandCount}>{perBrand[b.id] ?? 0}</span></button>
               ))}
             </div>
             <label className={s.find}>
               <LeadIcon name="search" size={14} />
               <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Name, phone, message or ad" aria-label="Search conversations" />
             </label>
+            {labels.length ? (
+              <select className={s.labelFilter} value={label} onChange={e => setLabel(e.target.value)} aria-label="Label">
+                <option value="">All labels</option>
+                {labels.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            ) : null}
             <div className={s.states} role="group" aria-label="Where they stand">
               {FILTERS.map(f => (
                 <button key={f.id} type="button" className={s.stateTab} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
@@ -211,6 +238,7 @@ export default function InboxView({
                     <span className={s.chips}>
                       <span className={s.chip}>{brands.get(c.brandId)?.name ?? '—'}</span>
                       {c.flowState === 'running' ? <span className={s.chip} data-tone="quiet">Template</span> : null}
+                      {labelsOf(c).map(l => <span key={l.id} className={s.label} data-tone={l.tone}>{l.name}</span>)}
                       {c.isTest ? <span className={s.testTag}>TEST</span> : null}
                     </span>
                   </span>
@@ -237,7 +265,7 @@ export default function InboxView({
           <aside className={s.panel} aria-label="Customer">
             <button type="button" className={s.fold} title="Fold the customer panel" aria-label="Fold the customer panel" onClick={() => togglePanel('card')}>»</button>
             {contact ? (
-              <CustomerCard key={contact.id} contact={contact} brand={brandOf}
+              <CustomerCard key={contact.id} contact={contact} brand={brandOf} labels={labels} canManage={canManage}
                 canEdit={canEdit} csName={csName} onSaved={() => load(contact.id)} />
             ) : null}
           </aside>
@@ -489,7 +517,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
                 <div className={s.buttons}>{m.buttons.map(b => <span key={b} className={s.button}>{b}</span>)}</div>
               ) : null}
               {m.phoneFound ? <span className={s.found}>Phone found · {formatPhone(m.phoneFound)}</span> : null}
-              <span className={s.meta}>{metaOf(m)}</span>
+              <span className={s.meta}>{metaOf(m)}<Ticks r={receiptOf(m, thread?.contact ?? contact)} /></span>
             </div>
           )
         })}
@@ -641,10 +669,17 @@ function MessageLabel({ m }: { m: LeadMessage }) {
   )
 }
 
-/** Under a message: its time — and, for ours, whether Meta took it, or it was only recorded (a test, Instagram), or not sent. */
+/** Under a message: its time — and, for ours, only recorded (a test) or not sent; Meta's ticks say the rest. */
 function metaOf(m: LeadMessage): string {
-  if (m.direction === 'in') return timeOf(m.at)
-  return [timeOf(m.at), m.delivery === 'recorded' ? 'recorded' : m.delivery === 'failed' ? 'not sent' : 'sent'].join(' · ')
+  if (m.direction === 'in' || m.delivery === 'sent') return timeOf(m.at)
+  return [timeOf(m.at), m.delivery === 'recorded' ? 'recorded' : 'not sent'].join(' · ')
+}
+
+/** WhatsApp's ticks (mig 20261027190000): ✓ sent, ✓✓ delivered, blue ✓✓ read — from Meta's receipts. */
+function Ticks({ r }: { r: Receipt | null }) {
+  if (r !== 'sent' && r !== 'delivered' && r !== 'read') return null
+  const title = r === 'read' ? 'Read' : r === 'delivered' ? 'Delivered' : 'Sent'
+  return <span className={s.ticks} data-r={r} title={title} aria-label={title}>{r === 'sent' ? '✓' : '✓✓'}</span>
 }
 
 const RECENT_KEY = 'lead-emoji-recent'

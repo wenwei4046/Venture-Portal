@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   const reads = ours(delivery.reads)
   // Every other Page's messages are Lead View's (a brand's Page) — standby ones too, and the Page's own replies sent from
   // Business Suite (lib/leads/page-events.ts); with no CRM Pages set, the CRM takes them all, as before.
-  const leadEvents = pages.size ? leadPageEvents(body, pages, process.env.META_APP_ID?.trim()) : { messages: [], replies: [] }
+  const leadEvents = pages.size ? leadPageEvents(body, pages, process.env.META_APP_ID?.trim()) : { messages: [], replies: [], receipts: { delivered: [], reads: [] } }
   const leadMessages = leadEvents.messages
   const ignored = delivery.ignored + (delivery.reads.length - reads.length)
 
@@ -136,6 +136,12 @@ export async function POST(request: Request) {
       console.error('lead_ingest_page_replies failed:', replies.error.message)
       leadsFailed = true
     }
+  }
+
+  // Delivered / read ticks (mig 20261027190000): worth no retry, so a failure only warns.
+  if (leadEvents.receipts.delivered.length || leadEvents.receipts.reads.length) {
+    const receipts = await client().rpc('lead_ingest_receipts', { p_receipts: leadEvents.receipts })
+    if (receipts.error) console.warn('lead_ingest_receipts failed:', receipts.error.message)
   }
 
   const { data, error } = await client().rpc('crm_ingest_messenger', {

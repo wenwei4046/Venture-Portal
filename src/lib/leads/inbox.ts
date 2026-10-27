@@ -2,7 +2,7 @@
 // what the screen works out — the columns' widths kept in the browser, who is replying now, where the phone
 // stands. Pure, tested in inbox.test.ts.
 
-import type { LeadContact } from './types'
+import type { LeadContact, LeadMessage } from './types'
 
 /** The browser's memory of the Inbox's columns (the handoff's key and shape). */
 export const LAYOUT_KEY = 'inboxv2-layout'
@@ -98,4 +98,22 @@ export function mediaKind(mime: string | null | undefined, body: string): 'image
 /** Only a label standing for the file ("[Photo]", "[File] plan.pdf") — not shown beside the file itself, as Messenger shows none. */
 export function isMediaPlaceholder(body: string): boolean {
   return /^\[(Photo|Video|Voice message|Sticker|File)\]( [^\n]*)?$/.test(body.trim())
+}
+
+/** What became of a message out, as WhatsApp ticks it: one tick sent, two delivered, two blue read (Meta's receipts). */
+export type Receipt = 'recorded' | 'failed' | 'sent' | 'delivered' | 'read'
+export function receiptOf(m: Pick<LeadMessage, 'direction' | 'delivery' | 'at'>, c: Pick<LeadContact, 'deliveredAt' | 'readAt'> | null): Receipt | null {
+  if (m.direction !== 'out') return null
+  if (m.delivery !== 'sent') return m.delivery
+  const at = Date.parse(m.at)
+  if (c?.readAt && Date.parse(c.readAt) >= at) return 'read'
+  if (c?.deliveredAt && Date.parse(c.deliveredAt) >= at) return 'delivered'
+  return 'sent'
+}
+
+/** How many conversations each brand has in what the list shows now (its status tab and search), and all of them. */
+export function brandCounts(rows: Array<Pick<LeadContact, 'brandId'>>): Record<string, number> {
+  const n: Record<string, number> = { all: rows.length }
+  for (const r of rows) n[r.brandId] = (n[r.brandId] ?? 0) + 1
+  return n
 }

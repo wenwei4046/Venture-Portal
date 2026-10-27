@@ -974,7 +974,7 @@ await db.exec(`
   const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
   const before = (await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_thread','lead_ingest_messenger','lead_ingest_instagram') order by 1`)).map(r => [r.proname, r.m])
   check(before, [['lead_ingest_instagram', '95240bef30c3140ab143b940f1f77ffd'], ['lead_ingest_messenger', '816bacb8113b7a232f43035efb411aef'], ['lead_thread', 'cf7fc34fc94286819682cd3a08bd1e51']], 'the three bodies here are production’s (the swaps are written against them)')
-  await db.exec(await f('20261027140000_lead_media.sql'))
+  await db.exec(await f('20261027140010_lead_media.sql'))
   await db.exec(await f('20261027140100_lead_media_guards.sql'))
   const P = '946946021838962'
   await as(CS_USER, ALL)
@@ -1089,6 +1089,44 @@ await db.exec(`
   check((await q(`select media_url from public.lead_messages where external_id = 'un.1'`))[0].media_url, null, 'never an address off Meta’s CDN')
   await q(`select public.lead_ingest_page_replies($1::jsonb)`, [JSON.stringify([{ externalId: 'un.p3', pageId: P, psid: '7700701', kind: 'image', body: null, mediaUrl: 'https://scontent.xx.fbcdn.net/v/new.jpg', sentAt: '2026-10-27T04:12:00Z' }])])
   check((await q(`select body, media_url from public.lead_messages where external_id = 'un.p3'`))[0], { body: '[Photo]', media_url: 'https://scontent.xx.fbcdn.net/v/new.jpg' }, 'a photo the Page sends now keeps its address')
+
+  // ── Labels and read ticks (migs 20261027190000 + its guards) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_contact_json'`))[0].m, '5c67205569ebe4e6f5ca7381b6ac89c2', 'lead_contact_json here is production’s body')
+  await db.exec(await f('20261027190000_lead_labels_reads.sql'))
+  await db.exec(await f('20261027190000_lead_labels_reads.sql'))
+  await db.exec(await f('20261027190100_lead_labels_guards.sql'))
+  await as(CS_USER, ALL)
+  const labels = (await q(`select public.lead_labels() l`))[0].l
+  check(labels.map(l => l.name), ['Considering', 'Qualified', 'Converted', 'Lost', 'Not qualified'], 'Meta’s five stages to start, once')
+  const card = async () => ((await q(`select public.lead_inbox() i`))[0].i).find(x => x.id === c)
+  check((await card()).labels, [], 'a customer has no labels at first')
+  await q(`select public.lead_set_labels($1, $2::uuid[])`, [c, [labels[0].id, labels[1].id]])
+  check((await card()).labels.map(l => l.name), ['Considering', 'Qualified'], 'labelled with two, in the list’s order')
+  check((await q(`select what from public.lead_events where contact_id = $1 order by id desc limit 1`, [c]))[0].what, 'Labelled Considering, Qualified', 'the timeline says so')
+  await q(`select public.lead_set_labels($1, $2::uuid[])`, [c, [labels[1].id]])
+  check((await card()).labels.map(l => l.name), ['Qualified'], 'one taken off')
+  await as(CS_USER, ['leads.view', 'leads.create'])
+  await refuses(`select public.lead_set_labels($1, $2::uuid[])`, [c, [labels[0].id]], /Lead View · Edit/, 'labelling needs Edit')
+  await refuses(`select public.lead_save_labels('[]'::jsonb)`, [], /Lead View · Manage/, 'changing the list needs Manage')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_save_labels($1::jsonb)`, [JSON.stringify([{ id: labels[1].id, name: 'Hot lead', tone: 'red' }, { name: 'VIP', tone: 'clay' }])])
+  const after = (await q(`select public.lead_labels() l`))[0].l
+  check(after.map(l => [l.name, l.tone]), [['Hot lead', 'red'], ['VIP', 'clay']], 'renamed, added, the rest deleted')
+  check((await card()).labels.map(l => l.name), ['Hot lead'], 'the customer keeps a renamed label')
+  await refuses(`select public.lead_set_labels($1, $2::uuid[])`, [c, [labels[0].id]], /That label is gone/, 'a deleted label cannot be put on')
+  check((await q(`select prosrc from pg_proc where proname = 'lead_set_labels'`))[0].prosrc.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.edit']);`), true, 'labelling asks the Inbox')
+
+  // Read ticks: Meta's deliveries (mids) and reads (a watermark) for the Page.
+  const outMid = (await q(`select external_id, created_at from public.lead_messages where external_id = 'un.p3'`))[0]
+  await q(`select public.lead_ingest_receipts($1::jsonb)`, [JSON.stringify({ delivered: [{ externalId: 'un.p3' }], reads: [] })])
+  const t1 = await card()
+  check([!!t1.deliveredAt, t1.readAt], [true, null], 'delivered, not read yet')
+  await q(`select public.lead_ingest_receipts($1::jsonb)`, [JSON.stringify({ delivered: [], reads: [{ pageId: P, psid: '7700701', watermark: '2030-01-01T00:00:00Z' }] })])
+  check(Date.parse((await card()).readAt), Date.parse('2030-01-01T00:00:00Z'), 'read up to Meta’s watermark')
+  await q(`select public.lead_ingest_receipts($1::jsonb)`, [JSON.stringify({ reads: [{ pageId: P, psid: '7700701', watermark: '2029-01-01T00:00:00Z' }] })])
+  check(Date.parse((await card()).readAt), Date.parse('2030-01-01T00:00:00Z'), 'an older watermark never moves it back')
+  check(!!outMid, true, 'the message out is there')
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_receipts(jsonb)', 'execute') a`))[0].a, false, 'receipts are the service role’s alone')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)
