@@ -12,7 +12,7 @@ import type { AgentMore, Correction, DataFile } from './agent'
 import type { QuickReply } from './quick'
 import type { AuditChange, AuditTableLine } from '@/lib/audit/changes'
 import { AUDIT_TABLES } from './audit'
-import type { LeadConfig, LeadContact, LeadThread } from './types'
+import type { LeadConfig, LeadContact, LeadLabel, LeadThread } from './types'
 
 /**
  * Lead View's readers (2026-10-16): each is one of the module's own functions (mig 20261016300200), which asks
@@ -98,6 +98,11 @@ export function loadAiMore(brandId: string): Promise<Read<AgentMore>> {
 /** The Data Center's files and links. */
 export function loadDataFiles(): Promise<Read<DataFile[]>> {
   return rpc<DataFile[]>('lead_data_files', undefined, 'The Data Center')
+}
+
+/** Customer Service's labels (mig 20261027190000). */
+export function loadLabels(): Promise<Read<LeadLabel[]>> {
+  return rpc<LeadLabel[]>('lead_labels', undefined, 'The labels')
 }
 
 /** The Data Center's quick replies (mig 20261023300000). */

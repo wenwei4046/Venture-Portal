@@ -135,6 +135,18 @@ export async function leadAgents(): Promise<LeadOutcome<Array<{ id: string; name
 }
 
 /** Give a conversation to a CS, or back to nobody (null) — Lead View · Manage. */
+/** A customer's labels, set whole (mig 20261027190000). */
+export async function setLeadLabels(contactId: string, labelIds: string[]) {
+  await requireActionOn('/leads', 'leads', 'edit')
+  return call<null>('lead_set_labels', { p_contact: contactId, p_labels: labelIds }, 'The labels were not saved.')
+}
+
+/** Customer Service's list of labels, saved whole: renamed, recoloured, reordered; one left out is deleted. */
+export async function saveLeadLabels(labels: Array<{ id?: string; name: string; tone: string }>) {
+  await requireActionOn('/leads', 'leads', 'manage')
+  return call<null>('lead_save_labels', { p_labels: labels }, 'The labels were not saved.')
+}
+
 export async function assignLead(contactId: string, userId: string | null) {
   await requireActionOn('/leads', 'leads', 'manage')
   return call<null>('lead_assign', { p_contact: contactId, p_user: userId }, 'The conversation was not given.')

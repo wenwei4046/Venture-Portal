@@ -38,9 +38,19 @@ describe('Lead View › a Page delivery: standby customers and the Page’s own 
     ])
   })
 
+  it('keeps Meta’s receipts for the brand Pages: delivered ids and read watermarks', () => {
+    const r = leadPageEvents({ object: 'page', entry: [{ id: P2990, time: 1, messaging: [
+      { sender: { id: '7700002' }, recipient: { id: P2990 }, timestamp: 1, delivery: { mids: ['e.1'], watermark: 1761530001000 } },
+      { sender: { id: '7700002' }, recipient: { id: P2990 }, timestamp: 1, read: { watermark: 1761530002000 } },
+    ] }] }, crm, OURS)
+    expect(r.receipts.delivered).toEqual([{ externalId: 'e.1' }])
+    expect(r.receipts.reads.map(x => [x.pageId, x.psid])).toEqual([[P2990, '7700002']])
+    expect(r.messages).toEqual([])
+  })
+
   it('leaves the CRM’s Pages and anything that is not a Page delivery alone', () => {
     expect(leadPageEvents({ object: 'page', entry: [{ id: CRM, time: 1, messaging: [customer('7700009', 'm.9')], standby: [echo('7700009', 'e.9', 'x')] }] }, crm, OURS))
-      .toEqual({ messages: [], replies: [] })
-    expect(leadPageEvents({ object: 'instagram', entry: [] }, crm, OURS)).toEqual({ messages: [], replies: [] })
+      .toEqual({ messages: [], replies: [], receipts: { delivered: [], reads: [] } })
+    expect(leadPageEvents({ object: 'instagram', entry: [] }, crm, OURS)).toEqual({ messages: [], replies: [], receipts: { delivered: [], reads: [] } })
   })
 })

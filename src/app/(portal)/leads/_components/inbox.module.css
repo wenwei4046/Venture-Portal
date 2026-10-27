@@ -24,17 +24,18 @@
 /* ── The list ── */
 .list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid rgb(var(--lv-border)); }
 .listHead { padding: 12px 12px 0; display: flex; flex-direction: column; gap: 10px; }
-.brands { display: flex; gap: 4px; flex-wrap: wrap; }
+.brands { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
 .brandTab {
   white-space: nowrap;
   border: 0;
   cursor: pointer;
   font: inherit;
   font-size: 14px;
-  padding: 5px 10px;
+  padding: 5px 6px;
   border-radius: 5px;
   background: transparent;
   color: rgb(var(--lv-text-2));
+  flex: none;
 }
 .brandTab[aria-pressed='true'] { background: rgb(var(--lv-ink)); color: rgb(var(--lv-cream)); }
 .find {
@@ -50,7 +51,8 @@
 .find input { flex: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 14px; background: transparent; color: rgb(var(--lv-ink)); }
 .states { display: flex; border-bottom: 1px solid rgb(var(--lv-border)); }
 .stateTab {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: nowrap;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -59,11 +61,11 @@
   cursor: pointer;
   font: inherit;
   font-size: 14px;
-  padding: 8px 0 9px;
+  padding: 8px 4px 9px;
   color: rgb(var(--lv-text-2));
   display: flex;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
 }
 .stateTab[aria-pressed='true'] { color: rgb(var(--lv-ink)); border-bottom-color: rgb(var(--lv-ink)); }
 .stateCount { font-size: 13px; color: rgb(var(--lv-text-4)); }
@@ -626,3 +628,41 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; background: 
 .owner { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; border: 1px solid rgb(var(--lv-border)); background: rgb(var(--lv-white)); color: rgb(var(--lv-text-2)); font: inherit; font-size: 13px; white-space: nowrap; }
 .owner[data-button] { cursor: pointer; }
 .owner[data-button]:hover:not(:disabled) { border-color: rgb(var(--lv-accent)); color: rgb(var(--lv-ink)); }
+
+/* The brands' numbers (2026-10-27): each brand's conversations under the status tab picked. */
+.brandCount { margin-left: 4px; font-size: 12px; opacity: 0.7; }
+.brandTab[aria-pressed='true'] .brandCount { opacity: 0.85; }
+.labelFilter { margin: 0 0 4px; height: 30px; padding: 0 8px; border: 1px solid rgb(var(--lv-border)); border-radius: 6px; background: rgb(var(--lv-white)); font: inherit; font-size: 13px; color: rgb(var(--lv-ink)); }
+
+/* Labels (mig 20261027190000): a small chip in its tone. */
+.label { display: inline-flex; align-items: center; font-size: 11px; line-height: 1; padding: 3px 7px; border-radius: 999px; white-space: nowrap; background: rgb(var(--lv-muted)); color: rgb(var(--lv-ink)); }
+.label[data-tone='amber'] { background: rgb(var(--lv-amber-bg)); color: rgb(var(--lv-amber-text)); }
+.label[data-tone='green'] { background: rgb(var(--lv-green-bg)); color: rgb(var(--lv-green)); }
+.label[data-tone='red'] { background: rgb(var(--lv-red-bg)); color: rgb(var(--lv-red)); }
+.label[data-tone='clay'] { background: rgb(var(--lv-tint)); color: rgb(var(--lv-accent-text)); }
+.label[data-tone='blue'] { background: rgb(var(--lv-read) / 0.14); color: rgb(var(--lv-k-text)); }
+.labelRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.labelEditor {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 31;
+  width: min(520px, calc(100vw - 32px));
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid rgb(var(--lv-frame));
+  border-radius: 10px;
+  background: rgb(var(--lv-white));
+  box-shadow: var(--lv-shadow-menu);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.labelEditRow { display: grid; grid-template-columns: minmax(0, 1fr) 100px auto 30px 30px 30px; align-items: center; gap: 6px; }
+.labelEditFoot { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+
+/* Read ticks (mig 20261027190000), as WhatsApp: ✓ sent, ✓✓ delivered, blue ✓✓ read. */
+.ticks { margin-left: 4px; letter-spacing: -2px; font-size: 12px; color: rgb(var(--lv-text-4)); }
+.ticks[data-r='read'] { color: rgb(var(--lv-read)); font-weight: 600; }
