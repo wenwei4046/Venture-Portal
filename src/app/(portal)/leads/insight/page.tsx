@@ -24,7 +24,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     )
   }
   const range = insightRange((await searchParams).r, config.data.today)
-  const [list, more, flows] = await Promise.all([loadLeadList(range.from, range.to), loadInsightMore(range.from, range.to), loadFlows()])
+  const [list, more, flows] = await Promise.all([loadLeadList(range.from, range.listTo), loadInsightMore(range.from, range.to), loadFlows()])
   if (!list.ok || (!more.ok && more.reason !== NOT_SET_UP)) {
     return (
       <HvPage>
