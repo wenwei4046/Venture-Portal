@@ -1071,6 +1071,24 @@ await db.exec(`
   await as(CS_USER, ALL)
   check((await q(`select has_function_privilege('anon', 'public.lead_mark_seen(uuid)', 'execute') a`))[0].a, false, 'not the publishable key’s')
   check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = 'lead_seen' and grantee in ('anon','authenticated')`))[0].n, 0, 'the table has no grants')
+
+  // ── The Page's own photos show in the chat (mig 20261027180000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_ingest_page_replies'`))[0].m, '54726b97802abfe23f9a78e0ae8a68a6', 'lead_ingest_page_replies here is production’s body')
+  // One kept before the change, whose address is still in the delivery log.
+  await q(`select public.lead_ingest_page_replies($1::jsonb)`, [JSON.stringify([{ externalId: 'un.p2', pageId: P, psid: '7700701', kind: 'image', body: null, sentAt: '2026-10-27T04:10:00Z' }])])
+  // The CRM's delivery log, as production has it (the CRM's migrations are not loaded here).
+  await db.exec(`create table if not exists public.crm_channel_events (id bigserial primary key, received_at timestamptz not null default now(),
+    channel text not null, status text not null, message text, counts jsonb, payload jsonb)`)
+  await db.exec(`insert into public.crm_channel_events (channel, status, payload) values ('messenger', 'ok', '${JSON.stringify({ object: 'page', entry: [{ id: P, standby: [
+    { sender: { id: P }, recipient: { id: '7700701' }, message: { mid: 'un.p2', is_echo: true, attachments: [{ type: 'image', payload: { url: 'https://scontent.xx.fbcdn.net/v/old.jpg' } }] } },
+    { sender: { id: P }, recipient: { id: '7700701' }, message: { mid: 'un.1', attachments: [{ type: 'image', payload: { url: 'https://evil.example.com/x.jpg' } }] } },
+  ] }] })}'::jsonb)`)
+  await db.exec(await f('20261027180000_lead_page_media.sql'))
+  await db.exec(await f('20261027180000_lead_page_media.sql'))
+  check((await q(`select media_url from public.lead_messages where external_id = 'un.p2'`))[0].media_url, 'https://scontent.xx.fbcdn.net/v/old.jpg', 'a photo kept before gets its address from the log')
+  check((await q(`select media_url from public.lead_messages where external_id = 'un.1'`))[0].media_url, null, 'never an address off Meta’s CDN')
+  await q(`select public.lead_ingest_page_replies($1::jsonb)`, [JSON.stringify([{ externalId: 'un.p3', pageId: P, psid: '7700701', kind: 'image', body: null, mediaUrl: 'https://scontent.xx.fbcdn.net/v/new.jpg', sentAt: '2026-10-27T04:12:00Z' }])])
+  check((await q(`select body, media_url from public.lead_messages where external_id = 'un.p3'`))[0], { body: '[Photo]', media_url: 'https://scontent.xx.fbcdn.net/v/new.jpg' }, 'a photo the Page sends now keeps its address')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

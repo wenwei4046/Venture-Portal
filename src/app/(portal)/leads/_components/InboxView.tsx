@@ -8,7 +8,7 @@ import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
 import { outcomeOf } from '@/lib/leads/ai'
 import { adLabel, adsManagerLink } from '@/lib/leads/ads'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
-import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
+import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, mediaKind, isMediaPlaceholder, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
 import { whenFull } from '@/lib/leads/time'
 import { formatPhone } from '@/lib/leads/phone'
 import { dayLabel, timeOf, whenShort } from '@/lib/leads/time'
@@ -475,7 +475,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
               {newDay ? <div className={s.day} style={{ alignSelf: 'stretch' }}>{day}</div> : null}
               {m.direction === 'out' ? <MessageLabel m={m} /> : null}
               {m.mediaPath || m.mediaUrl ? <MessageMedia m={m} link={m.mediaPath ? links[m.mediaPath] : m.mediaUrl ?? undefined} /> : null}
-              {m.mediaPath && /^\[(Photo|Video|File)\]/.test(m.body) ? null : <div className={s.bubble}>{m.body}</div>}
+              {(m.mediaPath || m.mediaUrl) && isMediaPlaceholder(m.body) ? null : <div className={s.bubble}>{m.body}</div>}
               {m.buttons?.length ? (
                 <div className={s.buttons}>{m.buttons.map(b => <span key={b} className={s.button}>{b}</span>)}</div>
               ) : null}
@@ -601,13 +601,17 @@ function OwnerPicker({ contact, canManage, onChanged }: { contact: LeadContact; 
 
 /** A message's photo, video or file: shown in place; a file (or a customer's attachment Meta keeps) opens in a tab. */
 function MessageMedia({ m, link }: { m: LeadMessage; link: string | undefined }) {
-  const kind = m.mediaMime?.startsWith('image/') || (!m.mediaMime && /^\[(Photo|Sticker)\]/.test(m.body)) ? 'image'
-    : m.mediaMime?.startsWith('video/') || (!m.mediaMime && m.body.startsWith('[Video]')) ? 'video' : 'file'
-  if (!link) return <div className={s.mediaWait}>{kind === 'image' ? 'Photo' : kind === 'video' ? 'Video' : 'File'} · loading…</div>
+  const kind = mediaKind(m.mediaMime, m.body)
+  // Meta's addresses expire after a while (a signed link after an hour): say so instead of a broken picture.
+  const [gone, setGone] = useState(false)
+  const what = kind === 'image' ? 'Photo' : kind === 'video' ? 'Video' : kind === 'audio' ? 'Voice message' : 'File'
+  if (!link) return <div className={s.mediaWait}>{what} · loading…</div>
+  if (gone) return <div className={s.mediaWait}>{what} · no longer available from Meta</div>
   // A short-lived signed link (or Meta's): nothing for next/image to optimise.
   // eslint-disable-next-line @next/next/no-img-element
-  if (kind === 'image') return <a href={link} target="_blank" rel="noopener noreferrer"><img className={s.mediaImg} src={link} alt={m.body} /></a>
-  if (kind === 'video') return <video className={s.mediaImg} src={link} controls preload="metadata" />
+  if (kind === 'image') return <a href={link} target="_blank" rel="noopener noreferrer"><img className={s.mediaImg} src={link} alt={m.body} onError={() => setGone(true)} /></a>
+  if (kind === 'video') return <video className={s.mediaImg} src={link} controls preload="metadata" onError={() => setGone(true)} />
+  if (kind === 'audio') return <audio className={s.mediaAudio} src={link} controls preload="metadata" onError={() => setGone(true)} />
   const name = m.mediaPath ? m.mediaPath.replace(/^.*\//, '').replace(/^[0-9a-f-]{36}-/, '') : 'Attachment'
   return <a className={s.mediaFile} href={link} target="_blank" rel="noopener noreferrer"><LeadIcon name="paperclip" size={14} />{name}</a>
 }

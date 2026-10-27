@@ -26,6 +26,18 @@ describe('Lead View › a Page delivery: standby customers and the Page’s own 
     ])
   })
 
+  it('keeps the address of a photo the Page sent, so the chat shows it (Meta’s CDN only)', () => {
+    const pic = (mid: string, url: string) => ({ sender: { id: P2990 }, recipient: { id: '7700002' }, timestamp: 1, message: { mid, is_echo: true, attachments: [{ type: 'image', payload: { url } }] } })
+    const r = leadPageEvents({ object: 'page', entry: [{ id: P2990, time: 1, messaging: [
+      pic('e.4', 'https://scontent.xx.fbcdn.net/v/t1.15752/bed.jpg'),
+      pic('e.5', 'https://evil.example.com/bed.jpg'),
+    ] }] }, crm, OURS)
+    expect(r.replies.map(x => [x.externalId, x.kind, x.mediaUrl ?? null])).toEqual([
+      ['e.4', 'image', 'https://scontent.xx.fbcdn.net/v/t1.15752/bed.jpg'],
+      ['e.5', 'image', null],
+    ])
+  })
+
   it('leaves the CRM’s Pages and anything that is not a Page delivery alone', () => {
     expect(leadPageEvents({ object: 'page', entry: [{ id: CRM, time: 1, messaging: [customer('7700009', 'm.9')], standby: [echo('7700009', 'e.9', 'x')] }] }, crm, OURS))
       .toEqual({ messages: [], replies: [] })

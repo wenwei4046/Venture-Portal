@@ -6,7 +6,7 @@
 //     conversation (lead_ingest_page_replies) unless this app sent it (its app_id), which Lead View has already.
 // The CRM's Pages are never read here (its parser and functions are unchanged).
 
-import { parseMessengerDelivery, type MsgInbound, type MsgKind } from '@/lib/messenger/webhook'
+import { metaMediaUrl, parseMessengerDelivery, type MsgInbound, type MsgKind } from '@/lib/messenger/webhook'
 
 export interface PageReply {
   externalId: string
@@ -15,6 +15,8 @@ export interface PageReply {
   psid: string
   kind: MsgKind
   body: string | null
+  /** A photo, video, voice note or file the Page sent: Meta's own address (mig 20261027180000; it expires after a while). */
+  mediaUrl?: string | null
   sentAt: string
 }
 
@@ -22,7 +24,7 @@ type Ev = {
   sender?: { id?: string }
   recipient?: { id?: string }
   timestamp?: number
-  message?: { mid?: string; text?: string; is_echo?: boolean; app_id?: number | string; attachments?: Array<{ type?: string; payload?: { sticker_id?: number } }> }
+  message?: { mid?: string; text?: string; is_echo?: boolean; app_id?: number | string; attachments?: Array<{ type?: string; payload?: { sticker_id?: number; url?: string } }> }
 }
 
 const KINDS: Record<string, MsgKind> = { image: 'image', video: 'video', audio: 'audio', file: 'document', location: 'location' }
@@ -45,6 +47,7 @@ export function leadPageEvents(body: unknown, crmPages: Set<string>, ourAppId: s
       const kind: MsgKind = m.text ? 'text' : first ? (first.type === 'image' && first.payload?.sticker_id ? 'sticker' : KINDS[first.type ?? ''] ?? 'other') : 'text'
       replies.push({
         externalId: m.mid, pageId: e.id!, psid: ev.recipient.id, kind, body: m.text ?? null,
+        ...(['image', 'video', 'audio', 'file'].includes(first?.type ?? '') && metaMediaUrl(first?.payload?.url) ? { mediaUrl: metaMediaUrl(first?.payload?.url) } : {}),
         sentAt: new Date(typeof ev.timestamp === 'number' ? ev.timestamp : Date.now()).toISOString(),
       })
     }
