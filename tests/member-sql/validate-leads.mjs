@@ -1149,11 +1149,11 @@ await db.exec(`
   check(await unreadOf(), 1, 'for somebody who has not opened it, the question after the old greeting is unread')
   await as(CS_USER, ALL)
 
-  // ── Meta's own times (mig 20261027210000): Ray Ng's case — his message arrives after the Page's answer to it ──
+  // ── Meta's own times (mig 20261027210010): Ray Ng's case — his message arrives after the Page's answer to it ──
   check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_ingest_messenger', 'lead_ingest_instagram', 'lead_ingest_page_replies') order by 1`)).map(r => [r.proname, r.m]),
     [['lead_ingest_instagram', '67351ec9be16f60519634ecf6363b9bb'], ['lead_ingest_messenger', 'b7644cce739f2f6bf6b33e6ee41cad54'], ['lead_ingest_page_replies', '00a667a6e2455f712a20a1cf382b0b25']], 'the three ingests here are production’s')
-  await db.exec(await f('20261027210000_lead_meta_times.sql'))
-  await db.exec(await f('20261027210000_lead_meta_times.sql'))
+  await db.exec(await f('20261027210010_lead_meta_times.sql'))
+  await db.exec(await f('20261027210010_lead_meta_times.sql'))
   const sent = (s) => new Date(Date.now() - s * 1000).toISOString()
   const ray = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
     { externalId: 'ray.1', pageId: P, psid: '7700901', name: 'Ray Test', kind: 'text', body: 'mattress', sentAt: sent(600), ad: null },

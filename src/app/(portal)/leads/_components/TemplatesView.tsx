@@ -86,9 +86,13 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
   const redo = () => { if (!future.length) return; setPast(p => [...p, draft]); setDraft(future[0]); setFuture(f => f.slice(1)); setDirty(true) }
 
   const open = (t: ReplyTemplate | null) => {
+    // Already on a new template nobody has touched: + New template has nothing to do (2026-10-27 — the user, asked to
+    // leave without saving at every click: "我要加template 为什么会一直这样？").
+    if (!t && draft.id.startsWith('new-') && !dirty) return
     if (dirty && !window.confirm('Leave this template without saving its changes?')) return
     const d = t ? draftOf(t) : blank()
-    setDraft(d); setPast([]); setFuture([]); setDirty(!t); setSel(d.steps[0]?.id ?? null); setError(''); setSavedNote('')
+    // A new template counts as changed only once something is edited; it can be saved as it stands (isNew below).
+    setDraft(d); setPast([]); setFuture([]); setDirty(false); setSel(d.steps[0]?.id ?? null); setError(''); setSavedNote('')
     window.history.replaceState(null, '', t ? `/leads/flows?t=${t.id}` : '/leads/flows')
   }
   const removeStep = (id: string) => {
@@ -134,7 +138,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
   const copyTpl = (t: ReplyTemplate) => {
     if (dirty && !window.confirm('Leave this template without saving its changes?')) return
     const d = { ...draftOf(t), id: `new-${Date.now().toString(36)}`, name: `${t.name} (copy)`.slice(0, 60) }
-    setDraft(d); setDirty(true); setSel(d.steps[0]?.id ?? null)
+    setDraft(d); setDirty(false); setSel(d.steps[0]?.id ?? null)
   }
 
   // ── Library from the canvas ──
@@ -184,7 +188,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
           <span className={s.eyebrow}>REPLIES</span>
           <h1 className={s.title}>Reply templates</h1>
         </div>
-        {canEdit ? <button type="button" className={s.btn} data-strong="" disabled={!dirty || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
+        {canEdit ? <button type="button" className={s.btn} data-strong="" disabled={!(dirty || isNew) || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
       </div>
       <div className={s.panel}>
         <div className={s.split}>
@@ -224,9 +228,9 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
               </div>
               {canEdit ? (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className={s.hint} data-dirty={dirty || undefined}>{dirty ? 'Unsaved changes' : savedNote || 'No changes yet'}</span>
+                  <span className={s.hint} data-dirty={dirty || undefined}>{dirty ? 'Unsaved changes' : isNew ? 'New template — not saved yet' : savedNote || 'No changes yet'}</span>
                   <button type="button" className={s.btn} data-quiet="" disabled={!dirty || busy} onClick={discard}>Discard</button>
-                  <button type="button" className={s.btn} data-strong="" disabled={!dirty || busy || !ready} onClick={save} title={!ready ? 'Waiting for the database update' : undefined}>{busy ? 'Saving…' : 'Save'}</button>
+                  <button type="button" className={s.btn} data-strong="" disabled={!(dirty || isNew) || busy || !ready} onClick={save} title={!ready ? 'Waiting for the database update' : undefined}>{busy ? 'Saving…' : 'Save'}</button>
                 </span>
               ) : null}
             </div>
