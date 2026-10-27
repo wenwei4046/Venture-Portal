@@ -1051,6 +1051,26 @@ await db.exec(`
   check(await unread(), 1, 'a new message after the answer: 1')
   await q(`select public.lead_ingest_page_replies($1::jsonb)`, [JSON.stringify([{ externalId: 'un.p1', pageId: P, psid: '7700701', body: 'From Business Suite', sentAt: '2026-10-27T04:05:00Z' }])])
   check(await unread(), 0, 'the Page answering from Business Suite clears it too')
+
+  // ── Opening a chat clears it for whoever opened it (mig 20261027170000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_inbox'`))[0].m, '195d52d07d2f977a82ad8fb13c66d5a1', 'lead_inbox here is production’s body after 160000')
+  await db.exec(await f('20261027170000_lead_seen.sql'))
+  await db.exec(await f('20261027170000_lead_seen.sql'))
+  await say('un.5', 'hello?')
+  await say('un.6', 'still there?')
+  check(await unread(), 2, 'two new: 2')
+  await q(`select public.lead_mark_seen($1)`, [c])
+  check(await unread(), 0, 'opened: 0, no answer needed')
+  await as(OTHER, ALL)
+  check(await unread(), 2, 'somebody else who has not opened it still sees 2')
+  await as(CS_USER, ALL)
+  await say('un.7', 'ok thanks')
+  check(await unread(), 1, 'a message after opening: 1')
+  await as(CS_USER, [])
+  await refuses(`select public.lead_mark_seen($1)`, [c], /Lead View · View/, 'marking needs Lead View · View')
+  await as(CS_USER, ALL)
+  check((await q(`select has_function_privilege('anon', 'public.lead_mark_seen(uuid)', 'execute') a`))[0].a, false, 'not the publishable key’s')
+  check((await q(`select count(*)::int n from information_schema.role_table_grants where table_name = 'lead_seen' and grantee in ('anon','authenticated')`))[0].n, 0, 'the table has no grants')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

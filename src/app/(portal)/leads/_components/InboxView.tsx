@@ -119,11 +119,17 @@ export default function InboxView({
   }, [searched])
   const shown = searched.filter(c => filter === 'all' || inboxState(c) === filter)
 
+  // Read here since its last message (readThread marks it seen, mig 20261027170000): its unread badge goes at once,
+  // before the list is read again.
+  const [readAt, setReadAt] = useState<Record<string, string>>({})
   const load = useCallback((id: string) => {
     startLoading(async () => {
       const r = await readThread(id)
       if (!r.ok) setError(r.reason)
-      else if (r.data) setThreads(t => ({ ...t, [id]: r.data! }))
+      else if (r.data) {
+        setThreads(t => ({ ...t, [id]: r.data! }))
+        setReadAt(m => ({ ...m, [id]: r.data!.contact.lastAt }))
+      }
     })
   }, [])
   const pick = (id: string) => {
@@ -131,7 +137,8 @@ export default function InboxView({
     setError(null)
     // The address names the conversation, so a refresh (and a link) opens it again.
     window.history.replaceState(null, '', `/leads?c=${id}`)
-    if (!threads[id]) load(id)
+    // Always read: the cached copy shows at once, and the read marks the chat seen.
+    load(id)
   }
   // The list changed under us (a write, a refresh): read the open conversation again.
   const lastAt = contacts.find(c => c.id === selected)?.lastAt
@@ -183,6 +190,7 @@ export default function InboxView({
               </div>
             ) : shown.map(c => {
               const st = inboxState(c)
+              const unread = c.id === selected || readAt[c.id] === c.lastAt ? 0 : c.unread
               return (
                 <button key={c.id} type="button" className={s.row} aria-current={c.id === selected} data-waiting={st === 'waiting' || undefined} onClick={() => pick(c.id)}>
                   <span className={s.avatarWrap} aria-hidden="true">
@@ -193,11 +201,11 @@ export default function InboxView({
                     <span className={s.rowTop}>
                       <span className={s.rowName}>{c.name || '—'}</span>
                       {st === 'waiting' && c.unread === undefined ? <span className={s.waitDot} aria-label="Waiting" /> : null}
-                      <span className={s.rowTime} data-unread={c.unread ? '' : undefined}>{whenShort(c.lastAt, config.today)}</span>
+                      <span className={s.rowTime} data-unread={unread ? '' : undefined}>{whenShort(c.lastAt, config.today)}</span>
                     </span>
                     <span className={s.rowLine}>
                       <span className={s.rowText}>{c.lastDir === 'out' ? '↩ ' : ''}{c.lastText}</span>
-                      {c.unread ? <span className={s.unread} aria-label={`${c.unread} unread`}>{unreadLabel(c.unread)}</span> : null}
+                      {unread ? <span className={s.unread} aria-label={`${unread} unread`}>{unreadLabel(unread)}</span> : null}
                     </span>
                     <span className={s.chips}>
                       <span className={s.chip}>{brands.get(c.brandId)?.name ?? '—'}</span>

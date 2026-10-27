@@ -51,6 +51,9 @@ export async function readThread(contactId: string): Promise<LeadOutcome<LeadThr
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { data, error } = await supabase.rpc('lead_thread', { p_contact: contactId })
   if (error) return { ok: false, reason: refusal(error, 'The conversation could not be read.') }
+  // Read = seen, for this person: the list's unread count clears (mig 20261027170000). A refusal (View as a person —
+  // read-only — or the migration not applied) changes nothing on the screen.
+  if (data) await supabase.rpc('lead_mark_seen', { p_contact: contactId })
   return { ok: true, data: data as LeadThread | null }
 }
 
@@ -517,10 +520,11 @@ export async function nameAd(adId: string, data: { name: string; campaign: strin
 }
 
 /** Settings › Ads: ask Ads Manager for these ads' names, campaigns, ad sets and posts (needs ads_read). */
-export async function fetchAdNames(adIds: string[]): Promise<LeadOutcome<number>> {
+export async function fetchAdNames(adIds: string[]): Promise<LeadOutcome<{ named: number; refused: number }>> {
   await requireActionOn('/leads/settings', 'leads', 'manage')
   const meta = await fetchMetaAds(adIds)
   if (!meta.ok) return meta
-  if (meta.ads.length === 0) return { ok: true, data: 0 }
-  return call<number>('lead_save_meta_ads', { p_rows: meta.ads }, 'What Meta said was not kept.')
+  if (meta.ads.length === 0) return { ok: true, data: { named: 0, refused: meta.refused } }
+  const kept = await call<number>('lead_save_meta_ads', { p_rows: meta.ads }, 'What Meta said was not kept.')
+  return kept.ok ? { ok: true, data: { named: kept.data, refused: meta.refused } } : kept
 }
