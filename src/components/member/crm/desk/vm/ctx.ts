@@ -95,6 +95,8 @@ export interface DeskUi {
   // Ads Performance
   apSel: string[] | null; mDraft: string[] | null; mDrag: number | null; mq: string; mFold: Record<string, boolean>;
   apStF: string;
+  /** Ads Performance's source: All · The Conts / DC, each by WhatsApp · Messenger (lib/member/crm-source.ts, 2026-10-27). */
+  apSrc?: string; apSrcOpen?: boolean;
   /** Ads Performance shows the ads hidden by a right click too, dimmed, to show them again (2026-10-24). */
   apShowHidden?: boolean;
   /** Ads Performance's column widths, dragged at a header's right edge (the owner, 2026-10-13); "name" is the Ad column. */

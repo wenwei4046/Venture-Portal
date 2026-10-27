@@ -5,6 +5,7 @@
  * newest message. Swipe a row left for More (Pin, Mute, Contact info, Label,
  * Block).
  */
+import { sourceOf } from "@/lib/member/crm-source";
 import type { ChangeEvent, MouseEvent } from "react";
 import { DEFAULT_LABELS, LABEL_SWATCHES, type CrmCustomer, type CrmLabel } from "@/lib/member/crm-data";
 import { BORDER, CHANNEL, dayLabel, firstName, ini, INK, isCold, lastChat, lastReal, STATUS_LABEL, stop, timeLabel, urgencyOf, type PEvent, type SalesCtx } from "./common";
@@ -71,7 +72,7 @@ export function inboxVM(ctx: SalesCtx) {
   const q = ui.q.trim().toLowerCase();
   const pinned = (c: CrmCustomer) => !!data.prefs[c.id]?.pinned;
   const view = mine
-    .filter(c => (!ui.adSel.length || ui.adSel.includes(c.ad)) && match(c) && (!q || `${c.name} ${previewOf(c)} ${c.ad}`.toLowerCase().includes(q)))
+    .filter(c => (!ui.adSel.length || ui.adSel.includes(c.ad)) && match(c) && (!q || `${c.name} ${previewOf(c)} ${c.ad} ${sourceOf(c).label}`.toLowerCase().includes(q)))
     .sort((a, b) => Number(pinned(b)) - Number(pinned(a)) || lastAt(b) - lastAt(a));
 
   // ── Row swipes ──
@@ -142,7 +143,7 @@ export function inboxVM(ctx: SalesCtx) {
       urgW: u.level === "soon" ? 500 : 600, urgIc: (u.level === "overdue" ? "triangle-alert" : "clock") as "triangle-alert" | "clock",
       name: c.name, ini: ini(c.name), ad: c.ad, preview: previewOf(c), when: lastChat(new Date(lastAt(c)).toISOString(), now),
       // A chat marked unread shows the badge as a dot, as WhatsApp's.
-      unread: c.unread || (marked(c) ? "\u00a0" : 0), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, cold,
+      unread: c.unread || (marked(c) ? "\u00a0" : 0), chanName: sourceOf(c).label, chanFg: ch.fg, chanIcon: ch.icon, cold,
       ownerTag: shared ? firstName(nameOf(c.assignedTo)) : "", ownerC: shared ? ownerColor.get(c.assignedTo!)! : "var(--crm-muted)",
       urgShow: !cold && u.level !== "none", urg: u.label, urg3b: u.color,
       firstVisit: firstMarked ? `${dayLabel(new Date(firstMarked.start))}, ${timeLabel(new Date(firstMarked.start))}` : "",

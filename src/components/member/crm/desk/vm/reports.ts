@@ -9,6 +9,7 @@
  */
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
+import { sourceOf, SOURCE_PICKS } from "@/lib/member/crm-source";
 
 export type RpPeriod = "week" | "month" | "last" | "all";
 export const RP_PERIODS: [RpPeriod, string][] = [["week", "This week"], ["month", "This month"], ["last", "Last month"], ["all", "All time"]];
@@ -94,7 +95,9 @@ export function sourcesReport(cs: CrmCustomer[], range: [number, number], status
   const reason = (c: CrmCustomer) => CRM_LOST_REASONS.find(r => r.value === c.lost?.reason)?.label ?? "Not given";
   return {
     figures: { leads: leads.length, fromAds: leads.filter(c => c.adId).length, won: leads.filter(c => c.status === "won").length, lost: lost.length },
-    byChannel: breakdown(leads, channelName), byAd: breakdown(leads, c => (c.adId ? c.ad || "Ad" : "No ad")),
+    byChannel: breakdown(leads, channelName),
+    // By source (2026-10-27): The Conts / DC, each by WhatsApp · Messenger — a number or Page not listed is its channel alone.
+    bySource: breakdown(leads, c => sourceOf(c).label, SOURCE_PICKS.filter(p => p.sub).map(p => p.label)), byAd: breakdown(leads, c => (c.adId ? c.ad || "Ad" : "No ad")),
     byStatus: breakdown(leads, statusOf, ["New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads"]),
     lostWhy: breakdown(lost, reason, CRM_LOST_REASONS.map(r => r.label).concat("Not given")),
     byType: breakdown(leads, c => c.details.type || "Not filled yet"),

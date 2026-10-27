@@ -93,6 +93,8 @@ export interface CrmCustomer {
   name: string;
   phone: string;
   channel: CrmChannel;
+  /** The WhatsApp number id or Page id the customer wrote to — its source (lib/member/crm-source.ts). */
+  accountId?: string | null;
   adId: string | null;
   ad: string;
   /** What Meta sent as the ad's headline ("Chat with us"); `ad` is the ad's name where it has one (crm_ad_names). */
@@ -530,6 +532,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     name: row.name?.trim() || row.phone || "Customer",
     phone: row.phone ?? "",
     channel: row.channel,
+    accountId: row.account_id ?? null,
     adId: row.ad_source_id,
     adUrl: row.ad_source_url ?? null,
     adMedia: row.ad_media === "video" || row.ad_media === "image" ? row.ad_media : null,
