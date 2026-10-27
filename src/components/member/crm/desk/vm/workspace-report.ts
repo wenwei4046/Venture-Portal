@@ -32,7 +32,7 @@ export const PERIODS: [ReportPeriod, string][] = [["week", "This week"], ["lastw
  * Every metric a report can work out (2026-10-27, the owner: "我要可以加指标得功能"): Meta's that the server reads
  * (metaFigures) and the CRM's own — the rest of Ads Performance's list (engagement, video) Meta's figures do not carry.
  */
-export const REPORT_METRICS = ["spend", "impr", "reach", "results", "cpr", "freq", "cpm", "cpp", "msgconv", "cpmsg", "clicks", "cpc", "ctr", "allclk", "ctrall", "cpcall",
+export const REPORT_METRICS = ["spend", "dbudget", "impr", "reach", "results", "cpr", "freq", "cpm", "cpp", "msgconv", "cpmsg", "clicks", "cpc", "ctr", "allclk", "ctrall", "cpcall",
   "leads", "cpl", "appt", "apptrate", "cpappt", "showup", "showrate", "won", "winrate", "cpwon"];
 const DEF_METRICS = ["spend", "leads", "cpl", "appt", "apptrate", "showup", "showrate"];
 const ALL_SECTIONS = SECTIONS.map(s => s[0]);

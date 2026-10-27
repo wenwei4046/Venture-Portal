@@ -25,9 +25,9 @@ const MAX = 4;
 /** Four colours that tell apart at a glance (the owner, 2026-10-24: "顏色有點像" — the desktop's series sat too close here). */
 const COLORS = ["var(--crm-rust)", "var(--crm-messenger)", "var(--crm-today)", "var(--crm-amber)"];
 /** What the phone offers: the CRM's own figures and Meta's that the server reads (the rest of the desktop's list stays there). */
-const OFFER = ["leads", "appt", "apptrate", "showup", "showrate", "won", "winrate", "spend", "cpl", "cpappt", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm"];
+const OFFER = ["leads", "appt", "apptrate", "showup", "showrate", "won", "winrate", "spend", "dbudget", "cpl", "cpappt", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm"];
 const DEF = ["leads", "apptrate", "spend", "cpl"];
-const META = new Set(["spend", "cpl", "cpappt", "cpwon", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm", "results", "cpr", "freq", "cpp", "allclk", "ctrall", "cpcall"]);
+const META = new Set(["spend", "dbudget", "cpl", "cpappt", "cpwon", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm", "results", "cpr", "freq", "cpp", "allclk", "ctrall", "cpcall"]);
 const defOf = (k: string) => ALL.find(m => m[0] === k);
 const LOWER_IS_BETTER = /^(cpl|cpappt|cpwon|cpmsg|cpc|cpm|cpr|cpp|cpcall|spend)$/;
 

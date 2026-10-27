@@ -11,7 +11,7 @@ import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText,
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
-import { crmAdNumbers, crmPages, listMetaAds, metaAdDaily, metaAdInsights, metaAdThumbs, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
+import { crmAdNumbers, crmPages, listMetaAds, metaAdBudget, metaAdDaily, metaAdInsights, metaAdThumbs, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
@@ -440,8 +440,9 @@ export async function fetchAdInsights(ids: string[], since: string, until: strin
     const ads = [...new Set(ids)].filter(id => /^\d{5,32}$/.test(id)).slice(0, 40), figs: Record<string, MetaFig | null> = {};
     for (let i = 0; i < ads.length; i += 4) {
       const part = ads.slice(i, i + 4);
-      const got = await Promise.all(part.map(id => metaAdInsights(id, token, since, until)));
-      part.forEach((id, k) => { figs[id] = got[k]; });
+      // Each ad's figures for the range and its budget as it stands today (2026-10-27: the daily budget).
+      const got = await Promise.all(part.map(id => Promise.all([metaAdInsights(id, token, since, until), metaAdBudget(id, token)])));
+      part.forEach((id, k) => { const [fig, budget] = got[k]; figs[id] = fig ? { ...fig, budget } : null; });
     }
     return { ok: true, figs };
   } catch (error) {

@@ -31,7 +31,7 @@ const BTN: CSSProperties = { border: 0, background: "transparent", font: "inheri
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const CARD: CSSProperties = { background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "12px", padding: "16px 18px", boxSizing: "border-box" };
 const DATE: CSSProperties = { height: "30px", borderRadius: "8px", border: "1px solid var(--crm-line)", padding: "0 8px", font: "500 12.5px Inter, sans-serif", background: "#fff", color: "var(--crm-ink)" };
-const META = new Set(["spend", "cpl", "cpappt", "cpwon", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm"]);
+const META = new Set(["spend", "dbudget", "cpl", "cpappt", "cpwon", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm"]);
 const defOf = (k: string) => ALL.find(m => m[0] === k);
 const labelOf = (k: string) => defOf(k)?.[1] ?? k;
 const show = (k: string, v: number | null | undefined) => { const f = chartFmtOf(defOf(k)?.[3] ?? "n"); return f === "pct" && v != null ? `${v.toFixed(1)}%` : chartFmt(v, f); };
