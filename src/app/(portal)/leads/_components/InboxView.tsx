@@ -9,6 +9,7 @@ import { outcomeOf } from '@/lib/leads/ai'
 import { adLabel, adsManagerLink } from '@/lib/leads/ads'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
 import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, mediaKind, isMediaPlaceholder, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
+import { EMOJI_GROUPS, insertAt, withRecent } from '@/lib/leads/emoji'
 import { whenFull } from '@/lib/leads/time'
 import { formatPhone } from '@/lib/leads/phone'
 import { dayLabel, timeOf, whenShort } from '@/lib/leads/time'
@@ -313,6 +314,14 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
   onSent: () => void
 }) {
   const [text, setText] = useState('')
+  const replyBox = useRef<HTMLTextAreaElement>(null)
+  // An emoji goes where the cursor is, and the cursor stays after it.
+  const putEmoji = (emoji: string) => {
+    const box = replyBox.current
+    const r = insertAt(text, box?.selectionStart ?? text.length, box?.selectionEnd ?? text.length, emoji)
+    setText(r.text.slice(0, 2000))
+    requestAnimationFrame(() => { box?.focus(); box?.setSelectionRange(r.caret, r.caret) })
+  }
   // "/word" at the end of the reply box: the quick replies it may mean (the handoff's Data Center › Quick replies).
   const qm = useMemo(() => quickMatches(text, quick, contact.brandId), [text, quick, contact.brandId])
   const putQuick = (r: QuickReply) => {
@@ -517,7 +526,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
                 ))}
               </div>
             ) : null}
-            <textarea className={s.reply} rows={3} value={text} onChange={e => setText(e.target.value)} maxLength={2000} disabled={botOn}
+            <textarea ref={replyBox} className={s.reply} rows={3} value={text} onChange={e => setText(e.target.value)} maxLength={2000} disabled={botOn}
               aria-label="Reply" placeholder={botOn ? 'A template is replying. Switch to CS from “Now” above to reply yourself.' : `Reply as ${csName}…`}
               onKeyDown={e => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); return }
@@ -528,6 +537,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
               <span className={s.row6} style={{ gap: 2 }}>
                 <button type="button" className={s.iconBtn} disabled={botOn || sending} title="Send a photo or video" onClick={() => photoPick.current?.click()}><LeadIcon name="camera" /></button>
                 <button type="button" className={s.iconBtn} disabled={botOn || sending} title="Send a file" onClick={() => filePick.current?.click()}><LeadIcon name="paperclip" /></button>
+                <EmojiMenu disabled={botOn || sending} onPick={putEmoji} />
                 <input ref={photoPick} type="file" accept="image/*,video/*" hidden onChange={e => { sendFile(e.target.files?.[0]); e.target.value = '' }} />
                 <input ref={filePick} type="file" hidden onChange={e => { sendFile(e.target.files?.[0]); e.target.value = '' }} />
               </span>
@@ -635,6 +645,49 @@ function MessageLabel({ m }: { m: LeadMessage }) {
 function metaOf(m: LeadMessage): string {
   if (m.direction === 'in') return timeOf(m.at)
   return [timeOf(m.at), m.delivery === 'recorded' ? 'recorded' : m.delivery === 'failed' ? 'not sent' : 'sent'].join(' · ')
+}
+
+const RECENT_KEY = 'lead-emoji-recent'
+
+/** The reply box's emoji (2026-10-27 — the user: "聊天室加 Emoji"): the viewer's recent ones, then the groups. Stays open for several. */
+function EmojiMenu({ disabled, onPick }: { disabled: boolean; onPick: (emoji: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [recent, setRecent] = useState<string[]>([])
+  const toggle = () => {
+    if (!open) {
+      try { const r = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]'); setRecent(Array.isArray(r) ? r.filter((e): e is string => typeof e === 'string').slice(0, 8) : []) } catch { setRecent([]) }
+    }
+    setOpen(o => !o)
+  }
+  const pick = (emoji: string) => {
+    onPick(emoji)
+    const next = withRecent(recent, emoji)
+    setRecent(next)
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)) } catch { /* a private window: no recent row */ }
+  }
+  const groups = recent.length ? [{ name: 'Recent', emoji: recent }, ...EMOJI_GROUPS] : EMOJI_GROUPS
+  return (
+    <span className={s.nowWrap}>
+      <button type="button" className={s.iconBtn} disabled={disabled} title="Emoji" aria-haspopup="dialog" aria-expanded={open} onClick={toggle}><LeadIcon name="smile" /></button>
+      {open ? (
+        <>
+          <div className={s.scrim} onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className={s.emojiMenu} role="dialog" aria-label="Emoji">
+            {groups.map(g => (
+              <div key={g.name}>
+                <div className={s.menuKicker}>{g.name.toUpperCase()}</div>
+                <div className={s.emojiGrid}>
+                  {g.emoji.map(e => (
+                    <button key={e} type="button" className={s.emojiBtn} onMouseDown={ev => ev.preventDefault()} onClick={() => pick(e)} aria-label={e}>{e}</button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </span>
+  )
 }
 
 /** The composer's General info menu (the handoff's 560px panel): a card's header inserts it whole, a line inserts its value. */

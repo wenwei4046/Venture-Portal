@@ -894,11 +894,11 @@ await db.exec(`
   check(await brandOf('7700101'), bMini, 'a conversation already begun stays where it began')
 }
 
-// ── Instagram Direct (mig 20261027110000): the brand by its Instagram account, the Page kept for replies, the outbox ──
+// ── Instagram Direct (mig 20261027110010): the brand by its Instagram account, the Page kept for replies, the outbox ──
 {
   const o0 = (await q(`select md5(prosrc) m from pg_proc where oid = 'public.lead_outbox(uuid[])'::regprocedure`))[0].m
   check(o0, 'c1ca0feb687a89ec8e960d7579687979', 'lead_outbox here is production’s body (the swap is written against it)')
-  const mig = (await readFile(new URL('../../supabase/migrations/20261027110000_lead_instagram.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
+  const mig = (await readFile(new URL('../../supabase/migrations/20261027110010_lead_instagram.sql', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
   await db.exec(mig)
   await db.exec(mig) // twice: the outbox swap finds itself in place
   const IG = '17841400000000001', P = '946946021838962'

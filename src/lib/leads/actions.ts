@@ -76,7 +76,7 @@ async function deliverReply(messageId: number): Promise<string | null> {
   // Before mig 20261026110000 (no lead_reply_target), or a test conversation: recorded, as it always was.
   if (!target.ok || !target.data || target.data.isTest) return null
   const t = target.data
-  // Messenger and Instagram Direct both go through the brand's Facebook Page (mig 20261027110000 keeps it on an
+  // Messenger and Instagram Direct both go through the brand's Facebook Page (mig 20261027110010 keeps it on an
   // Instagram conversation); the PSID is the Instagram-scoped id there.
   const result = await deliver({ pageId: t.pageId, psid: t.psid, body: t.body, lastInAt: t.lastInAt }, process.env.META_SYSTEM_USER_TOKEN?.trim())
   await quiet<null>('lead_reply_sent', { p_message: messageId, p_mid: 'mid' in result ? result.mid : null, p_error: 'error' in result ? result.error : null }, '')
