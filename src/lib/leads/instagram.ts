@@ -1,4 +1,4 @@
-// Lead View › Instagram Direct in (2026-10-27, mig 20261027110000). Instagram messaging through Facebook login reaches
+// Lead View › Instagram Direct in (2026-10-27, mig 20261027110010). Instagram messaging through Facebook login reaches
 // the Messenger webhook as object "instagram": each entry is one of our Instagram professional accounts, each sender an
 // Instagram-scoped id (IGSID), and the events are shaped as Messenger's — so Messenger's parser reads them, the entry's
 // id being the Instagram account where Messenger's is the Page. Everything Instagram sends is Lead View's (the CRM takes
