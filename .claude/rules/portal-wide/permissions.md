@@ -436,6 +436,36 @@ answers auth.uid()), so a page that narrows rows only through RLS shows more
 than the person would. **A new function the portal reads goes on the list, or
 it fails while viewing as somebody.**
 
+**EVERY VIEW SWITCHER LISTS EVERY VIEW (2026-10-27 — the user, the Principal's
+top-bar menu beside the Revenue app's module menu (four rows) and Marketing's
+browser list (no Lead View): "我要全部是跟 principal 那种的，它能够显示出来全部的
+东西。然后在别的 App 上面，它照这样子的风格没问题 … marketing 的这个 dropdown 就照
+它的那个设计风格 … 它有显示到全部的 view 能够选，跟 module"; then, of the Revenue
+app: "view as person, no need in revenue app add on, others can, cause revenue
+app can use view as team member").** One list, `lib/view-switch.ts`
+`SWITCH_VIEWS`, in the Principal's order — Principal · Finance · HR · Marketing
+· Revenue · Lead View · View as a person… — with the portal's words (*Finance
+view*, *Revenue View*) and the apps' (*Finance*, *Revenue team*). Every switcher
+reads it. The portal's bars are ONE component, `layout/ViewSwitch`: HR's,
+Finance's and the Principal's (`HrTopBar`), Lead View's, the phone's
+(`PortalViewSwitcher`, its 44px field) and Marketing's, which had drawn the
+browser's own list without Lead View — the dot, the words, the soft menu
+(`hrv/select` `plain`). The Revenue app's module menu, the CRM's beside it and
+Profile's Switch view list `REVENUE_APP_VIEWS`: every view but View as a
+person… (a team member is viewed with the app's own View as; the portal's
+picker never lists a Revenue app account anyway — A PERSON'S OWN EDITS WIN ›
+"Still the KIND's"). The HR app's and the Finance app's Switch view list all
+seven, *View as a person…* opening the portal's picker over the app
+(`ViewAsPersonPicker` `z` 90, above Me's layer). A phone row says where it
+opens (`phoneWhere`): the Principal's own view and Finance's are the Finance
+app since 2026-10-17 (the HR app and the Revenue app still said *The portal*),
+Marketing and Lead View the portal's phone shell. Tests:
+`src/lib/view-switch-coverage.test.ts` finds every switcher by its name (*View
+portal as role*, *Switch module*, *Switch view*) and refuses one that does not
+read the list; `view-switch.test.ts`, `layout/ViewSwitch.test.tsx`,
+`shell/DeskAside.modules.test.tsx`, `crm/desk/Desk4a.modules.test.tsx`,
+`ProfileMain.views.test.tsx`, `HrApp.test.tsx`, `fin-app/ProfileScreen.test.tsx`.
+
 **SWITCHING VIEW KEEPS YOUR POWER (2026-10-11, the user: "switch view is still
 can be edit, full access means = ultimate access").** HR's and Finance's views
 are LENSES, no longer masks: `getUser` keeps the account's own keys, actions,

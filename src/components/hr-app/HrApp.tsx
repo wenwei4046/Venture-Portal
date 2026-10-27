@@ -802,10 +802,11 @@ function AccountRows({ d, memos, pushNow, busy, togglePush, openGuide, hasEmail,
         <div role="group" aria-label="Switch view" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
           <Label>Switch view</Label>
           <ListCard>
+            {/* Every view, as every switcher lists them (2026-10-27): a view's dot, View as a person…'s eye. */}
             {HR_APP_VIEWS.map(([v, name, where, dot], i) => {
               const here = v === d.views?.current
               return (
-                <ListItem key={v} leading={<Tile bg="rgb(246 242 236)" fg={dot}><span style={{ width: 10, height: 10, borderRadius: 5, background: dot }} /></Tile>} title={name}
+                <ListItem key={v} leading={<Tile bg="rgb(246 242 236)" fg={dot ?? 'rgb(90 78 68)'}>{dot ? <span style={{ width: 10, height: 10, borderRadius: 5, background: dot }} /> : <Icon name="eye" />}</Tile>} title={name}
                   subtitle={here ? 'You are here' : where} chevron={!here} onClick={here ? undefined : () => switchView(v)} divider={i < HR_APP_VIEWS.length - 1} />
               )
             })}

@@ -6,6 +6,7 @@
  */
 
 import { formatIntlDate } from '@/lib/utils'
+import { SWITCH_VIEWS, phoneWhere, type SwitchTarget } from '@/lib/view-switch'
 import type { Notice, Notices } from '@/lib/push/notices'
 import type { MyMemo } from '@/lib/memos/model'
 import type { MyDocuments } from '@/lib/documentation/personal'
@@ -262,20 +263,30 @@ export interface HrDocument {
   at: string
 }
 
-/** A view of the one app (setViewAs): the portal as the Principal or Finance, this app, the Revenue app. */
-export type HrAppView = 'principal' | 'finance' | 'hr' | 'revenue_member'
+/**
+ * A row of the one app's switcher (setViewAs): every view, as every switcher lists them (2026-10-27,
+ * lib/view-switch.ts) — or `person`, the portal's View as a person… picker.
+ */
+export type HrAppView = SwitchTarget
 
-/** The switcher's rows: the view, its name (the Revenue app's module menu's), where it opens, its dot. */
-export const HR_APP_VIEWS: ReadonlyArray<readonly [HrAppView, string, string, string]> = [
-  ['principal', 'Principal', 'The portal', 'rgb(128 96 72)'],
-  ['finance', 'Finance', 'The portal', 'rgb(59 104 148)'],
-  ['hr', 'HR', 'This app', 'rgb(46 125 90)'],
-  ['revenue_member', 'Revenue team', 'The Revenue app', 'rgb(233 154 83)'],
-]
+const VIEW_DOT: Readonly<Record<HrAppView, string | null>> = {
+  principal: 'rgb(128 96 72)',
+  finance: 'rgb(59 104 148)',
+  hr: 'rgb(46 125 90)',
+  marketing: 'rgb(176 78 124)',
+  revenue_member: 'rgb(233 154 83)',
+  lead: 'rgb(108 92 160)',
+  person: null,
+}
+
+/** The switcher's rows: the view, its name (the Revenue app's module menu's), where it opens, its dot (none: the eye). */
+export const HR_APP_VIEWS: ReadonlyArray<readonly [HrAppView, string, string, string | null]> = SWITCH_VIEWS.map(
+  v => [v.value, v.short, phoneWhere(v.value, 'hr'), VIEW_DOT[v.value]] as const,
+)
 
 /** Which row of the switcher an account's view is. */
 export function hrAppViewOf(role: string): HrAppView {
-  return role === 'finance' || role === 'hr' || role === 'revenue_member' ? role : 'principal'
+  return role === 'finance' || role === 'hr' || role === 'marketing' || role === 'revenue_member' ? role : 'principal'
 }
 
 export const CHIP: Readonly<Record<ChipTone, [string, string]>> = {

@@ -319,6 +319,9 @@
      design_handoff_product_list) */
   --rv-faint: #A08E82;
   --rv-module-finance: #3C6E8F;
+  /* …and the two views the menu lists since 2026-10-27: Marketing's rose (its My Space pink), Lead View's violet. */
+  --rv-module-marketing: #B04E7C;
+  --rv-module-lead: #6C5CA0;
   --rv-ink-16: rgba(63,43,34,.16);
   --rv-accent-soft: #E99A53;
   --rv-accent-12: rgba(189,74,25,.12);

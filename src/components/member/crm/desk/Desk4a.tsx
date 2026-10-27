@@ -15,10 +15,13 @@ import { avatarTint, STATUS } from "../shared/palette";
 import type { Frame4a } from "./vm/frame4a";
 import { DeskAddCustomer, DeskProfileDrawer, type ProfileDrawerV } from "./DeskExtras";
 import { WA_VERTICALS } from "@/lib/meta/channels";
+import { REVENUE_APP_VIEWS } from "@/lib/view-switch";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const BTN: CSSProperties = { border: 0, background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left", margin: 0, boxSizing: "border-box" };
-const MODULE_ROWS: [string, string][] = [["finance", "Finance"], ["principal", "Principal"], ["hr", "HR"], ["revenue", "Revenue team"]];
+// Every view, as the Revenue app's module menu lists them (2026-10-27 — the owner: the Principal's list in every app;
+// lib/view-switch.ts).
+const MODULE_ROWS: [string, string][] = REVENUE_APP_VIEWS.map(v => [v.value, v.short]);
 
 interface SideBits {
   f4: Frame4a;

@@ -650,11 +650,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     router.push(productsHref(baseRoute), { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the quote's setters are stable
   }, [onProducts, closeProfileSheets, router, baseRoute]);
-  // The module switcher: the portal's other modules are the Principal's views of it (setViewAs).
+  // The module switcher: the portal's other modules are the Principal's views of it (setViewAs) — every view since
+  // 2026-10-27, as every switcher lists them; a team member is viewed with Profile's View as, not the portal's picker.
   const [, startSwitch] = useTransition();
   const pickModule = useCallback((id: ModuleId) => {
     // The design preview draws the menu and goes nowhere, as the prototype's does.
-    if (id === "revenue" || device !== "live" || !mayLeaveProducts()) return;
+    if (id === "revenue_member" || device !== "live" || !mayLeaveProducts()) return;
     const form = new FormData();
     form.set("role", id);
     startSwitch(async () => { await setViewAs(form); });
@@ -1521,7 +1522,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         // The CRM's 4a frame draws this sidebar's rows itself (2026-10-18): the same screens, counts and switcher.
         hidden: hiddenScreens, crmUnread: crmUnread ?? 0,
         products: productList ? { group: productList.group, onOpen: openProducts } : null,
-        modules: principal ? { current: "revenue", onPick: id => pickModule(id as ModuleId) } : null,
+        modules: principal ? { current: "revenue_member", onPick: id => pickModule(id as ModuleId) } : null,
       } : undefined} />;
     } else if (pf === "memos") {
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
@@ -1544,7 +1545,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         changePassword: ownPassword ? () => setPwOpen(true) : undefined,
         changeEmail: ownEmail ? () => setEmailOpen(true) : undefined,
         itSupport: !viewed && !data.demo && !fixture ? () => goScreen("account", { pf: "it" }) : undefined,
-      }} views={live && !desk && principal && !viewed ? { current: "revenue", pick: pickModule } : null} />;
+      }} views={live && !desk && principal && !viewed ? { current: "revenue_member", pick: pickModule } : null} />;
     }
   } else {
     page = <Pending screen={route.screen} />;
@@ -1559,7 +1560,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         onNotif={toggleNotif} onProfile={() => goScreen("account")}
         products={productList ? { group: productList.group, onOpen: openProducts } : null}
         it={itDesk && itDeskOn ? { group: itDesk.group, count: it.newCount, on: route.screen === "account" && route.pf === "itdesk", onOpen: () => goScreen("account", { pf: "itdesk" }) } : null}
-        modules={principal ? { current: "revenue", onPick: pickModule } : null}
+        modules={principal ? { current: "revenue_member", onPick: pickModule } : null}
         crm={crm ? { unread: crmUnread ?? 0, onOpen: openCrm } : null} />
       <DeskHeader greet={fixture?.greeting ?? greeting()} me={me} subName={membership?.name ?? ""} dateLine={`${longDayLabel(today)} · ${quarterLabel(today)}`}
         unread={nfCount > 0 || nf.items.some(n => n.unread)} onSubDept={() => openSheet("sd")} onNotif={toggleNotif}
