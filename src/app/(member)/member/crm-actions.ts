@@ -11,7 +11,7 @@ import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText,
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
-import { crmAdNumbers, crmPages, listMetaAds, metaAdDaily, metaAdInsights, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
+import { crmAdNumbers, crmPages, listMetaAds, metaAdDaily, metaAdInsights, metaAdThumbs, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
@@ -446,6 +446,19 @@ export async function fetchAdInsights(ids: string[], since: string, until: strin
     return { ok: true, figs };
   } catch (error) {
     return { ok: false, error: friendly(error, "Meta's figures could not be read.") };
+  }
+}
+
+/** Each ad's picture for Workspace's report (2026-10-27): Meta's image of its creative. CRM · Manage; the token stays here. */
+export async function fetchAdThumbs(ids: string[]): Promise<{ ok: true; thumbs: Record<string, string> } | { ok: false; error: string }> {
+  try {
+    await session();
+    await requireCrm("manage");
+    const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
+    if (!token) throw new Error("Meta is not connected on this server.");
+    return { ok: true, thumbs: await metaAdThumbs(ids, token) };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The ads' pictures could not be read.") };
   }
 }
 

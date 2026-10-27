@@ -15,7 +15,7 @@ export interface F4Head { title: string; tabs: F4Tab[]; subTabs?: F4Tab[]; sub: 
 
 const CRM_ICON: Record<DeskTab, Icon4a> = {
   insight: "trending-up", inbox: "inbox", people: "contact", calendar: "calendar", adsperf: "arrow-up-right", assignment: "users",
-  showrooms: "map-pin", forms: "list", channels: "phone", settings: "sliders-horizontal", auditlog: "clock-3", reports: "file-text",
+  showrooms: "map-pin", forms: "list", channels: "phone", settings: "sliders-horizontal", auditlog: "clock-3", reports: "file-text", workspace: "file-text",
 };
 
 /** "Sun, 18 Oct 2026" — the top bar's date, as the frames write it. */
@@ -39,7 +39,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
   const hidden = new Set(app.hidden ?? []);
   const inboxUnread = data.customers.reduce((n, c) => n + (c.unread || 0), 0);
   const ids: Record<string, DeskTab> = { Insight: "insight", Inbox: "inbox", Contacts: "people", Calendar: "calendar", "Ads Performance": "adsperf", Assignment: "assignment",
-    Showrooms: "showrooms", "Customer form": "forms", Channels: "channels", Settings: "settings", "Audit log": "auditlog", Reports: "reports" };
+    Showrooms: "showrooms", "Customer form": "forms", Channels: "channels", Settings: "settings", "Audit log": "auditlog", Reports: "reports", Workspace: "workspace" };
   const crmNav = fr.crmGroups.map(g => ({ head: g.label ?? "", items: g.items.map((n): F4Item => {
     const id = ids[n.label] ?? "insight";
     return { label: n.label, icon: CRM_ICON[id], on: n.on, pick: n.pick, badge: id === "inbox" && inboxUnread ? (inboxUnread > 99 ? "99+" : String(inboxUnread)) : "" };

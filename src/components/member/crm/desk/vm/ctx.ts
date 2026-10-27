@@ -11,7 +11,7 @@ import type { ApptType, CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/
 import type { PanelActions } from "../../panel/actions";
 import type { Team } from "../../panel/vm/common";
 
-export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog" | "reports";
+export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog" | "reports" | "workspace";
 export type PaneMode = "closed" | "empty" | "docked" | "overlay" | "wide" | "wideEmpty";
 export type PaneKind = "chat" | "alerts" | "section" | "info" | "clist" | "metrics" | "team" | "assign" | "book" | "note" | "form" | "move" | "share";
 

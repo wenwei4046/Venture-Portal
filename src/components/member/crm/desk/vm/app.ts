@@ -73,6 +73,9 @@ export function deskVM(ctx: DeskCtx) {
     ...channelsVM(ctx),
     ...adsPerfVM(ctx),
     ...reportsVM(ctx),
+    // Workspace (2026-10-27): one's own Weekly / Monthly reports (DeskWorkspace.tsx, vm/workspace-report.ts).
+    kWorkspace: ui.tab === "workspace",
+    workspace: { customers: data.customers, visits: data.visits, adNames: data.adNames ?? {}, nameOf: ctx.nameOf, now: ctx.now, live: ctx.live },
     ...chatProgressVM(ctx, op),
     // 4a's chat head (frame 02): the avatar in the customer's tint and, for a chat, the wait in oxblood ("Attention ·
     // waiting 6 h") or its status in the muted line's colour.

@@ -285,7 +285,8 @@ module.exports = function desk4a(body) {
   body = once(body, '<p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.chatOwner}</p>', "", "v2 chat owner line");
   // v2 (2026-10-23, note 06 › Inbox and Audit log colours): the chat wall is #F7F3EF, no longer cream.
   body = every(body, 'padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>', 'padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>', "v2 chat wall");
-  body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kAdsPerf) && (<>", "reports page");
+  body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>", "reports page");
+  // Workspace (2026-10-27, the owner: "workspace 可以放在左边report的下方（独立）"): one's own Weekly / Monthly reports, DeskWorkspace.tsx.
   // Frame 08 · Customer form: pages · sections and fields · live preview (Desk4a.tsx › DeskForm4a), on formpage.ts as before.
   {
     const start = '{!!(v.cfOn) && (<>', a = body.indexOf(start);

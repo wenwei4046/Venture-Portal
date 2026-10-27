@@ -228,3 +228,30 @@ export async function metaAdDaily(adId: string, token: string, since: string, un
     return null;
   }
 }
+
+/** Meta's own image hosts only — an ad's picture is drawn straight from them. */
+const metaImage = (u: unknown): string | null =>
+  typeof u === 'string' && /^https:\/\/[A-Za-z0-9.-]+\.(fbcdn\.net|fbsbx\.com|facebook\.com)\//.test(u) ? u : null
+
+/**
+ * Each ad's picture (Workspace's report, 2026-10-27: "每个广告的截图"): its creative's image, else the thumbnail Meta draws
+ * of it (a video's first frame). Asked ad by ad, four at a time (Graph v26 refuses `?ids=`), up to 40; an ad the token
+ * cannot see is left out.
+ */
+export async function metaAdThumbs(adIds: string[], token: string, fetchImpl: typeof fetch = fetch): Promise<Record<string, string>> {
+  const ids = [...new Set(adIds)].filter(id => AD_ID.test(id)).slice(0, 40)
+  const out: Record<string, string> = {}
+  const one = async (id: string) => {
+    try {
+      const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${id}?fields=creative{image_url,thumbnail_url}`, {
+        headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000),
+      })
+      if (!res.ok) return
+      const c = ((await res.json()) as { creative?: { image_url?: unknown; thumbnail_url?: unknown } }).creative
+      const u = metaImage(c?.image_url) ?? metaImage(c?.thumbnail_url)
+      if (u) out[id] = u
+    } catch { /* left out */ }
+  }
+  for (let i = 0; i < ids.length; i += 4) await Promise.all(ids.slice(i, i + 4).map(one))
+  return out
+}
