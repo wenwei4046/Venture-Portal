@@ -277,6 +277,7 @@ kReports
 kSection
 kTeam
 kTopMove
+kWorkspace
 leadsByAd
 listCards
 listMin
@@ -500,3 +501,4 @@ waUserHas
 waUserNone
 waWeb
 wn
+workspace
