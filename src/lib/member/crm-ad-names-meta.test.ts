@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers, crmPages, metaAdInsights, metaAdDaily } from './crm-ad-names-meta'
+import { adIdsOf, forgetAdMisses, metaAdName, nameAdsFromMeta, refreshAdStatuses, listMetaAds, crmAdNumbers, crmPages, metaAdInsights, metaAdDaily, metaAdThumbs } from './crm-ad-names-meta'
 
 // An ad's name from Ads Manager (2026-10-19, mig 20261019100000): a webhook delivery with an ad nobody named asks
 // Graph for it and keeps it as source 'meta'; a named ad is never asked; an ad the token cannot see is not asked
@@ -183,5 +183,23 @@ describe("an ad's figures day by day (Ads Performance's chart, 2026-10-23)", () 
   it('answers null for an ad the token cannot see, or a bad id', async () => {
     expect(await metaAdDaily('111111', 'T', '2026-10-20', '2026-10-21', vi.fn(async () => new Response('{}', { status: 400 })) as unknown as typeof fetch)).toBeNull()
     expect(await metaAdDaily('abc', 'T', '2026-10-20', '2026-10-21')).toBeNull()
+  })
+})
+
+describe("each ad's picture, full size (2026-10-27: \"截图改成大图\")", () => {
+  const answer = (creative: unknown) => vi.fn(async () => new Response(JSON.stringify({ creative }), { status: 200 })) as unknown as typeof fetch
+  it('asks Meta for an 800 px thumbnail, never its 64 px default', async () => {
+    const f = answer({ thumbnail_url: 'https://scontent.xx.fbcdn.net/t.jpg' })
+    await metaAdThumbs(['120251332896640103'], 'tok', f)
+    const url = decodeURIComponent(String((f as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0]))
+    expect(url).toContain('creative.thumbnail_width(800).thumbnail_height(800)')
+  })
+  it("takes the creative's image, else a video's cover, else a link ad's picture, else the thumbnail", async () => {
+    const id = '120251332896640103', fb = (n: string) => `https://scontent.xx.fbcdn.net/${n}.jpg`
+    expect(await metaAdThumbs([id], 't', answer({ image_url: fb('img'), thumbnail_url: fb('th') }))).toEqual({ [id]: fb('img') })
+    expect(await metaAdThumbs([id], 't', answer({ thumbnail_url: fb('th'), object_story_spec: { video_data: { image_url: fb('cover') } } }))).toEqual({ [id]: fb('cover') })
+    expect(await metaAdThumbs([id], 't', answer({ thumbnail_url: fb('th'), object_story_spec: { link_data: { picture: fb('pic') } } }))).toEqual({ [id]: fb('pic') })
+    expect(await metaAdThumbs([id], 't', answer({ thumbnail_url: fb('th') }))).toEqual({ [id]: fb('th') })
+    expect(await metaAdThumbs([id], 't', answer({ image_url: 'https://evil.example.com/x.jpg' }))).toEqual({})
   })
 })

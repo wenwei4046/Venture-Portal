@@ -245,7 +245,11 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
 
           {on("shots") && ads.length > 0 && (
             <div style={CARD}>
-              <h2 style={h2}>Each ad&apos;s picture</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+                <h2 style={{ ...h2, margin: 0 }}>Each ad&apos;s picture</h2>
+                <span style={{ marginLeft: "auto" }} />
+                {Object.keys(thumbs).length > 1 && <button type="button" data-ws-noprint onClick={() => void (async () => { for (const [i, a] of ads.entries()) if (thumbs[a.id]) { await savePicture(thumbs[a.id], a.name, i + 1); await new Promise(r => setTimeout(r, 400)); } })()} style={{ ...chip(false), fontWeight: 650 }}>Download all</button>}
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "12px" }}>
                 {ads.map(a => (
                   <figure key={a.id} style={{ margin: 0, display: "flex", flexDirection: "column", gap: "6px", breakInside: "avoid" }}>
@@ -253,6 +257,7 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
                       ? <img src={thumbs[a.id]} alt={a.name} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: "8px", background: "var(--crm-field)" }} />
                       : <span style={{ width: "100%", aspectRatio: "1", borderRadius: "8px", background: "var(--crm-field)", display: "grid", placeItems: "center", fontSize: "12px", color: "var(--crm-faint)" }}>{w.live ? "No picture" : "Live CRM only"}</span>}
                     <figcaption style={{ fontSize: "12px", lineHeight: 1.35 }}>{a.name}<span style={{ display: "block", color: "var(--crm-muted)" }}>{a.cur.length} lead{a.cur.length === 1 ? "" : "s"}</span></figcaption>
+                    {thumbs[a.id] && <button type="button" data-ws-noprint onClick={() => void savePicture(thumbs[a.id], a.name, ads.indexOf(a) + 1)} style={{ ...BTN, alignSelf: "flex-start", fontSize: "12px", fontWeight: 650, color: "var(--crm-rust)" }}>Download</button>}
                   </figure>
                 ))}
               </div>
@@ -347,4 +352,22 @@ function MetricPicker({ have, add }: { have: string[]; add: (k: string) => void 
       </>)}
     </span>
   );
+}
+
+/**
+ * Saves an ad's picture to the computer (2026-10-27, the owner: "我要如何下载放到canva里？"), full size as Meta keeps it,
+ * named by its place and the ad ("1 - Astrum Ampang.jpg"); Meta's image hosts let the page read it. If they ever refuse,
+ * the picture opens in a new tab to be saved from there.
+ */
+async function savePicture(url: string, name: string, n: number) {
+  const file = `${n} - ${name.replace(/[\/:*?"<>|【】[\]]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80)}.jpg`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(String(res.status));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await res.blob()); a.download = file; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch {
+    window.open(url, "_blank", "noopener");
+  }
 }
