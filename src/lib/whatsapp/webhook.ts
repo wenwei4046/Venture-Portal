@@ -101,6 +101,8 @@ export interface WaDelivery {
   messages: WaInboundMessage[];
   /** A customer's reactions, apart from their messages (2026-10-24): set on the message they react to (crm_their_reactions). */
   reactions: { target: string; emoji: string }[];
+  /** A customer's document's own file name (2026-10-27): kept beside its caption (crm_document_names). */
+  names: { id: string; name: string }[];
   statuses: WaStatusUpdate[];
   /** Changes that were not WhatsApp messages/statuses (other fields Meta may send) — logged, not applied. */
   ignored: number;
@@ -144,7 +146,7 @@ function readMessage(m: WaMessage, phoneNumberId: string, names: Map<string, str
 
 /** Meta's delivery → flat rows. Tolerates anything unexpected; never throws on shape. */
 export function parseDelivery(body: unknown): WaDelivery {
-  const out: WaDelivery = { messages: [], reactions: [], statuses: [], ignored: 0 };
+  const out: WaDelivery = { messages: [], reactions: [], names: [], statuses: [], ignored: 0 };
   const entries = (body as { entry?: { changes?: { field?: string; value?: WaValue }[] }[] })?.entry;
   if (!Array.isArray(entries)) return out;
   for (const entry of entries) {
@@ -158,6 +160,8 @@ export function parseDelivery(body: unknown): WaDelivery {
         // A reaction is not a message of its own — it was an empty bubble (the owner, 2026-10-24: "為什麼看不到客戶的訊息").
         if (m.type === "reaction") { if (m.reaction?.message_id) out.reactions.push({ target: m.reaction.message_id, emoji: m.reaction.emoji ?? "" }); continue; }
         const row = readMessage(m, phoneNumberId, names); if (row) out.messages.push(row);
+        // A document's own name, beside its caption — a captioned one lost it (the owner, 2026-10-27: "it can view all").
+        if (row && m.id && m.document?.filename) out.names.push({ id: m.id, name: m.document.filename });
       }
       for (const s of v.statuses ?? []) {
         if (!s.id || !["sent", "delivered", "read", "failed"].includes(s.status ?? "")) continue;

@@ -123,8 +123,8 @@ describe("parsing a delivery", () => {
   it("ignores other fields and other products, and never throws on odd shapes", () => {
     expect(parseDelivery(delivery({ ...base }, "account_update")).ignored).toBe(1);
     expect(parseDelivery(delivery({ messaging_product: "instagram", metadata: { phone_number_id: "x" } })).ignored).toBe(1);
-    expect(parseDelivery(null)).toEqual({ messages: [], reactions: [], statuses: [], ignored: 0 });
-    expect(parseDelivery({ entry: "nope" })).toEqual({ messages: [], reactions: [], statuses: [], ignored: 0 });
+    expect(parseDelivery(null)).toEqual({ messages: [], reactions: [], names: [], statuses: [], ignored: 0 });
+    expect(parseDelivery({ entry: "nope" })).toEqual({ messages: [], reactions: [], names: [], statuses: [], ignored: 0 });
     expect(parseDelivery(delivery({ ...base, messages: [{ type: "text" }] })).messages).toEqual([]); // no id / from
   });
 });

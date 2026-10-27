@@ -407,6 +407,8 @@ export interface CrmMessageRowX extends CrmMessageRow {
   reply_to?: string | null;
   my_reaction?: string | null;
   their_reaction?: string | null;
+  /** A customer's document's own file name, beside its caption (mig 20261027100000). */
+  media_name?: string | null;
   card?: CrmCard | null;
 }
 /**
@@ -497,7 +499,11 @@ export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
   // A file to show: WhatsApp's media id, our own copy of what we sent, or Messenger's address — all through our route.
   const shown = row.media_id || row.media_path || row.media_url ? MEDIA_KIND[row.kind] : undefined;
   // A template we sent is its text; media with a file is its caption; media without one is named.
+  // A document with its own name kept (2026-10-27): the name is the file's, the body its caption — WhatsApp's "￼" alone is none.
+  const fileName = row.media_name?.trim() || null;
+  const caption = fileName ? (row.body ?? "").replace(/￼/g, "").trim() : null;
   const text = row.kind === "template" || row.kind === "text" ? row.body ?? ""
+    : fileName ? (caption && caption !== fileName ? caption : "")
     : shown ? row.body ?? "" : label ? (row.body ? `${label} · ${row.body}` : label) : row.body ?? "";
   return {
     id: row.id,
@@ -505,7 +511,7 @@ export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
     kind: row.kind,
     text,
     at: row.sent_at,
-    ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: row.body || "Document", ...(row.media_mime ? { mime: row.media_mime } : {}) } : {}) } } : {}),
+    ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: fileName || row.body || "Document", ...(row.media_mime ? { mime: row.media_mime } : {}) } : {}) } } : {}),
     ...(row.direction === "out" && row.status && row.status !== "received" ? { status: row.status } : {}),
     ...(row.error ? { error: row.error } : {}),
     ...(row.auto ? { auto: true } : {}),
