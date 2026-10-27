@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { handLeadOver, handLeadToGroup } from '@/lib/leads/actions'
+import { copyText } from '@/lib/leads/clipboard'
 import { handoffText, SALES_GROUP, suggestedSales } from '@/lib/leads/handoff'
 import { formatPhone, whatsAppLink } from '@/lib/leads/phone'
 import type { LeadBrand, LeadContact } from '@/lib/leads/types'
@@ -50,18 +51,7 @@ export default function HandoffWindow({ contact, brand, csName, onClose, onDone 
     setText(handoffText(contact, brand.name, brand.sales.find(x => x.id === id) ?? null, csName))
   }
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = text
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      try { document.execCommand('copy') } catch { /* nothing more to try */ }
-      ta.remove()
-    }
+    await copyText(text)
     setCopied(true)
     if (copiedTimer.current) clearTimeout(copiedTimer.current)
     copiedTimer.current = setTimeout(() => setCopied(false), 1200)
