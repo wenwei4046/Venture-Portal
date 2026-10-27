@@ -84,6 +84,10 @@ export interface LeadContact {
   lostAt?: string | null
   lostReason?: string
   stageByName?: string
+  /** The CS who handles it (mig 20261027150000): taken by their first reply, or given by Lead View · Manage. */
+  assignedTo?: string | null
+  assignedName?: string
+  assignedAt?: string | null
   updatedAt?: string
 }
 

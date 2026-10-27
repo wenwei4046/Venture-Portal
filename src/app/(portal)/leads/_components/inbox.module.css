@@ -598,3 +598,8 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; background: 
 .mediaImg { display: block; max-width: 260px; max-height: 320px; border-radius: 10px; border: 1px solid rgb(var(--lv-border)); background: rgb(var(--lv-white)); }
 .mediaFile { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; border: 1px solid rgb(var(--lv-border)); background: rgb(var(--lv-white)); color: rgb(var(--lv-ink)); font-size: 14px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mediaWait { font-size: 13px; color: rgb(var(--lv-text-3)); padding: 6px 0; }
+
+/* Who handles the chat (2026-10-27, mig 20261027150000). */
+.owner { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; border: 1px solid rgb(var(--lv-border)); background: rgb(var(--lv-white)); color: rgb(var(--lv-text-2)); font: inherit; font-size: 13px; white-space: nowrap; }
+.owner[data-button] { cursor: pointer; }
+.owner[data-button]:hover:not(:disabled) { border-color: rgb(var(--lv-accent)); color: rgb(var(--lv-ink)); }

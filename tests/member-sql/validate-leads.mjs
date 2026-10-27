@@ -999,4 +999,33 @@ await db.exec(`
   check(src.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.create']);`), true, 'it asks the Inbox')
 }
 
+// ── Each conversation's own CS (mig 20261027150000): a mark — everybody still sees everything ──
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  await db.exec(`alter table public.users add column if not exists is_active boolean not null default true`)
+  await db.exec(await f('20261027150000_lead_owner.sql'))
+  const CS = ['leads.view', 'leads.create', 'leads.edit']
+  const P = '946946021838962'
+  const c = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'own.1', pageId: P, psid: '7700601', name: 'Owner Test', kind: 'text', body: 'hi', sentAt: '2026-10-27T03:00:00Z', ad: null },
+  ])]))[0].r.contacts[0]
+  await as(OTHER, CS)
+  await q(`select public.lead_reply($1, 'Hi, I can help')`, [c])
+  check((await q(`select assigned_to from public.lead_contacts where id = $1`, [c]))[0].assigned_to, OTHER, 'the first CS to reply takes it')
+  check((await q(`select what from public.lead_events where contact_id = $1 order by id desc limit 1`, [c]))[0].what.startsWith('Taken by '), true, 'the timeline says who took it')
+  await as(CS_USER, CS)
+  check(((await q(`select public.lead_inbox() i`))[0].i).some(x => x.id === c), true, 'another CS still sees it')
+  await q(`select public.lead_reply($1, 'me too')`, [c])
+  check((await q(`select assigned_to from public.lead_contacts where id = $1`, [c]))[0].assigned_to, OTHER, 'and replying does not take it from its CS')
+  await refuses(`select public.lead_assign($1, $2)`, [c, CS_USER], /Lead View · Manage/, 'only Manage gives a conversation')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_assign($1, $2)`, [c, CS_USER])
+  const t = (await q(`select public.lead_thread($1) t`, [c]))[0].t
+  check([t.contact.assignedTo, !!t.contact.assignedName], [CS_USER, true], 'given to another CS; the card says who')
+  await q(`select public.lead_assign($1, null)`, [c])
+  check((await q(`select assigned_to from public.lead_contacts where id = $1`, [c]))[0].assigned_to, null, 'given back to nobody')
+  await q(`select public.lead_reply($1, 'Principal here')`, [c])
+  check((await q(`select assigned_to from public.lead_contacts where id = $1`, [c]))[0].assigned_to, null, 'Manage replying takes nothing')
+}
+
 console.log(`validate-leads: ${checks} checks passed`)

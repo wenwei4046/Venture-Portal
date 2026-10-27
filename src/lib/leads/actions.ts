@@ -125,6 +125,18 @@ export async function leadMediaLinks(paths: string[]): Promise<LeadOutcome<Recor
   return { ok: true, data: links }
 }
 
+/** Who a conversation may be given to (mig 20261027150000): logins whose permissions give Lead View › Inbox's Create. */
+export async function leadAgents(): Promise<LeadOutcome<Array<{ id: string; name: string }>>> {
+  await requireActionOn('/leads', 'leads', 'manage')
+  return quiet<Array<{ id: string; name: string }>>('lead_agents', {}, 'The list of CS could not be read.')
+}
+
+/** Give a conversation to a CS, or back to nobody (null) — Lead View · Manage. */
+export async function assignLead(contactId: string, userId: string | null) {
+  await requireActionOn('/leads', 'leads', 'manage')
+  return call<null>('lead_assign', { p_contact: contactId, p_user: userId }, 'The conversation was not given.')
+}
+
 /** The customer card: name, phone, interest, budget, showroom, time, note. */
 export async function saveLeadCard(contactId: string, fields: LeadCardFields) {
   await requireActionOn('/leads', 'leads', 'edit')

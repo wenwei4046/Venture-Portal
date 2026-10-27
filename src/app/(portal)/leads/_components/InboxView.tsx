@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent } from 'react'
-import { draftLeadReply, leadMediaLinks, quickReplyUsed, readThread, replyToLead, sendLeadMedia, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
+import { assignLead, draftLeadReply, leadAgents, leadMediaLinks, quickReplyUsed, readThread, replyToLead, sendLeadMedia, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
 import { FILE_LIMIT, TOO_BIG } from '@/lib/leads/messenger'
 import { createClient } from '@/lib/supabase/client'
 import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
@@ -47,6 +47,7 @@ export default function InboxView({
   initialQuery = '',
   canReply,
   canEdit,
+  canManage = false,
   csName,
   aiBrands,
   aiConnected,
@@ -60,6 +61,8 @@ export default function InboxView({
   initialQuery?: string
   canReply: boolean
   canEdit: boolean
+  /** Lead View · Manage: may give a conversation to a CS (mig 20261027150000). */
+  canManage?: boolean
   /** Who is signed in — the hand-over's text and the NOW pill name them. */
   csName: string
   /** Brands whose AI agent is a copilot. */
@@ -209,7 +212,7 @@ export default function InboxView({
         <section className={s.chat} aria-label="Chat">
           {contact ? (
             <Chat key={contact.id} contact={contact} thread={thread} brand={brandOf} csName={csName}
-              canReply={canReply} aiOn={aiBrands.includes(contact.brandId)} aiConnected={aiConnected} info={info} quick={quick} today={config.today}
+              canReply={canReply} canManage={canManage} aiOn={aiBrands.includes(contact.brandId)} aiConnected={aiConnected} info={info} quick={quick} today={config.today}
               loading={loading && !thread} onSent={() => load(contact.id)} />
           ) : (
             <div className={s.empty}>Pick a conversation.</div>
@@ -283,12 +286,13 @@ function useDrag(layout: InboxLayout, setLayout: (next: InboxLayout | ((l: Inbox
   }
 }
 
-function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, info, quick, today, loading, onSent }: {
+function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiConnected, info, quick, today, loading, onSent }: {
   contact: LeadContact
   thread: LeadThread | null
   brand: LeadBrand | undefined
   csName: string
   canReply: boolean
+  canManage: boolean
   aiOn: boolean
   aiConnected: boolean
   info: LeadInfo | null
@@ -431,6 +435,7 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
             </>
           ) : null}
         </div>
+        <OwnerPicker contact={thread?.contact ?? contact} canManage={canManage} onChanged={onSent} />
         <span className={s.stateTag} data-state={state}>{STATE_LABEL[state]}</span>
       </div>
 
@@ -530,6 +535,56 @@ function Chat({ contact, thread, brand, csName, canReply, aiOn, aiConnected, inf
         </div>
       ) : null}
     </>
+  )
+}
+
+/**
+ * The CS who handles the conversation (mig 20261027150000): taken by their first reply, or given here by Lead View ·
+ * Manage — the list is everybody whose permissions give Lead View › Inbox's Create. Everybody still sees every chat.
+ */
+function OwnerPicker({ contact, canManage, onChanged }: { contact: LeadContact; canManage: boolean; onChanged: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [agents, setAgents] = useState<Array<{ id: string; name: string }> | null>(null)
+  const [busy, start] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const label = contact.assignedTo ? (contact.assignedName || 'a colleague') : 'No CS yet'
+  if (!canManage) return <span className={s.owner} title="Who handles this chat">CS · {label}</span>
+  const toggle = () => {
+    setOpen(o => !o)
+    if (!agents) void leadAgents().then(r => { if (r.ok) setAgents(r.data); else setError(r.reason) })
+  }
+  const give = (id: string | null) => start(async () => {
+    setError(null)
+    const r = await assignLead(contact.id, id)
+    if (!r.ok) { setError(r.reason); return }
+    setOpen(false)
+    onChanged()
+  })
+  return (
+    <span className={s.nowWrap}>
+      <button type="button" className={s.owner} data-button="" onClick={toggle} aria-haspopup="menu" aria-expanded={open} disabled={busy} title="Give this chat to a CS">
+        CS · {label}<LeadIcon name="chevronDown" size={12} />
+      </button>
+      {open ? (
+        <>
+          <div className={s.scrim} onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className={s.menu} role="menu" aria-label="Give this chat to">
+            <div className={s.menuKicker}>GIVE THIS CHAT TO</div>
+            {agents === null && !error ? <div className={s.menuNote}>Loading…</div> : null}
+            {(agents ?? []).map(a => (
+              <button key={a.id} type="button" role="menuitemradio" aria-checked={contact.assignedTo === a.id} className={s.menuItem} onClick={() => give(a.id)} disabled={busy}>
+                <span style={{ flex: 1 }}>{a.name}</span><span className={s.menuTick}>{contact.assignedTo === a.id ? '✓' : ''}</span>
+              </button>
+            ))}
+            {agents && !agents.length ? <div className={s.menuNote}>Nobody yet — a person whose permissions tick Lead View › Inbox (Create) shows here.</div> : null}
+            <button type="button" role="menuitemradio" aria-checked={!contact.assignedTo} className={s.menuItem} onClick={() => give(null)} disabled={busy}>
+              <span style={{ flex: 1 }}>Nobody</span><span className={s.menuTick}>{contact.assignedTo ? '' : '✓'}</span>
+            </button>
+            {error ? <div className={s.menuNote} role="alert">{error}</div> : null}
+          </div>
+        </>
+      ) : null}
+    </span>
   )
 }
 
