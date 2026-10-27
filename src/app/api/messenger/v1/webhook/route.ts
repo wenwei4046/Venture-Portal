@@ -146,6 +146,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'ingest failed' }, { status: 500 })
   }
   if (leadsFailed) return NextResponse.json({ ok: false, error: 'lead ingest failed' }, { status: 500 })
+  // A file's own name beside the message (service role only, mig 20261027100000); a failure only warns.
+  const fileNames = messages.flatMap(m => (m.fileName ? [{ id: m.externalId, name: m.fileName }] : []))
+  if (fileNames.length) {
+    const { error: nmError } = await client().rpc('crm_document_names', { p_names: fileNames })
+    if (nmError) console.error('crm_document_names failed:', nmError.message)
+  }
   // Only a delivery with new messages can have told somebody something (a receipt-only one never does).
   if (Number((data as { messages?: unknown } | null)?.messages) > 0) pushSoon()
   // An ad with no name yet: Ads Manager's, asked once Meta has its answer (lib/member/crm-ad-names-meta.ts).

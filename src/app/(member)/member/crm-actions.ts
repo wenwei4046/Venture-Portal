@@ -547,8 +547,11 @@ export async function sendCrmMedia(input: { contact: string; path: string; name:
     if (!message) return { ok: false, error: "Sent to the customer, but it could not be saved here. Reload before sending again." };
     const { error: mediaError } = await db.rpc("crm_set_out_media", { p_message: message.id, p_path: input.path, p_mime: mime || "application/octet-stream", p_caption: caption });
     if (mediaError) return { ok: true, message };
+    // A document keeps its own name beside its caption (2026-10-27, mig 20261027110000) — a failure only leaves it named as before.
+    const shownName = (input.name || filename).trim().slice(0, 240) || filename;
+    if (kind === "document") await db.rpc("crm_name_out_file", { p_message: message.id, p_name: shownName });
     const shown = kind === "document" ? "file" : kind;
-    return { ok: true, message: { ...message, kind, text: kind === "document" ? message.text : caption, media: { kind: shown, url: `/member/crm-media/${message.id}`, ...(shown === "file" ? { name: filename } : {}) } } };
+    return { ok: true, message: { ...message, kind, text: caption, media: { kind: shown, url: `/member/crm-media/${message.id}`, ...(shown === "file" ? { name: shownName } : {}) } } };
   } catch (error) {
     return { ok: false, error: friendly(error, "The file could not be sent.") };
   }
@@ -633,7 +636,7 @@ export async function forwardCrmMessage(messageId: string, toContact: string): P
     if (!/^[0-9a-f-]{36}$/i.test(messageId) || !/^[0-9a-f-]{36}$/i.test(toContact)) throw new Error("Choose the message again.");
     const db = await session();
     await requireCrm("edit");
-    const { data: m } = await db.from("crm_messages").select("id, kind, body, media_id, media_path, media_url, media_mime").eq("id", messageId).maybeSingle();
+    const { data: m } = await db.from("crm_messages").select("id, kind, body, media_id, media_path, media_url, media_mime, media_name").eq("id", messageId).maybeSingle();
     if (!m) throw new Error("That message is not there any more.");
     const hasFile = !!(m.media_id || m.media_path || m.media_url);
     if (!hasFile) {
@@ -664,7 +667,8 @@ export async function forwardCrmMessage(messageId: string, toContact: string): P
     // The bucket's own limit (100 MB on R2); sendCrmMedia then holds it to the target channel's.
     if (blob.size > 100 * 1024 * 1024) throw new Error("A file can be forwarded up to 100 MB.");
     const kind = mediaKindOf(mime);
-    const name = kind === "document" ? (String(m.body ?? "").trim() || "file") : `${kind}`;
+    // A document forwarded under its own name (2026-10-27), else its words as before.
+    const name = kind === "document" ? (String(m.media_name ?? "").trim() || String(m.body ?? "").trim() || "file") : `${kind}`;
     const path = mediaPath(toContact, name, mime);
     const up = await db.storage.from("crm-media").upload(path, blob, { contentType: mime, upsert: false });
     if (up.error) throw new Error("You cannot send to that customer.");

@@ -24,6 +24,8 @@ export interface MsgInbound {
   body: string | null;
   /** A photo, video, voice message or file: Meta's address for it (its own CDN, https only), shown through our route. */
   mediaUrl?: string | null;
+  /** A file's own name, read off Meta's address (2026-10-27) — kept beside the message (crm_document_names). */
+  fileName?: string | null;
   sentAt: string;        // ISO
   /** media: "video" or "image" from the ad's context; sourceUrl: its post on Facebook (2026-10-15). */
   ad: { sourceId: string | null; headline: string | null; sourceUrl: string | null; media: string | null } | null;
@@ -76,6 +78,15 @@ function kindOf(a: Attachment | undefined): MsgKind {
   }
 }
 
+/** A file's name from Meta's address — its path's last part ("…/SA-GRR.docx?_nc_cat=…" → "SA-GRR.docx"). */
+export function fileNameOf(url: string | null | undefined): string | null {
+  const last = (url ?? "").split(/[?#]/)[0].split("/").pop() ?? "";
+  let name = last;
+  try { name = decodeURIComponent(last); } catch { /* keep it as it came */ }
+  name = name.trim();
+  return /\.[A-Za-z0-9]{1,8}$/.test(name) ? name.slice(0, 240) : null;
+}
+
 /** Meta's delivery → flat rows. Tolerates anything unexpected; never throws on shape. */
 export function parseMessengerDelivery(body: unknown): MsgDelivery {
   const out: MsgDelivery = { messages: [], delivered: [], reads: [], ignored: 0 };
@@ -97,6 +108,7 @@ export function parseMessengerDelivery(body: unknown): MsgDelivery {
         out.messages.push({
           externalId: e.message.mid, pageId, psid, name: null, kind: e.message.text ? "text" : kindOf(first), body: body ?? null,
           ...(["image", "video", "audio", "file"].includes(first?.type ?? "") && metaMediaUrl(first?.payload?.url) ? { mediaUrl: metaMediaUrl(first?.payload?.url) } : {}),
+          ...(first?.type === "file" && fileNameOf(first?.payload?.url) ? { fileName: fileNameOf(first?.payload?.url) } : {}),
           sentAt: iso(e.timestamp), ad: adOf(e.message.referral ?? e.referral),
         });
         continue;

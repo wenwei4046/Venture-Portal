@@ -220,6 +220,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_save_showroom_extras',
   // CRM photos, videos and voice notes (mig 20261013240000): asks crm_can_reply().
   'crm_set_out_media',
+  // A document we send keeps its own name (mig 20261027110000): asks crm_can_reply().
+  'crm_name_out_file',
   // CRM Desktop v2's Channels (mig 20261015100000): asks crm_manages().
   'crm_note_channel_save',
   // Settings › General (mig 20261018100000): crm_me() first — anybody in the CRM reads the reply lines and switches.
