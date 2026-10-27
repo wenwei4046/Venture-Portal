@@ -64,11 +64,12 @@ describe("moduleInfo — the ERP's module vocabulary", () => {
 });
 
 // 2026-10-27, the user: "每一个 compartment 只会有一个 back cushion（1A 是一个 back cushion，2A 就是两个 back cushion）";
-// a whole sofa "都当 1 个". The ERP's SOFA_MODULES `cushions` — catalogue_apply_sofa_charges counts the same.
+// a whole sofa "都当 1 个"; a corner "cnr , put = 0". The ERP's SOFA_MODULES `cushions` but the corner —
+// catalogue_apply_sofa_charges counts the same.
 describe("moduleCushions — a module's back cushions, its compartments", () => {
   it.each([
     ["1A(LHF)", 1], ["2A(RHF)", 2], ["1B(LHF)", 1], ["2B(LHF)", 2], ["1NA", 1], ["2NA", 2], ["1S", 1], ["2S", 2], ["3S", 3],
-    ["1A(P)(RHF)", 1], ["1NA(L)", 1], ["1S(R)", 1], ["L(RHF)", 1], ["CNR", 1], ["Console", 0], ["STOOL", 0], ["6FT", 1], ["", 1],
+    ["1A(P)(RHF)", 1], ["1NA(L)", 1], ["1S(R)", 1], ["L(RHF)", 1], ["CNR", 0], ["Console", 0], ["STOOL", 0], ["6FT", 1], ["", 1],
   ])("%s has %i", (code, cushions) => {
     expect(moduleCushions(code)).toBe(cushions);
   });
