@@ -780,6 +780,16 @@ describe('IT support stays in the HR app', () => {
     expect(window.location.pathname).toBe('/hr-app')
   })
 
+  // 2026-10-27 — the user's phone: the list ran from one edge of the screen to the other, and its table came out
+  // dark in the phone's dark mode (the portal's own tokens turn dark there; the sheet's never do).
+  it('stands in a sub screen’s gutter, on the sheet’s palette', () => {
+    window.history.pushState(null, '', '/hr-app?open=it:it-1')
+    render(<HrApp data={data} actions={actions} />)
+    const frame = screen.getByTestId('it-support').parentElement!
+    expect(frame).toHaveClass('sheet-theme')
+    expect(frame.className).toMatch(/sub/)
+  })
+
   it('a tapped IT push opens its request and consumes the address', () => {
     window.history.pushState(null, '', '/hr-app?open=it:it-1')
     render(<HrApp data={data} actions={actions} />)

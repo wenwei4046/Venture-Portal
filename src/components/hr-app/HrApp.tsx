@@ -649,7 +649,8 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
             saveNotes={() => { if (d.may.talentEdit && talentNotes?.id === tt.id && talentNotes.text !== tt.notes) run(() => actions.talentNotes(tt.id, talentNotes.text), undefined, 'Notes saved') }} />
         ) : null}
         {top?.k === 'notices' ? <NoticesScreen items={d.notices.items} fresh={fresh} open={(n: Notice) => openRef(n.refKind, n.refId)} /> : null}
-        {top?.k === 'it' && !d.viewingAs ? <ItSupport key={top.id ?? 'mine'} app="hr" initialId={top.id} /> : null}
+        {/* A sub screen's gutter like every other, on the sheet's palette — light whatever the phone's theme (2026-10-27). */}
+        {top?.k === 'it' && !d.viewingAs ? <div className={`${s.sub} sheet-theme`}><ItSupport key={top.id ?? 'mine'} app="hr" initialId={top.id} /></div> : null}
         {top?.k === 'memos' ? <MemosScreen memos={memos} open={id => push({ k: 'memo', id })} /> : null}
         {top?.k === 'memo' ? (
           <MemoScreen m={mm} openFile={id => openInTab(() => actions.memoFile(id, 'view'), flash)}

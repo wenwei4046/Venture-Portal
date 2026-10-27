@@ -220,7 +220,7 @@ function team(): TeamVM {
   const kids = KIDS.map(([n, t, st, gk]) => {
     const title = t.split(" · ")[0];
     sheets[n] = sheet(n, title);
-    return { id: n, name: n, title, ini: ini(n), dot: dot(st), kids: gk.map(([kn, kt]) => { sheets[kn] = sheet(kn, kt); return { id: kn, name: kn, title: kt, ini: ini(kn), dot: "up" as const }; }) };
+    return { id: n, name: n, title, ini: ini(n), dot: dot(st), kids: gk.map(([kn, kt]) => { sheets[kn] = sheet(kn, kt); return { id: kn, name: kn, title: kt, ini: ini(kn), dot: "up" as const, kids: [] }; }) };
   });
   return {
     lede: "Fair · Klang Valley",

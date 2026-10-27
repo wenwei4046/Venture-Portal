@@ -104,6 +104,15 @@ describe('IT support in its own host', () => {
     expect(mocks.replace).toHaveBeenCalledWith('/fin-app/profile')
   })
 
+  // 2026-10-27 — the user's phone: the list ran from one edge of the screen to the other, and its table came out
+  // dark in the phone's dark mode (the portal's own tokens turn dark there; the sheet's never do).
+  it('keeps the list in the app’s gutter, on the sheet’s palette', () => {
+    render(<ItSupportApp />)
+    const frame = screen.getByTestId('support').parentElement!
+    expect(frame).toHaveClass('sheet-theme')
+    expect(frame.className).toMatch(/itSupport/)
+  })
+
   it('returns to the previous app screen when opened from Profile', () => {
     mocks.canStepBack.mockReturnValue(true)
     const back = vi.spyOn(window.history, 'back').mockImplementation(() => {})

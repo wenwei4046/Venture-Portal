@@ -757,6 +757,9 @@
 .menuRow:disabled .pushSwitch { opacity: 0.45; }
 .pushReason { margin: 0; padding: 0 16px 12px 60px; font-size: 12.5px; line-height: 1.4; color: var(--ds-danger); }
 .signOutWrap { padding: 22px 16px 0; }
+/* Profile › IT support (2026-10-27 — the user's phone showed it touching both edges of the screen, and its table dark
+   in the phone's dark mode): the shared list kept off the edges, as Profile's own cards are. */
+.itSupport { padding: 18px 16px 0; }
 .signOut {
   width: 100%;
   min-height: 50px;
