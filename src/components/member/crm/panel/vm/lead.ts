@@ -109,7 +109,7 @@ export function leadVM(ctx: PanelCtx) {
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? MINE_BG : "#fff", bd: mine ? MINE_BG : "#fff", fg: mine ? "#fff" : "var(--crm-ink)", timeC: mine ? MINE_TIME : "var(--crm-muted)", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
       // A visit sent to the customer shows as the visit card, as in the salesperson's chat (sales/vm/chat.ts › ev), not
       // as its text with the map links (user 2026-10-11). Tap → Calendar on that day.
-      ...visitCard(m.card), pDisp: !md && !m.card && m.text ? "inline" : m.card || mk === "file" || (shows && !m.text) ? "none" : "block" };
+      ...visitCard(m.card), pDisp: !md && !m.card && m.text ? "inline" : m.card || (mk === "file" && (!m.text || m.text === md?.name)) || (shows && !m.text) ? "none" : "block" };
   });
   return {
     onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pReply: null, pCmp: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),

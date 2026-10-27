@@ -175,7 +175,7 @@ export function chatVM(ctx: SalesCtx) {
       } : null,
       // A document is its tile (name and type), never its name again under it (2026-10-14).
       ...mediaOf(m, gallery, al.lead.get(key)), ...(by ? { timeTop: "4px", ...(md?.kind === "audio" ? { inPad: "0 2px" } : {}) } : {}), ...(!md && !card && m.text ? INLINE_TIME : {}),
-      pDisp: !md && !card && m.text ? "inline" : card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: typePx(16.3) /* 15 px on a phone, frame M04 */, textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
+      pDisp: !md && !card && m.text ? "inline" : card || (mk === "file" && (!m.text || m.text === md?.name)) || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: typePx(16.3) /* 15 px on a phone, frame M04 */, textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : m.text),
       // A starred message shows ★ by its time (the message menu's Star, 2026-10-14).
       timeJustify: "flex-end", timeColor: mine ? MINE_TIME : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
       failNote: mine && m.status === "failed" ? failNote(m.error) : "",
