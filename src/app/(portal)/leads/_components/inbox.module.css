@@ -632,7 +632,16 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; background: 
 /* The brands' numbers (2026-10-27): each brand's conversations under the status tab picked. */
 .brandCount { margin-left: 4px; font-size: 12px; opacity: 0.7; }
 .brandTab[aria-pressed='true'] .brandCount { opacity: 0.85; }
-.labelFilter { margin: 0 0 4px; height: 30px; padding: 0 8px; border: 1px solid rgb(var(--lv-border)); border-radius: 6px; background: rgb(var(--lv-white)); font: inherit; font-size: 13px; color: rgb(var(--lv-ink)); }
+/* Quick filters under the search, as Business Suite's chips: Unread and the labels; one label at a time. */
+.quickChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.quickChip { border: 1px solid rgb(var(--lv-border)); border-radius: 6px; background: rgb(var(--lv-white)); padding: 3px 9px; font: inherit; font-size: 13px; line-height: 1.3; color: rgb(var(--lv-text-2)); cursor: pointer; white-space: nowrap; }
+.quickChip:hover { border-color: rgb(var(--lv-frame)); color: rgb(var(--lv-ink)); }
+.quickChip[aria-pressed='true'] { background: rgb(var(--lv-ink)); border-color: rgb(var(--lv-ink)); color: rgb(var(--lv-cream)); }
+.quickChip[data-tone='amber'][aria-pressed='true'] { background: rgb(var(--lv-amber-bg)); border-color: rgb(var(--lv-amber)); color: rgb(var(--lv-amber-text)); }
+.quickChip[data-tone='green'][aria-pressed='true'] { background: rgb(var(--lv-green-bg)); border-color: rgb(var(--lv-green)); color: rgb(var(--lv-green)); }
+.quickChip[data-tone='red'][aria-pressed='true'] { background: rgb(var(--lv-red-bg)); border-color: rgb(var(--lv-red)); color: rgb(var(--lv-red)); }
+.quickChip[data-tone='clay'][aria-pressed='true'] { background: rgb(var(--lv-tint)); border-color: rgb(var(--lv-accent)); color: rgb(var(--lv-accent-text)); }
+.quickChip[data-tone='blue'][aria-pressed='true'] { background: rgb(var(--lv-read) / 0.14); border-color: rgb(var(--lv-read)); color: rgb(var(--lv-k-text)); }
 
 /* Labels (mig 20261027190000): a small chip in its tone. */
 .label { display: inline-flex; align-items: center; font-size: 11px; line-height: 1; padding: 3px 7px; border-radius: 999px; white-space: nowrap; background: rgb(var(--lv-muted)); color: rgb(var(--lv-ink)); }
@@ -666,3 +675,21 @@ textarea.input { height: auto; padding: 8px 10px; resize: vertical; background: 
 /* Read ticks (mig 20261027190000), as WhatsApp: ✓ sent, ✓✓ delivered, blue ✓✓ read. */
 .ticks { margin-left: 4px; letter-spacing: -2px; font-size: 12px; color: rgb(var(--lv-text-4)); }
 .ticks[data-r='read'] { color: rgb(var(--lv-read)); font-weight: 600; }
+
+/* Reply to one message, react (mig 20261027220000): the actions show beside a bubble on hover, as Messenger's. */
+.bubbleRow { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+.msg[data-out] .bubbleRow { flex-direction: row-reverse; }
+.msgActions { display: inline-flex; gap: 2px; opacity: 0; transition: opacity 0.12s; }
+.msg:hover .msgActions, .msgActions:focus-within { opacity: 1; }
+.msgAction { width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; color: rgb(var(--lv-text-4)); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.msgAction:hover:not(:disabled) { background: rgb(var(--lv-cream)); color: rgb(var(--lv-ink)); }
+.reactMenu { position: absolute; bottom: 30px; left: -8px; z-index: 31; display: flex; align-items: center; gap: 2px; padding: 4px 6px; border: 1px solid rgb(var(--lv-frame)); border-radius: 999px; background: rgb(var(--lv-white)); box-shadow: var(--lv-shadow-menu); white-space: nowrap; }
+.reactMenu .emojiBtn { width: 32px; height: 32px; }
+.reactMenu .emojiBtn[aria-pressed='true'] { background: rgb(var(--lv-cream)); }
+.reaction { margin-top: -10px; padding: 1px 6px; border: 1px solid rgb(var(--lv-border)); border-radius: 999px; background: rgb(var(--lv-white)); font-size: 14px; line-height: 1.3; }
+.quote { max-width: 70%; display: flex; flex-direction: column; gap: 1px; padding: 5px 10px; border-left: 3px solid rgb(var(--lv-frame)); border-radius: 6px; background: rgb(var(--lv-muted)); font-size: 12px; color: rgb(var(--lv-text-3)); }
+.quoteWho { font-weight: 600; color: rgb(var(--lv-text-2)); }
+.quoteText { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: pre-wrap; }
+.replyBar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-left: 3px solid rgb(var(--lv-accent)); border-radius: 6px; background: rgb(var(--lv-tint)); }
+.replyBarText { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 13px; color: rgb(var(--lv-text-2)); }
+.replyBarWho { font-weight: 600; color: rgb(var(--lv-accent-text)); font-size: 12px; }

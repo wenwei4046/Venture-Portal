@@ -122,6 +122,10 @@ export interface LeadMessage {
   mediaMime?: string | null
   /** A customer's photo / video / voice note / file: Meta's own address (it expires after a while). */
   mediaUrl?: string | null
+  /** Meta's id of this message, the id of the message it quotes, and the Page's emoji on it (mig 20261027220000). */
+  mid?: string | null
+  replyToMid?: string | null
+  reaction?: string | null
 }
 
 export interface LeadEvent {

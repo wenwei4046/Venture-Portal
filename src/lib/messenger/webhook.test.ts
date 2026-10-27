@@ -17,6 +17,12 @@ describe("Messenger deliveries", () => {
     }]);
   });
 
+  it("keeps what a customer's reply quotes (Lead View, 2026-10-27)", () => {
+    const d = parseMessengerDelivery(page([{ sender: { id: "PSID1" }, recipient: { id: "PAGE1" }, timestamp: T,
+      message: { mid: "m_9", text: "Queen", reply_to: { mid: "m_page" } } }]));
+    expect(d.messages[0]).toMatchObject({ externalId: "m_9", body: "Queen", replyToMid: "m_page" });
+  });
+
   it("names the ad's kind and links its post (2026-10-15)", () => {
     const ad = (x: Record<string, string>) => parseMessengerDelivery(page([{ sender: { id: "P" }, recipient: { id: "PAGE1" }, timestamp: T, message: { mid: "v", text: "hi" },
       referral: { source: "ADS", type: "OPEN_THREAD", ad_id: "AD1", ads_context_data: { ad_title: "Sofa", ...x } } }])).messages[0].ad;

@@ -26,6 +26,8 @@ export interface MsgInbound {
   mediaUrl?: string | null;
   /** A file's own name, read off Meta's address (2026-10-27) — kept beside the message (crm_document_names). */
   fileName?: string | null;
+  /** Meta's id of the message this one quotes (a reply to one message, 2026-10-27) — Lead View keeps it. */
+  replyToMid?: string | null;
   sentAt: string;        // ISO
   /** media: "video" or "image" from the ad's context; sourceUrl: its post on Facebook (2026-10-15). */
   ad: { sourceId: string | null; headline: string | null; sourceUrl: string | null; media: string | null } | null;
@@ -50,7 +52,7 @@ interface Event {
   sender?: { id?: string };
   recipient?: { id?: string };
   timestamp?: number;
-  message?: { mid?: string; text?: string; is_echo?: boolean; attachments?: Attachment[]; quick_reply?: { payload?: string }; referral?: Referral };
+  message?: { mid?: string; text?: string; is_echo?: boolean; attachments?: Attachment[]; quick_reply?: { payload?: string }; referral?: Referral; reply_to?: { mid?: string } };
   postback?: { mid?: string; title?: string; referral?: Referral };
   referral?: Referral;
   delivery?: { mids?: string[] };
@@ -109,6 +111,7 @@ export function parseMessengerDelivery(body: unknown): MsgDelivery {
           externalId: e.message.mid, pageId, psid, name: null, kind: e.message.text ? "text" : kindOf(first), body: body ?? null,
           ...(["image", "video", "audio", "file"].includes(first?.type ?? "") && metaMediaUrl(first?.payload?.url) ? { mediaUrl: metaMediaUrl(first?.payload?.url) } : {}),
           ...(first?.type === "file" && fileNameOf(first?.payload?.url) ? { fileName: fileNameOf(first?.payload?.url) } : {}),
+          ...(e.message.reply_to?.mid ? { replyToMid: e.message.reply_to.mid } : {}),
           sentAt: iso(e.timestamp), ad: adOf(e.message.referral ?? e.referral),
         });
         continue;

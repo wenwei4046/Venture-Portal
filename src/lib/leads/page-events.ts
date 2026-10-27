@@ -17,6 +17,8 @@ export interface PageReply {
   body: string | null
   /** A photo, video, voice note or file the Page sent: Meta's own address (mig 20261027180000; it expires after a while). */
   mediaUrl?: string | null
+  /** Meta's id of the message this reply quotes (mig 20261027220000). */
+  replyToMid?: string | null
   sentAt: string
 }
 
@@ -24,7 +26,7 @@ type Ev = {
   sender?: { id?: string }
   recipient?: { id?: string }
   timestamp?: number
-  message?: { mid?: string; text?: string; is_echo?: boolean; app_id?: number | string; attachments?: Array<{ type?: string; payload?: { sticker_id?: number; url?: string } }> }
+  message?: { mid?: string; text?: string; is_echo?: boolean; app_id?: number | string; attachments?: Array<{ type?: string; payload?: { sticker_id?: number; url?: string } }>; reply_to?: { mid?: string } }
 }
 
 const KINDS: Record<string, MsgKind> = { image: 'image', video: 'video', audio: 'audio', file: 'document', location: 'location' }
@@ -55,6 +57,7 @@ export function leadPageEvents(body: unknown, crmPages: Set<string>, ourAppId: s
       replies.push({
         externalId: m.mid, pageId: e.id!, psid: ev.recipient.id, kind, body: m.text ?? null,
         ...(['image', 'video', 'audio', 'file'].includes(first?.type ?? '') && metaMediaUrl(first?.payload?.url) ? { mediaUrl: metaMediaUrl(first?.payload?.url) } : {}),
+        ...(m.reply_to?.mid ? { replyToMid: m.reply_to.mid } : {}),
         sentAt: new Date(typeof ev.timestamp === 'number' ? ev.timestamp : Date.now()).toISOString(),
       })
     }

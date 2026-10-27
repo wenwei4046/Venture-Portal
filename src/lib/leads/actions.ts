@@ -9,7 +9,7 @@ import { askModel, type AgentDocument } from './ai-model'
 import { agentCards, agentReads, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile, type FixedAnswer, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
 import { quickProblem, type QuickReply } from './quick'
-import { deliver, deliverFile } from './messenger'
+import { deliver, deliverFile, sendReaction } from './messenger'
 import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
 import type { BusinessHours, InfoCard, InfoCat, LeadInfo } from './info'
@@ -69,8 +69,40 @@ export async function replyToLead(contactId: string, body: string): Promise<Lead
   return { ok: true, data: { id: saved.data, notSent: await deliverReply(saved.data) } }
 }
 
+/**
+ * Answer one message of the conversation (mig 20261027220000 — the user: "能回复特定的内容"): recorded as a reply that
+ * quotes it, then sent with Meta's `reply_to`, so the customer sees the quote above it as in Messenger.
+ */
+export async function replyToMessage(contactId: string, body: string, messageId: number): Promise<LeadOutcome<{ id: number; notSent: string | null }>> {
+  await requireActionOn('/leads', 'leads', 'create')
+  const saved = await call<{ id: number; replyToMid: string }>('lead_reply_to', { p_contact: contactId, p_body: body, p_message: messageId }, 'The reply was not saved.')
+  if (!saved.ok) return saved
+  return { ok: true, data: { id: saved.data.id, notSent: await deliverReply(saved.data.id, saved.data.replyToMid) } }
+}
+
+/**
+ * The Page's emoji on a customer's message (mig 20261027220000 — the user: "和emoji"); null takes it away. Kept first,
+ * then sent as Meta's react / unreact; when Meta refuses, the reaction before is put back and the refusal said.
+ */
+export async function reactToMessage(messageId: number, emoji: string | null): Promise<LeadOutcome<null>> {
+  await requireActionOn('/leads', 'leads', 'create')
+  const kept = await call<{ mid: string | null; pageId: string | null; psid: string; channel: string; isTest: boolean; before: string | null }>(
+    'lead_react', { p_message: messageId, p_emoji: emoji }, 'The reaction was not saved.')
+  if (!kept.ok) return kept
+  const t = kept.data
+  // A test conversation, or a message Meta never gave an id: kept here only.
+  if (t.isTest || !t.mid) return { ok: true, data: null }
+  const refused = await sendReaction({ pageId: t.pageId, psid: t.psid, mid: t.mid }, emoji, process.env.META_SYSTEM_USER_TOKEN?.trim())
+  if (refused) {
+    await quiet<unknown>('lead_react', { p_message: messageId, p_emoji: t.before }, '')
+    return { ok: false, reason: refused }
+  }
+  revalidatePath('/leads', 'layout')
+  return { ok: true, data: null }
+}
+
 /** Send a reply just recorded; null when it went (or is a test's, kept here only), else why not. */
-async function deliverReply(messageId: number): Promise<string | null> {
+async function deliverReply(messageId: number, replyToMid: string | null = null): Promise<string | null> {
   const target = await quiet<{ isTest: boolean; channel: string; pageId: string | null; psid: string; body: string; lastInAt: string | null } | null>(
     'lead_reply_target', { p_message: messageId }, '')
   // Before mig 20261026110000 (no lead_reply_target), or a test conversation: recorded, as it always was.
@@ -78,7 +110,7 @@ async function deliverReply(messageId: number): Promise<string | null> {
   const t = target.data
   // Messenger and Instagram Direct both go through the brand's Facebook Page (mig 20261027110010 keeps it on an
   // Instagram conversation); the PSID is the Instagram-scoped id there.
-  const result = await deliver({ pageId: t.pageId, psid: t.psid, body: t.body, lastInAt: t.lastInAt }, process.env.META_SYSTEM_USER_TOKEN?.trim())
+  const result = await deliver({ pageId: t.pageId, psid: t.psid, body: t.body, lastInAt: t.lastInAt, replyToMid }, process.env.META_SYSTEM_USER_TOKEN?.trim())
   await quiet<null>('lead_reply_sent', { p_message: messageId, p_mid: 'mid' in result ? result.mid : null, p_error: 'error' in result ? result.error : null }, '')
   revalidatePath('/leads', 'layout')
   return 'error' in result ? result.error : null
