@@ -6,12 +6,12 @@
  * properties asked about and what customers asked most (keywords, no AI). Print / PDF and Excel. Kept per browser.
  * The arithmetic is vm/workspace-report.ts; Meta's figures and pictures are read on the server (CRM · Manage).
  */
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adPageInSource, BRAND_LABEL, brandOf, SOURCE_PICKS, sourceLabel, sourceOf, type SourcePick } from "@/lib/member/crm-source";
 import { fetchAdInsights, fetchAdThumbs } from "@/app/(member)/member/crm-actions";
-import { ALL, METRICS, metaFigures } from "./vm/adsperf";
+import { ALL, METRICS, metaFigures, moveHeld } from "./vm/adsperf";
 import { chartFmt, chartFmtOf, isoOf } from "./vm/adschart";
 import {
   changeOf, crmFigures, leadsByRep, loadReports, periodRanges, PERIODS, propertyRanking, questionTopics, REPORT_METRICS,
@@ -47,6 +47,15 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
   const [editing, setEditing] = useState(false);
   const rep = reports.find(r => r.id === pick) ?? reports[0];
   const update = (patch: Partial<WorkspaceReport>) => setReports(list => { const next = list.map(r => (r.id === rep.id ? { ...r, ...patch } : r)); saveReports(next); return next; });
+  // A metric dragged to another place (the owner, 2026-10-27: "metrics 可以拉动"): the held one is read from the ref at the
+  // moment of each move, never a render's copy — dragover comes faster than the chips redraw (as Ads Performance's moveHeld).
+  const held = useRef<number | null>(null), [dragging, setDragging] = useState<string | null>(null);
+  const dragTo = (i: number) => {
+    const from = held.current;
+    if (from == null || from === i) return;
+    held.current = i;
+    setReports(list => { const next = list.map(r => (r.id !== rep.id ? r : { ...r, metrics: moveHeld(r.metrics, from, i) ?? r.metrics })); saveReports(next); return next; });
+  };
   const addReport = () => setReports(list => {
     const id = `r${Date.now().toString(36)}`, next = [...list, { ...rep, id, name: "New report" }];
     saveReports(next); setPick(id); setEditing(true); return next;
@@ -173,13 +182,16 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
                 </div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>Metrics · in this order (↑ ↓ to move)</span>
+                <span style={{ fontSize: "12.5px", color: "var(--crm-muted)" }}>Metrics · drag to reorder</span>
                 <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                   {rep.metrics.map((k, i) => (
-                    <span key={k} style={{ ...chip(true), display: "inline-flex", alignItems: "center", gap: "6px", cursor: "default" }}>
+                    <span key={k} draggable title="Drag to reorder"
+                      onDragStart={e => { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", k); } catch { /* not every browser lets it */ } held.current = i; setDragging(k); }}
+                      onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; dragTo(i); }}
+                      onDrop={e => e.preventDefault()} onDragEnd={() => { held.current = null; setDragging(null); }}
+                      style={{ ...chip(true), display: "inline-flex", alignItems: "center", gap: "6px", cursor: "grab", opacity: dragging === k ? 0.45 : 1, userSelect: "none" }}>
+                      <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" style={{ opacity: 0.6 }}><g fill="currentColor"><circle cx="2.5" cy="2" r="1.1" /><circle cx="7.5" cy="2" r="1.1" /><circle cx="2.5" cy="6" r="1.1" /><circle cx="7.5" cy="6" r="1.1" /><circle cx="2.5" cy="10" r="1.1" /><circle cx="7.5" cy="10" r="1.1" /></g></svg>
                       {labelOf(k)}
-                      <button type="button" aria-label={`Move ${labelOf(k)} left`} disabled={i === 0} onClick={() => { const m = [...rep.metrics]; [m[i - 1], m[i]] = [m[i], m[i - 1]]; update({ metrics: m }); }} style={{ ...BTN, opacity: i === 0 ? 0.3 : 0.8 }}>↑</button>
-                      <button type="button" aria-label={`Move ${labelOf(k)} right`} disabled={i === rep.metrics.length - 1} onClick={() => { const m = [...rep.metrics]; [m[i + 1], m[i]] = [m[i], m[i + 1]]; update({ metrics: m }); }} style={{ ...BTN, opacity: i === rep.metrics.length - 1 ? 0.3 : 0.8 }}>↓</button>
                       <button type="button" aria-label={`Remove ${labelOf(k)}`} onClick={() => update({ metrics: rep.metrics.filter(x => x !== k) })} style={{ ...BTN, opacity: 0.8 }}>×</button>
                     </span>
                   ))}
