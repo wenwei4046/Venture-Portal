@@ -1,8 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useMemo, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { setViewAs } from '@/components/layout/view-as-actions'
+import ViewAsPersonPicker from '@/components/layout/ViewAsPersonPicker'
 import {
   hrAppAcknowledge, hrAppAddCandidate, hrAppAttDecide, hrAppBook, hrAppCancelBooking, hrAppCancelHire, hrAppCandidateStage, hrAppConfirmProbation, hrAppDecide,
   hrAppDecline, hrAppContractAck, hrAppExtendProbation, hrAppFill, hrAppLetterLink, hrAppNewHire, hrAppProbationAck, hrAppRemoveTalent, hrAppRequestInfo,
@@ -24,6 +25,8 @@ import HrApp, { type HrAppActions } from './HrApp'
 export default function HrAppLive({ data }: { data: HrAppData }) {
   const router = useRouter()
   const [, startSwitch] = useTransition()
+  // View as a person… (2026-10-27, every switcher's last row): the portal's own picker, over Me and the Account sheet.
+  const [picking, setPicking] = useState(false)
   const actions = useMemo<HrAppActions>(() => ({
     hireAck: hrAppAcknowledge,
     hireInfo: hrAppRequestInfo,
@@ -66,11 +69,17 @@ export default function HrAppLive({ data }: { data: HrAppData }) {
     myDocLink: (kind, id) => openMyDoc(kind, id),
     // Another view of the one app: the server action opens where it lives (on a phone, HR's is this app).
     switchView: view => {
+      if (view === 'person') return setPicking(true)
       const form = new FormData()
       form.set('role', view)
       startSwitch(async () => { await setViewAs(form) })
     },
     refresh: () => router.refresh(),
   }), [router])
-  return <HrApp data={data} actions={actions} />
+  return (
+    <>
+      <HrApp data={data} actions={actions} />
+      {data.views ? <ViewAsPersonPicker open={picking} onClose={() => setPicking(false)} z={90} /> : null}
+    </>
+  )
 }

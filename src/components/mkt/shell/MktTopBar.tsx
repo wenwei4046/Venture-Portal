@@ -1,10 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useRef, useState } from 'react'
 import type { User } from '@/types'
-import { setViewAs } from '@/components/layout/view-as-actions'
-import ViewAsPersonPicker from '@/components/layout/ViewAsPersonPicker'
+import ViewSwitch from '@/components/layout/ViewSwitch'
 import MemoBell from '@/components/layout/MemoBell'
 import { MeDesktop } from '@/components/me/MeDesktop'
 import MktSearch from './MktSearch'
@@ -12,10 +10,9 @@ import s from './shell.module.css'
 
 // Marketing's top bar (`Marketing Shell.dc.html`): the page's crumb, the search, then on the right — + New Project for
 // whoever may start one, for a login of one's own Me (today's punch, one's leave and payslips) and one's memos, as in
-// every view — the bell. An account
-// that may switch views (the Principal's) picks the view here, as on HR's and Finance's bars.
-
-const VIEWING = '__viewing'
+// every view — the bell. An account that may switch views (the Principal's) picks the view here with the Principal's
+// own switch (2026-10-27 — the user: "marketing 的这个 dropdown 就照它的那个设计风格"): the dot and the words, the soft
+// menu, every view.
 
 export default function MktTopBar({
   user,
@@ -44,7 +41,11 @@ export default function MktTopBar({
       <MktSearch />
       <div className={s.grow} />
       <div className={s.right}>
-        {user.canSwitchView ? <ViewSwitch value={user.role} viewingAs={user.viewingAs?.name} /> : null}
+        {user.canSwitchView ? (
+          <span className={s.view}>
+            <ViewSwitch value={user.role} viewingAs={user.viewingAs?.name} />
+          </span>
+        ) : null}
         {newProject ? (
           <Link href="/marketing/new" className={s.newBtn}>
             <span className={s.newPlus} aria-hidden="true">+</span>
@@ -66,40 +67,5 @@ export default function MktTopBar({
         </button>
       </div>
     </div>
-  )
-}
-
-/** The view the account draws the portal in (the Principal's; setViewAs asks the database again). */
-function ViewSwitch({ value, viewingAs }: { value: string; viewingAs?: string }) {
-  const form = useRef<HTMLFormElement>(null)
-  const [picking, setPicking] = useState(false)
-  const current = viewingAs ? VIEWING : value
-  return (
-    <>
-      <form ref={form} action={setViewAs}>
-        <select
-          key={current}
-          name="role"
-          defaultValue={current}
-          className={s.viewSelect}
-          aria-label="View portal as role"
-          onChange={e => {
-            if (e.target.value === 'person') {
-              e.target.value = current
-              setPicking(true)
-            } else if (e.target.value !== VIEWING) form.current?.requestSubmit()
-          }}
-        >
-          {viewingAs ? <option value={VIEWING}>Viewing as {viewingAs}</option> : null}
-          <option value="principal">Principal</option>
-          <option value="finance">Finance view</option>
-          <option value="hr">HR view</option>
-          <option value="marketing">Marketing view</option>
-          <option value="revenue_member">Revenue View</option>
-          <option value="person">View as a person…</option>
-        </select>
-      </form>
-      <ViewAsPersonPicker open={picking} onClose={() => setPicking(false)} />
-    </>
   )
 }

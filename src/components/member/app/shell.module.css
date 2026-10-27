@@ -208,11 +208,14 @@
 }
 .moduleRowOn { background: var(--rv-cream); font-weight: 650; }
 .moduleRowLabel { flex: 1; }
+/* Every view's dot (2026-10-27, every view in the menu — Marketing and Lead View added). */
 .moduleDot { width: 8px; height: 8px; border-radius: 50%; }
 .moduleDotFinance { background: var(--rv-module-finance); }
 .moduleDotPrincipal { background: var(--rv-brown); }
 .moduleDotHr { background: var(--rv-green); }
+.moduleDotMarketing { background: var(--rv-module-marketing); }
 .moduleDotRevenue { background: var(--rv-accent); }
+.moduleDotLead { background: var(--rv-module-lead); }
 .moduleButton {
   width: 100%;
   display: flex;

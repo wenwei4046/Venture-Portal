@@ -22,6 +22,10 @@ const ROOTS = [
   'src/app/(portal)/admin',
   'src/app/(portal)/audit-log',
   'src/components/layout/HrTopBar.tsx',
+  // The view switch on every bar (2026-10-27 — the user: Marketing's "照它的那个设计风格", the Principal's soft menu).
+  'src/components/layout/ViewSwitch.tsx',
+  'src/components/layout/PortalViewSwitcher.tsx',
+  'src/components/mkt/shell/MktTopBar.tsx',
   'src/components/layout/HrSidebar.tsx',
   // Finance's shell and the Finance view's kit (2026-10-14, the Finance revamp v2: its HrSelect is this Select).
   'src/components/layout/ViewSidebar.tsx',

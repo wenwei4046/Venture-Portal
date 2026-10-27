@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 
 // The Finance app's Profile, as the Principal's own view opens it (2026-10-17): the view it names, Switch view
 // with the Principal's own app here, and This phone's notifications (the portal's phone face had them, #514).
+// Switch view lists every view since 2026-10-27, as every switcher does, and View as a person… opens the portal's picker.
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
@@ -18,6 +19,9 @@ vi.mock('@/components/layout/AccountMenu', () => ({
 }))
 // Me's card (2026-10-17) reads from the browser and writes through Server Actions: drawn here as its marker only.
 vi.mock('@/components/me/MeCard', () => ({ MeCard: () => <div data-testid="me-card" /> }))
+vi.mock('@/components/layout/ViewAsPersonPicker', () => ({
+  default: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="View as a person" /> : null),
+}))
 vi.mock('./PushRow', () => ({
   default: ({ roman }: { roman: string }) => (
     <>
@@ -29,6 +33,7 @@ vi.mock('./PushRow', () => ({
   ),
 }))
 
+import { setViewAs } from '@/components/layout/view-as-actions'
 import FinAppFrame from './FinAppFrame'
 import ProfileScreen from './ProfileScreen'
 
@@ -47,6 +52,18 @@ describe('the Finance app’s Profile', () => {
     expect(within(views).getByRole('button', { name: /Principal You are here/ })).toBeDisabled()
     expect(within(views).getByRole('button', { name: /Finance This app/ })).toBeEnabled()
     expect(screen.getByTestId('sign-out')).toHaveTextContent('the Principal view')
+  })
+
+  it('Switch view: every view and where it opens on a phone; View as a person… opens the picker', () => {
+    draw({ view: 'principal', canSwitch: true })
+    const views = screen.getByLabelText('Switch view')
+    expect(within(views).getAllByRole('button').map(b => b.textContent)).toEqual([
+      'PrincipalYou are here', 'FinanceThis app›', 'HRThe HR app›', 'MarketingThe portal›', 'Revenue teamThe Revenue app›',
+      'Lead ViewThe portal›', 'View as a person…Read-only›',
+    ])
+    fireEvent.click(within(views).getByRole('button', { name: /View as a person/ }))
+    expect(screen.getByRole('dialog', { name: 'View as a person' })).toBeInTheDocument()
+    expect(setViewAs).not.toHaveBeenCalled()
   })
 
   it('carries This phone’s notifications as the last section, numbered after the others', () => {

@@ -1,0 +1,23 @@
+/* The portal's view switch (2026-10-27): the Principal's — an amber dot and the view's words, which ARE the switcher.
+   Its own tokens with their values as fallbacks, so Marketing's bar and Lead View's, outside HR's shell, draw it the
+   same (their bars carried no `--hvs-*`, and Lead View's dot did not show). */
+.form { display: flex; align-items: center; gap: 6px; color: rgb(var(--hvs-top-view, 90 78 68)); }
+.dot { width: 5px; height: 5px; border-radius: 50%; background: rgb(var(--hvs-top-dot, 150 100 12)); flex: none; }
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  /* As wide as the view it names, not the longest option — "HR view" sits
+     20px from the date, as the prototype's words do. */
+  field-sizing: content;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: normal;
+  color: rgb(var(--hvs-top-view, 90 78 68));
+  cursor: pointer;
+}
+.select:focus-visible { outline: 2px solid rgb(var(--hvs-nav-bar, 233 154 83)); outline-offset: 2px; border-radius: 4px; }
+.select:disabled { opacity: 0.6; }

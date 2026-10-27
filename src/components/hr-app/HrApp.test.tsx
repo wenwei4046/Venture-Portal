@@ -719,6 +719,23 @@ describe('the avatar: Me, with the old More’s rows', () => {
     expect(screen.queryByText('Change password')).toBeNull()
   })
 
+  // Every view, as every switcher lists them (2026-10-27 — the user: "我要全部是跟 principal 那种的，它能够显示出来全部的东西"):
+  // Marketing, Lead View and View as a person… too, each saying where it opens on a phone.
+  it('Switch view lists every view and where it opens; View as a person… asks for the picker', () => {
+    const me = openMe({ views: { current: 'hr' } })
+    const views = within(me).getByRole('group', { name: 'Switch view' })
+    for (const [name, where] of [
+      ['Principal', 'The Finance app'], ['Finance', 'The Finance app'], ['HR', 'You are here'], ['Marketing', 'The portal'],
+      ['Revenue team', 'The Revenue app'], ['Lead View', 'The portal'], ['View as a person…', 'Read-only'],
+    ]) {
+      expect(within(views).getByText(name)).toBeInTheDocument()
+      expect(within(views).getByText(name).parentElement).toHaveTextContent(where)
+    }
+    fireEvent.click(within(views).getByText('Lead View'))
+    fireEvent.click(within(views).getByText('View as a person…'))
+    expect(vi.mocked(actions.switchView).mock.calls).toEqual([['lead'], ['person']])
+  })
+
   it('Change password: asks the current one, then the new one twice; says what is wrong before sending; done, Done closes it', async () => {
     const change = vi.fn(async () => ({ ok: true as const }))
     const me = openMe({}, { changePassword: change })
