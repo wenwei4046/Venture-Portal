@@ -1028,4 +1028,29 @@ await db.exec(`
   check((await q(`select assigned_to from public.lead_contacts where id = $1`, [c]))[0].assigned_to, null, 'Manage replying takes nothing')
 }
 
+// ── The Inbox's unread count (mig 20261027160000): the customer's messages since the last one that went out ──
+{
+  const f = n => readFile(new URL(`../../supabase/migrations/${n}`, import.meta.url), 'utf8').then(t => t.replace(/\r\n/g, '\n'))
+  const before = (await q(`select md5(prosrc) m from pg_proc where proname = 'lead_inbox'`))[0].m
+  check(before, '68e0e08f58deaba5ffe0466f283e6483', 'lead_inbox here is production’s body')
+  await db.exec(await f('20261027160000_lead_unread.sql'))
+  await db.exec(await f('20261027160000_lead_unread.sql'))
+  const P = '946946021838962'
+  const say = (id, body) => q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: id, pageId: P, psid: '7700701', name: 'Unread Test', kind: 'text', body, sentAt: '2026-10-27T04:00:00Z', ad: null },
+  ])])
+  const c = (await say('un.1', 'hi'))[0].r.contacts[0]
+  await say('un.2', 'price?')
+  await say('un.3', 'anyone?')
+  await as(CS_USER, ALL)
+  const unread = async () => ((await q(`select public.lead_inbox() i`))[0].i).find(x => x.id === c).unread
+  check(await unread(), 3, 'three from the customer, nothing back: 3')
+  await q(`select public.lead_reply($1, 'Hi! Which sofa?')`, [c])
+  check(await unread(), 0, 'answered: 0')
+  await say('un.4', 'L shape')
+  check(await unread(), 1, 'a new message after the answer: 1')
+  await q(`select public.lead_ingest_page_replies($1::jsonb)`, [JSON.stringify([{ externalId: 'un.p1', pageId: P, psid: '7700701', body: 'From Business Suite', sentAt: '2026-10-27T04:05:00Z' }])])
+  check(await unread(), 0, 'the Page answering from Business Suite clears it too')
+}
+
 console.log(`validate-leads: ${checks} checks passed`)

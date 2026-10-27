@@ -8,7 +8,7 @@ import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
 import { outcomeOf } from '@/lib/leads/ai'
 import { adLabel, adsManagerLink } from '@/lib/leads/ads'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
-import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
+import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
 import { whenFull } from '@/lib/leads/time'
 import { formatPhone } from '@/lib/leads/phone'
 import { dayLabel, timeOf, whenShort } from '@/lib/leads/time'
@@ -192,10 +192,13 @@ export default function InboxView({
                   <span className={s.rowBody}>
                     <span className={s.rowTop}>
                       <span className={s.rowName}>{c.name || '—'}</span>
-                      {st === 'waiting' ? <span className={s.waitDot} aria-label="Waiting" /> : null}
-                      <span className={s.rowTime}>{whenShort(c.lastAt, config.today)}</span>
+                      {st === 'waiting' && c.unread === undefined ? <span className={s.waitDot} aria-label="Waiting" /> : null}
+                      <span className={s.rowTime} data-unread={c.unread ? '' : undefined}>{whenShort(c.lastAt, config.today)}</span>
                     </span>
-                    <span className={s.rowText}>{c.lastDir === 'out' ? '↩ ' : ''}{c.lastText}</span>
+                    <span className={s.rowLine}>
+                      <span className={s.rowText}>{c.lastDir === 'out' ? '↩ ' : ''}{c.lastText}</span>
+                      {c.unread ? <span className={s.unread} aria-label={`${c.unread} unread`}>{unreadLabel(c.unread)}</span> : null}
+                    </span>
                     <span className={s.chips}>
                       <span className={s.chip}>{brands.get(c.brandId)?.name ?? '—'}</span>
                       {c.flowState === 'running' ? <span className={s.chip} data-tone="quiet">Template</span> : null}

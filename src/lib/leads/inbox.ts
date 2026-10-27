@@ -83,3 +83,8 @@ export function phoneSteps(stage: PhoneStage): Array<{ label: 'Found' | 'Confirm
 export function isVisitDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
 }
+
+/** The list's unread badge (mig 20261027160000), as WhatsApp writes it: the number, 99+ past 99. */
+export function unreadLabel(n: number): string {
+  return n > 99 ? '99+' : String(n)
+}

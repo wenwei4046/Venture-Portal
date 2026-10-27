@@ -116,7 +116,11 @@
 .row[data-waiting] .rowName { font-weight: 600; }
 .waitDot { width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--lv-accent)); flex: none; }
 .rowTime { font-size: 11px; color: rgb(var(--lv-text-4)); white-space: nowrap; }
-.rowText { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; color: rgb(var(--lv-text-2)); }
+.rowTime[data-unread] { color: rgb(var(--lv-accent)); font-weight: 600; }
+.rowLine { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rowText { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; color: rgb(var(--lv-text-2)); }
+/* The unread count (mig 20261027160000), as WhatsApp draws it: a round accent badge at the row's right. */
+.unread { flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: rgb(var(--lv-accent)); color: rgb(var(--lv-white)); font-size: 11px; font-weight: 600; line-height: 20px; text-align: center; }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip { font-size: 11px; padding: 2px 6px; border-radius: 3px; background: rgb(var(--lv-muted)); color: rgb(var(--lv-ink)); white-space: nowrap; }
 .chip[data-tone='quiet'] { background: rgb(var(--lv-hover)); color: rgb(var(--lv-text-2)); }

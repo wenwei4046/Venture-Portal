@@ -88,6 +88,8 @@ export interface LeadContact {
   assignedTo?: string | null
   assignedName?: string
   assignedAt?: string | null
+  /** The Inbox list only (mig 20261027160000): the customer's messages since the last one that went out to them. */
+  unread?: number
   updatedAt?: string
 }
 

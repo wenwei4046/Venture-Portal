@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, readPanels, replyingNow, RIGHT_W } from './inbox'
+import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, readPanels, replyingNow, RIGHT_W, unreadLabel } from './inbox'
 
 describe('the Inbox columns the browser keeps', () => {
   it('starts at the handoff widths', () => {
@@ -46,5 +46,13 @@ describe('the right-hand panels', () => {
     expect(readPanels('oops')).toEqual({ card: true, log: false })
     expect(readPanels(JSON.stringify({ card: false, log: true }))).toEqual({ card: false, log: true })
     expect(readPanels(JSON.stringify({ card: 'no', log: 1 }))).toEqual({ card: true, log: false })
+  })
+})
+
+describe('unreadLabel', () => {
+  it('writes the number, 99+ past 99, as WhatsApp does', () => {
+    expect(unreadLabel(1)).toBe('1')
+    expect(unreadLabel(99)).toBe('99')
+    expect(unreadLabel(100)).toBe('99+')
   })
 })
