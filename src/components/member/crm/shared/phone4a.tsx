@@ -444,15 +444,29 @@ export function Phone4aCalMonth({ v }: { v: { cal4: { month: string; prev: () =>
 
 type CalItem = { name: string; room: string; open: unknown; t: string; ap: string; kick: string };
 type CalBtn = { label: string; kind?: "main" | "green"; on: () => void };
+/** The unit’s key handed over with a photo (2026-10-28): collected, returned — each its time, a tap opens its photo. */
+type CalKeys = { keyOut: { time: string; view: () => void } | null; keyBack: { time: string; view: () => void } | null; takeKey: () => void };
+function KeyRow({ k }: { k: CalKeys }) {
+  const chip = { ...BTN, height: "30px", padding: "0 11px", borderRadius: "15px", display: "inline-flex", alignItems: "center", gap: "6px", boxSizing: "border-box", fontSize: fs(12.5), fontWeight: 500, whiteSpace: "nowrap" } as CSSProperties;
+  const done = { ...chip, background: "var(--crm-tint-follow)", color: "var(--crm-brown)", border: "1px solid var(--crm-tint-follow)" } as CSSProperties;
+  return (
+    <div data-key-row="" style={{ display: "flex", flexWrap: "wrap", gap: "6px", padding: "2px 0 8px" }}>
+      {k.keyOut
+        ? <button type="button" onClick={k.keyOut.view} title="See the photo of the key collected" style={done}><Ic name="key-round" size={14} />Key collected · {k.keyOut.time}</button>
+        : <button type="button" onClick={k.takeKey} style={{ ...chip, background: "#fff", color: "var(--crm-rust)", border: "1px dashed var(--crm-rust)" }}><Ic name="key-round" size={14} />Collect key · photo<Ic name="camera" size={14} /></button>}
+      {k.keyBack && <button type="button" onClick={k.keyBack.view} title="See the photo of the key returned" style={done}><Ic name="check" size={14} />Key returned · {k.keyBack.time}</button>}
+    </div>
+  );
+}
 /** M10 (v3) · two-part cards on the pale cream, grouped by day — the name and room on top, the buttons below in equal
  * widths. Today's is green (its 4 px bar, TODAY tag and "in 2 h"): Change · No show · Show up (green). Did they come?:
  * Change · No show · Show up. Upcoming: Change · Send reminder (Send again once sent) — every button production's. */
 export function Phone4aCalLists({ v }: { v: {
   hasToday: boolean; todayCount: string; noUpcoming: boolean; upTitle: string; upCount: string;
-  todayList: (CalItem & { due: boolean; soon: string; change: unknown; came: () => void; noShow: () => void })[];
+  todayList: (CalItem & CalKeys & { due: boolean; soon: string; change: unknown; came: () => void; noShow: () => void })[];
   upList: (CalItem & { done: boolean; remind: () => void; rLabel: string; change: unknown })[]; cal4: { today: string } } }) {
   const Kick = ({ children }: { children: ReactNode }) => <span style={{ padding: "4px 4px 0", fontSize: fs(11), fontWeight: 500, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{children}</span>;
-  const Card = ({ a, today, btns }: { a: CalItem; today?: boolean; btns: CalBtn[] }) => {
+  const Card = ({ a, today, btns, keys }: { a: CalItem; today?: boolean; btns: CalBtn[]; keys?: CalKeys }) => {
     const bg = today ? "var(--crm-today-bg)" : "#fff", bd = today ? "var(--crm-today-line)" : "var(--crm-nav-line)", bar = `inset 4px 0 0 ${today ? "var(--crm-today)" : "transparent"}`;
     return (<div>
       <div style={{ display: "flex", gap: "12px", padding: "12px 14px 10px", borderRadius: "16px 16px 0 0", background: bg, border: `1px solid ${bd}`, borderBottom: 0, boxShadow: bar }}>
@@ -468,7 +482,8 @@ export function Phone4aCalLists({ v }: { v: {
           <span style={{ fontSize: fs(12), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.room}</span>
         </button>
       </div>
-      <div style={{ display: "flex", gap: "6px", marginTop: "-6px", padding: "6px 14px 12px", background: bg, border: `1px solid ${bd}`, borderTop: 0, borderRadius: "0 0 16px 16px", boxShadow: bar }}>
+      {keys && <div style={{ padding: "0 14px", background: bg, borderLeft: `1px solid ${bd}`, borderRight: `1px solid ${bd}`, boxShadow: bar }}><KeyRow k={keys} /></div>}
+      <div style={{ display: "flex", gap: "6px", marginTop: keys ? 0 : "-6px", padding: "6px 14px 12px", background: bg, border: `1px solid ${bd}`, borderTop: 0, borderRadius: "0 0 16px 16px", boxShadow: bar }}>
         {btns.map(x => {
           const fill = x.kind === "green" ? "var(--crm-today)" : x.kind === "main" ? "var(--crm-rust)" : "";
           return <button key={x.label} type="button" onClick={x.on} style={{ ...BTN, flex: "1 1 0", minWidth: 0, height: "36px", borderRadius: "18px", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", fontSize: fs(13), fontWeight: 500, whiteSpace: "nowrap",
@@ -484,8 +499,8 @@ export function Phone4aCalLists({ v }: { v: {
     { label: "Change", on: a.change as () => void }, { label: "No show", on: a.noShow }, { label: "Show up", kind: green ? "green" : "main", on: a.came }];
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: "10px", margin: "4px 0 -24px", padding: "14px 16px 28px", background: "var(--crm-hover)", flex: "1 0 auto" }}>
-      {v.hasToday && today.length > 0 && (<><Kick>Today · {v.cal4.today}</Kick>{today.map((a, i) => <Card key={"t" + i} a={{ ...a, room: a.soon ? `${a.room} · ${a.soon}` : a.room }} today btns={marks(a, true)} />)}</>)}
-      {v.hasToday && byDay(due).map(([d, xs]) => (<Fragment key={"d" + d}><Kick>Did they come? · {d}</Kick>{xs.map((a, i) => <Card key={"d" + d + i} a={a} btns={marks(a, false)} />)}</Fragment>))}
+      {v.hasToday && today.length > 0 && (<><Kick>Today · {v.cal4.today}</Kick>{today.map((a, i) => <Card key={"t" + i} a={{ ...a, room: a.soon ? `${a.room} · ${a.soon}` : a.room }} today btns={marks(a, true)} keys={a} />)}</>)}
+      {v.hasToday && byDay(due).map(([d, xs]) => (<Fragment key={"d" + d}><Kick>Did they come? · {d}</Kick>{xs.map((a, i) => <Card key={"d" + d + i} a={a} btns={marks(a, false)} keys={a} />)}</Fragment>))}
       {v.noUpcoming && (<><Kick>{v.upTitle}</Kick><span style={{ padding: "6px 4px", fontSize: fs(14), color: "var(--crm-muted)" }}>No upcoming appointments.</span></>)}
       {byDay(v.upList).map(([d, xs]) => (<Fragment key={"u" + d}><Kick>Upcoming · {d}</Kick>{xs.map((a, i) => (
         <Card key={"u" + d + i} a={a} btns={[{ label: "Change", on: a.change as () => void }, { label: a.done ? "Send again" : a.rLabel, kind: "main", on: a.remind }]} />))}</Fragment>))}

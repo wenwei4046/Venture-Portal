@@ -12,6 +12,8 @@ import { BORDER, gb, day0, DAY, dayLabel, firstName, ini, money, stop, timeLabel
 import type { OutcomeAsk } from "../ui";
 import { contactInfoVM, customerFormVM } from "./customer";
 import { oneAtATime } from "../../shared/once";
+import { askKeyPhoto } from "../../shared/key-photo";
+import { openViewer } from "../../shared/viewer";
 
 export const LOST_OPTIONS: [string, string, string][] = [
   ["Price", "too_expensive", "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"],
@@ -71,6 +73,21 @@ export function calendarVM(ctx: SalesCtx) {
   const earlier = todayV.filter(a => day0(a.at) < T).length, today = todayV.length - earlier;
   const vLabel = (a: Shown) => `${dayLabel(a.at)}, ${timeLabel(a.at)}`;
   const ask = (a: Shown, mode?: "noshow"): OutcomeAsk => ({ visitId: a.v.id, customerId: a.c.id, name: a.c.name, when: vLabel(a), room: a.room, ...(mode ? { mode } : {}) });
+  // The unit’s key handed over with a photo (the owner, 2026-10-28): collected before the visit, returned after it.
+  const KEY_ASK = {
+    out: { title: "Photo of the key collected", sub: "Take or choose a photo of the key you collected for this visit.", saved: "Key collected · photo saved" },
+    back: { title: "Photo of the key returned", sub: "Take or choose a photo of the key handed back, then mark the visit.", saved: "Key returned · photo saved" },
+  } as const;
+  const keyAsk = (a: Shown, kind: "out" | "back", then?: () => void) => askKeyPhoto({
+    title: KEY_ASK[kind].title, sub: KEY_ASK[kind].sub,
+    run: async file => { const ok = await oneAtATime(`key:${a.v.id}`, () => act.keyPhoto(a.v.id, kind, file)); if (ok) { act.toast(KEY_ASK[kind].saved); then?.(); } return !!ok; },
+  }, act.toast);
+  const keyView = (path: string) => () => { void act.keyPhotoUrl(path).then(url => { if (url) openViewer([{ kind: "image", url, name: "Key photo" }], 0); }); };
+  const keys = (a: Shown) => ({
+    keyOut: a.v.keyOut ? { time: timeLabel(new Date(a.v.keyOut.at)), view: keyView(a.v.keyOut.path) } : null,
+    keyBack: a.v.keyBack ? { time: timeLabel(new Date(a.v.keyBack.at)), view: keyView(a.v.keyBack.path) } : null,
+    takeKey: () => keyAsk(a, "out"),
+  });
   const change = (a: Shown) => () => {
     const ri = Math.max(0, data.rooms.filter(r => r.active).findIndex(r => r.id === a.v.showroomId));
     set(u => ({ ...u, tab: "inbox", chat: a.c.id, book: { customerId: a.c.id, room: ri, day: day0(a.at), slot: timeLabel(a.at), visitId: a.v.id, ...customPrefill(a.v) }, hist: [...u.hist, u.tab].slice(-20) }));
@@ -205,7 +222,10 @@ export function calendarVM(ctx: SalesCtx) {
       // v3 M10: a visit still to come today says how soon ("in 2 h", "in 40 min").
       soon: a.at > now ? soonLabel(+a.at - +now) : "",
       time: day0(a.at) === T ? timeLabel(a.at) : `${gb(a.at, { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(a.at)}`,
-      change: change(a), came: () => patch({ outcomeAsk: ask(a) }), noShow: () => patch({ outcomeAsk: ask(a, "noshow") }),
+      change: change(a), ...keys(a),
+      // Every Show up needs the key returned on a photo; a No show too once the key was collected (the owner, 2026-10-28).
+      came: () => (a.v.keyBack ? patch({ outcomeAsk: ask(a) }) : keyAsk(a, "back", () => patch({ outcomeAsk: ask(a) }))),
+      noShow: () => (a.v.keyOut && !a.v.keyBack ? keyAsk(a, "back", () => patch({ outcomeAsk: ask(a, "noshow") })) : patch({ outcomeAsk: ask(a, "noshow") })),
     })),
     outcomeOpen: !!oa, outcomeTitle, outcomeWhen, outcomeOpts, outcomeClose,
     ...lost, ...won,

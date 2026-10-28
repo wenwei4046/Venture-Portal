@@ -147,7 +147,12 @@ export interface CrmVisit {
   typeId?: string;
   label?: string;
   answers?: Record<string, string>;
+  /** The unit’s key handed over with a photo (the owner, 2026-10-28; mig 20261028130000): collected before the visit, returned
+   * after it — each a file in crm-media under the customer’s folder. A Show up needs the key returned; a No show too once collected. */
+  keyOut?: CrmKeyPhoto;
+  keyBack?: CrmKeyPhoto;
 }
+export interface CrmKeyPhoto { path: string; at: string }
 
 /**
  * A closure from a to b (YYYY-MM-DD). With hours, only those hours each day; without, the whole day. Hours come two
@@ -436,6 +441,7 @@ export interface CrmVisitRow {
   outcome?: CrmVisit["outcome"]; reminded_at?: string | null;
   kind?: string | null; meeting_link?: string | null; place?: string | null; remarks?: string | null;
   type_id?: string | null; answers?: Record<string, string> | null;
+  key_out_path?: string | null; key_out_at?: string | null; key_back_path?: string | null; key_back_at?: string | null;
 }
 export interface CrmRoomRow {
   id: string; name: string; active: boolean; sort_order: number;
@@ -574,6 +580,8 @@ export const visitFromRow = (a: CrmVisitRow): CrmVisit => {
     outcome: a.outcome ?? null, remindedAt: a.reminded_at ?? null,
     ...(custom ? { kind: custom, typeId: a.type_id ?? custom, label: a.showroom, ...(a.meeting_link ? { link: a.meeting_link } : {}), ...(a.place ? { place: a.place } : {}), ...(a.answers ? { answers: a.answers } : {}) } : {}),
     ...(a.remarks ? { remarks: a.remarks } : {}),
+    ...(a.key_out_path ? { keyOut: { path: a.key_out_path, at: a.key_out_at ?? "" } } : {}),
+    ...(a.key_back_path ? { keyBack: { path: a.key_back_path, at: a.key_back_at ?? "" } } : {}),
   };
 };
 /** The room an online / elsewhere visit is named by. */
