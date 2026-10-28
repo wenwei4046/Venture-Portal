@@ -67,6 +67,8 @@ export const PERMISSIONS = [
   'it_requests',
   // Marketing's own view (2026-10-23, mig 20261023214000): Marketing · View opens it.
   'marketing',
+  // Marketing's own pool in that view (2026-10-28, mig 20261028120000): Marketing pool · View opens it.
+  'marketing_pool',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

@@ -46,6 +46,8 @@ export const FUNCTIONS: Record<string, { actions: Action[]; scopes: Scope[] }> =
   it_requests: { actions: ['view', 'edit'], scopes: ['all'] },
   // Marketing's own view (mig 20261023214000).
   marketing: { actions: ['view', 'create', 'edit', 'approve', 'manage'], scopes: ['all'] },
+  // Marketing's own pool (mig 20261028120000).
+  marketing_pool: { actions: ['view', 'export'], scopes: ['all'] },
 }
 
 // `permission_cell_keys` (as permission-matrix.test.ts holds it; the Product List's gate went 2026-10-14, mig 20261014100000).
@@ -70,6 +72,7 @@ export const CELL_KEYS: CellKey[] = [
   K('leads', 'view', 'leads', 'all'),
   K('it_requests', 'view', 'it_requests', 'all'),
   K('marketing', 'view', 'marketing', 'all'),
+  K('marketing_pool', 'view', 'marketing_pool', 'all'),
 ]
 
 // The templates exactly as production holds them on 2026-10-11 (permission_template_grants) —

@@ -1,6 +1,6 @@
 // Marketing's sidebar (the handoff's `Marketing Shell.dc.html`): My Space, Calendar, Subsidiaries (each one under it),
 // Projects, Library, then MANAGER TOOLS — Tracking Dashboard, Workflow Builder, Product Builder, Minutes Builder,
-// Replace Person, Billing — and Settings at the foot. Each row is a page of Marketing's view and shows where its page
+// Replace Person, Billing, Pool (Marketing's own P&L and Cash Flow, 2026-10-28) — and Settings at the foot. Each row is a page of Marketing's view and shows where its page
 // opens for the viewer (its tab, lib/page-tabs.ts). Two rows the handoff does not draw sit by Settings: one's own claims
 // and the meeting rooms, which every member of staff keeps (Staff · Basic's) — Marketing's people would lose them otherwise.
 //
@@ -10,7 +10,7 @@ import { opensPath } from '@/lib/page-tabs'
 
 export type MktNavKey =
   | 'myspace' | 'calendar' | 'subs' | 'projects' | 'library'
-  | 'tracking' | 'workflow' | 'product' | 'minutes' | 'replace' | 'billing'
+  | 'tracking' | 'workflow' | 'product' | 'minutes' | 'replace' | 'billing' | 'pool'
   | 'claims' | 'rooms' | 'settings'
 
 /** The tile behind a row's emoji (the handoff's four tones). */
@@ -47,6 +47,9 @@ export const MKT_NAV: readonly MktNavRow[] = [
   { key: 'replace', emoji: '🔁', label: 'Replace Person', tone: 'mist', href: '/marketing/replace', manager: true },
   // Not in the handoff (②b-2b — the user's answers 43–48): the month's billing the manager confirms for Finance.
   { key: 'billing', emoji: '💰', label: 'Billing', tone: 'peach', href: '/marketing/billing', manager: true },
+  // Not in the handoff (2026-10-28 — the user: "Marketing view 加一行，打开就是 Finance 那页 Marketing 的 P&L / Cash
+  // Flow"): Marketing's own pool, a box of its own (Marketing view › Pool).
+  { key: 'pool', emoji: '🏦', label: 'Pool', tone: 'sand', href: '/marketing/pool', manager: true },
   { key: 'claims', emoji: '🧾', label: 'My claims', tone: 'cream', href: '/claims', foot: true },
   { key: 'rooms', emoji: '🚪', label: 'Meeting Rooms', tone: 'mist', href: '/admin/rooms', foot: true },
 ]
@@ -59,6 +62,19 @@ export function mktNavRows(tabs: readonly string[] | undefined): MktNavRow[] {
 }
 
 const under = (path: string, prefix: string) => path === prefix || path.startsWith(prefix + '/')
+
+/**
+ * Finance's own page kept in Marketing's view (2026-10-28 — the Pool, Finance's Marketing P&L and Cash Flow, the user:
+ * "我要exactly 给他们看这个part"): drawn on Finance's sheet, exactly as Dept Pool draws it, not on Marketing's card.
+ */
+export function mktFinancePage(pathname: string): boolean {
+  return under(pathname.split('?')[0], '/marketing/pool')
+}
+
+/** A page drawn on Marketing's own card, as the handoff draws them; every other page on the portal's sheet. */
+export function mktOwnPage(pathname: string): boolean {
+  return under(pathname.split('?')[0], '/marketing') && !mktFinancePage(pathname)
+}
 
 /** Which row a page lights: the most specific one whose page it is under; a subsidiary's projects light its own row. */
 export function mktNavActive(pathname: string, search: URLSearchParams | null): MktNavKey | `sub:${string}` | null {

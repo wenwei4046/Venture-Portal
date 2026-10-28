@@ -8,7 +8,7 @@ import { actionsOnPage, opensPath } from '@/lib/page-tabs'
 import { canDo } from '@/lib/permission-actions'
 import { MKT_LOOK_COOKIE, MKT_NAV_COOKIE } from '@/lib/marketing-view'
 import { densityOf, lookToCookie, LOOK_SIZES, type Look } from '@/lib/marketing/look'
-import { mktCrumb, mktNavActive, mktNavRows, type MktNavKey } from '@/lib/marketing/nav'
+import { mktCrumb, mktFinancePage, mktNavActive, mktNavRows, mktOwnPage, type MktNavKey } from '@/lib/marketing/nav'
 import { groupTone, toneBg } from '@/lib/marketing/groups'
 import { initialOf } from '@/lib/marketing/shell'
 import { ToastHost } from '@/components/hrv/toast'
@@ -69,7 +69,7 @@ export default function MktShell({
     return canDo(acting, 'marketing', 'create')
   }, [user, navUser.tabs])
   const active = pending ?? mktNavActive(pathname, search)
-  const own = pathname === '/marketing' || pathname.startsWith('/marketing/')
+  const own = mktOwnPage(pathname)
   const personal = user.personalLogin === true && !user.viewingAs
 
   // The crumb: the row's own, or a subsidiary's when its page or its projects are open.
@@ -142,7 +142,7 @@ export default function MktShell({
           {own ? (
             <main className={`${s.content} route-surface page-enter print:p-0`} data-mkt-own="">{children}</main>
           ) : (
-            <main className="sheet-theme sheet hrv-sheet route-surface page-enter print:p-0">{children}</main>
+            <main className={`sheet-theme sheet hrv-sheet${mktFinancePage(pathname) ? ' fin-sheet' : ''} route-surface page-enter print:p-0`}>{children}</main>
           )}
           <ToastHost />
         </div>

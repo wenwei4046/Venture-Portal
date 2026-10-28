@@ -33,6 +33,8 @@ export type FunctionKey =
   | 'it_requests'
   // Marketing's own view (mig 20261023214000).
   | 'marketing'
+  // Marketing's own pool in that view (mig 20261028120000).
+  | 'marketing_pool'
 
 /** Anybody gates can be asked about: their keys, and their actions when they were loaded. */
 export interface ActionHolder extends PermissionHolder {
@@ -124,6 +126,8 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   it_requests: ['it_requests.view', 'it_requests.edit'],
   // Marketing's own view (20261023214000): its pages, starting projects, working stages, approving, the manager tools.
   marketing: ['marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve', 'marketing.manage'],
+  // Marketing's own pool (20261028120000): Finance's Marketing P&L and Cash Flow, and their Excel and PDF.
+  marketing_pool: ['marketing_pool.view', 'marketing_pool.export'],
 }
 
 /**
@@ -207,6 +211,9 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'marketing.edit': 'all',
   'marketing.approve': 'all',
   'marketing.manage': 'all',
+  // Marketing's own pool (2026-10-28): its page and the lines it opens (View), its Excel and PDF (Export).
+  'marketing_pool.export': 'all',
+  'marketing_pool.view': 'all',
   // Sales Groups › Waiting list's "+" (2026-10-11): Member services · Edit.
   'member.manage': 'all',
   'opex.view': 'all',
