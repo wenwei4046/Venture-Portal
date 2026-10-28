@@ -99,14 +99,40 @@ export function withMetaUnread(contacts: LeadContact[], counts: Map<string, numb
 }
 
 /**
- * Messenger's own note "<name> replied to an ad." — the Page sends it as a message when a customer answers an ad, and
- * Messenger draws it as a grey line in the middle (2026-10-28 — the user, Lead View beside Business Suite: "为什么不一样？").
- * The note's words without the full stop, else null.
+ * Messenger's own notes — lines Meta writes into the chat as the Page's messages, which Messenger draws as grey lines in
+ * the middle, not bubbles (2026-10-28 — the user, Lead View beside Business Suite: "为什么不一样？", then "聊天室能不能就
+ * 做到跟msg 一样，改很多次了"). Every kind the Pages' chats held that day: a customer answering an ad, a post or the
+ * automated welcome, an auto-label, a conversation assigned. Meta marks only the last (tag admin_text), so they are
+ * known by their words. The note as drawn (its first sentence, no full stop), else null.
  */
-export function adNoteOf(m: Pick<LeadMessage, 'direction' | 'body'>): string | null {
+const NOTES: RegExp[] = [
+  /^(.{1,120} replied to an ad).?$/,
+  /^(.{1,120} replied to a post).?$/,
+  /^(.{1,120} replied to your automated welcome message).(?: To change or remove this greeting, visit Messaging settings.)?$/,
+  /^(Auto-label (?:added|removed): .{1,160}?).?$/,
+  /^(.{1,80} (?:assigned|unassigned|reassigned) this conversation(?: to .{1,80}?)?).?$/,
+  /^(.{1,80} (?:marked this conversation as (?:done|unread|read|spam)|moved this conversation to .{1,40}?)).?$/,
+]
+export function noteOf(m: Pick<LeadMessage, 'direction' | 'body'>): string | null {
   if (m.direction !== 'out') return null
-  const hit = /^(.{1,120}) replied to an ad\.?$/.exec(m.body.trim())
-  return hit ? `${hit[1]} replied to an ad` : null
+  const body = m.body.trim()
+  for (const re of NOTES) {
+    const hit = re.exec(body)
+    if (hit) return hit[1]
+  }
+  return null
+}
+
+/**
+ * Where each message stands in its run — Messenger names the sender once over a run of one sender's messages and
+ * writes the time once under it. A run: the same side and sender, each within two minutes of the one before, on the
+ * same day, no note between.
+ */
+export function runsOf<T extends Pick<LeadMessage, 'direction' | 'sender' | 'byName' | 'at' | 'body'>>(messages: T[], day: (iso: string) => string): Array<{ first: boolean; last: boolean }> {
+  const key = (m: T) => (noteOf(m) ? null : `${m.direction}|${m.sender}|${m.byName ?? ''}`)
+  const joins = (a: T | undefined, b: T | undefined) => !!a && !!b && key(a) !== null && key(a) === key(b)
+    && Date.parse(b.at) - Date.parse(a.at) <= 120_000 && day(a.at) === day(b.at)
+  return messages.map((m, i) => ({ first: !joins(messages[i - 1], m), last: !joins(m, messages[i + 1]) }))
 }
 
 /**
@@ -117,7 +143,7 @@ export function inMessengerOrder<T extends Pick<LeadMessage, 'direction' | 'body
   const sec = (m: T) => Math.floor(Date.parse(m.at) / 1000)
   return messages
     .map((m, i) => ({ m, i }))
-    .sort((a, b) => sec(a.m) - sec(b.m) || Number(!adNoteOf(a.m)) - Number(!adNoteOf(b.m)) || a.i - b.i)
+    .sort((a, b) => sec(a.m) - sec(b.m) || Number(!noteOf(a.m)) - Number(!noteOf(b.m)) || a.i - b.i)
     .map(x => x.m)
 }
 

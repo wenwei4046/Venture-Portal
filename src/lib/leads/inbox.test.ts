@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, brandCounts, isMediaPlaceholder, mediaKind, receiptOf, readPanels, replyingNow, RIGHT_W, unreadLabel, adNoteOf, inMessengerOrder } from './inbox'
+import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, brandCounts, isMediaPlaceholder, mediaKind, receiptOf, readPanels, replyingNow, RIGHT_W, unreadLabel, noteOf, runsOf, inMessengerOrder } from './inbox'
 import { dayLabel } from './time'
 
 describe('the Inbox columns the browser keeps', () => {
@@ -99,10 +99,16 @@ describe('brandCounts', () => {
 
 describe('a chat as Messenger shows it (2026-10-28)', () => {
   it('reads the Page’s "replied to an ad." as Messenger’s note, nothing else', () => {
-    expect(adNoteOf({ direction: 'out', body: 'Low Tze Yen replied to an ad.' })).toBe('Low Tze Yen replied to an ad')
-    expect(adNoteOf({ direction: 'in', body: 'Low Tze Yen replied to an ad.' })).toBeNull()
-    expect(adNoteOf({ direction: 'out', body: 'Hi Low Tze Yen! Please let us know how we can help you.' })).toBeNull()
-    expect(adNoteOf({ direction: 'out', body: 'He replied to an adviser' })).toBeNull()
+    expect(noteOf({ direction: 'out', body: 'Low Tze Yen replied to an ad.' })).toBe('Low Tze Yen replied to an ad')
+    expect(noteOf({ direction: 'in', body: 'Low Tze Yen replied to an ad.' })).toBeNull()
+    expect(noteOf({ direction: 'out', body: 'Hi Low Tze Yen! Please let us know how we can help you.' })).toBeNull()
+    expect(noteOf({ direction: 'out', body: 'He replied to an adviser' })).toBeNull()
+    // Every kind the Pages' chats held (2026-10-28).
+    expect(noteOf({ direction: 'out', body: 'Janice Siow replied to a post.' })).toBe('Janice Siow replied to a post')
+    expect(noteOf({ direction: 'out', body: '桂红陈 replied to your automated welcome message. To change or remove this greeting, visit Messaging settings.' })).toBe('桂红陈 replied to your automated welcome message')
+    expect(noteOf({ direction: 'out', body: 'Auto-label added: Lead stage set to intake.' })).toBe('Auto-label added: Lead stage set to intake')
+    expect(noteOf({ direction: 'out', body: '陸凱儀 assigned this conversation to 陸凱儀.' })).toBe('陸凱儀 assigned this conversation to 陸凱儀')
+    expect(noteOf({ direction: 'out', body: 'Mind leaving your phone number here? I will have our Home Buddy reach out to you via WhatsApp' })).toBeNull()
   })
 
   it('puts the ad note first within its second, as Messenger does, and keeps the rest in order', () => {
@@ -130,5 +136,26 @@ describe('a file’s name, shown and forwarded (2026-10-28)', () => {
     expect(mediaFileName({ body: '[Photo]', mediaPath: 'chat/c/0b0c3f0e-1111-2222-3333-444455556666-sofa.jpg' })).toBe('sofa.jpg')
     expect(mediaFileName({ body: '[Photo]', mediaPath: 'chat/c/meta-12-file.jpg' })).toBe('file.jpg')
     expect(forwardName({ body: '[Photo]', mediaPath: null, mediaMime: 'image/jpeg' })).toBe('photo.jpg')
+  })
+})
+
+describe('runs, as Messenger groups a sender’s messages (2026-10-28)', () => {
+  it('names the sender once and writes the time once per run', () => {
+    const day = (iso: string) => iso.slice(0, 10)
+    const m = (direction: 'in' | 'out', at: string, body = 'x', sender = direction === 'in' ? 'customer' : 'page') => ({ direction, sender, byName: 'Business Suite', at, body }) as never
+    const runs = runsOf([
+      m('out', '2026-10-28T08:55:00Z', 'Gui replied to your automated welcome message.'),
+      m('out', '2026-10-28T08:55:01Z', 'Welcome to 2990’s'),
+      m('out', '2026-10-28T08:55:30Z', 'Sofa & mattress all RM2,990'),
+      m('in', '2026-10-28T08:56:00Z', 'What time do you open?'),
+      m('out', '2026-10-28T09:30:00Z', 'We open at 11'),
+    ], day)
+    expect(runs).toEqual([
+      { first: true, last: true },
+      { first: true, last: false },
+      { first: false, last: true },
+      { first: true, last: true },
+      { first: true, last: true },
+    ])
   })
 })
