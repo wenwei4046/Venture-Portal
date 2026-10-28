@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, brandCounts, isMediaPlaceholder, mediaKind, receiptOf, readPanels, replyingNow, RIGHT_W, unreadLabel } from './inbox'
+import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, brandCounts, isMediaPlaceholder, mediaKind, receiptOf, readPanels, replyingNow, RIGHT_W, unreadLabel, adNoteOf, inMessengerOrder } from './inbox'
+import { dayLabel } from './time'
 
 describe('the Inbox columns the browser keeps', () => {
   it('starts at the handoff widths', () => {
@@ -93,5 +94,31 @@ describe('read ticks, as WhatsApp', () => {
 describe('brandCounts', () => {
   it('counts each brand and all', () => {
     expect(brandCounts([{ brandId: 'a' }, { brandId: 'b' }, { brandId: 'a' }])).toEqual({ all: 3, a: 2, b: 1 })
+  })
+})
+
+describe('a chat as Messenger shows it (2026-10-28)', () => {
+  it('reads the Page’s "replied to an ad." as Messenger’s note, nothing else', () => {
+    expect(adNoteOf({ direction: 'out', body: 'Low Tze Yen replied to an ad.' })).toBe('Low Tze Yen replied to an ad')
+    expect(adNoteOf({ direction: 'in', body: 'Low Tze Yen replied to an ad.' })).toBeNull()
+    expect(adNoteOf({ direction: 'out', body: 'Hi Low Tze Yen! Please let us know how we can help you.' })).toBeNull()
+    expect(adNoteOf({ direction: 'out', body: 'He replied to an adviser' })).toBeNull()
+  })
+
+  it('puts the ad note first within its second, as Messenger does, and keeps the rest in order', () => {
+    const at = '2026-10-27T18:22:26Z'
+    const out = inMessengerOrder([
+      { id: 1, direction: 'out', body: 'Hi! Please let us know how we can help you.', at },
+      { id: 2, direction: 'out', body: 'Low Tze Yen replied to an ad.', at: '2026-10-27T18:22:26.400Z' },
+      { id: 3, direction: 'in', body: '在哪里？', at: '2026-10-27T18:22:27.395Z' },
+      { id: 0, direction: 'out', body: 'earlier', at: '2025-12-10T02:00:11Z' },
+    ])
+    expect(out.map(m => m.id)).toEqual([0, 2, 1, 3])
+  })
+
+  it('writes the year on a day of another year', () => {
+    const now = new Date('2026-10-28T04:00:00Z')
+    expect(dayLabel('2026-10-27T18:22:26Z', now)).toBe('28 Oct')
+    expect(dayLabel('2025-12-10T02:00:11Z', now)).toBe('10 Dec 2025')
   })
 })

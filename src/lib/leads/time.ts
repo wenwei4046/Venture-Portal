@@ -26,7 +26,9 @@ export function timeOf(iso: string): string {
   return formatIntlDate(new Date(iso), { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false }, 'en-GB')
 }
 
-/** 16 Oct — a day's rule in the chat (Inbox v2, 2026-10-22). */
-export function dayLabel(iso: string): string {
-  return formatIntlDate(new Date(iso), { timeZone: TZ, day: 'numeric', month: 'short' }, 'en-GB')
+/** 16 Oct — a day's rule in the chat (Inbox v2, 2026-10-22); 10 Dec 2025 for a day of another year (2026-10-28 — a
+ * conversation's history from Meta can reach back years). */
+export function dayLabel(iso: string, now: Date = new Date()): string {
+  const year = officeDayOf(iso).slice(0, 4) !== officeDayOf(now.toISOString()).slice(0, 4)
+  return formatIntlDate(new Date(iso), { timeZone: TZ, day: 'numeric', month: 'short', ...(year ? { year: 'numeric' } : {}) }, 'en-GB')
 }

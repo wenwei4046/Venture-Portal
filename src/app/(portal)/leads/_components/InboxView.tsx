@@ -9,7 +9,7 @@ import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
 import { outcomeOf } from '@/lib/leads/ai'
 import { adLabel, adsManagerLink } from '@/lib/leads/ads'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
-import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, mediaKind, isMediaPlaceholder, brandCounts, receiptOf, type Receipt, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
+import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, mediaKind, isMediaPlaceholder, brandCounts, receiptOf, adNoteOf, inMessengerOrder, type Receipt, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
 import { EMOJI_GROUPS, insertAt, withRecent } from '@/lib/leads/emoji'
 import { whenFull } from '@/lib/leads/time'
 import { formatPhone } from '@/lib/leads/phone'
@@ -529,9 +529,19 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
 
       <div className={s.messages}>
         {loading ? <div className={s.empty}>Loading…</div> : null}
-        {(thread?.messages ?? []).map((m, i, all) => {
+        {inMessengerOrder(thread?.messages ?? []).map((m, i, all) => {
           const day = dayLabel(m.at)
           const newDay = i === 0 || dayLabel(all[i - 1].at) !== day
+          // "<name> replied to an ad." is Messenger's grey note in the middle, not the Page's bubble (adNoteOf).
+          const note = adNoteOf(m)
+          if (note) {
+            return (
+              <div key={m.id} className={s.msg} style={{ alignItems: 'stretch' }}>
+                {newDay ? <div className={s.day}>{day}</div> : null}
+                <div className={s.note}>{note} · {timeOf(m.at)}</div>
+              </div>
+            )
+          }
           return (
             <div key={m.id} className={s.msg} data-out={m.direction === 'out' || undefined}>
               {newDay ? <div className={s.day} style={{ alignSelf: 'stretch' }}>{day}</div> : null}
