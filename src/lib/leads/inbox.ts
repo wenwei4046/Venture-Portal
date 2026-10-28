@@ -98,6 +98,29 @@ export function withMetaUnread(contacts: LeadContact[], counts: Map<string, numb
   })
 }
 
+/**
+ * Messenger's own note "<name> replied to an ad." — the Page sends it as a message when a customer answers an ad, and
+ * Messenger draws it as a grey line in the middle (2026-10-28 — the user, Lead View beside Business Suite: "为什么不一样？").
+ * The note's words without the full stop, else null.
+ */
+export function adNoteOf(m: Pick<LeadMessage, 'direction' | 'body'>): string | null {
+  if (m.direction !== 'out') return null
+  const hit = /^(.{1,120}) replied to an ad\.?$/.exec(m.body.trim())
+  return hit ? `${hit[1]} replied to an ad` : null
+}
+
+/**
+ * A chat in Messenger's order: by time, and within one second (Meta's times are to the second) the ad note before
+ * what the Page sent with it, as Messenger shows it. Otherwise the order handed in stays.
+ */
+export function inMessengerOrder<T extends Pick<LeadMessage, 'direction' | 'body' | 'at'>>(messages: T[]): T[] {
+  const sec = (m: T) => Math.floor(Date.parse(m.at) / 1000)
+  return messages
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => sec(a.m) - sec(b.m) || Number(!adNoteOf(a.m)) - Number(!adNoteOf(b.m)) || a.i - b.i)
+    .map(x => x.m)
+}
+
 /** The list's unread badge (mig 20261027160000), as WhatsApp writes it: the number, 99+ past 99. */
 export function unreadLabel(n: number): string {
   return n > 99 ? '99+' : String(n)
