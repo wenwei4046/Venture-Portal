@@ -11,6 +11,7 @@ import { sendLeadOutbox } from '@/lib/leads/messenger-outbox'
 import { adAccountName } from '@/lib/leads/ad-account'
 import { parseInstagramDelivery, takeInstagram } from '@/lib/leads/instagram'
 import { leadPageEvents } from '@/lib/leads/page-events'
+import { fillHistory } from '@/lib/leads/meta-sync'
 
 /**
  * /api/messenger/v1/webhook — the Callback URL for our Facebook Pages'
@@ -127,6 +128,8 @@ export async function POST(request: Request) {
     } else {
       const contacts = ((lead.data as { contacts?: string[] } | null)?.contacts ?? []).filter(Boolean)
       if (contacts.length) after(() => sendLeadOutbox(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => undefined))
+      // A conversation Lead View has never filled in gets its earlier messages from Meta (lib/leads/meta-sync.ts).
+      if (contacts.length) after(() => fillHistory(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => undefined))
     }
   }
   // The Page's own replies, after its customers' messages (a reply joins a conversation Lead View already has).

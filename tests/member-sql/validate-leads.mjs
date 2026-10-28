@@ -1208,6 +1208,42 @@ await db.exec(`
   for (const fn of ['lead_reply_to', 'lead_react']) {
     check((await q(`select prosrc from pg_proc where proname = $1`, [fn]))[0].prosrc.includes(`PERFORM public.tab_write_guard(ARRAY['/leads'], ARRAY['leads.create']);`), true, `${fn} asks the Inbox`)
   }
+
+  // ── The same as Messenger: a conversation's history, pageId / psid on the card (mig 20261028100000) ──
+  check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_flow_on_message', 'lead_contact_json') order by 1`)).map(r => [r.proname, r.m]),
+    [['lead_contact_json', '599eeb023b6dcde9792d13bb958099e5'], ['lead_flow_on_message', '03b5955f7bd61d661e022bbec6656110']], 'the two bodies here are production’s')
+  await db.exec(await f('20261028100000_lead_like_messenger.sql'))
+  await db.exec(await f('20261028100000_lead_like_messenger.sql'))
+  const nowMs = Date.now()
+  const ago = min => new Date(nowMs - min * 60000).toISOString()
+  const hin = (await q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: 'hist.3', pageId: P, psid: '7701001', name: 'History Test', kind: 'text', body: 'hello again', sentAt: ago(1), ad: null },
+  ])]))[0].r
+  const hc = hin.contacts[0]
+  const wanted = (await q(`select public.lead_history_wanted($1::uuid[]) w`, [[hc]]))[0].w
+  check(wanted.map(w => [w.id, w.pageId, w.psid]), [[hc, P, '7701001']], 'a new Messenger conversation wants its history')
+  check((await q(`select public.lead_history_wanted($1::uuid[]) w`, [[ray]]))[0].w, [], 'one there before the migration does not')
+  const flowsBefore = (await q(`select count(*)::int n from public.lead_messages where sender = 'flow'`))[0].n
+  const added = (await q(`select public.lead_ingest_history($1, $2::jsonb) n`, [hc, JSON.stringify([
+    { mid: 'hist.1', in: true, at: ago(600), body: 'my number 012-338 4721', mediaUrl: null },
+    { mid: 'hist.2', in: false, at: ago(590), body: '[Photo]', mediaUrl: 'https://scontent.xx.fbcdn.net/v/a.jpg' },
+    { mid: 'hist.3', in: true, at: ago(1), body: 'hello again', mediaUrl: null },
+    { mid: 'hist.f', in: true, at: new Date(nowMs + 3600000).toISOString(), body: 'from the future', mediaUrl: null },
+    { mid: '', in: true, at: ago(5), body: 'no id', mediaUrl: null },
+  ])]))[0].n
+  check(added, 2, 'only what Lead View lacks, with an id, not in the future')
+  const ht = (await q(`select public.lead_thread($1) t`, [hc]))[0].t
+  check(ht.messages.map(m => m.mid), ['hist.1', 'hist.2', 'hist.3'], 'in the order they were written')
+  check((await q(`select sender, by_name, media_url from public.lead_messages where external_id = 'hist.2'`))[0], { sender: 'page', by_name: 'Business Suite', media_url: 'https://scontent.xx.fbcdn.net/v/a.jpg' }, 'the Page’s message is the Page’s')
+  const hrow = (await q(`select last_dir, last_text, phone, phone_state, history_at is not null h from public.lead_contacts where id = $1`, [hc]))[0]
+  check(hrow, { last_dir: 'in', last_text: 'hello again', phone: '0123384721', phone_state: 'detected', h: true }, 'the last message by time, the phone found, marked filled')
+  check((await q(`select count(*)::int n from public.lead_messages where sender = 'flow'`))[0].n, flowsBefore, 'history starts no template')
+  check((await q(`select public.lead_history_wanted($1::uuid[]) w`, [[hc]]))[0].w, [], 'filled once, never asked again')
+  check((await q(`select public.lead_ingest_history($1, $2::jsonb) n`, [hc, JSON.stringify([{ mid: 'hist.1', in: true, at: ago(600), body: 'x' }])]))[0].n, 0, 'a message kept is not kept twice')
+  for (const fn of ['lead_history_wanted(uuid[])', 'lead_ingest_history(uuid, jsonb)']) {
+    check((await q(`select has_function_privilege('authenticated', 'public.${fn}', 'execute') a`))[0].a, false, `${fn} is the service role’s alone`)
+  }
+  check([ht.contact.pageId, ht.contact.psid], [P, '7701001'], 'the card carries the Page and the customer’s Messenger id')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

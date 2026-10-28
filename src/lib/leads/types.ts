@@ -93,6 +93,9 @@ export interface LeadContact {
   /** Meta's receipts (mig 20261027190000): every message out at or before them reached / was read by the customer. */
   deliveredAt?: string | null
   readAt?: string | null
+  /** The conversation's Facebook Page and the customer's id there (mig 20261028100000): Messenger's unread count, "seen". */
+  pageId?: string | null
+  psid?: string | null
   /** Customer Service's labels on this customer (mig 20261027190000). */
   labels?: LeadLabelChip[]
   updatedAt?: string

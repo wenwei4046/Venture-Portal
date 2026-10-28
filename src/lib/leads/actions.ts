@@ -10,6 +10,7 @@ import { agentCards, agentReads, answersPrompt, readable, settingsOf, settingsPr
 import { fetchMetaAds } from './ads-server'
 import { quickProblem, type QuickReply } from './quick'
 import { deliver, deliverFile, sendReaction } from './messenger'
+import { markSeen } from './meta-sync'
 import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
 import type { BusinessHours, InfoCard, InfoCat, LeadInfo } from './info'
@@ -53,8 +54,15 @@ export async function readThread(contactId: string): Promise<LeadOutcome<LeadThr
   if (error) return { ok: false, reason: refusal(error, 'The conversation could not be read.') }
   // Read = seen, for this person: the list's unread count clears (mig 20261027170000). A refusal (View as a person —
   // read-only — or the migration not applied) changes nothing on the screen.
-  if (data) await supabase.rpc('lead_mark_seen', { p_contact: contactId })
-  return { ok: true, data: data as LeadThread | null }
+  const thread = data as LeadThread | null
+  if (thread) {
+    const seen = await supabase.rpc('lead_mark_seen', { p_contact: contactId })
+    // …and in Messenger, as opening it in Business Suite (mig 20261028100000 — the user: "我需要跟msg 一摸一样"): the
+    // customer sees "Seen". Only a real Messenger conversation, only when the read was this person's (not View as).
+    const c = thread.contact
+    if (!seen.error && !c.isTest && c.channel === 'messenger') await markSeen({ pageId: c.pageId ?? null, psid: c.psid ?? null }, process.env.META_SYSTEM_USER_TOKEN?.trim())
+  }
+  return { ok: true, data: thread }
 }
 
 /**

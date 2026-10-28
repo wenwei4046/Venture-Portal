@@ -2,6 +2,8 @@ import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import { loadInbox, loadInfo, loadLabels, loadLeadConfig, loadPersonas, loadQuickReplies, loadThread } from '@/lib/leads/server'
+import { withMetaUnread } from '@/lib/leads/inbox'
+import { metaUnread } from '@/lib/leads/meta-sync'
 import InboxView from './_components/InboxView'
 
 export const dynamic = 'force-dynamic'
@@ -20,12 +22,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
       </HvPage>
     )
   }
+  // Messenger's own unread counts, as Business Suite shows them (mig 20261028100000); Meta not answering keeps Lead View's.
+  const pages = inbox.data.filter(x => x.channel === 'messenger' && !x.isTest && x.pageId).map(x => x.pageId as string)
   const pick = c && inbox.data.some(x => x.id === c) ? c : inbox.data[0]?.id
-  const thread = pick ? await loadThread(pick) : null
+  const [counts, thread] = await Promise.all([metaUnread(pages, process.env.META_SYSTEM_USER_TOKEN?.trim()), pick ? loadThread(pick) : null])
+  const contacts = withMetaUnread(inbox.data, counts)
   return (
     <InboxView
       config={config.data}
-      contacts={inbox.data}
+      contacts={contacts}
       initialThread={thread?.ok ? thread.data : null}
       initialQuery={q?.slice(0, 80) ?? ''}
       canReply={canDo(user, 'leads', 'create')}
