@@ -60,10 +60,12 @@ export type InboxState = 'waiting' | 'answered' | 'handed'
  * Where a conversation stands on the Inbox: handed over, the customer waiting for us, or answered. The customer wrote
  * last but this person has opened the chat since (`unread` 0, mig 20261027170000) — it is seen, not waiting
  * (2026-10-28 — the user: "只要客服打开之后，其实就不会在waiting里了，因为已经被打开，就属于看过"). Without an unread
- * count (Leads, or before the migration) the customer writing last is waiting, as before.
+ * count (Leads, or before the migration) the customer writing last is waiting, as before. With a count, the count
+ * decides whoever wrote last — on a real Messenger conversation it is Messenger's own (`withMetaUnread`, mig
+ * 20261028100000 — the user: "我需要跟msg 一摸一样"): an away auto-reply does not make a chat read in Business Suite.
  */
 export function inboxState(contact: Pick<LeadContact, 'handedAt' | 'lastDir' | 'unread'>): InboxState {
   if (contact.handedAt) return 'handed'
-  if (contact.lastDir !== 'in') return 'answered'
-  return contact.unread === 0 ? 'answered' : 'waiting'
+  if (typeof contact.unread === 'number') return contact.unread > 0 ? 'waiting' : 'answered'
+  return contact.lastDir === 'in' ? 'waiting' : 'answered'
 }

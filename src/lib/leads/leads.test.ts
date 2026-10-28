@@ -70,6 +70,9 @@ describe('handing a lead over', () => {
     expect(inboxState(contact({ unread: 0 }))).toBe('answered')
     expect(inboxState(contact({ unread: 2 }))).toBe('waiting')
     expect(inboxState(contact({ unread: undefined }))).toBe('waiting')
+    // Messenger's own count decides (mig 20261028100000): an away auto-reply went last, Business Suite still unread.
+    expect(inboxState(contact({ lastDir: 'out', unread: 1 }))).toBe('waiting')
+    expect(inboxState(contact({ lastDir: 'out', unread: 0 }))).toBe('answered')
   })
 })
 
