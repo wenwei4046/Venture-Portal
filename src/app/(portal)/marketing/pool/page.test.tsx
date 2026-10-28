@@ -15,7 +15,20 @@ const mocks = vi.hoisted(() => ({
   sides: vi.fn(),
   bridge: vi.fn(),
   openMarketingPoolRow: vi.fn(async () => ({ ok: true, lines: {} })),
+  sheet: vi.fn(),
 }))
+// The statement as drawn, its props kept: what an opened account offers under its lines.
+vi.mock('../../reports/_components/SheetReport', async (orig) => {
+  const real = await orig<typeof import('../../reports/_components/SheetReport')>()
+  const { createElement } = await import('react')
+  return {
+    ...real,
+    default: (p: Parameters<typeof real.default>[0]) => {
+      mocks.sheet(p)
+      return createElement(real.default, p)
+    },
+  }
+})
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireActionOn: mocks.requireActionOn }))
 vi.mock('@/lib/supabase/admin', () => ({ adminClient: mocks.adminClient }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.sessionClient }))
@@ -125,6 +138,14 @@ describe('Marketing’s own pool', () => {
     expect(within(views()).getByRole('link', { name: 'Cash Flow' })).toHaveAttribute('href', '/marketing/pool?period=2026-09&from=2026-04')
     expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/marketing/pool/export?view=pnl&format=xlsx&period=2026-09&from=2026-04')
     expect(screen.getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/marketing/pool/export?view=pnl&format=pdf&period=2026-09&from=2026-04')
+  })
+
+  it('links the General Ledger under the lines only for whoever its page opens for — a Reports reader', async () => {
+    render(await page())
+    expect(mocks.sheet.mock.lastCall?.[0].monthly).toMatchObject({ report: 'cash-flow', segment: 'marketing', ledger: false })
+    mocks.requireActionOn.mockResolvedValue({ ...MANAGER, permissions: [...MANAGER.permissions, 'reports'] })
+    render(await page({ view: 'pnl' }))
+    expect(mocks.sheet.mock.lastCall?.[0].monthly).toMatchObject({ report: 'pnl', segment: 'marketing', ledger: true })
   })
 
   it('draws no files without the Export the View carries', async () => {

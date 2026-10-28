@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
+import { can } from '@/lib/permissions'
+import { opensPath } from '@/lib/page-tabs'
 import { adminClient } from '@/lib/supabase/admin'
 import { officeMonth } from '@/lib/office-time'
 import { statementHref, statementPeriod } from '@/lib/dept-statements'
@@ -40,6 +42,11 @@ export default async function MarketingPoolPage({ searchParams }: Props) {
     // The Excel and PDF ride with the View (the user: "Excel/PDF 也给").
     canExport: canDo(user, 'marketing_pool', 'export'),
     exportHref: (format) => marketingPoolExport(view, format, range),
-    drill: { open: openMarketingPoolRow, segment: MARKETING_POOL.segment },
+    // The General Ledger's link under the lines only for whoever its page opens for (it asks its tab and Reports).
+    drill: {
+      open: openMarketingPoolRow,
+      segment: MARKETING_POOL.segment,
+      ledger: can(user, 'reports') && opensPath(user.tabs, '/reports/ledger'),
+    },
   })
 }
