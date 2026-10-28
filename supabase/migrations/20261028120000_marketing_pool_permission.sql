@@ -16,6 +16,8 @@
 --    Marketing view › Pool).
 -- 4. The tab `mkt.pool` ("Pool", the Marketing view) and its page `/marketing/pool`, in the database's copy of the
 --    registry — added by name, never seeded whole (production holds rows main does not).
+-- 5. bridge_mirror_slices() serves the service role every slice, as it serves Finance, so the pool's Cash Flow puts
+--    Marketing's share of a shared bill on its own account, as Finance's page does.
 -- Nobody loses anything. Running it twice changes nothing.
 
 -- ── 1. The function ─────────────────────────────────────────────────────────
@@ -74,3 +76,39 @@ INSERT INTO public.permission_tab_cells (tab_id, action, cell) VALUES
   ('mkt.pool', 'view', 'marketing_pool.export'),
   ('mkt.pool', 'view', 'marketing_pool.view')
 ON CONFLICT DO NOTHING;
+
+-- ── 5. The bridge's mirror slices, for the service role ─────────────────────
+-- Finance's Cash Flow puts each department's share of a shared bill on the paying side's own account (rent 9094,
+-- utilities, salary…) through bridge_mirror_slices(). That function serves every slice to a Reports or Department
+-- reports reader and none to a caller with no sign-in. The pool reads as the service role, so its Cash Flow would
+-- have put Marketing's Office Rental on the bridge's own line, not on 9094 as Finance sees it. Checked on production:
+-- the service role read 0 of the 21 slices. The service role reads those two tables whole anyway; now it reads the
+-- slices as Finance does. Every signed-in caller is asked exactly as before. pg_temp.swap_check works as in
+-- 20261009040000: production's statement, whitespace-blind, exactly once.
+
+CREATE OR REPLACE FUNCTION pg_temp.swap_check(p_sig regprocedure, p_old text, p_new text)
+RETURNS void
+LANGUAGE plpgsql AS $fn$
+DECLARE
+  v_src   text := (SELECT prosrc FROM pg_proc WHERE oid = p_sig);
+  v_pat   text;
+  v_found text;
+  v_n     integer;
+BEGIN
+  IF strpos(v_src, p_new) > 0 THEN
+    RETURN;  -- already swapped
+  END IF;
+  -- The old statement, every run of whitespace matching any run.
+  v_pat := regexp_replace(regexp_replace(p_old, '([.^$*+?()\[\]{}|\\])', '\\\1', 'g'), '\s+', '\\s+', 'g');
+  SELECT count(*) INTO v_n FROM regexp_matches(v_src, v_pat, 'g');
+  IF v_n <> 1 THEN
+    RAISE EXCEPTION '%: its check is there % times, not once — production changed since this migration was written', p_sig, v_n;
+  END IF;
+  v_found := (regexp_match(v_src, '(' || v_pat || ')'))[1];
+  EXECUTE replace(pg_get_functiondef(p_sig), v_found, p_new);
+END
+$fn$;
+
+SELECT pg_temp.swap_check('public.bridge_mirror_slices()',
+  $q$IF public.has_any_action(ARRAY['dept_reports.view', 'reports.view']) THEN$q$,
+  $q$IF auth.role() = 'service_role' OR public.has_any_action(ARRAY['dept_reports.view', 'reports.view']) THEN$q$);
