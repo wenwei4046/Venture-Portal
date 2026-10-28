@@ -166,8 +166,10 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       const H = ios ? baseH : window.innerHeight;
       app.style.bottom = `${Math.round(H - pan - (toKb ? vv.height : H))}px`;
       if (ios && toKb) {
+        // A rect that reads the pan itself is measured from the page's top, as WebKit's own does: the screen is already
+        // on what is visible (a salesperson's iPhone, 2026-10-28 — moved "back" by the pan, the screen went white).
         const off = app.getBoundingClientRect().top;
-        if (Math.abs(off) > 1) {
+        if (Math.abs(off) > 1 && Math.abs(off - pan) > 1) {
           app.style.top = `${Math.round(pan - off)}px`;
           app.style.bottom = `${Math.round(H - pan + off - vv.height)}px`;
         }

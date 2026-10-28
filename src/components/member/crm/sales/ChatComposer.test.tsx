@@ -328,4 +328,26 @@ describe("the iPhone's screen drawn away from what is visible", () => {
     delete (document.documentElement as unknown as Record<string, unknown>).clientHeight;
     delete (navigator as unknown as Record<string, unknown>).userAgent;
   });
+
+  it("is left in place when its rect is measured from the page's top (a salesperson's iPhone went white, 2026-10-28)", async () => {
+    const vv = Object.assign(new EventTarget(), { height: 793, offsetTop: 0, scale: 1, width: 393 });
+    vi.stubGlobal("visualViewport", vv);
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 793 });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 393 });
+    Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, value: 793 });
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X)" });
+    await openChat();
+    const app = composer().closest<HTMLElement>("[data-revenue-app]")!;
+    // WebKit's own client coordinates: a fixed screen at top 403px reads 403 — it is on what is visible.
+    app.getBoundingClientRect = () => ({ top: parseFloat(app.style.top) || 0 } as DOMRect);
+    box().focus();
+    Object.assign(vv, { height: 390, offsetTop: 403 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 390 });
+    await act(async () => { vv.dispatchEvent(new Event("resize")); });
+    expect(app.style.top).toBe("403px");
+    expect(app.style.bottom).toBe("0px");
+    for (const k of ["innerHeight", "innerWidth"] as const) delete (window as unknown as Record<string, unknown>)[k];
+    delete (document.documentElement as unknown as Record<string, unknown>).clientHeight;
+    delete (navigator as unknown as Record<string, unknown>).userAgent;
+  });
 });
