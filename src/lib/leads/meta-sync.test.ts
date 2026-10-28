@@ -24,6 +24,12 @@ describe('Lead View › the same as Messenger (mig 20261028100000)', () => {
       { mid: 'm.2', in: false, at: '2026-10-27T03:00:00+0000', body: '[Photo]', mediaUrl: 'https://scontent.xx.fbcdn.net/v/a.jpg' },
       { mid: 'm.3', in: true, at: '2026-10-27T04:00:00+0000', body: '[File] plan.pdf', mediaUrl: null },
     ])
+    // A card the Page sent and a shared post read as their words, not "[Message]" (2026-10-28).
+    const words = historyOf([
+      { id: 'c.1', from: { id: PAGE }, created_time: '2026-10-27T05:00:00+0000', message: '', attachments: { data: [{ generic_template: { title: 'Hi！欢迎来到 Carress', cta: [{ title: '了解门店地址' }, { title: '了解最新优惠' }] } }] } },
+      { id: 'c.2', from: { id: PAGE }, created_time: '2026-10-27T05:01:00+0000', message: '', shares: { data: [{ name: 'RM999睡出五星级酒店感' }] } },
+    ], PAGE)
+    expect(words.map(w => [w.body, w.mediaUrl])).toEqual([['Hi！欢迎来到 Carress\n▸ 了解门店地址\n▸ 了解最新优惠', null], ['[Shared] RM999睡出五星级酒店感', null]])
     expect(metaCdn('https://cdn.fbsbx.com/v/x')).toBe('https://cdn.fbsbx.com/v/x')
     expect(metaCdn('http://scontent.xx.fbcdn.net/v/a.jpg')).toBeNull()
   })
