@@ -17,6 +17,7 @@ import { DIRECTOR_C, DIRECTOR_TEAM, ST, teamColours } from "./tokens";
 import { avatarTint } from "../../shared/palette";
 import { adHref } from "../../shared/AdLink";
 import { isNewChat } from "../../shared/new-chat";
+import { saidInChat, snippetAround } from "../../shared/chat-search";
 import { jobTitle, personOf, teamAssignees } from "../../shared/people";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
@@ -82,7 +83,9 @@ export function inboxVM(ctx: DeskCtx) {
         ["Lost", x => x.key === "Lost", false], ["Cold leads", isCold, false]];
       const cur = T4.find(t => t[0] === ui.inbF) ?? T4[0];
       const q = (ui.ibQ ?? "").trim().toLowerCase();
-      const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q) || sourceOf(x.c).label.toLowerCase().includes(q);
+      const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q) || sourceOf(x.c).label.toLowerCase().includes(q) || !!saidInChat(x.c, q);
+      // Found further back in the chat: the row shows the message that holds the words, not the last one.
+      const preview = (x: ChatRow) => { if (!q || x.msg.toLowerCase().includes(q)) return x.msg; const m = saidInChat(x.c, q); return m ? snippetAround(m.text, q) : x.msg; };
       const rows = [...shown.filter(cur[1]).filter(hit)].sort((a, b) => Number(!!pref(b.id)?.pinned) - Number(!!pref(a.id)?.pinned));
       const DAY_MS = 86400000, fmtVisit = (t: Date) => `${t.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, ${t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase()}`;
       return {
@@ -96,7 +99,7 @@ export function inboxVM(ctx: DeskCtx) {
             : visit ? { text: `Visit · ${fmtVisit(new Date(visit.start))}`, kind: "calm" }
               : isCold(x) && lastIn ? { text: `Cold · ${Math.max(1, Math.floor((now.getTime() - lastIn) / DAY_MS))} d`, kind: "mute" } : null;
           const sel = ui.pane === "docked" && ui.chat === x.id;
-          return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: [sourceOf(x.c).brandLabel, x.ad].filter(Boolean).join(" · "), msg: x.msg, time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
+          return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: [sourceOf(x.c).brandLabel, x.ad].filter(Boolean).join(" · "), msg: preview(x), time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
             hot: n > 0 || dot, owner: x.owner, pinned: !!p?.pinned, muted: !!p?.muted, sel,
             note: note?.text ?? "", noteColor: !note ? "" : note.kind === "hot" ? "var(--crm-oxblood)" : note.kind === "warm" ? "var(--crm-ink)" : note.kind === "calm" ? "var(--crm-ink-soft)" : "var(--crm-faint)",
             noteWeight: note?.kind === "hot" ? 600 : 500, noteIcon: !note ? null : note.kind === "calm" ? "calendar" : note.kind === "hot" && u.level === "overdue" ? "triangle-alert" : "clock",

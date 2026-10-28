@@ -11,6 +11,7 @@ import { DEFAULT_LABELS, LABEL_SWATCHES, type CrmCustomer, type CrmLabel } from 
 import { BORDER, CHANNEL, dayLabel, firstName, ini, INK, isCold, lastChat, lastReal, STATUS_LABEL, stop, timeLabel, urgencyOf, type PEvent, type SalesCtx } from "./common";
 import type { InboxFilter } from "../ui";
 import { isNewChat } from "../../shared/new-chat";
+import { saidInChat } from "../../shared/chat-search";
 import { mediaWord } from "../../shared/chat-media";
 import { leaderAssignees } from "./chat";
 import { STATUS, avatarTint } from "../../shared/palette";
@@ -72,7 +73,7 @@ export function inboxVM(ctx: SalesCtx) {
   const q = ui.q.trim().toLowerCase();
   const pinned = (c: CrmCustomer) => !!data.prefs[c.id]?.pinned;
   const view = mine
-    .filter(c => (!ui.adSel.length || ui.adSel.includes(c.ad)) && match(c) && (!q || `${c.name} ${previewOf(c)} ${c.ad} ${sourceOf(c).label}`.toLowerCase().includes(q)))
+    .filter(c => (!ui.adSel.length || ui.adSel.includes(c.ad)) && match(c) && (!q || `${c.name} ${previewOf(c)} ${c.ad} ${sourceOf(c).label}`.toLowerCase().includes(q) || !!saidInChat(c, q)))
     .sort((a, b) => Number(pinned(b)) - Number(pinned(a)) || lastAt(b) - lastAt(a));
 
   // ── Row swipes ──
