@@ -26,7 +26,30 @@ export interface GraphMessage {
   from?: { id?: string }
   created_time?: string
   message?: string
-  attachments?: { data?: Array<{ mime_type?: string; name?: string; image_data?: { url?: string }; video_data?: { url?: string }; file_url?: string }> }
+  attachments?: { data?: Array<{ mime_type?: string; name?: string; image_data?: { url?: string }; video_data?: { url?: string }; file_url?: string; generic_template?: GraphCard }> }
+  shares?: { data?: Array<{ name?: string; link?: string }> }
+}
+
+/** A card the Page sent, as the Graph reads it back (its webhook echo is a `template` attachment — page-events.ts). */
+export interface GraphCard { title?: string; subtitle?: string; cta?: Array<{ title?: string }> }
+
+/** A card's words and buttons ("▸ <title>"), as `templateText` writes a webhook's card. Null for none. */
+export function cardText(g: GraphCard | undefined): string | null {
+  if (!g) return null
+  const parts = [g.title?.trim(), g.subtitle?.trim(), ...(g.cta ?? []).map(c => c.title?.trim()).filter(Boolean).map(t => '▸ ' + t)]
+  const text = parts.filter(Boolean).join('\n')
+  return text ? text.slice(0, 2000) : null
+}
+
+/** What a message carried when it had no words: a card, a shared post ("[Shared] <its name>"), else a file's label. */
+export function wordlessBody(m: GraphMessage): string {
+  const a = m.attachments?.data?.[0]
+  const card = cardText(a?.generic_template)
+  if (card) return card
+  if (a) return placeholder(a)
+  const share = m.shares?.data?.[0]
+  if (share?.name || share?.link) return ['[Shared]', share.name?.trim(), share.link].filter(Boolean).join(' ')
+  return '[Message]'
 }
 
 export interface HistoryMessage { mid: string; in: boolean; at: string; body: string; mediaUrl: string | null }
@@ -54,8 +77,8 @@ export function historyOf(messages: GraphMessage[], pageId: string): HistoryMess
         mid: m.id,
         in: m.from?.id !== pageId,
         at: m.created_time as string,
-        body: ((m.message ?? '').trim() || (a ? placeholder(a) : '[Message]')).slice(0, 2000),
-        mediaUrl: a ? metaCdn(a.image_data?.url ?? a.video_data?.url ?? a.file_url) : null,
+        body: ((m.message ?? '').trim() || wordlessBody(m)).slice(0, 2000),
+        mediaUrl: a && !a.generic_template ? metaCdn(a.image_data?.url ?? a.video_data?.url ?? a.file_url) : null,
       }
     })
     .sort((x, y) => Date.parse(x.at) - Date.parse(y.at))
@@ -67,7 +90,7 @@ async function conversationMessages(pageId: string, psid: string, token: string,
   const id = (conv?.data as Array<{ id?: string }> | undefined)?.[0]?.id
   if (!id) return null
   const out: GraphMessage[] = []
-  let url: string | null = graph(`${encodeURIComponent(id)}/messages?fields=id,from,created_time,message,attachments{mime_type,image_data,video_data,file_url,name}&limit=100`)
+  let url: string | null = graph(`${encodeURIComponent(id)}/messages?fields=id,from,created_time,message,attachments{mime_type,image_data,video_data,file_url,name,generic_template},shares{name,link}&limit=100`)
   for (let i = 0; url && i < 5; i++) {
     const page = await getJson(url, token, fetchImpl)
     if (!page) return out.length ? out : null
