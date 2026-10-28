@@ -1815,7 +1815,7 @@ tr:hover .icon-btn { opacity: 1; }
   text-transform: none;
   letter-spacing: 0.01em;
 }
-/* Lead View draws its own titles (Cormorant Garamond, `[data-lead-view]`, 2026-10-27): left out here as the two apps are. */
+/* Lead View draws its own titles (its own face, `--lv-font-title` on `[data-lead-view]`, 2026-10-27): left out here as the two apps are. */
 h1:not(.sr-only):not(:where([data-revenue-app] *, [data-hr-app] *, [data-lead-view] *)), .page-title {
   font-family: var(--font-display);
   font-weight: 400;
@@ -7608,15 +7608,18 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
 /* ═══════════════════════════════════════════════════════════════════════════
    LEAD VIEW — the third theme (2026-10-22, the redesign v2 handoff
    `docs/design_handoff_lead_view_inbox`; DESIGN.md › Three views, one system).
-   Customer Service's inbox: a dark walnut sidebar, a warm paper page, Lora for
-   every word and Cormorant Garamond for titles. Drawn by LeadShell on
-   `[data-lead-view]`, which also carries the two faces (lead-fonts.ts), so
-   nothing outside Lead View reads these. Light in either mode, as the sheet.
+   Customer Service's inbox: a dark walnut sidebar, a warm paper page, and
+   (since 2026-10-28) Inter for every word, titles included — Noto Sans SC for
+   Chinese, the system's faces and emoji after them. Drawn by LeadShell on
+   `[data-lead-view]`, so nothing outside Lead View reads these. Light in either mode, as the sheet.
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-lead-view] {
   color-scheme: light;
-  --lv-font: var(--font-lora), 'Lora', var(--font-cjk), serif;
-  --lv-font-title: var(--font-cormorant), 'Cormorant Garamond', var(--font-lora), var(--font-cjk), serif;
+  /* One clean, formal face for every word (2026-10-28 — the user: "所有字体能不能换成看起来比较正式，舒服的字体 … 一定要可以套用
+     在全部字体上，不会出现看不懂的符号"): Inter, the portal's own, for Latin; Noto Sans SC for Chinese; then the system's
+     faces for any other script and its emoji fonts — a customer's name or message never falls back to boxes. */
+  --lv-font: var(--font-sans), 'Inter', var(--font-cjk), system-ui, -apple-system, 'Segoe UI', 'Noto Sans', 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  --lv-font-title: var(--lv-font);
   --lv-ink: 43 33 28;
   --lv-page: 243 240 236;
   --lv-white: 255 255 255;

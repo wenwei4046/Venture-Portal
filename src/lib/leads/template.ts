@@ -330,3 +330,9 @@ export function runsOn(templateId: string, rules: ReplyRules, brandName: (id: st
   for (const a of rules.ads) if (a.reply === templateId) where.push(`ad “${adName(a.adId)}”${a.when === 'open' ? ' · working hours' : a.when === 'closed' ? ' · after hours' : ''}`)
   return where.length ? `Runs on ${where.join(', ')}` : 'Not used by any reply rule yet'
 }
+
+/** Reply templates' right panel (Edit step / Test as customer): its width, dragged by its left edge (2026-10-28). */
+export const SIDE_W = { start: 360, min: 300, max: 720 }
+export function clampSide(w: number): number {
+  return Number.isFinite(w) ? Math.round(Math.min(SIDE_W.max, Math.max(SIDE_W.min, w))) : SIDE_W.start
+}

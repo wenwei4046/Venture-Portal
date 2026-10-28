@@ -5,7 +5,7 @@
 .head { flex: none; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 12px; padding-bottom: 14px; }
 .titles { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .eyebrow { font-size: 11px; letter-spacing: 0.14em; color: rgb(var(--lv-text-2)); }
-.title { margin: 0; font-family: var(--lv-font-title); font-size: 26px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
+.title { margin: 0; font-family: var(--lv-font-title); font-size: 22px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
 .saveHint { font-size: 13px; color: rgb(var(--lv-text-4)); }
 .saveHint[data-dirty] { color: rgb(var(--lv-ink)); }
 .btn {
@@ -195,7 +195,7 @@
 .tab[aria-pressed='true'] { color: rgb(var(--lv-ink)); border-bottom-color: rgb(var(--lv-accent)); }
 .sheet { flex: 1; min-height: 0; overflow-y: auto; border: 1px solid rgb(var(--lv-frame)); border-radius: 10px; background: rgb(var(--lv-white)); box-shadow: var(--lv-shadow-card); padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
 .sheetHead { display: flex; align-items: flex-start; gap: 12px; }
-.sheetTitle { font-family: var(--lv-font-title); font-size: 24px; font-weight: 600; line-height: 1.15; }
+.sheetTitle { font-family: var(--lv-font-title); font-size: 20px; font-weight: 600; line-height: 1.15; }
 .sheetSub { font-size: 13px; color: rgb(var(--lv-text-2)); margin-top: 2px; }
 .days { max-width: 560px; border-top: 1px solid rgb(var(--lv-border)); }
 .day { display: grid; grid-template-columns: 110px 46px minmax(0, 1fr); align-items: center; gap: 12px; min-height: 46px; padding: 6px 0; border-bottom: 1px solid rgb(var(--lv-border)); }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromLibrary, normDigits, rowsOf, runsOn, templateProblem, tidy, toLibrary, updateFromLibrary, walkAnswer, walkFrom, type TemplateStep } from './template'
+import { clampSide, SIDE_W, fromLibrary, normDigits, rowsOf, runsOn, templateProblem, tidy, toLibrary, updateFromLibrary, walkAnswer, walkFrom, type TemplateStep } from './template'
 
 // The same template tests/member-sql/validate-leads.mjs runs through the database's runner.
 const steps: TemplateStep[] = [
@@ -79,5 +79,14 @@ describe('where the rules run a template', () => {
     const rules = { ads: [{ id: 'r', adId: '1201', when: 'closed' as const, reply: 'T' }], pages: [{ brandId: 'b', channel: 'messenger' as const, work: 'T', after: 'T' }, { brandId: 'b', channel: 'instagram' as const, work: 'cs', after: 'T' }] }
     expect(runsOn('T', rules, () => '2990s', () => 'Oct Sofa Week')).toBe('Runs on 2990s Messenger, 2990s Instagram · after hours, ad “Oct Sofa Week” · after hours')
     expect(runsOn('X', rules, () => '', () => '')).toBe('Not used by any reply rule yet')
+  })
+})
+
+describe('the right panel’s width', () => {
+  it('keeps a dragged width between 300 and 720, whole pixels; nonsense is the start', () => {
+    expect(clampSide(250)).toBe(SIDE_W.min)
+    expect(clampSide(900)).toBe(SIDE_W.max)
+    expect(clampSide(480.6)).toBe(481)
+    expect(clampSide(Number.NaN)).toBe(SIDE_W.start)
   })
 })

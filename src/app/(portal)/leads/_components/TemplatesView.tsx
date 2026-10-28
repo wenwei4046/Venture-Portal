@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { removeTemplate, saveLibraryItem, saveTemplate } from '@/lib/leads/actions'
 import { infoEntries, type LeadInfo } from '@/lib/leads/info'
 import {
-  CARD_W, KINDS, RETRY_PHONE, SAVE_AS, fromLibrary, kindOf, placed, rowsOf, runsOn, stepAfter, templateProblem, tidy, toLibrary,
+  CARD_W, KINDS, SIDE_W, clampSide, RETRY_PHONE, SAVE_AS, fromLibrary, kindOf, placed, rowsOf, runsOn, stepAfter, templateProblem, tidy, toLibrary,
   updateFromLibrary, walkAnswer, walkFrom, freshId, type LibraryItem, type ReplyRules, type ReplyTemplate, type StepKind, type TemplateStep, type Walk,
 } from '@/lib/leads/template'
 import { LeadIcon } from '@/components/layout/lead-icons'
@@ -64,6 +64,23 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
     try { const v = localStorage.getItem('ar-test-open'); if (v === 'edit' || v === 'test') setPanelState(v) } catch { /* private window */ }
   }, [])
   const [toast, setToast] = useState('')
+  // The right panel's width (2026-10-28 — the user: "做可调整宽度"): its left edge drags, 300–720px; the viewer's
+  // (localStorage `ar-side-w`); a double-click puts it back.
+  const [sideW, setSideW] = useState(SIDE_W.start)
+  useEffect(() => {
+    try { const v = Number(localStorage.getItem('ar-side-w')); if (v) setSideW(clampSide(v)) } catch { /* private window */ }
+  }, [])
+  const keepSide = (w: number) => { try { localStorage.setItem('ar-side-w', String(w)) } catch { /* private window */ } }
+  const dragSide = (e: ReactMouseEvent) => {
+    e.preventDefault()
+    const x0 = e.clientX, w0 = sideW
+    let w = w0
+    const move = (ev: MouseEvent) => { w = clampSide(w0 + (x0 - ev.clientX)); setSideW(w) }
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.style.cursor = ''; keepSide(w) }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+    document.body.style.cursor = 'col-resize'
+  }
 
   useEffect(() => {
     if (!dirty) return
@@ -246,7 +263,8 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
                   <button type="button" className={s.vertical} onClick={() => setPanel('test')}>Test as customer</button>
                 </div>
               ) : (
-                <aside className={s.side} aria-label="Step">
+                <aside className={s.side} aria-label="Step" style={{ width: sideW }}>
+                  <div className={s.sideGrip} onMouseDown={dragSide} onDoubleClick={() => { setSideW(SIDE_W.start); keepSide(SIDE_W.start) }} title="Drag to resize · double-click to reset" aria-hidden="true" />
                   <div className={s.sideTabs}>
                     <button type="button" className={s.sideTab} aria-pressed={panel === 'edit'} onClick={() => setPanel('edit')}>Edit step</button>
                     <button type="button" className={s.sideTab} aria-pressed={panel === 'test'} onClick={() => setPanel('test')}>Test as customer</button>

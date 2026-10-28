@@ -12,7 +12,6 @@ import { ToastHost } from '@/components/hrv/toast'
 import ViewSwitch from './ViewSwitch'
 import MemoBell from './MemoBell'
 import ViewingAsBanner from './ViewingAsBanner'
-import { cormorant, lora } from './lead-fonts'
 import { LeadIcon } from './lead-icons'
 import { leadNavSections, visibleLeadNav } from './lead-nav'
 import s from './LeadShell.module.css'
@@ -63,7 +62,7 @@ export default function LeadShell({ user, initialCollapsed, children }: { user: 
   const mine = user.personalLogin === true && !user.viewingAs
 
   return (
-    <div data-lead-view="" className={`${lora.variable} ${cormorant.variable} ${s.root}`}>
+    <div data-lead-view="" className={s.root}>
       <aside className={s.nav} data-collapsed={collapsed || undefined} aria-label="Lead View">
         <div className={s.brand}>
           <span className={s.logo} aria-hidden="true">H</span>
