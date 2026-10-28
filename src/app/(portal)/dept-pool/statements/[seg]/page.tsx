@@ -58,14 +58,13 @@ export default async function DeptStatementPage({ params, searchParams }: Props)
     nowYM,
     links: { pnl: statementPath(dept.slug, 'pnl', kept), 'cash-flow': statementPath(dept.slug, 'cash-flow', kept) },
     // The files for whoever may take them out — the route asks Dept reports · Export (2026-10-16).
-    exportHref: canDo(user, 'dept_reports', 'export')
-      ? (format) => {
-          const qs = new URLSearchParams({ format, period: range.to })
-          qs.set('segment', dept.segment)
-          if (!range.wholeYear) qs.set('from', range.from)
-          return `/reports/${view === 'pnl' ? 'monthly-pnl' : 'monthly-cash-flow'}/export?${qs.toString()}`
-        }
-      : null,
+    canExport: canDo(user, 'dept_reports', 'export'),
+    exportHref: (format) => {
+      const qs = new URLSearchParams({ format, period: range.to })
+      qs.set('segment', dept.segment)
+      if (!range.wholeYear) qs.set('from', range.from)
+      return `/reports/${view === 'pnl' ? 'monthly-pnl' : 'monthly-cash-flow'}/export?${qs.toString()}`
+    },
     // An account opens onto its months and lines for this segment (2026-10-24), through this page's own action.
     drill: { open: openDeptPoolRow, segment: dept.segment },
   })

@@ -24,6 +24,7 @@ export async function renderDeptStatement({
   range,
   nowYM,
   links,
+  canExport,
   exportHref,
   drill,
 }: {
@@ -37,8 +38,10 @@ export async function renderDeptStatement({
   nowYM: string
   /** Each statement's address, the period kept. */
   links: Record<StatementView, string>
-  /** The Excel and PDF for whoever may take them out; null draws no buttons. */
-  exportHref: ((format: 'xlsx' | 'pdf') => string) | null
+  /** Whether the reader may take out the Excel and PDF — the page asked canDo(…, 'export'). */
+  canExport: boolean
+  /** The Excel's or the PDF's address. */
+  exportHref: (format: 'xlsx' | 'pdf') => string
   /** The page's action that reads an opened account's lines, and the segment it reads them for. */
   drill: Omit<MonthlyDrill, 'report'>
 }) {
@@ -61,7 +64,7 @@ export async function renderDeptStatement({
             {label} - {view === 'pnl' ? 'Profit & Loss' : 'Cash Flow'}
           </h1>
         </div>
-        {exportHref ? (
+        {canExport ? (
           <div className="flex flex-wrap items-center justify-end gap-2">
             <a href={exportHref('xlsx')} className="btn-quiet-sheet">
               Excel

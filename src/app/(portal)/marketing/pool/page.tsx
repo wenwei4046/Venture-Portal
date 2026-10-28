@@ -38,7 +38,8 @@ export default async function MarketingPoolPage({ searchParams }: Props) {
       'cash-flow': statementHref(MARKETING_POOL.path, 'cash-flow', kept),
     },
     // The Excel and PDF ride with the View (the user: "Excel/PDF 也给").
-    exportHref: canDo(user, 'marketing_pool', 'export') ? (format) => marketingPoolExport(view, format, range) : null,
+    canExport: canDo(user, 'marketing_pool', 'export'),
+    exportHref: (format) => marketingPoolExport(view, format, range),
     drill: { open: openMarketingPoolRow, segment: MARKETING_POOL.segment },
   })
 }
