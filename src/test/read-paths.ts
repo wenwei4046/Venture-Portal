@@ -44,6 +44,15 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
   // open to them (appAccess(user).parts.people: can(team) || can(team_directory), with People's tab).
   'src/lib/hr-app/server.ts#mobiles':
     { wants: ['team.view:own'], text: 'appAccess(user).parts.people — People (team / team_directory) with its tab open' },
+  // 2026-10-28 — Marketing's own pool: Finance's Marketing P&L and Cash Flow in Marketing's view. The ledger opens to
+  // the treasury only, so the page, the lines it opens and its files read through the service role once their own
+  // View or Export is held, Marketing's segment named in code (lib/marketing/pool.ts).
+  'src/app/(portal)/marketing/pool/page.tsx#MarketingPoolPage':
+    { wants: ['service_role'], text: 'every read goes through adminClient(), once Marketing pool · View is held on its page — Marketing’s segment only' },
+  'src/app/(portal)/marketing/pool/actions.ts#openMarketingPoolRow':
+    { wants: ['service_role'], text: 'every read goes through adminClient(), once Marketing pool · View is held on its page — Marketing’s segment only' },
+  'src/app/(portal)/marketing/pool/export/route.tsx#GET':
+    { wants: ['service_role'], text: 'every read goes through adminClient(), once Marketing pool · Export is held on its page — Marketing’s segment only' },
 }
 
 /**

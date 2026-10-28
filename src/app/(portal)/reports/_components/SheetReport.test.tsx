@@ -207,12 +207,17 @@ describe('a month-by-month account opened', () => {
   ]
   const L9020 = [txn('d', '2026-10-04', 350, 0, 'JE-202610-0004', { value: -350, party: 'SIA JOSIAH', text: 'Outsource Design' })]
   const answer = (lines: Record<string, SheetTxn[]>) => vi.fn(async () => ({ ok: true, lines }))
-  const drawM = (rows: SheetRow[], open: (ask: unknown) => Promise<unknown>, opts: { report?: 'pnl' | 'cash-flow'; variant?: 'dept' } = {}) =>
+  const drawM = (rows: SheetRow[], open: (ask: unknown) => Promise<unknown>, opts: { report?: 'pnl' | 'cash-flow'; variant?: 'dept'; ledger?: boolean } = {}) =>
     render(
       <ReportSearchProvider level={3} levels={4}>
         <Level to={4} />
         <Level to={3} />
-        <SheetReport columns={MONTHS} rows={rows} monthly={{ open: open as never, report: opts.report ?? 'pnl', segment: 'marketing' }} variant={opts.variant} />
+        <SheetReport
+          columns={MONTHS}
+          rows={rows}
+          monthly={{ open: open as never, report: opts.report ?? 'pnl', segment: 'marketing', ...(opts.ledger === undefined ? {} : { ledger: opts.ledger }) }}
+          variant={opts.variant}
+        />
       </ReportSearchProvider>,
     )
   const lineRows = () => Array.from(document.querySelectorAll('tr[data-kind="line"]')) as HTMLElement[]
@@ -262,6 +267,16 @@ describe('a month-by-month account opened', () => {
     // Back at L3 the accounts are folded again.
     fireEvent.click(screen.getByRole('button', { name: 'level 3' }))
     expect(lineRows()).toHaveLength(0)
+  })
+
+  // 2026-10-28 — Marketing's pool: the General Ledger opens only with Reports, so its link would only bounce them.
+  it('leaves out the General Ledger’s link for a viewer its page would not open for', async () => {
+    drawM(PNL, answer({ 'pnl:9087': L9087 }), { ledger: false })
+    fireEvent.click(within(row('group', 'Website')).getByRole('button', { name: /Website/ }))
+    await waitFor(() => expect(lineRows()).toHaveLength(3))
+    const foot = row('line-foot', 'lines')
+    expect(foot).toHaveTextContent(/^3 lines · Aug – Oct 2026/)
+    expect(within(foot).queryByRole('link')).toBeNull()
   })
 
   it('says why it could not read the lines, and reads again on Try again', async () => {

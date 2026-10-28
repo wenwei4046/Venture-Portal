@@ -46,6 +46,28 @@ export interface MonthlyDrillAsk {
   rows: MonthlyDrillRow[]
 }
 
+/** As many rows as a sheet has, never more. */
+const MAX_ROWS = 600
+
+/** An ask as a page sent it, made what it says: a known report, strings, at most a sheet's rows. */
+export function cleanDrillAsk(ask: MonthlyDrillAsk): MonthlyDrillAsk {
+  return {
+    report: ask.report === 'cash-flow' ? 'cash-flow' : 'pnl',
+    segment: typeof ask.segment === 'string' ? ask.segment : '',
+    from: String(ask.from ?? ''),
+    to: String(ask.to ?? ''),
+    rows: (Array.isArray(ask.rows) ? ask.rows : []).slice(0, MAX_ROWS).map((r) => ({
+      code: String(r?.code ?? '').slice(0, 40),
+      side: r?.side === 'in' || r?.side === 'out' ? r.side : null,
+    })),
+  }
+}
+
+/** A read that failed, in words for the sheet. */
+export function drillFailure(e: unknown): { ok: false; reason: string } {
+  return { ok: false, reason: e instanceof Error && e.message ? e.message : 'The lines could not be read just now. Try again.' }
+}
+
 const MONTH = /^\d{4}-\d{2}$/
 
 const findLeaf = (sections: ReportSection[], code: string): AccountNode | null => {

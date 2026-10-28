@@ -219,6 +219,8 @@ export const PAGE_TABS = {
   '/marketing/minutes': ['mkt.tracking'],
   '/marketing/replace': ['mkt.tracking'],
   '/marketing/billing': ['mkt.tracking'],
+  // Marketing's own P&L and Cash Flow (2026-10-28): a box of its own, beside the manager tools.
+  '/marketing/pool': ['mkt.pool'],
 } as const satisfies Record<string, readonly string[]>
 
 export type PageRoute = keyof typeof PAGE_TABS

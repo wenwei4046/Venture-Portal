@@ -103,6 +103,8 @@ const MY_CLAIMS: Opens = { view: ['claims.view'], create: ['claims.create'], edi
 // one is on; Approve decides a stage as its approver; Manage — the manager tools — is each such page's View.
 const MARKETING: Opens = { view: ['marketing.view'], create: ['marketing.create'], edit: ['marketing.edit'], approve: ['marketing.approve'] }
 const MARKETING_MANAGE: Opens = { view: ['marketing.manage'] }
+// Marketing's own pool (mig 20261028120000): Finance's Marketing P&L and Cash Flow; their Excel and PDF ride with View.
+const MARKETING_POOL: Opens = { view: ['marketing_pool.view', 'marketing_pool.export'] }
 
 // The Overview is the company's in every view (the dashboard has no narrower reach).
 const tab = (view: TabView, id: string, label: string, keys: readonly string[], opens: Opens, reach?: Scope): PermissionTab => ({
@@ -215,6 +217,13 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // The manager's tools — the Tracking Dashboard and the builders — one box: a second box for Marketing · Manage would
   // make the cell narrow, and every write asking it would have to ask the pages first (tab-write-guards).
   tab('mkt', 'tracking', 'Manager tools', ['marketing'], MARKETING_MANAGE),
+  // Marketing's own pool (2026-10-28 — the user, of Finance's Marketing - Cash Flow: "我要exactly 给他们看这个part"):
+  // that page for Marketing alone, every line it opens, its Excel and PDF. A box of its own, never Dept Pool's — the
+  // Marketing view reaches the whole company, and Dept Pool · View at All reads every department's pool.
+  {
+    ...tab('mkt', 'pool', 'Pool', ['marketing_pool'], MARKETING_POOL),
+    hints: { view: 'Marketing’s own P&L and Cash Flow, as Finance’s Dept Pool shows Marketing — with Excel and PDF' },
+  },
   // One's own claims, listed in Marketing's view for whoever holds Marketing (the key it opens on here, so the move
   // ticks it for Marketing's templates only — Staff · Basic keeps the Department view's). Marketing's tabs come before
   // the Department view's: a narrower tab is ticked only for what an earlier one has not given, so a Marketing
