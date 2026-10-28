@@ -1244,6 +1244,41 @@ await db.exec(`
     check((await q(`select has_function_privilege('authenticated', 'public.${fn}', 'execute') a`))[0].a, false, `${fn} is the service role’s alone`)
   }
   check([ht.contact.pageId, ht.contact.psid], [P, '7701001'], 'the card carries the Page and the customer’s Messenger id')
+
+  // ── The Inbox's tools: mark unread, every photo kept in R2 (mig 20261028110000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_mark_seen'`))[0].m, '086511bc7a2b6019cce5d5162ddb17c4', 'lead_mark_seen here is production’s')
+  await db.exec(await f('20261028110000_lead_inbox_tools.sql'))
+  await db.exec(await f('20261028110000_lead_inbox_tools.sql'))
+  await as(CS_USER, ALL)
+  await q(`select public.lead_mark_seen($1)`, [hc])
+  check((await q(`select public.lead_my_unread_marks() m`))[0].m, [], 'nothing marked at first')
+  await q(`select public.lead_mark_unread($1)`, [hc])
+  check((await q(`select public.lead_my_unread_marks() m`))[0].m, [hc], 'a chat marked unread is listed for its marker')
+  await as(OTHER, ALL)
+  check((await q(`select public.lead_my_unread_marks() m`))[0].m, [], 'and for nobody else')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_mark_seen($1)`, [hc])
+  check((await q(`select public.lead_my_unread_marks() m`))[0].m, [], 'opening it again clears the mark')
+  await q(`select public.lead_mark_unread($1)`, [ray])
+  check((await q(`select public.lead_my_unread_marks() m`))[0].m, [ray], 'a chat never opened can be marked too')
+  await as(CS_USER, [])
+  await refuses(`select public.lead_mark_unread($1)`, [hc], /Lead View · View/, 'marking needs Lead View · View')
+  await as(CS_USER, ALL)
+  const keep = (await q(`select public.lead_media_to_keep() k`))[0].k
+  const photo = keep.find(k => k.url === 'https://scontent.xx.fbcdn.net/v/a.jpg')
+  check([photo?.contactId, photo?.body], [hc, '[Photo]'], 'a photo only at Meta’s address is listed to keep')
+  const kept = `chat/${hc}/meta-${photo.id}.jpg`
+  check((await q(`select public.lead_media_kept($1::jsonb) n`, [JSON.stringify([{ id: photo.id, path: kept, mime: 'image/jpeg' }])]))[0].n, 0, 'not before the bucket has it')
+  await db.exec(`insert into public.file_objects (bucket_id, name) values ('lead-media', '${kept}')`)
+  check((await q(`select public.lead_media_kept($1::jsonb) n`, [JSON.stringify([{ id: photo.id, path: `chat/${ray}/x.jpg`, mime: 'image/jpeg' }])]))[0].n, 0, 'never another conversation’s folder')
+  check((await q(`select public.lead_media_kept($1::jsonb) n`, [JSON.stringify([{ id: photo.id, path: kept, mime: 'image/jpeg' }])]))[0].n, 1, 'kept once it is there')
+  const keptMsg = (await q(`select public.lead_thread($1) t`, [hc]))[0].t.messages.find(m => m.mid === 'hist.2')
+  check([keptMsg.mediaPath, keptMsg.mediaMime], [kept, 'image/jpeg'], 'the chat shows our copy')
+  check((await q(`select public.lead_media_to_keep() k`))[0].k.some(k => k.id === photo.id), false, 'and it is not listed again')
+  for (const fn of ['lead_media_to_keep()', 'lead_media_kept(jsonb)']) {
+    check((await q(`select has_function_privilege('authenticated', 'public.${fn}', 'execute') a`))[0].a, false, `${fn} is the service role’s alone`)
+  }
+  check((await q(`select has_function_privilege('anon', 'public.lead_mark_unread(uuid)', 'execute') a`))[0].a, false, 'marking is no anon’s')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

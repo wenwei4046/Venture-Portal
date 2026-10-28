@@ -11,6 +11,8 @@ import { fetchMetaAds } from './ads-server'
 import { quickProblem, type QuickReply } from './quick'
 import { deliver, deliverFile, sendReaction } from './messenger'
 import { markSeen } from './meta-sync'
+import { KEEP_LIMIT, metaCdnUrl } from './media-keep'
+import { forwardName, isMediaPlaceholder } from './inbox'
 import type { Audience, AudienceCount, CampaignChannel, OptIn } from './campaign'
 import type { FlowStep, FlowTrigger } from './flow'
 import type { BusinessHours, InfoCard, InfoCat, LeadInfo } from './info'
@@ -152,6 +154,57 @@ async function deliverMedia(messageId: number, path: string, mime: string): Prom
   await quiet<null>('lead_reply_sent', { p_message: messageId, p_mid: 'mid' in result ? result.mid : null, p_error: 'error' in result ? result.error : null }, '')
   revalidatePath('/leads', 'layout')
   return 'error' in result ? result.error : null
+}
+
+/**
+ * Mark a chat unread for oneself, to answer later (mig 20261028110000 — the user: "把讯息unread 来提醒自己稍后回复").
+ * Lead View's alone: Meta lets no app mark a Messenger chat unread. Opening the chat again clears it.
+ */
+export async function markUnread(contactId: string): Promise<LeadOutcome<null>> {
+  await requireActionOn('/leads', 'leads', 'view')
+  return call<null>('lead_mark_unread', { p_contact: contactId }, 'The chat could not be marked unread.')
+}
+
+/**
+ * Forward a message to another conversation (2026-10-28 — the user: "转发就好，不需要删除"): Meta has no forward for an
+ * app, so it is sent there as a new reply from this person — words through replyToLead; a photo, video or file copied
+ * into that conversation's folder (ours, else fetched from Meta's address) and sent through sendLeadMedia, its words
+ * as the caption. The same 24-hour window holds there.
+ */
+export async function forwardMessage(toContactId: string, m: { body: string; mediaPath: string | null; mediaMime: string | null; mediaUrl: string | null }): Promise<LeadOutcome<{ id: number; notSent: string | null }>> {
+  await requireActionOn('/leads', 'leads', 'create')
+  if (!/^[0-9a-f-]{36}$/.test(toContactId)) return { ok: false, reason: 'Pick a conversation to forward to.' }
+  const body = (m.body ?? '').trim()
+  if (!m.mediaPath && !m.mediaUrl) {
+    if (!body) return { ok: false, reason: 'There is nothing to forward.' }
+    return replyToLead(toContactId, body)
+  }
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const mime = m.mediaMime || 'application/octet-stream'
+  const path = `chat/${toContactId}/${crypto.randomUUID()}-${forwardName(m)}`
+  if (m.mediaPath) {
+    if (!/^chat\/[0-9a-f-]{36}\/[^/]{1,200}$/.test(m.mediaPath)) return { ok: false, reason: 'That file cannot be forwarded.' }
+    const copied = await supabase.storage.from('lead-media').copy(m.mediaPath, path)
+    if (copied.error) return { ok: false, reason: 'The file could not be copied to that conversation.' }
+  } else {
+    const url = metaCdnUrl(m.mediaUrl)
+    if (!url) return { ok: false, reason: 'That file cannot be forwarded.' }
+    let blob: Blob
+    let type = mime
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(15000) })
+      if (!res.ok) return { ok: false, reason: 'Meta no longer has that file.' }
+      blob = await res.blob()
+      type = (res.headers.get('content-type') ?? '').split(';')[0].trim() || mime
+    } catch {
+      return { ok: false, reason: 'Could not reach Meta for that file. Try again.' }
+    }
+    if (blob.size > KEEP_LIMIT) return { ok: false, reason: 'Messenger takes a photo or file up to 25 MB.' }
+    const up = await supabase.storage.from('lead-media').upload(path, blob, { contentType: type, upsert: false })
+    if (up.error) return { ok: false, reason: 'The file could not be copied to that conversation.' }
+    return sendLeadMedia(toContactId, path, type, isMediaPlaceholder(body) ? '' : body)
+  }
+  return sendLeadMedia(toContactId, path, mime, isMediaPlaceholder(body) ? '' : body)
 }
 
 /** Short-lived links (an hour) to the photos and files sent in a conversation, by their paths. */

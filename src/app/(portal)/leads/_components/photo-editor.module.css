@@ -1,0 +1,39 @@
+/* Lead View › the photo editor before sending (2026-10-28). Lead View's own tokens (globals.css [data-lead-view]). */
+.scrim { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(var(--lv-ink) / 0.55); }
+.panel { display: flex; flex-direction: column; width: min(920px, 100%); max-height: calc(100vh - 32px); background: rgb(var(--lv-white)); border-radius: 12px; box-shadow: var(--lv-shadow-menu); overflow: hidden; }
+.head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid rgb(var(--lv-hair)); }
+.title { font-weight: 600; font-size: 15px; color: rgb(var(--lv-ink)); }
+.name { flex: 1; min-width: 0; font-size: 12px; color: rgb(var(--lv-text-3)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.close { display: flex; padding: 4px; border-radius: 6px; color: rgb(var(--lv-text-2)); }
+.close:hover { background: rgb(var(--lv-hover)); }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 16px; border-bottom: 1px solid rgb(var(--lv-hair)); }
+.tool { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid rgb(var(--lv-border)); border-radius: 7px; font-size: 13px; color: rgb(var(--lv-text-2)); background: rgb(var(--lv-white)); }
+.tool:hover:not(:disabled) { background: rgb(var(--lv-hover)); }
+.tool[aria-pressed='true'] { border-color: rgb(var(--lv-accent)); color: rgb(var(--lv-accent-text)); background: rgb(var(--lv-tint)); }
+.tool:disabled { opacity: 0.45; cursor: default; }
+.sep { width: 1px; height: 22px; margin: 0 4px; background: rgb(var(--lv-hair)); }
+.swatch { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgb(var(--lv-border)); }
+.swatch[aria-pressed='true'] { outline: 2px solid rgb(var(--lv-accent)); outline-offset: 2px; }
+.hint { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 13px; color: rgb(var(--lv-text-2)); background: rgb(var(--lv-page)); }
+.words { flex: 1; padding: 6px 10px; border: 1px solid rgb(var(--lv-border)); border-radius: 7px; font: inherit; font-size: 13px; }
+.apply { padding: 5px 12px; border-radius: 7px; font-size: 13px; color: rgb(var(--lv-white)); background: rgb(var(--lv-accent)); }
+.apply:disabled { opacity: 0.45; }
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; overflow: auto; background: rgb(var(--lv-chat)); }
+.frame { position: relative; display: inline-block; line-height: 0; touch-action: none; }
+.frame[data-tool='pen'], .frame[data-tool='crop'] { cursor: crosshair; }
+.frame[data-tool='text'] { cursor: text; }
+.canvas { max-width: 100%; max-height: 58vh; border-radius: 4px; }
+.crop { position: absolute; border: 2px dashed rgb(var(--lv-white)); box-shadow: 0 0 0 9999px rgb(var(--lv-ink) / 0.45); pointer-events: none; }
+.fail { margin-bottom: 10px; font-size: 13px; color: rgb(var(--lv-red)); }
+.foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid rgb(var(--lv-hair)); }
+.note { flex: 1; font-size: 12px; color: rgb(var(--lv-text-3)); }
+.cancel { padding: 7px 14px; border: 1px solid rgb(var(--lv-border)); border-radius: 8px; font-size: 13px; color: rgb(var(--lv-text-2)); }
+.send { padding: 7px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; color: rgb(var(--lv-white)); background: rgb(var(--lv-accent)); }
+.send:disabled { opacity: 0.5; }
+/* The forward window's list (ForwardDialog). */
+.pickList { flex: 1; min-height: 160px; max-height: 50vh; overflow: auto; padding: 6px 8px; }
+.pickRow { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 8px 10px; border-radius: 8px; text-align: left; }
+.pickRow:hover { background: rgb(var(--lv-hover)); }
+.pickRow[aria-selected='true'] { background: rgb(var(--lv-tint)); box-shadow: inset 0 0 0 1px rgb(var(--lv-accent)); }
+.pickName { font-size: 14px; font-weight: 500; color: rgb(var(--lv-ink)); }
+.pickSub { font-size: 12px; color: rgb(var(--lv-text-3)); }

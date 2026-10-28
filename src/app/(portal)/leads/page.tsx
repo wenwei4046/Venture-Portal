@@ -1,7 +1,7 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
-import { loadInbox, loadInfo, loadLabels, loadLeadConfig, loadPersonas, loadQuickReplies, loadThread } from '@/lib/leads/server'
+import { loadInbox, loadInfo, loadLabels, loadLeadConfig, loadPersonas, loadQuickReplies, loadThread, loadUnreadMarks } from '@/lib/leads/server'
 import { withMetaUnread } from '@/lib/leads/inbox'
 import { metaUnread } from '@/lib/leads/meta-sync'
 import InboxView from './_components/InboxView'
@@ -13,7 +13,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
   await requirePage('/leads')
   const user = await requirePermission('leads')
   const { c, q } = await searchParams
-  const [config, inbox, personas, info, quick, labels] = await Promise.all([loadLeadConfig(), loadInbox(), loadPersonas(), loadInfo(), loadQuickReplies(), loadLabels()])
+  const [config, inbox, personas, info, quick, labels, marks] = await Promise.all([loadLeadConfig(), loadInbox(), loadPersonas(), loadInfo(), loadQuickReplies(), loadLabels(), loadUnreadMarks()])
   if (!config.ok || !inbox.ok) {
     return (
       <HvPage>
@@ -45,6 +45,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
       quick={quick.ok ? quick.data : []}
       // Customer Service's labels (none before mig 20261027190000).
       labels={labels.ok ? labels.data : []}
+      // The chats this person marked unread to answer later (none before mig 20261028110000).
+      marked={marks.ok ? marks.data : []}
       // Brands whose AI agent is a copilot: their conversations offer an AI draft (none while its tables are not there).
       aiBrands={personas.ok ? personas.data.filter(p => p.mode === 'copilot').map(p => p.brandId) : []}
     />
