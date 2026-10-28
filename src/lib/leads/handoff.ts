@@ -56,8 +56,14 @@ export const SALES_GROUP = 'Sales group'
 
 export type InboxState = 'waiting' | 'answered' | 'handed'
 
-/** Where a conversation stands on the Inbox: handed over, the customer waiting for us, or answered. */
-export function inboxState(contact: Pick<LeadContact, 'handedAt' | 'lastDir'>): InboxState {
+/**
+ * Where a conversation stands on the Inbox: handed over, the customer waiting for us, or answered. The customer wrote
+ * last but this person has opened the chat since (`unread` 0, mig 20261027170000) — it is seen, not waiting
+ * (2026-10-28 — the user: "只要客服打开之后，其实就不会在waiting里了，因为已经被打开，就属于看过"). Without an unread
+ * count (Leads, or before the migration) the customer writing last is waiting, as before.
+ */
+export function inboxState(contact: Pick<LeadContact, 'handedAt' | 'lastDir' | 'unread'>): InboxState {
   if (contact.handedAt) return 'handed'
-  return contact.lastDir === 'in' ? 'waiting' : 'answered'
+  if (contact.lastDir !== 'in') return 'answered'
+  return contact.unread === 0 ? 'answered' : 'waiting'
 }

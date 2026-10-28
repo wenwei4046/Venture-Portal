@@ -113,6 +113,9 @@ export default function InboxView({
   const cardW = panels.card ? layout.rightW : RAIL
   const logW = panels.log ? LOG_W : RAIL
 
+  // Read here since its last message (readThread marks it seen, mig 20261027170000): its unread badge goes at once,
+  // before the list is read again.
+  const [readAt, setReadAt] = useState<Record<string, string>>({})
   const brands = useMemo(() => new Map(config.brands.map(b => [b.id, b])), [config.brands])
   const q = query.trim().toLowerCase()
   const qDigits = q.replace(/[\s-]/g, '')
@@ -126,18 +129,20 @@ export default function InboxView({
     return hay.includes(q) || (qDigits.length >= 3 && /^\d+$/.test(qDigits) && (c.phone ?? '').includes(qDigits))
   })
   // Each brand's number: its conversations under the status tab picked (the user: numbers beside the brands).
-  const perBrand = brandCounts(found.filter(c => filter === 'all' || inboxState(c) === filter))
+  // This person's unread: none for a chat they read since its last message (readThread marks it seen) — and so, as
+  // the user asked, not Waiting any more. The open chat keeps its place in the list while it is read.
+  const unreadOf = (c: LeadContact) => (readAt[c.id] === c.lastAt ? 0 : c.unread)
+  const stateOf = (c: LeadContact) => inboxState({ ...c, unread: unreadOf(c) })
+  const perBrand = brandCounts(found.filter(c => filter === 'all' || stateOf(c) === filter))
   const searched = found.filter(c => brand === 'all' || c.brandId === brand)
   const counts = useMemo(() => {
     const n: Record<Filter, number> = { waiting: 0, answered: 0, handed: 0, all: searched.length }
-    for (const c of searched) n[inboxState(c)]++
+    for (const c of searched) n[stateOf(c)]++
     return n
-  }, [searched])
-  const shown = searched.filter(c => filter === 'all' || inboxState(c) === filter)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stateOf reads readAt, listed
+  }, [searched, readAt])
+  const shown = searched.filter(c => filter === 'all' || stateOf(c) === filter || c.id === selected)
 
-  // Read here since its last message (readThread marks it seen, mig 20261027170000): its unread badge goes at once,
-  // before the list is read again.
-  const [readAt, setReadAt] = useState<Record<string, string>>({})
   const load = useCallback((id: string) => {
     startLoading(async () => {
       const r = await readThread(id)
@@ -221,8 +226,8 @@ export default function InboxView({
                 {contacts.length === 0 ? 'No conversations yet. Until Meta is connected, send a test message from Settings › Test.' : 'Nothing here.'}
               </div>
             ) : shown.map(c => {
-              const st = inboxState(c)
-              const unread = c.id === selected || readAt[c.id] === c.lastAt ? 0 : c.unread
+              const st = stateOf(c)
+              const unread = c.id === selected ? 0 : unreadOf(c)
               return (
                 <button key={c.id} type="button" className={s.row} aria-current={c.id === selected} data-waiting={st === 'waiting' || undefined} onClick={() => pick(c.id)}>
                   <span className={s.avatarWrap} aria-hidden="true">
@@ -398,7 +403,9 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
 
   const now = replyingNow(contact, csName)
   const botOn = now.kind !== 'cs'
-  const state = inboxState(contact)
+  // Open here, so seen: the customer's last word reads "Seen", not Waiting (2026-10-28, the user).
+  const state = inboxState({ ...contact, unread: 0 })
+  const stateLabel = state === 'answered' && contact.lastDir === 'in' ? 'Seen' : STATE_LABEL[state]
   const ad = adLabel(contact)
   const manager = adsManagerLink(contact.adAccount ?? '', contact.adId ?? '')
 
@@ -502,7 +509,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
           ) : null}
         </div>
         <OwnerPicker contact={thread?.contact ?? contact} canManage={canManage} onChanged={onSent} />
-        <span className={s.stateTag} data-state={state}>{STATE_LABEL[state]}</span>
+        <span className={s.stateTag} data-state={state}>{stateLabel}</span>
       </div>
 
       <div className={s.source}>

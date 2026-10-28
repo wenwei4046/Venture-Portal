@@ -4,7 +4,7 @@
 .head { flex: none; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 16px; padding-bottom: 14px; }
 .titles { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .eyebrow { font-size: 11px; letter-spacing: 0.14em; color: rgb(var(--lv-text-2)); }
-.title { margin: 0; font-family: var(--lv-font-title); font-size: 26px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
+.title { margin: 0; font-family: var(--lv-font-title); font-size: 22px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
 .subtitle { font-size: 14px; color: rgb(var(--lv-text-2)); }
 .export {
   white-space: nowrap;
@@ -149,7 +149,7 @@
 @keyframes lvDrawerIn { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 .drawerHead { flex: none; padding: 18px 20px 14px; border-bottom: 1px solid rgb(var(--lv-hair)); display: flex; gap: 12px; align-items: flex-start; }
 .drawerWho { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.bigName { font-weight: 600; letter-spacing: -0.01em; font-size: 26px; line-height: 1.1; overflow-wrap: anywhere; }
+.bigName { font-weight: 600; letter-spacing: -0.01em; font-size: 22px; line-height: 1.1; overflow-wrap: anywhere; }
 .phone { font-size: 15px; color: rgb(var(--lv-green)); }
 .phone[data-none] { color: rgb(var(--lv-text-4)); }
 .close { flex: none; cursor: pointer; width: 30px; height: 30px; border-radius: 6px; border: 1px solid rgb(var(--lv-frame)); background: rgb(var(--lv-white)); color: rgb(var(--lv-text-2)); display: flex; align-items: center; justify-content: center; }

@@ -66,6 +66,10 @@ describe('handing a lead over', () => {
     expect(inboxState(contact())).toBe('waiting')
     expect(inboxState(contact({ lastDir: 'out' }))).toBe('answered')
     expect(inboxState(contact({ handedAt: '2026-10-16T07:00:00Z' }))).toBe('handed')
+    // Opened since the customer wrote (unread 0): seen — no longer waiting; unknown (no count) stays waiting.
+    expect(inboxState(contact({ unread: 0 }))).toBe('answered')
+    expect(inboxState(contact({ unread: 2 }))).toBe('waiting')
+    expect(inboxState(contact({ unread: undefined }))).toBe('waiting')
   })
 })
 

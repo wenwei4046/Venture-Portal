@@ -38,7 +38,8 @@ const newsreaderItalic = Newsreader({
 })
 
 const inter = Inter({
-  subsets: ['latin'],
+  // latin-ext too (2026-10-28): a customer's name in Lead View may carry letters beyond Latin-1 (ĩ, ł, ş …).
+  subsets: ['latin', 'latin-ext'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-sans',
   display: 'swap',

@@ -11,7 +11,6 @@ import { useFinView } from './fin-view'
 const nav = vi.hoisted(() => ({ pathname: '/payments' }))
 vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }))
 // Lead View's faces come from next/font, which only the Next build provides.
-vi.mock('./lead-fonts', () => ({ lora: { variable: '' }, cormorant: { variable: '' } }))
 vi.mock('./Sidebar', () => ({ default: () => <aside>sidebar</aside> }))
 vi.mock('./TopBar', () => ({ default: (p: { fin?: boolean }) => <div data-testid="topbar" data-fin={String(!!p.fin)} /> }))
 vi.mock('./BottomTabBar', () => ({ default: (p: { fin?: boolean }) => <nav data-testid="tabbar" data-fin={String(!!p.fin)} /> }))

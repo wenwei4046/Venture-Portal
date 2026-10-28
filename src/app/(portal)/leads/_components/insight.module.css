@@ -4,7 +4,7 @@
 .head { flex: none; display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 12px; padding-bottom: 12px; border-bottom: 1px solid rgb(var(--lv-border)); }
 .titles { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .eyebrow { font-size: 11px; letter-spacing: 0.14em; color: rgb(var(--lv-text-2)); }
-.title { margin: 0; font-family: var(--lv-font-title); font-size: 26px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
+.title { margin: 0; font-family: var(--lv-font-title); font-size: 22px; font-weight: 600; line-height: 1.15; letter-spacing: -0.01em; }
 .seg { display: inline-flex; border: 1px solid rgb(var(--lv-frame)); border-radius: 6px; overflow: hidden; background: rgb(var(--lv-white)); }
 .seg button { border: 0; border-left: 1px solid rgb(var(--lv-frame)); background: transparent; padding: 5px 11px; font: inherit; font-size: 13px; color: rgb(var(--lv-text-2)); cursor: pointer; white-space: nowrap; }
 .seg button:first-child { border-left: 0; }
@@ -14,7 +14,7 @@
 .note { align-self: flex-start; font-size: 13px; color: rgb(var(--lv-text-2)); background: rgb(var(--lv-muted)); padding: 6px 12px; border-radius: 999px; }
 .section { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .sectHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
-.h2 { margin: 0; font-family: var(--lv-font-title); font-size: 24px; font-weight: 600; }
+.h2 { margin: 0; font-family: var(--lv-font-title); font-size: 20px; font-weight: 600; }
 .sub { margin: 0; font-size: 12px; color: rgb(var(--lv-text-3)); }
 .link { color: rgb(var(--lv-accent-text)); text-decoration: none; }
 .link:hover { text-decoration: underline; }
@@ -24,7 +24,7 @@
 .stage { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-left: 1px solid rgb(var(--lv-hair)); }
 .stage:first-child { border-left: 0; }
 .stageLabel { font-size: 13px; color: rgb(var(--lv-text-2)); }
-.big { font-family: var(--lv-font-title); font-size: 30px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.big { font-family: var(--lv-font-title); font-size: 26px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
 .track { position: relative; display: block; height: 4px; border-radius: 2px; background: rgb(var(--lv-muted)); overflow: hidden; flex: 1; }
 .bar { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: rgb(var(--lv-frame)); }
 .bar[data-tone='sand'] { background: rgb(var(--lv-sage)); }
