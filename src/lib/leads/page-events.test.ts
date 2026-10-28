@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { leadPageEvents } from './page-events'
+import { leadPageEvents, templateText } from './page-events'
 
 const P2990 = '946946021838962', CRM = '102351059576534', OURS = '1848411446523305'
 const crm = new Set([CRM])
@@ -52,5 +52,21 @@ describe('Lead View › a Page delivery: standby customers and the Page’s own 
     expect(leadPageEvents({ object: 'page', entry: [{ id: CRM, time: 1, messaging: [customer('7700009', 'm.9')], standby: [echo('7700009', 'e.9', 'x')] }] }, crm, OURS))
       .toEqual({ messages: [], replies: [], receipts: { delivered: [], reads: [] } })
     expect(leadPageEvents({ object: 'instagram', entry: [] }, crm, OURS)).toEqual({ messages: [], replies: [], receipts: { delivered: [], reads: [] } })
+  })
+})
+
+describe('a card the Page sent (2026-10-28)', () => {
+  const card = {
+    type: 'template', title: 'Hi！你好我是 Alex，Carress的线上顾问',
+    payload: { template_type: 'button', buttons: [{ type: 'postback', title: '了解RM49的优惠🎉' }, { type: 'postback', title: '了解【Rent To Own】' }] },
+  }
+  it('reads a button card as its words and its buttons', () => {
+    expect(templateText(card)).toBe('Hi！你好我是 Alex，Carress的线上顾问\n▸ 了解RM49的优惠🎉\n▸ 了解【Rent To Own】')
+    expect(templateText({ type: 'template', payload: { elements: [{ title: 'King', subtitle: 'RM2k', buttons: [{ title: 'Book' }] }] } })).toBe('King\nRM2k\n▸ Book')
+    expect(templateText({ type: 'image', payload: { url: 'x' } } as never)).toBeNull()
+  })
+  it('keeps the card’s words on the Page’s reply', () => {
+    const out = leadPageEvents({ object: 'page', entry: [{ id: P2990, messaging: [{ sender: { id: P2990 }, recipient: { id: '296' }, timestamp: 1793155203631, message: { mid: 'm.card', is_echo: true, app_id: 532160876956612, attachments: [card] } }] }] }, crm, OURS)
+    expect(out.replies[0]).toMatchObject({ externalId: 'm.card', kind: 'text', body: expect.stringContaining('▸ 了解RM49的优惠🎉') })
   })
 })
