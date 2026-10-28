@@ -9,7 +9,7 @@ import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
 import { outcomeOf } from '@/lib/leads/ai'
 import { adLabel, adsManagerLink } from '@/lib/leads/ads'
 import { inboxState, type InboxState } from '@/lib/leads/handoff'
-import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, mediaKind, isMediaPlaceholder, brandCounts, receiptOf, adNoteOf, inMessengerOrder, mediaFileName, type Receipt, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
+import { LAYOUT_KEY, LIST_W, LOG_W, PANELS_KEY, RIGHT_W, clampWidth, readLayout, readPanels, replyingNow, unreadLabel, mediaKind, isMediaPlaceholder, brandCounts, receiptOf, noteOf, runsOf, inMessengerOrder, mediaFileName, type Receipt, type InboxLayout, type InboxPanels } from '@/lib/leads/inbox'
 import { EMOJI_GROUPS, insertAt, withRecent } from '@/lib/leads/emoji'
 import { whenFull } from '@/lib/leads/time'
 import { formatPhone } from '@/lib/leads/phone'
@@ -420,6 +420,9 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
     })
   }
   const end = useRef<HTMLDivElement>(null)
+  // The chat in Messenger's order, and each message's place in its sender's run (the label once over it, the time once under).
+  const ordered = useMemo(() => inMessengerOrder(thread?.messages ?? []), [thread])
+  const runs = useMemo(() => runsOf(ordered, iso => dayLabel(iso)), [ordered])
   const count = thread?.messages.length ?? 0
   // Photos and files (mig 20261027140000): picked from the camera (photos, videos) or the paperclip (anything), put in
   // the bucket lead-media, then sent as a reply — the reply box's words as its caption.
@@ -571,11 +574,12 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
 
       <div className={s.messages}>
         {loading ? <div className={s.empty}>Loading…</div> : null}
-        {inMessengerOrder(thread?.messages ?? []).map((m, i, all) => {
+        {ordered.map((m, i, all) => {
           const day = dayLabel(m.at)
           const newDay = i === 0 || dayLabel(all[i - 1].at) !== day
-          // "<name> replied to an ad." is Messenger's grey note in the middle, not the Page's bubble (adNoteOf).
-          const note = adNoteOf(m)
+          // Messenger's own notes ("… replied to an ad", an auto-label …) are grey lines in the middle, not bubbles (noteOf).
+          const note = noteOf(m)
+          const run = runs[i]
           if (note) {
             return (
               <div key={m.id} className={s.msg} style={{ alignItems: 'stretch' }}>
@@ -585,9 +589,9 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
             )
           }
           return (
-            <div key={m.id} className={s.msg} data-out={m.direction === 'out' || undefined}>
+            <div key={m.id} className={s.msg} data-out={m.direction === 'out' || undefined} data-cont={run.first ? undefined : ''}>
               {newDay ? <div className={s.day} style={{ alignSelf: 'stretch' }}>{day}</div> : null}
-              {m.direction === 'out' ? <MessageLabel m={m} /> : null}
+              {m.direction === 'out' && run.first ? <MessageLabel m={m} /> : null}
               {m.replyToMid ? <Quote m={byMid.get(m.replyToMid) ?? null} /> : null}
               {m.mediaPath || m.mediaUrl ? <MessageMedia m={m} link={m.mediaPath ? links[m.mediaPath] : m.mediaUrl ?? undefined} /> : null}
               <div className={s.bubbleRow}>
@@ -620,7 +624,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
                 <div className={s.buttons}>{m.buttons.map(b => <span key={b} className={s.button}>{b}</span>)}</div>
               ) : null}
               {m.phoneFound ? <span className={s.found}>Phone found · {formatPhone(m.phoneFound)}</span> : null}
-              <span className={s.meta}>{metaOf(m)}<Ticks r={receiptOf(m, thread?.contact ?? contact)} /></span>
+              {run.last || (m.direction === 'out' && m.delivery !== 'sent') ? <span className={s.meta}>{metaOf(m)}<Ticks r={receiptOf(m, thread?.contact ?? contact)} /></span> : null}
             </div>
           )
         })}
