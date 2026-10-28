@@ -45,6 +45,11 @@ export function loadInbox(): Promise<Read<LeadContact[]>> {
   return rpc<LeadContact[]>('lead_inbox', undefined, 'The inbox')
 }
 
+/** The chats the signed-in person marked unread to answer later (mig 20261028110000). */
+export function loadUnreadMarks(): Promise<Read<string[]>> {
+  return rpc<string[]>('lead_my_unread_marks', undefined, 'Your marks')
+}
+
 /** One conversation (null when it is gone). */
 export function loadThread(contactId: string): Promise<Read<LeadThread | null>> {
   return rpc<LeadThread | null>('lead_thread', { p_contact: contactId }, 'The conversation')

@@ -122,3 +122,13 @@ describe('a chat as Messenger shows it (2026-10-28)', () => {
     expect(dayLabel('2025-12-10T02:00:11Z', now)).toBe('10 Dec 2025')
   })
 })
+
+describe('a file’s name, shown and forwarded (2026-10-28)', () => {
+  it('reads the name from "[File] name", else from our path', async () => {
+    const { mediaFileName, forwardName } = await import('./inbox')
+    expect(mediaFileName({ body: '[File] price list.pdf', mediaPath: 'chat/x/meta-9-price list.pdf' })).toBe('price list.pdf')
+    expect(mediaFileName({ body: '[Photo]', mediaPath: 'chat/c/0b0c3f0e-1111-2222-3333-444455556666-sofa.jpg' })).toBe('sofa.jpg')
+    expect(mediaFileName({ body: '[Photo]', mediaPath: 'chat/c/meta-12-file.jpg' })).toBe('file.jpg')
+    expect(forwardName({ body: '[Photo]', mediaPath: null, mediaMime: 'image/jpeg' })).toBe('photo.jpg')
+  })
+})

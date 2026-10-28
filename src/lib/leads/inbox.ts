@@ -137,6 +137,22 @@ export function isMediaPlaceholder(body: string): boolean {
   return /^\[(Photo|Video|Voice message|Sticker|File)\]( [^\n]*)?$/.test(body.trim())
 }
 
+/** A file's name as the chat shows it: "[File] name" says it, else its path's less our prefixes (a uuid, meta-<id>-). */
+export function mediaFileName(m: Pick<LeadMessage, 'body' | 'mediaPath'>): string {
+  const named = /^\[File\] (.+)$/.exec(m.body.trim())?.[1]?.trim()
+  if (named) return named
+  if (!m.mediaPath) return 'Attachment'
+  return m.mediaPath.replace(/^.*\//, '').replace(/^[0-9a-f-]{36}-/, '').replace(/^meta-\d+-/, '') || 'Attachment'
+}
+
+/** The name a forwarded file gets in the other conversation's folder (no slashes, an extension for a bare photo). */
+export function forwardName(m: Pick<LeadMessage, 'body' | 'mediaPath' | 'mediaMime'>): string {
+  const name = mediaFileName(m).replace(/[\\/]/g, '_').slice(-120)
+  if (name !== 'Attachment') return name
+  const mime = m.mediaMime ?? ''
+  return mime.startsWith('image/') ? 'photo.jpg' : mime.startsWith('video/') ? 'video.mp4' : mime.startsWith('audio/') ? 'voice.m4a' : 'file'
+}
+
 /** What became of a message out, as WhatsApp ticks it: one tick sent, two delivered, two blue read (Meta's receipts). */
 export type Receipt = 'recorded' | 'failed' | 'sent' | 'delivered' | 'read'
 export function receiptOf(m: Pick<LeadMessage, 'direction' | 'delivery' | 'at'>, c: Pick<LeadContact, 'deliveredAt' | 'readAt'> | null): Receipt | null {
