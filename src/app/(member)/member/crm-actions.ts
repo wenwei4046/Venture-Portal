@@ -30,6 +30,8 @@ const CRM_WRITES = [
   "crm_visit_outcome", "crm_save_details", "crm_set_pref", "crm_hide_message", "crm_save_labels", "crm_set_label",
   "crm_save_quick_replies", "crm_save_auto_replies", "crm_seen_notifications", "crm_invite", "crm_answer_invite",
   "crm_save_showroom_full", "crm_slot_counts", "crm_mark_reminded",
+  // The key handed over with a photo (mig 20261028130000).
+  "crm_set_key_photo",
   // The Control panel (mig 20261009180000).
   "crm_send_to", "crm_save_ad_assign", "crm_save_fulltime", "crm_read_notifs",
   // Save and apply to all's window: the ads ticked, each on its own or counted together (mig 20261025134700), CRM · Manage.
@@ -131,7 +133,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
-  "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded",
+  "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded", "crm_set_key_photo",
   "crm_add_note", "crm_add_contact",
 ]);
 const friendly = (error: unknown, fallback: string) => {
@@ -166,7 +168,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       fetchAllRowsParallel<CrmDataRows["messages"][number]>((from, to, withCount) => db.from("crm_messages")
         .select("id, contact_id, direction, kind, body, media_id, media_path, media_url, media_mime, auto, sent_by, sent_at, status, error, reply_to, my_reaction, their_reaction, media_name, card", withCount ? { count: "exact" } : undefined)
         .order("sent_at").order("id").range(from, to), "crm messages"),
-      read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at, kind, meeting_link, place, remarks, type_id, answers")),
+      read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at, kind, meeting_link, place, remarks, type_id, answers, key_out_path, key_out_at, key_back_path, key_back_at")),
       read<CrmDataRows["rooms"]>(db.from("crm_showrooms").select("id, name, active, sort_order, address, slots, cap, weekly, blocks")),
       read<CrmDataRows["prefs"]>(db.from("crm_contact_prefs").select("contact_id, pinned, muted, hidden, blocked, pinned_message_id, marked_unread")),
       read<CrmDataRows["hides"]>(db.from("crm_message_hides").select("message_id")),

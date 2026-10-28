@@ -44,6 +44,11 @@ export interface SalesActions {
   cancelVisit(visitId: string): Promise<boolean>;
   outcome(visitId: string, came: boolean, outcome: "follow_up" | "won" | "lost" | "rebooked", extra?: { amount?: number; reason?: string; note?: string }): Promise<boolean>;
   remind(visitId: string): Promise<boolean>;
+  /** The unit’s key handed over with a photo (the owner, 2026-10-28; mig 20261028130000): "out" collected before the visit,
+   * "back" returned after it. The photo goes upright and smaller into crm-media under the customer’s folder, then crm_set_key_photo. */
+  keyPhoto(visitId: string, kind: "out" | "back", file: File): Promise<boolean>;
+  /** A key photo’s address to look at it: a link signed for an hour (the demo keeps the phone’s own copy). */
+  keyPhotoUrl(path: string): Promise<string | null>;
   saveQuickReplies(items: { shortcut: string; message: string }[]): Promise<void>;
   /** Profile › Quick replies: typed in place, saved a moment after the last keystroke (a half-typed row is kept on screen, not saved). */
   editQuickReplies(items: CrmQuickReply[]): void;
@@ -293,6 +298,32 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       }));
       if (!live && (outcome === "won" || outcome === "lost")) setData(d => ({ ...d, events: [{ id: Date.now(), kind: outcome, customerId: v.customerId, actor: me, owner: me, data: outcome === "won" ? { amount: extra.amount } : { reason: extra.reason }, at: new Date().toISOString() }, ...d.events] }));
       return true;
+    },
+    async keyPhoto(visitId, kind, file) {
+      const v = visit(visitId);
+      if (!v) return false;
+      if (!file.type.startsWith("image/")) { toast("Choose a photo of the key."); return false; }
+      if (!live) {
+        const at = new Date().toISOString(), path = typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : "demo";
+        setVisit(visitId, x => ({ ...x, [kind === "out" ? "keyOut" : "keyBack"]: { path, at } }));
+        return true;
+      }
+      const photo = file.type === "image/gif" ? file : await prepareImage(file, false);
+      const mime = (photo.type || "image/jpeg").split(";")[0];
+      const path = mediaPath(v.customerId, photo.name || "key.jpg", mime);
+      const up = await createClient().storage.from("crm-media").upload(path, photo, { contentType: mime, upsert: false });
+      if (up.error) { toast("The photo could not be uploaded. Check the connection and try again."); return false; }
+      const r = await write("crm_set_key_photo", { p_appointment: visitId, p_kind: kind, p_path: path });
+      if (!r.ok) return false;
+      const row = r.data as { key_out_at?: string | null; key_back_at?: string | null } | null, at = (kind === "out" ? row?.key_out_at : row?.key_back_at) ?? new Date().toISOString();
+      setVisit(visitId, x => ({ ...x, [kind === "out" ? "keyOut" : "keyBack"]: { path, at } }));
+      return true;
+    },
+    async keyPhotoUrl(path) {
+      if (!live || path.startsWith("blob:")) return path;
+      const r = await createClient().storage.from("crm-media").createSignedUrl(path, 3600);
+      if (r.error || !r.data?.signedUrl) { toast("The photo could not be opened."); return null; }
+      return r.data.signedUrl;
     },
     async remind(visitId) {
       const v = visit(visitId);
