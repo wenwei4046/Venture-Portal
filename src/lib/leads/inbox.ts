@@ -84,6 +84,20 @@ export function isVisitDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value.trim())
 }
 
+/**
+ * The list as Messenger counts it (mig 20261028100000 — the user: "我需要跟msg 一摸一样"): a real Messenger conversation
+ * whose Page and customer Meta listed takes Messenger's own unread count (Business Suite's); a test, an Instagram one
+ * or one Meta did not list keeps Lead View's own. `counts` is keyed "pageId:psid" (lib/leads/meta-sync.ts).
+ */
+export function withMetaUnread(contacts: LeadContact[], counts: Map<string, number>): LeadContact[] {
+  if (!counts.size) return contacts
+  return contacts.map(c => {
+    if (c.isTest || c.channel !== 'messenger' || !c.pageId || !c.psid) return c
+    const n = counts.get(`${c.pageId}:${c.psid}`)
+    return n === undefined ? c : { ...c, unread: n }
+  })
+}
+
 /** The list's unread badge (mig 20261027160000), as WhatsApp writes it: the number, 99+ past 99. */
 export function unreadLabel(n: number): string {
   return n > 99 ? '99+' : String(n)
