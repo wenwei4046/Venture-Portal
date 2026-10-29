@@ -15,7 +15,7 @@
 
 .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
 .kicker { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: rgb(189 74 25); font-weight: 600; }
-.title { margin: 6px 0 0; font: 600 32px/1.15 var(--font-display-rv), 'Inter Tight', Inter, sans-serif; letter-spacing: -.01em; }
+.title { margin: 6px 0 0; font: 600 32px/1.15 var(--font-display-rv), 'Inter Tight', Inter, sans-serif; letter-spacing: -.01em; color: rgb(43 31 23); }
 .lookup { display: flex; flex-direction: column; gap: 6px; min-width: 300px; }
 .lookupLabel { font-size: 12px; color: rgb(122 104 92); font-weight: 500; }
 .lookupRow { display: flex; gap: 8px; }
@@ -58,8 +58,9 @@
 
 .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
 .field { display: flex; flex-direction: column; gap: 5px; }
-.field > span { font-size: 12px; color: rgb(122 104 92); font-weight: 500; }
-.input { width: 100%; border: 1px solid rgb(229 218 208); border-radius: 10px; padding: 9px 11px; font: inherit; color: inherit; background: rgb(255 255 255); outline: none; resize: vertical; }
+.field > span { font-size: 12px; color: rgb(122 104 92); font-weight: 500; letter-spacing: .01em; }
+.input { width: 100%; border: 1px solid rgb(229 218 208); border-radius: 10px; padding: 10px 12px; font: 400 15px/1.35 var(--font-sans), Inter, system-ui, sans-serif; color: rgb(43 31 23); background: rgb(255 255 255); outline: none; resize: vertical; -webkit-appearance: none; }
+.input::placeholder { color: rgb(170 152 140); }
 .input:focus { border-color: rgb(189 74 25); box-shadow: 0 0 0 3px rgb(189 74 25 / .12); }
 
 .summary { margin-top: 6px; padding: 12px 14px; border-radius: 12px; background: rgb(251 246 242); }
@@ -93,7 +94,7 @@
 .row .ghost { padding: 6px 12px; font-size: 12px; }
 @media (max-width: 960px) { .row { grid-template-columns: 1fr 1fr; } .rowHead { display: none; } }
 
-.wrap { max-width: 720px; }
+.wrapPhone { max-width: 720px; }
 .cards { display: flex; flex-direction: column; gap: 10px; }
 .bookingCard { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); text-align: left; cursor: pointer; font: inherit; color: inherit; }
 .bcWhen { font-weight: 600; font-size: 15px; }
@@ -115,7 +116,8 @@
 .summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 @media (max-width: 560px) {
   .wrap { padding: 18px 14px 40px; }
-  .title { font-size: 26px; }
+  .title { font-size: 24px; }
+  .h2 { font-size: 14px; }
   .card { padding: 16px; border-radius: 16px; }
   .two { grid-template-columns: minmax(0, 1fr); }
   .rooms { grid-template-columns: minmax(0, 1fr); }

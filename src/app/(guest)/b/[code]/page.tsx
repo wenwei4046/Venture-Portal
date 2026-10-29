@@ -1,8 +1,11 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { readPartnerPage } from '@/lib/crm-partner/read'
 import PartnerBooking from './_components/PartnerBooking'
 
 export const dynamic = 'force-dynamic'
+
+// A phone keeps the page at its size when a field takes the keyboard (the fields are 15px, under iOS's 16px zoom line).
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, maximumScale: 1 }
 
 export const metadata: Metadata = {
   title: 'HOUZS · Showroom booking',
