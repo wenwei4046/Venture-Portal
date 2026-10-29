@@ -90,9 +90,9 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     expect(screen.queryByText(/Applies to everyone holding/)).toBeNull()
     // A template with no ticks stored is drawn from its cells: Overview, HR Costing's three pages, Audit Log (Changes).
     expect(screen.getByRole('tab', { name: /HR view/ })).toHaveAttribute('aria-selected', 'true')
-    // Of the HR view's 28 tabs (round 2 added Documentation, Hiring ×3, Meeting Rooms, Guest Link; Attendance its seven, 2026-10-15;
-    // Claim, 2026-10-29).
-    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('5/28')
+    // Of the HR view's 29 tabs (round 2 added Documentation, Hiring ×3, Meeting Rooms, Guest Link; Attendance its seven, 2026-10-15;
+    // Claim, 2026-10-29; Claim & approve, PR ③).
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('5/29')
     expect(box('Payroll · View')).toHaveAttribute('aria-checked', 'true')
     expect(box('Payroll · Approve')).toHaveAttribute('aria-checked', 'false')
     expect(box('Overview · Create')).toBeDisabled()
@@ -152,7 +152,7 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     expect(win.getByText('There is already a template called that')).toBeInTheDocument()
     fireEvent.change(win.getByPlaceholderText('e.g. Area Manager'), { target: { value: 'Area Manager' } })
     // Each view with how many tabs it has.
-    expect(win.getByText('Department view').closest('label')).toHaveTextContent('Department view3 tabs')
+    expect(win.getByText('Department view').closest('label')).toHaveTextContent('Department view4 tabs')
     fireEvent.click(win.getByRole('checkbox', { name: /Department view/ }))
     fireEvent.click(win.getByRole('checkbox', { name: /Salary amounts/ }))
     expect(win.getByText('Its holders sign in to the portal.')).toBeInTheDocument()
@@ -202,9 +202,9 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     fireEvent.click(box('Select all · every box in HR view'))
     expect(box('Director Pool · Edit')).toHaveAttribute('aria-checked', 'true')
     expect(box('Select all · every box in HR view')).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('28/28')
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('29/29')
     fireEvent.click(box('Select all · every box in HR view'))
-    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('0/28')
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('0/29')
     expect(screen.getByText('Unsaved changes to HR · Payroll')).toBeInTheDocument()
   })
 
@@ -240,6 +240,19 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     expect(screen.queryByRole('checkbox', { name: 'Select all · View' })).toBeNull()
     expect(box('Payroll · View')).toBeDisabled()
     expect(screen.getByLabelText('Template for HR EXECUTIVE')).toBeDisabled()
+  })
+
+  // 2026-10-29 (the claim process's PR ③): By management approve, ticked once for a title — under its Claim row.
+  it('ticks By management approve for every holder of a template, saved with its boxes', async () => {
+    mocks.saveTemplateTabs.mockResolvedValue({ ok: true, version: 3, titles: 0 })
+    renderTab({ initialTemplateId: STAFF })
+    expect(screen.getByRole('tab', { name: /Department view/ })).toHaveAttribute('aria-selected', 'true')
+    expect(box('Claim · By management approve')).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(box('Claim · By management approve'))
+    expect(box('Claim · By management approve')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText('Unsaved changes to Staff · Basic')).toBeInTheDocument()
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(mocks.saveTemplateTabs).toHaveBeenCalledWith(expect.objectContaining({ templateId: STAFF, version: 1, review: true }))
   })
 })
 

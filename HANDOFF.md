@@ -1,5 +1,24 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-29 s (PR ③ built, not merged) — a department's approval before Finance
+
+Session e73c0205. "可以，开始做 PR ③" → branch `feat/payment-requests-approval` (plan:
+`docs/module-spec-payment-requests.md` §4c; design: the mockup's ②):
+
+- **By management approve** — not a cell: `permission_template_flags` / `user_permission_flags` (flag `claims_review`,
+  the person wins), a pill under each Claim row in the permission windows (template + person), saved only when it moved.
+- **Claim & approve** — tab `claims_approve` in HR / Finance / Marketing / Department views at Dept; `/claims` becomes
+  Claim & approve for a holder (To approve · All {dept} · Mine, Select → Approve / Reject…, drawer buttons). Approvers
+  are read from cells (`payment_request_approvers`); writes ask claims.approve:dept, no page guard (`narrows()`).
+- **Routing at Submit**: ticked + not an approver + somebody else approves → pending_approval, else Finance. An approver's
+  own and a department with nobody to approve go straight to Finance.
+- **Notices** (kind `claims`, ref `payment_request` → `/claims?open=<id>`): to approvers on send; to the sender on
+  approve, send back, Finance reject, paid. Marketing's bell (`mkt_notices`) and sidebar number (`mkt_shell` → `claims`)
+  swapped in place (swap_check). HR / Finance rows read *Claim & approve*; the Department view's stays *Claim*.
+- **Seeded**: Marketing · Staff ticked; Marketing · Manager holds Claim & approve (SIA JOSIAH today).
+- **Mig `20261029200000_payment_request_approval`**: NOT applied — dry-run first on the user's go (validator 61
+  checks). The merge waits for the user's word.
+
 ## CHECKPOINT 2026-10-29 r (SHIPPED, #847) — the claim process: the staff's own requests to Finance
 
 Session e73c0205. The user settled the claim process with the boss (2026-10-29; the design is

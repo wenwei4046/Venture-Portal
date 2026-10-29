@@ -38,7 +38,7 @@ with ROLLBACK, then COMMIT + its `schema_migrations` row), as every PR here.
 |---|---|---|
 | ① | **Finance › Payment request with what exists today.** Finance's sidebar: Payments › *Payment voucher* (today's `/payments`, retitled) and › *Payment request* (`/payments/requests`, new). The new page lists HR's payroll funding requests (tab *Payroll*, Payroll payouts holders only) and the Revenue members' benefit claims HR approved for payment, in the Payments hub's kit (HubHead, HubCards, `FinTable` with its column tools, `RowMenu`, a drawer). Each row worked as today — payroll: Generate PV (rounds), Send back to HR; member claim: Create PV (`claim_create_payment_voucher`) — plus the new **Return to HR** for a member claim. Payment voucher loses its Dept / Claims / Payroll head buttons. | Built 2026-10-29 (branch `feat/payment-requests`) |
 | ② | **Staff requests, end to end without approval.** The tables, the private bucket, the readers and writers (§3); the staff page `/claims` rebuilt as *Claim* — the requester's own requests and the *New request* window (claim or direct pay, items, receipts, pay-to from HR's record, split with departments / companies); the rows on Payment request; Create PV = today's Create payment window filled in (lines, payee, account hint, notes, files carried over, one person's open requests combined); Reject → fixed and sent again; Bill back Yes/No → a draft invoice in Invoice; the PV followed (paid → paid, voided → back to Finance). | Built 2026-10-29 (branch `feat/payment-requests-staff`) |
-| ③ | **By management approve and Claim & approve.** The tick on a title's template and a person (person wins); the department head's *Claim & approve* (their department's requests, Approve / Reject, several at once); routing at submit; the portal's notices to approvers and requesters. | |
+| ③ | **By management approve and Claim & approve.** The tick on a title's template and a person (person wins); the department head's *Claim & approve* (their department's requests, Approve / Reject, several at once); routing at submit; the portal's notices to approvers and requesters. | Built 2026-10-29 (branch `feat/payment-requests-approval`) |
 | ④ | **Several at once for Finance.** Select on Payment request → Create PV (one PV a payee, combined, a bill-back answer each, Save drafts / Submit — one approval group for the Principal) and Reject. | |
 | ⑤ | **Supplier invoices read for the requester.** Direct pay: the supplier's invoice read by the model (name, bank, account), checked by the requester; saved supplier accounts; Finance told when an invoice shows a different account. | |
 | ⑥ | **The rest.** The Finance phone app's Payments bar and request pages on the new list; the old `/payments/claim-requests`, `/payments/dept-requests`, `/payments/payroll-requests` and the pool-claims code retired; `dept_payment_requests` left read-only. | |
@@ -203,9 +203,86 @@ the bells' kinds and taps are one change. The Claim page shows a rejected reques
   PV (`payment-attachments`, copied inside R2).
 - *Viewing as somebody* the Claim page shows none of the real account's requests and offers no New request.
 
+## 4c. PR ③ — tasks (2026-10-29, the user: "可以，开始做 PR ③")
+
+Branch `feat/payment-requests-approval`; mig `20261029200000_payment_request_approval`. The design is the mockup's
+② (`mockups/claims-flow-mockup.html`: the Marketing Manager's *Claim & approve*, the permission rows "Claim ☑ By
+management approve") and §1's rows *Who approves first* and *Who sees what*.
+
+1. **By management approve — the tick** (§1: "勾在人的权限上（职位模板也可以一次勾）"; person wins). Not a permission (it
+   opens nothing — it routes one's own requests), so not a cell: its own two tables, as the sensitive fields' are —
+   `permission_template_flags (template_id, flag)` and `user_permission_flags (user_id, flag, granted)`, `flag` one
+   value today, `claims_review`. Drawn where the mockup draws it: a pill on the **Claim** row of the permission
+   window (a title's template and one person's), ticked from the template, the red dot where it is the person's
+   own. Saved with the window's Save (`permission_template_flags_set` / `permission_user_flags_set`, Manage
+   permissions as the boxes; the template's version bumped). Read by `payment_request_review_of(user)`: the person's
+   own tick, else their title's template's, else no.
+2. **Claim & approve — the tab.** `claims_approve` in the HR, Finance, Marketing and Department views (the
+   mockup's "以后有了 manager … 不用改系统"), reach **Dept**: View opens Claims · View, Approve opens Claims ·
+   Approve, at the holder's department; page `/claims`. Who holds it in a department is read from the boxes (the
+   person's own Approve box, else their template's) — `payment_request_approvers(department)` — because
+   `current_actions()` answers for the caller only; the writes still ask the caller's cells.
+3. **Routing at Submit** (`payment_request_save`): ticked, not a Claim & approve holder oneself, and somebody else in
+   the department holds it → *Waiting for approval* (`pending_approval`, `needs_approval`); else to Finance as
+   today. My calls, said in the window: an approver's own go straight to Finance (the mockup: "Yours go straight to
+   Finance"); ticked with nobody to approve → straight to Finance rather than stuck.
+4. **The approver's writes:** `payment_request_approve(ids)` → with Finance, `approved_by` / `approved_at`;
+   `payment_request_send_back(ids, reason)` → rejected at the approval stage, one reason for all. Each: Claims ·
+   Approve at Dept (no page guard: every box for that cell is on `/claims`, so the cell is the box), the request's
+   department the approver's own, never one's own request, only while it waits for approval. The requester fixes and sends again
+   under the same number (and it waits for approval again).
+5. **The approver's reads:** `payment_requests_for_approval()` — every sent request of their department (Claims ·
+   View at Dept); their files through `payment_request_file` and the bucket's read policy (spec §3: "the
+   department's approvers"); accounts as the last four without the Bank tick.
+6. **The page** — `/claims` for a holder is **Claim & approve** (the mockup's ②): "{Department}’s requests. Your
+   team’s wait here for you or {the other approvers} — one approval is enough. Yours go straight to Finance.",
+   + New request; cards **To approve** · **All {Department}** · **Mine**; the table Sent · From · What · Amount ·
+   Pay; ticking rows (FinTable's select) opens the bar's **Approve** / **Reject**; the drawer's *Approve — send to
+   Finance* / *Reject…* ("Tell {name} what to fix — they can submit it again"). A staff member's Claim page is
+   PR ②'s, its chip saying *Waiting for approval · {who}* and *With Finance · approved by {name}*; the New request
+   window says who approves first. Finance's drawer says who approved.
+7. **The rows:** each view's Claim row reads **Claim & approve** for a holder; Marketing's carries the number
+   waiting (its sidebar's counts).
+8. **Notices** (`app_notifications`, kind `claims`, about a `payment_request`): sent for approval → the
+   department's approvers; approved, sent back, rejected by Finance, paid → the requester. Listed by the bells
+   that list the portal's notices (the HR and Finance apps, the phone's push) and by the Marketing view's bell
+   (`mkt_notices` takes `claims` too); a tap opens the request on the Claim page.
+9. **Seeded** (§1: "Today: Marketing staff ticked; Marketing Manager / Assistant Manager hold Claim & approve"):
+   Marketing · Staff ticks By management approve; Marketing · Manager holds Claim & approve (View, Approve).
+10. **Tests:** the SQL validator (routing, approve / send back, the approvers' reads and files, the flags, the
+    notices); the models, the page in both modes, the permission window's pill; the registries.
+
+**As built (2026-10-29).**
+
+- *No page guard on Approve / Reject:* every box standing for Claims · Approve is a tab of `/claims`, so the cell
+  is the box (the scan's `narrows()` — a guard there would close nothing).
+- *Who approves* is read from the cells, the person's own over their title's (`payment_request_approvers`); a
+  holder at All (the Principal) may approve their own department's on the page but is never listed or told.
+- *The rows:* HR's Admin and Finance's account menu say **Claim & approve** for a holder; Marketing's row moves under
+  MANAGER TOOLS with the number waiting; the Department view's row keeps *Claim* (its sidebar takes no per-viewer
+  name yet) — the page itself is Claim & approve.
+- *The list:* the hub's cards To approve · All {department} · Mine, the table Sent · From · What · Pay · Where it is ·
+  **By whom** (who approves, approved or sent it back — the mockup's line under the chip, a column of its own, the
+  Claim page too); *Select* in the toolbar ticks the waiting rows (as Approvals), the bar says "N selected · RM" with
+  Clear, Reject…, Approve N →.
+- *Notices* reach the HR and Finance apps' bells and the phone (`notifications_mine`, the push), and Marketing's bell
+  (`mkt_notices` lists `claims` too, each saying what it opens); a tap opens `/claims?open=<id>`. The Department view
+  has no bell — its Claim page says where each stands.
+- *Seeded:* Marketing · Staff (no login yet) ticks By management approve; Marketing · Manager (SIA JOSIAH, and KHO
+  WEI JIE once he has a login) holds Claim & approve.
+
 Later PRs are detailed here when they start.
 
 ## 5. Review focus
+
+PR ③:
+
+- A request waiting when its department's only approver leaves (their login closed) → it waits; its sender cancels it
+  and sends it again, now straight to Finance (the next ones go straight there).
+- An approver approving two at once while one was just cancelled → the whole lot refused, nothing approved.
+- The Assistant Manager with View but no Approve → reads the list, no Select, no Approve.
+- A title's tick moved while a person has their own over it → the person's stands (the red dot).
+- Marketing's bell after PR ③ → its own notices as before, the claims' beside them, each opening its own page.
 
 PR ②:
 

@@ -8552,6 +8552,21 @@ export type Database = {
         Args: { p_ids: string[]; p_pv: string; p_bill: Json }
         Returns: Json
       }
+      payment_requests_for_approval: { Args: never; Returns: Json }
+      payment_requests_waiting_count: { Args: never; Returns: number }
+      payment_request_approve: { Args: { p_ids: string[] }; Returns: number }
+      payment_request_send_back: {
+        Args: { p_ids: string[]; p_reason: string }
+        Returns: number
+      }
+      permission_template_flags_set: {
+        Args: { p_template: string; p_version: number; p_flags: string[] }
+        Returns: number
+      }
+      permission_user_flags_set: {
+        Args: { p_user: string; p_flags: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       account_type:

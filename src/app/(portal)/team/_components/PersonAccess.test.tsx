@@ -231,3 +231,52 @@ describe('a person’s own sensitive fields', () => {
     expect(box('Sensitive fields · NRIC / IC')).toBeDisabled()
   })
 })
+
+// 2026-10-29 (the claim process's PR ③ — the mockup's "Claim ☑ By management approve"): under the Claim row, their
+// requests go to their department's Claim & approve first; the person's own tick over their title's.
+describe('a person’s own By management approve', () => {
+  const marketing = (over: Partial<Extract<PersonAccessData, { kind: 'template' }>> = {}) =>
+    access({
+      titleName: 'CONTENT CREATOR',
+      template: {
+        id: 't', name: 'Marketing · Staff', baseRole: 'staff', grants: { claims: { view: 'own', create: 'own' } }, sensitive: [],
+        tabs: ['mkt.my_claims.view', 'mkt.my_claims.create'], review: true,
+      },
+      ownReview: null,
+      functions: [fn('claims', 'Claims', 'view create', 'own dept all')],
+      cellKeys: [K('claims', 'view', 'claims'), K('claims', 'create', 'claims')],
+      ...over,
+    })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.setPersonTabs.mockResolvedValue({ ok: true })
+  })
+
+  it('shows the title’s tick under Claim, and takes it off for one person — saved with the boxes', async () => {
+    render(<PersonAccess access={marketing()} canEdit />)
+    expect(screen.getByRole('tab', { name: /Marketing view/ })).toHaveAttribute('aria-selected', 'true')
+    expect(box('Claim · By management approve')).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(box('Claim · By management approve'))
+    expect(box('Claim · By management approve')).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getAllByLabelText('changed for this person')).toHaveLength(1)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [], review: false })
+  })
+
+  it('their own tick is drawn over the title’s; Reset to title gives them the title’s again', async () => {
+    render(<PersonAccess access={marketing({ ownReview: false })} canEdit />)
+    expect(box('Claim · By management approve')).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'Reset to title' }))
+    expect(box('Claim · By management approve')).toHaveAttribute('aria-checked', 'true')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [], review: null })
+  })
+
+  it('an untouched tick is not sent', async () => {
+    render(<PersonAccess access={marketing()} canEdit />)
+    fireEvent.click(box('Sensitive fields · Salary amounts'))
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    expect(mocks.setPersonTabs.mock.calls[0][0]).not.toHaveProperty('review')
+  })
+})

@@ -30,6 +30,8 @@ export interface TemplateRecord {
   version: number
   grants: Grants
   sensitive: SensitiveField[]
+  /** By management approve (2026-10-29, mig 20261029200000): its holders’ requests are approved in their department first. */
+  review: boolean
   /** Its ticked boxes, view › tab › action (2026-10-11) — null until its first save on tabs: then its cells give them. */
   tabs: string[] | null
 }
@@ -86,7 +88,7 @@ function rows<T>(data: unknown): T[] {
  */
 export async function loadPermissionsData(client: SupabaseClient): Promise<PermissionsData> {
   const supabase = client as unknown as SupabaseClient
-  const [fnRes, keyRes, tplRes, grantRes, sensRes, titleRes, levelRes, staffRes, cellRes, legacyRes, tabRes, boxRes] = await Promise.all([
+  const [fnRes, keyRes, tplRes, grantRes, sensRes, titleRes, levelRes, staffRes, cellRes, legacyRes, tabRes, boxRes, flagRes] = await Promise.all([
     supabase.from('permission_functions').select('key, label, section, actions, scopes, description').order('sort_order'),
     supabase.from('permission_cell_keys').select('function_key, action, legacy_key, min_scope, gate'),
     supabase.from('permission_templates').select('id, key, name, description, base_role, version').order('sort_order'),
@@ -107,6 +109,8 @@ export async function loadPermissionsData(client: SupabaseClient): Promise<Permi
     // The boxes (mig 20261011010000): every signed-in session reads a template's, a person's as their cells are read.
     supabase.from('permission_template_tabs').select('template_id, tab_id, action'),
     supabase.from('user_permission_tabs').select('user_id, tab_id, action, granted'),
+    // By management approve (mig 20261029200000): read by anybody signed in, as the sensitive fields are; none until then.
+    supabase.from('permission_template_flags').select('template_id, flag').then(r => r, () => ({ data: null, error: null })),
   ])
 
   for (const [label, res] of [
@@ -128,6 +132,7 @@ export async function loadPermissionsData(client: SupabaseClient): Promise<Permi
   const grantRows = rows<{ template_id: string; function_key: string; action: string; scope: string }>(grantRes.data)
   const sensRows = rows<{ template_id: string; field: string }>(sensRes.data)
   const tabRows = rows<{ template_id: string; tab_id: string; action: string }>(tabRes.data)
+  const flagRows = flagRes.error ? [] : rows<{ template_id: string; flag: string }>(flagRes.data)
   const templates: TemplateRecord[] = rows<{
     id: string; key: string; name: string; description: string | null; base_role: string; version: number
   }>(tplRes.data).map(t => ({
@@ -139,6 +144,7 @@ export async function loadPermissionsData(client: SupabaseClient): Promise<Permi
     version: t.version,
     grants: grantsFromRows(grantRows.filter(g => g.template_id === t.id)),
     sensitive: sensRows.filter(s => s.template_id === t.id).map(s => s.field).filter(isSensitiveField),
+    review: flagRows.some(f => f.template_id === t.id && f.flag === 'claims_review'),
     tabs: tabRows.some(r => r.template_id === t.id) ? tabRows.filter(r => r.template_id === t.id).map(r => `${r.tab_id}.${r.action}`) : null,
   }))
 

@@ -44,8 +44,8 @@ describe('the tab catalog (HR revamp 8)', () => {
       'Documentation', 'Hiring requests', 'Hiring insights', 'Talent Bank',
       // HR › Attendance (20261015030000), in the sidebar's order.
       'Attendance today', 'Attendance records', 'Attendance requests', 'Leave balances', 'Month close', 'Attendance settings', 'Readiness',
-      // One's own claims (2026-10-29), above the rooms as the sidebar has it.
-      'Claim', 'Meeting Rooms', 'Guest Link', 'Audit Log',
+      // One's own claims (2026-10-29), above the rooms as the sidebar has it — and Claim & approve, the department's (PR ③).
+      'Claim', 'Claim & approve', 'Meeting Rooms', 'Guest Link', 'Audit Log',
     ])
     expect(PERMISSION_TABS.filter(t => t.view === 'rev').map(t => t.label).slice(0, 8)).toEqual([
       'Today', 'Insight', 'Quote', 'Arena', 'Profile · My income', 'Profile · Requests', 'Profile · Waiting list & replacements', 'Profile · Team & capacity',
@@ -82,6 +82,19 @@ describe('the tab catalog (HR revamp 8)', () => {
     expect([...moved('staff')].filter(g => g.includes('my_claims')).sort()).toEqual(['dept.my_claims.create', 'dept.my_claims.edit', 'dept.my_claims.view'])
     for (const key of ['fin_maker', 'hr', 'staff']) {
       expect(lossesOf(cellsOf(PROD[key].cells), moved(key)), key).toEqual([])
+    }
+  })
+
+  // 2026-10-29 (the claim process's PR ③): Claim & approve in every staff view — the department's requests read and
+  // approved, at the holder's department; nobody's cells tick it until a template holds Claims at Dept.
+  it('gives every staff view a Claim & approve at Dept', () => {
+    for (const view of ['hr', 'fin', 'mkt', 'dept']) {
+      const t = PERMISSION_TABS.find(x => x.id === `${view}.claims_approve`)!
+      expect([t.label, t.reach], view).toEqual(['Claim & approve', 'dept'])
+      expect(t.opens).toEqual({ view: ['claims.view'], approve: ['claims.approve'] })
+    }
+    for (const key of ['ultimate', 'full', 'fin_maker', 'hr', 'staff']) {
+      expect([...moved(key)].filter(g => g.includes('claims_approve')), key).toEqual([])
     }
   })
 
@@ -333,7 +346,7 @@ describe('Select all, the New template window and the boxes that open nothing ye
     const other = new Set(['hr.payroll.view'])
     const every = toggleView(other, 'dept')
     expect(viewTally(every, 'dept')).toBe('all')
-    expect(viewCount('dept', every)).toEqual({ seen: 3, of: 3 })
+    expect(viewCount('dept', every)).toEqual({ seen: 4, of: 4 })
     expect(every.has('dept.my_claims.edit')).toBe(true)
     expect(every.has('hr.payroll.view')).toBe(true)
     expect([...toggleView(every, 'dept')]).toEqual(['hr.payroll.view'])

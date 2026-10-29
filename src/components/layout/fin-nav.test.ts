@@ -136,6 +136,12 @@ describe("Finance's account menu", () => {
     expect(accountMenuActive(finAccountMenu(), '/claims', null)).toBe('claim')
   })
 
+  // PR ③ (2026-10-29): for whoever holds the Finance view's Claim & approve, the same row says so.
+  it('says Claim & approve to its holder', () => {
+    const groups = visibleAccountMenu(finAccountMenu(), { ...carrie, tabs: [...(carrie.tabs ?? []), 'fin.my_claims.view', 'fin.claims_approve.view'] })
+    expect(groups.find((g) => g.title === 'Account')?.items.map((i) => i.label)).toContain('Claim & approve')
+  })
+
   it('lets a shared login ask IT for help, with no password control', () => {
     const groups = visibleAccountMenu(finAccountMenu(), finance)
     expect(groups.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([

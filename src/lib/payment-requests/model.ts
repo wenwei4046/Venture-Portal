@@ -75,6 +75,12 @@ export interface PaymentRequest {
   rejectedAt: string | null
   rejectReason: string | null
   rejectedByName: string | null
+  /** Sent to its department's Claim & approve first (PR ③). */
+  needsApproval: boolean
+  approvedAt: string | null
+  approvedByName: string | null
+  /** While it waits for approval: who may approve it (the department's holders but its sender). */
+  reviewers: string[] | null
   pvId: string | null
   pvNo: string | null
   pvStatus: string | null
@@ -93,6 +99,8 @@ export interface RequestContext {
   salaryAccount: { bank: string; last4: string } | null
   departments: Array<{ id: string; name: string }>
   companies: Array<{ id: string; name: string }>
+  /** Who approves a sent request first (PR ③); null — it goes straight to Finance. */
+  reviewers: string[] | null
 }
 
 // ── Reading the database's answers ─────────────────────────────────────────
@@ -105,6 +113,8 @@ const n = (v: unknown): number => {
   return Number.isFinite(x) ? Math.round(x * 100) / 100 : 0
 }
 const list = (v: unknown): Raw[] => (Array.isArray(v) ? v.map(obj) : [])
+/** A list of names as the database hands it — none (null) when it is not a list. */
+const names = (v: unknown): string[] | null => (Array.isArray(v) ? v.flatMap((x) => (str(x) ? [str(x)!] : [])) : null)
 const STATUSES: readonly RequestStatus[] = ['draft', 'pending_approval', 'with_finance', 'rejected', 'in_pv', 'paid', 'cancelled']
 
 export function parseRequest(raw: unknown): PaymentRequest | null {
@@ -136,6 +146,10 @@ export function parseRequest(raw: unknown): PaymentRequest | null {
     rejectedAt: str(r.rejectedAt),
     rejectReason: str(r.rejectReason),
     rejectedByName: str(r.rejectedByName),
+    needsApproval: r.needsApproval === true,
+    approvedAt: str(r.approvedAt),
+    approvedByName: str(r.approvedByName),
+    reviewers: names(r.reviewers),
     pvId: str(r.pvId),
     pvNo: str(r.pvNo),
     pvStatus: str(r.pvStatus),
@@ -181,6 +195,7 @@ export function parseContext(raw: unknown): RequestContext | null {
     salaryAccount: str(acct.bank) && str(acct.last4) ? { bank: str(acct.bank)!, last4: str(acct.last4)! } : null,
     departments: named(c.departments),
     companies: named(c.companies),
+    reviewers: names(c.reviewers)?.length ? names(c.reviewers) : null,
   }
 }
 
@@ -242,6 +257,28 @@ export function whereItIs(r: PaymentRequest): { text: string; tone: ChipTone } {
   }
 }
 
+/** "SIA JOSIAH", "SIA JOSIAH or KHO WEI JIE", "A, B or C". */
+export function orWords(people: readonly string[]): string {
+  if (people.length <= 1) return people[0] ?? ''
+  return `${people.slice(0, -1).join(', ')} or ${people[people.length - 1]}`
+}
+
+/** Under the chip: who approves it, who approved it, who sent it back (PR ③) — none when nothing more is to say. */
+export function whereItIsNote(r: PaymentRequest): string | null {
+  if (r.status === 'pending_approval') return r.reviewers?.length ? `${orWords(r.reviewers)} approves it` : 'Waiting for its approver'
+  if (r.status === 'rejected') return r.rejectedStage === 'approval' ? `Sent back by ${r.rejectedByName ?? 'the approver'}` : 'Rejected by Finance'
+  if ((r.status === 'with_finance' || r.status === 'in_pv' || r.status === 'paid') && r.approvedByName) return `Approved by ${r.approvedByName}`
+  return null
+}
+
+/** The New request window's last line: who approves it first, or straight to Finance. */
+export function routeWords(ctx: Pick<RequestContext, 'reviewers'> | null): string {
+  const who = ctx?.reviewers ?? []
+  if (who.length === 0) return 'After you submit: it goes straight to Finance.'
+  if (who.length === 1) return `After you submit: ${who[0]} approves it first, then it goes to Finance.`
+  return `After you submit: ${orWords(who)} approves it first — one approval is enough — then it goes to Finance.`
+}
+
 // ── The Claim page ─────────────────────────────────────────────────────────
 
 export type StaffCard = 'all' | 'draft' | 'finance' | 'rejected' | 'paid'
@@ -288,6 +325,65 @@ export function staffHero(rows: readonly PaymentRequest[]): { label: string; val
 export const canEdit = (r: PaymentRequest) => r.mine && (r.status === 'draft' || r.status === 'rejected')
 export const canCancel = (r: PaymentRequest) =>
   r.mine && !r.pvId && (r.status === 'draft' || r.status === 'pending_approval' || r.status === 'with_finance' || r.status === 'rejected')
+
+// ── Claim & approve (PR ③) ─────────────────────────────────────────────────
+
+/** A holder's page (`payment_requests_for_approval`): their department's sent requests, who approves them, may they. */
+export interface ApprovalRead {
+  departmentName: string
+  canApprove: boolean
+  approvers: Array<{ id: string; name: string }>
+  requests: PaymentRequest[]
+}
+
+export function parseApproval(raw: unknown): ApprovalRead | null {
+  const a = obj(raw)
+  const departmentName = str(a.departmentName)
+  if (!departmentName) return null
+  return {
+    departmentName,
+    canApprove: a.canApprove === true,
+    approvers: list(a.approvers).map((x) => ({ id: str(x.id) ?? '', name: str(x.name) ?? '' })).filter((x) => x.id && x.name),
+    requests: parseRequests(a.requests),
+  }
+}
+
+export type ApproveCard = 'to_approve' | 'department' | 'mine'
+
+/** It waits for the reader's approval: their department's, sent for approval, not their own. */
+export const waitsForMe = (r: PaymentRequest) => r.status === 'pending_approval' && !r.mine
+
+/** The cards: To approve · All {department} · Mine (the reader's own, drafts too). */
+export function approveCards(read: ApprovalRead, mine: readonly PaymentRequest[]): HubCardItem[] {
+  const card = (key: ApproveCard, label: string, tone: CardTone, icon: HrIconName): HubCardItem => {
+    const of = rowsOfApproveCard(read, mine, key)
+    return { key, label, tone, icon, sub: count(of.length), value: rmOf(sum(of)) }
+  }
+  return [
+    card('to_approve', 'To approve', 'pending_approval', 'approve'),
+    card('department', `All ${read.departmentName}`, 'all', 'receipt'),
+    card('mine', 'Mine', 'draft', 'doc'),
+  ]
+}
+
+export function rowsOfApproveCard(read: ApprovalRead, mine: readonly PaymentRequest[], card: string): PaymentRequest[] {
+  if (card === 'mine') return [...mine]
+  if (card === 'department') return [...read.requests]
+  return read.requests.filter(waitsForMe)
+}
+
+/** The total over the cards: what waits for the reader. */
+export function approveHero(read: ApprovalRead): { label: string; value: string } {
+  const waiting = read.requests.filter(waitsForMe)
+  return { label: `Waiting for you · ${count(waiting.length)}`, value: rmOf(sum(waiting)) }
+}
+
+/** The page's line under its head (the mockup's ②), the reader's fellow approvers named. */
+export function approveLede(read: ApprovalRead, me: string): string {
+  const others = read.approvers.map((a) => a.name).filter((name) => name !== me)
+  const who = others.length ? `you or ${orWords(others)} — one approval is enough` : 'you'
+  return `${read.departmentName}’s requests. Your team’s wait here for ${who}. Yours go straight to Finance.`
+}
 
 // ── The New request window ─────────────────────────────────────────────────
 

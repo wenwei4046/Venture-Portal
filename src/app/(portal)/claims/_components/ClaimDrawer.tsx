@@ -6,10 +6,11 @@ import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/
 import { RequestGroups, RequestHero } from '@/components/payment-requests/RequestParts'
 import { officeDay } from '@/lib/office-time'
 import { openRequestFile } from '@/lib/payment-requests/actions'
-import { canCancel, canEdit, whereItIs, type PaymentRequest } from '@/lib/payment-requests/model'
+import { canCancel, canEdit, orWords, waitsForMe, whereItIs, type PaymentRequest } from '@/lib/payment-requests/model'
 
-// One of one's own requests in the Claim page's drawer (2026-10-29, PR ②): where it is, what it holds, why Finance sent
-// it back — and, while it is still the requester's, Edit (or Fix and send again), Submit and Cancel request.
+// One of one's own requests in the Claim page's drawer (2026-10-29, PR ②): where it is, what it holds, why it was sent
+// back — and, while it is still the requester's, Edit (or Fix and send again), Submit and Cancel request. Since PR ③ a
+// Claim & approve holder opens their department's here too: Approve — send to Finance, or Reject… with what to fix.
 
 const KICKER = { claim: 'Claim · I paid', direct_pay: 'Direct payment' } as const
 
@@ -18,11 +19,14 @@ function noteOf(r: PaymentRequest): string {
     case 'draft':
       return 'Not sent yet — Submit it when it is complete.'
     case 'pending_approval':
-      return 'Waiting for your department’s approval, then Finance.'
+      if (!r.mine) return 'Waiting for your approval — approve it to send it to Finance, or send it back with what to fix.'
+      return r.reviewers?.length ? `Waiting for ${orWords(r.reviewers)} to approve it, then Finance.` : 'Waiting for your department’s approval, then Finance.'
     case 'with_finance':
-      return 'With Finance — they make its payment voucher.'
+      return r.approvedByName ? `Approved by ${r.approvedByName} — with Finance now; they make its payment voucher.` : 'With Finance — they make its payment voucher.'
     case 'rejected':
-      return 'Finance sent it back — fix it and send it again.'
+      return r.rejectedStage === 'approval'
+        ? `${r.rejectedByName ?? 'Your approver'} sent it back — fix it and send it again.`
+        : 'Finance sent it back — fix it and send it again.'
     case 'in_pv':
       return `In ${r.pvNo ?? 'a payment voucher'} — paid once it is approved.`
     case 'paid':
@@ -41,6 +45,7 @@ export function ClaimDrawer({
   onCancel,
   submitting,
   error,
+  decide,
 }: {
   request: PaymentRequest | null
   onClose: () => void
@@ -51,6 +56,8 @@ export function ClaimDrawer({
   onCancel: (r: PaymentRequest) => void
   submitting: boolean
   error: string | null
+  /** A Claim & approve holder who may approve: their department's request waiting for it. */
+  decide?: { onApprove: (r: PaymentRequest) => void; onSendBack: (r: PaymentRequest) => void } | null
 }) {
   // The request stays drawn while the drawer plays out.
   const [shown, setShown] = useState<PaymentRequest | null>(request)
@@ -102,6 +109,16 @@ export function ClaimDrawer({
         </button>,
       )
     }
+    if (decide && waitsForMe(r)) {
+      bar.push(
+        <button key="back" type="button" className={d.barBtn} data-kind="danger" onClick={() => decide.onSendBack(r)} disabled={submitting}>
+          Reject…
+        </button>,
+        <button key="approve" type="button" className={d.barBtn} data-kind="primary" onClick={() => decide.onApprove(r)} disabled={submitting}>
+          {submitting ? 'Approving…' : 'Approve — send to Finance'}
+        </button>,
+      )
+    }
   }
 
   return (
@@ -118,7 +135,11 @@ export function ClaimDrawer({
           />
           {r.status === 'rejected' && r.rejectReason ? (
             <Group n="—" title="Why it was sent back">
-              <Line label={r.rejectedByName ?? 'Finance'} value={r.rejectReason} sub={r.rejectedAt ? fd(officeDay(r.rejectedAt).format('YYYY-MM-DD')) : undefined} />
+              <Line
+                label={r.rejectedByName ?? (r.rejectedStage === 'approval' ? 'Your approver' : 'Finance')}
+                value={r.rejectReason}
+                sub={r.rejectedAt ? fd(officeDay(r.rejectedAt).format('YYYY-MM-DD')) : undefined}
+              />
             </Group>
           ) : null}
           {error ? (

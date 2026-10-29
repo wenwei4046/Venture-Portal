@@ -90,7 +90,7 @@ export type PersonAccessData =
       kind: 'template'
       userId: string
       titleName: string
-      template: { id: string; name: string; baseRole: string; grants: Grants; sensitive: SensitiveField[]; tabs: string[] | null }
+      template: { id: string; name: string; baseRole: string; grants: Grants; sensitive: SensitiveField[]; tabs: string[] | null; review: boolean }
       cells: PersonCells
       /** Their own boxes over the template's ticks (2026-10-11); none stored yet = their cells give them. */
       boxes: PersonBox[]
@@ -100,6 +100,8 @@ export type PersonAccessData =
       reach: PersonReach | null
       /** Their own Salary / NRIC / Bank ticks over the template's (2026-10-16). */
       ownSensitive: SensitiveTick[]
+      /** Their own By management approve over the template's (2026-10-29, mig 20261029200000) — null: the template's. */
+      ownReview: boolean | null
       functions: PermFunction[]
       cellKeys: CellKey[]
     }
@@ -116,7 +118,7 @@ export async function loadPersonAccess(
   }
   // The permission tables postdate database.types.ts.
   const db = supabase as unknown as SupabaseClient
-  const [tpl, grants, sens, fns, keys, cells, legacy, defs, tabs, boxes, reach, ownSens] = await Promise.all([
+  const [tpl, grants, sens, fns, keys, cells, legacy, defs, tabs, boxes, reach, ownSens, tplFlags, ownFlags] = await Promise.all([
     db.from('permission_templates').select('id, name, base_role').eq('id', title.templateId).maybeSingle(),
     db.from('permission_template_grants').select('function_key, action, scope').eq('template_id', title.templateId),
     db.from('permission_template_sensitive').select('field').eq('template_id', title.templateId),
@@ -131,6 +133,9 @@ export async function loadPersonAccess(
     db.rpc('person_sub_department_reach', { p_user: account.id }),
     // Their own Salary / NRIC / Bank ticks (2026-10-16).
     db.from('user_permission_sensitive').select('field, granted').eq('user_id', account.id),
+    // By management approve (2026-10-29): the template's tick and their own over it — none until the tables are there.
+    db.from('permission_template_flags').select('flag').eq('template_id', title.templateId).then(r => r, () => ({ data: null, error: null })),
+    db.from('user_permission_flags').select('flag, granted').eq('user_id', account.id).then(r => r, () => ({ data: null, error: null })),
   ])
   for (const [label, res] of [['their template', tpl], ['its cells', grants], ['the permission catalog', fns], ['their own cells', cells], ['its boxes', tabs], ['their own boxes', boxes]] as const) {
     if (res.error) throw new Error(`Could not load ${label}: ${res.error.message}`)
@@ -152,6 +157,7 @@ export async function loadPersonAccess(
       grants: grantsFromRows((grants.data ?? []) as Array<{ function_key: string; action: string; scope: string }>),
       sensitive: ((sens.data ?? []) as Array<{ field: string }>).map(s => s.field).filter(isSensitiveField),
       tabs: (tabs.data ?? []).length ? ((tabs.data ?? []) as Array<{ tab_id: string; action: string }>).map(t => `${t.tab_id}.${t.action}`) : null,
+      review: !tplFlags.error && ((tplFlags.data ?? []) as Array<{ flag: string }>).some(f => f.flag === 'claims_review'),
     },
     boxes: ((boxes.data ?? []) as Array<{ tab_id: string; action: string; granted: boolean }>).map(b => ({ tab: b.tab_id, action: b.action as TabAction, granted: b.granted })),
     cells: personCellsFromRows((cells.data ?? []) as Array<{ function_key: string; action: string; scope: string | null }>),
@@ -162,6 +168,7 @@ export async function loadPersonAccess(
     })),
     reach: reach.error ? null : personReachFromJson(reach.data),
     ownSensitive: sensitiveTicksFromRows((ownSens.data ?? []) as Array<{ field: string; granted: boolean }>),
+    ownReview: ownFlags.error ? null : (((ownFlags.data ?? []) as Array<{ flag: string; granted: boolean }>).find(f => f.flag === 'claims_review')?.granted ?? null),
     functions: functionsFromRows(
       (fns.data ?? []) as Array<{ key: string; label: string; section: string; actions: string[]; scopes: string[]; description: string | null }>,
     ),
