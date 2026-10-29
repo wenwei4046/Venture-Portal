@@ -46,7 +46,7 @@ export interface MsgDelivery {
   ignored: number;
 }
 
-interface Referral { source?: string; type?: string; ref?: string; ad_id?: string; ads_context_data?: { ad_title?: string; post_id?: string; photo_url?: string; video_url?: string } }
+export interface Referral { source?: string; type?: string; ref?: string; ad_id?: string; ads_context_data?: { ad_title?: string; post_id?: string; photo_url?: string; video_url?: string } }
 interface Attachment { type?: string; title?: string; payload?: { url?: string; sticker_id?: number; coordinates?: { lat?: number; long?: number } } }
 interface Event {
   sender?: { id?: string };
@@ -61,7 +61,7 @@ interface Event {
 
 const iso = (ms: number | undefined) => (Number.isFinite(ms) && ms! > 0 ? new Date(ms!).toISOString() : new Date().toISOString());
 
-function adOf(r: Referral | undefined): MsgInbound["ad"] {
+export function adOf(r: Referral | undefined): MsgInbound["ad"] {
   if (!r || (!r.ad_id && r.source !== "ADS")) return null;
   const x = r.ads_context_data;
   return { sourceId: r.ad_id ?? null, headline: x?.ad_title ?? null,

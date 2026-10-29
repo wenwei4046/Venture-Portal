@@ -50,8 +50,8 @@ describe('Lead View › a Page delivery: standby customers and the Page’s own 
 
   it('leaves the CRM’s Pages and anything that is not a Page delivery alone', () => {
     expect(leadPageEvents({ object: 'page', entry: [{ id: CRM, time: 1, messaging: [customer('7700009', 'm.9')], standby: [echo('7700009', 'e.9', 'x')] }] }, crm, OURS))
-      .toEqual({ messages: [], replies: [], receipts: { delivered: [], reads: [] } })
-    expect(leadPageEvents({ object: 'instagram', entry: [] }, crm, OURS)).toEqual({ messages: [], replies: [], receipts: { delivered: [], reads: [] } })
+      .toEqual({ messages: [], replies: [], receipts: { delivered: [], reads: [] }, returns: [] })
+    expect(leadPageEvents({ object: 'instagram', entry: [] }, crm, OURS)).toEqual({ messages: [], replies: [], receipts: { delivered: [], reads: [] }, returns: [] })
   })
 })
 
@@ -80,5 +80,18 @@ describe('a tapped template button reads as its whole option (2026-10-29)', () =
       ev('m.3', 'Yes', 'SOMETHING_ELSE'),
     ] }] }, crm, OURS)
     expect(out.messages.map(m => m.body)).toEqual(['Talk to a salesperson about delivery', 'Hello', 'Yes'])
+  })
+})
+
+describe('a customer back from an ad (2026-10-29, mig 20261029170010)', () => {
+  it('reads a referral on its own as a return, with the ad', () => {
+    const out = leadPageEvents({ object: 'page', entry: [{ id: P2990, messaging: [
+      { sender: { id: '28148126538195565' }, recipient: { id: P2990 }, timestamp: 1793053595,
+        referral: { type: 'OPEN_THREAD', ad_id: '120248982273430254', source: 'ADS', ads_context_data: { post_id: '122141456535199078', ad_title: '[Promotion] Skip the markup' } } },
+      { sender: { id: P2990 }, recipient: { id: '777' }, referral: { ad_id: '1', source: 'ADS' } },
+      { sender: { id: '888' }, recipient: { id: P2990 }, referral: { type: 'OPEN_THREAD', source: 'SHORTLINK', ref: 'x' } },
+    ] }] }, crm, OURS)
+    expect(out.returns).toEqual([{ pageId: P2990, psid: '28148126538195565', ad: expect.objectContaining({ sourceId: '120248982273430254', headline: '[Promotion] Skip the markup' }) }])
+    expect(out.messages).toEqual([])
   })
 })

@@ -97,7 +97,7 @@ export async function POST(request: Request) {
   const reads = ours(delivery.reads)
   // Every other Page's messages are Lead View's (a brand's Page) — standby ones too, and the Page's own replies sent from
   // Business Suite (lib/leads/page-events.ts); with no CRM Pages set, the CRM takes them all, as before.
-  const leadEvents = pages.size ? leadPageEvents(body, pages, process.env.META_APP_ID?.trim()) : { messages: [], replies: [], receipts: { delivered: [], reads: [] } }
+  const leadEvents = pages.size ? leadPageEvents(body, pages, process.env.META_APP_ID?.trim()) : { messages: [], replies: [], receipts: { delivered: [], reads: [] }, returns: [] }
   const leadMessages = leadEvents.messages
   const ignored = delivery.ignored + (delivery.reads.length - reads.length)
 
@@ -117,6 +117,12 @@ export async function POST(request: Request) {
   // Lead View's own function and answer. A failure there answers 500 after the CRM's are kept: Meta retries the whole
   // delivery, and both sides keep a message by Meta's id, so a retry takes nothing twice.
   let leadsFailed = false
+  // A customer back from an ad (a referral on its own): the ad kept, the reply rules asked again on their next message
+  // (lead_ingest_ad_return, mig 20261029170010) — before the messages, which may come in the same delivery. Only warns.
+  if (leadEvents.returns.length) {
+    const back = await client().rpc('lead_ingest_ad_return', { p_returns: leadEvents.returns })
+    if (back.error) console.warn('lead_ingest_ad_return failed:', back.error.message)
+  }
   if (leadMessages.length) {
     // Which brand an ad's customer is: the ad account's name decides 2990s mini (lib/leads/ad-account.ts).
     const forLeads = await Promise.all(leadMessages.map(async m => m.ad?.sourceId
