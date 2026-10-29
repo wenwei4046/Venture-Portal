@@ -19,6 +19,7 @@ import { adRunLine, adRunning, adStatusOf } from "@/lib/member/crm-ad-running";
 import { lbaRange, lbaStatus, leadsByAd, type LbaStatus } from "./leads-by-ad";
 import { panelLeads } from "./lead-panel";
 import { initials } from "./data";
+import { BRAND_LABEL, brandOf as pageBrand, sourceOf, type SourceBrand } from "@/lib/member/crm-source";
 
 const DAY = 86_400_000;
 const day0 = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -136,12 +137,19 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   const brandOf = (id: string) => data.adNames?.[id]?.pageName || (data.adNames?.[id]?.pageId ? `Page ${data.adNames[id]!.pageId}` : "Other");
   const brandSort = <C extends { id: string }>(cs: C[]) => { const order = [...new Set(cs.map(c => brandOf(c.id)))].sort((x, y) => Number(x === "Other") - Number(y === "Other") || x.localeCompare(y));
     return [...cs].sort((x, y) => order.indexOf(brandOf(x.id)) - order.indexOf(brandOf(y.id))); };
+  // The Conts or Dream Crafter (the owner, 2026-10-29: "多一个筛选条件，the conts & Dream Crafter"): an ad's brand by its Page,
+  // else by its leads' number or Page.
+  const brandKey = (id: string): SourceBrand | null => { const a = ads.find(x => x.id === id); return pageBrand(data.adNames?.[id]?.pageId) ?? (a?.cs[0] ? sourceOf(a.cs[0]).brand : null); };
+  const adBrand = (ui.adBrand ?? "all") as SourceBrand | "all";
+  const inBrandPick = (id: string) => adBrand === "all" || brandKey(id) === adBrand;
+  const brandAds = ads.filter(a => inBrandPick(a.id));
   const adList4 = {
-    summary: `${ads.length} ads`, unsetN: ads.filter(a => !data.adRules.some(r => r.adId === a.id) || !named(a)).length,
+    summary: `${brandAds.length} ads`, unsetN: brandAds.filter(a => !data.adRules.some(r => r.adId === a.id) || !named(a)).length,
+    brands: (["all", "conts", "dc"] as const).map(k => ({ label: k === "all" ? "All" : BRAND_LABEL[k], on: adBrand === k, pick: () => patch({ adBrand: k }) })),
     legend: T3.map(t => ({ name: t.name === DIRECTOR_TEAM ? "Director" : t.name.replace(/^Team /, ""), color: t.color })),
     // By the ad's id (two ads may share a name — Meta lets a name repeat across ad sets), grouped by Page (2026-10-22, the
     // owner: "分一下 DC & The conts"): one brand after another, Other (no Page known) last.
-    rows: brandSort(as.adCards).map((c, i, all) => { const a = ads.find(x => x.id === c.id);
+    rows: brandSort(as.adCards.filter(c => inBrandPick(c.id))).map((c, i, all) => { const a = ads.find(x => x.id === c.id);
       const brand = brandOf(c.id), dup = all.filter(x => x.name === c.name).length > 1;
       // "Not named yet" (oxblood) until a manager types its name; Meta's headline — or what the CRM calls it — under it.
       const nameless = !!a && !named(a), hl = a?.cs.find(x => x.adHeadline)?.adHeadline ?? "";

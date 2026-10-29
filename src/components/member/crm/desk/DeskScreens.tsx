@@ -41,6 +41,8 @@ export interface DeskScreensProps {
   toMine?: () => void;
   /** View as a team member (the owner, 2026-10-29: "desktop 版本能做 view as team member 吗？"): whose CRM may be opened, and opening it. */
   viewAs?: DeskViewAs;
+  /** Viewing somebody's desktop (View as, 2026-10-29): whose, and the way back to one's own. */
+  viewing?: { name: string; exit: () => void };
   /** A read that failed (the last one's words), shown as the toast. */
   problem?: string;
   /** What a shared action (send, star, forward …) said — the phone panel's toast — shown here as the desktop's toast. */
@@ -370,6 +372,12 @@ export default function DeskScreens(p: DeskScreensProps) {
   return (
     <div ref={boxRef} className={R.root} data-revenue-app="" style={{ position: "fixed", inset: 0, zIndex: 10, overflow: "auto" }}>
       <DeskApp v={v} />
+      {p.viewing && (
+        <div role="status" style={{ position: "fixed", top: "10px", left: "50%", transform: "translateX(-50%)", zIndex: 30, display: "flex", alignItems: "center", gap: "12px", height: "36px", padding: "0 6px 0 14px", borderRadius: "18px", background: "var(--crm-ink)", color: "#fff", font: "500 13px Inter, sans-serif", boxShadow: "0 8px 24px rgba(42,22,12,.25)", whiteSpace: "nowrap" }}>
+          <span>Viewing {p.viewing.name}&apos;s CRM</span>
+          <button type="button" onClick={p.viewing.exit} style={{ height: "26px", padding: "0 12px", borderRadius: "13px", border: 0, background: "#fff", color: "var(--crm-ink)", font: "600 12px Inter, sans-serif", cursor: "pointer" }}>Exit</button>
+        </div>
+      )}
       {/* Save and apply to all's window (2026-10-24): over the split editor, drawn as the Add customer window. */}
       {v.applyWin && <DeskApplyAds v={v.applyWin} />}
       {/* The phone's photo / video / document viewer and the message dialogs (Forward, Info, Starred), shared. */}
