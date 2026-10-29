@@ -11,7 +11,7 @@ export type PartnerPage = { on: false } | { on: true; name: string; today: strin
 /** The answers to the booking form's own questions, by question id (the six below until 2026-10-29). */
 export type PartnerInfo = Record<string, string>;
 /**
- * The booking form the CRM puts in use (2026-10-29, mig 20261029250000; the owner: "我从这边调整，使用者的画面也会更新"):
+ * The booking form the CRM puts in use (2026-10-29, mig 20261030040000; the owner: "我从这边调整，使用者的画面也会更新"):
  * its sections and questions. booker / bookerPhone / customer / customerPhone / remarks / note are the booking's own columns;
  * every other id is a question of the form's own, answered into info.
  */
