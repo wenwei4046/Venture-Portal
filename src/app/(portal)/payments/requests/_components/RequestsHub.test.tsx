@@ -36,7 +36,6 @@ vi.mock('../../create-actions', () => ({ openCreatePayment: mocks.openCreate }))
 vi.mock('@/lib/payment-requests/actions', () => ({ openRequestFile: mocks.openFile }))
 vi.mock('@/app/(portal)/payments/claim-requests/actions', () => ({ raiseClaimVoucher: mocks.raise }))
 vi.mock('@/app/(portal)/payments/payroll-requests/actions', () => ({ generatePvFromRequestInWords: vi.fn(), sendBackPayrollInWords: vi.fn() }))
-vi.mock('@/app/(portal)/payments/dept-requests/actions', () => ({ generateDeptRequestPvInWords: vi.fn() }))
 vi.mock('../../_components/VoucherDrawer', () => ({ VoucherDrawer: ({ id }: { id: string | null }) => (id ? <div data-testid="voucher">{id}</div> : null) }))
 
 import RequestsHub from './RequestsHub'

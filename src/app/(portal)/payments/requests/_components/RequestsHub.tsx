@@ -9,15 +9,12 @@ import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { fd } from '@/components/finv/DrawerParts'
 import type { PayrollRequestLine } from '@/lib/fin-app/payroll-requests-model'
 import { f2, plural, rm } from '@/lib/fin-app/page-model'
-import { bulkGroups, combineTag, samePayeeOpen, voucherStart, type RequestVoucherStart } from '@/lib/payment-requests/model'
+import { combineTag } from '@/lib/payment-requests/model'
 import { VoucherDrawer } from '../../_components/VoucherDrawer'
-import CreatePaymentDialog from '../../_components/CreatePaymentDialog'
-import { createPaymentForRequests } from '../../actions'
-import { openRequestsForPv, openRequestsForPvs } from '../actions'
 import type { PaymentRequestsRead } from '../_lib/requests-read'
-import { ALL_CARD, requestCards, requestHero, rowsOf, stageChip, type PaymentRequestRow } from '../_lib/requests-model'
-import CreatePaymentsDialog, { type CreatePaymentsStart } from './CreatePaymentsDialog'
+import { ALL_CARD, requestCards, requestHero, rowsOf, stageChip, tickable, whyNot, type PaymentRequestRow } from '../_lib/requests-model'
 import { RequestDrawer } from './RequestDrawer'
+import { useRequestPvs } from './use-request-pvs'
 import { FundSheet, RaiseSheet, RejectRequestSheet, RejectRequestsSheet, ReturnClaimSheet, SendBackSheet, type RaiseTarget } from './RequestSheets'
 
 // Payments › Payment request (2026-10-29, PR ①): Payment voucher's hub, its parts as they are — the head, the cards
@@ -40,16 +37,6 @@ export const COLUMNS: FinColumn<PaymentRequestRow>[] = [
 /** On show until the account arranges its own: the agreed list's Sent · From · What · Pay to · Who pays · RM, and Status. */
 const DEFAULT_SHOWN = ['sent', 'payTo', 'whoPays', 'status'] as const
 
-// Several at once (2026-10-29, PR ④): a staff request waiting for its PV is ticked; payroll and a Revenue claim are
-// worked one by one, and a press on their box says so.
-const tickable = (r: PaymentRequestRow) => r.source === 'request' && r.stage === 'finance' && r.request?.status === 'with_finance' && !r.request.pvId
-const whyNot = (r: PaymentRequestRow) =>
-  r.source === 'payroll'
-    ? 'Payroll is funded one by one — open it to Generate PV.'
-    : r.source === 'claim'
-      ? 'A Revenue claim is paid on its own — open it to Create PV.'
-      : 'Only a request waiting for its PV can be ticked.'
-
 export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
   const router = useRouter()
   const cards = useMemo(() => requestCards(data.rows, data.departments, data.seesPayroll), [data])
@@ -63,15 +50,10 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
   const [raising, setRaising] = useState<RaiseTarget | null>(null)
   const [returning, setReturning] = useState<{ id: string; label: string; sub: string } | null>(null)
   const [rejecting, setRejecting] = useState<{ id: string; label: string; sub: string } | null>(null)
-  // Create PV from staff requests: what the window starts from — asked first (still with Finance, one payee into one account).
-  const [pv, setPv] = useState<{ key: string; start: RequestVoucherStart } | null>(null)
-  const [pvOpen, setPvOpen] = useState(false)
+  // Create PV's refusal, said in the drawer of the row it was asked from.
   const [pvError, setPvError] = useState<string | null>(null)
-  // Several at once: the ticked rows, Create payments' start (read again first), the ones a Reject… sends back.
+  // Several at once: the ticked rows, and the ones a Reject… sends back.
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [bulk, setBulk] = useState<{ key: string; start: CreatePaymentsStart } | null>(null)
-  const [bulkOpen, setBulkOpen] = useState(false)
-  const [opening, setOpening] = useState(false)
   const [rejectingMany, setRejectingMany] = useState<Array<{ id: string; label: string }> | null>(null)
 
   // The card a link or a refresh lands on (?card=), once the cards are known; then kept in the URL as it changes.
@@ -98,20 +80,28 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
   // The same person's requests with no PV yet go into one PV, until Finance makes it (the user: "自动合成认的是我有没有开pv");
   // each split's Bill back? is answered in the window, with the voucher ("我开pv 时就要确定是不是要开单了").
   const staffRequests = useMemo(() => data.rows.flatMap((r) => (r.request ? [r.request] : [])), [data.rows])
+  const pvs = useRequestPvs({
+    staffRequests,
+    today: data.today,
+    onMadeOne: (made) => {
+      setOpen(null)
+      setSelected(new Set())
+      router.refresh()
+      setVoucher(made.id)
+    },
+    onMadeMany: () => {
+      setSelected(new Set())
+      setOpen(null)
+      router.refresh()
+    },
+  })
   const createRequestPv = async (r: PaymentRequestRow) => {
     if (!r.request) return
     setPvError(null)
-    try {
-      const res = await openRequestsForPv(samePayeeOpen(staffRequests, r.request).map((x) => x.id))
-      if (!res.ok) {
-        setOpen(r.key)
-        return setPvError(res.reason)
-      }
-      setPv({ key: res.requests.map((x) => x.id).join(','), start: voucherStart(res.requests) })
-      setPvOpen(true)
-    } catch {
+    const why = await pvs.createOne(r.request)
+    if (why) {
       setOpen(r.key)
-      setPvError('The requests could not be read. Try again.')
+      setPvError(why)
     }
   }
 
@@ -139,23 +129,10 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
   // Create PV for the ticked: one payee's in today's Create PV window; several payees' in Create payments — each PV's
   // requests read again first, the payee's others with no PV yet put in with them.
   const createForTicked = async () => {
-    const requests = ticked.flatMap((r) => (r.request ? [r.request] : []))
-    const groups = bulkGroups(requests, staffRequests, true)
-    if (groups.length === 0 || opening) return
-    if (groups.length === 1) return void createRequestPv(ticked[0])
-    if (groups.length > 20) return flash('Up to 20 PVs at once — tick fewer.')
-    setOpening(true)
-    try {
-      const res = await openRequestsForPvs(groups.map((g) => g.map((x) => x.id)))
-      if (!res.ok) return flash(res.reason)
-      setBulk({ key: groups.map((g) => g.map((x) => x.id).join(',')).join('|'), start: { groups: res.groups, ticked: requests.map((x) => x.id), canBillBack: res.canBillBack } })
-      setBulkOpen(true)
-    } catch {
-      flash('The requests could not be read. Try again.')
-    } finally {
-      setOpening(false)
-    }
+    const why = await pvs.createFor(ticked.flatMap((r) => (r.request ? [r.request] : [])))
+    if (why) flash(why)
   }
+  const opening = pvs.opening
 
   const steps = {
     fund: (r: PaymentRequestRow) => r.payroll && setFunding(r.payroll),
@@ -168,6 +145,13 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
   }
   const waiting = (r: PaymentRequestRow) => r.stage === 'finance'
 
+  // A statutory payment opens its voucher; every other row its drawer.
+  const openRequest = (r: PaymentRequestRow) => {
+    setPvError(null)
+    if (r.source === 'statutory' && r.voucherId) setVoucher(r.voucherId)
+    else setOpen(r.key)
+  }
+
   const onRowContextMenu = (r: PaymentRequestRow, e: MouseEvent<HTMLElement>) => {
     e.preventDefault()
     setRowMenu({ row: r, anchor: { x: e.clientX, y: e.clientY } })
@@ -175,9 +159,11 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
   let rowMenuNode = null
   if (rowMenu) {
     const r = rowMenu.row
-    const items: RowMenuItem[] = [{ key: 'open', label: 'Open', onSelect: () => setOpen(r.key) }]
+    const items: RowMenuItem[] = [{ key: 'open', label: 'Open', onSelect: () => openRequest(r) }]
     const more: RowMenuItem[] = []
-    if (r.payroll) {
+    if (r.source === 'statutory') {
+      // HR's voucher: opening it is all there is.
+    } else if (r.payroll) {
       if (waiting(r) && data.can.pay) more.push({ key: 'fund', label: 'Generate PV…', onSelect: () => steps.fund(r) })
       if (waiting(r) && data.can.sendBack && r.payroll.canSendBack) more.push({ key: 'back', label: 'Send back to HR…', danger: true, onSelect: () => steps.sendBack(r) })
     } else if (r.claim) {
@@ -223,10 +209,7 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
           amountOf={(r) => r.amount}
           search={{ value: query, onChange: setQuery, placeholder: 'Search name, what, reference…' }}
           activeKey={open}
-          onRowClick={(r) => {
-            setPvError(null)
-            setOpen(r.key)
-          }}
+          onRowClick={openRequest}
           onRowContextMenu={onRowContextMenu}
           emptyText={data.rows.length === 0 ? 'Nothing is waiting for Finance.' : 'No requests here.'}
           canSetDefault={data.canSetDefault}
@@ -279,7 +262,6 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
         }}
       />
       <RaiseSheet
-        kind="claim"
         label="Create PV"
         request={raising}
         banks={data.banks}
@@ -305,39 +287,7 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
           done('Rejected — back with the requester')
         }}
       />
-      {pv ? (
-        <CreatePaymentDialog
-          key={pv.key}
-          open={pvOpen}
-          onClose={() => setPvOpen(false)}
-          prefix={`HV-PV-${data.today.slice(0, 7).replace('-', '')}`}
-          today={data.today}
-          preset={{ title: 'Create PV', payee: pv.start.payee, description: pv.start.description, requests: pv.start }}
-          create={createPaymentForRequests}
-          onSaved={(made) => {
-            setPvOpen(false)
-            setOpen(null)
-            setSelected(new Set())
-            router.refresh()
-            setVoucher(made.id)
-          }}
-        />
-      ) : null}
-      {bulk ? (
-        <CreatePaymentsDialog
-          key={bulk.key}
-          open={bulkOpen}
-          start={bulk.start}
-          prefix={`HV-PV-${data.today.slice(0, 7).replace('-', '')}`}
-          today={data.today}
-          onClose={() => setBulkOpen(false)}
-          onDone={() => {
-            setSelected(new Set())
-            setOpen(null)
-            router.refresh()
-          }}
-        />
-      ) : null}
+      {pvs.windows}
       <RejectRequestsSheet
         requests={rejectingMany}
         onClose={() => setRejectingMany(null)}

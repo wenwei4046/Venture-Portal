@@ -7788,10 +7788,6 @@ export type Database = {
           out_staff_cost: number
         }[]
       }
-      cancel_dept_payment_request: {
-        Args: { p_reason?: string; p_request_id: string }
-        Returns: undefined
-      }
       cancel_loan_and_approval:
         | { Args: { p_loan_id: string }; Returns: undefined }
         | {
@@ -7966,14 +7962,6 @@ export type Database = {
       generate_monthly_invoices: {
         Args: { p_modes?: string[]; p_period_month: string }
         Returns: Json
-      }
-      generate_pv_for_dept_request: {
-        Args: {
-          p_pay_from_account_id: string
-          p_payment_method: string
-          p_request_id: string
-        }
-        Returns: string
       }
       get_current_base_rate: {
         Args: { p_as_of_date?: string }

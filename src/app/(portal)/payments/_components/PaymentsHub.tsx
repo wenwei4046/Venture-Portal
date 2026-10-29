@@ -4,13 +4,12 @@ import { loadPaymentsHub } from '../_lib/payments-hub'
 import type { LedgerParams } from '../_lib/hub-ledger'
 import PaymentsHubClient from './PaymentsHubClient'
 
-// Payments › Payment voucher (2026-10-14, the Finance revamp v2 — D02–D05): the ledger read once. What waits for a
-// voucher — Dept, Payroll and Claim requests — is Payments › Payment request's since 2026-10-29; the reads are
-// `loadPaymentsHub`, the Finance phone app's too, which still lists them.
+// Payments › Payment voucher (2026-10-14, the Finance revamp v2 — D02–D05): the ledger read once (`loadPaymentsHub`,
+// the Finance phone app's too). What waits for a voucher is Payments › Payment request's since 2026-10-29.
 
 export default async function PaymentsHub({ params }: { params: LedgerParams }) {
   const user = await requirePermission('treasury')
-  const hub = await loadPaymentsHub(user, params, { requests: false })
+  const hub = await loadPaymentsHub(user, params)
   return (
     <PaymentsHubClient
       ledger={hub.ledger}

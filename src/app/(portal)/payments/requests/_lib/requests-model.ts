@@ -7,15 +7,17 @@ import type { HrIconName } from '@/components/hrv/icons'
 import type { CardTone, ChipTone, HubCardItem } from '@/components/finv/Hub'
 import { claimReference, type ClaimQueueRow } from '@/lib/claim-requests'
 import type { PayrollRequestLine } from '@/lib/fin-app/payroll-requests-model'
+import type { StatutoryPeriod } from '../../payroll-requests/_lib/payroll-read'
 import { officeDay } from '@/lib/office-time'
 import { plural, rm } from '@/lib/fin-app/page-model'
 import { whatOf, whoPaysWords, type PaymentRequest } from '@/lib/payment-requests/model'
 
 // Since PR ② (2026-10-29): the staff's own requests too — a claim or a direct payment from the Claim page, under the
-// requester's department, worked here (Bill back?, Reject…, Create PV).
-export type RequestSource = 'payroll' | 'claim' | 'request'
-/** With Finance (to fund, or waiting for a voucher), or with the Principal (funded, or its voucher raised). */
-export type RequestStage = 'finance' | 'principal'
+// requester's department, worked here (Bill back?, Reject…, Create PV). Since PR ⑥: the statutory payments HR made for a
+// payroll (the old Payroll Requests page's read-only section) — vouchers to see, on a card of their own.
+export type RequestSource = 'payroll' | 'claim' | 'request' | 'statutory'
+/** With Finance (to fund, or waiting for a voucher), with the Principal (funded, or its voucher raised), or HR's own (a statutory voucher, to see). */
+export type RequestStage = 'finance' | 'principal' | 'hr'
 
 export interface PaymentRequestRow {
   /** `payroll:<request>` or `claim:<claim>` — one key for every row the page lists. */
@@ -45,6 +47,8 @@ export interface PaymentRequestRow {
   claim: ClaimQueueRow | null
   /** A staff member's request (the Claim page's). */
   request: PaymentRequest | null
+  /** A statutory payment's voucher status (draft, pending_approval, paid…). */
+  voucherStatus?: string
 }
 
 /** A department as its card names it. */
@@ -140,30 +144,66 @@ export function staffRequestRow(r: PaymentRequest, departments: readonly Request
   }
 }
 
-/** Oldest first within each stage — what waits for Finance before what is with the Principal. */
+const MONTH = (iso: string) => (iso ? officeDay(iso).format('MMM YYYY') : '')
+
+/** A statutory payment HR made for a payroll (PR ⑥ — the old Payroll Requests page's read-only section): its voucher, to see. */
+export function statutoryRow(month: string, pv: StatutoryPeriod['pvs'][number]): PaymentRequestRow {
+  return {
+    key: `statutory:${pv.id}`,
+    id: pv.id,
+    source: 'statutory',
+    card: 'statutory',
+    from: pv.payee_name?.trim() || 'Statutory',
+    fromSub: 'HR · statutory payment',
+    what: `Statutory · ${MONTH(month)}`.trim(),
+    sent: pv.payment_date ?? '',
+    ref: pv.voucher_no ?? '',
+    department: 'Payroll',
+    payTo: 'Statutory',
+    whoPays: 'Payroll',
+    amount: pv.amount,
+    stage: 'hr',
+    voucherId: pv.id,
+    voucherNo: pv.voucher_no,
+    payroll: null,
+    claim: null,
+    request: null,
+    voucherStatus: pv.status,
+  }
+}
+
+const STAGE_ORDER: Record<RequestStage, number> = { finance: 0, principal: 1, hr: 2 }
+
+/** Oldest first within each stage — what waits for Finance, then what is with the Principal, then HR's statutory vouchers. */
 export function sortRequests(rows: readonly PaymentRequestRow[]): PaymentRequestRow[] {
-  return [...rows].sort((a, b) => (a.stage === b.stage ? a.sent.localeCompare(b.sent) || a.key.localeCompare(b.key) : a.stage === 'finance' ? -1 : 1))
+  return [...rows].sort((a, b) => STAGE_ORDER[a.stage] - STAGE_ORDER[b.stage] || a.sent.localeCompare(b.sent) || a.key.localeCompare(b.key))
 }
 
 const sum = (rows: readonly PaymentRequestRow[]) => Math.round(rows.reduce((t, r) => t + r.amount, 0) * 100) / 100
 
 export const ALL_CARD = 'all'
 
-/** The cards: All, Payroll (only for an account that sees payroll), every department — and a card for any other. */
+/** The requests — every row but a statutory voucher (those are HR's, on their own card). */
+const requestsOnly = (rows: readonly PaymentRequestRow[]) => rows.filter((r) => r.source !== 'statutory')
+
+/** The cards: All, Payroll and Statutory (only for an account that sees payroll), every department — and a card for any other. */
 export function requestCards(rows: readonly PaymentRequestRow[], departments: readonly RequestDepartment[], seesPayroll: boolean): HubCardItem[] {
-  const card = (key: string, label: string, tone: CardTone, icon: HrIconName, of: readonly PaymentRequestRow[]): HubCardItem => ({
+  const card = (key: string, label: string, tone: CardTone, icon: HrIconName, of: readonly PaymentRequestRow[], one = 'request', many = 'requests'): HubCardItem => ({
     key,
     tone,
     icon,
     label,
-    sub: plural(of.length, 'request', 'requests'),
+    sub: plural(of.length, one, many),
     value: rm(sum(of)),
   })
   const under = (key: string) => rows.filter((r) => r.card === key)
   const other = under('other')
+  const statutory = under('statutory')
   return [
-    card(ALL_CARD, 'All requests', 'all', 'doc', rows),
+    card(ALL_CARD, 'All requests', 'all', 'doc', requestsOnly(rows)),
     ...(seesPayroll ? [card('payroll', 'Payroll', 'payroll', 'payroll', under('payroll'))] : []),
+    // Only when HR made some (as the old page's section), and only for whoever sees payroll.
+    ...(seesPayroll && statutory.length > 0 ? [card('statutory', 'Statutory', 'quiet', 'receipt', statutory, 'voucher', 'vouchers')] : []),
     ...departments.map((d) => card(d.key, d.name, 'quiet', 'people', under(d.key))),
     ...(other.length > 0 ? [card('other', 'Other', 'quiet', 'doc', other)] : []),
   ]
@@ -175,8 +215,16 @@ export function requestHero(rows: readonly PaymentRequestRow[]): { label: string
   return { label: `Waiting for you · ${plural(waiting.length, 'request', 'requests')}`, value: rm(sum(waiting)) }
 }
 
+const STATUTORY_CHIP: Record<string, { text: string; tone: ChipTone }> = {
+  draft: { text: 'Draft · HR’s', tone: 'def' },
+  pending_approval: { text: 'With the Principal', tone: 'accent' },
+  approved: { text: 'Approved · to be paid', tone: 'accent' },
+  paid: { text: 'Paid', tone: 'ledger' },
+}
+
 /** The status chip. */
 export function stageChip(r: PaymentRequestRow): { text: string; tone: ChipTone } {
+  if (r.source === 'statutory') return STATUTORY_CHIP[r.voucherStatus ?? ''] ?? { text: r.voucherStatus ?? 'Voucher', tone: 'def' }
   if (r.source === 'payroll') {
     if (r.stage === 'principal') return { text: 'Funded · with the Principal', tone: 'accent' }
     return { text: (r.payroll?.committed ?? 0) > 0.005 ? 'Part funded' : 'To fund', tone: 'wait' }
@@ -187,7 +235,19 @@ export function stageChip(r: PaymentRequestRow): { text: string; tone: ChipTone 
   return r.stage === 'principal' ? { text: 'PV with the Principal', tone: 'accent' } : { text: 'Waiting for a PV', tone: 'wait' }
 }
 
-/** The rows a card lists. */
+// Several at once (PR ④; the phone's too since PR ⑥): a staff request waiting for its PV is ticked; payroll, a Revenue
+// claim and a statutory voucher are worked one by one, and a press on their box says why.
+export const tickable = (r: PaymentRequestRow) => r.source === 'request' && r.stage === 'finance' && r.request?.status === 'with_finance' && !r.request.pvId
+export const whyNot = (r: PaymentRequestRow) =>
+  r.source === 'payroll'
+    ? 'Payroll is funded one by one — open it to Generate PV.'
+    : r.source === 'claim'
+      ? 'A Revenue claim is paid on its own — open it to Create PV.'
+      : r.source === 'statutory'
+        ? 'A statutory payment is HR’s voucher — open it to see it.'
+        : 'Only a request waiting for its PV can be ticked.'
+
+/** The rows a card lists — All, every request (a statutory voucher is on its own card). */
 export function rowsOf(rows: readonly PaymentRequestRow[], card: string): PaymentRequestRow[] {
-  return card === ALL_CARD ? [...rows] : rows.filter((r) => r.card === card)
+  return card === ALL_CARD ? requestsOnly(rows) : rows.filter((r) => r.card === card)
 }

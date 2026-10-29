@@ -8,13 +8,14 @@ import { payrollRequestsModel } from '@/lib/fin-app/payroll-requests-model'
 import { parseRequests } from '@/lib/payment-requests/model'
 import type { User } from '@/types'
 import { readPayrollRequests, type PayrollBank } from '../../payroll-requests/_lib/payroll-read'
-import { claimRow, payrollRow, requestDepartments, sortRequests, staffRequestRow, type PaymentRequestRow, type RequestDepartment } from './requests-model'
+import { claimRow, payrollRow, requestDepartments, sortRequests, staffRequestRow, statutoryRow, type PaymentRequestRow, type RequestDepartment } from './requests-model'
 
 // What Payments › Payment request reads (2026-10-29, PR ①): HR's payroll funding requests as Payroll Requests read
 // them (`readPayrollRequests` — only for an account with Payroll payouts, as that page asked), the claims HR approved
 // to be paid by Finance (`claim_payment_queue`, Treasury's), the departments their cards are, the active banks. The
 // caller has asked for the page and the treasury. Since PR ②, the staff's own requests sent to Finance
-// (`payment_requests_for_finance`, Treasury's — an account as its last four without the Bank tick).
+// (`payment_requests_for_finance`, Treasury's — an account as its last four without the Bank tick). Since PR ⑥, the
+// statutory vouchers that read brings too (the old page's section; Payroll payouts only, as the payroll).
 
 export interface PaymentRequestsRead {
   rows: PaymentRequestRow[]
@@ -59,6 +60,8 @@ export async function readPaymentRequests(user: User): Promise<PaymentRequestsRe
       const r = byId.get(line.id)
       if (r) rows.push(payrollRow(line, r))
     }
+    // PR ⑥: the statutory payments the old Payroll Requests page listed — HR's vouchers, on a card of their own.
+    for (const period of payroll.statutoryPeriods) for (const pv of period.pvs) rows.push(statutoryRow(period.period_month, pv))
   }
   for (const raw of ((claims.data ?? []) as unknown as Record<string, unknown>[])) rows.push(claimRow(readClaimQueueRow(raw), departments))
   // A read that fails leaves the rest of the list as it is.

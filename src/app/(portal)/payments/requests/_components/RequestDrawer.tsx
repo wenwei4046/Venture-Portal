@@ -31,30 +31,30 @@ export interface RequestDrawerSteps {
   createRequestPv: (r: PaymentRequestRow) => void
 }
 
-export function RequestDrawer({
-  row,
-  onClose,
-  can,
-  steps,
-  stepError = null,
-}: {
-  row: PaymentRequestRow | null
-  onClose: () => void
-  can: RequestDrawerCan
-  steps: RequestDrawerSteps
-  /** Why a step begun from the page (Create PV) did not go — said in the drawer. */
-  stepError?: string | null
-}) {
-  // The row stays drawn while the drawer plays out.
-  const [shown, setShown] = useState<PaymentRequestRow | null>(row)
+/** A step a request's foot offers: the drawer's bar buttons, the phone's (PR ⑥). */
+export interface RequestAction {
+  key: string
+  label: string
+  kind: 'primary' | 'danger'
+  onClick: () => void
+}
+
+/**
+ * What a request shows and what may be done with it — the drawer's body and bar, and since PR ⑥ (2026-10-29) the Finance
+ * phone app's request screen too, so the two read alike.
+ */
+export function useRequestView(
+  r: PaymentRequestRow | null,
+  can: RequestDrawerCan,
+  steps: RequestDrawerSteps,
+  /** Why a step begun from the page (Create PV) did not go — said with the request. */
+  stepError: string | null = null,
+): { body: ReactNode; actions: RequestAction[] } {
   const [fileError, setFileError] = useState<string | null>(null)
   const [openingFile, setOpeningFile] = useState<string | null>(null)
   const [opening, start] = useTransition()
-  useEffect(() => {
-    if (row) setShown(row)
-    setFileError(null)
-  }, [row])
-  const r = row ?? shown
+  const key = r?.key ?? null
+  useEffect(() => setFileError(null), [key])
 
   const openInvoice = (claimId: string) => {
     setFileError(null)
@@ -86,7 +86,7 @@ export function RequestDrawer({
   }
 
   let body: ReactNode = null
-  const bar: ReactNode[] = []
+  const actions: RequestAction[] = []
   if (r?.payroll) {
     const p = r.payroll
     const toFund = r.stage === 'finance'
@@ -131,20 +131,8 @@ export function RequestDrawer({
         ) : null}
       </>
     )
-    if (toFund && can.sendBack && p.canSendBack) {
-      bar.push(
-        <button key="back" type="button" className={d.barBtn} data-kind="danger" onClick={() => steps.sendBack(r)}>
-          Send back to HR…
-        </button>,
-      )
-    }
-    if (toFund && can.pay) {
-      bar.push(
-        <button key="fund" type="button" className={d.barBtn} data-kind="primary" onClick={() => steps.fund(r)}>
-          Generate PV
-        </button>,
-      )
-    }
+    if (toFund && can.sendBack && p.canSendBack) actions.push({ key: 'back', label: 'Send back to HR…', kind: 'danger', onClick: () => steps.sendBack(r) })
+    if (toFund && can.pay) actions.push({ key: 'fund', label: 'Generate PV', kind: 'primary', onClick: () => steps.fund(r) })
   } else if (r?.claim) {
     const c = r.claim
     const member = c.claimType === 'benefit'
@@ -193,20 +181,8 @@ export function RequestDrawer({
         ) : null}
       </>
     )
-    if (waiting && member && can.sendBack) {
-      bar.push(
-        <button key="return" type="button" className={d.barBtn} data-kind="danger" onClick={() => steps.returnToHr(r)}>
-          Return to HR…
-        </button>,
-      )
-    }
-    if (waiting && can.pay) {
-      bar.push(
-        <button key="pv" type="button" className={d.barBtn} data-kind="primary" onClick={() => steps.createPv(r)}>
-          Create PV
-        </button>,
-      )
-    }
+    if (waiting && member && can.sendBack) actions.push({ key: 'return', label: 'Return to HR…', kind: 'danger', onClick: () => steps.returnToHr(r) })
+    if (waiting && can.pay) actions.push({ key: 'pv', label: 'Create PV', kind: 'primary', onClick: () => steps.createPv(r) })
   } else if (r?.request) {
     const q = r.request
     const waiting = q.status === 'with_finance' && !q.pvId
@@ -244,21 +220,34 @@ export function RequestDrawer({
         ) : null}
       </>
     )
-    if (waiting && can.sendBack) {
-      bar.push(
-        <button key="reject" type="button" className={d.barBtn} data-kind="danger" onClick={() => steps.rejectRequest(r)}>
-          Reject…
-        </button>,
-      )
-    }
-    if (waiting && can.pay) {
-      bar.push(
-        <button key="pv" type="button" className={d.barBtn} data-kind="primary" onClick={() => steps.createRequestPv(r)}>
-          Create PV
-        </button>,
-      )
-    }
+    if (waiting && can.sendBack) actions.push({ key: 'reject', label: 'Reject…', kind: 'danger', onClick: () => steps.rejectRequest(r) })
+    if (waiting && can.pay) actions.push({ key: 'pv', label: 'Create PV', kind: 'primary', onClick: () => steps.createRequestPv(r) })
   }
+
+  return { body, actions }
+}
+
+export function RequestDrawer({
+  row,
+  onClose,
+  can,
+  steps,
+  stepError = null,
+}: {
+  row: PaymentRequestRow | null
+  onClose: () => void
+  can: RequestDrawerCan
+  steps: RequestDrawerSteps
+  /** Why a step begun from the page (Create PV) did not go — said in the drawer. */
+  stepError?: string | null
+}) {
+  // The row stays drawn while the drawer plays out.
+  const [shown, setShown] = useState<PaymentRequestRow | null>(row)
+  useEffect(() => {
+    if (row) setShown(row)
+  }, [row])
+  const r = row ?? shown
+  const { body, actions } = useRequestView(r, can, steps, stepError)
 
   return (
     <FinDrawer
@@ -266,7 +255,15 @@ export function RequestDrawer({
       onClose={onClose}
       label={r ? `${r.from} · ${r.what}` : 'Request'}
       title={r ? (r.source === 'payroll' ? r.what : r.ref || r.what) : ''}
-      bar={bar.length > 0 ? bar : null}
+      bar={
+        actions.length > 0
+          ? actions.map((a) => (
+              <button key={a.key} type="button" className={d.barBtn} data-kind={a.kind} onClick={a.onClick}>
+                {a.label}
+              </button>
+            ))
+          : null
+      }
     >
       {body}
     </FinDrawer>

@@ -13,7 +13,6 @@ import { bankOption } from '@/lib/fin-app/requests-model'
 import type { PayrollBank } from '@/app/(portal)/payments/payroll-requests/_lib/payroll-read'
 import { generatePvFromRequestInWords, sendBackPayrollInWords } from '@/app/(portal)/payments/payroll-requests/actions'
 import { raiseClaimVoucher } from '@/app/(portal)/payments/claim-requests/actions'
-import { generateDeptRequestPvInWords } from '@/app/(portal)/payments/dept-requests/actions'
 import { rejectPaymentRequest, rejectPaymentRequests, returnMemberClaim } from '../actions'
 
 // The windows a request is worked in (2026-10-29 — Payments › Payment request, and the Finance phone app's request
@@ -200,13 +199,7 @@ export function SendBackSheet({ request, onClose, onDone }: { request: PayrollRe
   )
 }
 
-const DEPT_METHODS = [
-  { value: 'bank_transfer', label: 'Bank transfer' },
-  { value: 'cheque', label: 'Cheque' },
-  { value: 'cash', label: 'Cash' },
-]
-
-const BUSY_WORD: Record<string, string> = { 'Raise voucher': 'Raising…', 'Generate PV': 'Generating…' }
+const BUSY_WORD: Record<string, string> = { 'Raise voucher': 'Raising…' }
 
 /** What a voucher is raised for: the request, its name and its amount as the list shows them. */
 export interface RaiseTarget {
@@ -215,16 +208,17 @@ export interface RaiseTarget {
   value: string
 }
 
-/** The voucher for one request: the bank it is paid from and how, then the Principal's queue. */
+/**
+ * The voucher for a member's claim HR approved for payment: the bank it is paid from and how, then the Principal's queue.
+ * (A Dept request's — its other kind — went with that page, 2026-10-29, PR ⑥.)
+ */
 export function RaiseSheet({
-  kind,
   request,
   banks,
-  label = kind === 'claim' ? 'Raise voucher' : 'Generate PV',
+  label = 'Raise voucher',
   onClose,
   onDone,
 }: {
-  kind: 'claim' | 'dept'
   request: RaiseTarget | null
   banks: Array<{ id: string; bank_name: string; current_balance: number }>
   /** The window's word for it — Payment request says *Create PV*. */
@@ -243,17 +237,13 @@ export function RaiseSheet({
     setError(null)
   }, [request])
   const close = () => !busy && onClose()
-  const methods = kind === 'claim' ? CLAIM_PAYMENT_METHODS : DEPT_METHODS
   const raise = () => {
     if (!request) return
     if (!bankId) return setError('Choose the bank account to pay from.')
     setError(null)
     start(async () => {
       try {
-        const res =
-          kind === 'claim'
-            ? await raiseClaimVoucher({ claimId: request.id, bankId, method })
-            : await generateDeptRequestPvInWords({ requestId: request.id, payFromAccountId: bankId, paymentMethod: method })
+        const res = await raiseClaimVoucher({ claimId: request.id, bankId, method })
         if (!res.ok) return setError(res.reason)
         onDone()
       } catch {
@@ -288,7 +278,7 @@ export function RaiseSheet({
         </Field>
         <Field label="Method" htmlFor="req-method">
           <Select id="req-method" round={12} className={fm.select} value={method} onChange={(e) => setMethod(e.target.value)}>
-            {methods.map((m) => (
+            {CLAIM_PAYMENT_METHODS.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
               </option>

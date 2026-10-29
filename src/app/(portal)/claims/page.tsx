@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
  * Claim (2026-10-29, PR ② of docs/module-spec-payment-requests.md — the claim process the user settled with the boss):
  * one's own payment requests — a claim ("I paid — pay me back") or a direct payment to a supplier — sent to Finance,
  * who makes the voucher on Payments › Payment request. In every view (each view's own row); the pool claims this page
- * listed before stay in the database until PR ⑥ retires them. Viewing as somebody shows none of the real account's.
+ * listed before (none in production) lost their code with PR ⑥. Viewing as somebody shows none of the real account's.
  * PR ③: for a Claim & approve holder (Claims · View at Dept) it is Claim & approve — their department's requests beside
  * their own; one whose department cannot be read keeps the Claim page.
  */

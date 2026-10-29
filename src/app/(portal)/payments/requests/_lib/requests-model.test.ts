@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ClaimQueueRow } from '@/lib/claim-requests'
 import type { PayrollRequestLine } from '@/lib/fin-app/payroll-requests-model'
-import { claimRow, payrollRow, requestCards, requestDepartments, requestHero, rowsOf, sortRequests, stageChip } from './requests-model'
+import { claimRow, payrollRow, requestCards, requestDepartments, requestHero, rowsOf, sortRequests, stageChip, statutoryRow } from './requests-model'
 
 // Payments › Payment request (2026-10-29): the rows, the cards they are under and what waits for Finance.
 
@@ -108,6 +108,25 @@ describe('the cards', () => {
 
   it('without Payroll payouts there is no Payroll card (and no payroll row is read)', () => {
     expect(requestCards(rows.filter((r) => r.source !== 'payroll'), DEPTS, false).map((c) => c.key)).toEqual(['all', 'dept:hr', 'dept:mk', 'dept:it', 'dept:rev'])
+  })
+
+  // PR ⑥ (2026-10-29): the old Payroll Requests page's statutory payments — HR's vouchers, a card of their own after
+  // Payroll; never in All, never waiting for Finance; each opens its voucher.
+  it('statutory vouchers: their own card after Payroll, not in All, not waiting', () => {
+    const pv = { id: 'pv-k', voucher_no: 'HV-PV-202610-0612', payee_name: 'KWSP', amount: 18250.4, status: 'paid', payment_date: '2026-10-15' }
+    const withStatutory = sortRequests([...rows, statutoryRow('2026-10-01', pv), statutoryRow('2026-10-01', { ...pv, id: 'pv-s', payee_name: 'PERKESO', amount: 1200, status: 'pending_approval' })])
+    expect(requestCards(withStatutory, DEPTS, true).map((c) => [c.key, c.sub, c.value]).slice(0, 3)).toEqual([
+      ['all', '4 requests', 'RM 98,700.10'],
+      ['payroll', '1 request', 'RM 98,450.20'],
+      ['statutory', '2 vouchers', 'RM 19,450.40'],
+    ])
+    expect(requestCards(withStatutory, DEPTS, false).map((c) => c.key)).not.toContain('statutory')
+    expect(requestHero(withStatutory)).toEqual(requestHero(rows))
+    expect(rowsOf(withStatutory, 'all').some((r) => r.source === 'statutory')).toBe(false)
+    const k = rowsOf(withStatutory, 'statutory')[0]
+    expect([k.from, k.what, k.ref, k.voucherId, stageChip(k).text]).toEqual(['KWSP', 'Statutory · Oct 2026', 'HV-PV-202610-0612', 'pv-k', 'Paid'])
+    expect(stageChip(rowsOf(withStatutory, 'statutory')[1]).text).toBe('With the Principal')
+    expect(withStatutory.at(-1)?.source).toBe('statutory')
   })
 
   it('an Other card only when a row has no department card', () => {

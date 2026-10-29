@@ -419,9 +419,9 @@ describe('the DEFINER functions that ask for an action', () => {
     })
   }
 
-  it('reads all 70 from the migration — 68 since My Billing’s two requests were dropped', () => {
+  it('reads all 70 from the migration — 66 since My Billing’s two requests and the Dept requests’ two steps were dropped', () => {
     expect(Object.keys(DEFINER_ASKS)).toHaveLength(70)
-    expect(Object.keys(DEFINER_ASKS).filter(name => !(name in DEFINER_ASKS_NOW)).sort()).toEqual(['submit_dept_payment_request', 'submit_invoice_request'])
+    expect(Object.keys(DEFINER_ASKS).filter(name => !(name in DEFINER_ASKS_NOW)).sort()).toEqual(['cancel_dept_payment_request', 'generate_pv_for_dept_request', 'submit_dept_payment_request', 'submit_invoice_request'])
     expect(DEFINER_ASKS_NOW.mint_invoice_no).toEqual(['billing.create'])
     expect(Object.values(DEFINER_ASKS).every(asked => asked.length > 0)).toBe(true)
     expect([...DEFINER_LETS_IN_APPROVERS]).toEqual(['dept_request_pv_rejected'])
