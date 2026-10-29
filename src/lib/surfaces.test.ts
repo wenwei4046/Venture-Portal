@@ -3,7 +3,6 @@ import { actionsFromKeys } from './permission-actions'
 import type { ActionHolder } from './permission-actions'
 import {
   decidesEverything,
-  decidesPoolClaims,
   overviewFor,
   raisesForSignOff,
   readsEveryPool,
@@ -57,21 +56,19 @@ const surfaces = (h: ActionHolder) => ({
   decidesEverything: decidesEverything(h),
   raisesForSignOff: raisesForSignOff(h),
   everyPool: readsEveryPool(h),
-  decidesPoolClaims: decidesPoolClaims(h),
   allSettings: seesAllSettings(h),
   reportsCompanyWide: reportsCompanyWide(h),
 })
 
 describe('the logins land where their kind put them', () => {
   // The old tests: isPrincipal (kind principal), isFinance (kind finance),
-  // role === 'hr', pool claims to Finance / Principal.
+  // role === 'hr'.
   const expected: Record<string, ReturnType<typeof surfaces>> = {
-    principal: { overview: 'treasury', decidesEverything: true, raisesForSignOff: false, everyPool: true, decidesPoolClaims: true, allSettings: true, reportsCompanyWide: true },
-    finance: { overview: 'treasury', decidesEverything: false, raisesForSignOff: true, everyPool: true, decidesPoolClaims: true, allSettings: false, reportsCompanyWide: true },
-    hr: { overview: 'hr', decidesEverything: false, raisesForSignOff: false, everyPool: false, decidesPoolClaims: false, allSettings: false, reportsCompanyWide: false },
-    // Kind finance: raises for sign-off as before; Claims · Approve is not on
-    // her template (the gate already refused her), and she opens no report.
-    carrie: { overview: 'treasury', decidesEverything: false, raisesForSignOff: true, everyPool: false, decidesPoolClaims: false, allSettings: false, reportsCompanyWide: false },
+    principal: { overview: 'treasury', decidesEverything: true, raisesForSignOff: false, everyPool: true, allSettings: true, reportsCompanyWide: true },
+    finance: { overview: 'treasury', decidesEverything: false, raisesForSignOff: true, everyPool: true, allSettings: false, reportsCompanyWide: true },
+    hr: { overview: 'hr', decidesEverything: false, raisesForSignOff: false, everyPool: false, allSettings: false, reportsCompanyWide: false },
+    // Kind finance: raises for sign-off as before, and opens no report.
+    carrie: { overview: 'treasury', decidesEverything: false, raisesForSignOff: true, everyPool: false, allSettings: false, reportsCompanyWide: false },
   }
   for (const [name, holder] of Object.entries(LOGINS) as Row[]) {
     it(name, () => expect(surfaces(holder)).toEqual(expected[name]))
@@ -82,15 +79,15 @@ describe('a template routes by its cells, whatever its hidden kind', () => {
   it('a Director (kind staff) gets the treasury Overview and the sign-off queue', () => {
     expect(surfaces(TEMPLATES.director)).toEqual({
       overview: 'treasury', decidesEverything: true, raisesForSignOff: false, everyPool: false,
-      decidesPoolClaims: false, allSettings: false, reportsCompanyWide: true,
+      allSettings: false, reportsCompanyWide: true,
     })
   })
   it('the Executive office (kind staff) has no Overview of its own — its Reports cell is held without Treasury', () => {
     expect(surfaces(TEMPLATES.office).overview).toBe('none')
     expect(reportsCompanyWide(TEMPLATES.office)).toBe(false)
   })
-  it('a Finance · Checker decides pool claims but raises nothing for sign-off', () => {
-    expect(surfaces(TEMPLATES.fin_checker)).toMatchObject({ overview: 'treasury', raisesForSignOff: false, everyPool: true, decidesPoolClaims: true, reportsCompanyWide: true })
+  it('a Finance · Checker raises nothing for sign-off', () => {
+    expect(surfaces(TEMPLATES.fin_checker)).toMatchObject({ overview: 'treasury', raisesForSignOff: false, everyPool: true, reportsCompanyWide: true })
   })
   it('HR · Payroll gets HR’s Overview; Staff · Basic none', () => {
     expect(overviewFor(TEMPLATES.hr)).toBe('hr')

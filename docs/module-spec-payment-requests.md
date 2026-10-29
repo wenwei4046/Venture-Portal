@@ -41,7 +41,7 @@ with ROLLBACK, then COMMIT + its `schema_migrations` row), as every PR here.
 | ③ | **By management approve and Claim & approve.** The tick on a title's template and a person (person wins); the department head's *Claim & approve* (their department's requests, Approve / Reject, several at once); routing at submit; the portal's notices to approvers and requesters. | Built 2026-10-29 (branch `feat/payment-requests-approval`) |
 | ④ | **Several at once for Finance.** Select on Payment request → Create PV (one PV a payee, combined, a bill-back answer each, Save drafts / Submit — one approval group for the Principal) and Reject. | Built 2026-10-29 (branch `feat/payment-requests-bulk`) |
 | ⑤ | **Supplier invoices read for the requester.** Direct pay: the supplier's invoice read by the model (name, bank, account), checked by the requester; saved supplier accounts; Finance told when an invoice shows a different account. | |
-| ⑥ | **The rest.** The Finance phone app's Payments bar and request pages on the new list; the old `/payments/claim-requests`, `/payments/dept-requests`, `/payments/payroll-requests` and the pool-claims code retired; `dept_payment_requests` left read-only. | |
+| ⑥ | **The rest.** The Finance phone app's Payments bar and request pages on the new list; the old `/payments/claim-requests`, `/payments/dept-requests`, `/payments/payroll-requests` and the pool-claims code retired; `dept_payment_requests` left read-only. | Built 2026-10-29 (branch `feat/payment-requests-rest`) |
 
 ## 3. The data (PR ②)
 
@@ -330,9 +330,72 @@ requests*.
   rejected and the page refreshed).
 - PR ③'s test fixtures gained `review` / `ownReview` / Marketing's `claims` count (type-only; `tsc` named them).
 
+## 4e. PR ⑥ — tasks (2026-10-29, the user: "b, 手机也能勾")
+
+Branch `feat/payment-requests-rest` (from PR ④'s; rebased on main once #852 is in). The phone's design is
+`mockups/pr6-phone-payment-request.html`: **B** — a *Requests · N* button on Payment's bar in place of Dept /
+Payroll / ⋯ › Claims — and **ticks on the phone too**.
+
+1. **The phone's Payment request** — `/fin-app/page/payment-requests`, the sidebar row's own address
+   (`appHref('payment-requests')`; today the catch-all's "coming"): the desktop's read (`readPaymentRequests`) in the
+   phone's kit — the hero *Waiting for you*, the cards (All · Payroll · Statutory · each department), a card's list,
+   a request's own screen (what the desktop's drawer shows, in the phone's groups) with its steps on the bar — a staff
+   request: Reject… · Create PV; a payroll: Send back to HR… · Generate PV; a Revenue claim: Return to HR… · Create
+   PV; one with a voucher: Open voucher. A staff request waiting for its PV has its box; ticked, the bar is "N
+   selected · RM" with Reject and Create PV — one payee's in the Create PV window, several payees' in Create payments
+   (PR ④'s windows, sheets on the phone), Reject with one reason.
+2. **Payment's bar** (phone): *+ Payment · Repayment · Requests · N · ⋯* — N the requests waiting for Finance; Dept,
+   Payroll and ⋯ › Claims go (⋯ keeps Export).
+3. **Statutory payments move in.** The old Payroll Requests page's read-only section — HR's KWSP · SOCSO · EIS · LHDN ·
+   SKBBK vouchers by month — becomes a **Statutory** card of Payment request, desktop and phone (Payroll payouts only,
+   as the Payroll card): a row a voucher, opening it (my call: kept rather than lost with the page).
+4. **The old pages go.** `/payments/claim-requests`, `/payments/dept-requests`, `/payments/payroll-requests` and the
+   phone's `/fin-app/page/claim-requests`, `…/dept-requests`, `…/payroll-requests` redirect to Payment request
+   (payroll's to its Payroll card), so an old link still lands. Their screens go (the old pages' bodies,
+   `RequestsApp`, `PayrollRequestsApp`); the parts Payment request uses stay where they are (`payroll-read`,
+   `GeneratePvForm`, `SendBackButton`, `raiseClaimVoucher`, `RaiseClaimVoucherForm`). The Dept requests code goes
+   whole — no row in production, orphaned since #533. The old pool-claims code of `/claims` (`claims/actions.ts`,
+   `ClaimActions`, `NewClaimForm`, `decidesPoolClaims`) goes — nothing has reached it since PR ②.
+5. **Dept payment requests read-only** — a migration: the table keeps its history (none today), its writers refuse
+   a client (no `EXECUTE` for `authenticated`), and the table takes no client write. Dry run first, on the user's go.
+6. **Tests:** the phone screen (cards, list, ticks, a request's steps), Payment's bar, the statutory rows, the
+   redirects; the SQL validator for the read-only table; the registries.
+
+**As built (2026-10-29).**
+
+- *The phone's ticks are the app's own Select* (as Invoice's: Select / Done beside the search, a press on a row ticks
+  it while selecting) rather than boxes always there — a phone row is one button. The dark bar holds **Reject** (in
+  Clear's place; Done clears) and **Create PV →** (`BulkBar.alt`, new in the app's kit).
+- *A request's phone screen is the drawer's own*: the drawer's body and steps became `useRequestView` (RequestDrawer),
+  which the drawer and the phone both draw; Create PV's two windows became `useRequestPvs`, shared the same way.
+- *Payment's bar* reads `Requests · N` from Payment request's own read (`readPaymentRequests`, what waits for
+  Finance), so the phone's number and the page's hero agree; `loadPaymentsHub` no longer reads the Dept, Payroll and
+  Claims lists.
+- *Statutory* shows only when HR made such vouchers (as the old page's section) and never in All or in *Waiting for
+  you*; a row opens its voucher (the drawer on the computer, the app's Payments on the phone).
+- *The old pages* redirect after asking their own page (`requirePage`, as every listed page); the phone's three to
+  `/fin-app/page/payment-requests` (payroll's on its Payroll card). Gone with them: the old pages' bodies and parts
+  (`StatutorySection`, `GeneratePvForm`, `SendBackButton`, `RaiseClaimVoucherForm`, `claim-read`), the whole Dept
+  requests folder, `RequestsApp`, `PayrollRequestsApp`, the phone's claim / dept request models (only `bankOption`
+  stays), RaiseSheet's Dept kind, and `/claims`' pool-claims code with `decidesPoolClaims`.
+- *Migration `20261029250000_dept_payment_requests_read_only`*: no client writes the table; Generate PV and Cancel
+  (`generate_pv_for_dept_request`, `cancel_dept_payment_request`) are **dropped** — nothing calls them (the app's only
+  caller went with the page; no function, trigger, policy or view names them in production) — rather than kept for the
+  service role. The approval queue's steps, the voucher's followers and the chart's renames run as their owner, as
+  before. Validator `validate-dept-requests-read-only.mjs` (8 checks).
+
 Later PRs are detailed here when they start.
 
 ## 5. Review focus
+
+PR ⑥:
+
+- An old link — a notice, a bookmark to `/payments/payroll-requests` or the phone's `/fin-app/page/claim-requests` →
+  Payment request (payroll's on its Payroll card), the page's own gates asked first.
+- The phone's Requests · N against the page's hero → the same number (one read).
+- A Finance · Maker on the phone → Select and Create PV, no Reject; a Treasury reader → no Select.
+- A statutory voucher → never counted as waiting; it opens its voucher.
+- Any voucher rejected on Approvals → `dept_request_pv_rejected` still runs, as its owner (it meets no Dept request).
 
 PR ④:
 

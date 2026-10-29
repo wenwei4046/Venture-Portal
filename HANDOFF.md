@@ -1,5 +1,21 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-29 u (PR ⑥ built, not merged) — the phone's Payment request, the old pages retired
+
+Session e73c0205. "可以，先把pr6 的代码写好" → the phone sample (`mockups/pr6-phone-payment-request.html`), the user:
+"b, 手机也能勾" → branch `feat/payment-requests-rest` (rebased on main after #852, opened for review on "可以，merge
+#852，然后把 ⑥ 开成 PR"; plan: `docs/module-spec-payment-requests.md` §4e).
+
+- **Phone:** Payment's bar *Requests · N* → `/fin-app/page/payment-requests` (`PaymentRequestsApp`): the cards, a list
+  with Select (dark bar: Reject · Create PV →), a request's screen = the drawer's `useRequestView`; Create PV's windows
+  `useRequestPvs` (shared with the desktop).
+- **Statutory card** (the old Payroll Requests page's section) on Payment request, desktop and phone.
+- **Old pages redirect** (desktop's after `requirePage`; phone's three); their bodies, the Dept requests code, the old
+  phone request apps and `/claims`' pool-claims code are gone.
+- **Mig `20261029250000_dept_payment_requests_read_only`**: NOT applied — REVOKE client writes on
+  `dept_payment_requests`, DROP `generate_pv_for_dept_request` / `cancel_dept_payment_request` (no caller anywhere,
+  checked in production). Dry run first, on the user's go, before the merge. The merge waits for the user's word.
+
 ## CHECKPOINT 2026-10-29 t (SHIPPED, #852) — several at once for Finance
 
 Session e73c0205. "可以，开始做 PR ④" → branch `feat/payment-requests-bulk` (plan: `docs/module-spec-payment-requests.md`

@@ -10,7 +10,7 @@ import dayjs from 'dayjs'
 import { officeTime } from '@/lib/office-time'
 import { deptRemaining, poolLabel, round2 } from '@/lib/payroll-funding'
 import type { RequestRow, BreakdownRow, FundingInfo } from '@/app/(portal)/payments/payroll-requests/_lib/payroll-read'
-import type { StatutoryPeriod } from '@/app/(portal)/payments/payroll-requests/_components/StatutorySection'
+import type { StatutoryPeriod } from '@/app/(portal)/payments/payroll-requests/_lib/payroll-read'
 import type { HubCardItem } from '@/components/finv/Hub'
 import { f2, plural, rm } from './page-model'
 
