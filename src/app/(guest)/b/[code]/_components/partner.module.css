@@ -157,5 +157,7 @@
 .days { display: flex !important; gap: 6px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; padding-bottom: 2px; }
 .days::-webkit-scrollbar { display: none; }
 .days .day { flex: 0 0 calc((100% - 36px) / 7); min-width: 46px; scroll-snap-align: start; }
-.dayMon { font-size: 10px !important; color: rgb(189 74 25) !important; font-weight: 600; }
+/* Every day says its month under it (the owner, 2026-10-29: "日期下方要放月份"); a month's first day in rust. */
+.dayMon { font-size: 10px !important; color: rgb(122 104 92) !important; font-weight: 500; }
+.dayMonFirst { color: rgb(189 74 25) !important; font-weight: 600; }
 .on .dayMon { color: rgb(255 255 255 / .85) !important; }
