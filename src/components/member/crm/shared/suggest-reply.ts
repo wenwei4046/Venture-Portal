@@ -8,7 +8,7 @@
  * Matching is words, not meaning: Latin words, Chinese characters in pairs, and a few topics that gather the many ways
  * one thing is asked (多少钱 / 几钱 / price / RM …).
  */
-import type { CrmCustomer, CrmQuickReply } from "@/lib/member/crm-data";
+import type { CrmCustomer, CrmData, CrmQuickReply, CrmReplyItem } from "@/lib/member/crm-data";
 
 export interface ReplyExample { q: string; a: string; won?: boolean; appt?: boolean }
 export interface Suggestion { text: string; why: string }
@@ -75,24 +75,65 @@ export function lastCustomerWords(c: Pick<CrmCustomer, "messages">): string {
 }
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
-const fill = (text: string, c: Pick<CrmCustomer, "name">) => text.replace(/\{name\}/g, firstName(c.name) || "there").trim();
 
-/** Up to `n` drafts for this chat: past answers to the closest questions (a visit or a sale first), and matching quick replies. */
-export function suggestReplies(c: Pick<CrmCustomer, "name" | "messages">, examples: ReplyExample[], quick: CrmQuickReply[] = [], n = 3): Suggestion[] {
+/** What fills a reply's blanks (the reply library, 2026-10-29: "里面的名字等，可以根据客户的咨询自动调整"). */
+export interface FillWith { me?: string; showroom?: string }
+type FillCustomer = Pick<CrmCustomer, "name"> & { details?: Partial<CrmCustomer["details"]> };
+/** The blanks a reply may hold, for the library's editor to list. */
+export const BLANKS: [string, string][] = [
+  ["{name}", "the customer's first name"], ["{fullname}", "the customer's full name"], ["{me}", "your name"],
+  ["{project}", "their unit location / project"], ["{type}", "their property type"], ["{size}", "their unit size"], ["{showroom}", "the showroom"],
+];
+/** A reply with its blanks filled for this customer; a blank with nothing to fill goes quietly (its word "there" for {name}). */
+export function fillReply(text: string, c: FillCustomer, w: FillWith = {}): string {
+  const d = c.details ?? {};
+  const map: Record<string, string> = {
+    name: firstName(c.name) || "there", fullname: c.name.trim() || "there", me: w.me ?? "",
+    project: d.loc?.trim() ?? "", type: d.type?.trim() ?? "", size: d.size?.trim() ?? "", showroom: w.showroom ?? "",
+  };
+  return text.replace(/\{(name|fullname|me|project|type|size|showroom)\}/g, (_m, k: string) => map[k] ?? "").replace(/[ \t]{2,}/g, " ").trim();
+}
+
+/** The salesperson's name and the showroom for a customer: their next booked visit's, else the first open showroom. */
+export function fillWithFor(d: Pick<CrmData, "visits" | "rooms">, c: Pick<CrmCustomer, "id">, me: string | undefined, now = new Date()): FillWith {
+  const next = d.visits.filter(v => v.customerId === c.id && v.state === "booked" && new Date(v.start) >= now).sort((a, b) => a.start.localeCompare(b.start))[0];
+  const room = (next && d.rooms.find(r => r.id === next.showroomId)) ?? d.rooms.find(r => r.active && !r.virtual && !r.deleted);
+  return { me: me ?? "", showroom: room?.name ?? "" };
+}
+
+/** The library for this customer: each reply filled, with its title and category, for the chat to browse. */
+export function libraryFor(c: FillCustomer, library: CrmReplyItem[] = [], w: FillWith = {}): { title: string; category: string; text: string }[] {
+  return library.map(r => ({ title: r.title, category: r.category, text: fillReply(r.body, c, w) }));
+}
+
+/**
+ * Up to `n` drafts for this chat: the reply library's matching entries first (by their keywords, title and words), then
+ * past answers to the closest questions (a visit or a sale first), and matching quick replies.
+ */
+export function suggestReplies(c: Pick<CrmCustomer, "name" | "messages"> & { details?: Partial<CrmCustomer["details"]> }, examples: ReplyExample[], quick: CrmQuickReply[] = [], n = 3,
+  opts: { library?: CrmReplyItem[] } & FillWith = {}): Suggestion[] {
   const asked = lastCustomerWords(c);
   if (!asked) return [];
   const want = wordsOf(asked);
   const scored: { text: string; why: string; score: number }[] = [];
+  for (const r of opts.library ?? []) {
+    // A keyword the customer used counts most; then the title and the words.
+    const kw = r.keywords.some(k => k.trim() && asked.toLowerCase().includes(k.trim().toLowerCase()));
+    // A keyword hit always leads (the company chose this reply for these words); else it competes, a step ahead.
+    const s = closeness(want, wordsOf(`${r.title} ${r.keywords.join(" ")} ${r.body}`));
+    if (!kw && s < 0.12) continue;
+    scored.push({ text: fillReply(r.body, c, opts), why: `Reply library · ${r.title}`, score: kw ? 2 + s : s + 0.3 });
+  }
   for (const e of examples) {
     const s = closeness(want, wordsOf(e.q));
     if (s < 0.12) continue;
-    scored.push({ text: fill(e.a, c), why: e.won ? `From a chat that ended in a sale · “${e.q.slice(0, 40)}”` : e.appt ? `From a chat that booked a visit · “${e.q.slice(0, 40)}”` : `Asked before · “${e.q.slice(0, 40)}”`,
+    scored.push({ text: fillReply(e.a, c, opts), why: e.won ? `From a chat that ended in a sale · “${e.q.slice(0, 40)}”` : e.appt ? `From a chat that booked a visit · “${e.q.slice(0, 40)}”` : `Asked before · “${e.q.slice(0, 40)}”`,
       score: s + (e.won ? 0.25 : e.appt ? 0.15 : 0) });
   }
   for (const q of quick) {
     const s = closeness(want, wordsOf(`${q.shortcut} ${q.message}`));
     if (s < 0.1) continue;
-    scored.push({ text: fill(q.message, c), why: `Quick reply /${q.shortcut}`, score: s + 0.1 });
+    scored.push({ text: fillReply(q.message, c, opts), why: `Quick reply /${q.shortcut}`, score: s + 0.1 });
   }
   const seen = new Set<string>(), out: Suggestion[] = [];
   for (const x of scored.sort((a, b) => b.score - a.score)) {

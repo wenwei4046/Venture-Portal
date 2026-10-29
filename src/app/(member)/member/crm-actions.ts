@@ -54,6 +54,8 @@ const CRM_WRITES = [
   "crm_save_showroom_remarks", "crm_delete_showroom",
   // A showroom's key handover and the showrooms' order (mig 20261029100000), CRM · Manage.
   "crm_set_showroom_keys", "crm_set_showroom_order",
+  // The reply library (mig 20261029170000), CRM · Manage.
+  "crm_save_reply_library",
   // v2 frame 08: put another form in use (mig 20261024160000), CRM · Manage.
   "crm_set_active_form",
   // v2 frames 02 / 03: a customer added by hand (mig 20261024180000), CRM · Edit (own).
@@ -131,7 +133,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
   "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types",
-  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form", "crm_set_showroom_keys", "crm_set_showroom_order",
+  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form", "crm_set_showroom_keys", "crm_set_showroom_order", "crm_save_reply_library",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
@@ -201,7 +203,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
-      forms: more.forms, notes: more.notes, stars: more.stars, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
+      forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
     }) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
@@ -219,7 +221,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -241,8 +243,10 @@ async function desktopRows(db: Db, journey: boolean) {
     soft<{ id: string; remarks: string | null; deleted_at: string | null; key_handover?: boolean }[]>(db.from("crm_showrooms").select("id, remarks, deleted_at, key_handover")),
     // Appointment types (mig 20261025040000): null before it, so the two built in stay.
     (async () => { try { const { data, error } = await db.rpc("crm_appt_types_read"); return error ? null : (data as unknown); } catch { return null; } })(),
+    // The reply library (mig 20261029170000): empty before it.
+    soft<{ id: string; title: string; category: string; body: string; keywords: string[] | null; sort_order: number }[]>(db.from("crm_reply_library").select("id, title, category, body, keywords, sort_order").order("sort_order")),
   ]);
-  return { roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes };
+  return { roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */

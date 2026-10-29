@@ -193,6 +193,8 @@ export interface CrmRoom {
 export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null; /** Marked unread by this person (swipe right › Unread, 2026-10-14); opening the chat takes it off. */ markedUnread?: boolean }
 export interface CrmLabel { id: string; name: string; color: string }
 export interface CrmQuickReply { id: string; shortcut: string; message: string }
+/** A reply in the company's reply library (mig 20261029170000): {name}, {me}, {project} … filled in for the customer on screen. */
+export interface CrmReplyItem { id: string | null; title: string; category: string; body: string; keywords: string[] }
 
 export interface CrmAutoReply { on: boolean; text: string; img?: string | null; imgName?: string }
 export interface CrmAutoReplySet {
@@ -291,6 +293,8 @@ export interface CrmData {
   quickReplies: CrmQuickReply[];
   /** What customers asked and our team answered (crm_reply_examples, 2026-10-29) — the suggested replies' experience; read once, absent until then. */
   replyExamples?: { q: string; a: string; won?: boolean; appt?: boolean }[];
+  /** The company's reply library, in its order (empty before the migration). */
+  replyLibrary?: CrmReplyItem[];
   autoReplies: CrmAutoReplySet;
   /** Other people's auto-replies, for View as (read only) — only for whoever sees everybody's CRM. */
   autoRepliesOf?: Record<string, CrmAutoReplySet>;
@@ -476,6 +480,8 @@ export interface CrmDataRows {
   hides: { message_id: string }[];
   /** One's own starred messages (mig 20261014060000); absent before it. */
   stars?: { message_id: string }[];
+  /** The reply library (mig 20261029170000). */
+  library?: { id: string; title: string; category: string; body: string; keywords: string[] | null; sort_order: number }[];
   labels: { id: string; name: string; color: string; sort_order: number }[];
   contactLabels: { label_id: string; contact_id: string }[];
   quickReplies: { id: string; shortcut: string; message: string; sort_order: number }[];
@@ -641,6 +647,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id, markedUnread: !!p.marked_unread }])),
     hiddenMessages: rows.hides.map(h => h.message_id),
     starredMessages: (rows.stars ?? []).map(s => s.message_id),
+    replyLibrary: (rows.library ?? []).map(r => ({ id: r.id, title: r.title, category: r.category ?? "", body: r.body, keywords: r.keywords ?? [] })),
     labels: [...rows.labels].sort((a, b) => a.sort_order - b.sort_order).map(l => ({ id: l.id, name: l.name, color: l.color })),
     customerLabels,
     quickReplies: [...rows.quickReplies].sort((a, b) => a.sort_order - b.sort_order).map(q => ({ id: q.id, shortcut: q.shortcut, message: q.message })),

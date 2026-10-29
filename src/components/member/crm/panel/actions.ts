@@ -8,7 +8,7 @@ import type { ApptType } from "@/lib/member/crm-data";
 import { crmWrite, fetchMetaAds, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
 import type { MetaAdRow } from "@/lib/member/crm-ad-names-meta";
 import { adToSync } from "@/lib/member/crm-ad-running";
-import type { CrmData, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
+import type { CrmData, CrmReplyItem, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
 import type { SalesActions } from "../sales/actions";
 import { teamOf } from "../shared/people";
 import type { Dispatch, SetStateAction } from "react";
@@ -28,6 +28,8 @@ export interface PanelActions extends SalesActions {
   metaAds(sync: boolean): Promise<MetaAdRow[] | null>;
   /** Settings › General (crm_save_settings, CRM · Manage): the reply lines, the template button, auto-assign. */
   saveSettings(s: CrmSettings): Promise<boolean>;
+  /** Settings › Reply library (crm_save_reply_library, CRM · Manage; 2026-10-29): the whole library, in its order. */
+  saveReplyLibrary(items: CrmReplyItem[]): Promise<boolean>;
   /** Save, this ad only; `together`: whether it is still counted with the together ads (saved with anything changed, it leaves them). */
   saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number; together: boolean }>;
   /** Save and apply to all's window (crm_save_ads, 2026-10-24): this setting on the ads ticked, each counting its own leads
@@ -79,6 +81,14 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     async saveSettings(st) {
       if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders, p_team_alerts: st.teamAlerts, p_send_auto: st.sendAutoReply }))) return false;
       setData(d => ({ ...d, settings: st }));
+      return true;
+    },
+    async saveReplyLibrary(items) {
+      const r = await write("crm_save_reply_library", { p_items: items.map(i => ({ id: i.id, title: i.title, category: i.category, body: i.body, keywords: i.keywords })) });
+      if (!r) return false;
+      // The database answers the library as saved (new rows with their ids); the demo keeps what was sent.
+      const saved = Array.isArray(r.data) ? (r.data as CrmReplyItem[]).map(x => ({ ...x, category: x.category ?? "", keywords: x.keywords ?? [] })) : items;
+      setData(d => ({ ...d, replyLibrary: saved }));
       return true;
     },
     async addAd(ad) {

@@ -252,6 +252,7 @@ isFtOp
 isGenOp
 isHistOp
 isLbaOp
+isLibOp
 isMwtOp
 isNtfOp
 isSrOp
@@ -359,6 +360,7 @@ ppPager
 ppStats
 rail
 railOn
+replyLib
 replyOn
 replyText
 replyWho
@@ -457,6 +459,7 @@ srWkFg
 srWkNote
 suggest
 suggestKey
+suggestLib
 suggestLogo
 sysLines
 teamName

@@ -100,7 +100,7 @@ module.exports = function desk4a(body) {
     '<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "82px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "12px", boxShadow: "0 6px 20px rgba(42,22,12,.08)" }}>\n                      <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px", paddingLeft: "10px", borderLeft: "3px solid var(--crm-rust)" }}>', "reply bar");
   body = swap(body, '<div style={{ flex: "0 0 auto", background: "#fff", padding: "12px 16px", borderTop: "1px solid var(--crm-rule)", display: "flex", alignItems: "center", gap: "6px" }}>\n                    <span style={{ position: "relative", flex: "0 0 auto" }}>', "div",
     // The suggested replies' floating logo over the reply box, as the phone's (the owner, 2026-10-29: "电脑版也加漂浮 logo").
-    `{v.suggest && <SuggestFloat key={v.suggestKey} list={v.suggest} pick={v.pickSuggest} showLogo={v.suggestLogo && !!v.suggest.length && !v.draft} desk />}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
+    `{v.suggest && <SuggestFloat key={v.suggestKey} list={v.suggest} pick={v.pickSuggest} library={v.suggestLib} showLogo={v.suggestLogo && !!v.suggest.length && !v.draft} desk />}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
                     <div style={{ flex: "1", minWidth: "0", height: "50px", borderRadius: "25px", display: "flex", alignItems: "center", gap: "16px", padding: "0 18px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-line)", boxShadow: "0 6px 20px rgba(42,22,12,.08)", color: "var(--crm-muted)" }}>
                       <span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" x2="9.01" y1="9" y2="9"></line><line x1="15" x2="15.01" y1="9" y2="9"></line></svg>{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}
@@ -271,7 +271,8 @@ module.exports = function desk4a(body) {
   }
   // Frame 10 · Settings: a General tab first, the frame's two-column groups (Desk4a.tsx › DeskSettings4a); Cold lead
   // templates and Notifications, production's, stay as the head's other two tabs.
-  body = once(body, '{!!(v.isNtfOp) && (<>', '{!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isNtfOp) && (<>', "settings general");
+  body = once(body, '{!!(v.isNtfOp) && (<>', '{!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLibOp) && (<DeskReplyLibrary4a v={v.replyLib} />)}{!!(v.isNtfOp) && (<>', "settings general");
+  // Settings › Reply library (2026-10-29, the owner: good replies kept for the salespeople, names filled in for the customer).
   // Frame 11 · Audit log: a search, three menus and the five-column table (Desk4a.tsx › DeskAudit4a). Production's three
   // tabs are the Area menu's areas; its stats band went into the head's count.
   {

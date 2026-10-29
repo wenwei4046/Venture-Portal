@@ -213,6 +213,8 @@ export interface ComposerIn {
   suggest?: { text: string; why: string }[];
   /** The floating logo: only while the customer's words wait for us (Suggest reply opens any time). */
   suggestLogo?: boolean;
+  /** The reply library, filled for this customer, to browse under the suggestions (2026-10-29). */
+  suggestLibrary?: { title: string; category: string; text: string }[];
 }
 
 /** What only the phone knows, measured by ChatComposer. */
