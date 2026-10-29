@@ -307,8 +307,8 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
                   <Field key={k} label={INFO_LABELS[k]}><input className={s.input} value={form.info[k] ?? ''} maxLength={120} onChange={e => setInfo(k, e.target.value)} /></Field>
                 ))}
               </div>
-              <Field label="Remarks for the showroom"><textarea className={s.input} rows={3} maxLength={1000} value={form.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="What the customer wants to see, keys, parking…" /></Field>
-              <Field label="Your own note"><textarea className={s.input} rows={3} maxLength={1000} value={form.note} onChange={e => set({ note: e.target.value })} placeholder="Anything about this lead for yourself" /></Field>
+              <Field label="Remarks for the showroom"><textarea className={s.input} rows={2} maxLength={1000} value={form.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="What the customer wants to see, keys, parking…" /></Field>
+              <Field label="Your own note"><textarea className={s.input} rows={2} maxLength={1000} value={form.note} onChange={e => set({ note: e.target.value })} placeholder="Anything about this lead for yourself" /></Field>
 
               <div className={s.summary}>
                 {start && r ? <span className={s.sumText}><b>{r.name}</b><span>{whenOf(start)}</span></span> : <span className={s.muted}>Pick a showroom, a date and a time.</span>}
@@ -316,7 +316,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
               {error && <div className={s.err}>{error}</div>}
               <div className={s.actions}>
                 {editing && <button type="button" className={s.danger} disabled={busy} onClick={() => void cancel()}>Cancel booking</button>}
-                <button type="button" className={s.primary} disabled={busy || !!problem} title={problem ?? undefined} onClick={() => void submit()}>
+                <button type="button" className={s.primary} disabled={busy} onClick={() => void submit()}>
                   {busy ? 'Saving…' : editing ? 'Save changes' : 'Book this slot'}
                 </button>
               </div>
@@ -518,12 +518,12 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
                   <Field key={k} label={INFO_LABELS[k]}><input className={s.input} value={form.info[k] ?? ''} maxLength={120} onChange={e => setInfo(k, e.target.value)} /></Field>
                 ))}
               </div>
-              <Field label="Remarks for the showroom"><textarea className={s.input} rows={3} maxLength={1000} value={form.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="What the customer wants to see, keys, parking…" /></Field>
-              <Field label="Your own note"><textarea className={s.input} rows={3} maxLength={1000} value={form.note} onChange={e => set({ note: e.target.value })} placeholder="Anything about this lead for yourself" /></Field>
+              <Field label="Remarks for the showroom"><textarea className={s.input} rows={2} maxLength={1000} value={form.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="What the customer wants to see, keys, parking…" /></Field>
+              <Field label="Your own note"><textarea className={s.input} rows={2} maxLength={1000} value={form.note} onChange={e => set({ note: e.target.value })} placeholder="Anything about this lead for yourself" /></Field>
               {error && <div className={s.err}>{error}</div>}
               <div className={s.actions}>
                 {editing && <button type="button" className={s.danger} disabled={busy} onClick={() => void cancel()}>Cancel booking</button>}
-                <button type="button" className={s.primary} disabled={busy || !!problem} title={problem ?? undefined} onClick={() => void submit()}>
+                <button type="button" className={s.primary} disabled={busy} onClick={() => void submit()}>
                   {busy ? 'Saving…' : editing ? 'Save changes' : 'Book this slot'}
                 </button>
               </div>
