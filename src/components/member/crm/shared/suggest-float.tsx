@@ -8,6 +8,7 @@
  */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { typePx } from "./type";
+import { waRuns } from "./wa-format";
 
 let wanted = 0;
 const subs = new Set<() => void>();
@@ -49,7 +50,7 @@ export function SuggestFloat({ list, library, pick, showLogo, desk }: { list: { 
           {list.map((s, i) => (
             <button key={i} type="button" onClick={() => { setOpen(false); pick(s.text); }}
               style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "10px 12px", borderRadius: "12px", border: "1px solid var(--crm-line)", background: "#fff", textAlign: "left", cursor: "pointer", font: "inherit" }}>
-              <span style={{ fontSize: typePx(14), lineHeight: 1.45, color: "var(--crm-ink)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{s.text}</span>
+              <span style={{ fontSize: typePx(14), lineHeight: 1.45, color: "var(--crm-ink)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{waRuns(s.text)}</span>
               <span style={{ fontSize: typePx(11.5), color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.why}</span>
             </button>
           ))}
@@ -72,8 +73,8 @@ export function SuggestFloat({ list, library, pick, showLogo, desk }: { list: { 
               {shown.map((r, i) => (
                 <button key={`l${i}`} type="button" onClick={() => { setOpen(false); pick(r.text); }}
                   style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "10px 12px", borderRadius: "12px", border: "1px solid var(--crm-line)", background: "#fff", textAlign: "left", cursor: "pointer", font: "inherit", flexShrink: 0 }}>
-                  <span style={{ fontSize: typePx(13), fontWeight: 600, color: "var(--crm-ink)" }}>{r.title}{r.category ? <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}> · {r.category}</span> : null}</span>
-                  <span style={{ fontSize: typePx(13.5), lineHeight: 1.45, color: "var(--crm-muted)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{r.text}</span>
+                  <span style={{ fontSize: typePx(13), fontWeight: 600, color: "var(--crm-ink)" }}>{r.title}{r.category && r.category.trim().toLowerCase() !== r.title.trim().toLowerCase() ? <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}> · {r.category}</span> : null}</span>
+                  <span style={{ fontSize: typePx(13.5), lineHeight: 1.45, color: "var(--crm-muted)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{waRuns(r.text)}</span>
                 </button>
               ))}
             </>);

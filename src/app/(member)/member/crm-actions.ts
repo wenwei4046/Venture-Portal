@@ -1,6 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { plainWa } from "@/lib/member/wa-text";
 import { headers } from "next/headers";
 import { getAccountUser, getMemberUser } from "@/lib/auth";
 import { canDo } from "@/lib/permission-actions";
@@ -323,7 +324,7 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
       // A visit card: WhatsApp's layout without bold, and Google Maps · Waze as buttons (through our /nav.html) when there is an address.
       const message = cardHasWay(opts.card) ? messengerVisitMessage(opts.card, await siteBase(), own)
         : opts.card ? { text: messengerCardText(opts.card) } : undefined;
-      const sent = await sendMessengerText({ pageId: contact.account_id, psid: contact.external_id, body: clean.text, token: pageAccess, window: window as "open" | "human_agent", message });
+      const sent = await sendMessengerText({ pageId: contact.account_id, psid: contact.external_id, body: plainWa(clean.text), token: pageAccess, window: window as "open" | "human_agent", message });
       if (!sent.ok) throw new Error(sent.error);
       externalId = sent.mid;
     } else {

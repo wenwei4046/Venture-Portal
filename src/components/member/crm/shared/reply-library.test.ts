@@ -1,7 +1,8 @@
 /** The reply library (2026-10-29): good replies kept once, the blanks filled for the customer, a matching one suggested first. */
 import { describe, expect, it } from "vitest";
 import type { CrmChatMessage, CrmReplyItem } from "@/lib/member/crm-data";
-import { fillReply, fillWithFor, libraryFor, suggestReplies } from "./suggest-reply";
+import { fillReply, fillWithFor, greetingOnly, libraryFor, suggestReplies } from "./suggest-reply";
+import { plainWa, wrapMark } from "./wa-format";
 import { filterLibrary } from "./suggest-float";
 import { libraryProblem, tidyLibrary } from "../desk/DeskReplyLibrary";
 
@@ -50,5 +51,36 @@ describe("the library's editor", () => {
     expect(libraryProblem([{ id: null, title: "", category: "", body: "x", keywords: [] }])).toBe("Give each reply a title.");
     expect(libraryProblem([{ id: null, title: "T", category: "", body: " ", keywords: [] }])).toBe('"T": write its words.');
     expect(libraryProblem(LIB)).toBeNull();
+  });
+});
+
+describe("a greeting (the owner, 2026-10-29: a \"hi\" answered with whatever came next in another chat)", () => {
+  const EX = [
+    { q: "hi", a: "可以 只需要装修还是一站式装修+出租配套ya?" },
+    { q: "Hi", a: "halo 下午好 可以呀" },
+    { q: "Hai", a: "Hello there! 👋 I'm Hector from The Conts 😊 We have our own showroom at Astrum Ampang" },
+    { q: "多少钱？", a: "Hi {name}，配套从 RM 9,999 起" },
+  ];
+  it("knows a greeting from a question", () => {
+    expect(greetingOnly("hi")).toBe(true);
+    expect(greetingOnly("Hai boss 🙏")).toBe(true);
+    expect(greetingOnly("你好！")).toBe(true);
+    expect(greetingOnly("hi, how much?")).toBe(false);
+    expect(greetingOnly("装修多少钱")).toBe(false);
+  });
+  it("answers a greeting only with an introduction, and a question never with an answer to a greeting", () => {
+    const s = suggestReplies({ name: "Zoe", messages: [msg("lead", "hi")] }, EX);
+    expect(s.map(x => x.text)).toEqual(["Hello there! 👋 I'm Hector from The Conts 😊 We have our own showroom at Astrum Ampang"]);
+    const q = suggestReplies({ name: "Zoe", messages: [msg("lead", "hi 多少钱")] }, EX);
+    expect(q.map(x => x.text)).toEqual(["Hi Zoe，配套从 RM 9,999 起"]);
+  });
+});
+
+describe("WhatsApp's bold and italic", () => {
+  it("wraps the picked words (spaces left outside), takes the mark off again, and strips it for Messenger", () => {
+    expect(wrapMark("say hello now", 4, 10, "*")).toEqual({ value: "say *hello* now", start: 5, end: 10 });
+    expect(wrapMark("say *hello* now", 5, 10, "*")).toEqual({ value: "say hello now", start: 4, end: 9 });
+    expect(wrapMark("ab", 1, 1, "_")).toEqual({ value: "a__b", start: 2, end: 2 });
+    expect(plainWa("*Hi* Zoe, _see you_ at my_place")).toBe("Hi Zoe, see you at my_place");
   });
 });
