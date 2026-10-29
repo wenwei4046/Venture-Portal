@@ -263,7 +263,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
                     const open = d <= last && openDay(d)
                     return (
                       <button key={d} type="button" disabled={!open} data-on={d === day ? '' : undefined} className={d === day ? `${s.day} ${s.on}` : s.day} onClick={() => { setDay(d); setStart('') }}>
-                        <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b>{d.endsWith('-01') && <span className={s.dayMon}>{MON[Number(d.slice(5, 7)) - 1]}</span>}
+                        <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b><span className={d.endsWith('-01') ? `${s.dayMon} ${s.dayMonFirst}` : s.dayMon}>{MON[Number(d.slice(5, 7)) - 1]}</span>
                       </button>
                     )
                   })}
@@ -468,7 +468,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
                     const open = d <= last && openDay(d)
                     return (
                       <button key={d} type="button" disabled={!open} data-on={d === day ? '' : undefined} className={d === day ? `${s.day} ${s.on}` : s.day} onClick={() => { setDay(d); setStart('') }}>
-                        <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b>{d.endsWith('-01') && <span className={s.dayMon}>{MON[Number(d.slice(5, 7)) - 1]}</span>}
+                        <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b><span className={d.endsWith('-01') ? `${s.dayMon} ${s.dayMonFirst}` : s.dayMon}>{MON[Number(d.slice(5, 7)) - 1]}</span>
                       </button>
                     )
                   })}
