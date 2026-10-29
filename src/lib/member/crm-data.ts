@@ -335,7 +335,7 @@ export interface CrmData {
   recentEmoji?: string[];
   /** CRM Desktop rev 1 (B5): the Customer info form the Principal / Director set — every salesperson's Customer info follows it. */
   forms?: CrmForm[];
-  /** The booking link's forms (mig 20261029250000, crm_forms.kind = 'booking'), the one in use first — what /b/<code> asks. */
+  /** The booking link's forms (mig 20261030040000, crm_forms.kind = 'booking'), the one in use first — what /b/<code> asks. */
   bookingForms?: CrmForm[];
   /** CRM Desktop rev 1 (B6): notes on customers, newest first. */
   notes?: CrmNote[];

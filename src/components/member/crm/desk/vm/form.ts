@@ -158,7 +158,7 @@ export const budgetOf = (c: CrmCustomer) => { const n = Number(String(c.details.
 
 /**
  * The booking link's form (2026-10-29, the owner: "这里是2个form, 一个是给crm customer info, 一个是internal sales booking
- * form"): what /b/<code> asks partners who have no login. Saved in crm_forms with kind 'booking' (mig 20261029250000), the
+ * form"): what /b/<code> asks partners who have no login. Saved in crm_forms with kind 'booking' (mig 20261030040000), the
  * first one in use. Your name, Customer name and Customer phone are core (a booking cannot do without them); Your phone,
  * Remarks and Your own note are the booking's own columns (built-in: their type stays, they may be removed); the rest are
  * the form's own questions, kept in the booking's info under their id. No field is filled by the CRM, and it is one page.
