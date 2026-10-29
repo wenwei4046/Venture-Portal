@@ -31,7 +31,7 @@ import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerI
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
-import { suggestReplies } from "../../shared/suggest-reply";
+import { suggestReplies, waitingWords } from "../../shared/suggest-reply";
 import { openSuggest } from "../../shared/suggest-float";
 import { avatarTint } from "../../shared/palette";
 
@@ -497,7 +497,7 @@ export function chatVM(ctx: SalesCtx) {
     placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
     warm: !shut,
     openTpl: () => void openTpl(), tplOn: data.settings?.suggestTemplate !== false, coldSub: coldLine(c, now),
-    suggest: shut ? undefined : suggestReplies(c, data.replyExamples ?? [], data.quickReplies),
+    suggest: shut ? undefined : suggestReplies(c, data.replyExamples ?? [], data.quickReplies), suggestLogo: !!waitingWords(c),
     reply: ui.reply ? { who: ui.reply.from === "me" ? "You" : c.name, text: plain(ui.reply.text) } : null,
     cancelReply: () => patch({ reply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,

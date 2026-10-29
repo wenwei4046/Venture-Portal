@@ -58,12 +58,28 @@ export function waitingWords(c: Pick<CrmCustomer, "messages">): string {
   return out.join("\n");
 }
 
+/**
+ * What the suggestions answer: the customer's waiting words, else — once we have replied — their last two text messages
+ * (the owner, 2026-10-29: "为什么现在都不会有 suggested replies?" — every chat had been answered, so there was nothing to
+ * answer). The floating logo still shows only while words wait (`waitingWords`); Suggest reply opens any time.
+ */
+export function lastCustomerWords(c: Pick<CrmCustomer, "messages">): string {
+  const waiting = waitingWords(c);
+  if (waiting) return waiting;
+  const out: string[] = [];
+  for (let i = c.messages.length - 1; i >= 0 && out.length < 2; i--) {
+    const m = c.messages[i];
+    if (m.from === "lead" && m.text?.trim() && (!m.kind || m.kind === "text")) out.unshift(m.text.trim());
+  }
+  return out.join("\n");
+}
+
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 const fill = (text: string, c: Pick<CrmCustomer, "name">) => text.replace(/\{name\}/g, firstName(c.name) || "there").trim();
 
 /** Up to `n` drafts for this chat: past answers to the closest questions (a visit or a sale first), and matching quick replies. */
 export function suggestReplies(c: Pick<CrmCustomer, "name" | "messages">, examples: ReplyExample[], quick: CrmQuickReply[] = [], n = 3): Suggestion[] {
-  const asked = waitingWords(c);
+  const asked = lastCustomerWords(c);
   if (!asked) return [];
   const want = wordsOf(asked);
   const scored: { text: string; why: string; score: number }[] = [];

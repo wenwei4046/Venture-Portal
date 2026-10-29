@@ -87,6 +87,7 @@ export function deskVM(ctx: DeskCtx) {
     pinShown: chat.pinShown, pinText: chat.pinText, unpinMsg: chat.unpinMsg, replyOn: chat.replyOn, replyWho: chat.replyWho, replyText: chat.replyText, cancelReply: chat.cancelReply,
     attachOpen: chat.attachOpen, attachToggle: chat.attachToggle, attachClose: chat.attachClose, attachOpts: chat.attachOpts,
     emojiOpen: chat.emojiOpen, emojiToggle: chat.emojiToggle, emojiFg: chat.emojiFg, emoji: chat.emoji,
+    suggest: chat.suggest, suggestKey: chat.suggestKey, pickSuggest: chat.pickSuggest, suggestLogo: chat.suggestLogo,
     // The design's one-message chat bindings, unused live (desk-chat-v2.cjs draws every message): the sample's values.
     sysLines: [] as { text: string; at: string }[], msgShown: false, chatIn: false, chatOut: false, chatText: "", chatTime: "", chatAppt: false,
     ...chatMenuVM(ctx, chat),
