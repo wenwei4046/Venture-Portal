@@ -11,7 +11,8 @@
 //   IV.  DEPARTMENT   Dept Pool · each department · Venture Pool
 //
 // and Admin is no category: Audit Log, Departments and Meeting Rooms sit in the
-// footer's account menu with Edit profile and Change password (finAccountMenu).
+// footer's account menu with Edit profile and Change password (finAccountMenu)
+// — and Claim, one's own requests to Finance, under Account (2026-10-29).
 // The user's calls (2026-10-14): Approvals, which the design leaves out, shows
 // to whoever holds it — first in Daily; Overdue, which the design lists under
 // Fund, stays gone (its page went the same day). Claims stood last in
@@ -30,6 +31,7 @@ import { statementDepts, statementPath } from '@/lib/dept-statements'
 import {
   canAccessAuditLog,
   canAccessCategories,
+  canSendOwnClaims,
   canAccessDeptPool,
   canAccessDeptReports,
   canAccessMeetingRooms,
@@ -182,7 +184,8 @@ export interface AccountMenuGroup {
 }
 
 /**
- * The footer's menu (the design's D13): Account — password for a personal login, IT support for every account —, then Admin.
+ * The footer's menu (the design's D13): Account — password for a personal login, IT support for every account, Claim for
+ * whoever sends their own (2026-10-29) —, then Admin.
  * The Principal's own view adds Access log and Settings to Admin (2026-10-17, the user's pick: "Audit Log ·
  * Access log · Departments · Meeting Rooms · Settings") — Settings opens on Treasury, its strip reaching the rest.
  * No Edit profile (2026-10-17 — the user: one's record is changed through Me › Profile, which HR approves).
@@ -194,6 +197,8 @@ export function finAccountMenu(opts: FinNavOptions = {}): AccountMenuGroup[] {
       items: [
         { key: 'password', label: 'Change password', icon: 'lock', window: 'password', visible: canChangePassword },
         { key: 'it-support', label: 'IT support', icon: 'buoy', href: '/it-support', visible: viewer => !viewer.viewingAs },
+        // One's own claims and direct payments to Finance (2026-10-29, the claim process — every view's own Claim row).
+        { key: 'claim', label: 'Claim', icon: 'receipt', href: '/claims', visible: canSendOwnClaims },
       ],
     },
     {

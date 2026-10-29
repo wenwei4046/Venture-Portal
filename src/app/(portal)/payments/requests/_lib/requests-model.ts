@@ -9,8 +9,11 @@ import { claimReference, type ClaimQueueRow } from '@/lib/claim-requests'
 import type { PayrollRequestLine } from '@/lib/fin-app/payroll-requests-model'
 import { officeDay } from '@/lib/office-time'
 import { plural, rm } from '@/lib/fin-app/page-model'
+import { whatOf, whoPaysWords, type PaymentRequest } from '@/lib/payment-requests/model'
 
-export type RequestSource = 'payroll' | 'claim'
+// Since PR ② (2026-10-29): the staff's own requests too — a claim or a direct payment from the Claim page, under the
+// requester's department, worked here (Bill back?, Reject…, Create PV).
+export type RequestSource = 'payroll' | 'claim' | 'request'
 /** With Finance (to fund, or waiting for a voucher), or with the Principal (funded, or its voucher raised). */
 export type RequestStage = 'finance' | 'principal'
 
@@ -40,6 +43,8 @@ export interface PaymentRequestRow {
   voucherNo: string | null
   payroll: PayrollRequestLine | null
   claim: ClaimQueueRow | null
+  /** A staff member's request (the Claim page's). */
+  request: PaymentRequest | null
 }
 
 /** A department as its card names it. */
@@ -77,6 +82,7 @@ export function payrollRow(line: PayrollRequestLine, request: { requested_at: st
     voucherNo: line.pendingPvs[0]?.voucherNo ?? null,
     payroll: line,
     claim: null,
+    request: null,
   }
 }
 
@@ -104,6 +110,33 @@ export function claimRow(c: ClaimQueueRow, departments: readonly RequestDepartme
     voucherNo: c.voucherNo,
     payroll: null,
     claim: c,
+    request: null,
+  }
+}
+
+/** A staff member's request (a claim or a direct payment), under its department's card — with Finance, or in its PV. */
+export function staffRequestRow(r: PaymentRequest, departments: readonly RequestDepartment[]): PaymentRequestRow {
+  const dept = departments.find((d) => d.key === `dept:${r.departmentId}`) ?? null
+  return {
+    key: `request:${r.id}`,
+    id: r.id,
+    source: 'request',
+    card: dept?.key ?? 'other',
+    from: r.requesterName,
+    fromSub: [r.departmentName, r.kind === 'claim' ? 'claim' : 'direct payment'].join(' · '),
+    what: whatOf(r),
+    sent: r.submittedAt ? day(r.submittedAt) : '',
+    ref: r.requestNo ?? '',
+    department: r.departmentName,
+    payTo: r.kind === 'claim' ? 'Claim' : 'Supplier',
+    whoPays: whoPaysWords(r),
+    amount: r.total,
+    stage: r.pvId ? 'principal' : 'finance',
+    voucherId: r.pvId,
+    voucherNo: r.pvNo,
+    payroll: null,
+    claim: null,
+    request: r,
   }
 }
 
@@ -148,6 +181,9 @@ export function stageChip(r: PaymentRequestRow): { text: string; tone: ChipTone 
     if (r.stage === 'principal') return { text: 'Funded · with the Principal', tone: 'accent' }
     return { text: (r.payroll?.committed ?? 0) > 0.005 ? 'Part funded' : 'To fund', tone: 'wait' }
   }
+  // A staff request's voucher may still be Finance's own draft.
+  if (r.request?.pvId && r.request.pvStatus === 'draft') return { text: `${r.request.pvNo ?? 'PV'} · draft`, tone: 'accent' }
+  if (r.request?.pvId && r.request.pvStatus === 'approved') return { text: 'Approved · to be paid', tone: 'accent' }
   return r.stage === 'principal' ? { text: 'PV with the Principal', tone: 'accent' } : { text: 'Waiting for a PV', tone: 'wait' }
 }
 

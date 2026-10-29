@@ -1,16 +1,19 @@
 'use client'
 
 import { useEffect, useState, useTransition, type ReactNode } from 'react'
-import { HrIcon } from '@/components/hrv/icons'
 import { FinDrawer, drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
+import { OpenRow, RequestGroups, RequestHero } from '@/components/payment-requests/RequestParts'
 import { f2, rm } from '@/lib/fin-app/page-model'
+import { openRequestFile } from '@/lib/payment-requests/actions'
 import { openMemberClaimInvoice } from '../actions'
 import { stageChip, type PaymentRequestRow } from '../_lib/requests-model'
 
 // A request in the hub's drawer (2026-10-29, Payments › Payment request): the dark hero as a voucher's, the request's
 // numbered groups, and at its foot what this reader may do while it is Finance's — a payroll's funding round and its
-// send back to HR, a claim's voucher and a member's claim returned to HR.
+// send back to HR, a claim's voucher and a member's claim returned to HR. Since PR ②, a staff request's too: its
+// items, receipts, who is paid and which pool pays, Reject… and Create PV (each split's Bill back? is answered in the
+// Create PV window — the user: "我开pv 时就要确定是不是要开单了").
 
 export interface RequestDrawerCan {
   pay: boolean
@@ -23,53 +26,29 @@ export interface RequestDrawerSteps {
   createPv: (r: PaymentRequestRow) => void
   returnToHr: (r: PaymentRequestRow) => void
   openVoucher: (id: string) => void
+  /** A staff request: rejected back to its requester, and its PV (the same person's open requests with it). */
+  rejectRequest: (r: PaymentRequestRow) => void
+  createRequestPv: (r: PaymentRequestRow) => void
 }
 
-const LIGHT: Record<string, string> = { wait: 'wait', accent: 'accent' }
-
-function Hero({ kicker, chip, no, amount, to, note }: { kicker: string; chip: { text: string; tone: string }; no: string; amount: number; to: string; note: string }) {
-  return (
-    <div className={d.hero} data-light={LIGHT[chip.tone] ?? 'def'}>
-      <div className={d.heroTop}>
-        <span className={d.kicker}>{kicker}</span>
-        <span className={d.heroChip}>
-          <span className={d.heroDot} />
-          {chip.text}
-        </span>
-      </div>
-      <div className={d.heroNo}>{no}</div>
-      <div className={d.heroAmount}>{rm(amount)}</div>
-      <div className={d.heroTo}>{to}</div>
-      <div className={d.heroNote}>
-        <span className={d.heroNoteDot} />
-        <span>{note}</span>
-      </div>
-    </div>
-  )
-}
-
-/** A file or a voucher to open, drawn as the voucher drawer's attachments. */
-function OpenRow({ icon, name, meta, onOpen, disabled = false }: { icon: 'doc' | 'out'; name: string; meta: string; onOpen: () => void; disabled?: boolean }) {
-  return (
-    <button type="button" className={d.file} onClick={onOpen} disabled={disabled}>
-      <span className={d.fileIcon}>
-        <HrIcon name={icon} size={15} />
-      </span>
-      <span className={d.fileText}>
-        <span className={d.fileName}>{name}</span>
-        <span className={d.fileMeta}>{meta}</span>
-      </span>
-      <span className={d.fileChev} aria-hidden="true">
-        ›
-      </span>
-    </button>
-  )
-}
-
-export function RequestDrawer({ row, onClose, can, steps }: { row: PaymentRequestRow | null; onClose: () => void; can: RequestDrawerCan; steps: RequestDrawerSteps }) {
+export function RequestDrawer({
+  row,
+  onClose,
+  can,
+  steps,
+  stepError = null,
+}: {
+  row: PaymentRequestRow | null
+  onClose: () => void
+  can: RequestDrawerCan
+  steps: RequestDrawerSteps
+  /** Why a step begun from the page (Create PV) did not go — said in the drawer. */
+  stepError?: string | null
+}) {
   // The row stays drawn while the drawer plays out.
   const [shown, setShown] = useState<PaymentRequestRow | null>(row)
   const [fileError, setFileError] = useState<string | null>(null)
+  const [openingFile, setOpeningFile] = useState<string | null>(null)
   const [opening, start] = useTransition()
   useEffect(() => {
     if (row) setShown(row)
@@ -90,6 +69,22 @@ export function RequestDrawer({ row, onClose, can, steps }: { row: PaymentReques
     })
   }
 
+  const openFile = (fileId: string) => {
+    setFileError(null)
+    setOpeningFile(fileId)
+    start(async () => {
+      try {
+        const res = await openRequestFile(fileId)
+        if (!res.ok) setFileError(res.reason)
+        else window.open(res.data.url, '_blank', 'noopener,noreferrer')
+      } catch {
+        setFileError('The file could not be opened. Try again.')
+      } finally {
+        setOpeningFile(null)
+      }
+    })
+  }
+
   let body: ReactNode = null
   const bar: ReactNode[] = []
   if (r?.payroll) {
@@ -97,7 +92,7 @@ export function RequestDrawer({ row, onClose, can, steps }: { row: PaymentReques
     const toFund = r.stage === 'finance'
     body = (
       <>
-        <Hero
+        <RequestHero
           kicker={p.isDirector ? 'Director salary · funding request' : 'Payroll · funding request'}
           chip={stageChip(r)}
           no={p.label}
@@ -156,7 +151,7 @@ export function RequestDrawer({ row, onClose, can, steps }: { row: PaymentReques
     const waiting = r.stage === 'finance'
     body = (
       <>
-        <Hero
+        <RequestHero
           kicker={member ? 'Member claim · approved by HR' : 'Claim'}
           chip={stageChip(r)}
           no={r.ref}
@@ -212,10 +207,67 @@ export function RequestDrawer({ row, onClose, can, steps }: { row: PaymentReques
         </button>,
       )
     }
+  } else if (r?.request) {
+    const q = r.request
+    const waiting = q.status === 'with_finance' && !q.pvId
+    body = (
+      <>
+        <RequestHero
+          kicker={q.kind === 'claim' ? 'Claim · I paid' : 'Direct payment'}
+          chip={stageChip(r)}
+          no={q.requestNo ?? r.ref}
+          amount={q.total}
+          to={`Pay to ${q.kind === 'claim' ? q.requesterName : q.payeeName ?? 'the supplier'}`}
+          note={
+            !waiting
+              ? `In ${q.pvNo ?? 'its payment voucher'}.`
+              : q.shares.length > 0
+                ? 'Create its payment voucher — each split’s Bill back is decided there — or reject it back with a reason.'
+                : 'Create its payment voucher, or reject it back with a reason.'
+          }
+        />
+        {stepError ? (
+          <div className={d.error} role="alert">
+            {stepError}
+          </div>
+        ) : null}
+        <RequestGroups r={q} opening={openingFile} fileError={fileError} onOpenFile={openFile} billBack />
+        {q.pvId ? (
+          <>
+            <div className={d.label}>
+              <span className={d.labelRoman}>V.</span> Voucher
+            </div>
+            <div className={d.files}>
+              <OpenRow icon="out" name={q.pvNo ?? 'Voucher'} meta={q.pvStatus === 'pending_approval' ? 'Pending approval' : (q.pvStatus ?? '—')} onOpen={() => steps.openVoucher(q.pvId!)} />
+            </div>
+          </>
+        ) : null}
+      </>
+    )
+    if (waiting && can.sendBack) {
+      bar.push(
+        <button key="reject" type="button" className={d.barBtn} data-kind="danger" onClick={() => steps.rejectRequest(r)}>
+          Reject…
+        </button>,
+      )
+    }
+    if (waiting && can.pay) {
+      bar.push(
+        <button key="pv" type="button" className={d.barBtn} data-kind="primary" onClick={() => steps.createRequestPv(r)}>
+          Create PV
+        </button>,
+      )
+    }
   }
 
   return (
-    <FinDrawer open={!!row} onClose={onClose} label={r ? `${r.from} · ${r.what}` : 'Request'} title={r ? (r.source === 'claim' ? r.ref : r.what) : ''} bar={bar.length > 0 ? bar : null}>
+    <FinDrawer
+      open={!!row}
+      onClose={onClose}
+      label={r ? `${r.from} · ${r.what}` : 'Request'}
+      title={r ? (r.source === 'payroll' ? r.what : r.ref || r.what) : ''}
+      bar={bar.length > 0 ? bar : null}
+    >
       {body}
     </FinDrawer>
   )

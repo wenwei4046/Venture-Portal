@@ -13,7 +13,7 @@ const r2 = vi.hoisted(() => ({
 vi.mock('./r2', () => r2)
 
 import { forgetFileBuckets } from './buckets'
-import { fileStorage, prepareUpload, withFileStorage } from './server'
+import { fileStorage, prepareUpload, withFileStorage, type FileBucketApi } from './server'
 
 type Row = Record<string, unknown>
 type Result = { data: unknown; error: { code?: string; message?: string } | null }
@@ -220,6 +220,32 @@ describe('a bucket in R2', () => {
     expect(res).toEqual({ data: { path: 'drive/b/x.pdf' }, error: null })
     expect(files.find(f => f.name === 'drive/b/x.pdf')).toMatchObject({ metadata: { size: 9, mimetype: 'application/pdf' } })
     expect(r2.r2Copy).toHaveBeenCalledWith({ r2Bucket: 'priv', key: 'hr-documents/drive/a/x.pdf' }, { r2Bucket: 'priv', key: 'hr-documents/drive/b/x.pdf' })
+  })
+
+  // A request's receipt onto its payment voucher (2026-10-29): read under one bucket's policy, written under the other's.
+  it('copies into another bucket in R2: the source read here, the copy’s row in the other bucket under its policy', async () => {
+    const { db, files, log } = fakeDb({
+      backends: { 'payment-request-files': 'r2', 'payment-attachments': 'r2' },
+      files: [{ id: '1', bucket_id: 'payment-request-files', name: 'u1/k/Receipt.pdf', metadata: { size: 9, mimetype: 'application/pdf' } }],
+    })
+    const bucket = withFileStorage(db).storage.from('payment-request-files') as unknown as FileBucketApi
+    const res = await bucket.copyTo('payment-attachments', 'u1/k/Receipt.pdf', 'pv-1/x-Receipt.pdf')
+    expect(res).toEqual({ data: { path: 'pv-1/x-Receipt.pdf' }, error: null })
+    expect(log).toEqual(['insert payment-attachments/pv-1/x-Receipt.pdf'])
+    expect(files.find(f => f.name === 'pv-1/x-Receipt.pdf')).toMatchObject({ bucket_id: 'payment-attachments', metadata: { size: 9, mimetype: 'application/pdf' } })
+    expect(r2.r2Copy).toHaveBeenCalledWith({ r2Bucket: 'priv', key: 'payment-request-files/u1/k/Receipt.pdf' }, { r2Bucket: 'priv', key: 'payment-attachments/pv-1/x-Receipt.pdf' })
+  })
+
+  it('a file the caller may not read, or a bucket not in R2, is not copied across', async () => {
+    const { db } = fakeDb({
+      backends: { 'payment-request-files': 'r2', 'payment-attachments': 'r2', 'old-bucket': 'supabase' },
+      files: [{ id: '1', bucket_id: 'payment-request-files', name: 'u1/k/Receipt.pdf', metadata: {} }],
+      mayRead: () => false,
+    })
+    const bucket = withFileStorage(db).storage.from('payment-request-files') as unknown as FileBucketApi
+    expect((await bucket.copyTo('payment-attachments', 'u1/k/Receipt.pdf', 'pv-1/x.pdf')).error).toMatchObject({ status: 404 })
+    expect((await bucket.copyTo('old-bucket', 'u1/k/Receipt.pdf', 'pv-1/x.pdf')).error).toMatchObject({ status: 400 })
+    expect(r2.r2Copy).not.toHaveBeenCalled()
   })
 
   it('a public bucket’s address is its own (file_buckets.public_url) once its bucket is known here', async () => {

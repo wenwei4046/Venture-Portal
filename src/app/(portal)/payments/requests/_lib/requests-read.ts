@@ -5,14 +5,16 @@ import { officeToday } from '@/lib/office-time'
 import { fetchDeptRegistry } from '@/lib/dept-registry'
 import { readClaimQueueRow } from '@/lib/claim-requests'
 import { payrollRequestsModel } from '@/lib/fin-app/payroll-requests-model'
+import { parseRequests } from '@/lib/payment-requests/model'
 import type { User } from '@/types'
 import { readPayrollRequests, type PayrollBank } from '../../payroll-requests/_lib/payroll-read'
-import { claimRow, payrollRow, requestDepartments, sortRequests, type PaymentRequestRow, type RequestDepartment } from './requests-model'
+import { claimRow, payrollRow, requestDepartments, sortRequests, staffRequestRow, type PaymentRequestRow, type RequestDepartment } from './requests-model'
 
 // What Payments › Payment request reads (2026-10-29, PR ①): HR's payroll funding requests as Payroll Requests read
 // them (`readPayrollRequests` — only for an account with Payroll payouts, as that page asked), the claims HR approved
 // to be paid by Finance (`claim_payment_queue`, Treasury's), the departments their cards are, the active banks. The
-// caller has asked for the page and the treasury.
+// caller has asked for the page and the treasury. Since PR ②, the staff's own requests sent to Finance
+// (`payment_requests_for_finance`, Treasury's — an account as its last four without the Bank tick).
 
 export interface PaymentRequestsRead {
   rows: PaymentRequestRow[]
@@ -32,9 +34,10 @@ export interface PaymentRequestsRead {
 export async function readPaymentRequests(user: User): Promise<PaymentRequestsRead> {
   const supabase = await createClient()
   const seesPayroll = canSeePayrollPayouts(user)
-  const [payroll, claims, registry, banks] = await Promise.all([
+  const [payroll, claims, staff, registry, banks] = await Promise.all([
     seesPayroll ? readPayrollRequests(supabase) : Promise.resolve(null),
     supabase.rpc('claim_payment_queue'),
+    supabase.rpc('payment_requests_for_finance'),
     fetchDeptRegistry(supabase),
     // Payroll Requests reads them too; without it, the claims still need a bank to be paid from.
     seesPayroll
@@ -58,6 +61,8 @@ export async function readPaymentRequests(user: User): Promise<PaymentRequestsRe
     }
   }
   for (const raw of ((claims.data ?? []) as unknown as Record<string, unknown>[])) rows.push(claimRow(readClaimQueueRow(raw), departments))
+  // A read that fails leaves the rest of the list as it is.
+  for (const r of staff.error ? [] : parseRequests(staff.data)) rows.push(staffRequestRow(r, departments))
 
   return {
     rows: sortRequests(rows),

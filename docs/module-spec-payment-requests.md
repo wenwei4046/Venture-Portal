@@ -18,7 +18,7 @@ The mockup is the behaviour, not the look: every screen is built from the portal
 | Who to pay | **I paid — pay me back** (a claim: the staff member's salary account from HR's records, another account allowed) or **Pay a supplier directly** (direct pay: the supplier's name, bank, account) — "要分的出来是claim". |
 | Supplier's account | Read automatically from the attached supplier invoice, then checked by the staff member ("pay a supplier directly 可以根据attachment自动读取account number?" — yes). A supplier paid before keeps its saved account; Finance is told when an invoice shows a different one. |
 | Which pool | Default the requester's department; **Split it** with other departments and/or companies, the amounts typed by the requester ("由他们来填"). |
-| Bill back | Finance decides per split ("finance 有权利拒绝，同时也要自持要不要bill back"). Yes → the system drafts the invoice (to the company, or to the department) and keeps it a **DRAFT** in Invoice until Finance checks and issues it ("但都是draft 的状态？然后我检查了没有问题才开？"). No → the requester's department pays all of it. |
+| Bill back | Finance decides per split, in the Create PV window as the PV is made ("finance 有权利拒绝，同时也要自持要不要bill back"; "我开pv 时就要确定是不是要开单了"). Yes → the system drafts the invoice (to the company, or to the department) and keeps it a **DRAFT** in Invoice until Finance checks and issues it ("但都是draft 的状态？然后我检查了没有问题才开？"). No → the requester's department pays all of it. |
 | Finance rejects | The requester fixes it and submits again; a Revenue claim goes back to HR ("finance 拒绝后可以再交过，revenue 的finance 会退回给hr"). |
 | Who sees what | A requester only their own requests; a Claim & approve holder their department's; Finance all — tabs **All · Payroll · each department** ("每个人只能看到自己的request。manager 有权利看到自己department 的request"). |
 | Finance's sidebar | Payments › **Payment voucher** (today's Payments page, unchanged but for its head buttons Dept / Claims / Payroll, which go) and Payments › **Payment request** ("pv 改成payment voucher"). |
@@ -37,7 +37,7 @@ with ROLLBACK, then COMMIT + its `schema_migrations` row), as every PR here.
 | PR | Contents | Status |
 |---|---|---|
 | ① | **Finance › Payment request with what exists today.** Finance's sidebar: Payments › *Payment voucher* (today's `/payments`, retitled) and › *Payment request* (`/payments/requests`, new). The new page lists HR's payroll funding requests (tab *Payroll*, Payroll payouts holders only) and the Revenue members' benefit claims HR approved for payment, in the Payments hub's kit (HubHead, HubCards, `FinTable` with its column tools, `RowMenu`, a drawer). Each row worked as today — payroll: Generate PV (rounds), Send back to HR; member claim: Create PV (`claim_create_payment_voucher`) — plus the new **Return to HR** for a member claim. Payment voucher loses its Dept / Claims / Payroll head buttons. | Built 2026-10-29 (branch `feat/payment-requests`) |
-| ② | **Staff requests, end to end without approval.** The tables, the private bucket, the readers and writers (§3); the staff page `/claims` rebuilt as *Claim* — the requester's own requests and the *New request* window (claim or direct pay, items, receipts, pay-to from HR's record, split with departments / companies); the rows on Payment request; Create PV = today's Create payment window filled in (lines, payee, account hint, notes, files carried over, one person's open requests combined); Reject → fixed and sent again; Bill back Yes/No → a draft invoice in Invoice; the PV followed (paid → paid, voided → back to Finance). | |
+| ② | **Staff requests, end to end without approval.** The tables, the private bucket, the readers and writers (§3); the staff page `/claims` rebuilt as *Claim* — the requester's own requests and the *New request* window (claim or direct pay, items, receipts, pay-to from HR's record, split with departments / companies); the rows on Payment request; Create PV = today's Create payment window filled in (lines, payee, account hint, notes, files carried over, one person's open requests combined); Reject → fixed and sent again; Bill back Yes/No → a draft invoice in Invoice; the PV followed (paid → paid, voided → back to Finance). | Built 2026-10-29 (branch `feat/payment-requests-staff`) |
 | ③ | **By management approve and Claim & approve.** The tick on a title's template and a person (person wins); the department head's *Claim & approve* (their department's requests, Approve / Reject, several at once); routing at submit; the portal's notices to approvers and requesters. | |
 | ④ | **Several at once for Finance.** Select on Payment request → Create PV (one PV a payee, combined, a bill-back answer each, Save drafts / Submit — one approval group for the Principal) and Reject. | |
 | ⑤ | **Supplier invoices read for the requester.** Direct pay: the supplier's invoice read by the model (name, bank, account), checked by the requester; saved supplier accounts; Finance told when an invoice shows a different account. | |
@@ -128,9 +128,94 @@ Files: `src/components/layout/fin-nav.ts` (+ `ViewSidebar` child rows), `src/lib
 - The phone app's request sheets (Fund, Send back, Raise) now live in `payments/requests/_components/RequestSheets`,
   shared by both; the desktop's says *Create PV*.
 
+## 4b. PR ② — tasks (2026-10-29, the user: "可以，开始做 PR ②")
+
+Since PR ①: no Anthropic key and no reading of invoices for now — a direct pay's supplier name, bank and account are
+typed by the requester ("不要开key 先，这个功能就不active 先，暂时就让他们填。如果不是claim 给自己的话"; PR ⑤ shelved).
+Notices (to Finance on a submit, to the requester on a reject) wait for PR ③, which adds every notice of the flow:
+the bells' kinds and taps are one change. The Claim page shows a rejected request with its reason meanwhile.
+
+1. **Migration** `…_payment_requests.sql` (§3's tables, RLS on, no policy, no client grants; each `audit_register`ed —
+   the account columns masked as bank):
+   - `payment-request-files` bucket — R2 from the start, private, 25 MB a file; `file_objects` policies: INSERT into
+     one's own folder `<uid>/…`; SELECT through `payment_request_object_readable` (one's own upload; a file of one's own
+     request; any filed file of a submitted request for Treasury — Finance and the Principal); DELETE one's own unfiled
+     upload. The helpers are granted to `authenticated` (a policy runs as the reader).
+   - Request numbers `PRQ-YYMM-NNNN` minted at the first submit under `pg_advisory_xact_lock`.
+   - Readers: `payment_request_context()` (the New request window: who, department and its pool, the salary account
+     from HR's record as bank + last four, the departments and companies a share may name); `my_payment_requests()`;
+     `payment_requests_for_finance()` (Treasury: submitted, in a PV); `payment_request_file(file)` (the path to sign).
+   - Writers: `payment_request_save(id, data, submit)` (a draft or a rejected request of one's own: kind, pay-to,
+     items, shares, files; Submit checks it whole — items, a receipt, the pay-to, shares under the total — then takes a
+     number, snapshots the salary account and goes to Finance); `payment_request_cancel(id)`;
+     `payment_request_reject(id, reason)` (Treasury · Void or Approve, as Return to HR); `payment_requests_for_pv(ids)`
+     (Treasury · Create — what a Create PV needs: the same payee into one account, the files to carry);
+     `payment_requests_attach_pv(ids, pv, bill)` (each split's Bill back? as answered in the window; a Yes drafts its
+     invoice in the same step).
+   - The PV followed (`payment_vouchers`, as `claims_follow_their_voucher`): paid → `paid`; voided → back to
+     `with_finance`, `pv_id` cleared; a draft deleted → the same.
+   - Who may: `claims.create:own` sends one's own (the staff templates hold it already); Treasury reads and works them.
+2. **The Claim page** (`/claims`, rebuilt; the pool-claims code stays until PR ⑥): Payment voucher's hub — *Claim*,
+   "Only your own requests — claims and direct payments.", **+ New request**; cards All · Draft · With Finance ·
+   Rejected · Paid; the table Date · What · Amount · Where it is; a drawer (items, receipts, pay to, who pays, the
+   reason when rejected) with *Edit* / *Submit* / *Cancel request*.
+3. **New request** — a pop-out window (`FinDialog`), the mockup's three parts, nothing chosen until picked: *What is it?*
+   (I paid — pay me back: HR's salary account, or another this time · Pay a supplier directly: the supplier's name,
+   bank and account, typed); *What was it for?* (items, + Add another item, the total; receipts or invoices, required —
+   uploaded from the browser into the bucket); *Which pool pays?* (the department's, or Split it: a company or a
+   department, which, the amount; the department pays the rest). *Submit* · *Save as draft* · *Cancel*.
+4. **The rows in every staff view:** Department view's *Claims* and Marketing's *My claims* say **Claim**; HR's view
+   gets *Claim* (Admin, beside the rooms) and Finance's account menu *Claim* (beside Meeting Rooms) — each view's own tab
+   (`hr.my_claims`, `fin.my_claims`, shared with `dept.my_claims` / `mkt.my_claims` as Meeting Rooms' are); HR · Payroll's
+   stored ticks gain HR's.
+5. **Finance's side** (Payment request): the requests under their department's card; the drawer — items, receipts
+   (open), pay to (whole account with the bank tick, else the last four), who pays and where each split's Bill back
+   stands; **Reject…** (a reason the requester reads); **Create PV** — today's Create payment window filled in: payee,
+   "Pay into …" under it, the description, a line per item on the requester's department pool, the same person's other
+   requests with no PV yet ticked in, the files carried over, notes "From Payment request · …", and **Bill back? Yes /
+   No** for each split. On save the voucher is made as any other, then the requests are tied to it, their files copied
+   into `payment-attachments`, and each Yes split drafted as an invoice (Invoice · Create — asked before anything is
+   written).
+6. **Tests:** `tests/member-sql/validate-payment-requests.mjs`; the models, the Claim page, the window, the drawer,
+   the dialog's preset; the registries (`DEFINER_RPCS`, `READS_WHILE_VIEWING_AS`, tabs, page tabs, database types).
+
+**As built (2026-10-29).**
+
+- *Bill back is drafted in the same database step that ties the requests to the PV* (`payment_requests_attach_pv`), not
+  by `createMultiLineInvoice` from the app: a refusal (a closed month, Invoice · Create missing, a share with no
+  category) leaves nothing tied and nothing drafted, and Create PV voids the draft voucher it made. The invoice is what
+  `createMultiLineInvoice` would make — draft, the requester's department's mode, the company (`subsidiary`) or the
+  department (`dept_pool`), one line credited to the account the request's lines carry on this voucher. A drafted
+  invoice keeps its share's answer (void it in Invoice to answer again); a voided one counts as none.
+- *Bill back is answered in the Create PV window* (the user, 2026-10-29: "我开pv 时就要确定是不是要开单了"): each split
+  of the requests the PV pays is asked Yes / No there, nothing pre-chosen, and Save waits for every answer; the drawer
+  only says where each stands (*Decided when the PV is made*). So Create PV takes the request picked and every request
+  of the same payee into the same account with no PV yet. A split invoiced already (its earlier PV voided) is not asked
+  again; Reject clears an answer whose invoice is none or voided. A window left open while a request changed is
+  refused before a voucher number is taken (*close the window and Create PV again*).
+- *Each item is its Description* (the user: "确定他们放的那个是description"): the New request window heads its items
+  Description · Amount (RM), and each becomes the words of its line on the PV.
+- *The rows:* HR's sidebar › Admin › **Claim** above the rooms; Finance's account menu › **Account** › Claim (the
+  phone app's Profile lists Admin only, so no half-made screen there); both only for a login of one's own and never
+  while viewing as. The Department view's and Marketing's rows say Claim. Finance AM holds no claims cells — left to
+  the user to tick.
+- *Files:* the PDF, JPG, PNG, Excel, Word or CSV a voucher's attachments take, up to 25 MB, so each carries onto the
+  PV (`payment-attachments`, copied inside R2).
+- *Viewing as somebody* the Claim page shows none of the real account's requests and offers no New request.
+
 Later PRs are detailed here when they start.
 
 ## 5. Review focus
+
+PR ②:
+
+- Two requests of one payee, one with a split → one PV for both; Save waits for that split's Yes / No; a No drafts nothing.
+- Create PV with a Yes share on a day the month is closed → nothing tied, nothing drafted, the voucher voided again.
+- A request's PV voided, then made again → its drafted invoice is the one kept (no second invoice number).
+- A shared login (finance@, hr@) → no Claim row in the HR or Finance view; a New request from it says HR must link it.
+- A receipt that will not copy onto the voucher → the voucher stands, the missing receipt said.
+
+PR ①:
 
 - A Revenue claim returned to HR while a draft PV for it exists → refused (no live voucher).
 - The Payroll tab and its counts for an account without Payroll payouts → absent, and the All count without them.

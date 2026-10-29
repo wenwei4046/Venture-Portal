@@ -416,7 +416,8 @@ function navEntries(data: NavData): NavEntry[] {
         { href: REVENUE_DEPARTMENT_PATH, label: 'Department', visible: canAccessRevenue },
       ],
     },
-    { href: '/claims', label: 'Claims', section: 'Departments', visible: canAccessClaims },
+    // One's own claims and direct payments to Finance — Claim since 2026-10-29 (the claim process).
+    { href: '/claims', label: 'Claim', section: 'Departments', visible: canAccessClaims },
 
     // ── People ──
     // Who works here, under which title, reporting to whom, with which account.

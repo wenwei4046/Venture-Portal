@@ -30,6 +30,7 @@ import { opensPath } from '@/lib/page-tabs'
 import { revenuePath } from '@/lib/revenue'
 import {
   canAccessAttendance,
+  canSendOwnClaims,
   canAccessDirectorPool,
   canAccessDirectorSalary,
   canAccessDocumentation,
@@ -226,6 +227,8 @@ export function hrNavSections(revenueSub: string | null | HrRevenueSubs): HrNavS
       label: 'Admin',
       tone: 'walnut',
       items: [
+        // One's own claims and direct payments to Finance (2026-10-29, the claim process: Claim above the rooms in every view).
+        { key: 'claim', label: 'Claim', icon: 'receipt', href: '/claims', match: p => under(p, '/claims'), visible: canSendOwnClaims },
         // Every view books a room (2026-10-11); its two tabs are rows here.
         { key: 'roomSched', label: 'Room schedule', icon: 'room', href: '/admin/rooms', match: roomOn('schedule'), visible: canAccessMeetingRooms },
         { key: 'roomRooms', label: 'Rooms', icon: 'room', href: '/admin/rooms?tab=rooms', match: roomOn('rooms'), visible: canAccessMeetingRooms },
