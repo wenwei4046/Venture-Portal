@@ -65,6 +65,7 @@ function dataWith(on: boolean, over: Partial<CommissionSettingsData> = {}): Comm
     kpiItems: [],
     kpiThresholds: [],
     kpiSpecials: [],
+    kpiFabricSeries: [],
     kpiGoneSkus: [],
     openBillRules: [],
     brands: [],

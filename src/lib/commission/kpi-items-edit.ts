@@ -18,7 +18,7 @@
 import { valueKey } from '@/lib/catalogue/keys'
 import { parseMoney } from '@/lib/catalogue/edits'
 import { kpiAddKey, type KpiItemsEdit } from '@/lib/catalogue/rule-edits'
-import { kpiCodeKey, type KpiOptionPool } from './kpi'
+import { kpiCodeKey, type FabricSeriesRow, type KpiFabricPool, type KpiOptionPool } from './kpi'
 
 /** An item on the list — a `comm_kpi_items` row in force today or later. */
 export interface KpiListedItem {
@@ -29,7 +29,7 @@ export interface KpiListedItem {
   code: string | null
   /** SKU items: the SKU's description when it was picked. */
   name: string | null
-  /** Option items: the Maintenance pool and the special's own spelling. */
+  /** Option items: the pool — a Maintenance special's or a fabric series' — and its own spelling. */
   optionPool: KpiOptionPool | null
   optionValue: string | null
   /** RM per unit. */
@@ -57,9 +57,16 @@ export function listedLabel(item: Pick<KpiListedItem, 'source' | 'code' | 'optio
   return (item.source === 'sku' ? item.code : item.optionValue) ?? '—'
 }
 
-/** Bed frame specials, then sofa specials, then SKUs — the order the tab lists them in. */
+const POOL_ORDER: Record<KpiOptionPool, number> = {
+  bedframe_specials: 0,
+  sofa_specials: 1,
+  bedframe_fabric_series: 2,
+  sofa_fabric_series: 3,
+}
+
+/** Bed frame specials, sofa specials, bed frame and sofa fabric series, then SKUs — the order the tab lists them in. */
 export function listedOrder(item: Pick<KpiListedItem, 'source' | 'optionPool'>): number {
-  return item.source === 'sku' ? 2 : item.optionPool === 'bedframe_specials' ? 0 : 1
+  return item.source === 'sku' ? 4 : (item.optionPool ? POOL_ORDER[item.optionPool] : undefined) ?? 0
 }
 
 export function sortListed<T extends KpiListedItem>(items: readonly T[]): T[] {
@@ -134,6 +141,41 @@ export function pickSpecial(special: { pool: KpiOptionPool; value: string; label
     value: special.value,
     name,
   }
+}
+
+/** A picked fabric series, a bed frame's or a sofa's — an option item of its pool, named by how many fabrics it holds. */
+export function pickFabricSeries(pool: KpiFabricPool, series: { series: string; fabrics: number }): KpiPickedItem {
+  return { ...pickSpecial({ pool, value: series.series }), name: fabricCount(series.fabrics) }
+}
+
+/** "18 fabrics" — what the tab says a series holds. */
+export function fabricCount(n: number): string {
+  return `${n} fabric${n === 1 ? '' : 's'}`
+}
+
+/**
+ * The fabric list as the picker offers it (2026-10-29): one row per series,
+ * spelled as its live fabrics spell it, with how many fabrics the ERP still
+ * lists — each code once: the ERP lists some twice (AVANI's 18 colours are 36
+ * rows) — and a series whose every fabric is gone marked so. Sorted by name.
+ */
+export function fabricSeriesList(rows: readonly FabricSeriesRow[]): Array<{ series: string; fabrics: number; removed: boolean }> {
+  const bySeries = new Map<string, { series: string; codes: Set<string>; live: boolean }>()
+  for (const row of rows) {
+    const series = (row.series ?? '').trim()
+    const key = valueKey(series)
+    if (!key) continue
+    const live = !row.removed_at
+    const held = bySeries.get(key) ?? { series, codes: new Set<string>(), live: false }
+    if (live) held.codes.add(kpiCodeKey(row.fabric_code))
+    // The writer keeps a live fabric's spelling (catalogue_save_kpi_items): so does the list.
+    if (live && (!held.live || series < held.series)) held.series = series
+    held.live = held.live || live
+    bySeries.set(key, held)
+  }
+  return [...bySeries.values()]
+    .map(s => ({ series: s.series, fabrics: s.codes.size, removed: !s.live }))
+    .sort((a, b) => a.series.localeCompare(b.series))
 }
 
 /** The draft as `saveKpiItems` takes it. */

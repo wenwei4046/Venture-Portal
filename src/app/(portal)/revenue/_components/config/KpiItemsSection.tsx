@@ -4,15 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { useRouter } from 'next/navigation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { formatMoneyBare } from '@/lib/utils'
-import { kpiItemKind, type KpiOptionPool } from '@/lib/commission/kpi'
+import { valueKey } from '@/lib/catalogue/keys'
+import { isFabricSeriesPool, kpiItemKind, type KpiOptionPool } from '@/lib/commission/kpi'
 import { validateKpiItems } from '@/lib/catalogue/rule-edits'
 import {
   amountDiffers,
   draftChanges,
   EMPTY_KPI_DRAFT,
+  fabricCount,
   kpiItemsEditOf,
   listedKeys,
   listedLabel,
+  pickFabricSeries,
   pickSku,
   pickSpecial,
   SKU_SEARCH_LIMIT,
@@ -37,6 +40,8 @@ const SOURCES: ReadonlyArray<{ key: PickSource; label: string }> = [
   { key: 'sku', label: 'SKU Master' },
   { key: 'bedframe_specials', label: 'Bed frame specials' },
   { key: 'sofa_specials', label: 'Sofa specials' },
+  { key: 'bedframe_fabric_series', label: 'Bed frame fabric series' },
+  { key: 'sofa_fabric_series', label: 'Sofa fabric series' },
 ]
 
 /** The Brands tab's picker pill: white, and the one being read on a peach wash with an orange rim. */
@@ -85,11 +90,13 @@ const NO_SEARCH: SkuSearch = { query: '', hits: [], total: 0, pending: false, er
  * what things cost; this sets what the pay does with them.
  *
  * A KPI item is a SKU of the SKU Master (searched for — the master is 2,368
- * rows) or a bed frame's or sofa's special from Maintenance (all 39 listed).
- * When the commission calculation finds one on a bill it counts by itself
- * (`kpi.ts` `orderKpiHits`, `comm_kpi_hits`): its amount off the bill's sales,
- * paid flat as KPI. Nothing here changes how a bill is read — only where the
- * list is kept and who keeps it (Principal and HR, as every rule).
+ * rows), a bed frame's or sofa's special from Maintenance (all 39 listed), or
+ * a bed frame's or sofa's FABRIC SERIES from the ERP's fabric list (2026-10-29,
+ * some 130 listed). When the commission calculation finds one on a bill it
+ * counts by itself (`kpi.ts` `orderKpiHits`, `comm_kpi_hits`): its amount off
+ * the bill's sales, paid flat as KPI. Nothing here changes how a bill is read
+ * — only where the list is kept and who keeps it (Principal and HR, as every
+ * rule).
  *
  * One draft for the whole list — picked, retyped, coming off — saved in one
  * transaction. It survives a switch to another tab (the section stays mounted,
@@ -117,6 +124,8 @@ export default function KpiItemsSection({
   const gone = useMemo(() => new Set(data.kpiGoneSkus), [data.kpiGoneSkus])
   const specials = data.kpiSpecials
   const specialByKey = useMemo(() => new Map(specials.map(o => [specialKey(o.pool, o.value), o])), [specials])
+  const fabricSeries = data.kpiFabricSeries
+  const seriesByKey = useMemo(() => new Map(fabricSeries.map(s => [valueKey(s.series), s])), [fabricSeries])
 
   const [draft, setDraft] = useState<KpiItemsDraft>(EMPTY_KPI_DRAFT)
   const [source, setSource] = useState<PickSource>('sku')
@@ -266,12 +275,17 @@ export default function KpiItemsSection({
 
   // What the picker offers for the source chosen.
   const q = query.trim().toLowerCase()
-  const specialMatches = source === 'sku'
+  const fabricPool = isFabricSeriesPool(source) ? source : null
+  const specialMatches = source === 'sku' || fabricPool
     ? []
     : specials
         .filter(o => o.pool === source && !o.removed)
         .filter(o => !q || o.value.toLowerCase().includes(q) || o.label.toLowerCase().includes(q))
         .sort((a, b) => a.sort_order - b.sort_order || a.value.localeCompare(b.value))
+  // A series every fabric of which the ERP has removed cannot be on a new bill, as a removed special cannot.
+  const seriesMatches = fabricPool
+    ? fabricSeries.filter(s => !s.removed && (!q || s.series.toLowerCase().includes(q)))
+    : []
   const results: Array<{ key: string; code: string; mono?: boolean; desc: string; listed: boolean; muted?: string; add: () => void }> =
     source === 'sku'
       ? sku.hits.map(h => ({
@@ -283,13 +297,21 @@ export default function KpiItemsSection({
           muted: h.active ? undefined : 'Off in the ERP',
           add: () => add(pickSku({ erpId: h.erpId, code: h.code, name: h.description })),
         }))
-      : specialMatches.map(o => ({
-          key: `${o.pool}:${o.value}`,
-          code: o.value,
-          desc: o.label !== o.value ? o.label : '',
-          listed: taken.has(specialKey(o.pool, o.value)),
-          add: () => add(pickSpecial({ pool: o.pool, value: o.value, label: o.label })),
-        }))
+      : fabricPool
+        ? seriesMatches.map(s => ({
+            key: `${fabricPool}:${s.series}`,
+            code: s.series,
+            desc: fabricCount(s.fabrics),
+            listed: taken.has(specialKey(fabricPool, s.series)),
+            add: () => add(pickFabricSeries(fabricPool, s)),
+          }))
+        : specialMatches.map(o => ({
+            key: `${o.pool}:${o.value}`,
+            code: o.value,
+            desc: o.label !== o.value ? o.label : '',
+            listed: taken.has(specialKey(o.pool, o.value)),
+            add: () => add(pickSpecial({ pool: o.pool, value: o.value, label: o.label })),
+          }))
   const message =
     source === 'sku'
       ? !q
@@ -303,9 +325,13 @@ export default function KpiItemsSection({
               : sku.total > SKU_SEARCH_LIMIT
                 ? `Showing ${SKU_SEARCH_LIMIT} of ${sku.total.toLocaleString()} — type more to narrow it.`
                 : null
-      : specialMatches.length === 0
-        ? 'No special matches.'
-        : null
+      : fabricPool
+        ? seriesMatches.length === 0
+          ? 'No fabric series matches.'
+          : null
+        : specialMatches.length === 0
+          ? 'No special matches.'
+          : null
 
   const lines: Array<{ key: string; added?: KpiPickedItem; saved?: KpiListedItem }> = [
     ...draft.added.map(a => ({ key: a.key, added: a })),
@@ -326,7 +352,10 @@ export default function KpiItemsSection({
         </p>
       ) : null}
 
-      <div className="sheet-toolbar flex-col items-stretch" role="group" aria-label="Add a KPI item">
+      {/* One column (flex-nowrap): the toolbar wraps by default, and a wrapping
+          column sizes itself to its widest row — the picker's list — so the
+          pills ran off a phone's screen once the list showed. */}
+      <div className="sheet-toolbar flex-col flex-nowrap items-stretch" role="group" aria-label="Add a KPI item">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mr-1">Add an item from</span>
           {SOURCES.map(s => (
@@ -351,8 +380,8 @@ export default function KpiItemsSection({
             value={query}
             disabled={saving}
             onChange={e => setQuery(e.target.value)}
-            placeholder={source === 'sku' ? 'Search SKU code or description…' : 'Filter the specials…'}
-            aria-label={source === 'sku' ? 'Find a SKU' : 'Filter the specials'}
+            placeholder={source === 'sku' ? 'Search SKU code or description…' : fabricPool ? 'Filter the fabric series…' : 'Filter the specials…'}
+            aria-label={source === 'sku' ? 'Find a SKU' : fabricPool ? 'Filter the fabric series' : 'Filter the specials'}
             className="flex-1 min-w-[14rem]"
           />
           <label className="inline-flex items-center gap-2 text-xs">
@@ -416,16 +445,24 @@ export default function KpiItemsSection({
                   saved ? { source: saved.source, optionPool: saved.optionPool } : { source: added!.source, optionPool: added!.source === 'option' ? added!.pool : null },
                 )
                 const title = saved ? listedLabel(saved) : added!.source === 'sku' ? added!.code : added!.value
-                const special = saved?.source === 'option' ? specialByKey.get(specialKey(saved.optionPool, saved.optionValue)) : undefined
+                const savedFabric = saved?.source === 'option' && isFabricSeriesPool(saved.optionPool)
+                const series = savedFabric ? seriesByKey.get(valueKey(saved!.optionValue)) : undefined
+                const special = saved?.source === 'option' && !savedFabric ? specialByKey.get(specialKey(saved.optionPool, saved.optionValue)) : undefined
                 const name = saved
-                  ? saved.source === 'sku' ? saved.name : special && special.label !== special.value ? special.label : null
+                  ? saved.source === 'sku'
+                    ? saved.name
+                    : savedFabric
+                      ? series ? fabricCount(series.fabrics) : null
+                      : special && special.label !== special.value ? special.label : null
                   : added!.name
                 const going = saved ? draft.removing.has(saved.id) : false
-                // Said only when known: a pool that could not be read names nothing gone.
+                // Said only when known: a pool or a fabric list that could not be read names nothing gone.
                 const outOfErp = saved
                   ? saved.source === 'sku'
                     ? !!saved.erpId && gone.has(saved.erpId)
-                    : specials.length > 0 && (!special || special.removed)
+                    : savedFabric
+                      ? fabricSeries.length > 0 && (!series || series.removed)
+                      : specials.length > 0 && (!special || special.removed)
                   : false
                 const text = draft.amounts.get(line.key)
                 const edited = text !== undefined && (!saved || amountDiffers(text, saved.amount))

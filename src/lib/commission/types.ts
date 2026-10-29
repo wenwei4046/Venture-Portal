@@ -66,6 +66,13 @@ export interface SalesLine {
    */
   specials?: string[]
   /**
+   * The series of the fabric the line carries, from the ERP's fabric list
+   * (`lineKpiFactsOf`, 2026-10-29) — how a bed frame's or a sofa's fabric
+   * series is found as a KPI item. Loaded only while the scheme has one to
+   * look for; absent = none.
+   */
+  fabricSeries?: string
+  /**
    * The one line of an upsale HR recorded by hand (`comm_upsales`, 2026-09-24).
    * Always commissionable whatever the scheme's item groups say, never a KPI
    * item, and never part of a margin — it carries no cost and it is not goods

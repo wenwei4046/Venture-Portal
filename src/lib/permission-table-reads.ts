@@ -111,7 +111,7 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   dp_inputs: ['director_pool.edit', 'director_pool.view'],
   dp_months: ['director_pool.edit', 'director_pool.view'],
   dp_settings: ['director_pool.edit', 'director_pool.view', 'director_salary.view'],
-  erp_fabrics: ['product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage'],
+  erp_fabrics: ['product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   erp_feed_closed_months: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   erp_feed_settings: ['revenue.edit', 'revenue.manage', 'revenue.view:own'],
   erp_links: ['revenue.manage', 'revenue.view:own'],
