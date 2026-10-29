@@ -64,7 +64,7 @@ function ViewAsPick({ people, open }: { people: { id: string; name: string; titl
             ))}
             {!list.length && <div style={{ padding: "10px", font: "400 12.5px Inter, sans-serif", color: "var(--crm-faint)" }}>Nobody matches.</div>}
           </div>
-          <div style={{ padding: "6px 8px 2px", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>Opens their CRM as the phone's View as does · Exit comes back.</div>
+          <div style={{ padding: "6px 8px 2px", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>Opens their CRM as the phone’s View as does · Exit comes back.</div>
         </div>
       </>)}
     </div>

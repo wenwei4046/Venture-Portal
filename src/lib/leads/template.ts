@@ -333,7 +333,7 @@ export function runsOn(templateId: string, rules: ReplyRules, brandName: (id: st
 
 /** Reply templates' right panel (Edit step / Test as customer): its width, dragged by its left edge (2026-10-28). */
 /**
- * An option's words, at most (mig 20261029100000 — the user: "button 不要限制字数"). Messenger's button shows 20 of them;
+ * An option's words, at most (mig 20261029100010 — the user: "button 不要限制字数"). Messenger's button shows 20 of them;
  * a longer option is written in full in the message too (lib/leads/messenger.ts `messageOf`).
  */
 export const OPTION_MAX = 200
