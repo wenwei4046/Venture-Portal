@@ -8,12 +8,14 @@ import {
   EditError,
   validateComboPrices,
   validateComboRemovals,
+  validateFabricUpgrades,
   validateModelEdit,
   validateNewCombo,
   validateOptionPrices,
   validateSkuPrices,
   type ComboPriceEdit,
   type ComboSetRef,
+  type FabricUpgradesEdit,
   type ModelEdit,
   type NewComboEdit,
   type OptionPriceEdit,
@@ -168,6 +170,43 @@ export async function saveOptionPrices(pool: string, edits: OptionPriceEdit[]): 
   }
   refresh()
   return { saved: upserts.length + clears.length }
+}
+
+export type SaveFabricUpgradesResult = { ok: true; saved: number } | { ok: false; reason: string }
+
+/**
+ * Maintenance › Fabrics › Sofa / Bedframe upgrades (2026-10-29): one
+ * category's upgrades — the ones made, only what changed on the others, the
+ * ones taken off — in one transaction (`catalogue_save_fabric_upgrades`, under
+ * the caller's own session). A charge, as every Maintenance price: what the
+ * customer pays on top, out of the margin; new and re-pushed bills are charged
+ * at once, a landed month when it is Recosted. A refusal the Principal can act
+ * on — a name twice, a series already under another upgrade — comes back as
+ * `reason`; production hides a thrown message.
+ */
+export async function saveFabricUpgrades(category: string, edit: FabricUpgradesEdit): Promise<SaveFabricUpgradesResult> {
+  await requireProductListEdit()
+  let plan
+  try {
+    plan = validateFabricUpgrades(category, edit)
+  } catch (e) {
+    if (e instanceof EditError) return { ok: false, reason: e.message }
+    throw e
+  }
+  const sb = await client()
+  const { data, error } = await sb.rpc('catalogue_save_fabric_upgrades', {
+    p_category: plan.category,
+    p_adds: plan.adds,
+    p_changes: plan.changes,
+    p_removes: plan.removes,
+  })
+  if (error) {
+    if (error.code === '22023') return { ok: false, reason: error.message }
+    if (error.code === '23505') return { ok: false, reason: 'Somebody saved these upgrades at the same time — reload the page' }
+    fail('the fabric upgrades', error)
+  }
+  refresh()
+  return { ok: true, saved: Number(data ?? 0) }
 }
 
 /** Combo prices per seat height. A combo whose every height is blank loses its price row. */

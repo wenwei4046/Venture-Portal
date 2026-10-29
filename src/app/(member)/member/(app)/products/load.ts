@@ -452,9 +452,22 @@ export interface FabricRow {
   removed: boolean
 }
 
-export async function loadMaintenance(): Promise<{ options: MaintenanceOption[]; fabrics: FabricRow[] }> {
+/**
+ * A fabric upgrade (2026-10-29, Maintenance › Fabrics › Sofa / Bedframe
+ * upgrades): its name — what the Quote says — its charge, and the fabric series
+ * ticked under it, as the fabric list spells them.
+ */
+export interface FabricUpgradeRow {
+  id: string
+  category: 'SOFA' | 'BEDFRAME'
+  name: string
+  price: number
+  series: string[]
+}
+
+export async function loadMaintenance(): Promise<{ options: MaintenanceOption[]; fabrics: FabricRow[]; upgrades: FabricUpgradeRow[] }> {
   const sb = await untyped()
-  const [options, prices, fabrics] = await Promise.all([
+  const [options, prices, fabrics, upgrades, upgradeSeries] = await Promise.all([
     all((f, t) =>
       sb
         .from('erp_maintenance_options')
@@ -477,7 +490,21 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
         .order('erp_id')
         .range(f, t),
     ),
+    all((f, t) =>
+      sb.from('catalogue_fabric_upgrades').select('id, category, name, price').eq('erp_company_id', 1).order('name').order('id').range(f, t),
+    ),
+    all((f, t) =>
+      sb
+        .from('catalogue_fabric_upgrade_series')
+        .select('upgrade_id, series')
+        .eq('erp_company_id', 1)
+        .order('series')
+        .order('upgrade_id')
+        .range(f, t),
+    ),
   ])
+  const seriesOf = new Map<string, string[]>()
+  for (const s of upgradeSeries) seriesOf.set(String(s.upgrade_id), [...(seriesOf.get(String(s.upgrade_id)) ?? []), String(s.series)])
   const priceOf = new Map(prices.map(p => [`${p.pool}\u0000${p.value}`, num(p.price)]))
   const counted = new Set(prices.filter(p => p.by_quantity === true).map(p => `${p.pool}\u0000${p.value}`))
   const isNew = newness(options)
@@ -505,6 +532,11 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
       active: f.active !== false,
       removed: f.removed_at !== null && f.removed_at !== undefined,
     })),
+    upgrades: upgrades.flatMap(u => {
+      const category = String(u.category)
+      if (category !== 'SOFA' && category !== 'BEDFRAME') return []
+      return [{ id: String(u.id), category, name: String(u.name), price: num(u.price) ?? 0, series: seriesOf.get(String(u.id)) ?? [] }]
+    }),
   }
 }
 

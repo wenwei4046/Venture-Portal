@@ -1,10 +1,10 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { FabricRow, MaintenanceOption } from '../load'
+import type { FabricRow, FabricUpgradeRow, MaintenanceOption } from '../load'
 
-const { saveOptionPrices, refresh } = vi.hoisted(() => ({ saveOptionPrices: vi.fn(), refresh: vi.fn() }))
+const { saveOptionPrices, saveFabricUpgrades, refresh } = vi.hoisted(() => ({ saveOptionPrices: vi.fn(), saveFabricUpgrades: vi.fn(), refresh: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
-vi.mock('../actions', () => ({ saveOptionPrices }))
+vi.mock('../actions', () => ({ saveOptionPrices, saveFabricUpgrades }))
 
 import MaintenanceTab from './MaintenanceTab'
 
@@ -35,6 +35,7 @@ async function saveSettled() { await waitFor(() => expect(screen.getByRole('butt
 
 beforeEach(() => {
   saveOptionPrices.mockReset().mockImplementation(async (_pool, edits) => ({ saved: edits.length }))
+  saveFabricUpgrades.mockReset().mockResolvedValue({ ok: true, saved: 1 })
   refresh.mockReset()
 })
 afterEach(cleanup)
@@ -322,5 +323,97 @@ describe('Maintenance workspace', () => {
     expect(screen.queryByRole('button', { name: /Show .* more/ })).not.toBeInTheDocument()
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'FAB-600' } })
     expect(screen.getByText('1 of 1 fabrics shown')).toBeInTheDocument()
+  })
+})
+
+// Maintenance › Fabrics › Sofa / Bedframe upgrades (2026-10-29, the user: "先建 upgrade 再勾 series").
+describe('Fabric upgrades', () => {
+  const UP = '6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b'
+  const upgrades: FabricUpgradeRow[] = [
+    { id: UP, category: 'SOFA', name: 'Upgrade fabric', price: 200, series: ['KS', 'PC151'] },
+    { id: '7a2e3d4c-5b6f-4a71-9b8c-0d1e2f3a4b5c', category: 'BEDFRAME', name: 'Upgrade fabric', price: 150, series: ['PC151'] },
+  ]
+  const fabrics = [
+    fabric({ erpId: 'a', code: 'KS-08', series: 'KS' }), fabric({ erpId: 'b', code: 'PC151-01', series: 'PC151' }),
+    fabric({ erpId: 'c', code: 'PC151-18', series: 'PC151' }), fabric({ erpId: 'd', code: 'LX-01', series: 'LX' }),
+    fabric({ erpId: 'e', code: 'ZL-02', series: 'ZL' }),
+  ]
+  const offered = (name: string) => within(screen.getByRole('combobox', { name })).getAllByRole('option').map(o => o.textContent)
+  function sofaUpgrades() { click('Fabrics'); click('Sofa upgrades') }
+
+  it('sit under Fabrics: a name, a charge and the series ticked — a sofa once per sofa, a bed frame per frame', () => {
+    render(<MaintenanceTab options={options} fabrics={fabrics} upgrades={upgrades} />)
+    click('Fabrics')
+    expect(within(screen.getByRole('group', { name: 'Fabrics lists' })).getAllByRole('button').map(b => b.textContent))
+      .toEqual(['All fabrics', 'Sofa upgrades', 'Bedframe upgrades'])
+    click('Sofa upgrades')
+    expect(screen.getByRole('heading', { name: 'Fabrics · Sofa upgrades' })).toBeInTheDocument()
+    expect(screen.getByText('1 upgrade · once per sofa')).toBeInTheDocument()
+    expect(within(screen.getByRole('table')).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['NAME', 'CHARGE (RM)', 'SERIES'])
+    const [row] = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    expect(within(row).getAllByRole('cell').map(cell => cell.textContent)).toEqual(['Upgrade fabric', '200.00', 'KSPC151'])
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    click('Bedframe upgrades')
+    expect(screen.getByText('1 upgrade · per bed frame')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit upgrades' })).toBeInTheDocument()
+  })
+
+  it('makes one and changes another, a series offered only where no upgrade has it — and saves only what changed', async () => {
+    render(<MaintenanceTab options={options} fabrics={fabrics} upgrades={upgrades} />)
+    sofaUpgrades()
+    click('Edit upgrades')
+    expect(offered('Tick a series for Upgrade fabric')).toEqual(['+ Series', 'LX · 1 fabric', 'ZL · 1 fabric'])
+    changePrice('Upgrade fabric charge', '250')
+    click('+ Add upgrade')
+    fireEvent.change(screen.getByRole('textbox', { name: 'New upgrade name' }), { target: { value: 'Leather' } })
+    changePrice('Leather charge', '500')
+    expect(offered('Tick a series for Leather')).toEqual(['+ Series', 'LX · 1 fabric', 'ZL · 1 fabric'])
+    select('Tick a series for Leather', 'LX')
+    expect(offered('Tick a series for Upgrade fabric')).toEqual(['+ Series', 'ZL · 1 fabric'])
+    expect(screen.getByRole('button', { name: 'Sofa upgrades 2 unsaved' })).toBeInTheDocument()
+    click('Save 2 changes')
+    await saveSettled()
+    expect(saveFabricUpgrades).toHaveBeenCalledExactlyOnceWith('SOFA', {
+      adds: [{ name: 'Leather', price: '500', series: ['LX'] }],
+      changes: [{ id: UP, label: 'Upgrade fabric', price: '250' }],
+      removes: [],
+    })
+    expect(screen.getByRole('status')).toHaveTextContent('2 changes saved.')
+    expect(refresh).toHaveBeenCalledOnce()
+    // Shown as saved until the page's fresh rows arrive.
+    expect(within(screen.getByRole('table')).getAllByRole('row').slice(1).map(r => within(r).getAllByRole('cell')[0].textContent))
+      .toEqual(['Upgrade fabric', 'LeatherNEW'])
+  })
+
+  it('unticks a series and takes an upgrade off; a refusal keeps the draft for a retry', async () => {
+    saveFabricUpgrades.mockResolvedValueOnce({ ok: false, reason: 'KS is already in Leather' })
+    render(<MaintenanceTab options={options} fabrics={fabrics} upgrades={upgrades} />)
+    sofaUpgrades()
+    click('Edit upgrades')
+    click('Untick KS from Upgrade fabric')
+    expect(offered('Tick a series for Upgrade fabric')).toEqual(['+ Series', 'KS · 1 fabric', 'LX · 1 fabric', 'ZL · 1 fabric'])
+    click('Save 1 change')
+    await saveSettled()
+    expect(saveFabricUpgrades).toHaveBeenLastCalledWith('SOFA', {
+      adds: [], changes: [{ id: UP, label: 'Upgrade fabric', dropSeries: ['KS'] }], removes: [],
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent('KS is already in Leather')
+    expect(refresh).not.toHaveBeenCalled()
+    click('Remove Upgrade fabric')
+    expect(screen.getByText('REMOVING')).toBeInTheDocument()
+    click('Save 1 change')
+    await saveSettled()
+    expect(saveFabricUpgrades).toHaveBeenLastCalledWith('SOFA', { adds: [], changes: [], removes: [UP] })
+  })
+
+  it('checks a Save before sending it', () => {
+    render(<MaintenanceTab options={options} fabrics={fabrics} upgrades={upgrades} />)
+    sofaUpgrades()
+    click('Edit upgrades')
+    click('+ Add upgrade')
+    changePrice('New upgrade charge', '100')
+    click('Save 1 change')
+    expect(screen.getByRole('alert')).toHaveTextContent('An upgrade has no name')
+    expect(saveFabricUpgrades).not.toHaveBeenCalled()
   })
 })

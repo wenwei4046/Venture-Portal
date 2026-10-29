@@ -339,3 +339,135 @@ export function validateComboRemovals(sets: readonly ComboSetRef[]): Array<{ bas
   }
   return [...out.values()]
 }
+
+// ─── Maintenance › Fabrics › Sofa / Bedframe upgrades (2026-10-29) ──────────
+
+/** The two categories an upgrade is for (CHECK on catalogue_fabric_upgrades.category). */
+export const FABRIC_UPGRADE_CATEGORIES = ['SOFA', 'BEDFRAME'] as const
+export type FabricUpgradeCategory = (typeof FABRIC_UPGRADE_CATEGORIES)[number]
+export const FABRIC_UPGRADE_NAME_MAX = 80
+
+/**
+ * What Maintenance's upgrades Save sends: the upgrades made, only what changed
+ * on the others — a name, a charge, a series ticked or unticked — and the ones
+ * taken off. `label` is the upgrade's name as the page shows it, for a refusal
+ * to name it; it is never written.
+ */
+export interface FabricUpgradesEdit {
+  adds: Array<{ name: string; price: string; series: string[] }>
+  changes: Array<{ id: string; label?: string; name?: string; price?: string; addSeries?: string[]; dropSeries?: string[] }>
+  removes: string[]
+}
+
+/** What `catalogue_save_fabric_upgrades` takes. */
+export interface FabricUpgradesPlan {
+  category: FabricUpgradeCategory
+  adds: Array<{ name: string; price: number; series: string[] }>
+  changes: Array<{ id: string; name?: string; price?: number; add_series?: string[]; drop_series?: string[] }>
+  removes: string[]
+}
+
+/** An upgrade's name as it is kept — and as the Quote shows it: one space between words, none around them. */
+export function tidyUpgradeName(raw: string | null | undefined): string {
+  return String(raw ?? '').replace(/\s+/g, ' ').trim()
+}
+
+function upgradeName(raw: string | null | undefined): string {
+  const name = tidyUpgradeName(raw)
+  if (!name) throw new EditError('An upgrade has no name')
+  if (name.length > FABRIC_UPGRADE_NAME_MAX) throw new EditError(`An upgrade's name is at most ${FABRIC_UPGRADE_NAME_MAX} characters`)
+  return name
+}
+
+/** A charge the customer pays, so above 0: an upgrade charged nothing is no upgrade. */
+function upgradeCharge(raw: string | null | undefined, name: string): number {
+  const price = parseMoney(raw, name)
+  if (price === null || price <= 0) throw new EditError(`${name}: a charge above 0`)
+  return price
+}
+
+/** Series as the fabric list spells them, each once whatever its case. */
+function seriesOf(raw: readonly string[] | null | undefined): string[] {
+  if (raw === null || raw === undefined) return []
+  if (!Array.isArray(raw)) throw new EditError('A series list is not a list')
+  const out = new Map<string, string>()
+  for (const s of raw) {
+    const series = String(s ?? '').trim()
+    if (!series || series.length > 80) throw new EditError('A fabric series is blank or too long')
+    const key = valueKey(series)!
+    if (!out.has(key)) out.set(key, series)
+  }
+  return [...out.values()]
+}
+
+/**
+ * One category's Save, checked before it is sent and again by the Server
+ * Action: a name once, a charge above 0, a series ticked under one upgrade of
+ * this Save at most (the database holds it to one upgrade of the category
+ * whatever else is saved — `catalogue_fabric_upgrade_series_one_upgrade`). A
+ * change to an upgrade being taken off goes with it.
+ */
+export function validateFabricUpgrades(category: string, edit: FabricUpgradesEdit): FabricUpgradesPlan {
+  const cat = String(category ?? '').trim().toUpperCase()
+  if (!(FABRIC_UPGRADE_CATEGORIES as readonly string[]).includes(cat)) throw new EditError('A fabric upgrade is a sofa’s or a bed frame’s')
+  const adds = Array.isArray(edit?.adds) ? edit.adds : []
+  const changes = Array.isArray(edit?.changes) ? edit.changes : []
+  const removes = [...new Set((Array.isArray(edit?.removes) ? edit.removes : []).map(String))]
+  if (removes.some(id => !UUID.test(id))) throw new EditError('An upgrade to take off is not one')
+  if (adds.length + changes.length > 200) throw new EditError('Save at most 200 upgrades at a time')
+
+  const names = new Map<string, string>()
+  const named = (name: string) => {
+    const key = valueKey(name)!
+    if (names.has(key)) throw new EditError(`Two upgrades are named ${name}`)
+    names.set(key, name)
+  }
+  const ticked = new Map<string, string>()
+  const tick = (series: readonly string[], under: string) => {
+    for (const s of series) {
+      const key = valueKey(s)!
+      const held = ticked.get(key)
+      if (held !== undefined) throw new EditError(`${s} is ticked under ${held} and ${under}`)
+      ticked.set(key, under)
+    }
+  }
+
+  const planAdds = adds.map(a => {
+    const name = upgradeName(a?.name)
+    named(name)
+    const price = upgradeCharge(a?.price, name)
+    const series = seriesOf(a?.series)
+    tick(series, name)
+    return { name, price, series }
+  })
+
+  const gone = new Set(removes)
+  const seen = new Set<string>()
+  const planChanges: FabricUpgradesPlan['changes'] = []
+  for (const c of changes) {
+    const id = String(c?.id ?? '')
+    if (!UUID.test(id)) throw new EditError('A changed upgrade is not one')
+    if (seen.has(id)) throw new EditError('An upgrade is changed twice')
+    seen.add(id)
+    if (gone.has(id)) continue
+    const out: FabricUpgradesPlan['changes'][number] = { id }
+    if (c.name !== undefined) {
+      out.name = upgradeName(c.name)
+      named(out.name)
+    }
+    const label = out.name ?? (tidyUpgradeName(c.label) || 'An upgrade')
+    if (c.price !== undefined) out.price = upgradeCharge(c.price, label)
+    // A series both ticked and unticked is left as it stands.
+    const ticking = seriesOf(c.addSeries)
+    const unticking = seriesOf(c.dropSeries)
+    const both = new Set(ticking.map(s => valueKey(s)).filter(k => unticking.some(s => valueKey(s) === k)))
+    const add = ticking.filter(s => !both.has(valueKey(s)))
+    const drop = unticking.filter(s => !both.has(valueKey(s)))
+    tick(add, label)
+    if (add.length) out.add_series = add
+    if (drop.length) out.drop_series = drop
+    if (Object.keys(out).length > 1) planChanges.push(out)
+  }
+  if (planAdds.length + planChanges.length + removes.length === 0) throw new EditError('Nothing to save')
+  return { category: cat as FabricUpgradeCategory, adds: planAdds, changes: planChanges, removes }
+}

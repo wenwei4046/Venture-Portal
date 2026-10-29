@@ -4,11 +4,13 @@ import {
   parseMoney,
   validateComboPrices,
   validateComboRemovals,
+  validateFabricUpgrades,
   validateNewCombo,
   validateModelEdit,
   validateOptionPrices,
   validateSkuPrices,
   tidyModelName,
+  tidyUpgradeName,
   type ComboPriceEdit,
   type ModelEdit,
   type SkuPriceEdit,
@@ -557,5 +559,61 @@ describe('validateNewCombo — a piece may be either side (2026-10-08)', () => {
     expect(() => validateNewCombo({ ...base, modules: [['A', 'B', 'C', 'D', 'E'], ['1NA']] })).toThrow('A compartment may be one of four modules at most.')
     expect(() => validateNewCombo({ ...base, modules: [['1A(LHF)', ' 1A(LHF)'], ['1NA']] })).toThrow('A compartment names the same module twice.')
     expect(() => validateNewCombo({ ...base, modules: [['1A(LHF)', 'a "b'], ['1NA']] })).toThrow('is not a compartment code')
+  })
+})
+
+describe('validateFabricUpgrades (Maintenance › Fabrics › upgrades, 2026-10-29)', () => {
+  const A = '6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b'
+  const B = '7a2e3d4c-5b6f-4a71-9b8c-0d1e2f3a4b5c'
+  const none = { adds: [], changes: [], removes: [] }
+
+  it('keeps a name tidy, as the Quote will show it', () => {
+    expect(tidyUpgradeName('  Upgrade \n  fabric ')).toBe('Upgrade fabric')
+    expect(validateFabricUpgrades(' sofa ', { ...none, adds: [{ name: ' Upgrade   fabric ', price: '1,200.50', series: [' PC151 ', 'pc151', 'KS'] }] }))
+      .toEqual({ category: 'SOFA', adds: [{ name: 'Upgrade fabric', price: 1200.5, series: ['PC151', 'KS'] }], changes: [], removes: [] })
+  })
+
+  it("is a sofa's or a bed frame's, named, charged above 0", () => {
+    expect(() => validateFabricUpgrades('MATTRESS', { ...none, adds: [{ name: 'X', price: '1', series: [] }] })).toThrow('a sofa’s or a bed frame’s')
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: '  ', price: '1', series: [] }] })).toThrow('An upgrade has no name')
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'x'.repeat(81), price: '1', series: [] }] })).toThrow('at most 80 characters')
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'Free', price: '0', series: [] }] })).toThrow('Free: a charge above 0')
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'Blank', price: '', series: [] }] })).toThrow('Blank: a charge above 0')
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'Minus', price: '-5', series: [] }] })).toThrow(EditError)
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'X', price: '1', series: [' '] }] })).toThrow('A fabric series is blank')
+    expect(() => validateFabricUpgrades('SOFA', none)).toThrow('Nothing to save')
+  })
+
+  it('names an upgrade once and ticks a series under one upgrade of the Save', () => {
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'Leather', price: '5', series: [] }, { name: 'leather', price: '6', series: [] }] }))
+      .toThrow('Two upgrades are named leather')
+    expect(() => validateFabricUpgrades('SOFA', {
+      adds: [{ name: 'Leather', price: '5', series: ['KS'] }],
+      changes: [{ id: A, label: 'Upgrade fabric', addSeries: ['ks'] }],
+      removes: [],
+    })).toThrow('ks is ticked under Leather and Upgrade fabric')
+  })
+
+  it('sends only what changed, and nothing for an upgrade being taken off', () => {
+    expect(validateFabricUpgrades('BEDFRAME', {
+      adds: [],
+      changes: [
+        { id: A, label: 'Upgrade fabric', price: '250', addSeries: ['ZL', 'KS'], dropSeries: ['KS', 'BN125'] },
+        { id: B, label: 'Old', name: 'Old fabric' },
+        { id: B.replace('7a', '8a'), label: 'Nothing' },
+      ],
+      removes: [B.replace('7a', '9a')],
+    })).toEqual({
+      category: 'BEDFRAME',
+      adds: [],
+      changes: [{ id: A, price: 250, add_series: ['ZL'], drop_series: ['BN125'] }, { id: B, name: 'Old fabric' }],
+      removes: [B.replace('7a', '9a')],
+    })
+    expect(validateFabricUpgrades('SOFA', { adds: [], changes: [{ id: A, label: 'X', price: '9' }], removes: [A] }))
+      .toEqual({ category: 'SOFA', adds: [], changes: [], removes: [A] })
+    expect(() => validateFabricUpgrades('SOFA', { adds: [], changes: [{ id: 'nope', price: '9' }], removes: [] })).toThrow('A changed upgrade is not one')
+    expect(() => validateFabricUpgrades('SOFA', { adds: [], changes: [], removes: ['nope'] })).toThrow('An upgrade to take off is not one')
+    expect(() => validateFabricUpgrades('SOFA', { adds: [], changes: [{ id: A, price: '1' }, { id: A, price: '2' }], removes: [] }))
+      .toThrow('An upgrade is changed twice')
   })
 })
