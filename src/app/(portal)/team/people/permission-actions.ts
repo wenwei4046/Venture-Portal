@@ -196,12 +196,16 @@ function peopleOver(
 const ticksAreShaped = (tabs: unknown): tabs is string[] =>
   Array.isArray(tabs) && tabs.length <= 400 && tabs.every(t => typeof t === 'string' && parseGrant(t) !== null)
 
-/** Save a template's ticks (and the cells they stand for), its sensitive fields, and its holders' own cells over them. */
+/**
+ * Save a template's ticks (and the cells they stand for), its sensitive fields, and its holders' own cells over them —
+ * then its By management approve (2026-10-29, mig 20261029200000), at the version the boxes left it.
+ */
 export async function saveTemplateTabs(input: {
   templateId: string
   version: number
   tabs: string[]
   sensitive: string[]
+  review?: boolean
 }): Promise<Result<{ version: number; titles: number }>> {
   await requireActionOn('/team/people', 'accounts', 'manage')
   if (
@@ -210,7 +214,8 @@ export async function saveTemplateTabs(input: {
     !Number.isInteger(input.version) ||
     !ticksAreShaped(input.tabs) ||
     !Array.isArray(input.sensitive) ||
-    !input.sensitive.every(isSensitiveField)
+    !input.sensitive.every(isSensitiveField) ||
+    (input.review !== undefined && typeof input.review !== 'boolean')
   ) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -230,9 +235,19 @@ export async function saveTemplateTabs(input: {
     p_people: peopleOver(owners, before, { ticks: new Set(tabs), cells: cellsFromTabs(tabs) }, before.cellKeys),
   })
   if (error) return { ok: false, reason: error.message }
-  refresh()
   const saved = data as { version: number; titles: number }
-  return { ok: true, version: saved.version, titles: saved.titles }
+  let version = saved.version
+  if (input.review !== undefined) {
+    const { data: flagged, error: flagError } = await supabase.rpc('permission_template_flags_set', {
+      p_template: input.templateId,
+      p_version: saved.version,
+      p_flags: input.review ? ['claims_review'] : [],
+    })
+    if (flagError) return { ok: false, reason: `Its boxes were saved; By management approve was not — ${flagError.message}` }
+    if (typeof flagged === 'number') version = flagged
+  }
+  refresh()
+  return { ok: true, version, titles: saved.titles }
 }
 
 /**
@@ -262,7 +277,15 @@ export async function setTitleTemplate(titleId: string, templateId: string | nul
 }
 
 /** One person's boxes over their title's template — the whole set ([] = back to the title). */
-export async function setPersonTabs(input: { userId: string; templateId: string; boxes: PersonBox[]; reach?: ReachTick[]; sensitive?: SensitiveTick[] }): Promise<Result> {
+export async function setPersonTabs(input: {
+  userId: string
+  templateId: string
+  boxes: PersonBox[]
+  reach?: ReachTick[]
+  sensitive?: SensitiveTick[]
+  /** Their own By management approve over the template's (2026-10-29); null: the template's again. */
+  review?: boolean | null
+}): Promise<Result> {
   await requireActionOn('/team/people', 'accounts', 'manage')
   if (
     !input ||
@@ -272,7 +295,8 @@ export async function setPersonTabs(input: { userId: string; templateId: string;
     input.boxes.length > 400 ||
     !input.boxes.every(b => b && typeof b.granted === 'boolean' && parseGrant(`${b.tab}.${b.action}`) !== null) ||
     (input.reach !== undefined && !isReachTickList(input.reach)) ||
-    (input.sensitive !== undefined && !isSensitiveTickList(input.sensitive))
+    (input.sensitive !== undefined && !isSensitiveTickList(input.sensitive)) ||
+    (input.review !== undefined && input.review !== null && typeof input.review !== 'boolean')
   ) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -295,6 +319,12 @@ export async function setPersonTabs(input: { userId: string; templateId: string;
   if (input.sensitive !== undefined) {
     const { error: sensitiveError } = await supabase.rpc('permission_user_sensitive_set', { p_user: input.userId, p_fields: input.sensitive })
     if (sensitiveError) return { ok: false, reason: sensitiveError.message }
+  }
+  // Their own By management approve (2026-10-29): the whole list — none, back to the template's.
+  if (input.review !== undefined) {
+    const flags = input.review === null ? [] : [{ flag: 'claims_review', granted: input.review }]
+    const { error: flagError } = await supabase.rpc('permission_user_flags_set', { p_user: input.userId, p_flags: flags })
+    if (flagError) return { ok: false, reason: flagError.message }
   }
   refresh()
   return { ok: true }

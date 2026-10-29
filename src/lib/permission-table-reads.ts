@@ -175,6 +175,8 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   user_sub_department_reach: ['accounts.manage', 'accounts.view', 'team.view:own'],
   // A person's Salary / NRIC / Bank ticks (mig 20261016210000): read as their boxes are.
   user_permission_sensitive: ['accounts.manage', 'accounts.view', 'team.view:own'],
+  // A person's By management approve tick (mig 20261029200000): read as their boxes are.
+  user_permission_flags: ['accounts.manage', 'accounts.view', 'team.view:own'],
   utility_splits: ['categories.view', 'settings.manage'],
   venture_pool: ['approvals.approve', 'billing.create', 'billing.view', 'treasury.approve', 'treasury.create', 'treasury.edit', 'treasury.view', 'treasury.void', 'venture_pool.create', 'venture_pool.edit'],
 }

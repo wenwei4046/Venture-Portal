@@ -99,6 +99,17 @@ const ROOMS_KEYS = ['meeting_rooms', 'meeting_rooms_manage']
 const LEADS_KEYS = ['leads']
 // One's own claims (the Department view's, and Marketing's since 2026-10-23).
 const MY_CLAIMS: Opens = { view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'] }
+// Claim & approve (2026-10-29, the claim process's PR ③): the department's requests read, and approved or rejected
+// before Finance — at the holder's own department in every view.
+const CLAIMS_APPROVE: Opens = { view: ['claims.view'], approve: ['claims.approve'] }
+const CLAIMS_APPROVE_HINTS = {
+  view: 'Their department’s requests — the page reads Claim & approve',
+  approve: 'Approve or reject their department’s requests before Finance',
+} as const
+const claimsApprove = (view: TabView, keys: readonly string[]): PermissionTab => ({
+  ...tab(view, 'claims_approve', 'Claim & approve', keys, CLAIMS_APPROVE, 'dept'),
+  hints: CLAIMS_APPROVE_HINTS,
+})
 // Marketing's own view (mig 20261023214000): its pages read with View; Create starts a project; Edit works the stages
 // one is on; Approve decides a stage as its approver; Manage — the manager tools — is each such page's View.
 const MARKETING: Opens = { view: ['marketing.view'], create: ['marketing.create'], edit: ['marketing.edit'], approve: ['marketing.approve'] }
@@ -161,6 +172,7 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // One's own claims from HR's own view (2026-10-29, the claim process: "Claim" above Meeting Rooms in every view) — on
   // HR's key, so only a template that opens HR's pages works it out here (Staff · Basic keeps the Department view's).
   tab('hr', 'my_claims', 'Claim', ['hr_costing'], MY_CLAIMS, 'own'),
+  claimsApprove('hr', ['hr_costing']),
   // Every view books a room (the user, 2026-10-11): one page, a tab in each.
   shared('meeting_rooms', tab('hr', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
   tab('hr', 'guest_link', 'Guest Link', ['guest_link'], { view: ['guest_link.view'], edit: ['guest_link.edit'] }),
@@ -194,6 +206,7 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // One's own claims from Finance's own view (2026-10-29 — the account menu's Claim, beside Meeting Rooms), on the
   // treasury's key as HR's is on HR's.
   tab('fin', 'my_claims', 'Claim', TREASURY_KEYS, MY_CLAIMS, 'own'),
+  claimsApprove('fin', TREASURY_KEYS),
   shared('meeting_rooms', tab('fin', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
   // Finance reads Audit Log › Changes for its own areas, as HR does for theirs.
   shared('audit_changes', tab('fin', 'audit_log', 'Audit Log', AUDIT_CHANGES_KEYS, {})),
@@ -235,6 +248,7 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // the Department view's: a narrower tab is ticked only for what an earlier one has not given, so a Marketing
   // template's own claims land here, not there.
   tab('mkt', 'my_claims', 'Claim', ['marketing'], MY_CLAIMS, 'own'),
+  claimsApprove('mkt', ['marketing']),
   shared('meeting_rooms', tab('mkt', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
 
   // ── Department view ── Staff · Basic's: the Overview, one's own claims, the rooms. The Dept Manager's
@@ -243,6 +257,7 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('dept', 'overview', 'Overview', [], OVERVIEW),
   // Raising one's own claims — every member of staff's (Staff · Basic). "Claim" since 2026-10-29 (the staff's word).
   tab('dept', 'my_claims', 'Claim', ['claims'], MY_CLAIMS, 'own'),
+  claimsApprove('dept', ['claims']),
   // The rooms are the company's: booked at the company's reach from the Department view too.
   shared('meeting_rooms', tab('dept', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS, 'all')),
 

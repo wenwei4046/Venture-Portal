@@ -17,6 +17,7 @@ import {
   emptyDraft,
   emptyItem,
   emptyShare,
+  routeWords,
   saveProblem,
   submitProblem,
   type PaymentRequest,
@@ -425,6 +426,8 @@ export default function NewRequestDialog({
           </>
         ) : null}
 
+        {/* Who approves it first, or straight to Finance (PR ③ — the mockup's last line). */}
+        {ctx ? <Hint>{routeWords(ctx)}</Hint> : null}
         {problem ? <Hint danger={!!(loadError ?? error)}>{problem}</Hint> : null}
       </DialogForm>
     </FinDialog>

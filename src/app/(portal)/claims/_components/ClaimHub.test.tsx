@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { parseRequest, type PaymentRequest, type RequestContext } from '@/lib/payment-requests/model'
+import { parseApproval, parseRequest, type ApprovalRead, type PaymentRequest, type RequestContext } from '@/lib/payment-requests/model'
 
 // Claim (2026-10-29, PR ② — the agreed design's staff page): one's own requests in Payment voucher's hub; the drawer's
 // Edit / Submit / Cancel request; the New request window — a pop-out, nothing chosen until picked, the receipts going
@@ -8,6 +8,7 @@ import { parseRequest, type PaymentRequest, type RequestContext } from '@/lib/pa
 
 const mocks = vi.hoisted(() => ({
   refresh: vi.fn(), flash: vi.fn(), open: vi.fn(), save: vi.fn(), cancel: vi.fn(), openFile: vi.fn(), upload: vi.fn(), remove: vi.fn(),
+  approve: vi.fn(), sendBack: vi.fn(),
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: mocks.refresh }) }))
 vi.mock('@/lib/supabase/client', () => ({
@@ -19,7 +20,10 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 vi.mock('@/components/hrv/toast', async (orig) => ({ ...(await orig<object>()), flash: mocks.flash }))
-vi.mock('@/lib/payment-requests/actions', () => ({ openNewRequest: mocks.open, saveRequest: mocks.save, cancelRequest: mocks.cancel, openRequestFile: mocks.openFile }))
+vi.mock('@/lib/payment-requests/actions', () => ({
+  openNewRequest: mocks.open, saveRequest: mocks.save, cancelRequest: mocks.cancel, openRequestFile: mocks.openFile,
+  approveRequests: mocks.approve, sendBackRequests: mocks.sendBack,
+}))
 vi.mock('@/lib/payment-requests/upload', () => ({ uploadRequestFile: mocks.upload, removeRequestUpload: mocks.remove }))
 
 import ClaimHub from './ClaimHub'
@@ -27,7 +31,7 @@ import ClaimHub from './ClaimHub'
 const CTX: RequestContext = {
   name: 'KHO WEI JIE', departmentId: 'mk', departmentName: 'Marketing', pool: 'dept_pool_marketing',
   salaryAccount: { bank: 'Hong Leong Bank', last4: '4821' },
-  departments: [{ id: 'hr', name: 'HR' }], companies: [{ id: 'dc', name: 'Dream Crafter' }],
+  departments: [{ id: 'hr', name: 'HR' }], companies: [{ id: 'dc', name: 'Dream Crafter' }], reviewers: null,
 }
 const req = (over: Record<string, unknown> = {}): PaymentRequest =>
   parseRequest({
@@ -192,5 +196,124 @@ describe('New request', () => {
     })
     expect(mocks.save).toHaveBeenCalledWith(null, expect.objectContaining({ kind: 'claim', items: [{ description: 'Jian Ying', amount: '' }] }), false)
     expect(mocks.flash).toHaveBeenCalledWith('Saved as draft')
+  })
+})
+
+// PR ③ (2026-10-29 — the mockup's ②): the Marketing Manager's Claim & approve — the team's requests waiting for them,
+// all of Marketing's, their own; Select to approve or reject several at once; the drawer's Approve and Reject….
+describe('Claim & approve', () => {
+  const CHIN = req({
+    id: '44444444-4444-4444-8444-444444444444', requestNo: 'PRQ-2610-0003', status: 'pending_approval', mine: false, requesterName: 'CHIN YEE RU',
+    payeeName: 'CHIN YEE RU', payeeAccount: '•••• 6602', description: 'KTM Butterworth – KL Sentral', total: 127.8,
+    items: [{ id: 'i4', description: 'KTM Butterworth – KL Sentral', amount: 127.8 }], reviewers: ['SIA JOSIAH'], needsApproval: true,
+  })
+  const JOEY = req({
+    id: '55555555-5555-4555-8555-555555555555', requestNo: 'PRQ-2610-0004', status: 'pending_approval', mine: false, requesterName: 'WONG JOEY',
+    payeeName: 'WONG JOEY', payeeAccount: '•••• 1180', description: 'Grab · client visit', total: 24.4,
+    items: [{ id: 'i5', description: 'Grab · client visit', amount: 24.4 }], reviewers: ['SIA JOSIAH'], needsApproval: true,
+  })
+  const SENT = req({
+    id: '66666666-6666-4666-8666-666666666666', requestNo: 'PRQ-2610-0005', mine: false, requesterName: 'LUM NI KER',
+    description: 'Printing', total: 60, items: [{ id: 'i6', description: 'Printing', amount: 60 }], approvedByName: 'SIA JOSIAH',
+  })
+  const read = (over: Partial<ApprovalRead> = {}): ApprovalRead => ({
+    ...(parseApproval({
+      departmentName: 'Marketing', canApprove: true, approvers: [{ id: 'u1', name: 'SIA JOSIAH' }, { id: 'u2', name: 'KHO WEI JIE' }], requests: [],
+    }) as ApprovalRead),
+    requests: [CHIN, JOEY, SENT],
+    ...over,
+  })
+  const drawApprover = async (over: Partial<ApprovalRead> = {}) => {
+    render(<ClaimHub rows={[req({ requesterName: 'SIA JOSIAH' })]} canCreate viewingAs={false} readError={null} approval={read(over)} me="SIA JOSIAH" />)
+    await act(async () => undefined)
+  }
+  const listed = () => screen.getAllByRole('row').slice(1).map((r) => within(r).getAllByRole('cell').map((c) => c.textContent).join(' '))
+
+  beforeEach(() => window.history.replaceState(null, '', '/claims'))
+
+  it('is Claim & approve: whose requests, who else approves, the team’s waiting first', async () => {
+    await drawApprover()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Claim & approve')
+    expect(screen.getByText('Marketing’s requests. Your team’s wait here for you or KHO WEI JIE — one approval is enough. Yours go straight to Finance.')).toBeInTheDocument()
+    for (const card of [/^To approve/, /^All Marketing/, /^Mine/]) expect(screen.getByRole('button', { name: card })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^To approve/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Waiting for you · 2 requests')).toBeInTheDocument()
+    expect(listed()).toEqual([expect.stringContaining('CHIN YEE RU'), expect.stringContaining('WONG JOEY')])
+    fireEvent.click(screen.getByRole('button', { name: /^All Marketing/ }))
+    expect(listed()).toHaveLength(3)
+    expect(listed().join(' ')).toContain('Approved by SIA JOSIAH')
+    fireEvent.click(screen.getByRole('button', { name: /^Mine/ }))
+    expect(listed()).toEqual([expect.stringContaining('Claude · Oct')])
+  })
+
+  it('Select, tick, Approve: several at once, sent to Finance', async () => {
+    mocks.approve.mockResolvedValue({ ok: true, data: { approved: 2 } })
+    await drawApprover()
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }))
+    fireEvent.click(screen.getByText('CHIN YEE RU'))
+    fireEvent.click(screen.getByText('WONG JOEY'))
+    expect(screen.getByText('2 selected · RM 152.20')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Approve 2 →' }))
+    })
+    expect(mocks.approve).toHaveBeenCalledWith([CHIN.id, JOEY.id])
+    expect(mocks.flash).toHaveBeenCalledWith('2 requests approved — with Finance now')
+    expect(mocks.refresh).toHaveBeenCalled()
+  })
+
+  it('Reject…: what to fix, read by whoever sent it', async () => {
+    mocks.sendBack.mockResolvedValue({ ok: true, data: { sentBack: 1 } })
+    await drawApprover()
+    fireEvent.click(screen.getByText('CHIN YEE RU'))
+    const drawer = screen.getByRole('dialog', { name: /PRQ-2610-0003/ })
+    expect(drawer).toHaveTextContent('Waiting for your approval')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Reject…' }))
+    const sheet = screen.getByRole('dialog', { name: 'Send PRQ-2610-0003 back to CHIN YEE RU?' })
+    expect(sheet).toHaveTextContent('Tell CHIN YEE RU what to fix — they can submit it again.')
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Send back to CHIN YEE RU' }))
+    expect(mocks.sendBack).not.toHaveBeenCalled()
+    fireEvent.change(within(sheet).getByLabelText('What to fix'), { target: { value: 'The ticket is for September' } })
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Send back to CHIN YEE RU' }))
+    })
+    expect(mocks.sendBack).toHaveBeenCalledWith([CHIN.id], 'The ticket is for September')
+    expect(mocks.flash).toHaveBeenCalledWith('1 request sent back to fix')
+  })
+
+  it('the drawer: Approve — send to Finance for the team’s; one’s own keeps Cancel, never Approve', async () => {
+    mocks.approve.mockResolvedValue({ ok: true, data: { approved: 1 } })
+    await drawApprover()
+    fireEvent.click(screen.getByText('WONG JOEY'))
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole('dialog', { name: /PRQ-2610-0004/ })).getByRole('button', { name: 'Approve — send to Finance' }))
+    })
+    expect(mocks.approve).toHaveBeenCalledWith([JOEY.id])
+    fireEvent.click(screen.getByRole('button', { name: /^Mine/ }))
+    fireEvent.click(screen.getByText('Claude · Oct'))
+    const own = screen.getByRole('dialog', { name: /PRQ-2610-0001/ })
+    expect(within(own).queryByRole('button', { name: 'Approve — send to Finance' })).toBeNull()
+    expect(within(own).getByRole('button', { name: 'Cancel request…' })).toBeInTheDocument()
+  })
+
+  it('one who reads but may not approve: no Select, no Approve', async () => {
+    await drawApprover({ canApprove: false })
+    expect(screen.queryByRole('button', { name: 'Select' })).toBeNull()
+    fireEvent.click(screen.getByText('CHIN YEE RU'))
+    expect(within(screen.getByRole('dialog', { name: /PRQ-2610-0003/ })).queryByRole('button', { name: 'Approve — send to Finance' })).toBeNull()
+  })
+
+  it('a notice’s tap (?open=) opens its request', async () => {
+    window.history.replaceState(null, '', `/claims?open=${JOEY.id}`)
+    await drawApprover()
+    expect(screen.getByRole('dialog', { name: /PRQ-2610-0004/ })).toBeInTheDocument()
+  })
+
+  it('the New request window says who approves it first', async () => {
+    mocks.open.mockResolvedValue({ ok: true, data: { ...CTX, reviewers: ['SIA JOSIAH'] } })
+    await draw()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '+ New request' }))
+    })
+    expect(window_()).toHaveTextContent('After you submit: SIA JOSIAH approves it first, then it goes to Finance.')
   })
 })

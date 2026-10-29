@@ -176,6 +176,8 @@ export interface AccountMenuItem {
   window?: 'password'
   permissionTabs?: readonly string[]
   visible: (viewer: NavViewer) => boolean
+  /** Its name for this viewer, where it is not always the same (Claim, or Claim & approve for its holder — 2026-10-29). */
+  labelFor?: (viewer: NavViewer) => string
 }
 
 export interface AccountMenuGroup {
@@ -198,7 +200,8 @@ export function finAccountMenu(opts: FinNavOptions = {}): AccountMenuGroup[] {
         { key: 'password', label: 'Change password', icon: 'lock', window: 'password', visible: canChangePassword },
         { key: 'it-support', label: 'IT support', icon: 'buoy', href: '/it-support', visible: viewer => !viewer.viewingAs },
         // One's own claims and direct payments to Finance (2026-10-29, the claim process — every view's own Claim row).
-        { key: 'claim', label: 'Claim', icon: 'receipt', href: '/claims', visible: canSendOwnClaims },
+        // Claim & approve for whoever holds it in this view (PR ③).
+        { key: 'claim', label: 'Claim', labelFor: (v) => (v.tabs?.includes('fin.claims_approve.view') ? 'Claim & approve' : 'Claim'), icon: 'receipt', href: '/claims', visible: canSendOwnClaims },
       ],
     },
     {
@@ -224,7 +227,9 @@ export function visibleAccountMenu(groups: AccountMenuGroup[], viewer: NavViewer
   return groups
     .map((g) => ({
       ...g,
-      items: g.items.filter((i) => i.visible(viewer) && (i.href === undefined || opensPath(viewer.tabs, i.href, i.permissionTabs))),
+      items: g.items
+        .filter((i) => i.visible(viewer) && (i.href === undefined || opensPath(viewer.tabs, i.href, i.permissionTabs)))
+        .map((i) => (i.labelFor ? { ...i, label: i.labelFor(viewer) } : i)),
     }))
     .filter((g) => g.items.length > 0)
 }

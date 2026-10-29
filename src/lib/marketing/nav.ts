@@ -16,8 +16,8 @@ export type MktNavKey =
 /** The tile behind a row's emoji (the handoff's four tones). */
 export type MktTone = 'sand' | 'mist' | 'peach' | 'cream'
 
-/** Which of the sidebar's counts a row carries (mkt_shell's `counts`). */
-export type MktCountKey = 'myspace' | 'calendar' | 'projects' | 'tracking'
+/** Which of the sidebar's counts a row carries (mkt_shell's `counts`; `claims` what waits for one's approval, PR ③). */
+export type MktCountKey = 'myspace' | 'calendar' | 'projects' | 'tracking' | 'claims'
 
 export interface MktNavRow {
   key: MktNavKey
@@ -55,11 +55,20 @@ export const MKT_NAV: readonly MktNavRow[] = [
   { key: 'rooms', emoji: '🚪', label: 'Meeting Rooms', tone: 'mist', href: '/admin/rooms', foot: true },
 ]
 
+/**
+ * Claim & approve (2026-10-29, the claim process's PR ③ — the mockup's ②): for whoever holds it, the Claim row is
+ * Claim & approve under MANAGER TOOLS, carrying the number waiting for them.
+ */
+const CLAIM_AND_APPROVE: Partial<MktNavRow> = { label: 'Claim & approve', count: 'claims', manager: true, foot: false }
+
 /** The rows a viewer's tabs open (an account with no tabs worked out is not asked — opensPath). */
 export function mktNavRows(tabs: readonly string[] | undefined): MktNavRow[] {
   // Subsidiaries lists the projects of each — it shows with Projects.
   const projects = opensPath(tabs, '/marketing/projects')
-  return MKT_NAV.filter(r => (r.key === 'subs' ? projects : r.href ? opensPath(tabs, r.href) : true))
+  const approves = !!tabs?.includes('mkt.claims_approve.view')
+  return MKT_NAV.filter(r => (r.key === 'subs' ? projects : r.href ? opensPath(tabs, r.href) : true)).map(r =>
+    r.key === 'claims' && approves ? { ...r, ...CLAIM_AND_APPROVE } : r,
+  )
 }
 
 const under = (path: string, prefix: string) => path === prefix || path.startsWith(prefix + '/')

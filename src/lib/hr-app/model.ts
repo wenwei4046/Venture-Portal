@@ -491,6 +491,8 @@ export function noticeTag(n: Pick<Notice, 'refKind'> & { title?: string }): { ta
   if (n.refKind === 'memo') return { ...MEMO_TAG }
   // An IT request (2026-10-20): the desk's or its sender's — it opens in the Revenue app.
   if (n.refKind === 'it_request') return { tag: 'IT', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
+  // A payment request (2026-10-29): sent for one's approval, or one's own decided or paid — it opens the Claim page.
+  if (n.refKind === 'payment_request') return { tag: 'CLAIM', bg: 'rgb(255 244 231)', fg: 'rgb(163 78 37)' }
   // A probation ending (2026-10-23): the person — the amber of the roster's Probation chip; a contract's (2026-10-24,
   // notify_term_ends titles it so), the peach of its.
   if (n.refKind === 'hr_staff') return n.title?.startsWith('Contract ending') ? { ...CONTRACT_TAG } : { ...PROBATION_TAG }

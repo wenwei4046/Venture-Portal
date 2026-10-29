@@ -48,6 +48,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'finance_member_claim_invoice',
   // …and the staff's own requests (mig 20261029180000): the window's lists, one's own, a file's path, Finance's list — STABLE.
   'payment_request_context', 'my_payment_requests', 'payment_request_file', 'payment_requests_for_finance',
+  // …a department's approver's (mig 20261029200000): their department's requests, the number waiting — STABLE.
+  'payment_requests_for_approval', 'payment_requests_waiting_count',
   // Member services › Food claim (mig 20261013150000).
   'member_admin_food_claim',
   'member_admin_transport_claim',

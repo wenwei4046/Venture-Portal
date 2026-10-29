@@ -171,8 +171,10 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'billing.export': 'all',
   'billing.void': 'all',
   'categories.manage': 'all',
-  'claims.approve': 'all',
+  // Claim & approve (2026-10-29, the claim process's PR ③): a department's requests read and approved at Dept.
+  'claims.approve': 'dept',
   'claims.create': 'own',
+  'claims.view': 'dept',
   'crm.edit': 'own',
   'crm.manage': 'all',
   'crm.view': 'own',

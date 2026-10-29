@@ -42,6 +42,8 @@ describe("HR's sidebar", () => {
     expect(admin({ ...li, personalLogin: true }).slice(0, 2)).toEqual(['Claim', 'Room schedule'])
     expect(admin({ ...li, personalLogin: false })).not.toContain('Claim')
     expect(admin({ ...li, personalLogin: true, viewingAs: { id: 'x', name: 'X' } })).not.toContain('Claim')
+    // PR ③: for whoever holds the HR view's Claim & approve, the same row says so.
+    expect(admin({ ...li, personalLogin: true, tabs: ['hr.my_claims.view', 'hr.claims_approve.view', 'hr.meeting_rooms.view'] })[0]).toBe('Claim & approve')
   })
 
   it('opens Revenue on the sub-department it is handed, each Sales Groups tab its own row', () => {

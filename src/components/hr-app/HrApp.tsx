@@ -319,6 +319,12 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
       openIt(id)
       return
     }
+    // A payment request (2026-10-29, the claim process's PR ③): the portal's Claim page, its drawer open — the app has no
+    // screen of its own for it.
+    if (kind === 'payment_request') {
+      window.location.assign(`/claims?open=${encodeURIComponent(id)}`)
+      return
+    }
     if (kind === 'hiring_request') {
       setTab('home')
       setStack(d.hires.some(h => h.id === id) ? [{ k: 'gen', id: 'hire' }, { k: 'hire', id }] : [{ k: 'gen', id: 'hire' }])

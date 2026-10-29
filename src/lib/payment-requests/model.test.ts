@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  approveCards,
+  approveHero,
+  approveLede,
+  orWords,
+  parseApproval,
+  routeWords,
+  rowsOfApproveCard,
+  waitsForMe,
+  whereItIsNote,
   billBackAnswers,
   billBackWords,
   canCancel,
@@ -46,7 +55,7 @@ const req = (over: Record<string, unknown> = {}) => parseRequest(raw(over)) as P
 const CTX: RequestContext = {
   name: 'KHO WEI JIE', departmentId: 'mk', departmentName: 'Marketing', pool: 'dept_pool_marketing',
   salaryAccount: { bank: 'Hong Leong Bank', last4: '4821' },
-  departments: [{ id: 'hr', name: 'HR' }], companies: [{ id: 'dc', name: 'Dream Crafter' }],
+  departments: [{ id: 'hr', name: 'HR' }], companies: [{ id: 'dc', name: 'Dream Crafter' }], reviewers: null,
 }
 const draft = (over: Partial<RequestDraft> = {}): RequestDraft => ({
   ...emptyDraft(), kind: 'claim', salary: true, items: [{ description: 'Claude · Oct', amount: '453.79' }], split: false, ...over,
@@ -199,5 +208,66 @@ describe('Create PV', () => {
     expect(billBackWords({ ...share, billBack: null, invoiceNo: null, invoiceStatus: null })).toBe('Decided when the PV is made')
     expect(billBackWords({ ...share, billBack: false, invoiceNo: null, invoiceStatus: null })).toBe('No — the department pays it')
     expect(billBackWords({ ...share, billBack: true, invoiceNo: 'HV-INV-202610-0091', invoiceStatus: 'draft' })).toBe('Yes · HV-INV-202610-0091 (draft)')
+  })
+})
+
+// PR ③ (2026-10-29): a department's approval before Finance — who approves, who approved, who sent it back, the New
+// request window's last line, and Claim & approve's cards.
+describe('a department’s approval first', () => {
+  it('reads who approves it, who approved it, and whether it was sent for approval', () => {
+    const waiting = req({ status: 'pending_approval', needsApproval: true, reviewers: ['SIA JOSIAH', 'KHO WEI JIE'] })
+    expect([waiting.needsApproval, waiting.reviewers, waiting.approvedByName]).toEqual([true, ['SIA JOSIAH', 'KHO WEI JIE'], null])
+    const approved = req({ needsApproval: true, approvedByName: 'SIA JOSIAH', approvedAt: '2026-10-29T03:00:00Z', reviewers: null })
+    expect([approved.approvedByName, approved.approvedAt, approved.reviewers]).toEqual(['SIA JOSIAH', '2026-10-29T03:00:00Z', null])
+    expect(req().needsApproval).toBe(false)
+  })
+
+  it('says by whom, under the chip', () => {
+    expect(orWords(['A'])).toBe('A')
+    expect(orWords(['A', 'B', 'C'])).toBe('A, B or C')
+    expect(whereItIsNote(req({ status: 'pending_approval', reviewers: ['SIA JOSIAH'] }))).toBe('SIA JOSIAH approves it')
+    expect(whereItIsNote(req({ status: 'pending_approval', reviewers: [] }))).toBe('Waiting for its approver')
+    expect(whereItIsNote(req({ approvedByName: 'SIA JOSIAH' }))).toBe('Approved by SIA JOSIAH')
+    expect(whereItIsNote(req({ status: 'rejected', rejectedStage: 'approval', rejectedByName: 'SIA JOSIAH' }))).toBe('Sent back by SIA JOSIAH')
+    expect(whereItIsNote(req({ status: 'rejected', rejectedStage: 'finance', rejectedByName: 'Finance Manager' }))).toBe('Rejected by Finance')
+    expect(whereItIsNote(req())).toBeNull()
+  })
+
+  it('the New request window says who approves it first, or that it goes straight to Finance', () => {
+    expect(parseContext({ ...CTX, reviewers: ['SIA JOSIAH'] })?.reviewers).toEqual(['SIA JOSIAH'])
+    expect(parseContext({ ...CTX, reviewers: [] })?.reviewers).toBeNull()
+    expect(routeWords(CTX)).toBe('After you submit: it goes straight to Finance.')
+    expect(routeWords({ reviewers: ['SIA JOSIAH'] })).toBe('After you submit: SIA JOSIAH approves it first, then it goes to Finance.')
+    expect(routeWords({ reviewers: ['KHO WEI JIE', 'SIA JOSIAH'] })).toBe(
+      'After you submit: KHO WEI JIE or SIA JOSIAH approves it first — one approval is enough — then it goes to Finance.',
+    )
+  })
+
+  it('Claim & approve: To approve (the team’s, never one’s own) · All {department} · Mine', () => {
+    const read = parseApproval({
+      departmentName: 'Marketing', canApprove: true,
+      approvers: [{ id: 'u1', name: 'SIA JOSIAH' }, { id: 'u2', name: 'KHO WEI JIE' }],
+      requests: [
+        raw({ id: 'a', status: 'pending_approval', mine: false, requesterName: 'CHIN YEE RU', total: 24.4 }),
+        raw({ id: 'b', status: 'pending_approval', mine: true, total: 80 }),
+        raw({ id: 'c', status: 'with_finance', mine: false, requesterName: 'WONG JOEY', total: 50 }),
+      ],
+    })!
+    expect(parseApproval({ requests: [] })).toBeNull()
+    expect(waitsForMe(read.requests[0])).toBe(true)
+    expect(waitsForMe(read.requests[1])).toBe(false)
+    const mine = [req({ id: 'd', status: 'draft' })]
+    expect(approveCards(read, mine).map((c) => [c.label, c.sub])).toEqual([
+      ['To approve', '1 request'], ['All Marketing', '3 requests'], ['Mine', '1 request'],
+    ])
+    expect(rowsOfApproveCard(read, mine, 'to_approve').map((r) => r.id)).toEqual(['a'])
+    expect(rowsOfApproveCard(read, mine, 'mine').map((r) => r.id)).toEqual(['d'])
+    expect(approveHero(read)).toEqual({ label: 'Waiting for you · 1 request', value: 'RM 24.40' })
+    expect(approveLede(read, 'SIA JOSIAH')).toBe(
+      'Marketing’s requests. Your team’s wait here for you or KHO WEI JIE — one approval is enough. Yours go straight to Finance.',
+    )
+    expect(approveLede({ ...read, approvers: [{ id: 'u1', name: 'SIA JOSIAH' }] }, 'SIA JOSIAH')).toBe(
+      'Marketing’s requests. Your team’s wait here for you. Yours go straight to Finance.',
+    )
   })
 })

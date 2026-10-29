@@ -104,9 +104,52 @@ export async function cancelRequest(id: string): Promise<Answer<PaymentRequest>>
   return { ok: true, data: request }
 }
 
+/** The ids a bar or a drawer acts on: requests, at most 50 — none when one is not an id. */
+const idList = (ids: unknown): string[] | null => {
+  const list = Array.isArray(ids) ? [...new Set(ids)] : []
+  return list.length > 0 && list.length <= 50 && list.every(isId) ? (list as string[]) : null
+}
+
 /**
- * A request's file, by a five-minute link: for whoever sent it, and for Finance (Treasury) once it is sent — the
- * database names the file (`payment_request_file`) and the bucket's policy lets the link be signed.
+ * Claim & approve (2026-10-29, PR ③): their department's requests waiting for approval, sent to Finance — several at
+ * once. The database asks Claims · Approve at Dept, the department theirs, none their own (mig 20261029200000).
+ */
+export async function approveRequests(ids: string[]): Promise<Answer<{ approved: number }>> {
+  const user = await requireActionOn('/claims', 'claims', 'approve', 'dept')
+  if (user.viewingAs) return { ok: false, reason: READ_ONLY_MESSAGE }
+  const list = idList(ids)
+  if (!list) return { ok: false, reason: 'Which requests? Reload the page and try again.' }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('payment_request_approve', { p_ids: list })
+  if (error) return { ok: false, reason: error.message?.trim() || 'They could not be approved. Please try again.' }
+
+  revalidatePath('/claims')
+  revalidatePath('/payments/requests')
+  return { ok: true, data: { approved: typeof data === 'number' ? data : list.length } }
+}
+
+/** …or back to their senders with one reason for all, to fix and send again. */
+export async function sendBackRequests(ids: string[], reason: string): Promise<Answer<{ sentBack: number }>> {
+  const user = await requireActionOn('/claims', 'claims', 'approve', 'dept')
+  if (user.viewingAs) return { ok: false, reason: READ_ONLY_MESSAGE }
+  const list = idList(ids)
+  if (!list) return { ok: false, reason: 'Which requests? Reload the page and try again.' }
+  const why = typeof reason === 'string' ? reason.trim().slice(0, 500) : ''
+  if (!why) return { ok: false, reason: 'Say what to fix — they read it to send the request again.' }
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc('payment_request_send_back', { p_ids: list, p_reason: why })
+  if (error) return { ok: false, reason: error.message?.trim() || 'They could not be sent back. Please try again.' }
+
+  revalidatePath('/claims')
+  return { ok: true, data: { sentBack: typeof data === 'number' ? data : list.length } }
+}
+
+/**
+ * A request's file, by a five-minute link: for whoever sent it, for their department's Claim & approve, and for Finance
+ * (Treasury) once it is sent — the database names the file (`payment_request_file`) and the bucket's policy lets the
+ * link be signed.
  */
 export async function openRequestFile(fileId: string): Promise<Answer<{ url: string; name: string }>> {
   await requireAuth()

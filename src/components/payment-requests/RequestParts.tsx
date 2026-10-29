@@ -4,6 +4,7 @@ import { HrIcon } from '@/components/hrv/icons'
 import { drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
 import { fileSize } from '@/components/finv/form-words'
+import { officeDay } from '@/lib/office-time'
 import { billBackWords, ownPart, payToWords, requestDay, rmOf, type PaymentRequest } from '@/lib/payment-requests/model'
 
 // A payment request in a hub's drawer (2026-10-29, PR ② of docs/module-spec-payment-requests.md): the dark hero as a
@@ -114,6 +115,9 @@ export function RequestGroups({
       <Group n="IV." title="Which pool pays" foot={r.shares.length > 0 ? { l: `${r.departmentName} pays`, v: rmOf(ownPart(r)) } : undefined}>
         <Line label="From" value={r.requesterName} sub={r.departmentName} />
         {r.requestNo ? <Line label="Request" value={r.requestNo} mono sub={r.submittedAt ? `Sent ${fd(requestDay(r))}` : undefined} /> : null}
+        {r.approvedByName ? (
+          <Line label="Approved by" value={r.approvedByName} sub={r.approvedAt ? fd(officeDay(r.approvedAt).format('YYYY-MM-DD')) : undefined} />
+        ) : null}
         {r.shares.length === 0 ? <Line label="Pool" value={`${r.departmentName} — all of it`} /> : null}
         {r.shares.map((s) => (
           <Line

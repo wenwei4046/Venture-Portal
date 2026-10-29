@@ -49,6 +49,8 @@ export interface MktNotice {
   read: boolean
   /** What it says: 'plan' (put on an Assignment plan), 'approve', 'changes' … (its data's `type`). */
   type: string | null
+  /** What it opens: a project, or (2026-10-29, the claim process's PR ③) a payment request on the Claim page. */
+  refKind: 'mkt_project' | 'payment_request'
 }
 
 export interface MktSearchHit {
@@ -87,7 +89,7 @@ export const EMPTY_SHELL: MktShellData = {
   today: '',
   me: null,
   subs: [],
-  counts: { myspace: 0, calendar: 0, projects: 0, tracking: 0 },
+  counts: { myspace: 0, calendar: 0, projects: 0, tracking: 0, claims: 0 },
   notices: 0,
 }
 
@@ -121,7 +123,7 @@ export function mktShellFromRow(v: unknown): MktShellData {
     today: str(v.today),
     me,
     subs,
-    counts: { myspace: num(c.myspace), calendar: num(c.calendar), projects: num(c.projects), tracking: num(c.tracking) },
+    counts: { myspace: num(c.myspace), calendar: num(c.calendar), projects: num(c.projects), tracking: num(c.tracking), claims: num(c.claims) },
     notices: num(v.notices),
   }
 }
@@ -146,6 +148,7 @@ export function mktNoticesFromRow(v: unknown): MktNotice[] {
     .map(n => ({
       id: str(n.id), title: str(n.title), body: str(n.body), ref: strOrNull(n.ref), at: str(n.at), read: n.read === true,
       type: isObj(n.data) ? strOrNull(n.data.type) : null,
+      refKind: n.refKind === 'payment_request' ? ('payment_request' as const) : ('mkt_project' as const),
     }))
 }
 

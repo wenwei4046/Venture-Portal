@@ -257,6 +257,11 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // answered with it) by Treasury (the page's box asked too).
   'payment_request_context', 'my_payment_requests', 'payment_request_save', 'payment_request_cancel', 'payment_request_file',
   'payment_requests_for_finance', 'payment_request_reject', 'payment_requests_for_pv', 'payment_requests_attach_pv',
+  // A department's approval first (mig 20261029200000): its requests read by Claims · View at Dept, the number waiting,
+  // Approve and Reject by Claims · Approve at Dept (the page's box asked too); the By management approve ticks set by
+  // whoever manages permissions.
+  'payment_requests_for_approval', 'payment_requests_waiting_count', 'payment_request_approve', 'payment_request_send_back',
+  'permission_template_flags_set', 'permission_user_flags_set',
   'close_approvals_for_voided_voucher', 'create_loan_with_approval', 'create_payroll_disbursement_vouchers', 'save_director_salary_results',
   'bank_gl_codes', 'bridge_mirror_slices', 'bridge_ref_flags', 'build_hr_cost_submission_payload', 'bump_bank_balance',
   'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_dept_payment_request', 'cancel_loan_and_approval',

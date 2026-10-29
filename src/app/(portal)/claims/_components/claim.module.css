@@ -65,3 +65,12 @@
   color: rgb(var(--hvs-ink));
 }
 .reasonBy { font-size: 11.5px; font-weight: 600; color: rgb(var(--fv-card-pending)); }
+
+/* Claim & approve's line under the head (PR ③ — the mockup's ②): whose requests these are, who else approves them. */
+.lede {
+  margin: 6px 0 18px;
+  max-width: 760px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: rgb(var(--hvs-muted));
+}

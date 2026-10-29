@@ -353,9 +353,9 @@ describe('what a template opens today — the database rule, in TypeScript', () 
     // Team · View is in force without Salary amounts since PR4b (the directory).
     expect(held('office').map(h => h.key)).toEqual(['reports.view'])
     expect(held('office').find(h => h.key === 'reports.view')?.reason).toMatch(/Treasury · View/)
+    // Claims · Approve at Dept is in force since Claim & approve (2026-10-29, the claim process's PR ③).
     const deptApprover = heldCells(setCell(T.staff.grants, fn('claims'), 'approve', 'dept'), [], 'staff', CELL_KEYS, FUNCTIONS)
-    expect(deptApprover.map(h => h.key)).toEqual(['claims.approve'])
-    expect(deptApprover[0].reason).toMatch(/^Dept is not enforced/)
+    expect(deptApprover.map(h => h.key)).toEqual([])
     // Since PR2 a write asks for its cell: Treasury · Approve (amending a booked
     // loan) is in force wherever Treasury opens, and since approvals go by
     // domain the queue opens on its own key — a Director's Approve is in force.
@@ -366,7 +366,7 @@ describe('what a template opens today — the database rule, in TypeScript', () 
     expect(held('staff')).toEqual([])
     const ownApprover = setCell(T.staff.grants, fn('claims'), 'approve', 'own')
     expect(heldCells(ownApprover, [], 'staff', CELL_KEYS, FUNCTIONS).map(h => h.reason))
-      .toEqual([expect.stringMatching(/^Own is not enforced on this yet.*All opens it now$/)])
+      .toEqual([expect.stringMatching(/^Own is not enforced on this yet.*Dept opens it now$/)])
   })
 
   it('a person raised on a cell opens it only where the rule allows', () => {

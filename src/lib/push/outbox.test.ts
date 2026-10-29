@@ -113,6 +113,11 @@ describe('a notice', () => {
     expect(openTarget('it:it1')).toEqual({ k: 'it', id: 'it1' })
     // A share request (2026-10-21): the Revenue app's, whichever app the phone signed up in — the request over Today.
     expect(noticeUrl({ refKind: 'share_request', refId: 's 1' }, 'revenue')).toBe('/member?share=s%201')
+    // A payment request (2026-10-29, the claim process's PR ③): the Claim page, its drawer open, from either app.
+    expect(noticeUrl({ refKind: 'payment_request', refId: 'p 1' }, 'hr')).toBe('/claims?open=p%201')
+    expect(noticeUrl({ refKind: 'payment_request', refId: 'p1' }, 'revenue')).toBe('/claims?open=p1')
+    expect(noticesFromRow({ unread: 1, items: [{ id: 'n', kind: 'claims', title: 'A claim to approve — CHIN YEE RU', body: '', refKind: 'payment_request', refId: 'p1', at: 'x', read: false }] }).items)
+      .toHaveLength(1)
     expect(noticeUrl({ refKind: 'share_request', refId: 's1' }, 'hr')).toBe('/member?share=s1')
     // Today › Remind all (2026-10-15): the app's front page, either app.
     expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'hr')).toBe('/hr-app')
