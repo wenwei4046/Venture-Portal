@@ -190,7 +190,7 @@ export const PAGE_TABS = {
   '/reconciliation/journal-entries/[id]': JOURNAL,
   '/reconciliation/journal-entries/[id]/edit': JOURNAL,
   '/reconciliation/journal-entries/new': JOURNAL,
-  '/claims': ['pri.claims', 'dept.my_claims', 'mkt.my_claims'],
+  '/claims': ['pri.claims', 'dept.my_claims', 'mkt.my_claims', 'hr.my_claims', 'fin.my_claims'],
   '/dept-pool': DEPT_POOL,
   '/dept-pool/[slug]': DEPT_POOL,
   '/dept-pool/marketing': DEPT_POOL,

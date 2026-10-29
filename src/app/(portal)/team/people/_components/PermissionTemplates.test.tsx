@@ -90,8 +90,9 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     expect(screen.queryByText(/Applies to everyone holding/)).toBeNull()
     // A template with no ticks stored is drawn from its cells: Overview, HR Costing's three pages, Audit Log (Changes).
     expect(screen.getByRole('tab', { name: /HR view/ })).toHaveAttribute('aria-selected', 'true')
-    // Of the HR view's 27 tabs (round 2 added Documentation, Hiring ×3, Meeting Rooms, Guest Link; Attendance its seven, 2026-10-15).
-    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('5/27')
+    // Of the HR view's 28 tabs (round 2 added Documentation, Hiring ×3, Meeting Rooms, Guest Link; Attendance its seven, 2026-10-15;
+    // Claim, 2026-10-29).
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('5/28')
     expect(box('Payroll · View')).toHaveAttribute('aria-checked', 'true')
     expect(box('Payroll · Approve')).toHaveAttribute('aria-checked', 'false')
     expect(box('Overview · Create')).toBeDisabled()
@@ -103,8 +104,8 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
   it('ticks a box (View comes with it), and saves the ticks', async () => {
     const { onNotice } = renderTab()
     fireEvent.click(screen.getByRole('tab', { name: /Department view/ }))
-    fireEvent.click(box('My claims · Create'))
-    expect(box('My claims · View')).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(box('Claim · Create'))
+    expect(box('Claim · View')).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByText('Unsaved changes to HR · Payroll')).toBeInTheDocument()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
     expect(mocks.saveTemplateTabs).toHaveBeenCalledWith(expect.objectContaining({
@@ -127,8 +128,8 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
   it('opens a template on the ticks it stored', () => {
     renderTab({ initialTemplateId: STAFF })
     expect(screen.getByRole('tab', { name: /Department view/ })).toHaveAttribute('aria-selected', 'true')
-    expect(box('My claims · Create')).toHaveAttribute('aria-checked', 'true')
-    expect(box('My claims · Edit')).toHaveAttribute('aria-checked', 'false')
+    expect(box('Claim · Create')).toHaveAttribute('aria-checked', 'true')
+    expect(box('Claim · Edit')).toHaveAttribute('aria-checked', 'false')
   })
 
   it('says what the database refused', async () => {
@@ -201,9 +202,9 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     fireEvent.click(box('Select all · every box in HR view'))
     expect(box('Director Pool · Edit')).toHaveAttribute('aria-checked', 'true')
     expect(box('Select all · every box in HR view')).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('27/27')
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('28/28')
     fireEvent.click(box('Select all · every box in HR view'))
-    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('0/27')
+    expect(screen.getByRole('tab', { name: /HR view/ })).toHaveTextContent('0/28')
     expect(screen.getByText('Unsaved changes to HR · Payroll')).toBeInTheDocument()
   })
 
