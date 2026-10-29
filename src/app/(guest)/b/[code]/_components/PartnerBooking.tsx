@@ -3,8 +3,8 @@
 /**
  * /b/<code> — a partner's showroom booking (2026-10-29; the owner: The Conts' own salespeople book a slot without signing
  * in to the CRM; it lands on the CRM's calendar and takes the showroom's per-slot place, so a full slot is full on both
- * sides). A desktop page: the showroom, a day of the next three weeks and a time on the left; the booker, the customer and
- * the remarks on the right. Booked, it shows its reference — typed under *Change or cancel*, it opens the booking again.
+ * sides). In pages, for a phone: Home (this booker's bookings, or Book appointment now), then the showroom, the date and
+ * time, and the details. Booked, it shows its reference; a booking opens again from Home to change or cancel.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { partnerBook, partnerCancel, partnerDay, partnerGet, partnerList } from '@/lib/crm-partner/actions'
@@ -30,6 +30,7 @@ const whenOf = (iso: string) => `${dayLabel(officeDay(iso))} · ${t12(officeTime
 interface Form { booker: string; bookerPhone: string; customer: string; customerPhone: string; info: PartnerInfo; remarks: string; note: string }
 const EMPTY: Form = { booker: '', bookerPhone: '', customer: '', customerPhone: '', info: {}, remarks: '', note: '' }
 const ME_KEY = 'partner-booker'
+type Step = 'home' | 'room' | 'time' | 'details'
 
 export default function PartnerBooking({ code, initial }: { code: string; initial: PartnerPage }) {
   if (!initial.on) {
@@ -56,10 +57,13 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   const [refText, setRefText] = useState('')
   const [refError, setRefError] = useState('')
   const [now, setNow] = useState(() => new Date())
+  const [step, setStep] = useState<Step>('home')
+  const [meName, setMeName] = useState('')
+  const [allOpen, setAllOpen] = useState(false)
 
   // The booker's own name and phone stay on this computer for the next booking (never the customer's).
   useEffect(() => {
-    try { const me = JSON.parse(localStorage.getItem(ME_KEY) ?? 'null') as { booker?: string; bookerPhone?: string } | null; if (me) setForm(f => ({ ...f, booker: me.booker ?? '', bookerPhone: me.bookerPhone ?? '' })) } catch { /* private window */ }
+    try { const me = JSON.parse(localStorage.getItem(ME_KEY) ?? 'null') as { booker?: string; bookerPhone?: string } | null; if (me) { setForm(f => ({ ...f, booker: me.booker ?? '', bookerPhone: me.bookerPhone ?? '' })); setMeName(me.booker ?? '') } } catch { /* private window */ }
   }, [])
 
   const r = page.rooms.find(x => x.id === room)
@@ -104,6 +108,9 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   const except = editing ? { showroom: editing.showroom, start: editing.start } : null
   const slots = r ? slotsOf(r, day, taken, now, except) : []
   const openDay = (ymd: string) => !!r && slotsOf(r, ymd, taken, now, except).some(x => !x.full && !x.past)
+  // A new booking's date step opens on the first day with a place (today's times may all be gone).
+  const firstOpen = !editing && step === 'time' && !start && !openDay(day) ? Array.from({ length: AHEAD + 1 }, (_, k) => addDays(page.today, k)).slice(0, 42).find(openDay) : undefined
+  useEffect(() => { if (firstOpen && firstOpen !== day) { setDay(firstOpen); showDay(firstOpen) } }, [firstOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (p: Partial<Form>) => setForm(f => ({ ...f, ...p }))
   const setInfo = (k: keyof PartnerInfo, v: string) => setForm(f => ({ ...f, info: { ...f.info, [k]: v } }))
@@ -116,6 +123,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     setBusy(false)
     if (!a.ok) { setError(a.reason); void load(); return }
     try { localStorage.setItem(ME_KEY, JSON.stringify({ booker: form.booker, bookerPhone: form.bookerPhone })) } catch { /* private window */ }
+    setMeName(form.booker)
     setDone(a.booked); setEditing(null); void load()
   }
   const again = () => { setDone(null); setStart(''); setForm(f => ({ ...EMPTY, booker: f.booker, bookerPhone: f.bookerPhone })); void load() }
@@ -129,6 +137,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     if (b.showroom === room) void load();
     setDone(null); setEditing(b); setRoom(b.showroom); setDay(officeDay(b.start)); showDay(officeDay(b.start)); setStart(new Date(b.start).toISOString())
     setForm({ booker: b.booker, bookerPhone: b.bookerPhone, customer: b.customer, customerPhone: b.customerPhone, info: b.info, remarks: b.remarks, note: b.note })
+    setStep('details'); window.scrollTo({ top: 0 })
   }
   const cancel = async () => {
     if (!editing || busy) return
@@ -141,30 +150,41 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   }
   const stopEditing = () => { setEditing(null); setStart(''); setForm(f => ({ ...EMPTY, booker: f.booker, bookerPhone: f.bookerPhone })) }
 
+  // Pages, for the phone (the owner, 2026-10-29: "做成分页会更好；首页可以有他已经的预约，或 no appt, book appointment now"):
+  // Home — this booker's bookings (by the name kept on this phone) or "No appointment yet" and Book appointment now — then
+  // 1 Showroom · 2 Date & time · 3 Details, each with Back and Next.
+  const mine = meName.trim() ? list.filter(b => b.booker.trim().toLowerCase() === meName.trim().toLowerCase()) : []
+  const go = (to: Step) => { setStep(to); setError(''); window.scrollTo({ top: 0 }) }
+  const startNew = () => { stopEditing(); setDone(null); go('room') }
+  const openBooking = (ref: string) => { setRefText(ref); void findRef(ref) }
+  const STEPS: Step[] = ['room', 'time', 'details']
+  const stepNo = STEPS.indexOf(step) + 1
+  const stepTitle = step === 'room' ? 'Showroom' : step === 'time' ? 'Date & time' : 'Details'
+  const card = (b: PartnerBooked) => (
+    <button key={b.ref} type="button" className={s.bookingCard} onClick={() => openBooking(b.ref)}>
+      <span className={s.bcWhen}>{whenOf(b.start)}</span>
+      <span className={s.bcRoom}>{b.showroomName}</span>
+      <span className={s.bcLine}>{b.customer} · {b.customerPhone}</span>
+      <span className={s.bcFoot}><span className={s.refCell}>{b.ref}</span><span>by {b.booker}</span><span className={s.bcOpen}>Open ›</span></span>
+    </button>
+  )
+
   return (
     <div className={s.root}>
       <div className={s.wrap}>
         <header className={s.head}>
           <div>
             <div className={s.kicker}>HOUZS showrooms · for {page.name}</div>
-            <h1 className={s.title}>Book a showroom visit</h1>
-          </div>
-          <div className={s.lookup}>
-            <label className={s.lookupLabel} htmlFor="ref">Change or cancel a booking</label>
-            <div className={s.lookupRow}>
-              <input id="ref" className={s.input} value={refText} onChange={e => setRefText(e.target.value.toUpperCase())} placeholder="TC-7KQ3X9" onKeyDown={e => { if (e.key === 'Enter') void findRef() }} />
-              <button type="button" className={s.ghost} onClick={() => void findRef()}>Open</button>
-            </div>
-            {refError && <span className={s.err}>{refError}</span>}
+            <h1 className={s.title}>{step === 'home' && !done ? (meName.trim() ? `Hi, ${meName.trim()}` : 'Showroom bookings') : editing ? 'Change a booking' : 'Book a showroom visit'}</h1>
           </div>
         </header>
 
         {done ? (
           <section className={s.done}>
-            <div className={s.doneBadge}>{done.state === 'cancelled' ? 'Cancelled' : editing === null ? 'Booked' : 'Saved'}</div>
+            <div className={s.doneBadge}>{done.state === 'cancelled' ? 'Cancelled' : 'Booked'}</div>
             <h2>{done.state === 'cancelled' ? 'The booking is cancelled' : 'The slot is yours'}</h2>
             <div className={s.ref}>{done.ref}</div>
-            <p className={s.muted}>{done.state === 'cancelled' ? 'Its slot is free again.' : 'Keep this reference — type it under “Change or cancel a booking” to change or cancel.'}</p>
+            <p className={s.muted}>{done.state === 'cancelled' ? 'Its slot is free again.' : 'It is on your home page — open it there to change or cancel.'}</p>
             <dl className={s.facts}>
               <dt>When</dt><dd>{whenOf(done.start)}</dd>
               <dt>Showroom</dt><dd>{done.showroomName}</dd>
@@ -173,18 +193,59 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
               {done.remarks && <><dt>Remarks</dt><dd>{done.remarks}</dd></>}
               {done.note && <><dt>Your note</dt><dd>{done.note}</dd></>}
             </dl>
-            <button type="button" className={s.primary} onClick={again}>Book another</button>
+            <div className={s.navRow}>
+              <button type="button" className={s.ghost} onClick={() => { again(); go('home') }}>Home</button>
+              <button type="button" className={s.primary} onClick={() => { again(); go('room') }}>Book another</button>
+            </div>
           </section>
-        ) : (
-          <div className={s.grid}>
-            <section className={s.card}>
-              {editing && (
-                <div className={s.editing}>
-                  Changing <b>{editing.ref}</b> · {editing.customer}, {whenOf(editing.start)}
-                  <button type="button" className={s.link} onClick={stopEditing}>New booking instead</button>
-                </div>
-              )}
-              <h2 className={s.h2}>1 · Showroom</h2>
+        ) : step === 'home' ? (<>
+          <section className={s.card}>
+            <h2 className={s.h2}>Your appointments{mine.length ? ` · ${mine.length}` : ''}</h2>
+            {mine.length ? <div className={s.cards}>{mine.map(card)}</div> : (
+              <div className={s.empty}>
+                <b>No appointment yet</b>
+                <span className={s.muted}>{meName.trim() ? 'Book a showroom visit for your customer.' : 'Your bookings show here once you have made one on this phone.'}</span>
+              </div>
+            )}
+            <button type="button" className={`${s.primary} ${s.bigBtn}`} onClick={startNew}>Book appointment now</button>
+          </section>
+
+          <section className={s.card}>
+            <h2 className={s.h2}>Find a booking</h2>
+            <div className={s.lookupRow}>
+              <input className={s.input} value={refText} onChange={e => setRefText(e.target.value.toUpperCase())} placeholder="Reference, e.g. TC-7KQ3X9" onKeyDown={e => { if (e.key === 'Enter') void findRef() }} />
+              <button type="button" className={s.ghost} onClick={() => void findRef()}>Open</button>
+            </div>
+            {refError && <span className={s.err}>{refError}</span>}
+          </section>
+
+          <section className={s.card}>
+            <button type="button" className={s.foldHead} onClick={() => setAllOpen(o => !o)} aria-expanded={allOpen}>
+              <span className={s.h2}>All bookings through this link · {list.length}</span><span>{allOpen ? '▴' : '▾'}</span>
+            </button>
+            {allOpen && (<>
+              <input className={s.input} value={listQ} onChange={e => setListQ(e.target.value)} placeholder="Search customer, phone, booker or reference" />
+              {(() => {
+                const q = listQ.trim().toLowerCase()
+                const shown = list.filter(b => !q || `${b.customer} ${b.customerPhone} ${b.booker} ${b.ref} ${b.showroomName}`.toLowerCase().includes(q))
+                return shown.length ? <div className={s.cards}>{shown.map(card)}</div> : <p className={s.muted}>{list.length ? 'No booking matches.' : 'No bookings yet.'}</p>
+              })()}
+            </>)}
+          </section>
+        </>) : (
+          <section className={s.card}>
+            <div className={s.stepHead}>
+              <button type="button" className={s.backBtn} onClick={() => go(step === 'room' ? 'home' : step === 'time' ? (editing ? 'details' : 'room') : (editing ? 'home' : 'time'))}>‹ Back</button>
+              <span className={s.stepNo}>Step {stepNo} of 3 · {stepTitle}</span>
+            </div>
+            <div className={s.progress}><i style={{ width: `${(stepNo / 3) * 100}%` }} /></div>
+            {editing && (
+              <div className={s.editing}>
+                Changing <b>{editing.ref}</b> · {editing.customer}, {whenOf(editing.start)}
+              </div>
+            )}
+
+            {step === 'room' && (<>
               <div className={s.rooms}>
                 {page.rooms.map(x => (
                   <button key={x.id} type="button" className={x.id === room ? `${s.room} ${s.on}` : s.room} onClick={() => { setRoom(x.id); setStart('') }}>
@@ -193,10 +254,12 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
                 ))}
                 {!page.rooms.length && <p className={s.muted}>No showroom is open for booking.</p>}
               </div>
+              <div className={s.navRow}><span /><button type="button" className={s.primary} disabled={!room} onClick={() => go('time')}>Next</button></div>
+            </>)}
 
+            {step === 'time' && (<>
               <div className={s.pickHead}>
-                <h2 className={s.h2}>2 · Date</h2>
-                <span className={s.monthLabel}>{view === 'week' ? `${MON[Number(weekDays[0].slice(5, 7)) - 1]} ${weekDays[0].slice(0, 4)}` : `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`}</span>
+                <span className={s.monthLabel}>{r?.name} · {view === 'week' ? `${MON[Number(weekDays[0].slice(5, 7)) - 1]} ${weekDays[0].slice(0, 4)}` : `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`}</span>
                 <div className={s.seg}>
                   {(['week', 'month'] as const).map(k => <button key={k} type="button" aria-pressed={view === k} className={view === k ? `${s.segOpt} ${s.segOn}` : s.segOpt} onClick={() => { setView(k); showDay(day) }}>{k === 'week' ? 'Week' : 'Month'}</button>)}
                 </div>
@@ -227,26 +290,30 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
                   })}
                 </div>
               )}
-
-              <h2 className={s.h2}>3 · Time · {dayLabel(day)}</h2>
+              <h2 className={s.h2}>Time · {dayLabel(day)}</h2>
               <div className={s.slots}>
                 {slots.map(x => {
                   const off = x.full || x.past, on = start === x.start
                   return (
-                    <button key={x.time} type="button" disabled={off} className={on ? `${s.slot} ${s.on}` : s.slot} onClick={() => setStart(x.start)}>
+                    <button key={x.time} type="button" disabled={off && !on} className={on ? `${s.slot} ${s.on}` : s.slot} onClick={() => setStart(x.start)}>
                       <b>{x.label}</b><span>{x.past ? 'Passed' : x.full ? 'Full' : `${x.left} of ${r?.cap ?? 0} free`}</span>
                     </button>
                   )
                 })}
-                {!slots.length && <p className={s.muted}>{r ? 'The showroom is closed that day.' : 'Pick a showroom.'}</p>}
+                {!slots.length && <p className={s.muted}>The showroom is closed that day.</p>}
               </div>
-            </section>
+              <div className={s.navRow}><span /><button type="button" className={s.primary} disabled={!start} onClick={() => go('details')}>Next</button></div>
+            </>)}
 
-            <section className={s.card}>
+            {step === 'details' && (<>
+              <div className={s.summary}>
+                {start && r ? <span><b>{r.name}</b> · {whenOf(start)}</span> : <span className={s.muted}>Pick a showroom, a date and a time.</span>}
+                <button type="button" className={s.link} onClick={() => go(editing ? 'time' : 'room')}>Change</button>
+              </div>
               <h2 className={s.h2}>You</h2>
               <div className={s.two}>
                 <Field label="Your name *"><input className={s.input} value={form.booker} maxLength={80} onChange={e => set({ booker: e.target.value })} /></Field>
-                <Field label="Your phone"><input className={s.input} value={form.bookerPhone} maxLength={30} onChange={e => set({ bookerPhone: e.target.value })} /></Field>
+                <Field label="Your phone"><input className={s.input} value={form.bookerPhone} maxLength={30} inputMode="tel" onChange={e => set({ bookerPhone: e.target.value })} /></Field>
               </div>
               <h2 className={s.h2}>Customer</h2>
               <div className={s.two}>
@@ -258,10 +325,6 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
               </div>
               <Field label="Remarks for the showroom"><textarea className={s.input} rows={3} maxLength={1000} value={form.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="What the customer wants to see, keys, parking…" /></Field>
               <Field label="Your own note"><textarea className={s.input} rows={3} maxLength={1000} value={form.note} onChange={e => set({ note: e.target.value })} placeholder="Anything about this lead for yourself" /></Field>
-
-              <div className={s.summary}>
-                {start && r ? <span><b>{r.name}</b> · {whenOf(start)}</span> : <span className={s.muted}>Pick a showroom, a date and a time.</span>}
-              </div>
               {error && <div className={s.err}>{error}</div>}
               <div className={s.actions}>
                 {editing && <button type="button" className={s.danger} disabled={busy} onClick={() => void cancel()}>Cancel booking</button>}
@@ -269,33 +332,9 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
                   {busy ? 'Saving…' : editing ? 'Save changes' : 'Book this slot'}
                 </button>
               </div>
-            </section>
-          </div>
+            </>)}
+          </section>
         )}
-
-        <section className={s.card}>
-          <div className={s.listHead}>
-            <h2 className={s.h2}>Bookings through this link · {list.length}</h2>
-            <input className={`${s.input} ${s.listSearch}`} value={listQ} onChange={e => setListQ(e.target.value)} placeholder="Search customer, phone, booker or reference" />
-          </div>
-          {(() => {
-            const q = listQ.trim().toLowerCase()
-            const shown = list.filter(b => !q || `${b.customer} ${b.customerPhone} ${b.booker} ${b.ref} ${b.showroomName}`.toLowerCase().includes(q))
-            if (!shown.length) return <p className={s.muted}>{list.length ? 'No booking matches.' : 'No bookings yet.'}</p>
-            return (
-              <div className={s.table}>
-                <div className={`${s.row} ${s.rowHead}`}><span>When</span><span>Showroom</span><span>Customer</span><span>Phone</span><span>Booked by</span><span>Reference</span><span /></div>
-                {shown.map(b => (
-                  <div key={b.ref} className={s.row}>
-                    <span>{whenOf(b.start)}</span><span>{b.showroomName}</span><span>{b.customer}</span><span>{b.customerPhone}</span><span>{b.booker}</span>
-                    <span className={s.refCell}>{b.ref}</span>
-                    <span><button type="button" className={s.ghost} onClick={() => { setRefText(b.ref); void findRef(b.ref); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Open</button></span>
-                  </div>
-                ))}
-              </div>
-            )
-          })()}
-        </section>
       </div>
     </div>
   )
