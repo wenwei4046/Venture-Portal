@@ -93,5 +93,40 @@
 .row .ghost { padding: 6px 12px; font-size: 12px; }
 @media (max-width: 960px) { .row { grid-template-columns: 1fr 1fr; } .rowHead { display: none; } }
 
+.wrap { max-width: 720px; }
+.cards { display: flex; flex-direction: column; gap: 10px; }
+.bookingCard { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.bcWhen { font-weight: 600; font-size: 15px; }
+.bcRoom { font-size: 13px; color: rgb(122 104 92); }
+.bcLine { font-size: 14px; }
+.bcFoot { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 12px; color: rgb(122 104 92); }
+.bcOpen { margin-left: auto; color: rgb(189 74 25); font-weight: 600; }
+.empty { display: flex; flex-direction: column; gap: 4px; padding: 18px; border-radius: 12px; background: rgb(251 246 242); text-align: center; }
+.empty b { font-size: 16px; }
+.bigBtn { width: 100%; padding: 14px 18px; font-size: 15px; }
+.foldHead { display: flex; align-items: center; justify-content: space-between; border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.stepHead { display: flex; align-items: center; gap: 10px; }
+.backBtn { border: 0; background: none; padding: 4px 0; font: 600 14px inherit; color: rgb(189 74 25); cursor: pointer; }
+.stepNo { margin-left: auto; font-size: 12px; color: rgb(122 104 92); font-weight: 600; }
+.progress { height: 4px; border-radius: 2px; background: rgb(243 236 228); overflow: hidden; }
+.progress i { display: block; height: 100%; background: rgb(189 74 25); transition: width .2s; }
+.navRow { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.navRow .primary, .navRow .ghost { min-width: 120px; padding: 12px 18px; }
+.summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+@media (max-width: 560px) {
+  .wrap { padding: 18px 14px 40px; }
+  .title { font-size: 26px; }
+  .card { padding: 16px; border-radius: 16px; }
+  .two { grid-template-columns: minmax(0, 1fr); }
+  .rooms { grid-template-columns: minmax(0, 1fr); }
+  .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pickHead { flex-wrap: wrap; }
+  .monthLabel { flex-basis: 100%; }
+  .days { gap: 4px; }
+  .day b { font-size: 15px; }
+  .actions { flex-direction: column-reverse; }
+  .actions button { width: 100%; padding: 13px; }
+}
+
 .closed { max-width: 460px; margin: 18vh auto 0; text-align: center; padding: 0 24px; }
 .closed h1 { font: 600 26px var(--font-display-rv), 'Inter Tight', Inter, sans-serif; }
