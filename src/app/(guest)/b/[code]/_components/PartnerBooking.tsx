@@ -6,7 +6,7 @@
  * sides). In pages, for a phone: Home (this booker's bookings, or Book appointment now), then the showroom, the date and
  * time, and the details. Booked, it shows its reference; a booking opens again from Home to change or cancel.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { partnerBook, partnerCancel, partnerDay, partnerGet, partnerList } from '@/lib/crm-partner/actions'
 import {
   addDays, bookingProblem, dowOf, INFO_LABELS, slotsOf, t12,
@@ -89,15 +89,25 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   const [ym, setYm] = useState(() => monthFirst(page.today))
   const last = addDays(page.today, AHEAD)
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, k) => addDays(page.today, wk * 7 + k)), [page.today, wk])
+  // Week is a strip to swipe (the owner, 2026-10-29: "可以左右滑动，电脑版也一样"): the next 62 days (the most the places are
+  // read for at once), seven to a screen, ‹ › a week at a time; the day picked kept in view.
+  const stripDays = useMemo(() => Array.from({ length: 62 }, (_, k) => addDays(page.today, k)).filter(x => x <= last), [page.today, last])
+  const stripRef = useRef<HTMLDivElement | null>(null)
+  const stripBy = (dir: 1 | -1) => { const el = stripRef.current; if (el) el.scrollBy({ left: dir * el.clientWidth, behavior: 'smooth' }) }
+  useEffect(() => {
+    if (view !== 'week') return
+    const el = stripRef.current, on = el?.querySelector<HTMLElement>('[data-on]')
+    if (el && on) el.scrollTo({ left: Math.max(0, on.offsetLeft - el.offsetLeft - (el.clientWidth - on.offsetWidth) / 2), behavior: 'smooth' })
+  }, [day, view, step])
   const monthCells = useMemo(() => {
     const lead = (dowOf(ym) + 6) % 7, start = addDays(ym, -lead)
     const n = Math.ceil((lead + daysBetween(ym, addMonths(ym, 1))) / 7) * 7
     return Array.from({ length: n }, (_, k) => addDays(start, k))
   }, [ym])
   // The places are read for what is on screen (from today, 42 days at most).
-  const rangeA = view === 'week' ? weekDays[0] : monthCells[0] < page.today ? page.today : monthCells[0]
-  const rangeB = view === 'week' ? weekDays[6] : monthCells[monthCells.length - 1]
-  const rangeDays = Math.max(1, Math.min(42, daysBetween(rangeA, rangeB) + 1))
+  const rangeA = view === 'week' ? page.today : monthCells[0] < page.today ? page.today : monthCells[0]
+  const rangeB = view === 'week' ? stripDays[stripDays.length - 1] : monthCells[monthCells.length - 1]
+  const rangeDays = Math.max(1, Math.min(62, daysBetween(rangeA, rangeB) + 1))
   const showDay = (ymd: string) => { setWk(Math.max(0, Math.floor(daysBetween(page.today, ymd) / 7))); setYm(monthFirst(ymd)) }
   const [listQ, setListQ] = useState('')
   const load = useCallback(async () => {
@@ -240,20 +250,20 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
 
               <div className={s.pickHead}>
                 <h2 className={s.h2}>2 · Date</h2>
-                <span className={s.monthLabel}>{view === 'week' ? `${MON[Number(weekDays[0].slice(5, 7)) - 1]} ${weekDays[0].slice(0, 4)}` : `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`}</span>
+                <span className={s.monthLabel}>{view === 'week' ? `${MONTHS[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}` : `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`}</span>
                 <div className={s.seg}>
                   {(['week', 'month'] as const).map(k => <button key={k} type="button" aria-pressed={view === k} className={view === k ? `${s.segOpt} ${s.segOn}` : s.segOpt} onClick={() => { setView(k); showDay(day) }}>{k === 'week' ? 'Week' : 'Month'}</button>)}
                 </div>
-                <button type="button" aria-label="Earlier" className={s.arrow} disabled={view === 'week' ? wk === 0 : ym <= monthFirst(page.today)} onClick={() => (view === 'week' ? setWk(w => Math.max(0, w - 1)) : setYm(m => addMonths(m, -1)))}>‹</button>
-                <button type="button" aria-label="Later" className={s.arrow} disabled={view === 'week' ? addDays(weekDays[6], 1) > last : addMonths(ym, 1) > last} onClick={() => (view === 'week' ? setWk(w => w + 1) : setYm(m => addMonths(m, 1)))}>›</button>
+                <button type="button" aria-label="Earlier" className={s.arrow} disabled={view === 'week' ? false : ym <= monthFirst(page.today)} onClick={() => (view === 'week' ? stripBy(-1) : setYm(m => addMonths(m, -1)))}>‹</button>
+                <button type="button" aria-label="Later" className={s.arrow} disabled={view === 'week' ? false : addMonths(ym, 1) > last} onClick={() => (view === 'week' ? stripBy(1) : setYm(m => addMonths(m, 1)))}>›</button>
               </div>
               {view === 'week' ? (
-                <div className={s.days}>
-                  {weekDays.map(d => {
+                <div className={s.days} ref={stripRef}>
+                  {stripDays.map(d => {
                     const open = d <= last && openDay(d)
                     return (
-                      <button key={d} type="button" disabled={!open} className={d === day ? `${s.day} ${s.on}` : s.day} onClick={() => { setDay(d); setStart('') }}>
-                        <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b>
+                      <button key={d} type="button" disabled={!open} data-on={d === day ? '' : undefined} className={d === day ? `${s.day} ${s.on}` : s.day} onClick={() => { setDay(d); setStart('') }}>
+                        <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b>{d.endsWith('-01') && <span className={s.dayMon}>{MON[Number(d.slice(5, 7)) - 1]}</span>}
                       </button>
                     )
                   })}
@@ -445,20 +455,20 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
 
             {step === 'time' && (<>
               <div className={s.pickHead}>
-                <span className={s.monthLabel}>{r?.name} · {view === 'week' ? `${MON[Number(weekDays[0].slice(5, 7)) - 1]} ${weekDays[0].slice(0, 4)}` : `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`}</span>
+                <span className={s.monthLabel}>{r?.name} · {view === 'week' ? `${MONTHS[Number(day.slice(5, 7)) - 1]} ${day.slice(0, 4)}` : `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`}</span>
                 <div className={s.seg}>
                   {(['week', 'month'] as const).map(k => <button key={k} type="button" aria-pressed={view === k} className={view === k ? `${s.segOpt} ${s.segOn}` : s.segOpt} onClick={() => { setView(k); showDay(day) }}>{k === 'week' ? 'Week' : 'Month'}</button>)}
                 </div>
-                <button type="button" aria-label="Earlier" className={s.arrow} disabled={view === 'week' ? wk === 0 : ym <= monthFirst(page.today)} onClick={() => (view === 'week' ? setWk(w => Math.max(0, w - 1)) : setYm(m => addMonths(m, -1)))}>‹</button>
-                <button type="button" aria-label="Later" className={s.arrow} disabled={view === 'week' ? addDays(weekDays[6], 1) > last : addMonths(ym, 1) > last} onClick={() => (view === 'week' ? setWk(w => w + 1) : setYm(m => addMonths(m, 1)))}>›</button>
+                <button type="button" aria-label="Earlier" className={s.arrow} disabled={view === 'week' ? false : ym <= monthFirst(page.today)} onClick={() => (view === 'week' ? stripBy(-1) : setYm(m => addMonths(m, -1)))}>‹</button>
+                <button type="button" aria-label="Later" className={s.arrow} disabled={view === 'week' ? false : addMonths(ym, 1) > last} onClick={() => (view === 'week' ? stripBy(1) : setYm(m => addMonths(m, 1)))}>›</button>
               </div>
               {view === 'week' ? (
-                <div className={s.days}>
-                  {weekDays.map(d => {
+                <div className={s.days} ref={stripRef}>
+                  {stripDays.map(d => {
                     const open = d <= last && openDay(d)
                     return (
-                      <button key={d} type="button" disabled={!open} className={d === day ? `${s.day} ${s.on}` : s.day} onClick={() => { setDay(d); setStart('') }}>
-                        <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b>
+                      <button key={d} type="button" disabled={!open} data-on={d === day ? '' : undefined} className={d === day ? `${s.day} ${s.on}` : s.day} onClick={() => { setDay(d); setStart('') }}>
+                        <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b>{d.endsWith('-01') && <span className={s.dayMon}>{MON[Number(d.slice(5, 7)) - 1]}</span>}
                       </button>
                     )
                   })}

@@ -152,3 +152,10 @@
    class alone, so on an iPhone in dark mode the title came out washed (the owner, 2026-10-29: "换个颜色"): this page's title
    is held in its own ink and face. */
 .root h1.title { color: rgb(43 31 23); font-family: var(--font-display-rv), 'Inter Tight', Inter, sans-serif; font-weight: 600; }
+
+/* Week: a strip to swipe — seven days to its width, snapping to a day (2026-10-29). */
+.days { display: flex !important; gap: 6px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; padding-bottom: 2px; }
+.days::-webkit-scrollbar { display: none; }
+.days .day { flex: 0 0 calc((100% - 36px) / 7); min-width: 46px; scroll-snap-align: start; }
+.dayMon { font-size: 10px !important; color: rgb(189 74 25) !important; font-weight: 600; }
+.on .dayMon { color: rgb(255 255 255 / .85) !important; }
