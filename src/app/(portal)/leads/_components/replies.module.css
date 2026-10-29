@@ -124,15 +124,16 @@
 .libDot[data-old]::after { content: ''; position: absolute; right: -2px; top: -2px; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--lv-amber)); }
 .cardIcon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: 1px solid rgb(var(--lv-frame)); border-radius: 4px; background: rgb(var(--lv-white)); color: rgb(var(--lv-text-3)); cursor: pointer; padding: 0; }
 .cardIcon:hover { color: rgb(var(--lv-ink)); }
-.cardText { padding: 0 10px 6px; font-size: 12px; line-height: 1.4; color: rgb(var(--lv-text-2)); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: 18px; }
+/* A card grows with its words (2026-10-29 — the user: "mind map 图，如果文字太多，它随之变大"): the whole message, every option wrapped. */
+.cardText { padding: 0 10px 6px; font-size: 12px; line-height: 1.4; color: rgb(var(--lv-text-2)); white-space: pre-wrap; overflow-wrap: anywhere; min-height: 18px; }
 .cardText[data-empty] { color: rgb(var(--lv-text-5)); font-style: italic; }
 .rows { display: flex; flex-direction: column; gap: 4px; padding: 2px 10px 10px; }
-.row { position: relative; display: flex; align-items: center; gap: 6px; height: 22px; }
-.pill { flex: 1; min-width: 0; height: 22px; display: flex; align-items: center; padding: 0 9px; border: 1px solid rgb(var(--tone) / 0.6); border-radius: 999px; font-size: 12px; color: rgb(var(--tone)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row { position: relative; display: flex; align-items: center; gap: 6px; min-height: 22px; }
+.pill { flex: 1; min-width: 0; min-height: 22px; box-sizing: border-box; display: flex; align-items: center; padding: 3px 9px; border: 1px solid rgb(var(--tone) / 0.6); border-radius: 11px; font-size: 12px; line-height: 1.3; color: rgb(var(--tone)); white-space: normal; overflow-wrap: anywhere; }
 .pill[data-summary] { border: 0; padding: 0; color: rgb(var(--lv-text-3)); font-style: italic; }
 .target { flex: none; font-size: 11px; padding: 1px 5px; border: 1px solid rgb(var(--lv-frame)); border-radius: 3px; color: rgb(var(--lv-text-3)); background: rgb(var(--lv-white)); }
 .plus { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1px dashed rgb(var(--lv-accent)); color: rgb(var(--lv-accent)); background: rgb(var(--lv-white)); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
-.port { position: absolute; right: -15px; top: 7px; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid rgb(var(--tone)); background: rgb(var(--lv-white)); }
+.port { position: absolute; right: -15px; top: calc(50% - 4px); width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid rgb(var(--tone)); background: rgb(var(--lv-white)); }
 .waitRow { font-size: 12px; color: rgb(var(--lv-text-3)); padding: 0 10px 10px; }
 
 .side { position: relative; flex: none; width: 360px; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid rgb(var(--lv-border)); background: rgb(var(--lv-white)); }
@@ -143,6 +144,8 @@
 .sideTab[aria-pressed='true'] { color: rgb(var(--lv-ink)); border-bottom-color: rgb(var(--lv-accent)); }
 .sideHead { flex: none; display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid rgb(var(--lv-hair)); }
 .sideBody { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+/* Nothing in the panel is squeezed to fit it — it scrolls instead; the message box was held at its 64px whatever it held or was dragged to (2026-10-29 — the user: "message 无法拉动变大"). */
+.sideBody > * { flex-shrink: 0; }
 .label { font-size: 11px; letter-spacing: 0.08em; font-weight: 600; color: rgb(var(--lv-text-2)); }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: rgb(var(--lv-text-3)); }
 .libBox { font-size: 12px; color: rgb(var(--lv-text-2)); background: rgb(var(--lv-muted)); padding: 6px 10px; border-radius: 6px; }
@@ -154,7 +157,13 @@
 .kindDot { margin-top: 4px; width: 10px; height: 10px; border-radius: 50%; background: rgb(var(--tone)); flex: none; }
 .kindText { display: flex; flex-direction: column; font-size: 13px; color: rgb(var(--lv-ink)); }
 .kindHint { font-size: 11px; color: rgb(var(--lv-text-4)); }
-.option { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid rgb(var(--lv-hair)); border-radius: 6px; }
+.option { display: flex; flex-direction: column; gap: 4px; padding: 8px; border: 1px solid rgb(var(--lv-hair)); border-radius: 6px; background: rgb(var(--lv-white)); }
+/* Options reorder by their grip (2026-10-29 — the user: "下方then 可以拉动调整，无需删掉重写"). */
+.option[data-dragging] { opacity: 0.45; }
+.option[data-drop='before'] { box-shadow: 0 -2px 0 rgb(var(--lv-accent)); }
+.option[data-drop='after'] { box-shadow: 0 2px 0 rgb(var(--lv-accent)); }
+.grip { flex: none; display: flex; align-items: center; justify-content: center; width: 16px; height: 24px; color: rgb(var(--lv-text-4)); cursor: grab; border-radius: 4px; }
+.grip:hover { background: rgb(var(--lv-hover)); color: rgb(var(--lv-ink)); }
 .optionTop { display: flex; align-items: center; gap: 6px; }
 
 .chat { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: rgb(var(--lv-chat)); }

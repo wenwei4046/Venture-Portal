@@ -90,3 +90,18 @@ describe('the right panel’s width', () => {
     expect(clampSide(Number.NaN)).toBe(SIDE_W.start)
   })
 })
+
+describe('cards grow with their words; options move (2026-10-29)', () => {
+  it('counts the whole message and every wrapped option in a card’s height', async () => {
+    const { cardHeight } = await import('./template')
+    const short = cardHeight({ id: 'a', kind: 'question', text: 'Hi', buttons: [{ label: 'Sofa', next: '' }] } as never)
+    const long = cardHeight({ id: 'a', kind: 'question', text: 'Hi {name}! Thank you for contacting 2990s.\nWe have received your message and will reply shortly.\nCustomer Care: Mon–Sun 9AM–6PM', buttons: [{ label: 'Would like to know more about our sofa, mattress or bedframe?', next: '' }, { label: 'Talk to person', next: '' }] } as never)
+    expect(long).toBeGreaterThan(short + 80)
+  })
+  it('moves an option from one place to another', async () => {
+    const { moveItem } = await import('./template')
+    expect(moveItem(['a', 'b', 'c'], 0, 2)).toEqual(['b', 'c', 'a'])
+    expect(moveItem(['a', 'b', 'c'], 2, 0)).toEqual(['c', 'a', 'b'])
+    expect(moveItem(['a', 'b'], 0, 5)).toEqual(['a', 'b'])
+  })
+})
