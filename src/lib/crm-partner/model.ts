@@ -108,7 +108,7 @@ export function bookingProblem(f: { room: string; start: string; booker: string;
   if (!f.booker.trim()) return "Type your name.";
   if (!f.customer.trim()) return "Type the customer's name.";
   const p = f.customerPhone.trim();
-  if (p.length < 6 || p.length > 30 || !/^[0-9 +()-]+$/.test(p)) return "Type the customer's phone number.";
+  if (p.length < 6 || p.length > 30 || !/^[0-9 +()-]+$/.test(p)) return "Type the customer's phone number: at least 6 digits.";
   return null;
 }
 

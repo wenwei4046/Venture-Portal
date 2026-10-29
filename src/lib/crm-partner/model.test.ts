@@ -46,7 +46,7 @@ describe("the form", () => {
     expect(bookingProblem(f)).toBeNull();
     expect(bookingProblem({ ...f, start: "" })).toBe("Pick a date and a time.");
     expect(bookingProblem({ ...f, booker: " " })).toBe("Type your name.");
-    expect(bookingProblem({ ...f, customerPhone: "abc" })).toBe("Type the customer's phone number.");
+    expect(bookingProblem({ ...f, customerPhone: "abc" })).toBe("Type the customer's phone number: at least 6 digits.");
   });
   it("reads the page closed unless the database says on, and shows only the functions' own refusals", () => {
     expect(pageFromRow(null)).toEqual({ on: false });
