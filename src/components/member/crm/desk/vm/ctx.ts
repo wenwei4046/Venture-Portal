@@ -113,7 +113,9 @@ export interface DeskUi {
   /** 4a Showrooms: which showroom is on screen (frame 07, one at a time). */
   srAt: number;
   /** Showrooms' two pages: the showrooms, or Appointment types (2026-10-24), and the types' draft until Save. */
-  srPage: "rooms" | "types";
+  srPage: "rooms" | "types" | "keys";
+  /** Showrooms › Key log's showroom and key state (2026-10-29). */
+  klRoom?: string; klState?: string;
   atDraft: ApptType[] | null;
   srDraft: SrDraft | null;
   srTab: "info" | "slots" | "blk";
@@ -341,8 +343,13 @@ export interface DeskCtx {
   app: DeskApp;
   /** The Director's Mine: their own CRM. */
   toMine?: () => void;
+  /** View as a team member (2026-10-29): read-only, as the phone's View as. */
+  viewAs?: DeskViewAs;
   /** Leave the CRM (the sidebar's other pages). */
   exit(): void;
   /** Channels: what Meta answered (read when Channels opens). */
   meta: import("./channels").MetaState;
 }
+
+/** The people a desktop may view the CRM of (one's line; anybody for View at All), and opening one's — read-only. */
+export interface DeskViewAs { people: { id: string; name: string; title: string }[]; open: (staffId: string) => void }

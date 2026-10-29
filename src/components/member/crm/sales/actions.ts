@@ -305,7 +305,7 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       if (!file.type.startsWith("image/")) { toast("Choose a photo of the key."); return false; }
       if (!live) {
         const at = new Date().toISOString(), path = typeof URL !== "undefined" && URL.createObjectURL ? URL.createObjectURL(file) : "demo";
-        setVisit(visitId, x => ({ ...x, [kind === "out" ? "keyOut" : "keyBack"]: { path, at } }));
+        setVisit(visitId, x => ({ ...x, [kind === "out" ? "keyOut" : "keyBack"]: { path, at, by: me } }));
         return true;
       }
       const photo = file.type === "image/gif" ? file : await prepareImage(file, false);
@@ -316,7 +316,7 @@ export function makeSalesActions({ live, me, data, setData, toast }: Deps): Sale
       const r = await write("crm_set_key_photo", { p_appointment: visitId, p_kind: kind, p_path: path });
       if (!r.ok) return false;
       const row = r.data as { key_out_at?: string | null; key_back_at?: string | null } | null, at = (kind === "out" ? row?.key_out_at : row?.key_back_at) ?? new Date().toISOString();
-      setVisit(visitId, x => ({ ...x, [kind === "out" ? "keyOut" : "keyBack"]: { path, at } }));
+      setVisit(visitId, x => ({ ...x, [kind === "out" ? "keyOut" : "keyBack"]: { path, at, by: me } }));
       return true;
     },
     async keyPhotoUrl(path) {

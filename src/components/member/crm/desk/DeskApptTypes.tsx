@@ -66,7 +66,7 @@ export function DeskApptTypes({ v }: { v: ReturnType<typeof apptTypesVM> }) {
                     {APPT_FIELD_KINDS.map(k => <option key={k.k} value={k.k}>{k.label}</option>)}
                   </select>
                   <label style={{ display: "flex", alignItems: "center", gap: "6px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)" }}>
-                    <input type="checkbox" checked={!!f.required || f.kind === "place"} disabled={off || f.kind === "place"} onChange={f.toggleRequired} />{f.kind === "place" ? "Always" : "Yes"}
+                    <input type="checkbox" checked={!!f.required} disabled={off} onChange={f.toggleRequired} />Yes
                   </label>
                   <span style={{ display: "flex", justifyContent: "flex-end" }}>
                     <button type="button" title="Move up" disabled={off || !f.up} onClick={f.up} style={ICONBTN(off || !f.up)}><span style={{ display: "flex", transform: "rotate(180deg)" }}><Ic name="chevron-down" size={13} /></span></button>

@@ -44,7 +44,8 @@ export interface CustomBook {
 }
 
 /** Asked of every answer, as crm_appt_values() asks it. */
-const fieldWhy = (f: ApptField, v: string) => !v ? (f.required || f.kind === "place" ? `Fill in ${f.label}` : "")
+// The Place is required only where it is ticked so (the owner, 2026-10-29: "place … 不要 default，让我勾选").
+const fieldWhy = (f: ApptField, v: string) => !v ? (f.required ? `Fill in ${f.label}` : "")
   : f.kind === "link" && !/^https?:\/\/\S+$/i.test(v) ? `${f.label}: the link must start with https://` : "";
 
 export function customBookVM(o: { b: CustomFields; put: (p: Partial<CustomFields>) => void; changing: boolean; now: Date; types: ApptType[]; save: (f: CustomVisit) => Promise<boolean>; done: () => void }): CustomBook {
@@ -132,7 +133,7 @@ function CustomForm({ m, bare }: { m: CustomBook; bare?: boolean }) {
 
 /** One question of a type: short or long text, a link, a number, a choice (chips) or the place. */
 function Question({ f, value, set }: { f: ApptField; value: string; set: (v: string) => void }) {
-  const star = f.required || f.kind === "place";
+  const star = !!f.required;
   const head = <span>{f.label}{star && <> <span style={{ color: "var(--crm-oxblood)" }} aria-hidden>*</span></>}</span>;
   if (f.kind === "long") return <label style={LBL}>{head}<textarea value={value} onChange={e => set(e.target.value)} rows={3} style={{ ...FIELD, height: "auto", padding: "10px 12px", lineHeight: 1.5, resize: "none" }} /></label>;
   if (f.kind === "choice") return (
