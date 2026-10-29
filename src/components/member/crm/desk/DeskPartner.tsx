@@ -95,3 +95,34 @@ export function DeskPartnerPane({ v, close }: { v: PartnerPaneBits | null; close
     </div>
   );
 }
+
+/**
+ * The booking link over Customer form (the owner, 2026-10-29: "在电脑端 crm 中的 contact form 加上这个的控制 panel，同时附上
+ * 这个链接让人可以复制"): each partner's link on one line — on / off, its address to copy, a new address, and how many
+ * bookings are coming up. Settings › Booking link keeps the full page with the list.
+ */
+export function DeskBookingBar({ v }: { v: BookingLinkBits }) {
+  const [busy, setBusy] = useState(false);
+  if (!v.can || !v.links.length) return null;
+  const urlOf = (l: CrmPartnerLink) => `${typeof window === "undefined" ? "" : window.location.origin}/b/${l.code}`;
+  const run = (p: Promise<boolean>) => { setBusy(true); void p.finally(() => setBusy(false)); };
+  const copy = (l: CrmPartnerLink) => { void navigator.clipboard?.writeText(urlOf(l)).then(() => v.toast("Link copied"), () => v.toast(urlOf(l))); };
+  return (
+    <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px", padding: "12px 36px", borderBottom: "1px solid var(--crm-rule)", background: "var(--crm-cream)" }}>
+      {v.links.map(l => (
+        <div key={l.id} style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+          <span style={{ flex: "none", font: `500 14px ${TIGHT}`, color: "var(--crm-ink)" }}>Booking link · {l.name}</span>
+          <button type="button" role="switch" aria-checked={l.on} aria-label={`${l.name} booking link`} disabled={busy} onClick={() => run(v.set(l.id, !l.on, false))}
+            style={{ flex: "none", width: "38px", height: "22px", borderRadius: "11px", border: 0, padding: "3px", cursor: "pointer", background: l.on ? "var(--crm-st-won)" : "var(--crm-line)", display: "flex", justifyContent: l.on ? "flex-end" : "flex-start" }}>
+            <span style={{ width: "16px", height: "16px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,.2)" }} />
+          </button>
+          <span style={{ flex: "none", font: "500 12px Inter, sans-serif", color: l.on ? "var(--crm-st-won)" : "var(--crm-muted)" }}>{l.on ? "On" : "Off"}</span>
+          <code style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "6px 10px", borderRadius: "8px", background: "#fff", border: "1px solid var(--crm-line)", font: "500 12px ui-monospace, monospace", color: "var(--crm-ink)" }}>{urlOf(l)}</code>
+          <button type="button" onClick={() => copy(l)} style={{ ...btn(true), flex: "none", padding: "6px 12px" }}>Copy link</button>
+          <button type="button" disabled={busy} onClick={() => { if (window.confirm(`Make a new link for ${l.name}? The old one stops opening; bookings already made stay.`)) run(v.set(l.id, null, true)); }} style={{ ...btn(false), flex: "none", padding: "6px 12px" }}>New link</button>
+          <span style={{ flex: "none", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.upcoming.filter(b => b.partner === l.id).length} coming up</span>
+        </div>
+      ))}
+    </div>
+  );
+}
