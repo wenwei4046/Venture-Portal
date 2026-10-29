@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import { DialogConfirm, FinDialog } from '@/components/finv/Dialog'
-import { BulkBar, BulkButton, HeadButton, HubCards, HubHead, hubStyles as hs } from '@/components/finv/Hub'
+import { HeadButton, HubCards, HubHead, TickButton, TickTools, hubStyles as hs } from '@/components/finv/Hub'
 import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { fd } from '@/components/finv/DrawerParts'
 import { approveRequests, cancelRequest, saveRequest } from '@/lib/payment-requests/actions'
@@ -40,7 +40,9 @@ import c from './claim.module.css'
 // (All · Draft · With Finance · Rejected · Paid, as its filters), the table with its column tools, the drawer a row
 // opens. The same page in every view (the Department view, Marketing's, HR's and Finance's own rows).
 // PR ③: for a Claim & approve holder it is Claim & approve (the mockup's ②) — cards To approve · All {department} ·
-// Mine, Select to approve or reject several at once, the drawer's Approve — send to Finance and Reject….
+// Mine, ticks to approve or reject several at once, the drawer's Approve — send to Finance and Reject…. Since PR ④ the
+// boxes are always there (a row still opening its drawer) and Reject / Approve stand in the table's toolbar at its
+// right, as on Finance's Payment request (§1 of the spec: "Managers likewise").
 
 export const COLUMNS: FinColumn<PaymentRequest>[] = [
   { key: 'date', label: 'Date', kind: 'date', width: 112, value: (r) => requestDay(r), text: (r) => (requestDay(r) ? fd(requestDay(r)) : '—') },
@@ -100,8 +102,7 @@ export default function ClaimHub({
   const [cancelling, setCancelling] = useState<PaymentRequest | null>(null)
   const [busy, setBusy] = useState(false)
   const [stepError, setStepError] = useState<string | null>(null)
-  // Claim & approve's Select, and the requests a Reject… is sending back.
-  const [selecting, setSelecting] = useState(false)
+  // Claim & approve's ticks, and the requests a Reject… is sending back.
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sendingBack, setSendingBack] = useState<PaymentRequest[] | null>(null)
 
@@ -182,7 +183,6 @@ export default function ClaimHub({
   const decided = (words: string) => {
     flash(words)
     setSelected(new Set())
-    setSelecting(false)
     setOpen(null)
     router.refresh()
   }
@@ -208,16 +208,20 @@ export default function ClaimHub({
 
   const writes = canCreate && !viewingAs
   const decides = !!approval?.canApprove && !viewingAs
-  const ticked = shown.filter((r) => selected.has(r.id))
-  const toggle = (r: PaymentRequest) =>
+  // The boxes, where something may be approved: To approve and All {department} — never Mine (one's own goes to Finance).
+  const ticks = decides && card !== 'mine'
+  const ticked = shown.filter((r) => selected.has(r.id) && waitsForMe(r))
+  const toggle = (r: PaymentRequest) => {
+    if (!waitsForMe(r)) return flash('Only a request waiting for your approval can be ticked.')
     setSelected((prev) => {
       const next = new Set(prev)
       if (next.has(r.id)) next.delete(r.id)
-      else if (waitsForMe(r)) next.add(r.id)
+      else next.add(r.id)
       return next
     })
+  }
   const toggleAll = (list: PaymentRequest[]) =>
-    setSelected((prev) => (list.every((r) => prev.has(r.id)) ? new Set() : new Set(list.map((r) => r.id))))
+    setSelected((prev) => (list.length > 0 && list.every((r) => prev.has(r.id)) ? new Set() : new Set(list.map((r) => r.id))))
 
   return (
     <div className={hs.root} data-fin-kit="">
@@ -244,7 +248,6 @@ export default function ClaimHub({
           onSelect={(k) => {
             setCard(k)
             setSelected(new Set())
-            setSelecting(false)
           }}
         />
         <FinTable
@@ -263,21 +266,18 @@ export default function ClaimHub({
             setOpen(r.id)
           }}
           tools={
-            decides && card === 'to_approve' && shown.length > 0 ? (
-              <button
-                type="button"
-                className={hs.toolBtn}
-                data-on={selecting ? 'true' : undefined}
-                onClick={() => {
-                  setSelecting((v) => !v)
-                  setSelected(new Set())
-                }}
-              >
-                {selecting ? 'Done' : 'Select'}
-              </button>
+            ticks ? (
+              <TickTools ticked={ticked.length} text={`${ticked.length} selected · ${rmOf(ticked.reduce((t, r) => t + r.total, 0))}`} idle="Tick requests to approve or reject several">
+                <TickButton kind="danger" disabled={ticked.length === 0 || busy} aria-label="Reject the ticked" onClick={() => setSendingBack(ticked)}>
+                  Reject
+                </TickButton>
+                <TickButton kind="primary" disabled={ticked.length === 0 || busy} aria-label="Approve the ticked" onClick={() => void approve(ticked)}>
+                  {busy ? 'Approving…' : 'Approve'}
+                </TickButton>
+              </TickTools>
             ) : null
           }
-          select={selecting ? { on: true, isSelected: (r) => selected.has(r.id), canSelect: waitsForMe, onToggle: toggle, onToggleAll: toggleAll } : null}
+          select={ticks ? { on: true, boxOnly: true, isSelected: (r) => selected.has(r.id), canSelect: waitsForMe, onToggle: toggle, onToggleAll: toggleAll } : null}
           emptyText={
             viewingAs
               ? 'Viewing as somebody — their requests are theirs to see.'
@@ -291,18 +291,6 @@ export default function ClaimHub({
           defaultShown={approval ? APPROVE_SHOWN : DEFAULT_SHOWN}
         />
       </div>
-
-      {selecting && ticked.length > 0 ? (
-        <BulkBar text={`${ticked.length} selected · ${rmOf(ticked.reduce((t, r) => t + r.total, 0))}`} sub="Approved ones go to Finance · one reason for all you reject">
-          <BulkButton onClick={() => setSelected(new Set())}>Clear</BulkButton>
-          <BulkButton disabled={busy} onClick={() => setSendingBack(ticked)}>
-            Reject…
-          </BulkButton>
-          <BulkButton primary disabled={busy} onClick={() => void approve(ticked)}>
-            {busy ? 'Approving…' : `Approve ${ticked.length} →`}
-          </BulkButton>
-        </BulkBar>
-      ) : null}
 
       <ClaimDrawer
         request={openRow}

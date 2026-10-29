@@ -264,7 +264,8 @@ management approve") and §1's rows *Who approves first* and *Who sees what*.
 - *The list:* the hub's cards To approve · All {department} · Mine, the table Sent · From · What · Pay · Where it is ·
   **By whom** (who approves, approved or sent it back — the mockup's line under the chip, a column of its own, the
   Claim page too); *Select* in the toolbar ticks the waiting rows (as Approvals), the bar says "N selected · RM" with
-  Clear, Reject…, Approve N →.
+  Clear, Reject…, Approve N →. Since PR ④ (the user: "统一吧") the boxes are always there instead, as on Payment
+  request — see §4d.
 - *Notices* reach the HR and Finance apps' bells and the phone (`notifications_mine`, the push), and Marketing's bell
   (`mkt_notices` lists `claims` too, each saying what it opens); a tap opens `/claims?open=<id>`. The Department view
   has no bell — its Claim page says where each stands.
@@ -305,10 +306,14 @@ requests*.
 
 **As built (2026-10-29).**
 
-- *The toolbar's group* is the design's bar inside the table's toolbar: light with "Tick requests to act on several"
-  and the two buttons greyed; dark once a row is ticked ("4 selected · RM 2,554.49"). On a narrow screen it wraps to
-  the toolbar's next line, still at the right. Its buttons are named *Reject the ticked* / *Create PV for the ticked*
-  for a screen reader (the drawer keeps its own *Create PV*).
+- *The toolbar's group* is the design's bar inside the table's toolbar (the kit's `TickTools` / `TickButton`): light
+  with "Tick requests to act on several" and the two buttons greyed; dark once a row is ticked ("4 selected · RM
+  2,554.49"). On a narrow screen it wraps to the toolbar's next line, still at the right. Its buttons are named *Reject
+  the ticked* / *Create PV for the ticked* for a screen reader (the drawer keeps its own *Create PV*).
+- *Claim & approve the same* (the user, told it still had PR ③'s Select and bottom bar: "统一吧" — §1's "Managers
+  likewise"): the boxes always there on To approve and All {department} (none on Mine — one's own goes straight to
+  Finance), a box of a request not waiting for one's approval saying so; `TickTools` with **Reject** (one reason for
+  all, the SendBackSheet) and **Approve** at the toolbar's right; the Select toggle and the bottom bar gone.
 - *Who sees the boxes:* an account that may Create (Treasury · Create) or Reject (Void or Approve); a Maker without
   Void / Approve has Create PV only. Changing card clears what was ticked; the search narrows it to the rows on show.
 - *Create payments* reads each PV's requests again before it opens (a request cancelled meanwhile is said, nothing

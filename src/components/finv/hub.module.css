@@ -836,6 +836,49 @@ button.member:hover .memberWho { text-decoration: underline; }
 .bulkBtn[data-off='true'] { opacity: 0.45; }
 .bulkBtn:active { transform: scale(0.97); }
 
+/* ── What is ticked, in the table's toolbar at its right (TickTools — Payment request, Claim & approve; 2026-10-29):
+   light with a hint and the buttons greyed, the dark bar once a row is ticked ── */
+.ticks {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
+  background: var(--ds-surface);
+}
+.ticks[data-on='true'] { border-color: rgb(var(--fv-dark)); background: rgb(var(--fv-dark)); }
+.ticksText {
+  font-size: 12.5px;
+  color: rgb(var(--hvs-muted));
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.ticks[data-on='true'] .ticksText { color: rgb(var(--hvs-cream)); font-weight: 500; }
+.ticksBtn {
+  height: 30px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: 8px;
+  background: var(--ds-surface);
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--ds-ink);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ticksBtn:disabled { opacity: 0.45; cursor: default; }
+.ticksBtn[data-kind='danger'] { color: var(--ds-danger); }
+.ticksBtn[data-kind='primary'] { border-color: var(--ds-accent); background: var(--ds-accent); font-weight: 500; }
+.ticks[data-on='true'] .ticksBtn:not([data-kind='primary']) {
+  border-color: rgb(255 255 255 / 0.2);
+  background: transparent;
+  color: rgb(var(--hvs-cream));
+}
+.ticksBtn:not(:disabled):hover { filter: brightness(0.97); }
+
 @media (prefers-reduced-motion: reduce) {
   .btn, .card, .row, .batchChev, .monthPop, .item { transition: none; }
   .btn:active, .card:active, .bulkBtn:active { transform: none; }

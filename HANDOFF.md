@@ -14,6 +14,9 @@ Session e73c0205. "可以，开始做 PR ④" → branch `feat/payment-requests-
   receipts), Save N drafts / Submit N for approval — each voucher `createPaymentForRequests` in turn, then
   `submitPaymentsTogether` (one `approval_requests.group_id` → Approvals' combined card, approve whole or split).
 - **Reject the ticked:** one reason (`rejectPaymentRequests`, each `payment_request_reject`).
+- **Claim & approve the same** ("统一吧"): boxes always there (To approve, All {department}; none on Mine), Reject /
+  Approve in the toolbar (the kit's `TickTools` / `TickButton`, shared with Payment request); PR ③'s Select and bottom
+  bar gone.
 - My calls: Revenue claims are not ticked (their voucher goes straight to the Principal, no draft; their reject is Return
   to HR); payroll one by one (the mockup). PR ③'s test fixtures gained the fields `tsc` named (type-only).
 - The merge waits for the user's word.

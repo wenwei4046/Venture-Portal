@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
-import { HubCards, HubHead, hubStyles as hs } from '@/components/finv/Hub'
+import { HubCards, HubHead, TickButton, TickTools, hubStyles as hs } from '@/components/finv/Hub'
 import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { fd } from '@/components/finv/DrawerParts'
 import type { PayrollRequestLine } from '@/lib/fin-app/payroll-requests-model'
@@ -19,7 +19,6 @@ import { ALL_CARD, requestCards, requestHero, rowsOf, stageChip, type PaymentReq
 import CreatePaymentsDialog, { type CreatePaymentsStart } from './CreatePaymentsDialog'
 import { RequestDrawer } from './RequestDrawer'
 import { FundSheet, RaiseSheet, RejectRequestSheet, RejectRequestsSheet, ReturnClaimSheet, SendBackSheet, type RaiseTarget } from './RequestSheets'
-import rq from './requests.module.css'
 
 // Payments › Payment request (2026-10-29, PR ①): Payment voucher's hub, its parts as they are — the head, the cards
 // beside the list (All, Payroll, every department: the agreed tabs, as the hub's filters), the table with its column
@@ -235,26 +234,23 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
           select={acts ? { on: true, boxOnly: true, isSelected: (r) => selected.has(r.key), canSelect: tickable, onToggle: toggle, onToggleAll: toggleAll } : null}
           tools={
             acts ? (
-              <span className={rq.several} data-on={ticked.length > 0 ? 'true' : undefined} role="group" aria-label="Several at once">
-                <span className={rq.severalWords}>{ticked.length > 0 ? `${ticked.length} selected · ${rm(tickedSum)}` : 'Tick requests to act on several'}</span>
+              <TickTools ticked={ticked.length} text={`${ticked.length} selected · ${rm(tickedSum)}`} idle="Tick requests to act on several">
                 {data.can.sendBack ? (
-                  <button
-                    type="button"
-                    className={rq.severalBtn}
-                    data-kind="danger"
+                  <TickButton
+                    kind="danger"
                     disabled={ticked.length === 0 || opening}
                     aria-label="Reject the ticked"
                     onClick={() => setRejectingMany(ticked.map((r) => ({ id: r.id, label: r.ref ? `${r.from} (${r.ref})` : r.from })))}
                   >
                     Reject
-                  </button>
+                  </TickButton>
                 ) : null}
                 {data.can.pay ? (
-                  <button type="button" className={rq.severalBtn} data-kind="primary" disabled={ticked.length === 0 || opening} aria-label="Create PV for the ticked" onClick={() => void createForTicked()}>
+                  <TickButton kind="primary" disabled={ticked.length === 0 || opening} aria-label="Create PV for the ticked" onClick={() => void createForTicked()}>
                     {opening ? 'Reading…' : 'Create PV'}
-                  </button>
+                  </TickButton>
                 ) : null}
-              </span>
+              </TickTools>
             ) : null
           }
         />
