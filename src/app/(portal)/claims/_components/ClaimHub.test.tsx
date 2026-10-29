@@ -200,7 +200,8 @@ describe('New request', () => {
 })
 
 // PR ③ (2026-10-29 — the mockup's ②): the Marketing Manager's Claim & approve — the team's requests waiting for them,
-// all of Marketing's, their own; Select to approve or reject several at once; the drawer's Approve and Reject….
+// all of Marketing's, their own; ticks to approve or reject several at once; the drawer's Approve and Reject…. Since
+// PR ④ the boxes are always there and Reject / Approve stand in the table's toolbar, as on Finance's Payment request.
 describe('Claim & approve', () => {
   const CHIN = req({
     id: '44444444-4444-4444-8444-444444444444', requestNo: 'PRQ-2610-0003', status: 'pending_approval', mine: false, requesterName: 'CHIN YEE RU',
@@ -246,19 +247,44 @@ describe('Claim & approve', () => {
     expect(listed()).toEqual([expect.stringContaining('Claude · Oct')])
   })
 
-  it('Select, tick, Approve: several at once, sent to Finance', async () => {
+  it('tick, Approve: several at once from the toolbar, sent to Finance — a row still opens its drawer', async () => {
     mocks.approve.mockResolvedValue({ ok: true, data: { approved: 2 } })
     await drawApprover()
-    fireEvent.click(screen.getByRole('button', { name: 'Select' }))
-    fireEvent.click(screen.getByText('CHIN YEE RU'))
+    const bar = screen.getByRole('group', { name: 'Several at once' })
+    expect(bar).toHaveTextContent('Tick requests to approve or reject several')
+    expect(screen.getByRole('button', { name: 'Approve the ticked' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Select' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Tick CHIN YEE RU' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Tick WONG JOEY' }))
+    expect(bar).toHaveTextContent('2 selected · RM 152.20')
     fireEvent.click(screen.getByText('WONG JOEY'))
-    expect(screen.getByText('2 selected · RM 152.20')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /PRQ-2610-0004/ })).toBeInTheDocument()
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Approve 2 →' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Approve the ticked' }))
     })
     expect(mocks.approve).toHaveBeenCalledWith([CHIN.id, JOEY.id])
     expect(mocks.flash).toHaveBeenCalledWith('2 requests approved — with Finance now')
     expect(mocks.refresh).toHaveBeenCalled()
+  })
+
+  it('Reject the ticked: one reason for all; on All Marketing one already approved cannot be ticked; Mine has no boxes', async () => {
+    mocks.sendBack.mockResolvedValue({ ok: true, data: { sentBack: 2 } })
+    await drawApprover()
+    fireEvent.click(screen.getByRole('button', { name: /^All Marketing/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Tick LUM NI KER' }))
+    expect(mocks.flash).toHaveBeenLastCalledWith('Only a request waiting for your approval can be ticked.')
+    fireEvent.click(screen.getByRole('button', { name: 'Tick CHIN YEE RU' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Tick WONG JOEY' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reject the ticked' }))
+    const sheet = screen.getByRole('dialog', { name: 'Send 2 requests back?' })
+    fireEvent.change(within(sheet).getByLabelText('What to fix'), { target: { value: 'Attach the receipts' } })
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Send back' }))
+    })
+    expect(mocks.sendBack).toHaveBeenCalledWith([CHIN.id, JOEY.id], 'Attach the receipts')
+    fireEvent.click(screen.getByRole('button', { name: /^Mine/ }))
+    expect(screen.queryByRole('group', { name: 'Several at once' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Tick / })).toBeNull()
   })
 
   it('Reject…: what to fix, read by whoever sent it', async () => {
@@ -295,9 +321,10 @@ describe('Claim & approve', () => {
     expect(within(own).getByRole('button', { name: 'Cancel request…' })).toBeInTheDocument()
   })
 
-  it('one who reads but may not approve: no Select, no Approve', async () => {
+  it('one who reads but may not approve: no boxes, no Approve', async () => {
     await drawApprover({ canApprove: false })
-    expect(screen.queryByRole('button', { name: 'Select' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Several at once' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Tick / })).toBeNull()
     fireEvent.click(screen.getByText('CHIN YEE RU'))
     expect(within(screen.getByRole('dialog', { name: /PRQ-2610-0003/ })).queryByRole('button', { name: 'Approve — send to Finance' })).toBeNull()
   })

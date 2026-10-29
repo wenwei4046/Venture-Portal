@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireActionOn, requireAnyActionOn, requirePermission } from '@/lib/auth'
+import { mayActOn, requireActionOn, requireAnyActionOn, requirePermission } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { parseRequests, type PaymentRequest } from '@/lib/payment-requests/model'
 
@@ -9,7 +9,8 @@ import { parseRequests, type PaymentRequest } from '@/lib/payment-requests/model
 // returned to HR, and its invoice opened. Each answers in words — production hides a thrown Server Action message
 // behind a digest. The payroll's and a claim's voucher are their own pages' actions (payroll-requests, claim-requests).
 // PR ②: a staff request rejected back to its requester, and what its Create PV starts from (its voucher — each split's
-// Bill back? answered with it — is made by payments/actions › createPaymentForRequests).
+// Bill back? answered with it — is made by payments/actions › createPaymentForRequests). PR ④: several at once — what
+// Create payments starts from, and several rejected with one reason.
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -86,4 +87,56 @@ export async function openRequestsForPv(requestIds: string[]): Promise<{ ok: tru
   const requests = parseRequests((data as { requests?: unknown } | null)?.requests)
   if (requests.length !== ids.length) return { ok: false, reason: 'A request is no longer waiting for Finance — reload and try again.' }
   return { ok: true, requests }
+}
+
+/**
+ * What Create payments starts from (PR ④, several at once): each PV's requests read again as one Create PV reads them
+ * (`payment_requests_for_pv` — still with Finance, one payee into one account) before the window opens, and whether
+ * the account may bill back (Invoice · Create — Create PV asks it again on save), so a Yes it cannot have is not offered.
+ */
+export async function openRequestsForPvs(
+  groups: string[][],
+): Promise<{ ok: true; groups: PaymentRequest[][]; canBillBack: boolean } | { ok: false; reason: string }> {
+  await requireActionOn('/payments/requests', 'treasury', 'create')
+  const asked = (Array.isArray(groups) ? groups : []).map((g) => (Array.isArray(g) ? g : []).filter((id) => typeof id === 'string' && UUID.test(id)))
+  if (asked.length === 0 || asked.some((g) => g.length === 0)) return { ok: false, reason: 'Which requests? Reload the page and try again.' }
+  if (asked.length > 20 || asked.some((g) => g.length > 20)) return { ok: false, reason: 'Up to 20 PVs at once, 20 requests a PV — tick fewer.' }
+
+  const supabase = await createClient()
+  const read: PaymentRequest[][] = []
+  for (const ids of asked) {
+    const { data, error } = await supabase.rpc('payment_requests_for_pv', { p_ids: ids })
+    if (error) return { ok: false, reason: error.message }
+    const requests = parseRequests((data as { requests?: unknown } | null)?.requests)
+    if (requests.length !== ids.length) return { ok: false, reason: 'A request is no longer waiting for Finance — reload and try again.' }
+    read.push(requests)
+  }
+  return { ok: true, groups: read, canBillBack: await mayActOn(['/ba', '/billing-allocator', '/statements'], 'billing', 'create') }
+}
+
+/**
+ * Reject several (PR ④): each as Reject… does (`payment_request_reject`), one reason for all — each requester reads it
+ * on their Claim page. One refused is said by its id and the rest go on.
+ */
+export async function rejectPaymentRequests(
+  requestIds: string[],
+  reason: string,
+): Promise<{ ok: true; rejected: number; failed: Array<{ id: string; reason: string }> } | { ok: false; reason: string }> {
+  await requireAnyActionOn('/payments/requests', ['treasury', 'void'], ['treasury', 'approve'])
+  const ids = [...new Set((Array.isArray(requestIds) ? requestIds : []).filter((id) => typeof id === 'string' && UUID.test(id)))]
+  if (ids.length === 0) return { ok: false, reason: 'Which requests? Reload the page and try again.' }
+  if (ids.length > 50) return { ok: false, reason: 'Up to 50 requests at once — tick fewer.' }
+  const words = typeof reason === 'string' ? reason.trim().slice(0, 500) : ''
+  if (!words) return { ok: false, reason: 'Say why — each requester reads it to fix the request.' }
+
+  const supabase = await createClient()
+  const failed: Array<{ id: string; reason: string }> = []
+  for (const id of ids) {
+    const { error } = await supabase.rpc('payment_request_reject', { p_request: id, p_reason: words })
+    if (error) failed.push({ id, reason: error.message })
+  }
+
+  revalidatePath('/payments/requests')
+  revalidatePath('/claims')
+  return { ok: true, rejected: ids.length - failed.length, failed }
 }

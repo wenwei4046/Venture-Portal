@@ -1,5 +1,26 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-29 t (PR ④ built, not merged) — several at once for Finance
+
+Session e73c0205. "可以，开始做 PR ④" → branch `feat/payment-requests-bulk` (plan: `docs/module-spec-payment-requests.md`
+§4d; design: the mockup's ③ 多选 → 一次开几张 PV). **No migration.**
+
+- **Payment request's list:** a box on each staff request waiting for its PV, always there, a press elsewhere on the row
+  still opening its drawer (`FinTable` `select.boxOnly`); payroll and Revenue claims faint, saying why. The toolbar's
+  group at its right — "N selected · RM", **Reject**, **Create PV** — greyed until a tick, dark once ("按钮换去上面",
+  "做在格子的靠右"). A payee's open requests tagged **2 → 1 PV** (`FinColumn` `tag`).
+- **Create PV for the ticked:** one payee → today's Create PV window; several → **Create payments**
+  (`CreatePaymentsDialog`, `_lib/bulk-pv`): bank / date / method once, One PV a person, a block a PV (lines, Bill back?,
+  receipts), Save N drafts / Submit N for approval — each voucher `createPaymentForRequests` in turn, then
+  `submitPaymentsTogether` (one `approval_requests.group_id` → Approvals' combined card, approve whole or split).
+- **Reject the ticked:** one reason (`rejectPaymentRequests`, each `payment_request_reject`).
+- **Claim & approve the same** ("统一吧"): boxes always there (To approve, All {department}; none on Mine), Reject /
+  Approve in the toolbar (the kit's `TickTools` / `TickButton`, shared with Payment request); PR ③'s Select and bottom
+  bar gone.
+- My calls: Revenue claims are not ticked (their voucher goes straight to the Principal, no draft; their reject is Return
+  to HR); payroll one by one (the mockup). PR ③'s test fixtures gained the fields `tsc` named (type-only).
+- The merge waits for the user's word.
+
 ## CHECKPOINT 2026-10-29 s (SHIPPED, #850) — a department's approval before Finance
 
 Session e73c0205. "可以，开始做 PR ③" → branch `feat/payment-requests-approval` (plan:

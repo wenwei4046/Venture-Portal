@@ -46,12 +46,12 @@ function data(): PermissionsData {
         // No ticks stored yet: drawn from its cells.
         id: HR, key: 'hr', name: 'HR · Payroll', description: 'Runs the roster and payroll.', baseRole: 'hr', version: 3,
         grants: { dashboard: { view: 'all' }, hr_costing: { view: 'all', create: 'all', edit: 'all', export: 'all' } },
-        sensitive: ['salary'], tabs: null,
+        sensitive: ['salary'], tabs: null, review: false,
       },
       {
         id: STAFF, key: 'staff', name: 'Staff · Basic', description: null, baseRole: 'staff', version: 1,
         grants: { dashboard: { view: 'all' }, claims: { view: 'own', create: 'own' } }, sensitive: [],
-        tabs: ['dept.overview.view', 'dept.my_claims.view', 'dept.my_claims.create'],
+        tabs: ['dept.overview.view', 'dept.my_claims.view', 'dept.my_claims.create'], review: false,
       },
     ],
     titles: [

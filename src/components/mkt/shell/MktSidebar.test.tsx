@@ -19,7 +19,7 @@ const shell: MktShellData = {
     { id: 's1', code: 'CAR', name: 'Carres', dot: 'x', emoji: '🛋️', client: false, count: 0 },
     { id: 's2', code: 'ACME', name: 'Acme Furniture', dot: 'y', emoji: '🏢', client: true, count: 0 },
   ],
-  counts: { myspace: 0, calendar: 0, projects: 0, tracking: 0 },
+  counts: { myspace: 0, calendar: 0, projects: 0, tracking: 0, claims: 0 },
   notices: 0,
 }
 const sidebar = (manager: boolean, subsOpen = true) =>

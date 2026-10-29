@@ -24,12 +24,13 @@ const access = (overrides: Partial<Extract<PersonAccessData, { kind: 'template' 
   kind: 'template',
   userId: USER,
   titleName: 'TEAM LEADER',
-  template: { id: 't', name: 'Revenue Team', baseRole: 'revenue_member', grants: { revenue_app: { view: 'own', create: 'own' } }, sensitive: [], tabs: null },
+  template: { id: 't', name: 'Revenue Team', baseRole: 'revenue_member', grants: { revenue_app: { view: 'own', create: 'own' } }, sensitive: [], tabs: null, review: false },
   cells: {},
   boxes: [],
   legacy: [],
   reach: null,
   ownSensitive: [],
+  ownReview: null,
   functions: [fn('revenue_app', 'Revenue app', 'view create', 'own')],
   cellKeys: [
     K('revenue_app', 'view', 'member_portal'), K('revenue_app', 'view', 'member_insight'), K('revenue_app', 'view', 'member_memos'),
@@ -154,7 +155,7 @@ describe('a person’s sub-departments on the Revenue tabs', () => {
   const kris = (ticks: Array<{ area: 'crm' | 'comm_cal' | 'sales_groups' | 'rules'; sub: string; granted: boolean }> = []) => access({
     template: {
       id: 't', name: 'Revenue Director', baseRole: 'revenue_member', grants: { revenue_app: { view: 'own' } }, sensitive: [],
-      tabs: ['rev.today.view', 'rev.leads.view', 'rev.leads.edit', 'rev.crm_team.view'],
+      tabs: ['rev.today.view', 'rev.leads.view', 'rev.leads.edit', 'rev.crm_team.view'], review: false,
     },
     reach: { subs: [{ id: FAIR, name: 'Fair' }, { id: IR, name: 'IR' }], handled: [FAIR], ticks },
   })

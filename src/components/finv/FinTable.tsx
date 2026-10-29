@@ -48,6 +48,8 @@ export interface FinColumn<R> {
   chip?: (r: R) => { text: string; tone: ChipTone } | null
   /** A figure's colour: money in, green (a receipt's +RM); money out, red (Fund OUT's −). */
   tone?: (r: R) => 'ledger' | 'danger' | null
+  /** A small tag after the words (Payment request's "2 → 1 PV") — kept in sight, and not what the filter lists. */
+  tag?: (r: R) => string | null
 }
 
 type Sort = { key: string; dir: 'asc' | 'desc' } | null
@@ -67,6 +69,11 @@ export interface FinTableSelect<R> {
   onToggle: (r: R) => void
   /** The rows on show that can be ticked — all of them ticked, or (when they all are) none. */
   onToggleAll: (rows: R[]) => void
+  /**
+   * Only the box ticks: a press elsewhere on the row still opens it (2026-10-29 — Payment request's list, its boxes
+   * always there, as the agreed design draws them).
+   */
+  boxOnly?: boolean
 }
 
 const viewKey = (id: string) => `fin-table-view:${id}`
@@ -309,9 +316,12 @@ export function FinTable<R>({
     return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [filterCol, rows])
 
+  // A press on a row ticks it while selecting — unless only its box does.
+  const ticksOnPress = selecting && !select!.boxOnly
+  const nameColumn = columns.find((c) => c.kind === 'name') ?? null
   const onRowKey = (r: R, e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'Enter' || e.target !== e.currentTarget) return
-    if (select?.on) select.onToggle(r)
+    if (ticksOnPress) select!.onToggle(r)
     else onRowClick(r)
   }
 
@@ -539,22 +549,40 @@ export function FinTable<R>({
                     tabIndex={0}
                     className={s.row}
                     style={{ minWidth: tableWidth }}
-                    data-active={selecting ? (on ? 'true' : undefined) : activeKey === key ? 'true' : undefined}
+                    data-active={ticksOnPress ? (on ? 'true' : undefined) : activeKey === key ? 'true' : undefined}
                     aria-selected={selecting ? on : undefined}
-                    onClick={() => (selecting ? select!.onToggle(r) : onRowClick(r))}
+                    onClick={() => (ticksOnPress ? select!.onToggle(r) : onRowClick(r))}
                     onKeyDown={(e) => onRowKey(r, e)}
                     onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(r, e) : undefined}
                   >
                     {selecting ? (
                       <span className={s.tickCell} role="cell">
-                        <span className={s.tick} data-on={on ? 'true' : undefined} data-faint={select!.canSelect(r) ? undefined : 'true'} aria-hidden="true">
-                          {on ? '✓' : ''}
-                        </span>
+                        {select!.boxOnly ? (
+                          <button
+                            type="button"
+                            className={s.tick}
+                            data-on={on ? 'true' : undefined}
+                            data-faint={select!.canSelect(r) ? undefined : 'true'}
+                            aria-pressed={on}
+                            aria-label={`Tick ${nameColumn ? nameColumn.text(r) : 'this row'}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              select!.onToggle(r)
+                            }}
+                          >
+                            {on ? '✓' : ''}
+                          </button>
+                        ) : (
+                          <span className={s.tick} data-on={on ? 'true' : undefined} data-faint={select!.canSelect(r) ? undefined : 'true'} aria-hidden="true">
+                            {on ? '✓' : ''}
+                          </span>
+                        )}
                       </span>
                     ) : null}
                     <span className={s.lead} />
                     {shown.map((c) => {
                       const chip = c.kind === 'chip' ? c.chip?.(r) : null
+                      const tag = c.tag?.(r) ?? null
                       return (
                         <span
                           key={c.key}
@@ -564,9 +592,19 @@ export function FinTable<R>({
                           data-kind={c.kind}
                           data-faint={c.kind === 'amount' && faint?.(r) ? 'true' : undefined}
                           data-tone={c.tone?.(r) ?? undefined}
+                          data-tagged={tag ? 'true' : undefined}
                           title={c.kind === 'desc' || c.kind === 'name' ? c.text(r) : undefined}
                         >
-                          {chip ? <Chip tone={chip.tone}>{chip.text}</Chip> : c.text(r)}
+                          {chip ? (
+                            <Chip tone={chip.tone}>{chip.text}</Chip>
+                          ) : tag ? (
+                            <>
+                              <span className={s.cellText}>{c.text(r)}</span>
+                              <span className={s.cellTag}>{tag}</span>
+                            </>
+                          ) : (
+                            c.text(r)
+                          )}
                         </span>
                       )
                     })}

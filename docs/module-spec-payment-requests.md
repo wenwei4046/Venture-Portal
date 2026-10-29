@@ -39,7 +39,7 @@ with ROLLBACK, then COMMIT + its `schema_migrations` row), as every PR here.
 | ① | **Finance › Payment request with what exists today.** Finance's sidebar: Payments › *Payment voucher* (today's `/payments`, retitled) and › *Payment request* (`/payments/requests`, new). The new page lists HR's payroll funding requests (tab *Payroll*, Payroll payouts holders only) and the Revenue members' benefit claims HR approved for payment, in the Payments hub's kit (HubHead, HubCards, `FinTable` with its column tools, `RowMenu`, a drawer). Each row worked as today — payroll: Generate PV (rounds), Send back to HR; member claim: Create PV (`claim_create_payment_voucher`) — plus the new **Return to HR** for a member claim. Payment voucher loses its Dept / Claims / Payroll head buttons. | Built 2026-10-29 (branch `feat/payment-requests`) |
 | ② | **Staff requests, end to end without approval.** The tables, the private bucket, the readers and writers (§3); the staff page `/claims` rebuilt as *Claim* — the requester's own requests and the *New request* window (claim or direct pay, items, receipts, pay-to from HR's record, split with departments / companies); the rows on Payment request; Create PV = today's Create payment window filled in (lines, payee, account hint, notes, files carried over, one person's open requests combined); Reject → fixed and sent again; Bill back Yes/No → a draft invoice in Invoice; the PV followed (paid → paid, voided → back to Finance). | Built 2026-10-29 (branch `feat/payment-requests-staff`) |
 | ③ | **By management approve and Claim & approve.** The tick on a title's template and a person (person wins); the department head's *Claim & approve* (their department's requests, Approve / Reject, several at once); routing at submit; the portal's notices to approvers and requesters. | Built 2026-10-29 (branch `feat/payment-requests-approval`) |
-| ④ | **Several at once for Finance.** Select on Payment request → Create PV (one PV a payee, combined, a bill-back answer each, Save drafts / Submit — one approval group for the Principal) and Reject. | |
+| ④ | **Several at once for Finance.** Select on Payment request → Create PV (one PV a payee, combined, a bill-back answer each, Save drafts / Submit — one approval group for the Principal) and Reject. | Built 2026-10-29 (branch `feat/payment-requests-bulk`) |
 | ⑤ | **Supplier invoices read for the requester.** Direct pay: the supplier's invoice read by the model (name, bank, account), checked by the requester; saved supplier accounts; Finance told when an invoice shows a different account. | |
 | ⑥ | **The rest.** The Finance phone app's Payments bar and request pages on the new list; the old `/payments/claim-requests`, `/payments/dept-requests`, `/payments/payroll-requests` and the pool-claims code retired; `dept_payment_requests` left read-only. | |
 
@@ -264,16 +264,85 @@ management approve") and §1's rows *Who approves first* and *Who sees what*.
 - *The list:* the hub's cards To approve · All {department} · Mine, the table Sent · From · What · Pay · Where it is ·
   **By whom** (who approves, approved or sent it back — the mockup's line under the chip, a column of its own, the
   Claim page too); *Select* in the toolbar ticks the waiting rows (as Approvals), the bar says "N selected · RM" with
-  Clear, Reject…, Approve N →.
+  Clear, Reject…, Approve N →. Since PR ④ (the user: "统一吧") the boxes are always there instead, as on Payment
+  request — see §4d.
 - *Notices* reach the HR and Finance apps' bells and the phone (`notifications_mine`, the push), and Marketing's bell
   (`mkt_notices` lists `claims` too, each saying what it opens); a tap opens `/claims?open=<id>`. The Department view
   has no bell — its Claim page says where each stands.
 - *Seeded:* Marketing · Staff (no login yet) ticks By management approve; Marketing · Manager (SIA JOSIAH, and KHO
   WEI JIE once he has a login) holds Claim & approve.
 
+## 4d. PR ④ — tasks (2026-10-29, the user: "可以，开始做 PR ④")
+
+Branch `feat/payment-requests-bulk`, **no migration**: every write is one PR ② already makes — `createPaymentForRequests`
+for each voucher, `payment_request_reject` for each request — and the batch is the Approvals' own: the vouchers'
+`approval_requests` share a `group_id`, which the Principal approves whole (`approve_voucher_batch`) or splits
+(`approve_voucher_batch_partial`); a voucher rejected there is voided, so its requests come back to Finance by PR ②'s
+trigger. The design is the mockup's ③ (*多选 → 一次开几张 PV*) and §1's rows *Several at once* and *One person's
+requests*.
+
+1. **The list.** Each staff request waiting for a PV has its tick box, always there (the mockup) — a press elsewhere
+   on the row still opens its drawer (`FinTable`'s `select.boxOnly`). Payroll rows and Revenue claims show a faint box
+   and say why when it is pressed (payroll is funded one by one — the mockup; a Revenue claim is paid on its own: its
+   voucher goes straight to the Principal, never a draft, and its "reject" is Return to HR — my call). Above the list
+   at the right, in the table's toolbar ("按钮换去上面", "做在格子的靠右"): "N selected · RM …" (else "Tick requests
+   to act on several"), **Reject** and **Create PV**, greyed until a row is ticked. A payee's open requests are tagged
+   **2 → 1 PV** after the name (`FinColumn`'s `tag`).
+2. **Create PV for the ticked.** All one payee's: today's Create PV window (PR ②). Several payees': the **Create
+   payments** window — From bank, Payment date and Method once; **One PV a person** (ticked: every open request of a
+   payee in one PV, the ones not ticked too — "自动合成认的是我有没有开pv"; unticked: a PV a request); a block for each
+   PV: the payee, Claim / Direct pay, the account, how many requests, the description, its lines (words, pool,
+   category, amount), Bill back? Yes / No for each split, the receipts it carries; the total; **Save N drafts** /
+   **Submit N for approval** ("Submitted together, they reach the Principal as one batch — approve all at once, or one
+   by one"). The requests are read again before it opens (`openRequestsForPvs` — each PV's `payment_requests_for_pv`,
+   and whether Billing back is open to the account); each voucher is saved as PR ②'s, one after the other, a draft
+   each; then they are sent together (`submitPaymentsTogether(ids)` — one `group_id` when two or more). One refused is
+   said, the rest go on.
+3. **Reject the ticked:** one reason for all (`rejectPaymentRequests(ids, reason)`, Treasury · Void or Approve as
+   Reject; each `payment_request_reject`; one refused is said, the rest go on).
+4. **Tests:** `FinTable` (boxOnly, tag); the model (the PVs a selection makes, the tag); the window (its blocks, what
+   Save waits for, each voucher's form, the run and its words); the actions (the group, the refusals); the hub (the
+   boxes, the toolbar, which window opens).
+
+**As built (2026-10-29).**
+
+- *The toolbar's group* is the design's bar inside the table's toolbar (the kit's `TickTools` / `TickButton`): light
+  with "Tick requests to act on several" and the two buttons greyed; dark once a row is ticked ("4 selected · RM
+  2,554.49"). On a narrow screen it wraps to the toolbar's next line, still at the right. Its buttons are named *Reject
+  the ticked* / *Create PV for the ticked* for a screen reader (the drawer keeps its own *Create PV*).
+- *Claim & approve the same* (the user, told it still had PR ③'s Select and bottom bar: "统一吧" — §1's "Managers
+  likewise"): the boxes always there on To approve and All {department} (none on Mine — one's own goes straight to
+  Finance), a box of a request not waiting for one's approval saying so; `TickTools` with **Reject** (one reason for
+  all, the SendBackSheet) and **Approve** at the toolbar's right; the Select toggle and the bottom bar gone.
+- *Who sees the boxes:* an account that may Create (Treasury · Create) or Reject (Void or Approve); a Maker without
+  Void / Approve has Create PV only. Changing card clears what was ticked; the search narrows it to the rows on show.
+- *Create payments* reads each PV's requests again before it opens (a request cancelled meanwhile is said, nothing
+  opens); with One PV a person unticked, each ticked request is a PV and the unticked ones drop out. The lines' edits
+  are kept by request and place, so ticking it again keeps the categories picked. A Yes needs Invoice · Create — without
+  it only No can be pressed. The run: each voucher made in turn ("Making 2 of 4…"), then sent together; all clean →
+  the window closes with *4 PVs submitted together — with the Principal* (or *saved as drafts*); anything refused or a
+  receipt not carried → the window lists each voucher's outcome, *Done* refreshes the page; nothing made → the window
+  stays as it was with the refusal.
+- *The batch on Approvals* is a combined card (*Payment voucher × 4*, the first voucher's words); the Principal
+  approves it whole or splits it (`approveRequestGroupPartial`), the rejected ones voided. One voucher alone is
+  submitted as any other.
+- *Reject the ticked* lists them by name and number, one reason for all; one refused stays in the window (the rest
+  rejected and the page refreshed).
+- PR ③'s test fixtures gained `review` / `ownReview` / Marketing's `claims` count (type-only; `tsc` named them).
+
 Later PRs are detailed here when they start.
 
 ## 5. Review focus
+
+PR ④:
+
+- Two payees ticked while one of their requests is cancelled → Create payments says so before it opens; one cancelled
+  after it opened → that voucher refused at save, the others made and sent together.
+- The Principal rejects one voucher of the batch → it is voided, its requests back with Finance, the rest paid.
+- A payee with three open requests, one ticked beside another payee's → all three in one PV, the window naming the two
+  not ticked.
+- One PV a person unticked after the categories were picked → each request its own PV, the categories kept.
+- Finance · Maker (Create, no Void / Approve) → boxes and Create PV, no Reject; a Treasury reader → no boxes.
 
 PR ③:
 

@@ -11,7 +11,9 @@ import {
   whereItIsNote,
   billBackAnswers,
   billBackWords,
+  bulkGroups,
   canCancel,
+  combineTag,
   canEdit,
   draftOf,
   draftPayload,
@@ -208,6 +210,28 @@ describe('Create PV', () => {
     expect(billBackWords({ ...share, billBack: null, invoiceNo: null, invoiceStatus: null })).toBe('Decided when the PV is made')
     expect(billBackWords({ ...share, billBack: false, invoiceNo: null, invoiceStatus: null })).toBe('No — the department pays it')
     expect(billBackWords({ ...share, billBack: true, invoiceNo: 'HV-INV-202610-0091', invoiceStatus: 'draft' })).toBe('Yes · HV-INV-202610-0091 (draft)')
+  })
+})
+
+// PR ④ (2026-10-29): several at once — the tag a payee's open requests carry, and the PVs a selection makes.
+describe('several at once', () => {
+  const kho1 = req()
+  const kho2 = req({ id: 'r2', requestNo: 'PRQ-2610-0002', submittedAt: '2026-10-29T03:00:00Z' })
+  const sia = req({ id: 'r3', requestNo: 'PRQ-2610-0003', requesterName: 'SIA JOSIAH', payeeName: 'SIA JOSIAH', payeeAccount: '•••• 3307', submittedAt: '2026-10-28T09:00:00Z' })
+  const lens = req({ id: 'r4', requestNo: 'PRQ-2610-0004', kind: 'direct_pay', requesterName: 'SIA JOSIAH', payeeName: 'Lens & Light Studio', payeeAccount: '•••• 4410', submittedAt: '2026-10-29T04:00:00Z' })
+  const inPv = req({ id: 'r5', requestNo: 'PRQ-2610-0005', status: 'in_pv', pvId: 'v1', submittedAt: '2026-10-27T01:00:00Z' })
+  const all = [kho1, kho2, sia, lens, inPv]
+
+  it('tags a payee’s open requests while they go into one PV — not one alone, not one in a PV', () => {
+    expect([kho1, kho2, sia, inPv].map((r) => combineTag(all, r))).toEqual(['2 → 1 PV', '2 → 1 PV', null, null])
+  })
+
+  it('one PV a payee — their other open request too, the oldest first; one in a PV left out', () => {
+    expect(bulkGroups([lens, kho2, sia, inPv], all, true).map((g) => g.map((r) => r.id))).toEqual([['r3'], ['r1', 'r2'], ['r4']])
+  })
+
+  it('One PV a person unticked: a PV for each ticked request, none added', () => {
+    expect(bulkGroups([kho2, sia], all, false).map((g) => g.map((r) => r.id))).toEqual([['r3'], ['r2']])
   })
 })
 
