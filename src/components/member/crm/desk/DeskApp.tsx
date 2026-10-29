@@ -2226,7 +2226,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                             <div style={{ position: "sticky", top: "0", display: "flex", flexDirection: "column", gap: "8px", padding: "14px", borderRadius: "14px", background: "var(--crm-field)" }}>
                               <div style={{ display: "flex", flexDirection: "column", borderRadius: "12px", background: "#fff", overflow: "hidden" }}>
                                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "18px 14px 14px" }}>
-                                  <span style={{ width: "72px", height: "72px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "22px", fontWeight: "700", display: "grid", placeItems: "center" }}>{v.waIni}</span>
+                                  <span style={{ width: "72px", height: "72px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "22px", fontWeight: "700", display: "grid", placeItems: "center" }}>{v.waPic ? <img src={v.waPic} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} /> : v.waIni}</span>
                                   <strong style={{ fontSize: "15px", textAlign: "center" }}>{v.wn.disp}</strong>
                                   <span style={{ fontSize: "12.5px", color: "var(--crm-ink)" }}>{v.wn.name}</span>
                                 </div>

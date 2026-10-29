@@ -52,6 +52,8 @@ export interface DeskUi {
   insTeam: string | null;
   /** Insight's Ads Performance cards: the metrics picked with + Metrics (the owner, 2026-10-13), in order. */
   insCards: string[] | null;
+  /** Insight's brand: all, The Conts or DC (2026-10-29). */
+  insSrc?: string;
   /** What Customise metrics is picking for: Ads Performance's columns, or Insight's ad cards. */
   mFor: "ads" | "cards" | "chart";
   // Inbox

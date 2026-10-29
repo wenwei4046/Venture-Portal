@@ -51,6 +51,10 @@ export interface PanelActions extends SalesActions {
   removeRoom(id: string): Promise<boolean>;
   /** v3 T07: a showroom's staff-only remarks (crm_save_showroom_remarks), as the desktop's frame 07. */
   saveRoomRemarks(id: string, remarks: string): Promise<boolean>;
+  /** A showroom hands the unit's key over, or not (crm_set_showroom_keys, the owner 2026-10-29). */
+  setRoomKeys(id: string, on: boolean): Promise<boolean>;
+  /** The showrooms in this order (crm_set_showroom_order): every list and picker follows it. */
+  orderRooms(ids: string[]): Promise<boolean>;
 }
 
 /** The same keys with the same values — as the database compares two saved settings (jsonb: a key missing ≠ a key at 0). */
@@ -234,6 +238,19 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       if (!(await write("crm_save_showroom_remarks", { p_id: id, p_remarks: remarks }))) return false;
       setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, remarks } : r)) }));
       return true;
+    },
+    async setRoomKeys(id, on) {
+      if (!(await write("crm_set_showroom_keys", { p_id: id, p_on: on }))) return false;
+      setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, keys: on } : r)) }));
+      return true;
+    },
+    async orderRooms(ids) {
+      // On screen at once; put back if the database refuses.
+      const before = data().rooms, rank = new Map(ids.map((id, i) => [id, i]));
+      setData(d => ({ ...d, rooms: [...d.rooms].sort((a, b) => (rank.get(a.id) ?? 1e6) - (rank.get(b.id) ?? 1e6)) }));
+      if (await write("crm_set_showroom_order", { p_ids: ids })) return true;
+      setData(d => ({ ...d, rooms: before }));
+      return false;
     },
     // Delete = gone from the lists, its past visits keep their showroom; refused while visits are upcoming (crm_delete_showroom,
     // the desktop's rule — v3 T07 links the two).

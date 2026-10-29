@@ -83,7 +83,9 @@ export function calendarVM(ctx: SalesCtx) {
     run: async file => { const ok = await oneAtATime(`key:${a.v.id}`, () => act.keyPhoto(a.v.id, kind, file)); if (ok) { act.toast(KEY_ASK[kind].saved); then?.(); } return !!ok; },
   }, act.toast);
   const keyView = (path: string) => () => { void act.keyPhotoUrl(path).then(url => { if (url) openViewer([{ kind: "image", url, name: "Key photo" }], 0); }); };
+  const keyRoom = (a: Shown) => !!data.rooms.find(r => r.id === a.v.showroomId)?.keys;
   const keys = (a: Shown) => ({
+    keyOn: keyRoom(a),
     keyOut: a.v.keyOut ? { time: timeLabel(new Date(a.v.keyOut.at)), view: keyView(a.v.keyOut.path) } : null,
     keyBack: a.v.keyBack ? { time: timeLabel(new Date(a.v.keyBack.at)), view: keyView(a.v.keyBack.path) } : null,
     takeKey: () => keyAsk(a, "out"),
@@ -223,9 +225,10 @@ export function calendarVM(ctx: SalesCtx) {
       soon: a.at > now ? soonLabel(+a.at - +now) : "",
       time: day0(a.at) === T ? timeLabel(a.at) : `${gb(a.at, { weekday: "short", day: "numeric", month: "short" })}, ${timeLabel(a.at)}`,
       change: change(a), ...keys(a),
-      // Every Show up needs the key returned on a photo; a No show too once the key was collected (the owner, 2026-10-28).
-      came: () => (a.v.keyBack ? patch({ outcomeAsk: ask(a) }) : keyAsk(a, "back", () => patch({ outcomeAsk: ask(a) }))),
-      noShow: () => (a.v.keyOut && !a.v.keyBack ? keyAsk(a, "back", () => patch({ outcomeAsk: ask(a, "noshow") })) : patch({ outcomeAsk: ask(a, "noshow") })),
+      // At a showroom that hands the key over (the owner, 2026-10-29 — its switch in Showrooms): Show up needs the key returned on
+      // a photo; a No show too once the key was collected (2026-10-28). Anywhere else a visit is marked as before.
+      came: () => (!keyRoom(a) || a.v.keyBack ? patch({ outcomeAsk: ask(a) }) : keyAsk(a, "back", () => patch({ outcomeAsk: ask(a) }))),
+      noShow: () => (keyRoom(a) && a.v.keyOut && !a.v.keyBack ? keyAsk(a, "back", () => patch({ outcomeAsk: ask(a, "noshow") })) : patch({ outcomeAsk: ask(a, "noshow") })),
     })),
     outcomeOpen: !!oa, outcomeTitle, outcomeWhen, outcomeOpts, outcomeClose,
     ...lost, ...won,

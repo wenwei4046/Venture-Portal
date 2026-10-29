@@ -184,6 +184,9 @@ export interface CrmRoom {
   deleted?: boolean;
   /** Made for one online / elsewhere visit (crmDataFromRows), never a showroom: no list, picker or count shows it. */
   virtual?: boolean;
+  /** The unit's key is handed over here (the owner, 2026-10-29; mig 20261029100000): a visit takes the key photos on the phone
+   * and is marked Show up only with the key returned (No show too once collected). Off, a visit is marked as before. */
+  keys?: boolean;
 }
 
 export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null; /** Marked unread by this person (swipe right › Unread, 2026-10-14); opening the chat takes it off. */ markedUnread?: boolean }
@@ -450,6 +453,8 @@ export interface CrmRoomRow {
   photo_url?: string | null; map_google?: string | null; map_waze?: string | null;
   /** v2 frame 07 (mig 20261024150000): staff-only remarks; a deleted showroom stays for its past visits' names. */
   remarks?: string; deleted?: boolean;
+  /** Hands a unit's key over (mig 20261029100000). */
+  keys?: boolean;
 }
 export interface CrmPrefRow { contact_id: string; pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinned_message_id: string | null; marked_unread?: boolean }
 export interface CrmInviteRow {
@@ -570,7 +575,7 @@ export const roomFromRow = (r: CrmRoomRow): CrmRoom => ({
   id: r.id, name: r.name, active: r.active, address: r.address ?? "",
   slots: r.slots ?? [], cap: r.cap ?? 2, weekly: r.weekly ?? [], blocks: Array.isArray(r.blocks) ? r.blocks : [],
   ...(r.photo_url ? { photo: r.photo_url } : {}), ...(r.map_google ? { mapGoogle: r.map_google } : {}), ...(r.map_waze ? { mapWaze: r.map_waze } : {}),
-  ...(r.remarks ? { remarks: r.remarks } : {}), ...(r.deleted ? { deleted: true } : {}),
+  ...(r.remarks ? { remarks: r.remarks } : {}), ...(r.deleted ? { deleted: true } : {}), ...(r.keys ? { keys: true } : {}),
 });
 
 export const visitFromRow = (a: CrmVisitRow): CrmVisit => {

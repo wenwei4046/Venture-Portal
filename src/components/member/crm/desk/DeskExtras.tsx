@@ -805,6 +805,23 @@ export function LeadsPanel({ P }: { P: LeadsPanelV }) {
   </>);
 }
 
+/**
+ * Leads by ad's Excel (the owner, 2026-10-29: "leads by ad 也需要 export"): what the table shows for the period, status and
+ * search picked — each ad with its team, status and leads, then each member who got its leads, their share.
+ */
+export async function exportLeadsByAd(v: Pick<LbaV, "title" | "ads" | "periods" | "custom" | "statuses">) {
+  const period = v.custom?.label ?? v.periods.find(p => p.on)?.label ?? "", status = v.statuses.find(s => s.on)?.label ?? "";
+  const rows: (string | number)[][] = [[`${v.title} · ${period}${status && status !== "All" ? ` · ${status}` : ""}`], [], ["Ad", "Team", "Status", "Member", "Leads", "Share"]];
+  for (const a of v.ads) {
+    rows.push([a.name, a.teamsLabel, a.status, "", a.total, ""]);
+    for (const r of a.rows) rows.push(["", r.team, "", r.name, r.n, r.pct]);
+  }
+  const XLSX = await import("xlsx"), wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "Leads by ad");
+  const blob = new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Leads by ad ${period}`.replace(/[^\w –-]+/g, " ").trim() + ".xlsx"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
 export function DeskLeadsByAd({ v }: { v: LbaV }) {
   const C = useLbaCols(), P = v.panel;
   const head = (label: string, k: LbaSortK | null, col: (typeof LBA_COLS)[number] | null, right?: boolean) => (
@@ -827,6 +844,7 @@ export function DeskLeadsByAd({ v }: { v: LbaV }) {
             <Ic name="search" size={13} />
             <input value={v.q} onChange={v.setQ} placeholder="Search ad or member" aria-label="Search ad or member" style={{ flex: 1, minWidth: 0, border: 0, outline: "none", padding: 0, background: "transparent", font: "400 12px Inter, sans-serif", color: "var(--crm-ink)" }} />
           </label>
+          <button type="button" onClick={() => void exportLeadsByAd(v)} disabled={v.empty} title="Download what the table shows as Excel" style={{ ...XBTN, height: "32px", padding: "0 12px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "6px", boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)", opacity: v.empty ? 0.5 : 1 }} className="crm4a-outline"><Ic name="download" size={13} />Export</button>
         </div>
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "0 14px 12px" }}>
           <div style={SEG}>{v.periods.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={segOpt(o.on)}>{o.label}</button>)}</div>
