@@ -663,3 +663,33 @@ export function billBackAnswers(
     return [yes ? { share: s.shareId, billBack: true, category: lines.find((l) => l.requestId === s.requestId && l.account)?.account ?? '' } : { share: s.shareId, billBack: false }]
   })
 }
+
+// ── Finance: several at once (PR ④) ────────────────────────────────────────
+
+const waitingForPv = (r: PaymentRequest) => r.status === 'with_finance' && !r.pvId
+const bySent = (a: PaymentRequest, b: PaymentRequest) => (a.submittedAt ?? '').localeCompare(b.submittedAt ?? '') || a.id.localeCompare(b.id)
+
+/** The tag after a payee's name while their open requests go into one PV ("2 → 1 PV") — else none. */
+export function combineTag(rows: readonly PaymentRequest[], r: PaymentRequest): string | null {
+  if (!waitingForPv(r)) return null
+  const n = samePayeeOpen(rows, r).length
+  return n >= 2 ? `${n} → 1 PV` : null
+}
+
+/**
+ * The PVs the ticked requests make (Create payments): one a payee — every open request of theirs, the ones not
+ * ticked too, until Finance makes the PV ("自动合成认的是我有没有开pv") — or, One PV a person unticked, one a request.
+ * Only requests still waiting for a PV; the oldest first.
+ */
+export function bulkGroups(ticked: readonly PaymentRequest[], all: readonly PaymentRequest[], combine: boolean): PaymentRequest[][] {
+  const open = ticked.filter(waitingForPv).sort(bySent)
+  if (!combine) return open.map((r) => [r])
+  const groups = new Map<string, PaymentRequest[]>()
+  for (const r of open) {
+    const key = payeeKey(r)
+    if (groups.has(key)) continue
+    const members = new Map([...samePayeeOpen(all, r), ...open.filter((x) => payeeKey(x) === key)].map((x) => [x.id, x] as const))
+    groups.set(key, [...members.values()].sort(bySent))
+  }
+  return [...groups.values()].sort((a, b) => bySent(a[0], b[0]))
+}

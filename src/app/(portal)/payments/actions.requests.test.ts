@@ -20,7 +20,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
-import { createPaymentForRequests } from './actions'
+import { createPaymentForRequests, submitPaymentsTogether } from './actions'
 
 const SPLIT = '22222222-2222-4222-8222-222222222222'
 const READY = {
@@ -162,5 +162,58 @@ describe('createPaymentForRequests', () => {
     expect(await createPaymentForRequests(form({ payment_request_ids: '[]' }))).toEqual({ ok: false, reason: 'Which requests? Reload the page and try again.' })
     expect(await createPaymentForRequests(form({ payment_request_ids: 'not json' }))).toEqual({ ok: false, reason: 'Which requests? Reload the page and try again.' })
     expect(db.rpcs).toHaveLength(0)
+  })
+})
+
+// Create payments' Submit (PR ④, 2026-10-29): the drafts it made, sent for approval as one batch — their approval
+// requests share a group id, which the Principal approves at once or splits on Approvals' combined card.
+describe('submitPaymentsTogether', () => {
+  const V1 = '33333333-3333-4333-8333-333333333333'
+  const V2 = '44444444-4444-4444-8444-444444444444'
+  const V3 = '55555555-5555-4555-8555-555555555555'
+  const drafts = (missing: string | null = null) => {
+    const db = recordingSupabase((call) => {
+      if (call.table === 'payment_vouchers' && call.op === 'select' && call.single) {
+        const id = call.chain.find(([m, col]) => m === 'eq' && col === 'id')?.[2] as string
+        return id === missing ? { data: null, error: { message: 'No rows' } } : { data: { id, voucher_no: `HV-PV-${id.slice(0, 4)}`, description: 'Claim · Claude', amount: 100, status: 'draft' } }
+      }
+      return {}
+    })
+    mocks.createClient.mockResolvedValue(db.client)
+    return db
+  }
+
+  it('sends them as one batch — each its approval request, one group id between them, each voucher pending', async () => {
+    const db = drafts()
+    expect(await submitPaymentsTogether([V1, V2, V1])).toEqual({ ok: true, submitted: [V1, V2], failed: [] })
+    expect(mocks.requireActionOn).toHaveBeenCalledWith('/payments/requests', 'treasury', 'create')
+    const asks = db.writes('approval_requests').map((w) => w.values as Record<string, unknown>)
+    expect(asks.map((a) => [a.request_type, a.reference_id, a.submitted_by, a.status])).toEqual([
+      ['payment_voucher', V1, 'fin', 'pending'], ['payment_voucher', V2, 'fin', 'pending'],
+    ])
+    expect(asks[0].group_id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(asks[1].group_id).toBe(asks[0].group_id)
+    expect(db.writes('payment_vouchers').map((w) => w.values)).toEqual([{ status: 'pending_approval' }, { status: 'pending_approval' }])
+  })
+
+  it('one alone is sent as any other — no group', async () => {
+    const db = drafts()
+    expect(await submitPaymentsTogether([V1])).toEqual({ ok: true, submitted: [V1], failed: [] })
+    expect(db.writes('approval_requests')[0].values).not.toHaveProperty('group_id')
+  })
+
+  it('one that is no longer a draft stays as it is, said by its id; the rest go on in the batch', async () => {
+    const db = drafts(V2)
+    expect(await submitPaymentsTogether([V1, V2, V3])).toEqual({ ok: true, submitted: [V1, V3], failed: [{ id: V2, reason: 'Voucher not found or not in draft status' }] })
+    const asks = db.writes('approval_requests').map((w) => w.values as Record<string, unknown>)
+    expect(asks.map((a) => a.reference_id)).toEqual([V1, V3])
+    expect(asks[1].group_id).toBe(asks[0].group_id)
+  })
+
+  it('names its vouchers, or sends nothing', async () => {
+    const db = drafts()
+    expect(await submitPaymentsTogether([])).toEqual({ ok: false, reason: 'Which vouchers? Reload the page and try again.' })
+    expect(await submitPaymentsTogether(['nonsense'])).toEqual({ ok: false, reason: 'Which vouchers? Reload the page and try again.' })
+    expect(db.writes()).toHaveLength(0)
   })
 })

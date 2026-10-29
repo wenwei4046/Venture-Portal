@@ -14,7 +14,7 @@ import type { PayrollBank } from '@/app/(portal)/payments/payroll-requests/_lib/
 import { generatePvFromRequestInWords, sendBackPayrollInWords } from '@/app/(portal)/payments/payroll-requests/actions'
 import { raiseClaimVoucher } from '@/app/(portal)/payments/claim-requests/actions'
 import { generateDeptRequestPvInWords } from '@/app/(portal)/payments/dept-requests/actions'
-import { rejectPaymentRequest, returnMemberClaim } from '../actions'
+import { rejectPaymentRequest, rejectPaymentRequests, returnMemberClaim } from '../actions'
 
 // The windows a request is worked in (2026-10-29 — Payments › Payment request, and the Finance phone app's request
 // pages, which drew them first, 2026-10-16): a payroll's funding round and its send back to HR, a claim's voucher,
@@ -405,6 +405,84 @@ export function RejectRequestSheet({ request, onClose, onDone }: { request: { id
             if (e.target.value.trim()) setError(null)
           }}
           placeholder="Reason (required) — the requester reads it"
+          aria-label="Reason"
+          maxLength={500}
+        />
+      </DialogConfirm>
+    </FinDialog>
+  )
+}
+
+/**
+ * Reject several (2026-10-29, PR ④): the ticked requests back to their requesters with one reason, each reading it on
+ * their Claim page. One refused is said and stays in the window to try again; the rest are rejected (`onPartly`).
+ */
+export function RejectRequestsSheet({
+  requests,
+  onClose,
+  onDone,
+  onPartly,
+}: {
+  requests: Array<{ id: string; label: string }> | null
+  onClose: () => void
+  onDone: (rejected: number) => void
+  onPartly: () => void
+}) {
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  // The ones still to reject once some were (null: all of them).
+  const [left, setLeft] = useState<string[] | null>(null)
+  const [busy, start] = useTransition()
+  useEffect(() => {
+    if (!requests) return
+    setReason('')
+    setError(null)
+    setLeft(null)
+  }, [requests])
+  const close = () => !busy && onClose()
+  const pending = (requests ?? []).filter((r) => !left || left.includes(r.id))
+  const n = pending.length
+  const confirm = () => {
+    if (pending.length === 0) return
+    if (!reason.trim()) return setError('Say why — each requester reads it to fix the request.')
+    setError(null)
+    start(async () => {
+      try {
+        const res = await rejectPaymentRequests(
+          pending.map((r) => r.id),
+          reason,
+        )
+        if (!res.ok) return setError(res.reason)
+        if (res.failed.length === 0) return onDone(res.rejected)
+        const label = new Map(pending.map((r) => [r.id, r.label]))
+        setError([`${res.rejected} rejected.`, ...res.failed.map((f) => `Not ${label.get(f.id) ?? 'one'}: ${f.reason}`)].join(' '))
+        setLeft(res.failed.map((f) => f.id))
+        if (res.rejected > 0) onPartly()
+      } catch {
+        setError('That did not go through. Try again.')
+      }
+    })
+  }
+  return (
+    <FinDialog open={requests !== null} onClose={close} title={`Reject ${n} ${n === 1 ? 'request' : 'requests'}?`} sub={pending.map((r) => r.label).join(', ')} locked={busy}>
+      <DialogConfirm
+        text="Each goes back to its requester to fix and send again. They read your reason on their Claim page."
+        confirmLabel={busy ? 'Rejecting…' : `Reject ${n}`}
+        danger
+        busy={busy}
+        off={!reason.trim()}
+        error={error}
+        onCancel={close}
+        onConfirm={confirm}
+      >
+        <TextArea
+          rows={3}
+          value={reason}
+          onChange={(e) => {
+            setReason(e.target.value)
+            if (e.target.value.trim()) setError(null)
+          }}
+          placeholder="Reason (required) — one for all, each requester reads it"
           aria-label="Reason"
           maxLength={500}
         />

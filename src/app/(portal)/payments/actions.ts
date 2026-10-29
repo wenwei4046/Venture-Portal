@@ -1005,6 +1005,42 @@ export async function createPaymentForRequests(formData: FormData): Promise<Dial
 }
 
 /**
+ * Submit together (2026-10-29, PR ④ — Payment request's Create payments): the drafts it just made, sent for approval as
+ * one batch — their approval requests share a group id, so the Principal approves them at once or splits them
+ * (Approvals' combined card: "Submitted together, they reach the Principal as one batch — approve all at once, or one
+ * by one"). One alone is sent as any other. A refusal leaves that one a draft, said by its id; the rest go on.
+ */
+export async function submitPaymentsTogether(
+  voucherIds: string[],
+): Promise<{ ok: true; submitted: string[]; failed: Array<{ id: string; reason: string }> } | { ok: false; reason: string }> {
+  try {
+    const user = await requireActionOn('/payments/requests', 'treasury', 'create')
+    const ids = [...new Set((Array.isArray(voucherIds) ? voucherIds : []).filter((v): v is string => typeof v === 'string' && REQUEST_ID.test(v)))]
+    if (ids.length === 0) return { ok: false, reason: 'Which vouchers? Reload the page and try again.' }
+    if (ids.length > 20) return { ok: false, reason: 'Up to 20 vouchers at once.' }
+
+    const supabase = await createClient()
+    const groupId = ids.length > 1 ? crypto.randomUUID() : null
+    const submitted: string[] = []
+    const failed: Array<{ id: string; reason: string }> = []
+    for (const id of ids) {
+      try {
+        await submitDraftForApproval(supabase, user.id, id, groupId)
+        submitted.push(id)
+      } catch (err) {
+        failed.push({ id, reason: err instanceof Error ? err.message : 'unknown error' })
+      }
+    }
+    revalidatePath('/payments/requests')
+    revalidatePath('/claims')
+    return { ok: true, submitted, failed }
+  } catch (err) {
+    if (isRedirect(err)) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+/**
  * Settle an invoice on its official receipt, the Finance phone app's sheet
  * (2026-10-16, part E4b — what `/payments/new?invoice_id=` makes: a
  * department pool's or a director's invoice settled by netting): the receipt
@@ -1059,8 +1095,11 @@ export async function submitForApproval(formData: FormData) {
   await submitDraftForApproval(supabase, user.id, id)
 }
 
-/** A draft sent to the approvals: its request, then the voucher pending. The caller has asked Treasury · Create. */
-async function submitDraftForApproval(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, id: string) {
+/**
+ * A draft sent to the approvals: its request, then the voucher pending. The caller has asked Treasury · Create. A group
+ * id (Create payments' Submit, PR ④) puts its request in a batch the Principal approves at once or splits.
+ */
+async function submitDraftForApproval(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, id: string, groupId: string | null = null) {
   // Fetch voucher
   const { data: voucher, error: fetchError } = await supabase
     .from('payment_vouchers')
@@ -1083,6 +1122,7 @@ async function submitDraftForApproval(supabase: Awaited<ReturnType<typeof create
       amount: voucher.amount,
       status: 'pending' as const,
       workflow_state: 'submitted' as const,
+      ...(groupId ? { group_id: groupId } : {}),
     })
 
   if (approvalError) throw new Error(`Failed to submit for approval: ${approvalError.message}`)

@@ -593,6 +593,20 @@
 /* Money out (Fund OUT, D12): the figure in the danger red, a minus before it. */
 .cell[data-kind='amount'][data-tone='danger'] { color: var(--ds-danger); }
 .cell[data-kind='amount'][data-faint='true'] { color: var(--ds-ink-4); }
+/* A tag after a cell's words (Payment request's "2 → 1 PV"): the words give way, the tag stays in sight. */
+.cell[data-tagged='true'] { display: flex; align-items: center; gap: 6px; }
+.cellText { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cellTag {
+  flex: none;
+  padding: 1px 7px;
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  background: var(--ds-surface);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgb(var(--hvs-muted));
+  white-space: nowrap;
+}
 .cell[data-kind='no'] { font-family: var(--font-mono), 'Chivo Mono', monospace; font-weight: 500; color: var(--ds-ink); }
 .cell[data-kind='date'] { font-family: var(--font-mono), 'Chivo Mono', monospace; }
 .chev { flex: none; width: 26px; font-size: 15px; color: rgb(var(--hvs-quiet)); }
