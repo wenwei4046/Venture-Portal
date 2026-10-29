@@ -746,6 +746,30 @@ and only in its own category. A **bed frame** special counts per bed frame
 every module. Hand-typed AutoCount-era text ("HEADBOARD DO STRAIGHT") parses to
 nothing and is not found.
 
+**A fabric series (2026-10-29, mig `20261030010000`)** — user: *"kpi item can
+selected with fabric series as well. for sofa and bedframe"* — is a third kind,
+a bed frame's (`bedframe_fabric_series`) or a sofa's (`sofa_fabric_series`),
+each its own item and amount: a series on the ERP's fabric list
+(`erp_fabrics.series`: PC151, KS, BO315). Found by the fabric the line carries
+(`variants.fabricCode`, else the first word of `description2` — the fabric the
+costing reads its tier from) looked up on that list, code trimmed and in any
+case (`lineKpiFactsOf` / `indexFabricSeries`; SQL the same join). A **bed
+frame**'s series counts per bed frame; a **sofa**'s **once per sofa set**
+(*"Sofa 每组算一次"*): the bill's pieces of one model — the code before the
+first '-' — in that series, as many sets as its fewest pieces, so two PC151
+sofas on one bill are two and ×2 everywhere is two; a return takes them back,
+an exchange of a piece is none. A fabric keyed TBC carries no series; when the
+ERP saves the order again with its fabric, the order comes back whole and the
+month — worked out live — finds it. Named `PC151 · Sofa fabric` /
+`PC151 · Bed frame fabric` (stored as the item's `product_name`), since one
+series may be both pools' item. The calculator's cart names no fabric, so a
+quote finds none.
+
+```
+RM 4,000 bill: 8030 1A+CNR+1A in PC151-01, 9058 2A in PC151-18; sofa PC151 at RM 50
+  two sets → KPI 2 × 50 = RM 100     main 3,900 at the rate
+```
+
 **Only when the bill's sales cover them** (`coverKpi`). A RM 0.00 exchange
 that still prints the sofa's specials sold no add-on: it pays no KPI and keeps
 its sales, nothing off. Not a run warning — every warning blocks Apply.
@@ -1707,7 +1731,7 @@ New tables. `sales_*` = imported facts, `comm_*` = config + results. The dormant
 | `comm_schemes` | knobs, component switches, deposit threshold, default rate mode, `cloned_from_scheme_id` |
 | `comm_ranks` | `title_id` → `titles` (replaced `tier_key` / `tier_label` 2026-09-03), rank, rate, `can_recruit`, the monthly `group_sales_threshold`, the earned `personal_sales_threshold` × `consecutive_months` |
 | `comm_item_groups` | ERP group → commissionable? |
-| `comm_kpi_items` / `comm_kpi_thresholds` | KPI items — a SKU (`product_code`) or a special (`option_pool` / `option_value`), effective-dated — and the qty ladder |
+| `comm_kpi_items` / `comm_kpi_thresholds` | KPI items — a SKU (`product_code`), a special or a fabric series (`option_pool` / `option_value`; the series since 2026-10-29), effective-dated — and the qty ladder |
 | `comm_cost_ratios` | a SKU's own Revenue Team cost ratio, per scheme (2026-09-27) |
 | `comm_open_bill_rules` | 50 / 40 / 30% |
 | `comm_brands` | Akemi / Zanotti / Ergotex + the Item-Code prefixes that identify them |

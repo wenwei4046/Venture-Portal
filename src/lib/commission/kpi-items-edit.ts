@@ -156,27 +156,25 @@ export function fabricCount(n: number): string {
 /**
  * The fabric list as the picker offers it (2026-10-29): one row per series,
  * spelled as its live fabrics spell it, with how many fabrics the ERP still
- * lists — a series whose every fabric is gone is marked so. Sorted by name.
+ * lists — each code once: the ERP lists some twice (AVANI's 18 colours are 36
+ * rows) — and a series whose every fabric is gone marked so. Sorted by name.
  */
 export function fabricSeriesList(rows: readonly FabricSeriesRow[]): Array<{ series: string; fabrics: number; removed: boolean }> {
-  const bySeries = new Map<string, { series: string; fabrics: number; live: boolean }>()
+  const bySeries = new Map<string, { series: string; codes: Set<string>; live: boolean }>()
   for (const row of rows) {
     const series = (row.series ?? '').trim()
     const key = valueKey(series)
     if (!key) continue
     const live = !row.removed_at
-    const held = bySeries.get(key)
-    if (!held) {
-      bySeries.set(key, { series, fabrics: live ? 1 : 0, live })
-      continue
-    }
-    if (live) held.fabrics++
+    const held = bySeries.get(key) ?? { series, codes: new Set<string>(), live: false }
+    if (live) held.codes.add(kpiCodeKey(row.fabric_code))
     // The writer keeps a live fabric's spelling (catalogue_save_kpi_items): so does the list.
     if (live && (!held.live || series < held.series)) held.series = series
     held.live = held.live || live
+    bySeries.set(key, held)
   }
   return [...bySeries.values()]
-    .map(s => ({ series: s.series, fabrics: s.fabrics, removed: !s.live }))
+    .map(s => ({ series: s.series, fabrics: s.codes.size, removed: !s.live }))
     .sort((a, b) => a.series.localeCompare(b.series))
 }
 

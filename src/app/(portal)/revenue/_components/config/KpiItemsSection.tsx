@@ -352,7 +352,10 @@ export default function KpiItemsSection({
         </p>
       ) : null}
 
-      <div className="sheet-toolbar flex-col items-stretch" role="group" aria-label="Add a KPI item">
+      {/* One column (flex-nowrap): the toolbar wraps by default, and a wrapping
+          column sizes itself to its widest row — the picker's list — so the
+          pills ran off a phone's screen once the list showed. */}
+      <div className="sheet-toolbar flex-col flex-nowrap items-stretch" role="group" aria-label="Add a KPI item">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] mr-1">Add an item from</span>
           {SOURCES.map(s => (

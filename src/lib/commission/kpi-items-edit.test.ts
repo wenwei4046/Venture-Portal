@@ -56,6 +56,8 @@ describe('the fabric list as the picker offers it', () => {
     expect(fabricSeriesList([
       { fabric_code: 'PC151-02', series: 'PC151', removed_at: null },
       { fabric_code: 'PC151-01', series: 'PC151 ', removed_at: null },
+      // The ERP lists some codes twice (AVANI's 18 colours are 36 rows): one fabric.
+      { fabric_code: 'pc151-01', series: 'PC151', removed_at: null },
       { fabric_code: 'PC151-99', series: 'pc151', removed_at: '2026-10-01T00:00:00Z' },
       { fabric_code: 'OT-01', series: 'OLD-TWEED', removed_at: '2026-10-01T00:00:00Z' },
       { fabric_code: 'X', series: '  ', removed_at: null },
