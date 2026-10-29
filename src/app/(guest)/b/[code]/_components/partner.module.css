@@ -168,11 +168,9 @@
 
 /* The first page's greeting (2026-10-29), drawn as the CRM's "Hello, Principal". */
 .greet { display: flex; align-items: center; gap: 14px; }
-.greetAvatar { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: rgb(74 44 30); color: rgb(255 255 255); font: 600 17px var(--font-display-rv), 'Inter Tight', Inter, sans-serif; letter-spacing: .02em; }
 .root h1.greetTitle { margin: 0; font-size: 28px; line-height: 1.15; }
 .greetSub { margin-top: 3px; font-size: 14px; color: rgb(122 104 92); }
 @media (max-width: 759px) {
-  .greetAvatar { width: 46px; height: 46px; font-size: 16px; }
   .root h1.greetTitle { font-size: 24px; }
   .greetSub { font-size: 13px; }
 }
