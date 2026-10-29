@@ -162,6 +162,12 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   }
   const stopEditing = () => { setEditing(null); setStart(''); setForm(f => ({ ...EMPTY, booker: f.booker, bookerPhone: f.bookerPhone })) }
 
+  const search = () => {
+    const q = findQ.trim()
+    setRefError('')
+    if (/^TC-?[A-Z0-9]{6}$/i.test(q)) { const ref = q.toUpperCase().replace(/^TC-?/, 'TC-'); setRefText(ref); void findRef(ref); return }
+    setListQ(q)
+  }
   const find = () => {
     const q = findQ.trim()
     setRefError(''); setFound(null)
@@ -364,7 +370,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
         <header className={s.head}>
           <div>
             <div className={s.kicker}>HOUZS showrooms · for {page.name}</div>
-            <h1 className={s.title}>{step === 'home' && !done ? (meName.trim() ? `Hi, ${meName.trim()}` : 'Showroom bookings') : editing ? 'Change a booking' : 'Book a showroom visit'}</h1>
+            <h1 className={s.title}>{step === 'home' && !done ? 'Showroom bookings' : editing ? 'Change a booking' : 'Book a showroom visit'}</h1>
           </div>
         </header>
 
@@ -373,7 +379,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
             <div className={s.doneBadge}>{done.state === 'cancelled' ? 'Cancelled' : 'Booked'}</div>
             <h2>{done.state === 'cancelled' ? 'The booking is cancelled' : 'The slot is yours'}</h2>
             <div className={s.ref}>{done.ref}</div>
-            <p className={s.muted}>{done.state === 'cancelled' ? 'Its slot is free again.' : 'It is on your home page — open it there to change or cancel.'}</p>
+            <p className={s.muted}>{done.state === 'cancelled' ? 'Its slot is free again.' : 'To change or cancel it, search its reference or the customer on the first page.'}</p>
             <dl className={s.facts}>
               <dt>When</dt><dd>{whenOf(done.start)}</dd>
               <dt>Showroom</dt><dd>{done.showroomName}</dd>
@@ -388,39 +394,29 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
             </div>
           </section>
         ) : step === 'home' ? (<>
+          {/* No sign-in, so no "your appointments" to trust (the owner, 2026-10-29: "因为这个页面是无法登入的 … 就只剩下 book
+              appt 的按钮就好"): Book appointment now, then the bookings with one search. */}
           <section className={s.card}>
-            <h2 className={s.h2}>Your appointments{mine.length ? ` · ${mine.length}` : ''}</h2>
-            {mine.length ? <div className={s.cards}>{mine.map(card)}</div> : (
-              <div className={s.empty}>
-                <b>No appointment yet</b>
-                <span className={s.muted}>{meName.trim() ? 'Book a showroom visit for your customer.' : 'Your bookings show here once you have made one on this phone.'}</span>
-              </div>
-            )}
             <button type="button" className={`${s.primary} ${s.bigBtn}`} onClick={startNew}>Book appointment now</button>
           </section>
 
           <section className={s.card}>
-            <h2 className={s.h2}>Find your bookings</h2>
-            <div className={s.lookupRow}>
-              <input className={s.input} value={findQ} onChange={e => { setFindQ(e.target.value); setFound(null) }} placeholder="Your name, customer, phone or reference" onKeyDown={e => { if (e.key === 'Enter') find() }} />
-              <button type="button" className={s.ghost} onClick={find}>Search</button>
-            </div>
+            <h2 className={s.h2}>Bookings through this link · {list.length}</h2>
+            {/* One search with a magnifier — tap it or press Enter (the owner: "文字小一点，好看一点，并且加个放大镜的符号"):
+                a reference opens its booking; a name, a customer or a phone filters the list. */}
+            <form className={s.searchBox} onSubmit={e => { e.preventDefault(); search() }} role="search">
+              <input className={s.searchInput} type="search" enterKeyHint="search" value={findQ} onChange={e => { setFindQ(e.target.value); if (!e.target.value.trim()) setListQ('') }}
+                placeholder="Search name, customer, phone or reference" aria-label="Search bookings" />
+              <button type="submit" className={s.searchBtn} aria-label="Search">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              </button>
+            </form>
             {refError && <span className={s.err}>{refError}</span>}
-            {found && (found.length ? <div className={s.cards}>{found.map(card)}</div> : <p className={s.muted}>No booking found for “{findQ.trim()}”.</p>)}
-          </section>
-
-          <section className={s.card}>
-            <button type="button" className={s.foldHead} onClick={() => setAllOpen(o => !o)} aria-expanded={allOpen}>
-              <span className={s.h2}>All bookings through this link · {list.length}</span><span>{allOpen ? '▴' : '▾'}</span>
-            </button>
-            {allOpen && (<>
-              <input className={s.input} value={listQ} onChange={e => setListQ(e.target.value)} placeholder="Search customer, phone, booker or reference" />
-              {(() => {
-                const q = listQ.trim().toLowerCase()
-                const shown = list.filter(b => !q || `${b.customer} ${b.customerPhone} ${b.booker} ${b.ref} ${b.showroomName}`.toLowerCase().includes(q))
-                return shown.length ? <div className={s.cards}>{shown.map(card)}</div> : <p className={s.muted}>{list.length ? 'No booking matches.' : 'No bookings yet.'}</p>
-              })()}
-            </>)}
+            {(() => {
+              const q = listQ.trim().toLowerCase(), digits = q.replace(/\D/g, '')
+              const shown = list.filter(b => !q || b.booker.toLowerCase().includes(q) || b.customer.toLowerCase().includes(q) || b.ref.toLowerCase().includes(q) || b.showroomName.toLowerCase().includes(q) || (digits.length >= 4 && b.customerPhone.replace(/\D/g, '').includes(digits)))
+              return shown.length ? <div className={s.cards}>{shown.map(card)}</div> : <p className={s.muted}>{list.length ? `No booking found for “${listQ.trim()}”.` : 'No bookings yet.'}</p>
+            })()}
           </section>
         </>) : (
           <section className={s.card}>
