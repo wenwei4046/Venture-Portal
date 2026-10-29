@@ -13,7 +13,7 @@ import { InfoValue } from "../shared/AdLink";
 import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
 import { SuggestFloat } from "../shared/suggest-float";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingLink4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -346,7 +346,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </div>
                 </div>
               </>)}
-              {!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLibOp) && (<DeskReplyLibrary4a v={v.replyLib} />)}{!!(v.isNtfOp) && (<>
+              {!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLibOp) && (<DeskReplyLibrary4a v={v.replyLib} />)}{!!(v.isLinkOp) && (<DeskBookingLink4a v={v.partnerLink} />)}{!!(v.isNtfOp) && (<>
                 <span style={{ fontSize: "15px", color: "var(--crm-muted)", marginTop: "-12px" }}>{v.ntfHead}</span>
                 <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
@@ -3065,7 +3065,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     </Fragment>))}
                   </div>
                 </>)}
-                {!!(v.kInfo) && (<>
+                {!!(v.kPartner) && (<DeskPartnerPane4a v={v.partnerPane} close={v.closePane} />)}{!!(v.kInfo) && (<>
                   {!!(v.infoBack) && (<>
                     <button type="button" onClick={v.backToList} style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", textAlign: "left" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="m15 6-6 6 6 6">

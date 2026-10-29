@@ -13,7 +13,7 @@ import type { Team } from "../../panel/vm/common";
 
 export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog" | "reports" | "workspace";
 export type PaneMode = "closed" | "empty" | "docked" | "overlay" | "wide" | "wideEmpty";
-export type PaneKind = "chat" | "alerts" | "section" | "info" | "clist" | "metrics" | "team" | "assign" | "book" | "note" | "form" | "move" | "share";
+export type PaneKind = "chat" | "alerts" | "section" | "info" | "clist" | "metrics" | "team" | "assign" | "book" | "note" | "form" | "move" | "share" | "partner";
 
 /** The screen's own state. Every key is the prototype's (same name, same meaning) unless it says otherwise. */
 export interface DeskUi {
@@ -37,6 +37,8 @@ export interface DeskUi {
   fromList: boolean;
   fromInfo: boolean;
   infoId: string | null;
+  /** A partner's booking open in the pane (mig 20261029190000). */
+  partner?: string | null;
   visit: string | null;
   clist: string;
   clSort: string;

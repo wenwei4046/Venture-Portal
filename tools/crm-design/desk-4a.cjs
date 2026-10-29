@@ -271,7 +271,9 @@ module.exports = function desk4a(body) {
   }
   // Frame 10 · Settings: a General tab first, the frame's two-column groups (Desk4a.tsx › DeskSettings4a); Cold lead
   // templates and Notifications, production's, stay as the head's other two tabs.
-  body = once(body, '{!!(v.isNtfOp) && (<>', '{!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLibOp) && (<DeskReplyLibrary4a v={v.replyLib} />)}{!!(v.isNtfOp) && (<>', "settings general");
+  body = once(body, '{!!(v.isNtfOp) && (<>', '{!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLibOp) && (<DeskReplyLibrary4a v={v.replyLib} />)}{!!(v.isLinkOp) && (<DeskBookingLink4a v={v.partnerLink} />)}{!!(v.isNtfOp) && (<>', "settings general");
+  // A partner's booking open in the pane (mig 20261029190000): its own card, beside Customer info.
+  body = once(body, '{!!(v.kInfo) && (<>', '{!!(v.kPartner) && (<DeskPartnerPane4a v={v.partnerPane} close={v.closePane} />)}{!!(v.kInfo) && (<>', "partner pane");
   // Settings › Reply library (2026-10-29, the owner: good replies kept for the salespeople, names filled in for the customer).
   // Frame 11 · Audit log: a search, three menus and the five-column table (Desk4a.tsx › DeskAudit4a). Production's three
   // tabs are the Area menu's areas; its stats band went into the head's count.

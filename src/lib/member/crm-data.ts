@@ -194,6 +194,13 @@ export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; bl
 export interface CrmLabel { id: string; name: string; color: string }
 export interface CrmQuickReply { id: string; shortcut: string; message: string }
 /** A reply in the company's reply library (mig 20261029170000): {name}, {me}, {project} … filled in for the customer on screen. */
+/** A booking a partner made through its link (mig 20261029190000): it takes its slot on the calendar; no CRM customer. */
+export interface CrmPartnerBooking {
+  id: string; ref: string; partner: string; showroomId: string; start: string; minutes: number; state: "booked" | "cancelled";
+  booker: string; bookerPhone: string; customer: string; customerPhone: string; info: Record<string, string>; remarks: string; note: string; createdAt: string;
+}
+/** A partner's booking link (CRM · Manage only). */
+export interface CrmPartnerLink { id: string; name: string; code: string; on: boolean }
 export interface CrmReplyItem { id: string | null; title: string; category: string; body: string; keywords: string[] }
 
 export interface CrmAutoReply { on: boolean; text: string; img?: string | null; imgName?: string }
@@ -295,6 +302,9 @@ export interface CrmData {
   replyExamples?: { q: string; a: string; won?: boolean; appt?: boolean }[];
   /** The company's reply library, in its order (empty before the migration). */
   replyLibrary?: CrmReplyItem[];
+  /** Partners' bookings through their links (mig 20261029190000) and the links themselves (CRM · Manage). */
+  partnerBookings?: CrmPartnerBooking[];
+  partnerLinks?: CrmPartnerLink[];
   autoReplies: CrmAutoReplySet;
   /** Other people's auto-replies, for View as (read only) — only for whoever sees everybody's CRM. */
   autoRepliesOf?: Record<string, CrmAutoReplySet>;
@@ -482,6 +492,8 @@ export interface CrmDataRows {
   stars?: { message_id: string }[];
   /** The reply library (mig 20261029170000). */
   library?: { id: string; title: string; category: string; body: string; keywords: string[] | null; sort_order: number }[];
+  partnerBookings?: { id: string; ref: string; partner: string; showroom: string; start_at: string; minutes: number | null; state: "booked" | "cancelled"; booker_name: string; booker_phone: string | null; customer_name: string; customer_phone: string | null; info: Record<string, string> | null; remarks: string | null; booker_note: string | null; created_at: string }[];
+  partnerLinks?: { id: string; name: string; code: string; on: boolean }[];
   labels: { id: string; name: string; color: string; sort_order: number }[];
   contactLabels: { label_id: string; contact_id: string }[];
   quickReplies: { id: string; shortcut: string; message: string; sort_order: number }[];
@@ -647,6 +659,9 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id, markedUnread: !!p.marked_unread }])),
     hiddenMessages: rows.hides.map(h => h.message_id),
     starredMessages: (rows.stars ?? []).map(s => s.message_id),
+    partnerBookings: (rows.partnerBookings ?? []).map(b => ({ id: b.id, ref: b.ref, partner: b.partner, showroomId: b.showroom, start: b.start_at, minutes: b.minutes ?? 60, state: b.state,
+      booker: b.booker_name, bookerPhone: b.booker_phone ?? "", customer: b.customer_name, customerPhone: b.customer_phone ?? "", info: b.info ?? {}, remarks: b.remarks ?? "", note: b.booker_note ?? "", createdAt: b.created_at })),
+    partnerLinks: rows.partnerLinks ?? [],
     replyLibrary: (rows.library ?? []).map(r => ({ id: r.id, title: r.title, category: r.category ?? "", body: r.body, keywords: r.keywords ?? [] })),
     labels: [...rows.labels].sort((a, b) => a.sort_order - b.sort_order).map(l => ({ id: l.id, name: l.name, color: l.color })),
     customerLabels,

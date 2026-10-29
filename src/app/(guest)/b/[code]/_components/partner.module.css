@@ -1,0 +1,71 @@
+/* /b/<code> — a partner's showroom booking (2026-10-29). A desktop page in the CRM's warm colours; it still reads on a
+   narrow window (one column under 960px). */
+
+.root {
+  min-height: 100vh;
+  background: rgb(246 242 236);
+  color: rgb(43 31 23);
+  font-family: var(--font-sans), Inter, var(--font-cjk), system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+.root * { box-sizing: border-box; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 32px 24px 64px; display: flex; flex-direction: column; gap: 24px; }
+
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+.kicker { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: rgb(189 74 25); font-weight: 600; }
+.title { margin: 6px 0 0; font: 600 32px/1.15 var(--font-display-rv), 'Inter Tight', Inter, sans-serif; letter-spacing: -.01em; }
+.lookup { display: flex; flex-direction: column; gap: 6px; min-width: 300px; }
+.lookupLabel { font-size: 12px; color: rgb(122 104 92); font-weight: 500; }
+.lookupRow { display: flex; gap: 8px; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.card { background: rgb(255 255 255); border-radius: 18px; padding: 22px 24px; box-shadow: 0 1px 2px rgb(42 22 12 / .06), 0 10px 30px rgb(42 22 12 / .06); display: flex; flex-direction: column; gap: 12px; }
+.h2 { margin: 8px 0 0; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: rgb(43 31 23); }
+
+.rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.room { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.room span { font-size: 12px; color: rgb(122 104 92); }
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; border-radius: 12px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); cursor: pointer; font: inherit; color: inherit; }
+.day span { font-size: 11px; color: rgb(122 104 92); }
+.day b { font-size: 17px; }
+.day:disabled { opacity: .35; cursor: default; text-decoration: line-through; }
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.slot { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); cursor: pointer; font: inherit; color: inherit; text-align: left; }
+.slot span { font-size: 11.5px; color: rgb(56 117 87); }
+.slot:disabled { background: rgb(246 242 236); cursor: default; }
+.slot:disabled span { color: rgb(160 140 128); }
+.on, .on:hover { border-color: rgb(189 74 25) !important; background: rgb(189 74 25) !important; color: rgb(255 255 255) !important; }
+.on span { color: rgb(255 255 255 / .85) !important; }
+
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field > span { font-size: 12px; color: rgb(122 104 92); font-weight: 500; }
+.input { width: 100%; border: 1px solid rgb(229 218 208); border-radius: 10px; padding: 9px 11px; font: inherit; color: inherit; background: rgb(255 255 255); outline: none; resize: vertical; }
+.input:focus { border-color: rgb(189 74 25); box-shadow: 0 0 0 3px rgb(189 74 25 / .12); }
+
+.summary { margin-top: 6px; padding: 12px 14px; border-radius: 12px; background: rgb(251 246 242); }
+.actions { display: flex; justify-content: flex-end; gap: 10px; }
+.primary, .ghost, .danger { border-radius: 12px; padding: 10px 18px; font: 600 14px/1 inherit; cursor: pointer; border: 1px solid transparent; }
+.primary { background: rgb(189 74 25); color: rgb(255 255 255); }
+.primary:disabled { background: rgb(214 200 190); cursor: default; }
+.ghost { background: rgb(255 255 255); border-color: rgb(229 218 208); color: rgb(43 31 23); }
+.danger { background: rgb(255 255 255); border-color: rgb(196 64 52 / .4); color: rgb(176 52 40); }
+.link { margin-left: 10px; border: 0; background: none; color: rgb(189 74 25); font: inherit; cursor: pointer; text-decoration: underline; }
+.editing { padding: 10px 12px; border-radius: 12px; background: rgb(253 241 230); font-size: 13px; }
+.err { color: rgb(176 52 40); font-size: 13px; }
+.muted { color: rgb(122 104 92); margin: 0; }
+
+.done { align-self: center; width: 100%; max-width: 560px; background: rgb(255 255 255); border-radius: 18px; padding: 28px 30px; box-shadow: 0 10px 30px rgb(42 22 12 / .08); display: flex; flex-direction: column; gap: 10px; }
+.done h2 { margin: 0; font: 600 22px var(--font-display-rv), 'Inter Tight', Inter, sans-serif; }
+.doneBadge { align-self: flex-start; padding: 4px 10px; border-radius: 999px; background: rgb(232 244 237); color: rgb(56 117 87); font-size: 12px; font-weight: 600; }
+.ref { font: 700 28px/1.2 ui-monospace, 'Chivo Mono', monospace; letter-spacing: .06em; color: rgb(189 74 25); }
+.facts { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; margin: 6px 0 10px; }
+.facts dt { color: rgb(122 104 92); }
+.facts dd { margin: 0; }
+
+.closed { max-width: 460px; margin: 18vh auto 0; text-align: center; padding: 0 24px; }
+.closed h1 { font: 600 26px var(--font-display-rv), 'Inter Tight', Inter, sans-serif; }

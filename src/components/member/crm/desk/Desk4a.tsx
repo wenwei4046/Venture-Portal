@@ -9,6 +9,7 @@ import { DeskApptTypes } from "./DeskApptTypes";
 import type { apptTypesVM } from "./vm/appt-types";
 import { DeskKeyLog } from "./DeskKeyLog";
 export { DeskReplyLibrary as DeskReplyLibrary4a } from "./DeskReplyLibrary";
+export { DeskBookingLink as DeskBookingLink4a, DeskPartnerPane as DeskPartnerPane4a } from "./DeskPartner";
 import type { KeyLogVM } from "./vm/key-log";
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { boldRuns, wrapBold } from "../shared/bold-text";
