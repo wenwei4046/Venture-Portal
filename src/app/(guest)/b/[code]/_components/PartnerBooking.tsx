@@ -14,7 +14,12 @@ import {
 } from '@/lib/crm-partner/model'
 import s from './partner.module.css'
 
-const DAYS = 21
+// How far ahead a visit may be booked (the database allows 120 days).
+const AHEAD = 119
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const monthFirst = (ymd: string) => `${ymd.slice(0, 8)}01`
+const addMonths = (first: string, n: number) => { const y = Number(first.slice(0, 4)), m = Number(first.slice(5, 7)) - 1 + n; return `${y + Math.floor(m / 12)}-${String(((m % 12) + 12) % 12 + 1).padStart(2, '0')}-01` }
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000)
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const dayLabel = (ymd: string) => { const [, m, d] = ymd.split('-').map(Number); return `${DOW[dowOf(ymd)]}, ${d} ${MON[m - 1]}` }
@@ -61,14 +66,31 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   // Every booking made through this link still to come, whoever made it (the owner, 2026-10-29: "这个表单能不能看到也是用这个
   // 表单的人的预约" — with the customer's phone and the reference, "不然预约的人忘记了就改不了了"), read with the places.
   const [list, setList] = useState<PartnerBooked[]>([])
+  // The day picker as the CRM's (the owner, 2026-10-29: "时间表做成跟 crm 一样，week & month 可切换"): Week — seven days from
+  // today, ‹ › a week at a time — or Month, the month's calendar; days gone by or past the limit cannot be picked.
+  const [view, setView] = useState<'week' | 'month'>('week')
+  const [wk, setWk] = useState(0)
+  const [ym, setYm] = useState(() => monthFirst(page.today))
+  const last = addDays(page.today, AHEAD)
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, k) => addDays(page.today, wk * 7 + k)), [page.today, wk])
+  const monthCells = useMemo(() => {
+    const lead = (dowOf(ym) + 6) % 7, start = addDays(ym, -lead)
+    const n = Math.ceil((lead + daysBetween(ym, addMonths(ym, 1))) / 7) * 7
+    return Array.from({ length: n }, (_, k) => addDays(start, k))
+  }, [ym])
+  // The places are read for what is on screen (from today, 42 days at most).
+  const rangeA = view === 'week' ? weekDays[0] : monthCells[0] < page.today ? page.today : monthCells[0]
+  const rangeB = view === 'week' ? weekDays[6] : monthCells[monthCells.length - 1]
+  const rangeDays = Math.max(1, Math.min(42, daysBetween(rangeA, rangeB) + 1))
+  const showDay = (ymd: string) => { setWk(Math.max(0, Math.floor(daysBetween(page.today, ymd) / 7))); setYm(monthFirst(ymd)) }
   const [listQ, setListQ] = useState('')
   const load = useCallback(async () => {
     if (!room) return
-    const [a, l] = await Promise.all([partnerDay(code, room, page.today, DAYS + 1), partnerList(code)])
+    const [a, l] = await Promise.all([partnerDay(code, room, rangeA, rangeDays), partnerList(code)])
     setNow(new Date())
     if (a.ok) setTaken(a.taken); else setError(a.reason)
     if (l.ok) setList(l.list)
-  }, [code, room, page.today])
+  }, [code, room, rangeA, rangeDays])
   useEffect(() => { void load() }, [load])
   // Every booking takes a place and a change or cancel gives one back, whoever made it (the owner, 2026-10-29: "只要有人预约成功，
   // showroom available 都要 -1"): the places are read again every 30 s while the page is open and when it comes back to the front.
@@ -79,7 +101,6 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     return () => { window.clearInterval(t); document.removeEventListener("visibilitychange", again); window.removeEventListener("focus", again) }
   }, [load])
 
-  const days = useMemo(() => Array.from({ length: DAYS }, (_, k) => addDays(page.today, k)), [page.today])
   const except = editing ? { showroom: editing.showroom, start: editing.start } : null
   const slots = r ? slotsOf(r, day, taken, now, except) : []
   const openDay = (ymd: string) => !!r && slotsOf(r, ymd, taken, now, except).some(x => !x.full && !x.past)
@@ -106,7 +127,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     if (b.state === 'cancelled') { setRefError(`${b.ref} was cancelled.`); return }
     // Read the places again: the booking may have been made after this page last read them.
     if (b.showroom === room) void load();
-    setDone(null); setEditing(b); setRoom(b.showroom); setDay(officeDay(b.start)); setStart(new Date(b.start).toISOString())
+    setDone(null); setEditing(b); setRoom(b.showroom); setDay(officeDay(b.start)); showDay(officeDay(b.start)); setStart(new Date(b.start).toISOString())
     setForm({ booker: b.booker, bookerPhone: b.bookerPhone, customer: b.customer, customerPhone: b.customerPhone, info: b.info, remarks: b.remarks, note: b.note })
   }
   const cancel = async () => {
@@ -173,17 +194,39 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
                 {!page.rooms.length && <p className={s.muted}>No showroom is open for booking.</p>}
               </div>
 
-              <h2 className={s.h2}>2 · Date</h2>
-              <div className={s.days}>
-                {days.map(d => {
-                  const open = openDay(d)
-                  return (
-                    <button key={d} type="button" disabled={!open} className={d === day ? `${s.day} ${s.on}` : s.day} onClick={() => { setDay(d); setStart('') }}>
-                      <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b><span>{MON[Number(d.slice(5, 7)) - 1]}</span>
-                    </button>
-                  )
-                })}
+              <div className={s.pickHead}>
+                <h2 className={s.h2}>2 · Date</h2>
+                <span className={s.monthLabel}>{view === 'week' ? `${MON[Number(weekDays[0].slice(5, 7)) - 1]} ${weekDays[0].slice(0, 4)}` : `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`}</span>
+                <div className={s.seg}>
+                  {(['week', 'month'] as const).map(k => <button key={k} type="button" aria-pressed={view === k} className={view === k ? `${s.segOpt} ${s.segOn}` : s.segOpt} onClick={() => { setView(k); showDay(day) }}>{k === 'week' ? 'Week' : 'Month'}</button>)}
+                </div>
+                <button type="button" aria-label="Earlier" className={s.arrow} disabled={view === 'week' ? wk === 0 : ym <= monthFirst(page.today)} onClick={() => (view === 'week' ? setWk(w => Math.max(0, w - 1)) : setYm(m => addMonths(m, -1)))}>‹</button>
+                <button type="button" aria-label="Later" className={s.arrow} disabled={view === 'week' ? addDays(weekDays[6], 1) > last : addMonths(ym, 1) > last} onClick={() => (view === 'week' ? setWk(w => w + 1) : setYm(m => addMonths(m, 1)))}>›</button>
               </div>
+              {view === 'week' ? (
+                <div className={s.days}>
+                  {weekDays.map(d => {
+                    const open = d <= last && openDay(d)
+                    return (
+                      <button key={d} type="button" disabled={!open} className={d === day ? `${s.day} ${s.on}` : s.day} onClick={() => { setDay(d); setStart('') }}>
+                        <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className={s.month}>
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(w => <span key={w} className={s.monthDow}>{w}</span>)}
+                  {monthCells.map(d => {
+                    const inMonth = d.slice(0, 7) === ym.slice(0, 7), open = inMonth && d >= page.today && d <= last && openDay(d)
+                    return (
+                      <button key={d} type="button" disabled={!open} className={[s.mday, d === day && inMonth ? s.on : '', inMonth ? '' : s.mdayOut].join(' ')} onClick={() => { setDay(d); setStart('') }}>
+                        {Number(d.slice(8))}{d === page.today && <i className={s.todayDot} />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
 
               <h2 className={s.h2}>3 · Time · {dayLabel(day)}</h2>
               <div className={s.slots}>
@@ -191,7 +234,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
                   const off = x.full || x.past, on = start === x.start
                   return (
                     <button key={x.time} type="button" disabled={off} className={on ? `${s.slot} ${s.on}` : s.slot} onClick={() => setStart(x.start)}>
-                      <b>{x.label}</b><span>{x.past ? 'Passed' : x.full ? 'Full' : `${x.left} of ${r?.cap ?? 0} left`}</span>
+                      <b>{x.label}</b><span>{x.past ? 'Passed' : x.full ? 'Full' : `${x.left} of ${r?.cap ?? 0} free`}</span>
                     </button>
                   )
                 })}

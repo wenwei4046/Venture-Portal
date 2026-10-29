@@ -33,7 +33,22 @@
 .day span { font-size: 11px; color: rgb(122 104 92); }
 .day b { font-size: 17px; }
 .day:disabled { opacity: .35; cursor: default; text-decoration: line-through; }
-.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.slots .slot { align-items: center; text-align: center; padding: 12px; }
+.pickHead { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.pickHead .h2 { margin: 0; }
+.monthLabel { flex: 1; font-weight: 600; }
+.seg { display: flex; padding: 3px; border-radius: 999px; background: rgb(243 236 228); }
+.segOpt { border: 0; background: transparent; padding: 6px 14px; border-radius: 999px; font: 500 13px inherit; cursor: pointer; color: rgb(122 104 92); }
+.segOn { background: rgb(255 255 255); color: rgb(43 31 23); box-shadow: 0 1px 2px rgb(42 22 12 / .12); }
+.arrow { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); font-size: 18px; line-height: 1; cursor: pointer; color: rgb(43 31 23); }
+.arrow:disabled { opacity: .35; cursor: default; }
+.month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.monthDow { text-align: center; font-size: 11px; color: rgb(122 104 92); padding: 2px 0; }
+.mday { position: relative; height: 40px; border-radius: 10px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); font: 600 14px inherit; color: inherit; cursor: pointer; }
+.mday:disabled { opacity: .35; cursor: default; }
+.mdayOut { visibility: hidden; }
+.todayDot { position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: rgb(189 74 25); }
 .slot { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); cursor: pointer; font: inherit; color: inherit; text-align: left; }
 .slot span { font-size: 11.5px; color: rgb(56 117 87); }
 .slot:disabled { background: rgb(246 242 236); cursor: default; }
