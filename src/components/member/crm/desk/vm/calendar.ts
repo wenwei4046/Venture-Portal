@@ -49,7 +49,7 @@ export function calendarVM(ctx: DeskCtx) {
   const partners = (data.partnerBookings ?? []).filter(b => b.state === "booked" && team === "all" && !ui.calWho.length && (ui.calShowroom === "all" || b.showroomId === ui.calShowroom))
     .map(b => ({ b, at: new Date(b.start) })).sort((x, y) => x.at.getTime() - y.at.getTime());
   const pItem = ({ b, at }: (typeof partners)[number]) => { const room = data.rooms.find(x => x.id === b.showroomId)?.name ?? "Showroom", who = partnerNames.get(b.partner) ?? (b.partner === "the_conts" ? "The Conts" : "Partner");
-    return { time: timeOf(at), short: short(at), name: `${b.customer} · ${who}`, who: `${b.booker} · ${room}`, rep: b.booker, room, status: "Booked" as VisitRow["status"], stBg: "var(--crm-peach-soft)", stFg: "var(--crm-brown)",
+    return { time: timeOf(at), short: short(at), name: `${b.customer || b.ref} · ${who}`, who: `${b.booker} · ${room}`, rep: b.booker, room, status: "Booked" as VisitRow["status"], stBg: "var(--crm-peach-soft)", stFg: "var(--crm-brown)",
       color: "var(--crm-brown)", tint: "var(--crm-peach-soft)", look: { bg: "var(--crm-peach-soft)", fg: "var(--crm-brown)", bd: "var(--crm-brown)", bs: "dotted" },
       hour: at.getHours() + at.getMinutes() / 60, mins: b.minutes || 60, open: () => patch({ pane: "docked", kind: "partner", partner: b.id, visit: null, infoId: null }) }; };
   const pOn = (t: number) => partners.filter(p => day0(p.at) === t && t >= r[0] && t <= r[1]).map(pItem);

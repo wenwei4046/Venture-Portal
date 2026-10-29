@@ -41,11 +41,11 @@ describe("the office's calendar", () => {
 });
 
 describe("the form", () => {
-  it("asks for the slot, the booker, the customer and a phone, in that order", () => {
+  it("asks for the slot, then a phone given must be a phone (names are the form's to require)", () => {
     const f = { room: "kl", start: "x", booker: "Jason", customer: "Mr Lim", customerPhone: "012-345 6789" };
     expect(bookingProblem(f)).toBeNull();
     expect(bookingProblem({ ...f, start: "" })).toBe("Pick a date and a time.");
-    expect(bookingProblem({ ...f, booker: " " })).toBe("Type your name.");
+    expect(bookingProblem({ ...f, booker: " ", customer: "", customerPhone: "" })).toBeNull();
     expect(bookingProblem({ ...f, customerPhone: "abc" })).toBe("Type the customer's phone number: at least 6 digits.");
   });
   it("reads the page closed unless the database says on, and shows only the functions' own refusals", () => {
@@ -72,17 +72,19 @@ describe("the booking form the CRM puts in use (2026-10-29)", () => {
   const saved = [{ id: "you", title: "You", fields: [{ id: "booker", label: "Your name", type: "Text", req: 1 }] },
     { id: "c", title: "Customer", fields: [{ id: "customer", label: "Customer name", type: "Text", req: 1 }, { id: "q1", label: "Car plate", type: "Text", req: 1 },
       { id: "kind", label: "Kind", type: "Choice", req: 0, opts: ["Condo", "Landed"] }] }];
-  it("asks the saved questions, and the three a booking needs even when a form lost one", () => {
+  it("asks the saved questions, required only where marked — none put back", () => {
     const f = formFromRow(saved);
     expect(f.map(s => s.title)).toEqual(["You", "Customer"]);
-    expect(f[0].fields.map(x => x.id)).toEqual(["customerPhone", "booker"]);
+    expect(f[0].fields.map(x => x.id)).toEqual(["booker"]);
     expect(f[1].fields.find(x => x.id === "kind")?.opts).toEqual(["Condo", "Landed"]);
     expect(formFromRow(null)).toBe(DEFAULT_PARTNER_FORM);
   });
   it("names a required question left empty as the database does, and labels an answer by the form", () => {
     const f = formFromRow(saved);
-    expect(missingAnswer(f, {})).toBe("Fill in Car plate.");
-    expect(missingAnswer(f, { q1: "WXY 1" })).toBeNull();
+    expect(missingAnswer(f, {})).toBe("Fill in Your name.");
+    expect(missingAnswer(f, { booker: "Jason", customer: "Mr Lim" })).toBe("Fill in Car plate.");
+    expect(missingAnswer(f, { booker: "Jason", customer: "Mr Lim", q1: "WXY 1" })).toBeNull();
+    expect(missingAnswer(formFromRow([{ title: "C", fields: [{ id: "customer", label: "Customer name", type: "Text", req: 0 }] }]), {})).toBeNull();
     expect(infoLabel(f, "q1")).toBe("Car plate");
     expect(infoLabel(f, "pax")).toBe("No. of people coming");
     expect(infoLabel(f, "zz")).toBe("zz");
