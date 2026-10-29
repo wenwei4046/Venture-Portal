@@ -152,7 +152,8 @@ export interface CrmVisit {
   keyOut?: CrmKeyPhoto;
   keyBack?: CrmKeyPhoto;
 }
-export interface CrmKeyPhoto { path: string; at: string }
+/** `by`: the staff member who took the photo (crm_appointments.key_*_by). */
+export interface CrmKeyPhoto { path: string; at: string; by?: string | null }
 
 /**
  * A closure from a to b (YYYY-MM-DD). With hours, only those hours each day; without, the whole day. Hours come two
@@ -444,7 +445,7 @@ export interface CrmVisitRow {
   outcome?: CrmVisit["outcome"]; reminded_at?: string | null;
   kind?: string | null; meeting_link?: string | null; place?: string | null; remarks?: string | null;
   type_id?: string | null; answers?: Record<string, string> | null;
-  key_out_path?: string | null; key_out_at?: string | null; key_back_path?: string | null; key_back_at?: string | null;
+  key_out_path?: string | null; key_out_at?: string | null; key_back_path?: string | null; key_back_at?: string | null; key_out_by?: string | null; key_back_by?: string | null;
 }
 export interface CrmRoomRow {
   id: string; name: string; active: boolean; sort_order: number;
@@ -585,8 +586,8 @@ export const visitFromRow = (a: CrmVisitRow): CrmVisit => {
     outcome: a.outcome ?? null, remindedAt: a.reminded_at ?? null,
     ...(custom ? { kind: custom, typeId: a.type_id ?? custom, label: a.showroom, ...(a.meeting_link ? { link: a.meeting_link } : {}), ...(a.place ? { place: a.place } : {}), ...(a.answers ? { answers: a.answers } : {}) } : {}),
     ...(a.remarks ? { remarks: a.remarks } : {}),
-    ...(a.key_out_path ? { keyOut: { path: a.key_out_path, at: a.key_out_at ?? "" } } : {}),
-    ...(a.key_back_path ? { keyBack: { path: a.key_back_path, at: a.key_back_at ?? "" } } : {}),
+    ...(a.key_out_path ? { keyOut: { path: a.key_out_path, at: a.key_out_at ?? "", by: a.key_out_by ?? null } } : {}),
+    ...(a.key_back_path ? { keyBack: { path: a.key_back_path, at: a.key_back_at ?? "", by: a.key_back_by ?? null } } : {}),
   };
 };
 /** The room an online / elsewhere visit is named by. */

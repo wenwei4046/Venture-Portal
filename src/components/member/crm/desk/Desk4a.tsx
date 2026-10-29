@@ -7,7 +7,9 @@
  */
 import { DeskApptTypes } from "./DeskApptTypes";
 import type { apptTypesVM } from "./vm/appt-types";
-import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { DeskKeyLog } from "./DeskKeyLog";
+import type { KeyLogVM } from "./vm/key-log";
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { boldRuns, wrapBold } from "../shared/bold-text";
 import { Ic, type Icon4a } from "../shared/icons4a";
 import { usePanelOpenOn } from "./panel-state";
@@ -34,6 +36,39 @@ interface SideBits {
   toggleMeMenu: () => void;
   closeMeMenu: () => void;
   signOutMe: () => void;
+  viewAs?: { people: { id: string; name: string; title: string }[]; open: (staffId: string) => void };
+}
+
+/** View as a team member on a computer (the owner, 2026-10-29): a search over whoever may be viewed; a pick opens their CRM as the phone's View as does. */
+function ViewAsPick({ people, open }: { people: { id: string; name: string; title: string }[]; open: (staffId: string) => void }) {
+  const [on, setOn] = useState(false), [q, setQ] = useState("");
+  const n = q.trim().toLowerCase(), list = people.filter(p => !n || `${p.name} ${p.title}`.toLowerCase().includes(n));
+  return (
+    <div style={{ position: "relative", margin: "0 0 10px" }}>
+      <button type="button" onClick={() => setOn(o => !o)} aria-expanded={on} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", height: "32px", padding: "0 10px", borderRadius: "7px", border: "1px solid var(--crm-nav-line)", background: "var(--crm-page)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">
+        <Ic name="eye" size={14} /><span style={{ flex: 1 }}>View as a team member</span><Ic name="chevron-down" size={12} />
+      </button>
+      {on && (<>
+        <div onClick={() => setOn(false)} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
+        <div role="dialog" aria-label="View as a team member" style={{ position: "absolute", top: "36px", left: 0, zIndex: 8, width: "280px", maxHeight: "420px", display: "flex", flexDirection: "column", padding: "8px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)" }}>
+          <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search name or title" aria-label="Search name or title" style={{ height: "32px", borderRadius: "7px", border: "1px solid var(--crm-line)", padding: "0 10px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)", marginBottom: "6px" }} />
+          <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
+            {list.map(p => (
+              <button key={p.id} type="button" onClick={() => { setOn(false); open(p.id); }} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "7px 8px", borderRadius: "7px" }} className="crm4a-row">
+                <span style={{ width: "28px", height: "28px", flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 11px ${TIGHT}`, background: avatarTint(p.name)[0], color: avatarTint(p.name)[1] }}>{p.name.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase()}</span>
+                <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                  <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                  <span style={{ font: "400 11.5px Inter, sans-serif", color: "var(--crm-muted)" }}>{p.title}</span>
+                </span>
+              </button>
+            ))}
+            {!list.length && <div style={{ padding: "10px", font: "400 12.5px Inter, sans-serif", color: "var(--crm-faint)" }}>Nobody matches.</div>}
+          </div>
+          <div style={{ padding: "6px 8px 2px", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>Opens their CRM as the phone's View as does · Exit comes back.</div>
+        </div>
+      </>)}
+    </div>
+  );
 }
 
 /** The Revenue sidebar (216 px, ink) and the CRM nav (212 px, cream), side by side. */
@@ -109,6 +144,7 @@ export function Desk4aSide({ v }: { v: SideBits }) {
             background: o.on ? "var(--crm-page)" : "transparent", color: o.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{o.label}</button>)}
         </div>
       )}
+      {v.viewAs && <ViewAsPick people={v.viewAs.people} open={v.viewAs.open} />}
       {f.crmNav.map((g, gi) => (<div key={gi} style={{ display: "contents" }}>
         {g.head && <div style={{ padding: "20px 10px 6px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}>{g.head}</div>}
         {g.items.map(n => (
@@ -1585,7 +1621,7 @@ function RemarksBox({ value, set }: { value: string; set: (e: { target: { value:
 }
 
 interface RoomsBits {
-  srPage: "rooms" | "types"; at: ReturnType<typeof apptTypesVM>;
+  srPage: "rooms" | "types" | "keys"; at: ReturnType<typeof apptTypesVM>; keyLog: KeyLogVM;
   sr4: {
     has: boolean; isNew: boolean; pager: { at: number; n: number; prev: () => void; next: () => void; prevOff: boolean; nextOff: boolean }; add: () => void;
     name: string; setName: (e: { target: { value: string } }) => void; addr: string; setAddr: (e: { target: { value: string } }) => void; links: { g: string; w: string };
@@ -1613,7 +1649,10 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
   // Before the Appointment types page's return: every render calls the same hooks (react-hooks/rules-of-hooks).
   const [more, setMore] = useState(false);
   const paint = useRef<boolean | null>(null);
+  const [hoursShut, setHoursShut] = useState(() => { try { return localStorage.getItem("crm-sr-hours-shut") === "1"; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem("crm-sr-hours-shut", hoursShut ? "1" : "0"); } catch { /* storage closed */ } }, [hoursShut]);
   if (v.srPage === "types") return <DeskApptTypes v={v.at} />;
+  if (v.srPage === "keys") return <DeskKeyLog v={v.keyLog} />;
   const S = v.sr4;
   const round = (off: boolean): CSSProperties => ({ ...BTN, width: "32px", height: "32px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: off ? "var(--crm-faint-2)" : "var(--crm-ink)" });
   if (!S.has) return (
@@ -1734,12 +1773,14 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
         {/* v2 frame 07 (note 04): opening hours typed in — All days + Apply to all, then each day; the grid shows the same. */}
         <div style={{ height: "1px", background: "var(--crm-rule)", margin: "20px 0" }} />
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          <div style={{ display: "flex", alignItems: "baseline" }}>
-            <div style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>Opening hours</div>
-            <div style={{ marginLeft: "auto", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Type, or drag on the grid</div>
-          </div>
-          <AllDaysHours f={S.hours.all.f} t={S.hours.all.t} apply={S.hours.all.apply} />
-          {S.hours.days.map(d => <DayHours key={d.l} d={d} />)}
+          {/* Folds to its head with a click (the owner, 2026-10-29: "点了之后可收起"); the grid on the right still shows the hours. */}
+          <button type="button" onClick={() => setHoursShut(s => !s)} aria-expanded={!hoursShut} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
+            <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>Opening hours</span>
+            <span style={{ marginLeft: "auto", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{hoursShut ? `${S.hours.all.f} – ${S.hours.all.t} · Show` : "Type, or drag on the grid · Hide"}</span>
+            <span style={{ display: "flex", color: "var(--crm-faint)", transform: hoursShut ? "rotate(-90deg)" : "none", transition: "transform 150ms" }}><Ic name="chevron-down" size={13} /></span>
+          </button>
+          {!hoursShut && <AllDaysHours f={S.hours.all.f} t={S.hours.all.t} apply={S.hours.all.apply} />}
+          {!hoursShut && S.hours.days.map(d => <DayHours key={d.l} d={d} />)}
         </div>
         <div style={{ height: "1px", background: "var(--crm-rule)", margin: "20px 0" }} />
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

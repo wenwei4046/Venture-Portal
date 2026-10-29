@@ -22,7 +22,7 @@ import { lastAt } from "./sales/vm/inbox";
 import SalesScreens from "./sales/SalesScreens";
 import SalesShellBanners from "./sales/SalesShellBanners";
 import { shellVM } from "./sales/vm/header";
-import { byTeam, downlineOf } from "./shared/people";
+import { byTeam, downlineOf, jobTitle } from "./shared/people";
 import PanelScreens from "./panel/PanelScreens";
 import DeskScreens from "./desk/DeskScreens";
 import type { DeskApp as DeskAppFrame } from "./desk/vm/ctx";
@@ -327,7 +327,11 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     if (desk && (full || leads) && panelFor.id === me.id && deskApp) {
       return (
         <DeskScreens data={data} me={me} now={now} live={live} act={panelAct} setData={setDataSafe} teams={teams} directors={pctx.directors}
-          nameOf={nameOf} app={deskApp} exit={onExit} toMine={pctx.toMyCrm} problem={problem} actToast={panelUi.toast} />
+          nameOf={nameOf} app={deskApp} exit={onExit} toMine={pctx.toMyCrm} problem={problem} actToast={panelUi.toast}
+          // View as a team member on a computer (the owner, 2026-10-29): their CRM, read-only, with the phone's banner (Switch ·
+          // Exit); Exit comes back here.
+          viewAs={{ people: switchList.map(p => ({ id: p.id, name: p.name, title: jobTitle(p) })),
+            open: id => { setTeamAs(null); setViewing(id); setUi(u => ({ ...initialSalesUi(), toast: u.toast })); } }} />
       );
     }
     // Viewing somebody's Team: the same "Viewing X's CRM · Switch · Exit" banner their own CRM has (user 2026-10-11).

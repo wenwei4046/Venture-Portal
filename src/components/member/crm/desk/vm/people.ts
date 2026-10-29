@@ -72,7 +72,7 @@ export function peopleVM(ctx: DeskCtx) {
     ...(field("budget") ? { budget: [lbl("budget", "Budget"), BUDGET.map(x => x[0]), "PROPERTY"] as [string, string[], string] } : {}),
     ...(field("loc") ? { loc: [lbl("loc", "Unit location"), uniq("loc"), "PROPERTY"] as [string, string[], string] } : {}),
     ...Object.fromEntries(own.filter(([, f]) => f.type === "Choice").map(([g, f]) => [f.id, [f.label, f.opts.split(",").map(x => x.trim()).filter(Boolean), g]])),
-    plat: ["Source", ["The Conts · WhatsApp", "The Conts · Messenger", "DC · WhatsApp", "DC · Messenger", "WhatsApp", "Messenger"], "LEAD"], ad: ["Ad", uniq("ad"), "LEAD"],
+    plat: ["Source", ["The Conts · WhatsApp", "The Conts · Messenger", "Dream Crafter · WhatsApp", "Dream Crafter · Messenger", "WhatsApp", "Messenger"], "LEAD"], ad: ["Ad", uniq("ad"), "LEAD"],
     status: ["Status", ["New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads"], "LEAD"], sp: ["Salesperson", uniq("sp"), "LEAD"], team: ["Team", uniq("team"), "LEAD"],
     visit: ["Visit", ["Showed up", "Booked", "No visit"], "VISIT"], showroom: ["Showroom", [...data.rooms.filter(r => r.active).map(r => r.name), "None"], "VISIT"],
     first: ["First contact", ["This week", "Last 2 weeks", "Earlier"], "CONTACT"], last: ["Last chat", ["Today", "This week", "Earlier"], "CONTACT"],

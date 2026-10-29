@@ -18,7 +18,7 @@ const ACCOUNTS: Record<string, SourceBrand> = {
   "478652958664343": "dc", // Page: Dream Crafter Design
 };
 
-export const BRAND_LABEL: Record<SourceBrand, string> = { conts: "The Conts", dc: "DC" };
+export const BRAND_LABEL: Record<SourceBrand, string> = { conts: "The Conts", dc: "Dream Crafter" };
 const CH_LABEL: Record<CrmChannel, string> = { whatsapp: "WhatsApp", messenger: "Messenger" };
 
 export const brandOf = (accountId: string | null | undefined): SourceBrand | null => (accountId ? ACCOUNTS[accountId] ?? null : null);
@@ -35,9 +35,9 @@ export const SOURCE_PICKS: { v: SourcePick; label: string; sub: boolean }[] = [
   { v: "conts", label: "The Conts", sub: false },
   { v: "conts:whatsapp", label: "The Conts · WhatsApp", sub: true },
   { v: "conts:messenger", label: "The Conts · Messenger", sub: true },
-  { v: "dc", label: "DC", sub: false },
-  { v: "dc:whatsapp", label: "DC · WhatsApp", sub: true },
-  { v: "dc:messenger", label: "DC · Messenger", sub: true },
+  { v: "dc", label: "Dream Crafter", sub: false },
+  { v: "dc:whatsapp", label: "Dream Crafter · WhatsApp", sub: true },
+  { v: "dc:messenger", label: "Dream Crafter · Messenger", sub: true },
 ];
 export const SOURCE_KEYS: SourceKey[] = ["conts:whatsapp", "conts:messenger", "dc:whatsapp", "dc:messenger"];
 export const sourceLabel = (pick: SourcePick) => SOURCE_PICKS.find(p => p.v === pick)?.label ?? "All sources";
