@@ -4,9 +4,12 @@ import {
   amountDiffers,
   draftChanges,
   EMPTY_KPI_DRAFT,
+  fabricCount,
+  fabricSeriesList,
   kpiItemsEditOf,
   kpiSkuSearchFilter,
   listedKeys,
+  pickFabricSeries,
   pickSku,
   pickSpecial,
   skuCodeKey,
@@ -38,6 +41,45 @@ const draft = (over: Partial<KpiItemsDraft> = {}): KpiItemsDraft => ({ ...EMPTY_
 describe('the list on the tab', () => {
   it('reads bed frame specials, then sofa specials, then SKUs', () => {
     expect(sortListed(LIST).map(i => i.id)).toEqual([HB.id, ARM.id, PILLOW.id])
+  })
+
+  // 2026-10-29: the fabric series come after the specials, a bed frame's first.
+  it('reads the fabric series after the specials, before the SKUs', () => {
+    const sofaSeries: KpiListedItem = { ...ARM, id: '33333333-3333-4333-8333-333333333333', optionPool: 'sofa_fabric_series', optionValue: 'PC151' }
+    const bedSeries: KpiListedItem = { ...ARM, id: '44444444-4444-4444-8444-444444444444', optionPool: 'bedframe_fabric_series', optionValue: 'PC151' }
+    expect(sortListed([PILLOW, sofaSeries, ARM, bedSeries, HB]).map(i => i.id)).toEqual([HB.id, ARM.id, bedSeries.id, sofaSeries.id, PILLOW.id])
+  })
+})
+
+describe('the fabric list as the picker offers it', () => {
+  it('one row per series, its live fabrics counted, a series with none marked gone', () => {
+    expect(fabricSeriesList([
+      { fabric_code: 'PC151-02', series: 'PC151', removed_at: null },
+      { fabric_code: 'PC151-01', series: 'PC151 ', removed_at: null },
+      { fabric_code: 'PC151-99', series: 'pc151', removed_at: '2026-10-01T00:00:00Z' },
+      { fabric_code: 'OT-01', series: 'OLD-TWEED', removed_at: '2026-10-01T00:00:00Z' },
+      { fabric_code: 'X', series: '  ', removed_at: null },
+      { fabric_code: 'KS-01', series: 'KS', removed_at: null },
+    ])).toEqual([
+      { series: 'KS', fabrics: 1, removed: false },
+      { series: 'OLD-TWEED', fabrics: 0, removed: true },
+      { series: 'PC151', fabrics: 2, removed: false },
+    ])
+  })
+
+  it('a picked series is an option item of its pool, named by its fabrics', () => {
+    const picked = pickFabricSeries('sofa_fabric_series', { series: 'PC151', fabrics: 18 })
+    expect(picked).toEqual({ key: 'option:sofa_fabric_series:pc151', source: 'option', pool: 'sofa_fabric_series', value: 'PC151', name: '18 fabrics' })
+    expect(fabricCount(1)).toBe('1 fabric')
+    expect(kpiItemsEditOf([], draft({ added: [picked], amounts: new Map([[picked.key, '50']]) })).adds)
+      .toEqual([{ source: 'option', optionPool: 'sofa_fabric_series', optionValue: 'PC151', amount: '50', label: 'PC151' }])
+  })
+
+  it("a series on one pool's list is still offered to the other", () => {
+    const bed: KpiListedItem = { ...HB, id: '55555555-5555-4555-8555-555555555555', optionPool: 'bedframe_fabric_series', optionValue: 'PC151' }
+    const keys = listedKeys([bed], draft())
+    expect(keys.has(specialKey('bedframe_fabric_series', 'pc151'))).toBe(true)
+    expect(keys.has(specialKey('sofa_fabric_series', 'PC151'))).toBe(false)
   })
 })
 

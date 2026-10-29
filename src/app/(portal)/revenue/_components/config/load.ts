@@ -2,6 +2,9 @@ import 'server-only'
 import { cache } from 'react'
 import { homeSubDepartmentOf } from '@/lib/revenue'
 import { listSubDepartments } from '../../_lib/sub-departments'
+import { readFabricSeries } from '../../_lib/fabric-series'
+import { fabricSeriesList } from '@/lib/commission/kpi-items-edit'
+import type { FabricSeriesRow } from '@/lib/commission/kpi'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { effectiveDirectLineLimit } from '@/lib/commission/chart-moves'
@@ -176,6 +179,7 @@ export async function loadCommissionSettings(
     kpiItems: [],
     kpiThresholds: [],
     kpiSpecials: [],
+    kpiFabricSeries: [],
     kpiGoneSkus: [],
     openBillRules: [],
     brands: [],
@@ -197,6 +201,7 @@ export async function loadCommissionSettings(
     kpiItems,
     kpiThresholds,
     kpiSpecials,
+    kpiFabrics,
     openBillRules,
     brands,
     marginBands,
@@ -215,6 +220,10 @@ export async function loadCommissionSettings(
     supabase.from('erp_maintenance_options').select('pool, value, label, sort_order, removed_at')
       .eq('erp_company_id', 1).in('pool', ['bedframe_specials', 'sofa_specials'])
       .order('pool').order('sort_order').order('value'),
+    // The fabric series a bed frame's or a sofa's KPI item may be (2026-10-29):
+    // the ERP's fabric list, about 900 fabrics in some 130 series. A list that
+    // cannot be read offers none, as the specials above, never a page that fails.
+    readFabricSeries(supabase).catch((): FabricSeriesRow[] => []),
     supabase.from('comm_open_bill_rules').select('*').eq('scheme_id', schemeId).is('effective_to', null).order('bill_rank'),
     supabase.from('comm_brands').select('*').eq('scheme_id', schemeId).order('code'),
     supabase.from('comm_margin_bands').select('*').eq('scheme_id', schemeId).order('sort_order'),
@@ -276,6 +285,7 @@ export async function loadCommissionSettings(
         sort_order: Number(o.sort_order ?? 0),
         removed: o.removed_at !== null && o.removed_at !== undefined,
       })),
+    kpiFabricSeries: fabricSeriesList(kpiFabrics),
     kpiGoneSkus: rows<{ erp_id: string; removed_at: string | null }>(kpiSkus.data)
       .filter(p => p.removed_at !== null && p.removed_at !== undefined)
       .map(p => p.erp_id),

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CommissionSettingsData, KpiItemRow, KpiSpecialRow, KpiThresholdRow, SchemeRow } from './types'
+import type { CommissionSettingsData, KpiFabricSeriesRow, KpiItemRow, KpiSpecialRow, KpiThresholdRow, SchemeRow } from './types'
 
 const { saveKpiItems, searchSkuMaster, refresh, upsertKpiThreshold, deleteKpiThreshold } = vi.hoisted(() => ({
   saveKpiItems: vi.fn(),
@@ -56,6 +56,17 @@ const SPECIALS: KpiSpecialRow[] = [
   special('sofa_specials', 'Nylon Fabric', 1),
   special('sofa_specials', 'Wooden Arm', 2, true),
 ]
+// The ERP's fabric list on 2026-10-29, three of its series: one whose every fabric is gone.
+const FABRICS: KpiFabricSeriesRow[] = [
+  { series: 'KS', fabrics: 19, removed: false },
+  { series: 'OLD-TWEED', fabrics: 0, removed: true },
+  { series: 'PC151', fabrics: 18, removed: false },
+]
+const KS_BED = '44444444-4444-4444-8444-444444444444'
+const KS_BED_ROW: KpiItemRow = {
+  id: KS_BED, source: 'option', product_code: null, product_name: 'KS · Bed frame fabric', erp_product_id: null,
+  option_pool: 'bedframe_fabric_series', option_value: 'KS', kpi_amount: 30, effective_from: '2026-10-29', effective_to: null,
+}
 
 function dataWith(over: Partial<CommissionSettingsData> = {}): CommissionSettingsData {
   return {
@@ -67,6 +78,7 @@ function dataWith(over: Partial<CommissionSettingsData> = {}): CommissionSetting
     kpiItems: [PILLOW_ROW, HB_ROW],
     kpiThresholds: [TIER_1],
     kpiSpecials: SPECIALS,
+    kpiFabricSeries: FABRICS,
     kpiGoneSkus: [],
     openBillRules: [],
     brands: [],
@@ -227,6 +239,51 @@ describe('Rules › KPI items', () => {
     renderSection({ kpiGoneSkus: ['pillow'], kpiSpecials: SPECIALS.filter(s => s.value !== 'HB Straight') })
     expect(within(bodyRows()[0]).getByText('Gone from the ERP')).toBeInTheDocument()
     expect(within(bodyRows()[1]).getByText('Gone from the ERP')).toBeInTheDocument()
+  })
+
+  // 2026-10-29 — the user: "kpi item can selected with fabric series as well. for sofa and bedframe".
+  it('picks a sofa fabric series from the fabric list, says how a bill counts it, and saves it', async () => {
+    renderSection({}, true)
+    click('Sofa fabric series')
+    const picker = screen.getByRole('list', { name: 'Items to add' })
+    expect(within(picker).getByText('18 fabrics')).toBeInTheDocument()
+    // A series every fabric of which the ERP removed is never offered.
+    expect(within(picker).queryByText('OLD-TWEED')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Filter the fabric series' }), { target: { value: 'pc' } })
+    expect(within(screen.getByRole('list', { name: 'Items to add' })).queryByText('KS')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'KPI amount for the next item added' }), { target: { value: '50' } })
+    click('Add PC151')
+    expect(firstCells()[0]).toEqual(['PC151New', '18 fabrics', 'Sofa fabric series', 'Once per sofa set'])
+    click('Save 1 change')
+    await waitFor(() => expect(saveKpiItems).toHaveBeenCalledWith(SCHEME, {
+      adds: [{ source: 'option', optionPool: 'sofa_fabric_series', optionValue: 'PC151', amount: '50', label: 'PC151' }],
+      changes: [],
+      removes: [],
+    }))
+  })
+
+  it("lists a bed frame's fabric series after the specials, and lets the same series be a sofa's item too", () => {
+    renderSection({ kpiItems: [PILLOW_ROW, HB_ROW, KS_BED_ROW] })
+    expect(firstCells()).toEqual([
+      ['HB Straight', '—', 'Bed frame special', 'Per bed frame'],
+      ['KS', '19 fabrics', 'Bed frame fabric series', 'Per bed frame'],
+      ['AK-CS PIL', 'Akemi cushion pillow', 'SKU', 'Per unit'],
+    ])
+    click('Bed frame fabric series')
+    expect(within(screen.getByRole('list', { name: 'Items to add' })).getByText('On the list')).toBeInTheDocument()
+    click('Sofa fabric series')
+    const sofa = screen.getByRole('list', { name: 'Items to add' })
+    expect(within(sofa).queryByText('On the list')).not.toBeInTheDocument()
+    expect(within(sofa).getByRole('button', { name: 'Add KS' })).toBeInTheDocument()
+  })
+
+  it('names a fabric series the ERP no longer lists', () => {
+    renderSection({ kpiItems: [KS_BED_ROW], kpiFabricSeries: [{ series: 'KS', fabrics: 0, removed: true }] })
+    expect(within(bodyRows()[0]).getByText('Gone from the ERP')).toBeInTheDocument()
+    // A fabric list that could not be read names nothing gone.
+    cleanup()
+    renderSection({ kpiItems: [KS_BED_ROW], kpiFabricSeries: [] })
+    expect(within(bodyRows()[0]).queryByText('Gone from the ERP')).not.toBeInTheDocument()
   })
 
   it('carries the threshold ladder on the same tab', () => {

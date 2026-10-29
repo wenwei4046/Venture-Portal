@@ -35,7 +35,7 @@ import {
   orderProductRevenue,
   round2,
 } from './engine'
-import { isKpiOptionPool, lineSpecialsOf } from './kpi'
+import { EMPTY_FABRIC_SERIES, indexFabricSeries, isKpiOptionPool, lineKpiFactsOf, type FabricSeriesRow } from './kpi'
 import type {
   DirectorTerms,
   EngineInput,
@@ -116,7 +116,7 @@ export interface ItemGroupRow {
 }
 
 /**
- * A KPI item: a SKU (`product_code`) or a Maintenance special
+ * A KPI item: a SKU (`product_code`), a Maintenance special or a fabric series
  * (`option_pool` + `option_value`) — Rules › KPI items (the Product List's
  * Add-on / KPI Items until 2026-10-08).
  * Rows written before 2026-09-27 carry no `source` and are SKUs.
@@ -234,6 +234,11 @@ export interface RunSourceRows {
   /** `comm_cost_ratios` of this scheme. Absent = every SKU at the default. */
   costRatios?: CostRatioRow[]
   /**
+   * The ERP's fabric list (`erp_fabrics`), read only while a KPI item is a
+   * fabric series (2026-10-29). Absent = no line's fabric has a series.
+   */
+  fabrics?: FabricSeriesRow[]
+  /**
    * Who among the sellers holds a title that heads the department
    * (`titles.is_department_head`). Absent = nobody.
    */
@@ -301,14 +306,11 @@ export function toKpiItems(rows: readonly KpiItemRow[]): KpiItem[] {
   })
 }
 
-/** A bed frame's or a sofa's specials — how an option KPI item is found. */
-function lineSpecials(l: SalesLineRow): { specials?: string[] } {
-  const specials = lineSpecialsOf(l.item_group, l.description2, l.variants)
-  return specials ? { specials } : {}
-}
-
 export function toEngineInput(rows: RunSourceRows): EngineInput {
   const released = new Set(rows.releasedOrderNos)
+  // A bed frame's or a sofa's specials and fabric series — how an option KPI item is found.
+  const fabrics = rows.fabrics?.length ? indexFabricSeries(rows.fabrics) : EMPTY_FABRIC_SERIES
+  const lineFacts = (l: SalesLineRow) => lineKpiFactsOf(l.item_group, l.description2, l.variants, fabrics)
 
   const ranks: Rank[] = rows.ranks.map(r => ({
     rankKey: r.rank_key,
@@ -415,7 +417,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         costAmount: numOrNull(l.cost_amount) ?? undefined,
         // Only when there is one: a line without a charge reads exactly as it always has.
         ...(numOrNull(l.option_charge_amount) ? { optionCharge: numOrNull(l.option_charge_amount)! } : {}),
-        ...lineSpecials(l),
+        ...lineFacts(l),
       })),
     }))
 

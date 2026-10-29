@@ -14,14 +14,15 @@
  * A KPI AMOUNT is money: up to two decimals, zero or more — a zero item still
  * counts toward the monthly quantity bonus — and never blank.
  *
- * What names a SKU or a special is NOT taken from here: the database reads a
- * SKU's code and name from the SKU Master and a special's spelling from its
- * Maintenance pool. These carry ids and the special as picked.
+ * What names a SKU, a special or a fabric series is NOT taken from here: the
+ * database reads a SKU's code and name from the SKU Master, a special's
+ * spelling from its Maintenance pool and a series' from the ERP's fabric list.
+ * These carry ids and the special or series as picked.
  */
 
 import { EditError, parseMoney } from './edits'
 import { valueKey } from './keys'
-import { isKpiOptionPool, type KpiOptionPool } from '@/lib/commission/kpi'
+import { isFabricSeriesPool, isKpiOptionPool, type KpiOptionPool } from '@/lib/commission/kpi'
 
 export { EditError }
 
@@ -144,7 +145,7 @@ export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
 
   const added = new Set<string>()
   const adds = addsIn.map((a): KpiAddRow => {
-    if (!a || (a.source !== 'sku' && a.source !== 'option')) throw new EditError('A KPI item is a SKU or a special')
+    if (!a || (a.source !== 'sku' && a.source !== 'option')) throw new EditError('A KPI item is a SKU, a special or a fabric series')
     if (a.source === 'sku') {
       if (typeof a.erpId !== 'string' || !ERP_ID.test(a.erpId)) throw new EditError('An added row names no SKU')
       const name = a.label?.trim() || a.erpId
@@ -154,10 +155,12 @@ export function validateKpiItems(edit: KpiItemsEdit): KpiItemsPlan {
       return { source: 'sku', erp_product_id: a.erpId, kpi_amount: kpiAmount(a.amount, name) }
     }
     if (typeof a.optionPool !== 'string' || !isKpiOptionPool(a.optionPool)) {
-      throw new EditError('Only a bed frame or a sofa special can be a KPI item')
+      throw new EditError("Only a bed frame's or a sofa's special or fabric series can be a KPI item")
     }
     const value = typeof a.optionValue === 'string' ? a.optionValue.trim() : ''
-    if (!value || value.length > 200) throw new EditError('An added special has no name')
+    if (!value || value.length > 200) {
+      throw new EditError(isFabricSeriesPool(a.optionPool) ? 'An added fabric series has no name' : 'An added special has no name')
+    }
     const name = a.label?.trim() || value
     const key = kpiAddKey({ source: 'option', optionPool: a.optionPool, optionValue: value })
     if (added.has(key)) throw new EditError(`${name} is added twice`)

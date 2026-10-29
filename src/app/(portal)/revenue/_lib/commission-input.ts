@@ -10,6 +10,7 @@ import { carriesInto } from '@/lib/commission/carry'
 import { officeToday } from '@/lib/office-time'
 import { loadMonthOrders } from './month-orders'
 import { loadBillsByDocNo } from './row-origins'
+import { namesFabricSeries, readFabricSeries } from './fabric-series'
 import type {
   CostRatioRow,
   HierarchyRow,
@@ -60,7 +61,7 @@ async function readByKeys<T>(
   }))
 }
 
-/** A KPI item is a SKU or a Maintenance special (2026-09-27). */
+/** A KPI item is a SKU, a Maintenance special (2026-09-27) or a fabric series (2026-10-29). */
 const KPI_ITEM_COLUMNS = 'source, product_code, product_name, option_pool, option_value, kpi_amount'
 
 function periodEnd(period: string): string {
@@ -298,7 +299,9 @@ export async function loadCommissionInput(
     const bill = upsaleBillId(row, upsaleDocBills)
     return bill ? [bill] : []
   }))]
-  const [lines, openBillTags, shares, priorRuns, upsaleBillShares] = await Promise.all([
+  // A KPI item that is a fabric series (2026-10-29) finds a line's fabric on the ERP's fabric list.
+  const needsFabrics = namesFabricSeries([...kpiItems, ...currentKpiItems])
+  const [lines, openBillTags, shares, priorRuns, upsaleBillShares, fabrics] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
         .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
@@ -316,6 +319,7 @@ export async function loadCommissionInput(
     readByKeys<OrderShareRow>('the shares of the bills drops and upsells changed', upsaleBillIds,
       (chunk, from, to) => supabase.from('sales_order_shares').select('order_id, staff_id, share_pct')
         .in('order_id', chunk).order('order_id').order('staff_id').range(from, to)),
+    needsFabrics ? readFabricSeries(supabase) : Promise.resolve([]),
   ])
   const upsaleShares = sharesOfUpsales(upsales, upsaleDocBills, upsaleBillShares)
 
@@ -372,7 +376,7 @@ export async function loadCommissionInput(
   const sourceRows = {
     periodMonth: period, scheme: schemeForMonth, ranks, itemGroups, kpiItems, kpiThresholds,
     openBillRules, openBillTags, marginBands, hierarchy, orders: orderRows,
-    releasedOrderNos, priorMonths, shares, upsales, upsaleShares, costRatios,
+    releasedOrderNos, priorMonths, shares, upsales, upsaleShares, costRatios, fabrics,
     departmentHeadIds: heads.map(head => head.id),
     directors,
     monthCommissionableValue: monthValue,

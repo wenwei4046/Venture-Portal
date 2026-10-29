@@ -18,7 +18,7 @@ import {
   type LineClass,
   type SalesLine,
 } from '@/lib/commission/engine'
-import { kpiItemLabel, lineSpecialsOf } from '@/lib/commission/kpi'
+import { EMPTY_FABRIC_SERIES, indexFabricSeries, kpiItemLabel, lineKpiFactsOf } from '@/lib/commission/kpi'
 import { toKpiItems, type CostRatioRow, type KpiItemRow } from '@/lib/commission/run-payload'
 import { chargeText, costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
@@ -31,6 +31,7 @@ import { paperRef } from '@/lib/commission/paper-ref'
 import { requireSubDepartment } from '../../../../_lib/sub-departments'
 import { loadOrderExclusions, loadOrderShares } from '../../../../_lib/month-orders'
 import { loadBillMoves } from '../../../../_lib/row-origins'
+import { namesFabricSeries, readFabricSeries } from '../../../../_lib/fabric-series'
 import { movedPhrase } from '@/lib/commission/bill-move'
 import { loadAdjustmentAnswers, loadBillChanges } from '../../../../_lib/erp-changes'
 import {
@@ -317,9 +318,12 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const threshold = scheme?.deposit_threshold_pct
   const depositPct = threshold === null || threshold === undefined ? null : Number(threshold)
   // The KPI items the run pays — none while the scheme has KPI switched off.
-  const kpiIndex = scheme?.enable_kpi
-    ? indexKpiItems(toKpiItems((kpiData ?? []) as KpiItemRow[]))
-    : EMPTY_KPI_INDEX
+  const kpiRows = (kpiData ?? []) as KpiItemRow[]
+  const kpiIndex = scheme?.enable_kpi ? indexKpiItems(toKpiItems(kpiRows)) : EMPTY_KPI_INDEX
+  // A fabric series item finds a line's fabric on the ERP's fabric list, as the run does (2026-10-29).
+  const fabrics = kpiIndex.size > 0 && namesFabricSeries(kpiRows)
+    ? indexFabricSeries(await readFabricSeries(supabase))
+    : EMPTY_FABRIC_SERIES
   // The Revenue Team's cost basis — `marginBase()` divides every line's cost
   // by its own SKU's ratio, else the scheme's, so this page has to as well or
   // it would explain the engine with a number the engine never used.
@@ -339,7 +343,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     brandCode: l.brand_code ?? undefined,
     costAmount: l.cost_amount === null ? undefined : Number(l.cost_amount),
     optionCharge: Number(l.option_charge_amount ?? 0) || undefined,
-    specials: lineSpecialsOf(l.item_group, l.description2, l.raw?.variants),
+    ...lineKpiFactsOf(l.item_group, l.description2, l.raw?.variants, fabrics),
   }))
   const classed = lines.map((l, i) => ({ line: l, cls: classifyLine(salesLines[i], groupIndex) }))
   // What its bed frames' divan, leg, gap and total height were charged (2026-10-05): in the
