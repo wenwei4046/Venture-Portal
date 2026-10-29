@@ -61,3 +61,19 @@ describe('business hours', () => {
       .toBe('Deepavali ends before it starts.')
   })
 })
+
+describe('a showroom’s map links from its address (2026-10-29)', () => {
+  it('makes Google Maps’ and Waze’s links, and follows the address only while a link is its own', async () => {
+    const { followAddress, mapsLinkOf, wazeLinkOf } = await import('./info')
+    const addr = '51, Jln Utara, Pjs 12, 46200 Petaling Jaya'
+    expect(mapsLinkOf(addr)).toBe('https://www.google.com/maps/search/?api=1&query=51%2C%20Jln%20Utara%2C%20Pjs%2012%2C%2046200%20Petaling%20Jaya')
+    expect(wazeLinkOf(addr)).toBe('https://waze.com/ul?q=51%2C%20Jln%20Utara%2C%20Pjs%2012%2C%2046200%20Petaling%20Jaya&navigate=yes')
+    expect(mapsLinkOf('  ')).toBe('')
+    const fields = [{ key: 'address', label: 'Address', value: addr }, { key: 'maps', label: 'Google Maps', value: '' }, { key: 'waze', label: 'Waze', value: 'https://waze.com/ul/hw2838' }] as never
+    const after = followAddress(fields, '', addr) as Array<{ value: string }>
+    expect(after[1].value).toBe(mapsLinkOf(addr))
+    expect(after[2].value).toBe('https://waze.com/ul/hw2838')
+    const moved = followAddress(after as never, addr, 'Mid Valley') as Array<{ value: string }>
+    expect(moved[1].value).toBe(mapsLinkOf('Mid Valley'))
+  })
+})

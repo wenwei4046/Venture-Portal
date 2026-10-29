@@ -181,3 +181,30 @@ export const DEFAULT_HOURS: BusinessHours = {
   week: DAY_NAMES.map((_, i) => ({ day: i + 1, on: i < 5, from: '10:00', to: '22:00' })),
   specials: [],
 }
+
+/**
+ * A showroom's map links made from its address (2026-10-29 — the user: "google map & waze 能否自动生成，并且能编辑"):
+ * Google Maps' and Waze's own search links, which open the app on a phone. Empty without an address.
+ */
+export function mapsLinkOf(address: string): string {
+  const a = address.trim()
+  return a ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a)}` : ''
+}
+export function wazeLinkOf(address: string): string {
+  const a = address.trim()
+  return a ? `https://waze.com/ul?q=${encodeURIComponent(a)}&navigate=yes` : ''
+}
+
+/**
+ * The address changed: a map link follows it while it is empty or still the one made from the address before —
+ * a link typed by hand stays.
+ */
+export function followAddress(fields: InfoField[], before: string, after: string): InfoField[] {
+  const made: Record<string, (a: string) => string> = { maps: mapsLinkOf, waze: wazeLinkOf }
+  return fields.map(f => {
+    const make = f.key ? made[f.key] : undefined
+    if (!make) return f
+    const v = f.value.trim()
+    return v === '' || v === make(before) ? { ...f, value: make(after) } : f
+  })
+}
