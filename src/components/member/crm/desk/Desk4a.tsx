@@ -42,16 +42,17 @@ interface SideBits {
 
 /** View as a team member on a computer (the owner, 2026-10-29): a search over whoever may be viewed; a pick opens their CRM as the phone's View as does. */
 function ViewAsPick({ people, open }: { people: { id: string; name: string; title: string }[]; open: (staffId: string) => void }) {
-  const [on, setOn] = useState(false);
+  // Fixed to the screen at the button, so the nav (which scrolls, and so clips) never cuts the list (the owner's screenshot, 2026-10-29).
+  const [on, setOn] = useState<{ left: number; bottom: number } | null>(null);
   return (
     <div style={{ position: "relative", flex: "none" }}>
       {/* Drawn as the way back under it: an icon and its words on the cream nav. */}
-      <button type="button" onClick={() => setOn(o => !o)} aria-expanded={on} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", height: "36px", padding: "0 10px", borderRadius: "7px", font: "400 13px Inter, sans-serif", whiteSpace: "nowrap", color: "var(--crm-ink-soft)", background: on ? "var(--crm-nav-active)" : "transparent" }} className="crm4a-nav">
+      <button type="button" onClick={e => { const r = e.currentTarget.getBoundingClientRect(); setOn(o => (o ? null : { left: r.left, bottom: window.innerHeight - r.top + 6 })); }} aria-expanded={!!on} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", height: "36px", padding: "0 10px", borderRadius: "7px", font: "400 13px Inter, sans-serif", whiteSpace: "nowrap", color: "var(--crm-ink-soft)", background: on ? "var(--crm-nav-active)" : "transparent" }} className="crm4a-nav">
         <Ic name="eye" size={15} /><span style={{ flex: 1 }}>View as a team member</span>
       </button>
       {on && (<>
-        <div onClick={() => setOn(false)} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-        <ViewAsList people={people} pick={id => { setOn(false); open(id); }} style={{ position: "absolute", bottom: "42px", left: 0, zIndex: 8 }} />
+        <div onClick={() => setOn(null)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+        <ViewAsList people={people} pick={id => { setOn(null); open(id); }} style={{ position: "fixed", bottom: `${on.bottom}px`, left: `${on.left}px`, zIndex: 41, maxHeight: `min(440px, calc(100vh - ${on.bottom + 16}px))` }} />
       </>)}
     </div>
   );
