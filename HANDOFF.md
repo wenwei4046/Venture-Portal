@@ -1,6 +1,6 @@
 # HOUZS Venture Portal — Session Handoff
 
-## CHECKPOINT 2026-10-29 s (PR ③ built, not merged) — a department's approval before Finance
+## CHECKPOINT 2026-10-29 s (SHIPPED, #850) — a department's approval before Finance
 
 Session e73c0205. "可以，开始做 PR ③" → branch `feat/payment-requests-approval` (plan:
 `docs/module-spec-payment-requests.md` §4c; design: the mockup's ②):
@@ -16,8 +16,13 @@ Session e73c0205. "可以，开始做 PR ③" → branch `feat/payment-requests-
   approve, send back, Finance reject, paid. Marketing's bell (`mkt_notices`) and sidebar number (`mkt_shell` → `claims`)
   swapped in place (swap_check). HR / Finance rows read *Claim & approve*; the Department view's stays *Claim*.
 - **Seeded**: Marketing · Staff ticked; Marketing · Manager holds Claim & approve (SIA JOSIAH today).
-- **Mig `20261029200000_payment_request_approval`**: NOT applied — dry-run first on the user's go (validator 61
-  checks). The merge waits for the user's word.
+- **Mig `20261029200000_payment_request_approval`**: APPLIED to production first ("可以，先 dry-run 再把 PR ③ 的
+  migration 上到 production"; schema_migrations `20261029200000 · payment_request_approval · claude-payment-requests`)
+  after a dry run of the final text (LI SEAN ticked; two of LI's requests posed as Marketing's pending; SIA JOSIAH
+  approved one and sent one back; ONG MEI SHUANG refused; rolled back). md5 of all 17 function bodies = the file; the
+  notice CHECKs kept every old value (+ `claims` / `payment_request`). MERGED on "可以" once the SQL checks were green:
+  squash `279a8c87`. SQL validator 61 checks.
+- Next: PR ④ (several at once), ⑥ (the rest) — each on the user's go. PR ⑤ stays shelved ("不要开key 先").
 
 ## CHECKPOINT 2026-10-29 r (SHIPPED, #847) — the claim process: the staff's own requests to Finance
 
