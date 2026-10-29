@@ -1279,6 +1279,15 @@ await db.exec(`
     check((await q(`select has_function_privilege('authenticated', 'public.${fn}', 'execute') a`))[0].a, false, `${fn} is the service role’s alone`)
   }
   check((await q(`select has_function_privilege('anon', 'public.lead_mark_unread(uuid)', 'execute') a`))[0].a, false, 'marking is no anon’s')
+
+  // ── Long options (mig 20261029100010) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_template_problem'`))[0].m, '88621c4466fed9cf166b5e4cbf9674f4', 'lead_template_problem here is production’s')
+  const opt = label => JSON.stringify([{ id: 'a', kind: 'question', text: 'Which?', buttons: [{ label, next: '' }] }])
+  check((await q(`select public.lead_template_problem($1::jsonb) p`, [opt('x'.repeat(21))]))[0].p, 'An option says 1 to 20 characters.', 'before: 20 at most')
+  await db.exec(await f('20261029100010_lead_long_options.sql'))
+  await db.exec(await f('20261029100010_lead_long_options.sql'))
+  check((await q(`select public.lead_template_problem($1::jsonb) p`, [opt('Talk to a salesperson about delivery')]))[0].p, null, 'a long option is fine')
+  check((await q(`select public.lead_template_problem($1::jsonb) p`, [opt('x'.repeat(201))]))[0].p, 'An option says 1 to 200 characters.', '200 at most')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

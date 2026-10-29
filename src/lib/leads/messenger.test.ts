@@ -9,10 +9,15 @@ describe('Lead View › Messenger out', () => {
     expect(messageOf('Hi')).toEqual({ text: 'Hi' })
     expect(messageOf('Which?', ['3-seater', ' L-shape ', ''])).toEqual({
       text: 'Which?',
-      quick_replies: [{ content_type: 'text', title: '3-seater', payload: '3-seater' }, { content_type: 'text', title: 'L-shape', payload: 'L-shape' }],
+      quick_replies: [{ content_type: 'text', title: '3-seater', payload: 'LV:3-seater' }, { content_type: 'text', title: 'L-shape', payload: 'LV:L-shape' }],
     })
     expect(messageOf('x', Array.from({ length: 15 }, (_, i) => `Option number ${i} and more`)).quick_replies).toHaveLength(13)
-    expect(messageOf('x', ['A very long button label indeed']).quick_replies?.[0].title).toBe('A very long button l')
+    // A long option (2026-10-29): every option written in full under the message, the buttons numbered and clipped,
+    // the payload the whole option.
+    const long = messageOf('Which one?', ['Sofa', 'Talk to a salesperson about delivery'])
+    expect(long.text).toBe('Which one?\n\n1. Sofa\n2. Talk to a salesperson about delivery')
+    expect(long.quick_replies?.map(q => [q.title, q.payload])).toEqual([['1. Sofa', 'LV:Sofa'], ['2. Talk to a salesp…', 'LV:Talk to a salesperson about delivery']])
+    expect([...long.quick_replies![1].title].length).toBe(20)
   })
 
   it('refuses before asking Meta: no Page, the window shut, no token', async () => {

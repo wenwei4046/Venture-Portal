@@ -160,7 +160,7 @@ export default function LibraryView({ items, ready, initialId, canEdit }: { item
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                         {(st.buttons ?? []).map((b, j) => (
                           <span key={j} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <input className={s.input} style={{ width: 120 }} value={b.label} maxLength={20} disabled={dis} aria-label={`Option ${j + 1}`}
+                            <input className={s.input} style={{ width: 120 }} value={b.label} maxLength={200} disabled={dis} aria-label={`Option ${j + 1}`}
                               onChange={e => setStep(i, { buttons: st.buttons!.map((x, k) => (k === j ? { ...x, label: e.target.value } : x)) })} />
                             → {goes(b.next, v => setStep(i, { buttons: st.buttons!.map((x, k) => (k === j ? { ...x, next: v } : x)) }), st.id)}
                             {canEdit && st.buttons!.length > 1 ? <button type="button" className={s.x} onClick={() => setStep(i, { buttons: st.buttons!.filter((_, k) => k !== j) })}>×</button> : null}

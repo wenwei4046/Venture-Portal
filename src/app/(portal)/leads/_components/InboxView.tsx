@@ -17,6 +17,7 @@ import { dayLabel, timeOf, whenShort } from '@/lib/leads/time'
 import { editable } from '@/lib/leads/photo-edit'
 import PhotoEditor from './PhotoEditor'
 import ForwardDialog from './ForwardDialog'
+import RichText from './RichText'
 import type { LeadBrand, LeadConfig, LeadContact, LeadLabel, LeadMessage, LeadThread } from '@/lib/leads/types'
 import { infoEntries, type LeadInfo } from '@/lib/leads/info'
 import { LeadIcon } from '@/components/layout/lead-icons'
@@ -595,7 +596,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
               {m.replyToMid ? <Quote m={byMid.get(m.replyToMid) ?? null} /> : null}
               {m.mediaPath || m.mediaUrl ? <MessageMedia m={m} link={m.mediaPath ? links[m.mediaPath] : m.mediaUrl ?? undefined} /> : null}
               <div className={s.bubbleRow}>
-                {(m.mediaPath || m.mediaUrl) && isMediaPlaceholder(m.body) ? null : <div className={s.bubble}>{m.body}</div>}
+                {(m.mediaPath || m.mediaUrl) && isMediaPlaceholder(m.body) ? null : <div className={s.bubble}><RichText text={m.body} /></div>}
                 {canReply && m.mid && !contact.isTest ? (
                   <span className={s.msgActions}>
                     {m.direction === 'in' ? (
