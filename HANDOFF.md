@@ -1,6 +1,6 @@
 # HOUZS Venture Portal — Session Handoff
 
-## CHECKPOINT 2026-10-29 r (PR ② built, not merged) — the claim process: the staff's own requests to Finance
+## CHECKPOINT 2026-10-29 r (SHIPPED, #847) — the claim process: the staff's own requests to Finance
 
 Session e73c0205. The user settled the claim process with the boss (2026-10-29; the design is
 `OneDrive\Desktop\Claude\Venture\mockups\claims-flow-mockup.html`, the plan `docs/module-spec-payment-requests.md`,
@@ -16,11 +16,12 @@ PR ① to ⑥). PR ① shipped as #840 (Payments › Payment voucher / Payment r
   Yes / No for each split asked in that window** (the user: "我开pv 时就要确定是不是要开单了" — the drawer only says
   where it stands), receipts copied onto the voucher (`.copyTo`), Yes splits drafted as DRAFT invoices in the same
   database step that ties the requests (`payment_requests_attach_pv(ids, pv, bill)`; `payment_request_bill_back` gone).
-- **Mig `20261029180000_payment_requests`**: dry-run on production (BEGIN … ROLLBACK, with a smoke as LI SEAN →
-  ONG MEI SHUANG) clean BEFORE the Bill back move — it changed since (`attach_pv` takes the answers, `for_pv` no
-  longer asks them, `payment_request_bill_back` gone), so dry-run it again when applying; NOT applied — waits for the
-  user's go, then the merge waits for the user's word. SQL validator 77 checks. No Anthropic key, no invoice reading
-  (PR ⑤ shelved: "不要开key 先").
+- **Mig `20261029180000_payment_requests`**: APPLIED to production first ("可以，先 dry-run 再把 PR ② 的 migration 上到
+  production"; schema_migrations `20261029180000 · payment_requests · claude-payment-requests`) after a dry run of the
+  final text (LI SEAN sent two; ONG MEI SHUANG — Invoice · Create and the Bank tick — tied them Yes / Yes / No → two
+  DRAFT invoices; rolled back). md5 of all 18 function bodies = the file, before and after COMMIT. MERGED on "CI 全绿就
+  merge PR ②": squash `043b74df`. SQL validator 77 checks. No Anthropic key, no invoice reading (PR ⑤ shelved:
+  "不要开key 先").
 - Next: PR ③ (By management approve, Claim & approve, the notices), ④ (several at once), ⑥ (the rest) — each on the
   user's go.
 
