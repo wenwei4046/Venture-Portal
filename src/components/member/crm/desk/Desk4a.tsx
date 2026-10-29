@@ -44,13 +44,14 @@ function ViewAsPick({ people, open }: { people: { id: string; name: string; titl
   const [on, setOn] = useState(false), [q, setQ] = useState("");
   const n = q.trim().toLowerCase(), list = people.filter(p => !n || `${p.name} ${p.title}`.toLowerCase().includes(n));
   return (
-    <div style={{ position: "relative", margin: "0 0 10px" }}>
-      <button type="button" onClick={() => setOn(o => !o)} aria-expanded={on} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "8px", height: "32px", padding: "0 10px", borderRadius: "7px", border: "1px solid var(--crm-nav-line)", background: "var(--crm-page)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">
-        <Ic name="eye" size={14} /><span style={{ flex: 1 }}>View as a team member</span><Ic name="chevron-down" size={12} />
+    <div style={{ position: "relative", flex: "none" }}>
+      {/* Drawn as the way back under it: an icon and its words on the cream nav. */}
+      <button type="button" onClick={() => setOn(o => !o)} aria-expanded={on} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", height: "36px", padding: "0 10px", borderRadius: "7px", font: "400 13px Inter, sans-serif", whiteSpace: "nowrap", color: "var(--crm-ink-soft)", background: on ? "var(--crm-nav-active)" : "transparent" }} className="crm4a-nav">
+        <Ic name="eye" size={15} /><span style={{ flex: 1 }}>View as a team member</span>
       </button>
       {on && (<>
         <div onClick={() => setOn(false)} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-        <div role="dialog" aria-label="View as a team member" style={{ position: "absolute", top: "36px", left: 0, zIndex: 8, width: "280px", maxHeight: "420px", display: "flex", flexDirection: "column", padding: "8px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)" }}>
+        <div role="dialog" aria-label="View as a team member" style={{ position: "absolute", bottom: "40px", left: 0, zIndex: 8, width: "280px", maxHeight: "420px", display: "flex", flexDirection: "column", padding: "8px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)" }}>
           <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search name or title" aria-label="Search name or title" style={{ height: "32px", borderRadius: "7px", border: "1px solid var(--crm-line)", padding: "0 10px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)", marginBottom: "6px" }} />
           <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
             {list.map(p => (
@@ -144,7 +145,6 @@ export function Desk4aSide({ v }: { v: SideBits }) {
             background: o.on ? "var(--crm-page)" : "transparent", color: o.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{o.label}</button>)}
         </div>
       )}
-      {v.viewAs && <ViewAsPick people={v.viewAs.people} open={v.viewAs.open} />}
       {f.crmNav.map((g, gi) => (<div key={gi} style={{ display: "contents" }}>
         {g.head && <div style={{ padding: "20px 10px 6px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}>{g.head}</div>}
         {g.items.map(n => (
@@ -158,7 +158,10 @@ export function Desk4aSide({ v }: { v: SideBits }) {
           </button>
         ))}
       </div>))}
-      <button type="button" onClick={v.returnApp} style={{ ...BTN, marginTop: "auto", flex: "none", display: "flex", alignItems: "center", gap: "10px", height: "36px", padding: "0 10px",
+      {/* At the foot, above the way back (the owner, 2026-10-29), its list opening upwards. */}
+      <div style={{ marginTop: "auto" }} />
+      {v.viewAs && <ViewAsPick people={v.viewAs.people} open={v.viewAs.open} />}
+      <button type="button" onClick={v.returnApp} style={{ ...BTN, flex: "none", display: "flex", alignItems: "center", gap: "10px", height: "36px", padding: "0 10px",
         font: "400 13px Inter, sans-serif", color: "var(--crm-ink-soft)" }}><Ic name="chevron-left" size={15} />Back to Revenue app</button>
     </aside>
   </>);
@@ -1321,7 +1324,7 @@ function AdsPager4a({ p }: { p: NonNullable<AdsBits["apPager"]> }) {
 }
 
 interface AdListBits {
-  adList4: { summary: string; unsetN: number; legend: { name: string; color: string }[];
+  adList4: { summary: string; unsetN: number; legend: { name: string; color: string }[]; brands?: { label: string; on: boolean; pick: () => void }[];
     rows: { name: string; nameless: boolean; paused?: boolean; run?: string; brand?: string; brandHead?: boolean; brandN?: number; headline: string; ch: "whatsapp" | "messenger"; leads: string; segs: { color: string; pct: number }[]; set: boolean; sel: boolean; open: () => void }[] };
   stCur: { label: string; n: number; color: string }; toggleSt: () => void; stOpen: boolean; stOpts: { label: string; hint?: string | null; color: string; pick: () => void; n?: number | string }[];
 }
@@ -1334,6 +1337,11 @@ export function DeskAdList4a({ v }: { v: AdListBits }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: "10px 14px", paddingBottom: "16px" }}>
+        {L.brands && (
+          <div role="group" aria-label="Brand" style={{ alignSelf: "center", height: "30px", padding: "3px", boxSizing: "border-box", borderRadius: "8px", background: "var(--crm-field)", display: "flex", gap: "2px", font: "500 12px Inter, sans-serif" }}>
+            {L.brands.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={{ ...BTN, padding: "0 10px", borderRadius: "6px", whiteSpace: "nowrap", background: o.on ? "#fff" : "transparent", boxShadow: o.on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: o.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{o.label}</button>)}
+          </div>
+        )}
         <div style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap", alignSelf: "center" }}>{L.summary}{L.unsetN > 0 && <span style={{ color: "var(--crm-oxblood)" }}> · {L.unsetN} not set up</span>}</div>
         <span style={{ position: "relative", alignSelf: "center" }}>
           <button type="button" onClick={v.toggleSt} style={{ ...BTN, display: "flex", alignItems: "center", gap: "5px", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)", whiteSpace: "nowrap" }}>
@@ -1776,8 +1784,8 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
           {/* Folds to its head with a click (the owner, 2026-10-29: "点了之后可收起"); the grid on the right still shows the hours. */}
           <button type="button" onClick={() => setHoursShut(s => !s)} aria-expanded={!hoursShut} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
             <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>Opening hours</span>
-            <span style={{ marginLeft: "auto", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{hoursShut ? `${S.hours.all.f} – ${S.hours.all.t} · Show` : "Type, or drag on the grid · Hide"}</span>
-            <span style={{ display: "flex", color: "var(--crm-faint)", transform: hoursShut ? "rotate(-90deg)" : "none", transition: "transform 150ms" }}><Ic name="chevron-down" size={13} /></span>
+            {/* Only the arrow (the owner, 2026-10-29: "保留向下箭头即可"). */}
+            <span title={hoursShut ? "Show" : "Hide"} style={{ marginLeft: "auto", display: "flex", color: "var(--crm-faint)", transform: hoursShut ? "rotate(-90deg)" : "none", transition: "transform 150ms" }}><Ic name="chevron-down" size={13} /></span>
           </button>
           {!hoursShut && <AllDaysHours f={S.hours.all.f} t={S.hours.all.t} apply={S.hours.all.apply} />}
           {!hoursShut && S.hours.days.map(d => <DayHours key={d.l} d={d} />)}

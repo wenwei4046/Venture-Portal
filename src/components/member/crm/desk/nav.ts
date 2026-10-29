@@ -72,7 +72,7 @@ export function useDeskPlace(ui: DeskUi, setUi: Dispatch<SetStateAction<DeskUi>>
  * metric 之后，下次进来也看到一样，不用一直重加"): Ads Performance's columns and their widths, the chart's tiles, Insight's ad
  * cards, the rows a page, the source. localStorage, per browser — not a place, so never a history step.
  */
-export const PREF_KEYS = ["apSel", "apW", "apChart", "insCards", "apPer", "apSrc", "insSrc"] as const;
+export const PREF_KEYS = ["apSel", "apW", "apChart", "insCards", "apPer", "apSrc", "insSrc", "adBrand"] as const;
 type PrefKey = (typeof PREF_KEYS)[number];
 const PREF_STORE = "crm-desk-prefs";
 
