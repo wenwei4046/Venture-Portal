@@ -162,6 +162,23 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   }
   const stopEditing = () => { setEditing(null); setStart(''); setForm(f => ({ ...EMPTY, booker: f.booker, bookerPhone: f.bookerPhone })) }
 
+  const find = () => {
+    const q = findQ.trim()
+    setRefError(''); setFound(null)
+    if (!q) return
+    if (/^TC-?[A-Z0-9]{6}$/i.test(q)) { const ref = q.toUpperCase().replace(/^TC-?/, 'TC-'); setRefText(ref); void findRef(ref); return }
+    const ql = q.toLowerCase(), digits = q.replace(/\D/g, '')
+    const hits = list.filter(b => b.booker.toLowerCase().includes(ql) || b.customer.toLowerCase().includes(ql) || (digits.length >= 4 && b.customerPhone.replace(/\D/g, '').includes(digits)))
+    // A computer filters the list under the form, as its own search (the owner, 2026-10-29: "跟下面的 search 一样").
+    if (phone) setFound(hits)
+    else { setListQ(q); document.getElementById('partner-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+    const exact = list.find(b => b.booker.trim().toLowerCase() === ql)
+    if (exact) {
+      setMeName(exact.booker); setForm(f => ({ ...f, booker: f.booker || exact.booker }))
+      try { localStorage.setItem(ME_KEY, JSON.stringify({ booker: exact.booker, bookerPhone: form.bookerPhone })) } catch { /* private window */ }
+    }
+  }
+
   if (!phone) return (
     <div className={s.root}>
       <div className={s.wrap}>
@@ -171,10 +188,10 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
             <h1 className={s.title}>Book a showroom visit</h1>
           </div>
           <div className={s.lookup}>
-            <label className={s.lookupLabel} htmlFor="ref">Change or cancel a booking</label>
+            <label className={s.lookupLabel} htmlFor="ref">Find a booking</label>
             <div className={s.lookupRow}>
-              <input id="ref" className={s.input} value={refText} onChange={e => setRefText(e.target.value.toUpperCase())} placeholder="TC-7KQ3X9" onKeyDown={e => { if (e.key === 'Enter') void findRef() }} />
-              <button type="button" className={s.ghost} onClick={() => void findRef()}>Open</button>
+              <input id="ref" className={s.input} value={findQ} onChange={e => setFindQ(e.target.value)} placeholder="Name, customer, phone or reference" onKeyDown={e => { if (e.key === 'Enter') find() }} />
+              <button type="button" className={s.ghost} onClick={find}>Search</button>
             </div>
             {refError && <span className={s.err}>{refError}</span>}
           </div>
@@ -185,7 +202,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
             <div className={s.doneBadge}>{done.state === 'cancelled' ? 'Cancelled' : editing === null ? 'Booked' : 'Saved'}</div>
             <h2>{done.state === 'cancelled' ? 'The booking is cancelled' : 'The slot is yours'}</h2>
             <div className={s.ref}>{done.ref}</div>
-            <p className={s.muted}>{done.state === 'cancelled' ? 'Its slot is free again.' : 'Keep this reference — type it under “Change or cancel a booking” to change or cancel.'}</p>
+            <p className={s.muted}>{done.state === 'cancelled' ? 'Its slot is free again.' : 'Keep this reference — search it under “Find a booking” to change or cancel.'}</p>
             <dl className={s.facts}>
               <dt>When</dt><dd>{whenOf(done.start)}</dd>
               <dt>Showroom</dt><dd>{done.showroomName}</dd>
@@ -294,7 +311,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
           </div>
         )}
 
-        <section className={s.card}>
+        <section id="partner-list" className={s.card}>
           <div className={s.listHead}>
             <h2 className={s.h2}>Bookings through this link · {list.length}</h2>
             <input className={`${s.input} ${s.listSearch}`} value={listQ} onChange={e => setListQ(e.target.value)} placeholder="Search customer, phone, booker or reference" />
@@ -321,20 +338,6 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     </div>
   )
 
-  const find = () => {
-    const q = findQ.trim()
-    setRefError(''); setFound(null)
-    if (!q) return
-    if (/^TC-?[A-Z0-9]{6}$/i.test(q)) { const ref = q.toUpperCase().replace(/^TC-?/, 'TC-'); setRefText(ref); void findRef(ref); return }
-    const ql = q.toLowerCase(), digits = q.replace(/\D/g, '')
-    const hits = list.filter(b => b.booker.toLowerCase().includes(ql) || b.customer.toLowerCase().includes(ql) || (digits.length >= 4 && b.customerPhone.replace(/\D/g, '').includes(digits)))
-    setFound(hits)
-    const exact = list.find(b => b.booker.trim().toLowerCase() === ql)
-    if (exact) {
-      setMeName(exact.booker); setForm(f => ({ ...f, booker: f.booker || exact.booker }))
-      try { localStorage.setItem(ME_KEY, JSON.stringify({ booker: exact.booker, bookerPhone: form.bookerPhone })) } catch { /* private window */ }
-    }
-  }
 
   // Pages, for the phone (the owner, 2026-10-29: "做成分页会更好；首页可以有他已经的预约，或 no appt, book appointment now"):
   // Home — this booker's bookings (by the name kept on this phone) or "No appointment yet" and Book appointment now — then
