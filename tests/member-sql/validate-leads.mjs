@@ -1288,6 +1288,91 @@ await db.exec(`
   await db.exec(await f('20261029100010_lead_long_options.sql'))
   check((await q(`select public.lead_template_problem($1::jsonb) p`, [opt('Talk to a salesperson about delivery')]))[0].p, null, 'a long option is fine')
   check((await q(`select public.lead_template_problem($1::jsonb) p`, [opt('x'.repeat(201))]))[0].p, 'An option says 1 to 200 characters.', '200 at most')
+
+  // ── Several replies to an option; picking more than one, by tapping again or by numbers (mig 20261029150010) ──
+  check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_flow_send', 'lead_flow_on_message') order by 1`)).map(r => [r.proname, r.m]),
+    [['lead_flow_on_message', 'b9bd11748a326fe93d77f4c9bfb02a1c'], ['lead_flow_send', 'adb6349aca3f86262e0c892a2e5764ff']], 'the runner here is production’s')
+  await db.exec(await f('20261029150010_lead_pick_more.sql'))
+  await db.exec(await f('20261029150010_lead_pick_more.sql'))
+  const PM = [
+    { id: 'q', kind: 'question', text: 'Which are you after?', saveAs: 'interest', multi: true, doneLabel: "That's all", next: 'ph',
+      buttons: [{ label: 'Sofa', next: '', also: ['ms', 'mp'] }, { label: 'Mattress', next: '', also: ['mm'] }, { label: 'Bed frame', next: '' }] },
+    { id: 'ms', kind: 'message', text: 'Our sofas: RM2,990', next: '' },
+    { id: 'mp', kind: 'message', text: 'Sofa promo this month', next: '' },
+    { id: 'mm', kind: 'message', text: 'Our mattresses: RM2,990', next: '' },
+    { id: 'ph', kind: 'phone', text: 'Your phone number?', next: '' },
+  ]
+  const ONE = [
+    { id: 'q', kind: 'question', text: 'Sofa or mattress?', buttons: [{ label: 'Sofa', next: 'ph', also: ['ms'] }, { label: 'Mattress', next: '' }] },
+    { id: 'ms', kind: 'message', text: 'Our sofas: RM2,990', next: '' },
+    { id: 'ph', kind: 'phone', text: 'Your phone number?', next: '' },
+  ]
+  check((await q(`select public.lead_template_problem($1::jsonb) p`, [JSON.stringify(PM)]))[0].p, null, 'a question that takes more than one is fine')
+  check((await q(`select public.lead_template_problem($1::jsonb) p`, [JSON.stringify(ONE)]))[0].p, null, 'an option with another reply is fine')
+  const bad = (patch) => JSON.stringify(PM.map(s => (s.id === 'q' ? { ...s, ...patch } : s)))
+  check((await q(`select public.lead_template_problem($1::jsonb) p`, [bad({ buttons: [{ label: 'Sofa', next: '', also: ['ph'] }] })]))[0].p, 'An option\'s other replies are "Send a message" steps.', 'only message steps as other replies')
+  check((await q(`select public.lead_template_problem($1::jsonb) p`, [bad({ buttons: [{ label: 'Sofa', next: '', also: ['gone'] }] })]))[0].p, 'An option\'s replies are steps of this template.', 'only this template’s steps')
+  check((await q(`select public.lead_template_problem($1::jsonb) p`, [bad({ buttons: [{ label: 'Sofa', next: 'ms' }] })]))[0].p, 'On a question that takes more than one, an option\'s replies are its messages; the question goes on when they finish.', 'a pick-more option goes nowhere itself')
+  check((await q(`select public.lead_template_problem($1::jsonb) p`, [bad({ doneLabel: 'x'.repeat(21) })]))[0].p, 'The finish button says 20 characters at most.', 'the finish button fits Messenger')
+
+  const pmFlowOf = async steps => (await q(`insert into public.lead_flows (name, template, trigger_kind, trigger_value, active, steps) values ('Pick more', 'custom', 'first', '', false, $1::jsonb) returning id`, [JSON.stringify(steps)]))[0].id
+  await as(CS_USER, ALL)
+  const startAt = async (name, flow) => {
+    const id = (await q(`select public.lead_simulate($1, 'messenger', $2, '', 'hi') c`, [b2990, name]))[0].c
+    await q(`update public.lead_contacts set flow_state = 'none', flow_step = null, interest = '' where id = $1`, [id])
+    await q(`select public.lead_flow_send($1, f, 'q') from public.lead_flows f where f.id = $2`, [id, flow])
+    return id
+  }
+  const tap = (name, body) => q(`select public.lead_simulate($1, 'messenger', $2, '', $3)`, [b2990, name, body])
+  const flowSince = async (id, n) => (await q(`select body, buttons from public.lead_messages where contact_id = $1 and sender = 'flow' order by created_at, id`, [id])).slice(n)
+  const pmFlow = await pmFlowOf(PM)
+
+  // Tap one, then another, then finish.
+  const pa = await startAt('Pick A', pmFlow)
+  check((await flowSince(pa, 0)).map(m => [m.body, m.buttons]), [['Which are you after?', ['Sofa', 'Mattress', 'Bed frame']]], 'the question asks')
+  await tap('Pick A', 'Sofa')
+  let pmSent = await flowSince(pa, 1)
+  check(pmSent.map(m => m.body), ['Our sofas: RM2,990', 'Sofa promo this month', 'Anything else? Pick another, or tap "That\'s all".'], 'an option’s replies in order, then the question again')
+  check(pmSent.at(-1).buttons, ['Mattress', 'Bed frame', "That's all"], 'the options not picked yet and the finish button')
+  await tap('Pick A', 'mattress')
+  check((await flowSince(pa, 4)).map(m => m.body), ['Our mattresses: RM2,990', 'Anything else? Pick another, or tap "That\'s all".'], 'another pick, its reply, the question again')
+  check((await q(`select interest, flow_state, flow_picked from public.lead_contacts where id = $1`, [pa]))[0], { interest: 'Sofa, Mattress', flow_state: 'running', flow_picked: [0, 1] }, 'both kept in the card')
+  await tap('Pick A', "That's all")
+  check((await flowSince(pa, 6)).map(m => m.body), ['Your phone number?'], 'the finish button goes on')
+  check((await q(`select flow_step, flow_picked from public.lead_contacts where id = $1`, [pa]))[0], { flow_step: 'ph', flow_picked: [] }, 'on to the next step, the picks emptied')
+
+  // Typed numbers: several at once, as the list shown numbers them; the finish button's own number.
+  const pb = await startAt('Pick B', pmFlow)
+  await tap('Pick B', '1、2')
+  pmSent = await flowSince(pb, 1)
+  check(pmSent.map(m => m.body), ['Our sofas: RM2,990', 'Sofa promo this month', 'Our mattresses: RM2,990', 'Anything else? Pick another, or tap "That\'s all".'], 'two numbers, both options’ replies in order')
+  check(pmSent.at(-1).buttons, ['Bed frame', "That's all"], 'what is left')
+  await tap('Pick B', '２')
+  check((await flowSince(pb, 5)).map(m => m.body), ['Your phone number?'], 'a number as the list now shown counts it — 2 is the finish button')
+  check((await q(`select interest from public.lead_contacts where id = $1`, [pb]))[0].interest, 'Sofa, Mattress', 'the picks kept')
+
+  // Every option picked goes on by itself.
+  const pc = await startAt('Pick C', pmFlow)
+  await tap('Pick C', '1 2 3')
+  check((await flowSince(pc, 1)).map(m => m.body).at(-1), 'Your phone number?', 'all three picked: on to the next step')
+
+  // A question that takes one: its other reply, then where it goes; a number picks it; other words stop it.
+  const oneFlow = await pmFlowOf(ONE)
+  const pd = await startAt('Pick D', oneFlow)
+  await tap('Pick D', '1')
+  check((await flowSince(pd, 1)).map(m => m.body), ['Our sofas: RM2,990', 'Your phone number?'], 'a number picks the option: its other reply, then its next step')
+  const pe = await startAt('Pick E', oneFlow)
+  await tap('Pick E', '1,2')
+  check((await flowSince(pe, 1)).map(m => m.body), ['Our sofas: RM2,990', 'Your phone number?'], 'one-option question: only the first number counts')
+  const pf = await startAt('Pick F', oneFlow)
+  await tap('Pick F', 'can I pay by instalment?')
+  check((await q(`select flow_state from public.lead_contacts where id = $1`, [pf]))[0].flow_state, 'stopped', 'its own words still stop it for CS')
+  const pg = await startAt('Pick G', oneFlow)
+  await tap('Pick G', '123')
+  check((await q(`select flow_state from public.lead_contacts where id = $1`, [pg]))[0].flow_state, 'stopped', 'a number with no such option stops it')
+  for (const fn of ['lead_flow_question(uuid, lead_flows, jsonb, text)', 'lead_flow_also(uuid, lead_flows, jsonb)', 'lead_flow_keep(uuid, text, text, boolean)', 'lead_template_more(jsonb)']) {
+    check((await q(`select has_function_privilege('authenticated', 'public.${fn}', 'execute') a`))[0].a, false, `${fn} is nobody’s to call`)
+  }
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

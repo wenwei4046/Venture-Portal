@@ -13,6 +13,12 @@ export interface StepOption {
   /** A step's id, or '' — End here. */
   next: string
   endMsg?: string
+  /**
+   * Other replies sent first, in order: "Send a message" steps whose words go out (their own Goes to not followed)
+   * before the option goes on to `next` (2026-10-29, mig 20261029150010). On a question that takes more than one they
+   * are the option's replies, and `next` stays ''.
+   */
+  also?: string[]
 }
 
 export interface TemplateStep {
@@ -29,6 +35,12 @@ export interface TemplateStep {
   retryMax?: string | null
   /** 'person' | '' (end) | a step's id. */
   failNext?: string | null
+  /** A question the customer may answer with more than one option: it comes back until they tap `doneLabel`. */
+  multi?: boolean
+  /** The finish button of such a question ("That's all"), 20 characters at most. */
+  doneLabel?: string
+  /** What it says when it comes back; empty = 'Anything else? Pick another, or tap "That's all".' */
+  againText?: string
   pos?: { x: number; y: number }
   lib?: { id: string; ver: number }
 }
@@ -107,22 +119,51 @@ export function templateProblem(steps: TemplateStep[]): string | null {
       for (const o of b) {
         if (!o.label.trim() || o.label.length > OPTION_MAX) return `${n}: an option says 1 to ${OPTION_MAX} characters.`
         if (o.next !== '' && !ids.includes(o.next)) return `${n}: every option goes to a step, or ends.`
+        if (s.multi && o.next) return `${n}: on a question that takes more than one, an option's replies are its messages.`
+        const also = o.also ?? []
+        if (also.length > ALSO_MAX) return `${n}: an option sends ${ALSO_MAX} more messages at most.`
+        if (new Set(also).size !== also.length) return `${n}: an option sends each reply once.`
+        for (const a of also) {
+          const t = steps.find(x => x.id === a)
+          if (!t || a === s.id) return `${n}: an option's replies are steps of this template.`
+          if (t.kind !== 'message') return `${n}: an option's other replies are "Send a message" steps.`
+        }
       }
+      if ((s.doneLabel ?? '').length > 20) return `${n}: the finish button says 20 characters at most.`
+      if ((s.againText ?? '').length > 1000) return `${n}: a message is 1,000 characters at most.`
+      if (s.multi && s.next && !ids.includes(s.next)) return `${n}: "${doneOf(s)}" goes to a step that is not there.`
     } else if (s.next && !ids.includes(s.next)) return `${n} goes to a step that is not there.`
   }
   return null
 }
 
 export interface StepRow {
-  /** The option's index, or -1 for a step's one way on. */
+  /** The option's index, or -1 for a step's one way on (on a question that takes more than one, its finish button). */
   i: number
   label: string
   next: string
+  /** Other replies sent first (an option's `also`). */
+  also?: string[]
+}
+
+/** An option sends this many other replies at most. */
+export const ALSO_MAX = 5
+/** A question's finish button, as it reads to the customer. */
+export function doneOf(s: Pick<TemplateStep, 'doneLabel'>): string {
+  return s.doneLabel?.trim() || "That's all"
+}
+/** What a question that takes more than one says when it comes back. */
+export function againOf(s: Pick<TemplateStep, 'againText' | 'doneLabel'>): string {
+  return s.againText?.trim() || `Anything else? Pick another, or tap "${doneOf(s)}".`
 }
 
 /** A card's rows: each option, or one line saying what the customer does, with where it goes. */
 export function rowsOf(s: TemplateStep): StepRow[] {
-  if (s.kind === 'question') return (s.buttons ?? []).map((b, i) => ({ i, label: b.label, next: b.next }))
+  if (s.kind === 'question') {
+    const rows: StepRow[] = (s.buttons ?? []).map((b, i) => ({ i, label: b.label, next: b.next, also: b.also ?? [] }))
+    // A question that takes more than one goes on by its finish button.
+    return s.multi ? [...rows, { i: -1, label: doneOf(s), next: s.next ?? '' }] : rows
+  }
   if (s.kind === 'handoff' || s.kind === 'ai') return []
   const label = s.kind === 'text' ? 'Types an answer…' : s.kind === 'phone' ? 'Gives a phone number' : 'Moves on, no reply'
   return [{ i: -1, label, next: s.next ?? '' }]
@@ -169,7 +210,7 @@ export function tidy(steps: TemplateStep[]): TemplateStep[] {
     order.push(id)
     const s = steps.find(x => x.id === id)
     if (!s) continue
-    const outs = [...rowsOf(s).map(r => r.next), s.kind === 'phone' && s.failNext && s.failNext !== 'person' ? s.failNext : '']
+    const outs = [...rowsOf(s).flatMap(r => [...(r.also ?? []), r.next]), s.kind === 'phone' && s.failNext && s.failNext !== 'person' ? s.failNext : '']
     for (const n of outs) if (n && !col.has(n) && steps.some(x => x.id === n)) { col.set(n, col.get(id)! + 1); queue.push(n) }
   }
   let last = Math.max(0, ...col.values())
@@ -218,6 +259,38 @@ export interface Walk {
   waiting: string | null
   tries: number
   ended: 'done' | 'person' | 'ai' | 'stopped' | null
+  /** The options picked so far on a question that takes more than one (lead_contacts.flow_picked). */
+  picked?: number[]
+}
+
+const NUMBERS = /^\s*\d{1,2}((\s*([,，、/&+]|和|及|and)\s*|\s+)\d{1,2})*\s*$/i
+
+/**
+ * Which options an answer picks — twin of lead_flow_question: an option's words, the finish button (a question that
+ * takes more than one), else numbers as `shown` (the list last sent) numbers them; one only where it takes one.
+ * Null: none of those.
+ */
+export function answerPicks(s: TemplateStep, answer: string, shown: string[]): { picks: number[]; finish: boolean } | null {
+  const opts = s.buttons ?? []
+  const done = doneOf(s).toLowerCase()
+  const a = answer.trim().toLowerCase()
+  if (s.multi && a === done) return { picks: [], finish: true }
+  const byWords = opts.findIndex(b => b.label.trim().toLowerCase() === a)
+  if (byWords >= 0) return { picks: [byWords], finish: false }
+  const norm = normDigits(answer)
+  if (!NUMBERS.test(norm)) return null
+  const picks: number[] = []
+  let finish = false
+  for (const m of norm.match(/\d+/g) ?? []) {
+    const k = Number(m)
+    const label = k >= 1 ? shown[k - 1] : undefined
+    if (label === undefined) continue
+    if (s.multi && label.trim().toLowerCase() === done) { finish = true; continue }
+    const i = opts.findIndex(b => b.label.trim().toLowerCase() === label.trim().toLowerCase())
+    if (i >= 0 && !picks.includes(i)) picks.push(i)
+  }
+  const kept = s.multi ? picks : picks.slice(0, 1)
+  return kept.length || finish ? { picks: kept, finish } : null
 }
 
 function endWith(t: { endMsg: string }, own: string | undefined, said: Said[]) {
@@ -247,14 +320,39 @@ export function walkFrom(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, from: strin
 
 /** The customer answered. Twin of lead_flow_on_message. */
 export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, w: Walk, answer: string): Walk {
+  const t0 = t
   const said: Said[] = [...w.said, { from: 'customer', text: answer }]
   const s = t.steps.find(x => x.id === w.waiting)
   if (!s) return { said, waiting: null, tries: 0, ended: 'stopped' }
   let next: string | null = null
   let end: string | undefined
   if (s.kind === 'question') {
-    const o = s.buttons?.find(b => b.label.trim().toLowerCase() === answer.trim().toLowerCase())
-    if (o) { next = o.next; end = o.endMsg }
+    const shown = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons ?? (s.buttons ?? []).map(b => b.label)
+    const hit = answerPicks(s, answer, shown)
+    const sayAlso = (ids: string[] | undefined) => {
+      for (const id of ids ?? []) { const t = t0.steps.find(x => x.id === id); if (t?.text?.trim()) said.push({ from: 'bot', text: t.text }) }
+    }
+    if (hit && !s.multi) {
+      const o = s.buttons![hit.picks[0]]
+      sayAlso(o.also)
+      next = o.next
+      end = o.endMsg
+    } else if (hit) {
+      const had = [...(w.picked ?? [])]
+      for (const i of hit.picks) {
+        if (had.includes(i)) continue
+        sayAlso(s.buttons![i].also)
+        had.push(i)
+      }
+      if (s.saveAs && hit.picks.length) said.push({ from: 'system', text: `Saved to ${SAVE_AS.find(x => x.v === s.saveAs)?.l ?? s.saveAs}: ${had.map(i => s.buttons![i].label).join(', ')}` })
+      const left = (s.buttons ?? []).map((b, i) => ({ b, i })).filter(x => !had.includes(x.i)).map(x => x.b.label)
+      if (!hit.finish && left.length) {
+        said.push({ from: 'bot', text: againOf(s), buttons: [...left, doneOf(s)] })
+        return { said, waiting: s.id, tries: 0, ended: null, picked: had }
+      }
+      next = s.next ?? ''
+      end = s.endMsg
+    }
   } else if (s.kind === 'text') {
     next = s.next ?? ''
     end = s.endMsg
@@ -288,7 +386,7 @@ export function toLibrary(steps: TemplateStep[], from: string, withAfter: boolea
     if (!s) return
     seen.add(id)
     chain.push(s)
-    if (withAfter) for (const r of rowsOf(s)) if (r.next) walk(r.next)
+    if (withAfter) for (const r of rowsOf(s)) for (const n of [...(r.also ?? []), r.next]) if (n) walk(n)
   }
   walk(from)
   const ids = new Map(chain.map((s, i) => [s.id, `s${i + 1}`]))
@@ -300,7 +398,7 @@ export function toLibrary(steps: TemplateStep[], from: string, withAfter: boolea
     return {
       ...rest,
       id: ids.get(s.id)!,
-      ...(s.kind === 'question' ? { buttons: (s.buttons ?? []).map(b => ({ ...b, next: to(b.next) })) } : { next: to(s.next) }),
+      ...(s.kind === 'question' ? { buttons: (s.buttons ?? []).map(b => ({ ...b, next: to(b.next), ...(b.also ? { also: b.also.map(to).filter(Boolean) } : {}) })), next: to(s.next) } : { next: to(s.next) }),
       ...(s.failNext && s.failNext !== 'person' ? { failNext: to(s.failNext) } : {}),
     }
   })
@@ -317,7 +415,7 @@ export function fromLibrary(steps: TemplateStep[], item: Pick<LibraryItem, 'id' 
     const copy: TemplateStep = {
       ...s,
       id: ids.get(s.id)!,
-      ...(s.kind === 'question' ? { buttons: (s.buttons ?? []).map(b => ({ ...b, next: to(b.next) })) } : { next: to(s.next) }),
+      ...(s.kind === 'question' ? { buttons: (s.buttons ?? []).map(b => ({ ...b, next: to(b.next), ...(b.also ? { also: b.also.map(to).filter(Boolean) } : {}) })), next: to(s.next) } : { next: to(s.next) }),
       ...(s.failNext && s.failNext !== 'person' ? { failNext: to(s.failNext) } : {}),
       pos: { x: at.x, y },
       lib: { id: item.id, ver: item.ver },

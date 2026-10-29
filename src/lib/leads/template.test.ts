@@ -105,3 +105,69 @@ describe('cards grow with their words; options move (2026-10-29)', () => {
     expect(moveItem(['a', 'b'], 0, 5)).toEqual(['a', 'b'])
   })
 })
+
+describe('several replies to an option; picking more than one (2026-10-29, mig 20261029150010)', async () => {
+  const { answerPicks, templateProblem, walkAnswer, walkFrom } = await import('./template')
+  const PM = {
+    endMsg: '',
+    steps: [
+      { id: 'q', kind: 'question', text: 'Which are you after?', saveAs: 'interest', multi: true, doneLabel: "That's all", next: 'ph',
+        buttons: [{ label: 'Sofa', next: '', also: ['ms', 'mp'] }, { label: 'Mattress', next: '', also: ['mm'] }, { label: 'Bed frame', next: '' }] },
+      { id: 'ms', kind: 'message', text: 'Our sofas: RM2,990', next: '' },
+      { id: 'mp', kind: 'message', text: 'Sofa promo this month', next: '' },
+      { id: 'mm', kind: 'message', text: 'Our mattresses: RM2,990', next: '' },
+      { id: 'ph', kind: 'phone', text: 'Your phone number?', next: '' },
+    ] as TemplateStep[],
+  }
+  const ONE = {
+    endMsg: '',
+    steps: [
+      { id: 'q', kind: 'question', text: 'Sofa or mattress?', buttons: [{ label: 'Sofa', next: 'ph', also: ['ms'] }, { label: 'Mattress', next: '' }] },
+      { id: 'ms', kind: 'message', text: 'Our sofas: RM2,990', next: '' },
+      { id: 'ph', kind: 'phone', text: 'Your phone number?', next: '' },
+    ] as TemplateStep[],
+  }
+  const bots = (w: { said: Array<{ from: string; text: string }> }, from = 0) => w.said.slice(from).filter(x => x.from === 'bot').map(x => x.text)
+
+  it('reads words, the finish button and numbers as the database does', () => {
+    const q = PM.steps[0]
+    const shown = ['Sofa', 'Mattress', 'Bed frame']
+    expect(answerPicks(q, ' sofa ', shown)).toEqual({ picks: [0], finish: false })
+    expect(answerPicks(q, '1、2', shown)).toEqual({ picks: [0, 1], finish: false })
+    expect(answerPicks(q, '１ 三', shown)).toEqual({ picks: [0, 2], finish: false })
+    expect(answerPicks(q, "that's all", shown)).toEqual({ picks: [], finish: true })
+    expect(answerPicks(q, '2', ['Bed frame', "That's all"])).toEqual({ picks: [], finish: true })
+    expect(answerPicks(q, '123', shown)).toBeNull()
+    expect(answerPicks(q, 'can I pay later?', shown)).toBeNull()
+    expect(answerPicks(ONE.steps[0], '1,2', ['Sofa', 'Mattress'])).toEqual({ picks: [0], finish: false })
+  })
+
+  it('taps one, then another, then finishes', () => {
+    let w = walkFrom(PM, 'q')
+    expect(bots(w)).toEqual(['Which are you after?'])
+    w = walkAnswer(PM, w, 'Sofa')
+    expect(bots(w, 1)).toEqual(['Our sofas: RM2,990', 'Sofa promo this month', 'Anything else? Pick another, or tap "That\'s all".'])
+    expect(w.said.at(-1)).toMatchObject({ buttons: ['Mattress', 'Bed frame', "That's all"] })
+    expect([w.waiting, w.picked]).toEqual(['q', [0]])
+    w = walkAnswer(PM, w, '1')
+    expect(w.picked).toEqual([0, 1])
+    expect(w.said.at(-1)).toMatchObject({ buttons: ['Bed frame', "That's all"] })
+    w = walkAnswer(PM, w, '2')
+    expect([w.waiting, bots(w).at(-1)]).toEqual(['ph', 'Your phone number?'])
+  })
+
+  it('a question that takes one: its other reply, then where it goes', () => {
+    const w = walkAnswer(ONE, walkFrom(ONE, 'q'), '1')
+    expect(bots(w, 1)).toEqual(['Our sofas: RM2,990', 'Your phone number?'])
+    expect(walkAnswer(ONE, walkFrom(ONE, 'q'), 'hello?').ended).toBe('stopped')
+  })
+
+  it('checks as the database does', () => {
+    expect(templateProblem(PM.steps)).toBeNull()
+    expect(templateProblem(ONE.steps)).toBeNull()
+    const bad = (patch: object) => PM.steps.map(s => (s.id === 'q' ? { ...s, ...patch } : s)) as TemplateStep[]
+    expect(templateProblem(bad({ buttons: [{ label: 'Sofa', next: '', also: ['ph'] }] }))).toMatch(/"Send a message" steps/)
+    expect(templateProblem(bad({ buttons: [{ label: 'Sofa', next: 'ms' }] }))).toMatch(/takes more than one/)
+    expect(templateProblem(bad({ doneLabel: 'x'.repeat(21) }))).toMatch(/finish button/)
+  })
+})
