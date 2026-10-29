@@ -1,6 +1,6 @@
 # HOUZS Venture Portal — Session Handoff
 
-## CHECKPOINT 2026-10-29 t (PR ④ built, not merged) — several at once for Finance
+## CHECKPOINT 2026-10-29 t (SHIPPED, #852) — several at once for Finance
 
 Session e73c0205. "可以，开始做 PR ④" → branch `feat/payment-requests-bulk` (plan: `docs/module-spec-payment-requests.md`
 §4d; design: the mockup's ③ 多选 → 一次开几张 PV). **No migration.**
@@ -19,7 +19,9 @@ Session e73c0205. "可以，开始做 PR ④" → branch `feat/payment-requests-
   bar gone.
 - My calls: Revenue claims are not ticked (their voucher goes straight to the Principal, no draft; their reject is Return
   to HR); payroll one by one (the mockup). PR ③'s test fixtures gained the fields `tsc` named (type-only).
-- The merge waits for the user's word.
+- MERGED on "可以，merge #852" once CI was green (7 of 7): squash `8aed9c56`. No migration.
+- Next: PR ⑥ (the rest: the phone's Payment request, the old request pages retired) — opened for review; its
+  migration waits for the user's go. PR ⑤ stays shelved ("不要开key 先").
 
 ## CHECKPOINT 2026-10-29 s (SHIPPED, #850) — a department's approval before Finance
 
