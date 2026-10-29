@@ -211,6 +211,8 @@ export interface ComposerIn {
   saveRecents: (list: string[]) => void;
   /** Suggested replies for the customer's waiting words (shared/suggest-reply.ts, 2026-10-29): a pick fills the box. */
   suggest?: { text: string; why: string }[];
+  /** The floating logo: only while the customer's words wait for us (Suggest reply opens any time). */
+  suggestLogo?: boolean;
 }
 
 /** What only the phone knows, measured by ChatComposer. */

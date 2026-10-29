@@ -351,6 +351,7 @@ personChats
 ph
 photo
 pickGroups
+pickSuggest
 pinShown
 pinText
 plainOp
@@ -454,6 +455,9 @@ srTabs
 srTimeModes
 srWkFg
 srWkNote
+suggest
+suggestKey
+suggestLogo
 sysLines
 teamName
 teamPeople

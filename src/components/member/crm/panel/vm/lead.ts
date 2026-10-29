@@ -26,7 +26,7 @@ import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "..
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { actionsOnScreen, closeActions, openActions, type ActionSheet } from "../../shared/action-sheet";
-import { suggestReplies } from "../../shared/suggest-reply";
+import { suggestReplies, waitingWords } from "../../shared/suggest-reply";
 import { openSuggest } from "../../shared/suggest-float";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
@@ -240,7 +240,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     key: cid, state: composerOf(ui.pCmp, cid) ?? initialComposer(), set: setCmp,
     placeholder: c ? `Reply to ${first(c.name)}…` : "", draft, setDraft, canSend: has, send: () => void send(),
     warm: !shut, openTpl: () => void openTpl(), tplOn: ctx.data.settings?.suggestTemplate !== false, coldSub: c ? coldLine(c, now) : "",
-    suggest: c && !shut ? suggestReplies(c, ctx.data.replyExamples ?? [], ctx.data.quickReplies) : undefined,
+    suggest: c && !shut ? suggestReplies(c, ctx.data.replyExamples ?? [], ctx.data.quickReplies) : undefined, suggestLogo: !!c && !!waitingWords(c),
     reply: reply ? { who: reply.who, text: reply.text } : null, cancelReply: () => patch({ pReply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()) } : null,

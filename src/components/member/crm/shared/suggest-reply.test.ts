@@ -21,8 +21,11 @@ describe("suggestReplies", () => {
     expect(s.map(x => x.text)).toContain("Hi Wah，价格要看单位大小哦");
     expect(s.some(x => x.text.includes("出租"))).toBe(false);
   });
-  it("offers nothing once we have answered, and a quick reply that matches", () => {
-    expect(suggestReplies(chat(msg("lead", "price?"), msg("me", "RM 9,999")), EXAMPLES)).toEqual([]);
+  it("once we have answered, still suggests for the customer's last words (no words waiting); and a quick reply that matches", () => {
+    const answered = chat(msg("lead", "价格多少"), msg("me", "RM 9,999"));
+    expect(waitingWords(answered)).toBe("");
+    expect(suggestReplies(answered, EXAMPLES)[0].text).toBe("Hi Wah，价格要看单位大小哦");
+    expect(suggestReplies(chat(msg("me", "Hello")), EXAMPLES)).toEqual([]);
     const s = suggestReplies(chat(msg("lead", "can rent out?")), [], [{ id: "1", shortcut: "rent", message: "Yes {name}, we rent it out for you" }]);
     expect(s).toEqual([{ text: "Yes Wah, we rent it out for you", why: "Quick reply /rent" }]);
   });

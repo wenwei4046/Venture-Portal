@@ -18,7 +18,7 @@ import { albumsOf, galleryOf, mediaOf, mediaWord, MINE_BG, MINE_TIME, NO_MEDIA, 
 import { MENU_ICON, REACTIONS, openMsgView, openStarred } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { ATTACH_TILES, DOC_ACCEPT } from "../../shared/attach-sheet";
-import { suggestReplies } from "../../shared/suggest-reply";
+import { suggestReplies, waitingWords } from "../../shared/suggest-reply";
 
 const SPARK = "M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z";
 import { CATS, ICON as CMP_ICON, emojiView, pushRecent } from "../../sales/vm/composer";
@@ -163,6 +163,9 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
       cats: CATS.map(([id, label, icon]) => ({ label, d: CMP_ICON[icon], on: !emo?.searching && emo?.ecat === id, pick: () => emoSet({ ecat: id, searching: false, q: "" }) })),
       list: (ev?.list ?? []).map(e => ({ e, pick: () => { setD(draft + e); const r = pushRecent(mine, e); patch({ recents: r }); ctx.deskAct.saveRecents(r); } })) },
     c, msgs, firstDay, draft,
+    // The suggested replies' floating logo over the reply box (2026-10-29: "电脑版也加漂浮 logo"), as the phone's.
+    suggest: c ? suggestReplies(c, data.replyExamples ?? [], data.quickReplies) : undefined, suggestKey: c?.id ?? "", pickSuggest: (text: string) => setD(text),
+    suggestLogo: !!c && !!waitingWords(c),
     setDraft: (e: { target: { value: string } }) => setD(e.target.value),
     draftKey: (e: { key: string; shiftKey: boolean; preventDefault(): void }) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } },
     send, micD: draft.trim() ? "M5 12h14M13 6l6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3",
