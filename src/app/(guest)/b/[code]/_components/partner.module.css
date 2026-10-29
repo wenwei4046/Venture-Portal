@@ -67,5 +67,16 @@
 .facts dt { color: rgb(122 104 92); }
 .facts dd { margin: 0; }
 
+.listHead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.listHead .h2 { flex: 1; margin: 0; }
+.listSearch { max-width: 320px; }
+.table { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: 170px minmax(0, 1fr) minmax(0, 1fr) 130px minmax(0, 0.9fr) 100px 70px; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid rgb(240 232 224); font-size: 13px; }
+.row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowHead { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: rgb(122 104 92); border-bottom-color: rgb(229 218 208); }
+.refCell { font-family: ui-monospace, 'Chivo Mono', monospace; font-weight: 600; color: rgb(189 74 25); }
+.row .ghost { padding: 6px 12px; font-size: 12px; }
+@media (max-width: 960px) { .row { grid-template-columns: 1fr 1fr; } .rowHead { display: none; } }
+
 .closed { max-width: 460px; margin: 18vh auto 0; text-align: center; padding: 0 24px; }
 .closed h1 { font: 600 26px var(--font-display-rv), 'Inter Tight', Inter, sans-serif; }
