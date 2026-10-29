@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { removeTemplate, saveLibraryItem, saveTemplate } from '@/lib/leads/actions'
 import { infoEntries, type LeadInfo } from '@/lib/leads/info'
 import {
-  CARD_W, KINDS, OPTION_MAX, moveItem, SIDE_W, clampSide, RETRY_PHONE, SAVE_AS, fromLibrary, kindOf, placed, rowsOf, runsOn, stepAfter, templateProblem, tidy, toLibrary,
-  updateFromLibrary, walkAnswer, walkFrom, freshId, type LibraryItem, type ReplyRules, type ReplyTemplate, type StepKind, type TemplateStep, type Walk,
+  ALSO_MAX, CARD_W, KINDS, OPTION_MAX, doneOf, moveItem, SIDE_W, clampSide, RETRY_PHONE, SAVE_AS, fromLibrary, kindOf, placed, rowsOf, runsOn, stepAfter, templateProblem, tidy, toLibrary,
+  updateFromLibrary, walkAnswer, walkFrom, freshId, type LibraryItem, type ReplyRules, type ReplyTemplate, type StepKind, type StepOption, type TemplateStep, type Walk,
 } from '@/lib/leads/template'
 import { LeadIcon } from '@/components/layout/lead-icons'
 import { wrapMark } from '@/lib/leads/rich'
@@ -119,7 +119,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
       ...d,
       steps: d.steps.filter(x => x.id !== id).map(x => ({
         ...x,
-        ...(x.buttons ? { buttons: x.buttons.map(b => (b.next === id ? { ...b, next: '' } : b)) } : {}),
+        ...(x.buttons ? { buttons: x.buttons.map(b => ({ ...b, ...(b.next === id ? { next: '' } : {}), ...(b.also?.includes(id) ? { also: b.also.filter(a => a !== id) } : {}) })) } : {}),
         ...(x.next === id ? { next: '' } : {}),
         ...(x.failNext === id ? { failNext: 'person' } : {}),
       })),
@@ -282,6 +282,13 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
                         change(d => ({ ...d, steps: [...d.steps, { ...n, name: '' }] }))
                         setSel(n.id)
                       }}
+                      newReply={(j, label) => {
+                        // An option's other reply: a new "Send a message" step, added to the option's `also` (mig 20261029150010).
+                        const n = stepAfter(draft.steps, step, label)
+                        const placed = { ...n, pos: { x: n.pos!.x, y: (step.pos?.y ?? 40) + j * 40 + (step.buttons?.[j]?.also?.length ?? 0) * 30 } }
+                        change(d => ({ ...d, steps: [...d.steps.map(x => (x.id !== step.id ? x : { ...x, buttons: (x.buttons ?? []).map((b, k) => (k === j ? { ...b, also: [...(b.also ?? []), n.id] } : b)) })), placed] }))
+                        setSel(n.id)
+                      }}
                       lib={step.lib ? libById.get(step.lib.id) ?? null : null} toLib={toLib} info={info} today={today} />
                   ) : (
                     <div className={s.sideBody}><span className={s.small}>Pick a step on the map to edit it.</span></div>
@@ -299,7 +306,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
 
 // ── The map ──
 
-type Line = { key: string; d: string; tone: string; to: string; from: string; head: string }
+type Line = { key: string; d: string; tone: string; to: string; from: string; head: string; also?: boolean }
 
 function Canvas({ draft, sel, setSel, canEdit, library, libById, change, setStep, removeStep, toLib, setPanel }: {
   draft: Draft
@@ -338,7 +345,8 @@ function Canvas({ draft, sel, setSel, canEdit, library, libById, change, setStep
     const next: Line[] = []
     for (const st of draft.steps) {
       const tone = kindOf(st.kind).tone
-      const outs: Array<{ i: number; to: string }> = rowsOf(st).filter(r => r.next).map(r => ({ i: r.i, to: r.next }))
+      // An option's other replies draw dashed lines beside its way on (mig 20261029150010).
+      const outs: Array<{ i: number; to: string; also?: boolean }> = rowsOf(st).flatMap(r => [...(r.also ?? []).map(to => ({ i: r.i, to, also: true })), ...(r.next ? [{ i: r.i, to: r.next }] : [])])
       if (st.kind === 'phone' && st.failNext && st.failNext !== 'person') outs.push({ i: -2, to: st.failNext })
       for (const o of outs) {
         const port = w.querySelector(`[data-port="${st.id}:${o.i === -2 ? -1 : o.i}"]`)
@@ -346,7 +354,7 @@ function Canvas({ draft, sel, setSel, canEdit, library, libById, change, setStep
         if (!port || !card) continue
         const p = at(port), c = at(card)
         const x1 = p.x + p.w, y1 = p.y + p.h / 2 + (o.i === -2 ? 4 : 0), x2 = c.x - 2, y2 = c.y + 14
-        next.push({ key: `${st.id}:${o.i}:${o.to}`, d: orth(x1, y1, x2, y2), tone, to: o.to, from: st.id, head: `M${x2 - 7},${y2 - 4} L${x2},${y2} L${x2 - 7},${y2 + 4}` })
+        next.push({ key: `${st.id}:${o.i}:${o.to}:${o.also ? 'a' : 'n'}`, d: orth(x1, y1, x2, y2), tone, to: o.to, from: st.id, head: `M${x2 - 7},${y2 - 4} L${x2},${y2} L${x2 - 7},${y2 + 4}`, also: o.also })
       }
     }
     setLines(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
@@ -472,7 +480,7 @@ function Canvas({ draft, sel, setSel, canEdit, library, libById, change, setStep
             const on = hover === l.key || sel === l.from || sel === l.to
             return (
               <g key={l.key} style={{ color: `rgb(var(${l.tone}))`, opacity: on ? 1 : 0.7 }}>
-                <path d={l.d} fill="none" stroke="currentColor" strokeWidth={on ? 2.25 : 1.4} />
+                <path d={l.d} fill="none" stroke="currentColor" strokeWidth={on ? 2.25 : 1.4} strokeDasharray={l.also ? '5 4' : undefined} />
                 <path d={l.head} fill="none" stroke="currentColor" strokeWidth={on ? 2.25 : 1.4} />
                 <path d={l.d} fill="none" stroke="transparent" strokeWidth={10} style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
                   onMouseEnter={() => setHover(l.key)} onMouseLeave={() => setHover(null)} onClick={() => setSel(l.to)} />
@@ -501,8 +509,22 @@ function Canvas({ draft, sel, setSel, canEdit, library, libById, change, setStep
                   {rows.map(r => (
                     <div key={r.i} className={s.row}>
                       <span className={s.pill} data-summary={r.i === -1 ? '' : undefined}>{r.label || '—'}</span>
-                      <span className={s.target}>{r.next ? `→ ${draft.steps.findIndex(x => x.id === r.next) + 1}` : 'End'}</span>
-                      {!r.next && canEdit ? (
+                      <span className={s.target}>{(() => {
+                        const to = [...(r.also ?? []), r.next].filter(Boolean).map(id => draft.steps.findIndex(x => x.id === id) + 1)
+                        return to.length ? `→ ${to.join(', ')}` : st.multi && r.i >= 0 ? 'Kept' : 'End'
+                      })()}</span>
+                      {canEdit && st.multi && r.i >= 0 && (r.also?.length ?? 0) < ALSO_MAX ? (
+                        <button type="button" className={s.plus} title="Add a reply to this option"
+                          onClick={() => {
+                            const n = stepAfter(draft.steps, st, r.label)
+                            change(d => ({
+                              ...d,
+                              steps: [...d.steps.map(x => (x.id !== st.id ? x : { ...x, buttons: (x.buttons ?? []).map((b, j) => (j === r.i ? { ...b, also: [...(b.also ?? []), n.id] } : b)) })), { ...n, pos: { x: n.pos!.x, y: p.y + r.i * 40 + (r.also?.length ?? 0) * 30 } }],
+                            }))
+                            setSel(n.id); setPanel('edit')
+                          }}><LeadIcon name="plus" size={10} /></button>
+                      ) : null}
+                      {!r.next && canEdit && !(st.multi && r.i >= 0) ? (
                         <button type="button" className={s.plus} title="Add the next step"
                           onClick={() => {
                             const n = stepAfter(draft.steps, st, r.i === -1 ? '' : r.label)
@@ -513,7 +535,7 @@ function Canvas({ draft, sel, setSel, canEdit, library, libById, change, setStep
                             setSel(n.id); setPanel('edit')
                           }}><LeadIcon name="plus" size={10} /></button>
                       ) : null}
-                      {r.next ? <span className={s.port} data-port={`${st.id}:${r.i}`} /> : <span data-port={`${st.id}:${r.i}`} style={{ width: 0 }} />}
+                      {r.next || r.also?.length ? <span className={s.port} data-port={`${st.id}:${r.i}`} /> : <span data-port={`${st.id}:${r.i}`} style={{ width: 0 }} />}
                     </div>
                   ))}
                 </div>
@@ -584,7 +606,7 @@ function orth(x1: number, y1: number, x2: number, y2: number): string {
 
 // ── Edit step ──
 
-function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAfter, lib, toLib, info, today }: {
+function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAfter, newReply, lib, toLib, info, today }: {
   step: TemplateStep
   draft: Draft
   setSel: (id: string | null) => void
@@ -592,6 +614,8 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
   setStep: (id: string, o: Partial<TemplateStep> | ((x: TemplateStep) => Partial<TemplateStep>)) => void
   removeStep: (id: string) => void
   insertAfter: () => void
+  /** A new "Send a message" step as one more reply of option j. */
+  newReply: (j: number, label: string) => void
   lib: LibraryItem | null
   toLib: (step: TemplateStep, withAfter: boolean, asNew?: boolean) => void
   info: LeadInfo | null
@@ -646,6 +670,50 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
       <input className={s.input} value={value ?? ''} maxLength={1000} disabled={dis} placeholder={draft.endMsg || 'e.g. Thanks! Our salesperson will WhatsApp you soon 😊'} onChange={e => onChange(e.target.value)} />
     </label>
   )
+  // An option's other replies — "Send a message" steps sent first, in order (2026-10-29, mig 20261029150010).
+  const alsoList = (j: number, b: StepOption, title: string) => {
+    const ids = b.also ?? []
+    const setAlso = (next: string[]) => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, also: next } : x)) })
+    const pickable = draft.steps.filter(x => x.kind === 'message' && x.id !== step.id && !ids.includes(x.id))
+    const named = (x: TemplateStep | undefined) => x?.name || x?.text?.trim().slice(0, 28) || 'Message'
+    return (
+      <div className={s.field}>{title}
+        {ids.length ? (
+          <span className={s.alsoList}>
+            {ids.map((id, k) => {
+              const t = draft.steps.findIndex(x => x.id === id)
+              return (
+                <span key={id} className={s.alsoChip}>
+                  <span className={s.num}>{k + 1}</span><span style={{ flex: 1, minWidth: 0 }}>→ {t + 1} · {named(draft.steps[t])}</span>
+                  {canEdit ? <button type="button" className={s.x} title="Take this reply off" onClick={() => setAlso(ids.filter(x => x !== id))}>×</button> : null}
+                </span>
+              )
+            })}
+          </span>
+        ) : null}
+        {canEdit && ids.length < ALSO_MAX ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <select className={s.select} style={{ flex: 1 }} value="" aria-label={`${title} · option ${j + 1}`} onChange={e => { if (e.target.value) setAlso([...ids, e.target.value]) }}>
+              <option value="">+ Add a message step…</option>
+              {pickable.map(x => <option key={x.id} value={x.id}>{draft.steps.indexOf(x) + 1} · {named(x)}</option>)}
+            </select>
+            <button type="button" className={s.link} onClick={() => newReply(j, b.label)}>+ New message</button>
+          </span>
+        ) : null}
+      </div>
+    )
+  }
+  // More than one: each option's Goes to becomes one of its replies when it is a message, and goes nowhere itself.
+  const setMulti = (on: boolean) => set(on
+    ? {
+        multi: true,
+        buttons: (step.buttons ?? []).map(b => {
+          const t = draft.steps.find(x => x.id === b.next)
+          const also = [...(t?.kind === 'message' ? [t.id] : []), ...(b.also ?? [])].filter((id, k, a) => a.indexOf(id) === k).slice(0, ALSO_MAX)
+          return { ...b, next: '', also }
+        }),
+      }
+    : { multi: false })
   const setKind = (k: StepKind) => {
     const o: Partial<TemplateStep> = { kind: k }
     if (k === 'question' && !(step.buttons ?? []).length) o.buttons = [{ label: 'Option 1', next: step.next ?? '' }]
@@ -742,6 +810,14 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
 
         {step.kind === 'question' ? (
           <>
+            {/* Picking more than one (2026-10-29 — the user: "then 是否能做多选的选项呢？"). */}
+            <label className={s.checkRow}>
+              <input type="checkbox" checked={!!step.multi} disabled={dis} onChange={e => setMulti(e.target.checked)} />
+              Customer can pick more than one
+            </label>
+            <span className={s.small}>{step.multi
+              ? `Each option tapped sends its replies, then the question comes back with the options left and “${doneOf(step)}”. Customers may also type the numbers, e.g. 1,3.`
+              : 'Customers tap an option, or type its number.'}</span>
             {(step.buttons ?? []).map((b, j) => (
               <div key={j} className={s.option} data-opt="" data-dragging={optDrag?.from === j || undefined}
                 data-drop={optDrag && optDrag.over === j && optDrag.from !== j ? (optDrag.after ? 'after' : 'before') : undefined}
@@ -770,15 +846,32 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
                     onChange={e => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, label: e.target.value } : x)) })} />
                   {canEdit && step.buttons!.length > 1 ? <button type="button" className={s.x} title="Remove option" onClick={() => set({ buttons: step.buttons!.filter((_, k) => k !== j) })}>×</button> : null}
                 </span>
-                <label className={s.field}>↳ Goes to {goes(b.next, v => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, next: v } : x)) }), `Option ${j + 1} goes to`)}</label>
-                {!b.next ? closing(b.endMsg, v => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, endMsg: v } : x)) })) : null}
+                {step.multi ? alsoList(j, b, '↳ Replies with') : (
+                  <>
+                    {alsoList(j, b, '↳ Also sends first')}
+                    <label className={s.field}>↳ Goes to {goes(b.next, v => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, next: v } : x)) }), `Option ${j + 1} goes to`)}</label>
+                    {!b.next ? closing(b.endMsg, v => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, endMsg: v } : x)) })) : null}
+                  </>
+                )}
               </div>
             ))}
             {canEdit ? (
               <span style={{ display: 'flex', gap: 14 }}>
                 <button type="button" className={s.link} disabled={(step.buttons ?? []).length >= 13} onClick={() => set({ buttons: [...(step.buttons ?? []), { label: `Option ${(step.buttons ?? []).length + 1}`, next: '' }] })}>+ Add option</button>
-                <button type="button" className={s.link} onClick={() => set({ buttons: step.buttons!.map(x => ({ ...x, next: step.buttons![0].next })) })}>Same for all</button>
+                {!step.multi ? <button type="button" className={s.link} onClick={() => set({ buttons: step.buttons!.map(x => ({ ...x, next: step.buttons![0].next })) })}>Same for all</button> : null}
               </span>
+            ) : null}
+            {step.multi ? (
+              <>
+                <label className={s.field}>Finish button · 20 characters
+                  <input className={s.input} value={step.doneLabel ?? ''} maxLength={20} disabled={dis} placeholder="That's all" onChange={e => set({ doneLabel: e.target.value })} />
+                </label>
+                <label className={s.field}>When it comes back, it says
+                  <input className={s.input} value={step.againText ?? ''} maxLength={1000} disabled={dis} placeholder={`Anything else? Pick another, or tap "${doneOf(step)}".`} onChange={e => set({ againText: e.target.value })} />
+                </label>
+                <label className={s.field}>After “{doneOf(step)}”, goes to {goes(step.next, v => set({ next: v }), 'After the finish button, goes to')}</label>
+                {!step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
+              </>
             ) : null}
             <label className={s.field}>Keep the answer in
               <select className={s.select} value={step.saveAs ?? ''} disabled={dis} onChange={e => set({ saveAs: (e.target.value || null) as TemplateStep['saveAs'] })}>
