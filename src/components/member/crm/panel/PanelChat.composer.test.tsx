@@ -105,22 +105,21 @@ describe("the Team chat is Mine's", () => {
     expect(emojiCells()[0].textContent).toBe("🛏️");
   });
 
-  it("Attach: Photos opens the photo picker; Quick replies and Auto replies open their lists", async () => {
+  it("Attach: Photos opens the photo picker; Suggest reply (Auto replies' place since 2026-10-29) opens the suggested replies", async () => {
     await openTeamChat();
     await tap(byTitle("Attach"));
     const panel = composer().querySelector<HTMLElement>("[data-attach]")!;
-    expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Auto replies"]);
+    expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Suggest reply"]);
     const photo = document.getElementById("crm-panel-photo")!, click = vi.spyOn(photo, "click");
     await tap(screen.getByText("Photos"));
     expect(click).toHaveBeenCalledTimes(1);
     expect(composer().querySelector("[data-attach]")).toBeNull();
     await tap(byTitle("Attach"));
-    await tap(screen.getByText("Auto replies"));
-    const sheet = screen.getByRole("dialog", { name: "Attach" });
-    expect(sheet.textContent).toContain("Auto replies");
+    await tap(screen.getByText("Suggest reply"));
+    const sheet = screen.getByRole("dialog", { name: "Suggested replies" });
+    expect(sheet.textContent).toContain("Suggested replies");
     const cam = document.getElementById("crm-panel-camera")!, camClick = vi.spyOn(cam, "click");
-    fireEvent.click(sheet);
-    await act(async () => {});
+    await tap(screen.getByRole("button", { name: "Close" }));
     await tap(byTitle("Camera"));
     expect(camClick).toHaveBeenCalledTimes(1);
   });

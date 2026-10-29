@@ -289,6 +289,8 @@ export interface CrmData {
   labels: CrmLabel[];
   customerLabels: Record<string, string[]>;
   quickReplies: CrmQuickReply[];
+  /** What customers asked and our team answered (crm_reply_examples, 2026-10-29) — the suggested replies' experience; read once, absent until then. */
+  replyExamples?: { q: string; a: string; won?: boolean; appt?: boolean }[];
   autoReplies: CrmAutoReplySet;
   /** Other people's auto-replies, for View as (read only) — only for whoever sees everybody's CRM. */
   autoRepliesOf?: Record<string, CrmAutoReplySet>;

@@ -17,7 +17,10 @@ import type { DeskCtx } from "./ctx";
 import { albumsOf, galleryOf, mediaOf, mediaWord, MINE_BG, MINE_TIME, NO_MEDIA, tickColor } from "../../shared/chat-media";
 import { MENU_ICON, REACTIONS, openMsgView, openStarred } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
-import { ATTACH_TILES, autoChoices, DOC_ACCEPT } from "../../shared/attach-sheet";
+import { ATTACH_TILES, DOC_ACCEPT } from "../../shared/attach-sheet";
+import { suggestReplies } from "../../shared/suggest-reply";
+
+const SPARK = "M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z";
 import { CATS, ICON as CMP_ICON, emojiView, pushRecent } from "../../sales/vm/composer";
 import { adKindLabel } from "../../shared/AdLink";
 
@@ -133,19 +136,21 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
   const pinnedId = c ? data.prefs[c.id]?.pinnedMessageId ?? null : null, pinned = c && pinnedId ? c.messages.find(m => m.id === pinnedId) : undefined;
   // The + menu: the phone's + sheet's choices; Quick replies and Auto replies list their texts in the same menu.
   const view = ui.attachView;
+  // Auto replies' place is Suggest reply since 2026-10-29 (the owner: "替换 auto replies"): the suggested replies for the
+  // customer's waiting words (shared/suggest-reply.ts), as the phone's floating logo offers them.
   const choices = view === "quick" ? data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : q.message.slice(0, 24), text: q.message }))
-    : view === "auto" ? autoChoices(data.autoReplies) : [];
+    : view === "auto" && c ? suggestReplies(c, data.replyExamples ?? [], data.quickReplies).map(s => ({ label: s.text.replace(/\s+/g, " ").slice(0, 70), text: s.text })) : [];
   const attachOpts = view ? [
     { label: "Back", bg: "var(--crm-muted)", d: "M15 18l-6-6 6-6", sep: false, pick: () => patch({ attachView: "" }) },
     ...(choices.length ? choices.map((x, i) => ({ label: x.label, bg: view === "quick" ? "var(--crm-brown)" : "var(--crm-brown)", d: view === "quick" ? ATTACH_TILES[3][2] : ATTACH_TILES[4][2], sep: i === 0,
       pick: () => { setD(x.text); patch({ attachOpen: false, attachView: "" }); } }))
-      : [{ label: view === "quick" ? "No quick replies yet" : "No auto replies yet", bg: "var(--crm-faint)", d: ATTACH_TILES[view === "quick" ? 3 : 4][2], sep: true, pick: () => {} }]),
-  ] : ATTACH_TILES.map(([k, label, d, bg], i) => ({ label, bg, d, sep: i === 3,
+      : [{ label: view === "quick" ? "No quick replies yet" : "No suggestion for the last message yet", bg: "var(--crm-faint)", d: ATTACH_TILES[view === "quick" ? 3 : 4][2], sep: true, pick: () => {} }]),
+  ] : ATTACH_TILES.map(([k, label0, d0, bg0], i) => { const sug = k === "auto"; const label = sug ? "Suggest reply" : label0, d = sug ? SPARK : d0, bg = sug ? "var(--crm-rust)" : bg0; return { label, bg, d, sep: i === 3,
     pick: () => {
       if (k === "quick" || k === "auto") { patch({ attachView: k }); return; }
       patch({ attachOpen: false });
       if (k === "camera") pick("image/*,video/*", false, true); else if (k === "photos") pick("image/*,video/*", true); else pick(DOC_ACCEPT, true);
-    } }));
+    } }; });
   // The emoji panel: the phone's Sticker panel's Emoji tab (its categories, Recents and search), as a popover over the
   // sticker icon; a pick goes into the reply box and to the front of one's Recents.
   const emo = ui.emo, mine = ui.recents ?? data.recentEmoji ?? [], ev = emo ? emojiView(emo, mine) : null;

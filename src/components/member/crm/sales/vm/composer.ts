@@ -61,12 +61,13 @@ export const NAMES: Readonly<Record<string, string>> = { bed: "🛏️", mattres
 /** The panel's tabs: Emoji alone while GIF and Sticker wait (the owner, 2026-10-14). */
 export const TABS: readonly (readonly [string, string, string])[] = [["emoji", "Emoji", ICON.smile]];
 
-/** The Attach panel's tiles (the prototype's TILES) — the CRM's own Photos, Document, Quick replies, Auto replies. */
+/** The Attach panel's tiles (the prototype's TILES) — the CRM's own Photos, Document, Quick replies, and Suggest reply (in Auto
+ * replies' place since 2026-10-29: "替换 auto replies"). */
 export const TILES = [
   ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "var(--crm-ink-soft)"],
   ["Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "var(--crm-rust)"],
   ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "var(--crm-brown)"],
-  ["Auto replies", "M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", "var(--crm-brown)"],
+  ["Suggest reply", "M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z", "var(--crm-rust)"],
 ] as const;
 export type TileLabel = (typeof TILES)[number][0];
 
@@ -208,6 +209,8 @@ export interface ComposerIn {
   /** One's recent emoji (crm_staff_prefs.recent_emoji), most recent first. */
   recents: readonly string[];
   saveRecents: (list: string[]) => void;
+  /** Suggested replies for the customer's waiting words (shared/suggest-reply.ts, 2026-10-29): a pick fills the box. */
+  suggest?: { text: string; why: string }[];
 }
 
 /** What only the phone knows, measured by ChatComposer. */

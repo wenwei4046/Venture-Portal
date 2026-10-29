@@ -134,11 +134,11 @@ describe("the Sticker panel", () => {
 });
 
 describe("the Attach panel", () => {
-  it("holds Photos, Document, Quick replies and Auto replies — the CRM's own", async () => {
+  it("holds Photos, Document, Quick replies and Suggest reply (Auto replies until 2026-10-29) — the CRM's own", async () => {
     await openChat();
     await tap(byTitle("Attach"));
     const panel = composer().querySelector<HTMLElement>("[data-attach]")!;
-    expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Auto replies"]);
+    expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Suggest reply"]);
     // A card floating over the chat, as tall as its tiles (2026-10-15): not the keyboard's height, not in the stack's flow.
     expect(panel.style.position).toBe("absolute");
     expect(panel.style.height).toBe("");
