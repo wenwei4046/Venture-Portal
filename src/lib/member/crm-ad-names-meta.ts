@@ -286,3 +286,27 @@ export async function metaAdThumbs(adIds: string[], token: string, fetchImpl: ty
   for (let i = 0; i < ids.length; i += 4) await Promise.all(ids.slice(i, i + 4).map(one))
   return out
 }
+
+/**
+ * Where an ad can be seen (2026-10-29, the owner: Ads Performance's ↗ "跳转的广告都不是正确的" — it opened one customer's
+ * referral link, which Meta gives per click and need not be the ad): the ad's own post on Facebook (its creative's
+ * effective_object_story_id, "<page>_<post>"), else its Instagram post; null when the token cannot see it.
+ */
+export async function metaAdPermalink(adId: string, token: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  if (!AD_ID.test(adId)) return null
+  try {
+    const fields = encodeURIComponent('creative{effective_object_story_id,instagram_permalink_url}')
+    const res = await fetchImpl(`https://graph.facebook.com/${GRAPH_VERSION}/${adId}?fields=${fields}`, {
+      headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000),
+    })
+    if (!res.ok) return null
+    const body = (await res.json()) as { creative?: { effective_object_story_id?: unknown; instagram_permalink_url?: unknown } }
+    const story = body.creative?.effective_object_story_id
+    if (typeof story === 'string' && /^\d+_\d+$/.test(story)) return `https://www.facebook.com/${story}`
+    const ig = body.creative?.instagram_permalink_url
+    if (typeof ig === 'string' && /^https:\/\/(www\.)?instagram\.com\//.test(ig)) return ig
+    return null
+  } catch {
+    return null
+  }
+}

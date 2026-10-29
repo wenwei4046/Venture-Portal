@@ -67,7 +67,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
     const ids = new Set<string>(); customers.forEach(c => { if (c.adId) ids.add(c.adId); });
     return [...ids].map(id => { const cs = customers.filter(c => c.adId === id); return { id, name: p.adNames[id]?.name ?? cs[0]?.ad ?? id, cs, hidden: !!p.adNames[id]?.hidden,
       // The ad itself: the link Meta sent with its leads, else Ads Manager (the owner, 2026-10-24: "加個按鈕可以導入去看那隻廣告").
-      url: [...cs].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).find(c => c.adUrl?.startsWith("https://"))?.adUrl ?? `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${id}` }; });
+      url: id.startsWith("ch:") ? "" : `/member/crm-ad/${encodeURIComponent(id)}` }; });
   }, [customers, p.adNames]);
   // An ad hidden earlier (crm_hide_ad) stays out of the list and the totals.
   const hidIds = new Set(ads.filter(a => a.hidden).map(a => a.id));

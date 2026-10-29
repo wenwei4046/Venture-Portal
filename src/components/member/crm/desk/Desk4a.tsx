@@ -33,7 +33,6 @@ interface SideBits {
   f4: Frame4a;
   showScope: boolean;
   scopeOpts: { label: string; on: boolean; pick: () => void }[];
-  brandOpts?: { label: string; title: string; on: boolean; pick: () => void }[];
   toggleSb: () => void;
   returnApp: () => void;
   meMenuOpen: boolean;
@@ -132,12 +131,6 @@ export function Desk4aSide({ v }: { v: SideBits }) {
         <div style={{ display: "flex", margin: "0 0 10px", background: "var(--crm-field)", borderRadius: "7px", padding: "3px", gap: "2px" }}>
           {v.scopeOpts.map(o => <button key={o.label} type="button" onClick={o.pick} style={{ ...BTN, flex: 1, height: "26px", borderRadius: "5px", textAlign: "center", font: "500 13px Inter, sans-serif",
             background: o.on ? "var(--crm-page)" : "transparent", color: o.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{o.label}</button>)}
-        </div>
-      )}
-      {!!v.brandOpts?.length && (
-        <div role="radiogroup" aria-label="Brand" style={{ display: "flex", margin: "0 0 10px", background: "var(--crm-field)", borderRadius: "7px", padding: "3px", gap: "2px" }}>
-          {v.brandOpts.map(o => <button key={o.label} type="button" role="radio" aria-checked={o.on} title={o.title} onClick={o.pick} style={{ ...BTN, flex: 1, height: "26px", borderRadius: "5px", textAlign: "center", font: "500 12.5px Inter, sans-serif", whiteSpace: "nowrap",
-            background: o.on ? "var(--crm-rust)" : "transparent", color: o.on ? "#fff" : "var(--crm-muted)" }}>{o.label}</button>)}
         </div>
       )}
       {f.crmNav.map((g, gi) => (<div key={gi} style={{ display: "contents" }}>
@@ -366,6 +359,7 @@ export function DeskInsight4a({ v }: { v: InsightBits }) {
 
 interface WhoOpt { head?: boolean; sel?: boolean; label: string; n?: number; color?: string; isGroup?: boolean; isPerson?: boolean; avBg?: string; avFg?: string; ini?: string; pick?: () => void }
 interface InboxListBits {
+  brandOpts?: { label: string; title: string; n: number; on: boolean; pick: () => void }[];
   whoLabel: string; whoOpen: boolean; toggleWho: () => void; whoClear: () => void; whoOpts: WhoOpt[];
   list4: {
     q: string; setQ: (e: { target: { value: string } }) => void;
@@ -381,6 +375,15 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "14px", padding: "16px 18px 12px" }}>
+        {/* The brand, as Lead View's Inbox (the owner, 2026-10-29: "不同专页像截图 3 那样分"): All · The Conts · Dream Crafter with
+            the chats waiting in each; the pick keeps every page of the CRM to that brand (DeskScreens › inBrand). */}
+        {!!v.brandOpts?.length && (
+          <div role="tablist" aria-label="Brand" style={{ display: "flex", alignItems: "center", gap: "4px", overflowX: "auto", scrollbarWidth: "none" }}>
+            {v.brandOpts.map(o => <button key={o.label} type="button" role="tab" aria-selected={o.on} title={o.title} onClick={o.pick} style={{ ...BTN, flex: "none", height: "30px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap",
+              font: `${o.on ? 600 : 500} 13px Inter, sans-serif`, background: o.on ? "var(--crm-ink)" : "transparent", color: o.on ? "#fff" : "var(--crm-ink-soft)" }}>
+              {o.label}<span style={{ font: "400 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: o.on ? "rgba(255,255,255,.75)" : "var(--crm-faint)" }}>{o.n}</span></button>)}
+          </div>
+        )}
         <div style={{ display: "flex", gap: "8px" }}>
           <span style={{ position: "relative", flex: "none" }}>
             <button type="button" onClick={v.toggleWho} aria-expanded={v.whoOpen} style={{ ...BTN, height: "36px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "6px",
