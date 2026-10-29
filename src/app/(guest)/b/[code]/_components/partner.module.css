@@ -161,3 +161,7 @@
 .dayMon { font-size: 10px !important; color: rgb(122 104 92) !important; font-weight: 500; }
 .dayMonFirst { color: rgb(189 74 25) !important; font-weight: 600; }
 .on .dayMon { color: rgb(255 255 255 / .85) !important; }
+
+/* The slot picked: the showroom on one line, the day and time under it (the owner, 2026-10-29: "下一行吧，好看些"). */
+.sumText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sumText span { color: rgb(122 104 92); font-size: 13px; }
