@@ -151,14 +151,15 @@ export default function DeskScreens(p: DeskScreensProps) {
         setData(d => ({ ...d, notes: [note, ...(d.notes ?? [])] }));
         return true;
       },
-      async saveForm(form) {
-        const r = await call("crm_save_form", { p_id: form.id, p_name: form.name, p_sections: form.sections });
+      async saveForm(form, kind = "customer") {
+        const r = await call("crm_save_form", { p_id: form.id, p_name: form.name, p_sections: form.sections, p_kind: kind });
         if (!r) return false;
         const id = (r.data as { id?: string } | null)?.id ?? form.id ?? `f${Date.now()}`;
         const saved: CrmForm = { id, name: form.name, sections: form.sections };
+        const key = kind === "booking" ? "bookingForms" : "forms";
         setData(d => {
-          const list = d.forms ?? [];
-          return { ...d, forms: list.some(x => x.id === id) ? list.map(x => (x.id === id ? saved : x)) : [...list, saved] };
+          const list = d[key] ?? [];
+          return { ...d, [key]: list.some(x => x.id === id) ? list.map(x => (x.id === id ? saved : x)) : [...list, saved] };
         });
         return id;
       },
@@ -175,12 +176,13 @@ export default function DeskScreens(p: DeskScreensProps) {
       },
       async setActiveForm(id) {
         if (!(await call("crm_set_active_form", { p_id: id }))) return false;
-        setData(d => { const list = d.forms ?? []; const f = list.find(x => x.id === id); return f ? { ...d, forms: [f, ...list.filter(x => x.id !== id)] } : d; });
+        const first = (list: CrmForm[] | undefined) => { const f = (list ?? []).find(x => x.id === id); return f ? [f, ...(list ?? []).filter(x => x.id !== id)] : list; };
+        setData(d => ({ ...d, forms: first(d.forms), bookingForms: first(d.bookingForms) }));
         return true;
       },
       async deleteForm(id) {
         if (!(await call("crm_delete_form", { p_id: id }))) return false;
-        setData(d => ({ ...d, forms: (d.forms ?? []).filter(x => x.id !== id) }));
+        setData(d => ({ ...d, forms: (d.forms ?? []).filter(x => x.id !== id), bookingForms: (d.bookingForms ?? []).filter(x => x.id !== id) }));
         return true;
       },
       async saveRoomRemarks(roomId, remarks) {

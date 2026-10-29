@@ -297,7 +297,7 @@ module.exports = function desk4a(body) {
     const end = '{!!(v.isFrmOp) && (<>', b = body.indexOf(end, a);
     if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: customer form");
     // …with the booking link's bar over it (2026-10-29, the owner: "contact form 加上这个的控制 panel，同时附上这个链接让人可以复制").
-    body = body.slice(0, a) + "{!!(v.cfOn) && (<><DeskBookingBar4a v={v.partnerLink} /><DeskForm4a v={v} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} /></>)} " + body.slice(b);
+    body = body.slice(0, a) + "{!!(v.cfOn) && (<DeskForm4a v={v} share={<DeskBookingBar4a v={v.partnerLink} />} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} />)} " + body.slice(b);
   }
   // v2 frame 06 (2026-10-23, note 04 / 06 / 08): Split, Ad performance and Audit log are ONE panel with three tabs
   // (DeskAdTabs4a), one shown at a time (v.paneOn) — the two strips they folded to are gone; › folds the whole panel to

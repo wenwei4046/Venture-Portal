@@ -211,7 +211,7 @@ export function frameVM(ctx: DeskCtx) {
     kChat: kind === "chat", kAlerts: kind === "alerts", kSection: kind === "section", kInfo: kind === "info", kClist: kind === "clist", kMetrics: kind === "metrics", kTeam: kind === "team", kAssign: kind === "assign", kPartner: kind === "partner",
     closePane,
     sheetMode, sheetOpen: sheetMode && stage === "menu", sheetTitle: sc[0], sheetSub: sc[1], sheetRows,
-    opKicker: sc[0].toUpperCase(), opTitle: tab === "forms" ? "Customer form" : opItem[0], opChip: sc[2], opSub: opItem[1], openSheet: () => patch({ stage: "menu" }),
+    opKicker: sc[0].toUpperCase(), opTitle: tab === "forms" ? "Forms" : opItem[0], opChip: sc[2], opSub: opItem[1], openSheet: () => patch({ stage: "menu" }),
     showKicker: tab !== "showrooms" && tab !== "forms", // The section pill ("All assignment ⌄") is gone (the owner, 2026-10-13): the right menu already switches sections.
     showOpChip: false,
     isAdsOp: opItem[0] === "Ads to teams", notAdsOp: opItem[0] !== "Ads to teams" && opItem[0] !== "Full time lead allocation",

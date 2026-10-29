@@ -7,8 +7,18 @@
 
 export interface PartnerBlock { a: string; b?: string | null; t1?: string | null; t2?: string | null; ranges?: { f: string; t: string }[] | null }
 export interface PartnerRoom { id: string; name: string; address: string; slots: string[]; cap: number; weekly: number[]; blocks: PartnerBlock[] }
-export type PartnerPage = { on: false } | { on: true; name: string; today: string; rooms: PartnerRoom[] };
-export interface PartnerInfo { project?: string; unit?: string; type?: string; size?: string; pax?: string; budget?: string }
+export type PartnerPage = { on: false } | { on: true; name: string; today: string; rooms: PartnerRoom[]; form: PartnerForm };
+/** The answers to the booking form's own questions, by question id (the six below until 2026-10-29). */
+export type PartnerInfo = Record<string, string>;
+/**
+ * The booking form the CRM puts in use (2026-10-29, mig 20261029250000; the owner: "我从这边调整，使用者的画面也会更新"):
+ * its sections and questions. booker / bookerPhone / customer / customerPhone / remarks / note are the booking's own columns;
+ * every other id is a question of the form's own, answered into info.
+ */
+export interface PartnerFormField { id: string; label: string; type: "Text" | "Long text" | "Choice" | "Number" | "Phone" | "Date" | "Range"; req: boolean; opts: string[] }
+export interface PartnerFormSection { title: string; fields: PartnerFormField[] }
+export type PartnerForm = PartnerFormSection[];
+export const COLUMN_FIELDS = ["booker", "bookerPhone", "customer", "customerPhone", "remarks", "note"] as const;
 export interface PartnerBooked {
   ref: string; showroom: string; showroomName: string; start: string; minutes: number; state: "booked" | "cancelled";
   booker: string; bookerPhone: string; customer: string; customerPhone: string; info: PartnerInfo; remarks: string; note: string;
@@ -26,6 +36,38 @@ export const INFO_LABELS: Record<(typeof INFO_KEYS)[number], string> = {
   project: "Project / unit location", unit: "Unit no.", type: "Property type", size: "Unit size", pax: "No. of people coming", budget: "Budget",
 };
 
+const F = (id: string, label: string, type: PartnerFormField["type"] = "Text", req = false): PartnerFormField => ({ id, label, type, req, opts: [] });
+/** The page's questions as they were before the CRM could set them — and what it asks while no booking form is saved. */
+export const DEFAULT_PARTNER_FORM: PartnerForm = [
+  { title: "You", fields: [F("booker", "Your name", "Text", true), F("bookerPhone", "Your phone", "Phone")] },
+  { title: "Customer", fields: [F("customer", "Customer name", "Text", true), F("customerPhone", "Customer phone", "Phone", true),
+    F("project", "Project / unit location"), F("unit", "Unit no."), F("type", "Property type"), F("size", "Unit size"), F("pax", "No. of people coming", "Number"), F("budget", "Budget")] },
+  { title: "Notes", fields: [F("remarks", "Remarks for the showroom", "Long text"), F("note", "Your own note", "Long text")] },
+];
+/** crm_forms' sections as the page asks them; nothing usable — the default. The three a booking cannot do without are always asked. */
+export function formFromRow(v: unknown): PartnerForm {
+  if (!Array.isArray(v)) return DEFAULT_PARTNER_FORM;
+  const out: PartnerForm = (v as Record<string, unknown>[]).map(s => ({ title: str(s.title),
+    fields: (Array.isArray(s.fields) ? (s.fields as Record<string, unknown>[]) : []).filter(f => str(f.id) && str(f.label)).map(f => ({
+      id: str(f.id), label: str(f.label), type: (str(f.type) || "Text") as PartnerFormField["type"],
+      req: ["booker", "customer", "customerPhone"].includes(str(f.id)) || Number(f.req) === 1, opts: Array.isArray(f.opts) ? (f.opts as unknown[]).map(str).filter(Boolean) : [] })) }))
+    .filter(s => s.fields.length);
+  if (!out.length) return DEFAULT_PARTNER_FORM;
+  const has = new Set(out.flatMap(s => s.fields.map(f => f.id)));
+  for (const f of DEFAULT_PARTNER_FORM.flatMap(s => s.fields).filter(f => f.req)) if (!has.has(f.id)) out[0].fields.unshift({ ...f });
+  return out;
+}
+/** The label a booking's answer is shown under: the form's own, else the old six's, else the id. */
+export function infoLabel(form: PartnerForm | null | undefined, id: string): string {
+  return form?.flatMap(s => s.fields).find(f => f.id === id)?.label ?? (INFO_LABELS as Record<string, string>)[id] ?? id;
+}
+/** The first required question of the form left empty, as the database would say it ("Fill in Budget."), or null. */
+export function missingAnswer(form: PartnerForm, values: Record<string, string>): string | null {
+  const f = form.flatMap(s => s.fields).find(x => x.req && !COLUMN_REQUIRED.has(x.id) && !(values[x.id] ?? "").trim());
+  return f ? `Fill in ${f.label}.` : null;
+}
+const COLUMN_REQUIRED = new Set(["booker", "customer", "customerPhone"]);
+
 export function pageFromRow(row: unknown): PartnerPage {
   const r = row as Record<string, unknown> | null;
   if (!r || r.on !== true) return { on: false };
@@ -34,7 +76,7 @@ export function pageFromRow(row: unknown): PartnerPage {
     slots: Array.isArray(x.slots) ? (x.slots as unknown[]).map(str) : [], cap: Number(x.cap) || 1,
     weekly: Array.isArray(x.weekly) ? (x.weekly as unknown[]).map(Number) : [], blocks: Array.isArray(x.blocks) ? (x.blocks as PartnerBlock[]) : [],
   })) : [];
-  return { on: true, name: str(r.name), today: str(r.today), rooms };
+  return { on: true, name: str(r.name), today: str(r.today), rooms, form: formFromRow(r.form) };
 }
 
 export function bookedFromRow(row: unknown): PartnerBooked | null {

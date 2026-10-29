@@ -9,8 +9,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { partnerBook, partnerCancel, partnerDay, partnerGet, partnerList } from '@/lib/crm-partner/actions'
 import {
-  addDays, bookingProblem, dowOf, INFO_LABELS, slotsOf, t12,
-  type PartnerBooked, type PartnerInfo, type PartnerPage, type PartnerTaken,
+  addDays, bookingProblem, dowOf, missingAnswer, slotsOf, t12,
+  type PartnerBooked, type PartnerForm, type PartnerInfo, type PartnerPage, type PartnerTaken,
 } from '@/lib/crm-partner/model'
 import s from './partner.module.css'
 
@@ -135,9 +135,10 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   useEffect(() => { if (firstOpen && firstOpen !== day) { setDay(firstOpen); showDay(firstOpen) } }, [firstOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (p: Partial<Form>) => setForm(f => ({ ...f, ...p }))
-  const setInfo = (k: keyof PartnerInfo, v: string) => setForm(f => ({ ...f, info: { ...f.info, [k]: v } }))
+  const setInfo = (k: string, v: string) => setForm(f => ({ ...f, info: { ...f.info, [k]: v } }))
 
   const problem = bookingProblem({ room, start, booker: form.booker, customer: form.customer, customerPhone: form.customerPhone })
+    ?? missingAnswer(page.form, { ...form.info, bookerPhone: form.bookerPhone, remarks: form.remarks, note: form.note })
   const submit = async () => {
     if (problem || busy) { setError(problem ?? ''); return }
     setBusy(true); setError('')
@@ -294,21 +295,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
             </section>
 
             <section className={s.card}>
-              <h2 className={s.h2}>You</h2>
-              <div className={s.two}>
-                <Field label="Your name *"><input className={s.input} value={form.booker} maxLength={80} onChange={e => set({ booker: e.target.value })} /></Field>
-                <Field label="Your phone"><input className={s.input} value={form.bookerPhone} maxLength={30} onChange={e => set({ bookerPhone: e.target.value })} /></Field>
-              </div>
-              <h2 className={s.h2}>Customer</h2>
-              <div className={s.two}>
-                <Field label="Customer name *"><input className={s.input} value={form.customer} maxLength={80} onChange={e => set({ customer: e.target.value })} /></Field>
-                <Field label="Customer phone *"><input className={s.input} value={form.customerPhone} maxLength={30} inputMode="tel" onChange={e => set({ customerPhone: e.target.value })} /></Field>
-                {(Object.keys(INFO_LABELS) as (keyof PartnerInfo)[]).map(k => (
-                  <Field key={k} label={INFO_LABELS[k]}><input className={s.input} value={form.info[k] ?? ''} maxLength={120} onChange={e => setInfo(k, e.target.value)} /></Field>
-                ))}
-              </div>
-              <Field label="Remarks for the showroom"><textarea className={s.input} rows={2} maxLength={1000} value={form.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="What the customer wants to see, keys, parking…" /></Field>
-              <Field label="Your own note"><textarea className={s.input} rows={2} maxLength={1000} value={form.note} onChange={e => set({ note: e.target.value })} placeholder="Anything about this lead for yourself" /></Field>
+              <BookingFields form={page.form} f={form} set={set} setInfo={setInfo} />
 
               <div className={s.summary}>
                 {start && r ? <span className={s.sumText}><b>{r.name}</b><span>{whenOf(start)}</span></span> : <span className={s.muted}>Pick a showroom, a date and a time.</span>}
@@ -505,21 +492,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
                 {start && r ? <span className={s.sumText}><b>{r.name}</b><span>{whenOf(start)}</span></span> : <span className={s.muted}>Pick a showroom, a date and a time.</span>}
                 <button type="button" className={s.link} onClick={() => go(editing ? 'time' : 'room')}>Change</button>
               </div>
-              <h2 className={s.h2}>You</h2>
-              <div className={s.two}>
-                <Field label="Your name *"><input className={s.input} value={form.booker} maxLength={80} onChange={e => set({ booker: e.target.value })} /></Field>
-                <Field label="Your phone"><input className={s.input} value={form.bookerPhone} maxLength={30} inputMode="tel" onChange={e => set({ bookerPhone: e.target.value })} /></Field>
-              </div>
-              <h2 className={s.h2}>Customer</h2>
-              <div className={s.two}>
-                <Field label="Customer name *"><input className={s.input} value={form.customer} maxLength={80} onChange={e => set({ customer: e.target.value })} /></Field>
-                <Field label="Customer phone *"><input className={s.input} value={form.customerPhone} maxLength={30} inputMode="tel" onChange={e => set({ customerPhone: e.target.value })} /></Field>
-                {(Object.keys(INFO_LABELS) as (keyof PartnerInfo)[]).map(k => (
-                  <Field key={k} label={INFO_LABELS[k]}><input className={s.input} value={form.info[k] ?? ''} maxLength={120} onChange={e => setInfo(k, e.target.value)} /></Field>
-                ))}
-              </div>
-              <Field label="Remarks for the showroom"><textarea className={s.input} rows={2} maxLength={1000} value={form.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="What the customer wants to see, keys, parking…" /></Field>
-              <Field label="Your own note"><textarea className={s.input} rows={2} maxLength={1000} value={form.note} onChange={e => set({ note: e.target.value })} placeholder="Anything about this lead for yourself" /></Field>
+              <BookingFields form={page.form} f={form} set={set} setInfo={setInfo} />
               {error && <div className={s.err}>{error}</div>}
               <div className={s.actions}>
                 {editing && <button type="button" className={s.danger} disabled={busy} onClick={() => void cancel()}>Cancel booking</button>}
@@ -550,4 +523,38 @@ function Greeting({ name }: { name: string }) {
       </div>
     </div>
   )
+}
+
+const COLUMN: Record<string, 'booker' | 'bookerPhone' | 'customer' | 'customerPhone' | 'remarks' | 'note'> = { booker: 'booker', bookerPhone: 'bookerPhone', customer: 'customer', customerPhone: 'customerPhone', remarks: 'remarks', note: 'note' }
+const PLACEHOLDER: Record<string, string> = { remarks: 'What the customer wants to see, keys, parking…', note: 'Anything about this lead for yourself' }
+/**
+ * The booking form the CRM has in use (2026-10-29): each section a heading, short questions two to a row, a long one and a
+ * choice the whole row. The booking's own columns keep their limits; the form's own questions answer into info.
+ */
+function BookingFields({ form, f, set, setInfo }: { form: PartnerForm; f: Form; set: (p: Partial<Form>) => void; setInfo: (k: string, v: string) => void }) {
+  return (<>
+    {form.map((sec, i) => (
+      <div key={i}>
+        <h2 className={s.h2}>{sec.title}</h2>
+        <div className={s.two}>
+          {sec.fields.map(q => {
+            const col = COLUMN[q.id]
+            const value = col ? f[col] : f.info[q.id] ?? ''
+            const put = (v: string) => (col ? set({ [col]: v } as Partial<Form>) : setInfo(q.id, v))
+            const label = q.label + (q.req ? ' *' : '')
+            const max = q.id === 'booker' || q.id === 'customer' ? 80 : q.id === 'bookerPhone' || q.id === 'customerPhone' ? 30 : q.type === 'Long text' ? 1000 : 120
+            if (q.type === 'Long text') return <div key={q.id} className={s.wide}><Field label={label}><textarea className={s.input} rows={2} maxLength={max} value={value} placeholder={PLACEHOLDER[q.id]} onChange={e => put(e.target.value)} /></Field></div>
+            if (q.type === 'Choice' && q.opts.length) return (
+              <div key={q.id} className={s.wide}><Field label={label}>
+                <span className={s.choices}>{q.opts.map(o => <button key={o} type="button" className={value === o ? `${s.choice} ${s.on}` : s.choice} onClick={() => put(value === o ? '' : o)}>{o}</button>)}</span>
+              </Field></div>
+            )
+            const phone = q.type === 'Phone' || q.id === 'bookerPhone' || q.id === 'customerPhone'
+            return <Field key={q.id} label={label}><input className={s.input} value={value} maxLength={max} type={q.type === 'Date' ? 'date' : 'text'}
+              inputMode={phone ? 'tel' : q.type === 'Number' ? 'decimal' : undefined} onChange={e => put(e.target.value)} /></Field>
+          })}
+        </div>
+      </div>
+    ))}
+  </>)
 }

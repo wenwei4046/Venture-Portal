@@ -7,7 +7,6 @@
  */
 import { useState } from "react";
 import type { CrmPartnerBooking, CrmPartnerLink } from "@/lib/member/crm-data";
-import { INFO_LABELS, type PartnerInfo } from "@/lib/crm-partner/model";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const when = (iso: string) => new Date(iso).toLocaleString("en-MY", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
@@ -62,7 +61,7 @@ export function DeskBookingLink({ v }: { v: BookingLinkBits }) {
   );
 }
 
-export interface PartnerPaneBits { b: CrmPartnerBooking; room: string; partnerName: string; can: boolean; cancel: () => Promise<boolean> }
+export interface PartnerPaneBits { b: CrmPartnerBooking; room: string; partnerName: string; can: boolean; infoRows: { label: string; value: string }[]; cancel: () => Promise<boolean> }
 
 export function DeskPartnerPane({ v, close }: { v: PartnerPaneBits | null; close: () => void }) {
   const [busy, setBusy] = useState(false);
@@ -82,7 +81,7 @@ export function DeskPartnerPane({ v, close }: { v: PartnerPaneBits | null; close
       <div style={{ font: `500 22px ${TIGHT}`, color: "var(--crm-ink)", marginTop: "6px" }}>{b.customer}</div>
       <div style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)", marginBottom: "8px" }}>{when(b.start)} · {v.room}{b.state === "cancelled" ? " · Cancelled" : ""}</div>
       {row("Customer phone", b.customerPhone)}
-      {(Object.keys(INFO_LABELS) as (keyof PartnerInfo)[]).map(k => row(INFO_LABELS[k], b.info[k] ?? ""))}
+      {v.infoRows.map(x => row(x.label, x.value))}
       {row("Remarks", b.remarks)}
       {row("Booked by", `${b.booker}${b.bookerPhone ? ` · ${b.bookerPhone}` : ""}`)}
       {row("Booker's note", b.note)}

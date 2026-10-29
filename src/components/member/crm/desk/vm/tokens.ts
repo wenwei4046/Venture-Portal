@@ -31,7 +31,7 @@ export const ICON: Record<string, string> = {
   profile: "M20 21a8 8 0 0 0-16 0M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
   workspace: "M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z",
 };
-export const PANEL_TABS: [import("./ctx").DeskTab, string][] = [["insight", "Insight"], ["inbox", "Inbox"], ["people", "Contacts"], ["assignment", "Assignment"], ["calendar", "Calendar"], ["adsperf", "Ads Performance"], ["showrooms", "Showrooms"], ["forms", "Customer form"], ["channels", "Channels"], ["settings", "Settings"], ["auditlog", "Audit log"], ["reports", "Reports"], ["workspace", "Workspace"]];
+export const PANEL_TABS: [import("./ctx").DeskTab, string][] = [["insight", "Insight"], ["inbox", "Inbox"], ["people", "Contacts"], ["assignment", "Assignment"], ["calendar", "Calendar"], ["adsperf", "Ads Performance"], ["showrooms", "Showrooms"], ["forms", "Forms"], ["channels", "Channels"], ["settings", "Settings"], ["auditlog", "Audit log"], ["reports", "Reports"], ["workspace", "Workspace"]];
 /** The sidebar's groups (v2): [label, pages]. */
 export const NAV_GROUPS: [string, import("./ctx").DeskTab[]][] = [["", ["insight", "inbox", "people", "calendar"]], ["MARKETING", ["adsperf", "assignment"]], ["REPORTS", ["reports"]], ["WORKSPACE", ["workspace"]], ["MANAGEMENT", ["showrooms", "forms", "channels", "settings", "auditlog"]]];
 /**
@@ -77,7 +77,7 @@ export const ST_META: Record<string, [string, string, null, string, string]> = {
   Paused: ["Paused", C.faint2, null, C.field, C.muted], Pending: ["Pending", C.amber, null, C.tintAppt, C.textAppt],
 };
 export const SHEET_COPY: Record<string, [string, string, string]> = {
-  forms: ["Customer form", "What salespeople fill in for each customer", "Customer form"],
+  forms: ["Forms", "What salespeople and the booking link ask", "Forms"],
   showrooms: ["Showrooms", "Where visits are booked", "Showrooms"], assignment: ["Assignment", "Who gets each new enquiry", "All assignment"],
   settings: ["Settings", "Choose what to set up", "All settings"],
 };
