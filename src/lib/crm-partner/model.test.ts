@@ -57,3 +57,13 @@ describe("the form", () => {
     expect(partnerRefusal({ code: "42501", message: "permission denied for function crm_partner_book" }, "Try again.")).toBe("Try again.");
   });
 });
+
+describe("moving a booking (the owner, 2026-10-29: a booking being changed read \"3 of 2 left\")", () => {
+  it("never shows more places than the showroom has, even with a count read before the booking", () => {
+    const now = new Date("2026-11-01T00:00:00Z"), at = startOf("2026-11-03", "14:00");
+    expect(slotsOf(room, "2026-11-03", {}, now, { showroom: "kl", start: at })[1].left).toBe(2);
+    expect(slotsOf(room, "2026-11-03", { [at]: 1 }, now, { showroom: "kl", start: at })[1].left).toBe(2);
+    expect(slotsOf(room, "2026-11-03", { [at]: 2 }, now, { showroom: "kl", start: at })[1].left).toBe(1);
+    expect(slotsOf(room, "2026-11-03", { [at]: 1 }, now)[1].left).toBe(1);
+  });
+});

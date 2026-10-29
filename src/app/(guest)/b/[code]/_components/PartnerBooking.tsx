@@ -91,6 +91,8 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     if (!a.ok) { setRefError(a.reason); return }
     const b = a.booked
     if (b.state === 'cancelled') { setRefError(`${b.ref} was cancelled.`); return }
+    // Read the places again: the booking may have been made after this page last read them.
+    if (b.showroom === room) void load();
     setDone(null); setEditing(b); setRoom(b.showroom); setDay(officeDay(b.start)); setStart(new Date(b.start).toISOString())
     setForm({ booker: b.booker, bookerPhone: b.bookerPhone, customer: b.customer, customerPhone: b.customerPhone, info: b.info, remarks: b.remarks, note: b.note })
   }
