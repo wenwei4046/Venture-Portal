@@ -44,6 +44,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'get_submitted_hr_summary', 'gl_net_by_account', 'hr_dashboard_summary', 'lookup_eis', 'lookup_epf', 'lookup_pcb', 'lookup_socso',
   'member_admin_brand_weeks', 'member_admin_claim_settings', 'member_admin_request_facts', 'member_admin_snapshot', 'member_capacity_of', 'member_catalogue',
   'member_memo_reads', 'member_sub_department_requests', 'member_waiting_form', 'member_waiting_transfer', 'next_staff_code',
+  // Payments › Payment request: a member claim's invoice (mig 20261029160000) — STABLE, reading only.
+  'finance_member_claim_invoice',
   // Member services › Food claim (mig 20261013150000).
   'member_admin_food_claim',
   'member_admin_transport_claim',

@@ -137,6 +137,8 @@ export const PAGE_TABS = {
   '/payments/claim-requests': PAYMENTS,
   '/payments/dept-requests': PAYMENTS,
   '/payments/payroll-requests': PAYMENTS,
+  // Payment request (2026-10-29): what waits for Finance to pay — Payments' own tab, as its old request pages.
+  '/payments/requests': PAYMENTS,
   '/invoice-pool': PAYMENTS,
   '/receipts': ['fin.receipt'],
   '/statements': INVOICE,

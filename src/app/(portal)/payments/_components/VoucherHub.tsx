@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
 import { BatchList, HeadButton, HubCards, HubHead, hubStyles as hs, type ChipTone } from '@/components/finv/Hub'
 import { FinTable, type FinColumn } from '@/components/finv/FinTable'
-import { DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
+import { DialogMenu, FinDialog } from '@/components/finv/Dialog'
 import AmendDateButton from './AmendDateButton'
 import AmendRepaymentButton from './AmendRepaymentButton'
 import { VoucherDrawer, fd } from './VoucherDrawer'
@@ -13,21 +13,14 @@ import { statusWord, type HubCardKey, type HubLedger, type HubRow } from '../_li
 import { CARD, cardLook, hubCards, plural, rm } from '../_lib/hub-cards'
 
 // The hub Payments and Receipt are drawn with (2026-10-14, the Finance revamp v2 — D02–D05 of
-// `.design/fin-r2/handoff`): the head (Create payment, Dept · N, Payroll · N,
-// and ours kept — Claims · N, Export ▾), the cards beside the list, the
-// table with its column tools, the payroll batches, and the drawer a row
-// opens. The rows come once from the server; a card or a search answers at
+// `.design/fin-r2/handoff`): the head (Create payment, Export ▾ — since 2026-10-29 the page is Payments ›
+// Payment voucher, and what was sent to be paid, Dept · Payroll · Claims, is Payments › Payment request's), the
+// cards beside the list, the table with its column tools, the payroll batches, and the drawer a row opens. The rows come once from the server; a card or a search answers at
 // once, and the URL keeps the card (?status=) for a link or a refresh.
 //
 // Receipt's hub is the same parts (D09, `ledger.receipts`): *Receive*, its
 // cards All receipts … Received … Voided (no payroll), *Create receipt* and
 // *Loan repayment*, the figures +RM in green, Bank among the columns.
-
-export interface RequestItem {
-  key: string
-  label: string
-  sub: string
-}
 
 const f2 = (n: number) => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -73,9 +66,6 @@ export default function VoucherHub({
   actions = null,
   canSetDefault,
   canExport = false,
-  dept,
-  payroll,
-  claims,
   children = null,
 }: {
   ledger: HubLedger
@@ -84,10 +74,6 @@ export default function VoucherHub({
   canSetDefault: boolean
   /** Treasury · Export — the head's Export ▾, as its route asks (2026-10-16). */
   canExport?: boolean
-  dept: RequestItem[]
-  /** null without Payroll payouts: Payroll Requests is not theirs to open. */
-  payroll: RequestItem[] | null
-  claims: RequestItem[]
   /** The page's own windows (Create payment's dialog). */
   children?: ReactNode
 }) {
@@ -96,7 +82,7 @@ export default function VoucherHub({
   const [query, setQuery] = useState(ledger.initialQuery)
   const [openBatches, setOpenBatches] = useState<Set<string>>(new Set())
   const [drawer, setDrawer] = useState<string | null>(null)
-  const [menu, setMenu] = useState<'dept' | 'payroll' | 'claims' | 'export' | null>(null)
+  const [menu, setMenu] = useState<'export' | null>(null)
   const [rowMenu, setRowMenu] = useState<{ row: HubRow; anchor: RowMenuAnchor } | null>(null)
   const [redate, setRedate] = useState<{ row: HubRow; nonce: number } | null>(null)
   const [amend, setAmend] = useState<{ row: HubRow; nonce: number } | null>(null)
@@ -167,32 +153,17 @@ export default function VoucherHub({
     if (q) p.set('q', query.trim())
     return `/payments/export?${p.toString()}`
   }
-  const requestMenu = (items: RequestItem[], page: string, open: string, none: string): DialogMenuItem[] =>
-    items.length > 0
-      ? items.map((it) => ({ key: it.key, label: it.label, sub: it.sub, onClick: () => { setMenu(null); router.push(page) } }))
-      : [{ key: 'open', label: open, sub: none, onClick: () => { setMenu(null); router.push(page) } }]
-
   return (
     <div className={hs.root} data-fin-kit="">
       <HubHead
         roman="I."
         eyebrow={receipts ? 'Daily · Receive' : 'Daily · Payments'}
-        title={receipts ? 'Receive' : 'Payments'}
+        title={receipts ? 'Receive' : 'Payment voucher'}
         actions={
-          receipts ? (
-            <>
-              {actions}
-              {canExport ? <HeadButton onClick={() => setMenu('export')}>Export ▾</HeadButton> : null}
-            </>
-          ) : (
           <>
             {actions}
-            <HeadButton onClick={() => setMenu('dept')}>{dept.length > 0 ? `Dept · ${dept.length}` : 'Dept'}</HeadButton>
-            {payroll ? <HeadButton onClick={() => setMenu('payroll')}>{payroll.length > 0 ? `Payroll · ${payroll.length}` : 'Payroll'}</HeadButton> : null}
-            <HeadButton onClick={() => setMenu('claims')}>{claims.length > 0 ? `Claims · ${claims.length}` : 'Claims'}</HeadButton>
             {canExport ? <HeadButton onClick={() => setMenu('export')}>Export ▾</HeadButton> : null}
           </>
-          )
         }
       />
 
@@ -256,17 +227,6 @@ export default function VoucherHub({
       <VoucherDrawer id={drawer} onClose={() => setDrawer(null)} onChanged={() => router.refresh()} />
       {children}
 
-      <FinDialog open={menu === 'dept'} onClose={() => setMenu(null)} title="Dept Requests" sub={dept.length > 0 ? `${dept.length} waiting for a voucher` : undefined}>
-        <DialogMenu items={requestMenu(dept, '/payments/dept-requests', 'Open Dept Requests', 'Nothing waiting')} />
-      </FinDialog>
-      {payroll ? (
-        <FinDialog open={menu === 'payroll'} onClose={() => setMenu(null)} title="Payroll Requests" sub={payroll.length > 0 ? `${payroll.length} waiting` : undefined}>
-          <DialogMenu items={requestMenu(payroll, '/payments/payroll-requests', 'Open Payroll Requests', 'Nothing waiting')} />
-        </FinDialog>
-      ) : null}
-      <FinDialog open={menu === 'claims'} onClose={() => setMenu(null)} title="Claim Requests" sub={claims.length > 0 ? `${claims.length} waiting for a voucher` : undefined}>
-        <DialogMenu items={requestMenu(claims, '/payments/claim-requests', 'Open Claim Requests', 'Nothing waiting')} />
-      </FinDialog>
       <FinDialog open={menu === 'export'} onClose={() => setMenu(null)} title="Export" sub={`${look(card).title}${q ? ` · “${query.trim()}”` : ''}`}>
         <DialogMenu
           items={[

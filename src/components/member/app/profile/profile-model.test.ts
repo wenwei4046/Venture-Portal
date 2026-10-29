@@ -431,4 +431,18 @@ describe("waiting list & replacements", () => {
       ["Updated and sent again", ""],
     ]);
   });
+
+  // Payment request (2026-10-29): Finance's Return to HR — the reason is HR's, the database keeps it from the member.
+  it("says a claim Finance sent back is with HR again", () => {
+    const events: RequestEvent[] = [
+      { at: "2026-10-06T01:00:00Z", status: "submitted", from: "draft", actor: "you", actorName: null, note: null },
+      { at: "2026-10-07T01:00:00Z", status: "approved", from: "submitted", actor: "hr", actorName: "Nadia", note: "Approved" },
+      { at: "2026-10-08T01:00:00Z", status: "submitted", from: "approved", actor: "finance", actorName: "Ong", note: null },
+    ];
+    expect(requestDetailVM(request(), events, { nameOf, readOnly: false, queues }).log.map(e => [e.what, e.who, e.note])).toEqual([
+      ["Submitted", "You", expect.any(String)],
+      ["Approved", "Nadia (HR)", "Approved"],
+      ["Back with HR for review", "Finance", ""],
+    ]);
+  });
 });

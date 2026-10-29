@@ -57,6 +57,11 @@ export interface HrNavItem {
   visible: (viewer: NavViewer) => boolean
   /** The permission tabs any one of which shows the link, where its page's own list is not the answer — Settings' tabs share one page. */
   permissionTabs?: readonly string[]
+  /**
+   * A row under a heading of its own (2026-10-29 — Finance's Payments › Payment voucher and Payment request): the rows
+   * of one group stand together, the heading drawn once above the first; a heading is no page.
+   */
+  group?: { key: string; label: string; icon: HrIconName }
 }
 
 export interface HrNavSection {

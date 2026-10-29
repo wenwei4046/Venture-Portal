@@ -149,13 +149,24 @@ export default function ViewSidebar({
                   <span>{section.label}</span>
                 </div>
               ) : null}
-              {section.items.map(item => {
+              {section.items.map((item, i) => {
                 const on = item.key === active
+                // A group's heading above its first row (Payments over its two); the heading is no link.
+                const head = item.group && item.group.key !== section.items[i - 1]?.group?.key ? item.group : null
                 return (
-                  <div className={s.itemWrap} key={item.key}>
+                  <Fragment key={item.key}>
+                  {head ? (
+                    <div className={`${s.groupHead} ${s[section.tone]}`} data-nav-group={head.key}>
+                      <span className={s.itemTile}>
+                        <HrIcon name={head.icon} size={16} />
+                      </span>
+                      <span className={s.itemLabel}>{head.label}</span>
+                    </div>
+                  ) : null}
+                  <div className={s.itemWrap} data-child={item.group ? 'true' : undefined}>
                     <Link
                       href={item.href}
-                      className={`${s.item} ${s[section.tone]}`}
+                      className={`${s.item} ${s[section.tone]}${item.group ? ` ${s.child}` : ''}`}
                       data-nav-key={item.key}
                       data-on={on ? 'true' : 'false'}
                       aria-current={item.key === matched ? 'page' : undefined}
@@ -168,11 +179,12 @@ export default function ViewSidebar({
                       onMouseLeave={cancelWarmIntent}
                     >
                       <span className={s.itemTile}>
-                        <HrIcon name={item.icon} size={16} />
+                        <HrIcon name={item.icon} size={item.group ? 14 : 16} />
                       </span>
                       <span className={s.itemLabel}>{item.label}</span>
                     </Link>
                   </div>
+                  </Fragment>
                 )
               })}
             </Fragment>

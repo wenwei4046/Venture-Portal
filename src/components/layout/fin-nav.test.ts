@@ -26,7 +26,7 @@ describe("Finance's sidebar", () => {
   it('lists finance@’s rows in the design’s order', () => {
     expect(labels(finance)).toEqual([
       [null, null, ['Overview']],
-      ['I.', 'Daily', ['Payments', 'Receipt', 'Invoice', 'Billing Allocator', 'Daily Bank', 'Reconciliation', 'Journal Entries']],
+      ['I.', 'Daily', ['Payment voucher', 'Payment request', 'Receipt', 'Invoice', 'Billing Allocator', 'Daily Bank', 'Reconciliation', 'Journal Entries']],
       ['II.', 'Fund', ['Fund IN', 'Fund OUT', 'Invoice Financing', 'Repayment', 'Statements']],
       ['III.', 'Report', ['General Ledger', 'P&L', 'Cash Flow', 'Receipt & Payment', 'Balance Sheet', 'Trial Balance', 'Debtor Aging', 'Loan Aging', 'Company Statement', 'Chart of Account', 'Base Rate History']],
       ['IV.', 'Department', ['Dept Pool', 'Venture', 'Marketing', 'Finance', 'HR', 'Director Office', 'Venture Pool']],
@@ -74,14 +74,29 @@ describe("Finance's sidebar", () => {
     const tabs = userTabs(null, principal.actions, principal.permissions as string[])
     const lens = lensNav({ ...principal, role: 'finance', actualRole: 'principal', tabs } as never) as NavViewer
     const rows = visibleHrNav(finNavSections(data), lens).flatMap((s) => s.items.map((i) => i.label))
-    expect(rows).toContain('Payments')
+    expect(rows).toContain('Payment voucher')
     expect(rows).toContain('Chart of Account')
+  })
+
+  it('draws Payment voucher and Payment request under one Payments heading (2026-10-29)', () => {
+    const daily = finNavSections(data).find((s) => s.label === 'Daily')!
+    const grouped = daily.items.filter((i) => i.group?.key === 'payments')
+    expect(grouped.map((i) => [i.key, i.label, i.href])).toEqual([
+      ['payments', 'Payment voucher', '/payments'],
+      ['payment-requests', 'Payment request', '/payments/requests'],
+    ])
+    expect(grouped[0].group?.label).toBe('Payments')
+    // The two stand together: nothing of another group between them.
+    const at = daily.items.findIndex((i) => i.key === 'payments')
+    expect(daily.items[at + 1].key).toBe('payment-requests')
   })
 
   it.each([
     ['/dashboard', null, 'overview'],
     ['/payments', null, 'payments'],
     ['/payments/payroll-requests', null, 'payments'],
+    ['/payments/requests', null, 'payment-requests'],
+    ['/payments/requests', 'tab=payroll', 'payment-requests'],
     ['/payments/new', null, 'payments'],
     ['/payments/new', 'mode=receipt', 'receipts'],
     ['/receipts', null, 'receipts'],

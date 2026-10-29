@@ -248,6 +248,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Recost a month from the Product List (mig 20261021240000): Revenue · Edit and the Orders page's box — as the
   // caller, every line's costing asked the permission helpers again (Fair · October, 1,282 lines: 56 s).
   'recost_sales_order_lines',
+  // Payments › Payment request (mig 20261029160000): a member claim's invoice for the treasury once HR approved it for
+  // payment (has_perm('treasury')), and Return to HR (Treasury · Void or Approve, the page's box).
+  'finance_member_claim_invoice', 'finance_return_member_claim',
   'close_approvals_for_voided_voucher', 'create_loan_with_approval', 'create_payroll_disbursement_vouchers', 'save_director_salary_results',
   'bank_gl_codes', 'bridge_mirror_slices', 'bridge_ref_flags', 'build_hr_cost_submission_payload', 'bump_bank_balance',
   'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_dept_payment_request', 'cancel_loan_and_approval',

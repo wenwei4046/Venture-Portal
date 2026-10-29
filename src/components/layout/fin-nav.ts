@@ -3,7 +3,8 @@
 // sidebar, drawn with Finance's categories —
 //
 //   Overview
-//   I.   DAILY        Payments · Receipt · Invoice · Billing Allocator · Daily Bank · Reconciliation · Journal Entries
+//   I.   DAILY        Payments (Payment voucher · Payment request) · Receipt · Invoice · Billing Allocator · Daily Bank ·
+//                     Reconciliation · Journal Entries
 //   II.  FUND         Fund IN · Fund OUT · Invoice Financing · Repayment · Statements
 //   III. REPORT       General Ledger · P&L · Cash Flow · Receipt & Payment · Balance Sheet · Trial Balance ·
 //                     Debtor Aging · Loan Aging · Company Statement · Chart of Account · Base Rate History
@@ -68,6 +69,9 @@ const link = (
   more: Partial<HrNavItem> = {},
 ): HrNavItem => ({ key, label, icon, href, visible, match, ...more })
 
+/** Payments' heading over Payment voucher and Payment request. */
+const PAYMENTS_GROUP: NonNullable<HrNavItem['group']> = { key: 'payments', label: 'Payments', icon: 'out' }
+
 /** Whose sidebar it is: Finance's view, or the Principal's own view on a computer (its own rows added). */
 export interface FinNavOptions {
   /** The Principal's own view (2026-10-17): OPEX at Department's foot; Access log and Settings in Admin. */
@@ -88,8 +92,15 @@ export function finNavSections(data: NavData, opts: FinNavOptions = {}): HrNavSe
       tone: 'clay',
       items: [
         link('approvals', 'Approvals', 'approve', '/approvals', canApprove),
-        // A receipt's form is Receipt's; a receipt's own page names Receipt itself (NavOwner).
-        link('payments', 'Payments', 'out', '/payments', canAccessTreasury, (p, q) => under(p, '/payments') && !receiptForm(p, q)),
+        // Payments (2026-10-29 — the user: "payment side bar 会有两个子account，一个是pv，一个是Payment request";
+        // "pv 改成payment voucher"): the vouchers and the requests waiting for one. A receipt's form is Receipt's; a
+        // receipt's own page names Receipt itself (NavOwner).
+        link('payments', 'Payment voucher', 'out', '/payments', canAccessTreasury, (p, q) => under(p, '/payments') && !under(p, '/payments/requests') && !receiptForm(p, q), {
+          group: PAYMENTS_GROUP,
+        }),
+        link('payment-requests', 'Payment request', 'inbox', '/payments/requests', canAccessTreasury, (p) => under(p, '/payments/requests'), {
+          group: PAYMENTS_GROUP,
+        }),
         link('receipts', 'Receipt', 'in', '/receipts', canAccessTreasury, (p, q) => under(p, '/receipts') || receiptForm(p, q)),
         // /statements is the Invoices landing; an invoice's own page and the billing forms are Invoice's.
         link('invoices', 'Invoice', 'invoice', '/statements', canAccessTreasury, (p) => p === '/statements' || under(p, '/invoices') || under(p, '/billing')),

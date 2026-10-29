@@ -89,7 +89,7 @@ describe('a receipt, on the Finance view', () => {
         <TopBar user={user} fin />
       </FinViewProvider>,
     )
-    expect(screen.getByTestId('fin-topbar')).toHaveTextContent('Payments')
+    expect(screen.getByTestId('fin-topbar')).toHaveTextContent('Payment voucher')
   })
 })
 
