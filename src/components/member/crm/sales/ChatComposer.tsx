@@ -18,6 +18,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import SalesComposer from "./SalesComposer";
+import { SuggestFloat } from "../shared/suggest-float";
 import { BOX_MAX, BOX_MIN, HOLD_HINT, PANEL_H, composerVM, dropLast, flash, focusBox, togglePanel, type ComposerIn, type ComposerPanel } from "./vm/composer";
 
 /** A press held this long records; shorter is a tap. */
@@ -362,6 +363,8 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   return (<>
     {/* Where this composer is in the chat (the stack and the screen are found from it). */}
     <span ref={anchorRef} hidden />
+    {/* Suggested replies' floating logo (2026-10-29): there while the customer's words wait and the box is empty. */}
+    {v.suggest && <SuggestFloat key={v.key} list={v.suggest} pick={v.setDraft} showLogo={!!v.suggest.length && !v.draft && !v.rec} />}
     <SalesComposer p={p} />
   </>);
 }

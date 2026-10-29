@@ -26,12 +26,13 @@ import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, NO_MEDIA, tickColor, tickPathOf } from "../../shared/chat-media";
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
-import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { typePx } from "../../shared/type";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "./composer";
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
+import { suggestReplies } from "../../shared/suggest-reply";
+import { openSuggest } from "../../shared/suggest-float";
 import { avatarTint } from "../../shared/palette";
 
 const RUST = "var(--crm-rust)", INK = "var(--crm-ink)", SUB = "rgb(128 107 96)", BD = "var(--crm-rule)";
@@ -488,14 +489,15 @@ export function chatVM(ctx: SalesCtx) {
     if (label === "Photos") document.getElementById("crm-pick-photo")?.click();
     else if (label === "Document") document.getElementById("crm-pick-file")?.click();
     else if (label === "Quick replies") patch({ qr: true });
-    // Auto replies: one's saved welcome / after-hours / keyword replies, into the reply box to send by hand.
-    else openAttach({ view: "auto", quick: [], auto: autoChoices(data.autoReplies), pick: text => setDraft(text) });
+    // Suggest reply (in Auto replies' place, 2026-10-29): the suggested replies' list over the chat.
+    else openSuggest();
   };
   const cmp: ComposerIn = {
     key: c.id, state: composerOf(ui.cmp, c.id) ?? initialComposer(), set: setCmp,
     placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
     warm: !shut,
     openTpl: () => void openTpl(), tplOn: data.settings?.suggestTemplate !== false, coldSub: coldLine(c, now),
+    suggest: shut ? undefined : suggestReplies(c, data.replyExamples ?? [], data.quickReplies),
     reply: ui.reply ? { who: ui.reply.from === "me" ? "You" : c.name, text: plain(ui.reply.text) } : null,
     cancelReply: () => patch({ reply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,

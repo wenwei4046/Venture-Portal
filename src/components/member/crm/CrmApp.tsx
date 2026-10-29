@@ -9,7 +9,7 @@
  * behaviour is sales/vm/*.ts; every change is saved first (sales/actions.ts).
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react";
-import { fetchCrmData } from "@/app/(member)/member/crm-actions";
+import { fetchCrmData, fetchCrmReplyExamples } from "@/app/(member)/member/crm-actions";
 import { canFromRole, type CrmData } from "@/lib/member/crm-data";
 import { crmDemoData } from "@/lib/member/crm-demo-data";
 import H from "./crm.module.css";
@@ -145,7 +145,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
           const sig = JSON.stringify(r.data);
           if (sig === lastRead) return;
           lastRead = sig;
-          setData(prev => keepSending(prev, r.data));
+          // The suggested replies' examples are read once (below) and kept across the reads.
+          setData(prev => { const n = keepSending(prev, r.data); return prev?.replyExamples ? { ...n, replyExamples: prev.replyExamples } : n; });
           saveSnapshot(desk ? "desk" : "phone", r.data);
         }
       } finally { busy = false; }
@@ -156,6 +157,14 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     window.addEventListener("focus", back);
     return () => { stopped = true; clearInterval(t); document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); };
   }, [live, refs, desk]);
+  // What customers asked and our team answered, for the chat's suggested replies (2026-10-29): read once, once the CRM is there.
+  const haveData = !!data;
+  useEffect(() => {
+    if (!live || !haveData) return;
+    let current = true;
+    void fetchCrmReplyExamples().then(ex => { if (current && ex) setData(d => (d ? { ...d, replyExamples: ex } : d)); });
+    return () => { current = false; };
+  }, [live, haveData]);
   // Demo only: whose eyes, after the first paint (the server cannot read the address's ?crmAs).
   // Every chat's newest photos are fetched onto the phone ahead of being opened (shared/media-cache.ts › warmPhotos).
   useEffect(() => { if (live && data) warmPhotos(photosAhead(data.customers)); }, [live, data]);

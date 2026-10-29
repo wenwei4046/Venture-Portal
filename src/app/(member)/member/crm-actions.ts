@@ -352,6 +352,23 @@ export async function reactToMessage(messageId: string, emoji: string): Promise<
   }
 }
 
+/**
+ * What customers asked and our team answered (crm_reply_examples, mig 20261029150000) — the chat's suggested replies' experience.
+ * Null when it cannot be read (before the migration, or not in the CRM); the chat then suggests from quick replies alone.
+ */
+export async function fetchCrmReplyExamples(): Promise<{ q: string; a: string; won?: boolean; appt?: boolean }[] | null> {
+  try {
+    const db = await session();
+    await requireCrm("view");
+    const { data, error } = await db.rpc("crm_reply_examples");
+    if (error || !Array.isArray(data)) return null;
+    return (data as { q?: unknown; a?: unknown; won?: unknown; appt?: unknown }[]).filter(x => typeof x.q === "string" && typeof x.a === "string")
+      .map(x => ({ q: x.q as string, a: x.a as string, won: !!x.won, appt: !!x.appt }));
+  } catch {
+    return null;
+  }
+}
+
 /** The WhatsApp Business Account's approved templates (for a cold lead). */
 export async function fetchCrmTemplates(): Promise<{ ok: true; templates: WaTemplate[] } | { ok: false; error: string }> {
   try {
