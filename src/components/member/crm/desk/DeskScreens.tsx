@@ -26,6 +26,8 @@ import { useFollowNewest } from "../shared/stick";
 import { useReadWhenSeen } from "../shared/seen";
 import { MediaViewer } from "../shared/viewer";
 import { MessageMenu } from "../shared/msg-menu";
+import { inBrand } from "./vm/insight";
+import type { SourcePick } from "@/lib/member/crm-source";
 
 export interface DeskScreensProps {
   data: CrmData;
@@ -247,7 +249,10 @@ export default function DeskScreens(p: DeskScreensProps) {
   const meta = useMemo(() => ({ data: metaData, loading: onChannels && !metaData && !metaErr, error: metaErr, reload: () => setMetaN(n => n + 1), origin }), [metaData, onChannels, metaErr, origin]);
 
   // People and teams in Title Case on the desktop (v2 › note 03) — display only; the writes take ids.
-  const shown = useMemo(() => ({ data: titleData(data), me: { ...p.me, name: titleName(p.me.name) }, teams: titleTeams(p.teams), directors: p.directors.map(d => ({ ...d, name: titleName(d.name) })) }), [data, p.me, p.teams, p.directors]);
+  // One brand at a time, as Lead View (the owner, 2026-10-29: "要分开 DC 和 The Conts 不同的专页，像 lead view 一样"): the
+  // sidebar's All · The Conts · Dream Crafter keeps every page to that brand's customers, their visits and journey (ui.insSrc,
+  // kept on this computer; Insight's own switch is the same choice). Writes still take ids.
+  const shown = useMemo(() => ({ data: inBrand(titleData(data), ui.insSrc as SourcePick | undefined), me: { ...p.me, name: titleName(p.me.name) }, teams: titleTeams(p.teams), directors: p.directors.map(d => ({ ...d, name: titleName(d.name) })) }), [data, p.me, p.teams, p.directors, ui.insSrc]);
   const nameOf = useCallback((id: string | null | undefined) => titleName(p.nameOf(id)), [p]);
   const ctx = {
     data: shown.data, me: shown.me, now: p.now, live, ui, set: setUi, patch, act, deskAct, teams: shown.teams, directors: shown.directors, nameOf,

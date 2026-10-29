@@ -65,6 +65,14 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     if (a.ok) setTaken(a.taken); else setError(a.reason)
   }, [code, room, page.today])
   useEffect(() => { void load() }, [load])
+  // Every booking takes a place and a change or cancel gives one back, whoever made it (the owner, 2026-10-29: "只要有人预约成功，
+  // showroom available 都要 -1"): the places are read again every 30 s while the page is open and when it comes back to the front.
+  useEffect(() => {
+    const again = () => { if (document.visibilityState === "visible") void load() }
+    const t = window.setInterval(again, 30_000)
+    document.addEventListener("visibilitychange", again); window.addEventListener("focus", again)
+    return () => { window.clearInterval(t); document.removeEventListener("visibilitychange", again); window.removeEventListener("focus", again) }
+  }, [load])
 
   const days = useMemo(() => Array.from({ length: DAYS }, (_, k) => addDays(page.today, k)), [page.today])
   const except = editing ? { showroom: editing.showroom, start: editing.start } : null
@@ -82,7 +90,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     setBusy(false)
     if (!a.ok) { setError(a.reason); void load(); return }
     try { localStorage.setItem(ME_KEY, JSON.stringify({ booker: form.booker, bookerPhone: form.bookerPhone })) } catch { /* private window */ }
-    setDone(a.booked); setEditing(null)
+    setDone(a.booked); setEditing(null); void load()
   }
   const again = () => { setDone(null); setStart(''); setForm(f => ({ ...EMPTY, booker: f.booker, bookerPhone: f.bookerPhone })); void load() }
   const findRef = async () => {
@@ -91,6 +99,8 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     if (!a.ok) { setRefError(a.reason); return }
     const b = a.booked
     if (b.state === 'cancelled') { setRefError(`${b.ref} was cancelled.`); return }
+    // Read the places again: the booking may have been made after this page last read them.
+    if (b.showroom === room) void load();
     setDone(null); setEditing(b); setRoom(b.showroom); setDay(officeDay(b.start)); setStart(new Date(b.start).toISOString())
     setForm({ booker: b.booker, bookerPhone: b.bookerPhone, customer: b.customer, customerPhone: b.customerPhone, info: b.info, remarks: b.remarks, note: b.note })
   }
@@ -101,7 +111,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     const a = await partnerCancel(code, editing.ref)
     setBusy(false)
     if (!a.ok) { setError(a.reason); return }
-    setDone(a.booked); setEditing(null)
+    setDone(a.booked); setEditing(null); void load()
   }
   const stopEditing = () => { setEditing(null); setStart(''); setForm(f => ({ ...EMPTY, booker: f.booker, bookerPhone: f.bookerPhone })) }
 

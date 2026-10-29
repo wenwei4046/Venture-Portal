@@ -92,8 +92,10 @@ export interface SlotView { time: string; label: string; start: string; left: nu
 export function slotsOf(r: PartnerRoom, ymd: string, taken: PartnerTaken, now: Date, except?: { showroom: string; start: string } | null): SlotView[] {
   return timesOf(r, ymd).map(time => {
     const start = startOf(ymd, time);
-    const own = except && except.showroom === r.id && new Date(except.start).toISOString() === start ? 1 : 0;
-    const left = Math.max(0, r.cap - ((taken[start] ?? 0) - own));
+    // The booking being moved holds one of this slot's places — only when the count read has it (a count read before it was
+    // booked does not), and never more places than the showroom has.
+    const n = taken[start] ?? 0, own = except && except.showroom === r.id && new Date(except.start).toISOString() === start && n > 0 ? 1 : 0;
+    const left = Math.min(r.cap, Math.max(0, r.cap - (n - own)));
     const past = new Date(start) <= now;
     return { time, label: t12(time), start, left, full: left <= 0, past };
   });

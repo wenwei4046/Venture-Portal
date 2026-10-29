@@ -201,6 +201,8 @@ export function frameVM(ctx: DeskCtx) {
     me: meCard, profileOpen: !fold.profile, profileRot: fold.profile ? -90 : 0, showScope: teamMine && !!ctx.toMine, viewAs: ctx.viewAs?.people.length ? ctx.viewAs : undefined,
     toggleProfile: () => set(u => ({ ...u, fold: { ...u.fold, profile: !u.fold.profile } })), toggleSb: () => patch({ collapsed: !collapsed }),
     pageTitle: curTab[1], pageBadge: null as number | null, scopeOpts,
+    // The brand the whole CRM shows (DeskScreens › inBrand).
+    brandOpts: ([["all", "All", "All brands"], ["conts", "The Conts", "The Conts"], ["dc", "DC", "Dream Crafter"]] as const).map(([k, label, title]) => ({ label, title, on: (ui.insSrc ?? "all") === k, pick: () => patch({ insSrc: k }) })),
     showPeriod: tab === "insight" && W >= 1440 && !teamMine, showPeriodCompact: tab === "insight" && (W < 1440 || teamMine),
     periodNow: "This month", alertsLabel: W >= 1440, periodOpts, openAlerts: () => patch({ pane: "overlay", kind: "alerts" }),
     isWide, isCenter, notWide: !isWide && !isCenter && !sheetMode, listCards,

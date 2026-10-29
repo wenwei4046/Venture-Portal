@@ -33,6 +33,7 @@ interface SideBits {
   f4: Frame4a;
   showScope: boolean;
   scopeOpts: { label: string; on: boolean; pick: () => void }[];
+  brandOpts?: { label: string; title: string; on: boolean; pick: () => void }[];
   toggleSb: () => void;
   returnApp: () => void;
   meMenuOpen: boolean;
@@ -131,6 +132,12 @@ export function Desk4aSide({ v }: { v: SideBits }) {
         <div style={{ display: "flex", margin: "0 0 10px", background: "var(--crm-field)", borderRadius: "7px", padding: "3px", gap: "2px" }}>
           {v.scopeOpts.map(o => <button key={o.label} type="button" onClick={o.pick} style={{ ...BTN, flex: 1, height: "26px", borderRadius: "5px", textAlign: "center", font: "500 13px Inter, sans-serif",
             background: o.on ? "var(--crm-page)" : "transparent", color: o.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{o.label}</button>)}
+        </div>
+      )}
+      {!!v.brandOpts?.length && (
+        <div role="radiogroup" aria-label="Brand" style={{ display: "flex", margin: "0 0 10px", background: "var(--crm-field)", borderRadius: "7px", padding: "3px", gap: "2px" }}>
+          {v.brandOpts.map(o => <button key={o.label} type="button" role="radio" aria-checked={o.on} title={o.title} onClick={o.pick} style={{ ...BTN, flex: 1, height: "26px", borderRadius: "5px", textAlign: "center", font: "500 12.5px Inter, sans-serif", whiteSpace: "nowrap",
+            background: o.on ? "var(--crm-rust)" : "transparent", color: o.on ? "#fff" : "var(--crm-muted)" }}>{o.label}</button>)}
         </div>
       )}
       {f.crmNav.map((g, gi) => (<div key={gi} style={{ display: "contents" }}>
