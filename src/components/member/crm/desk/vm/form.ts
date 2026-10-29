@@ -52,12 +52,17 @@ const AUTO: Record<StdKey, FormFieldV2[]> = {
   visit: [{ id: "visit", label: "Visit", type: "Date", opts: "", req: false, kind: "auto" }, { id: "showroom", label: "Showroom", type: "Choice", opts: "", req: false, kind: "auto" }],
   property: [],
 };
+// Name and Phone were "Always asked" until the owner made them the form's like any question (2026-10-29: "always ask 我也要自定义"
+// — "必填开关 + 可删除"): required at first, their own controls, and they can be made optional or taken off. Status stays the CRM's.
 const CORE: Record<string, FormFieldV2> = {
-  name: { id: "name", label: "Name", type: "Short text", opts: "", req: true, kind: "core" },
-  phone: { id: "phone", label: "Phone", type: "Short text", opts: "", req: true, kind: "core" },
   status: { id: "status", label: "Status", type: "Choice", opts: "New, Follow up, Appointment, Won, Lost", req: true, kind: "core" },
 };
+const NAME_PHONE: Record<string, FormFieldV2> = {
+  name: { id: "name", label: "Name", type: "Short text", opts: "", req: true, kind: "builtin" },
+  phone: { id: "phone", label: "Phone", type: "Short text", opts: "", req: true, kind: "builtin" },
+};
 const BUILTIN: Record<string, FormFieldV2> = {
+  ...NAME_PHONE,
   type: { id: "type", label: "Property type", type: "Choice", opts: "Condo, Landed", req: false, kind: "builtin" },
   size: { id: "size", label: "Unit size", type: "Choice", opts: SIZES.join(", "), req: false, kind: "builtin" },
   loc: { id: "loc", label: "Unit location", type: "Short text", opts: "", req: false, kind: "builtin" },
@@ -70,9 +75,9 @@ const sectionOf = (title: string): StdKey => { const t = title.toLowerCase(); re
 /** The default form: the design's (D0) — every built-in, no own question. */
 export function defaultForm(): FormSectionV2[] {
   return SECTIONS.map(([key, label]) => ({ key, label, page: 0, pageTitle: pageName(0), fields: [
-    ...(key === "contact" ? [CORE.name, CORE.phone] : []), ...AUTO[key].filter(f => key !== "lead" || f.id !== "sp"),
+    ...(key === "contact" ? [BUILTIN.name, BUILTIN.phone] : []), ...AUTO[key].filter(f => key !== "lead" || f.id !== "sp"),
     ...(key === "lead" ? [CORE.status, AUTO.lead[2]] : []),
-    ...(key === "property" ? Object.values(BUILTIN) : []),
+    ...(key === "property" ? Object.values(BUILTIN).filter(f => !NAME_PHONE[f.id]) : []),
   ].map(f => ({ ...f })) }));
 }
 
@@ -85,9 +90,9 @@ export function formV2(data: Pick<CrmData, "forms">): FormSectionV2[] {
   const sec = (k: StdKey) => out.find(s => s.key === k)!;
   for (const s of form.sections) {
     for (const f of s.fields) {
-      if (f.id === "name" || f.id === "phone" || f.id === "status") { const c = sec("contact").fields.find(x => x.id === f.id) ?? sec("lead").fields.find(x => x.id === f.id); if (c) c.label = f.label || c.label; continue; }
+      if (f.id === "status") { const c = sec("lead").fields.find(x => x.id === f.id); if (c) c.label = f.label || c.label; continue; }
       const b = BUILTIN[f.id];
-      const into: StdKey = (STD_KEYS as string[]).includes(s.id) ? s.id as StdKey : b ? "property" : sectionOf(s.title);
+      const into: StdKey = (STD_KEYS as string[]).includes(s.id) ? s.id as StdKey : NAME_PHONE[f.id] ? "contact" : b ? "property" : sectionOf(s.title);
       sec(into).fields.push(b ? { ...b, label: f.label || b.label, req: !!f.req, opts: f.opts?.length ? f.opts.join(", ") : b.opts }
         : { id: f.id, label: f.label, type: FROM_DB(f.type), opts: (f.opts ?? []).join(", "), req: !!f.req, kind: "own" });
     }
@@ -108,7 +113,7 @@ function pagedForm(form: CrmForm): FormSectionV2[] {
   });
   const has = new Set(out.flatMap(s => s.fields.map(f => f.id)));
   const home = (k: StdKey) => out.find(s => s.key === k) ?? out[0];
-  for (const k of STD_KEYS) for (const f of [...AUTO[k], ...(k === "contact" ? [CORE.name, CORE.phone] : k === "lead" ? [CORE.status] : [])])
+  for (const k of STD_KEYS) for (const f of [...AUTO[k], ...(k === "lead" ? [CORE.status] : [])])
     if (!has.has(f.id) && home(k)) home(k).fields.push({ ...f });
   return out;
 }
@@ -159,14 +164,15 @@ export const budgetOf = (c: CrmCustomer) => { const n = Number(String(c.details.
 /**
  * The booking link's form (2026-10-29, the owner: "这里是2个form, 一个是给crm customer info, 一个是internal sales booking
  * form"): what /b/<code> asks partners who have no login. Saved in crm_forms with kind 'booking' (mig 20261030040000), the
- * first one in use. Your name, Customer name and Customer phone are core (a booking cannot do without them); Your phone,
- * Remarks and Your own note are the booking's own columns (built-in: their type stays, they may be removed); the rest are
+ * first one in use. Your name, Your phone, Customer name, Customer phone, Remarks and Your own note are the booking's own
+ * columns (built-in: their type stays; required or not, and removable, as the owner sets — 2026-10-29); the rest are
  * the form's own questions, kept in the booking's info under their id. No field is filled by the CRM, and it is one page.
  */
+// Required at first; the owner may make them optional or take them off (2026-10-29: "always ask 我也要自定义").
 const BOOKING_CORE: Record<string, FormFieldV2> = {
-  booker: { id: "booker", label: "Your name", type: "Short text", opts: "", req: true, kind: "core" },
-  customer: { id: "customer", label: "Customer name", type: "Short text", opts: "", req: true, kind: "core" },
-  customerPhone: { id: "customerPhone", label: "Customer phone", type: "Short text", opts: "", req: true, kind: "core" },
+  booker: { id: "booker", label: "Your name", type: "Short text", opts: "", req: true, kind: "builtin" },
+  customer: { id: "customer", label: "Customer name", type: "Short text", opts: "", req: true, kind: "builtin" },
+  customerPhone: { id: "customerPhone", label: "Customer phone", type: "Short text", opts: "", req: true, kind: "builtin" },
 };
 const BOOKING_BUILTIN: Record<string, FormFieldV2> = {
   bookerPhone: { id: "bookerPhone", label: "Your phone", type: "Short text", opts: "", req: false, kind: "builtin" },
@@ -189,10 +195,8 @@ export function defaultBookingForm(): FormSectionV2[] {
 export function bookingFormV2(form: CrmForm | undefined): FormSectionV2[] {
   if (!form || !form.sections.length) return defaultBookingForm();
   const out: FormSectionV2[] = form.sections.map(s => ({ key: s.id, label: s.title, page: 0, pageTitle: pageName(0), custom: true,
-    fields: s.fields.map(f => BOOKING_CORE[f.id] ? { ...BOOKING_CORE[f.id], label: f.label || BOOKING_CORE[f.id].label }
+    fields: s.fields.map(f => BOOKING_CORE[f.id] ? { ...BOOKING_CORE[f.id], label: f.label || BOOKING_CORE[f.id].label, req: !!f.req }
       : BOOKING_BUILTIN[f.id] ? { ...BOOKING_BUILTIN[f.id], label: f.label || BOOKING_BUILTIN[f.id].label, req: !!f.req }
       : { id: f.id, label: f.label, type: FROM_DB(f.type), opts: (f.opts ?? []).join(", "), req: !!f.req, kind: "own" as const }) }));
-  const has = new Set(out.flatMap(s => s.fields.map(f => f.id)));
-  for (const f of Object.values(BOOKING_CORE)) if (!has.has(f.id) && out[0]) out[0].fields.push({ ...f });
   return out;
 }

@@ -43,7 +43,8 @@ describe("the Forms page", () => {
     expect(v.cfForms.list.map(f => [f.name, f.inUse])).toEqual([["Booking form", true]]);
     expect(v.cfSecs.map(s => s.title)).toEqual(["You", "Customer", "Notes"]);
     const customer = v.cfSecs[1].fields;
-    expect(customer.filter(f => f.core).map(f => f.label)).toEqual(["Customer name", "Customer phone"]);
+    // Required at first, and the owner may switch that off or remove them (2026-10-29: "always ask 我也要自定义").
+    expect(customer.filter(f => f.reqOn).map(f => [f.label, f.core, f.removable])).toEqual([["Customer name", false, true], ["Customer phone", false, true]]);
     expect(v.cfSummary).toMatch(/^Booking form · 12 questions · 3 required$/);
     const html = renderToStaticMarkup(<DeskForm4a v={v} preview={<span>PHONE-PREVIEW</span>} share={<span>LINK-CARD</span>} />);
     expect(html).toContain("LINK-CARD");

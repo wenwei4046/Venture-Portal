@@ -138,7 +138,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   const setInfo = (k: string, v: string) => setForm(f => ({ ...f, info: { ...f.info, [k]: v } }))
 
   const problem = bookingProblem({ room, start, booker: form.booker, customer: form.customer, customerPhone: form.customerPhone })
-    ?? missingAnswer(page.form, { ...form.info, bookerPhone: form.bookerPhone, remarks: form.remarks, note: form.note })
+    ?? missingAnswer(page.form, { ...form.info, booker: form.booker, bookerPhone: form.bookerPhone, customer: form.customer, customerPhone: form.customerPhone, remarks: form.remarks, note: form.note })
   const submit = async () => {
     if (problem || busy) { setError(problem ?? ''); return }
     setBusy(true); setError('')
@@ -353,7 +353,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     <button key={b.ref} type="button" className={s.bookingCard} onClick={() => openBooking(b.ref)}>
       <span className={s.bcWhen}>{whenOf(b.start)}</span>
       <span className={s.bcRoom}>{b.showroomName}</span>
-      <span className={s.bcLine}>{b.customer} · {b.customerPhone}</span>
+      <span className={s.bcLine}>{[b.customer, b.customerPhone].filter(Boolean).join(' · ') || 'No customer details'}</span>
       <span className={s.bcFoot}><span className={s.refCell}>{b.ref}</span><span>by {b.booker}</span><span className={s.bcOpen}>Open ›</span></span>
     </button>
   )

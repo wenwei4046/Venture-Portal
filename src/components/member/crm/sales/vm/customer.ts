@@ -37,7 +37,7 @@ const isBuiltIn = (id: string): id is BuiltIn => (BUILT_IN as readonly string[])
 export function formOf(data: Pick<CrmData, "forms">) {
   const form: CrmForm | undefined = data.forms?.[0];
   const ids = new Set(form?.sections.flatMap(s => s.fields.map(f => f.id)) ?? BUILT_IN);
-  const has = Object.fromEntries(BUILT_IN.map(k => [k, k === "name" || ids.has(k)])) as Record<BuiltIn, boolean>;
+  const has = Object.fromEntries(BUILT_IN.map(k => [k, ids.has(k)])) as Record<BuiltIn, boolean>;
   const extra = (form?.sections ?? []).map(s => ({ title: s.title, fields: s.fields.filter(f => !isBuiltIn(f.id) && !f.sys && f.id !== "status") })).filter(s => s.fields.length);
   // A form saved as pages (2026-10-16) is asked page by page, every question in its saved place (pagedQuestions).
   const paged = !!form && form.sections.some(s => typeof s.page === "number");
@@ -75,7 +75,7 @@ const BUILT_IN_Q: Record<BuiltIn, Omit<CrmFormField, "id" | "label" | "req">> = 
 };
 /** A paged form's questions (2026-10-16): the pages that ask something, the one being filled (`at`), its sections, every question. */
 export function pagedQuestions(form: CrmForm, page: number) {
-  const q = (x: CrmFormField): CrmFormField => (isBuiltIn(x.id) ? { ...BUILT_IN_Q[x.id], ...(x.opts?.length ? { opts: x.opts } : {}), id: x.id, label: x.label, req: x.id === "name" ? 1 : x.req } : x);
+  const q = (x: CrmFormField): CrmFormField => (isBuiltIn(x.id) ? { ...BUILT_IN_Q[x.id], ...(x.opts?.length ? { opts: x.opts } : {}), id: x.id, label: x.label, req: x.req } : x);
   const secs = form.sections.map(s => ({ title: s.title, page: s.page ?? 0, fields: s.fields.filter(x => !x.sys && x.id !== "status").map(q) })).filter(s => s.fields.length);
   const pages = [...new Set(secs.map(s => s.page))].sort((a, b) => a - b);
   const at = Math.max(0, Math.min(page, pages.length - 1));
@@ -144,7 +144,9 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
   const cfExtra: ExtraSection[] = pg ? pg.here.map(s => ({ title: s.title, fields: s.fields.map(q => extraField(q, valOf(q.id), putOf(q.id))) }))
     : extra.map(s => ({ title: s.title, fields: s.fields.map(q => extraField(q, ans(q.id), val => putX(q.id, val))) }));
   const missing = pg ? pg.all.some(q => q.req && !valOf(q.id).trim()) : extra.some(s => s.fields.some(q => q.req && !ans(q.id).trim()));
-  const ok = !!v("name").trim() && !missing;
+  // Name is required where the form asks it and marks it so (the designed form asks it, required — 2026-10-29).
+  const nameReq = pg ? false : has.name && (data.forms?.[0]?.sections.flatMap(s => s.fields).find(x => x.id === "name")?.req ?? 1) === 1;
+  const ok = (!nameReq || !!v("name").trim()) && !missing;
   const pageOk = !pg || pg.here.every(s => s.fields.every(q => !q.req || !!valOf(q.id).trim()));
   const more = !!pg && pg.at < pg.n - 1;
   return {
@@ -161,7 +163,9 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
     cfSaveBg: (more ? pageOk : ok) ? "var(--crm-rust)" : "var(--crm-line)", cfSaveLabel: more ? "Next" : f.edit ? "Save" : "Save & choose a time",
     cfSave: more ? (pageOk ? () => put({ page: pg!.at + 1 }) : undefined) : ok ? async () => {
       const answers = f.extra ? Object.fromEntries(Object.entries(f.extra).map(([k, x]) => [k, x.trim() || null])) : undefined;
-      const saved = await saveDetails(c.id, { name: v("name"), phone: v("phone"), type: v("type"), size: v("size"), loc: v("loc"), req: v("req"), budget: v("budget"), ...(answers ? { extra: answers } : {}) });
+      // The database keeps a name on every customer: one the form did not ask, or left empty, stays as it was (else the phone).
+      const name = v("name").trim() || c.name || phoneLabel(c.phone) || "Customer";
+      const saved = await saveDetails(c.id, { name, phone: v("phone"), type: v("type"), size: v("size"), loc: v("loc"), req: v("req"), budget: v("budget"), ...(answers ? { extra: answers } : {}) });
       if (saved) onSaved(c, f.edit);
     } : undefined,
   };

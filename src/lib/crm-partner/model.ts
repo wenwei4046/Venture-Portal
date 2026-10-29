@@ -44,18 +44,15 @@ export const DEFAULT_PARTNER_FORM: PartnerForm = [
     F("project", "Project / unit location"), F("unit", "Unit no."), F("type", "Property type"), F("size", "Unit size"), F("pax", "No. of people coming", "Number"), F("budget", "Budget")] },
   { title: "Notes", fields: [F("remarks", "Remarks for the showroom", "Long text"), F("note", "Your own note", "Long text")] },
 ];
-/** crm_forms' sections as the page asks them; nothing usable — the default. The three a booking cannot do without are always asked. */
+/** crm_forms' sections as the page asks them, required where marked (2026-10-29: "always ask 我也要自定义"); nothing usable — the default. */
 export function formFromRow(v: unknown): PartnerForm {
   if (!Array.isArray(v)) return DEFAULT_PARTNER_FORM;
   const out: PartnerForm = (v as Record<string, unknown>[]).map(s => ({ title: str(s.title),
     fields: (Array.isArray(s.fields) ? (s.fields as Record<string, unknown>[]) : []).filter(f => str(f.id) && str(f.label)).map(f => ({
       id: str(f.id), label: str(f.label), type: (str(f.type) || "Text") as PartnerFormField["type"],
-      req: ["booker", "customer", "customerPhone"].includes(str(f.id)) || Number(f.req) === 1, opts: Array.isArray(f.opts) ? (f.opts as unknown[]).map(str).filter(Boolean) : [] })) }))
+      req: Number(f.req) === 1, opts: Array.isArray(f.opts) ? (f.opts as unknown[]).map(str).filter(Boolean) : [] })) }))
     .filter(s => s.fields.length);
-  if (!out.length) return DEFAULT_PARTNER_FORM;
-  const has = new Set(out.flatMap(s => s.fields.map(f => f.id)));
-  for (const f of DEFAULT_PARTNER_FORM.flatMap(s => s.fields).filter(f => f.req)) if (!has.has(f.id)) out[0].fields.unshift({ ...f });
-  return out;
+  return out.length ? out : DEFAULT_PARTNER_FORM;
 }
 /** The label a booking's answer is shown under: the form's own, else the old six's, else the id. */
 export function infoLabel(form: PartnerForm | null | undefined, id: string): string {
@@ -63,10 +60,9 @@ export function infoLabel(form: PartnerForm | null | undefined, id: string): str
 }
 /** The first required question of the form left empty, as the database would say it ("Fill in Budget."), or null. */
 export function missingAnswer(form: PartnerForm, values: Record<string, string>): string | null {
-  const f = form.flatMap(s => s.fields).find(x => x.req && !COLUMN_REQUIRED.has(x.id) && !(values[x.id] ?? "").trim());
+  const f = form.flatMap(s => s.fields).find(x => x.req && !(values[x.id] ?? "").trim());
   return f ? `Fill in ${f.label}.` : null;
 }
-const COLUMN_REQUIRED = new Set(["booker", "customer", "customerPhone"]);
 
 export function pageFromRow(row: unknown): PartnerPage {
   const r = row as Record<string, unknown> | null;
@@ -84,7 +80,8 @@ export function bookedFromRow(row: unknown): PartnerBooked | null {
   if (!r || !r.ref) return null;
   const info: PartnerInfo = {};
   const raw = (r.info ?? {}) as Record<string, unknown>;
-  for (const k of INFO_KEYS) if (raw[k]) info[k] = str(raw[k]);
+  // Every answer it holds — the form's own questions too, so an edit keeps them (2026-10-29).
+  for (const [k, val] of Object.entries(raw)) if (val != null && str(val)) info[k] = str(val);
   return { ref: str(r.ref), showroom: str(r.showroom), showroomName: str(r.showroomName), start: str(r.start), minutes: Number(r.minutes) || 60,
     state: r.state === "cancelled" ? "cancelled" : "booked", booker: str(r.booker), bookerPhone: str(r.bookerPhone), customer: str(r.customer),
     customerPhone: str(r.customerPhone), info, remarks: str(r.remarks), note: str(r.note) };
@@ -147,10 +144,9 @@ export function slotsOf(r: PartnerRoom, ymd: string, taken: PartnerTaken, now: D
 export function bookingProblem(f: { room: string; start: string; booker: string; customer: string; customerPhone: string }): string | null {
   if (!f.room) return "Pick a showroom.";
   if (!f.start) return "Pick a date and a time.";
-  if (!f.booker.trim()) return "Type your name.";
-  if (!f.customer.trim()) return "Type the customer's name.";
+  // Whether a name or a phone must be there is the booking form's (missingAnswer); a phone given is still a phone.
   const p = f.customerPhone.trim();
-  if (p.length < 6 || p.length > 30 || !/^[0-9 +()-]+$/.test(p)) return "Type the customer's phone number: at least 6 digits.";
+  if (p && (p.length < 6 || p.length > 30 || !/^[0-9 +()-]+$/.test(p))) return "Type the customer's phone number: at least 6 digits.";
   return null;
 }
 
