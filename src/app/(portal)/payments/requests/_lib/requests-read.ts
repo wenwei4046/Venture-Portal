@@ -76,6 +76,7 @@ export async function readPaymentRequests(user: User): Promise<PaymentRequestsRe
       pay: canDo(user, 'treasury', 'create'),
       sendBack: canDo(user, 'treasury', 'void') || canDo(user, 'treasury', 'approve'),
     },
-    canSetDefault: user.role === 'finance' || user.role === 'principal',
+    // Everyone's default arrangement, as Dept Pool and Invoice Financing offer it: whoever makes vouchers.
+    canSetDefault: canDo(user, 'treasury', 'create'),
   }
 }

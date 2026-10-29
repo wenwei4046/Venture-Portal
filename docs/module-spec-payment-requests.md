@@ -36,7 +36,7 @@ with ROLLBACK, then COMMIT + its `schema_migrations` row), as every PR here.
 
 | PR | Contents | Status |
 |---|---|---|
-| ① | **Finance › Payment request with what exists today.** Finance's sidebar: Payments › *Payment voucher* (today's `/payments`, retitled) and › *Payment request* (`/payments/requests`, new). The new page lists HR's payroll funding requests (tab *Payroll*, Payroll payouts holders only) and the Revenue members' benefit claims HR approved for payment, in the Payments hub's kit (HubHead, HubCards, `FinTable` with its column tools, `RowMenu`, a drawer). Each row worked as today — payroll: Generate PV (rounds), Send back to HR; member claim: Create PV (`claim_create_payment_voucher`) — plus the new **Return to HR** for a member claim. Payment voucher loses its Dept / Claims / Payroll head buttons. | |
+| ① | **Finance › Payment request with what exists today.** Finance's sidebar: Payments › *Payment voucher* (today's `/payments`, retitled) and › *Payment request* (`/payments/requests`, new). The new page lists HR's payroll funding requests (tab *Payroll*, Payroll payouts holders only) and the Revenue members' benefit claims HR approved for payment, in the Payments hub's kit (HubHead, HubCards, `FinTable` with its column tools, `RowMenu`, a drawer). Each row worked as today — payroll: Generate PV (rounds), Send back to HR; member claim: Create PV (`claim_create_payment_voucher`) — plus the new **Return to HR** for a member claim. Payment voucher loses its Dept / Claims / Payroll head buttons. | Built 2026-10-29 (branch `feat/payment-requests`) |
 | ② | **Staff requests, end to end without approval.** The tables, the private bucket, the readers and writers (§3); the staff page `/claims` rebuilt as *Claim* — the requester's own requests and the *New request* window (claim or direct pay, items, receipts, pay-to from HR's record, split with departments / companies); the rows on Payment request; Create PV = today's Create payment window filled in (lines, payee, account hint, notes, files carried over, one person's open requests combined); Reject → fixed and sent again; Bill back Yes/No → a draft invoice in Invoice; the PV followed (paid → paid, voided → back to Finance). | |
 | ③ | **By management approve and Claim & approve.** The tick on a title's template and a person (person wins); the department head's *Claim & approve* (their department's requests, Approve / Reject, several at once); routing at submit; the portal's notices to approvers and requesters. | |
 | ④ | **Several at once for Finance.** Select on Payment request → Create PV (one PV a payee, combined, a bill-back answer each, Save drafts / Submit — one approval group for the Principal) and Reject. | |
@@ -111,6 +111,22 @@ Files: `src/components/layout/fin-nav.ts` (+ `ViewSidebar` child rows), `src/lib
    the happy path).
 7. **Payment voucher.** `VoucherHub`'s non-receipt head keeps *Create payment* and *Export ▾*; the hub's title
    *Payment voucher*. `PaymentsHubClient.test.tsx` updated.
+
+**As built (2026-10-29).**
+
+- *The tabs are the hub's cards.* Payment voucher filters its list by its cards, so Payment request does too: the
+  total (*Waiting for you*), then *All requests*, *Payroll* (Payroll payouts only) and one card per department from
+  the registry (all but Venture Office and Director; a new department appears by itself; a claim of no known
+  department under *Other*), each with its count and sum, `?card=` kept in the URL.
+- *Columns:* Sent · From · What · Pay to · Who pays · Status · Amount on show, Department and Ref # in Columns
+  (`layoutId` `fin.payment_requests`).
+- *Return to HR* asks Treasury · Void or Approve (as Send back to HR on a payroll) — Finance · Maker cannot. The
+  reason never reaches the member (the mockup: "HR sees it (not LUCAS)"): it is the note of the request's history
+  step HR's Member services shows and the body of HR's notice ("Claim returned by Finance · NAME"); the member's
+  history (`member_request_history`) shows the step as *Back with HR for review* without it, and the request's own
+  note is cleared.
+- The phone app's request sheets (Fund, Send back, Raise) now live in `payments/requests/_components/RequestSheets`,
+  shared by both; the desktop's says *Create PV*.
 
 Later PRs are detailed here when they start.
 

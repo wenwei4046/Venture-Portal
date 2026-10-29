@@ -154,7 +154,7 @@ END
 $$;
 
 COMMENT ON FUNCTION public.finance_return_member_claim(uuid, text) IS
-  'Payment request (2026-10-29): Finance returns a member''s claim HR approved for payment, with no payment voucher, to HR — the claim pending again, the request submitted with "Returned by Finance: <reason>". Treasury · Void or Approve, and the page''s box.';
+  'Payment request (2026-10-29): Finance returns a member''s claim HR approved for payment, with no payment voucher, to HR — the claim pending again, the request submitted again; the reason in the history HR reads and in HR''s notice, never in what the member reads. Treasury · Void or Approve, and the page''s box.';
 
 -- The guard the scan reads (tab-write-guards.test.ts), checked against the body above.
 CREATE OR REPLACE FUNCTION pg_temp.tab_guard(p_sig text, p_pages text, p_wants text[])

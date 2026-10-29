@@ -21,7 +21,7 @@ import { FundSheet, RaiseSheet, ReturnClaimSheet, SendBackSheet, type RaiseTarge
 // card is kept in the URL (?card=) for a link or a refresh.
 
 export const COLUMNS: FinColumn<PaymentRequestRow>[] = [
-  { key: 'sent', label: 'Sent', kind: 'date', width: 104, value: (r) => r.sent, text: (r) => (r.sent ? fd(r.sent) : '—') },
+  { key: 'sent', label: 'Sent', kind: 'date', width: 112, value: (r) => r.sent, text: (r) => (r.sent ? fd(r.sent) : '—') },
   { key: 'name', label: 'From', kind: 'name', fixed: true, width: 170, min: 120, value: (r) => r.from.toLowerCase(), text: (r) => r.from },
   { key: 'desc', label: 'What', kind: 'desc', fixed: true, width: 220, min: 120, value: (r) => r.what.toLowerCase(), text: (r) => r.what },
   { key: 'dept', label: 'Department', kind: 'text', width: 140, value: (r) => r.department.toLowerCase(), text: (r) => r.department },

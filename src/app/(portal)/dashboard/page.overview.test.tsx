@@ -147,8 +147,9 @@ describe("Finance's Overview (D01)", () => {
     mocks.requireAuth.mockResolvedValue(withActions({ id: 'f', name: 'Aina Rahman', role: 'finance', permissions: FINANCE }))
     const { container } = render(await drawn())
     const heads = [...container.querySelectorAll('[class*="catHead"]')].map((h) => h.textContent)
-    // Department: Dept Pool, the five departments, Venture Pool — no Claims since 2026-10-15.
-    expect(heads).toEqual(['I.Daily7 pages', 'II.Fund5 pages', 'III.Report11 pages', 'IV.Department7 pages'])
+    // Department: Dept Pool, the five departments, Venture Pool — no Claims since 2026-10-15. Daily: Payment voucher
+    // and Payment request since 2026-10-29.
+    expect(heads).toEqual(['I.Daily8 pages', 'II.Fund5 pages', 'III.Report11 pages', 'IV.Department7 pages'])
   })
 
   it('reads by person for whoever holds Payroll payouts in their own view (finance@): payroll counted', async () => {
