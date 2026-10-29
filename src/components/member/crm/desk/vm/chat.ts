@@ -20,6 +20,9 @@ import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { ATTACH_TILES, DOC_ACCEPT } from "../../shared/attach-sheet";
 import { suggestReplies, waitingWords } from "../../shared/suggest-reply";
 
+// A + menu row holds one line (its height is fixed — two suggestions ran over each other, the owner's screenshot 2026-10-29):
+// a suggestion shows its start there; the pick still fills the box with the whole of it.
+const oneLine = (t: string) => { const s = t.replace(/\s+/g, " ").trim(); return s.length > 22 ? `${s.slice(0, 22)}…` : s; };
 const SPARK = "M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z";
 import { CATS, ICON as CMP_ICON, emojiView, pushRecent } from "../../sales/vm/composer";
 import { adKindLabel } from "../../shared/AdLink";
@@ -139,7 +142,7 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
   // Auto replies' place is Suggest reply since 2026-10-29 (the owner: "替换 auto replies"): the suggested replies for the
   // customer's waiting words (shared/suggest-reply.ts), as the phone's floating logo offers them.
   const choices = view === "quick" ? data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : q.message.slice(0, 24), text: q.message }))
-    : view === "auto" && c ? suggestReplies(c, data.replyExamples ?? [], data.quickReplies).map(s => ({ label: s.text.replace(/\s+/g, " ").slice(0, 70), text: s.text })) : [];
+    : view === "auto" && c ? suggestReplies(c, data.replyExamples ?? [], data.quickReplies).map(s => ({ label: oneLine(s.text), text: s.text })) : [];
   const attachOpts = view ? [
     { label: "Back", bg: "var(--crm-muted)", d: "M15 18l-6-6 6-6", sep: false, pick: () => patch({ attachView: "" }) },
     ...(choices.length ? choices.map((x, i) => ({ label: x.label, bg: view === "quick" ? "var(--crm-brown)" : "var(--crm-brown)", d: view === "quick" ? ATTACH_TILES[3][2] : ATTACH_TILES[4][2], sep: i === 0,
