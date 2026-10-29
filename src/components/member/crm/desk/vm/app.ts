@@ -52,6 +52,7 @@ export function deskVM(ctx: DeskCtx) {
     book: { avatar: "", title: "Appointment", sub: cur ? `${cur.name} · showroom visit` : "", subColor: "var(--crm-muted)", menu: false },
     note: { avatar: "", title: "Notes", sub: cur?.name ?? "", subColor: "var(--crm-muted)", menu: false },
     form: { avatar: "", title: "Edit customer", sub: data.customers.find(c => c.id === (ui.infoId ?? ""))?.name ?? "", subColor: "var(--crm-muted)", menu: false },
+    partner: { avatar: "", title: "Partner booking", sub: "", subColor: "var(--crm-muted)", menu: false },
   };
   const as = assignPageVM(ctx, op);
   const awC = ui.awChat ? data.customers.find(c => c.id === ui.awChat) : undefined;

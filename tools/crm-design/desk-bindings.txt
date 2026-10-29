@@ -253,6 +253,7 @@ isGenOp
 isHistOp
 isLbaOp
 isLibOp
+isLinkOp
 isMwtOp
 isNtfOp
 isSrOp
@@ -272,6 +273,7 @@ kInsight
 kList
 kMetrics
 kNote
+kPartner
 kPeople
 kPick
 kReports
@@ -346,6 +348,8 @@ paneFull
 paneOn
 paneShown
 paneStyle
+partnerLink
+partnerPane
 people
 perfW
 personChats

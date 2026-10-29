@@ -43,6 +43,17 @@ export function calendarVM(ctx: DeskCtx) {
     return { time: timeOf(v.at), short: short(v.at), name: v.name, who: `${v.rep} · ${v.room}`, rep: v.rep, room: v.room, status: v.status, stBg: st[0], stFg: st[1], color: ink, tint, look: lookOf(v.status),
       hour: v.at.getHours() + v.at.getMinutes() / 60, mins: v.v.minutes || 60,
       open: () => patch({ pane: "docked", kind: "info", visit: v.id, infoId: null }) }; };
+  // A partner's bookings through its link (mig 20261029190000): on the calendar beside the visits, in their own colour —
+  // no CRM customer behind them, so they follow the showroom filter and leave when a team or people are picked.
+  const partnerNames = new Map((data.partnerLinks ?? []).map(l => [l.id, l.name]));
+  const partners = (data.partnerBookings ?? []).filter(b => b.state === "booked" && team === "all" && !ui.calWho.length && (ui.calShowroom === "all" || b.showroomId === ui.calShowroom))
+    .map(b => ({ b, at: new Date(b.start) })).sort((x, y) => x.at.getTime() - y.at.getTime());
+  const pItem = ({ b, at }: (typeof partners)[number]) => { const room = data.rooms.find(x => x.id === b.showroomId)?.name ?? "Showroom", who = partnerNames.get(b.partner) ?? (b.partner === "the_conts" ? "The Conts" : "Partner");
+    return { time: timeOf(at), short: short(at), name: `${b.customer} · ${who}`, who: `${b.booker} · ${room}`, rep: b.booker, room, status: "Booked" as VisitRow["status"], stBg: "var(--crm-peach-soft)", stFg: "var(--crm-brown)",
+      color: "var(--crm-brown)", tint: "var(--crm-peach-soft)", look: { bg: "var(--crm-peach-soft)", fg: "var(--crm-brown)", bd: "var(--crm-brown)", bs: "dotted" },
+      hour: at.getHours() + at.getMinutes() / 60, mins: b.minutes || 60, open: () => patch({ pane: "docked", kind: "partner", partner: b.id, visit: null, infoId: null }) }; };
+  const pOn = (t: number) => partners.filter(p => day0(p.at) === t && t >= r[0] && t <= r[1]).map(pItem);
+  const byTime = <X extends { hour: number }>(xs: X[]) => xs.sort((a, b) => a.hour - b.hour);
 
   // The month on screen: the range's month (the prototype: October with 28–30 Sep and 1 Nov around it).
   const mA = new Date(new Date(r[0]).getFullYear(), new Date(r[0]).getMonth(), 1), lead = (mA.getDay() + 6) % 7, days = new Date(mA.getFullYear(), mA.getMonth() + 1, 0).getDate();
@@ -50,23 +61,23 @@ export function calendarVM(ctx: DeskCtx) {
   const monthCells = Array.from({ length: rows * 7 }, (_, k) => {
     const d = new Date(mA.getFullYear(), mA.getMonth(), 1 - lead + k), t = d.getTime(), muted = d.getMonth() !== mA.getMonth();
     return { num: d.getDate(), bg: muted ? "var(--crm-page)" : "#fff", numBg: !muted && t === T ? "var(--crm-rust)" : "transparent", numFg: muted ? "var(--crm-faint-2)" : t === T ? "#fff" : "var(--crm-ink)",
-      visits: muted ? [] : vs.filter(v => day0(v.at) === t).map(item) };
+      visits: muted ? [] : byTime([...vs.filter(v => day0(v.at) === t).map(item), ...pOn(t)]) };
   });
   const weekCols = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((dow, k) => { const t = wkA + k * DAY, n = new Date(t).getDate();
-    return { dow, num: n, fg: t === T ? "var(--crm-rust)" : "var(--crm-ink)", bd: t === T ? "var(--crm-rust)" : "var(--crm-rule)", visits: vs.filter(v => day0(v.at) === t).map(item) }; });
+    return { dow, num: n, fg: t === T ? "var(--crm-rust)" : "var(--crm-ink)", bd: t === T ? "var(--crm-rust)" : "var(--crm-rule)", visits: byTime([...vs.filter(v => day0(v.at) === t).map(item), ...pOn(t)]) }; });
   // Day: the showrooms' own times today (the prototype: 11 am – 7 pm), each free or with its visits.
   const room = ui.calShowroom === "all" ? undefined : data.rooms.find(x => x.id === ui.calShowroom);
   const dow = (now.getDay() + 6) % 7;
   const slotTimes = [...new Set((room ? [room] : data.rooms.filter(x => x.active)).flatMap(x => x.slots.filter(s => !s.includes("@") || s.split("@")[1].includes(String(dow))).map(s => s.split("@")[0])))].sort();
   const today = vs.filter(v => day0(v.at) === T);
   const daySlots = slotTimes.map(hm => { const [h, m] = hm.split(":").map(Number), at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
-    const list = today.filter(v => v.at.getHours() === h && v.at.getMinutes() === m).map(item);
+    const list = [...today.filter(v => v.at.getHours() === h && v.at.getMinutes() === m).map(item), ...pOn(T).filter(x => x.hour === h + m / 60)];
     return { time: timeOf(at), visits: list, free: !list.length }; });
   const cap = room?.cap ?? Math.max(1, ...data.rooms.filter(x => x.active).map(x => x.cap));
   const upcoming = vs.filter(v => view === "today" ? day0(v.at) === T : day0(v.at) >= T);
-  const dayKeys = [...new Set(upcoming.map(v => day0(v.at)))];
+  const dayKeys = [...new Set([...upcoming.map(v => v.at), ...partners.filter(p => view === "today" ? day0(p.at) === T : day0(p.at) >= T).map(p => p.at)].map(day0))].sort((a, b) => a - b);
   const upDays = dayKeys.map(t => ({ label: (t === T ? "Today · " : "") + new Date(t).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", month: "short" }),
-    fg: t === T ? "var(--crm-rust)" : "var(--crm-muted)", visits: upcoming.filter(v => day0(v.at) === t).map(item) }));
+    fg: t === T ? "var(--crm-rust)" : "var(--crm-muted)", visits: byTime([...upcoming.filter(v => day0(v.at) === t).map(item), ...partners.filter(p => day0(p.at) === t).map(pItem)]) }));
   const teamsList: [string, string, string | null][] = [["all", "All teams", null], ...(ctx.directors.length ? [[DIRECTOR_TEAM, DIRECTOR_TEAM, DIRECTOR_C[0]] as [string, string, string]] : []),
     ...teams.map((t, k) => [t.name, t.name, teamColours(k)[0]] as [string, string, string])];
   const due = vs.filter(v => v.at <= now), showed = vs.filter(v => v.v.state === "attended").length, noShow = vs.filter(v => v.v.state === "no_show").length;
@@ -139,7 +150,7 @@ export function calendarVM(ctx: DeskCtx) {
     calToday: () => patch({ calRange: view === "month" ? [monthA, monthB] : view === "week" ? [wkA, wkB] : view === "day" ? [T, T] : [T, monthB] }),
     week4: (() => {
       const a = view === "week" ? r[0] : wkA;
-      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((dow, k) => { const t = a + k * DAY; return { dow, num: new Date(t).getDate(), today: t === T, visits: vs.filter(v => day0(v.at) === t).map(item) }; });
+      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((dow, k) => { const t = a + k * DAY; return { dow, num: new Date(t).getDate(), today: t === T, visits: byTime([...vs.filter(v => day0(v.at) === t).map(item), ...pOn(t)]) }; });
       const hs = days.flatMap(d => d.visits.map(x => x.hour));
       const h0 = Math.min(10, ...hs.map(Math.floor)), h1 = Math.max(20, ...hs.map(h => Math.ceil(h + 1)));
       return { days, h0, hours: Array.from({ length: h1 - h0 + 1 }, (_, i) => { const h = h0 + i; return `${h % 12 || 12} ${h < 12 ? "am" : "pm"}`; }) };

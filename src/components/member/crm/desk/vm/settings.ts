@@ -234,8 +234,24 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     can: !!data.can.manage, items: data.replyLibrary ?? [],
     save: (items: CrmReplyItem[]) => act.saveReplyLibrary(items).then(okd => { if (okd) patch({ toast: "Saved · Reply library" }); return okd; }),
   };
+  // A partner's booking link (mig 20261029190000): the link, and the booking open in the pane.
+  const pb = (data.partnerBookings ?? []).find(b => b.id === ui.partner);
+  const partnerPane = pb ? {
+    b: pb, room: data.rooms.find(r => r.id === pb.showroomId)?.name ?? "Showroom",
+    partnerName: (data.partnerLinks ?? []).find(l => l.id === pb.partner)?.name ?? (pb.partner === "the_conts" ? "The Conts" : "Partner"),
+    can: !!data.can.manage,
+    cancel: () => act.cancelPartnerBooking(pb.id).then(okd => { if (okd) patch({ toast: `Cancelled · ${pb.customer}` }); return okd; }),
+  } : null;
+  const partnerLink = {
+    can: !!data.can.manage, links: data.partnerLinks ?? [],
+    upcoming: (data.partnerBookings ?? []).filter(b => b.state === "booked" && new Date(b.start) >= new Date(ctx.now.getTime() - 3_600_000)),
+    roomName: (id: string) => data.rooms.find(r => r.id === id)?.name ?? "Showroom",
+    set: (id: string, on: boolean | null, fresh: boolean) => act.setPartnerLink(id, on, fresh).then(okd => { if (okd) patch({ toast: fresh ? "New link made · the old one stops opening" : on ? "Booking link on" : "Booking link off" }); return okd; }),
+    open: (id: string) => patch({ pane: "docked", kind: "partner", partner: id, visit: null, infoId: null }),
+    toast: (msg: string) => patch({ toast: msg }),
+  };
   return {
-    set4, settings4, replyLib,
+    set4, settings4, replyLib, partnerPane, partnerLink,
     actVM, mwtTeams, mwtDirty: dirty, mwtClean: !dirty, mwtBtnBg: dirty ? "var(--crm-rust)" : "var(--crm-line)", mwtBtnCur: dirty ? "pointer" : "default", mwtSavedMsg: !dirty && ui.mwtSaved, mwtSave,
     cltOpen: !ui.frmOpen && !!cE && opItem === "Cold lead templates" && sheetOpen, cltE: cE ?? card({ t: { id: "", name: "", ch: "whatsapp", st: "draft", body: "", on: false, metaName: null, language: "en", reason: null }, status: "Draft", ch: "WhatsApp" }),
     cltTaRef: { current: null },

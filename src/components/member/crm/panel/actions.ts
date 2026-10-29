@@ -30,6 +30,10 @@ export interface PanelActions extends SalesActions {
   saveSettings(s: CrmSettings): Promise<boolean>;
   /** Settings › Reply library (crm_save_reply_library, CRM · Manage; 2026-10-29): the whole library, in its order. */
   saveReplyLibrary(items: CrmReplyItem[]): Promise<boolean>;
+  /** A partner's booking link (mig 20261029190000, CRM · Manage): on / off, or a new address. */
+  setPartnerLink(id: string, on: boolean | null, newCode: boolean): Promise<boolean>;
+  /** Cancel a booking a partner made through its link. */
+  cancelPartnerBooking(id: string): Promise<boolean>;
   /** Save, this ad only; `together`: whether it is still counted with the together ads (saved with anything changed, it leaves them). */
   saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number; together: boolean }>;
   /** Save and apply to all's window (crm_save_ads, 2026-10-24): this setting on the ads ticked, each counting its own leads
@@ -89,6 +93,18 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       // The database answers the library as saved (new rows with their ids); the demo keeps what was sent.
       const saved = Array.isArray(r.data) ? (r.data as CrmReplyItem[]).map(x => ({ ...x, category: x.category ?? "", keywords: x.keywords ?? [] })) : items;
       setData(d => ({ ...d, replyLibrary: saved }));
+      return true;
+    },
+    async setPartnerLink(id, on, newCode) {
+      const r = await write("crm_partner_link_set", { p_id: id, p_on: on, p_new_code: newCode });
+      if (!r) return false;
+      const l = r.data as { id: string; name: string; code: string; on: boolean } | null;
+      setData(d => ({ ...d, partnerLinks: (d.partnerLinks ?? []).map(x => (x.id === id ? (l ?? { ...x, on: on ?? x.on }) : x)) }));
+      return true;
+    },
+    async cancelPartnerBooking(id) {
+      if (!(await write("crm_partner_booking_cancel", { p_id: id }))) return false;
+      setData(d => ({ ...d, partnerBookings: (d.partnerBookings ?? []).map(b => (b.id === id ? { ...b, state: "cancelled" as const } : b)) }));
       return true;
     },
     async addAd(ad) {

@@ -238,6 +238,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_appt_types_read',
   // The chat's suggested replies (mig 20261029150000): crm_me() first — anybody in the CRM reads the team's past answers.
   'crm_reply_examples',
+  'crm_partner_links_read',
   // An ad's name from Ads Manager (mig 20261019100000): the webhooks' service role alone — EXECUTE for nobody else.
   'crm_ads_unnamed', 'crm_meta_name_ad', 'crm_ads_to_check', 'crm_meta_ad_status',
   // Auto-replies sent (mig 20261019120000): the webhooks' service role alone — EXECUTE for nobody else.
@@ -383,6 +384,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // five (page, day, book, cancel, hire) are anon's by name and check the link's code instead.
   'guest_link_admin', 'guest_link_set', 'guest_link_new_code', 'guest_link_room', 'guest_link_save_subsidiary',
   'guest_link_remove_subsidiary', 'guest_link_legend', 'guest_link_page', 'guest_link_day', 'guest_link_book', 'guest_link_cancel', 'guest_link_hire',
+  // The partner booking link's page (mig 20261029190000), anon's by name, each asking the link's code.
+  'crm_partner_page', 'crm_partner_day', 'crm_partner_book', 'crm_partner_get', 'crm_partner_cancel',
   // Notifications and phone push (mig 20261011180000): each asks a sign-in and answers only the caller’s own; the outbox asks the server’s secret.
   'notifications_mine', 'notifications_read', 'notification_topics_sync', 'push_subscribe', 'push_unsubscribe', 'push_outbox_take', 'push_outbox_done',
   // Change password (mig 20261012000000): whether the caller's own login is one a People record names — nothing else.
