@@ -167,7 +167,7 @@ describe("a sofa special charged by quantity", () => {
   const SEAT = { value: "Seat Base Fully Cover", charge: 300 };
   const catalogWith = (specials: typeof SEAT[]): QCatalog => ({
     brand: "ZANOTTI", name: "Zanotti", sofa: true, frames: [], kpis: [], accSummary: "0 items", accs: [],
-    models: [{ key: "8030", name: "SOFFIO", desc: "8030", sizes: {}, choices: { legs: [], specials }, modules: [
+    models: [{ key: "8030", name: "SOFFIO", desc: "8030", sizes: {}, choices: { legs: [], specials, upgrades: [] }, modules: [
       { code: "1A(LHF)", desc: "1-seat · left arm", seats: 1, chaise: false, productId: "s-1a", options: [] },
       { code: "2A(LHF)", desc: "2-seat · left arm", seats: 2, chaise: false, productId: "s-2a", options: [] },
       { code: "L(RHF)", desc: "Chaise · right", seats: 1, chaise: true, productId: "s-l", options: [] },
@@ -223,5 +223,54 @@ describe("a sofa special charged by quantity", () => {
     drawSofa([SEAT]);
     expect(screen.getByText("Once per sofa · not in margin")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Seat Base Fully Cover/ })).toHaveTextContent(/^Seat Base Fully Cover\+ RM 300$/);
+  });
+});
+
+// 2026-10-29 (user): "just like them choose, like upgrade fabric enough" — Maintenance › Fabrics' upgrades, by name.
+describe("a fabric upgrade", () => {
+  const UP = { value: "Upgrade fabric", charge: 200 };
+  const sofaCatalog: QCatalog = {
+    brand: "ZANOTTI", name: "Zanotti", sofa: true, frames: [], kpis: [], accSummary: "0 items", accs: [],
+    models: [{ key: "8030", name: "SOFFIO", desc: "8030", sizes: {}, choices: { legs: [], specials: [], upgrades: [UP] }, modules: [
+      { code: "1NA", desc: "1-seat · no arm", seats: 1, chaise: false, productId: "s-1na", options: [] },
+    ] }],
+  };
+  const frameCatalog: QCatalog = {
+    brand: "AKEMI", name: "Akemi", sofa: false, kpis: [], accSummary: "0 items", accs: [], models: [],
+    frames: [{ key: "y04", name: "Y04", sizes: { Q: "y04-q" },
+      choices: { divans: [], legs: [], gaps: [], totals: [], specials: [], upgrades: [{ value: "Upgrade fabric", charge: 150 }] } }],
+  };
+  const actions = (over: object) => ({
+    close: vi.fn(), patch: vi.fn(), patchFrame: vi.fn(), openBf: vi.fn(), editBf: vi.fn(), removeBf: vi.fn(), backToMattress: vi.fn(),
+    applyFrame: vi.fn(), add: vi.fn(), ...over,
+  });
+
+  it("is a sofa's choice after its fabric: Standard, or an upgrade once per sofa", () => {
+    const patches: Partial<SheetState>[] = [];
+    function Harness() {
+      const [sheet, setSheet] = useState<SheetState>({ mode: "sofa", key: "8030", layout: "C", mods: { "1NA": 1 }, qty: 1, kpi: [], height: null,
+        tier: null, leg: null, specials: [], specialQty: {}, acc: {}, accAll: false });
+      return <ProductSheet sheet={sheet} catalog={sofaCatalog} memory={EMPTY_MEMORY} cart={[]} build={NO_SOFA_BUILD} readOnly={false}
+        actions={actions({ patch: (patch: Partial<SheetState>) => { patches.push(patch); setSheet(s => ({ ...s, ...patch } as SheetState)); } })} />;
+    }
+    render(<Harness />);
+    expect(screen.getByText(/· Fabric upgrade$/)).toBeInTheDocument();
+    expect(screen.getByText("Once per sofa · not in margin")).toBeInTheDocument();
+    const standard = screen.getByRole("button", { name: /^Standard/ });
+    expect(standard.className).toMatch(/chipOn/);
+    fireEvent.click(screen.getByRole("button", { name: /Upgrade fabric/ }));
+    expect(patches.at(-1)).toEqual({ fabricUpgrade: "Upgrade fabric" });
+    expect(screen.getByRole("button", { name: /Upgrade fabric/ })).toHaveTextContent("+ RM 200");
+    fireEvent.click(screen.getByRole("button", { name: /^Standard/ }));
+    expect(patches.at(-1)).toEqual({ fabricUpgrade: null });
+  });
+
+  it("is a bed frame's choice after its specials, per frame", () => {
+    const patchFrame = vi.fn();
+    render(<ProductSheet sheet={{ mode: "frame", size: "Q", frame: "y04", kpi: [], qty: 1, drop: false }} catalog={frameCatalog}
+      memory={EMPTY_MEMORY} cart={[]} build={NO_SOFA_BUILD} readOnly={false} actions={actions({ patchFrame })} />);
+    expect(screen.getByText("3 · Fabric upgrade")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Upgrade fabric/ }));
+    expect(patchFrame).toHaveBeenLastCalledWith({ build: { fabricUpgrade: "Upgrade fabric" } });
   });
 });

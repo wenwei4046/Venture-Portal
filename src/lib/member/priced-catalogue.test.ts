@@ -127,4 +127,22 @@ describe("reading the calculator's catalogue", () => {
   it("answers an empty catalogue for a malformed response", () => {
     expect(pricedCatalogueOf(null)).toEqual({ products: [], pricing: { options: [], combos: [], models: [] } });
   });
+
+  // 2026-10-29: each sofa and bed frame is handed its category's fabric upgrades (member_catalogue).
+  it("keeps each model's fabric upgrades, and prices them for the calculator once per category and name", () => {
+    const models = [
+      { id: "s1", kind: "SOFA", options: {}, charges: { fabric_upgrades: [{ value: "Upgrade fabric", charge: 200 }, { value: "Free", charge: 0 }] } },
+      { id: "s2", kind: "SOFA", options: {}, charges: { fabric_upgrades: [{ value: "upgrade fabric", charge: 200 }] } },
+      { id: "b1", kind: "BEDFRAME", options: {}, charges: { fabric_upgrades: [{ value: "Upgrade fabric", charge: 150 }] } },
+    ];
+    expect(catalogueModelsOf(models).map(m => m.charges?.fabric_upgrades)).toEqual([
+      [{ value: "Upgrade fabric", charge: 200 }], [{ value: "upgrade fabric", charge: 200 }], [{ value: "Upgrade fabric", charge: 150 }],
+    ]);
+    expect(pricedCatalogueOf({ products: [], optionPrices: [{ pool: "sofa_leg_heights", value: '6"', price: 100 }], combos: [], models }).pricing.options)
+      .toEqual([
+        { pool: "sofa_leg_heights", value: '6"', price: 100 },
+        { pool: "sofa_fabric_upgrades", value: "Upgrade fabric", price: 200 },
+        { pool: "bedframe_fabric_upgrades", value: "Upgrade fabric", price: 150 },
+      ]);
+  });
 });

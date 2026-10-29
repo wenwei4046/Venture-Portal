@@ -196,6 +196,45 @@ describe("option charges", () => {
     expect(r.margin).toBeCloseTo(margin(1000 / 0.5), 10);
     expect(r.optionCharge).toBe(30);
   });
+
+  // 2026-10-29 (user): "just like them choose, like upgrade fabric enough, then i can edit the name and price" — the
+  // fabric upgrades Maintenance › Fabrics makes, picked by name: a sofa once per sofa, a bed frame per frame.
+  describe("a fabric upgrade", () => {
+    const upgraded = () => pricing({
+      options: [
+        ...pricing().options,
+        { pool: "sofa_fabric_upgrades", value: "Upgrade fabric", price: 200 },
+        { pool: "bedframe_fabric_upgrades", value: "Upgrade fabric", price: 150 },
+      ],
+      models: [
+        { ...pricing().models[0], charges: { fabric_upgrades: [{ value: "Upgrade fabric", charge: 200 }] } },
+        { ...pricing().models[1], charges: { fabric_upgrades: [{ value: "Upgrade fabric", charge: 150 }] } },
+      ],
+    });
+
+    it("charges a sofa's once per sofa — two of a module are two sofas — on top, out of the margin", () => {
+      const r = calculateQuote(quote([one("a", 2), one("b", 2)], { ...sofa, leg: '4"', fabricUpgrade: "Upgrade fabric" }), products, bands, undefined, upgraded());
+      expect(r.valid).toBe(true);
+      expect(r.margin).toBeCloseTo(margin(2 * 1000 + 2 * 1500), 10);
+      expect(r.optionCharges).toEqual([{ label: '8030 SOFFIO · leg 4" · Upgrade fabric', qty: 2, amount: 2 * (30 + 200) }]);
+      expect(r.customerPays).toBe(5000 + 460);
+    });
+
+    it("charges a bed frame's per frame", () => {
+      const r = calculateQuote(quote([{ ...one("y04-q", 2), bedframe: { fabricUpgrade: "upgrade fabric" } }], undefined, "2000"),
+        products, bands, undefined, upgraded());
+      expect(r.optionCharges).toEqual([{ label: "Y04 · upgrade fabric", qty: 2, amount: 300 }]);
+      expect(r.margin).toBeCloseTo(margin(1600, 2000), 10);
+    });
+
+    it("refuses one the cart is not offered, and says the one it takes on the customer's quote", () => {
+      expect(calculateQuote(quote([one("a")], { ...sofa, fabricUpgrade: "Leather" }), products, bands, undefined, upgraded()).error)
+        .toMatch(/fabric upgrade/);
+      const input = quote([one("a")], { ...sofa, fabricUpgrade: "Upgrade fabric" });
+      expect(customerQuote(input, products, calculateQuote(input, products, bands, undefined, upgraded())))
+        .toContain("Sofa build: seat height 30 · Tier 2 fabric · Upgrade fabric");
+    });
+  });
 });
 
 describe("sofa combos — exactly the set, at the portal's price", () => {
