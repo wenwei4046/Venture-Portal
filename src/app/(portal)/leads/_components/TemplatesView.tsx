@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { removeTemplate, saveLibraryItem, saveTemplate } from '@/lib/leads/actions'
 import { infoEntries, type LeadInfo } from '@/lib/leads/info'
 import {
-  CARD_W, KINDS, OPTION_MAX, SIDE_W, clampSide, RETRY_PHONE, SAVE_AS, fromLibrary, kindOf, placed, rowsOf, runsOn, stepAfter, templateProblem, tidy, toLibrary,
+  CARD_W, KINDS, OPTION_MAX, moveItem, SIDE_W, clampSide, RETRY_PHONE, SAVE_AS, fromLibrary, kindOf, placed, rowsOf, runsOn, stepAfter, templateProblem, tidy, toLibrary,
   updateFromLibrary, walkAnswer, walkFrom, freshId, type LibraryItem, type ReplyRules, type ReplyTemplate, type StepKind, type TemplateStep, type Walk,
 } from '@/lib/leads/template'
 import { LeadIcon } from '@/components/layout/lead-icons'
@@ -614,6 +614,14 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
     set({ text: r.text.slice(0, 1000) })
     requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(r.caret, r.caret) })
   }
+  // An option dragged by its grip to another place (2026-10-29 — the user: "下方then 可以拉动调整，无需删掉重写").
+  const [optDrag, setOptDrag] = useState<{ from: number; over: number; after: boolean } | null>(null)
+  const dropOption = () => {
+    if (!optDrag || !step.buttons) return
+    const at = optDrag.after ? optDrag.over + 1 : optDrag.over
+    set({ buttons: moveItem(step.buttons, optDrag.from, optDrag.from < at ? at - 1 : at) })
+    setOptDrag(null)
+  }
   const [kindOpen, setKindOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const [infoCard, setInfoCard] = useState(0)
@@ -735,8 +743,28 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
         {step.kind === 'question' ? (
           <>
             {(step.buttons ?? []).map((b, j) => (
-              <div key={j} className={s.option}>
+              <div key={j} className={s.option} data-opt="" data-dragging={optDrag?.from === j || undefined}
+                data-drop={optDrag && optDrag.over === j && optDrag.from !== j ? (optDrag.after ? 'after' : 'before') : undefined}
+                onDragOver={e => {
+                  if (!optDrag) return
+                  e.preventDefault()
+                  const r = e.currentTarget.getBoundingClientRect()
+                  const after = e.clientY > r.top + r.height / 2
+                  if (optDrag.over !== j || optDrag.after !== after) setOptDrag({ ...optDrag, over: j, after })
+                }}
+                onDrop={e => { e.preventDefault(); dropOption() }}>
                 <span className={s.optionTop}>
+                  {canEdit && step.buttons!.length > 1 ? (
+                    <span className={s.grip} draggable title="Drag to move this option" aria-label={`Move option ${j + 1}`}
+                      onDragStart={e => {
+                        e.dataTransfer.effectAllowed = 'move'
+                        e.dataTransfer.setData('text/plain', String(j))
+                        const card = e.currentTarget.closest('[data-opt]')
+                        if (card) e.dataTransfer.setDragImage(card, 12, 12)
+                        setOptDrag({ from: j, over: j, after: false })
+                      }}
+                      onDragEnd={() => setOptDrag(null)}><LeadIcon name="grip" size={14} /></span>
+                  ) : null}
                   <span className={s.num}>{j + 1}</span>
                   <input className={s.input} style={{ flex: 1 }} value={b.label} maxLength={OPTION_MAX} disabled={dis} aria-label={`Option ${j + 1}`}
                     onChange={e => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, label: e.target.value } : x)) })} />

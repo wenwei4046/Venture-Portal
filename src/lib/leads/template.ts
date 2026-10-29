@@ -132,10 +132,29 @@ export const CARD_W = 230
 const COL_GAP = 70
 const ROW_GAP = 30
 
-/** A card's height on the canvas, roughly as drawn: head, message, rows. */
+/** How many lines words take in a column about this many characters wide (each line of the text, wrapped). */
+function wrapped(text: string, perLine: number): number {
+  return Math.max(1, text.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil([...l].length / perLine)), 0))
+}
+
+/**
+ * A card's height on the canvas, roughly as drawn: head, the whole message, every option wrapped — the card grows with
+ * its words (2026-10-29 — the user: "mind map 图，如果文字太多，它随之变大"). Tidy up spaces the cards by it.
+ */
 export function cardHeight(s: TemplateStep): number {
-  const lines = Math.min(3, Math.max(1, Math.ceil((s.text?.length ?? 0) / 32)))
-  return 36 + lines * 18 + 14 + Math.max(1, rowsOf(s).length) * 26 + 12
+  const lines = s.text?.trim() ? wrapped(s.text.trim(), 32) : 1
+  const rows = rowsOf(s)
+  const rowsH = rows.length ? rows.reduce((h, r) => h + Math.max(22, 6 + wrapped(r.label || '—', 24) * 16) + 4, 0) : 26
+  return 36 + lines * 17 + 14 + rowsH + 12
+}
+
+/** A list with one item moved from one place to another (an option dragged by its grip). */
+export function moveItem<T>(list: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || from >= list.length || to < 0 || to >= list.length) return list
+  const next = [...list]
+  const [item] = next.splice(from, 1)
+  next.splice(to, 0, item)
+  return next
 }
 
 /** "Tidy up": each step in the column of its first path from the start, top to bottom in the order they are reached. */
