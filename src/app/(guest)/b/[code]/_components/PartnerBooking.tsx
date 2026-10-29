@@ -7,7 +7,7 @@
  * the remarks on the right. Booked, it shows its reference — typed under *Change or cancel*, it opens the booking again.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { partnerBook, partnerCancel, partnerDay, partnerGet } from '@/lib/crm-partner/actions'
+import { partnerBook, partnerCancel, partnerDay, partnerGet, partnerList } from '@/lib/crm-partner/actions'
 import {
   addDays, bookingProblem, dowOf, INFO_LABELS, slotsOf, t12,
   type PartnerBooked, type PartnerInfo, type PartnerPage, type PartnerTaken,
@@ -58,11 +58,16 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   }, [])
 
   const r = page.rooms.find(x => x.id === room)
+  // Every booking made through this link still to come, whoever made it (the owner, 2026-10-29: "这个表单能不能看到也是用这个
+  // 表单的人的预约" — with the customer's phone and the reference, "不然预约的人忘记了就改不了了"), read with the places.
+  const [list, setList] = useState<PartnerBooked[]>([])
+  const [listQ, setListQ] = useState('')
   const load = useCallback(async () => {
     if (!room) return
-    const a = await partnerDay(code, room, page.today, DAYS + 1)
+    const [a, l] = await Promise.all([partnerDay(code, room, page.today, DAYS + 1), partnerList(code)])
     setNow(new Date())
     if (a.ok) setTaken(a.taken); else setError(a.reason)
+    if (l.ok) setList(l.list)
   }, [code, room, page.today])
   useEffect(() => { void load() }, [load])
   // Every booking takes a place and a change or cancel gives one back, whoever made it (the owner, 2026-10-29: "只要有人预约成功，
@@ -93,9 +98,9 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     setDone(a.booked); setEditing(null); void load()
   }
   const again = () => { setDone(null); setStart(''); setForm(f => ({ ...EMPTY, booker: f.booker, bookerPhone: f.bookerPhone })); void load() }
-  const findRef = async () => {
+  const findRef = async (ref: string = refText) => {
     setRefError('')
-    const a = await partnerGet(code, refText)
+    const a = await partnerGet(code, ref)
     if (!a.ok) { setRefError(a.reason); return }
     const b = a.booked
     if (b.state === 'cancelled') { setRefError(`${b.ref} was cancelled.`); return }
@@ -224,6 +229,30 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
             </section>
           </div>
         )}
+
+        <section className={s.card}>
+          <div className={s.listHead}>
+            <h2 className={s.h2}>Bookings through this link · {list.length}</h2>
+            <input className={`${s.input} ${s.listSearch}`} value={listQ} onChange={e => setListQ(e.target.value)} placeholder="Search customer, phone, booker or reference" />
+          </div>
+          {(() => {
+            const q = listQ.trim().toLowerCase()
+            const shown = list.filter(b => !q || `${b.customer} ${b.customerPhone} ${b.booker} ${b.ref} ${b.showroomName}`.toLowerCase().includes(q))
+            if (!shown.length) return <p className={s.muted}>{list.length ? 'No booking matches.' : 'No bookings yet.'}</p>
+            return (
+              <div className={s.table}>
+                <div className={`${s.row} ${s.rowHead}`}><span>When</span><span>Showroom</span><span>Customer</span><span>Phone</span><span>Booked by</span><span>Reference</span><span /></div>
+                {shown.map(b => (
+                  <div key={b.ref} className={s.row}>
+                    <span>{whenOf(b.start)}</span><span>{b.showroomName}</span><span>{b.customer}</span><span>{b.customerPhone}</span><span>{b.booker}</span>
+                    <span className={s.refCell}>{b.ref}</span>
+                    <span><button type="button" className={s.ghost} onClick={() => { setRefText(b.ref); void findRef(b.ref); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Open</button></span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </section>
       </div>
     </div>
   )

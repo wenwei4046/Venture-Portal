@@ -54,6 +54,14 @@ export async function partnerBook(input: PartnerBookInput): Promise<PartnerDone<
   return booked ? { ok: true, booked } : { ok: false, reason: 'The slot could not be booked. Please try again.' }
 }
 
+/** The bookings made through the link still to come (the owner, 2026-10-29: with the customer's phone and the reference). */
+export async function partnerList(code: string): Promise<PartnerDone<{ list: PartnerBooked[] }>> {
+  if (!isPartnerCode(code)) return { ok: false, reason: CLOSED }
+  const { data, error } = await guestClient().rpc('crm_partner_list', { p_code: code })
+  if (error) return { ok: false, reason: partnerRefusal(error, 'The bookings could not be read. Please try again.') }
+  return { ok: true, list: (Array.isArray(data) ? data : []).map(bookedFromRow).filter((b): b is PartnerBooked => !!b) }
+}
+
 /** A booking by its reference. */
 export async function partnerGet(code: string, ref: string): Promise<PartnerDone<{ booked: PartnerBooked }>> {
   if (!isPartnerCode(code)) return { ok: false, reason: CLOSED }
