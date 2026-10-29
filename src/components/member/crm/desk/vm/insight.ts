@@ -27,7 +27,7 @@ export function inBrand(d: CrmData, src: SourcePick | null | undefined): CrmData
   const customers = d.customers.filter(c => inSource(c, src)), ids = new Set(customers.map(c => c.id));
   return { ...d, customers, visits: d.visits.filter(v => ids.has(v.customerId)), events: d.events.filter(e => ids.has(e.customerId)) };
 }
-export const INSIGHT_SOURCES: [SourcePick, string][] = [["all", "All"], ["conts", "The Conts"], ["dc", "DC"]];
+export const INSIGHT_SOURCES: [SourcePick, string][] = [["all", "All"], ["conts", "The Conts"], ["dc", "Dream Crafter"]];
 
 export const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 

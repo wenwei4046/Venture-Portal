@@ -18,7 +18,7 @@ import { DeskApplyAds } from "./DeskExtras";
 import R from "./desk-root.module.css";
 import { deskVM } from "./vm/app";
 import { titleData, titleName, titleTeams } from "./vm/names";
-import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type DeskUi } from "./vm/ctx";
+import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type DeskUi, type DeskViewAs } from "./vm/ctx";
 import { historyRows } from "./vm/history";
 import { useDeskPlace, withSavedPlace, withSavedPrefs, useDeskPrefs } from "./nav";
 import { useFollowNewest } from "../shared/stick";
@@ -39,6 +39,8 @@ export interface DeskScreensProps {
   app: DeskAppFrame;
   exit(): void;
   toMine?: () => void;
+  /** View as a team member (the owner, 2026-10-29: "desktop 版本能做 view as team member 吗？"): whose CRM may be opened, and opening it. */
+  viewAs?: DeskViewAs;
   /** A read that failed (the last one's words), shown as the toast. */
   problem?: string;
   /** What a shared action (send, star, forward …) said — the phone panel's toast — shown here as the desktop's toast. */
@@ -246,7 +248,7 @@ export default function DeskScreens(p: DeskScreensProps) {
   const nameOf = useCallback((id: string | null | undefined) => titleName(p.nameOf(id)), [p]);
   const ctx = {
     data: shown.data, me: shown.me, now: p.now, live, ui, set: setUi, patch, act, deskAct, teams: shown.teams, directors: shown.directors, nameOf,
-    slotCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, exit: p.exit, meta,
+    slotCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, viewAs: p.viewAs, exit: p.exit, meta,
   };
   const v = deskVM(ctx);
   // Inbox opens on its first chat, so the page is never an empty "Pick a chat" (the owner, 2026-10-24: "能不能默認打開第一個信息，

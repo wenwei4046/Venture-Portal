@@ -8,8 +8,8 @@ describe("where an enquiry came from (2026-10-27)", () => {
   it("names the brand by the number or Page written to", () => {
     expect(sourceOf(wa("1438056256053876")).label).toBe("The Conts · WhatsApp");
     expect(sourceOf(ms("102351059576534")).label).toBe("The Conts · Messenger");
-    expect(sourceOf(wa("1422533724269131")).label).toBe("DC · WhatsApp");
-    expect(sourceOf(ms("478652958664343")).label).toBe("DC · Messenger");
+    expect(sourceOf(wa("1422533724269131")).label).toBe("Dream Crafter · WhatsApp");
+    expect(sourceOf(ms("478652958664343")).label).toBe("Dream Crafter · Messenger");
     expect(sourceOf(wa(null)).label).toBe("WhatsApp");
   });
   it("filters by brand or by brand and channel", () => {

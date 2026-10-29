@@ -43,6 +43,8 @@ export const ICONS_4A = {
   "images": "<path d=\"M18 22H4a2 2 0 0 1-2-2V6\"></path> <path d=\"m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18\"></path> <circle cx=\"12\" cy=\"8\" r=\"2\"></circle> <rect width=\"16\" height=\"16\" x=\"6\" y=\"2\" rx=\"2\"></rect>",
   "inbox": "<polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\"></polyline> <path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"></path>",
   "info": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle> <path d=\"M12 16v-4\"></path> <path d=\"M12 8h.01\"></path>",
+  // lucide eye: View as a team member (2026-10-29).
+  "eye": "<path d=\"M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0\"></path> <circle cx=\"12\" cy=\"12\" r=\"3\"></circle>",
   // lucide arrow-left / arrow-right: a showroom moved in the list (2026-10-29).
   "arrow-left": "<path d=\"m12 19-7-7 7-7\"></path> <path d=\"M19 12H5\"></path>",
   "arrow-right": "<path d=\"M5 12h14\"></path> <path d=\"m12 5 7 7-7 7\"></path>",
