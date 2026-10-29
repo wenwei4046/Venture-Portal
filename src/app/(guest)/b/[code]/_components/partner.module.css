@@ -147,3 +147,8 @@
   .root .searchBox input.searchInput:not([type="checkbox"]) { font-size: 14px !important; }
   .root .field input.input:not([type="checkbox"]), .root .field textarea.input:not([type="checkbox"]), .root .lookupRow input.input:not([type="checkbox"]) { font-size: 15px !important; }
 }
+
+/* The portal's h1 rule (globals.css: `h1:not(.sr-only)…`, colour rgb(var(--ink)), which dark mode makes light) outranks a
+   class alone, so on an iPhone in dark mode the title came out washed (the owner, 2026-10-29: "换个颜色"): this page's title
+   is held in its own ink and face. */
+.root h1.title { color: rgb(43 31 23); font-family: var(--font-display-rv), 'Inter Tight', Inter, sans-serif; font-weight: 600; }
