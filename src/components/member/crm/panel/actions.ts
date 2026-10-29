@@ -45,6 +45,9 @@ export interface PanelActions extends SalesActions {
   setFullTime(staffId: string, on: boolean): Promise<boolean>;
   /** Lock a member out of the dealing for now, or back in (crm_set_locked, CRM · Manage). */
   setLocked(staffId: string, on: boolean): Promise<boolean>;
+  /** A member's leave (mig 20261029220000, CRM · Manage): add or change one; remove one. */
+  saveLeave(leave: { id: string | null; staffId: string; from: string; to: string; note: string }): Promise<boolean>;
+  deleteLeave(id: string): Promise<boolean>;
   /** Cold lead templates (rev 1011): save a draft, or save and submit a WhatsApp one for Meta's review. */
   saveTemplate(t: { id: string | null; name: string; ch: CrmTemplate["ch"]; body: string }, submit: boolean): Promise<CrmTemplate | false>;
   templateOn(id: string, on: boolean): Promise<boolean>;
@@ -199,6 +202,18 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     async setLocked(staffId, on) {
       if (!(await write("crm_set_locked", { p_staff: staffId, p_locked: on }))) return false;
       setData(d => ({ ...d, lockedStaff: on ? [...new Set([...(d.lockedStaff ?? []), staffId])] : (d.lockedStaff ?? []).filter(id => id !== staffId) }));
+      return true;
+    },
+    async saveLeave(l) {
+      const r = await write("crm_save_leave", { p_id: l.id, p_staff: l.staffId, p_from: l.from, p_to: l.to, p_note: l.note });
+      if (!r) return false;
+      const id = typeof r.data === "string" ? r.data : l.id ?? `local-${Date.now()}`;
+      setData(d => ({ ...d, leaves: [...(d.leaves ?? []).filter(x => x.id !== l.id), { id, staffId: l.staffId, from: l.from, to: l.to, note: l.note }].sort((a, b) => a.from.localeCompare(b.from)) }));
+      return true;
+    },
+    async deleteLeave(id) {
+      if (!(await write("crm_delete_leave", { p_id: id }))) return false;
+      setData(d => ({ ...d, leaves: (d.leaves ?? []).filter(x => x.id !== id) }));
       return true;
     },
     async setFullTime(staffId, on) {

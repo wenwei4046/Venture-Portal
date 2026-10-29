@@ -391,6 +391,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'guest_link_remove_subsidiary', 'guest_link_legend', 'guest_link_page', 'guest_link_day', 'guest_link_book', 'guest_link_cancel', 'guest_link_hire',
   // The partner booking link's page (mig 20261029190000), anon's by name, each asking the link's code.
   'crm_partner_page', 'crm_partner_day', 'crm_partner_book', 'crm_partner_get', 'crm_partner_cancel',
+  // The hourly sweep's leave notices (mig 20261029220000), service role.
+  'crm_notify_leave_starts',
   // Notifications and phone push (mig 20261011180000): each asks a sign-in and answers only the caller’s own; the outbox asks the server’s secret.
   'notifications_mine', 'notifications_read', 'notification_topics_sync', 'push_subscribe', 'push_unsubscribe', 'push_outbox_take', 'push_outbox_done',
   // Change password (mig 20261012000000): whether the caller's own login is one a People record names — nothing else.
