@@ -13,7 +13,7 @@ import { InfoValue } from "../shared/AdLink";
 import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
 import { SuggestFloat } from "../shared/suggest-float";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -346,7 +346,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </div>
                 </div>
               </>)}
-              {!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isNtfOp) && (<>
+              {!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLibOp) && (<DeskReplyLibrary4a v={v.replyLib} />)}{!!(v.isNtfOp) && (<>
                 <span style={{ fontSize: "15px", color: "var(--crm-muted)", marginTop: "-12px" }}>{v.ntfHead}</span>
                 <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
@@ -2800,7 +2800,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </button>
                     </div>
                   </>)}
-                  {v.suggest && <SuggestFloat key={v.suggestKey} list={v.suggest} pick={v.pickSuggest} showLogo={v.suggestLogo && !!v.suggest.length && !v.draft} desk />}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
+                  {v.suggest && <SuggestFloat key={v.suggestKey} list={v.suggest} pick={v.pickSuggest} library={v.suggestLib} showLogo={v.suggestLogo && !!v.suggest.length && !v.draft} desk />}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
                     <div style={{ flex: "1", minWidth: "0", height: "50px", borderRadius: "25px", display: "flex", alignItems: "center", gap: "16px", padding: "0 18px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-line)", boxShadow: "0 6px 20px rgba(42,22,12,.08)", color: "var(--crm-muted)" }}>
                       <span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" x2="9.01" y1="9" y2="9"></line><line x1="15" x2="15.01" y1="9" y2="9"></line></svg>{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}

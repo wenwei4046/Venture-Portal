@@ -364,7 +364,7 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
     {/* Where this composer is in the chat (the stack and the screen are found from it). */}
     <span ref={anchorRef} hidden />
     {/* Suggested replies' floating logo (2026-10-29): there while the customer's words wait and the box is empty. */}
-    {v.suggest && <SuggestFloat key={v.key} list={v.suggest} pick={v.setDraft} showLogo={!!v.suggestLogo && !!v.suggest.length && !v.draft && !v.rec} />}
+    {v.suggest && <SuggestFloat key={v.key} list={v.suggest} library={v.suggestLibrary} pick={v.setDraft} showLogo={!!v.suggestLogo && !!v.suggest.length && !v.draft && !v.rec} />}
     <SalesComposer p={p} />
   </>);
 }

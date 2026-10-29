@@ -18,7 +18,8 @@ import { albumsOf, galleryOf, mediaOf, mediaWord, MINE_BG, MINE_TIME, NO_MEDIA, 
 import { MENU_ICON, REACTIONS, openMsgView, openStarred } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { ATTACH_TILES, DOC_ACCEPT } from "../../shared/attach-sheet";
-import { suggestReplies, waitingWords } from "../../shared/suggest-reply";
+import { fillWithFor, libraryFor, suggestReplies, waitingWords } from "../../shared/suggest-reply";
+import { openSuggest } from "../../shared/suggest-float";
 
 // A + menu row holds one line (its height is fixed — two suggestions ran over each other, the owner's screenshot 2026-10-29):
 // a suggestion shows its start there; the pick still fills the box with the whole of it.
@@ -150,7 +151,8 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
       : [{ label: view === "quick" ? "No quick replies yet" : "No suggestion for the last message yet", bg: "var(--crm-faint)", d: ATTACH_TILES[view === "quick" ? 3 : 4][2], sep: true, pick: () => {} }]),
   ] : ATTACH_TILES.map(([k, label0, d0, bg0], i) => { const sug = k === "auto"; const label = sug ? "Suggest reply" : label0, d = sug ? SPARK : d0, bg = sug ? "var(--crm-rust)" : bg0; return { label, bg, d, sep: i === 3,
     pick: () => {
-      if (k === "quick" || k === "auto") { patch({ attachView: k }); return; }
+      if (k === "auto") { patch({ attachOpen: false, attachView: "" }); openSuggest(); return; }
+      if (k === "quick") { patch({ attachView: k }); return; }
       patch({ attachOpen: false });
       if (k === "camera") pick("image/*,video/*", false, true); else if (k === "photos") pick("image/*,video/*", true); else pick(DOC_ACCEPT, true);
     } }; });
@@ -167,8 +169,8 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
       list: (ev?.list ?? []).map(e => ({ e, pick: () => { setD(draft + e); const r = pushRecent(mine, e); patch({ recents: r }); ctx.deskAct.saveRecents(r); } })) },
     c, msgs, firstDay, draft,
     // The suggested replies' floating logo over the reply box (2026-10-29: "电脑版也加漂浮 logo"), as the phone's.
-    suggest: c ? suggestReplies(c, data.replyExamples ?? [], data.quickReplies) : undefined, suggestKey: c?.id ?? "", pickSuggest: (text: string) => setD(text),
-    suggestLogo: !!c && !!waitingWords(c),
+    suggest: c ? suggestReplies(c, data.replyExamples ?? [], data.quickReplies, 3, { library: data.replyLibrary, ...fillWithFor(data, c, ctx.me.name, ctx.now) }) : undefined, suggestKey: c?.id ?? "", pickSuggest: (text: string) => setD(text),
+    suggestLogo: !!c && !!waitingWords(c), suggestLib: c ? libraryFor(c, data.replyLibrary, fillWithFor(data, c, ctx.me.name, ctx.now)) : undefined,
     setDraft: (e: { target: { value: string } }) => setD(e.target.value),
     draftKey: (e: { key: string; shiftKey: boolean; preventDefault(): void }) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } },
     send, micD: draft.trim() ? "M5 12h14M13 6l6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3",
