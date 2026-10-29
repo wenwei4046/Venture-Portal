@@ -11,6 +11,7 @@ import { DeskKeyLog } from "./DeskKeyLog";
 import type { KeyLogVM } from "./vm/key-log";
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { boldRuns, wrapBold } from "../shared/bold-text";
+import { ViewAsList } from "./ViewAsList";
 import { Ic, type Icon4a } from "../shared/icons4a";
 import { usePanelOpenOn } from "./panel-state";
 import { DeskAdsChart, FoldHead, type AdsChartBits } from "./DeskAdsChart";
@@ -41,8 +42,7 @@ interface SideBits {
 
 /** View as a team member on a computer (the owner, 2026-10-29): a search over whoever may be viewed; a pick opens their CRM as the phone's View as does. */
 function ViewAsPick({ people, open }: { people: { id: string; name: string; title: string }[]; open: (staffId: string) => void }) {
-  const [on, setOn] = useState(false), [q, setQ] = useState("");
-  const n = q.trim().toLowerCase(), list = people.filter(p => !n || `${p.name} ${p.title}`.toLowerCase().includes(n));
+  const [on, setOn] = useState(false);
   return (
     <div style={{ position: "relative", flex: "none" }}>
       {/* Drawn as the way back under it: an icon and its words on the cream nav. */}
@@ -51,22 +51,7 @@ function ViewAsPick({ people, open }: { people: { id: string; name: string; titl
       </button>
       {on && (<>
         <div onClick={() => setOn(false)} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-        <div role="dialog" aria-label="View as a team member" style={{ position: "absolute", bottom: "40px", left: 0, zIndex: 8, width: "280px", maxHeight: "420px", display: "flex", flexDirection: "column", padding: "8px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)" }}>
-          <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search name or title" aria-label="Search name or title" style={{ height: "32px", borderRadius: "7px", border: "1px solid var(--crm-line)", padding: "0 10px", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)", marginBottom: "6px" }} />
-          <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
-            {list.map(p => (
-              <button key={p.id} type="button" onClick={() => { setOn(false); open(p.id); }} style={{ ...BTN, width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "7px 8px", borderRadius: "7px" }} className="crm4a-row">
-                <span style={{ width: "28px", height: "28px", flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 11px ${TIGHT}`, background: avatarTint(p.name)[0], color: avatarTint(p.name)[1] }}>{p.name.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase()}</span>
-                <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                  <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
-                  <span style={{ font: "400 11.5px Inter, sans-serif", color: "var(--crm-muted)" }}>{p.title}</span>
-                </span>
-              </button>
-            ))}
-            {!list.length && <div style={{ padding: "10px", font: "400 12.5px Inter, sans-serif", color: "var(--crm-faint)" }}>Nobody matches.</div>}
-          </div>
-          <div style={{ padding: "6px 8px 2px", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>Opens their CRM as they see it · Exit comes back.</div>
-        </div>
+        <ViewAsList people={people} pick={id => { setOn(false); open(id); }} style={{ position: "absolute", bottom: "42px", left: 0, zIndex: 8 }} />
       </>)}
     </div>
   );
