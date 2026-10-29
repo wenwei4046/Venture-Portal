@@ -250,7 +250,8 @@ export function adsPerfVM(ctx: DeskCtx) {
         sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) })),
       rows: ADs.slice(pg * per, pg * per + per).map(a => ({ name: a.name, headline: [a.brand, a.cs.find(c => c.adHeadline)?.adHeadline ?? ""].filter(Boolean).join(" · "), ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
         // The ad itself (the newest https link Meta sent with its leads, else Ads Manager), and hiding it from this list.
-        url: a.id.startsWith("ch:") ? "" : [...a.cs].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).find(c => c.adUrl?.startsWith("https://"))?.adUrl ?? `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${a.id}`,
+        // The ad itself, asked of Meta by the server (/member/crm-ad), not one customer's referral link (2026-10-29).
+        url: a.id.startsWith("ch:") ? "" : `/member/crm-ad/${encodeURIComponent(a.id)}`,
         hidden: !!data.adNames?.[a.id]?.hidden,
         hide: data.can.manage && !a.id.startsWith("ch:") ? () => { const on = !data.adNames?.[a.id]?.hidden; void ctx.act.hideAd(a.id, on).then(ok => { if (ok) patch({ toast: on ? `${a.name} hidden from Ads Performance` : `${a.name} shown again` }); }); } : undefined,
         cells: cols.map(m => { const c = cell(a.cs, m, false, a.id, [a.id]), raw = val(a.cs, [a.id], m[0], ra, rb); return { ...c, bar: m[0] === "apptrate" && raw != null ? Math.min(100, Math.round(raw * 2)) : null }; }) })),

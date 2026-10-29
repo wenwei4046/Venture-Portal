@@ -341,6 +341,8 @@ export interface DeskCtx {
   nameOf(id: string | null | undefined): string;
   /** Booked visits per slot start (ISO) for the showroom and week Appointment shows. */
   slotCounts: Record<string, number>;
+  /** Chats with unread messages per brand, over every brand (DeskScreens; the Inbox's brand tabs, 2026-10-29). */
+  brandCounts?: Record<"all" | "conts" | "dc", number>;
   /** The viewport the desktop fills. */
   W: number;
   H: number;

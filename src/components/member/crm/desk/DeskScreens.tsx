@@ -27,7 +27,7 @@ import { useReadWhenSeen } from "../shared/seen";
 import { MediaViewer } from "../shared/viewer";
 import { MessageMenu } from "../shared/msg-menu";
 import { inBrand } from "./vm/insight";
-import type { SourcePick } from "@/lib/member/crm-source";
+import { sourceOf, type SourcePick } from "@/lib/member/crm-source";
 
 export interface DeskScreensProps {
   data: CrmData;
@@ -254,9 +254,15 @@ export default function DeskScreens(p: DeskScreensProps) {
   // kept on this computer; Insight's own switch is the same choice). Writes still take ids.
   const shown = useMemo(() => ({ data: inBrand(titleData(data), ui.insSrc as SourcePick | undefined), me: { ...p.me, name: titleName(p.me.name) }, teams: titleTeams(p.teams), directors: p.directors.map(d => ({ ...d, name: titleName(d.name) })) }), [data, p.me, p.teams, p.directors, ui.insSrc]);
   const nameOf = useCallback((id: string | null | undefined) => titleName(p.nameOf(id)), [p]);
+  // The Inbox's brand tabs count what waits in each brand, whichever is picked (as Lead View's).
+  const brandCounts = useMemo(() => {
+    const n = { all: 0, conts: 0, dc: 0 };
+    for (const c of data.customers) { if (!(c.unread > 0)) continue; n.all++; const b = sourceOf(c).brand; if (b) n[b]++; }
+    return n;
+  }, [data.customers]);
   const ctx = {
     data: shown.data, me: shown.me, now: p.now, live, ui, set: setUi, patch, act, deskAct, teams: shown.teams, directors: shown.directors, nameOf,
-    slotCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, viewAs: p.viewAs, exit: p.exit, meta,
+    slotCounts, brandCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, viewAs: p.viewAs, exit: p.exit, meta,
   };
   const v = deskVM(ctx);
   // Inbox opens on its first chat, so the page is never an empty "Pick a chat" (the owner, 2026-10-24: "能不能默認打開第一個信息，
