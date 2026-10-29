@@ -4,6 +4,10 @@ import {
   buildError,
   buildKey,
   buildLines,
+  frameBuildError,
+  frameBuildText,
+  frameCharge,
+  frameChoicesOf,
   kindOf,
   pruneBuild,
   specialQtyOf,
@@ -48,7 +52,7 @@ describe("what the cart's builds may take", () => {
       [product("a", "SOFA", "soffio"), product("b", "SOFA", "roma")],
       models,
     );
-    expect(choices.sofa).toEqual({ legs: ["Default", '6"'], specials: ["Nylon Fabric"] });
+    expect(choices.sofa).toEqual({ legs: ["Default", '6"'], specials: ["Nylon Fabric"], upgrades: [] });
     expect(choices.bedframe).toBeNull();
   });
 
@@ -59,7 +63,7 @@ describe("what the cart's builds may take", () => {
 
   it("offers nothing when a line of that kind has no model", () => {
     const choices = buildChoicesFor([product("a", "SOFA", "soffio"), product("b", "SOFA", null)], models);
-    expect(choices.sofa).toEqual({ legs: [], specials: [] });
+    expect(choices.sofa).toEqual({ legs: [], specials: [], upgrades: [] });
   });
 
   it("gives a bed frame its own build", () => {
@@ -70,6 +74,7 @@ describe("what the cart's builds may take", () => {
       totals: ['24"'],
       gaps: ['12"'],
       specials: ["Left Drawer"],
+      upgrades: [],
     });
     expect(choices.sofa).toBeNull();
   });
@@ -180,5 +185,63 @@ describe("a special's quantity", () => {
     expect(pruneBuild({ specials: ["Nylon Fabric", "Pillow Back"], specialQty: { "Pillow Back": 2, "Nylon Fabric": 4 } }, choices))
       .toEqual({ specials: ["Nylon Fabric"], specialQty: { "Nylon Fabric": 4 } });
     expect(buildError({ specials: ["Nylon Fabric"], specialQty: { "Pillow Back": 2 } }, choices)).toMatch(/quantity no longer matches/);
+  });
+});
+
+// 2026-10-29: a fabric upgrade (Maintenance › Fabrics) — the Quote picks one by its name.
+describe("a fabric upgrade", () => {
+  const UP = { value: "Upgrade fabric", charge: 200 };
+  const LEATHER = { value: "Leather", charge: 500 };
+  const upgraded: MemberCatalogueModel[] = [
+    { id: "soffio", kind: "SOFA", options: {}, charges: { fabric_upgrades: [UP, LEATHER] } },
+    { id: "roma", kind: "SOFA", options: {}, charges: { fabric_upgrades: [UP] } },
+    { id: "y04", kind: "BEDFRAME", options: {}, charges: { fabric_upgrades: [{ value: "Upgrade fabric", charge: 150 }] } },
+  ];
+
+  it("is offered what every model in the cart is offered, its category's", () => {
+    expect(buildChoicesFor([product("a", "SOFA", "soffio")], upgraded).sofa?.upgrades).toEqual(["Upgrade fabric", "Leather"]);
+    expect(buildChoicesFor([product("a", "SOFA", "soffio"), product("b", "SOFA", "roma")], upgraded).sofa?.upgrades).toEqual(["Upgrade fabric"]);
+    expect(buildChoicesFor([product("f", "BEDFRAME", "y04", "Bed frame")], upgraded).bedframe?.upgrades).toEqual(["Upgrade fabric"]);
+  });
+
+  it("refuses one the cart is not offered, and drops it when the cart changes", () => {
+    const both = buildChoicesFor([product("a", "SOFA", "soffio"), product("b", "SOFA", "roma")], upgraded);
+    expect(buildError({ fabricUpgrade: "upgrade  FABRIC" }, both)).toBeNull();
+    expect(buildError({ fabricUpgrade: "Leather" }, both)).toMatch(/no longer offered for the sofa/);
+    expect(buildError({ fabricUpgrade: "Leather" }, { sofa: null, bedframe: null })).toMatch(/no longer match the cart/);
+    expect(pruneBuild({ fabricUpgrade: "Leather", leg: "Default" }, both)).toEqual({});
+    expect(pruneBuild({ fabricUpgrade: "Upgrade fabric" }, both)).toEqual({ fabricUpgrade: "Upgrade fabric" });
+    const frames = buildChoicesFor([product("f", "BEDFRAME", "y04", "Bed frame")], upgraded);
+    expect(buildError({ bedframe: { fabricUpgrade: "Leather" } }, frames)).toMatch(/no longer offered for the bed frame/);
+  });
+
+  it("keys a build only when it has one, and is said on the customer's quote", () => {
+    expect(buildKey({ leg: '6"' })).toEqual(buildKey({ leg: '6"', fabricUpgrade: undefined }));
+    expect(buildKey({ leg: '6"', fabricUpgrade: "Upgrade fabric" })).not.toEqual(buildKey({ leg: '6"' }));
+    expect(buildLines({ leg: '6"', fabricUpgrade: "Upgrade fabric", bedframe: { divan: '12"', fabricUpgrade: "Upgrade fabric" } },
+      { sofaGrid: false, sofa: true, bedframe: true }))
+      .toEqual(['Sofa build: leg 6" · Upgrade fabric', 'Bed frame build: divan 12" · Upgrade fabric']);
+  });
+});
+
+describe("one bed frame's fabric upgrade", () => {
+  const frame: MemberCatalogueModel = {
+    id: "y04", kind: "BEDFRAME", options: {},
+    charges: { leg_heights: [{ value: '6"', charge: 100 }], fabric_upgrades: [{ value: "Upgrade fabric", charge: 150 }] },
+  };
+  const bed = product("f", "BEDFRAME", "y04", "Bed frame");
+
+  it("is charged per frame beside its options, and said with them", () => {
+    const c = frameChoicesOf(frame);
+    expect(c.upgrades).toEqual([{ value: "Upgrade fabric", charge: 150 }]);
+    expect(frameCharge(c, { leg: '6"', fabricUpgrade: "upgrade fabric" })).toBe(250);
+    expect(frameCharge(c, { leg: '6"' })).toBe(100);
+    expect(frameBuildText({ leg: '6"', fabricUpgrade: "Upgrade fabric" })).toBe('leg 6" · Upgrade fabric');
+  });
+
+  it("refuses one the frame is not offered", () => {
+    expect(frameBuildError({ fabricUpgrade: "Upgrade fabric" }, bed, [frame])).toBeNull();
+    expect(frameBuildError({ fabricUpgrade: "Leather" }, bed, [frame])).toMatch(/not offered for this bed frame/);
+    expect(frameBuildError({ fabricUpgrade: "Upgrade fabric" }, bed, [{ ...frame, charges: {} }])).toMatch(/not offered/);
   });
 });

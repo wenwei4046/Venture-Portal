@@ -1,3 +1,4 @@
+import { valueKey } from "@/lib/catalogue/keys";
 import type { OptionPrice } from "@/lib/catalogue/pricing";
 import type { PricedCombo } from "@/lib/catalogue/combos";
 import type { QuotePricing } from "./calculator";
@@ -43,12 +44,30 @@ function optionList(v: unknown): string[] {
 /**
  * What each kind may be charged for: a bed frame's divan, leg, gap and total
  * height (20261005010000) and its specials, a sofa's leg height and specials
- * (20261006050000 — every Maintenance price is the customer's).
+ * (20261006050000 — every Maintenance price is the customer's), and each its
+ * category's fabric upgrades (20261030030000).
  */
 const CHARGE_KEYS = {
-  BEDFRAME: ["divan_heights", "leg_heights", "gaps", "total_heights", "specials"],
-  SOFA: ["leg_heights", "specials"],
+  BEDFRAME: ["divan_heights", "leg_heights", "gaps", "total_heights", "specials", "fabric_upgrades"],
+  SOFA: ["leg_heights", "specials", "fabric_upgrades"],
 } as const;
+
+/**
+ * The fabric upgrades as the calculator prices them: each model hands its
+ * category's (`member_catalogue`), so one price per category and name — the
+ * pools `bedframe_fabric_upgrades` / `sofa_fabric_upgrades`, as a bill's parts.
+ */
+function upgradePricesOf(models: readonly MemberCatalogueModel[]): OptionPrice[] {
+  const out = new Map<string, OptionPrice>();
+  for (const m of models) {
+    const pool = m.kind === "SOFA" ? "sofa_fabric_upgrades" : "bedframe_fabric_upgrades";
+    for (const u of m.charges?.fabric_upgrades ?? []) {
+      const key = `${pool}\u0000${valueKey(u.value)}`;
+      if (!out.has(key)) out.set(key, { pool, value: u.value, price: u.charge });
+    }
+  }
+  return [...out.values()];
+}
 
 /**
  * `[{ value, charge, byQuantity? }]`, each a short value and a charge above zero — anything
@@ -190,12 +209,13 @@ export function pricedCatalogueOf(raw: unknown): { products: MemberProduct[]; pr
   const products = (Array.isArray(r.products) ? r.products : [])
     .map((p) => catalogueProductOf(p, true))
     .filter((p): p is MemberProduct => p !== null);
+  const models = catalogueModelsOf(r.models);
   return {
     products,
     pricing: {
-      options: optionPricesOf(r.optionPrices),
+      options: [...optionPricesOf(r.optionPrices), ...upgradePricesOf(models)],
       combos: combosOf(r.combos),
-      models: catalogueModelsOf(r.models),
+      models,
     },
   };
 }

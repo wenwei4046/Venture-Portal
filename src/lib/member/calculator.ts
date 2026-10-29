@@ -95,6 +95,9 @@ const CHARGE_WORD: Record<ChargePart["pool"], string> = {
   bedframe_specials: "",
   sofa_leg_heights: "leg ",
   sofa_specials: "",
+  // A fabric upgrade (2026-10-29) is its own name: `Upgrade fabric`.
+  bedframe_fabric_upgrades: "",
+  sofa_fabric_upgrades: "",
 };
 const chargeWord = (p: ChargePart) => `${CHARGE_WORD[p.pool]}${p.value}`;
 
@@ -158,11 +161,11 @@ function costLines(
       line,
       product,
       unit: priced.price,
-      // A bed frame's divan, leg, gap, total height and specials are charged per frame.
+      // A bed frame's divan, leg, gap, total height, specials and fabric upgrade are charged per frame.
       ...chargeOf(kind === "BEDFRAME" && pricing
         ? lineCharge(kind, {
             divan: frame?.divan ?? null, leg: frame?.leg ?? null, gap: frame?.gap ?? null,
-            total: frame?.total ?? null, specials: frame?.specials ?? [],
+            total: frame?.total ?? null, specials: frame?.specials ?? [], fabricUpgrade: frame?.fabricUpgrade ?? null,
           }, prices)
         : null),
       noHeight: grid.length > 0 && priced.how !== "grid",
@@ -448,6 +451,7 @@ export function calculateQuote(
           qty: l.line.quantity,
           leg: input.build?.leg ?? null,
           specials: picked.filter((sp) => !isCounted(sp)),
+          fabricUpgrade: input.build?.fabricUpgrade ?? null,
         })),
         new OptionPrices(pricing.options),
       )

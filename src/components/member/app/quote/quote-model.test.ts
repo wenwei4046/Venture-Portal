@@ -354,9 +354,9 @@ describe("a bed frame's own build", () => {
   it("reads each frame's charges from the catalogue's models; a frame with none is all FOC", () => {
     const c = withCharges();
     expect(c.frames.find(f => f.key === "m-cody")?.choices).toEqual({
-      divans: [], legs: [{ value: '6"', charge: 100 }], gaps: [{ value: '12"', charge: 20 }], totals: [], specials: [],
+      divans: [], legs: [{ value: '6"', charge: 100 }], gaps: [{ value: '12"', charge: 20 }], totals: [], specials: [], upgrades: [],
     });
-    expect(c.frames.find(f => f.key === "m-pebble")?.choices).toEqual({ divans: [], legs: [], gaps: [], totals: [], specials: [] });
+    expect(c.frames.find(f => f.key === "m-pebble")?.choices).toEqual({ divans: [], legs: [], gaps: [], totals: [], specials: [], upgrades: [] });
   });
 
   // 2026-10-06 (user): "if there is no price written in Maintenance, then just don't show it".
@@ -434,8 +434,8 @@ describe("a sofa's leg height and specials", () => {
   const inCart = (key: string, productId: string, qty = 1): CartLine => ({ id: `s-${productId}`, kind: "sofa", key, name: key, size: "", qty, productId });
 
   it("reads each sofa model's charged legs and charged specials; a model with none offers nothing", () => {
-    expect(z().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [LEG4, LEG6], specials: [ARM, SEAT] });
-    expect(zanotti().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [], specials: [] });
+    expect(z().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [LEG4, LEG6], specials: [ARM, SEAT], upgrades: [] });
+    expect(zanotti().models.find(m => m.key === "m-2376")?.choices).toEqual({ legs: [], specials: [], upgrades: [] });
     expect(sofaPick(sheet("m-2376"), zanotti(), [], NO_SOFA_BUILD)).toMatchObject({ legs: [], specials: [], leg: null, picked: [] });
   });
 
@@ -459,11 +459,12 @@ describe("a sofa's leg height and specials", () => {
 
   it("asks the server only for what every sofa in the cart still takes", () => {
     const build = { height: "60cm", tier: "PRICE_1", leg: '4"', specials: ["Wooden Arm", "Seat Add 1ft"] };
-    expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s")])).toEqual({ ...build, specialQty: {} });
+    expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s")])).toEqual({ ...build, specialQty: {}, fabricUpgrade: null });
     expect(sofaBuildToSend(build, z(), [inCart("m-2376", "2376-2s"), inCart("m-810", "810-2s")]))
-      .toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: ["Wooden Arm"], specialQty: {} });
+      .toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: ["Wooden Arm"], specialQty: {}, fabricUpgrade: null });
     // Turned OFF on Modular (or no longer charged) since: it drops out.
-    expect(sofaBuildToSend(build, zanotti(), [inCart("m-2376", "2376-2s")])).toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [], specialQty: {} });
+    expect(sofaBuildToSend(build, zanotti(), [inCart("m-2376", "2376-2s")]))
+      .toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [], specialQty: {}, fabricUpgrade: null });
     expect(sofaBuildToSend({ ...build, specials: ["Pillow Back", "Seat Add 1ft"] }, z(), [inCart("m-2376", "2376-2s")]).specials).toEqual(["Seat Add 1ft"]);
   });
 
@@ -478,11 +479,44 @@ describe("a sofa's leg height and specials", () => {
   });
 
   it("reads a build an older phone kept (seat height and tier only)", () => {
-    expect(sofaBuildOf({ height: "60cm", tier: "PRICE_1" })).toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [], specialQty: {} });
+    expect(sofaBuildOf({ height: "60cm", tier: "PRICE_1" }))
+      .toEqual({ height: "60cm", tier: "PRICE_1", leg: null, specials: [], specialQty: {}, fabricUpgrade: null });
     expect(sofaBuildOf(undefined)).toEqual(NO_SOFA_BUILD);
-    expect(sofaBuildOf({ leg: '6"', specials: ["Wooden Arm", 3 as unknown as string] })).toEqual({ height: null, tier: null, leg: '6"', specials: ["Wooden Arm"], specialQty: {} });
+    expect(sofaBuildOf({ leg: '6"', specials: ["Wooden Arm", 3 as unknown as string] }))
+      .toEqual({ height: null, tier: null, leg: '6"', specials: ["Wooden Arm"], specialQty: {}, fabricUpgrade: null });
     // Quantities (2026-10-26): whole numbers 1–100 only.
     expect(sofaBuildOf({ specials: ["Back"], specialQty: { Back: 3, Bad: 0, Worse: 1.5, Wrong: "2" as unknown as number } }).specialQty).toEqual({ Back: 3 });
+  });
+
+  // 2026-10-29 (user): "just like them choose, like upgrade fabric enough" — Maintenance › Fabrics' upgrades, by name.
+  describe("a fabric upgrade", () => {
+    const UP = { value: "Upgrade fabric", charge: 200 };
+    const LEATHER = { value: "Leather", charge: 500 };
+    const UPGRADED = [
+      { ...MODELS[0], charges: { ...MODELS[0].charges, fabric_upgrades: [UP, LEATHER] } },
+      { ...MODELS[1], charges: { ...MODELS[1].charges, fabric_upgrades: [UP] } },
+    ];
+    const u = () => catalogFromProducts(SOFAS, "ZANOTTI", "Zanotti", [], UPGRADED);
+
+    it("is offered what every sofa model in the cart takes, Standard besides", () => {
+      expect(u().models.find(m => m.key === "m-2376")?.choices.upgrades).toEqual([UP, LEATHER]);
+      const alone = sofaPick({ ...sheet("m-2376"), fabricUpgrade: "leather" }, u(), [], NO_SOFA_BUILD);
+      expect(alone).toMatchObject({ upgrades: [UP, LEATHER], fabricUpgrade: "Leather" });
+      // 810 in the cart takes Upgrade fabric alone: Leather drops to Standard.
+      expect(sofaPick({ ...sheet("m-2376"), fabricUpgrade: "Leather" }, u(), [inCart("m-810", "810-2s")], NO_SOFA_BUILD))
+        .toMatchObject({ upgrades: [UP], fabricUpgrade: null });
+    });
+
+    it("is charged once per sofa until the server says, and sent only while the cart takes it", () => {
+      const build = { ...NO_SOFA_BUILD, fabricUpgrade: "Upgrade fabric" };
+      expect(sofaCartCharge(u(), [inCart("m-2376", "2376-2s"), inCart("m-2376", "2376-2s-b")], build)).toBe(200);
+      expect(sofaCartCharge(u(), [inCart("m-2376", "2376-2s", 2), inCart("m-2376", "2376-2s-b", 2)], build)).toBe(400);
+      expect(sofaCartCharge(u(), [inCart("m-2376", "2376-2s"), inCart("m-810", "810-2s")], build)).toBe(400);
+      expect(sofaBuildToSend(build, u(), [inCart("m-2376", "2376-2s")]).fabricUpgrade).toBe("Upgrade fabric");
+      expect(sofaBuildToSend({ ...build, fabricUpgrade: "Leather" }, u(), [inCart("m-2376", "2376-2s"), inCart("m-810", "810-2s")]).fabricUpgrade)
+        .toBeNull();
+      expect(sofaBuildOf({ fabricUpgrade: "Leather" }).fabricUpgrade).toBe("Leather");
+    });
   });
 });
 

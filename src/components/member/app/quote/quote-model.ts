@@ -73,9 +73,11 @@ export interface QModel {
 export interface QSofaChoices {
   legs: OptionCharge[];
   specials: OptionCharge[];
+  /** Its category's fabric upgrades (Maintenance › Fabrics, 2026-10-29): Standard, or one of these, once per sofa. */
+  upgrades: OptionCharge[];
 }
 
-export const NO_SOFA_CHOICES: QSofaChoices = { legs: [], specials: [] };
+export const NO_SOFA_CHOICES: QSofaChoices = { legs: [], specials: [], upgrades: [] };
 
 export interface QFrame {
   key: string;
@@ -88,13 +90,14 @@ export interface QFrame {
   choices: FrameChoices;
 }
 
-const NO_CHOICES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [] };
+const NO_CHOICES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [], upgrades: [] };
 
-/** A sofa model's charged leg heights and charged specials, as the catalogue's models list them. */
+/** A sofa model's charged leg heights, charged specials and fabric upgrades, as the catalogue's models list them. */
 function sofaChoicesOf(model: MemberCatalogueModel | undefined): QSofaChoices {
   return {
     legs: model?.charges?.leg_heights ?? [],
     specials: model?.charges?.specials ?? [],
+    upgrades: model?.charges?.fabric_upgrades ?? [],
   };
 }
 
@@ -109,11 +112,13 @@ export function frameBuildFor(choices: FrameChoices, build: BedframeBuild | unde
   const gap = keep(build.gap, choices.gaps);
   const total = keep(build.total, choices.totals);
   const specials = (build.specials ?? []).filter(sp => choices.specials.some(c => valueKey(c.value) === valueKey(sp)));
+  const fabricUpgrade = keep(build.fabricUpgrade, choices.upgrades);
   if (divan) out.divan = divan;
   if (leg) out.leg = leg;
   if (gap) out.gap = gap;
   if (total) out.total = total;
   if (specials.length) out.specials = specials;
+  if (fabricUpgrade) out.fabricUpgrade = fabricUpgrade;
   return Object.keys(out).length ? out : undefined;
 }
 
@@ -130,6 +135,7 @@ export function frameBuildMeta(choices: FrameChoices, build: BedframeBuild | und
       const c = chargeIn(choices.specials, sp);
       return c > 0 ? `${sp} +${rmShort(c)}` : sp;
     }),
+    build.fabricUpgrade ? `${build.fabricUpgrade} +${rmShort(chargeIn(choices.upgrades, build.fabricUpgrade))}` : null,
   ].filter(Boolean).join(" · ");
 }
 
@@ -425,6 +431,8 @@ export type SheetState =
       leg: string | null; specials: string[];
       /** And how many of each special charged by quantity (2026-10-26); absent on a sheet from before. */
       specialQty?: Record<string, number>;
+      /** The cart's fabric upgrade, by name (2026-10-29); null / absent = Standard. */
+      fabricUpgrade?: string | null;
       /** Its sofa accessories (2026-10-26), by SKU, per set — as *Sofa accessories only* picks them. */
       acc: Record<string, number>; accAll: boolean;
     }
@@ -725,9 +733,11 @@ export interface SofaBuild {
    * cart, keyed as the list spells it; a special picked with none counts 1. Absent on a build from before.
    */
   specialQty?: Record<string, number>;
+  /** The sofas' fabric upgrade, by name (2026-10-29), once per sofa; null / absent = Standard. */
+  fabricUpgrade?: string | null;
 }
 
-export const NO_SOFA_BUILD: SofaBuild = { height: null, tier: null, leg: null, specials: [], specialQty: {} };
+export const NO_SOFA_BUILD: SofaBuild = { height: null, tier: null, leg: null, specials: [], specialQty: {}, fabricUpgrade: null };
 
 /** Whole quantities of 1–100, by special; anything else is dropped. */
 function quantitiesOf(raw: unknown): Record<string, number> {
@@ -751,6 +761,7 @@ export function sofaBuildOf(raw: Partial<SofaBuild> | null | undefined): SofaBui
     leg: typeof raw?.leg === "string" ? raw.leg : null,
     specials: Array.isArray(raw?.specials) ? raw.specials.filter((v): v is string => typeof v === "string") : [],
     specialQty: quantitiesOf(raw?.specialQty),
+    fabricUpgrade: typeof raw?.fabricUpgrade === "string" ? raw.fabricUpgrade : null,
   };
 }
 
@@ -771,7 +782,7 @@ export function sofaChoicesIn(catalog: QCatalog, modelKeys: Iterable<string>): Q
   const [first, ...rest] = lists;
   const shared = (pick: (c: QSofaChoices) => OptionCharge[]) =>
     pick(first).filter(o => rest.every(c => pick(c).some(x => valueKey(x.value) === valueKey(o.value))));
-  return { legs: shared(c => c.legs), specials: shared(c => c.specials) };
+  return { legs: shared(c => c.legs), specials: shared(c => c.specials), upgrades: shared(c => c.upgrades) };
 }
 
 /**
@@ -789,7 +800,8 @@ export function sofaCartCharge(catalog: QCatalog | null, cart: CartLine[], build
   const picked = new Set(build.specials.map(sp => valueKey(sp)));
   const counted = choices.specials.filter(o => o.byQuantity && picked.has(valueKey(o.value)))
     .reduce((sum, o) => sum + o.charge * qtyIn(build.specialQty, o.value), 0);
-  const unit = chargeIn(choices.legs, build.leg ?? undefined) + specialsCharge(choices.specials.filter(o => !o.byQuantity), build.specials);
+  const unit = chargeIn(choices.legs, build.leg ?? undefined) + specialsCharge(choices.specials.filter(o => !o.byQuantity), build.specials)
+    + chargeIn(choices.upgrades, build.fabricUpgrade ?? undefined);
   if (!(unit > 0)) return counted;
   return counted + keys.reduce((sum, key) => {
     const pieces = cart.filter(l => l.kind === "sofa" && l.key === key).map(l => l.qty);
@@ -818,7 +830,10 @@ function offeredAll(values: string[], list: string[]): string[] {
 export function sofaBuildToSend(build: SofaBuild, catalog: QCatalog | null, cart: CartLine[]): SofaBuild {
   const choices = catalog ? sofaChoicesIn(catalog, cartSofaKeys(cart)) : NO_SOFA_CHOICES;
   const specials = offeredAll(build.specials, choices.specials.map(o => o.value));
-  return { ...build, leg: offeredOne(build.leg, choices.legs.map(o => o.value)), specials, specialQty: countedOf(choices.specials, specials, build.specialQty) };
+  return {
+    ...build, leg: offeredOne(build.leg, choices.legs.map(o => o.value)), specials, specialQty: countedOf(choices.specials, specials, build.specialQty),
+    fabricUpgrade: offeredOne(build.fabricUpgrade ?? null, choices.upgrades.map(o => o.value)),
+  };
 }
 
 /** Each picked special charged by quantity, with its quantity (1 when none was set), as the list spells it. */
@@ -846,6 +861,9 @@ export interface SofaBuildPick {
   qty: Record<string, number>;
   /** The back cushions of every sofa in the cart and of what this sheet adds — where a special charged by quantity starts. */
   compartments: number;
+  /** The fabric upgrades it may take (Standard besides), and the sheet's, while still offered (null = Standard). */
+  upgrades: OptionCharge[];
+  fabricUpgrade: string | null;
 }
 
 /**
@@ -880,5 +898,6 @@ export function sofaPick(
     legs: options.legs, specials: options.specials,
     leg: offeredOne(sh.leg, options.legs.map(o => o.value)), picked, qty: countedOf(options.specials, picked, sh.specialQty),
     compartments: inCartCushions + sheetCushions,
+    upgrades: options.upgrades, fabricUpgrade: offeredOne(sh.fabricUpgrade ?? null, options.upgrades.map(o => o.value)),
   };
 }

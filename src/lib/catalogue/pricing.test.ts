@@ -443,6 +443,42 @@ describe('sofaSetCharges — catalogue_apply_sofa_charges', () => {
   it('reads values by their folded spelling', () => {
     expect(sofaSetCharges([piece('810', 1, '6”', ['NYLON FABRIC'])], p)[0].total).toBe(150)
   })
+
+  // 2026-10-29: the Quote's fabric upgrade, by name — once per sofa, as a special charged as a full set.
+  it('charges a fabric upgrade once per sofa, times the sofas', () => {
+    const up = new OptionPrices([
+      { pool: 'sofa_leg_heights', value: '6"', price: 100 },
+      { pool: 'sofa_fabric_upgrades', value: 'Upgrade fabric', price: 200 },
+      { pool: 'bedframe_fabric_upgrades', value: 'Leather', price: 150 },
+    ])
+    const UP = { pool: 'sofa_fabric_upgrades', value: 'Upgrade fabric', price: 200 }
+    const lines = (qty: number) => [1, 2, 3].map(() => ({ ...piece('8030', qty, '6"'), fabricUpgrade: 'upgrade  FABRIC' }))
+    expect(sofaSetCharges(lines(1), up)).toEqual([{ group: '8030', sets: 1, unit: 300, total: 300, parts: [LEG, { ...UP, value: 'upgrade  FABRIC' }] }])
+    expect(sofaSetCharges(lines(2), up)[0]).toMatchObject({ sets: 2, total: 600 })
+    // A bed frame's upgrade is no sofa's; Standard is nothing.
+    expect(sofaSetCharges([{ ...piece('8030', 1, null), fabricUpgrade: 'Leather' }], up)).toEqual([])
+    expect(sofaSetCharges([{ ...piece('8030', 1, null), fabricUpgrade: null }], up)).toEqual([])
+  })
+})
+
+describe('lineCharge — a bed frame’s fabric upgrade (2026-10-29)', () => {
+  const p = new OptionPrices([
+    { pool: 'bedframe_leg_heights', value: '6"', price: 100 },
+    { pool: 'bedframe_fabric_upgrades', value: 'Upgrade fabric', price: 150 },
+    { pool: 'sofa_fabric_upgrades', value: 'Leather', price: 500 },
+  ])
+  const none = { divan: null, leg: null, gap: null, total: null, specials: [] as string[] }
+
+  it('per frame, after its options; Standard and a sofa’s upgrade are nothing', () => {
+    expect(lineCharge('BEDFRAME', { ...none, leg: '6"', fabricUpgrade: 'Upgrade fabric' }, p)).toEqual({
+      amount: 250,
+      parts: [{ pool: 'bedframe_leg_heights', value: '6"', price: 100 }, { pool: 'bedframe_fabric_upgrades', value: 'Upgrade fabric', price: 150 }],
+    })
+    expect(lineCharge('BEDFRAME', { ...none, fabricUpgrade: null }, p)).toEqual({ amount: 0, parts: [] })
+    expect(lineCharge('BEDFRAME', { ...none, fabricUpgrade: 'Leather' }, p)).toEqual({ amount: 0, parts: [] })
+    // A sofa is charged once per set, never per line.
+    expect(lineCharge('SOFA', { ...none, fabricUpgrade: 'Leather' }, p)).toEqual({ amount: 0, parts: [] })
+  })
 })
 
 describe('roundCents — ROUND(x, 2)', () => {

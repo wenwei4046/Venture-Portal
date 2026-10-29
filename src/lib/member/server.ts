@@ -1056,6 +1056,9 @@ function quoteBuild(raw: unknown): QuoteInput["build"] {
     }
     if (Object.keys(quantities).length) build.specialQty = quantities;
   }
+  // The sofas' fabric upgrade, by name (2026-10-29); whether the cart is offered it is the calculator's check.
+  const fabricUpgrade = option(b.fabricUpgrade, "sofa fabric upgrade");
+  if (fabricUpgrade) build.fabricUpgrade = fabricUpgrade;
   const frame = bedframeBuild(b.bedframe);
   if (frame) build.bedframe = frame;
   return build;
@@ -1086,11 +1089,13 @@ function bedframeBuild(raw: unknown): BedframeBuild | undefined {
   if (f.specials !== undefined && f.specials !== null && (!Array.isArray(f.specials) || f.specials.length > 20))
     throw new Error("The bed frame specials are invalid.");
   const specials = [...new Set(((f.specials as unknown[] | undefined) ?? []).map((v) => option(v, "bed frame special")).filter((v): v is string => !!v))];
+  const fabricUpgrade = option(f.fabricUpgrade, "bed frame fabric upgrade");
   if (divan) frame.divan = divan;
   if (leg) frame.leg = leg;
   if (total) frame.total = total;
   if (gap) frame.gap = gap;
   if (specials.length) frame.specials = specials;
+  if (fabricUpgrade) frame.fabricUpgrade = fabricUpgrade;
   return Object.keys(frame).length ? frame : undefined;
 }
 
