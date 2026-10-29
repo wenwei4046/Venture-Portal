@@ -13,7 +13,7 @@ import { InfoValue } from "../shared/AdLink";
 import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
 import { SuggestFloat } from "../shared/suggest-float";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingLink4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -177,7 +177,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </div>
               </>)}
               {!!(v.isSrOp) && (<DeskShowrooms4a v={v} />)}
-              {!!(v.cfOn) && (<DeskForm4a v={v} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} />)} {!!(v.isFrmOp) && (<>
+              {!!(v.cfOn) && (<><DeskBookingBar4a v={v.partnerLink} /><DeskForm4a v={v} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} /></>)} {!!(v.isFrmOp) && (<>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px" }}>
                   {(v.frmCards).map((fc, fc_i) => (<Fragment key={fc_i}>
                     <button type="button" onClick={fc.open} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "18px 20px", borderRadius: "18px", border: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", textAlign: "left", color: "var(--crm-ink)", cursor: "pointer", boxShadow: "0 1px 2px rgba(42,22,12,.04)" }} className={DH.h16}>
