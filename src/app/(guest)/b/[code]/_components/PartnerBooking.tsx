@@ -314,7 +314,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
               <Field label="Your own note"><textarea className={s.input} rows={3} maxLength={1000} value={form.note} onChange={e => set({ note: e.target.value })} placeholder="Anything about this lead for yourself" /></Field>
 
               <div className={s.summary}>
-                {start && r ? <span><b>{r.name}</b> · {whenOf(start)}</span> : <span className={s.muted}>Pick a showroom, a date and a time.</span>}
+                {start && r ? <span className={s.sumText}><b>{r.name}</b><span>{whenOf(start)}</span></span> : <span className={s.muted}>Pick a showroom, a date and a time.</span>}
               </div>
               {error && <div className={s.err}>{error}</div>}
               <div className={s.actions}>
@@ -503,7 +503,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
 
             {step === 'details' && (<>
               <div className={s.summary}>
-                {start && r ? <span><b>{r.name}</b> · {whenOf(start)}</span> : <span className={s.muted}>Pick a showroom, a date and a time.</span>}
+                {start && r ? <span className={s.sumText}><b>{r.name}</b><span>{whenOf(start)}</span></span> : <span className={s.muted}>Pick a showroom, a date and a time.</span>}
                 <button type="button" className={s.link} onClick={() => go(editing ? 'time' : 'room')}>Change</button>
               </div>
               <h2 className={s.h2}>You</h2>
