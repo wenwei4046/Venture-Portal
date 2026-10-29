@@ -177,7 +177,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </div>
               </>)}
               {!!(v.isSrOp) && (<DeskShowrooms4a v={v} />)}
-              {!!(v.cfOn) && (<><DeskBookingBar4a v={v.partnerLink} /><DeskForm4a v={v} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} /></>)} {!!(v.isFrmOp) && (<>
+              {!!(v.cfOn) && (<DeskForm4a v={v} share={<DeskBookingBar4a v={v.partnerLink} />} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} />)} {!!(v.isFrmOp) && (<>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px" }}>
                   {(v.frmCards).map((fc, fc_i) => (<Fragment key={fc_i}>
                     <button type="button" onClick={fc.open} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "18px 20px", borderRadius: "18px", border: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", textAlign: "left", color: "var(--crm-ink)", cursor: "pointer", boxShadow: "0 1px 2px rgba(42,22,12,.04)" }} className={DH.h16}>

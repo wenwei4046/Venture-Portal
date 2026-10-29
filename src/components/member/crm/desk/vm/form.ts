@@ -155,3 +155,44 @@ export function answerOf(data: CrmData, c: CrmCustomer, f: FormFieldV2, nameOf: 
 }
 /** The budget as a number (Contacts' median and buckets), or null. */
 export const budgetOf = (c: CrmCustomer) => { const n = Number(String(c.details.budget || "").replace(/[^\d.]/g, "")); return n > 0 ? n : null; };
+
+/**
+ * The booking link's form (2026-10-29, the owner: "这里是2个form, 一个是给crm customer info, 一个是internal sales booking
+ * form"): what /b/<code> asks partners who have no login. Saved in crm_forms with kind 'booking' (mig 20261029250000), the
+ * first one in use. Your name, Customer name and Customer phone are core (a booking cannot do without them); Your phone,
+ * Remarks and Your own note are the booking's own columns (built-in: their type stays, they may be removed); the rest are
+ * the form's own questions, kept in the booking's info under their id. No field is filled by the CRM, and it is one page.
+ */
+const BOOKING_CORE: Record<string, FormFieldV2> = {
+  booker: { id: "booker", label: "Your name", type: "Short text", opts: "", req: true, kind: "core" },
+  customer: { id: "customer", label: "Customer name", type: "Short text", opts: "", req: true, kind: "core" },
+  customerPhone: { id: "customerPhone", label: "Customer phone", type: "Short text", opts: "", req: true, kind: "core" },
+};
+const BOOKING_BUILTIN: Record<string, FormFieldV2> = {
+  bookerPhone: { id: "bookerPhone", label: "Your phone", type: "Short text", opts: "", req: false, kind: "builtin" },
+  remarks: { id: "remarks", label: "Remarks for the showroom", type: "Long text", opts: "", req: false, kind: "builtin" },
+  note: { id: "note", label: "Your own note", type: "Long text", opts: "", req: false, kind: "builtin" },
+};
+export const BOOKING_TYPES: AnswerType[] = ["Short text", "Number", "Long text", "Choice", "Date"];
+const own = (id: string, label: string, type: AnswerType = "Short text"): FormFieldV2 => ({ id, label, type, opts: "", req: false, kind: "own" });
+/** The default booking form: the page's questions as they were until 2026-10-29 (the six info keys kept, so older bookings read). */
+export function defaultBookingForm(): FormSectionV2[] {
+  const sec = (key: string, label: string, fields: FormFieldV2[]): FormSectionV2 => ({ key, label, page: 0, pageTitle: pageName(0), custom: true, fields: fields.map(f => ({ ...f })) });
+  return [
+    sec("you", "You", [BOOKING_CORE.booker, BOOKING_BUILTIN.bookerPhone]),
+    sec("customer", "Customer", [BOOKING_CORE.customer, BOOKING_CORE.customerPhone, own("project", "Project / unit location"), own("unit", "Unit no."),
+      own("type", "Property type"), own("size", "Unit size"), own("pax", "No. of people coming", "Number"), own("budget", "Budget")]),
+    sec("notes", "Notes", [BOOKING_BUILTIN.remarks, BOOKING_BUILTIN.note]),
+  ];
+}
+/** A saved booking form read into the editor's sections (none — the default); a core field it lacks goes back to the first section. */
+export function bookingFormV2(form: CrmForm | undefined): FormSectionV2[] {
+  if (!form || !form.sections.length) return defaultBookingForm();
+  const out: FormSectionV2[] = form.sections.map(s => ({ key: s.id, label: s.title, page: 0, pageTitle: pageName(0), custom: true,
+    fields: s.fields.map(f => BOOKING_CORE[f.id] ? { ...BOOKING_CORE[f.id], label: f.label || BOOKING_CORE[f.id].label }
+      : BOOKING_BUILTIN[f.id] ? { ...BOOKING_BUILTIN[f.id], label: f.label || BOOKING_BUILTIN[f.id].label, req: !!f.req }
+      : { id: f.id, label: f.label, type: FROM_DB(f.type), opts: (f.opts ?? []).join(", "), req: !!f.req, kind: "own" as const }) }));
+  const has = new Set(out.flatMap(s => s.fields.map(f => f.id)));
+  for (const f of Object.values(BOOKING_CORE)) if (!has.has(f.id) && out[0]) out[0].fields.push({ ...f });
+  return out;
+}

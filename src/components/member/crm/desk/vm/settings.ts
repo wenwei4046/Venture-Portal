@@ -5,6 +5,7 @@
  * Notifications page (Unread | Read, categories, Select, Delete with a 30 s Undo). The read state is the phone's
  * (crm_read_notifs); what the Principal or Director sets here is what everybody's CRM uses.
  */
+import { formFromRow, infoLabel } from "@/lib/crm-partner/model";
 import type { CrmLeave, CrmReplyItem, CrmTemplate } from "@/lib/member/crm-data";
 import { panelNotifs } from "../../panel/vm/notifs";
 import { urgencyOf } from "../../sales/vm/common";
@@ -247,6 +248,8 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     b: pb, room: data.rooms.find(r => r.id === pb.showroomId)?.name ?? "Showroom",
     partnerName: (data.partnerLinks ?? []).find(l => l.id === pb.partner)?.name ?? (pb.partner === "the_conts" ? "The Conts" : "Partner"),
     can: !!data.can.manage,
+    // Its answers under the booking form's own words (the one in use; 2026-10-29), else the old six's.
+    infoRows: Object.entries(pb.info ?? {}).filter(([, val]) => val).map(([k, val]) => ({ label: infoLabel(formFromRow(data.bookingForms?.[0]?.sections), k), value: val })),
     cancel: () => act.cancelPartnerBooking(pb.id).then(okd => { if (okd) patch({ toast: `Cancelled · ${pb.customer}` }); return okd; }),
   } : null;
   const partnerLink = {

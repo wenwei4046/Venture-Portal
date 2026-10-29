@@ -1,6 +1,6 @@
 /** A partner's booking link (2026-10-29): the showroom's rules as the database keeps them, on the office's day. */
 import { describe, expect, it } from "vitest";
-import { addDays, bookingProblem, dayClosed, isPartnerCode, isPartnerRef, pageFromRow, partnerRefusal, slotsOf, startOf, t12, timesOf, type PartnerRoom } from "./model";
+import { addDays, bookingProblem, dayClosed, DEFAULT_PARTNER_FORM, formFromRow, infoLabel, isPartnerCode, isPartnerRef, missingAnswer, pageFromRow, partnerRefusal, slotsOf, startOf, t12, timesOf, type PartnerRoom } from "./model";
 
 const room: PartnerRoom = { id: "kl", name: "KL", address: "", slots: ["11:00", "14:00", "19:00@56"], cap: 2, weekly: [1], blocks: [] };
 
@@ -51,7 +51,7 @@ describe("the form", () => {
   it("reads the page closed unless the database says on, and shows only the functions' own refusals", () => {
     expect(pageFromRow(null)).toEqual({ on: false });
     expect(pageFromRow({ on: true, name: "The Conts", today: "2026-11-01", rooms: [{ id: "kl", name: "KL", slots: ["11:00"], cap: "2", weekly: [], blocks: [] }] }))
-      .toEqual({ on: true, name: "The Conts", today: "2026-11-01", rooms: [{ id: "kl", name: "KL", address: "", slots: ["11:00"], cap: 2, weekly: [], blocks: [] }] });
+      .toEqual({ on: true, name: "The Conts", today: "2026-11-01", rooms: [{ id: "kl", name: "KL", address: "", slots: ["11:00"], cap: 2, weekly: [], blocks: [] }], form: DEFAULT_PARTNER_FORM });
     expect(partnerRefusal({ code: "22023", message: "That time is full at KL. Choose another." }, "x")).toBe("That time is full at KL. Choose another.");
     expect(partnerRefusal({ code: "42883", message: "function does not exist" }, "Try again.")).toBe("Try again.");
     expect(partnerRefusal({ code: "42501", message: "permission denied for function crm_partner_book" }, "Try again.")).toBe("Try again.");
@@ -65,5 +65,26 @@ describe("moving a booking (the owner, 2026-10-29: a booking being changed read 
     expect(slotsOf(room, "2026-11-03", { [at]: 1 }, now, { showroom: "kl", start: at })[1].left).toBe(2);
     expect(slotsOf(room, "2026-11-03", { [at]: 2 }, now, { showroom: "kl", start: at })[1].left).toBe(1);
     expect(slotsOf(room, "2026-11-03", { [at]: 1 }, now)[1].left).toBe(1);
+  });
+});
+
+describe("the booking form the CRM puts in use (2026-10-29)", () => {
+  const saved = [{ id: "you", title: "You", fields: [{ id: "booker", label: "Your name", type: "Text", req: 1 }] },
+    { id: "c", title: "Customer", fields: [{ id: "customer", label: "Customer name", type: "Text", req: 1 }, { id: "q1", label: "Car plate", type: "Text", req: 1 },
+      { id: "kind", label: "Kind", type: "Choice", req: 0, opts: ["Condo", "Landed"] }] }];
+  it("asks the saved questions, and the three a booking needs even when a form lost one", () => {
+    const f = formFromRow(saved);
+    expect(f.map(s => s.title)).toEqual(["You", "Customer"]);
+    expect(f[0].fields.map(x => x.id)).toEqual(["customerPhone", "booker"]);
+    expect(f[1].fields.find(x => x.id === "kind")?.opts).toEqual(["Condo", "Landed"]);
+    expect(formFromRow(null)).toBe(DEFAULT_PARTNER_FORM);
+  });
+  it("names a required question left empty as the database does, and labels an answer by the form", () => {
+    const f = formFromRow(saved);
+    expect(missingAnswer(f, {})).toBe("Fill in Car plate.");
+    expect(missingAnswer(f, { q1: "WXY 1" })).toBeNull();
+    expect(infoLabel(f, "q1")).toBe("Car plate");
+    expect(infoLabel(f, "pax")).toBe("No. of people coming");
+    expect(infoLabel(f, "zz")).toBe("zz");
   });
 });

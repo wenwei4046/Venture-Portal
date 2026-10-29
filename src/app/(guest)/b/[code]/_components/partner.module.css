@@ -175,3 +175,9 @@
   .root h1.greetTitle { font-size: 24px; }
   .greetSub { font-size: 13px; }
 }
+
+/* The booking form's long questions and choices take the whole row (2026-10-29). */
+.wide { grid-column: 1 / -1; }
+.choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.choice { padding: 7px 12px; border-radius: 999px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); font: 500 13px Inter, system-ui, sans-serif; color: rgb(43 31 23); cursor: pointer; }
+.choice.on { background: rgb(189 74 25); border-color: rgb(189 74 25); color: rgb(255 255 255); }

@@ -335,6 +335,8 @@ export interface CrmData {
   recentEmoji?: string[];
   /** CRM Desktop rev 1 (B5): the Customer info form the Principal / Director set — every salesperson's Customer info follows it. */
   forms?: CrmForm[];
+  /** The booking link's forms (mig 20261029250000, crm_forms.kind = 'booking'), the one in use first — what /b/<code> asks. */
+  bookingForms?: CrmForm[];
   /** CRM Desktop rev 1 (B6): notes on customers, newest first. */
   notes?: CrmNote[];
   /** Settings › General (mig 20261018100000, crm_settings_read): the reply lines, the template button, auto-assign. */
@@ -508,7 +510,7 @@ export interface CrmDataRows {
   events: CrmEventRow[];
   staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null; notif_deleted?: string[] | null; recent_emoji?: string[] | null }[];
   /** CRM Desktop rev 1 (B5 / B6): absent where the database has none yet. */
-  forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number }[];
+  forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number; kind?: string | null }[];
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
   adNames?: { ad_source_id: string; name: string; source: string; meta_status?: string | null; status_at?: string | null; added_at?: string | null; starts_at?: string | null; ends_at?: string | null; page_id?: string | null; page_name?: string | null; hidden_at?: string | null }[];
   locked?: string[];
@@ -687,7 +689,8 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}), ...(r.together ? { together: true } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
     templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason })),
-    forms: [...(rows.forms ?? [])].sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
+    forms: [...(rows.forms ?? [])].filter(x => x.kind !== "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
+    bookingForms: [...(rows.forms ?? [])].filter(x => x.kind === "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
     notes: (rows.notes ?? []).map(n => ({ id: n.id, customerId: n.contact_id, by: n.author, text: n.body, at: n.created_at })).sort((a, b) => b.at.localeCompare(a.at)),
   };
 }

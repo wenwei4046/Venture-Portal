@@ -2062,7 +2062,7 @@ export function DeskAudit4a({ v }: { v: AuditBits }) {
   );
 }
 
-type FormBits = Pick<ReturnType<typeof import("./vm/formpage").formPageVM>, "cfPages" | "cfSecs" | "cfDirty" | "cfReset" | "cfDevs" | "cfDesk" | "cfDragEnd" | "cfForms">;
+type FormBits = Pick<ReturnType<typeof import("./vm/formpage").formPageVM>, "cfPages" | "cfSecs" | "cfDirty" | "cfReset" | "cfDevs" | "cfDesk" | "cfDragEnd" | "cfForms" | "cfKinds" | "cfBooking" | "cfBookPv">;
 const Switch = ({ on, act, locked }: { on: boolean; act?: () => void; locked?: boolean }) => (
   <span role="switch" aria-checked={on} onClick={locked ? undefined : act} style={{ position: "relative", width: "30px", height: "18px", flex: "none", borderRadius: "9px", background: on ? "var(--crm-rust)" : "var(--crm-track)", cursor: locked ? "default" : "pointer", opacity: locked ? 0.6 : 1, transition: "background .15s" }}>
     <span style={{ position: "absolute", top: "2px", left: on ? "14px" : "2px", width: "14px", height: "14px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.25)", transition: "left .15s" }} />
@@ -2077,34 +2077,56 @@ const CF_KICK: CSSProperties = { font: "500 10.5px Inter, sans-serif", letterSpa
  * to its editor on its chevron), the live preview on the right. Appearance only — every control is vm/formpage.ts's,
  * as before (pages, sections and fields dragged, rename, add, delete, answer type, choices, Required, Discard).
  */
-export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) {
+export function DeskForm4a({ v, preview, share }: { v: FormBits; preview: ReactNode; share?: ReactNode }) {
   const [open, setOpen] = useState<string | null>(null);
   const P = v.cfPages;
   return (
     <div onDragEnd={v.cfDragEnd} style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "242px minmax(0,1fr) 340px" }}>
       <div style={{ padding: "18px 16px 24px 36px", borderRight: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", gap: "4px", overflowY: "auto" }}>
-        {/* v2 frame 08: the form picker — several forms kept, the first in use; Duplicate and Delete beside it. */}
-        <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)", paddingBottom: "8px" }}>Form</span>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "16px", marginBottom: "14px", borderBottom: "1px solid var(--crm-rule)" }}>
-          <label style={{ position: "relative", flex: 1, minWidth: 0, height: "34px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden" }}>
-            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{v.cfForms.list.find(x => x.id === v.cfForms.cur)?.label.replace(/ · in use$/, "") ?? "Customer info"}</span>
-            <span style={{ marginLeft: "auto", flex: "none", display: "flex", color: "var(--crm-muted)" }}><Ic name="chevron-down" size={11} /></span>
-            <select value={v.cfForms.cur} onChange={v.cfForms.pick} aria-label="Form" style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}>{v.cfForms.list.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}</select>
-          </label>
-          <button type="button" onClick={v.cfForms.duplicate} title="Duplicate form" aria-label="Duplicate form" style={{ ...BTN, flex: "none", width: "34px", height: "34px", borderRadius: "7px", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-ink-soft)" }}><Ic name="copy" size={14} /></button>
-          <button type="button" onClick={v.cfForms.canDelete ? v.cfForms.askDelete : undefined} title={v.cfForms.deleteTip} aria-label="Delete form" style={{ ...BTN, flex: "none", width: "34px", height: "34px", borderRadius: "7px", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)",
-            color: v.cfForms.canDelete ? "var(--crm-oxblood)" : "var(--crm-faint-2)", cursor: v.cfForms.canDelete ? "pointer" : "not-allowed" }}><Ic name="trash-2" size={14} /></button>
-        </div>
-        {!v.cfForms.inUse && <button type="button" onClick={v.cfForms.setActive} style={{ ...BTN, alignSelf: "flex-start", margin: "-8px 0 14px", font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>Set as active</button>}
-        {v.cfForms.ask && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "-6px 0 14px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
-            Delete this form? Answers already given stay on each customer.
-            <span style={{ display: "flex", gap: "8px" }}>
-              <button type="button" onClick={v.cfForms.askDelete} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "6px", border: "1px solid var(--crm-line)", font: "500 12px Inter, sans-serif" }}>Cancel</button>
-              <button type="button" onClick={v.cfForms.del} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "6px", background: "var(--crm-oxblood)", color: "#fff", font: "500 12px Inter, sans-serif" }}>Delete</button>
+        {/* Forms (2026-10-29, the owner: "这里是2个form … 现在的画面看不懂"): first WHICH form — Customer info or the booking
+            link's — then that kind's forms, the one in use marked; the open form's name, Put in use, Duplicate, Delete under it. */}
+        <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)", paddingBottom: "8px" }}>Which form</span>
+        {v.cfKinds.map(k => (
+          <button key={k.key} type="button" onClick={k.pick} style={{ ...BTN, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "3px", padding: "10px 12px", marginBottom: "6px", borderRadius: "8px", textAlign: "left",
+            border: `1px solid ${k.on ? "var(--crm-rust)" : "var(--crm-line)"}`, background: k.on ? "var(--crm-tint-attention)" : "#fff" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "8px", font: "600 14px Inter, sans-serif", color: k.on ? "var(--crm-rust)" : "var(--crm-ink)" }}>
+              <Ic name={k.key === "booking" ? "link" : "user-round"} size={14} />{k.label}
             </span>
-          </div>
-        )}
+            <span style={{ font: "400 12px/1.35 Inter, sans-serif", color: "var(--crm-muted)" }}>{k.desc}</span>
+          </button>
+        ))}
+        <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)", padding: "14px 0 8px" }}>{v.cfBooking ? "Booking forms" : "Customer info forms"}</span>
+        {v.cfForms.list.map(f => (
+          <button key={f.id} type="button" onClick={f.pick} className={f.on ? undefined : "crm4a-nav"} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 10px", borderRadius: "6px",
+            background: f.on ? "var(--crm-cream-nav-active)" : "transparent", font: `${f.on ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)" }}>
+            <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.name}</span>
+            {f.inUse && <span style={{ flex: "none", padding: "2px 7px", borderRadius: "10px", background: "var(--crm-rust)", color: "#fff", font: "600 10px Inter, sans-serif" }}>In use</span>}
+          </button>
+        ))}
+        {!v.cfForms.list.length && <span style={{ padding: "4px 10px 6px", font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>The default form · in use</span>}
+        <button type="button" onClick={v.cfForms.add} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 10px", font: "500 13px Inter, sans-serif", color: "var(--crm-rust)" }}><Ic name="plus" size={13} />New form</button>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "10px 0 14px", padding: "12px", borderRadius: "8px", border: "1px solid var(--crm-rule)", background: "var(--crm-cream-nav)" }}>
+          <span style={CF_KICK}>THIS FORM</span>
+          <input key={v.cfForms.cur} type="text" defaultValue={v.cfForms.chosenName} aria-label="Form name" onBlur={e => v.cfForms.rename(e.target.value)} onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} style={CF_FIELD} />
+          <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {v.cfForms.inUse
+              ? <span style={{ flex: 1, font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>{v.cfBooking ? "In use · the booking link asks this" : "In use · salespeople fill this"}</span>
+              : <button type="button" onClick={v.cfForms.setActive} style={{ ...BTN, flex: 1, height: "30px", borderRadius: "6px", background: "var(--crm-rust)", color: "#fff", font: "500 12px Inter, sans-serif" }}>Put in use</button>}
+            <button type="button" onClick={v.cfForms.duplicate} title="Duplicate form" aria-label="Duplicate form" style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "6px", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink-soft)" }}><Ic name="copy" size={13} /></button>
+            <button type="button" onClick={v.cfForms.canDelete ? v.cfForms.askDelete : undefined} title={v.cfForms.deleteTip} aria-label="Delete form" style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "6px", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: "#fff",
+              color: v.cfForms.canDelete ? "var(--crm-oxblood)" : "var(--crm-faint-2)", cursor: v.cfForms.canDelete ? "pointer" : "not-allowed" }}><Ic name="trash-2" size={13} /></button>
+          </span>
+          {v.cfForms.ask && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
+              {v.cfBooking ? "Delete this form? Bookings already made keep their answers." : "Delete this form? Answers already given stay on each customer."}
+              <span style={{ display: "flex", gap: "8px" }}>
+                <button type="button" onClick={v.cfForms.askDelete} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "6px", border: "1px solid var(--crm-line)", background: "#fff", font: "500 12px Inter, sans-serif" }}>Cancel</button>
+                <button type="button" onClick={v.cfForms.del} style={{ ...BTN, height: "28px", padding: "0 10px", borderRadius: "6px", background: "var(--crm-oxblood)", color: "#fff", font: "500 12px Inter, sans-serif" }}>Delete</button>
+              </span>
+            </div>
+          )}
+        </div>
+        {!v.cfBooking && (<>
         <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)", paddingBottom: "10px" }}>Pages</span>
         {P.tabs.map(t => (
           <button key={t.num} type="button" onClick={t.pick} onDragOver={t.over} onDrop={t.drop} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", height: "36px", padding: "0 10px", borderRadius: "6px",
@@ -2116,9 +2138,10 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
           </button>
         ))}
         <button type="button" onClick={P.addPage} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 10px", font: "500 14px Inter, sans-serif", color: "var(--crm-rust)" }}><Ic name="plus" size={14} />Add page</button>
+        </>)}
         <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "18px", paddingTop: "14px", borderTop: "1px solid var(--crm-rule-soft)" }}>
-          <span style={CF_KICK}>PAGE NAME</span>
-          <input type="text" value={P.title} onChange={P.setTitle} placeholder="Page name" style={CF_FIELD} />
+          {!v.cfBooking && <span style={CF_KICK}>PAGE NAME</span>}
+          {!v.cfBooking && <input type="text" value={P.title} onChange={P.setTitle} placeholder="Page name" style={CF_FIELD} />}
           <button type="button" onClick={P.addSection} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", height: "32px", font: "500 13px Inter, sans-serif", color: "var(--crm-rust)" }}><Ic name="plus" size={13} />Add section</button>
           {P.many && <button type="button" onClick={P.remove} disabled={!P.canDelete} title={P.deleteTip} style={{ ...BTN, height: "28px", font: "500 13px Inter, sans-serif", color: P.canDelete ? "var(--crm-oxblood)" : "var(--crm-faint-2)", cursor: P.canDelete ? "pointer" : "not-allowed" }}>Delete page</button>}
           {v.cfDirty && <button type="button" onClick={v.cfReset} style={{ ...BTN, height: "28px", font: "500 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Discard changes</button>}
@@ -2126,6 +2149,7 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
         </div>
       </div>
       <div style={{ padding: "16px 28px 32px", display: "flex", flexDirection: "column", gap: "28px", overflowY: "auto" }}>
+        {v.cfBooking && share}
         {v.cfSecs.map((s, si) => (
           <section key={s.anchor} id={s.anchor} onDragOver={s.dragOver} onDrop={s.drop} style={{ display: "flex", flexDirection: "column", opacity: s.op, borderRadius: "6px", boxShadow: s.ring }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "8px", borderBottom: "1px solid var(--crm-ink)" }}>
@@ -2197,9 +2221,12 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
       <div style={{ background: "var(--crm-cream-nav)", borderLeft: "1px solid var(--crm-rule)", display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0 24px", overflow: "hidden" }}>
         <span style={{ ...CF_KICK, display: "flex", gap: "6px", paddingBottom: "16px" }}>
           LIVE PREVIEW ·
-          {v.cfDevs.map(d => <button key={d.label} type="button" onClick={d.pick} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", color: d.on ? "var(--crm-ink-soft)" : "var(--crm-faint-2)" }}>{d.label.toUpperCase()}</button>)}
+          {v.cfBooking && <span style={{ color: "var(--crm-ink-soft)" }}>BOOKING PAGE</span>}
+          {!v.cfBooking && v.cfDevs.map(d => <button key={d.label} type="button" onClick={d.pick} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", color: d.on ? "var(--crm-ink-soft)" : "var(--crm-faint-2)" }}>{d.label.toUpperCase()}</button>)}
         </span>
-        {v.cfDesk
+        {v.cfBooking
+          ? <div style={{ width: "270px", height: "560px", boxSizing: "border-box", border: "8px solid var(--crm-deep)", borderRadius: "36px", background: "var(--crm-cream-nav)", overflow: "hidden", display: "flex", flexDirection: "column" }}><BookingPreview secs={v.cfBookPv} /></div>
+          : v.cfDesk
           ? <div style={{ width: "290px", flex: 1, minHeight: 0, overflowY: "auto", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "10px", padding: "14px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "10px" }}>
               {v.cfSecs.map(s => (
                 <div key={s.anchor} style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -2213,6 +2240,36 @@ export function DeskForm4a({ v, preview }: { v: FormBits; preview: ReactNode }) 
               ))}
             </div>
           : <div style={{ width: "270px", height: "560px", boxSizing: "border-box", border: "8px solid var(--crm-deep)", borderRadius: "36px", background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column" }}>{preview}</div>}
+      </div>
+    </div>
+  );
+}
+
+/** The booking page's details step as a partner sees it (/b/<code>, PartnerBooking), drawn from the draft — preview only. */
+function BookingPreview({ secs }: { secs: FormBits["cfBookPv"] }) {
+  const box: CSSProperties = { height: "26px", border: "1px solid var(--crm-line)", borderRadius: "7px", background: "#fff" };
+  return (
+    <div style={{ flex: 1, overflowY: "auto", padding: "14px 12px 18px", display: "flex", flexDirection: "column", gap: "8px" }}>
+      <span style={{ font: "600 9px Inter, sans-serif", letterSpacing: ".08em", color: "var(--crm-rust)" }}>HOUZS SHOWROOMS · FOR THE PARTNER</span>
+      <span style={{ font: `600 17px ${TIGHT}`, color: "var(--crm-ink)" }}>Book a showroom visit</span>
+      <div style={{ background: "#fff", borderRadius: "12px", padding: "10px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <span style={{ font: "500 9px Inter, sans-serif", color: "var(--crm-muted)", textAlign: "right" }}>Step 3 of 3 · Details</span>
+        {secs.map((s, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            <span style={{ font: "600 11px Inter, sans-serif", color: "var(--crm-ink)" }}>{s.title}</span>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+              {s.fields.map(f => (
+                <span key={f.id} style={{ gridColumn: f.type === "Long text" || f.type === "Choice" ? "1 / -1" : "auto", display: "flex", flexDirection: "column", gap: "3px", font: "400 9px Inter, sans-serif", color: "var(--crm-muted)", minWidth: 0 }}>
+                  <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.label || "Untitled"}{f.req ? " *" : ""}</span>
+                  {f.type === "Choice"
+                    ? <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>{(f.opts.length ? f.opts : ["Choice"]).map(o => <span key={o} style={{ padding: "3px 7px", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff", font: "500 9px Inter, sans-serif", color: "var(--crm-ink)" }}>{o}</span>)}</span>
+                    : <span style={{ ...box, height: f.type === "Long text" ? "38px" : "26px" }} />}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+        <span style={{ marginTop: "4px", height: "30px", borderRadius: "8px", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", font: "600 11px Inter, sans-serif" }}>Book this slot</span>
       </div>
     </div>
   );
