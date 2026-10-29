@@ -60,6 +60,18 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   const [step, setStep] = useState<Step>('home')
   const [meName, setMeName] = useState('')
   const [allOpen, setAllOpen] = useState(false)
+  // Pages on a phone only; a computer keeps the page as it was (the owner, 2026-10-29: "desktop 用回上一次的版本，分页式只在手机").
+  const [phone, setPhone] = useState(false)
+  useEffect(() => {
+    const m = window.matchMedia('(max-width: 760px)'), on = () => setPhone(m.matches)
+    on(); m.addEventListener('change', on)
+    return () => m.removeEventListener('change', on)
+  }, [])
+  // Find by name (the owner, 2026-10-29: "搜寻那边是否可以搜寻自己的名字，看得到自己的预约"): a reference opens its booking;
+  // anything else lists the bookings whose booker, customer or phone has it — and a booker's own name becomes this phone's,
+  // so Your appointments shows theirs from then on.
+  const [findQ, setFindQ] = useState('')
+  const [found, setFound] = useState<PartnerBooked[] | null>(null)
 
   // The booker's own name and phone stay on this computer for the next booking (never the customer's).
   useEffect(() => {
@@ -150,6 +162,180 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
   }
   const stopEditing = () => { setEditing(null); setStart(''); setForm(f => ({ ...EMPTY, booker: f.booker, bookerPhone: f.bookerPhone })) }
 
+  if (!phone) return (
+    <div className={s.root}>
+      <div className={s.wrap}>
+        <header className={s.head}>
+          <div>
+            <div className={s.kicker}>HOUZS showrooms · for {page.name}</div>
+            <h1 className={s.title}>Book a showroom visit</h1>
+          </div>
+          <div className={s.lookup}>
+            <label className={s.lookupLabel} htmlFor="ref">Change or cancel a booking</label>
+            <div className={s.lookupRow}>
+              <input id="ref" className={s.input} value={refText} onChange={e => setRefText(e.target.value.toUpperCase())} placeholder="TC-7KQ3X9" onKeyDown={e => { if (e.key === 'Enter') void findRef() }} />
+              <button type="button" className={s.ghost} onClick={() => void findRef()}>Open</button>
+            </div>
+            {refError && <span className={s.err}>{refError}</span>}
+          </div>
+        </header>
+
+        {done ? (
+          <section className={s.done}>
+            <div className={s.doneBadge}>{done.state === 'cancelled' ? 'Cancelled' : editing === null ? 'Booked' : 'Saved'}</div>
+            <h2>{done.state === 'cancelled' ? 'The booking is cancelled' : 'The slot is yours'}</h2>
+            <div className={s.ref}>{done.ref}</div>
+            <p className={s.muted}>{done.state === 'cancelled' ? 'Its slot is free again.' : 'Keep this reference — type it under “Change or cancel a booking” to change or cancel.'}</p>
+            <dl className={s.facts}>
+              <dt>When</dt><dd>{whenOf(done.start)}</dd>
+              <dt>Showroom</dt><dd>{done.showroomName}</dd>
+              <dt>Customer</dt><dd>{done.customer} · {done.customerPhone}</dd>
+              <dt>Booked by</dt><dd>{done.booker}{done.bookerPhone ? ` · ${done.bookerPhone}` : ''}</dd>
+              {done.remarks && <><dt>Remarks</dt><dd>{done.remarks}</dd></>}
+              {done.note && <><dt>Your note</dt><dd>{done.note}</dd></>}
+            </dl>
+            <button type="button" className={s.primary} onClick={again}>Book another</button>
+          </section>
+        ) : (
+          <div className={s.grid}>
+            <section className={s.card}>
+              {editing && (
+                <div className={s.editing}>
+                  Changing <b>{editing.ref}</b> · {editing.customer}, {whenOf(editing.start)}
+                  <button type="button" className={s.link} onClick={stopEditing}>New booking instead</button>
+                </div>
+              )}
+              <h2 className={s.h2}>1 · Showroom</h2>
+              <div className={s.rooms}>
+                {page.rooms.map(x => (
+                  <button key={x.id} type="button" className={x.id === room ? `${s.room} ${s.on}` : s.room} onClick={() => { setRoom(x.id); setStart('') }}>
+                    <b>{x.name}</b>{x.address && <span>{x.address}</span>}
+                  </button>
+                ))}
+                {!page.rooms.length && <p className={s.muted}>No showroom is open for booking.</p>}
+              </div>
+
+              <div className={s.pickHead}>
+                <h2 className={s.h2}>2 · Date</h2>
+                <span className={s.monthLabel}>{view === 'week' ? `${MON[Number(weekDays[0].slice(5, 7)) - 1]} ${weekDays[0].slice(0, 4)}` : `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`}</span>
+                <div className={s.seg}>
+                  {(['week', 'month'] as const).map(k => <button key={k} type="button" aria-pressed={view === k} className={view === k ? `${s.segOpt} ${s.segOn}` : s.segOpt} onClick={() => { setView(k); showDay(day) }}>{k === 'week' ? 'Week' : 'Month'}</button>)}
+                </div>
+                <button type="button" aria-label="Earlier" className={s.arrow} disabled={view === 'week' ? wk === 0 : ym <= monthFirst(page.today)} onClick={() => (view === 'week' ? setWk(w => Math.max(0, w - 1)) : setYm(m => addMonths(m, -1)))}>‹</button>
+                <button type="button" aria-label="Later" className={s.arrow} disabled={view === 'week' ? addDays(weekDays[6], 1) > last : addMonths(ym, 1) > last} onClick={() => (view === 'week' ? setWk(w => w + 1) : setYm(m => addMonths(m, 1)))}>›</button>
+              </div>
+              {view === 'week' ? (
+                <div className={s.days}>
+                  {weekDays.map(d => {
+                    const open = d <= last && openDay(d)
+                    return (
+                      <button key={d} type="button" disabled={!open} className={d === day ? `${s.day} ${s.on}` : s.day} onClick={() => { setDay(d); setStart('') }}>
+                        <span>{DOW[dowOf(d)]}</span><b>{Number(d.slice(8))}</b>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className={s.month}>
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(w => <span key={w} className={s.monthDow}>{w}</span>)}
+                  {monthCells.map(d => {
+                    const inMonth = d.slice(0, 7) === ym.slice(0, 7), open = inMonth && d >= page.today && d <= last && openDay(d)
+                    return (
+                      <button key={d} type="button" disabled={!open} className={[s.mday, d === day && inMonth ? s.on : '', inMonth ? '' : s.mdayOut].join(' ')} onClick={() => { setDay(d); setStart('') }}>
+                        {Number(d.slice(8))}{d === page.today && <i className={s.todayDot} />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+
+              <h2 className={s.h2}>3 · Time · {dayLabel(day)}</h2>
+              <div className={s.slots}>
+                {slots.map(x => {
+                  const off = x.full || x.past, on = start === x.start
+                  return (
+                    <button key={x.time} type="button" disabled={off} className={on ? `${s.slot} ${s.on}` : s.slot} onClick={() => setStart(x.start)}>
+                      <b>{x.label}</b><span>{x.past ? 'Passed' : x.full ? 'Full' : `${x.left} of ${r?.cap ?? 0} free`}</span>
+                    </button>
+                  )
+                })}
+                {!slots.length && <p className={s.muted}>{r ? 'The showroom is closed that day.' : 'Pick a showroom.'}</p>}
+              </div>
+            </section>
+
+            <section className={s.card}>
+              <h2 className={s.h2}>You</h2>
+              <div className={s.two}>
+                <Field label="Your name *"><input className={s.input} value={form.booker} maxLength={80} onChange={e => set({ booker: e.target.value })} /></Field>
+                <Field label="Your phone"><input className={s.input} value={form.bookerPhone} maxLength={30} onChange={e => set({ bookerPhone: e.target.value })} /></Field>
+              </div>
+              <h2 className={s.h2}>Customer</h2>
+              <div className={s.two}>
+                <Field label="Customer name *"><input className={s.input} value={form.customer} maxLength={80} onChange={e => set({ customer: e.target.value })} /></Field>
+                <Field label="Customer phone *"><input className={s.input} value={form.customerPhone} maxLength={30} inputMode="tel" onChange={e => set({ customerPhone: e.target.value })} /></Field>
+                {(Object.keys(INFO_LABELS) as (keyof PartnerInfo)[]).map(k => (
+                  <Field key={k} label={INFO_LABELS[k]}><input className={s.input} value={form.info[k] ?? ''} maxLength={120} onChange={e => setInfo(k, e.target.value)} /></Field>
+                ))}
+              </div>
+              <Field label="Remarks for the showroom"><textarea className={s.input} rows={3} maxLength={1000} value={form.remarks} onChange={e => set({ remarks: e.target.value })} placeholder="What the customer wants to see, keys, parking…" /></Field>
+              <Field label="Your own note"><textarea className={s.input} rows={3} maxLength={1000} value={form.note} onChange={e => set({ note: e.target.value })} placeholder="Anything about this lead for yourself" /></Field>
+
+              <div className={s.summary}>
+                {start && r ? <span><b>{r.name}</b> · {whenOf(start)}</span> : <span className={s.muted}>Pick a showroom, a date and a time.</span>}
+              </div>
+              {error && <div className={s.err}>{error}</div>}
+              <div className={s.actions}>
+                {editing && <button type="button" className={s.danger} disabled={busy} onClick={() => void cancel()}>Cancel booking</button>}
+                <button type="button" className={s.primary} disabled={busy || !!problem} title={problem ?? undefined} onClick={() => void submit()}>
+                  {busy ? 'Saving…' : editing ? 'Save changes' : 'Book this slot'}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        <section className={s.card}>
+          <div className={s.listHead}>
+            <h2 className={s.h2}>Bookings through this link · {list.length}</h2>
+            <input className={`${s.input} ${s.listSearch}`} value={listQ} onChange={e => setListQ(e.target.value)} placeholder="Search customer, phone, booker or reference" />
+          </div>
+          {(() => {
+            const q = listQ.trim().toLowerCase()
+            const shown = list.filter(b => !q || `${b.customer} ${b.customerPhone} ${b.booker} ${b.ref} ${b.showroomName}`.toLowerCase().includes(q))
+            if (!shown.length) return <p className={s.muted}>{list.length ? 'No booking matches.' : 'No bookings yet.'}</p>
+            return (
+              <div className={s.table}>
+                <div className={`${s.row} ${s.rowHead}`}><span>When</span><span>Showroom</span><span>Customer</span><span>Phone</span><span>Booked by</span><span>Reference</span><span /></div>
+                {shown.map(b => (
+                  <div key={b.ref} className={s.row}>
+                    <span>{whenOf(b.start)}</span><span>{b.showroomName}</span><span>{b.customer}</span><span>{b.customerPhone}</span><span>{b.booker}</span>
+                    <span className={s.refCell}>{b.ref}</span>
+                    <span><button type="button" className={s.ghost} onClick={() => { setRefText(b.ref); void findRef(b.ref); window.scrollTo({ top: 0, behavior: 'smooth' }) }}>Open</button></span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </section>
+      </div>
+    </div>
+  )
+
+  const find = () => {
+    const q = findQ.trim()
+    setRefError(''); setFound(null)
+    if (!q) return
+    if (/^TC-?[A-Z0-9]{6}$/i.test(q)) { const ref = q.toUpperCase().replace(/^TC-?/, 'TC-'); setRefText(ref); void findRef(ref); return }
+    const ql = q.toLowerCase(), digits = q.replace(/\D/g, '')
+    const hits = list.filter(b => b.booker.toLowerCase().includes(ql) || b.customer.toLowerCase().includes(ql) || (digits.length >= 4 && b.customerPhone.replace(/\D/g, '').includes(digits)))
+    setFound(hits)
+    const exact = list.find(b => b.booker.trim().toLowerCase() === ql)
+    if (exact) {
+      setMeName(exact.booker); setForm(f => ({ ...f, booker: f.booker || exact.booker }))
+      try { localStorage.setItem(ME_KEY, JSON.stringify({ booker: exact.booker, bookerPhone: form.bookerPhone })) } catch { /* private window */ }
+    }
+  }
+
   // Pages, for the phone (the owner, 2026-10-29: "做成分页会更好；首页可以有他已经的预约，或 no appt, book appointment now"):
   // Home — this booker's bookings (by the name kept on this phone) or "No appointment yet" and Book appointment now — then
   // 1 Showroom · 2 Date & time · 3 Details, each with Back and Next.
@@ -171,7 +357,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
 
   return (
     <div className={s.root}>
-      <div className={s.wrap}>
+      <div className={`${s.wrap} ${s.wrapPhone}`}>
         <header className={s.head}>
           <div>
             <div className={s.kicker}>HOUZS showrooms · for {page.name}</div>
@@ -211,12 +397,13 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
           </section>
 
           <section className={s.card}>
-            <h2 className={s.h2}>Find a booking</h2>
+            <h2 className={s.h2}>Find your bookings</h2>
             <div className={s.lookupRow}>
-              <input className={s.input} value={refText} onChange={e => setRefText(e.target.value.toUpperCase())} placeholder="Reference, e.g. TC-7KQ3X9" onKeyDown={e => { if (e.key === 'Enter') void findRef() }} />
-              <button type="button" className={s.ghost} onClick={() => void findRef()}>Open</button>
+              <input className={s.input} value={findQ} onChange={e => { setFindQ(e.target.value); setFound(null) }} placeholder="Your name, customer, phone or reference" onKeyDown={e => { if (e.key === 'Enter') find() }} />
+              <button type="button" className={s.ghost} onClick={find}>Search</button>
             </div>
             {refError && <span className={s.err}>{refError}</span>}
+            {found && (found.length ? <div className={s.cards}>{found.map(card)}</div> : <p className={s.muted}>No booking found for “{findQ.trim()}”.</p>)}
           </section>
 
           <section className={s.card}>
