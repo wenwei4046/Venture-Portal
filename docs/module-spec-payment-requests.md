@@ -186,8 +186,11 @@ the bells' kinds and taps are one change. The Claim page shows a rejected reques
   `createMultiLineInvoice` would make — draft, the requester's department's mode, the company (`subsidiary`) or the
   department (`dept_pool`), one line credited to the account the request's lines carry on this voucher. A drafted
   invoice keeps its share's answer (void it in Invoice to answer again); a voided one counts as none.
-- *Auto-combine is strict:* Create PV takes every request of the same payee into the same account with no PV yet; one
-  of them with a share unanswered stops it, said in the drawer.
+- *Auto-combine takes the answered ones* (the user, 2026-10-29: "可以"): Create PV takes the request picked and every
+  request of the same payee into the same account with no PV yet whose Bill back? is answered; one still to be answered
+  stays with Finance for a PV of its own, said in a line as the window opens. The request picked asks its own answer first.
+- *Each item is its Description* (the user: "确定他们放的那个是description"): the New request window heads its items
+  Description · Amount (RM), and each becomes the words of its line on the PV.
 - *The rows:* HR's sidebar › Admin › **Claim** above the rooms; Finance's account menu › **Account** › Claim (the
   phone app's Profile lists Admin only, so no half-made screen there); both only for a login of one's own and never
   while viewing as. The Department view's and Marketing's rows say Claim. Finance AM holds no claims cells — left to
@@ -202,7 +205,7 @@ Later PRs are detailed here when they start.
 
 PR ②:
 
-- Two requests of one payee, one with a split unanswered → Create PV on the other is stopped, the unanswered one named.
+- Two requests of one payee, one with a split unanswered → Create PV on the other pays it alone; the unanswered one stays, named.
 - Create PV with a Yes share on a day the month is closed → nothing tied, nothing drafted, the voucher voided again.
 - A request's PV voided, then made again → its drafted invoice is the one kept (no second invoice number).
 - A shared login (finance@, hr@) → no Claim row in the HR or Finance view; a New request from it says HR must link it.

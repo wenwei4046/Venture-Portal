@@ -273,4 +273,30 @@ describe('a staff request', () => {
     expect(pv).toHaveTextContent('From the request')
     expect(within(pv).getByLabelText('Notes')).toHaveValue('From Payment request · PRQ-2610-0002, PRQ-2610-0003')
   })
+
+  // 2026-10-29 — the user ("可以"): one of the same person's requests still waiting for its Bill back? answer stays with
+  // Finance for a PV of its own; the answered ones go in.
+  it('Create PV leaves out the same person’s request whose Bill back? is not answered — said, never stopped', async () => {
+    const waiting = staff({ id: '77777777-7777-4777-8777-777777777777', requestNo: 'PRQ-2610-0005', description: 'Canva', total: 300,
+      submittedAt: '2026-10-29T04:00:00Z', items: [{ id: 'i7', description: 'Canva', amount: 300 }],
+      shares: [{ id: '88888888-8888-4888-8888-888888888888', party: 'company', companyId: 'dc', companyName: 'Dream Crafter', amount: 100, billBack: null }] })
+    mocks.forPv.mockResolvedValue({ ok: true, requests: [staff()] })
+    mocks.openCreate.mockResolvedValue({ ok: false, reason: 'not read in this test' })
+    await draw(withStaff(staff(), waiting))
+    fireEvent.contextMenu(screen.getByText('Claude · Oct'))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Create PV' }))
+    })
+    expect(mocks.forPv).toHaveBeenCalledWith(['33333333-3333-4333-8333-333333333333'])
+    expect(screen.getByRole('dialog', { name: 'Create PV' })).toBeInTheDocument()
+    expect(mocks.flash).toHaveBeenCalledWith('PRQ-2610-0005 stays with Finance — Bill back? not answered yet')
+    // The unanswered one itself asks for its answer first.
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.contextMenu(screen.getByText('Canva'))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Create PV' }))
+    })
+    expect(mocks.forPv).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('dialog', { name: /KHO WEI JIE · Canva/ })).toHaveTextContent('Answer Bill back? for PRQ-2610-0005 first.')
+  })
 })

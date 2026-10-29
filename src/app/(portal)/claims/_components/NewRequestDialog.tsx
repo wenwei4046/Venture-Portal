@@ -232,6 +232,12 @@ export default function NewRequestDialog({
             {/* ── 2. What was it for? ── */}
             <div className={df.typeLabel}>2 · What was it for?</div>
             <div className={`${fm.lines} ${c.part}`}>
+              {/* Each item's words are its Description — the PV line's words when Finance pays it (the user: "确定他们放的那个是description"). */}
+              <div className={c.itemsHead} aria-hidden="true">
+                <span>Description</span>
+                <span>Amount (RM)</span>
+                <span />
+              </div>
               {draft.items.map((it, i) => (
                 <div key={i} className={fm.lineWrap}>
                   <div className={fm.lineRow} data-shape="item">
@@ -239,9 +245,9 @@ export default function NewRequestDialog({
                       className={fm.lineText}
                       value={it.description}
                       onChange={(e) => setItem(i, { description: e.target.value })}
-                      placeholder="What it was — e.g. Canva team plan · Oct"
+                      placeholder="e.g. Canva team plan · Oct"
                       maxLength={PR_LIMITS.words}
-                      aria-label={`Item ${i + 1}`}
+                      aria-label={`Item ${i + 1} description`}
                     />
                     <input
                       className={fm.lineAmount}

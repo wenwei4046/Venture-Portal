@@ -481,6 +481,22 @@ export function samePayeeOpen(rows: readonly PaymentRequest[], r: PaymentRequest
   return rows.filter((x) => x.status === 'with_finance' && !x.pvId && payeeKey(x) === key)
 }
 
+/** Every share's Bill back? answered — or no share at all. */
+export const billBackAnswered = (r: PaymentRequest) => r.shares.every((s) => s.billBack !== null)
+
+/**
+ * What one Create PV takes: the request picked and the same person's open requests whose Bill back? is answered. One
+ * still to be answered stays with Finance for a PV of its own (the user, 2026-10-29: "可以" — rather than stopping the
+ * whole PV for it).
+ */
+export function pvTogether(rows: readonly PaymentRequest[], r: PaymentRequest): { together: PaymentRequest[]; left: PaymentRequest[] } {
+  const open = samePayeeOpen(rows, r)
+  return {
+    together: open.filter((x) => x.id === r.id || billBackAnswered(x)),
+    left: open.filter((x) => x.id !== r.id && !billBackAnswered(x)),
+  }
+}
+
 /** A line of the PV a request starts: its item's words, the requester's department's pool, the amount — the category Finance's. */
 export interface RequestLine {
   requestId: string

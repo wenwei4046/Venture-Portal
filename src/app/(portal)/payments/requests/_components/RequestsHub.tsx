@@ -9,7 +9,7 @@ import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { fd } from '@/components/finv/DrawerParts'
 import type { PayrollRequestLine } from '@/lib/fin-app/payroll-requests-model'
 import { f2, rm } from '@/lib/fin-app/page-model'
-import { samePayeeOpen, voucherStart, type PaymentRequest, type RequestVoucherStart } from '@/lib/payment-requests/model'
+import { billBackAnswered, pvTogether, voucherStart, type RequestVoucherStart } from '@/lib/payment-requests/model'
 import { VoucherDrawer } from '../../_components/VoucherDrawer'
 import CreatePaymentDialog from '../../_components/CreatePaymentDialog'
 import { createPaymentForRequests } from '../../actions'
@@ -77,18 +77,18 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
   const active = cards.find((c) => c.key === card) ?? cards[0]
   const openRow = data.rows.find((r) => r.key === open) ?? null
 
-  // The same person's requests with no PV yet go into one PV, until Finance makes it (the user: "自动合成认的是我有没有开pv").
+  // The same person's requests with no PV yet go into one PV, until Finance makes it (the user: "自动合成认的是我有没有开pv")
+  // — those whose Bill back? is answered; one still to be answered stays with Finance for a PV of its own.
   const staffRequests = useMemo(() => data.rows.flatMap((r) => (r.request ? [r.request] : [])), [data.rows])
   const createRequestPv = async (r: PaymentRequestRow) => {
     if (!r.request) return
     setPvError(null)
-    const together: PaymentRequest[] = samePayeeOpen(staffRequests, r.request)
-    const unanswered = together.find((x) => x.shares.some((s) => s.billBack === null))
-    if (unanswered) {
-      setOpen(`request:${unanswered.id}`)
-      setPvError(`Answer Bill back? for ${unanswered.requestNo ?? 'its request'} first — it goes into the same PV.`)
+    if (!billBackAnswered(r.request)) {
+      setOpen(r.key)
+      setPvError(`Answer Bill back? for ${r.request.requestNo ?? 'this request'} first.`)
       return
     }
+    const { together, left } = pvTogether(staffRequests, r.request)
     try {
       const res = await openRequestsForPv(together.map((x) => x.id))
       if (!res.ok) {
@@ -97,6 +97,10 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
       }
       setPv({ key: res.requests.map((x) => x.id).join(','), start: voucherStart(res.requests) })
       setPvOpen(true)
+      if (left.length > 0) {
+        const nos = left.map((x) => x.requestNo ?? 'a request').join(', ')
+        flash(`${nos} ${left.length === 1 ? 'stays' : 'stay'} with Finance — Bill back? not answered yet`)
+      }
     } catch {
       setOpen(r.key)
       setPvError('The requests could not be read. Try again.')

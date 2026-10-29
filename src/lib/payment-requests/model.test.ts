@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  billBackAnswered,
   billBackCategories,
   canCancel,
   canEdit,
@@ -13,6 +14,7 @@ import {
   prContentType,
   prFileRefusal,
   prObjectPath,
+  pvTogether,
   samePayeeOpen,
   staffCards,
   staffHero,
@@ -152,6 +154,15 @@ describe('Create PV', () => {
     const other = req({ id: 'r3', payeeAccount: '•••• 0210' })
     const paid = req({ id: 'r4', status: 'in_pv', pvId: 'v' })
     expect(samePayeeOpen([a, b, other, paid], b).map((r) => r.id)).toEqual(['r1', 'r2'])
+  })
+
+  it('takes the answered ones; one whose Bill back? is still to answer stays with Finance (2026-10-29, "可以")', () => {
+    const picked = req()
+    const answered = req({ id: 'r2', shares: [{ id: 's2', party: 'company', companyId: 'dc', amount: 10, billBack: false }] })
+    const waiting = req({ id: 'r3', shares: [{ id: 's3', party: 'company', companyId: 'dc', amount: 10, billBack: null }] })
+    const { together, left } = pvTogether([picked, answered, waiting], picked)
+    expect([together.map((r) => r.id), left.map((r) => r.id)]).toEqual([['r1', 'r2'], ['r3']])
+    expect([billBackAnswered(waiting), billBackAnswered(picked)]).toEqual([false, true])
   })
 
   it('starts the voucher from them: a line per item on the department’s pool, the account under Pay to, the notes, the files, the Yes shares', () => {

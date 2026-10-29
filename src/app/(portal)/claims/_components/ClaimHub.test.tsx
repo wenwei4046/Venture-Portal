@@ -100,7 +100,7 @@ describe('the drawer', () => {
       fireEvent.click(within(drawer).getByRole('button', { name: 'Fix and send again' }))
     })
     expect(window_()).toHaveTextContent('Sent back by Finance Manager')
-    expect(within(window_()).getByLabelText('Item 1')).toHaveValue('Canva')
+    expect(within(window_()).getByLabelText('Item 1 description')).toHaveValue('Canva')
   })
 
   it('Cancel request asks first', async () => {
@@ -138,6 +138,10 @@ describe('New request', () => {
     expect(within(w).getByRole('radio', { name: /My salary account/ })).toHaveAccessibleName(/Hong Leong Bank •••• 4821/)
     expect(within(w).getByText('2 · What was it for?')).toBeInTheDocument()
     expect(within(w).getByText('3 · Which pool pays?')).toBeInTheDocument()
+    // Each item is its Description and its amount (the user: "确定他们放的那个是description").
+    expect(within(w).getByText('Description')).toBeInTheDocument()
+    expect(within(w).getByText('Amount (RM)')).toBeInTheDocument()
+    expect(within(w).getByLabelText('Item 1 description')).toHaveAttribute('placeholder', 'e.g. Canva team plan · Oct')
   })
 
   it('a claim, whole: its items, a receipt gone up, the department’s pool — Submit sends it', async () => {
@@ -146,7 +150,7 @@ describe('New request', () => {
     const w = await open()
     fireEvent.click(within(w).getByRole('radio', { name: /I paid — pay me back/ }))
     fireEvent.click(within(w).getByRole('radio', { name: /My salary account/ }))
-    fireEvent.change(within(w).getByLabelText('Item 1'), { target: { value: 'Claude · Oct' } })
+    fireEvent.change(within(w).getByLabelText('Item 1 description'), { target: { value: 'Claude · Oct' } })
     fireEvent.change(within(w).getByLabelText('Item 1 amount'), { target: { value: '453.79' } })
     expect(w).toHaveTextContent('Add the receipts or invoices and which pool pays.')
     const input = w.querySelector('input[type="file"]') as HTMLInputElement
@@ -182,7 +186,7 @@ describe('New request', () => {
     mocks.save.mockResolvedValue({ ok: true, data: DRAFT })
     const w = await open()
     fireEvent.click(within(w).getByRole('radio', { name: /I paid — pay me back/ }))
-    fireEvent.change(within(w).getByLabelText('Item 1'), { target: { value: 'Jian Ying' } })
+    fireEvent.change(within(w).getByLabelText('Item 1 description'), { target: { value: 'Jian Ying' } })
     await act(async () => {
       fireEvent.click(within(w).getByRole('button', { name: 'Save as draft' }))
     })
