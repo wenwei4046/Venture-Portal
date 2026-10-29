@@ -28,6 +28,23 @@ export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
 export const ALL = METRICS.flatMap(g => g[2]);
 
 /** Column order's drag: the row held (`from`, as the state has it now) moved to where the pointer is; null when it is there already. */
+/**
+ * A drag passes a row or chip only once the pointer is past its middle, in the way it is moving (the owner, 2026-10-29: "无法
+ * 拉动/根本不灵敏"): two neighbours of different sizes swapped back and forth under a pointer that sat over both.
+ */
+export function pastMiddle(from: number | null | undefined, to: number, e: { clientX?: number; clientY?: number; currentTarget?: unknown }, axis: "x" | "y"): boolean {
+  if (from == null || from === to) return false;
+  const el = e.currentTarget as { getBoundingClientRect?: () => { left: number; top: number; width: number; height: number } } | undefined;
+  const r = el?.getBoundingClientRect?.(), at = axis === "x" ? e.clientX : e.clientY;
+  if (!r || at == null || (!r.width && !r.height)) return true;
+  const mid = axis === "x" ? r.left + r.width / 2 : r.top + r.height / 2;
+  return to > from ? at >= mid : at <= mid;
+}
+/**
+ * What a drag's start changes on screen waits a moment (2026-10-29): Chrome drops a drag whose element is redrawn inside its
+ * own dragstart, which is why the metrics would not move at all.
+ */
+export const afterDragStart = (run: () => void) => { setTimeout(run, 0); };
 export function moveHeld(list: string[], from: number | null | undefined, to: number): string[] | null {
   if (from == null || from === to || from < 0 || from >= list.length) return null;
   const c = [...list]; const [x] = c.splice(from, 1); c.splice(to, 0, x); return c;
@@ -288,8 +305,8 @@ export function adsPerfVM(ctx: DeskCtx) {
         // The row held is read from the state itself, not this render's copy: a drag's dragover events come faster than the
         // list redraws, and a stale index swapped the row straight back (the owner, 2026-10-27: "拉住无法调整"). setData:
         // Firefox starts no drag without it.
-        dStart: (e: { dataTransfer: DataTransfer }) => { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(i)); } catch { /* not every browser lets it */ } patch({ mDrag: i }); },
-        dOver: (e: { preventDefault(): void; dataTransfer?: DataTransfer }) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "move"; set(u => { const c = moveHeld((u.mDraft ?? baseOf(u)).filter(k => ALL.some(x => x[0] === k)), u.mDrag, i); return c ? { ...u, mDraft: c, mDrag: i } : u; }); },
+        dStart: (e: { dataTransfer: DataTransfer }) => { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(i)); } catch { /* not every browser lets it */ } afterDragStart(() => patch({ mDrag: i })); },
+        dOver: (e: { preventDefault(): void; dataTransfer?: DataTransfer; clientY?: number; currentTarget?: unknown }) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "move"; set(u => { if (!pastMiddle(u.mDrag, i, e, "y")) return u; const c = moveHeld((u.mDraft ?? baseOf(u)).filter(k => ALL.some(x => x[0] === k)), u.mDrag, i); return c ? { ...u, mDraft: c, mDrag: i } : u; }); },
         dDrop: (e: { preventDefault(): void }) => { e.preventDefault(); patch({ mDrag: null }); }, dEnd: () => patch({ mDrag: null }) }; }),
     mOrdOpen: !ui.mFold.__order, mOrdRot: ui.mFold.__order ? -90 : 0, mOrdFold: () => set(u => ({ ...u, mFold: { ...u.mFold, __order: !u.mFold.__order } })),
     syncedNote: "Not connected to Meta Ads yet",

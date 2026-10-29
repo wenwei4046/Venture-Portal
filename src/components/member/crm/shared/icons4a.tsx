@@ -43,6 +43,9 @@ export const ICONS_4A = {
   "images": "<path d=\"M18 22H4a2 2 0 0 1-2-2V6\"></path> <path d=\"m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18\"></path> <circle cx=\"12\" cy=\"8\" r=\"2\"></circle> <rect width=\"16\" height=\"16\" x=\"6\" y=\"2\" rx=\"2\"></rect>",
   "inbox": "<polyline points=\"22 12 16 12 14 15 10 15 8 12 2 12\"></polyline> <path d=\"M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z\"></path>",
   "info": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle> <path d=\"M12 16v-4\"></path> <path d=\"M12 8h.01\"></path>",
+  // lucide arrow-left / arrow-right: a showroom moved in the list (2026-10-29).
+  "arrow-left": "<path d=\"m12 19-7-7 7-7\"></path> <path d=\"M19 12H5\"></path>",
+  "arrow-right": "<path d=\"M5 12h14\"></path> <path d=\"m12 5 7 7-7 7\"></path>",
   // lucide key-round: the unit’s key handed over with a photo (2026-10-28).
   "key-round": "<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\"></path> <circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\"></circle>",
   "keyboard": "<path d=\"M10 8h.01\"></path> <path d=\"M12 12h.01\"></path> <path d=\"M14 8h.01\"></path> <path d=\"M16 12h.01\"></path> <path d=\"M18 8h.01\"></path> <path d=\"M6 8h.01\"></path> <path d=\"M7 16h10\"></path> <path d=\"M8 12h.01\"></path> <rect width=\"20\" height=\"16\" x=\"2\" y=\"4\" rx=\"2\"></rect>",

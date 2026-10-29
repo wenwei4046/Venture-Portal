@@ -11,7 +11,7 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adPageInSource, BRAND_LABEL, brandOf, SOURCE_PICKS, sourceLabel, sourceOf, type SourcePick } from "@/lib/member/crm-source";
 import { fetchAdInsights, fetchAdThumbs } from "@/app/(member)/member/crm-actions";
-import { ALL, METRICS, metaFigures, moveHeld } from "./vm/adsperf";
+import { afterDragStart, ALL, METRICS, metaFigures, moveHeld, pastMiddle } from "./vm/adsperf";
 import { chartFmt, chartFmtOf, isoOf } from "./vm/adschart";
 import {
   changeOf, crmFigures, leadsByRep, loadReports, periodRanges, PERIODS, propertyRanking, questionTopics, REPORT_METRICS,
@@ -25,11 +25,15 @@ export interface WorkspaceIn {
   nameOf: (id: string | null | undefined) => string;
   now: Date;
   live: boolean;
+  /** The teams, for Who the leads went to's team picker (the owner, 2026-10-29: "可以选team"). */
+  teams?: { id: string; name: string; people: string[] }[];
 }
 
 const BTN: CSSProperties = { border: 0, background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left", margin: 0, padding: 0, boxSizing: "border-box" };
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const CARD: CSSProperties = { background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "12px", padding: "16px 18px", boxSizing: "border-box" };
+// Each ad's name stays in sight while its figures scroll sideways (the owner, 2026-10-29: "广告名字固定").
+const PIN: CSSProperties = { position: "sticky", left: 0, zIndex: 1, background: "#fff", boxShadow: "8px 0 8px -8px rgba(42,22,12,.18)" };
 const DATE: CSSProperties = { height: "30px", borderRadius: "8px", border: "1px solid var(--crm-line)", padding: "0 8px", font: "500 12.5px Inter, sans-serif", background: "#fff", color: "var(--crm-ink)" };
 const META = new Set(["spend", "dbudget", "cpl", "cpappt", "cpwon", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm"]);
 const defOf = (k: string) => ALL.find(m => m[0] === k);
@@ -50,9 +54,9 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
   // A metric dragged to another place (the owner, 2026-10-27: "metrics 可以拉动"): the held one is read from the ref at the
   // moment of each move, never a render's copy — dragover comes faster than the chips redraw (as Ads Performance's moveHeld).
   const held = useRef<number | null>(null), [dragging, setDragging] = useState<string | null>(null);
-  const dragTo = (i: number) => {
+  const dragTo = (i: number, e: { clientX?: number; currentTarget?: unknown }) => {
     const from = held.current;
-    if (from == null || from === i) return;
+    if (from == null || from === i || !pastMiddle(from, i, e, "x")) return;
     held.current = i;
     setReports(list => { const next = list.map(r => (r.id !== rep.id ? r : { ...r, metrics: moveHeld(r.metrics, from, i) ?? r.metrics })); saveReports(next); return next; });
   };
@@ -108,7 +112,10 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
     const c = crmFigures(cs, w.visits, r); return { ...c, ...metaFigures(adIds.map(i => fig[i]), c) } as Record<string, number | null | undefined>;
   };
   const tot = figsOf(leads, cur, ids, figA), totB = figsOf(leadsPrev, prev, ids, figB);
-  const reps = leadsByRep(leads, w.visits, w.nameOf);
+  // Who the leads went to, for one team or all (2026-10-29): a lead is the team's when it was dealt to it or is held by one of its people.
+  const [repTeam, setRepTeam] = useState("all");
+  const team = w.teams?.find(t => t.id === repTeam);
+  const reps = leadsByRep(team ? leads.filter(c => c.teamId === team.id || (!!c.assignedTo && team.people.includes(c.assignedTo))) : leads, w.visits, w.nameOf);
   const props = propertyRanking(leads);
   const questions = questionTopics(leads, cur);
   const title = `${rep.name} · ${sourceLabel(src)} · ${rangeText(cur)}`;
@@ -186,8 +193,8 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
                 <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                   {rep.metrics.map((k, i) => (
                     <span key={k} draggable title="Drag to reorder"
-                      onDragStart={e => { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", k); } catch { /* not every browser lets it */ } held.current = i; setDragging(k); }}
-                      onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; dragTo(i); }}
+                      onDragStart={e => { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", k); } catch { /* not every browser lets it */ } held.current = i; afterDragStart(() => setDragging(k)); }}
+                      onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; dragTo(i, e); }}
                       onDrop={e => e.preventDefault()} onDragEnd={() => { held.current = null; setDragging(null); }}
                       style={{ ...chip(true), display: "inline-flex", alignItems: "center", gap: "6px", cursor: "grab", opacity: dragging === k ? 0.45 : 1, userSelect: "none" }}>
                       <svg width="10" height="12" viewBox="0 0 10 12" aria-hidden="true" style={{ opacity: 0.6 }}><g fill="currentColor"><circle cx="2.5" cy="2" r="1.1" /><circle cx="7.5" cy="2" r="1.1" /><circle cx="2.5" cy="6" r="1.1" /><circle cx="7.5" cy="6" r="1.1" /><circle cx="2.5" cy="10" r="1.1" /><circle cx="7.5" cy="10" r="1.1" /></g></svg>
@@ -230,10 +237,10 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
               {!ads.length ? <span style={{ color: "var(--crm-faint)" }}>No ad brought a lead in this period.</span> : (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                    <thead><tr><th style={{ ...th, textAlign: "left" }}>Ad</th>{rep.metrics.map(k => <th key={k} style={th}>{labelOf(k)}</th>)}<th style={{ ...th, textAlign: "left" }}>Assigned to</th></tr></thead>
+                    <thead><tr><th style={{ ...th, textAlign: "left", ...PIN }}>Ad</th>{rep.metrics.map(k => <th key={k} style={th}>{labelOf(k)}</th>)}<th style={{ ...th, textAlign: "left" }}>Assigned to</th></tr></thead>
                     <tbody>{ads.map(a => { const f = figsOf(a.cur, cur, [a.id], figA), fb = figsOf(a.prev, prev, [a.id], figB); return (
                       <tr key={a.id}>
-                        <td style={{ ...td, textAlign: "left", whiteSpace: "normal", minWidth: "200px" }}>{a.name}{a.brand && <span style={{ display: "block", fontSize: "11.5px", color: "var(--crm-muted)" }}>{a.brand}</span>}</td>
+                        <td style={{ ...td, textAlign: "left", whiteSpace: "normal", minWidth: "200px", ...PIN }}>{a.name}{a.brand && <span style={{ display: "block", fontSize: "11.5px", color: "var(--crm-muted)" }}>{a.brand}</span>}</td>
                         {rep.metrics.map(k => { const d = changeOf(k, f[k], fb[k]); return <td key={k} style={td}>{show(k, f[k])}{d && <span style={{ display: "block", fontSize: "10.5px", fontWeight: 600, color: d.good ? "var(--crm-today)" : "var(--crm-oxblood)" }}>{d.t}</span>}</td>; })}
                         <td style={{ ...td, textAlign: "left", whiteSpace: "normal", minWidth: "180px", fontSize: "12px", color: "var(--crm-muted)" }}>{repsOfAd(a.cur, w.nameOf) || "—"}</td>
                       </tr>); })}</tbody>
@@ -266,7 +273,15 @@ export function DeskWorkspace({ w }: { w: WorkspaceIn }) {
 
           {on("reps") && (
             <div style={CARD}>
-              <h2 style={h2}>Who the leads went to</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+                <h2 style={{ ...h2, margin: 0 }}>Who the leads went to</h2>
+                {!!w.teams?.length && (
+                  <select value={repTeam} onChange={e => setRepTeam(e.target.value)} aria-label="Team" style={{ marginLeft: "auto", height: "30px", borderRadius: "8px", border: "1px solid var(--crm-line)", padding: "0 8px", font: "500 12.5px Inter, sans-serif", background: "#fff", color: "var(--crm-ink)" }}>
+                    <option value="all">All teams</option>
+                    {w.teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                )}
+              </div>
               {!reps.length ? <span style={{ color: "var(--crm-faint)" }}>No leads in this period.</span> : (
                 <table style={{ borderCollapse: "collapse", width: "100%" }}>
                   <thead><tr><th style={{ ...th, textAlign: "left" }}>Salesperson</th><th style={th}>Leads</th><th style={th}>Appointments</th><th style={th}>Showed up</th></tr></thead>

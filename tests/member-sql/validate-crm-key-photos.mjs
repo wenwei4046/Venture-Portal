@@ -58,7 +58,7 @@ const as = async (who, sql, params = []) => {
 }
 // The files' table (mig 20261023150000) — only what the check reads.
 await db.exec(`create table public.file_objects (bucket_id text not null, name text not null, primary key (bucket_id, name))`)
-for (const m of ['20261028130000_crm_key_photos.sql', '20261028130100_crm_key_photos_required.sql']) await db.exec((await readFile(new URL(m, dir), 'utf8')).replace(/\r\n/g, '\n'))
+for (const m of ['20261028130000_crm_key_photos.sql', '20261028130100_crm_key_photos_required.sql', '20261029100000_crm_showroom_keys_order.sql']) await db.exec((await readFile(new URL(m, dir), 'utf8')).replace(/\r\n/g, '\n'))
 
 const contact = (await q(`insert into crm_contacts (channel, account_id, external_id, name, assigned_to, status) values ('whatsapp', 'PN1', 'key-1', 'Key', $1, 'appointment') returning id`, [id('s', 'ann')]))[0].id
 const visit = async () => (await q(`insert into crm_appointments (contact_id, showroom, start_at, minutes, state) values ($1, 'kl', now(), 60, 'booked') returning id`, [contact]))[0].id
@@ -67,6 +67,13 @@ const outcome = (who, v, came, o = 'follow_up') => as(who, `select public.crm_vi
 const key = (who, v, kind, path) => as(who, `select public.crm_set_key_photo($1, $2, $3)`, [v, kind, path])
 
 // Every Show up needs the key returned.
+// A showroom that hands no key over (the default since 20261029100000) marks visits as before.
+const v0 = await visit()
+await outcome('ann', v0, true)
+check((await q(`select state from crm_appointments where id = $1`, [v0]))[0].state, 'attended', 'a showroom with no key handover: Show up with no photo')
+await assert.rejects(as('ann', `select public.crm_set_showroom_keys('kl', true)`), /./, 'only CRM · Manage switches a showroom'); checks++
+await as('boss', `select public.crm_set_showroom_keys('kl', true)`)
+check((await q(`select key_handover from crm_showrooms where id = 'kl'`))[0].key_handover, true, 'the Principal switches the key handover on')
 const v1 = await visit()
 await assert.rejects(outcome('ann', v1, true), /key returned first/, 'Show up without the key returned is refused'); checks++
 await assert.rejects(key('ann', v1, 'out', `${contact}/never-uploaded.jpg`), /did not arrive/, 'a photo that never arrived is refused'); checks++
@@ -95,4 +102,10 @@ check((await q(`select state from crm_appointments where id = $1`, [v3]))[0].sta
 
 const acl = (await q(`select proacl::text as acl from pg_proc where proname = 'crm_set_key_photo'`))[0].acl
 check([/(^|[{,])anon=/.test(acl), /(^|[{,])=X/.test(acl), /authenticated=X/.test(acl)], [false, false, true], 'crm_set_key_photo: signed-in sessions only')
+
+// The order: sort_order by position, CRM · Manage only.
+await q(`insert into crm_showrooms (id, name, active, sort_order) values ('pj', 'PJ', true, 5) on conflict (id) do nothing`)
+await assert.rejects(as('ann', `select public.crm_set_showroom_order(array['pj', 'kl'])`), /./, 'only CRM · Manage orders the showrooms'); checks++
+await as('boss', `select public.crm_set_showroom_order(array['pj', 'kl'])`)
+check((await q(`select id from crm_showrooms where id in ('pj', 'kl') order by sort_order`)).map(r => r.id), ['pj', 'kl'], 'the showrooms in the order given')
 console.log(`validate-crm-key-photos: ${checks} checks passed`)

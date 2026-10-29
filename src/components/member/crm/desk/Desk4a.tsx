@@ -8,6 +8,7 @@
 import { DeskApptTypes } from "./DeskApptTypes";
 import type { apptTypesVM } from "./vm/appt-types";
 import { Fragment, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { boldRuns, wrapBold } from "../shared/bold-text";
 import { Ic, type Icon4a } from "../shared/icons4a";
 import { usePanelOpenOn } from "./panel-state";
 import { DeskAdsChart, FoldHead, type AdsChartBits } from "./DeskAdsChart";
@@ -245,12 +246,23 @@ interface InsightBits {
   teams4: { name: string; sub: string; leads: string; appt: string; apptW: string; show: string; won: string; lost: string; dot: string; person: boolean; open: boolean; pick: () => void }[];
   status4: { label: string; n: number; color: string; text: string; pct: string; open: () => void }[];
   statusTotal: number;
+  /** All · The Conts · DC over the page (2026-10-29). */
+  src4?: { label: string; on: boolean; pick: () => void }[];
 }
 const T_COLS = "minmax(0,2.2fr) minmax(0,0.7fr) minmax(0,1.5fr) repeat(3,minmax(0,0.8fr))";
 
 /** Frame 01 · Insight: the cream hero of six figures, Team performance (a team opens to its people) and Leads by status. */
 export function DeskInsight4a({ v }: { v: InsightBits }) {
   return (<>
+    {v.src4 && (
+      <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+        <span style={{ font: "500 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Brand</span>
+        <div role="group" aria-label="Brand" style={{ height: "32px", padding: "3px", boxSizing: "border-box", borderRadius: "8px", background: "var(--crm-field)", display: "flex", gap: "2px", font: "500 12px Inter, sans-serif" }}>
+          {v.src4.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={{ ...BTN, padding: "0 12px", borderRadius: "6px", font: "inherit", whiteSpace: "nowrap",
+            background: o.on ? "#fff" : "transparent", boxShadow: o.on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: o.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{o.label}</button>)}
+        </div>
+      </div>
+    )}
     <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(6,minmax(0,1fr))", padding: "26px 0", borderRadius: "12px", background: "var(--crm-sum)", border: "1px solid var(--crm-sum-line)" }}>
       {v.metrics4.map(m => (
         <button key={m.label} type="button" onClick={m.open} style={{ ...BTN, display: "flex", flexDirection: "column", gap: "10px", padding: "0 18px", minWidth: 0,
@@ -668,8 +680,9 @@ export function DeskContacts4a({ v, pager }: { v: ContactsBits; pager: ReactNode
                 </span>
               </span>
               {d.cells.map((x, j) => (
-                // v2 (frame 03): pills 24 px; Ad and Visit in ink-soft, Assigned to in ink, Added right-aligned muted.
-                <span key={j} style={{ minWidth: 0, display: "flex", overflow: "hidden", justifyContent: v.ppKeys[j] === "first" ? "flex-end" : undefined }}>
+                // v2 (frame 03): pills 24 px; Ad and Visit in ink-soft, Assigned to in ink, Added muted. Every column on the left, under
+                // its head (the owner, 2026-10-29: "统一靠左边" — Added sat right, under Last chat's head).
+                <span key={j} style={{ minWidth: 0, display: "flex", overflow: "hidden" }}>
                   {x.pill ? <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "24px", padding: "0 9px", borderRadius: "12px", background: x.bg, color: x.fg, font: "500 12px Inter, sans-serif", whiteSpace: "nowrap" }}>
                     {x.dot && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: x.dot }} />}{x.v}</span>
                     : <span style={{ font: "400 13px Inter, sans-serif", color: x.v === "—" ? "var(--crm-faint-2)" : v.ppKeys[j] === "sp" ? "var(--crm-ink)" : v.ppKeys[j] === "first" ? "var(--crm-muted)" : "var(--crm-ink-soft)",
@@ -1200,13 +1213,16 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
     );
   };
   const C = v.apChartV;
+  // The ad's column stays put while the figures scroll sideways under it (the owner, 2026-10-29: "往右拉动时，广告名称栏位是
+  // freeze 的"): sticky at the scroller's left, over the row's own padding, on the row's colour.
+  const pin = (bg: string): CSSProperties => ({ position: "sticky", left: 0, zIndex: 1, marginLeft: "-12px", paddingLeft: "12px", alignSelf: "stretch", alignItems: "center", background: bg, boxShadow: "8px 0 8px -8px rgba(42,22,12,.18)" });
   // The header band and every row run the whole width of the columns however many metrics are added (the owner,
   // 2026-10-23: "要 full cover 不管加多少指标") — the rows sit in a max-content box inside the sideways scroller.
   const table = (
     <div style={{ overflowX: "auto", minWidth: 0 }}><div style={{ display: "flex", flexDirection: "column", width: "max-content", minWidth: "100%" }}>
       <div style={{ display: "grid", gridTemplateColumns: grid, gap: "14px", alignItems: "center", padding: "9px 12px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-ink)", borderBottom: "1px solid var(--crm-nav-line)",
         font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
-        <span style={{ position: "relative", minWidth: 0, display: "flex" }}><button type="button" onClick={v.apSortName} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit" }}>Ad{v.apNameArrow === "▲" ? " ↑" : v.apNameArrow === "▼" ? " ↓" : ""}</button><Resize id="ad" /></span>
+        <span style={{ ...pin("var(--crm-cream-nav)"), minWidth: 0, display: "flex", zIndex: 2 }}><button type="button" onClick={v.apSortName} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit" }}>Ad{v.apNameArrow === "▲" ? " ↑" : v.apNameArrow === "▼" ? " ↓" : ""}</button><Resize id="ad" /></span>
         {A.cols.map(c => <span key={c.id} style={{ position: "relative", minWidth: 0, display: "flex", justifyContent: "flex-end" }}><button type="button" onClick={c.sort} style={{ ...BTN, font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", textAlign: "right", lineHeight: 1.25 }}>{c.label}{c.arrow ? ` ${c.arrow}` : ""}</button><Resize id={c.id} /></span>)}
         {/* The + stays in sight at the right however many columns there are (the owner, 2026-10-24: "+號…應該一直都在"). */}
         <button type="button" onClick={v.openMetrics} title="Add columns" style={{ ...BTN, justifySelf: "end", position: "sticky", right: "0", zIndex: 1, width: "24px", height: "24px", borderRadius: "6px", display: "grid", placeItems: "center", border: "1px dashed var(--crm-rust)", background: "var(--crm-cream-nav)", boxShadow: "-10px 0 8px var(--crm-cream-nav)", color: "var(--crm-rust)" }}><Ic name="plus" size={12} /></button>
@@ -1214,7 +1230,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
       {A.rows.map((r, i) => (
         <div key={i} style={{ display: "grid", gridTemplateColumns: grid, gap: "14px", alignItems: "center", height: "44px", padding: "0 12px", boxSizing: "border-box", borderBottom: "1px solid var(--crm-rule-soft)",
           font: "400 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }} className="crm4a-row">
-          <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+          <span style={{ ...pin("#fff"), display: "flex", gap: "10px", minWidth: 0 }}>
             <span style={{ display: "flex", color: r.ch === "whatsapp" ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={15} /></span>
             <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
               <AdName r={r} />
@@ -1227,7 +1243,7 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
       ))}
       <div style={{ display: "grid", gridTemplateColumns: grid, gap: "14px", alignItems: "center", minHeight: "44px", padding: "0 12px", borderTop: "1px solid var(--crm-ink)", marginTop: "-1px",
         font: "500 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>
-        <span>{A.total.label}</span>
+        <span style={{ ...pin("#fff"), display: "flex" }}>{A.total.label}</span>
         {A.total.cells.map((c, j) => <Cell key={j} c={c} id={A.cols[j].id} total />)}
         <span />
       </div>
@@ -1525,17 +1541,46 @@ function DayHours({ d }: { d: { l: string; open: boolean; f: string; t: string; 
     </div>
   );
 }
-/** Delete showroom (note 04): asked again; the database refuses it while visits are upcoming and says how many. */
+/** Delete showroom (note 04): a bin beside + (the owner, 2026-10-29: "delete showroom 可以变成垃圾桶放在+号的右边"), asked
+ * again under it; the database refuses it while visits are upcoming and says how many. */
 function DeleteRoom({ name, del }: { name: string; del: () => void }) {
   const [ask, setAsk] = useState(false);
-  return ask ? (
-    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "20px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
-      <span style={{ flex: 1, minWidth: 0 }}>Delete {name || "this showroom"}? Past visits keep its name.</span>
-      <button type="button" onClick={() => setAsk(false)} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "6px", border: "1px solid var(--crm-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }}>Cancel</button>
-      <button type="button" onClick={() => { setAsk(false); del(); }} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "6px", background: "var(--crm-oxblood)", color: "#fff", font: "500 12px Inter, sans-serif" }}>Delete</button>
+  return (
+    <span style={{ position: "relative", flex: "none" }}>
+      <button type="button" onClick={() => setAsk(a => !a)} title="Delete showroom" aria-label="Delete showroom" aria-expanded={ask} style={{ ...BTN, width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-oxblood)" }} className="crm4a-outline"><Ic name="trash-2" size={15} /></button>
+      {ask && (<>
+        <span onClick={() => setAsk(false)} style={{ position: "fixed", inset: 0, zIndex: 7 }} />
+        <span role="dialog" aria-label="Delete showroom" style={{ position: "absolute", top: "42px", right: 0, zIndex: 8, width: "260px", padding: "12px", borderRadius: "10px", background: "#fff", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "10px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>
+          <span>Delete {name || "this showroom"}? Past visits keep its name.</span>
+          <span style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+            <button type="button" onClick={() => setAsk(false)} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "6px", border: "1px solid var(--crm-line)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }}>Cancel</button>
+            <button type="button" onClick={() => { setAsk(false); del(); }} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "6px", background: "var(--crm-oxblood)", color: "#fff", font: "500 12px Inter, sans-serif" }}>Delete</button>
+          </span>
+        </span>
+      </>)}
+    </span>
+  );
+}
+
+/** Remarks with a B button (2026-10-29: "remarks 可以加粗体字"): the words picked go **bold** — drawn bold where sales see them. */
+function RemarksBox({ value, set }: { value: string; set: (e: { target: { value: string } }) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const bold = () => {
+    const el = ref.current; if (!el) return;
+    const w = wrapBold(value, el.selectionStart ?? value.length, el.selectionEnd ?? value.length);
+    set({ target: { value: w.value } });
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(w.start, w.end); });
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", borderRadius: "8px", border: "1px solid var(--crm-line)", background: "#fff", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 6px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+        <button type="button" onMouseDown={e => e.preventDefault()} onClick={bold} title="Bold the words picked" aria-label="Bold" style={{ ...BTN, width: "26px", height: "24px", borderRadius: "5px", display: "grid", placeItems: "center", font: "700 13px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-row">B</button>
+        <span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>Pick words, then B</span>
+      </div>
+      <textarea ref={ref} value={value} onChange={set} aria-label="Remarks" placeholder="Parking, which lift, what to show first…" rows={3} style={{ minHeight: "72px", padding: "10px 12px", border: 0, boxSizing: "border-box",
+        font: "400 13px/1.5 Inter, sans-serif", color: "var(--crm-ink-soft)", resize: "vertical", outline: "none", background: "#fff" }} />
+      {/\*\*[^*\n]+?\*\*/.test(value) && <div style={{ padding: "8px 12px", borderTop: "1px solid var(--crm-rule-soft)", font: "400 12.5px/1.5 Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", background: "var(--crm-sel)" }}>{boldRuns(value)}</div>}
     </div>
-  ) : (
-    <button type="button" onClick={() => setAsk(true)} style={{ ...BTN, display: "flex", alignItems: "center", gap: "8px", marginTop: "20px", paddingTop: "4px", font: "500 13px Inter, sans-serif", color: "var(--crm-oxblood)" }}><Ic name="trash-2" size={14} />Delete showroom</button>
   );
 }
 
@@ -1548,6 +1593,8 @@ interface RoomsBits {
     grid: { label: string; cells: { on: boolean; toggle: () => void }[] }[]; dirty: boolean;
     hours: { all: { f: string; t: string; apply: (f: number, t: number) => void }; days: { l: string; open: boolean; f: string; t: string; set: (f: number, t: number) => void; toggle: () => void }[] };
     remarks: string; setRemarks: (e: { target: { value: string } }) => void; canDelete: boolean; del: () => void;
+    keys?: { on: boolean; can: boolean; toggle: () => void };
+    move?: { can: boolean; earlier: () => void; later: () => void; earlierOff: boolean; laterOff: boolean };
   };
   srBlkOpen: boolean; srBlkToggle: () => void; srBlk: { from: string; to: string; reason: string };
   srBlkFrom: (e: { target: { value: string } }) => void; srBlkTo: (e: { target: { value: string } }) => void; srBlkReason: (e: { target: { value: string } }) => void;
@@ -1565,6 +1612,7 @@ const FIELD: CSSProperties = { height: "32px", padding: "0 8px", boxSizing: "bor
 export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
   // Before the Appointment types page's return: every render calls the same hooks (react-hooks/rules-of-hooks).
   const [more, setMore] = useState(false);
+  const paint = useRef<boolean | null>(null);
   if (v.srPage === "types") return <DeskApptTypes v={v.at} />;
   const S = v.sr4;
   const round = (off: boolean): CSSProperties => ({ ...BTN, width: "32px", height: "32px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: off ? "var(--crm-faint-2)" : "var(--crm-ink)" });
@@ -1581,7 +1629,15 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
           <button type="button" onClick={S.pager.prev} disabled={S.pager.prevOff} title="Previous showroom" style={round(S.pager.prevOff)}><Ic name="chevron-left" size={14} /></button>
           <span style={{ font: "500 14px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{S.pager.at} / {S.pager.n}</span>
           <button type="button" onClick={S.pager.next} disabled={S.pager.nextOff} title="Next showroom" style={round(S.pager.nextOff)}><Ic name="chevron-right" size={14} /></button>
+          {S.move?.can && (
+            <span title="Move this showroom in the list" style={{ marginLeft: "10px", display: "flex", alignItems: "center", gap: "2px", font: "500 11px Inter, sans-serif", color: "var(--crm-muted)" }}>
+              Order
+              <button type="button" onClick={S.move.earlier} disabled={S.move.earlierOff} title="Move earlier" aria-label="Move earlier" style={{ ...BTN, width: "24px", height: "24px", borderRadius: "6px", display: "grid", placeItems: "center", color: S.move.earlierOff ? "var(--crm-faint-2)" : "var(--crm-ink)" }}><Ic name="arrow-left" size={13} /></button>
+              <button type="button" onClick={S.move.later} disabled={S.move.laterOff} title="Move later" aria-label="Move later" style={{ ...BTN, width: "24px", height: "24px", borderRadius: "6px", display: "grid", placeItems: "center", color: S.move.laterOff ? "var(--crm-faint-2)" : "var(--crm-ink)" }}><Ic name="arrow-right" size={13} /></button>
+            </span>
+          )}
           <button type="button" onClick={S.add} title="Add showroom" aria-label="Add showroom" style={{ ...BTN, marginLeft: "auto", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary"><Ic name="plus" size={16} /></button>
+          {S.canDelete && <DeleteRoom name={S.name} del={S.del} />}
         </div>
         <input value={S.name} onChange={S.setName} placeholder="Showroom name" aria-label="Showroom name" style={{ marginTop: "20px", width: "100%", border: 0, outline: "none", padding: 0, background: "transparent",
           font: `500 26px ${TIGHT}`, letterSpacing: "-0.02em", color: "var(--crm-ink)" }} />
@@ -1622,6 +1678,18 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
             <button type="button" onClick={S.up} aria-label="More" style={{ ...BTN, width: "34px", height: "34px", display: "grid", placeItems: "center", color: "var(--crm-ink-soft)" }}>+</button>
           </div>
         </div>
+        {S.keys?.can && (<>
+          <div style={{ height: "1px", background: "var(--crm-rule)", margin: "18px 0 16px" }} />
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+              <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>Key handover</span>
+              <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Sales photo the key collected and returned in the app</span>
+            </div>
+            <button type="button" role="switch" aria-checked={S.keys.on} aria-label="Key handover" onClick={S.keys.toggle} style={{ ...BTN, marginLeft: "auto", width: "40px", height: "22px", borderRadius: "11px", position: "relative", flex: "none", background: S.keys.on ? "var(--crm-rust)" : "var(--crm-line)", transition: "background 150ms" }}>
+              <span style={{ position: "absolute", top: "3px", left: S.keys.on ? "21px" : "3px", width: "16px", height: "16px", borderRadius: "50%", background: "#fff", transition: "left 150ms" }} />
+            </button>
+          </div>
+        </>)}
         <div style={{ height: "1px", background: "var(--crm-rule)", margin: "18px 0 16px" }} />
         <div style={{ display: "flex", alignItems: "center" }}>
           <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>Closures</span>
@@ -1679,11 +1747,9 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
             <div style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>Remarks</div>
             <span style={{ height: "20px", padding: "0 8px", borderRadius: "10px", display: "inline-flex", alignItems: "center", gap: "4px", background: "var(--crm-tint-lost)", color: "var(--crm-muted)", font: "500 11px Inter, sans-serif" }}><Ic name="lock" size={10} />Staff only</span>
           </div>
-          <textarea value={S.remarks} onChange={S.setRemarks} aria-label="Remarks" placeholder="Parking, which lift, what to show first…" rows={3} style={{ minHeight: "72px", padding: "10px 12px", borderRadius: "8px", boxSizing: "border-box", border: "1px solid var(--crm-line)",
-            font: "400 13px/1.5 Inter, sans-serif", color: "var(--crm-ink-soft)", resize: "vertical", outline: "none", background: "#fff" }} />
+          <RemarksBox value={S.remarks} set={S.setRemarks} />
           <div style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>Customers never see this. It shows to sales when they book a visit here.</div>
         </div>
-        {S.canDelete && <DeleteRoom name={S.name} del={S.del} />}
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: "20px 36px 32px 28px", display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center", paddingBottom: "14px" }}>
@@ -1698,8 +1764,13 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
           {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(dw => <span key={dw} style={{ textAlign: "center", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)", paddingBottom: "2px" }}>{dw}</span>)}
           {S.grid.map((row, h) => (<Fragment key={h}>
             <span style={{ font: "400 10px Inter, sans-serif", color: "var(--crm-faint)", lineHeight: "20px" }}>{row.label}</span>
-            {row.cells.map((c, di) => <button key={di} type="button" onClick={c.toggle} aria-pressed={c.on} title={c.on ? "Open — tap to close" : "Closed — tap to open"}
-              style={{ ...BTN, height: "20px", borderRadius: "3px", background: c.on ? "var(--crm-brown)" : "var(--crm-rule-soft)" }} />)}
+            {row.cells.map((c, di) => <button key={di} type="button" aria-pressed={c.on} title={c.on ? "Open — tap or drag to close" : "Closed — tap or drag to open"}
+              // Drag across the grid to open or close many hours at once (the head says so — it only took taps; the owner,
+              // 2026-10-29: "无法拉动/根本不灵敏"): the first cell decides open or close, every cell passed takes the same.
+              onPointerDown={e => { if (e.button !== 0) return; e.preventDefault(); paint.current = !c.on; c.toggle(); const up = () => { paint.current = null; window.removeEventListener("pointerup", up); }; window.addEventListener("pointerup", up); }}
+              onPointerEnter={() => { if (paint.current !== null && c.on !== paint.current) c.toggle(); }}
+              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); c.toggle(); } }}
+              style={{ ...BTN, height: "20px", borderRadius: "3px", touchAction: "none", background: c.on ? "var(--crm-brown)" : "var(--crm-rule-soft)" }} />)}
           </Fragment>))}
         </div>
       </div>

@@ -19,7 +19,7 @@ module.exports = [
   [/(<span style=\{\{ width: "52px", height: "52px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", fontWeight: "700", display: "grid", placeItems: "center" \}\}>)H<\/span>(\s*<strong style=\{\{ fontSize: "14px" \}\}>)HOUZS Venture<\/strong>/,
     "$1{v.chPageIni}</span>$2{v.chPageName}</strong>", "The Messenger preview names the Page being edited."],
   [/(<span style=\{\{ width: "72px", height: "72px", borderRadius: "50%", background: "#FFF0E4", color: "#BD4A19", fontSize: "22px", fontWeight: "700", display: "grid", placeItems: "center" \}\}>)H<\/span>/,
-    "$1{v.waIni}</span>", "The WhatsApp profile preview's picture is the business name's letter."],
+    "$1{v.waPic ? <img src={v.waPic} alt=\"\" style={{ width: \"100%\", height: \"100%\", borderRadius: \"50%\", objectFit: \"cover\" }} /> : v.waIni}</span>", "The WhatsApp profile preview shows the number's own profile picture (read from Meta, 2026-10-29), else the business name's letter."],
   [/(Cover photo · 1640 × 624<span style=\{\{[^\n]*?\}\}>)H<\/span>/, "$1{v.chPageIni}</span>", "The Page's picture placeholder is the Page's letter."],
   [/\{!!\(v\.chRo\) && \(<>(\s*<div style=\{\{ padding: "10px 14px", borderRadius: "10px", background: "#FBF6F2", fontSize: "13px", color: "#806B60" \}\}>)Only Principal and Director can change these\. You can look\.<\/div>/,
     "{!!(v.chNote) && (<>$1{v.chNote}</div>", "The read-only banner also says, in its own style, that Meta is being read or could not be (states the design did not draw)."],

@@ -66,3 +66,40 @@ export function useDeskPlace(ui: DeskUi, setUi: Dispatch<SetStateAction<DeskUi>>
     } catch { /* history unavailable */ }
   }, [ui]);
 }
+
+/**
+ * What one sets up to look at, kept for the next visit on this computer (the owner, 2026-10-29: "ads performance 下方我加了
+ * metric 之后，下次进来也看到一样，不用一直重加"): Ads Performance's columns and their widths, the chart's tiles, Insight's ad
+ * cards, the rows a page, the source. localStorage, per browser — not a place, so never a history step.
+ */
+export const PREF_KEYS = ["apSel", "apW", "apChart", "insCards", "apPer", "apSrc", "insSrc"] as const;
+type PrefKey = (typeof PREF_KEYS)[number];
+const PREF_STORE = "crm-desk-prefs";
+
+export function readPrefs(raw: string | null): Partial<Pick<DeskUi, PrefKey>> {
+  if (!raw) return {};
+  try {
+    const v = JSON.parse(raw) as Record<string, unknown>;
+    if (!v || typeof v !== "object") return {};
+    const out: Record<string, unknown> = {};
+    for (const k of PREF_KEYS) if (k in v && v[k] != null) out[k] = v[k];
+    return out as Partial<Pick<DeskUi, PrefKey>>;
+  } catch { return {}; }
+}
+
+export function withSavedPrefs(fresh: DeskUi): DeskUi {
+  if (typeof window === "undefined") return fresh;
+  try { return { ...fresh, ...readPrefs(localStorage.getItem(PREF_STORE)) }; } catch { return fresh; }
+}
+
+export function useDeskPrefs(ui: DeskUi) {
+  const last = useRef<string | null>(null);
+  useEffect(() => {
+    const out: Record<string, unknown> = {};
+    for (const k of PREF_KEYS) out[k] = ui[k];
+    const s = JSON.stringify(out);
+    if (s === last.current) return;
+    last.current = s;
+    try { localStorage.setItem(PREF_STORE, s); } catch { /* storage closed */ }
+  }, [ui]);
+}

@@ -492,6 +492,7 @@ waOba
 waObaHas
 waObaNone
 waObaReq
+waPic
 waProf
 waStats
 waSubs

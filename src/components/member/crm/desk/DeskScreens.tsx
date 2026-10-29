@@ -20,7 +20,7 @@ import { deskVM } from "./vm/app";
 import { titleData, titleName, titleTeams } from "./vm/names";
 import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type DeskUi } from "./vm/ctx";
 import { historyRows } from "./vm/history";
-import { useDeskPlace, withSavedPlace } from "./nav";
+import { useDeskPlace, withSavedPlace, withSavedPrefs, useDeskPrefs } from "./nav";
 import { useFollowNewest } from "../shared/stick";
 import { useReadWhenSeen } from "../shared/seen";
 import { MediaViewer } from "../shared/viewer";
@@ -51,8 +51,10 @@ const MIN_W = 1280, MIN_H = 800;
 export default function DeskScreens(p: DeskScreensProps) {
   const { data, live, act, setData } = p;
   // A refresh opens where this tab was; Back steps through the clicks (./nav.ts, user 2026-10-13).
-  const [ui, setUi] = useState<DeskUi>(() => withSavedPlace(initialDeskUi()));
+  const [ui, setUi] = useState<DeskUi>(() => withSavedPrefs(withSavedPlace(initialDeskUi())));
   useDeskPlace(ui, setUi);
+  // Columns, chart tiles and cards set up once stay for the next visit (./nav.ts, the owner 2026-10-29).
+  useDeskPrefs(ui);
   // A chat opens on its newest message and follows the next ones, as on the phone (the owner, 2026-10-14: "電腦版打開聊天時
   // 看的是最新消息，而不是從上面慢慢滑到下面").
   const msgCount = (id: string | null) => (id ? data.customers.find(c => c.id === id)?.messages.length ?? 0 : 0);

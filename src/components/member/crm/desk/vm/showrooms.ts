@@ -159,6 +159,15 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     remarks: d4.remarks ?? "", setRemarks: (e: { target: { value: string } }) => edit4({ remarks: e.target.value.slice(0, 1000) }),
     // Delete showroom: asked again on screen; the database refuses it while visits are upcoming and says how many.
     canDelete: en !== "new" && !!curRoom,
+    // Key handover (the owner, 2026-10-29): on, a visit here takes the key photos on the phone; saved at once.
+    keys: { on: !!curRoom?.keys, can: en !== "new" && !!curRoom,
+      toggle: () => { if (!curRoom) return; const on = !curRoom.keys; void ctx.act.setRoomKeys(curRoom.id, on).then(ok => { if (ok) patch({ toast: on ? `${curRoom.name}: the key is handed over with photos` : `${curRoom.name}: no key photos` }); }); } },
+    // The order (2026-10-29: "我可以移动 showroom 的顺序"): this showroom one place earlier or later; every list follows it.
+    move: (() => {
+      const ids = rooms.map(r => r.id), go = (to: number) => { if (!curRoom || to < 0 || to >= ids.length) return; const next = ids.filter(x => x !== curRoom.id); next.splice(to, 0, curRoom.id);
+        void ctx.act.orderRooms(next).then(ok => { if (ok) patch({ srAt: to, srEdit: null, srDraft: null }); }); };
+      return { can: en !== "new" && !!curRoom && ids.length > 1, earlier: () => go(at - 1), later: () => go(at + 1), earlierOff: at === 0, laterOff: at >= ids.length - 1 };
+    })(),
     del: () => { if (!curRoom) return; void ctx.deskAct.deleteRoom(curRoom.id).then(ok => { if (ok) patch({ srEdit: null, srDraft: null, srAt: Math.max(0, at - 1), toast: `${curRoom.name} deleted` }); }); },
   };
   return {

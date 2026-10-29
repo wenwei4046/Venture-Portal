@@ -52,6 +52,8 @@ const CRM_WRITES = [
   "crm_save_settings",
   // v2 frame 07 · Showrooms: staff-only remarks, delete (mig 20261024150000), CRM · Manage.
   "crm_save_showroom_remarks", "crm_delete_showroom",
+  // A showroom's key handover and the showrooms' order (mig 20261029100000), CRM · Manage.
+  "crm_set_showroom_keys", "crm_set_showroom_order",
   // v2 frame 08: put another form in use (mig 20261024160000), CRM · Manage.
   "crm_set_active_form",
   // v2 frames 02 / 03: a customer added by hand (mig 20261024180000), CRM · Edit (own).
@@ -129,7 +131,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
   "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types",
-  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form",
+  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form", "crm_set_showroom_keys", "crm_set_showroom_order",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
@@ -194,7 +196,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       rooms: rooms.map(r => {
         const x = roomX.get(r.id);
         const y = more.roomMore.find(m => m.id === r.id);
-        const r2 = y ? { ...r, remarks: y.remarks ?? "", deleted: !!y.deleted_at } : r;
+        const r2 = y ? { ...r, remarks: y.remarks ?? "", deleted: !!y.deleted_at, keys: !!y.key_handover } : r;
         return x ? { ...r2, photo_url: x.photo_path ? `/member/crm-room-photo/${encodeURIComponent(r.id)}?v=${encodeURIComponent(x.photo_path)}` : null, map_google: x.map_google, map_waze: x.map_waze } : r2;
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
@@ -235,7 +237,8 @@ async function desktopRows(db: Db, journey: boolean) {
     // Members locked out of the dealing for now (mig 20261022130000).
     soft<{ staff_id: string }[]>(db.from("crm_staff").select("staff_id").eq("locked", true)),
     // Showrooms' staff-only remarks and the deleted ones (mig 20261024150000).
-    soft<{ id: string; remarks: string | null; deleted_at: string | null }[]>(db.from("crm_showrooms").select("id, remarks, deleted_at")),
+    // …and whether it hands a unit's key over (mig 20261029100000).
+    soft<{ id: string; remarks: string | null; deleted_at: string | null; key_handover?: boolean }[]>(db.from("crm_showrooms").select("id, remarks, deleted_at, key_handover")),
     // Appointment types (mig 20261025040000): null before it, so the two built in stay.
     (async () => { try { const { data, error } = await db.rpc("crm_appt_types_read"); return error ? null : (data as unknown); } catch { return null; } })(),
   ]);

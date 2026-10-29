@@ -10,6 +10,7 @@
 import type { ChangeEvent as RChangeEvent, CSSProperties, FocusEvent, KeyboardEvent, MouseEvent as RMouseEvent, PointerEvent as RPointerEvent, ReactNode } from "react";
 import { useEffect, useRef, useState, Fragment } from "react";
 import { Ic, type Icon4a } from "./icons4a";
+import { boldRuns } from "./bold-text";
 import { PHONE_TYPE, typePx } from "./type";
 import type { ActiveVM } from "./locked";
 import type { ApplyWindowVM } from "./apply-ads";
@@ -297,7 +298,7 @@ export function Phone4aRoomRemarks({ text }: { text: string }) {
   return (
     <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "4px", padding: "10px 12px", borderRadius: "12px", background: "var(--crm-sel)" }}>
       <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: fs(11), fontWeight: 500, color: "var(--crm-muted)" }}><Ic name="lock" size={10} />Remarks · staff only</span>
-      <span style={{ fontSize: fs(13), lineHeight: 1.45, color: "var(--crm-ink)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{text}</span>
+      <span style={{ fontSize: fs(13), lineHeight: 1.45, color: "var(--crm-ink)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{boldRuns(text)}</span>
     </div>
   );
 }
@@ -445,7 +446,7 @@ export function Phone4aCalMonth({ v }: { v: { cal4: { month: string; prev: () =>
 type CalItem = { name: string; room: string; open: unknown; t: string; ap: string; kick: string };
 type CalBtn = { label: string; kind?: "main" | "green"; on: () => void };
 /** The unit’s key handed over with a photo (2026-10-28): collected, returned — each its time, a tap opens its photo. */
-type CalKeys = { keyOut: { time: string; view: () => void } | null; keyBack: { time: string; view: () => void } | null; takeKey: () => void };
+type CalKeys = { keyOn?: boolean; keyOut: { time: string; view: () => void } | null; keyBack: { time: string; view: () => void } | null; takeKey: () => void };
 function KeyRow({ k }: { k: CalKeys }) {
   const chip = { ...BTN, height: "30px", padding: "0 11px", borderRadius: "15px", display: "inline-flex", alignItems: "center", gap: "6px", boxSizing: "border-box", fontSize: fs(12.5), fontWeight: 500, whiteSpace: "nowrap" } as CSSProperties;
   const done = { ...chip, background: "var(--crm-tint-follow)", color: "var(--crm-brown)", border: "1px solid var(--crm-tint-follow)" } as CSSProperties;
@@ -482,8 +483,8 @@ export function Phone4aCalLists({ v }: { v: {
           <span style={{ fontSize: fs(12), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.room}</span>
         </button>
       </div>
-      {keys && <div style={{ padding: "0 14px", background: bg, borderLeft: `1px solid ${bd}`, borderRight: `1px solid ${bd}`, boxShadow: bar }}><KeyRow k={keys} /></div>}
-      <div style={{ display: "flex", gap: "6px", marginTop: keys ? 0 : "-6px", padding: "6px 14px 12px", background: bg, border: `1px solid ${bd}`, borderTop: 0, borderRadius: "0 0 16px 16px", boxShadow: bar }}>
+      {keys?.keyOn && <div style={{ padding: "0 14px", background: bg, borderLeft: `1px solid ${bd}`, borderRight: `1px solid ${bd}`, boxShadow: bar }}><KeyRow k={keys} /></div>}
+      <div style={{ display: "flex", gap: "6px", marginTop: keys?.keyOn ? 0 : "-6px", padding: "6px 14px 12px", background: bg, border: `1px solid ${bd}`, borderTop: 0, borderRadius: "0 0 16px 16px", boxShadow: bar }}>
         {btns.map(x => {
           const fill = x.kind === "green" ? "var(--crm-today)" : x.kind === "main" ? "var(--crm-rust)" : "";
           return <button key={x.label} type="button" onClick={x.on} style={{ ...BTN, flex: "1 1 0", minWidth: 0, height: "36px", borderRadius: "18px", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box", fontSize: fs(13), fontWeight: 500, whiteSpace: "nowrap",

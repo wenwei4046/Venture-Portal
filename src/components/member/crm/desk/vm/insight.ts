@@ -18,6 +18,16 @@ import { STATUS } from "../../shared/palette";
 import { CHANNEL_COLOUR, CHANNEL_TINT } from "../../shared/palette";
 import { rangeLine } from "./frame4a";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
+import { inSource, type SourcePick } from "@/lib/member/crm-source";
+import type { CrmData } from "@/lib/member/crm-data";
+
+/** Insight for one brand (the owner, 2026-10-29: "Insight 要可以筛选 DC / The Conts"): its customers, their visits and journey. */
+export function inBrand(d: CrmData, src: SourcePick | null | undefined): CrmData {
+  if (!src || src === "all") return d;
+  const customers = d.customers.filter(c => inSource(c, src)), ids = new Set(customers.map(c => c.id));
+  return { ...d, customers, visits: d.visits.filter(v => ids.has(v.customerId)), events: d.events.filter(e => ids.has(e.customerId)) };
+}
+export const INSIGHT_SOURCES: [SourcePick, string][] = [["all", "All"], ["conts", "The Conts"], ["dc", "DC"]];
 
 export const MON = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -69,7 +79,7 @@ export function wonIn(ctx: Pick<DeskCtx, "data">, r: { a: number; b: number }) {
 
 export function insightVM(ctx0: DeskCtx) {
   // An ad hidden from Ads Performance leaves Insight's figures too (2026-10-24).
-  const ctx = { ...ctx0, data: withoutHiddenAds(ctx0.data) };
+  const ctx = { ...ctx0, data: inBrand(withoutHiddenAds(ctx0.data), ctx0.ui.insSrc as SourcePick | undefined) };
   const { data, now, patch, teams } = ctx;
   const { r, name } = insightRange(ctx);
   const inR = (iso: string) => { const t = new Date(iso); const d = new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime(); return d >= r.a && d <= r.b; };
@@ -174,6 +184,7 @@ export function insightVM(ctx0: DeskCtx) {
     hero, heroStats, teams: teamsOut, leadStatus,
     // 4a (frame 01): the hero's six figures, the teams with their people (opened in place), all seven statuses.
     metrics4, status4, statusTotal: tot7,
+    src4: INSIGHT_SOURCES.map(([k, label]) => ({ label, on: (ctx.ui.insSrc ?? "all") === k, pick: () => ctx.patch({ insSrc: k }) })),
     teams4: (() => {
       const apptN = (s: string) => parseFloat(s) || 0;
       const all = [...dirRows.map(t => ({ ...t, key: DIRECTOR_TEAM, people: ctx.directors })), ...teams.map((t, k) => ({ ...teamsOut[dirRows.length + k], key: t.id, people: t.people }))];
