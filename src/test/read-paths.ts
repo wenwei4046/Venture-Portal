@@ -374,7 +374,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'lead_ads', 'lead_name_ad', 'lead_save_meta_ads', 'lead_test_ad',
   // Messenger connected (mig 20261026110000): a reply's target and what Meta said ask leads.create; the ingest and the
   // outbox are the webhook's service role alone — EXECUTE for nobody else.
-  'lead_reply_target', 'lead_reply_sent', 'lead_ingest_messenger', 'lead_ingest_instagram', 'lead_ingest_page_replies', 'lead_handoff_group', 'lead_reply_media', 'lead_agents', 'lead_assign', 'lead_mark_seen', 'lead_reply_to', 'lead_react', 'lead_labels', 'lead_save_labels', 'lead_set_labels', 'lead_ingest_receipts', 'lead_outbox', 'lead_outbox_done', 'lead_history_wanted', 'lead_ingest_history', 'lead_mark_unread', 'lead_my_unread_marks', 'lead_media_to_keep', 'lead_media_kept',
+  'lead_reply_target', 'lead_reply_sent', 'lead_ingest_messenger', 'lead_ingest_instagram', 'lead_ingest_page_replies', 'lead_handoff_group', 'lead_reply_media', 'lead_agents', 'lead_assign', 'lead_mark_seen', 'lead_reply_to', 'lead_react', 'lead_labels', 'lead_save_labels', 'lead_set_labels', 'lead_ingest_receipts', 'lead_outbox', 'lead_outbox_done', 'lead_history_wanted', 'lead_ingest_history', 'lead_mark_unread', 'lead_my_unread_marks', 'lead_media_to_keep', 'lead_media_kept', 'lead_ingest_ad_return',
   // Me (mig 20261017100000): each answers for the caller's own People record only — one's month, today, line, team,
   // record and paid payslips — and writes only one's own (the punch notice read, one's photo); one's punch and an MC
   // filed on one's own request ask their own staff record (mig 20261015200000).

@@ -6,7 +6,7 @@
 //     conversation (lead_ingest_page_replies) unless this app sent it (its app_id), which Lead View has already.
 // The CRM's Pages are never read here (its parser and functions are unchanged).
 
-import { metaMediaUrl, parseMessengerDelivery, type MsgInbound, type MsgKind } from '@/lib/messenger/webhook'
+import { adOf, metaMediaUrl, parseMessengerDelivery, type MsgInbound, type MsgKind, type Referral } from '@/lib/messenger/webhook'
 import { OPTION_PAYLOAD } from './messenger'
 
 export interface PageReply {
@@ -27,6 +27,8 @@ type Ev = {
   sender?: { id?: string }
   recipient?: { id?: string }
   timestamp?: number
+  referral?: Referral
+  postback?: unknown
   message?: { mid?: string; text?: string; quick_reply?: { payload?: string }; is_echo?: boolean; app_id?: number | string; attachments?: Array<{ type?: string; title?: string; payload?: TemplatePayload & { sticker_id?: number; url?: string } }>; reply_to?: { mid?: string } }
 }
 
@@ -55,10 +57,17 @@ export interface PageReceipts {
   reads: { pageId: string; psid: string; watermark: string }[]
 }
 
-/** The Lead View Pages' customer messages (messaging and standby), the Page's own replies sent from elsewhere, and receipts. */
-export function leadPageEvents(body: unknown, crmPages: Set<string>, ourAppId: string | undefined): { messages: MsgInbound[]; replies: PageReply[]; receipts: PageReceipts } {
+/**
+ * A customer who already has a thread tapping an ad again (2026-10-29, mig 20261029170010): Meta says so by a referral on
+ * its own (type OPEN_THREAD), with the ad's id and title and no message. lead_ingest_ad_return keeps the ad and asks the
+ * reply rules again on their next message.
+ */
+export interface AdReturn { pageId: string; psid: string; ad: MsgInbound['ad'] }
+
+/** The Lead View Pages' customer messages (messaging and standby), the Page's own replies sent from elsewhere, receipts and returns from an ad. */
+export function leadPageEvents(body: unknown, crmPages: Set<string>, ourAppId: string | undefined): { messages: MsgInbound[]; replies: PageReply[]; receipts: PageReceipts; returns: AdReturn[] } {
   const b = body as { object?: string; entry?: Array<{ id?: string; time?: number; messaging?: Ev[]; standby?: Ev[] }> } | null
-  if (b?.object !== 'page' || !Array.isArray(b.entry)) return { messages: [], replies: [], receipts: { delivered: [], reads: [] } }
+  if (b?.object !== 'page' || !Array.isArray(b.entry)) return { messages: [], replies: [], receipts: { delivered: [], reads: [] }, returns: [] }
   const entries = b.entry
     .filter(e => e?.id && !crmPages.has(e.id))
     .map(e => ({ ...e, messaging: [...(Array.isArray(e.messaging) ? e.messaging : []), ...(Array.isArray(e.standby) ? e.standby : [])] }))
@@ -88,5 +97,12 @@ export function leadPageEvents(body: unknown, crmPages: Set<string>, ourAppId: s
       })
     }
   }
-  return { messages, replies, receipts: { delivered: parsed.delivered, reads: parsed.reads } }
+  // A referral on its own, from a customer (never the Page itself).
+  const returns: AdReturn[] = []
+  for (const e of entries) for (const ev of e.messaging) {
+    if (!ev?.referral || ev.message || ev.postback || !ev.sender?.id || ev.sender.id === e.id) continue
+    const ad = adOf(ev.referral)
+    if (ad?.sourceId) returns.push({ pageId: e.id!, psid: ev.sender.id, ad })
+  }
+  return { messages, replies, receipts: { delivered: parsed.delivered, reads: parsed.reads }, returns }
 }

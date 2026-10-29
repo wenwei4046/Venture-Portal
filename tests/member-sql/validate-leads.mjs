@@ -1373,6 +1373,58 @@ await db.exec(`
   for (const fn of ['lead_flow_question(uuid, lead_flows, jsonb, text)', 'lead_flow_also(uuid, lead_flows, jsonb)', 'lead_flow_keep(uuid, text, text, boolean)', 'lead_template_more(jsonb)']) {
     check((await q(`select has_function_privilege('authenticated', 'public.${fn}', 'execute') a`))[0].a, false, `${fn} is nobody’s to call`)
   }
+
+  // ── Back from an ad: the ad kept, the reply rules asked again (mig 20261029170010) ──
+  check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_ingest_messenger', 'lead_flow_on_message') order by 1`)).map(r => [r.proname, r.m]),
+    [['lead_flow_on_message', 'b55553cafa0373854a71f1ed4d76e45f'], ['lead_ingest_messenger', '81363a67c59972b2b10a3f00bc539951']], 'the runner and the intake here are production’s')
+  await db.exec(await f('20261029170010_lead_ad_again.sql'))
+  await db.exec(await f('20261029170010_lead_ad_again.sql'))
+  const AGAIN_AD = '120249999000001'
+  const backFlow = (await q(`insert into public.lead_flows (name, template, trigger_kind, trigger_value, active, steps) values ('Back from the ad', 'custom', 'first', '', false, $1::jsonb) returning id`,
+    [JSON.stringify([{ id: 'w', kind: 'message', text: 'Welcome back! Here is this week’s promo.', next: '' }])]))[0].id
+  await q(`insert into public.lead_reply_rules (ad_id, at_when, reply) values ($1, 'any', $2)`, [AGAIN_AD, backFlow])
+  let seq = 0
+  const inMsg = (psid, body, ad = null) => q(`select public.lead_ingest_messenger($1::jsonb) r`, [JSON.stringify([
+    { externalId: `again.${psid}.${++seq}`, pageId: P, psid, name: 'Back Again', kind: 'text', body, sentAt: new Date().toISOString(), ad },
+  ])])
+  const contactOf = async psid => (await q(`select id from public.lead_contacts where channel = 'messenger' and external_id = $1`, [psid]))[0].id
+  const welcomes = async id => (await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and sender = 'flow' and body like 'Welcome back!%'`, [id]))[0].n
+  const settle = id => q(`update public.lead_contacts set flow_state = 'done', flow_step = null where id = $1`, [id])
+
+  // A customer we have, tapping the ad again: the referral on its own keeps the ad; their next message gets its template, once.
+  await inMsg('7703001', 'hello')
+  const ba = await contactOf('7703001')
+  await settle(ba)
+  check((await q(`select public.lead_ingest_ad_return($1::jsonb) n`, [JSON.stringify([{ pageId: P, psid: '7703001', ad: { sourceId: AGAIN_AD, headline: 'Skip the markup' } }])]))[0].n, 1, 'a return from an ad is kept')
+  let bc = (await q(`select ad_id, source_ad, ad_again_at is not null marked from public.lead_contacts where id = $1`, [ba]))[0]
+  check(bc, { ad_id: AGAIN_AD, source_ad: 'Skip the markup', marked: true }, 'the ad on the conversation, marked')
+  check((await q(`select count(*)::int n from public.lead_events where contact_id = $1 and what = 'Came back from the ad Skip the markup'`, [ba]))[0].n, 1, 'the timeline says so')
+  await inMsg('7703001', 'is the promo still on?')
+  check(await welcomes(ba), 1, 'their next message gets the ad’s reply again')
+  check((await q(`select ad_again_at from public.lead_contacts where id = $1`, [ba]))[0].ad_again_at, null, 'the mark is used once')
+  await settle(ba)
+  await inMsg('7703001', 'and delivery?')
+  check(await welcomes(ba), 1, 'a later message gets nothing more')
+
+  // CS answered in the last day: no template over their conversation.
+  await inMsg('7703002', 'hi')
+  const bb = await contactOf('7703002')
+  await settle(bb)
+  await q(`insert into public.lead_messages (contact_id, direction, sender, by_name, body, delivery) values ($1, 'out', 'cs', 'CS', 'Sure, what size?', 'sent')`, [bb])
+  await q(`select public.lead_ingest_ad_return($1::jsonb)`, [JSON.stringify([{ pageId: P, psid: '7703002', ad: { sourceId: AGAIN_AD, headline: 'Skip the markup' } }])])
+  await inMsg('7703002', 'hello again')
+  check(await welcomes(bb), 0, 'CS replied in the last day: nothing automatic')
+
+  // The ad told on the message itself: that message gets the template.
+  await inMsg('7703003', 'hi')
+  const bd = await contactOf('7703003')
+  await settle(bd)
+  await inMsg('7703003', 'saw your ad again', { sourceId: AGAIN_AD, headline: 'Skip the markup' })
+  check(await welcomes(bd), 1, 'a referral on the message runs the rules on it')
+  check((await q(`select count(*)::int n from public.lead_events where contact_id = $1 and what like 'Came back from the ad%'`, [bd]))[0].n, 1, 'and says so once')
+
+  check((await q(`select public.lead_ingest_ad_return($1::jsonb) n`, [JSON.stringify([{ pageId: P, psid: '7703999', ad: { sourceId: AGAIN_AD } }, { pageId: P, psid: '7703001', ad: { sourceId: 'x' } }])]))[0].n, 0, 'nobody we have, or no ad: nothing')
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_ad_return(jsonb)', 'execute') a`))[0].a, false, 'the service role’s alone')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)
