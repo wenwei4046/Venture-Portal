@@ -105,7 +105,7 @@ export function templateProblem(steps: TemplateStep[]): string | null {
       if (b.length === 0) return `${n} needs at least one option.`
       if (b.length > 13) return `${n}: Messenger shows 13 options at most.`
       for (const o of b) {
-        if (!o.label.trim() || o.label.length > 20) return `${n}: an option says 1 to 20 characters.`
+        if (!o.label.trim() || o.label.length > OPTION_MAX) return `${n}: an option says 1 to ${OPTION_MAX} characters.`
         if (o.next !== '' && !ids.includes(o.next)) return `${n}: every option goes to a step, or ends.`
       }
     } else if (s.next && !ids.includes(s.next)) return `${n} goes to a step that is not there.`
@@ -332,6 +332,12 @@ export function runsOn(templateId: string, rules: ReplyRules, brandName: (id: st
 }
 
 /** Reply templates' right panel (Edit step / Test as customer): its width, dragged by its left edge (2026-10-28). */
+/**
+ * An option's words, at most (mig 20261029100000 — the user: "button 不要限制字数"). Messenger's button shows 20 of them;
+ * a longer option is written in full in the message too (lib/leads/messenger.ts `messageOf`).
+ */
+export const OPTION_MAX = 200
+
 export const SIDE_W = { start: 360, min: 300, max: 720 }
 export function clampSide(w: number): number {
   return Number.isFinite(w) ? Math.round(Math.min(SIDE_W.max, Math.max(SIDE_W.min, w))) : SIDE_W.start

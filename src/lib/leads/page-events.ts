@@ -7,6 +7,7 @@
 // The CRM's Pages are never read here (its parser and functions are unchanged).
 
 import { metaMediaUrl, parseMessengerDelivery, type MsgInbound, type MsgKind } from '@/lib/messenger/webhook'
+import { OPTION_PAYLOAD } from './messenger'
 
 export interface PageReply {
   externalId: string
@@ -26,7 +27,7 @@ type Ev = {
   sender?: { id?: string }
   recipient?: { id?: string }
   timestamp?: number
-  message?: { mid?: string; text?: string; is_echo?: boolean; app_id?: number | string; attachments?: Array<{ type?: string; title?: string; payload?: TemplatePayload & { sticker_id?: number; url?: string } }>; reply_to?: { mid?: string } }
+  message?: { mid?: string; text?: string; quick_reply?: { payload?: string }; is_echo?: boolean; app_id?: number | string; attachments?: Array<{ type?: string; title?: string; payload?: TemplatePayload & { sticker_id?: number; url?: string } }>; reply_to?: { mid?: string } }
 }
 
 type TemplateButton = { title?: string }
@@ -62,7 +63,14 @@ export function leadPageEvents(body: unknown, crmPages: Set<string>, ourAppId: s
     .filter(e => e?.id && !crmPages.has(e.id))
     .map(e => ({ ...e, messaging: [...(Array.isArray(e.messaging) ? e.messaging : []), ...(Array.isArray(e.standby) ? e.standby : [])] }))
   const parsed = parseMessengerDelivery({ object: 'page', entry: entries })
-  const messages = parsed.messages
+  // A tapped template button carries its whole option (lib/leads/messenger.ts `messageOf`): the customer's message reads
+  // as that option, not the button's 20 characters.
+  const options = new Map<string, string>()
+  for (const e of entries) for (const ev of e.messaging) {
+    const p = ev?.message?.quick_reply?.payload
+    if (ev?.message?.mid && p?.startsWith(OPTION_PAYLOAD) && p.length > OPTION_PAYLOAD.length) options.set(ev.message.mid, p.slice(OPTION_PAYLOAD.length))
+  }
+  const messages = parsed.messages.map(m => (options.has(m.externalId) ? { ...m, body: options.get(m.externalId)! } : m))
   const replies: PageReply[] = []
   for (const e of entries) {
     for (const ev of e.messaging) {

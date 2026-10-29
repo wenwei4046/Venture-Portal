@@ -26,12 +26,26 @@ export const NO_PAGE = 'This conversation has no Facebook Page to send from.'
 export const NOT_CONNECTED = 'Messenger is not connected on this server (no Meta token).'
 export const NO_PAGE_TOKEN = 'Meta gave no access token for this Page — check that the Page is assigned to the system user.'
 
-/** A template's buttons as Messenger's quick replies (13 at most, 20 characters each); none → the plain text. */
+/** What Messenger shows on a quick-reply button (Meta's rule). */
+export const BUTTON_CHARS = 20
+/** A tapped button's payload carries its whole option behind this mark (lib/leads/page-events.ts reads it back). */
+export const OPTION_PAYLOAD = 'LV:'
+
+const clip = (s: string) => ([...s].length > BUTTON_CHARS ? [...s].slice(0, BUTTON_CHARS - 1).join('') + '…' : s)
+
+/**
+ * A template's buttons as Messenger's quick replies (13 at most). A button shows 20 characters, so when an option is
+ * longer (2026-10-29 — the user: "button 不要限制字数") every option is also written in full, numbered, under the
+ * message, and the buttons read "1. …". The payload carries the whole option, so the tap reads as the option.
+ */
 export function messageOf(body: string, buttons?: string[] | null): { text: string; quick_replies?: Array<{ content_type: 'text'; title: string; payload: string }> } {
-  const titles = (buttons ?? []).map(b => b.trim().slice(0, 20)).filter(Boolean).slice(0, 13)
-  return titles.length
-    ? { text: body, quick_replies: titles.map(title => ({ content_type: 'text', title, payload: title })) }
-    : { text: body }
+  const labels = (buttons ?? []).map(b => b.trim()).filter(Boolean).slice(0, 13)
+  if (!labels.length) return { text: body }
+  const long = labels.some(l => [...l].length > BUTTON_CHARS)
+  return {
+    text: long ? `${body}\n\n${labels.map((l, i) => `${i + 1}. ${l}`).join('\n')}` : body,
+    quick_replies: labels.map((l, i) => ({ content_type: 'text' as const, title: long ? clip(`${i + 1}. ${l}`) : l, payload: OPTION_PAYLOAD + l.slice(0, 900) })),
+  }
 }
 
 /** Send one message; answers Meta's id or why not — never throws. */

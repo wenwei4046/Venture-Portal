@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import { removeTemplate, saveLibraryItem, saveTemplate } from '@/lib/leads/actions'
 import { infoEntries, type LeadInfo } from '@/lib/leads/info'
 import {
-  CARD_W, KINDS, SIDE_W, clampSide, RETRY_PHONE, SAVE_AS, fromLibrary, kindOf, placed, rowsOf, runsOn, stepAfter, templateProblem, tidy, toLibrary,
+  CARD_W, KINDS, OPTION_MAX, SIDE_W, clampSide, RETRY_PHONE, SAVE_AS, fromLibrary, kindOf, placed, rowsOf, runsOn, stepAfter, templateProblem, tidy, toLibrary,
   updateFromLibrary, walkAnswer, walkFrom, freshId, type LibraryItem, type ReplyRules, type ReplyTemplate, type StepKind, type TemplateStep, type Walk,
 } from '@/lib/leads/template'
 import { LeadIcon } from '@/components/layout/lead-icons'
+import { wrapMark } from '@/lib/leads/rich'
+import RichText from './RichText'
 import s from './replies.module.css'
 
 /**
@@ -599,6 +601,19 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
   const dis = !canEdit
   const set = (o: Partial<TemplateStep>) => setStep(step.id, o)
   const text = useRef<HTMLTextAreaElement>(null)
+  // The message box grows with its words (the user, 2026-10-29: "要可以拉动"); its corner still drags it taller.
+  useLayoutEffect(() => {
+    const el = text.current
+    if (el && el.scrollHeight > el.clientHeight) el.style.height = `${Math.min(el.scrollHeight + 2, 520)}px`
+  }, [step.text, step.id])
+  // *Bold* / _italic_ around the selection, as Messenger reads them (lib/leads/rich.ts).
+  const mark = (m: '*' | '_') => {
+    const el = text.current
+    const v = step.text ?? ''
+    const r = wrapMark(v, el?.selectionStart ?? v.length, el?.selectionEnd ?? v.length, m)
+    set({ text: r.text.slice(0, 1000) })
+    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(r.caret, r.caret) })
+  }
   const [kindOpen, setKindOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const [infoCard, setInfoCard] = useState(0)
@@ -660,9 +675,11 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
         ) : null}
 
         <span className={s.label}>MESSAGE</span>
-        <textarea ref={text} className={s.textarea} rows={4} value={step.text ?? ''} maxLength={1000} disabled={dis} aria-label="Message"
+        <textarea ref={text} className={s.textarea} rows={6} value={step.text ?? ''} maxLength={1000} disabled={dis} aria-label="Message"
           placeholder={step.kind === 'handoff' ? 'Optional — e.g. One of our team will reply shortly.' : 'What the customer reads'} onChange={e => set({ text: e.target.value })} />
-        <span style={{ display: 'flex', gap: 8, position: 'relative' }}>
+        <span style={{ display: 'flex', gap: 8, position: 'relative', flexWrap: 'wrap' }}>
+          <button type="button" className={s.toolBtn} data-plain="" disabled={dis} title="Bold — Messenger shows *words* in bold" aria-label="Bold" onMouseDown={e => e.preventDefault()} onClick={() => mark('*')}><b>B</b></button>
+          <button type="button" className={s.toolBtn} data-plain="" disabled={dis} title="Italic — Messenger shows _words_ in italic" aria-label="Italic" onMouseDown={e => e.preventDefault()} onClick={() => mark('_')}><i>I</i></button>
           <button type="button" className={s.toolBtn} data-plain="" disabled={dis || !info} onClick={() => setInfoOpen(o => !o)} title={!info ? 'General info waits for its database update' : undefined}><LeadIcon name="bookOpen" size={12} />General info<LeadIcon name="chevronDown" size={12} /></button>
           <button type="button" className={s.toolBtn} data-plain="" disabled title="Attachments come with the Data Center’s files (step 5)"><LeadIcon name="paperclip" size={12} />Attach</button>
           {infoOpen ? (
@@ -721,7 +738,7 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
               <div key={j} className={s.option}>
                 <span className={s.optionTop}>
                   <span className={s.num}>{j + 1}</span>
-                  <input className={s.input} style={{ flex: 1 }} value={b.label} maxLength={20} disabled={dis} aria-label={`Option ${j + 1}`}
+                  <input className={s.input} style={{ flex: 1 }} value={b.label} maxLength={OPTION_MAX} disabled={dis} aria-label={`Option ${j + 1}`}
                     onChange={e => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, label: e.target.value } : x)) })} />
                   {canEdit && step.buttons!.length > 1 ? <button type="button" className={s.x} title="Remove option" onClick={() => set({ buttons: step.buttons!.filter((_, k) => k !== j) })}>×</button> : null}
                 </span>
@@ -801,7 +818,7 @@ function TestChat({ draft }: { draft: Draft }) {
       <div className={s.chat}>
         {w.said.map((m, i) => m.from === 'system' ? <span key={i} className={s.sys}>{m.text}</span> : (
           <div key={i} style={{ display: 'contents' }}>
-            <div className={s.bubble} data-from={m.from}>{m.text}</div>
+            <div className={s.bubble} data-from={m.from}><RichText text={m.text} /></div>
             {m.buttons && i === w.said.length - 1 && waiting?.kind === 'question' ? (
               <div className={s.chips}>{m.buttons.map(b => <button key={b} type="button" className={s.chip} onClick={() => answer(b)}>{b}</button>)}</div>
             ) : null}

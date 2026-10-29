@@ -70,3 +70,15 @@ describe('a card the Page sent (2026-10-28)', () => {
     expect(out.replies[0]).toMatchObject({ externalId: 'm.card', kind: 'text', body: expect.stringContaining('▸ 了解RM49的优惠🎉') })
   })
 })
+
+describe('a tapped template button reads as its whole option (2026-10-29)', () => {
+  it('takes the option from the payload, not the button’s 20 characters', () => {
+    const ev = (mid: string, text: string, payload?: string) => ({ sender: { id: '777' }, recipient: { id: P2990 }, timestamp: 1793155203631, message: { mid, text, ...(payload ? { quick_reply: { payload } } : {}) } })
+    const out = leadPageEvents({ object: 'page', entry: [{ id: P2990, messaging: [
+      ev('m.1', '2. Talk to a salesp…', 'LV:Talk to a salesperson about delivery'),
+      ev('m.2', 'Hello'),
+      ev('m.3', 'Yes', 'SOMETHING_ELSE'),
+    ] }] }, crm, OURS)
+    expect(out.messages.map(m => m.body)).toEqual(['Talk to a salesperson about delivery', 'Hello', 'Yes'])
+  })
+})
