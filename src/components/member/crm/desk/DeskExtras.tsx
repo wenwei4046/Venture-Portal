@@ -15,6 +15,7 @@ import SalesCustomerForm from "../sales/SalesCustomerForm";
 import type { CustomerFormVM } from "../sales/vm/customer";
 import type { bookVM, customerFormVM, historyVM, noteVM } from "./vm/extras";
 import type { ActiveVM } from "../shared/locked";
+import type { CrmLeave } from "@/lib/member/crm-data";
 import type { ApplyWindowVM } from "../shared/apply-ads";
 import { Ic, type Icon4a } from "../shared/icons4a";
 import { Phone4aBookMode, Phone4aCustomBook } from "../shared/custom-book";
@@ -588,8 +589,17 @@ export function DeskFormPages({ v }: { v: ReturnType<typeof import("./vm/formpag
  * each group folding at its chevron. A switch changes the draft; Save writes it (crm_set_locked; shared/locked.ts › activeVM)
  * — the owner's Save (2026-10-22), which the frame does not draw, sits at the card head's right.
  */
-const ACT_GRID = "minmax(0, 1.8fr) minmax(0, 1.3fr) 120px 130px 80px";
-export function DeskActive({ v }: { v: ActiveVM & { leads?: Record<string, number> } }) {
+const ACT_GRID = "minmax(0, 1.8fr) minmax(0, 1.3fr) 120px 170px 130px 80px";
+/** Members' leave (2026-10-29): the office's today, each member's leaves not ended, and CRM · Manage's writes. */
+export interface LeaveBits {
+  can: boolean; today: string; of: Record<string, CrmLeave[]>;
+  save: (l: { id: string | null; staffId: string; from: string; to: string; note: string }) => Promise<boolean>; remove: (id: string) => Promise<boolean>;
+}
+const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const dShort = (ymd: string) => `${Number(ymd.slice(8))} ${MON3[Number(ymd.slice(5, 7)) - 1]}`;
+const dRange = (l: { from: string; to: string }) => (l.from === l.to ? dShort(l.from) : `${dShort(l.from)} – ${dShort(l.to)}`);
+export function DeskActive({ v }: { v: ActiveVM & { leads?: Record<string, number>; leave?: LeaveBits } }) {
+  const [leaveFor, setLeaveFor] = useState<{ id: string; name: string } | null>(null);
   // Folded at first (the owner, 2026-10-24: "member work type & active 默認收起"); `opened` keeps the opened, a search opens all.
   const [opened, setOpened] = useState<Record<string, boolean>>({});
   const [q, setQ] = useState(""), [f, setF] = useState<"all" | "active" | "locked">("all");
@@ -615,7 +625,7 @@ export function DeskActive({ v }: { v: ActiveVM & { leads?: Record<string, numbe
         </div>
         <div style={{ flex: "none", display: "grid", gridTemplateColumns: ACT_GRID, gap: "16px", alignItems: "center", height: "36px", padding: "0 16px", background: "var(--crm-cream-nav)", borderTop: "1px solid var(--crm-nav-line)",
           font: "600 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-brown)" }}>
-          <span>Name</span><span>Title</span><span>Status</span><span style={{ textAlign: "right" }}>Leads this month</span><span style={{ textAlign: "right" }}>New leads</span>
+          <span>Name</span><span>Title</span><span>Status</span><span>Leave</span><span style={{ textAlign: "right" }}>Leads this month</span><span style={{ textAlign: "right" }}>New leads</span>
         </div>
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", scrollbarWidth: "thin", scrollbarColor: "var(--crm-line) transparent" }}>
           {groups.map(g => (
@@ -628,7 +638,7 @@ export function DeskActive({ v }: { v: ActiveVM & { leads?: Record<string, numbe
                 <span style={{ color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{g.count}</span>
               </button>
               {!shut(g.name) && g.rows.map(p => {
-                const n = v.leads?.[p.id];
+                const today = v.leave?.today ?? "", n = v.leads?.[p.id], lv = v.leave?.of[p.id] ?? [], now = lv.find(l => l.from <= today && l.to >= today), next = lv.find(l => l.from > today);
                 return (
                   <div key={p.id} style={{ display: "grid", gridTemplateColumns: ACT_GRID, gap: "16px", alignItems: "center", height: "46px", padding: "0 16px", borderTop: "1px solid var(--crm-rule-soft)", font: "400 14px Inter, sans-serif" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
@@ -636,9 +646,17 @@ export function DeskActive({ v }: { v: ActiveVM & { leads?: Record<string, numbe
                       <span style={{ fontWeight: 500, color: p.active ? "var(--crm-ink)" : "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
                     </span>
                     <span style={{ color: "var(--crm-ink-soft)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.role}</span>
-                    <span>{p.active
-                      ? <span style={{ ...STPILL, background: "var(--crm-tint-new)", color: "var(--crm-ink)" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />Active</span>
-                      : <span style={{ ...STPILL, background: "var(--crm-tint-lost)", color: "var(--crm-muted)" }}><Ic name="lock" size={10} />Locked</span>}</span>
+                    <span>{!p.active
+                      ? <span style={{ ...STPILL, background: "var(--crm-tint-lost)", color: "var(--crm-muted)" }}><Ic name="lock" size={10} />Locked</span>
+                      : now ? <span style={{ ...STPILL, background: "var(--crm-tint-attention)", color: "var(--crm-rust)" }}>On leave</span>
+                      : <span style={{ ...STPILL, background: "var(--crm-tint-new)", color: "var(--crm-ink)" }}><span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "currentcolor" }} />Active</span>}</span>
+                    <span style={{ minWidth: 0 }}>
+                      <button type="button" disabled={!v.leave?.can && !lv.length} onClick={() => setLeaveFor({ id: p.id, name: p.name })} title={v.leave?.can ? "Set leave" : undefined}
+                        style={{ ...XBTN, maxWidth: "100%", height: "26px", padding: "0 8px", borderRadius: "6px", display: "inline-flex", alignItems: "center", gap: "6px", font: "400 12px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                          border: now || next ? "0" : "1px dashed var(--crm-line)", background: now ? "var(--crm-tint-attention)" : next ? "var(--crm-field)" : "transparent", color: now ? "var(--crm-rust)" : next ? "var(--crm-ink-soft)" : "var(--crm-faint)" }}>
+                        {now ? `Until ${dShort(now.to)}` : next ? dRange(next) : v.leave?.can ? "+ Leave" : "—"}{lv.length > 1 && <span style={{ color: "var(--crm-faint)" }}>+{lv.length - 1}</span>}
+                      </button>
+                    </span>
                     <span style={{ textAlign: "right", font: `500 14px ${TIGHT_X}`, fontVariantNumeric: "tabular-nums", color: p.active ? "var(--crm-ink)" : "var(--crm-faint-2)" }}>{p.active ? n ?? 0 : "—"}</span>
                     <span style={{ textAlign: "right" }}>
                       <button type="button" role="switch" aria-checked={p.active} aria-label={`${p.name} takes new leads`} onClick={p.toggle} style={{ ...XBTN, width: "36px", height: "20px", borderRadius: "10px", position: "relative", display: "inline-block", verticalAlign: "middle", background: p.active ? "var(--crm-rust)" : "var(--crm-line)", transition: "background .16s" }}>
@@ -652,6 +670,56 @@ export function DeskActive({ v }: { v: ActiveVM & { leads?: Record<string, numbe
           ))}
           {!groups.length && <div style={{ padding: "28px 16px", textAlign: "center", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Nobody matches</div>}
         </div>
+      </div>
+      {leaveFor && v.leave && <LeaveDialog who={leaveFor} bits={v.leave} close={() => setLeaveFor(null)} />}
+    </div>
+  );
+}
+
+/**
+ * A member's leave (the owner, 2026-10-29: "可以设定 member 的休假，不要派名单给他"): their leaves not ended yet, each to change
+ * or remove, and a new one — the first and the last day (both off) and a note. While on leave no new lead goes to them
+ * (crm_staff_locked counts it); their own customers stay theirs and their upline is told when it starts.
+ */
+function LeaveDialog({ who, bits, close }: { who: { id: string; name: string }; bits: LeaveBits; close: () => void }) {
+  const list = bits.of[who.id] ?? [];
+  const blank = { id: null as string | null, from: bits.today, to: bits.today, note: "" };
+  const [f, setF] = useState(blank);
+  const [busy, setBusy] = useState(false);
+  const bad = !f.from || !f.to ? "Pick the first and the last day." : f.to < f.from ? "The last day comes before the first." : null;
+  const field = { height: "36px", boxSizing: "border-box" as const, padding: "0 10px", borderRadius: "8px", border: "1px solid var(--crm-line)", background: "#fff", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)", outline: "none" };
+  const save = () => { if (bad || busy) return; setBusy(true); void bits.save({ ...f, staffId: who.id }).then(ok => { setBusy(false); if (ok) setF(blank); }); };
+  return (
+    <div onClick={close} style={{ position: "fixed", inset: 0, zIndex: 60, background: "rgba(42,22,12,.28)", display: "grid", placeItems: "center" }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-label={`${who.name} · Leave`} style={{ width: "min(460px, calc(100vw - 48px))", background: "#fff", borderRadius: "16px", boxShadow: "0 20px 50px rgba(42,22,12,.25)", padding: "18px 20px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <strong style={{ flex: 1, font: `500 17px ${TIGHT_X}`, color: "var(--crm-ink)" }}>{who.name} · Leave</strong>
+          <button type="button" onClick={close} aria-label="Close" style={{ ...XBTN, width: "30px", height: "30px", borderRadius: "15px", background: "var(--crm-field)", color: "var(--crm-ink)", fontSize: "15px" }}>×</button>
+        </div>
+        <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>No new leads go to them on these days. Their own customers stay theirs; their upline is told when the leave starts.</span>
+        {list.map(l => (
+          <div key={l.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "8px", background: l.from <= bits.today ? "var(--crm-tint-attention)" : "var(--crm-field)", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)" }}>
+            <span style={{ fontWeight: 500 }}>{dRange(l)}</span>
+            <span style={{ flex: 1, minWidth: 0, color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.note}</span>
+            {bits.can && <button type="button" onClick={() => setF({ id: l.id, from: l.from, to: l.to, note: l.note })} style={{ ...XBTN, font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>Change</button>}
+            {bits.can && <button type="button" aria-label="Remove leave" onClick={() => { if (window.confirm(`Remove ${who.name} · leave ${dRange(l)}?`)) void bits.remove(l.id); }} style={{ ...XBTN, font: "500 14px Inter, sans-serif", color: "var(--crm-oxblood)" }}>×</button>}
+          </div>
+        ))}
+        {!list.length && <span style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-faint)" }}>No leave set.</span>}
+        {bits.can && (<>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "4px" }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: "4px", font: "500 11px Inter, sans-serif", color: "var(--crm-muted)" }}>First day off
+              <input type="date" value={f.from} min={f.id ? undefined : bits.today} onChange={e => setF({ ...f, from: e.target.value, to: f.to < e.target.value ? e.target.value : f.to })} style={field} /></label>
+            <label style={{ display: "flex", flexDirection: "column", gap: "4px", font: "500 11px Inter, sans-serif", color: "var(--crm-muted)" }}>Last day off
+              <input type="date" value={f.to} min={f.from} onChange={e => setF({ ...f, to: e.target.value })} style={field} /></label>
+          </div>
+          <input value={f.note} maxLength={200} onChange={e => setF({ ...f, note: e.target.value })} placeholder="Note (optional) — annual leave, MC…" style={field} />
+          {bad && <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-oxblood)" }}>{bad}</span>}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+            {f.id && <button type="button" onClick={() => setF(blank)} style={{ ...XBTN, height: "34px", padding: "0 14px", borderRadius: "8px", border: "1px solid var(--crm-line)", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>New leave instead</button>}
+            <button type="button" disabled={!!bad || busy} onClick={save} style={{ ...XBTN, height: "34px", padding: "0 16px", borderRadius: "8px", font: "600 13px Inter, sans-serif", color: "#fff", background: bad ? "var(--crm-line)" : "var(--crm-rust)" }}>{busy ? "Saving…" : f.id ? "Save changes" : "Add leave"}</button>
+          </div>
+        </>)}
       </div>
     </div>
   );

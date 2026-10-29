@@ -5,7 +5,7 @@
  * Notifications page (Unread | Read, categories, Select, Delete with a 30 s Undo). The read state is the phone's
  * (crm_read_notifs); what the Principal or Director sets here is what everybody's CRM uses.
  */
-import type { CrmReplyItem, CrmTemplate } from "@/lib/member/crm-data";
+import type { CrmLeave, CrmReplyItem, CrmTemplate } from "@/lib/member/crm-data";
 import { panelNotifs } from "../../panel/vm/notifs";
 import { urgencyOf } from "../../sales/vm/common";
 import { DEFAULT_CRM_SETTINGS, type CrmSettings } from "@/lib/member/crm-data";
@@ -56,7 +56,14 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     ...(ctx.directors.length ? [{ name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: ctx.directors }] : []),
     ...teams.map((t, k) => ({ name: t.name, color: teamColours(k)[0], people: t.people })),
   ], lk, p => jobTitle(p as (typeof teams)[number]["people"][number]), ui.actDraft, d => patch({ actDraft: d }), act.setLocked, msg => patch({ toast: msg }));
-  const actVM = { ...actBase, leads: actLeads };
+  // Members' leave (2026-10-29, the owner: "可以设定 member 的休假，不要派名单给他"): the office's today, each member's leaves
+  // not ended yet, and the writes (CRM · Manage).
+  const today = new Date(ctx.now.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
+  const leaveOf: Record<string, CrmLeave[]> = {};
+  (data.leaves ?? []).filter(l => l.to >= today).forEach(l => { (leaveOf[l.staffId] ??= []).push(l); });
+  const actVM = { ...actBase, leads: actLeads, leave: { can: !!data.can.manage, today, of: leaveOf,
+    save: (l: { id: string | null; staffId: string; from: string; to: string; note: string }) => act.saveLeave(l).then(okd => { if (okd) patch({ toast: "Saved · Leave" }); return okd; }),
+    remove: (id: string) => act.deleteLeave(id).then(okd => { if (okd) patch({ toast: "Leave removed" }); return okd; }) } };
   const mwtSave = () => { if (!dirty) return; const changed = Object.keys(on).filter(id => !!on[id] !== !!saved[id]);
     void Promise.all(changed.map(id => act.setFullTime(id, !!on[id]))).then(rs => { if (rs.every(Boolean)) patch({ mwt: null, mwtSaved: true, toast: "Saved · Member work type" }); }); };
 

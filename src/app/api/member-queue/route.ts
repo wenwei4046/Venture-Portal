@@ -40,6 +40,10 @@ export async function GET(request: Request) {
     const crmDue = await db.rpc('notify_crm_due')
     if (crmDue.error) console.error('CRM due notices failed', crmDue.error.code ?? 'unknown')
     else if (crmDue.data) console.info('CRM due notices written', crmDue.data)
+    // A member's leave that has started: their upline is told once (mig 20261029220000). A count only.
+    const crmLeave = await db.rpc('crm_notify_leave_starts')
+    if (crmLeave.error) console.error('CRM leave notices failed', crmLeave.error.code ?? 'unknown')
+    else if (crmLeave.data) console.info('CRM leave notices written', crmLeave.data)
     // A probation or a contract ending (mig 20261024223000; both, 30 and again 15 days before, since 20261025046500): each
     // reminder once to each HR app holder who may still acknowledge it, asked as them — then sent by the flush below. A
     // count only (the names are people's).
