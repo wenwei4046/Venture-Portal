@@ -983,8 +983,8 @@ GRANT EXECUTE ON FUNCTION public.payment_requests_attach_pv(uuid[], uuid, jsonb)
 
 -- ── Claim in every view ─────────────────────────────────────────────────────
 -- The staff send theirs from their own view's sidebar (the mockup: Claim above Meeting Rooms in each): the Department
--- view's and Marketing's rows are there already; the HR view gets its own tab (Admin, beside the rooms) and Finance's
--- view its own (the account menu, beside Meeting Rooms) — one's own claims at Own, as the other two (lib/permission-tabs.ts).
+-- view's and Marketing's rows are there already; the HR view gets its own tab (Admin, above the rooms) and Finance's
+-- view its own (the account menu's Account) — one's own claims at Own, as the other two (lib/permission-tabs.ts).
 INSERT INTO public.permission_page_tabs (page, tab_id) VALUES
   ('/claims', 'hr.my_claims'),
   ('/claims', 'fin.my_claims')

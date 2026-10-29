@@ -1,5 +1,26 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-29 r (PR ② built, not merged) — the claim process: the staff's own requests to Finance
+
+Session e73c0205. The user settled the claim process with the boss (2026-10-29; the design is
+`OneDrive\Desktop\Claude\Venture\mockups\claims-flow-mockup.html`, the plan `docs/module-spec-payment-requests.md`,
+PR ① to ⑥). PR ① shipped as #840 (Payments › Payment voucher / Payment request; Return to HR; mig 20261029160000).
+"可以，开始做 PR ②" → branch `feat/payment-requests-staff`:
+
+- **Claim** (`/claims`, rebuilt — the old pool-claims code stays until PR ⑥): one's own claims and direct payments in
+  Payment voucher's hub; the drawer's Edit / Submit / Cancel request; **New request** pop-out (what it is · what it was
+  for, receipts straight to R2 · which pool pays or Split it). Rows: Department / Marketing say Claim; HR › Admin ›
+  Claim; Finance's account menu › Account › Claim (personal logins only, never while viewing as).
+- **Payments › Payment request**: the requests under their department's card; Bill back? Yes / No per share; Reject…;
+  Create PV = today's Create payment window filled in (`createPaymentForRequests`), same payee's open requests
+  combined, receipts copied onto the voucher (`.copyTo`), Yes shares drafted as DRAFT invoices in the same database
+  step that ties the requests (`payment_requests_attach_pv`).
+- **Mig `20261029180000_payment_requests`**: dry-run on production (BEGIN … ROLLBACK, with a smoke as LI SEAN →
+  ONG MEI SHUANG) clean; NOT applied — waits for the user's go, then the merge waits for the user's word. SQL
+  validator 75 checks. No Anthropic key, no invoice reading (PR ⑤ shelved: "不要开key 先").
+- Next: PR ③ (By management approve, Claim & approve, the notices), ④ (several at once), ⑥ (the rest) — each on the
+  user's go.
+
 ## CHECKPOINT 2026-10-26 q (SHIPPED, #779) — an opened account's lines as rows of the sheet, under their months; L4; clearer words
 
 Session e73c0205 (the #754 session). The user, showing #754's drill: "我点开了还是这样" — the fifth-round design
