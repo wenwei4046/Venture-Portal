@@ -35,6 +35,15 @@ describe("HR's sidebar", () => {
     expect(items({ ...own, viewingAs: { id: 'other', name: 'Other' } }).map(i => i.key)).not.toContain('it-support')
   })
 
+  // 2026-10-29 (the claim process): one's own requests to Finance, above the rooms — a person's own login only.
+  it('lists Claim in Admin for a login of one’s own that sends claims — never a shared one, nor while viewing as', () => {
+    const li = withActions({ id: 'l', role: 'hr', permissions: ['claims', 'meeting_rooms', 'audit_log'] }) as unknown as NavViewer
+    const admin = (viewer: NavViewer) => visibleHrNav(hrNavSections(null), viewer).find(s => s.label === 'Admin')?.items.map(i => i.label) ?? []
+    expect(admin({ ...li, personalLogin: true }).slice(0, 2)).toEqual(['Claim', 'Room schedule'])
+    expect(admin({ ...li, personalLogin: false })).not.toContain('Claim')
+    expect(admin({ ...li, personalLogin: true, viewingAs: { id: 'x', name: 'X' } })).not.toContain('Claim')
+  })
+
   it('opens Revenue on the sub-department it is handed, each Sales Groups tab its own row', () => {
     const rev = hrNavSections('ir').find(s => s.label === 'Revenue')!
     expect(rev.items.slice(0, 6).map(i => i.href)).toEqual([
@@ -123,7 +132,7 @@ describe("HR's sidebar", () => {
     ['/admin/rooms', '', 'roomSched'],
     ['/audit-log/access', '', 'audit'],
     ['/it-support', '', 'it-support'],
-    ['/claims', '', null],
+    ['/claims', '', 'claim'],
     ['/revenue/department', '', null],
   ])('%s?%s lights %s', (path, search, key) => {
     expect(activeHrNavKey(hrNavSections('fair'), path, q(search))).toBe(key)

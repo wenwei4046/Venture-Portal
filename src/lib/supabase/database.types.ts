@@ -8534,6 +8534,28 @@ export type Database = {
         Args: { p_fund_source_id: string }
         Returns: undefined
       }
+      payment_request_context: { Args: never; Returns: Json }
+      my_payment_requests: { Args: never; Returns: Json }
+      payment_request_save: {
+        Args: { p_request: string | null; p_data: Json; p_submit: boolean }
+        Returns: Json
+      }
+      payment_request_cancel: { Args: { p_request: string }; Returns: Json }
+      payment_request_file: { Args: { p_file: string }; Returns: Json }
+      payment_requests_for_finance: { Args: never; Returns: Json }
+      payment_request_reject: {
+        Args: { p_request: string; p_reason: string }
+        Returns: undefined
+      }
+      payment_request_bill_back: {
+        Args: { p_share: string; p_bill_back: boolean }
+        Returns: undefined
+      }
+      payment_requests_for_pv: { Args: { p_ids: string[] }; Returns: Json }
+      payment_requests_attach_pv: {
+        Args: { p_ids: string[]; p_pv: string; p_bill: Json }
+        Returns: Json
+      }
     }
     Enums: {
       account_type:

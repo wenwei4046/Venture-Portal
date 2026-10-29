@@ -56,3 +56,6 @@
   .override { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .override > :last-child { grid-column: 1 / -1; }
 }
+
+/* A receipt carried over from the staff request a Create PV pays (2026-10-29, PR ②): filed on the voucher with it. */
+.carried { font-size: 11.5px; color: rgb(var(--hvs-muted)); white-space: nowrap; }

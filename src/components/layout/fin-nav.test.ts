@@ -128,10 +128,12 @@ describe("Finance's account menu", () => {
   it('opens Account and Admin for Carrie', () => {
     const groups = visibleAccountMenu(finAccountMenu(), carrie)
     expect(groups.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([
-      // No Edit profile (2026-10-17): one's record changes through Me › Profile, which HR approves.
-      ['Account', ['Change password', 'IT support']],
+      // No Edit profile (2026-10-17): one's record changes through Me › Profile, which HR approves. Claim (2026-10-29):
+      // her own requests to Finance.
+      ['Account', ['Change password', 'IT support', 'Claim']],
       ['Admin', ['Audit Log', 'Meeting Rooms']],
     ])
+    expect(accountMenuActive(finAccountMenu(), '/claims', null)).toBe('claim')
   })
 
   it('lets a shared login ask IT for help, with no password control', () => {

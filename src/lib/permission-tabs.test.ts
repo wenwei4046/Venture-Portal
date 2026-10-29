@@ -44,7 +44,8 @@ describe('the tab catalog (HR revamp 8)', () => {
       'Documentation', 'Hiring requests', 'Hiring insights', 'Talent Bank',
       // HR › Attendance (20261015030000), in the sidebar's order.
       'Attendance today', 'Attendance records', 'Attendance requests', 'Leave balances', 'Month close', 'Attendance settings', 'Readiness',
-      'Meeting Rooms', 'Guest Link', 'Audit Log',
+      // One's own claims (2026-10-29), above the rooms as the sidebar has it.
+      'Claim', 'Meeting Rooms', 'Guest Link', 'Audit Log',
     ])
     expect(PERMISSION_TABS.filter(t => t.view === 'rev').map(t => t.label).slice(0, 8)).toEqual([
       'Today', 'Insight', 'Quote', 'Arena', 'Profile · My income', 'Profile · Requests', 'Profile · Waiting list & replacements', 'Profile · Team & capacity',
@@ -66,6 +67,31 @@ describe('the tab catalog (HR revamp 8)', () => {
     // Finance · Checker's two claims cells went with the box (mig 20261016140000): it ticks no claims box anywhere.
     expect([...moved('fin_checker')].filter(g => g.includes('claims'))).toEqual([])
     expect(views(moved('fin_checker'))).not.toContain('pri')
+  })
+
+  // 2026-10-29 (the claim process): every view has its own Claim — one's own requests only, never a department's.
+  it('gives the HR and Finance views a Claim of their own, at Own, beside the Department view’s', () => {
+    for (const id of ['hr.my_claims', 'fin.my_claims', 'mkt.my_claims', 'dept.my_claims']) {
+      const t = PERMISSION_TABS.find(x => x.id === id)!
+      expect([t.label, t.reach], id).toEqual(['Claim', 'own'])
+      expect(t.opens).toEqual({ view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'] })
+    }
+    // Worked out from cells, a Finance or an HR template ticks its own view's beside the Department view's (one reach,
+    // side by side) — the same cells; Staff · Basic keeps the Department view's alone.
+    expect([...moved('fin_maker')].filter(g => g.includes('my_claims')).sort()).toEqual(['dept.my_claims.create', 'dept.my_claims.view', 'fin.my_claims.create', 'fin.my_claims.view'])
+    expect([...moved('staff')].filter(g => g.includes('my_claims')).sort()).toEqual(['dept.my_claims.create', 'dept.my_claims.edit', 'dept.my_claims.view'])
+    for (const key of ['fin_maker', 'hr', 'staff']) {
+      expect(lossesOf(cellsOf(PROD[key].cells), moved(key)), key).toEqual([])
+    }
+  })
+
+  // The migration that gave HR · Payroll's stored ticks the HR view's Claim (20261029180000): the cells it holds, none more.
+  it('HR · Payroll’s stored Claim ticks stand for cells it already holds', () => {
+    const sql = readFileSync(resolve(process.cwd(), 'supabase/migrations/20261029180000_payment_requests.sql'), 'utf8')
+    const block = /SELECT t\.id, 'hr\.my_claims', a\s+FROM public\.permission_templates t, unnest\(ARRAY\[([^\]]*)\]\) a\s+WHERE t\.key = 'hr'/.exec(sql)
+    expect(block).not.toBeNull()
+    const ticks = [...block![1].matchAll(/'(\w+)'/g)].map(m => grantOf('hr.my_claims', m[1] as never))
+    expect(gainsOf(cellsOf(PROD.hr.cells), ticks)).toEqual([])
   })
 
   it('reads a stored box back, and refuses one that does not exist', () => {

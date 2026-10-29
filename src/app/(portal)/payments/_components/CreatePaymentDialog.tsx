@@ -5,14 +5,15 @@ import { DateField } from '@/components/finv/DateField'
 import { DialogButton, DialogForm, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
 import { FilesField } from '@/components/finv/FilesField'
 import { PartyInput } from '@/components/finv/PartyInput'
-import { filesProblem, money, neededSentence, num, poolName, shortDay } from '@/components/finv/form-words'
+import { fileSize, filesProblem, money, neededSentence, num, poolName, shortDay } from '@/components/finv/form-words'
 import fm from '@/components/finv/form.module.css'
 import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { typeLabel, type AccountType } from '@/lib/coa'
 import { buildRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
 import { stageInto } from '@/lib/storage/stage'
-import { createPaymentFromDialog } from '../actions'
+import { billBackCategories, type RequestVoucherStart } from '@/lib/payment-requests/model'
+import { createPaymentFromDialog, type DialogPaymentResult } from '../actions'
 import { openCreatePayment } from '../create-actions'
 import type { CreatePaymentOptions } from '../_lib/create-payment-options'
 import c from './create.module.css'
@@ -28,7 +29,9 @@ import c from './create.module.css'
 // its principal / interest / penalty, a line each), an internal transfer, the
 // method and notes open from the small buttons under them. The voucher is the
 // form page's (createPaymentVoucherInner, every rule); the dialog stays on
-// Payments and says what it made.
+// Payments and says what it made. Payment request's Create PV (2026-10-29)
+// opens this same window filled in from the staff requests it pays — "generate
+// 的pv 是和我原本普通开pv 的样子一样" — and saves through its own action.
 
 const METHODS = [
   { value: 'bank_transfer', label: 'Bank transfer' },
@@ -48,6 +51,8 @@ interface Line {
   amount: string
   role?: RepaymentRole
   autoAccount?: boolean
+  /** The staff request it pays (Create PV from Payment request): its bill backs take this line's category. */
+  requestId?: string
 }
 
 // The words are the kit's (components/finv/form-words), kept importable from here.
@@ -65,15 +70,19 @@ export interface PaymentPreset {
   companyId?: string | null
   amount?: number
   description?: string
+  /**
+   * Payments › Payment request's Create PV (2026-10-29, PR ②): the staff requests it pays — a line per item on the
+   * requester's department's pool (the category Finance's), the account under Pay to, the notes, the receipts it
+   * carries over, and the shares Finance said Yes to bill back.
+   */
+  requests?: RequestVoucherStart
 }
 
-/** A dialog's first line: Venture's, on the amount a payment begun elsewhere brings. */
-const firstLine = (preset: PaymentPreset | null): Line => ({
-  description: '',
-  pool: 'venture_pool',
-  account: '',
-  amount: preset?.amount ? preset.amount.toFixed(2) : '',
-})
+/** A dialog's lines: a line per item of the requests it pays, else Venture's, on the amount a payment begun elsewhere brings. */
+const firstLines = (preset: PaymentPreset | null): Line[] =>
+  preset?.requests && preset.requests.lines.length > 0
+    ? preset.requests.lines.map((l) => ({ description: l.description, pool: l.pool, account: '', amount: l.amount.toFixed(2), requestId: l.requestId }))
+    : [{ description: '', pool: 'venture_pool', account: '', amount: preset?.amount ? preset.amount.toFixed(2) : '' }]
 
 export default function CreatePaymentDialog({
   open,
@@ -82,6 +91,7 @@ export default function CreatePaymentDialog({
   today,
   initial = null,
   preset = null,
+  create = createPaymentFromDialog,
   onSaved,
 }: {
   open: boolean
@@ -94,6 +104,8 @@ export default function CreatePaymentDialog({
   initial?: CreatePaymentOptions | null
   /** A payment begun elsewhere — what it starts from (each opening starts from it again). */
   preset?: PaymentPreset | null
+  /** What saves it: the dialog's own, or Payment request's (the requests tied to the voucher it makes). */
+  create?: (fd: FormData) => Promise<DialogPaymentResult>
   /** Saved: the voucher it made (the caller refreshes what it shows). */
   onSaved?: (voucher: { id: string; voucherNo: string }) => void
 }) {
@@ -104,19 +116,19 @@ export default function CreatePaymentDialog({
   const [bankId, setBankId] = useState(initial?.banks[0]?.id ?? '')
   const [desc, setDesc] = useState(preset?.description ?? '')
   const [date, setDate] = useState(today)
-  const [lines, setLines] = useState<Line[]>(() => [firstLine(preset)])
+  const [lines, setLines] = useState<Line[]>(() => firstLines(preset))
   // What the small buttons open.
   const [repay, setRepay] = useState(false)
   const [transfer, setTransfer] = useState(false)
   const [showMethod, setShowMethod] = useState(false)
-  const [showNotes, setShowNotes] = useState(false)
+  const [showNotes, setShowNotes] = useState(!!preset?.requests?.notes)
   const [dealId, setDealId] = useState('')
   const [principal, setPrincipal] = useState('0.00')
   const [interest, setInterest] = useState('0.00')
   const [penalty, setPenalty] = useState('0.00')
   const [method, setMethod] = useState('bank_transfer')
   const [files, setFiles] = useState<File[]>([])
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes] = useState(preset?.requests?.notes ?? '')
   const [busy, setBusy] = useState<'draft' | 'submit' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -146,18 +158,18 @@ export default function CreatePaymentDialog({
     setBankId(opts?.banks[0]?.id ?? '')
     setDesc(preset?.description ?? '')
     setDate(today)
-    setLines([firstLine(preset)])
+    setLines(firstLines(preset))
     setRepay(false)
     setTransfer(false)
     setShowMethod(false)
-    setShowNotes(false)
+    setShowNotes(!!preset?.requests?.notes)
     setDealId('')
     setPrincipal('0.00')
     setInterest('0.00')
     setPenalty('0.00')
     setMethod('bank_transfer')
     setFiles([])
-    setNotes('')
+    setNotes(preset?.requests?.notes ?? '')
     setError(null)
   }
   const close = () => {
@@ -241,10 +253,13 @@ export default function CreatePaymentDialog({
   if (method !== 'netting' && !bankId) need.push('a bank')
   if (!desc.trim()) need.push('a description')
   const offBy = repay && total > 0 && lines.length > 0 ? Math.round((total - lineSum) * 100) / 100 : 0
+  // A request's Yes share is invoiced at the category of that request's lines on this voucher.
+  const billBack = preset?.requests ? billBackCategories(preset.requests.billBack, lines) : []
   const problem =
     neededSentence(need) ??
     (Math.abs(offBy) > 0.005 ? `The lines add up to RM ${money(lineSum)} — the amount is RM ${money(total)}.` : null) ??
-    filesProblem(files)
+    filesProblem(files) ??
+    (billBack.some((b) => !b.category) ? 'Keep a line of each request billed back — its invoice takes that line’s category.' : null)
   const ok = problem === null && !!opts
 
   const save = async (submit: boolean) => {
@@ -281,10 +296,14 @@ export default function CreatePaymentDialog({
     }
     fd.set('attachment_count', String(files.length))
     if (submit) fd.set('submit', '1')
+    if (preset?.requests) {
+      fd.set('payment_request_ids', JSON.stringify(preset.requests.requestIds))
+      fd.set('payment_request_bill', JSON.stringify(billBack))
+    }
     try {
       // Each file sent ahead, the save carrying only its line (2026-10-23 — no longer 4 MB for them all).
       for (const [i, f] of files.entries()) await stageInto(fd, `attachment_${i}`, f)
-      const res = await createPaymentFromDialog(fd)
+      const res = await create(fd)
       if (!res.ok) {
         setError(res.reason)
         return
@@ -378,6 +397,7 @@ export default function CreatePaymentDialog({
                 setCompanyId(id)
               }}
             />
+            {preset?.requests?.payInto ? <Hint>{preset.requests.payInto}</Hint> : null}
           </Field>
           <Field label="Payment date">
             <DateField value={date} onChange={setDate} today={today} label="Payment date" />
@@ -483,6 +503,19 @@ export default function CreatePaymentDialog({
         </Field>
 
         <Field label="Attachments">
+          {preset?.requests && preset.requests.files.length > 0 ? (
+            <div className={fm.files}>
+              {preset.requests.files.map((f) => (
+                <div key={f.id} className={fm.file}>
+                  <span className={fm.fileName} title={f.name}>
+                    {f.name}
+                  </span>
+                  <span className={fm.fileSize}>{f.size ? fileSize(f.size) : ''}</span>
+                  <span className={c.carried}>From the request</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
           <FilesField files={files} onChange={setFiles} />
         </Field>
 

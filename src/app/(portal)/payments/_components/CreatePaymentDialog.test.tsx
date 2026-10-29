@@ -342,3 +342,54 @@ describe('the lines', () => {
     expect(screen.getByRole('button', { name: 'Payment date: Wed, 30 Sep 2026' })).toBeInTheDocument()
   })
 })
+
+// Payment request's Create PV (2026-10-29, PR ②): this same window, filled in from the staff requests it pays — a line
+// per item on the department's pool, the category Finance's — saved through Payment request's own action with the
+// requests and each Yes share's category (its request's line's).
+describe('from staff requests', () => {
+  const requests = {
+    requestIds: ['r1', 'r2'],
+    payee: 'KHO WEI JIE',
+    payInto: 'Pay into Hong Leong Bank 12345674821 · salary account',
+    description: '2 requests · KHO WEI JIE',
+    lines: [
+      { requestId: 'r1', description: 'Claude · Oct', pool: 'dept_pool_marketing', amount: 453.79 },
+      { requestId: 'r2', description: 'Jian Ying', pool: 'dept_pool_marketing', amount: 325.79 },
+    ],
+    notes: 'From Payment request · PRQ-2610-0001, PRQ-2610-0002',
+    billBack: [{ shareId: 's1', requestId: 'r2' }],
+    files: [{ id: 'f1', name: 'Receipt-2932.pdf', size: 1200 }],
+  }
+
+  it('starts on the requests and saves through the action it is handed, with the requests and each bill back’s category', async () => {
+    const create = vi.fn().mockResolvedValue({ ok: true, id: 'pv-9', voucherNo: 'HV-PV-202610-0700', submitted: false })
+    draw({ preset: { title: 'Create PV', payee: requests.payee, description: requests.description, requests }, create })
+    await act(async () => undefined)
+    expect(within(dialog()).getByText('Create PV')).toBeInTheDocument()
+    expect(screen.getByLabelText('Pay to')).toHaveValue('KHO WEI JIE')
+    expect(dialog()).toHaveTextContent('Pay into Hong Leong Bank 12345674821 · salary account')
+    expect([screen.getByLabelText('Line 1 description'), screen.getByLabelText('Line 2 amount')].map((i) => (i as HTMLInputElement).value)).toEqual(['Claude · Oct', '325.79'])
+    expect(dialog()).toHaveTextContent('Receipt-2932.pdf')
+    expect(screen.getByLabelText('Notes')).toHaveValue('From Payment request · PRQ-2610-0001, PRQ-2610-0002')
+    fireEvent.change(screen.getByLabelText('Line 1 category'), { target: { value: '9087' } })
+    fireEvent.change(screen.getByLabelText('Line 2 category'), { target: { value: '6000' } })
+    await save()
+    const form = create.mock.calls[0][0] as FormData
+    expect(JSON.parse(form.get('payment_request_ids') as string)).toEqual(['r1', 'r2'])
+    expect(JSON.parse(form.get('payment_request_bill') as string)).toEqual([{ share: 's1', category: '6000' }])
+    expect(form.get('notes')).toBe('From Payment request · PRQ-2610-0001, PRQ-2610-0002')
+    expect(form.get('source_rows[1][pool]')).toBe('dept_pool_marketing')
+    expect(mocks.create).not.toHaveBeenCalled()
+  })
+
+  it('a request billed back keeps a line on the voucher — its invoice takes that line’s category', async () => {
+    const create = vi.fn()
+    draw({ preset: { payee: requests.payee, description: requests.description, requests }, create })
+    await act(async () => undefined)
+    fireEvent.change(screen.getByLabelText('Line 1 category'), { target: { value: '9087' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Remove line 2' }))
+    expect(dialog()).toHaveTextContent('Keep a line of each request billed back — its invoice takes that line’s category.')
+    await save()
+    expect(create).not.toHaveBeenCalled()
+  })
+})

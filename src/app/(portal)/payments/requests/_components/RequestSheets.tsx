@@ -14,11 +14,12 @@ import type { PayrollBank } from '@/app/(portal)/payments/payroll-requests/_lib/
 import { generatePvFromRequestInWords, sendBackPayrollInWords } from '@/app/(portal)/payments/payroll-requests/actions'
 import { raiseClaimVoucher } from '@/app/(portal)/payments/claim-requests/actions'
 import { generateDeptRequestPvInWords } from '@/app/(portal)/payments/dept-requests/actions'
-import { returnMemberClaim } from '../actions'
+import { rejectPaymentRequest, returnMemberClaim } from '../actions'
 
 // The windows a request is worked in (2026-10-29 — Payments › Payment request, and the Finance phone app's request
 // pages, which drew them first, 2026-10-16): a payroll's funding round and its send back to HR, a claim's voucher,
-// and a member's claim returned to HR. Each write is its page's own action, answered in words.
+// a member's claim returned to HR, and (PR ②) a staff request rejected back to its requester. Each write is its page's
+// own action, answered in words.
 
 /** The desktop's default destination: the Alliance payroll account (GL 3010), else the first bank that is not the source. */
 export function defaultDest(banks: PayrollBank[], source: string): string {
@@ -348,6 +349,62 @@ export function ReturnClaimSheet({ claim, onClose, onDone }: { claim: { id: stri
             if (e.target.value.trim()) setError(null)
           }}
           placeholder="Reason (required) — HR sees it"
+          aria-label="Reason"
+          maxLength={500}
+        />
+      </DialogConfirm>
+    </FinDialog>
+  )
+}
+
+/**
+ * Reject… a staff request (2026-10-29, PR ②): back to its requester with a reason they read on their Claim page — they
+ * fix it and send it again. Treasury · Void or Approve, as Return to HR.
+ */
+export function RejectRequestSheet({ request, onClose, onDone }: { request: { id: string; label: string; sub: string } | null; onClose: () => void; onDone: () => void }) {
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, start] = useTransition()
+  useEffect(() => {
+    if (!request) return
+    setReason('')
+    setError(null)
+  }, [request])
+  const close = () => !busy && onClose()
+  const confirm = () => {
+    if (!request) return
+    if (!reason.trim()) return setError('Say why — the requester reads it to fix the request.')
+    setError(null)
+    start(async () => {
+      try {
+        const res = await rejectPaymentRequest(request.id, reason)
+        if (!res.ok) return setError(res.reason)
+        onDone()
+      } catch {
+        setError('That did not go through. Try again.')
+      }
+    })
+  }
+  return (
+    <FinDialog open={request !== null} onClose={close} title={`Reject ${request?.label ?? 'this request'}?`} sub={request?.sub} locked={busy}>
+      <DialogConfirm
+        text="It goes back to the requester to fix and send again. They read your reason on their Claim page."
+        confirmLabel={busy ? 'Rejecting…' : 'Reject'}
+        danger
+        busy={busy}
+        off={!reason.trim()}
+        error={error}
+        onCancel={close}
+        onConfirm={confirm}
+      >
+        <TextArea
+          rows={3}
+          value={reason}
+          onChange={(e) => {
+            setReason(e.target.value)
+            if (e.target.value.trim()) setError(null)
+          }}
+          placeholder="Reason (required) — the requester reads it"
           aria-label="Reason"
           maxLength={500}
         />

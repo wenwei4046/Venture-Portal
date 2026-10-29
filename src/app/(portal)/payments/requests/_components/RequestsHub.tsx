@@ -9,11 +9,15 @@ import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { fd } from '@/components/finv/DrawerParts'
 import type { PayrollRequestLine } from '@/lib/fin-app/payroll-requests-model'
 import { f2, rm } from '@/lib/fin-app/page-model'
+import { samePayeeOpen, voucherStart, type PaymentRequest, type RequestVoucherStart } from '@/lib/payment-requests/model'
 import { VoucherDrawer } from '../../_components/VoucherDrawer'
+import CreatePaymentDialog from '../../_components/CreatePaymentDialog'
+import { createPaymentForRequests } from '../../actions'
+import { openRequestsForPv } from '../actions'
 import type { PaymentRequestsRead } from '../_lib/requests-read'
 import { ALL_CARD, requestCards, requestHero, rowsOf, stageChip, type PaymentRequestRow } from '../_lib/requests-model'
 import { RequestDrawer } from './RequestDrawer'
-import { FundSheet, RaiseSheet, ReturnClaimSheet, SendBackSheet, type RaiseTarget } from './RequestSheets'
+import { FundSheet, RaiseSheet, RejectRequestSheet, ReturnClaimSheet, SendBackSheet, type RaiseTarget } from './RequestSheets'
 
 // Payments › Payment request (2026-10-29, PR ①): Payment voucher's hub, its parts as they are — the head, the cards
 // beside the list (All, Payroll, every department: the agreed tabs, as the hub's filters), the table with its column
@@ -46,6 +50,11 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
   const [sending, setSending] = useState<PayrollRequestLine | null>(null)
   const [raising, setRaising] = useState<RaiseTarget | null>(null)
   const [returning, setReturning] = useState<{ id: string; label: string; sub: string } | null>(null)
+  const [rejecting, setRejecting] = useState<{ id: string; label: string; sub: string } | null>(null)
+  // Create PV from staff requests: what the window starts from — asked first (still with Finance, every share answered).
+  const [pv, setPv] = useState<{ key: string; start: RequestVoucherStart } | null>(null)
+  const [pvOpen, setPvOpen] = useState(false)
+  const [pvError, setPvError] = useState<string | null>(null)
 
   // The card a link or a refresh lands on (?card=), once the cards are known; then kept in the URL as it changes.
   useEffect(() => {
@@ -68,12 +77,41 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
   const active = cards.find((c) => c.key === card) ?? cards[0]
   const openRow = data.rows.find((r) => r.key === open) ?? null
 
+  // The same person's requests with no PV yet go into one PV, until Finance makes it (the user: "自动合成认的是我有没有开pv").
+  const staffRequests = useMemo(() => data.rows.flatMap((r) => (r.request ? [r.request] : [])), [data.rows])
+  const createRequestPv = async (r: PaymentRequestRow) => {
+    if (!r.request) return
+    setPvError(null)
+    const together: PaymentRequest[] = samePayeeOpen(staffRequests, r.request)
+    const unanswered = together.find((x) => x.shares.some((s) => s.billBack === null))
+    if (unanswered) {
+      setOpen(`request:${unanswered.id}`)
+      setPvError(`Answer Bill back? for ${unanswered.requestNo ?? 'its request'} first — it goes into the same PV.`)
+      return
+    }
+    try {
+      const res = await openRequestsForPv(together.map((x) => x.id))
+      if (!res.ok) {
+        setOpen(r.key)
+        return setPvError(res.reason)
+      }
+      setPv({ key: res.requests.map((x) => x.id).join(','), start: voucherStart(res.requests) })
+      setPvOpen(true)
+    } catch {
+      setOpen(r.key)
+      setPvError('The requests could not be read. Try again.')
+    }
+  }
+
   const steps = {
     fund: (r: PaymentRequestRow) => r.payroll && setFunding(r.payroll),
     sendBack: (r: PaymentRequestRow) => r.payroll && setSending(r.payroll),
     createPv: (r: PaymentRequestRow) => setRaising({ id: r.id, label: r.from, value: f2(r.amount) }),
     returnToHr: (r: PaymentRequestRow) => setReturning({ id: r.id, label: r.from, sub: [r.ref, rm(r.amount)].filter(Boolean).join(' · ') }),
     openVoucher: (id: string) => setVoucher(id),
+    rejectRequest: (r: PaymentRequestRow) => setRejecting({ id: r.id, label: r.ref || r.from, sub: [r.from, rm(r.amount)].join(' · ') }),
+    createRequestPv: (r: PaymentRequestRow) => void createRequestPv(r),
+    changed: () => router.refresh(),
   }
   const waiting = (r: PaymentRequestRow) => r.stage === 'finance'
 
@@ -92,6 +130,10 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
     } else if (r.claim) {
       if (waiting(r) && data.can.pay) more.push({ key: 'pv', label: 'Create PV', onSelect: () => steps.createPv(r) })
       if (waiting(r) && data.can.sendBack && r.claim.claimType === 'benefit') more.push({ key: 'return', label: 'Return to HR…', danger: true, onSelect: () => steps.returnToHr(r) })
+      if (r.voucherId) more.push({ key: 'voucher', label: 'Open voucher', onSelect: () => steps.openVoucher(r.voucherId!) })
+    } else if (r.request) {
+      if (waiting(r) && data.can.pay) more.push({ key: 'pv', label: 'Create PV', onSelect: () => steps.createRequestPv(r) })
+      if (waiting(r) && data.can.sendBack) more.push({ key: 'reject', label: 'Reject…', danger: true, onSelect: () => steps.rejectRequest(r) })
       if (r.voucherId) more.push({ key: 'voucher', label: 'Open voucher', onSelect: () => steps.openVoucher(r.voucherId!) })
     }
     if (more.length > 0) items.push('sep', ...more)
@@ -119,7 +161,10 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
           amountOf={(r) => r.amount}
           search={{ value: query, onChange: setQuery, placeholder: 'Search name, what, reference…' }}
           activeKey={open}
-          onRowClick={(r) => setOpen(r.key)}
+          onRowClick={(r) => {
+            setPvError(null)
+            setOpen(r.key)
+          }}
           onRowContextMenu={onRowContextMenu}
           emptyText={data.rows.length === 0 ? 'Nothing is waiting for Finance.' : 'No requests here.'}
           canSetDefault={data.canSetDefault}
@@ -127,7 +172,7 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
         />
       </div>
 
-      <RequestDrawer row={openRow} onClose={() => setOpen(null)} can={data.can} steps={steps} />
+      <RequestDrawer row={openRow} onClose={() => setOpen(null)} can={data.can} steps={steps} stepError={pvError} />
       <VoucherDrawer id={voucher} onClose={() => setVoucher(null)} onChanged={() => router.refresh()} />
 
       <FundSheet
@@ -168,6 +213,31 @@ export default function RequestsHub({ data }: { data: PaymentRequestsRead }) {
           done('Returned to HR')
         }}
       />
+      <RejectRequestSheet
+        request={rejecting}
+        onClose={() => setRejecting(null)}
+        onDone={() => {
+          setRejecting(null)
+          done('Rejected — back with the requester')
+        }}
+      />
+      {pv ? (
+        <CreatePaymentDialog
+          key={pv.key}
+          open={pvOpen}
+          onClose={() => setPvOpen(false)}
+          prefix={`HV-PV-${data.today.slice(0, 7).replace('-', '')}`}
+          today={data.today}
+          preset={{ title: 'Create PV', payee: pv.start.payee, description: pv.start.description, requests: pv.start }}
+          create={createPaymentForRequests}
+          onSaved={(made) => {
+            setPvOpen(false)
+            setOpen(null)
+            router.refresh()
+            setVoucher(made.id)
+          }}
+        />
+      ) : null}
       {rowMenuNode}
     </div>
   )

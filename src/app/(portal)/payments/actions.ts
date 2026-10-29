@@ -9,7 +9,8 @@ import { officeDate } from '@/lib/office-clock'
 import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { dropStaged, dropStagedIn, formFile, formFiles, type FormFile } from '@/lib/storage/staged'
-import { requireActionOn, requireApproverOn, requirePermission } from '@/lib/auth'
+import type { FileBucketApi } from '@/lib/storage/server'
+import { mayActOn, requireActionOn, requireApproverOn, requirePermission } from '@/lib/auth'
 import { decision } from '@/lib/approval-domains'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
@@ -890,6 +891,102 @@ export async function createPaymentFromDialog(formData: FormData): Promise<Dialo
         voucherNo: made.voucherNo,
         submitted: false,
         note: `Saved as a draft — it was not sent for approval: ${err instanceof Error ? err.message : 'unknown error'}`,
+      }
+    }
+  } catch (err) {
+    if (isRedirect(err)) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** A form field holding a JSON list, as far as it is one. */
+function jsonList(raw: FormDataEntryValue | null): unknown[] {
+  try {
+    const v = typeof raw === 'string' ? JSON.parse(raw) : null
+    return Array.isArray(v) ? v : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Create PV from Payments › Payment request (2026-10-29, PR ② of docs/module-spec-payment-requests.md): the voucher
+ * today's Create payment window makes (createPaymentVoucherInner — every rule), filled in from the staff requests it
+ * pays; then, in one database step, the requests are tied to it and each Yes share's invoice is drafted
+ * (`payment_requests_attach_pv` — refused, the draft voucher is voided again and nothing is tied); then the requests'
+ * receipts are carried onto it; then, when asked, it is sent for approval. Answered in words, never a redirect.
+ */
+export async function createPaymentForRequests(formData: FormData): Promise<DialogPaymentResult> {
+  try {
+    await requireActionOn('/payments/requests', 'treasury', 'create')
+    if (formData.get('direction') !== 'debit') return { ok: false, reason: 'Create PV makes a payment voucher.' }
+    if (formData.get('return_to')) formData.delete('return_to')
+    const ids = [...new Set(jsonList(formData.get('payment_request_ids')).filter((v): v is string => typeof v === 'string' && REQUEST_ID.test(v)))].slice(0, 20)
+    if (ids.length === 0) return { ok: false, reason: 'Which requests? Reload the page and try again.' }
+    const bill = jsonList(formData.get('payment_request_bill')).flatMap((b) => {
+      const o = b && typeof b === 'object' ? (b as Record<string, unknown>) : {}
+      return typeof o.share === 'string' && REQUEST_ID.test(o.share) && typeof o.category === 'string' ? [{ share: o.share, category: o.category.slice(0, 20) }] : []
+    })
+
+    const supabase = await createClient()
+    // Asked before anything is written: still with Finance, one payee into one account, every share answered.
+    const { data: ready, error: readyErr } = await supabase.rpc('payment_requests_for_pv', { p_ids: ids })
+    if (readyErr) return { ok: false, reason: readyErr.message }
+    if (bill.length > 0 && !(await mayActOn(['/ba', '/billing-allocator', '/statements'], 'billing', 'create'))) {
+      return { ok: false, reason: 'Billing back needs Invoice · Create — answer No, or ask for it.' }
+    }
+    const carry = ((ready as { files?: unknown } | null)?.files ?? []) as Array<{ id: string; path: string; name: string; contentType: string | null; size: number | null }>
+    const requestNos = new Map(
+      ((ready as { requests?: Array<{ id: string; requestNo: string | null; files?: Array<{ id: string }> }> } | null)?.requests ?? []).flatMap((r) =>
+        (r.files ?? []).map((f) => [f.id, r.requestNo ?? 'Payment request'] as const),
+      ),
+    )
+
+    const made = await createPaymentVoucherInner(formData)
+    const { error: tieErr } = await supabase.rpc('payment_requests_attach_pv', { p_ids: ids, p_pv: made.id, p_bill: bill as never })
+    if (tieErr) {
+      const voided = await voidHalfMadeVoucher(supabase, made.id)
+      return { ok: false, reason: `${clause(tieErr.message)} — ${voided ? `${made.voucherNo} was voided, nothing kept` : `void ${made.voucherNo}, it was not tied`}.` }
+    }
+
+    // The receipts, onto the voucher: each copied inside file storage and filed as its attachment.
+    let missed = 0
+    for (const f of carry) {
+      const target = `${made.id}/${crypto.randomUUID()}-${(f.name || 'file').replace(/[^\w.\-]/g, '_').slice(-80)}`
+      const copied = await (supabase.storage.from('payment-request-files') as unknown as FileBucketApi).copyTo('payment-attachments', f.path, target)
+      const filed = copied.error
+        ? { error: copied.error }
+        : await supabase.from('payment_attachments').insert({
+            voucher_id: made.id,
+            file_name: f.name,
+            file_type: f.contentType ?? 'application/octet-stream',
+            file_size: f.size ?? 0,
+            storage_path: target,
+            description: `From ${requestNos.get(f.id) ?? 'Payment request'}`,
+            uploaded_by: made.user.id,
+          })
+      if (filed.error) missed++
+    }
+    const notes = missed > 0 ? [`${missed === 1 ? 'A receipt' : `${missed} receipts`} could not be carried over — add ${missed === 1 ? 'it' : 'them'} on the voucher.`] : []
+
+    revalidatePath('/payments/requests')
+    revalidatePath('/claims')
+    revalidatePath('/statements')
+    if (formData.get('submit') !== '1') {
+      return { ok: true, id: made.id, voucherNo: made.voucherNo, submitted: false, ...(notes.length ? { note: `${made.voucherNo} saved as draft. ${notes[0]}` } : {}) }
+    }
+    try {
+      await submitDraftForApproval(supabase, made.user.id, made.id)
+      return { ok: true, id: made.id, voucherNo: made.voucherNo, submitted: true, ...(notes.length ? { note: `${made.voucherNo} submitted. ${notes[0]}` } : {}) }
+    } catch (err) {
+      return {
+        ok: true,
+        id: made.id,
+        voucherNo: made.voucherNo,
+        submitted: false,
+        note: [`Saved as a draft — it was not sent for approval: ${err instanceof Error ? err.message : 'unknown error'}`, ...notes].join(' '),
       }
     }
   } catch (err) {

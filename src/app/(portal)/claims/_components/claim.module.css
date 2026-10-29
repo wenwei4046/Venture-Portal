@@ -1,0 +1,54 @@
+/* The Claim page's window (2026-10-29, PR ②): what the Finance kit's forms do not draw already — the two places a
+   claim is paid into, a share's line (who, which, the amount, ×), a file still going up, and the reason Finance sent a
+   request back. The choices, the lines, the files and the fields are the kit's (components/finv). */
+
+/* A card of lines straight in the window's scrolling body: kept whole (the body is a column that shrinks what may
+   overflow — a card of lines clips, so it would shrink to nothing). */
+.part { flex: none; }
+
+/* A place to pay into, under "I paid — pay me back": the choice card's own radio row, smaller. */
+.option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 6px 0;
+  font-size: 13.5px;
+  color: rgb(var(--hvs-ink));
+  cursor: pointer;
+}
+.option input { flex: none; width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--ds-accent); cursor: pointer; }
+.option[data-off='true'] { opacity: 0.55; cursor: default; }
+.option[data-off='true'] input { cursor: default; }
+.option + .option { margin-bottom: 8px; }
+
+/* A share: a department or a company, which, the amount, ×. On a phone its two selects, then the amount and ×. */
+.shareRow {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) 112px 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 12px;
+}
+@media (max-width: 560px) {
+  .shareRow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .shareRow > :last-child { justify-self: end; }
+}
+
+/* A file still going up, or one that did not. */
+.fileState { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 11.5px; color: rgb(var(--hvs-muted)); }
+.fileState[data-state='failed'] { color: var(--ds-danger); font-family: inherit; font-size: 12px; }
+
+/* Why Finance sent it back, over the window — the requester fixes it from here. */
+.reason {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid rgb(var(--fv-card-pending) / 0.25);
+  border-radius: 10px;
+  background: rgb(var(--fv-notice));
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgb(var(--hvs-ink));
+}
+.reasonBy { font-size: 11.5px; font-weight: 600; color: rgb(var(--fv-card-pending)); }

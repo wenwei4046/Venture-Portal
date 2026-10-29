@@ -188,6 +188,15 @@ export function canSeeMyDocuments(u: { personalLogin?: boolean; viewingAs?: unkn
   return u.personalLogin === true && !u.viewingAs
 }
 
+/**
+ * Claim in the HR and Finance views (2026-10-29, the claim process): one's own requests to Finance — for whoever sends
+ * their own (Claims), from a login of one's own (a shared one is no person: no People record, no salary account to
+ * pay), never while viewing as somebody. As My documents'.
+ */
+export function canSendOwnClaims(u: PermissionHolder & { personalLogin?: boolean; viewingAs?: unknown }): boolean {
+  return canAccessClaims(u) && u.personalLogin === true && !u.viewingAs
+}
+
 export function canAccessAuditLog(u: PermissionHolder): boolean {
   // The whole history, and Audit Log › Access (who read what).
   return can(u, 'audit_log')

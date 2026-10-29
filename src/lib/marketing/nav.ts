@@ -50,7 +50,8 @@ export const MKT_NAV: readonly MktNavRow[] = [
   // Not in the handoff (2026-10-28 — the user: "Marketing view 加一行，打开就是 Finance 那页 Marketing 的 P&L / Cash
   // Flow"): Marketing's own pool, a box of its own (Marketing view › Pool).
   { key: 'pool', emoji: '🏦', label: 'Pool', tone: 'sand', href: '/marketing/pool', manager: true },
-  { key: 'claims', emoji: '🧾', label: 'My claims', tone: 'cream', href: '/claims', foot: true },
+  // One's own claims and direct payments to Finance — Claim since 2026-10-29 (the staff's word, the claim process).
+  { key: 'claims', emoji: '🧾', label: 'Claim', tone: 'cream', href: '/claims', foot: true },
   { key: 'rooms', emoji: '🚪', label: 'Meeting Rooms', tone: 'mist', href: '/admin/rooms', foot: true },
 ]
 
