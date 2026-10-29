@@ -199,10 +199,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     <div className={s.root}>
       <div className={s.wrap}>
         <header className={s.head}>
-          <div>
-            <div className={s.kicker}>HOUZS showrooms · for {page.name}</div>
-            <h1 className={s.title}>Book a showroom visit</h1>
-          </div>
+          <Greeting name={page.name} />
           <div className={s.lookup}>
             <label className={s.lookupLabel} htmlFor="ref">Find a booking</label>
             <div className={s.lookupRow}>
@@ -378,10 +375,12 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
     <div className={s.root}>
       <div className={`${s.wrap} ${s.wrapPhone}`}>
         <header className={s.head}>
-          <div>
-            <div className={s.kicker}>HOUZS showrooms · for {page.name}</div>
-            <h1 className={s.title}>{step === 'home' && !done ? 'Showroom bookings' : editing ? 'Change a booking' : 'Book a showroom visit'}</h1>
-          </div>
+          {step === 'home' && !done ? <Greeting name={page.name} /> : (
+            <div>
+              <div className={s.kicker}>HOUZS showrooms · for {page.name}</div>
+              <h1 className={s.title}>{editing ? 'Change a booking' : 'Book a showroom visit'}</h1>
+            </div>
+          )}
         </header>
 
         {done ? (
@@ -538,4 +537,19 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className={s.field}><span>{label}</span>{children}</label>
+}
+
+// The first page greets the partner's team as the CRM greets its user (the owner, 2026-10-29: "可以在上面加打招呼吗？比方说 Hi Team"):
+// the partner's initials in a circle, "Hello, Team", and whose link it is under it.
+function Greeting({ name }: { name: string }) {
+  const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('') || 'H'
+  return (
+    <div className={s.greet}>
+      <span className={s.greetAvatar} aria-hidden="true">{initials}</span>
+      <div>
+        <h1 className={`${s.title} ${s.greetTitle}`}>Hello, Team</h1>
+        <div className={s.greetSub}>{name} · HOUZS showrooms</div>
+      </div>
+    </div>
+  )
 }
