@@ -21,6 +21,7 @@ import { titleData, titleName, titleTeams } from "./vm/names";
 import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type DeskUi, type DeskViewAs } from "./vm/ctx";
 import { historyRows } from "./vm/history";
 import { useDeskPlace, withSavedPlace, withSavedPrefs, useDeskPrefs } from "./nav";
+import { ViewAsList, type ViewAsPerson } from "./ViewAsList";
 import { useFollowNewest } from "../shared/stick";
 import { useReadWhenSeen } from "../shared/seen";
 import { MediaViewer } from "../shared/viewer";
@@ -42,7 +43,7 @@ export interface DeskScreensProps {
   /** View as a team member (the owner, 2026-10-29: "desktop 版本能做 view as team member 吗？"): whose CRM may be opened, and opening it. */
   viewAs?: DeskViewAs;
   /** Viewing somebody's desktop (View as, 2026-10-29): whose, and the way back to one's own. */
-  viewing?: { name: string; exit: () => void };
+  viewing?: { id: string; name: string; exit: () => void; people: ViewAsPerson[]; switchTo: (id: string) => void };
   /** A read that failed (the last one's words), shown as the toast. */
   problem?: string;
   /** What a shared action (send, star, forward …) said — the phone panel's toast — shown here as the desktop's toast. */
@@ -375,6 +376,7 @@ export default function DeskScreens(p: DeskScreensProps) {
       {p.viewing && (
         <div role="status" style={{ position: "fixed", top: "10px", left: "50%", transform: "translateX(-50%)", zIndex: 30, display: "flex", alignItems: "center", gap: "12px", height: "36px", padding: "0 6px 0 14px", borderRadius: "18px", background: "var(--crm-ink)", color: "#fff", font: "500 13px Inter, sans-serif", boxShadow: "0 8px 24px rgba(42,22,12,.25)", whiteSpace: "nowrap" }}>
           <span>Viewing {p.viewing.name}&apos;s CRM</span>
+          {p.viewing.people.length > 1 && <ViewingSwitch v={p.viewing} />}
           <button type="button" onClick={p.viewing.exit} style={{ height: "26px", padding: "0 12px", borderRadius: "13px", border: 0, background: "#fff", color: "var(--crm-ink)", font: "600 12px Inter, sans-serif", cursor: "pointer" }}>Exit</button>
         </div>
       )}
@@ -384,5 +386,21 @@ export default function DeskScreens(p: DeskScreensProps) {
       <MediaViewer />
       <MessageMenu />
     </div>
+  );
+}
+
+/** The viewing strip's Switch (the owner, 2026-10-29: "要有可以 switch 的功能"): another person's CRM straight away. */
+function ViewingSwitch({ v }: { v: NonNullable<DeskScreensProps["viewing"]> }) {
+  const [on, setOn] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "flex" }}>
+      <button type="button" onClick={() => setOn(o => !o)} aria-expanded={on} style={{ height: "26px", padding: "0 10px", borderRadius: "13px", border: "1px solid rgba(255,255,255,.35)", background: "transparent", color: "#fff", font: "600 12px Inter, sans-serif", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}>
+        Switch <span aria-hidden>▾</span>
+      </button>
+      {on && (<>
+        <span onClick={() => setOn(false)} style={{ position: "fixed", inset: 0, zIndex: 1 }} />
+        <ViewAsList people={v.people} current={v.id} pick={id => { setOn(false); if (id !== v.id) v.switchTo(id); }} style={{ position: "absolute", top: "34px", left: "50%", transform: "translateX(-50%)", zIndex: 2, color: "var(--crm-ink)" }} />
+      </>)}
+    </span>
   );
 }
