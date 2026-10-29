@@ -540,12 +540,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 // The first page greets the partner's team as the CRM greets its user (the owner, 2026-10-29: "可以在上面加打招呼吗？比方说 Hi Team"):
-// the partner's initials in a circle, "Hello, Team", and whose link it is under it.
+// "Hello, Team" and whose link it is under it (no initials circle — the owner, the same day: "不用TC 小圆圈").
 function Greeting({ name }: { name: string }) {
-  const initials = name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join('') || 'H'
   return (
     <div className={s.greet}>
-      <span className={s.greetAvatar} aria-hidden="true">{initials}</span>
       <div>
         <h1 className={`${s.title} ${s.greetTitle}`}>Hello, Team</h1>
         <div className={s.greetSub}>{name} · HOUZS showrooms</div>
