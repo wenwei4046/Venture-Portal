@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveInfo } from '@/lib/leads/actions'
-import { SHOP_FIELDS, cardStatus, slug, tokenOf, type InfoCard, type InfoCat, type InfoField, type LeadInfo } from '@/lib/leads/info'
+import { SHOP_FIELDS, cardStatus, followAddress, mapsLinkOf, slug, tokenOf, wazeLinkOf, type InfoCard, type InfoCat, type InfoField, type LeadInfo } from '@/lib/leads/info'
 import type { LeadBrand } from '@/lib/leads/types'
 import { LeadIcon, type LeadIconName } from '@/components/layout/lead-icons'
 import s from './setup.module.css'
@@ -49,6 +49,8 @@ export default function InfoView({ info, ready, brands, today, uses, canEdit }: 
   const [fBrands, setFBrands] = useState<string[]>([])
   const [fStats, setFStats] = useState<string[]>([])
   const [open, setOpen] = useState<string | null>(null)
+  // Which showroom each showroom category shows (one at a time).
+  const [page, setPage] = useState<Record<string, number>>({})
   const [catIn, setCatIn] = useState<string | null>(null)
   // A category's right-click menu (the user, 2026-10-23: "加delete") — any category, seeded or added.
   const [catMenu, setCatMenu] = useState<{ id: string; x: number; y: number } | null>(null)
@@ -189,6 +191,15 @@ export default function InfoView({ info, ready, brands, today, uses, canEdit }: 
           <div className={s.groups}>
             {shownCats.map(g => {
               const list = d.cards.filter(c => c.catId === g.id && byBrand(c) && byStat(c) && byView(c))
+              // Showrooms one at a time (2026-10-29 — the user: "showroom 做成可分页式（容易看）；能新增也能删除（垃圾桶）").
+              const paged = g.kind === 'showroom' && list.length > 1
+              const at = Math.min(page[g.id] ?? 0, Math.max(0, list.length - 1))
+              const shown = paged ? list.slice(at, at + 1) : list
+              const cur = list[at]
+              const removeCard = (id: string) => {
+                edit(x => ({ ...x, cards: x.cards.filter(y => y.id !== id) }))
+                setPage(p => ({ ...p, [g.id]: Math.max(0, at - (at >= list.length - 1 ? 1 : 0)) }))
+              }
               return (
                 <div key={g.id} className={s.group}>
                   <div className={s.groupHead}>
@@ -197,12 +208,22 @@ export default function InfoView({ info, ready, brands, today, uses, canEdit }: 
                     <span className={s.groupCount}>{list.length}</span>
                     <span className={s.fill} />
                     {g.custom && canEdit && !d.cards.some(c => c.catId === g.id) ? <button type="button" className={s.linkBtn} onClick={() => removeCat(g)}>Delete category</button> : null}
-                    {canEdit ? <button type="button" className={s.addBtn} onClick={() => addCard(g)}><LeadIcon name="plus" size={13} />{g.kind === 'showroom' ? 'Add showroom' : 'Add info'}</button> : null}
+                    {paged ? (
+                      <span className={s.pager}>
+                        <button type="button" className={s.pageBtn} disabled={at === 0} onClick={() => setPage(p => ({ ...p, [g.id]: at - 1 }))} aria-label="Previous showroom"><LeadIcon name="chevronLeft" size={14} /></button>
+                        <span className={s.pageOf}>{at + 1} / {list.length}</span>
+                        <button type="button" className={s.pageBtn} disabled={at >= list.length - 1} onClick={() => setPage(p => ({ ...p, [g.id]: at + 1 }))} aria-label="Next showroom"><LeadIcon name="chevronRight" size={14} /></button>
+                      </span>
+                    ) : null}
+                    {canEdit && g.kind === 'showroom' && cur ? (
+                      <button type="button" className={s.pageBtn} title={`Delete ${cur.name || 'this showroom'}`} aria-label="Delete this showroom" onClick={() => removeCard(cur.id)}><LeadIcon name="trash" size={14} /></button>
+                    ) : null}
+                    {canEdit ? <button type="button" className={s.addBtn} onClick={() => { addCard(g); if (g.kind === 'showroom') setPage(p => ({ ...p, [g.id]: list.length })) }}><LeadIcon name="plus" size={13} />{g.kind === 'showroom' ? 'Add showroom' : 'Add info'}</button> : null}
                   </div>
-                  {list.map(c => (
+                  {shown.map(c => (
                     <Card key={c.id} c={c} kind={g.kind} today={today} canEdit={canEdit} brandOpts={brandOpts} brandName={brandName}
                       uses={uses} open={open} setOpen={setOpen} upd={upd}
-                      remove={() => edit(x => ({ ...x, cards: x.cards.filter(y => y.id !== c.id) }))} />
+                      remove={() => removeCard(c.id)} />
                   ))}
                   {list.length === 0 ? <div className={s.empty}>Nothing here yet.</div> : null}
                 </div>
@@ -268,7 +289,13 @@ function Card({ c, kind, today, canEdit, brandOpts, brandName, uses, open, setOp
   const st = cardStatus(c, today)
   const ranged = c.validFrom !== null || c.validUntil !== null
   const first = c.fields.find(f => f.value || f.label) ?? c.fields[0]
-  const setField = (i: number, o: Partial<InfoField>) => upd(c.id, x => ({ fields: x.fields.map((f, j) => (j === i ? { ...f, ...o } : f)) }))
+  const setField = (i: number, o: Partial<InfoField>) => upd(c.id, x => {
+    const fields = x.fields.map((f, j) => (j === i ? { ...f, ...o } : f))
+    // The map links follow the address while they are empty or still the address's own (2026-10-29, the user).
+    const was = x.fields[i]
+    return { fields: was?.key === 'address' && o.value !== undefined ? followAddress(fields, was.value, o.value) : fields }
+  })
+  const address = c.fields.find(f => f.key === 'address')?.value.trim() ?? ''
   const useKey = `use-${c.id}`
   const dis = !canEdit
   const nameRef = useRef<HTMLInputElement>(null)
@@ -300,8 +327,17 @@ function Card({ c, kind, today, canEdit, brandOpts, brandName, uses, open, setOp
               ) : (
                 <input className={s.input} value={f.label} onChange={e => setField(i, { label: e.target.value })} placeholder="Label" disabled={dis} maxLength={60} aria-label="Label" />
               )}
-              <input className={s.input} value={f.value} onChange={e => setField(i, { value: e.target.value })} placeholder={shop?.hint ?? 'Value'} disabled={dis} maxLength={1000}
-                title={tokenOf(c, f)} aria-label={f.label || 'Value'} />
+              {(f.key === 'maps' || f.key === 'waze') && !f.value.trim() && address && canEdit ? (
+                <span style={{ display: 'flex', gap: 8, minWidth: 0 }}>
+                  <input className={s.input} style={{ flex: 1, minWidth: 0 }} value={f.value} onChange={e => setField(i, { value: e.target.value })} placeholder={shop?.hint ?? 'Value'} disabled={dis} maxLength={1000}
+                    title={tokenOf(c, f)} aria-label={f.label || 'Value'} />
+                  <button type="button" className={s.linkBtn} style={{ flex: 'none' }} title="Make the link from the address above — you can still edit it"
+                    onClick={() => setField(i, { value: f.key === 'maps' ? mapsLinkOf(address) : wazeLinkOf(address) })}>From the address</button>
+                </span>
+              ) : (
+                <input className={s.input} value={f.value} onChange={e => setField(i, { value: e.target.value })} placeholder={shop?.hint ?? 'Value'} disabled={dis} maxLength={1000}
+                  title={tokenOf(c, f)} aria-label={f.label || 'Value'} />
+              )}
               {canEdit && c.fields.length > 1 ? (
                 <button type="button" className={s.x} title="Remove field" onClick={() => upd(c.id, x => ({ fields: x.fields.filter((_, j) => j !== i) }))}>×</button>
               ) : <span />}

@@ -584,6 +584,12 @@ function orth(x1: number, y1: number, x2: number, y2: number): string {
 
 // ── Edit step ──
 
+/** How many lines a message box opens at: its words wrapped at about 42 characters, 2 to 8 lines (it drags taller). */
+function boxRows(text: string | undefined): number {
+  const lines = (text ?? '').split('\n').reduce((n, l) => n + Math.max(1, Math.ceil([...l].length / 42)), 0)
+  return Math.min(8, Math.max(2, lines))
+}
+
 function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAfter, lib, toLib, info, today }: {
   step: TemplateStep
   draft: Draft
@@ -643,7 +649,8 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
   )
   const closing = (value: string | undefined, onChange: (v: string) => void) => (
     <label className={s.field}>Closing message when it ends here · empty uses the template’s
-      <input className={s.input} value={value ?? ''} maxLength={1000} disabled={dis} placeholder={draft.endMsg || 'e.g. Thanks! Our salesperson will WhatsApp you soon 😊'} onChange={e => onChange(e.target.value)} />
+      {/* A box that wraps — a long message was one line running out of sight (2026-10-29 — the user: "不要太长 看不到，也不要overlap"). */}
+      <textarea className={s.textarea} rows={boxRows(value || draft.endMsg)} value={value ?? ''} maxLength={1000} disabled={dis} placeholder={draft.endMsg || 'e.g. Thanks! Our salesperson will WhatsApp you soon 😊'} onChange={e => onChange(e.target.value)} />
     </label>
   )
   const setKind = (k: StepKind) => {
