@@ -162,6 +162,25 @@
 }
 .item[data-on='true'] .itemLabel { transform: translateX(2px); }
 
+/* A group's heading and its rows (2026-10-29 — Payments over Payment voucher and Payment request): the heading reads
+   as a row but is no link; its rows sit indented under it, their tiles a size down, each as tall as any row (the
+   pill's 38px). Folded, the heading goes and the rows keep their tiles where every row's tile stands. */
+.groupHead {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 5px;
+  color: rgb(var(--hvs-graphite));
+  font-size: 13.5px;
+  white-space: nowrap;
+  cursor: default;
+}
+.child { padding-left: 22px; font-size: 13px; }
+.child .itemTile { width: 24px; height: 24px; border-radius: 7px; }
+.aside[data-collapsed='true'] .groupHead { display: none; }
+.aside[data-collapsed='true'] .child { padding-left: 5px; }
+
 .foot {
   border-top: 1px solid rgb(var(--hvs-nav-border));
   padding: 12px;

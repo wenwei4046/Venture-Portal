@@ -15,6 +15,8 @@ import { loadCreatePaymentOptions, type CreatePaymentOptions } from './create-pa
 // ledger read once, and what waits for a voucher — Dept Requests, Payroll
 // Requests (the Payroll payouts right's, as its page), Claim Requests. Every
 // read starts together (lib/start-read). The caller has asked the treasury.
+// The desktop's Payment voucher asks without the requests (`requests: false`,
+// 2026-10-29): they are Payments › Payment request's; the phone still lists them.
 
 export interface RequestItem {
   key: string
@@ -34,21 +36,24 @@ export interface PaymentsHubData {
   claims: RequestItem[]
 }
 
-export async function loadPaymentsHub(user: User, params: LedgerParams): Promise<PaymentsHubData> {
+export async function loadPaymentsHub(user: User, params: LedgerParams, opts: { requests?: boolean } = {}): Promise<PaymentsHubData> {
+  const requests = opts.requests !== false
   const supabase = await createClient()
   const seesPayroll = canSeePayrollPayouts(user)
   const canCreate = canDo(user, 'treasury', 'create')
   const canSetDefault = user.role === 'finance' || user.role === 'principal'
 
   const ledgerRead = startRead(loadHubLedger(supabase, user, 'debit', params))
-  const deptRead = startRead(
-    supabase
-      .from('dept_payment_requests')
-      .select('id, amount, payee_name, description, requested_at, departments (name)')
-      .eq('status', 'pending_finance_pv')
-      .order('requested_at', { ascending: false }),
-  )
-  const payrollRead = seesPayroll
+  const deptRead = requests
+    ? startRead(
+        supabase
+          .from('dept_payment_requests')
+          .select('id, amount, payee_name, description, requested_at, departments (name)')
+          .eq('status', 'pending_finance_pv')
+          .order('requested_at', { ascending: false }),
+      )
+    : null
+  const payrollRead = requests && seesPayroll
     ? startRead(
         supabase
           .from('payroll_payment_requests')
@@ -58,23 +63,25 @@ export async function loadPaymentsHub(user: User, params: LedgerParams): Promise
       )
     : null
   // Approved claims waiting for Finance's voucher — a menu, never a reason for the page not to open.
-  const claimsRead = startRead(
-    (async () => {
-      try {
-        const { data } = await supabase.rpc('claim_payment_queue')
-        return ((data ?? []) as unknown as Array<Record<string, unknown>>).map(readClaimQueueRow).filter((r) => !r.voucherId)
-      } catch {
-        return []
-      }
-    })(),
-  )
+  const claimsRead = requests
+    ? startRead(
+        (async () => {
+          try {
+            const { data } = await supabase.rpc('claim_payment_queue')
+            return ((data ?? []) as unknown as Array<Record<string, unknown>>).map(readClaimQueueRow).filter((r) => !r.voucherId)
+          } catch {
+            return []
+          }
+        })(),
+      )
+    : null
 
   // Arriving with Create payment open (the Overview's button): its lists come with the page, so nothing asks for them after the navigation.
   const createRead = canCreate && params.new === '1' ? startRead(loadCreatePaymentOptions(supabase).catch(() => null)) : null
 
   const ledger = await ledgerRead
 
-  const { data: deptRows } = await deptRead
+  const { data: deptRows } = deptRead ? await deptRead : { data: [] }
   const dept: RequestItem[] = ((deptRows ?? []) as unknown as Array<{
     id: string
     amount: number | string
@@ -108,7 +115,7 @@ export async function loadPaymentsHub(user: User, params: LedgerParams): Promise
     })
   }
 
-  const claims: RequestItem[] = (await claimsRead).map((r) => ({
+  const claims: RequestItem[] = (claimsRead ? await claimsRead : []).map((r) => ({
     key: r.claimId,
     label: `${r.claimantName} · ${claimReference(r)}`,
     sub: `${formatMoney(r.amount)}${r.department ? ` · ${r.department}` : ''}`,

@@ -106,9 +106,6 @@ const draw = (over: Partial<Parameters<typeof PaymentsHubClient>[0]> = {}) =>
       canCreate
       canSetDefault={false}
       canExport
-      dept={[{ key: 'd1', label: 'Marketing · FB ads top-up', sub: 'RM 25,000.00 · requested 05 Oct' }]}
-      payroll={[]}
-      claims={[]}
       create={{ prefix: 'HV-PV-202610', today: '2026-10-14', open: false, initial: null }}
       {...over}
     />,
@@ -122,21 +119,19 @@ beforeEach(() => {
 })
 
 describe('the head', () => {
-  it('says Daily · Payments, with Create payment, Dept · N, Payroll, Claims and Export', async () => {
+  // 2026-10-29: Payments › Payment voucher — what is sent to be paid (Dept, Payroll, Claims) is Payment request's.
+  it('says Daily · Payments › Payment voucher, with Create payment and Export, and no request menus', async () => {
     draw()
     await act(async () => undefined)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Payments')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Payment voucher')
     expect(screen.getByRole('button', { name: 'Create payment' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Dept · 1' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Payroll' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Claims' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Export ▾' })).toBeInTheDocument()
+    for (const gone of [/^Dept/, /^Payroll( · \d+)?$/, /^Claims/]) expect(screen.queryByRole('button', { name: gone })).toBeNull()
   })
 
-  it('has no Payroll menu without Payroll payouts, no Create payment without Create, no Export without Export', async () => {
-    draw({ payroll: null, canCreate: false, canExport: false })
+  it('has no Create payment without Create, no Export without Export', async () => {
+    draw({ canCreate: false, canExport: false })
     await act(async () => undefined)
-    expect(screen.queryByRole('button', { name: /^Payroll( · \d+)?$/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Create payment' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Export ▾' })).toBeNull()
   })
@@ -158,15 +153,6 @@ describe('the head', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }))
     expect(screen.queryByTestId('create-dialog')).toBeNull()
     expect(window.location.search).toBe('')
-  })
-
-  it('opens Dept Requests as a menu of what waits, each going to its page', async () => {
-    draw()
-    await act(async () => undefined)
-    fireEvent.click(screen.getByRole('button', { name: 'Dept · 1' }))
-    const item = await screen.findByRole('menuitem', { name: /Marketing · FB ads top-up/ })
-    fireEvent.click(item)
-    expect(mocks.push).toHaveBeenCalledWith('/payments/dept-requests')
   })
 })
 

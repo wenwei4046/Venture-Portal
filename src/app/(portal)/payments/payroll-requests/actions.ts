@@ -65,7 +65,7 @@ export async function generatePvFromRequestInWords(
   sources: PayrollPoolSource[],
   paymentDate: string,
 ): Promise<{ ok: true; voucherId: string } | { ok: false; reason: string }> {
-  const user = await requirePayrollPayoutsActionOn('/payments/payroll-requests', ['treasury', 'create'])
+  const user = await requirePayrollPayoutsActionOn(['/payments/payroll-requests', '/payments/requests'], ['treasury', 'create'])
   try {
     return { ok: true, voucherId: await fundPayrollRound(user.id, requestId, sourceBankId, destBankId, sources, paymentDate) }
   } catch (e) {
@@ -315,6 +315,7 @@ async function fundPayrollRound(
   // ── Refresh affected surfaces ─────────────────────────────────────────────
   revalidatePath('/payments')
   revalidatePath('/payments/payroll-requests')
+  revalidatePath('/payments/requests')
   revalidatePath(`/hr-costing/payroll/${periodMonth}`)
   revalidatePath('/hr-costing/payroll')
   revalidatePath('/director-salary')
@@ -367,6 +368,7 @@ export async function financeCancelRequest(
   const periodMonth = (req.payroll_runs as any)?.period_month
   if (periodMonth) revalidatePath(`/hr-costing/payroll/${periodMonth}`)
   revalidatePath('/payments/payroll-requests')
+  revalidatePath('/payments/requests')
   revalidatePath('/hr-costing/payroll')
   revalidatePath('/director-salary')
   revalidatePath('/dashboard')
@@ -394,6 +396,7 @@ export async function sendBackPayrollBatch(batchId: string, reason?: string): Pr
   if (error) throw new Error(`打回失败：${error.message}`)
 
   revalidatePath('/payments/payroll-requests')
+  revalidatePath('/payments/requests')
   revalidatePath('/payments')
   revalidatePath('/hr-costing/payroll')
   if (batch?.period_month) revalidatePath(`/hr-costing/payroll/${batch.period_month}`)
@@ -423,6 +426,7 @@ export async function sendBackPayrollRun(period: string): Promise<void> {
   if (error) throw new Error(`打回失败：${error.message}`)
 
   revalidatePath('/payments/payroll-requests')
+  revalidatePath('/payments/requests')
   revalidatePath('/payments')
   revalidatePath('/hr-costing/payroll')
   revalidatePath(`/hr-costing/payroll/${p}`)
@@ -436,7 +440,7 @@ export async function sendBackPayrollRun(period: string): Promise<void> {
  * month — the button's own choice; the refusal says why.
  */
 export async function sendBackPayrollInWords(batchId: string | null, period: string): Promise<{ ok: true } | { ok: false; reason: string }> {
-  await requirePayrollPayoutsActionOn('/payments/payroll-requests', ['treasury', 'void'], ['treasury', 'approve'])
+  await requirePayrollPayoutsActionOn(['/payments/payroll-requests', '/payments/requests'], ['treasury', 'void'], ['treasury', 'approve'])
   try {
     if (batchId) await sendBackPayrollBatch(batchId)
     else await sendBackPayrollRun(period)

@@ -216,8 +216,10 @@ export function requestDetailVM(r: MemberRequest, events: readonly RequestEvent[
     // again after HR asked for more is an update too.
     const edited = e.status === "submitted" && !!e.note && e.note.startsWith("Updated by the member");
     const resent = e.status === "submitted" && (e.from === "needs_info" || shown[i - 1]?.status === "needs_info");
+    // An approved claim Finance sent back to HR (2026-10-29): with HR again — the reason is HR's, so none is read here.
+    const returned = r.kind === "claim" && e.status === "submitted" && e.from === "approved";
     const what = edited ? "Updated by the member" : e.status === "allocated" ? `Allocated to ${str(d.department) || "the team"}`
-      : resent ? "Updated and sent again" : WHAT[e.status] ?? e.status;
+      : returned ? "Back with HR for review" : resent ? "Updated and sent again" : WHAT[e.status] ?? e.status;
     const who = e.actor === "you" ? "You" : e.actor === "hr" ? (e.actorName ? `${e.actorName} (HR)` : "HR") : e.actor === "finance" ? "Finance"
       : e.actor === "principal" ? (e.actorName ?? "Principal") : "Revenue system";
     const bad = ["needs_info", "rejected", "withdrawn", "expired", "failed"].includes(e.status);

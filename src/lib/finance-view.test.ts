@@ -40,7 +40,7 @@ describe('isFinanceDetailRoute', () => {
   })
 
   it('is not a list, a form or a sub-page of its own', () => {
-    for (const path of ['/payments', '/payments/new', '/payments/export', '/payments/voucher-doc', '/payments/payroll-requests', '/fund-in/new', '/statements/monthly', '/statements/export', '/reconciliation', '/reconciliation/journal', '/reconciliation/journal-entries', '/reconciliation/journal-entries/new', '/dept-pool', '/dept-pool/submissions', '/dept-pool/marketing/contracts', '/billing/invoice-doc', '/reports/ledger', '/daily-bank', '/billing-allocator']) {
+    for (const path of ['/payments', '/payments/new', '/payments/export', '/payments/voucher-doc', '/payments/payroll-requests', '/payments/requests', '/fund-in/new', '/statements/monthly', '/statements/export', '/reconciliation', '/reconciliation/journal', '/reconciliation/journal-entries', '/reconciliation/journal-entries/new', '/dept-pool', '/dept-pool/submissions', '/dept-pool/marketing/contracts', '/billing/invoice-doc', '/reports/ledger', '/daily-bank', '/billing-allocator']) {
       expect(isFinanceDetailRoute(path), path).toBe(false)
     }
   })
@@ -49,7 +49,8 @@ describe('isFinanceDetailRoute', () => {
 describe('financePageTitle', () => {
   it('names the page the way the sidebar does, a detail page by its list', () => {
     expect(financePageTitle('/dashboard')).toBe('Overview')
-    expect(financePageTitle('/payments/v1')).toBe('Payments')
+    expect(financePageTitle('/payments/v1')).toBe('Payment voucher')
+    expect(financePageTitle('/payments/requests')).toBe('Payment request')
     expect(financePageTitle('/receipts')).toBe('Receipt')
     expect(financePageTitle('/statements')).toBe('Invoice')
     expect(financePageTitle('/statements/monthly')).toBe('Statements')

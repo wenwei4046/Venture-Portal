@@ -3,14 +3,11 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react'
 import { flash } from '@/components/hrv/toast'
-import { DialogButton, DialogConfirm, DialogForm, Field, FinDialog, Hint } from '@/components/finv/Dialog'
-import fm from '@/components/finv/form.module.css'
-import { Select } from '@/components/hrv/select'
-import { CLAIM_PAYMENT_METHODS } from '@/lib/claim-requests'
-import { REQUEST_CARDS, bankOption, type RequestCard, type RequestLine, type RequestsModel } from '@/lib/fin-app/requests-model'
+import { DialogConfirm, FinDialog } from '@/components/finv/Dialog'
+import { REQUEST_CARDS, type RequestCard, type RequestLine, type RequestsModel } from '@/lib/fin-app/requests-model'
 import { HUB_HREF } from '@/lib/fin-app/routes'
-import { raiseClaimVoucher } from '@/app/(portal)/payments/claim-requests/actions'
-import { cancelDeptRequestInWords, generateDeptRequestPvInWords } from '@/app/(portal)/payments/dept-requests/actions'
+import { cancelDeptRequestInWords } from '@/app/(portal)/payments/dept-requests/actions'
+import { RaiseSheet } from '@/app/(portal)/payments/requests/_components/RequestSheets'
 import AppScreen, { PageHead, type BarButton } from './AppScreen'
 import { canStepBack, pushIntent, setIntent, useStep } from './nav'
 import { BankHero, ItemGroup, Notice, StackCards } from './parts'
@@ -39,11 +36,6 @@ const stepQuery = (s: Step) => (s.kind === 'item' ? `f=${s.from}&id=${encodeURIC
 
 const TITLE: Record<RequestsKind, string> = { claim: 'Claim requests', dept: 'Dept Payment Requests' }
 const CARD_TITLE: Record<RequestCard, string> = { waiting: 'Waiting for a voucher', principal: 'With the Principal' }
-const DEPT_METHODS = [
-  { value: 'bank_transfer', label: 'Bank transfer' },
-  { value: 'cheque', label: 'Cheque' },
-  { value: 'cash', label: 'Cash' },
-]
 
 export default function RequestsApp({
   kind,
@@ -149,90 +141,6 @@ export default function RequestsApp({
         }}
       />
     </>
-  )
-}
-
-/** The voucher for one request: the bank it is paid from and how, then the Principal's queue. */
-function RaiseSheet({
-  kind,
-  request,
-  banks,
-  onClose,
-  onDone,
-}: {
-  kind: RequestsKind
-  request: RequestLine | null
-  banks: Array<{ id: string; bank_name: string; current_balance: number }>
-  onClose: () => void
-  onDone: () => void
-}) {
-  const [bankId, setBankId] = useState('')
-  const [method, setMethod] = useState('bank_transfer')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, start] = useTransition()
-  useEffect(() => {
-    if (!request) return
-    setBankId('')
-    setMethod('bank_transfer')
-    setError(null)
-  }, [request])
-  const close = () => !busy && onClose()
-  const methods = kind === 'claim' ? CLAIM_PAYMENT_METHODS : DEPT_METHODS
-  const raise = () => {
-    if (!request) return
-    if (!bankId) return setError('Choose the bank account to pay from.')
-    setError(null)
-    start(async () => {
-      try {
-        const res =
-          kind === 'claim'
-            ? await raiseClaimVoucher({ claimId: request.id, bankId, method })
-            : await generateDeptRequestPvInWords({ requestId: request.id, payFromAccountId: bankId, paymentMethod: method })
-        if (!res.ok) return setError(res.reason)
-        onDone()
-      } catch {
-        setError('That did not go through. Try again.')
-      }
-    })
-  }
-  const label = kind === 'claim' ? 'Raise voucher' : 'Generate PV'
-  return (
-    <FinDialog open={request !== null} onClose={close} title={`${label} · ${request?.label ?? ''}`} sub={request ? `RM ${request.value}` : undefined} locked={busy}>
-      <DialogForm
-        onSubmit={raise}
-        buttons={
-          <>
-            <DialogButton onClick={close} disabled={busy}>
-              Cancel
-            </DialogButton>
-            <DialogButton kind="primary" type="submit" off={!bankId} disabled={busy}>
-              {busy ? (kind === 'claim' ? 'Raising…' : 'Generating…') : label}
-            </DialogButton>
-          </>
-        }
-      >
-        <Field label="Pay from" htmlFor="req-bank">
-          <Select id="req-bank" round={12} className={fm.select} value={bankId} onChange={(e) => setBankId(e.target.value)}>
-            <option value="">— Pay from —</option>
-            {banks.map((b) => (
-              <option key={b.id} value={b.id}>
-                {bankOption(b)}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Method" htmlFor="req-method">
-          <Select id="req-method" round={12} className={fm.select} value={method} onChange={(e) => setMethod(e.target.value)}>
-            {methods.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        {error ? <Hint danger>{error}</Hint> : null}
-      </DialogForm>
-    </FinDialog>
   )
 }
 

@@ -7945,6 +7945,19 @@ export type Database = {
         Returns: string
       }
       execute_loan_cancel: { Args: { p_loan_id: string }; Returns: string }
+      finance_member_claim_invoice: {
+        Args: { p_claim: string }
+        Returns: {
+          file_name: string
+          mime_type: string
+          object_path: string
+          size_bytes: number
+        }[]
+      }
+      finance_return_member_claim: {
+        Args: { p_claim: string; p_reason: string }
+        Returns: undefined
+      }
       format_invoice_no: { Args: { p_period: string }; Returns: string }
       generate_invoices_from_request: {
         Args: { p_request_id: string }

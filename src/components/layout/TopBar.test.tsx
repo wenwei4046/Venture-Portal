@@ -38,7 +38,7 @@ describe('TopBar on the Finance view', () => {
     const bar = screen.getByTestId('fin-topbar')
     expect(bar).toHaveTextContent('H')
     expect(bar).toHaveTextContent('Finance')
-    expect(bar).toHaveTextContent('Payments')
+    expect(bar).toHaveTextContent('Payment voucher')
     expect(bar).toHaveClass('md:hidden')
     // The desktop bar stays, hidden on a phone.
     expect(screen.getByText('Finance Manager').closest('div')?.parentElement?.parentElement).toHaveClass('hidden')

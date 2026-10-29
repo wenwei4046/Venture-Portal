@@ -77,9 +77,6 @@ const draw = (canExport = true) =>
       ledger={LEDGER}
       canSetDefault={false}
       canExport={canExport}
-      dept={[]}
-      payroll={null}
-      claims={[]}
       actions={
         <>
           <Link href="/payments/new?mode=receipt">Create receipt</Link>
