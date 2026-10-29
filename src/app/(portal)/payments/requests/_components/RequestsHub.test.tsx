@@ -13,7 +13,7 @@ import { claimRow, payrollRow, requestDepartments, sortRequests, staffRequestRow
 
 const mocks = vi.hoisted(() => ({
   refresh: vi.fn(), flash: vi.fn(), returnClaim: vi.fn(), openInvoice: vi.fn(), raise: vi.fn(),
-  reject: vi.fn(), billBack: vi.fn(), forPv: vi.fn(), createPv: vi.fn(), openCreate: vi.fn(), openFile: vi.fn(),
+  reject: vi.fn(), forPv: vi.fn(), createPv: vi.fn(), openCreate: vi.fn(), openFile: vi.fn(),
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: mocks.refresh }) }))
 vi.mock('@/lib/supabase/client', () => ({
@@ -27,7 +27,7 @@ vi.mock('@/lib/supabase/client', () => ({
 vi.mock('@/components/hrv/toast', async (orig) => ({ ...(await orig<object>()), flash: mocks.flash }))
 vi.mock('../actions', () => ({
   returnMemberClaim: mocks.returnClaim, openMemberClaimInvoice: mocks.openInvoice,
-  rejectPaymentRequest: mocks.reject, answerBillBack: mocks.billBack, openRequestsForPv: mocks.forPv,
+  rejectPaymentRequest: mocks.reject, openRequestsForPv: mocks.forPv,
 }))
 vi.mock('../../actions', () => ({ createPaymentForRequests: mocks.createPv, createPaymentFromDialog: vi.fn() }))
 vi.mock('../../create-actions', () => ({ openCreatePayment: mocks.openCreate }))
@@ -181,9 +181,9 @@ describe('a row’s menu and drawer', () => {
   })
 })
 
-// PR ② (2026-10-29): the staff's own requests from the Claim page, under their department — each share's Bill back?
-// answered in the drawer, Reject… with a reason the requester reads, and Create PV in today's Create payment window,
-// the same person's open requests in it.
+// PR ② (2026-10-29): the staff's own requests from the Claim page, under their department — Reject… with a reason the
+// requester reads, and Create PV in today's Create payment window with the same person's open requests in it, each
+// split's Bill back? answered there (the user: "我开pv 时就要确定是不是要开单了").
 describe('a staff request', () => {
   const staff = (over: Record<string, unknown> = {}): PaymentRequest =>
     parseRequest({
@@ -215,18 +215,13 @@ describe('a staff request', () => {
     expect(within(drawer).getByRole('button', { name: 'Create PV' })).toBeEnabled()
   })
 
-  it('a share waits for Bill back? — answered in the drawer — before its PV', async () => {
-    mocks.billBack.mockResolvedValue({ ok: true })
+  it('a split’s Bill back is decided when the PV is made — the drawer says so, and Create PV is open', async () => {
     await draw(withStaff(LI))
     fireEvent.click(screen.getByText('LI SEAN'))
     const drawer = screen.getByRole('dialog', { name: /LI SEAN/ })
-    expect(drawer).toHaveTextContent('Bill back: Not answered')
-    expect(within(drawer).getByRole('button', { name: 'Create PV' })).toBeDisabled()
-    await act(async () => {
-      fireEvent.click(within(drawer).getByRole('button', { name: 'Bill back · Yes' }))
-    })
-    expect(mocks.billBack).toHaveBeenCalledWith('55555555-5555-4555-8555-555555555555', true)
-    expect(mocks.refresh).toHaveBeenCalled()
+    expect(drawer).toHaveTextContent('Bill back: Decided when the PV is made')
+    expect(within(drawer).queryByRole('button', { name: /Bill back/ })).toBeNull()
+    expect(within(drawer).getByRole('button', { name: 'Create PV' })).toBeEnabled()
   })
 
   it('Reject… asks a reason the requester reads, then sends it back', async () => {
@@ -274,29 +269,26 @@ describe('a staff request', () => {
     expect(within(pv).getByLabelText('Notes')).toHaveValue('From Payment request · PRQ-2610-0002, PRQ-2610-0003')
   })
 
-  // 2026-10-29 — the user ("可以"): one of the same person's requests still waiting for its Bill back? answer stays with
-  // Finance for a PV of its own; the answered ones go in.
-  it('Create PV leaves out the same person’s request whose Bill back? is not answered — said, never stopped', async () => {
-    const waiting = staff({ id: '77777777-7777-4777-8777-777777777777', requestNo: 'PRQ-2610-0005', description: 'Canva', total: 300,
+  // 2026-10-29 — the user: "我开pv 时就要确定是不是要开单了". A request with a split is combined like any other; its Bill
+  // back? is asked in the window, with the voucher.
+  it('Create PV takes the same person’s request with a split too — its Bill back asked in the window', async () => {
+    const split = staff({ id: '77777777-7777-4777-8777-777777777777', requestNo: 'PRQ-2610-0005', description: 'Canva', total: 300,
       submittedAt: '2026-10-29T04:00:00Z', items: [{ id: 'i7', description: 'Canva', amount: 300 }],
       shares: [{ id: '88888888-8888-4888-8888-888888888888', party: 'company', companyId: 'dc', companyName: 'Dream Crafter', amount: 100, billBack: null }] })
-    mocks.forPv.mockResolvedValue({ ok: true, requests: [staff()] })
+    mocks.forPv.mockResolvedValue({ ok: true, requests: [staff(), split] })
     mocks.openCreate.mockResolvedValue({ ok: false, reason: 'not read in this test' })
-    await draw(withStaff(staff(), waiting))
+    await draw(withStaff(staff(), split))
     fireEvent.contextMenu(screen.getByText('Claude · Oct'))
     await act(async () => {
       fireEvent.click(screen.getByRole('menuitem', { name: 'Create PV' }))
     })
-    expect(mocks.forPv).toHaveBeenCalledWith(['33333333-3333-4333-8333-333333333333'])
-    expect(screen.getByRole('dialog', { name: 'Create PV' })).toBeInTheDocument()
-    expect(mocks.flash).toHaveBeenCalledWith('PRQ-2610-0005 stays with Finance — Bill back? not answered yet')
-    // The unanswered one itself asks for its answer first.
-    fireEvent.keyDown(document, { key: 'Escape' })
-    fireEvent.contextMenu(screen.getByText('Canva'))
-    await act(async () => {
-      fireEvent.click(screen.getByRole('menuitem', { name: 'Create PV' }))
-    })
-    expect(mocks.forPv).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('dialog', { name: /KHO WEI JIE · Canva/ })).toHaveTextContent('Answer Bill back? for PRQ-2610-0005 first.')
+    expect(mocks.forPv).toHaveBeenCalledWith(['33333333-3333-4333-8333-333333333333', '77777777-7777-4777-8777-777777777777'])
+    const pv = screen.getByRole('dialog', { name: 'Create PV' })
+    const ask = within(pv).getByRole('group', { name: 'Bill back Dream Crafter?' })
+    expect(within(ask).getByRole('button', { name: 'Yes' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(ask).getByRole('button', { name: 'No' })).toHaveAttribute('aria-pressed', 'false')
+    expect(pv).toHaveTextContent('Dream Crafter · RM 100.00')
+    expect(pv).toHaveTextContent('No: Marketing pays it.')
+    expect(mocks.flash).not.toHaveBeenCalled()
   })
 })

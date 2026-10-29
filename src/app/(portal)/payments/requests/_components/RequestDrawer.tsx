@@ -3,17 +3,17 @@
 import { useEffect, useState, useTransition, type ReactNode } from 'react'
 import { FinDrawer, drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
-import { BillBackAnswer, OpenRow, RequestGroups, RequestHero } from '@/components/payment-requests/RequestParts'
+import { OpenRow, RequestGroups, RequestHero } from '@/components/payment-requests/RequestParts'
 import { f2, rm } from '@/lib/fin-app/page-model'
 import { openRequestFile } from '@/lib/payment-requests/actions'
-import type { RequestShare } from '@/lib/payment-requests/model'
-import { answerBillBack, openMemberClaimInvoice } from '../actions'
+import { openMemberClaimInvoice } from '../actions'
 import { stageChip, type PaymentRequestRow } from '../_lib/requests-model'
 
 // A request in the hub's drawer (2026-10-29, Payments › Payment request): the dark hero as a voucher's, the request's
 // numbered groups, and at its foot what this reader may do while it is Finance's — a payroll's funding round and its
 // send back to HR, a claim's voucher and a member's claim returned to HR. Since PR ②, a staff request's too: its
-// items, receipts, who is paid and which pool pays, each share's Bill back? answered here, Reject… and Create PV.
+// items, receipts, who is paid and which pool pays, Reject… and Create PV (each split's Bill back? is answered in the
+// Create PV window — the user: "我开pv 时就要确定是不是要开单了").
 
 export interface RequestDrawerCan {
   pay: boolean
@@ -29,8 +29,6 @@ export interface RequestDrawerSteps {
   /** A staff request: rejected back to its requester, and its PV (the same person's open requests with it). */
   rejectRequest: (r: PaymentRequestRow) => void
   createRequestPv: (r: PaymentRequestRow) => void
-  /** Something the drawer wrote itself (a Bill back answer): the page reads again. */
-  changed: () => void
 }
 
 export function RequestDrawer({
@@ -51,13 +49,10 @@ export function RequestDrawer({
   const [shown, setShown] = useState<PaymentRequestRow | null>(row)
   const [fileError, setFileError] = useState<string | null>(null)
   const [openingFile, setOpeningFile] = useState<string | null>(null)
-  const [answering, setAnswering] = useState<string | null>(null)
-  const [answerError, setAnswerError] = useState<string | null>(null)
   const [opening, start] = useTransition()
   useEffect(() => {
     if (row) setShown(row)
     setFileError(null)
-    setAnswerError(null)
   }, [row])
   const r = row ?? shown
 
@@ -88,21 +83,6 @@ export function RequestDrawer({
         setOpeningFile(null)
       }
     })
-  }
-
-  const answer = async (share: RequestShare, yes: boolean) => {
-    if (answering) return
-    setAnswering(share.id)
-    setAnswerError(null)
-    try {
-      const res = await answerBillBack(share.id, yes)
-      if (!res.ok) setAnswerError(res.reason)
-      else steps.changed()
-    } catch {
-      setAnswerError('The answer could not be saved. Try again.')
-    } finally {
-      setAnswering(null)
-    }
   }
 
   let body: ReactNode = null
@@ -230,7 +210,6 @@ export function RequestDrawer({
   } else if (r?.request) {
     const q = r.request
     const waiting = q.status === 'with_finance' && !q.pvId
-    const unanswered = q.shares.some((s) => s.billBack === null)
     body = (
       <>
         <RequestHero
@@ -242,23 +221,17 @@ export function RequestDrawer({
           note={
             !waiting
               ? `In ${q.pvNo ?? 'its payment voucher'}.`
-              : unanswered
-                ? 'Answer Bill back? for each share, then Create PV.'
+              : q.shares.length > 0
+                ? 'Create its payment voucher — each split’s Bill back is decided there — or reject it back with a reason.'
                 : 'Create its payment voucher, or reject it back with a reason.'
           }
         />
-        {answerError ?? stepError ? (
+        {stepError ? (
           <div className={d.error} role="alert">
-            {answerError ?? stepError}
+            {stepError}
           </div>
         ) : null}
-        <RequestGroups
-          r={q}
-          opening={openingFile}
-          fileError={fileError}
-          onOpenFile={openFile}
-          share={(s) => (waiting && can.pay ? <BillBackAnswer share={s} disabled={answering !== null} onAnswer={(yes) => void answer(s, yes)} /> : null)}
-        />
+        <RequestGroups r={q} opening={openingFile} fileError={fileError} onOpenFile={openFile} billBack />
         {q.pvId ? (
           <>
             <div className={d.label}>
@@ -280,7 +253,7 @@ export function RequestDrawer({
     }
     if (waiting && can.pay) {
       bar.push(
-        <button key="pv" type="button" className={d.barBtn} data-kind="primary" onClick={() => steps.createRequestPv(r)} disabled={unanswered} title={unanswered ? 'Answer Bill back? for each share first' : undefined}>
+        <button key="pv" type="button" className={d.barBtn} data-kind="primary" onClick={() => steps.createRequestPv(r)}>
           Create PV
         </button>,
       )

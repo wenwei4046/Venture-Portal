@@ -216,10 +216,10 @@ export const ownPart = (r: PaymentRequest): number => Math.round((r.total - r.sh
 
 /** A share's Bill back, as it stands. */
 export function billBackWords(s: RequestShare): string {
-  if (s.billBack === null) return 'Not answered'
-  if (!s.billBack) return 'No — the department pays it'
   if (s.invoiceNo && s.invoiceStatus !== 'voided') return `Yes · ${s.invoiceNo} (${s.invoiceStatus === 'draft' ? 'draft' : s.invoiceStatus ?? 'draft'})`
-  return 'Yes — its invoice is drafted with the PV'
+  if (s.billBack === false) return 'No — the department pays it'
+  // Answered in the Create PV window, with the voucher.
+  return 'Decided when the PV is made'
 }
 
 /** Where it is, for the requester (the Claim page's chip). */
@@ -481,28 +481,27 @@ export function samePayeeOpen(rows: readonly PaymentRequest[], r: PaymentRequest
   return rows.filter((x) => x.status === 'with_finance' && !x.pvId && payeeKey(x) === key)
 }
 
-/** Every share's Bill back? answered — or no share at all. */
-export const billBackAnswered = (r: PaymentRequest) => r.shares.every((s) => s.billBack !== null)
-
-/**
- * What one Create PV takes: the request picked and the same person's open requests whose Bill back? is answered. One
- * still to be answered stays with Finance for a PV of its own (the user, 2026-10-29: "可以" — rather than stopping the
- * whole PV for it).
- */
-export function pvTogether(rows: readonly PaymentRequest[], r: PaymentRequest): { together: PaymentRequest[]; left: PaymentRequest[] } {
-  const open = samePayeeOpen(rows, r)
-  return {
-    together: open.filter((x) => x.id === r.id || billBackAnswered(x)),
-    left: open.filter((x) => x.id !== r.id && !billBackAnswered(x)),
-  }
-}
-
 /** A line of the PV a request starts: its item's words, the requester's department's pool, the amount — the category Finance's. */
 export interface RequestLine {
   requestId: string
   description: string
   pool: string
   amount: number
+}
+
+/**
+ * A split of the requests a PV pays, as the Create PV window asks its Bill back? (the user: "我开pv 时就要确定是不是要开单了").
+ * One whose invoice is drafted already (a voided one counts as none) is not asked again.
+ */
+export interface RequestSplit {
+  shareId: string
+  requestId: string
+  requestNo: string
+  /** The company or the department it is billed back to. */
+  who: string
+  amount: number
+  /** Its invoice, drafted with an earlier PV of this request — its answer stands. */
+  invoiceNo: string | null
 }
 
 export interface RequestVoucherStart {
@@ -513,8 +512,10 @@ export interface RequestVoucherStart {
   description: string
   lines: RequestLine[]
   notes: string
-  /** The Yes shares to draft as invoices, each with the request whose lines give its category. */
-  billBack: Array<{ shareId: string; requestId: string }>
+  /** Each split of the requests, its Bill back? asked in the window. */
+  splits: RequestSplit[]
+  /** Who pays a split answered No: the requester's department. */
+  department: string
   files: Array<{ id: string; name: string; size: number | null }>
 }
 
@@ -533,15 +534,36 @@ export function voucherStart(requests: readonly PaymentRequest[]): RequestVouche
       r.items.map((i) => ({ requestId: r.id, description: i.description, pool: r.pool ?? '', amount: i.amount })),
     ),
     notes: `From Payment request · ${nos.join(', ')}`.slice(0, 500),
-    billBack: rs.flatMap((r) => r.shares.filter((s) => s.billBack && !(s.invoiceNo && s.invoiceStatus !== 'voided')).map((s) => ({ shareId: s.id, requestId: r.id }))),
+    splits: rs.flatMap((r) =>
+      r.shares.map((s) => ({
+        shareId: s.id,
+        requestId: r.id,
+        requestNo: r.requestNo ?? 'Request',
+        who: (s.party === 'company' ? s.companyName : s.departmentName) ?? (s.party === 'company' ? 'Company' : 'Department'),
+        amount: s.amount,
+        invoiceNo: s.invoiceNo && s.invoiceStatus !== 'voided' ? s.invoiceNo : null,
+      })),
+    ),
+    department: first?.departmentName ?? 'The department',
     files: rs.flatMap((r) => r.files.map((f) => ({ id: f.id, name: f.name, size: f.size }))),
   }
 }
 
-/** Each Yes share's category: the account the first of its request's lines is booked to on the voucher. */
-export function billBackCategories(
-  billBack: RequestVoucherStart['billBack'],
+/** The splits still to answer: every one but those whose invoice is drafted already. */
+export const openSplits = (splits: readonly RequestSplit[]) => splits.filter((s) => !s.invoiceNo)
+
+/**
+ * What the voucher's save sends for the splits: each open split's answer, and a Yes one's category — the account the
+ * first of its request's lines is booked to on the voucher (empty when none is: the window says so first).
+ */
+export function billBackAnswers(
+  splits: readonly RequestSplit[],
+  answers: Readonly<Record<string, boolean>>,
   lines: ReadonlyArray<{ requestId?: string; account: string }>,
-): Array<{ share: string; category: string }> {
-  return billBack.map((b) => ({ share: b.shareId, category: lines.find((l) => l.requestId === b.requestId && l.account)?.account ?? '' }))
+): Array<{ share: string; billBack: boolean; category?: string }> {
+  return openSplits(splits).flatMap((s) => {
+    const yes = answers[s.shareId]
+    if (yes === undefined) return []
+    return [yes ? { share: s.shareId, billBack: true, category: lines.find((l) => l.requestId === s.requestId && l.account)?.account ?? '' } : { share: s.shareId, billBack: false }]
+  })
 }

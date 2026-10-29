@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
-  billBackAnswered,
-  billBackCategories,
+  billBackAnswers,
+  billBackWords,
   canCancel,
   canEdit,
   draftOf,
   draftPayload,
   emptyDraft,
+  openSplits,
   parseContext,
   parseRequest,
   parseRequests,
@@ -14,7 +15,6 @@ import {
   prContentType,
   prFileRefusal,
   prObjectPath,
-  pvTogether,
   samePayeeOpen,
   staffCards,
   staffHero,
@@ -156,37 +156,48 @@ describe('Create PV', () => {
     expect(samePayeeOpen([a, b, other, paid], b).map((r) => r.id)).toEqual(['r1', 'r2'])
   })
 
-  it('takes the answered ones; one whose Bill back? is still to answer stays with Finance (2026-10-29, "可以")', () => {
-    const picked = req()
-    const answered = req({ id: 'r2', shares: [{ id: 's2', party: 'company', companyId: 'dc', amount: 10, billBack: false }] })
-    const waiting = req({ id: 'r3', shares: [{ id: 's3', party: 'company', companyId: 'dc', amount: 10, billBack: null }] })
-    const { together, left } = pvTogether([picked, answered, waiting], picked)
-    expect([together.map((r) => r.id), left.map((r) => r.id)]).toEqual([['r1', 'r2'], ['r3']])
-    expect([billBackAnswered(waiting), billBackAnswered(picked)]).toEqual([false, true])
-  })
-
-  it('starts the voucher from them: a line per item on the department’s pool, the account under Pay to, the notes, the files, the Yes shares', () => {
-    const a = req({ shares: [{ id: 's1', party: 'company', companyId: 'dc', companyName: 'Dream Crafter', amount: 100, billBack: true }, { id: 's2', party: 'department', departmentId: 'hr', amount: 20, billBack: false }] })
+  it('starts the voucher from them: a line per item on the department’s pool, the account under Pay to, the notes, the files, every split to answer', () => {
+    const a = req({ shares: [{ id: 's1', party: 'company', companyId: 'dc', companyName: 'Dream Crafter', amount: 100, billBack: null }, { id: 's2', party: 'department', departmentId: 'hr', departmentName: 'HR', amount: 20, billBack: null }] })
     const b = req({ id: 'r2', requestNo: 'PRQ-2610-0002', submittedAt: '2026-10-29T03:00:00Z', items: [{ id: 'i3', description: 'Canva', amount: 50 }], files: [] })
     const start = voucherStart([b, a])
     expect(start.requestIds).toEqual(['r1', 'r2'])
-    expect([start.payee, start.payInto, start.description, start.notes]).toEqual([
-      'KHO WEI JIE', 'Pay into Hong Leong Bank •••• 4821 · salary account', '2 requests · KHO WEI JIE', 'From Payment request · PRQ-2610-0001, PRQ-2610-0002',
+    expect([start.payee, start.payInto, start.description, start.notes, start.department]).toEqual([
+      'KHO WEI JIE', 'Pay into Hong Leong Bank •••• 4821 · salary account', '2 requests · KHO WEI JIE', 'From Payment request · PRQ-2610-0001, PRQ-2610-0002', 'Marketing',
     ])
     expect(start.lines.map((l) => [l.requestId, l.description, l.pool, l.amount])).toEqual([
       ['r1', 'Claude · Oct', 'dept_pool_marketing', 453.79], ['r1', 'Jian Ying', 'dept_pool_marketing', 325.79], ['r2', 'Canva', 'dept_pool_marketing', 50],
     ])
-    expect(start.billBack).toEqual([{ shareId: 's1', requestId: 'r1' }])
+    expect(start.splits.map((s) => [s.shareId, s.requestNo, s.who, s.amount, s.invoiceNo])).toEqual([
+      ['s1', 'PRQ-2610-0001', 'Dream Crafter', 100, null], ['s2', 'PRQ-2610-0001', 'HR', 20, null],
+    ])
     expect(start.files.map((f) => f.name)).toEqual(['Receipt-2932.pdf'])
-    // Each Yes share is invoiced at its request's first line's category on the voucher.
-    expect(billBackCategories(start.billBack, [{ requestId: 'r1', account: '' }, { requestId: 'r1', account: '9087' }, { requestId: 'r2', account: '9031' }])).toEqual([{ share: 's1', category: '9087' }])
-    expect(billBackCategories(start.billBack, [{ requestId: 'r2', account: '9031' }])).toEqual([{ share: 's1', category: '' }])
   })
 
-  it('a share whose invoice is drafted already is not drafted again — unless it was voided', () => {
-    const drafted = req({ shares: [{ id: 's1', party: 'company', companyId: 'dc', amount: 100, billBack: true, invoiceNo: 'HV-INV-202610-0091', invoiceStatus: 'draft' }] })
-    expect(voucherStart([drafted]).billBack).toEqual([])
-    const voided = req({ shares: [{ id: 's1', party: 'company', companyId: 'dc', amount: 100, billBack: true, invoiceNo: 'HV-INV-202610-0091', invoiceStatus: 'voided' }] })
-    expect(voucherStart([voided]).billBack).toEqual([{ shareId: 's1', requestId: 'r1' }])
+  // 2026-10-29 — the user: "我开pv 时就要确定是不是要开单了" — each split's Bill back? is answered in the Create PV window.
+  it('sends each split’s answer with the voucher; a Yes carries the category of its request’s first line', () => {
+    const start = voucherStart([req({ shares: [
+      { id: 's1', party: 'company', companyId: 'dc', companyName: 'Dream Crafter', amount: 100, billBack: null },
+      { id: 's2', party: 'department', departmentId: 'hr', departmentName: 'HR', amount: 20, billBack: null },
+    ] })])
+    const lines = [{ requestId: 'r1', account: '' }, { requestId: 'r1', account: '9087' }]
+    expect(billBackAnswers(start.splits, { s1: true, s2: false }, lines)).toEqual([{ share: 's1', billBack: true, category: '9087' }, { share: 's2', billBack: false }])
+    // Not answered yet: nothing sent for it (the window asks first).
+    expect(billBackAnswers(start.splits, { s2: false }, lines)).toEqual([{ share: 's2', billBack: false }])
+    // A Yes whose request has no line left has no category (the window says so first).
+    expect(billBackAnswers(start.splits, { s1: true }, [])).toEqual([{ share: 's1', billBack: true, category: '' }])
+  })
+
+  it('a split whose invoice is drafted already is not asked again — unless that invoice was voided', () => {
+    const drafted = voucherStart([req({ shares: [{ id: 's1', party: 'company', companyId: 'dc', amount: 100, billBack: true, invoiceNo: 'HV-INV-202610-0091', invoiceStatus: 'draft' }] })])
+    expect([drafted.splits[0].invoiceNo, openSplits(drafted.splits)]).toEqual(['HV-INV-202610-0091', []])
+    const voided = voucherStart([req({ shares: [{ id: 's1', party: 'company', companyId: 'dc', amount: 100, billBack: true, invoiceNo: 'HV-INV-202610-0091', invoiceStatus: 'voided' }] })])
+    expect(openSplits(voided.splits).map((s) => s.shareId)).toEqual(['s1'])
+  })
+
+  it('says each split’s Bill back as Finance reads it', () => {
+    const share = { id: 's', party: 'company' as const, departmentId: null, departmentName: null, companyId: 'dc', companyName: 'Dream Crafter', amount: 10, invoiceId: null }
+    expect(billBackWords({ ...share, billBack: null, invoiceNo: null, invoiceStatus: null })).toBe('Decided when the PV is made')
+    expect(billBackWords({ ...share, billBack: false, invoiceNo: null, invoiceStatus: null })).toBe('No — the department pays it')
+    expect(billBackWords({ ...share, billBack: true, invoiceNo: 'HV-INV-202610-0091', invoiceStatus: 'draft' })).toBe('Yes · HV-INV-202610-0091 (draft)')
   })
 })

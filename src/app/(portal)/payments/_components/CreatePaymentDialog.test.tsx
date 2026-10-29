@@ -344,8 +344,8 @@ describe('the lines', () => {
 })
 
 // Payment request's Create PV (2026-10-29, PR ②): this same window, filled in from the staff requests it pays — a line
-// per item on the department's pool, the category Finance's — saved through Payment request's own action with the
-// requests and each Yes share's category (its request's line's).
+// per item on the department's pool, the category Finance's — each split's Bill back? answered here with the voucher
+// (the user: "我开pv 时就要确定是不是要开单了"), saved through Payment request's own action.
 describe('from staff requests', () => {
   const requests = {
     requestIds: ['r1', 'r2'],
@@ -357,11 +357,18 @@ describe('from staff requests', () => {
       { requestId: 'r2', description: 'Jian Ying', pool: 'dept_pool_marketing', amount: 325.79 },
     ],
     notes: 'From Payment request · PRQ-2610-0001, PRQ-2610-0002',
-    billBack: [{ shareId: 's1', requestId: 'r2' }],
+    splits: [
+      { shareId: 's1', requestId: 'r2', requestNo: 'PRQ-2610-0002', who: 'Dream Crafter', amount: 100, invoiceNo: null },
+      { shareId: 's2', requestId: 'r1', requestNo: 'PRQ-2610-0001', who: 'HR', amount: 20, invoiceNo: null },
+      { shareId: 's3', requestId: 'r1', requestNo: 'PRQ-2610-0001', who: 'HOUZS Century', amount: 10, invoiceNo: 'HV-INV-202610-0091' },
+    ],
+    department: 'Marketing',
     files: [{ id: 'f1', name: 'Receipt-2932.pdf', size: 1200 }],
   }
+  const pick = (who: string, answer: 'Yes' | 'No') =>
+    fireEvent.click(within(screen.getByRole('group', { name: `Bill back ${who}?` })).getByRole('button', { name: answer }))
 
-  it('starts on the requests and saves through the action it is handed, with the requests and each bill back’s category', async () => {
+  it('starts on the requests, asks each split’s Bill back, and saves through the action it is handed', async () => {
     const create = vi.fn().mockResolvedValue({ ok: true, id: 'pv-9', voucherNo: 'HV-PV-202610-0700', submitted: false })
     draw({ preset: { title: 'Create PV', payee: requests.payee, description: requests.description, requests }, create })
     await act(async () => undefined)
@@ -371,12 +378,22 @@ describe('from staff requests', () => {
     expect([screen.getByLabelText('Line 1 description'), screen.getByLabelText('Line 2 amount')].map((i) => (i as HTMLInputElement).value)).toEqual(['Claude · Oct', '325.79'])
     expect(dialog()).toHaveTextContent('Receipt-2932.pdf')
     expect(screen.getByLabelText('Notes')).toHaveValue('From Payment request · PRQ-2610-0001, PRQ-2610-0002')
+    // Each split: nothing chosen until picked; one already invoiced is not asked again.
+    expect(within(screen.getByRole('group', { name: 'Bill back Dream Crafter?' })).getByRole('button', { name: 'Yes' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('group', { name: 'Bill back HOUZS Century?' })).toBeNull()
+    expect(dialog()).toHaveTextContent('HV-INV-202610-0091 · drafted')
+    expect(dialog()).toHaveTextContent('No: Marketing pays it.')
     fireEvent.change(screen.getByLabelText('Line 1 category'), { target: { value: '9087' } })
     fireEvent.change(screen.getByLabelText('Line 2 category'), { target: { value: '6000' } })
+    expect(dialog()).toHaveTextContent('Each split’s Bill back is needed before you can save.')
+    await save()
+    expect(create).not.toHaveBeenCalled()
+    pick('Dream Crafter', 'Yes')
+    pick('HR', 'No')
     await save()
     const form = create.mock.calls[0][0] as FormData
     expect(JSON.parse(form.get('payment_request_ids') as string)).toEqual(['r1', 'r2'])
-    expect(JSON.parse(form.get('payment_request_bill') as string)).toEqual([{ share: 's1', category: '6000' }])
+    expect(JSON.parse(form.get('payment_request_bill') as string)).toEqual([{ share: 's1', billBack: true, category: '6000' }, { share: 's2', billBack: false }])
     expect(form.get('notes')).toBe('From Payment request · PRQ-2610-0001, PRQ-2610-0002')
     expect(form.get('source_rows[1][pool]')).toBe('dept_pool_marketing')
     expect(mocks.create).not.toHaveBeenCalled()
@@ -388,6 +405,8 @@ describe('from staff requests', () => {
     await act(async () => undefined)
     fireEvent.change(screen.getByLabelText('Line 1 category'), { target: { value: '9087' } })
     fireEvent.click(screen.getByRole('button', { name: 'Remove line 2' }))
+    pick('Dream Crafter', 'Yes')
+    pick('HR', 'No')
     expect(dialog()).toHaveTextContent('Keep a line of each request billed back — its invoice takes that line’s category.')
     await save()
     expect(create).not.toHaveBeenCalled()

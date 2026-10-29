@@ -12,7 +12,7 @@ import { flash } from '@/components/hrv/toast'
 import { typeLabel, type AccountType } from '@/lib/coa'
 import { buildRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
 import { stageInto } from '@/lib/storage/stage'
-import { billBackCategories, type RequestVoucherStart } from '@/lib/payment-requests/model'
+import { billBackAnswers, openSplits, type RequestVoucherStart } from '@/lib/payment-requests/model'
 import { createPaymentFromDialog, type DialogPaymentResult } from '../actions'
 import { openCreatePayment } from '../create-actions'
 import type { CreatePaymentOptions } from '../_lib/create-payment-options'
@@ -129,6 +129,8 @@ export default function CreatePaymentDialog({
   const [method, setMethod] = useState('bank_transfer')
   const [files, setFiles] = useState<File[]>([])
   const [notes, setNotes] = useState(preset?.requests?.notes ?? '')
+  // Each split's Bill back?, answered here with the voucher — nothing chosen until it is picked.
+  const [answers, setAnswers] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState<'draft' | 'submit' | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -170,6 +172,7 @@ export default function CreatePaymentDialog({
     setMethod('bank_transfer')
     setFiles([])
     setNotes(preset?.requests?.notes ?? '')
+    setAnswers({})
     setError(null)
   }
   const close = () => {
@@ -252,14 +255,16 @@ export default function CreatePaymentDialog({
   } else if (lines.length === 0 || lines.some((l) => !l.pool || !l.account || !(num(l.amount) > 0))) need.push('each line’s pool, category, amount')
   if (method !== 'netting' && !bankId) need.push('a bank')
   if (!desc.trim()) need.push('a description')
+  // The requests' splits: each answered Bill back? Yes or No; a Yes is invoiced at the category of its request's lines.
+  const splits = preset?.requests ? openSplits(preset.requests.splits) : []
+  if (splits.some((s) => answers[s.shareId] === undefined)) need.push('each split’s Bill back')
+  const billBack = preset?.requests ? billBackAnswers(preset.requests.splits, answers, lines) : []
   const offBy = repay && total > 0 && lines.length > 0 ? Math.round((total - lineSum) * 100) / 100 : 0
-  // A request's Yes share is invoiced at the category of that request's lines on this voucher.
-  const billBack = preset?.requests ? billBackCategories(preset.requests.billBack, lines) : []
   const problem =
     neededSentence(need) ??
     (Math.abs(offBy) > 0.005 ? `The lines add up to RM ${money(lineSum)} — the amount is RM ${money(total)}.` : null) ??
     filesProblem(files) ??
-    (billBack.some((b) => !b.category) ? 'Keep a line of each request billed back — its invoice takes that line’s category.' : null)
+    (billBack.some((b) => b.billBack && !b.category) ? 'Keep a line of each request billed back — its invoice takes that line’s category.' : null)
   const ok = problem === null && !!opts
 
   const save = async (submit: boolean) => {
@@ -501,6 +506,38 @@ export default function CreatePaymentDialog({
             </div>
           </div>
         </Field>
+
+        {preset?.requests && preset.requests.splits.length > 0 ? (
+          <Field label="Bill back">
+            <div className={c.splits}>
+              {preset.requests.splits.map((s) => (
+                <div key={s.shareId} className={c.split}>
+                  <span className={c.splitText}>
+                    <span className={c.splitWho}>
+                      {s.who} · RM {money(s.amount)}
+                    </span>
+                    <span className={c.splitSub}>{s.requestNo}</span>
+                  </span>
+                  {s.invoiceNo ? (
+                    <span className={c.splitDone}>{s.invoiceNo} · drafted</span>
+                  ) : (
+                    <span className={fm.more} role="group" aria-label={`Bill back ${s.who}?`}>
+                      <button type="button" className={fm.moreBtn} aria-pressed={answers[s.shareId] === true} onClick={() => setAnswers((a) => ({ ...a, [s.shareId]: true }))}>
+                        Yes
+                      </button>
+                      <button type="button" className={fm.moreBtn} aria-pressed={answers[s.shareId] === false} onClick={() => setAnswers((a) => ({ ...a, [s.shareId]: false }))}>
+                        No
+                      </button>
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <Hint>
+              Yes drafts an invoice to them — a draft in Invoice until you issue it. No: {preset.requests.department} pays it.
+            </Hint>
+          </Field>
+        ) : null}
 
         <Field label="Attachments">
           {preset?.requests && preset.requests.files.length > 0 ? (

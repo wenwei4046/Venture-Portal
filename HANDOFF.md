@@ -11,13 +11,16 @@ PR ① to ⑥). PR ① shipped as #840 (Payments › Payment voucher / Payment r
   Payment voucher's hub; the drawer's Edit / Submit / Cancel request; **New request** pop-out (what it is · what it was
   for, receipts straight to R2 · which pool pays or Split it). Rows: Department / Marketing say Claim; HR › Admin ›
   Claim; Finance's account menu › Account › Claim (personal logins only, never while viewing as).
-- **Payments › Payment request**: the requests under their department's card; Bill back? Yes / No per share; Reject…;
-  Create PV = today's Create payment window filled in (`createPaymentForRequests`), same payee's open requests
-  combined, receipts copied onto the voucher (`.copyTo`), Yes shares drafted as DRAFT invoices in the same database
-  step that ties the requests (`payment_requests_attach_pv`).
+- **Payments › Payment request**: the requests under their department's card; Reject…; Create PV = today's Create
+  payment window filled in (`createPaymentForRequests`), every open request of the same payee combined, **Bill back?
+  Yes / No for each split asked in that window** (the user: "我开pv 时就要确定是不是要开单了" — the drawer only says
+  where it stands), receipts copied onto the voucher (`.copyTo`), Yes splits drafted as DRAFT invoices in the same
+  database step that ties the requests (`payment_requests_attach_pv(ids, pv, bill)`; `payment_request_bill_back` gone).
 - **Mig `20261029180000_payment_requests`**: dry-run on production (BEGIN … ROLLBACK, with a smoke as LI SEAN →
-  ONG MEI SHUANG) clean; NOT applied — waits for the user's go, then the merge waits for the user's word. SQL
-  validator 75 checks. No Anthropic key, no invoice reading (PR ⑤ shelved: "不要开key 先").
+  ONG MEI SHUANG) clean BEFORE the Bill back move — it changed since (`attach_pv` takes the answers, `for_pv` no
+  longer asks them, `payment_request_bill_back` gone), so dry-run it again when applying; NOT applied — waits for the
+  user's go, then the merge waits for the user's word. SQL validator 77 checks. No Anthropic key, no invoice reading
+  (PR ⑤ shelved: "不要开key 先").
 - Next: PR ③ (By management approve, Claim & approve, the notices), ④ (several at once), ⑥ (the rest) — each on the
   user's go.
 

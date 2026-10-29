@@ -293,13 +293,11 @@ try {
   await q(`DELETE FROM closed_pages`)
   await as(FIN)
   await reject('SELECT payment_request_reject($1, $2)', [liReq, '  '], /Say why/, 'a reason is required')
-  const firstShare = (await one('SELECT payment_requests_for_finance()')).find(x => x.id === liReq).shares[0].id
-  await q('SELECT payment_request_bill_back($1, true)', [firstShare])
   await q('SELECT payment_request_reject($1, $2)', [liReq, 'Marketing says 80, not 100'])
   await as(LI)
   req = (await one('SELECT my_payment_requests()'))[0]
   check([req.status, req.rejectReason, req.rejectedByName, req.shares[0].billBack], ['rejected', 'Marketing says 80, not 100', 'Finance Manager', null],
-    'she reads why, and Finance answers the share afresh once it is fixed')
+    'she reads why; its split is answered when its PV is made')
   req = await save(liReq, { ...claimData([], {
     payTo: { salary: false, bank: 'Public Bank', accountNo: '3-1874502-10' },
     items: [{ description: 'Canva team plan · Oct', amount: '250' }],
@@ -316,41 +314,44 @@ try {
   await as(KHO)
   await reject('SELECT payment_requests_for_pv($1)', [[liReq]], /needs Treasury · Create/, 'a staff account makes no voucher')
   await as(FIN)
-  await reject('SELECT payment_requests_for_pv($1)', [[liReq]], /Answer Bill back\? for every share first/, 'every share answered first')
   await reject('SELECT payment_requests_for_pv($1)', [[liReq, draft]], /one payee into one account/, 'one voucher, one payee')
   const share = await one('SELECT id FROM payment_request_shares WHERE request_id = $1', [liReq]).catch(() => null)
   check(share, null, 'Finance reads the tables only through the functions')
   const liShare = (await one('SELECT payment_requests_for_finance()')).find(x => x.id === liReq).shares[0].id
-  await q('SELECT payment_request_bill_back($1, true)', [liShare])
   const forPv = await one('SELECT payment_requests_for_pv($1)', [[liReq]])
-  check([forPv.requests.length, forPv.files.map(f => f.name)], [1, ['Canva-invoice-Oct.pdf']], 'what the voucher needs: the request and its files to carry')
+  check([forPv.requests.length, forPv.files.map(f => f.name)], [1, ['Canva-invoice-Oct.pdf']],
+    'what the voucher needs: the request and its files to carry — its split answered in the window, with the voucher')
   const attach = (pv, bill) => q('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], pv, JSON.stringify(bill)])
   // How many invoices there are (read as the database itself — the next step says whose it is).
   const invoices = async () => {
     await as(null, null)
     return q(`SELECT count(*)::int AS n FROM invoices`).then(r => r[0].n)
   }
-  // A Maker makes vouchers but no invoices: the Yes share stops it before anything is written.
+  const yes = (category) => [{ share: liShare, billBack: true, category }]
+  // The split is answered when the PV is made (the user: "我开pv 时就要确定是不是要开单了").
+  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], PV, '[]'], /Answer Bill back\? for each split/, 'each split answered with the voucher')
+  // A Maker makes vouchers but no invoices: a Yes stops it before anything is written.
   await as(MAKER)
-  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], PV, JSON.stringify([{ share: liShare, category: '9087' }])],
+  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], PV, JSON.stringify(yes('9087'))],
     /Billing back needs Invoice · Create/, 'a bill back asks Invoice · Create')
   await as(FIN)
-  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], PV, '[]'], /no category from the voucher/, 'its category is asked')
-  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], PV, JSON.stringify([{ share: liShare, category: '9031' }])],
+  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], PV, JSON.stringify([{ share: liShare, billBack: true }])],
+    /no category from the voucher/, 'its category is asked')
+  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], PV, JSON.stringify(yes('9031'))],
     /no category from the voucher/, '…one of this voucher’s lines’')
   await as(null, null)
   await q(`INSERT INTO period_locks (period_month) VALUES (date_trunc('month', (now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date)::date)`)
   await as(FIN)
-  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], PV, JSON.stringify([{ share: liShare, category: '9087' }])],
+  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], PV, JSON.stringify(yes('9087'))],
     /is closed — its invoices cannot be drafted/, 'never in a closed month')
   await as(null, null)
   await q(`DELETE FROM period_locks`)
   check([await one('SELECT status FROM payment_requests WHERE id = $1', [liReq]), await invoices()], ['with_finance', 1],
     'each refusal left the request with Finance and drafted nothing')
   await as(FIN)
-  const tied = (await attach(PV, [{ share: liShare, category: '9087' }]))[0].payment_requests_attach_pv
+  const tied = (await attach(PV, yes('9087')))[0].payment_requests_attach_pv
   check(tied.invoices.map(i => [i.share, i.invoiceNo]), [[liShare, 'HV-INV-' + tied.invoices[0].invoiceNo.slice(7, 13) + '-0091']],
-    'tied to the voucher, the Yes share’s invoice drafted with it')
+    'tied to the voucher, the Yes split’s invoice drafted with it')
   await as(null, null)
   check(await q(`SELECT i.status, i.billing_mode::text AS mode, i.billable_to_type::text AS kind, i.billable_to_department_id AS dept, i.company_id,
                         i.total_amount::float AS total, i.reference_no, i.category_code, l.category_code AS line_category, l.amount::float AS line_amount,
@@ -366,8 +367,8 @@ try {
   await reject('SELECT payment_request_reject($1, $2)', [liReq, 'late'], /needs Treasury/, 'nor by a Maker')
   await as(LI)
   req = (await one('SELECT my_payment_requests()'))[0]
-  check([req.status, req.pvNo, req.shares[0].invoiceNo, req.shares[0].invoiceStatus], ['in_pv', 'HV-PV-202610-0700', tied.invoices[0].invoiceNo, 'draft'],
-    'she sees it in a voucher, and its share billed back')
+  check([req.status, req.pvNo, req.shares[0].billBack, req.shares[0].invoiceNo, req.shares[0].invoiceStatus],
+    ['in_pv', 'HV-PV-202610-0700', true, tied.invoices[0].invoiceNo, 'draft'], 'she sees it in a voucher, its split’s answer kept, billed back')
   await reject('SELECT payment_request_cancel($1)', [liReq], /ask Finance to void it first/, 'it is not cancelled once in a voucher')
 
   // The voucher moves: paid → paid; voided → back with Finance; a draft deleted → the same.
@@ -380,21 +381,26 @@ try {
   check(await q('SELECT status, pv_id FROM payment_requests WHERE id = $1', [liReq]), [{ status: 'with_finance', pv_id: null }],
     'a voided voucher puts it back with Finance')
   await as(FIN)
-  await reject('SELECT payment_request_bill_back($1, false)', [liShare], /drafted already — void it in Invoice/, 'its drafted invoice holds its answer')
-  check((await attach(PV2, []))[0].payment_requests_attach_pv.invoices, [], 'in the next voucher its invoice is the one already drafted')
+  check((await attach(PV2, []))[0].payment_requests_attach_pv.invoices, [],
+    'in the next voucher its drafted invoice stands — nothing to answer again')
   check(await invoices(), 2, '…none drafted twice')
   await as(null, null)
   await q(`DELETE FROM payment_vouchers WHERE id = $1`, [PV2])
   check(await q('SELECT status, pv_id FROM payment_requests WHERE id = $1', [liReq]), [{ status: 'with_finance', pv_id: null }],
     'a deleted draft voucher too')
-  // Finance voided that invoice in Invoice: it counts as none, so the share is answered again and drafted afresh.
+  // Finance voided that invoice in Invoice: it counts as none — the split is answered again with the next voucher.
   await q(`UPDATE invoices SET status = 'voided' WHERE id = $1`, [tied.invoices[0].invoiceId])
   await q(`INSERT INTO payment_vouchers VALUES ($1, 'HV-PV-202610-0702', 'draft', 'debit')`, [PV2])
   await as(FIN)
-  await q('SELECT payment_request_bill_back($1, true)', [liShare])
-  check((await attach(PV2, [{ share: liShare, category: '9031' }]))[0].payment_requests_attach_pv.invoices.length, 1,
-    'a voided invoice is drafted again')
+  await reject('SELECT payment_requests_attach_pv($1, $2, $3::jsonb)', [[liReq], PV2, '[]'], /Answer Bill back\? for each split/,
+    'a voided invoice counts as none: its split is asked again')
+  check((await attach(PV2, [{ share: liShare, billBack: false }]))[0].payment_requests_attach_pv.invoices, [],
+    'No: nothing drafted — the department pays it')
+  await as(LI)
+  check((await one('SELECT my_payment_requests()'))[0].shares.map(s => [s.billBack, s.invoiceId]), [[false, null]],
+    'the answer No kept, the voided invoice let go')
   await as(null, null)
+  check(await invoices(), 2, '…and no invoice drafted for a No')
   await q(`UPDATE payment_vouchers SET status = 'voided' WHERE id = $1`, [PV2])
 
   // ── Cancel ────────────────────────────────────────────────────────────────

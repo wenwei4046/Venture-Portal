@@ -10,6 +10,7 @@ import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { dropStaged, dropStagedIn, formFile, formFiles, type FormFile } from '@/lib/storage/staged'
 import type { FileBucketApi } from '@/lib/storage/server'
+import { openSplits, parseRequests, voucherStart } from '@/lib/payment-requests/model'
 import { mayActOn, requireActionOn, requireApproverOn, requirePermission } from '@/lib/auth'
 import { decision } from '@/lib/approval-domains'
 import { canSeePayrollPayouts } from '@/lib/roles'
@@ -914,9 +915,10 @@ function jsonList(raw: FormDataEntryValue | null): unknown[] {
 /**
  * Create PV from Payments › Payment request (2026-10-29, PR ② of docs/module-spec-payment-requests.md): the voucher
  * today's Create payment window makes (createPaymentVoucherInner — every rule), filled in from the staff requests it
- * pays; then, in one database step, the requests are tied to it and each Yes share's invoice is drafted
- * (`payment_requests_attach_pv` — refused, the draft voucher is voided again and nothing is tied); then the requests'
- * receipts are carried onto it; then, when asked, it is sent for approval. Answered in words, never a redirect.
+ * pays; then, in one database step, the requests are tied to it, each split's Bill back? answered in the window is kept
+ * and each Yes split's invoice is drafted (`payment_requests_attach_pv` — refused, the draft voucher is voided again and
+ * nothing is tied); then the requests' receipts are carried onto it; then, when asked, it is sent for approval.
+ * Answered in words, never a redirect.
  */
 export async function createPaymentForRequests(formData: FormData): Promise<DialogPaymentResult> {
   try {
@@ -925,16 +927,23 @@ export async function createPaymentForRequests(formData: FormData): Promise<Dial
     if (formData.get('return_to')) formData.delete('return_to')
     const ids = [...new Set(jsonList(formData.get('payment_request_ids')).filter((v): v is string => typeof v === 'string' && REQUEST_ID.test(v)))].slice(0, 20)
     if (ids.length === 0) return { ok: false, reason: 'Which requests? Reload the page and try again.' }
+    // Each split's Bill back?, answered in the window with the voucher; a Yes carries its category.
     const bill = jsonList(formData.get('payment_request_bill')).flatMap((b) => {
       const o = b && typeof b === 'object' ? (b as Record<string, unknown>) : {}
-      return typeof o.share === 'string' && REQUEST_ID.test(o.share) && typeof o.category === 'string' ? [{ share: o.share, category: o.category.slice(0, 20) }] : []
+      if (typeof o.share !== 'string' || !REQUEST_ID.test(o.share) || typeof o.billBack !== 'boolean') return []
+      return [o.billBack ? { share: o.share, billBack: true, category: typeof o.category === 'string' ? o.category.slice(0, 20) : '' } : { share: o.share, billBack: false }]
     })
 
     const supabase = await createClient()
-    // Asked before anything is written: still with Finance, one payee into one account, every share answered.
+    // Asked before anything is written: still with Finance, one payee into one account — and every split the window asks
+    // answered (a request changed since the window opened is caught here, before a voucher number is taken).
     const { data: ready, error: readyErr } = await supabase.rpc('payment_requests_for_pv', { p_ids: ids })
     if (readyErr) return { ok: false, reason: readyErr.message }
-    if (bill.length > 0 && !(await mayActOn(['/ba', '/billing-allocator', '/statements'], 'billing', 'create'))) {
+    const asked = openSplits(voucherStart(parseRequests((ready as { requests?: unknown } | null)?.requests)).splits)
+    if (asked.some((s) => !bill.some((b) => b.share === s.shareId))) {
+      return { ok: false, reason: 'Each split’s Bill back is needed — close the window and Create PV again.' }
+    }
+    if (bill.some((b) => b.billBack) && !(await mayActOn(['/ba', '/billing-allocator', '/statements'], 'billing', 'create'))) {
       return { ok: false, reason: 'Billing back needs Invoice · Create — answer No, or ask for it.' }
     }
     const carry = ((ready as { files?: unknown } | null)?.files ?? []) as Array<{ id: string; path: string; name: string; contentType: string | null; size: number | null }>

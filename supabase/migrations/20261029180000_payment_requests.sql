@@ -33,8 +33,9 @@
 --   claims.create (own)  send one's own and follow them — the staff templates hold it already (Staff · Basic,
 --                        Marketing, HR · Payroll, Finance · Maker, Director, Executive office, Ultimate, Full access).
 --   Treasury             read every submitted request and its files (Finance and the Principal);
---     · Create           answer Bill back and make the PV (the page's box asked too — tab_write_guard); a Yes
---                        share's draft invoice asks Invoice · Create (billing.create) as well, before anything is written;
+--     · Create           make the PV, each split's Bill back? answered with it (the page's box asked too —
+--                        tab_write_guard); a Yes split's draft invoice asks Invoice · Create (billing.create) as well,
+--                        before anything is written;
 --     · Void / Approve   reject one back to its requester (as Return to HR).
 -- The Claim page is each view's own row (the HR view's and Finance's tabs below, beside the Department view's and
 -- Marketing's): one's own requests, whichever view one works in.
@@ -680,39 +681,9 @@ BEGIN
 END
 $fn$;
 
--- Bill back? — Finance's answer on one share: Yes drafts its invoice when the PV is made.
-CREATE OR REPLACE FUNCTION public.payment_request_bill_back(p_share uuid, p_bill_back boolean)
-RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public
-AS $fn$
-DECLARE
-  s record;
-BEGIN
-  PERFORM public.tab_write_guard(ARRAY['/payments/requests'], ARRAY['treasury.create']);
-  IF auth.uid() IS NULL OR NOT public.has_any_action(ARRAY['treasury.create']) THEN
-    RAISE EXCEPTION 'payment_request_bill_back: needs Treasury · Create' USING ERRCODE = '42501';
-  END IF;
-  IF p_bill_back IS NULL THEN RAISE EXCEPTION 'Answer Yes or No.'; END IF;
-  SELECT x.id, r.status, r.pv_id, i.invoice_no, i.status AS invoice_status INTO s
-    FROM public.payment_request_shares x JOIN public.payment_requests r ON r.id = x.request_id
-    LEFT JOIN public.invoices i ON i.id = x.invoice_id
-   WHERE x.id = p_share
-     FOR UPDATE OF x;
-  IF NOT FOUND THEN RAISE EXCEPTION 'Share not found'; END IF;
-  IF s.status <> 'with_finance' OR s.pv_id IS NOT NULL THEN
-    RAISE EXCEPTION 'This request is not waiting for Finance';
-  END IF;
-  IF s.invoice_no IS NOT NULL AND s.invoice_status <> 'voided' THEN
-    RAISE EXCEPTION 'Its invoice % is drafted already — void it in Invoice to answer again.', s.invoice_no;
-  END IF;
-  UPDATE public.payment_request_shares SET bill_back = p_bill_back, decided_by = auth.uid(), decided_at = now(), invoice_id = NULL
-   WHERE id = p_share;
-END
-$fn$;
-
--- What a Create PV needs, asked before the voucher is made: requests waiting for Finance, one payee, every share
--- answered; their files to carry onto the voucher and the shares to draft as invoices.
+-- What a Create PV needs, asked before the voucher is made: requests waiting for Finance, one payee into one account;
+-- their files to carry onto the voucher. (Bill back? is answered in the Create PV window, with the voucher — the user:
+-- "我开pv 时就要确定是不是要开单了".)
 CREATE OR REPLACE FUNCTION public.payment_requests_for_pv(p_ids uuid[])
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -736,9 +707,6 @@ BEGIN
         FROM public.payment_requests r WHERE r.id = ANY (p_ids)) > 1 THEN
     RAISE EXCEPTION 'One voucher pays one payee into one account — these requests pay different ones.';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.payment_request_shares s WHERE s.request_id = ANY (p_ids) AND s.bill_back IS NULL) THEN
-    RAISE EXCEPTION 'Answer Bill back? for every share first.';
-  END IF;
   RETURN jsonb_build_object(
     'requests', public.payment_requests_json(ARRAY(
                   SELECT r.id FROM public.payment_requests r WHERE r.id = ANY (p_ids) ORDER BY r.submitted_at, r.id)),
@@ -749,12 +717,13 @@ BEGIN
 END
 $fn$;
 
--- The voucher made: its requests are in it now, and each Yes share's invoice is drafted — to the company, or to the
--- department — in Invoice, a DRAFT until Finance checks and issues it (the user: "但都是draft 的状态？然后我检查了没有
--- 问题才开？"). Billed in the requester's department's mode, so its pool has the money back when the invoice is settled;
--- one line, booked to the account the request's lines carry on this voucher (`p_bill`: [{ share, category }] — the
--- invoice credits it back, the house's contra-expense, as Notion's third to Cr 9087). One step: refused, nothing is tied
--- and nothing drafted (Create PV then voids the draft voucher it made). Answers the invoices drafted.
+-- The voucher made: its requests are in it now, each split's Bill back? answered in the Create PV window is kept (the
+-- user: "我开pv 时就要确定是不是要开单了"), and each Yes split's invoice is drafted — to the company, or to the department
+-- — in Invoice, a DRAFT until Finance checks and issues it ("但都是draft 的状态？然后我检查了没有问题才开？"). Billed in the
+-- requester's department's mode, so its pool has the money back when the invoice is settled; one line, booked to the
+-- account the request's lines carry on this voucher (`p_bill`: [{ share, billBack, category }] — the invoice credits
+-- it back, the house's contra-expense, as Notion's third to Cr 9087). One step: refused, nothing is tied and nothing
+-- drafted (Create PV then voids the draft voucher it made). Answers the invoices drafted.
 CREATE OR REPLACE FUNCTION public.payment_requests_attach_pv(p_ids uuid[], p_pv uuid, p_bill jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
@@ -771,6 +740,7 @@ DECLARE
   v_inv    uuid;
   v_out    jsonb := '[]'::jsonb;
   v_bill   jsonb := CASE WHEN jsonb_typeof(p_bill) = 'array' THEN p_bill ELSE '[]'::jsonb END;
+  v_open   uuid[];
   v_todo   uuid[];
 BEGIN
   PERFORM public.tab_write_guard(ARRAY['/payments/requests'], ARRAY['treasury.create']);
@@ -787,14 +757,18 @@ BEGIN
   IF p_ids IS NULL OR v_n = 0 OR v_n <> cardinality(ARRAY(SELECT DISTINCT unnest(p_ids))) THEN
     RAISE EXCEPTION 'A request is no longer waiting for Finance — reload and try again.';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.payment_request_shares x WHERE x.request_id = ANY (p_ids) AND x.bill_back IS NULL) THEN
-    RAISE EXCEPTION 'Answer Bill back? for every share first.';
+  -- Each split's Bill back?, answered in the Create PV window — every split but one whose invoice is drafted already (a
+  -- voided one counts as none) — and the invoices the Yes ones draft, asked whole before anything is written.
+  v_open := ARRAY(SELECT x.id FROM public.payment_request_shares x LEFT JOIN public.invoices i ON i.id = x.invoice_id
+                   WHERE x.request_id = ANY (p_ids) AND (x.invoice_id IS NULL OR i.status = 'voided'));
+  IF EXISTS (SELECT 1 FROM unnest(v_open) o(id)
+              WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_bill) b
+                                 WHERE b.value ->> 'share' = o.id::text AND jsonb_typeof(b.value -> 'billBack') = 'boolean')) THEN
+    RAISE EXCEPTION 'Answer Bill back? for each split.';
   END IF;
-
-  -- The invoices to draft — a Yes share with none, or with one voided since (it counts as none) — asked whole before
-  -- anything is written.
-  v_todo := ARRAY(SELECT x.id FROM public.payment_request_shares x LEFT JOIN public.invoices i ON i.id = x.invoice_id
-                   WHERE x.request_id = ANY (p_ids) AND x.bill_back AND (x.invoice_id IS NULL OR i.status = 'voided'));
+  v_todo := ARRAY(SELECT o.id FROM unnest(v_open) o(id)
+                   WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(v_bill) b
+                                  WHERE b.value ->> 'share' = o.id::text AND (b.value ->> 'billBack')::boolean));
   IF cardinality(v_todo) > 0 THEN
     IF NOT coalesce(public.has_any_action(ARRAY['billing.create']), false) THEN
       RAISE EXCEPTION 'Billing back needs Invoice · Create — answer No, or ask for it.' USING ERRCODE = '42501';
@@ -810,6 +784,11 @@ BEGIN
     END LOOP;
   END IF;
 
+  -- The answers, kept on the splits.
+  UPDATE public.payment_request_shares x
+     SET bill_back = (SELECT (b.value ->> 'billBack')::boolean FROM jsonb_array_elements(v_bill) b WHERE b.value ->> 'share' = x.id::text LIMIT 1),
+         decided_by = auth.uid(), decided_at = now(), invoice_id = NULL
+   WHERE x.id = ANY (v_open);
   UPDATE public.payment_requests SET status = 'in_pv', pv_id = p_pv, updated_at = now() WHERE id = ANY (p_ids);
 
   FOR s IN SELECT x.id, x.party, x.company_id, x.department_id, x.amount, r.request_no, r.requester_name, r.description,
@@ -858,8 +837,6 @@ $g$;
 
 SELECT pg_temp.tab_guard('public.payment_request_reject(uuid, text)',
   $$ARRAY['/payments/requests']$$, ARRAY['treasury.void', 'treasury.approve']);
-SELECT pg_temp.tab_guard('public.payment_request_bill_back(uuid, boolean)',
-  $$ARRAY['/payments/requests']$$, ARRAY['treasury.create']);
 SELECT pg_temp.tab_guard('public.payment_requests_for_pv(uuid[])',
   $$ARRAY['/payments/requests']$$, ARRAY['treasury.create']);
 SELECT pg_temp.tab_guard('public.payment_requests_attach_pv(uuid[], uuid, jsonb)',
@@ -967,7 +944,6 @@ REVOKE ALL ON FUNCTION public.payment_request_cancel(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.payment_request_file(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.payment_requests_for_finance() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.payment_request_reject(uuid, text) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.payment_request_bill_back(uuid, boolean) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.payment_requests_for_pv(uuid[]) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.payment_requests_attach_pv(uuid[], uuid, jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.payment_request_context() TO authenticated, service_role;
@@ -977,7 +953,6 @@ GRANT EXECUTE ON FUNCTION public.payment_request_cancel(uuid) TO authenticated, 
 GRANT EXECUTE ON FUNCTION public.payment_request_file(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.payment_requests_for_finance() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.payment_request_reject(uuid, text) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.payment_request_bill_back(uuid, boolean) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.payment_requests_for_pv(uuid[]) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.payment_requests_attach_pv(uuid[], uuid, jsonb) TO authenticated, service_role;
 

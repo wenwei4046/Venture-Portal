@@ -253,11 +253,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // payment (has_perm('treasury')), and Return to HR (Treasury · Void or Approve, the page's box).
   'finance_member_claim_invoice', 'finance_return_member_claim',
   // Staff payment requests (mig 20261029180000): one's own sent, saved, withdrawn and read by Claims · Create / View at
-  // Own; a file's path to its requester or the treasury; Finance's list, Bill back?, Reject and Create PV by Treasury
-  // (the page's box asked too).
+  // Own; a file's path to its requester or the treasury; Finance's list, Reject and Create PV (each split's Bill back?
+  // answered with it) by Treasury (the page's box asked too).
   'payment_request_context', 'my_payment_requests', 'payment_request_save', 'payment_request_cancel', 'payment_request_file',
-  'payment_requests_for_finance', 'payment_request_reject', 'payment_request_bill_back', 'payment_requests_for_pv',
-  'payment_requests_attach_pv',
+  'payment_requests_for_finance', 'payment_request_reject', 'payment_requests_for_pv', 'payment_requests_attach_pv',
   'close_approvals_for_voided_voucher', 'create_loan_with_approval', 'create_payroll_disbursement_vouchers', 'save_director_salary_results',
   'bank_gl_codes', 'bridge_mirror_slices', 'bridge_ref_flags', 'build_hr_cost_submission_payload', 'bump_bank_balance',
   'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_dept_payment_request', 'cancel_loan_and_approval',

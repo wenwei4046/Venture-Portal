@@ -18,7 +18,7 @@ The mockup is the behaviour, not the look: every screen is built from the portal
 | Who to pay | **I paid — pay me back** (a claim: the staff member's salary account from HR's records, another account allowed) or **Pay a supplier directly** (direct pay: the supplier's name, bank, account) — "要分的出来是claim". |
 | Supplier's account | Read automatically from the attached supplier invoice, then checked by the staff member ("pay a supplier directly 可以根据attachment自动读取account number?" — yes). A supplier paid before keeps its saved account; Finance is told when an invoice shows a different one. |
 | Which pool | Default the requester's department; **Split it** with other departments and/or companies, the amounts typed by the requester ("由他们来填"). |
-| Bill back | Finance decides per split ("finance 有权利拒绝，同时也要自持要不要bill back"). Yes → the system drafts the invoice (to the company, or to the department) and keeps it a **DRAFT** in Invoice until Finance checks and issues it ("但都是draft 的状态？然后我检查了没有问题才开？"). No → the requester's department pays all of it. |
+| Bill back | Finance decides per split, in the Create PV window as the PV is made ("finance 有权利拒绝，同时也要自持要不要bill back"; "我开pv 时就要确定是不是要开单了"). Yes → the system drafts the invoice (to the company, or to the department) and keeps it a **DRAFT** in Invoice until Finance checks and issues it ("但都是draft 的状态？然后我检查了没有问题才开？"). No → the requester's department pays all of it. |
 | Finance rejects | The requester fixes it and submits again; a Revenue claim goes back to HR ("finance 拒绝后可以再交过，revenue 的finance 会退回给hr"). |
 | Who sees what | A requester only their own requests; a Claim & approve holder their department's; Finance all — tabs **All · Payroll · each department** ("每个人只能看到自己的request。manager 有权利看到自己department 的request"). |
 | Finance's sidebar | Payments › **Payment voucher** (today's Payments page, unchanged but for its head buttons Dept / Claims / Payroll, which go) and Payments › **Payment request** ("pv 改成payment voucher"). |
@@ -148,10 +148,10 @@ the bells' kinds and taps are one change. The Claim page shows a rejected reques
    - Writers: `payment_request_save(id, data, submit)` (a draft or a rejected request of one's own: kind, pay-to,
      items, shares, files; Submit checks it whole — items, a receipt, the pay-to, shares under the total — then takes a
      number, snapshots the salary account and goes to Finance); `payment_request_cancel(id)`;
-     `payment_request_reject(id, reason)` (Treasury · Void or Approve, as Return to HR); `payment_request_bill_back(share,
-     yes)` (Treasury · Create); `payment_requests_for_pv(ids)` (Treasury · Create — what a Create PV needs: the same payee,
-     every share answered, the files to carry); `payment_requests_attach_pv(ids, pv)` and
-     `payment_request_share_invoiced(share, invoice)`.
+     `payment_request_reject(id, reason)` (Treasury · Void or Approve, as Return to HR); `payment_requests_for_pv(ids)`
+     (Treasury · Create — what a Create PV needs: the same payee into one account, the files to carry);
+     `payment_requests_attach_pv(ids, pv, bill)` (each split's Bill back? as answered in the window; a Yes drafts its
+     invoice in the same step).
    - The PV followed (`payment_vouchers`, as `claims_follow_their_voucher`): paid → `paid`; voided → back to
      `with_finance`, `pv_id` cleared; a draft deleted → the same.
    - Who may: `claims.create:own` sends one's own (the staff templates hold it already); Treasury reads and works them.
@@ -169,12 +169,13 @@ the bells' kinds and taps are one change. The Claim page shows a rejected reques
    (`hr.my_claims`, `fin.my_claims`, shared with `dept.my_claims` / `mkt.my_claims` as Meeting Rooms' are); HR · Payroll's
    stored ticks gain HR's.
 5. **Finance's side** (Payment request): the requests under their department's card; the drawer — items, receipts
-   (open), pay to (whole account with the bank tick, else the last four), who pays with **Bill back? Yes / No** per
-   share; **Reject…** (a reason the requester reads); **Create PV** — today's Create payment window filled in: payee,
+   (open), pay to (whole account with the bank tick, else the last four), who pays and where each split's Bill back
+   stands; **Reject…** (a reason the requester reads); **Create PV** — today's Create payment window filled in: payee,
    "Pay into …" under it, the description, a line per item on the requester's department pool, the same person's other
-   requests with no PV yet ticked in, the files carried over, notes "From Payment request · …". On save the voucher is
-   made as any other, then the requests are tied to it, their files copied into `payment-attachments`, and each
-   Yes share drafted as an invoice (`createMultiLineInvoice`, Invoice · Create — asked before anything is written).
+   requests with no PV yet ticked in, the files carried over, notes "From Payment request · …", and **Bill back? Yes /
+   No** for each split. On save the voucher is made as any other, then the requests are tied to it, their files copied
+   into `payment-attachments`, and each Yes split drafted as an invoice (Invoice · Create — asked before anything is
+   written).
 6. **Tests:** `tests/member-sql/validate-payment-requests.mjs`; the models, the Claim page, the window, the drawer,
    the dialog's preset; the registries (`DEFINER_RPCS`, `READS_WHILE_VIEWING_AS`, tabs, page tabs, database types).
 
@@ -186,9 +187,12 @@ the bells' kinds and taps are one change. The Claim page shows a rejected reques
   `createMultiLineInvoice` would make — draft, the requester's department's mode, the company (`subsidiary`) or the
   department (`dept_pool`), one line credited to the account the request's lines carry on this voucher. A drafted
   invoice keeps its share's answer (void it in Invoice to answer again); a voided one counts as none.
-- *Auto-combine takes the answered ones* (the user, 2026-10-29: "可以"): Create PV takes the request picked and every
-  request of the same payee into the same account with no PV yet whose Bill back? is answered; one still to be answered
-  stays with Finance for a PV of its own, said in a line as the window opens. The request picked asks its own answer first.
+- *Bill back is answered in the Create PV window* (the user, 2026-10-29: "我开pv 时就要确定是不是要开单了"): each split
+  of the requests the PV pays is asked Yes / No there, nothing pre-chosen, and Save waits for every answer; the drawer
+  only says where each stands (*Decided when the PV is made*). So Create PV takes the request picked and every request
+  of the same payee into the same account with no PV yet. A split invoiced already (its earlier PV voided) is not asked
+  again; Reject clears an answer whose invoice is none or voided. A window left open while a request changed is
+  refused before a voucher number is taken (*close the window and Create PV again*).
 - *Each item is its Description* (the user: "确定他们放的那个是description"): the New request window heads its items
   Description · Amount (RM), and each becomes the words of its line on the PV.
 - *The rows:* HR's sidebar › Admin › **Claim** above the rooms; Finance's account menu › **Account** › Claim (the
@@ -205,7 +209,7 @@ Later PRs are detailed here when they start.
 
 PR ②:
 
-- Two requests of one payee, one with a split unanswered → Create PV on the other pays it alone; the unanswered one stays, named.
+- Two requests of one payee, one with a split → one PV for both; Save waits for that split's Yes / No; a No drafts nothing.
 - Create PV with a Yes share on a day the month is closed → nothing tied, nothing drafted, the voucher voided again.
 - A request's PV voided, then made again → its drafted invoice is the one kept (no second invoice number).
 - A shared login (finance@, hr@) → no Claim row in the HR or Finance view; a New request from it says HR must link it.

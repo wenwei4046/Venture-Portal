@@ -1,17 +1,15 @@
 'use client'
 
-import type { ReactNode } from 'react'
 import { HrIcon } from '@/components/hrv/icons'
 import { drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
 import { fileSize } from '@/components/finv/form-words'
-import fm from '@/components/finv/form.module.css'
-import { billBackWords, ownPart, payToWords, requestDay, rmOf, type PaymentRequest, type RequestShare } from '@/lib/payment-requests/model'
-import p from './parts.module.css'
+import { billBackWords, ownPart, payToWords, requestDay, rmOf, type PaymentRequest } from '@/lib/payment-requests/model'
 
 // A payment request in a hub's drawer (2026-10-29, PR ② of docs/module-spec-payment-requests.md): the dark hero as a
 // voucher's, then the request's numbered groups — what it was for, the receipts, who is paid, which pool pays. The
-// requester's Claim page and Finance's Payment request draw it alike; Finance adds its Bill back? answers.
+// requester's Claim page and Finance's Payment request draw it alike; Finance reads each split's Bill back too (answered
+// in the Create PV window — the user: "我开pv 时就要确定是不是要开单了").
 
 const LIGHT: Record<string, string> = { wait: 'wait', accent: 'accent' }
 
@@ -54,42 +52,23 @@ export function OpenRow({ icon, name, meta, onOpen, disabled = false }: { icon: 
   )
 }
 
-/**
- * Finance's Bill back? under a share, while the request waits for Finance: Yes (its invoice drafted with the PV) or No
- * (the requester's department pays it), the answer pressed. Once its invoice is drafted the answer stands.
- */
-export function BillBackAnswer({ share, disabled, onAnswer }: { share: RequestShare; disabled: boolean; onAnswer: (yes: boolean) => void }) {
-  const drafted = !!share.invoiceNo && share.invoiceStatus !== 'voided'
-  const who = share.party === 'company' ? share.companyName : share.departmentName
-  return (
-    <div className={p.answer} role="group" aria-label={`Bill back ${who ?? 'this share'}?`}>
-      <button type="button" className={fm.moreBtn} aria-pressed={share.billBack === true} disabled={disabled || drafted} onClick={() => onAnswer(true)}>
-        Bill back · Yes
-      </button>
-      <button type="button" className={fm.moreBtn} aria-pressed={share.billBack === false} disabled={disabled || drafted} onClick={() => onAnswer(false)}>
-        No
-      </button>
-    </div>
-  )
-}
-
 const KIND_WORDS = { claim: 'Claim · I paid', direct_pay: 'Direct payment to a supplier' } as const
 
-/** The request's own groups, I. to IV.; `share` draws what goes under a share (Finance's Bill back?). */
+/** The request's own groups, I. to IV. */
 export function RequestGroups({
   r,
   opening,
   fileError,
   onOpenFile,
-  share,
+  billBack = false,
 }: {
   r: PaymentRequest
   /** The file being opened. */
   opening: string | null
   fileError: string | null
   onOpenFile: (fileId: string) => void
-  /** Finance's: each share's Bill back? — its answer said, and what to answer drawn under it. */
-  share?: (s: RequestShare) => ReactNode
+  /** Finance's: each split's Bill back said under it. */
+  billBack?: boolean
 }) {
   return (
     <>
@@ -137,15 +116,13 @@ export function RequestGroups({
         {r.requestNo ? <Line label="Request" value={r.requestNo} mono sub={r.submittedAt ? `Sent ${fd(requestDay(r))}` : undefined} /> : null}
         {r.shares.length === 0 ? <Line label="Pool" value={`${r.departmentName} — all of it`} /> : null}
         {r.shares.map((s) => (
-          <div key={s.id}>
-            <Line
-              label={s.party === 'company' ? s.companyName ?? 'Company' : s.departmentName ?? 'Department'}
-              value={rmOf(s.amount)}
-              mono
-              sub={share ? `Bill back: ${billBackWords(s)}` : undefined}
-            />
-            {share ? share(s) : null}
-          </div>
+          <Line
+            key={s.id}
+            label={s.party === 'company' ? s.companyName ?? 'Company' : s.departmentName ?? 'Department'}
+            value={rmOf(s.amount)}
+            mono
+            sub={billBack ? `Bill back: ${billBackWords(s)}` : undefined}
+          />
         ))}
       </Group>
     </>

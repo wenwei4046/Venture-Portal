@@ -8,8 +8,8 @@ import { parseRequests, type PaymentRequest } from '@/lib/payment-requests/model
 // Payments › Payment request's own steps (2026-10-29, PR ① of docs/module-spec-payment-requests.md): a member's claim
 // returned to HR, and its invoice opened. Each answers in words — production hides a thrown Server Action message
 // behind a digest. The payroll's and a claim's voucher are their own pages' actions (payroll-requests, claim-requests).
-// PR ②: a staff request's Bill back? answered, the request rejected back to its requester, and what its Create PV
-// starts from (its voucher is made by payments/actions › createPaymentForRequests).
+// PR ②: a staff request rejected back to its requester, and what its Create PV starts from (its voucher — each split's
+// Bill back? answered with it — is made by payments/actions › createPaymentForRequests).
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -70,23 +70,10 @@ export async function rejectPaymentRequest(requestId: string, reason: string): P
   return { ok: true }
 }
 
-/** Bill back? — Finance's answer on one share of a request (`payment_request_bill_back`): Yes drafts its invoice with the PV. */
-export async function answerBillBack(shareId: string, billBack: boolean): Promise<{ ok: true } | { ok: false; reason: string }> {
-  await requireActionOn('/payments/requests', 'treasury', 'create')
-  if (typeof shareId !== 'string' || !UUID.test(shareId)) return { ok: false, reason: 'Which share? Reload the page and try again.' }
-  if (typeof billBack !== 'boolean') return { ok: false, reason: 'Answer Yes or No.' }
-
-  const supabase = await createClient()
-  const { error } = await supabase.rpc('payment_request_bill_back', { p_share: shareId, p_bill_back: billBack })
-  if (error) return { ok: false, reason: error.message }
-
-  revalidatePath('/payments/requests')
-  return { ok: true }
-}
-
 /**
  * What Create PV starts from (`payment_requests_for_pv`): the requests — still with Finance, one payee into one
- * account, every share answered — asked before the window opens, so a refusal is said before anything is typed.
+ * account — asked before the window opens, so a refusal is said before anything is typed. Each split's Bill back? is
+ * answered in the window, with the voucher.
  */
 export async function openRequestsForPv(requestIds: string[]): Promise<{ ok: true; requests: PaymentRequest[] } | { ok: false; reason: string }> {
   await requireActionOn('/payments/requests', 'treasury', 'create')

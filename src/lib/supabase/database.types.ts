@@ -8547,10 +8547,6 @@ export type Database = {
         Args: { p_request: string; p_reason: string }
         Returns: undefined
       }
-      payment_request_bill_back: {
-        Args: { p_share: string; p_bill_back: boolean }
-        Returns: undefined
-      }
       payment_requests_for_pv: { Args: { p_ids: string[] }; Returns: Json }
       payment_requests_attach_pv: {
         Args: { p_ids: string[]; p_pv: string; p_bill: Json }
