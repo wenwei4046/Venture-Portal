@@ -74,6 +74,17 @@ export function lastCustomerWords(c: Pick<CrmCustomer, "messages">): string {
   return out.join("\n");
 }
 
+/**
+ * Only a greeting ("hi", "Hai boss", "你好 🙏"): nothing to answer yet. Past answers to such a line were whatever came next
+ * in that chat (the owner, 2026-10-29, a "hi" answered with "可以 只需要装修还是…": "他的显示结果有点奇怪"), so a greeting is
+ * answered only by an introduction — a past answer that itself opens with a greeting and says something.
+ */
+const GREETING = /\b(hi+|hello|hey|hai|halo|harlo|helo|good\s+(morning|afternoon|evening|day)|morning|boss|sis|bro|dear|there|yo)\b|你好|您好|哈喽|哈啰|在吗|在嗎|早安|午安|晚安|早上好|下午好|晚上好|老板|请问/gi;
+export function greetingOnly(text: string): boolean {
+  return !!text.trim() && !text.replace(GREETING, "").replace(/[\s\p{P}\p{S}\p{Extended_Pictographic}0-9]/gu, "");
+}
+const introduces = (a: string) => /^\s*(hi|hello|hey|hai|halo|harlo|你好|您好|哈喽|dear)\b/i.test(a) && a.trim().length >= 25;
+
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";
 
 /** What fills a reply's blanks (the reply library, 2026-10-29: "里面的名字等，可以根据客户的咨询自动调整"). */
@@ -114,7 +125,7 @@ export function suggestReplies(c: Pick<CrmCustomer, "name" | "messages"> & { det
   opts: { library?: CrmReplyItem[] } & FillWith = {}): Suggestion[] {
   const asked = lastCustomerWords(c);
   if (!asked) return [];
-  const want = wordsOf(asked);
+  const want = wordsOf(asked), greet = greetingOnly(asked);
   const scored: { text: string; why: string; score: number }[] = [];
   for (const r of opts.library ?? []) {
     // A keyword the customer used counts most; then the title and the words.
@@ -125,6 +136,8 @@ export function suggestReplies(c: Pick<CrmCustomer, "name" | "messages"> & { det
     scored.push({ text: fillReply(r.body, c, opts), why: `Reply library · ${r.title}`, score: kw ? 2 + s : s + 0.3 });
   }
   for (const e of examples) {
+    // A greeting: introductions only; anything else: never an answer to a mere greeting.
+    if (greet ? !introduces(e.a) : greetingOnly(e.q)) continue;
     const s = closeness(want, wordsOf(e.q));
     if (s < 0.12) continue;
     scored.push({ text: fillReply(e.a, c, opts), why: e.won ? `From a chat that ended in a sale · “${e.q.slice(0, 40)}”` : e.appt ? `From a chat that booked a visit · “${e.q.slice(0, 40)}”` : `Asked before · “${e.q.slice(0, 40)}”`,
