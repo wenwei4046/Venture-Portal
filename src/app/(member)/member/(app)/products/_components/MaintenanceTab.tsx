@@ -2,10 +2,14 @@
 
 import { useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { BY_QUANTITY_POOL, validateOptionPrices } from '@/lib/catalogue/edits'
+import {
+  BY_QUANTITY_POOL, FABRIC_UPGRADE_CATEGORIES, validateFabricUpgrades, validateOptionPrices, type FabricUpgradeCategory, type FabricUpgradesEdit,
+} from '@/lib/catalogue/edits'
 import { MAINTENANCE_SECTIONS } from '@/lib/catalogue/options'
-import { saveOptionPrices } from '../actions'
-import type { FabricRow, MaintenanceOption } from '../load'
+import { saveFabricUpgrades, saveOptionPrices } from '../actions'
+import type { FabricRow, FabricUpgradeRow, MaintenanceOption } from '../load'
+import { EMPTY_UPGRADES_DRAFT, seriesOptions, upgradesChanges, upgradesEditOf, upgradesOf, type UpgradesDraft } from './fabric-upgrades'
+import FabricUpgradesTable from './FabricUpgradesTable'
 import PageScrolledTable from './PageScrolledTable'
 import { useProductDraftGuard } from './ProductWorkspace'
 import {
@@ -15,6 +19,9 @@ import {
 import c from './products.module.css'
 
 const FABRICS = 'fabrics'
+/** Fabrics › Sofa / Bedframe upgrades (2026-10-29): a fabric series' charge, made here. */
+const UPGRADE_POOLS: Readonly<Record<string, FabricUpgradeCategory>> = { fabric_upgrades_sofa: 'SOFA', fabric_upgrades_bedframe: 'BEDFRAME' }
+const UPGRADE_TABS = [['fabric_upgrades_sofa', 'Sofa upgrades'], ['fabric_upgrades_bedframe', 'Bedframe upgrades']] as const
 const PAGE_SIZE = 300
 /** An option's unsaved change: its price as typed, and — a sofa special's — how it is charged. */
 type Draft = { price?: string; byQuantity?: boolean }
@@ -32,11 +39,19 @@ const TIER_OPTIONS = [['', 'All tiers'], ['PRICE_1', 'P1'], ['PRICE_2', 'P2'], [
 const FOC_POOLS = new Set(['bedframe_divan_heights', 'bedframe_total_heights', 'bedframe_gaps', 'bedframe_leg_heights', 'sofa_leg_heights'])
 
 /** ERP option values and fabric mappings stay read-only; only the portal's prices — what the customer is charged for an option — are editable. */
-export default function MaintenanceTab({ options, fabrics }: { options: MaintenanceOption[]; fabrics: FabricRow[] }) {
+export default function MaintenanceTab({ options, fabrics, upgrades = [] }: {
+  options: MaintenanceOption[]
+  fabrics: FabricRow[]
+  upgrades?: FabricUpgradeRow[]
+}) {
   const router = useRouter()
   const [pool, setPool] = useState('bedframe_divan_heights')
   const [editing, setEditing] = useState(false)
   const [drafts, setDrafts] = useState<Drafts>(new Map())
+  const [upgradeDrafts, setUpgradeDrafts] = useState<ReadonlyMap<FabricUpgradeCategory, UpgradesDraft>>(new Map())
+  // A category saved: the rows the page had then. Its draft is what is saved until fresh rows arrive.
+  const [settled, setSettled] = useState<ReadonlyMap<FabricUpgradeCategory, FabricUpgradeRow[]>>(new Map())
+  const newUpgradeKey = useRef(0)
   // Confirmed saves remain visible while the server refresh catches up, including partial saves.
   const [savedPrices, setSavedPrices] = useState<{ source: MaintenanceOption[]; values: Prices }>({ source: options, values: new Map() })
   const [saving, startSaving] = useTransition()
@@ -50,10 +65,23 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
   const [limit, setLimit] = useState(PAGE_SIZE)
 
   const fabricView = pool === FABRICS
+  const upgradeCategory: FabricUpgradeCategory | undefined = UPGRADE_POOLS[pool]
   const section = MAINTENANCE_SECTIONS.find(s => s.pools.some(p => p.pool === pool))
   const meta = section?.pools.find(p => p.pool === pool)
+  const upgradeRows = useMemo(() => new Map(FABRIC_UPGRADE_CATEGORIES.map(cat => [cat, upgradesOf(upgrades, cat)])), [upgrades])
+  const seriesList = useMemo(() => seriesOptions(fabrics), [fabrics])
+  // Fresh rows arrived: what a category saved is in them now, and its draft goes.
+  const stale = [...settled].filter(([, source]) => source !== upgrades).map(([cat]) => cat)
+  if (stale.length > 0) {
+    setSettled(previous => new Map([...previous].filter(([cat]) => !stale.includes(cat))))
+    setUpgradeDrafts(previous => new Map([...previous].filter(([cat]) => !stale.includes(cat))))
+  }
+  const upgradeDraftOf = (cat: FabricUpgradeCategory) => upgradeDrafts.get(cat) ?? EMPTY_UPGRADES_DRAFT
+  const upgradeChanges = (cat: FabricUpgradeCategory) => (settled.has(cat) ? 0 : upgradesChanges(upgradeRows.get(cat) ?? [], upgradeDraftOf(cat)))
   const dirty = [...drafts.values()].reduce((sum, values) => sum + values.size, 0)
+    + FABRIC_UPGRADE_CATEGORIES.reduce((sum, cat) => sum + upgradeChanges(cat), 0)
   const dirtyPools = [...drafts.values()].filter(values => values.size > 0).length
+    + FABRIC_UPGRADE_CATEGORIES.filter(cat => upgradeChanges(cat) > 0).length
   useProductDraftGuard(dirty, saving)
   const byPool = useMemo(() => {
     const groups = new Map<string, MaintenanceOption[]>()
@@ -95,9 +123,16 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
     setNotice(null)
   }
 
+  function touchUpgrades(cat: FabricUpgradeCategory, next: UpgradesDraft) {
+    if (saveInFlight.current) return
+    setUpgradeDrafts(previous => new Map(previous).set(cat, next))
+    setNotice(null)
+  }
+
   function cancel() {
     if (saveInFlight.current) return
     setDrafts(new Map())
+    setUpgradeDrafts(new Map())
     setEditing(false)
     setError(null)
   }
@@ -106,6 +141,7 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
     if (saveInFlight.current || dirty === 0) return
     // Validate the entire batch first, before any pool can be written.
     let pending: Array<{ pool: string; edits: Array<{ value: string; price: string; byQuantity?: boolean }>; prices: Map<string, { price: number | null; byQuantity: boolean }> }>
+    let upgradeBatches: Array<{ category: FabricUpgradeCategory; edit: FabricUpgradesEdit; changes: number }>
     try {
       pending = [...drafts].map(([poolKey, values]) => {
         // An option sent whole: a price typed keeps how it is charged, a choice of how keeps its price.
@@ -124,16 +160,31 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
         for (const value of validated.clears) prices.set(value, { price: null, byQuantity: false })
         return { pool: poolKey, edits, prices }
       })
+      // And each category's upgrades: only what changed.
+      upgradeBatches = FABRIC_UPGRADE_CATEGORIES.flatMap(category => {
+        const changes = upgradeChanges(category)
+        if (changes === 0) return []
+        const edit = upgradesEditOf(upgradeRows.get(category) ?? [], upgradeDraftOf(category))
+        validateFabricUpgrades(category, edit)
+        return [{ category, edit, changes }]
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Check the amounts.')
       return
     }
+    const rowsAtSave = upgrades
     saveInFlight.current = true
     setError(null)
     setNotice(null)
     startSaving(async () => {
       let saved = 0
       try {
+        for (const batch of upgradeBatches) {
+          const result = await saveFabricUpgrades(batch.category, batch.edit)
+          if (!result.ok) throw new Error(result.reason)
+          saved += batch.changes
+          setSettled(previous => new Map(previous).set(batch.category, rowsAtSave))
+        }
         for (const batch of pending) {
           const result = await saveOptionPrices(batch.pool, batch.edits)
           saved += result.saved
@@ -167,10 +218,13 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
   }
   const counted = pool === BY_QUANTITY_POOL
 
+  const unsaved = editing && dirty > 0 ? `${plural(dirty, 'unsaved change')} across ${plural(dirtyPools, 'pool')}; Save includes them all.` : ''
   const note = fabricView
     ? 'Sofa and Bedframe mappings override the shared ERP tier independently. With neither mapping nor shared tier, P2 is used.'
-    : (meta?.note ?? 'ERP choices only; model availability is set on Modular.')
-      + (editing && dirty > 0 ? ` ${plural(dirty, 'unsaved change')} across ${plural(dirtyPools, 'pool')}; Save includes them all.` : '')
+    : upgradeCategory
+      ? unsaved
+      : `${meta?.note ?? 'ERP choices only; model availability is set on Modular.'}${unsaved ? ` ${unsaved}` : ''}`
+  const upgradeCount = upgradeCategory ? (upgradeRows.get(upgradeCategory)?.length ?? 0) : 0
 
   return (
     <>
@@ -179,7 +233,7 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
           {MAINTENANCE_SECTIONS.map(group => (
             <Chip key={group.section} on={section?.section === group.section} disabled={saving} onClick={() => pick(group.pools[0].pool)}>{group.section}</Chip>
           ))}
-          <Chip on={fabricView} disabled={saving} onClick={() => pick(FABRICS)}>Fabrics</Chip>
+          <Chip on={fabricView || upgradeCategory !== undefined} disabled={saving} onClick={() => pick(FABRICS)}>Fabrics</Chip>
         </ChipRow>
         {section ? (
           <SubChipRow ariaLabel={`${section.section} option pools`}>
@@ -189,7 +243,16 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
               </Chip>
             ))}
           </SubChipRow>
-        ) : null}
+        ) : (
+          <SubChipRow ariaLabel="Fabrics lists">
+            <Chip small on={fabricView} disabled={saving} onClick={() => pick(FABRICS)}>All fabrics</Chip>
+            {UPGRADE_TABS.map(([key, label]) => (
+              <Chip key={key} small on={pool === key} disabled={saving} count={upgradeChanges(UPGRADE_POOLS[key]) || undefined} onClick={() => pick(key)}>
+                {label}
+              </Chip>
+            ))}
+          </SubChipRow>
+        )}
         {/* No search on an option pool: the largest holds about twenty values,
             and the ERP's own Maintenance lists have none (user 2026-09-27).
             The fabrics run to the hundreds and keep theirs, as the ERP's
@@ -207,26 +270,36 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
       </FilterPanel>
 
       <Heading
-        title={fabricView ? 'Fabrics' : `${section?.section} · ${meta?.label}`}
-        sub={fabricView ? `${shownFabrics.length.toLocaleString()} of ${liveFabrics.length.toLocaleString()} fabrics` : plural(rows.length, 'option')}
-        readOnly={!fabricView && !meta?.priced}
+        title={fabricView ? 'Fabrics' : upgradeCategory ? `Fabrics · ${upgradeCategory === 'SOFA' ? 'Sofa' : 'Bedframe'} upgrades` : `${section?.section} · ${meta?.label}`}
+        sub={fabricView
+          ? `${shownFabrics.length.toLocaleString()} of ${liveFabrics.length.toLocaleString()} fabrics`
+          : upgradeCategory
+            ? `${plural(upgradeCount, 'upgrade')} · ${upgradeCategory === 'SOFA' ? 'once per sofa' : 'per bed frame'}`
+            : plural(rows.length, 'option')}
+        readOnly={!fabricView && !upgradeCategory && !meta?.priced}
       />
 
       <ActionRow>
         {editing ? (
           <EditingButtons cancelLabel="Cancel changes" onCancel={cancel} onSave={save} changes={dirty} saving={saving}
             saveLabel={dirty === 0 ? 'Save changes' : `Save ${plural(dirty, 'change')}`} />
+        ) : upgradeCategory ? (
+          <EditButton label="Edit upgrades" onClick={() => { setEditing(true); setNotice(null) }} />
         ) : meta?.priced && !fabricView ? (
           <EditButton label={meta.charge ? 'Edit charges' : 'Edit surcharges'} onClick={() => { setEditing(true); setNotice(null) }} />
         ) : null}
       </ActionRow>
-      <Note>{note}</Note>
+      {note ? <Note>{note}</Note> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
       {notice ? <Notice tone="ok">{notice}</Notice> : null}
 
       <div className={c.tableCard} data-page="">
-        <PageScrolledTable label={fabricView ? 'Fabric mappings table' : 'Maintenance options table'}>
-          {fabricView ? (
+        <PageScrolledTable label={fabricView ? 'Fabric mappings table' : upgradeCategory ? 'Fabric upgrades table' : 'Maintenance options table'}>
+          {upgradeCategory ? (
+            <FabricUpgradesTable upgrades={upgradeRows.get(upgradeCategory) ?? []} draft={upgradeDraftOf(upgradeCategory)}
+              onDraft={next => touchUpgrades(upgradeCategory, next)} editing={editing && !settled.has(upgradeCategory)} saving={saving}
+              options={seriesList} newKey={() => `new-${++newUpgradeKey.current}`} />
+          ) : fabricView ? (
             <table className={c.table}>
               <thead><tr>
                 <th scope="col" className={c.th} data-first="" style={{ minWidth: 130 }}>FABRIC CODE</th>
@@ -300,11 +373,15 @@ export default function MaintenanceTab({ options, fabrics }: { options: Maintena
             </table>
           )}
         </PageScrolledTable>
-        <TableFoot
-          shown={`${visibleCount.toLocaleString()} of ${count.toLocaleString()} ${fabricView ? 'fabrics' : 'options'} shown`}
-          more={visibleCount < count ? `Show ${Math.min(PAGE_SIZE, count - visibleCount)} more` : undefined}
-          onMore={() => setLimit(value => value + PAGE_SIZE)}
-        />
+        {upgradeCategory ? (
+          <TableFoot shown={`${plural(upgradeCount, 'upgrade')} shown`} />
+        ) : (
+          <TableFoot
+            shown={`${visibleCount.toLocaleString()} of ${count.toLocaleString()} ${fabricView ? 'fabrics' : 'options'} shown`}
+            more={visibleCount < count ? `Show ${Math.min(PAGE_SIZE, count - visibleCount)} more` : undefined}
+            onMore={() => setLimit(value => value + PAGE_SIZE)}
+          />
+        )}
       </div>
     </>
   )

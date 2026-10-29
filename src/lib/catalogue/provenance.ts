@@ -88,6 +88,9 @@ const CHARGE_WORD: Record<string, string> = {
   bedframe_specials: '',
   sofa_leg_heights: 'leg ',
   sofa_specials: '',
+  // Maintenance › Fabrics › upgrades (2026-10-29): the upgrade's name, the series it was found by after it.
+  bedframe_fabric_upgrades: '',
+  sofa_fabric_upgrades: '',
 }
 
 /**
@@ -96,7 +99,8 @@ const CHARGE_WORD: Record<string, string> = {
  * the customer's price for each, out of the margin and in the commission. A
  * sofa is charged once per sofa and the set's charge spread over its pieces
  * (`cost_detail.charge_set`), which the words say; a sofa special charged by
- * quantity once per compartment (2026-10-27, `by_quantity`, `count`) says how many.
+ * quantity once per compartment (2026-10-27, `by_quantity`, `count`) says how many;
+ * a fabric's upgrade (2026-10-29) the series it was found by — `Upgrade fabric (PC151)`.
  */
 export function chargeText(detail: unknown): string {
   const d: Detail = detail && typeof detail === 'object' && !Array.isArray(detail) ? (detail as Detail) : {}
@@ -107,7 +111,8 @@ export function chargeText(detail: unknown): string {
     const word = pool ? CHARGE_WORD[pool] : undefined
     const count = Number((c as Detail).count)
     const times = (c as Detail).by_quantity === true && Number.isInteger(count) && count > 0 ? ` ×${count}` : ''
-    return word !== undefined && value ? [`${word}${value}${times}`] : []
+    const series = text((c as Detail).series)
+    return word !== undefined && value ? [`${word}${value}${series ? ` (${series})` : ''}${times}`] : []
   })
   const base = words.length ? `for ${words.join(' · ')}` : 'for its options'
   const set = d.charge_set && typeof d.charge_set === 'object' && !Array.isArray(d.charge_set) ? (d.charge_set as Detail) : null

@@ -126,7 +126,7 @@ export default async function ProductListPage({
     body = <ModularTab models={models} brands={brands} options={maintenance.options} />
   } else if (tab === 'maintenance') {
     const maintenance = await loadMaintenance()
-    body = <MaintenanceTab options={maintenance.options} fabrics={maintenance.fabrics} />
+    body = <MaintenanceTab options={maintenance.options} fabrics={maintenance.fabrics} upgrades={maintenance.upgrades} />
   } else if (tab === 'combos') {
     const [combos, skus, sofaSizes] = await Promise.all([loadCombos(), loadSkus(), loadSofaSizes()])
     body = <ComboPricingTab combos={combos} sofaSkus={skus.filter(s => (s.category ?? '').toUpperCase() === 'SOFA' && !s.removed)} sofaSizes={sofaSizes} />

@@ -10,7 +10,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('next/cache', () => ({ revalidatePath: mocks.refresh }))
 vi.mock('server-only', () => ({}))
 
-import { addCombo, removeCombos, saveCostSetting, saveModelSettings } from './actions'
+import { addCombo, removeCombos, saveCostSetting, saveFabricUpgrades, saveModelSettings } from './actions'
 
 /** A save refreshes the Product List's own page and every Comm Cal page a price moves. */
 const REFRESHED = [['/member/products'], ['/revenue', 'layout']]
@@ -217,6 +217,51 @@ describe('Combo Pricing › Remove', () => {
     expect(await removeCombos([{ baseModel: '8030', slotsKey: key }])).toEqual({ ok: false, reason: 'Only the Principal can remove a combo.' })
     mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: 'XX000', message: 'boom' } })
     await expect(removeCombos([{ baseModel: '8030', slotsKey: key }])).rejects.toThrow('Could not save the combos')
+    expect(mocks.refresh).not.toHaveBeenCalled()
+  })
+})
+
+describe('Maintenance › Fabrics › upgrades', () => {
+  beforeEach(() => {
+    mocks.createClient.mockResolvedValue({ from: mocks.from, rpc: mocks.rpc })
+    mocks.rpc.mockResolvedValue({ data: 4, error: null })
+  })
+
+  const UP = '6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b'
+
+  it('hands the database one category’s Save — only what changed — for product_list edit only', async () => {
+    expect(await saveFabricUpgrades('sofa', {
+      adds: [{ name: ' Upgrade   fabric ', price: '200', series: ['PC151', 'pc151', 'KS'] }],
+      changes: [{ id: UP, label: 'Leather', price: '550.50', addSeries: ['LX'] }],
+      removes: [],
+    })).toEqual({ ok: true, saved: 4 })
+    expect(mocks.permission).toHaveBeenCalledOnce()
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('catalogue_save_fabric_upgrades', {
+      p_category: 'SOFA',
+      p_adds: [{ name: 'Upgrade fabric', price: 200, series: ['PC151', 'KS'] }],
+      p_changes: [{ id: UP, price: 550.5, add_series: ['LX'] }],
+      p_removes: [],
+    })
+    expect(mocks.refresh.mock.calls).toEqual(REFRESHED)
+  })
+
+  it('answers its own refusals as a reason, before any write', async () => {
+    expect(await saveFabricUpgrades('MATTRESS', { adds: [{ name: 'X', price: '1', series: [] }], changes: [], removes: [] }))
+      .toEqual({ ok: false, reason: 'A fabric upgrade is a sofa’s or a bed frame’s' })
+    expect(await saveFabricUpgrades('BEDFRAME', { adds: [{ name: 'Free', price: '0', series: [] }], changes: [], removes: [] }))
+      .toEqual({ ok: false, reason: 'Free: a charge above 0' })
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    expect(mocks.refresh).not.toHaveBeenCalled()
+  })
+
+  it("passes the database's refusals (22023) through as a reason, a race as a reload, and throws anything else", async () => {
+    const edit = { adds: [{ name: 'Leather', price: '500', series: ['KS'] }], changes: [], removes: [] }
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: '22023', message: 'KS is already in Upgrade fabric' } })
+    expect(await saveFabricUpgrades('SOFA', edit)).toEqual({ ok: false, reason: 'KS is already in Upgrade fabric' })
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: '23505', message: 'duplicate key value' } })
+    expect(await saveFabricUpgrades('SOFA', edit)).toEqual({ ok: false, reason: 'Somebody saved these upgrades at the same time — reload the page' })
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { code: 'XX000', message: 'boom' } })
+    await expect(saveFabricUpgrades('SOFA', edit)).rejects.toThrow('Could not save the fabric upgrades')
     expect(mocks.refresh).not.toHaveBeenCalled()
   })
 })

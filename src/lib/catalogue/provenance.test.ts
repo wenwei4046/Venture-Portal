@@ -82,4 +82,21 @@ describe('what a line’s options were charged for', () => {
     expect(chargeText({ charges: [{ pool: 'sofa_specials', value: 'Change 8030 Backcushion', price: 600, special_order: true }] }))
       .toBe('for Change 8030 Backcushion')
   })
+
+  // 2026-10-29: a fabric's upgrade (Maintenance › Fabrics › upgrades) names the series it was found by.
+  it('names a fabric upgrade and its series', () => {
+    expect(chargeText({
+      charges: [
+        { pool: 'bedframe_divan_heights', value: '12"', price: 100 },
+        { pool: 'bedframe_fabric_upgrades', value: 'Upgrade fabric', series: 'PC151', price: 150 },
+      ],
+    })).toBe('for divan 12" · Upgrade fabric (PC151)')
+    expect(chargeText({
+      charges: [
+        { pool: 'sofa_fabric_upgrades', value: 'Leather', series: 'LX', price: 500, count: 2 },
+        { pool: 'sofa_leg_heights', value: '5"', price: 200, count: 2 },
+      ],
+      charge_set: { sets: 2, compartments: 6, total: 1400, lines: 3 },
+    })).toBe('for Leather (LX) · leg 5" — RM 1400.00 for 2 sofas, spread over its 3 pieces')
+  })
 })
