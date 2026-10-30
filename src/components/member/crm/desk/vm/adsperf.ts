@@ -140,7 +140,9 @@ export function adsPerfVM(ctx: DeskCtx) {
   const src = (ui.apSrc ?? "all") as SourcePick;
   const ads = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].filter(id => ui.apShowHidden || !data.adNames?.[id]?.hidden).map(id => { const all = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id), cs = all.filter(c => inSource(c, src));
     const s0 = all[0] ? sourceOf(all[0]) : null, brand = s0?.brandLabel || (brandOf(data.adNames?.[id]?.pageId) ? BRAND_LABEL[brandOf(data.adNames?.[id]?.pageId)!] : "");
-    return { id, name: all[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !all.length || all.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs, brand, keep: src === "all" || cs.length > 0 || (!all.length && adPageInSource(data.adNames?.[id]?.pageId, src)) }; }).filter(a => a.keep);
+    return { id, name: all[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !all.length || all.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs, brand, // An ad with no lead in the brand picked at the top (Insight's DC / The Conts) is listed only when its Page is that brand's — else
+    // the other brand's ads stood there with 0 leads (the owner, 2026-10-30: "我在msg 跑广告怎么都没显示出来？" — the page was on Dream Crafter).
+    keep: (all.length > 0 || adPageInSource(data.adNames?.[id]?.pageId, ui.insSrc as SourcePick | undefined)) && (src === "all" || cs.length > 0 || (!all.length && adPageInSource(data.adNames?.[id]?.pageId, src))) }; }).filter(a => a.keep);
   const apStF = ui.apStF;
   const AD = ads.filter(a => apStF === "all" || status(a.id) === apStF);
   const val = (cs: CrmCustomer[], ids: string[], k: string, a: number, b: number): number | null => { const crm = crmFigures(cs, ctx, a, b); return crm[k] ?? metaFigures(metaOf(ids, a, b), crm)[k] ?? null; };
