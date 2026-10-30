@@ -104,6 +104,11 @@ describe('Multi-line invoice', () => {
     expect(within(dialog()).getByRole('button', { name: /^Invoice date/ })).toHaveTextContent('Wed, 14 Oct 2026')
   })
 
+  it('on a desktop it is the wide window (680px), so a line’s description reads as it is typed', () => {
+    draw()
+    expect(dialog()).toHaveAttribute('data-wide')
+  })
+
   it('with two lines each needs its description; the lines take the category; it is written on the hub’s month', async () => {
     const { onDone, onClose } = draw()
     set('Bill to', 'freetext')

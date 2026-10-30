@@ -37,6 +37,10 @@ import { loadMalaysia } from '@/lib/address/malaysia'
 // 1:1): a draft is rewritten whole; an issued or paid one keeps its number,
 // its entry corrected in place, with a reason — and once money has come in,
 // its amounts, its payer and its month stay as they are.
+//
+// On a desktop it is the kit's wide window, 680px (2026-10-30 — the user:
+// "key line 时 key description 看到不是很清楚"): a line shows about 65
+// characters of its description instead of 40. The phone's sheet is unchanged.
 
 export interface InvoiceEditing {
   id: string
@@ -275,6 +279,7 @@ export default function InvoiceLinesDialog({
       sub={editing ? (editing.no ? `${editing.no} · ${statusWords}` : 'Draft') : 'Saved as draft · approve to issue'}
       locked={busy}
       tall
+      wide
     >
       <DialogForm
         buttons={
