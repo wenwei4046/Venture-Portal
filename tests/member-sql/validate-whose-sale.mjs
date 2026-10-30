@@ -1,8 +1,8 @@
-// Local PostgreSQL regression for 20261031030000 (2026-10-31 — the user, on SHAWN keying orders of salespeople who left
-// as new orders of his own: "要能够分开哪些是真正他自己开的单，哪些是他只是帮人家处理的单，要不然会变成 double claim").
-// Production's bodies (tests/member-sql/whose-sale-production.sql and every-paper-production.sql, read with
-// pg_get_functiondef, md5-checked) are loaded over stand-ins for what they call; 20261031013000 and the migration under
-// test then run VERBATIM, in that order. A delivery is played as the receiver plays it: the bill written, then
+// Local PostgreSQL regression for 20261031030000 + 20261031030100 (2026-10-31 — the user, on SHAWN keying orders of
+// salespeople who left as new orders of his own: "要能够分开哪些是真正他自己开的单，哪些是他只是帮人家处理的单，要不然会变成 double
+// claim"). Production's bodies (tests/member-sql/whose-sale-production.sql and every-paper-production.sql, read with
+// pg_get_functiondef, md5-checked) are loaded over stand-ins for what they call; 20261031013000 and the two migrations
+// under test then run VERBATIM, in that order. A delivery is played as the receiver plays it: the bill written, then
 // erp_sync_after_delivery handed the receiver's own result. Under test: a bill the feed OPENS on a paper another
 // salesperson's order carries — a bill of the portal's, a claim form's row, an older order of the ERP's — is held until
 // HR answers; the same person, a bill only updated, one paying nothing, a paid month and a booth alone hold nothing; HR's
@@ -14,6 +14,7 @@ import { PGlite } from '@electric-sql/pglite'
 const db = new PGlite()
 const EVERY_PAPER = new URL('../../supabase/migrations/20261031013000_every_paper_number.sql', import.meta.url)
 const MIGRATION = new URL('../../supabase/migrations/20261031030000_whose_sale.sql', import.meta.url)
+const ASKS = new URL('../../supabase/migrations/20261031030100_whose_sale_asks.sql', import.meta.url)
 const q = async (sql, params = []) => (await db.query(sql, params)).rows
 const one = async (sql, params = []) => Object.values((await q(sql, params))[0] ?? { v: undefined })[0]
 let checks = 0
@@ -133,11 +134,17 @@ for (const r of await q(`SELECT proname, md5(prosrc) AS md5 FROM pg_proc WHERE p
   check(r.md5, PROD[r.proname], `${r.proname}: production's body`)
 }
 
-// ── The two migrations, verbatim, in order ──
+// ── The three migrations, verbatim, in order ──
 await db.exec(await readFile(EVERY_PAPER, 'utf8'))
 await db.exec(await readFile(MIGRATION, 'utf8'))
+check(await one(`SELECT md5(prosrc) FROM pg_proc WHERE proname = 'erp_sync_after_delivery'`), PROD.erp_sync_after_delivery,
+  'the first touches no delivery: the feed asks nothing until the tab is live')
+await db.exec(await readFile(ASKS, 'utf8'))
 check(await one(`SELECT md5(prosrc) <> $1 FROM pg_proc WHERE proname = 'erp_sync_after_delivery'`, [PROD.erp_sync_after_delivery]), true,
-  'erp_sync_after_delivery is replaced')
+  'the second replaces erp_sync_after_delivery')
+await refuses(async () => db.exec(await readFile(ASKS, 'utf8')), /erp_sync_after_delivery has changed on this database/,
+  'and refuses to run over any body but production\'s')
+await db.exec('ROLLBACK')
 check(await q(`SELECT table_name, read_keys, mode FROM audit_registered ORDER BY table_name`), [
   { table_name: 'erp_order_papers', read_keys: [], mode: 'none' },
   { table_name: 'sales_order_seller_checks', read_keys: ['revenue'], mode: 'all' },

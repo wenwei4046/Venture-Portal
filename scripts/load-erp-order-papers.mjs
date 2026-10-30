@@ -17,7 +17,7 @@
  * next day) — else its salesperson now. `shared_with` is the ERP's Shared with (`collaborator_staff_ids`): who may work
  * the order, never a part of its sale.
  */
-import { execFileSync } from 'node:child_process'
+import { execSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -31,10 +31,10 @@ const dir = mkdtempSync(join(tmpdir(), 'erp-order-papers-'))
 function query(ref, sql, json = true) {
   const file = join(dir, `${ref}.sql`)
   writeFileSync(file, sql)
-  const args = ['supabase', 'db', 'query', '--linked', '--project-ref', ref, '--agent=no', ...(json ? ['-o', 'json'] : []), '-f', file]
-  const out = execFileSync('npx', args, {
-    encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'inherit'], shell: process.platform === 'win32',
-  })
+  const args = ['npx', 'supabase', 'db', 'query', '--linked', '--project-ref', ref, '--agent=no', ...(json ? ['-o', 'json'] : []), '-f', file]
+  // One command line through the shell (npx is npx.cmd on Windows); only the file's path is ever quoted.
+  const line = args.map(a => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a)).join(' ')
+  const out = execSync(line, { encoding: 'utf8', maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'inherit'] })
   if (!json) return out
   const start = out.indexOf('[')
   if (start < 0) throw new Error(`No rows came back from ${ref}:\n${out.slice(0, 400)}`)
@@ -66,8 +66,8 @@ SELECT so.doc_no,
  WHERE so.company_id = 1
  ORDER BY so.doc_no`
 const orders = query(ERP, ERP_SQL)
-const moved = orders.filter(o => o.erp_salesperson_id && o.shared_with.length >= 0).length
-console.log(`ERP: ${orders.length} orders (${orders.filter(o => o.ref_no).length} with a Ref No., ${moved} with a salesperson)`)
+const withSeller = orders.filter(o => o.erp_salesperson_id || o.salesperson_name).length
+console.log(`ERP: ${orders.length} orders (${orders.filter(o => o.ref_no).length} with a Ref No., ${withSeller} with a salesperson)`)
 
 // ── 2. The portal's copy (one transaction) ─────────────────────────────────────────────────────────────────────────
 const lit = v => (v === null || v === undefined ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`)

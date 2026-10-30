@@ -36,34 +36,18 @@
 -- 4. erp_sync_check_seller(order, event) — asks it once, for a counting bill with a salesperson, in a month no run has
 --    paid: writes the question, takes the bill out through revenue_exclude_order (its Open Bill pick, the day's order and
 --    the batch follow, as by hand) under the check's own name, and marks the delivery `whose_sale`.
--- 5. erp_sync_after_delivery — production's body (md5 bd437686…, refused otherwise) with ONE block added at its end: a
---    delivery that opened a bill (`created …`) asks. In a block of its own: a fault there is a `whose_sale_check_failed`
---    warning on the delivery, never the delivery's failure, and never the audit trail's.
--- 6. revenue_seller_checks(sub, period) — the tab's reader, Revenue · View (or Edit).
--- 7. revenue_answer_seller_check(order, theirs, note) — HR's answer, Revenue · Edit on the month page's tab.
+-- 5. revenue_seller_checks(sub, period) — the tab's reader, Revenue · View (or Edit).
+-- 6. revenue_answer_seller_check(order, theirs, note) — HR's answer, Revenue · Edit on the month page's tab.
 --
--- Reversal: re-apply erp_sync_after_delivery from tests/member-sql/whose-sale-production.sql (production's body as of
--- 2026-10-31, md5 bd437686…); count the held bills again (revenue_include_order for every check still `waiting`); then
--- DROP FUNCTION revenue_answer_seller_check(uuid, boolean, text), revenue_seller_checks(uuid, date),
+-- The feed starts ASKING with 20261031030100 (erp_sync_after_delivery), applied once the tab is live: a bill held before
+-- HR can see the tab would only vanish from its month. Nothing here touches a bill.
+--
+-- Reversal (after 20261031030100's): count the held bills again (revenue_include_order for every check still
+-- `waiting`); then DROP FUNCTION revenue_answer_seller_check(uuid, boolean, text), revenue_seller_checks(uuid, date),
 -- erp_sync_check_seller(uuid, uuid), sales_order_seller_evidence(uuid); DROP TABLE sales_order_seller_checks,
 -- erp_order_papers; DELETE FROM audit_tables WHERE table_name IN ('sales_order_seller_checks', 'erp_order_papers').
 
 BEGIN;
-
--- ── 0. The body this was written from ───────────────────────────────────────
-
-DO $guard$
-DECLARE
-    v_md5 TEXT;
-BEGIN
-    SELECT md5(p.prosrc) INTO v_md5
-      FROM pg_proc p
-     WHERE p.oid = 'public.erp_sync_after_delivery(uuid, text, jsonb, jsonb, jsonb)'::regprocedure;
-    IF v_md5 IS DISTINCT FROM 'bd437686f00688e1491f47096ca21001' THEN
-        RAISE EXCEPTION 'erp_sync_after_delivery has changed on this database (md5 %) — compare it with 20261031030000 before applying', v_md5;
-    END IF;
-END
-$guard$;
 
 -- ── 1. The ERP's orders, by paper ───────────────────────────────────────────
 
@@ -277,74 +261,12 @@ END
 $fn$;
 
 COMMENT ON FUNCTION public.erp_sync_check_seller(UUID, UUID) IS
-    'Whose sale? Asked once per bill: a counting bill with a salesperson, in a month no run has paid, whose papers another salesperson''s order already carries (sales_order_seller_evidence) is held — taken out through revenue_exclude_order under the name ''Whose sale check'' — until HR answers (revenue_answer_seller_check). Called by erp_sync_after_delivery for a bill a delivery opened; a signed-in caller (a replay) needs Revenue · Edit (20261031030000).';
+    'Whose sale? Asked once per bill: a counting bill with a salesperson, in a month no run has paid, whose papers another salesperson''s order already carries (sales_order_seller_evidence) is held — taken out through revenue_exclude_order under the name ''Whose sale check'' — until HR answers (revenue_answer_seller_check). Called by erp_sync_after_delivery for a bill a delivery opened (20261031030100); a signed-in caller (a replay) needs Revenue · Edit on the month page (20261031030000).';
 
 REVOKE ALL ON FUNCTION public.erp_sync_check_seller(UUID, UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.erp_sync_check_seller(UUID, UUID) TO authenticated, service_role;
 
--- ── 5. erp_sync_after_delivery — production's body, one block added ──────────
-
-CREATE OR REPLACE FUNCTION public.erp_sync_after_delivery(p_sub_department_id uuid, p_doc_no text, p_order jsonb, p_result jsonb, p_before jsonb)
- RETURNS jsonb
- LANGUAGE plpgsql
- SET search_path TO 'public'
-AS $function$
-DECLARE
-    v_status TEXT := p_result->>'status';
-    v_event  UUID := NULLIF(p_result->>'eventId', '')::UUID;
-    v_bill   UUID;
-    v_period DATE;
-    v_after  JSONB;
-BEGIN
-    IF p_doc_no IS NULL OR v_status IS NULL OR v_status NOT IN ('applied', 'held') THEN
-        RETURN p_result;
-    END IF;
-    BEGIN
-        SELECT o.id, o.period_month INTO v_bill, v_period
-          FROM sales_orders o
-          JOIN sales_import_batches b ON b.id = o.batch_id AND b.sub_department_id = p_sub_department_id
-         WHERE o.order_no = p_doc_no AND o.source = 'erp_sync';
-        IF p_before IS NULL AND v_bill IS NULL THEN
-            RETURN p_result;
-        END IF;
-        IF COALESCE((p_order->>'deleted')::BOOLEAN, FALSE) THEN
-            v_after := COALESCE(p_before, '{}'::JSONB) || JSONB_BUILD_OBJECT('deleted', TRUE, 'status', 'DELETED', 'commissionable', 0);
-        ELSE
-            v_after := erp_order_state(p_order, erp_sync_scheme_of(p_sub_department_id));
-        END IF;
-        IF v_status = 'applied' AND v_bill IS NOT NULL THEN
-            PERFORM erp_sync_note_adjustment(v_bill, p_order, v_event);
-        END IF;
-        PERFORM erp_sync_note_change(p_sub_department_id, p_doc_no, v_bill, v_event, v_status,
-                    COALESCE(v_period, NULLIF(p_result->>'periodMonth', '')::DATE),
-                    p_before, v_after, NULLIF(p_order->>'snapshotAt', '')::TIMESTAMPTZ);
-    EXCEPTION WHEN OTHERS THEN
-        RAISE WARNING 'erp_sync_after_delivery(%): %', p_doc_no, SQLERRM;
-        IF v_event IS NOT NULL THEN
-            UPDATE erp_sync_events
-               SET warnings = ARRAY_APPEND(warnings, 'change_trail_failed')
-             WHERE id = v_event;
-        END IF;
-    END;
-    -- (20261031030000) A bill this delivery opened, on a paper another salesperson's order already carries, waits for
-    -- HR to say whose sale it is. A block of its own: a fault here is a warning on the delivery, never its failure.
-    IF v_status = 'applied' AND v_bill IS NOT NULL AND COALESCE(p_result->>'message', '') LIKE 'created%' THEN
-        BEGIN
-            PERFORM erp_sync_check_seller(v_bill, v_event);
-        EXCEPTION WHEN OTHERS THEN
-            RAISE WARNING 'erp_sync_check_seller(%): %', p_doc_no, SQLERRM;
-            IF v_event IS NOT NULL THEN
-                UPDATE erp_sync_events
-                   SET warnings = ARRAY_APPEND(warnings, 'whose_sale_check_failed')
-                 WHERE id = v_event;
-            END IF;
-        END;
-    END IF;
-    RETURN p_result;
-END;
-$function$;
-
--- ── 6. The tab's reader ─────────────────────────────────────────────────────
+-- ── 5. The tab's reader ─────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.revenue_seller_checks(p_sub_department UUID, p_period DATE)
 RETURNS JSONB
@@ -382,7 +304,7 @@ COMMENT ON FUNCTION public.revenue_seller_checks(UUID, DATE) IS
 REVOKE ALL ON FUNCTION public.revenue_seller_checks(UUID, DATE) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.revenue_seller_checks(UUID, DATE) TO authenticated;
 
--- ── 7. HR's answer ──────────────────────────────────────────────────────────
+-- ── 6. HR's answer ──────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.revenue_answer_seller_check(p_order_id UUID, p_theirs BOOLEAN, p_note TEXT)
 RETURNS JSONB
