@@ -182,7 +182,13 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
             <div className="fin-form">
               <FundingSourceEditor loanId={loan.id} repaymentTerms={loan.repaymentTerms} />
               <RepaymentStartEditor loanId={loan.id} current={loan.start.set ? loan.start.date : null} min={loan.disbursementDate ?? undefined} />
-              <MinPayInterestToggle loanId={loan.id} current={loan.minPayInterest} />
+              <MinPayInterestToggle
+                loanId={loan.id}
+                current={loan.minPayInterest}
+                from={loan.minPayFrom}
+                firstDueYM={loan.start.date ? loan.start.date.slice(0, 7) : null}
+                today={today}
+              />
             </div>
           </FullCard>
 

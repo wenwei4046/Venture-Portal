@@ -11,6 +11,7 @@ import { monthEvents, type CalendarEntry } from '@/lib/repayment-calendar'
 import { fromCalendar } from '@/lib/deal-return'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../../fund-in/actions'
+import { minPayStartYM } from '@/lib/min-pay'
 import type { SchedRow, NoTermRow, CompoundRow, MinInterestRow } from '../_components/ScheduleView'
 
 // The Repayment Schedule's month (2026-10-10, lifted out of its page so the
@@ -53,7 +54,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   const [{ data: loans }, { data: loanOut }, { data: companies }, { data: loanReps }] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, min_pay_interest, repayment_start_month, repayment_start_date, terms_effective_from, principal_per_month')
+      .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_start_date, terms_effective_from, principal_per_month')
       .in('status', ['active', 'fully_repaid']),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
     supabase.from('companies').select('id, short_code, name'),
@@ -132,10 +133,11 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     // 最低还息单 (2026-09-04): flagged = "本金可以慢慢还,当月利息一定要还".
     // due 按这笔单自己的算法(flat 原额×月息 / compound 余额×月息),paid = 当月
     // interest 类还款(含 penalty/netting,同 已收行 的口径)。首期未到的月份不追。
+    // 设了起始月 (2026-10-30) 的,起始月之前也不追。
     if ((l as { min_pay_interest?: boolean }).min_pay_interest === true && rate > 0) {
-      const firstDueYM = resolveFirstDueYM(
-        ((l as { repayment_start_month?: string | null }).repayment_start_month ?? null),
-        l.disbursement_date as string | null,
+      const firstDueYM = minPayStartYM(
+        resolveFirstDueYM(((l as { repayment_start_month?: string | null }).repayment_start_month ?? null), l.disbursement_date as string | null),
+        (l as { min_pay_interest_from?: string | null }).min_pay_interest_from,
       )
       if (!firstDueYM || firstDueYM <= currentYM) {
         const isCompound = (l as { compound_interest?: boolean }).compound_interest === true
@@ -236,7 +238,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
   // ── 应付 (fund sources) + repayment history + compounding meta + pending PVs ──
   const [payable, { data: fsMetaRows }, { data: fsReps }, { data: pendingPvs }, { data: fsDepts }, { data: fsDirectors }] = await Promise.all([
     listPayableFundSources({ includeSettledInMonth: currentYM }),
-    supabase.from('fund_sources').select('id, status, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from, principal_per_month'),
+    supabase.from('fund_sources').select('id, status, from_company_id, from_department_id, from_director_id, from_freetext_name, compound_interest, effective_date, min_pay_interest, min_pay_interest_from, repayment_start_month, repayment_date, amount, cost_rate, lock_in_months, terms_effective_from, principal_per_month'),
     fetchAllRows((lo, hi) => supabase.from('fund_source_repayments').select('fund_source_id, amount, payment_date, payment_type').order('id', { ascending: true }).range(lo, hi)).then((data) => ({ data })),
     supabase
       .from('payment_vouchers')
@@ -248,7 +250,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     // A director's fund source goes by the director's name (2026-10-12).
     supabase.from('directors').select('id, name'),
   ])
-  const fsMeta = new Map((fsMetaRows ?? []).map((m) => [m.id as string, m as { compound_interest?: boolean; effective_date?: string | null; min_pay_interest?: boolean; repayment_start_month?: string | null; amount?: number | string; cost_rate?: number | string; lock_in_months?: number | null; terms_effective_from?: string | null; principal_per_month?: number | string | null }]))
+  const fsMeta = new Map((fsMetaRows ?? []).map((m) => [m.id as string, m as { compound_interest?: boolean; effective_date?: string | null; min_pay_interest?: boolean; min_pay_interest_from?: string | null; repayment_start_month?: string | null; amount?: number | string; cost_rate?: number | string; lock_in_months?: number | null; terms_effective_from?: string | null; principal_per_month?: number | string | null }]))
   const fsHist = await fetchTermsHistory(supabase, 'fund_source', (fsMetaRows ?? []).map((m) => m.id as string))
   const fsPrincipalByMonth = principalPaidByMonth(
     (fsReps ?? []).map((rp) => ({ id: rp.fund_source_id as string, amount: Number(rp.amount), payment_date: rp.payment_date as string, payment_type: rp.payment_type as string })),
@@ -317,7 +319,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     // 最低还息单 (应付侧, 2026-09-04): 当月最低要付的利息 vs 已付。口径同应收侧;
     // settled(本金已清)的不再追。
     if (fsm?.min_pay_interest === true && p.cost_rate > 0 && !p.settled_in_month) {
-      const firstDueYM = resolveFirstDueYM(fsm.repayment_start_month ?? null, fsm.effective_date ?? null)
+      const firstDueYM = minPayStartYM(resolveFirstDueYM(fsm.repayment_start_month ?? null, fsm.effective_date ?? null), fsm.min_pay_interest_from)
       if (!firstDueYM || firstDueYM <= currentYM) {
         const isCompound = fsm.compound_interest === true
         const due = isCompound

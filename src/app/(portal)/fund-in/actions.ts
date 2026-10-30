@@ -17,6 +17,7 @@ import { remainingPeriods } from '@/lib/loan-monitor'
 import { loadNewSourceOptions, type NewSourceOptions } from './_lib/new-source-options'
 import { amendMonthWords, compoundSent, explainAmendRefusal, openFromSent, principalPerMonthSent } from '@/lib/fund-amend'
 import { sourceEditPatch } from '@/lib/fund-source-edit'
+import { minPayFromDate } from '@/lib/min-pay'
 
 // ─── Amend an ACTIVE fund source: the terms in force recalculated ─────────────
 // Principal is the top approval authority, so edits apply immediately via the
@@ -491,7 +492,8 @@ async function createFundSourceInner(formData: FormData, userId: string): Promis
   const cost_rate = raw.cost_rate_percent / 100
   // 利滚利 — compound interest, settable at creation (2026-06-12; was edit-only).
   const compound = formData.get('compound_interest') === 'on'
-  // 最低还息 — minimum-pay-interest flag, settable at creation (2026-09-04).
+  // 最低还息 — minimum-pay-interest flag, settable at creation (2026-09-04), and the month it is checked from
+  // (2026-10-30): a later month's first day, or none — the first instalment.
   const minPayInterest = formData.get('min_pay_interest') === 'on'
 
   const basePayload = {
@@ -501,6 +503,7 @@ async function createFundSourceInner(formData: FormData, userId: string): Promis
     cost_rate,
     compound_interest: compound,
     min_pay_interest: minPayInterest,
+    min_pay_interest_from: minPayInterest ? minPayFromDate(formData.get('min_pay_interest_from')) : null,
     // Blank → null (无固定期限). NaN (blank number) is falsy → null.
     lock_in_months: !isNaN(raw.lock_in_months) && raw.lock_in_months >= 1 ? raw.lock_in_months : null,
     principal_per_month: ppm.value,
@@ -808,10 +811,12 @@ export async function setFundSourceRepaymentStart(
 // ─── 最低还息单 toggle (user 2026-09-04) ─────────────────────────────────────
 // Flagged = "本金可以慢慢还，但每月利息一定要付". Drives the minimum-interest
 // tracking on /repayment-schedule and the note on the company statement.
-// Display/tracking metadata only — no GL impact.
+// Display/tracking metadata only — no GL impact. Turned on from a month (2026-10-30): `from` a later month's
+// `YYYY-MM`, or none — the first instalment.
 export async function setFundSourceMinPayInterest(
   id: string,
-  value: boolean
+  value: boolean,
+  from?: string | null
 ): Promise<{ error: string } | undefined> {
   await requireActionOn('/fund-in', 'treasury', 'edit')
   const supabase = await createClient()
@@ -821,6 +826,7 @@ export async function setFundSourceMinPayInterest(
   const { error } = await supabase.rpc('set_fund_source_min_pay_interest' as never, {
     p_fund_source_id: id,
     p_value: value,
+    p_from: value ? minPayFromDate(from) : null,
   } as never)
   if (error) return { error: `Could not save: ${error.message}` }
 

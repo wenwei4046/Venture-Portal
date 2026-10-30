@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { DateField, dayLabel } from '@/components/finv/DateField'
 import { DialogButton, DialogForm, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
-import { DealPart, DealRepaymentType, DealSummary } from '@/components/finv/DealTermsParts'
+import { DealMinPayFrom, DealPart, DealRepaymentType, DealSummary } from '@/components/finv/DealTermsParts'
 import df from '@/components/finv/dealform.module.css'
 import { neededSentence, num } from '@/components/finv/form-words'
 import fm from '@/components/finv/form.module.css'
@@ -11,6 +11,7 @@ import { useFinSurface } from '@/components/finv/surface'
 import { Select } from '@/components/hrv/select'
 import { typeLabel, type AccountType } from '@/lib/coa'
 import { withCode } from '@/lib/fund-hub'
+import { NO_MIN_PAY_FROM, minPayChoiceWords, minPayFromField, minPayFromMissing, minPayLaterMonths, type MinPayFrom } from '@/lib/min-pay'
 import { addYM, money, previewRows, readRepayment, repaymentSummary, repaymentWords, type RepaymentChoice } from '@/lib/repayment-type'
 import { createFundSourceFromDialog, openRecordFundIn } from '../actions'
 import type { NewSourceOptions } from '../_lib/new-source-options'
@@ -66,6 +67,8 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
   const [firstDue, setFirstDue] = useState('')
   const [compound, setCompound] = useState(false)
   const [minPay, setMinPay] = useState(false)
+  // Minimum pay interest's month (2026-10-30): none chosen until one is.
+  const [minPayFrom, setMinPayFrom] = useState<MinPayFrom>(NO_MIN_PAY_FROM)
   // Repayment type (desktop): none chosen until one is.
   const [repay, setRepay] = useState<RepaymentChoice | null>(null)
   const [perMonth, setPerMonth] = useState('')
@@ -107,6 +110,7 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
     setFirstDue('')
     setCompound(false)
     setMinPay(false)
+    setMinPayFrom(NO_MIN_PAY_FROM)
     setRepay(null)
     setPerMonth('')
     setError(null)
@@ -121,6 +125,11 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
     setFromId('')
     setFromName('')
   }
+  // Off, its month goes with it: ticked again, it is asked again.
+  const pickMinPay = (on: boolean) => {
+    setMinPay(on)
+    if (!on) setMinPayFrom(NO_MIN_PAY_FROM)
+  }
 
   const named = type === 'director_loan' || type === 'outsource'
   // The months box is the term on the phone, the Repayment type's months on a desktop.
@@ -130,10 +139,15 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
   const amountN = num(amount)
   // What the Repayment type's box works out to on the amount.
   const read = desktop && (repay === 'amount' || repay === 'months') ? readRepayment(repay, repay === 'amount' ? perMonth : months, amountN) : null
+  // The first repayment's month (the month after the money came in, unset), and the later months minimum pay may start in.
+  const firstDueYM = firstDue ? firstDue.slice(0, 7) : addYM(date.slice(0, 7), 1)
+  const laterMonths = minPayLaterMonths(firstDueYM, today.slice(0, 7))
+  const minPayMissing = minPay ? minPayFromMissing(minPayFrom, laterMonths) : null
   const need: string[] = []
   if (named ? !fromName.trim() : !fromId) need.push('From')
   if (!(amountN > 0)) need.push('an amount')
   if (!Number.isFinite(rateN)) need.push('a rate')
+  if (minPayMissing) need.push(minPayMissing)
   if (desktop && !repay) need.push('a repayment type')
   const problem =
     neededSentence(need, true) ??
@@ -177,7 +191,10 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
     fd.set('account_code', account)
     if (bankId) fd.set('bank_account_id', bankId)
     if (compound) fd.set('compound_interest', 'on')
-    if (minPay) fd.set('min_pay_interest', 'on')
+    if (minPay) {
+      fd.set('min_pay_interest', 'on')
+      fd.set('min_pay_interest_from', minPayFromField(minPayFrom))
+    }
     try {
       const res = await createFundSourceFromDialog(fd)
       if (!res.ok) {
@@ -267,7 +284,7 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
 
   if (desktop) {
     // What the terms make: from the first repayment's month (the month after the money came in, unset).
-    const startYM = firstDue ? firstDue.slice(0, 7) : addYM(date.slice(0, 7), 1)
+    const startYM = firstDueYM
     const interest = !compound && Number.isFinite(rateN) && amountN > 0 ? r2((amountN * rateN) / 100) : null
     const plan = read?.ok ? read.plan : null
     const schedule =
@@ -328,13 +345,14 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
                     </span>
                   </label>
                   <label className={df.check}>
-                    <input type="checkbox" checked={minPay} onChange={(e) => setMinPay(e.target.checked)} />
+                    <input type="checkbox" checked={minPay} onChange={(e) => pickMinPay(e.target.checked)} />
                     <span>
                       Minimum pay interest
                       <span className={df.checkNote}>The principal may come slowly, but each month’s interest must be paid.</span>
                     </span>
                   </label>
                 </div>
+                {minPay ? <DealMinPayFrom value={minPayFrom} onChange={setMinPayFrom} firstDueYM={firstDueYM} laterMonths={laterMonths} idPrefix="fi" /> : null}
               </DealPart>
 
               <DealPart no={4} title="Repayment" note="When repaying starts, and how the principal is repaid.">
@@ -383,6 +401,9 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
                   value: !repay ? 'Not chosen yet' : repay === 'none' || plan ? repaymentSummary(repay, plan, startYM) : 'Not filled in yet',
                   todo: !repay || (repay !== 'none' && !plan),
                 },
+                ...(minPay
+                  ? [{ key: 'Minimum pay', value: minPayChoiceWords(minPayFrom, firstDueYM, laterMonths) ?? 'Not chosen yet', todo: !!minPayMissing }]
+                  : []),
                 { key: 'Account', value: chosenAccount ? `${chosenAccount.code} · ${chosenAccount.name}` : '4000 · Fund Sources Payable' },
               ]}
               schedule={schedule}
@@ -439,11 +460,12 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
               <span className={fm.checkName}>Compound interest</span>
             </label>
             <label className={fm.check}>
-              <input type="checkbox" checked={minPay} onChange={(e) => setMinPay(e.target.checked)} />
+              <input type="checkbox" checked={minPay} onChange={(e) => pickMinPay(e.target.checked)} />
               <span className={fm.checkName}>Minimum pay interest</span>
             </label>
           </div>
         ) : null}
+        {showInterest && minPay ? <DealMinPayFrom value={minPayFrom} onChange={setMinPayFrom} firstDueYM={firstDueYM} laterMonths={laterMonths} idPrefix="fi" /> : null}
 
         <div className={fm.more} role="group" aria-label="More">
           <button type="button" className={fm.moreBtn} aria-pressed={showAccount} onClick={() => setShowAccount((v) => !v)}>
