@@ -605,7 +605,7 @@ export const TRIGGER_READS: Readonly<Record<string, readonly string[]>> = {
   sales_order_reassignments_guard: ['comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_orders'],
   guard_commission_order_child: ['comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_orders'],
   sales_order_lines_apply_combos: ['catalogue_combo_prices', 'catalogue_fabric_upgrade_series', 'catalogue_fabric_upgrades', 'catalogue_live_combos', 'catalogue_option_prices', 'erp_fabrics', 'erp_products', 'sales_order_lines', 'sales_orders'],
-  sales_order_lines_fill_cost: ['catalogue_fabric_upgrade_series', 'catalogue_fabric_upgrades', 'catalogue_option_prices', 'catalogue_skus', 'erp_fabrics', 'erp_products', 'sales_orders'],
+  sales_order_lines_fill_cost: ['catalogue_fabric_upgrade_series', 'catalogue_fabric_upgrades', 'catalogue_kiv_costs', 'catalogue_option_prices', 'catalogue_skus', 'erp_fabrics', 'erp_products', 'sales_orders'],
   guard_open_bill_scope: ['sales_import_batches', 'sales_orders'],
   sales_order_shares_guard: ['comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_order_shares', 'sales_orders'],
   guard_commission_order_scope: ['comm_order_releases', 'comm_runs', 'sales_import_batches'],

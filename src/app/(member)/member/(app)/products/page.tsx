@@ -10,6 +10,7 @@ import {
   loadCombos,
   loadCostRatios,
   loadCostingGaps,
+  loadKivCosts,
   loadMaintenance,
   loadMirrorStatus,
   loadModels,
@@ -61,7 +62,8 @@ export const metadata = { title: 'Product List · HOUZS Venture' }
  *   Combo Pricing       the sofa combos, and their price per seat height
  *   Costing gaps        what was sold and nothing could price, worth-first
  *   Costing Setting     the ratio a cost is divided by for the Revenue Team,
- *                       and the SKUs divided by a ratio of their own
+ *                       what a bed frame still to be chosen (KIV) costs by
+ *                       size, and the SKUs divided by a ratio of their own
  *
  * The seventh, Add-on / KPI Items, moved to Rules › KPI items on 2026-10-08
  * (user: "rules 这里是用来算薪水的 … product list 是拿来 set costing 的"): which
@@ -138,7 +140,7 @@ export default async function ProductListPage({
     if (!current || !current.schemeId || !rules) {
       body = <Notice tone="error">{current ? `${current.name} has no active scheme yet.` : 'No Revenue sub-department is set up yet.'}</Notice>
     } else {
-      const [skus, ratios] = await Promise.all([loadSkus(), loadCostRatios(current.schemeId)])
+      const [skus, ratios, kivCosts] = await Promise.all([loadSkus(), loadCostRatios(current.schemeId), loadKivCosts()])
       body = (
         <CostSettingTab
           key={current.slug}
@@ -148,6 +150,7 @@ export default async function ProductListPage({
           divisor={rules.divisor}
           ratios={ratios}
           skus={skus.map(toPickSku)}
+          kivCosts={kivCosts}
         />
       )
     }

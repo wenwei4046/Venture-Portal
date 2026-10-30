@@ -9,6 +9,7 @@ import {
   validateComboPrices,
   validateComboRemovals,
   validateFabricUpgrades,
+  validateKivCosts,
   validateModelEdit,
   validateNewCombo,
   validateOptionPrices,
@@ -16,6 +17,7 @@ import {
   type ComboPriceEdit,
   type ComboSetRef,
   type FabricUpgradesEdit,
+  type KivCostEdit,
   type ModelEdit,
   type NewComboEdit,
   type OptionPriceEdit,
@@ -167,6 +169,32 @@ export async function saveOptionPrices(pool: string, edits: OptionPriceEdit[]): 
       .eq('pool', pool)
       .in('value', clears)
     if (error) fail('the surcharges', error)
+  }
+  refresh()
+  return { saved: upserts.length + clears.length }
+}
+
+/**
+ * Costing Setting › KIV bed frames (2026-10-31): what a bed frame still to be chosen costs, by size — the dearest
+ * frame of the size, so its bill's margin reads low until it is chosen, never high. Only the sizes changed; blank
+ * takes a size's cost off (its frames then cost the dearest of the others). Every sub-department alike. New bills are
+ * costed at it from the moment it is saved; a month already landed moves when it is recosted.
+ */
+export async function saveKivCosts(edits: KivCostEdit[]): Promise<SaveSummary> {
+  const user = await requireProductListEdit()
+  const { upserts, clears } = guard(() => validateKivCosts(edits))
+  const sb = await client()
+  const now = new Date().toISOString()
+  if (upserts.length > 0) {
+    const { error } = await sb.from('catalogue_kiv_costs').upsert(
+      upserts.map(u => ({ erp_company_id: 1, ...u, updated_by: user.id, updated_at: now })),
+      { onConflict: 'erp_company_id,size_code' },
+    )
+    if (error) fail('the KIV bed frame costs', error)
+  }
+  if (clears.length > 0) {
+    const { error } = await sb.from('catalogue_kiv_costs').delete().eq('erp_company_id', 1).in('size_code', clears)
+    if (error) fail('the KIV bed frame costs', error)
   }
   refresh()
   return { saved: upserts.length + clears.length }

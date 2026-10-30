@@ -55,6 +55,7 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   catalogue_combos: ['product_list.edit', 'product_list.view', 'revenue.edit'],
   catalogue_fabric_upgrade_series: ['product_list.edit', 'product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage'],
   catalogue_fabric_upgrades: ['product_list.edit', 'product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage'],
+  catalogue_kiv_costs: ['product_list.edit', 'product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage'],
   catalogue_models: ['product_list.edit', 'product_list.view'],
   catalogue_option_prices: ['product_list.edit', 'product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage'],
   catalogue_skus: ['product_list.edit', 'product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
