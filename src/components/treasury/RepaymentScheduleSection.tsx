@@ -8,10 +8,12 @@ import type { RepaymentPlan } from '@/lib/repayment-plan'
 // Balance / Outstanding / Remark columns). The figures come from
 // lib/repayment-plan; the payments themselves fold away underneath, where a
 // loan's repayment can still be reversed. A 利滚利 deal's (2026-10-24, the
-// user's tidied LO#7 — "照整理后的样子做"): four figures over the table —
-// overdue now, owed now, paid to date, interest rolled in — then Due / Paid /
-// To balance / Balance / Overdue, a line where its terms change, and a total
-// that adds up.
+// user's tidied LO#7 — "照整理后的样子做"): Due / Paid / To balance / Balance /
+// Overdue, a line where its terms change, and a total that adds up — one with
+// no fixed term paid along the way (2026-10-26, the user's A: "Overdue 和卡片照样稿
+// 做") Due / Paid / Balance / Overdue, its money on the oldest interest first.
+// Every schedule (2026-10-26 — fund in "也需要卡片，和fund out 一样") opens on
+// four figures: overdue now, owed now, paid to date, the next installment.
 
 const money = (n: number | null) => (n === null ? '—' : formatMoneyBare(n))
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -26,44 +28,77 @@ export function scheduleCount(plan: RepaymentPlan): string {
       : 'NO SCHEDULE'
 }
 
-/** A 利滚利 deal's table: the figures over it, a line where its terms change, Due = Paid + To balance + Overdue. */
+/**
+ * The four figures over every schedule (2026-10-26 — the user: fund in "也需要卡片，和fund out 一样", every schedule "是",
+ * the fourth "改成 next installment"): overdue now, owed now, paid to date, the next installment.
+ */
+function ScheduleFacts({ plan }: { plan: RepaymentPlan }) {
+  const c = plan.compound
+  const last = plan.rows[plan.rows.length - 1]
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  // Owed now: a 利滚利 deal's whole balance (rolled into); else — and a 利滚利 deal paid along the way, its money on the
+  // oldest interest first — the principal still owed and the interest already due but unpaid.
+  const unpaidInterest = r2(Math.max(0, plan.rows.filter((r) => !plan.next || r.due < plan.next.due).reduce((s, r) => s + r.interest, 0) - plan.interestPaid))
+  const next = plan.next ?? null
+  const facts: Array<{ key: string; label: string; value: string; sub: string; bad?: boolean }> = [
+    {
+      key: 'overdue',
+      label: 'Overdue now',
+      value: formatMoney(plan.overdue),
+      sub: plan.overdueSince ? `since ${dayjs(plan.overdueSince).format('D MMM YYYY')} · ${plural(plan.overdueDays, 'day', 'days')}` : 'nothing past its day',
+      bad: plan.overdue > 0.005,
+    },
+    c && !c.interestFirst
+      ? { key: 'owed', label: 'Owed now', value: formatMoney(c.owedNow), sub: last ? `balance after ${monthWords(last.ym)}` : '' }
+      : {
+          key: 'owed',
+          label: 'Owed now',
+          value: formatMoney(r2(plan.principalOwed + unpaidInterest)),
+          sub: `principal ${formatMoneyBare(plan.principalOwed)} + interest ${formatMoneyBare(unpaidInterest)}`,
+        },
+    {
+      key: 'paid',
+      label: 'Paid to date',
+      value: formatMoney(r2(plan.principalPaid + plan.interestPaid)),
+      sub: `principal ${formatMoneyBare(plan.principalPaid)} + interest ${formatMoneyBare(plan.interestPaid)}`,
+    },
+    next
+      ? {
+          key: 'next',
+          label: 'Next installment',
+          value: formatMoney(next.amount),
+          sub: `${dayjs(next.due).format('D MMM YYYY')} · ${next.principal > 0.005 ? `principal ${formatMoneyBare(next.principal)} + interest ${formatMoneyBare(next.interest)}` : 'interest'}`,
+        }
+      : { key: 'next', label: 'Next installment', value: '—', sub: 'nothing more falls due' },
+  ]
+  return (
+    <div className="sched-facts">
+      {facts.map((f) => (
+        <div key={f.key} className="sched-fact" data-bad={f.bad ? 'true' : undefined}>
+          <div className="sched-fact-k">{f.label}</div>
+          <div className="sched-fact-v">{f.value}</div>
+          <div className="sched-fact-s">{f.sub}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * A 利滚利 deal's table: a line where its terms change, Due = Paid + To balance + Overdue — one paid along the way with
+ * no fixed term (its money on the oldest interest first) rolls nothing: Due = Paid + Overdue.
+ */
 function CompoundTable({ plan }: { plan: RepaymentPlan }) {
   const c = plan.compound!
-  const last = plan.rows[plan.rows.length - 1]
+  const rolls = !c.interestFirst
   const breakAt = new Map(c.breaks.map((b) => [b.no, b]))
   const total = (pick: (r: RepaymentPlan['rows'][number]) => number) => Math.round(plan.rows.reduce((s, r) => s + pick(r), 0) * 100) / 100
   const due = total((r) => r.installment)
   const paid = total((r) => r.paid ?? 0)
   const toBalance = total((r) => r.toBalance ?? 0)
   const addsUp = Math.abs(due - paid - toBalance - plan.overdue) < 0.01
-  const facts: Array<{ key: string; label: string; value: number; sub: string; bad?: boolean }> = [
-    {
-      key: 'overdue',
-      label: 'Overdue now',
-      value: plan.overdue,
-      sub: plan.overdueSince ? `since ${dayjs(plan.overdueSince).format('D MMM YYYY')} · ${plural(plan.overdueDays, 'day', 'days')}` : 'nothing past its day',
-      bad: plan.overdue > 0.005,
-    },
-    { key: 'owed', label: 'Owed now', value: c.owedNow, sub: last ? `balance after ${monthWords(last.ym)}` : '' },
-    { key: 'paid', label: 'Paid to date', value: c.paidToDate, sub: `principal ${formatMoneyBare(plan.principalPaid)} + interest ${formatMoneyBare(plan.interestPaid)}` },
-    {
-      key: 'added',
-      label: 'Added to the balance',
-      value: c.addedToBalance,
-      sub: c.addedFrom && c.addedTo ? `${monthWords(c.addedFrom)}${c.addedTo !== c.addedFrom ? ` – ${monthWords(c.addedTo)}` : ''} · unpaid interest` : 'nothing rolled in',
-    },
-  ]
   return (
     <>
-      <div className="sched-facts">
-        {facts.map((f) => (
-          <div key={f.key} className="sched-fact" data-bad={f.bad ? 'true' : undefined}>
-            <div className="sched-fact-k">{f.label}</div>
-            <div className="sched-fact-v">{formatMoney(f.value)}</div>
-            <div className="sched-fact-s">{f.sub}</div>
-          </div>
-        ))}
-      </div>
       <div className="overflow-x-auto">
         <table className="ledger-table w-full sched-table">
           <thead>
@@ -72,7 +107,7 @@ function CompoundTable({ plan }: { plan: RepaymentPlan }) {
               <th>Date</th>
               <th className="text-right right">Due</th>
               <th className="text-right right m-hide">Paid</th>
-              <th className="text-right right m-hide">To balance</th>
+              {rolls ? <th className="text-right right m-hide">To balance</th> : null}
               <th className="text-right right m-hide">Balance</th>
               <th className="text-right right">Overdue</th>
               <th className="m-hide">Remark</th>
@@ -85,7 +120,7 @@ function CompoundTable({ plan }: { plan: RepaymentPlan }) {
                 <Fragment key={r.no}>
                   {b ? (
                     <tr className="sched-break">
-                      <td colSpan={8}>
+                      <td colSpan={rolls ? 8 : 7}>
                         <b>{b.head}</b> · {b.rest}
                       </td>
                     </tr>
@@ -95,7 +130,9 @@ function CompoundTable({ plan }: { plan: RepaymentPlan }) {
                     <td className="whitespace-nowrap">{dayjs(r.due).format('D MMM YYYY')}</td>
                     <td className="num">{money(r.installment)}</td>
                     <td className="num m-hide">{r.paid ? money(r.paid) : <span className="text-muted">—</span>}</td>
-                    <td className="num m-hide">{r.toBalance ? <span className="sched-alert">{money(r.toBalance)}</span> : <span className="text-muted">—</span>}</td>
+                    {rolls ? (
+                      <td className="num m-hide">{r.toBalance ? <span className="sched-alert">{money(r.toBalance)}</span> : <span className="text-muted">—</span>}</td>
+                    ) : null}
                     <td className="num m-hide">{money(r.balance)}</td>
                     <td className="num">{r.late ? <span className="sched-danger">{money(r.outstanding)}</span> : <span className="text-muted">—</span>}</td>
                     <td className="m-hide">
@@ -112,10 +149,10 @@ function CompoundTable({ plan }: { plan: RepaymentPlan }) {
               <td>Total</td>
               <td className="num">{money(due)}</td>
               <td className="num m-hide">{money(paid)}</td>
-              <td className="num m-hide">{money(toBalance)}</td>
+              {rolls ? <td className="num m-hide">{money(toBalance)}</td> : null}
               <td className="m-hide" />
               <td className="num">{money(plan.overdue)}</td>
-              <td className="m-hide sched-total-note">{addsUp ? 'Due = Paid + To balance + Overdue' : null}</td>
+              <td className="m-hide sched-total-note">{addsUp ? (rolls ? 'Due = Paid + To balance + Overdue' : 'Due = Paid + Overdue') : null}</td>
             </tr>
           </tfoot>
         </table>
@@ -150,6 +187,7 @@ export default function RepaymentScheduleSection({
           <span className="count">{count}</span>
         </div>
       )}
+      {plan.rows.length > 0 ? <ScheduleFacts plan={plan} /> : null}
       {plan.rows.length === 0 ? (
         <div className="border border-hairline rounded-md bg-surface p-5 text-center">
           <p className="font-sans text-sm text-graphite">{cancelled ? 'Cancelled — no schedule.' : 'No installments yet.'}</p>

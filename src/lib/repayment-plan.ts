@@ -29,7 +29,13 @@
 // asked them (LO#7, 2026-10-24: 0.5% flat to December 2025, 1,000 + 300 a
 // month, then 4% compounding from January on the 51,000 still owed). Its rows
 // also say what came in and what was rolled in, and its plan the figures over
-// the table and where the terms change (`compound`).
+// the table and where the terms change (`compound`). One with no fixed term
+// that is paid along the way (LO#7, 2026-10-26 — the user: "没有固定期数、每个月
+// 在还", overdue is all the interest not paid, the oldest first) rolls nothing:
+// its money pays the months' interest oldest first and what is over repays the
+// principal, so a month reads what of its interest was paid, and what is short
+// once its day has passed is overdue. One paid off in one sum (一次还清) still
+// rolls a month's unpaid interest into the balance.
 // A repaid deal's month-by-month rows stop at the month it was repaid.
 
 import dayjs from 'dayjs'
@@ -92,6 +98,9 @@ export interface CompoundFacts {
   addedToBalance: number
   addedFrom: string | null
   addedTo: string | null
+  /** No fixed term, paid along the way (2026-10-26): the money on the months' interest oldest first, what is short
+   *  overdue, nothing rolled in — Paid and the plan's principal / interest paid as set, not as recorded. */
+  interestFirst: boolean
 }
 
 export interface RepaymentPlan {
@@ -116,6 +125,18 @@ export interface RepaymentPlan {
   principalOwed: number
   /** 利滚利 (a compounding deal) — null otherwise. */
   compound: CompoundFacts | null
+  /** The next installment (2026-10-26, the schedule's fourth card — the user: "改成 next installment"); null when nothing
+   *  more falls due. Set by buildRepaymentPlan. */
+  next?: PlanNext | null
+}
+
+export interface PlanNext {
+  /** Its day, YYYY-MM-DD. */
+  due: string
+  amount: number
+  /** The principal it asks (0 with no fixed term) and the interest. */
+  principal: number
+  interest: number
 }
 
 export interface PlanInput {
@@ -214,9 +235,34 @@ function planOf(input: PlanInput): RepaymentPlan {
   if (segments[0].fromYM === '0000-00') return summary('none', [], null, 0, terms.principal, principalPaid, interestPaid)
 
   const pools = { principalPays, interestPays, principalPaid, interestPaid }
-  if (segments.some((s) => s.compounding)) return compoundPlan(input, segments, pools, dueDay)
-  if (!segments[segments.length - 1].months) return openPlan(input, segments, pools, dueDay)
-  return fixedPlan(input, segments, pools, dueDay)
+  const plan = segments.some((s) => s.compounding)
+    ? compoundPlan(input, segments, pools, dueDay)
+    : !segments[segments.length - 1].months
+      ? openPlan(input, segments, pools, dueDay)
+      : fixedPlan(input, segments, pools, dueDay)
+  plan.next = nextOf(plan, input, segments, dueDay)
+  return plan
+}
+
+/**
+ * The next installment: the first row still to fall due — else, on a plan that runs month by month to today (no
+ * fixed term, 利滚利), the month after its last: the interest on what is owed then (利滚利: the whole balance; else the
+ * terms' monthly interest) with any principal its terms ask. Nothing on a plan paid up, repaid, or past its term.
+ */
+function nextOf(plan: RepaymentPlan, input: PlanInput, segments: TermsSegment[], dueDay: number): PlanNext | null {
+  if (input.status === 'repaid' || input.status === 'fully_repaid' || input.status === 'cancelled') return null
+  const upcoming = plan.rows.find((r) => r.due > input.today)
+  if (upcoming) {
+    const interest = upcoming.interest
+    return { due: upcoming.due, amount: upcoming.installment, principal: r2(Math.max(0, upcoming.installment - interest)), interest }
+  }
+  const last = plan.rows[plan.rows.length - 1]
+  if (plan.kind !== 'open' || !last || last.balance <= PAID_UP) return null
+  const ym = addMonthsYM(last.ym, 1)
+  const seg = segmentFor(segments, ym)
+  const interest = seg.compounding ? r2(last.balance * seg.rate) : seg.interestPerMonth
+  const principal = seg.months && !seg.compounding && (!seg.scheduledEndYM || ym <= seg.scheduledEndYM) ? seg.principalPerMonth : 0
+  return { due: dueOn(ym, dueDay), amount: r2(principal + interest), principal, interest }
 }
 
 interface Pools {
@@ -393,7 +439,7 @@ const figure = (n: number) => n.toLocaleString('en-MY', { minimumFractionDigits:
 const monthWords = (ym: string) => dayjs(`${ym}-01`).format('MMM YYYY')
 
 /** The line over the row that starts a set of terms in a 利滚利 plan. */
-function termsBreak(seg: TermsSegment, toYM: string, rolledFrom: number | null): { head: string; rest: string } {
+function termsBreak(seg: TermsSegment, toYM: string, rolledFrom: number | null, interestFirst = false): { head: string; rest: string } {
   const rate = `${(seg.rate * 100).toFixed(3)}% /mo`
   if (!seg.compounding) {
     return {
@@ -403,8 +449,68 @@ function termsBreak(seg: TermsSegment, toYM: string, rolledFrom: number | null):
   }
   return {
     head: `From ${monthWords(seg.fromYM)}`,
-    rest: `${rate} compounding · ${seg.months ? `${seg.months} months` : 'no fixed term'}${rolledFrom != null ? ` · rolls from RM ${figure(rolledFrom)} owed` : ''}`,
+    rest: `${rate} compounding · ${seg.months ? `${seg.months} months` : 'no fixed term'}${rolledFrom != null ? ` · rolls from RM ${figure(rolledFrom)} owed` : ''}${interestFirst ? ' · payments set against the oldest interest first' : ''}`,
   }
+}
+
+/**
+ * A 利滚利 deal with no fixed term paid along the way (2026-10-26): each payment, in date order, pays the interest of
+ * the months up to its own still unpaid, oldest first, and what is over repays the principal. A month then reads what
+ * of its interest was paid — in full on the day the money first reached it — and what is short, overdue once its day
+ * has passed. Returns the months paid in full and what went to interest and to principal.
+ */
+function setInterestFirst(rows: PlanRow[], pays: readonly PlanPayment[], today: string): { paidCount: number; interest: number; principal: number } {
+  // What the months ask, running total through each.
+  const asked: number[] = []
+  let sum = 0
+  for (const r of rows) {
+    sum = r2(sum + r.interest)
+    asked.push(sum)
+  }
+  let interest = 0
+  let principal = 0
+  let upTo = 0
+  let i = 0
+  const principalIn: Record<string, number> = {}
+  const steps: Array<{ interest: number; at: Reach }> = []
+  for (const p of pays) {
+    const ym = p.date.slice(0, 7)
+    while (i < rows.length && rows[i].ym <= ym) upTo = asked[i++]
+    const toInterest = r2(Math.min(p.amount, Math.max(0, upTo - interest)))
+    interest = r2(interest + toInterest)
+    const over = r2(p.amount - toInterest)
+    if (over > EPS) {
+      principal = r2(principal + over)
+      principalIn[ym] = r2((principalIn[ym] ?? 0) + over)
+    }
+    if (toInterest > EPS) steps.push({ interest, at: { date: p.date, ref: p.ref } })
+  }
+  let paidCount = 0
+  rows.forEach((r, n) => {
+    const paid = r2(Math.min(r.interest, Math.max(0, interest - (n > 0 ? asked[n - 1] : 0))))
+    r.paid = paid
+    r.outstanding = r2(r.interest - paid)
+    r.principal = principalIn[r.ym] ?? null
+    r.remark = ''
+    r.tone = ''
+    if (r.interest <= EPS) {
+      r.outstanding = 0
+    } else if (r.outstanding <= EPS) {
+      r.outstanding = 0
+      r.tone = 'ledger'
+      paidCount++
+      r.remark = paidRemark(steps.find((s) => s.interest >= asked[n] - EPS)?.at ?? null)
+    } else if (r.due < today) {
+      r.tone = 'danger'
+      r.remark = paid > EPS ? `Part paid ${figure(paid)} · short ${figure(r.outstanding)} · ${dayjs(today).diff(dayjs(r.due), 'day')} days` : overdue(today, r.due)
+    } else if (paid > EPS) {
+      r.tone = 'alert'
+      r.remark = `Part paid ${figure(paid)} · short ${figure(r.outstanding)}`
+    }
+    const over = principalIn[r.ym]
+    if (over) r.remark = r.remark ? `${r.remark} · principal ${money(over)}` : `Principal ${money(over)} repaid`
+  })
+  return { paidCount, interest, principal }
 }
 
 function compoundPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, dueDay: number): RepaymentPlan {
@@ -424,9 +530,14 @@ function compoundPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, 
   // flat months' interest was paid apart: none of it is rolled in.
   const k = Math.max(0, segments.findIndex((s) => s.compounding))
   const rollYM = segments[k].fromYM
+  const early = (p: PlanPayment) => p.date.slice(0, 7) < rollYM
+  // No fixed term and paid along the way — a payment before its last month, not one sum that settled it: the money
+  // goes on the oldest interest first (setInterestFirst), nothing rolled into the balance.
+  const runPays = pays.filter((p) => !early(p))
+  const latest = segments[segments.length - 1]
+  const interestFirst = !pending && latest.compounding && !latest.months && runPays.some((p) => p.date.slice(0, 7) < endYM)
   let ym = segments[0].fromYM
   if (k > 0) {
-    const early = (p: PlanPayment) => p.date.slice(0, 7) < rollYM
     const flatP = principalPays.filter(early)
     const flatI = interestPays.filter(early)
     const paidP = r2(flatP.reduce((s, p) => s + p.amount, 0))
@@ -485,9 +596,11 @@ function compoundPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, 
     }
   }
   let balance = k > 0 ? segments[k].base : terms.principal
+  const runFrom = rows.length
   while (ym <= endYM && rows.length < 600) {
     const seg = segmentFor(segments, ym)
-    if (segments.length > 1 && ym === seg.fromYM) breaks.push({ no: rows.length + 1, ...termsBreak(seg, ym, k > 0 && seg === segments[k] ? balance : null) })
+    if (segments.length > 1 && ym === seg.fromYM)
+      breaks.push({ no: rows.length + 1, ...termsBreak(seg, ym, k > 0 && seg === segments[k] ? balance : null, interestFirst && seg === segments[k]) })
     const interest = r2(balance * seg.rate)
     const month = pays.filter((p) => p.date.slice(0, 7) === ym)
     const paid = r2(month.reduce((s, p) => s + p.amount, 0))
@@ -498,7 +611,9 @@ function compoundPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, 
     let toBalance = 0
     let remark = ''
     let tone: PlanTone = ''
-    if (paid > 0 && paid >= interest - slack(interest)) {
+    if (interestFirst) {
+      // Paid, short, overdue: once every month's interest is known (setInterestFirst, below).
+    } else if (paid > 0 && paid >= interest - slack(interest)) {
       tone = 'ledger'
       paidCount++
       remark = paidRemark(last ? { date: last.date, ref: last.ref } : null)
@@ -521,13 +636,23 @@ function compoundPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, 
     if (balance <= PAID_UP) break
     ym = addMonthsYM(ym, 1)
   }
+  // Paid along the way: the principal and interest paid as the money was set — the months before the roll as recorded.
+  let paidP = principalPaid
+  let paidI = interestPaid
+  if (interestFirst) {
+    const set = setInterestFirst(rows.slice(runFrom), runPays, today)
+    paidCount += set.paidCount
+    paidP = r2(principalPays.filter(early).reduce((s, p) => s + p.amount, 0) + set.principal)
+    paidI = r2(interestPays.filter(early).reduce((s, p) => s + p.amount, 0) + set.interest)
+  }
   const added = rows.filter((r) => (r.toBalance ?? 0) > EPS)
-  return summary('open', rows, null, paidCount, terms.principal, principalPaid, interestPaid, {
+  return summary('open', rows, null, paidCount, terms.principal, paidP, paidI, {
     breaks,
     owedNow: rows.length > 0 ? rows[rows.length - 1].balance : terms.principal,
     paidToDate: r2(principalPaid + interestPaid),
     addedToBalance: r2(added.reduce((s, r) => s + (r.toBalance ?? 0), 0)),
     addedFrom: added[0]?.ym ?? null,
     addedTo: added[added.length - 1]?.ym ?? null,
+    interestFirst,
   })
 }

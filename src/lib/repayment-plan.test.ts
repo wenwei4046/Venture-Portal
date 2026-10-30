@@ -50,6 +50,8 @@ describe('a fixed-term plan', () => {
       months: 12, paidCount: 2, outstandingDue: 600 + 9 * 11200, firstDue: '2026-02-15', firstInstallment: 11200,
       totalInterest: 14400, principalPaid: 30000, interestPaid: 3000, principalOwed: 90000,
     })
+    // 2026-10-26 — the schedule's fourth card: the next installment still to fall due.
+    expect(plan.next).toEqual({ due: '2026-07-15', amount: 11200, principal: 10000, interest: 1200 })
   })
 
   it('puts the last cent of principal on the last installment', () => {
@@ -172,6 +174,10 @@ describe('a deal with no fixed term', () => {
     expect(plan.rows[7].balance).toBe(51000) // the base January re-bases on
     expect(plan.rows[17].balance).toBe(41000)
     expect(plan.principalOwed).toBe(41000)
+    // No fixed term: the month after the last, its interest on the base it keeps, no principal asked.
+    const last = plan.rows[plan.rows.length - 1]
+    expect(plan.next).toMatchObject({ principal: 0, interest: last.interest, amount: last.interest })
+    expect(plan.next!.due > last.due).toBe(true)
 
     const open = buildRepaymentPlan({
       terms: { principal: 100000, startYM: '2026-03', firstDueYM: '2026-04', current: { rate: 0.01, months: null, compounding: false, effectiveFrom: null }, history: [] },
@@ -209,9 +215,10 @@ describe('a deal with no fixed term', () => {
     ])
   })
 
+  // A one-off 利滚利 deal (LO#12–15, LO#26: a fixed month, 一次还清) rolls a month's unpaid interest into the balance.
   it('compounds an unpaid month into the balance', () => {
     const plan = buildRepaymentPlan({
-      terms: { principal: 10000, startYM: '2026-01', firstDueYM: '2026-02', current: { rate: 0.04, months: null, compounding: true, effectiveFrom: null }, history: [] },
+      terms: { principal: 10000, startYM: '2026-01', firstDueYM: '2026-02', current: { rate: 0.04, months: 1, compounding: true, effectiveFrom: null }, history: [] },
       payments: [pay('2026-02-20', 'interest', 400, 'HV-PV-9')],
       isPrincipal,
       today: '2026-04-15',
@@ -228,13 +235,57 @@ describe('a deal with no fixed term', () => {
     expect(plan.rows[1]).toMatchObject({ remark: 'Unpaid · 400.00 to balance', tone: 'alert', paid: 0, toBalance: 400 })
     expect(plan.rows[2]).toMatchObject({ remark: '', tone: '' })
     // April's 416 is not past its day (20 Apr): owed, not overdue.
-    expect(plan).toMatchObject({ overdue: 0, overdueSince: null, compound: { breaks: [], owedNow: 10816, paidToDate: 400, addedToBalance: 400, addedFrom: '2026-03', addedTo: '2026-03' } })
+    expect(plan).toMatchObject({
+      overdue: 0,
+      overdueSince: null,
+      compound: { breaks: [], owedNow: 10816, paidToDate: 400, addedToBalance: 400, addedFrom: '2026-03', addedTo: '2026-03', interestFirst: false },
+    })
+  })
+
+  // 2026-10-26 — the user (A): a 利滚利 deal with no fixed term paid month by month ("没有固定期数、每个月在还") is overdue
+  // on all the interest it has not paid, the oldest first; nothing is rolled into the balance.
+  it('sets a no-fixed-term deal’s money on the oldest interest first — a month not paid is overdue, not rolled in', () => {
+    const plan = buildRepaymentPlan({
+      terms: { principal: 10000, startYM: '2026-01', firstDueYM: '2026-02', current: { rate: 0.04, months: null, compounding: true, effectiveFrom: null }, history: [] },
+      payments: [pay('2026-02-20', 'interest', 400, 'HV-PV-9')],
+      isPrincipal,
+      today: '2026-04-15',
+      dueDay: 20,
+      status: 'active',
+    })
+    // The balance rolls as before — 4% on what is owed, the unpaid interest in it; only what is overdue changes.
+    expect(plan.rows.map((r) => [r.due, r.interest, r.paid, r.toBalance, r.balance, r.outstanding, r.tone, r.remark])).toEqual([
+      ['2026-02-20', 400, 400, 0, 10000, 0, 'ledger', 'Paid 20 Feb 2026 · HV-PV-9'],
+      ['2026-03-20', 400, 0, 0, 10400, 400, 'danger', 'Overdue 26 days'],
+      ['2026-04-20', 416, 0, 0, 10816, 416, '', ''],
+    ])
+    expect(plan).toMatchObject({ overdue: 400, overdueSince: '2026-03-20', overdueDays: 26, principalPaid: 0, interestPaid: 400, principalOwed: 10000 })
+    expect(plan.compound).toMatchObject({ interestFirst: true, owedNow: 10816, addedToBalance: 0, addedFrom: null })
+  })
+
+  it('repays the principal with what is over every month’s interest so far', () => {
+    const plan = buildRepaymentPlan({
+      terms: { principal: 10000, startYM: '2026-01', firstDueYM: '2026-02', current: { rate: 0.04, months: null, compounding: true, effectiveFrom: null }, history: [] },
+      payments: [pay('2026-02-20', 'interest', 400), pay('2026-03-25', 'principal', 1000, 'HV-OR-3')],
+      isPrincipal,
+      today: '2026-04-15',
+      dueDay: 20,
+      status: 'active',
+    })
+    // March's 1,000: its 400 interest, and 600 off the principal — April's 4% is on 9,400.
+    expect(plan.rows.map((r) => [r.due, r.interest, r.principal, r.paid, r.balance, r.outstanding, r.remark])).toEqual([
+      ['2026-02-20', 400, null, 400, 10000, 0, 'Paid 20 Feb 2026'],
+      ['2026-03-20', 400, 600, 400, 9400, 0, 'Paid 25 Mar 2026 · HV-OR-3 · principal RM 600.00'],
+      ['2026-04-20', 376, null, 0, 9776, 376, ''],
+    ])
+    expect(plan).toMatchObject({ overdue: 0, principalPaid: 600, interestPaid: 800, principalOwed: 9400 })
   })
 
   // LO#7 (2026-10-24): 60,000 from 5 Apr 2025 at 0.5% flat × 60 (1,000 + 300), then 4% compounding with no fixed term
   // from January 2026; 1,300 a month came in to September. The schedule read every month as compounding — 2025's
   // interest 300, 295, 289.98… and January's roll from 50,817.88 — where the Company Statement rolls from the 51,000
-  // still owed in January (compoundRoll). Now the two agree.
+  // still owed in January (compoundRoll). Now the two agree. 2026-10-26 (the user's A): paid month by month with no
+  // fixed term, its money goes on the oldest interest first — January–May paid, June in part, July–October overdue.
   it('keeps a deal’s flat months flat and rolls from the month it turned compounding, on the principal owed then', () => {
     const DATES = ['2025-04-05', '2025-05-05', '2025-06-05', '2025-07-05', '2025-08-05', '2025-09-05', '2025-10-05', '2025-11-05', '2025-12-05', '2026-01-05', '2026-02-05', '2026-03-05', '2026-04-05', '2026-05-05', '2026-06-08', '2026-07-14', '2026-08-11', '2026-09-19']
     const plan = buildRepaymentPlan({
@@ -257,36 +308,47 @@ describe('a deal with no fixed term', () => {
       [59000, 58000, 57000, 56000, 55000, 54000, 53000, 52000, 51000].map((b) => [1300, 1000, 300, 1300, b, 0, 'ledger']),
     )
     expect(plan.rows[0].remark).toBe('Paid 5 Apr 2025')
-    // January on: 4% on the rolled balance from the 51,000 owed; each month's short interest to the balance.
-    expect(plan.rows.slice(9).map((r) => [r.due, r.installment, r.paid, r.toBalance, r.balance, r.outstanding])).toEqual([
-      ['2026-01-05', 2040, 1300, 740, 51740, 0],
-      ['2026-02-05', 2069.6, 1300, 769.6, 52509.6, 0],
-      ['2026-03-05', 2100.38, 1300, 800.38, 53309.98, 0],
-      ['2026-04-05', 2132.4, 1300, 832.4, 54142.38, 0],
-      ['2026-05-05', 2165.7, 1300, 865.7, 55008.08, 0],
-      ['2026-06-05', 2200.32, 1300, 900.32, 55908.4, 0],
-      ['2026-07-05', 2236.34, 1300, 936.34, 56844.74, 0],
-      ['2026-08-05', 2273.79, 1300, 973.79, 57818.53, 0],
-      ['2026-09-05', 2312.74, 1300, 1012.74, 58831.27, 0],
-      ['2026-10-05', 2353.25, 0, 0, 61184.52, 2353.25],
+    // January on: 4% on the rolled balance from the 51,000 owed. The 11,700 that came in pays January–May's interest
+    // and 1,191.92 of June's, the day the money first reached each — none of it the principal (each month asks more
+    // than 1,300). The rest is overdue.
+    expect(plan.rows.slice(9).map((r) => [r.due, r.installment, r.paid, r.toBalance, r.balance, r.outstanding, r.remark])).toEqual([
+      ['2026-01-05', 2040, 2040, 0, 51740, 0, 'Paid 5 Feb 2026'],
+      ['2026-02-05', 2069.6, 2069.6, 0, 52509.6, 0, 'Paid 5 Apr 2026'],
+      ['2026-03-05', 2100.38, 2100.38, 0, 53309.98, 0, 'Paid 5 May 2026'],
+      ['2026-04-05', 2132.4, 2132.4, 0, 54142.38, 0, 'Paid 14 Jul 2026'],
+      ['2026-05-05', 2165.7, 2165.7, 0, 55008.08, 0, 'Paid 19 Sep 2026'],
+      ['2026-06-05', 2200.32, 1191.92, 0, 55908.4, 1008.4, 'Part paid 1,191.92 · short 1,008.40 · 141 days'],
+      ['2026-07-05', 2236.34, 0, 0, 56844.74, 2236.34, 'Overdue 111 days'],
+      ['2026-08-05', 2273.79, 0, 0, 57818.53, 2273.79, 'Overdue 80 days'],
+      ['2026-09-05', 2312.74, 0, 0, 58831.27, 2312.74, 'Overdue 49 days'],
+      ['2026-10-05', 2353.25, 0, 0, 61184.52, 2353.25, 'Overdue 19 days'],
     ])
-    expect(plan.rows[9].remark).toBe('Part paid · 740.00 to balance')
-    expect(plan.rows[18]).toMatchObject({ remark: 'Overdue 19 days', tone: 'danger', late: true })
-    expect(plan).toMatchObject({ overdue: 2353.25, overdueSince: '2026-10-05', overdueDays: 19 })
+    expect(plan.rows.slice(14).every((r) => r.late && r.tone === 'danger')).toBe(true)
+    expect(plan).toMatchObject({ overdue: 10184.52, overdueSince: '2026-06-05', overdueDays: 141 })
+    // Paid as it was set: 2025's principal 9,000 + interest 2,700, then 11,700 all interest — 51,000 still owed.
+    expect(plan).toMatchObject({ principalPaid: 9000, interestPaid: 14400, principalOwed: 51000 })
     expect(plan.compound).toEqual({
       breaks: [
         { no: 1, head: 'Apr 2025 – Dec 2025', rest: '0.500% /mo flat · RM 1,000.00 + 300.00 a month' },
-        { no: 10, head: 'From Jan 2026', rest: '4.000% /mo compounding · no fixed term · rolls from RM 51,000.00 owed' },
+        {
+          no: 10,
+          head: 'From Jan 2026',
+          rest: '4.000% /mo compounding · no fixed term · rolls from RM 51,000.00 owed · payments set against the oldest interest first',
+        },
       ],
       owedNow: 61184.52,
       paidToDate: 23400,
-      addedToBalance: 7831.27,
-      addedFrom: '2026-01',
-      addedTo: '2026-09',
+      addedToBalance: 0,
+      addedFrom: null,
+      addedTo: null,
+      interestFirst: true,
     })
-    // The table's total adds up: what was due = what came in + what was rolled in + what is overdue.
+    // The table's total adds up: what was due = what was paid + what is overdue.
     const due = Math.round(plan.rows.reduce((s, r) => s + r.installment, 0) * 100) / 100
-    expect([due, Math.round((plan.compound!.paidToDate + plan.compound!.addedToBalance + plan.overdue) * 100) / 100]).toEqual([33584.52, 33584.52])
+    const paid = Math.round(plan.rows.reduce((s, r) => s + (r.paid ?? 0), 0) * 100) / 100
+    expect([due, paid, Math.round((paid + plan.overdue) * 100) / 100]).toEqual([33584.52, 23400, 33584.52])
+    // The next installment: November's 4% on the whole balance owed after October.
+    expect(plan.next).toEqual({ due: '2026-11-05', amount: 2447.38, principal: 0, interest: 2447.38 })
   })
 
   it('says what is overdue on a no-fixed-term plan’s head, and on a fixed plan’s nothing changes', () => {
@@ -364,6 +426,9 @@ describe('the live book’s rounding', () => {
     })
     expect(plan.rows).toHaveLength(8)
     expect(plan.rows[7]).toMatchObject({ ym: '2026-08', interest: 525.49, balance: 0, tone: 'ledger', remark: 'Paid 20 Aug 2026 · HV-PV-202608-0297', paid: 26799.95 })
+    expect(plan.next).toBeNull()
+    // Paid off in one sum (一次还清), not along the way: its months still rolled into the balance.
     expect(plan.rows[0]).toMatchObject({ interest: 457.47, balance: 23330.97, remark: 'Unpaid · 457.47 to balance' })
+    expect(plan.compound!.interestFirst).toBe(false)
   })
 })
