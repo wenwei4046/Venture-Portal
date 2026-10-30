@@ -19,6 +19,8 @@ const ACCOUNTS: Record<string, SourceBrand> = {
 };
 
 export const BRAND_LABEL: Record<SourceBrand, string> = { conts: "The Conts", dc: "Dream Crafter" };
+/** Each brand's WhatsApp number (its phone number id) — where an Instant Form lead from its Page is reached (2026-10-30). */
+export const BRAND_WHATSAPP: Record<SourceBrand, string> = { conts: "1438056256053876", dc: "1422533724269131" };
 const CH_LABEL: Record<CrmChannel, string> = { whatsapp: "WhatsApp", messenger: "Messenger" };
 
 export const brandOf = (accountId: string | null | undefined): SourceBrand | null => (accountId ? ACCOUNTS[accountId] ?? null : null);

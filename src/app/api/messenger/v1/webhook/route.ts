@@ -7,6 +7,7 @@ import { sendAutoReplies } from '@/lib/member/crm-auto-reply'
 import { signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 import { parseMessengerDelivery } from '@/lib/messenger/webhook'
 import { pageToken, profileName } from '@/lib/messenger/send'
+import { messengerLeadRow, readInstantLead } from '@/lib/messenger/lead-forms'
 import { sendLeadOutbox } from '@/lib/leads/messenger-outbox'
 import { adAccountName } from '@/lib/leads/ad-account'
 import { parseInstagramDelivery, takeInstagram } from '@/lib/leads/instagram'
@@ -161,6 +162,29 @@ export async function POST(request: Request) {
   if (error) {
     console.error('crm_ingest_messenger failed:', error.message)
     return NextResponse.json({ ok: false, error: 'ingest failed' }, { status: 500 })
+  }
+  // Lead form ads (2026-10-30): a Messenger lead ad's answers, and Instant Form leads read from Meta with the Page's
+  // token (lib/messenger/lead-forms.ts) — one ingest, crm_ingest_lead (service role only), which logs every delivery.
+  // A failure answers 500: Meta retries, and the ingest keeps an Instant Form lead once.
+  const formLeads = ours(delivery.leads ?? []), instant = ours(delivery.instant ?? [])
+  if (formLeads.length || instant.length) {
+    const tokens = new Map<string, string | null>()
+    const tokenOf = async (pageId: string) => {
+      if (!systemToken) return null
+      if (!tokens.has(pageId)) tokens.set(pageId, await pageToken(pageId, systemToken))
+      return tokens.get(pageId) ?? null
+    }
+    for (const l of formLeads) {
+      const token = await tokenOf(l.pageId)
+      if (token) l.name = await profileName(l.pageId, l.psid, token)
+    }
+    const rows = [...formLeads.map(messengerLeadRow), ...(await Promise.all(instant.map(async ref => readInstantLead(ref, await tokenOf(ref.pageId)))))]
+    const { error: leadError } = await client().rpc('crm_ingest_lead', { p_leads: rows, p_payload: body })
+    if (leadError) {
+      console.error('crm_ingest_lead failed:', leadError.message)
+      return NextResponse.json({ ok: false, error: 'lead form ingest failed' }, { status: 500 })
+    }
+    pushSoon()
   }
   if (leadsFailed) return NextResponse.json({ ok: false, error: 'lead ingest failed' }, { status: 500 })
   // A file's own name beside the message (service role only, mig 20261027100000); a failure only warns.

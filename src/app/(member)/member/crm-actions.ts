@@ -196,10 +196,11 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
     ]);
     const more = await desktopRows(db, !!opts.journey);
     const extra = new Map(more.extras.map(x => [x.id, x.extra]));
+    const leadForm = new Map(more.leadForms.map(x => [x.id, x.lead_form]));
     const roomX = new Map(more.rooms.map(r => [r.id, r]));
     return { ok: true, data: crmDataFromRows({
       people, can, messages, visits, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, adRules, ftRules, templates,
-      contacts: extra.size ? contacts.map(c => (extra.has(c.id) ? { ...c, extra: extra.get(c.id) } : c)) : contacts,
+      contacts: extra.size || leadForm.size ? contacts.map(c => ({ ...c, ...(extra.has(c.id) ? { extra: extra.get(c.id) } : {}), ...(leadForm.has(c.id) ? { lead_form: leadForm.get(c.id) } : {}) })) : contacts,
       rooms: rooms.map(r => {
         const x = roomX.get(r.id);
         const y = more.roomMore.find(m => m.id === r.id);
@@ -226,7 +227,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order, kind")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -257,8 +258,10 @@ async function desktopRows(db: Db, journey: boolean) {
     // Members' leave (mig 20261029220000): what has not ended yet (yesterday on, for the office's day).
     soft<NonNullable<CrmDataRows["leaves"]>>(db.from("crm_staff_leave").select("id, staff_id, starts_on, ends_on, note").gte("ends_on", new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)).order("starts_on")),
     (async () => { try { const { data, error } = await db.rpc("crm_partner_links_read"); return error || !Array.isArray(data) ? [] : (data as { id: string; name: string; code: string; on: boolean }[]); } catch { return []; } })(),
+    // A lead form ad's answers (mig 20261030060000), read softly so the CRM opens before the column.
+    soft<{ id: string; lead_form: CrmDataRows["contacts"][number]["lead_form"] }[]>(db.from("crm_contacts").select("id, lead_form").not("lead_form", "is", null).limit(5000)),
   ]);
-  return { roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
+  return { leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */
