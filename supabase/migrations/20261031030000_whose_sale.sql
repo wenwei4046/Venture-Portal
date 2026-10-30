@@ -232,9 +232,13 @@ DECLARE
     v_note  TEXT;
 BEGIN
     -- The feed calls it with no sign-in; a held delivery replayed calls it as whoever replays it, who holds the action
-    -- that takes a bill out by hand.
-    IF auth.uid() IS NOT NULL AND NOT COALESCE(public.has_any_action(ARRAY['revenue.edit']), FALSE) THEN
-        RAISE EXCEPTION 'Not open to your account.' USING ERRCODE = '42501';
+    -- that takes a bill out by hand — on the month's page, as Don't count this bill asks (the guard stands aside inside
+    -- the receiver, whose own gate stood for it). No page of the app calls it.
+    IF auth.uid() IS NOT NULL THEN
+        IF NOT COALESCE(public.has_any_action(ARRAY['revenue.edit']), FALSE) THEN
+            RAISE EXCEPTION 'Not open to your account.' USING ERRCODE = '42501';
+        END IF;
+        PERFORM public.tab_write_guard(ARRAY['/revenue/[sub]/[period]'], ARRAY['revenue.edit']);
     END IF;
     SELECT * INTO v_me FROM public.sales_orders WHERE id = p_order_id;
     IF NOT FOUND OR v_me.source <> 'erp_sync' OR v_me.cancelled OR v_me.order_total <= 0 OR v_me.staff_id IS NULL THEN
@@ -455,6 +459,25 @@ COMMENT ON FUNCTION public.revenue_answer_seller_check(UUID, BOOLEAN, TEXT) IS
 
 REVOKE ALL ON FUNCTION public.revenue_answer_seller_check(UUID, BOOLEAN, TEXT) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.revenue_answer_seller_check(UUID, BOOLEAN, TEXT) TO authenticated;
+
+-- The guard the scan reads (tab-write-guards.test.ts): the answer asks the month's page in the database, as the app's
+-- gate in front of it does (requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')). The body above carries it
+-- already; this only checks it is there.
+CREATE OR REPLACE FUNCTION pg_temp.tab_guard(p_sig text, p_pages text, p_wants text[])
+RETURNS void
+LANGUAGE plpgsql AS $g$
+DECLARE
+  v_line text := format('PERFORM public.tab_write_guard(%s, ARRAY[%s]);', p_pages,
+    array_to_string(ARRAY(SELECT quote_literal(w) FROM unnest(p_wants) w), ', '));
+BEGIN
+  IF position(v_line IN (SELECT prosrc FROM pg_proc WHERE oid = p_sig::regprocedure)) = 0 THEN
+    RAISE EXCEPTION '% does not ask its page: % is not in its body', p_sig, v_line;
+  END IF;
+END
+$g$;
+
+SELECT pg_temp.tab_guard('public.revenue_answer_seller_check(uuid, boolean, text)',
+  $$ARRAY['/revenue/[sub]/[period]']$$, ARRAY['revenue.edit']);
 
 COMMIT;
 

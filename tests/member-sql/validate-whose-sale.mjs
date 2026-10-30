@@ -290,6 +290,15 @@ await refuses(() => as(MEMBER, 'revenue.view', () => q(`SELECT erp_sync_check_se
 await refuses(() => as(MEMBER, '', () => q(`SELECT revenue_seller_checks($1, $2)`, [FAIR, OCT])), /Comm Cal is not open/, 'reading needs Revenue · View')
 await refuses(() => as(MEMBER, 'revenue.view', () => q(`SELECT revenue_answer_seller_check($1, true, NULL)`, [stephy.orderId])),
   /not open to your account/, 'answering needs Revenue · Edit')
+// A held delivery replayed runs as whoever replays it: Revenue · Edit holds the bill, on the month page's tab, still under
+// the check's name.
+await db.exec(`DELETE FROM tab_guard_calls`)
+check(Boolean(await as(HR, 'revenue.edit', () => one(`SELECT erp_sync_check_seller($1, NULL)`, [faulty.orderId]))), true,
+  'asked as HR, the bill the failed check left counting is held')
+check(await stateOf(faulty.orderId), { cancelled: true, excluded_reason: 'manual', excluded_by_name: 'Whose sale check',
+  note: 'Whose sale? HC11467 is on Zack\'s HC-SO-012720 (8 Jul 2026)', status: 'waiting' }, 'under the check\'s name, not HR\'s')
+check(await q(`SELECT pages, wants FROM tab_guard_calls`), [{ pages: ['/revenue/[sub]/[period]'], wants: ['revenue.edit'] }],
+  'a signed-in caller is asked the month page\'s tab')
 
 // ── The tab's reader ──
 const rows = await as(HR, 'revenue.view', () => one(`SELECT revenue_seller_checks($1, $2)`, [FAIR, OCT]))
@@ -297,18 +306,20 @@ check(rows.map(r => [r.orderNo, r.status, r.sellerName, r.staffName, r.held, r.c
   ['HC-SO-2610-241', 'waiting', 'STEPHY', 'SHAWN', true, false],
   ['HC-SO-2610-300', 'waiting', 'YANG', 'SHAWN', true, false],
   ['HC-SO-2610-307', 'waiting', 'WEI HOW', 'SHAWN', true, false],
-], 'October: the three questions, each held')
+  ['HC-SO-2610-406', 'waiting', 'Zack', 'SHAWN', true, false],
+], 'October: the four questions, each held')
 check(rows.find(r => r.orderNo === 'HC-SO-2610-300').refNo, 'HC9882+ZNT4864', 'the Ref No. as the ERP has it')
 check(await as(HR, 'revenue.view', () => one(`SELECT revenue_seller_checks($1, $2)`, [FAIR, SEP])), [], 'September has none')
 
 // ── HR's answers ──
+await db.exec(`DELETE FROM tab_guard_calls`)
 const answer = (orderId, theirs, note) => as(HR, 'revenue.edit', () => one(`SELECT revenue_answer_seller_check($1, $2, $3)`, [orderId, theirs, note]))
 check(await answer(stephy.orderId, false, 'STEPHY left; SHAWN only handles the customer'),
   { orderNo: 'HC-SO-2610-241', status: 'not_theirs', counts: false }, 'not theirs: it stays out')
 check(await stateOf(stephy.orderId), { cancelled: true, excluded_reason: 'manual', excluded_by_name: 'HR Manager',
   note: 'Not SHAWN\'s sale — STEPHY\'s HC-SO-008712: STEPHY left; SHAWN only handles the customer', status: 'not_theirs' },
 'kept out in HR\'s name, saying whose it was')
-check((await q(`SELECT pages, wants FROM tab_guard_calls LIMIT 1`))[0], { pages: ['/revenue/[sub]/[period]'], wants: ['revenue.edit'] },
+check(await q(`SELECT pages, wants FROM tab_guard_calls`), [{ pages: ['/revenue/[sub]/[period]'], wants: ['revenue.edit'] }],
   'the month page\'s tab is asked')
 check(await answer(yang.orderId, true, 'the customer bought a new set from SHAWN'), { orderNo: 'HC-SO-2610-300', status: 'theirs', counts: true },
   'their own sale: it counts')
