@@ -331,8 +331,10 @@ check([(await cal(kelvin)).campaigns, (await cal(hana)).campaigns.map(c => c.cod
 check((await cal(kelvin)).holidays, [{ day: await plus(6), name: 'Deepavali' }], 'HR’s holidays, once a day — never another state’s, a deleted one, one past the window')
 
 // ── Never a number, a staff id, or a field's value ─────────────────────────────────────────────────────────
+// The Draft due day is looked for as a value of its own: on the 31st of October it is 2026-11-01, which the posted
+// mark above carries inside its time ("2026-11-01T02:00:00Z") — the bare day matched there and the check went red.
 const words = JSON.stringify(await cal(kelvin))
-check([/345 ?6789|3456789|8765432|1111111/.test(words), Object.values({ ...U, ...S }).some(v => words.includes(v)), /whatsapp/i.test(words), words.includes('Draft due'), words.includes(D1)],
+check([/345 ?6789|3456789|8765432|1111111/.test(words), Object.values({ ...U, ...S }).some(v => words.includes(v)), /whatsapp/i.test(words), words.includes('Draft due'), words.includes(JSON.stringify(D1))],
   [false, false, false, false, false], 'no WhatsApp number, no staff id or name, never a date off the PIC’s calendar')
 
 // ── The PIC changed: the link closes; only its formatting changed, it stays; named again, it opens ────────────
