@@ -12,7 +12,7 @@ import { customBookVM, customPrefill } from "../../shared/custom-book";
 import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/lib/member/crm-data";
 import { chatStripOf, coldLine, DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
 import { avatarTint } from "../../shared/palette";
-import { failNote, roomClosed, roomSlots, slotAt, slotBlocked } from "../../sales/vm/chat";
+import { failNote, quietFailure, roomClosed, roomSlots, slotAt, slotBlocked } from "../../sales/vm/chat";
 import { bookingSkipsForm, infoRows } from "../../sales/vm/customer";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
@@ -107,7 +107,7 @@ export function leadVM(ctx: PanelCtx) {
       tickC: tickColor(m.status), tickPath: tickPathOf(m.status),
       // Not delivered says why under it, as in Mine's chat (2026-10-17 — the owner: two videos WhatsApp refused showed
       // in the Team chat as sent; only Mine's said so).
-      failNote: mine && m.status === "failed" ? failNote(m.error) : "",
+      failNote: mine && m.status === "failed" && !quietFailure(m.status, m.error) ? failNote(m.error) : "",
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? MINE_BG : "#fff", bd: mine ? MINE_BG : "#fff", fg: mine ? "#fff" : "var(--crm-ink)", timeC: mine ? MINE_TIME : "var(--crm-muted)", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
       // A visit sent to the customer shows as the visit card, as in the salesperson's chat (sales/vm/chat.ts › ev), not
       // as its text with the map links (user 2026-10-11). Tap → Calendar on that day.
