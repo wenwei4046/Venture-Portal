@@ -184,7 +184,8 @@ export default function SellerChecksPanel({ checks, unavailable, canDecide, base
                 { l: 'Bill total', v: formatMoney(open.total) },
                 { l: 'Salesperson', v: open.staffName },
                 { l: 'Ref No.', v: open.refNo || '—' },
-                ...(open.askedAt ? [{ l: 'Held', v: when(open.askedAt) }] : []),
+                // When it was asked — a bill asked without being held (or counted again by hand) is no "Held".
+                ...(open.askedAt ? [{ l: 'Asked', v: when(open.askedAt) }] : []),
                 ...(open.decidedByName && open.decidedAt ? [{ l: 'Answered', v: `${open.decidedByName} · ${when(open.decidedAt)}` }] : []),
                 ...(open.note ? [{ l: 'HR’s note', v: open.note }] : []),
               ]}

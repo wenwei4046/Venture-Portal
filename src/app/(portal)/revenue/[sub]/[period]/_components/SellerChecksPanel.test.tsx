@@ -60,6 +60,9 @@ describe('Comm Cal › Whose sale', () => {
     const drawer = screen.getByRole('dialog')
     expect(drawer).toHaveTextContent('Bill totalRM 7,794.00')
     expect(drawer).toHaveTextContent('Ref No.HC12110')
+    // When it was asked, never "Held": a bill may be asked while it still counts (found on production, 2026-10-31).
+    expect(drawer).toHaveTextContent('Asked31 Oct, 01:00')
+    expect(drawer).not.toHaveTextContent(/Held\d/)
     expect(drawer).toHaveTextContent('HC-SO-008712ERP order')
     expect(drawer).toHaveTextContent('STEPHY · 22 Oct 2025 · RM 7,794.00 · HC12110')
     expect(drawer).toHaveTextContent('STEPHY left')
