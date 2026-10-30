@@ -5,6 +5,7 @@ import {
   validateComboPrices,
   validateComboRemovals,
   validateFabricUpgrades,
+  validateKivCosts,
   validateNewCombo,
   validateModelEdit,
   validateOptionPrices,
@@ -615,5 +616,29 @@ describe('validateFabricUpgrades (Maintenance › Fabrics › upgrades, 2026-10-
     expect(() => validateFabricUpgrades('SOFA', { adds: [], changes: [], removes: ['nope'] })).toThrow('An upgrade to take off is not one')
     expect(() => validateFabricUpgrades('SOFA', { adds: [], changes: [{ id: A, price: '1' }, { id: A, price: '2' }], removes: [] }))
       .toThrow('An upgrade is changed twice')
+  })
+})
+
+describe('validateKivCosts (Costing Setting › KIV bed frames, 2026-10-31)', () => {
+  it('takes the four sizes — a cost each, or blank to take the cost off', () => {
+    expect(validateKivCosts([{ size: 'K', cost: '1,000' }, { size: 'q', cost: '820.5' }, { size: 'S', cost: '' }])).toEqual({
+      upserts: [{ size_code: 'K', cost: 1000 }, { size_code: 'Q', cost: 820.5 }],
+      clears: ['S'],
+    })
+    expect(validateKivCosts([{ size: 'SS', cost: null }])).toEqual({ upserts: [], clears: ['SS'] })
+  })
+
+  it('refuses a frame costing RM 0 — its bill would read a margin too high', () => {
+    expect(() => validateKivCosts([{ size: 'Q', cost: '0' }])).toThrow(/Queen: a KIV frame cannot cost RM 0/)
+    expect(() => validateKivCosts([{ size: 'Q', cost: '0.00' }])).toThrow(EditError)
+  })
+
+  it('refuses what the table would: another size, a size twice, no amount, more than RM 100,000', () => {
+    expect(() => validateKivCosts([{ size: 'SK', cost: '1500' }])).toThrow(/Unknown bed frame size SK/)
+    expect(() => validateKivCosts([{ size: 'K', cost: '1000' }, { size: 'k', cost: '900' }])).toThrow(/King appears twice/)
+    expect(() => validateKivCosts([{ size: 'S', cost: 'abc' }])).toThrow(/Single: "abc" is not an amount/)
+    expect(() => validateKivCosts([{ size: 'S', cost: '-5' }])).toThrow(/cannot be negative/)
+    expect(() => validateKivCosts([{ size: 'K', cost: '100000.01' }])).toThrow(/out of range/)
+    expect(() => validateKivCosts([])).toThrow(/Nothing to save/)
   })
 })

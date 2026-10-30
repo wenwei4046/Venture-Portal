@@ -11,6 +11,7 @@
  */
 
 import { TIERS } from './pricing'
+import { isKivSize, KIV_SIZE_LABEL } from './edits'
 
 /** PRICE_2 → Tier 2, the way the calculator says it. */
 function tierLabelOf(tier: string): string {
@@ -58,6 +59,11 @@ export function costProvenance(
 
   switch (source) {
     case 'catalogue':
+      // A bed frame still to be chosen (2026-10-31): the dearest frame of its size, else of any size.
+      if (text(detail.how) === 'kiv') {
+        const size = text(detail.size)
+        return { label: `KIV bed frame · ${isKivSize(size) ? KIV_SIZE_LABEL[size] : 'the dearest size'}`, missing: false }
+      }
       return { label: ['Product List', ...how].join(' · '), missing: false }
     case 'catalogue_combo': {
       const combo = detail.combo && typeof detail.combo === 'object' ? (detail.combo as Detail) : {}

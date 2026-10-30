@@ -9,6 +9,15 @@ describe('where a line’s cost came from', () => {
     ).toEqual({ label: 'Product List · seat 30 · Tier 2 · + RM 80.00 options', missing: false })
   })
 
+  it('names a bed frame still to be chosen by the size it was costed at (2026-10-31)', () => {
+    expect(costProvenance('catalogue', { how: 'kiv', unit: 820, size: 'Q', named: ['Q'], size_from: 'words' }, true))
+      .toEqual({ label: 'KIV bed frame · Queen', missing: false })
+    // No size, or one the four do not set (SK): the dearest of the four.
+    expect(costProvenance('catalogue', { how: 'kiv', unit: 1000 }, true).label).toBe('KIV bed frame · the dearest size')
+    expect(costProvenance('catalogue', { how: 'kiv', unit: 1000, named: ['SK'], size_from: 'code' }, true).label)
+      .toBe('KIV bed frame · the dearest size')
+  })
+
   it('names the combo a module was costed at', () => {
     expect(
       costProvenance('catalogue_combo', { combo: { label: 'L-shape', price: 2000, sets: 1 } }, true),

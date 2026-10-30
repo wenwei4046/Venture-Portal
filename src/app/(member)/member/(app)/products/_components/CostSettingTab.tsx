@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import { parseRatio, teamCost, validateCostSetting, type CostSettingEdit } from '@/lib/catalogue/rule-edits'
 import { saveCostSetting } from '../actions'
-import type { CostRatioRow, PickSku } from '../load'
+import type { CostRatioRow, KivCostRow, PickSku } from '../load'
+import KivCostsSection from './KivCostsSection'
 import PageScrolledTable from './PageScrolledTable'
 import SubDepartmentChips, { type SubRef } from './SubDepartmentChips'
 import { useProductDraftGuard } from './ProductWorkspace'
@@ -69,6 +70,7 @@ export default function CostSettingTab({
   divisor,
   ratios,
   skus,
+  kivCosts = [],
 }: {
   sub: SubRef
   subs: SubRef[]
@@ -76,6 +78,8 @@ export default function CostSettingTab({
   divisor: number
   ratios: CostRatioRow[]
   skus: PickSku[]
+  /** KIV bed frames' four costs (2026-10-31) — every sub-department's alike. */
+  kivCosts?: KivCostRow[]
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
@@ -152,7 +156,9 @@ export default function CostSettingTab({
   const changed = editing ? lines.filter(l => changeOf(l) !== undefined) : []
   const dirty = editing ? (divisorChanged ? 1 : 0) + changed.length : 0
   const renamedCount = lines.filter(renamed).length
-  useProductDraftGuard(dirty, saving)
+  // The KIV costs below keep drafts of their own; one guard holds both.
+  const [kivDraft, setKivDraft] = useState({ changes: 0, saving: false })
+  useProductDraftGuard(dirty + kivDraft.changes, saving || kivDraft.saving)
 
   const draftDivisor = divisorDraft === null ? divisor : readRatio(divisorDraft)
   const shownDivisor = typeof draftDivisor === 'number' ? draftDivisor : divisor
@@ -308,6 +314,8 @@ export default function CostSettingTab({
           </div>
         </div>
       </div>
+
+      <KivCostsSection costs={kivCosts} divisor={shownDivisor} onDraft={setKivDraft} />
 
       <Heading title="SKUs at their own ratio" sub={plural(ratios.length, 'SKU')} />
       <ActionRow>

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { priceGridOf, type PriceCell } from '@/lib/catalogue/pricing'
 import { calcCategoryOf, defaultGift, needsBrandPick, sellsUnderBrand, skuOptionLabel } from '@/lib/catalogue/options'
 import { normaliseComboModules } from '@/lib/catalogue/combos'
+import { isKivSize, type KivSize } from '@/lib/catalogue/edits'
 
 /**
  * What the Product List reads: the ERP's catalogue as mirrored (`erp_*`, items
@@ -755,6 +756,23 @@ export interface CostRatioRow {
   code: string
   ratio: number
   updatedAt: string | null
+}
+
+export interface KivCostRow {
+  size: KivSize
+  cost: number
+}
+
+/** Costing Setting › KIV bed frames (2026-10-31): what a still-to-be-chosen frame of each size costs, every sub-department alike. */
+export async function loadKivCosts(): Promise<KivCostRow[]> {
+  const sb = await untyped()
+  const { data, error } = await sb.from('catalogue_kiv_costs').select('size_code, cost').eq('erp_company_id', 1)
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as Row[]).flatMap(r => {
+    const size = str(r.size_code)
+    const cost = num(r.cost)
+    return isKivSize(size) && cost !== null ? [{ size, cost }] : []
+  })
 }
 
 export async function loadCostRatios(schemeId: string): Promise<CostRatioRow[]> {

@@ -175,6 +175,49 @@ export interface OptionPriceEdit {
 export const BY_QUANTITY_POOL = 'sofa_specials'
 
 /**
+ * A bed frame still to be chosen — the ERP's BEDFRAME KIV… (2026-10-31): costed, until it is chosen, at the dearest
+ * frame of its size, so its bill's margin reads low and never high (the user: "补钱容易，扣钱很难"). The four sizes
+ * set on Costing Setting (CHECK on catalogue_kiv_costs.size_code); any other size, or none stated, costs the dearest
+ * of them (catalogue_kiv_cost).
+ */
+export const KIV_SIZES = ['K', 'Q', 'SS', 'S'] as const
+export type KivSize = (typeof KIV_SIZES)[number]
+export const KIV_SIZE_LABEL: Readonly<Record<KivSize, string>> = { K: 'King', Q: 'Queen', SS: 'Super single', S: 'Single' }
+
+export function isKivSize(size: unknown): size is KivSize {
+  return typeof size === 'string' && (KIV_SIZES as readonly string[]).includes(size)
+}
+
+export interface KivCostEdit {
+  size: string
+  /** Blank takes the size's cost off: its frames then cost the dearest of the others. */
+  cost: string | null
+}
+
+/** Never 0 — a frame that cost nothing would read its bill's margin high (CHECK cost > 0 AND cost <= 100000). */
+export function validateKivCosts(edits: readonly KivCostEdit[]): {
+  upserts: Array<{ size_code: KivSize; cost: number }>
+  clears: KivSize[]
+} {
+  if (!Array.isArray(edits) || edits.length === 0) throw new EditError('Nothing to save')
+  const upserts: Array<{ size_code: KivSize; cost: number }> = []
+  const clears: KivSize[] = []
+  const seen = new Set<KivSize>()
+  for (const e of edits) {
+    const size = String(e?.size ?? '').trim().toUpperCase()
+    if (!isKivSize(size)) throw new EditError(`Unknown bed frame size ${e?.size ?? ''}`.trim())
+    if (seen.has(size)) throw new EditError(`${KIV_SIZE_LABEL[size]} appears twice`)
+    seen.add(size)
+    const cost = parseMoney(e.cost, KIV_SIZE_LABEL[size])
+    if (cost === null) clears.push(size)
+    else if (cost === 0) throw new EditError(`${KIV_SIZE_LABEL[size]}: a KIV frame cannot cost RM 0 — type the dearest frame's cost, or leave it blank`)
+    else if (cost > 100_000) throw new EditError(`${KIV_SIZE_LABEL[size]}: "${e.cost}" is out of range`)
+    else upserts.push({ size_code: size, cost })
+  }
+  return { upserts, clears }
+}
+
+/**
  * A price on Maintenance is what the CUSTOMER pays for the option (2026-10-05,
  * every priced pool since 2026-10-06), so it is never negative (CHECK
  * catalogue_option_prices_charge_not_negative). A sofa's seat size carries no
