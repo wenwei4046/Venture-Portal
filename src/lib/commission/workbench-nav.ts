@@ -16,6 +16,8 @@
  *   ?view=changes|claims|requests  the month's review panels (2026-09-30): Drops &
  *                                  upsells, Possible double claims — and (2026-10-21)
  *                                  the salespeople's share requests
+ *   ?view=sellers                  (2026-10-31) Whose sale: the bills held because their
+ *                                  paper is on another salesperson's order
  *   ?person=<staff id>             whose ledger is open (the cut is then theirs)
  *   ?orders=overriding|deposit     which of their tables (absent: Personal)
  *   ?q= ?brand= ?sort=             the table's search, brand and order
@@ -25,7 +27,7 @@
  * alone.
  */
 
-export type WorkbenchTab = 'sales' | 'kpi' | 'open' | 'deposit' | 'exhibition' | 'changes' | 'claims' | 'requests'
+export type WorkbenchTab = 'sales' | 'kpi' | 'open' | 'deposit' | 'exhibition' | 'changes' | 'claims' | 'sellers' | 'requests'
 export type LedgerView = 'personal' | 'overriding' | 'deposit'
 export type LedgerSort = 'date_asc' | 'date_desc' | 'commission_desc'
 
@@ -38,7 +40,7 @@ export interface WorkbenchLocation {
   sort: LedgerSort
 }
 
-const TABS: readonly WorkbenchTab[] = ['sales', 'kpi', 'open', 'deposit', 'exhibition', 'changes', 'claims', 'requests']
+const TABS: readonly WorkbenchTab[] = ['sales', 'kpi', 'open', 'deposit', 'exhibition', 'changes', 'claims', 'sellers', 'requests']
 const VIEWS: readonly LedgerView[] = ['personal', 'overriding', 'deposit']
 const SORTS: readonly LedgerSort[] = ['date_asc', 'date_desc', 'commission_desc']
 

@@ -36,6 +36,8 @@ import ErpFeedChip from './_components/ErpFeedChip'
 import DoubleClaimPanel from './_components/DoubleClaimPanel'
 import ShareRequestsPanel from './_components/ShareRequestsPanel'
 import { shareRequestsFromRow, type ShareRequest } from '@/lib/member/share-requests'
+import SellerChecksPanel from './_components/SellerChecksPanel'
+import { isWaiting, sellerChecksFromRow, type SellerCheck } from '@/lib/commission/seller-checks'
 import { canDo } from '@/lib/permission-actions'
 import { actionsOnPage } from '@/lib/page-tabs'
 import ErpChangesPanel, { type ChangeBrief, type TrailRowView } from './_components/ErpChangesPanel'
@@ -251,6 +253,13 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       ? { requests: [] as ShareRequest[], unavailable: error.message }
       : { requests: shareRequestsFromRow(data), unavailable: null }))
     .catch((err: unknown) => ({ requests: [] as ShareRequest[], unavailable: err instanceof Error ? err.message : 'The read failed.' }))
+  // Whose sale (2026-10-31): the month's bills the feed held because their paper is on another salesperson's order.
+  // Read softly, as the requests.
+  const sellerChecksRead = once(supabase.rpc('revenue_seller_checks', { p_sub_department: subDept.id, p_period: period }))
+    .then(({ data, error }) => (error
+      ? { checks: [] as SellerCheck[], unavailable: error.message }
+      : { checks: sellerChecksFromRow(data), unavailable: null }))
+    .catch((err: unknown) => ({ checks: [] as SellerCheck[], unavailable: err instanceof Error ? err.message : 'The read failed.' }))
 
   // The drops and upsells the ERP found that somebody paid into this month
   // (Undo sends one back), those still to answer from any month (paid into
@@ -512,6 +521,14 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       returnTo={`${revenuePath(subDept.slug, period)}?view=requests`} period={period} />
   )
   const requestsWaiting = shareRequests.requests.filter(q => q.status === 'hr').length
+  // Whose sale: what waits is a held bill nobody answered — Revenue · Edit on this page's tab answers it.
+  const sellerChecks = await sellerChecksRead
+  const sellerChecksPanel = (
+    <SellerChecksPanel key="seller-checks" checks={sellerChecks.checks} unavailable={sellerChecks.unavailable}
+      canDecide={canDo(acting, 'revenue', 'edit')} basePath={revenuePath(subDept.slug)}
+      returnTo={`${revenuePath(subDept.slug, period)}?view=sellers`} period={period} />
+  )
+  const sellersWaiting = sellerChecks.checks.filter(isWaiting).length
 
   const monthHeader = (
       <div key="month-head" className="page-head">
@@ -592,6 +609,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         reviews={{
           changes: { panel: erpChangesPanel, count: changesWaiting },
           claims: doubleClaimPanel ? { panel: doubleClaimPanel, count: claimsWaiting } : undefined,
+          sellers: { panel: sellerChecksPanel, count: sellersWaiting },
           requests: { panel: shareRequestsPanel, count: requestsWaiting },
         }}
         monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: orders.length,

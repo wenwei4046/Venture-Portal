@@ -848,6 +848,17 @@ nothing the portal reads (a cost the portal does not use) writes no row. A
 fault in the trail is a `change_trail_failed` warning on the delivery's log,
 never a failed delivery: the ERP still gets its 200.
 
+**Whose sale (2026-10-31, migs `20261031030000` / `20261031030100`).** After the
+trail, a delivery that OPENED a bill (`message` *created …*) asks whose sale it
+is: a bill whose paper number is already on another salesperson's order — a
+bill of the portal's, or an ERP order the portal never had (`erp_order_papers`,
+loaded from the ERP by `scripts/load-erp-order-papers.mjs`) — is held out of
+its month until HR answers on Comm Cal › Whose sale. The delivery itself is
+applied as it was; its log says `whose_sale` when the bill was held and
+`whose_sale_check_failed` when the check faulted — never a failed delivery: the
+ERP still gets its 200. The ERP's *Shared with* (`collaborator_staff_ids`) is
+read as who looks after an order, never a part of its sale.
+
 **When a change is a drop or an upsell to answer.** While a bill's commission
 has not been given, a change simply counts in its own month. Once it has — a
 salesperson's close released it (since the unified payroll no run is applied,

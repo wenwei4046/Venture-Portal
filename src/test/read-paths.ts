@@ -532,6 +532,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
   'member_share_order_context', 'member_share_order_send', 'member_share_order_answer', 'member_share_order_cancel',
   'member_share_requests', 'revenue_share_requests', 'revenue_share_request_decide',
+  // Whose sale (mig 20261031030000): Comm Cal's held bills read by Revenue · View / Edit, answered by Revenue · Edit.
+  'revenue_seller_checks', 'revenue_answer_seller_check',
   // One's own memos, in every view (mig 20261012210000): the login's own memos and receipt (a sign-in, their People
   // record); a memo's file to its person or to Documentation · View; Publish › Preview asks Documentation · View.
   'my_memos', 'my_memo_mark', 'memo_attachment', 'hr_memo_preview',
