@@ -106,6 +106,8 @@ export function windowLeft(c: CrmCustomer, now: Date): string {
  * MP4) — each is now made into what WhatsApp takes before it goes (shared/video-fit.ts), so one sent before says so.
  */
 export function failNote(error: string | null | undefined): string {
+  // A reply past Meta's window is kept here and never sent (crm-actions › keptUnsent, 2026-10-30).
+  if (error && /since the customer’s last message/.test(error)) return `Saved but not sent · ${error}`;
   if (error && /131053/.test(error)) return "Not delivered · WhatsApp could not open this file. Send it again — videos and voice notes are now made ready for WhatsApp first.";
   return error ? `Not delivered · ${error}` : "Not delivered";
 }
@@ -263,6 +265,8 @@ export function chatVM(ctx: SalesCtx) {
       ...(superior ? [["Move", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), `Hand over to ${firstName(superior.name)}`, "var(--crm-tint-cold)", "var(--crm-ink-soft)"]] : []),
       ["Customer info", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => setHm({ menu: false, info: true }), "", "var(--crm-tint-follow)", "var(--crm-brown)"],
       ["Appointment", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => setHm({ menu: false, appt: true }), "", "var(--crm-tint-new)", "var(--crm-ink-soft)"],
+      // A WhatsApp chat past its 24 hours: the template is here, since the bar stays a bar (2026-10-30 — a reply typed is kept, not sent).
+      ...(shut && c.channel === "whatsapp" && data.settings?.suggestTemplate !== false ? [["Send template message", "M4 6h16v12H4zM4 7l8 6 8-6", () => { setHm({ menu: false }); void openTpl(); }, "Reopens the chat on WhatsApp", "var(--crm-tint-attention)", "var(--crm-rust)"]] : []),
       ["Starred messages", "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", () => { setHm({ menu: false }); openStarred(c.messages.filter(m => stars.has(m.id)).map(m => ({ id: m.id, who: m.from === "me" ? "You" : c.name, text: m.text || (m.media ? mediaWord(m) : ""), at: msgTime(m.at) }))); }, `${c.messages.filter(m => stars.has(m.id)).length} in this chat`, "var(--crm-tint-appt)", "var(--crm-brown)"],
     ] as [string, string, () => void, string, string, string][]).map(([label, icon, go, sub, bg, fg]) => ({ label, icon, go, sub, bg, fg })),
     apptOpen: !!hm.appt, apptHas: !!nextVisit, apptNone: !nextVisit,
@@ -495,7 +499,7 @@ export function chatVM(ctx: SalesCtx) {
   const cmp: ComposerIn = {
     key: c.id, state: composerOf(ui.cmp, c.id) ?? initialComposer(), set: setCmp,
     placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
-    warm: !shut,
+    warm: true, // past the window too: the reply is kept in the chat, marked not sent (crm-actions › keptUnsent, 2026-10-30)
     openTpl: () => void openTpl(), tplOn: data.settings?.suggestTemplate !== false, coldSub: coldLine(c, now),
     suggest: shut ? undefined : suggestReplies(c, data.replyExamples ?? [], data.quickReplies, 3, { library: data.replyLibrary, ...fillWithFor(data, c, owner.name, now) }), suggestLogo: !!waitingWords(c),
     suggestLibrary: shut ? undefined : libraryFor(c, data.replyLibrary, fillWithFor(data, c, owner.name, now)),

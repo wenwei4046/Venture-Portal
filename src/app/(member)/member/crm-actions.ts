@@ -7,7 +7,7 @@ import { getAccountUser, getMemberUser } from "@/lib/auth";
 import { canDo } from "@/lib/permission-actions";
 import { createClient } from "@/lib/supabase/server";
 import { cleanText, fetchWhatsAppTemplateStatuses, fillTemplate, mediaMessage, metaTemplateBody, metaTemplateName, reactionMessage, sendWhatsApp, submitWhatsAppTemplate, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
-import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
+import { HUMAN_AGENT_APPROVED, messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
 import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText, whatsappVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
@@ -276,7 +276,24 @@ async function roomMapLinks(db: Db, room: string): Promise<{ google?: string | n
 
 interface Reachable { id: string; channel: "whatsapp" | "messenger"; account_id: string; external_id: string; assigned_to: string | null; last_customer_at: string | null }
 
-/** The customer as the sender needs them — read under RLS, then asked may-you-reply, then Meta's window. */
+/**
+ * Why a reply past Meta's window was kept in the chat and not sent (2026-10-30, the owner: "crm 改成lead view的做法" —
+ * the salesperson types and sends as ever; the message stays here, marked not sent, with this under it).
+ */
+function windowShutReason(channel: "whatsapp" | "messenger"): string {
+  return channel === "messenger"
+    ? `More than ${HUMAN_AGENT_APPROVED ? "7 days" : "24 hours"} since the customer’s last message — Messenger does not allow a reply now.`
+    : "More than 24 hours since the customer’s last message — WhatsApp only allows an approved template now.";
+}
+
+/** A reply past the window: kept in the chat as ours, not sent (crm_record_unsent — not counted as a reply). */
+async function keptUnsent(db: Db, args: { contact: string; channel: "whatsapp" | "messenger"; kind: "text" | "image" | "document"; body: string; replyTo?: string | null }): Promise<CrmChatMessage> {
+  const { data, error } = await db.rpc("crm_record_unsent", { p_contact: args.contact, p_kind: args.kind, p_body: args.body, p_error: windowShutReason(args.channel), p_reply_to: args.replyTo ?? null });
+  if (error || !data) throw new Error(error?.message ?? "The message could not be kept.");
+  return chatMessage(data as Parameters<typeof chatMessage>[0]);
+}
+
+/** The customer as the sender needs them — read under RLS, then asked may-you-reply, then Meta's window ("shut" is the caller's to keep unsent). */
 async function reachable(db: Db, contactId: string, freeText: boolean): Promise<{ contact: Reachable; token: string; window: "open" | "human_agent" | "shut" }> {
   if (!/^[0-9a-f-]{36}$/i.test(contactId)) throw new Error("Choose a customer first.");
   // The customer and may-I-reply are asked side by side: each send waited for one, then the other.
@@ -288,11 +305,6 @@ async function reachable(db: Db, contactId: string, freeText: boolean): Promise<
   if (!contact) throw new Error("That customer is not in your CRM.");
   const c = contact as Reachable;
   const window = c.channel === "messenger" ? messengerWindow(c.last_customer_at) : windowOpen(c.last_customer_at) ? "open" : "shut";
-  if (freeText && window === "shut") {
-    throw new Error(c.channel === "messenger"
-      ? "More than 7 days since the customer's last message — Messenger no longer allows a reply."
-      : "More than 24 hours since the customer's last message — WhatsApp only allows an approved template now.");
-  }
   if (checkError) throw new Error(checkError.message);
   if (allowed !== true) throw new Error("You may not reply to this customer.");
   const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
@@ -317,6 +329,10 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
     if (!clean.ok) throw new Error(clean.error);
     const db = await session();
     const [, { contact, token, window }] = await Promise.all([requireCrm("edit"), reachable(db, contactId, true)]);
+    if (window === "shut") {
+      if (opts.card) throw new Error(windowShutReason(contact.channel));
+      return { ok: true, message: await keptUnsent(db, { contact: contactId, channel: contact.channel, kind: "text", body: clean.text, replyTo: opts.replyTo }) };
+    }
     let quote: string | null = null;
     if (opts.replyTo) {
       const { data: q } = await db.from("crm_messages").select("id, external_id, contact_id").eq("id", opts.replyTo).maybeSingle();
@@ -571,6 +587,15 @@ export async function sendCrmMedia(input: { contact: string; path: string; name:
     if (contact.channel === "whatsapp" && kind === "image" && file.size > mediaLimit("whatsapp", "image")) kind = "document";
     if (file.size > mediaLimit(contact.channel, kind)) {
       throw new Error(`${kind === "image" ? "A photo" : kind === "video" ? "A video" : kind === "audio" ? "A voice note" : "A file"} can be up to ${Math.round(mediaLimit(contact.channel, kind) / 1048576)} MB on ${contact.channel === "messenger" ? "Messenger" : "WhatsApp"}.`);
+    }
+    if (window === "shut") {
+      const message = await keptUnsent(db, { contact: contactId, channel: contact.channel, kind: kind === "image" ? "image" : "document", body: caption || filename });
+      const { error: mediaError } = await db.rpc("crm_set_out_media", { p_message: message.id, p_path: input.path, p_mime: mime || "application/octet-stream", p_caption: caption });
+      if (mediaError) return { ok: true, message };
+      const shownName = (input.name || filename).trim().slice(0, 240) || filename;
+      if (kind === "document") await db.rpc("crm_name_out_file", { p_message: message.id, p_name: shownName });
+      const shown = kind === "document" ? "file" : kind;
+      return { ok: true, message: { ...message, kind, text: caption, media: { kind: shown, url: `/member/crm-media/${message.id}`, ...(shown === "file" ? { name: shownName } : {}) } } };
     }
     let externalId: string;
     if (contact.channel === "messenger") {
