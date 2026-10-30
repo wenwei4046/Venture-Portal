@@ -37,7 +37,7 @@ const TABLES: Record<string, Array<Record<string, unknown>>> = {
   directors: [],
 }
 
-function client() {
+function client(tables = TABLES) {
   return {
     from: (table: string) => {
       // Only the columns selected come back, as from PostgREST.
@@ -45,7 +45,7 @@ function client() {
       const q: Record<string, unknown> = {}
       for (const m of ['eq', 'neq', 'in', 'not', 'gte', 'lte', 'lt', 'order', 'range', 'limit']) q[m] = () => q
       q.select = (c?: string) => ((columns = selectedColumns(c)), q)
-      q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: projected(TABLES[table] ?? [], columns), error: null }).then(res)
+      q.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: projected(tables[table] ?? [], columns), error: null }).then(res)
       return q
     },
   }
@@ -58,5 +58,29 @@ describe('the Repayment Schedule’s calendar', () => {
       ['HK', '2026-10-25'],
       ['CAR', '2026-10-07'],
     ])
+  })
+})
+
+describe('minimum pay interest', () => {
+  // 50,000 to Carres at 2% from 5 Aug, no fixed term: its first instalment Sep 2026. Each month's interest must come in —
+  // from Nov 2026, the month set (2026-10-30, the user's sample A).
+  const loan = {
+    id: 'l2', company_id: 'co-car', principal: 50000, effective_rate: 0.02, tenure_months: null, status: 'active', repayment_terms: null,
+    compound_interest: false, disbursement_date: '2026-08-05', min_pay_interest: true, min_pay_interest_from: '2026-11-01', repayment_start_month: null,
+    repayment_start_date: null, terms_effective_from: null, principal_per_month: null,
+  }
+
+  it('is checked from the month it was set from, not the first instalment', async () => {
+    const tables = { ...TABLES, loans: [loan], fund_sources: [] }
+    const oct = await loadRepaymentSchedule(client(tables) as never, '2026-10')
+    expect(oct.collectMin).toEqual([])
+    const nov = await loadRepaymentSchedule(client(tables) as never, '2026-11')
+    expect(nov.collectMin.map((r) => [r.key, r.due, r.met])).toEqual([['l2', 1000, false]])
+  })
+
+  it('without a month, from the first instalment as before', async () => {
+    const tables = { ...TABLES, loans: [{ ...loan, min_pay_interest_from: null }], fund_sources: [] }
+    const oct = await loadRepaymentSchedule(client(tables) as never, '2026-10')
+    expect(oct.collectMin.map((r) => r.key)).toEqual(['l2'])
   })
 })

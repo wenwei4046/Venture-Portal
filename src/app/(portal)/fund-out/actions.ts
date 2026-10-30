@@ -20,6 +20,7 @@ import type { PaymentType } from '@/types'
 import type { Json } from '@/lib/supabase/database.types'
 import { amendMonthWords, compoundSent, explainAmendRefusal, openFromSent, principalPerMonthSent } from '@/lib/fund-amend'
 import { loadNewLoanOptions, type NewLoanOptions } from './_lib/new-loan-options'
+import { minPayFromDate } from '@/lib/min-pay'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
 //
@@ -238,9 +239,20 @@ async function createLoanInner(formData: FormData): Promise<{ error: string } | 
   // doesn't take them, so flag the just-created loan. Safe: it's still
   // pending_approval (no GL/cash yet), and both flags only affect the
   // schedule/tracking math, not the disbursement.
-  const creationFlags: { compound_interest?: boolean; min_pay_interest?: boolean; repayment_start_month?: string; principal_per_month?: number } = {}
+  const creationFlags: {
+    compound_interest?: boolean
+    min_pay_interest?: boolean
+    min_pay_interest_from?: string
+    repayment_start_month?: string
+    principal_per_month?: number
+  } = {}
   if (formData.get('compound_interest') === 'on') creationFlags.compound_interest = true
-  if (formData.get('min_pay_interest') === 'on') creationFlags.min_pay_interest = true
+  if (formData.get('min_pay_interest') === 'on') {
+    creationFlags.min_pay_interest = true
+    // The month it is checked from (2026-10-30): a later month's first day; none is the first instalment.
+    const minPayFrom = minPayFromDate(formData.get('min_pay_interest_from'))
+    if (minPayFrom) creationFlags.min_pay_interest_from = minPayFrom
+  }
   // First installment month, same field the detail page's 还款起始月 editor sets.
   if (repaymentStartDate) creationFlags.repayment_start_month = dayjs(repaymentStartDate).startOf('month').format('YYYY-MM-DD')
   if (ppm.value !== null) creationFlags.principal_per_month = ppm.value
@@ -580,10 +592,12 @@ export async function setLoanRepaymentStart(
 // ─── 最低还息单 toggle (user 2026-09-04) ─────────────────────────────────────
 // Flagged = "本金可以慢慢还，但每月利息一定要还". Drives the minimum-interest
 // tracking on /repayment-schedule and the note on the company statement.
-// Display/tracking metadata only — no GL impact.
+// Display/tracking metadata only — no GL impact. Turned on from a month (2026-10-30): `from` a later month's
+// `YYYY-MM`, or none — the first instalment.
 export async function setLoanMinPayInterest(
   id: string,
-  value: boolean
+  value: boolean,
+  from?: string | null
 ): Promise<{ error: string } | undefined> {
   await requireActionOn('/fund-out', 'treasury', 'edit')
   const supabase = await createClient()
@@ -593,6 +607,7 @@ export async function setLoanMinPayInterest(
   const { error } = await supabase.rpc('set_loan_min_pay_interest' as never, {
     p_loan_id: id,
     p_value: value,
+    p_from: value ? minPayFromDate(from) : null,
   } as never)
   if (error) return { error: `Could not save: ${error.message}` }
 

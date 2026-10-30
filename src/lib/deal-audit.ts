@@ -48,6 +48,13 @@ function fieldLine(table: string, key: string, before: Record<string, unknown>, 
   if (key === 'repayment_start_date' || key === 'repayment_date') return `First repayment ${day(before[key])} → ${day(after[key])}`
   if (key === 'compound_interest') return `Compound interest ${onOff(after[key])}`
   if (key === 'min_pay_interest') return `Minimum pay interest ${onOff(after[key])}`
+  // Its month (2026-10-30) — turned off, the switch's own line says it.
+  if (key === 'min_pay_interest_from') {
+    if (after.min_pay_interest === false) return null
+    if (!after[key]) return 'Minimum pay interest from the first instalment'
+    const [y, m] = String(after[key]).slice(0, 7).split('-').map(Number)
+    return `Minimum pay interest from ${m ? `${MON[m - 1]} ${y}` : String(after[key])}`
+  }
   if (key === 'repayment_terms') return 'Terms changed'
   if (key === 'notes') return 'Notes changed'
   if (key === 'account_code') return `Account ${String(before[key] ?? 'default')} → ${String(after[key] ?? 'default')}`

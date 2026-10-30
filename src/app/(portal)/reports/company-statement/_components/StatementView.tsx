@@ -13,6 +13,7 @@
 import { Fragment, useEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
 import Link from 'next/link'
 import { formatMoneyBare } from '@/lib/utils'
+import { monthShort } from '@/lib/min-pay'
 import type { CounterpartyRow, PositionRow, StatementSide, StatementTotals } from '@/lib/counterparty-statement'
 import {
   dayText,
@@ -84,7 +85,7 @@ function Badges({ item }: { item: PositionRow }) {
       ) : null}
       {item.minPayInterest ? (
         <span className="cs-bdg" title="最低还息单 — 本金可以慢慢还，但每月利息一定要还">
-          Min interest RM {formatMoneyBare(item.monthlyInterest)}/mo
+          Min interest RM {formatMoneyBare(item.monthlyInterest)}/mo{item.minPayFrom ? ` · from ${monthShort(item.minPayFrom.slice(0, 7))}` : ''}
         </span>
       ) : null}
     </>
