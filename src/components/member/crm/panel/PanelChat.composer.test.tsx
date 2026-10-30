@@ -176,7 +176,10 @@ describe("the Team chat is Mine's", () => {
 
   it("a cold chat's templates are read each time: switched on in Profile, offered at once with the words each sends", async () => {
     await openTeamChat("Rajesh Kumar");
-    const sendTemplate = () => tap([...composer().querySelectorAll("span")].find(s => s.textContent === "Send template message") ?? null);
+    const sendTemplate = async () => {
+      await tap(head().querySelector('[title="More"]'));
+      await tap(screen.getAllByText("Send template message", { exact: true })[0]);
+    };
     await sendTemplate();
     fireEvent.click(screen.getByRole("dialog", { name: "No templates switched on" }));
     await act(async () => {});
@@ -192,14 +195,13 @@ describe("the Team chat is Mine's", () => {
     expect(sheet.textContent).toContain("Hi Rajesh, this is HOUZS.");
   });
 
-  it("a cold chat: frame M08's card in the bar's place — This chat is cold, who last wrote, Send template message — as Mine's", async () => {
+  it("a chat past its window keeps the reply bar (as Lead View, 2026-10-30): no cold card, the template in ⋮", async () => {
     await openTeamChat("Rajesh Kumar");
     expect(head().textContent).not.toContain("Cold lead ·");
-    const card = composer().querySelector("[data-cold-card]");
-    expect(card?.textContent).toContain("This chat is cold");
-    expect(card?.textContent).toMatch(/^.*Rajesh last wrote .* ago. WhatsApp only lets an approved template open the chat again./);
-    expect(composer().querySelector("textarea")).toBeNull();
-    await tap([...composer().querySelectorAll("span")].find(s => s.textContent === "Send template message") ?? null);
+    expect(composer().querySelector("[data-cold-card]")).toBeNull();
+    expect(composer().querySelector("textarea")).not.toBeNull();
+    await tap(head().querySelector('[title="More"]'));
+    await tap(screen.getAllByText("Send template message", { exact: true })[0]);
     // The demo's templates are all off: the sheet says where they are switched on.
     expect(screen.getByRole("dialog", { name: "No templates switched on" })).toBeInTheDocument();
   });
