@@ -84,6 +84,8 @@ export interface SourcePageModel {
   termsChanges: TermsChangeComparison[]
   start: RepaymentStart
   minPayInterest: boolean
+  /** The month minimum pay interest is checked from (`YYYY-MM-DD`); none — the first instalment (2026-10-30). */
+  minPayFrom: string | null
   notes: string | null
   monthlyInterest: number
   monthlyPayment: number
@@ -328,6 +330,7 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
     termsChanges,
     start,
     minPayInterest: (source as { min_pay_interest?: boolean }).min_pay_interest === true,
+    minPayFrom: (source as { min_pay_interest_from?: string | null }).min_pay_interest_from ?? null,
     notes: (source.notes as string | null) ?? null,
     monthlyInterest,
     monthlyPayment,

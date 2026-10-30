@@ -52,7 +52,7 @@ export async function fetchCounterpartyStatement(
     supabase
       .from('loans')
       .select(
-        'id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, min_pay_interest, terms_effective_from, principal_per_month',
+        'id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, min_pay_interest, min_pay_interest_from, terms_effective_from, principal_per_month',
       )
       .eq('status', 'active'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
@@ -67,7 +67,7 @@ export async function fetchCounterpartyStatement(
     supabase
       .from('fund_sources')
       .select(
-        'id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, notes, min_pay_interest, terms_effective_from, principal_per_month',
+        'id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, notes, min_pay_interest, min_pay_interest_from, terms_effective_from, principal_per_month',
       )
       .in('status', ['active', 'matured']),
     supabase.from('fund_source_outstanding').select('fund_source_id, outstanding, total_principal_paid'),
@@ -148,6 +148,7 @@ export async function fetchCounterpartyStatement(
       outstanding: Number(out?.outstanding ?? l.principal),
       paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {},
       minPayInterest: (l as { min_pay_interest?: boolean }).min_pay_interest === true,
+      minPayFrom: (l as { min_pay_interest_from?: string | null }).min_pay_interest_from ?? null,
       source: fundingSourceFromTerms(l.repayment_terms as string | null),
       segments: buildTermsSegments(termsForLoan(l, loanHist.get(l.id as string) ?? []), loanPrincipalByMonth.get(l.id as string) ?? {}),
       principalByMonth: loanPrincipalByMonth.get(l.id as string) ?? {},
@@ -180,6 +181,7 @@ export async function fetchCounterpartyStatement(
       outstanding: Number(out?.outstanding ?? s.amount),
       paymentsByMonth: fsPayByMonth.get(s.id as string) ?? {},
       minPayInterest: (s as { min_pay_interest?: boolean }).min_pay_interest === true,
+      minPayFrom: (s as { min_pay_interest_from?: string | null }).min_pay_interest_from ?? null,
       // Loan-to tag from the fund source's notes. 「借给: X」 parses to X, but
       // Finance fills plain labels too ("Conts - 60k", "Hookka" — 11 HC rows
       // 2026-08-06), so a note without the prefix IS the tag, verbatim.

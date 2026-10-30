@@ -116,11 +116,18 @@ describe('Record fund in on a desktop', () => {
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Savings Oct' } })
     fireEvent.change(screen.getByLabelText('Rate % /mo'), { target: { value: '2' } })
     fireEvent.click(screen.getByLabelText(/Minimum pay interest/))
+    // Its month (2026-10-30): none chosen until one is; a later month opens its month under the two.
+    expect(screen.getByText('From which month minimum pay starts and a repayment type are needed.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Starts from')).toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: /From a later month/ }))
+    expect(screen.getByRole('radio', { name: /From the first instalment/ })).toHaveAccessibleName(/Nov 2026/)
+    fireEvent.change(screen.getByLabelText('Starts from'), { target: { value: '2026-12' } })
     fireEvent.click(screen.getByRole('button', { name: 'Change' }))
     fireEvent.change(screen.getByLabelText('Account'), { target: { value: '4052' } })
     fireEvent.click(screen.getByRole('radio', { name: /Over a number of months/ }))
     fireEvent.change(screen.getByLabelText('Number of months'), { target: { value: '6' } })
     expect(screen.getByTestId('repayment-worked')).toHaveTextContent('RM 50,000.00 a month (RM 300,000.00 ÷ 6) — the last in Apr 2027.')
+    expect(within(screen.getByTestId('deal-summary')).getByText('From Dec 2026')).toBeInTheDocument()
     await submit()
     expect(sent()).toEqual({
       source_type: 'subsidiary',
@@ -135,6 +142,7 @@ describe('Record fund in on a desktop', () => {
       account_code: '4052',
       bank_account_id: 'bk-hl',
       min_pay_interest: 'on',
+      min_pay_interest_from: '2026-12',
     })
   })
 

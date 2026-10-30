@@ -1,8 +1,11 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import { Select } from '@/components/hrv/select'
 import { Field, Input } from './Dialog'
 import df from './dealform.module.css'
+import fm from './form.module.css'
+import { monthLong, monthShort, type MinPayFrom } from '@/lib/min-pay'
 import { REPAYMENT_CHOICES, money, type PreviewRow, type RepaymentChoice, type Words } from '@/lib/repayment-type'
 import { formatMoneyBare } from '@/lib/utils'
 
@@ -130,6 +133,68 @@ export function DealRepaymentType(props: {
       </div>
       {choice ? null : <p className={df.pick}>Choose one and what to fill in opens under it.</p>}
     </>
+  )
+}
+
+/**
+ * Minimum pay interest's month, under its switch (2026-10-30 — the user's sample A, the two choices Amend terms has):
+ * from the first instalment, or from a later month picked under them. None is chosen at first.
+ */
+export function DealMinPayFrom({
+  value,
+  onChange,
+  firstDueYM,
+  laterMonths,
+  idPrefix,
+  label = 'Minimum pay from',
+}: {
+  value: MinPayFrom
+  onChange: (v: MinPayFrom) => void
+  /** The first instalment's month, `YYYY-MM`. */
+  firstDueYM: string | null
+  /** The months *From a later month* offers (lib/min-pay). */
+  laterMonths: readonly string[]
+  /** The fields' ids, one form to a page. */
+  idPrefix: string
+  label?: string
+}) {
+  const later = value.choice === 'later'
+  return (
+    <div className={df.mpFrom}>
+      <div className={df.mpLabel} id={`${idPrefix}-mp-label`}>
+        {label}
+      </div>
+      <div className={df.mpCards} role="radiogroup" aria-labelledby={`${idPrefix}-mp-label`}>
+        <label className={df.mpCard} data-on={value.choice === 'first' ? 'true' : undefined}>
+          <input type="radio" name={`${idPrefix}-mp-from`} value="first" checked={value.choice === 'first'} onChange={() => onChange({ choice: 'first', month: '' })} />
+          <span>
+            From the first instalment
+            <span className={df.checkNote}>Every month from the first instalment{firstDueYM ? `, ${monthShort(firstDueYM)},` : ''} must have its interest paid.</span>
+          </span>
+        </label>
+        <label className={df.mpCard} data-on={later ? 'true' : undefined}>
+          <input type="radio" name={`${idPrefix}-mp-from`} value="later" checked={later} onChange={() => onChange({ choice: 'later', month: value.month })} />
+          <span>
+            From a later month
+            <span className={df.checkNote}>Months before it are not checked.{laterMonths[0] ? ` Earliest for this deal: ${monthShort(laterMonths[0])}.` : ''}</span>
+          </span>
+        </label>
+      </div>
+      {later ? (
+        <div className={df.mpMonth}>
+          <Field label="Starts from" htmlFor={`${idPrefix}-mp-month`}>
+            <Select id={`${idPrefix}-mp-month`} round={12} className={fm.select} value={value.month} onChange={(e) => onChange({ choice: 'later', month: e.target.value })}>
+              <option value="">Choose a month</option>
+              {laterMonths.map((m) => (
+                <option key={m} value={m}>
+                  {monthLong(m)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+      ) : null}
+    </div>
   )
 }
 

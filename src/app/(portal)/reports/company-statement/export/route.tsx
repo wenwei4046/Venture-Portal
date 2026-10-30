@@ -17,6 +17,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
 import { fetchCounterpartyStatement } from '@/lib/counterparty-statement-data'
+import { monthShort } from '@/lib/min-pay'
 import type { PositionRow } from '@/lib/counterparty-statement'
 import { buildXlsxBuffer, type XlsxSectionBreak } from '@/lib/export/excel'
 import { PdfDocument, PdfTable, type PdfColumn, type PdfRowKind } from '@/lib/export/pdf'
@@ -38,7 +39,7 @@ function positionLabel(item: PositionRow): string {
   const bits = [`${parseFloat((item.monthlyRate * 100).toFixed(3))}%/mo`, kind]
   if (item.startYM) bits.push(`starts ${item.startYM}`)
   // 最低还息单 — the agreed monthly-interest floor travels on the export too.
-  if (item.minPayInterest) bits.push(`min interest ${money(item.monthlyInterest)}/mo`)
+  if (item.minPayInterest) bits.push(`min interest ${money(item.monthlyInterest)}/mo${item.minPayFrom ? ` from ${monthShort(item.minPayFrom.slice(0, 7))}` : ''}`)
   // collect: SC = funding source remark; repay: where the money was lent on.
   if (item.source) {
     const src = item.source.length > 24 ? `${item.source.slice(0, 24)}…` : item.source

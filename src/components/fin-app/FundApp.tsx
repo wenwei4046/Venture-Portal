@@ -30,7 +30,8 @@ import AppScreen, { PageHead, type BarButton } from './AppScreen'
 import { useHubTabs } from './hub-tabs'
 import { pushIntent, setIntent, useStep } from './nav'
 import { BankHero, ListBlock, RecordItems, Row, SearchRow, StackCards, type ItemLine } from './parts'
-import { DealCancelSheet, FundingSourceSheet, LoanRepaymentSheet, NotesSheet, RepaymentStartSheet, SourceRepaymentSheet } from './FundSheets'
+import { DealCancelSheet, FundingSourceSheet, LoanRepaymentSheet, MinPaySheet, NotesSheet, RepaymentStartSheet, SourceRepaymentSheet } from './FundSheets'
+import { minPayFromWords } from '@/lib/min-pay'
 import { AmendTermsSheet, EditSourceSheet } from './FundTermsSheets'
 
 // Fund › Fund out and Fund › Fund in in the Finance phone app (2026-10-15, the
@@ -99,6 +100,7 @@ type Sheet =
   | { kind: 'repay' }
   | { kind: 'funding' }
   | { kind: 'start' }
+  | { kind: 'minpay' }
   | { kind: 'notes' }
   | { kind: 'void'; id: string; label: string }
   | { kind: 'revert'; from: string }
@@ -284,15 +286,15 @@ export default function FundApp({
     const mayEdit = loan ? loan.can.edit : !!source?.can.financeEdit
     const pendingCancel = dealOn?.pendingCancel ?? null
 
-    const toggleMinPay = async () => {
+    // Off at once; on asks from which month first (MinPaySheet, 2026-10-30).
+    const turnOffMinPay = async () => {
       const deal = loan ?? source
       if (busy || !deal) return
       setBusy(true)
-      const next = !deal.minPayInterest
       try {
-        const res = out ? await setLoanMinPayInterest(deal.id, next) : await setFundSourceMinPayInterest(deal.id, next)
+        const res = out ? await setLoanMinPayInterest(deal.id, false) : await setFundSourceMinPayInterest(deal.id, false)
         if (res?.error) flash(res.error)
-        else done(next ? 'Minimum pay interest turned on' : 'Minimum pay interest turned off')
+        else done('Minimum pay interest turned off')
       } catch (err) {
         flash(err instanceof Error ? err.message : 'That did not go through. Try again.')
       } finally {
@@ -362,7 +364,12 @@ export default function FundApp({
               key: 'minpay',
               label: 'Minimum pay interest',
               chip: (loan ?? source)!.minPayInterest ? { text: 'on', tone: 'ledger' as const } : { text: 'off', tone: 'def' as const },
-              action: mayEdit ? { label: (loan ?? source)!.minPayInterest ? 'Turn off' : 'Turn on', off: busy, onClick: () => void toggleMinPay() } : null,
+              sub: (loan ?? source)!.minPayInterest ? minPayFromWords((loan ?? source)!.minPayFrom, (loan ?? source)!.start.date?.slice(0, 7) ?? null) : undefined,
+              action: mayEdit
+                ? (loan ?? source)!.minPayInterest
+                  ? { label: 'Turn off', off: busy, onClick: () => void turnOffMinPay() }
+                  : { label: 'Turn on', off: busy, onClick: () => setSheet({ kind: 'minpay' }) }
+                : null,
             },
           ]}
           notes={
@@ -471,6 +478,15 @@ export default function FundApp({
             min={loanOn.disbursementDate}
             today={today}
           />
+          <MinPaySheet
+            open={sheet?.kind === 'minpay'}
+            onClose={() => setSheet(null)}
+            onDone={done}
+            side="out"
+            id={loanOn.id}
+            firstDueYM={loanOn.start.date ? loanOn.start.date.slice(0, 7) : null}
+            today={today}
+          />
           {sheet?.kind === 'void' ? (
             <VoidRepaymentDialog open onClose={() => setSheet(null)} onDone={() => done('Repayment voided — its entry, bank and pool reversed')} repaymentId={sheet.id} loanId={loanOn.id} label={sheet.label} />
           ) : null}
@@ -501,6 +517,15 @@ export default function FundApp({
             id={sourceOn.id}
             current={sourceOn.start.set ? sourceOn.start.date : null}
             min={sourceOn.effectiveDate}
+            today={today}
+          />
+          <MinPaySheet
+            open={sheet?.kind === 'minpay'}
+            onClose={() => setSheet(null)}
+            onDone={done}
+            side="in"
+            id={sourceOn.id}
+            firstDueYM={sourceOn.start.date ? sourceOn.start.date.slice(0, 7) : null}
             today={today}
           />
           <NotesSheet key={`nt:${sourceOn.notes ?? ''}`} open={sheet?.kind === 'notes'} onClose={() => setSheet(null)} onDone={done} sourceId={sourceOn.id} current={sourceOn.notes} />

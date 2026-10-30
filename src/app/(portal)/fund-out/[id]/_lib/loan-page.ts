@@ -61,6 +61,8 @@ export interface LoanPageModel {
   termsChanges: TermsChangeComparison[]
   start: RepaymentStart
   minPayInterest: boolean
+  /** The month minimum pay interest is checked from (`YYYY-MM-DD`); none — the first instalment (2026-10-30). */
+  minPayFrom: string | null
   late: OverdueSummary | null
   monthlyInterest: number
   outstanding: number
@@ -239,6 +241,7 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     termsChanges,
     start,
     minPayInterest: (loan as { min_pay_interest?: boolean }).min_pay_interest === true,
+    minPayFrom: (loan as { min_pay_interest_from?: string | null }).min_pay_interest_from ?? null,
     late,
     monthlyInterest,
     outstanding: outstandingAmount,

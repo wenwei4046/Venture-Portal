@@ -2,15 +2,30 @@
 
 import { useState } from 'react'
 import { DateField } from '@/components/finv/DateField'
+import { DealMinPayFrom } from '@/components/finv/DealTermsParts'
 import { DialogButton, DialogConfirm, DialogForm, Field, FinDialog, Hint, Input, TextArea } from '@/components/finv/Dialog'
-import { money, num } from '@/components/finv/form-words'
+import { money, neededSentence, num } from '@/components/finv/form-words'
 import fm from '@/components/finv/form.module.css'
 import { Select } from '@/components/hrv/select'
 import { bankShort } from '@/lib/deal-preview'
+import { NO_MIN_PAY_FROM, minPayFromMissing, minPayFromWords, minPayLaterMonths, type MinPayFrom } from '@/lib/min-pay'
 import { DEFAULT_REPAYMENT_POOL } from '@/lib/repayment-source-rows'
 import { fundSourceRepaymentForm, repaymentTotal } from '@/lib/fund-source-repayment'
-import { cancelPendingLoan, recordRepaymentFromSheet, requestLoanCancel, setLoanFundingSource, setLoanRepaymentStart } from '@/app/(portal)/fund-out/actions'
-import { requestFundSourceCancel, setFundSourceNotes, setFundSourceRepaymentStart, withdrawFundSource } from '@/app/(portal)/fund-in/actions'
+import {
+  cancelPendingLoan,
+  recordRepaymentFromSheet,
+  requestLoanCancel,
+  setLoanFundingSource,
+  setLoanMinPayInterest,
+  setLoanRepaymentStart,
+} from '@/app/(portal)/fund-out/actions'
+import {
+  requestFundSourceCancel,
+  setFundSourceMinPayInterest,
+  setFundSourceNotes,
+  setFundSourceRepaymentStart,
+  withdrawFundSource,
+} from '@/app/(portal)/fund-in/actions'
 import { createPaymentFromDialog } from '@/app/(portal)/payments/actions'
 import type { SourceRepaymentOptions } from '@/app/(portal)/fund-in/[id]/_lib/source-page'
 
@@ -401,6 +416,75 @@ export function RepaymentStartSheet({
         <Field label="First instalment">
           <DateField value={value} onChange={setValue} today={today} label="First instalment" emptyText="The month after, on its day" />
         </Field>
+        {w.error ? <Hint danger>{w.error}</Hint> : null}
+      </DialogForm>
+    </FinDialog>
+  )
+}
+
+/**
+ * Minimum pay interest turned on (2026-10-30 — the user's sample A, "手机 Fund app 的开关也一样会问"): from which month,
+ * the first instalment or a later one picked under it. Turning it off stays the row's own button.
+ */
+export function MinPaySheet({
+  open,
+  onClose,
+  onDone,
+  side,
+  id,
+  firstDueYM,
+  today,
+}: {
+  open: boolean
+  onClose: () => void
+  onDone: (message: string) => void
+  side: 'out' | 'in'
+  id: string
+  /** The deal's first instalment, `YYYY-MM`. */
+  firstDueYM: string | null
+  today: string
+}) {
+  const w = useWrite()
+  const [value, setValue] = useState<MinPayFrom>(NO_MIN_PAY_FROM)
+  const laterMonths = firstDueYM ? minPayLaterMonths(firstDueYM, today.slice(0, 7)) : []
+  const missing = minPayFromMissing(value, laterMonths)
+  const close = () => {
+    if (w.busy) return
+    onClose()
+    setValue(NO_MIN_PAY_FROM)
+    w.setError(null)
+  }
+  const save = async () => {
+    if (missing) {
+      w.setError(neededSentence([missing]))
+      return
+    }
+    const month = value.choice === 'later' ? value.month : null
+    const ok = await w.run(async () =>
+      answered(side === 'out' ? await setLoanMinPayInterest(id, true, month) : await setFundSourceMinPayInterest(id, true, month)),
+    )
+    if (!ok) return
+    onClose()
+    setValue(NO_MIN_PAY_FROM)
+    onDone(`Minimum pay interest turned on — ${minPayFromWords(month ? `${month}-01` : null, firstDueYM)}`)
+  }
+  return (
+    <FinDialog open={open} onClose={close} title="Minimum pay interest" locked={w.busy} tall>
+      <DialogForm
+        onSubmit={() => void save()}
+        buttons={
+          <>
+            <DialogButton disabled={w.busy} onClick={close}>
+              Cancel
+            </DialogButton>
+            <DialogButton kind="primary" off={!!missing} disabled={w.busy} onClick={() => void save()}>
+              {w.busy ? 'Saving…' : 'Turn on'}
+            </DialogButton>
+          </>
+        }
+      >
+        <Hint>Interest must be paid in full every month; the principal can be repaid gradually.</Hint>
+        <DealMinPayFrom value={value} onChange={setValue} firstDueYM={firstDueYM} laterMonths={laterMonths} idPrefix="ms" label="From which month" />
         {w.error ? <Hint danger>{w.error}</Hint> : null}
       </DialogForm>
     </FinDialog>

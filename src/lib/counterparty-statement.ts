@@ -71,6 +71,8 @@ export interface PositionInput {
   paymentsByMonth: Record<string, number>
   /** 最低还息单 (2026-09-04) — the deal requires each month's interest paid. */
   minPayInterest?: boolean
+  /** The month it is checked from (`YYYY-MM-DD`, 2026-10-30); none — the first instalment. */
+  minPayFrom?: string | null
   source?: string | null
   /** Terms segments (lib/treasury-terms) when the deal's terms changed
    *  mid-life (2026-09-21). Omitted / single unchanged segment = legacy maths. */
@@ -104,6 +106,8 @@ export interface PositionRow {
   startDate: string | null
   /** 最低还息单 — statement notes "每月最低应还利息 = monthlyInterest". */
   minPayInterest: boolean
+  /** The month minimum pay is checked from (`YYYY-MM-DD`); none — the first instalment. */
+  minPayFrom?: string | null
   source?: string | null
   /** Set when the terms changed mid-life: the month the CURRENT terms took
    *  effect, the base they run on, and every change with its 差价. */
@@ -145,6 +149,7 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
     startYM,
     startDate: p.startDate ?? null,
     minPayInterest: p.minPayInterest === true,
+    minPayFrom: p.minPayInterest === true ? (p.minPayFrom ?? null) : null,
     source: p.source ?? null,
     ...(seg && changed
       ? {
