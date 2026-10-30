@@ -7,7 +7,7 @@ import type { CSSProperties, Dispatch, PointerEvent as RPointerEvent, SetStateAc
 import { replyUrgency, type CrmStatus } from "@/lib/member/crm";
 import { asLead, type CrmChatMessage, type CrmCustomer, type CrmData, type CrmPerson } from "@/lib/member/crm-data";
 import { windowOpen } from "@/lib/whatsapp/send";
-import { messengerWindow } from "@/lib/messenger/send";
+import { HUMAN_AGENT_APPROVED, messengerWindow } from "@/lib/messenger/send";
 import type { SalesRefs, SalesUi } from "../ui";
 import { formatIntlDate } from "@/lib/utils";
 
@@ -69,7 +69,13 @@ export function windowShut(c: CrmCustomer, now: Date): boolean {
  * also needed OUR message to be the last, so a customer left unanswered past 24 h stayed in Attention though nothing but
  * a template could reach them (the owner: "这个客户已经超过30h没被我们回复，他是否也应该在cold lead?").
  */
-export function isCold(c: CrmCustomer, now: Date): boolean {
+/**
+ * …except a Messenger chat until Human Agent is approved (the owner, 2026-10-30: "Messenger 客户先不要去 cold lead，等 human
+ * agent 回复后再恢复"): it stays in its own column past 24 h. Flipping HUMAN_AGENT_APPROVED puts it back (a chat shut past
+ * Human Agent's 7 days is cold). The chat itself still says the window is shut and its send still refuses.
+ */
+export function isCold(c: CrmCustomer, now: Date, approved = HUMAN_AGENT_APPROVED): boolean {
+  if (c.channel === "messenger" && !approved) return false;
   return !!lastReal(c) && windowShut(c, now);
 }
 
