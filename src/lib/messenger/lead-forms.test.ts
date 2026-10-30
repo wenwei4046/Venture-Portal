@@ -50,6 +50,13 @@ describe("an Instant Form lead", () => {
     expect(row).toMatchObject({ kind: "instant", name: "Joe Example", phone: "+60 12-345 6789", waAccount: "1438056256053876",
       ad: { sourceId: "52621329088064" }, answers: [{ q: "Full name", a: "Joe Example" }, { q: "Phone number", a: "+60 12-345 6789" }, { q: "Unit location", a: "Mont Kiara" }] });
   });
+  it("leaves a Messenger lead ad's lead (inbox_url) to its chat, and finds a phone asked in a whole sentence", () => {
+    const ref = parseMessengerDelivery(notice).instant![0];
+    expect(instantLeadRow(ref, { field_data: [{ name: "inbox_url", values: ["https://business.facebook.com/x"] }, { name: "full_name", values: ["A"] }] }))
+      .toMatchObject({ error: "from a Messenger lead ad — taken by its chat" });
+    expect(instantLeadRow(ref, { field_data: [{ name: "sounds_good,_{{user_first_name}}._what_is_the_best_phone_number_to_reach_you_on?", values: ["0123456789"] }] }))
+      .toMatchObject({ phone: "0123456789" });
+  });
   it("says why when Meta will not let it be read (no leads_retrieval)", async () => {
     const ref = parseMessengerDelivery(notice).instant![0];
     const refused = (async () => new Response(JSON.stringify({ error: { message: "(#200) Requires leads_retrieval permission" } }), { status: 403 })) as unknown as typeof fetch;
