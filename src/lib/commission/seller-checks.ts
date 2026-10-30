@@ -12,6 +12,19 @@
  */
 
 export type SellerCheckStatus = 'waiting' | 'theirs' | 'not_theirs'
+/**
+ * What was asked: `paper` — a bill the feed opened on a paper another salesperson's order carries (held until HR
+ * answers); `erp_moved` (2026-10-31, mig 20261031040000) — a bill the ERP gave to another salesperson after the portal had
+ * it (stopped: it stays with whom it was until HR answers — the user: "我要先拦住 然后hr take action 才continue"). For a
+ * move, `theirs` = it goes to the salesperson the ERP gave it to, `not_theirs` = it stays whose it was.
+ */
+export type SellerCheckKind = 'paper' | 'erp_moved'
+/** A move's two salespeople and when the portal saw it. */
+export interface SellerMove {
+  from: { staffId: string | null; name: string }
+  to: { staffId: string | null; name: string }
+  movedAt: string | null
+}
 /** Where the other order was found: a bill the ERP fed, a claim form's row, an order of the ERP's the portal never had. */
 export type SellerEvidenceSource = 'bill' | 'claim_form' | 'erp'
 
@@ -46,6 +59,9 @@ export interface SellerCheck {
   total: number
   staffId: string | null
   staffName: string
+  kind: SellerCheckKind
+  /** A move's salespeople (kind `erp_moved`); null for a paper question. */
+  move: SellerMove | null
   status: SellerCheckStatus
   /** Whose order the paper was found on first. */
   sellerName: string | null
@@ -99,6 +115,9 @@ export function sellerCheckFromRow(v: unknown): SellerCheck | null {
   const orderId = str(v.orderId), orderNo = str(v.orderNo), status = str(v.status) as SellerCheckStatus | null
   if (!orderId || !orderNo || !status || !STATUSES.includes(status)) return null
   const evidence = isObj(v.evidence) ? v.evidence : {}
+  const kind: SellerCheckKind = v.kind === 'erp_moved' ? 'erp_moved' : 'paper'
+  const person = (p: unknown) => (isObj(p) ? { staffId: str(p.staffId), name: str(p.name) ?? '—' } : { staffId: null, name: '—' })
+  const move = kind === 'erp_moved' ? { from: person(evidence.from), to: person(evidence.to), movedAt: str(evidence.movedAt) } : null
   const booth = isObj(evidence.booth) && str(evidence.booth.fair)
     ? {
         fair: str(evidence.booth.fair) ?? '',
@@ -108,7 +127,7 @@ export function sellerCheckFromRow(v: unknown): SellerCheck | null {
   return {
     orderId, orderNo, refNo: str(v.refNo), orderDate: str(v.orderDate) ?? '', periodMonth: str(v.periodMonth) ?? '',
     customer: str(v.customer), total: num(v.total) ?? 0, staffId: str(v.staffId), staffName: str(v.staffName) ?? '—',
-    status, sellerName: str(v.sellerName),
+    kind, move, status, sellerName: str(v.sellerName),
     orders: (Array.isArray(evidence.orders) ? evidence.orders : []).map(evidenceOrder).filter((o): o is SellerEvidenceOrder => !!o),
     booth, askedAt: str(v.askedAt) ?? '', decidedByName: str(v.decidedByName), decidedAt: str(v.decidedAt), note: str(v.note),
     counts: v.counts !== false, held: v.held === true,
@@ -139,5 +158,10 @@ export function sharedPapers(c: Pick<SellerCheck, 'orders'>): string[] {
 
 /** The question as it stands after an answer, until the page is read again. */
 export function answered(c: SellerCheck, a: SellerAnswer): SellerCheck {
+  if (c.kind === 'erp_moved' && c.move) {
+    // A move takes no bill out: it counts either way, under whoever keeps it.
+    const holder = a.status === 'not_theirs' ? c.move.from : c.move.to
+    return { ...c, status: a.status, counts: a.counts, staffId: holder.staffId, staffName: holder.name }
+  }
   return { ...c, status: a.status, counts: a.counts, held: !a.counts }
 }

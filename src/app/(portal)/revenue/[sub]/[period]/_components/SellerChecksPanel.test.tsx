@@ -4,8 +4,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { sellerCheckFromRow, type SellerCheck } from '@/lib/commission/seller-checks'
 import SellerChecksPanel, { checkStatus } from './SellerChecksPanel'
 
-const { answer, refresh } = vi.hoisted(() => ({ answer: vi.fn(), refresh: vi.fn() }))
-vi.mock('../../../seller-check-actions', () => ({ answerSellerCheck: answer }))
+const { answer, answerMove, refresh } = vi.hoisted(() => ({ answer: vi.fn(), answerMove: vi.fn(), refresh: vi.fn() }))
+vi.mock('../../../seller-check-actions', () => ({ answerSellerCheck: answer, answerSellerMove: answerMove }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }))
 vi.mock('next/link', () => ({ default: ({ children, href, ...rest }: { children: ReactNode; href: string }) => <a href={href} {...rest}>{children}</a> }))
 
@@ -51,7 +51,7 @@ describe('Comm Cal › Whose sale', () => {
 
   it('says so when nothing was held', () => {
     render(<SellerChecksPanel {...props} checks={[]} />)
-    expect(screen.getByText('No bill of October 2026 is on another salesperson’s paper.')).toBeTruthy()
+    expect(screen.getByText('No bill of October 2026 waits on whose sale it is.')).toBeTruthy()
   })
 
   it('opens what was found — the ERP’s Shared with said as the ERP’s, never as a share of the sale', () => {
@@ -115,5 +115,58 @@ describe('Comm Cal › Whose sale', () => {
     expect(checkStatus({ status: 'waiting', counts: true })).toEqual({ text: 'Counting · to answer', tone: 'info' })
     expect(checkStatus({ status: 'theirs', counts: true })).toEqual({ text: 'Their own sale', tone: 'ledger' })
     expect(checkStatus({ status: 'not_theirs', counts: false })).toEqual({ text: 'Not theirs', tone: 'plain' })
+  })
+})
+
+// A bill the ERP gave to another salesperson after the portal had it (mig 20261031040000): stopped — still KINGSLEY's,
+// counting — until HR answers.
+const MOVED = check({
+  orderId: 'o-600', orderNo: 'HC-SO-2610-600', refNo: 'HC99001', total: 3000, staffId: 'kingsley', staffName: 'KINGSLEY',
+  kind: 'erp_moved', status: 'waiting', sellerName: 'KINGSLEY', counts: true, held: false,
+  evidence: { from: { staffId: 'kingsley', name: 'KINGSLEY' }, to: { staffId: 'shawn', name: 'SHAWN' }, movedAt: '2026-10-31T01:30:00Z' },
+})
+
+describe('Comm Cal › Whose sale — a bill the ERP moved', () => {
+  it('lists it as a stopped move: still KINGSLEY’s, whom the ERP gave it to, waiting on HR', () => {
+    render(<SellerChecksPanel {...props} checks={[MOVED]} />)
+    const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    expect(rows.map(r => r.textContent)).toEqual([
+      'HC-SO-2610-600MS CHANKINGSLEYHC99001KINGSLEY → SHAWNMoved in the ERP · 31 Oct, 09:30RM 3,000.00Stopped · to answer',
+    ])
+  })
+
+  it('a bill asked both ways is two questions, never one row over the other', () => {
+    render(<SellerChecksPanel {...props} checks={[check({ orderId: 'o-600', orderNo: 'HC-SO-2610-600' }), MOVED]} />)
+    expect(within(screen.getByRole('table')).getAllByRole('row').slice(1)).toHaveLength(2)
+  })
+
+  it('opens on the move and answers in both names — keep KINGSLEY’s moves it back', async () => {
+    answerMove.mockResolvedValue({ ok: true, answer: { orderNo: 'HC-SO-2610-600', status: 'not_theirs', counts: true } })
+    render(<SellerChecksPanel {...props} checks={[MOVED]} />)
+    fireEvent.click(screen.getByText('HC-SO-2610-600'))
+    const drawer = screen.getByRole('dialog')
+    expect(drawer).toHaveTextContent('Moved in the ERPKINGSLEY → SHAWN · 31 Oct, 09:30')
+    expect(drawer).not.toHaveTextContent('Found on')
+    expect(screen.getByRole('button', { name: 'SHAWN’s now' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Keep KINGSLEY’s' }))
+    await waitFor(() => expect(answerMove).toHaveBeenCalledWith('o-600', true, null))
+    expect(answer).not.toHaveBeenCalled()
+    await waitFor(() => expect(within(screen.getByRole('dialog')).getByText('Kept KINGSLEY’s')).toBeTruthy())
+    expect(screen.queryByRole('button', { name: 'Keep KINGSLEY’s' })).toBeNull()
+  })
+
+  it('SHAWN’s now leaves it where the ERP put it', async () => {
+    answerMove.mockResolvedValue({ ok: true, answer: { orderNo: 'HC-SO-2610-600', status: 'theirs', counts: true } })
+    render(<SellerChecksPanel {...props} checks={[MOVED]} />)
+    fireEvent.click(screen.getByText('HC-SO-2610-600'))
+    fireEvent.click(screen.getByRole('button', { name: 'SHAWN’s now' }))
+    await waitFor(() => expect(answerMove).toHaveBeenCalledWith('o-600', false, null))
+    await waitFor(() => expect(within(screen.getByRole('dialog')).getAllByText('SHAWN’s now').length).toBeGreaterThan(0))
+  })
+
+  it('names a move’s states', () => {
+    const move = MOVED.move
+    expect(checkStatus({ status: 'theirs', counts: true, kind: 'erp_moved', move })).toEqual({ text: 'SHAWN’s now', tone: 'ledger' })
+    expect(checkStatus({ status: 'not_theirs', counts: true, kind: 'erp_moved', move })).toEqual({ text: 'Kept KINGSLEY’s', tone: 'plain' })
   })
 })
