@@ -321,6 +321,22 @@ export function billMargin(order: SalesOrder, base: MarginBase): BillMargin {
 }
 
 /**
+ * What a bill with NO SALES of its own costs the month (2026-10-30) — a gift on a bill of its own at RM 0, or a bill
+ * whose KPI items and option charges take all it sold. It has no margin to read (nothing to divide by), yet its goods
+ * cost what they cost: it counts against the month's margin, as a free pillow on a paid bill counts against that
+ * bill's (user: "consider margin negative as well. make sure in the calculation of monthly").
+ *
+ * Its cost once every goods line is costed; `null` while one still waits for a cost (the month's margin waits with
+ * it); `undefined` for a bill that sells, or that has no goods at all (transport alone), which is no part of any
+ * margin. The SQL twin is `member_order_facts.no_sales_cost`.
+ */
+export function noSalesCost(lines: SalesLine[], base: MarginBase, groupIndex: Map<string, boolean>): number | null | undefined {
+  if (base.revenue > 0) return undefined
+  if (!lines.some(line => inGoodsScope(line, groupIndex))) return undefined
+  return base.complete ? base.cost : null
+}
+
+/**
  * Below-margin penalty for one bill. Penalty bands are read as "margin at or
  * BELOW this threshold", and the MOST SEVERE match wins — so with the user's
  * ladder (27% → x0.5, 25% → x0.25, 24% → x0):
@@ -396,6 +412,9 @@ export function marginIncentiveAcrossBrands(
   if (unbranded) {
     return { ...none, blockedReason: 'some sales carry no brand' }
   }
+  // A brand given away and never sold that month (2026-10-30): a cost and no sales, a margin below nothing — it
+  // clears no tier, and every brand must. Judged, not held: nothing is missing, so nothing to warn about.
+  if (brands.some(b => b.noSales)) return none
   const noMargin = brands.find(b => b.marginPct === null)
   if (noMargin) {
     return { ...none, blockedReason: `no cost data for ${noMargin.brandCode}` }
@@ -1011,14 +1030,21 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         )
       }
       const bill = billMargin(order, base)
+      // A bill with no sales of its own still costs the month what its goods cost (2026-10-30) — no sales, so none of
+      // the month's revenue, even where its KPI items and charges take more than it sold; a gift that costs nothing
+      // is no part of it.
+      const giftCost = noSalesCost(order.lines, base, groupIndex)
 
-      if (base.revenue > 0) {
+      if (base.revenue > 0 || giftCost === null || (giftCost ?? 0) > 0) {
         if (base.brandCode === null) draft.missingBrand = true
         else {
           const tally = draft.marginByBrand.get(base.brandCode) ?? { revenue: 0, cost: 0, complete: true }
-          tally.revenue = round2(tally.revenue + base.revenue)
-          tally.cost = round2(tally.cost + bill.cost)
-          if (bill.source === 'none') tally.complete = false
+          tally.revenue = round2(tally.revenue + Math.max(base.revenue, 0))
+          if (giftCost === undefined) {
+            tally.cost = round2(tally.cost + bill.cost)
+            if (bill.source === 'none') tally.complete = false
+          } else if (giftCost === null) tally.complete = false
+          else tally.cost = round2(tally.cost + giftCost)
           draft.marginByBrand.set(base.brandCode, tally)
         }
       }
@@ -1240,6 +1266,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       revenue: t.revenue,
       cost: t.cost,
       marginPct: marginPctOf(t),
+      ...(t.complete && t.revenue <= 0 && t.cost > 0 ? { noSales: true as const } : {}),
     }))
     if (d.missingBrand) {
       brands.push({ brandCode: null, revenue: 0, cost: 0, marginPct: null })
@@ -1247,10 +1274,12 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
     const totalRevenue = sum(brands.map(b => b.revenue))
     const totalCost = sum(brands.map(b => b.cost))
+    // Complete when every cost is known: a brand whose bills had no sales has no margin of its own, yet its cost is
+    // known and in the month's (2026-10-30).
     const overall = marginPctOf({
       revenue: totalRevenue,
       cost: totalCost,
-      complete: brands.every(b => b.marginPct !== null),
+      complete: !d.missingBrand && [...d.marginByBrand.values()].every(t => t.complete),
     })
 
     let bandKey: string | null = null

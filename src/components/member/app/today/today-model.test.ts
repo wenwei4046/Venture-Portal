@@ -158,6 +158,12 @@ describe("Sales / Margin / KPI", () => {
     const me = score({ id: "me", self: true, brands: { AKEMI: brand(10000, 5600), DUNLOP: brand(10000, 6600) } });
     expect(reachedTier({ ...base, arena: arena([me]) })).toBe("Incentive Tier 1");
   });
+  // 2026-10-30: a gift on a bill of its own, of a brand never sold that month — a cost, no sales.
+  it("reaches no tier while a brand was given away and never sold", () => {
+    const given = { ...brand(0, 214.29), sales: 0 };
+    const me = score({ id: "me", self: true, brands: { AKEMI: brand(10000, 5600), DUNLOP: given } });
+    expect(reachedTier({ ...base, arena: arena([me]) })).toBeNull();
+  });
   it("says Standard when no incentive tier is reached", () => {
     const me = score({ id: "me", self: true, brands: { AKEMI: brand(10000, 7000) } });
     const m = todayModel({ ...base, insight: block({ marginRevenue: 10000, marginCost: 7000 }, null), arena: arena([me]) });

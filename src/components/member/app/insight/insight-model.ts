@@ -66,6 +66,8 @@ export interface BrandStat {
   margin: number | null;
   /** Counted bills of this brand still without a cost. */
   blind: number;
+  /** Given away and never sold, its cost known (2026-10-30): no margin to read, below every tier. */
+  noSales: boolean;
   ladder: Ladder;
   row: LadderRow | null;
 }
@@ -84,17 +86,37 @@ function blend(orders: readonly MemberBookOrder[]): number | null {
   return revenue > 0 ? ((revenue - cost) / revenue) * 100 : null;
 }
 
+/**
+ * A gift on a bill of its own: no sales, its cost known (2026-10-30 — the user: "show, no sales. but consider margin
+ * negative as well. make sure in the calculation of monthly"). It has no margin of its own and counts against the
+ * month's: the book's `margins` carry its cost, which no bill here does.
+ */
+export const noSalesBill = (o: MemberBookOrder): boolean => o.margin === null && o.noSales === true;
+
+/** Waits for a cost: a bill that sells with none yet, or a gift whose goods are not all costed. An answer from before the server said which bills have no sales reads as it always did. */
+const pendingCost = (o: MemberBookOrder): boolean => o.margin === null && (o.noSales === undefined ? o.revenue > 0 : !o.noSales);
+
+/** The margin the book's counted bills make together: the server's own, a no-sales bill's cost in it, when it gave one. */
+function bookMargin(book: MemberOrderBook | null, brand?: string): number | null {
+  if (book?.margins) return brand === undefined ? book.margins.overall : book.margins.brands[brand] ?? null;
+  const done = counted(book);
+  return blend(brand === undefined ? done : done.filter(o => o.brand === brand));
+}
+
 export function brandStats(book: MemberOrderBook | null, bands: readonly MemberBand[]): BrandStat[] {
   const byBrand = new Map<string, MemberBookOrder[]>();
   for (const o of counted(book)) byBrand.set(o.brand, [...(byBrand.get(o.brand) ?? []), o]);
   return [...byBrand.entries()]
     .map(([code, orders]) => {
       const ladder = brandLadder(bands.filter(b => b.brand === code));
-      const margin = blend(orders);
+      const margin = bookMargin(book, code);
+      const blind = orders.filter(pendingCost).length;
+      // The server names a brand among its margins once something of it counts: a gift that cost something does.
+      const counts = book?.margins ? Object.prototype.hasOwnProperty.call(book.margins.brands, code) : orders.some(noSalesBill);
       return {
-        code, orders: orders.length, ladder, margin,
+        code, orders: orders.length, ladder, margin, blind,
+        noSales: margin === null && blind === 0 && counts,
         goods: orders.reduce((s, o) => s + o.revenue, 0),
-        blind: orders.filter(o => o.margin === null && o.revenue > 0).length,
         row: rowFor(margin, ladder),
       };
     })
@@ -104,18 +126,20 @@ export function brandStats(book: MemberOrderBook | null, bands: readonly MemberB
 /** The tier label and its tone a brand reads as: a tier only once every bill is costed. */
 function brandPill(b: BrandStat): { pill: string; tone: Tone } {
   if (b.code === "UNCLASSIFIED") return { pill: "No ladder", tone: "none" };
-  if (b.margin === null || b.blind > 0) return { pill: "Cost pending", tone: "warn" };
+  if (b.blind > 0) return { pill: "Cost pending", tone: "warn" };
+  // Every bill of it a gift with no sales: a cost and no margin to read (a gift that cost nothing, no cost either).
+  if (b.margin === null) return { pill: "No sales", tone: b.noSales ? "bad" : "none" };
   return b.row ? { pill: b.row.label, tone: b.row.tone } : { pill: "No ladder", tone: "none" };
 }
 
-/** A bill's margin read on its own brand's ladder. */
+/** A bill's margin read on its own brand's ladder — a bill with no sales at the foot of it, below every tier. */
 function billRow(o: MemberBookOrder, ladders: Map<string, Ladder>, bands: readonly MemberBand[]): LadderRow | null {
   let ladder = ladders.get(o.brand);
   if (!ladder) {
     ladder = brandLadder(bands.filter(b => b.brand === o.brand));
     ladders.set(o.brand, ladder);
   }
-  return rowFor(o.margin, ladder);
+  return rowFor(noSalesBill(o) ? -Infinity : o.margin, ladder);
 }
 
 const stillDue = (o: MemberBookOrder) => Math.max(0, (o.depositNeeded ?? 0) - o.paid);
@@ -154,13 +178,17 @@ function salesCard(sales: number, target: number | null, fallbackSub: string, wh
   return { right: "Counted sales", rightAccent: false, amount: rm(sales), bar: null, sub: fallbackSub };
 }
 
-/** What every brand's costed bills reach together — the run's rule: every brand must clear a tier. */
+/**
+ * What every brand's costed bills reach together — the run's rule: every brand must clear a tier. A brand given away
+ * and never sold clears none (2026-10-30).
+ */
 function tierReached(stats: readonly BrandStat[]): LadderRow | null {
-  const costed = stats.filter(s => s.code !== "UNCLASSIFIED" && s.margin !== null);
+  const costed = stats.filter(s => s.code !== "UNCLASSIFIED" && (s.margin !== null || s.noSales));
   if (!costed.length) return null;
   let common: LadderRow[] | null = null;
   for (const s of costed) {
-    const cleared = s.ladder.rows.filter(r => r.kind === "incentive" && s.margin! + 1e-9 >= r.threshold);
+    const margin = s.margin;
+    const cleared = margin === null ? [] : s.ladder.rows.filter(r => r.kind === "incentive" && margin + 1e-9 >= r.threshold);
     common = common === null ? cleared : common.filter(c => cleared.some(r => r.label === c.label));
   }
   return (common ?? []).sort((a, b) => b.amount - a.amount || b.threshold - a.threshold)[0] ?? null;
@@ -184,7 +212,7 @@ export function marginStanding(book: MemberOrderBook | null, bands: readonly Mem
   const stats = brandStats(book, bands);
   const lowest = stats.flatMap(s => s.ladder.incentives).sort((a, b) => a.threshold - b.threshold)[0]?.label ?? null;
   return {
-    margin: blend(counted(book)),
+    margin: bookMargin(book),
     tier: tierReached(stats),
     held: stats.some(s => s.blind > 0 || s.code === "UNCLASSIFIED"),
     blind: stats.reduce((n, s) => n + s.blind, 0),
@@ -236,7 +264,7 @@ export function insightMain(input: InsightInput): InsightMainVM {
   const heldSum = held.reduce((s, o) => s + o.revenue, 0);
   const monthly = period.kind === "monthly";
   const stats = brandStats(book, input.bands);
-  const overall = blend(done);
+  const overall = bookMargin(book);
 
   // KPI card
   const whole = input.whole;
@@ -263,7 +291,7 @@ export function insightMain(input: InsightInput): InsightMainVM {
   const hits = kpiCounts ? team.filter(r => r.kpiQty >= threshold!).length : 0;
   const rows: TeamRowVM[] = [...team].sort((a, b) => b.sales - a.sales || a.name.localeCompare(b.name)).map(r => {
     const m = r.marginRevenue > 0 ? ((r.marginRevenue - r.marginCost) / r.marginRevenue) * 100 : null;
-    const marginText = m === null ? "Cost pending" : `${m.toFixed(1)}%`;
+    const marginText = m === null ? (r.blindOrders > 0 ? "Cost pending" : "No sales yet") : `${m.toFixed(1)}%`;
     return {
       id: r.staffId || (r.mine ? "me" : r.name), ini: initials(r.name), name: r.mine ? `${r.name} (you)` : r.name, title: r.title,
       sales: rm(r.sales), meta: kpiCounts ? `${marginText} · ${r.kpiQty >= threshold! ? "KPI hit" : "KPI pending"}` : marginText, mine: r.mine,
@@ -280,7 +308,7 @@ export function insightMain(input: InsightInput): InsightMainVM {
         value: String(done.length), pill: "Deposit cleared",
         sub: held.length ? `${held.length} waiting for deposit` : "Nothing waiting", subAmber: held.length > 0,
       },
-      overall: overall === null ? (done.length ? "Cost pending" : "No sales yet") : `${overall.toFixed(1)}% overall`,
+      overall: overall === null ? (done.some(pendingCost) ? "Cost pending" : "No sales yet") : `${overall.toFixed(1)}% overall`,
       brands: stats.map(b => {
         const { pill, tone } = brandPill(b);
         return { code: b.code, name: brandName(b.code), sub: `${rm(b.goods)} goods · ${plural(b.orders, "order")}`, pct: b.margin === null ? "—" : `${b.margin.toFixed(1)}%`, pill, tone };
@@ -407,8 +435,9 @@ export function billsView(input: InsightInput): BillsVM {
   const row = (o: MemberBookOrder, sub: string): BillRowVM => {
     const band = billRow(o, ladders, input.bands);
     const due = stillDue(o);
-    const pill = !o.cleared ? (due > 0 ? `Due ${rm(due)}` : "Deposit due") : o.margin === null ? "Cost pending" : `${o.margin.toFixed(1)}%`;
-    const ink = !o.cleared || o.margin === null ? TONES.warn.ink : TONES[band?.tone ?? "neutral"].ink;
+    const gift = noSalesBill(o);
+    const pill = !o.cleared ? (due > 0 ? `Due ${rm(due)}` : "Deposit due") : gift ? "No sales" : o.margin === null ? "Cost pending" : `${o.margin.toFixed(1)}%`;
+    const ink = !o.cleared || (o.margin === null && !gift) ? TONES.warn.ink : TONES[band?.tone ?? (gift ? "bad" : "neutral")].ink;
     return { id: o.id, no: o.number, sub, amt: rm(o.revenue), amtMuted: !o.cleared, pill, pillInk: ink, kpiText: kpiEnabled ? `KPI ${o.kpiQty}` : null };
   };
 
@@ -495,8 +524,8 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
     statusTone: o.cleared ? "good" : "warn",
     amt: rm(o.total),
     margin: o.margin === null ? "—" : `${o.margin.toFixed(1)}%`,
-    marginInk: o.margin === null ? TONES.warn.ink : TONES[band?.tone ?? "neutral"].ink,
-    tier: o.margin === null ? "Cost pending" : band?.label ?? "No ladder",
+    marginInk: noSalesBill(o) ? TONES[band?.tone ?? "bad"].ink : o.margin === null ? TONES.warn.ink : TONES[band?.tone ?? "neutral"].ink,
+    tier: noSalesBill(o) ? "No sales" : o.margin === null ? "Cost pending" : band?.label ?? "No ladder",
     kpi: kpiOn(input) ? String(o.kpiQty) : "—",
     lines: o.lines.map(l => ({ name: l.name, qty: qty(l.qty), amt: l.amount ? rm(l.amount) : "Free", kpi: l.kpiQty, isKpi: l.kpiQty > 0 })),
     own: o.own,
@@ -601,11 +630,15 @@ export function brandPage(input: InsightInput, code: string): BrandPageVM | null
 
   let nextTitle: string;
   let nextSub: string;
-  if (b.margin === null || b.blind > 0) {
+  if (b.blind > 0) {
     nextTitle = "Waiting for supplier cost";
     nextSub = b.margin === null
       ? `${plural(b.orders, "order")} ${b.orders === 1 ? "has" : "have"} no cost yet. Margin and tier show once every order is costed.`
       : `${b.blind} of ${plural(b.orders, "order")} ${b.blind === 1 ? "has" : "have"} no cost yet. Margin and tier show once every order is costed.`;
+  } else if (b.margin === null) {
+    // Every bill of the brand a gift with no sales: a cost, and nothing to read a margin against.
+    nextTitle = "No sales yet";
+    nextSub = `${plural(b.orders, "order")} with no sales count against the margin. Margin and tier show once ${brandName(b.code)} sells.`;
   } else if (!top) {
     nextTitle = "No margin incentive for this brand";
     nextSub = `${brandName(b.code)} has no incentive tier in this sub-department's rules.`;
@@ -631,7 +664,9 @@ export function brandPage(input: InsightInput, code: string): BrandPageVM | null
   });
 
   const ladders = new Map<string, Ladder>([[b.code, b.ladder]]);
-  const orders = counted(input.book).filter(o => o.brand === b.code).sort((x, y) => (x.margin ?? -1) - (y.margin ?? -1));
+  // Lowest first: a bill with no sales below every margin, a bill waiting for a cost just under 0%.
+  const sortKey = (o: MemberBookOrder) => (noSalesBill(o) ? -Infinity : o.margin ?? -1);
+  const orders = counted(input.book).filter(o => o.brand === b.code).sort((x, y) => (sortKey(x) === sortKey(y) ? 0 : sortKey(x) - sortKey(y)));
   const groups = billGroups(input);
   const titleOf = (o: MemberBookOrder) => groups.find(g => g.orders.some(x => x.id === o.id))?.title;
   return {
@@ -653,9 +688,10 @@ export function brandPage(input: InsightInput, code: string): BrandPageVM | null
       return {
         id: o.id, no: o.number,
         meta: [input.whole ? sellerOf(o) : null, o.customer || "Walk-in", titleOf(o), rm(o.revenue)].filter(Boolean).join(" · "),
-        pct: o.margin === null ? "No cost" : `${o.margin.toFixed(1)}%`,
-        tier: o.margin === null ? "Cost pending" : r?.label ?? "No ladder",
-        ink: o.margin === null ? TONES.warn.ink : TONES[r?.tone ?? "neutral"].ink,
+        // A gift on a bill of its own (2026-10-30): "No sales", at the foot of its brand's ladder.
+        pct: noSalesBill(o) ? "No sales" : o.margin === null ? "No cost" : `${o.margin.toFixed(1)}%`,
+        tier: noSalesBill(o) ? r?.label ?? "No ladder" : o.margin === null ? "Cost pending" : r?.label ?? "No ladder",
+        ink: noSalesBill(o) ? TONES[r?.tone ?? "bad"].ink : o.margin === null ? TONES.warn.ink : TONES[r?.tone ?? "neutral"].ink,
       };
     }),
     footnote: "Brand margin uses commissionable goods. Bed frames and accessories follow their mattress brand. Delivery and disposal are excluded.",

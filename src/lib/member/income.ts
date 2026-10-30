@@ -92,9 +92,12 @@ export interface IncomeMonth {
   commission: number;
   /** Commissionable sales the deposit cleared this month. */
   countedSales: number;
-  /** The incentive tier every brand cleared (a band key), and the brands' layer-2 margins. */
+  /**
+   * The incentive tier every brand cleared (a band key), and the brands' layer-2 margins — `noSales` a brand given
+   * away and never sold, its cost known (2026-10-30): no margin, and no cost pending either.
+   */
   bandKey: string | null;
-  brands: { code: string; marginPct: number | null }[];
+  brands: { code: string; marginPct: number | null; noSales?: true }[];
   bills: IncomeBill[];
   overrides: IncomeOverride[];
   payLines: IncomePayLine[];
@@ -179,7 +182,8 @@ export function liveIncome(person: WorkbenchPerson | null, extra: Pick<IncomeMon
     commission: person?.totalCommission ?? 0,
     countedSales: st?.productRevenue ?? 0,
     bandKey: st?.marginBandKey ?? null,
-    brands: (st?.marginByBrand ?? []).flatMap(b => (b.brandCode ? [{ code: b.brandCode, marginPct: b.marginPct }] : [])),
+    brands: (st?.marginByBrand ?? []).flatMap(b => (b.brandCode
+      ? [{ code: b.brandCode, marginPct: b.marginPct, ...(b.noSales ? { noSales: true as const } : {}) }] : [])),
     bills: rows.map(bill),
     overrides: (person?.overridingRows ?? []).map(override),
     notice: null,
@@ -252,7 +256,9 @@ export function closedIncome(close: {
     commission: s.total,
     countedSales: st?.product_revenue ?? s.commissionable,
     bandKey: st?.margin_band_key ?? null,
-    brands: (st?.brand_margins ?? []).map(b => ({ code: b.brand_code, marginPct: b.margin_pct })),
+    // A close keeps each brand's revenue and cost: a cost and no revenue is a brand given away, never sold.
+    brands: (st?.brand_margins ?? []).map(b => ({ code: b.brand_code, marginPct: b.margin_pct,
+      ...(b.margin_pct === null && b.revenue <= 0 && b.cost > 0 ? { noSales: true as const } : {}) })),
     bills,
     overrides,
     notice: null,

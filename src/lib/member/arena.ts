@@ -149,6 +149,8 @@ export type ArenaIncentiveBlock =
 
 export interface ArenaBrandStanding {
   brand: string; revenue: number; marginPct: number | null; blindOrders: number;
+  /** Given away and never sold this month, its cost known (2026-10-30): no margin to read, below every tier. */
+  noSales: boolean;
   /** Band keys this brand's own margin clears. */
   cleared: string[];
   /** The next rung of this brand's ladder, and how far off it is. */
@@ -177,7 +179,9 @@ function brandMargin(score: ArenaScore): number | null {
  * intersection of what each brand clears and the money stacks up that
  * intersection. Anything that makes one brand unjudgeable — a bill with no
  * brand, a bill with no cost, a brand with no ladder — blocks the whole
- * incentive and says which, rather than quietly paying on the rest.
+ * incentive and says which, rather than quietly paying on the rest. A brand
+ * given away and never sold (2026-10-30) is judged, not held: below every
+ * tier, so nothing is earned.
  *
  * Kept as a pure function beside the ranking because the board's one promise
  * is that it agrees with the run, and that is only checkable if the rule lives
@@ -185,18 +189,20 @@ function brandMargin(score: ArenaScore): number | null {
  */
 export function arenaIncentive(person: ArenaPerson, tiers: readonly ArenaTier[]): ArenaIncentive {
   // A brand counts the moment it carries commissionable goods revenue, costed
-  // or not — the same test the engine makes before it tallies a bill.
+  // or not, or a gift's cost with no sales — the same test the engine makes
+  // before it tallies a bill.
   const active = Object.entries(person.brands)
-    .filter(([, score]) => score.marginRevenue > 0 || score.blindOrders > 0)
+    .filter(([, score]) => score.marginRevenue > 0 || score.blindOrders > 0 || score.marginCost > 0)
     .sort(([a], [b]) => a.localeCompare(b));
 
   const brands: ArenaBrandStanding[] = active.map(([brand, score]) => {
     const marginPct = brandMargin(score);
+    const noSales = score.blindOrders === 0 && !(score.marginRevenue > 0) && score.marginCost > 0;
     const ladder = tiers.filter(tier => tier.brand === brand).slice().sort((a, b) => a.marginPct - b.marginPct);
     const cleared = marginPct === null ? [] : ladder.filter(tier => marginPct + 1e-9 >= tier.marginPct).map(tier => tier.bandKey);
     const next = marginPct === null ? undefined : ladder.find(tier => marginPct + 1e-9 < tier.marginPct);
     return {
-      brand, revenue: score.marginRevenue, marginPct, blindOrders: score.blindOrders, cleared,
+      brand, revenue: score.marginRevenue, marginPct, blindOrders: score.blindOrders, noSales, cleared,
       next: next ? { label: next.label, marginPct: next.marginPct, gap: next.marginPct - marginPct! } : null,
     };
   });
@@ -204,6 +210,7 @@ export function arenaIncentive(person: ArenaPerson, tiers: readonly ArenaTier[])
   if (brands.length === 0) return { brands, blocked: null, earned: [], amount: 0 };
 
   const unbranded = brands.some(brand => brand.brand === ARENA_UNBRANDED);
+  if (!unbranded && brands.some(brand => brand.noSales)) return { brands, blocked: null, earned: [], amount: 0 };
   const blind = brands.find(brand => brand.marginPct === null);
   const bare = brands.find(brand => !tiers.some(tier => tier.brand === brand.brand));
   const blocked: ArenaIncentiveBlock | null = unbranded ? { reason: "no_brand" }
