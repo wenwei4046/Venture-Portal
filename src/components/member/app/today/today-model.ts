@@ -179,12 +179,13 @@ function salesMetric(input: TodayInput): TodayMetric {
  * The incentive tier the costed brands reach together — what the margin has
  * EARNED, whether or not an uncosted bill is still holding the payment back
  * (Insight and My income say "held"; the hero names the tier). Same rule as
- * the run: every brand must clear a tier, so it is the intersection.
+ * the run: every brand must clear a tier, so it is the intersection — and a
+ * brand given away and never sold clears none (2026-10-30).
  */
 export function reachedTier(input: TodayInput): string | null {
   const person = input.arena?.people.find(p => p.self);
   if (!person || !input.arena) return null;
-  const costed = arenaIncentive(person, input.arena.tiers).brands.filter(b => b.marginPct !== null);
+  const costed = arenaIncentive(person, input.arena.tiers).brands.filter(b => b.marginPct !== null || b.noSales);
   if (!costed.length) return null;
   let keys = new Set(costed[0].cleared);
   for (const b of costed.slice(1)) keys = new Set([...keys].filter(k => b.cleared.includes(k)));

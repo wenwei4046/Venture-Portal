@@ -15,6 +15,7 @@ import {
   marginIncentiveAcrossBrands,
   marginPctOf,
   monthsBefore,
+  noSalesCost,
   orderProductRevenue,
   orderRevenueSplit,
   penaltyBandFor,
@@ -1551,6 +1552,145 @@ describe('monthly margin incentive, end to end', () => {
       const lineSum = Math.round(st.lines.reduce((a, l) => a + l.amount, 0) * 100) / 100
       expect(lineSum).toBe(st.totalCommission)
     }
+  })
+})
+
+// 2026-10-30, the user on October's RM 0 gift bills: "show, no sales. but consider margin negative as well. make sure
+// in the calculation of monthly". A bill of its own with nothing sold has no margin, but its goods cost what they cost.
+describe('a bill with no sales, in the month', () => {
+  const kpiIndex = indexKpiItems(KPI_ITEMS)
+  const groupIndex = indexItemGroups(ITEM_GROUPS)
+  const costBasis = costBasisOf(1, [])
+  const baseOf = (o: SalesOrder) => marginBase(o.lines, kpiIndex, groupIndex, costBasis, o.brandCode ?? null)
+
+  it('costs what its goods cost, once every one is costed', () => {
+    const gift = order('2', 'rs', [['ACC', 'AK-PILLOW', 1, 0, 300]], { brandCode: 'AKEMI' })
+    expect(noSalesCost(gift.lines, baseOf(gift), groupIndex)).toBe(300)
+  })
+
+  it('waits while one of its goods has no cost', () => {
+    const gift = order('2', 'rs', [['ACC', 'AK-PILLOW', 1, 0, 300], ['ACC', 'AK-BOLSTER', 1, 0]], { brandCode: 'AKEMI' })
+    expect(noSalesCost(gift.lines, baseOf(gift), groupIndex)).toBeNull()
+  })
+
+  it('is no part of the margin when the bill sells, or carries no goods', () => {
+    const sold = order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]])
+    expect(noSalesCost(sold.lines, baseOf(sold), groupIndex)).toBeUndefined()
+    const transport = order('3', 'rs', [['TRANS', 'TRANSPORTATION CHARGES', 1, 150]], { brandCode: 'AKEMI' })
+    expect(noSalesCost(transport.lines, baseOf(transport), groupIndex)).toBeUndefined()
+  })
+
+  it('counts against its brand in the month: the margin falls, the bill stays none', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]], { brandCode: 'AKEMI' }), // 44% alone
+        order('2', 'rs', [['ACC', 'AK-PILLOW', 1, 0, 300]], { brandCode: 'AKEMI' }),
+      ],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginByBrand).toEqual([{ brandCode: 'AKEMI', revenue: 10_000, cost: 5_900, marginPct: 0.41 }])
+    expect(rs.marginPct).toBeCloseTo(0.41, 10)
+    expect(rs.marginIncentive).toBe(1_000) // 41% is Tier 1 only; 44% alone would be Tier 2
+  })
+
+  it('holds the month while a gift on its own still waits for a cost', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]], { brandCode: 'AKEMI' }),
+        order('2', 'rs', [['ACC', 'AK-PILLOW', 1, 0]], { brandCode: 'AKEMI' }),
+      ],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginPct).toBeNull()
+    expect(rs.marginIncentive).toBe(0)
+    expect(r.warnings.join(' ')).toMatch(/no cost data for AKEMI/)
+  })
+
+  // HC-SO-2610-096 (2026-10-30): WEI PIN sold Zanotti that month and gave an Akemi item away on a bill of its own.
+  it('reads a brand given away and never sold as below every tier — judged, not held', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]], { brandCode: 'AKEMI' }), // 44% alone: Tier 2
+        order('2', 'rs', [['ACC', 'DL-PILLOW', 1, 0, 400, 'DUNLOP']], { brandCode: 'DUNLOP' }),
+      ],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginByBrand).toContainEqual({ brandCode: 'DUNLOP', revenue: 0, cost: 400, marginPct: null, noSales: true })
+    expect(rs.marginByBrand).toContainEqual({ brandCode: 'AKEMI', revenue: 10_000, cost: 5_600, marginPct: 0.44 })
+    expect(rs.marginPct).toBeCloseTo(0.4, 10) // 10,000 sold, 5,600 + 400 cost
+    expect(rs.marginIncentive).toBe(0)
+    expect(rs.marginBandKey).toBeNull()
+    expect(r.warnings).toEqual([]) // nothing missing, so nothing holds Apply
+  })
+
+  it('does not call a brand "no sales" while a gift of it still waits for a cost', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]], { brandCode: 'AKEMI' }),
+        order('2', 'rs', [['ACC', 'DL-PILLOW', 1, 0, 400, 'DUNLOP']], { brandCode: 'DUNLOP' }),
+        order('3', 'rs', [['ACC', 'DL-BOLSTER', 1, 0]], { brandCode: 'DUNLOP' }),
+      ],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginByBrand).toContainEqual({ brandCode: 'DUNLOP', revenue: 0, cost: 400, marginPct: null })
+    expect(rs.marginPct).toBeNull()
+    expect(r.warnings.join(' ')).toMatch(/no cost data for DUNLOP/)
+  })
+
+  it('takes none of the month’s revenue where its KPI items and charges take more than it sold', () => {
+    const frame = order('2', 'rs', [['BEDFRAME', 'TRION (K)', 1, 300, 140]], { brandCode: 'AKEMI' })
+    frame.lines[0].optionCharge = 500 // the leg and divan charged 500 on a frame line of 300
+    const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]], { brandCode: 'AKEMI' }), frame] })
+    const akemi = find(r.statements, 'rs').marginByBrand.find(b => b.brandCode === 'AKEMI')!
+    expect([akemi.revenue, akemi.cost]).toEqual([10_000, 5_740]) // never 9,800: a bill with no sales sells nothing
+    expect(akemi.marginPct).toBeCloseTo(0.426, 10)
+  })
+
+  it('leaves a gift that costs nothing out of the month', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]], { brandCode: 'AKEMI' }),
+        order('2', 'rs', [['ACC', 'DL-SAMPLE', 1, 0, 0, 'DUNLOP']], { brandCode: 'DUNLOP' }),
+      ],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginByBrand).toEqual([{ brandCode: 'AKEMI', revenue: 10_000, cost: 5_600, marginPct: 0.44 }])
+    expect(rs.marginIncentive).toBe(2_500)
+  })
+
+  it('leaves a bill of transport alone out of the margin', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]], { brandCode: 'AKEMI' }),
+        order('2', 'rs', [['TRANS', 'TRANSPORTATION CHARGES', 1, 0]], { brandCode: 'AKEMI' }),
+      ],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.marginByBrand).toEqual([{ brandCode: 'AKEMI', revenue: 10_000, cost: 5_600, marginPct: 0.44 }])
+    expect(rs.marginIncentive).toBe(2_500)
+  })
+
+  it('pays no commission on it and takes no penalty from it', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 5_600]], { brandCode: 'AKEMI' }),
+        order('2', 'rs', [['ACC', 'AK-PILLOW', 1, 0, 300]], { brandCode: 'AKEMI' }),
+      ],
+    })
+    const rs = find(r.statements, 'rs')
+    expect(rs.lines.filter(l => l.component === 'product_revenue').map(l => l.sourceOrderId)).toEqual(['1'])
+    expect(rs.penaltyWeightedRevenue).toBe(10_000)
+    expect(r.warnings.join(' ')).not.toMatch(/have no margin/)
+  })
+})
+
+describe('marginIncentiveAcrossBrands with a brand given away', () => {
+  it('pays nothing while a brand had no sales, whatever the others clear', () => {
+    const result = marginIncentiveAcrossBrands([
+      { brandCode: 'AKEMI', revenue: 10_000, cost: 5_000, marginPct: 0.5 },
+      { brandCode: 'ZANOTTI', revenue: 0, cost: 300, marginPct: null, noSales: true },
+    ], MARGIN_BANDS)
+    expect(result).toEqual({ amount: 0, bandKey: null, bandLabel: null, blockedReason: null })
   })
 })
 

@@ -110,6 +110,57 @@ describe("Insight › KPI, brand, the order sheet", () => {
   });
 });
 
+// 2026-10-30 — the user, on October's RM 0 gift bills reading "No cost · Cost pending": "show, no sales. but consider
+// margin negative as well. make sure in the calculation of monthly". The server works the margins out, the gift's cost
+// in them; no bill carries a cost.
+describe("Insight › a bill with no sales", () => {
+  const gift = (o: Partial<MemberBookOrder> & Pick<MemberBookOrder, "id">) => order({
+    revenue: 0, total: 0, paid: 0, depositNeeded: 0, margin: null, noSales: true,
+    lines: [{ name: "PILLOW", code: "P", qty: 1, amount: 0, goods: true, kpiQty: 0 }], ...o,
+  });
+  const zanotti = { brand: "ZANOTTI", booth: "ZANOTTI" };
+  const sold = order({ id: "1", ...zanotti, revenue: 2000, margin: 40 });
+  // The server's margins: Zanotti's pillow brings 40% down to 35%.
+  const withGift = { ...book([sold, gift({ id: "2", ...zanotti }), gift({ id: "3", ...zanotti, noSales: false })]),
+    margins: { overall: 35, brands: { ZANOTTI: 35 } } };
+
+  it("reads the month's margin from the server, the gift's cost in it", () => {
+    const vm = insightMain(input({ book: { ...withGift, orders: withGift.orders.slice(0, 2) } }));
+    expect(vm.personal.brands.map(b => [b.name, b.pct, b.pill])).toEqual([["Zanotti", "35.0%", "Incentive Tier 1"]]);
+    expect(vm.personal.overall).toBe("35.0% overall");
+    expect(marginStanding({ ...withGift, orders: withGift.orders.slice(0, 2) }, BANDS)).toMatchObject({ margin: 35, held: false, blind: 0 });
+  });
+  it("calls the gift No sales — never Cost pending — and a gift still uncosted Cost pending", () => {
+    const vm = billsView(input({ book: withGift }));
+    const pills = Object.fromEntries(vm.weeks["2026-09-11"].bills.map(b => [b.id, b.pill]));
+    expect(pills).toEqual({ "1": "40.0%", "2": "No sales", "3": "Cost pending" });
+    expect(orderSheet(input({ book: withGift }), "2")).toMatchObject({ margin: "—", tier: "No sales" });
+  });
+  it("puts a gift at the foot of its brand's ladder, below every bill that sold", () => {
+    const page = brandPage(input({ book: { ...withGift, orders: withGift.orders.slice(0, 2) } }), "ZANOTTI")!;
+    // The page lists the lowest first.
+    expect(page.orders.map(o => [o.id, o.pct, o.tier])).toEqual([["2", "No sales", "Below margin Tier 3"], ["1", "40.0%", "Incentive Tier 2"]]);
+  });
+  // HC-SO-2610-096: Zanotti sold, an Akemi item given away on its own — the run's rule: every brand must clear a tier.
+  it("reaches no tier while a brand was given away and never sold", () => {
+    const akemiGift = gift({ id: "4" });
+    const st = marginStanding({ ...book([sold, akemiGift]), margins: { overall: 32, brands: { ZANOTTI: 40, AKEMI: null } } }, BANDS);
+    expect([st.margin, st.tier, st.held]).toEqual([32, null, false]);
+    const vm = insightMain(input({ book: { ...book([sold, akemiGift]), margins: { overall: 32, brands: { ZANOTTI: 40, AKEMI: null } } } }));
+    expect(vm.personal.brands.map(b => [b.name, b.pct, b.pill, b.tone])).toEqual([
+      ["Zanotti", "40.0%", "Incentive Tier 2", "good"], ["Akemi", "—", "No sales", "bad"],
+    ]);
+  });
+  it("a gift that cost nothing names no brand among the margins, and holds back no tier", () => {
+    const st = marginStanding({ ...book([sold, gift({ id: "5" })]), margins: { overall: 40, brands: { ZANOTTI: 40 } } }, BANDS);
+    expect(st.tier?.label).toBe("Incentive Tier 2");
+  });
+  it("an answer from before the server said which bills have no sales reads as it always did", () => {
+    const old = order({ id: "6", ...zanotti, revenue: 0, total: 0, margin: null });
+    expect(billsView(input({ book: book([sold, old]) })).weeks["2026-09-11"].bills.map(b => b.pill)).toEqual(["40.0%", "Cost pending"]);
+  });
+});
+
 // The Principal viewing nobody (2026-10-25 — a salesperson's note the user passed on: "直接 show 全部人的单 … 或者点按过去看
 // 全部人的"): everybody's bills, each naming its salesperson; everybody on the team, a tap viewing them.
 describe("Insight › the whole sub-department", () => {

@@ -11,6 +11,7 @@ import { buildCommissionWorkbench } from '@/lib/commission/workbench'
 import { commissionByBill, type BillCommission } from '@/lib/commission/bill-commission'
 import { billCountAction, describeExclusion, exclusionReason } from '@/lib/commission/bill-exclusion'
 import { billBrandAction } from '@/lib/commission/bill-brand'
+import { readsNoSales } from '@/lib/commission/no-sales'
 import { rowOrigin } from '@/lib/commission/row-origin'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
 import {
@@ -203,7 +204,8 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   // it: one uncosted line blinds the whole bill, so ten lines can be one
   // question or ten.
   const live = rows.filter(o => !o.cancelled)
-  const blind = live.filter(o => o.marginPct === null)
+  // A gift on a bill of its own has no margin, and waits for no cost (2026-10-30).
+  const blind = live.filter(o => o.marginPct === null && !readsNoSales(o))
   const blindValue = blind.reduce((a, o) => a + o.orderTotal, 0)
   const tagged = live.filter(o => o.openBillRank !== null)
   const stillSuggested = tagged.filter(o => o.openBillAuto).length
@@ -251,6 +253,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       marginPct: o.marginPct,
       marginValue: o.marginCost === null ? null : Math.round((o.marginRevenue - o.marginCost) * 100) / 100,
       marginKeyed: o.marginSource === 'manual',
+      noSales: readsNoSales(o),
       status: reason ?? (!o.staffId ? 'Pays nobody' : !o.depositMet ? 'Deposit pending' : 'Included'),
       cancelled: o.cancelled,
       exclusionDetail: byHand ? describeExclusion(byHand) : null,

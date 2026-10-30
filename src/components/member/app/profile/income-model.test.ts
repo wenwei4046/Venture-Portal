@@ -47,6 +47,22 @@ describe("incomeVM", () => {
     expect(vm.amount).toBe("RM ••••••");
     expect(vm.rows.every(r => r.amt.startsWith("RM ••••"))).toBe(true);
   });
+
+  // 2026-10-30: a brand given away and never sold that month — its cost known, no margin, and no cost pending.
+  describe("the margin incentive and a brand given away", () => {
+    const on = { kpi: false, openBill: false, incentive: true, override: true, group: false };
+    const sub = (m: IncomeMonth) => incomeVM(data(m), false).rows.find(r => r.label === "Margin incentive")?.sub;
+    it("names it as what stops the tier, never as a bill without cost", () => {
+      const m = month({ switches: on, brands: [{ code: "ZANOTTI", marginPct: 0.4 }, { code: "AKEMI", marginPct: null, noSales: true }] });
+      expect(sub(m)).toBe("No tier · Akemi has no sales");
+      expect(incomeVM(data({ ...m, bills: [bill()] }), false).held).toBeNull();
+    });
+    it("still holds the incentive for a brand waiting on a cost", () => {
+      const m = month({ switches: on, bills: [bill()], brands: [{ code: "ZANOTTI", marginPct: 0.4 }, { code: "AKEMI", marginPct: null }] });
+      expect(sub(m)).toBe("Held · Akemi has a bill without cost");
+      expect(incomeVM(data(m), false).held?.strong).toBe("Akemi has a bill without cost.");
+    });
+  });
 });
 
 // 2026-10-20 — the user, of Today's "Fixed salary RM 7,000.00 + commission RM 9,746.00" (RM 16,746): "the basic

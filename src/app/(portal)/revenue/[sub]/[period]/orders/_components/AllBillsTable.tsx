@@ -56,6 +56,8 @@ export interface BillRow {
   marginPct: number | null
   marginValue: number | null
   marginKeyed: boolean
+  /** A gift on a bill of its own (2026-10-30): no margin to read, its cost — `marginValue`, below nothing — the month's. */
+  noSales?: boolean
   /** The bill's standing, in words: Included / Deposit pending / why it is excluded. */
   status: string
   cancelled: boolean
@@ -280,7 +282,9 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
       case 'sales': return money(r.orderTotal)
       case 'commissionable': return <>{money(r.commissionable)}<NoCommission amount={r.orderTotal - r.commissionable} /></>
       case 'paid': return <>{money(r.paidAmount)}{r.depositShort !== null && <small className="text-danger">needs {money(r.depositShort)}</small>}</>
-      case 'margin': return r.marginPct === null
+      case 'margin': return r.noSales
+        ? <>No sales<small className={s.muted}>{r.marginValue === null ? '' : money(r.marginValue)}</small></>
+        : r.marginPct === null
         ? <>—<small className={s.muted}>Cost incomplete</small></>
         : <>{pct(r.marginPct)}<small className={s.muted}>{r.marginKeyed ? 'keyed' : r.marginValue === null ? '' : money(r.marginValue)}</small></>
       case 'rank': return r.staff ? <>{r.title ?? '—'}<small className={s.muted}>{r.rank ?? 'Rank unassigned'}{r.rate !== null ? ` · ${pct(r.rate)}` : ''}</small></> : '—'

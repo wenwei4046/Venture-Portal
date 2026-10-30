@@ -781,7 +781,10 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         ? <>{money(row.orderTotal)}<small className={s.muted}>{sharePct(partOf(row))} of {money(row.share.wholeTotal)}</small></>
         : money(row.orderTotal)
       case 'commissionable': return <>{money(row.commissionableValue)}<NoCommission amount={row.orderTotal - row.commissionableValue} /></>
-      case 'margin': return row.upsale ? 'Not applicable' : <>{pct(row.marginPct)}<small className={s.muted}>{row.marginCost == null ? 'Cost incomplete' : money(row.marginRevenue - row.marginCost)}</small></>
+      case 'margin': return row.upsale ? 'Not applicable'
+        // A gift on a bill of its own: no margin to read, its cost in the month's (2026-10-30).
+        : 'noSales' in row && row.noSales ? <>No sales<small className={s.muted}>{money(row.marginRevenue - (row.marginCost ?? 0))}</small></>
+        : <>{pct(row.marginPct)}<small className={s.muted}>{row.marginCost == null ? 'Cost incomplete' : money(row.marginRevenue - row.marginCost)}</small></>
       case 'rank': return overriding ? <>{(row as OverrideOrderRow).downlineTitle}<small>{(row as OverrideOrderRow).downlineRank}</small></>
         : <>{selected?.titleLabel}<small>{selected?.rankLabel} · {pct(own.productRate)}</small></>
       case 'product': return overriding ? money((row as OverrideOrderRow).overrideBasis) : <>{money(own.productCommission)}<small title={own.penaltyWithheld > 0 ? 'Includes the margin penalty on product commission and Open Bill bonus.' : undefined}>{pct(own.productRate)}{own.penaltyWithheld > 0 ? ` · −${money(own.penaltyWithheld)} total bill cut` : ''}</small></>

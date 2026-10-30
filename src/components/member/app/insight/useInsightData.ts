@@ -15,9 +15,16 @@ export interface InsightData {
   loading: boolean;
 }
 
-/** The two-month book cut down to one month: the same bills, the same meta. */
+/**
+ * The two-month book cut down to one month: the same bills, the same meta — and that month's own margins, which the
+ * server works out with a no-sales bill's cost in them (2026-10-30). A month it gave none for has nothing costed.
+ */
 export function bookMonth(book: MemberOrderBook, month: string): MemberOrderBook {
-  return { ...book, from: month, through: month, orders: book.orders.filter(o => o.recognitionMonth === month) };
+  const { margins, ...rest } = book;
+  return {
+    ...rest, from: month, through: month, orders: book.orders.filter(o => o.recognitionMonth === month),
+    ...(margins ? { margins: margins.months?.[month] ?? { overall: null, brands: {} } } : {}),
+  };
 }
 
 /** The sub-department's block of an Insight answer. */

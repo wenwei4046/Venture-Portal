@@ -1,5 +1,30 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-30 y (OPEN, #884 — merge on the user's next word) — Minimum pay interest from a month
+
+Session e73c0205. The user: "minimn pay interest 可以set 几时开始吗？" → it could not (an undated on/off: on, every
+month from the first instalment was checked) → a sample (scratchpad `minpay/minpay-start-sample.html`), the user picked
+**A** (Amend terms' two choices) → "照这个做" → branch `feat/min-pay-from-month`.
+
+- **Migration `20261030080000_min_pay_interest_from.sql` — on production FIRST** (dry-run twice, then COMMIT +
+  schema_migrations row, 2026-10-30 ~12:35Z, on "上数据库，全绿就 merge"): `min_pay_interest_from date` on fund_sources
+  and loans (NULL = the first instalment — HC's 220,000 fund in, the only deal on, stays so); a CHECK (a month's first
+  day, only while on); `set_fund_source_min_pay_interest` / `set_loan_min_pay_interest` take `p_from date DEFAULT NULL`
+  (the old two-argument calls still resolve), re-registered with `pg_temp.tab_guard` (a DROP FUNCTION un-registers a
+  guard in the tab-write-guards scan).
+- **Choice A** (`DealMinPayFrom`, `lib/min-pay`): *From the first instalment* (its month) / *From a later month* →
+  *Starts from* (a month; *Earliest for this deal: …*), none chosen at first. In Record fund in / Create fund out
+  (desktop + phone; the summary's *Minimum pay*), the old /fund-in/new and /fund-out/new forms (hidden field), a deal's
+  page (`MinPayInterestField`: Save; *On — from …*; unticked = off at once — the choice sits OUTSIDE `.fin-field`,
+  whose page rule draws every input as a text box), the phone Fund app (*Turn on* → `MinPaySheet`; *Turn off* one
+  press).
+- Reads: the Repayment Schedule checks from the later of the first instalment and the month set (`minPayStartYM`);
+  the Company Statement and its export say *· from Nov 2026*; the audit log *Minimum pay interest from Nov 2026*.
+- **NOT MERGED.** At 20:46 (12:46Z) 6 of 7 checks were green, and the SQL job (started 12:30Z, ~23 min) was still running. The user
+  had to leave: "下次再 merge". **Next session:** read `gh pr checks 884`; all green → squash-merge #884; then a short
+  SHIPPED checkpoint and the deploy status. If a check failed, show it to the user first. Production is safe meanwhile:
+  the migration is backward compatible with the live code. Local: 104 files / 787 tests. Not seen live by me (no login).
+
 ## CHECKPOINT 2026-10-30 x (SHIPPED, #883) — a past month's invoice starts at its last day
 
 Session e73c0205. The user: "帮我检查如果是payroll bill back 回会有问题吗？只是检查" → one problem found: the director
