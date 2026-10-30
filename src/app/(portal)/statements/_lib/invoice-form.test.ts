@@ -2,29 +2,29 @@ import { describe, expect, it } from 'vitest'
 import {
   billToValue,
   categoryGroups,
+  hrDescription,
   hrSource,
   modeOptions,
-  monthEnd,
   parseBillTo,
   partialSentence,
   periodChoices,
-  planCreateInvoices,
+  planCompanyInvoices,
   plusDays,
-  type InvoiceTarget,
+  rechargeParts,
 } from './invoice-form'
 
 // The invoice dialogs' rules (2026-10-14, the Finance revamp v2 — D10's
 // inv-form): one Bill to for every kind of party, the modes in the hub's words,
-// the accounts income first, the months, and what Save draft writes — the old
-// Create Invoice's batch (companies × billing modes, a director's CTC itemised).
+// the accounts income first, the months, HR's figures as lines, and what
+// Several companies writes — an invoice for each company, HR's figure itemised
+// on an account for each kind of line (2026-10-30).
 
-const HC: InvoiceTarget = { label: 'HOUZS Century (HC)', billKind: 'subsidiary', companyId: 'co-hc', amount: 25768.1 }
-const C2990: InvoiceTarget = { label: '2990 (2990)', billKind: 'subsidiary', companyId: 'co-2990', amount: 9642.13 }
 // HR's Sep'26 director CTC per subsidiary (get_director_ctc_by_company).
 const CTC = new Map([
   ['co-hc', { basic: 22800, kpi: 0, allowance: 0, epf: 2736, socso: 208.3, eis: 23.8 }],
   ['co-2990', { basic: 2500, kpi: 0, allowance: 6769.38, epf: 325, socso: 42.85, eis: 4.9 }],
 ])
+const STAFF = { salary: 933.2, allowance: 279.96, epf: 121.32, socso: 16.13, eis: 1.84 }
 
 describe('Bill to', () => {
   it('holds a company, a department pool, a director or anyone else in one value', () => {
@@ -91,93 +91,111 @@ describe('the months', () => {
     expect(periodChoices('2026-10', '2024-03').at(-1)?.value).toBe('2024-03')
   })
 
-  it('the month’s last day, thirty days on', () => {
-    expect(monthEnd('2026-09')).toBe('2026-09-30')
-    expect(monthEnd('2028-02')).toBe('2028-02-29')
+  it('thirty days on', () => {
     expect(plusDays('2026-10-14', 30)).toBe('2026-11-13')
   })
 })
 
-describe('what Save draft writes', () => {
-  const plan = (targets: InvoiceTarget[], pools: Array<{ mode: string; category: string; amount: number }>, split: boolean, several: boolean, ctc = new Map()) =>
-    planCreateInvoices({ targets, pools, split, several, period: '2026-09', ctc })
-
-  it('one party, one mode: one invoice at its amount', () => {
-    const out = plan([{ label: 'Marketing', billKind: 'dept_pool', deptId: 'd-mkt', amount: 780.25 }], [{ mode: 'venture_attribution', category: '9091', amount: 780.25 }], false, false)
-    expect(out).toEqual([
-      { kind: 'one', label: 'Marketing', target: expect.objectContaining({ deptId: 'd-mkt' }), mode: 'venture_attribution', category: '9091', amount: 780.25 },
+describe('HR’s figures as lines', () => {
+  it('a director’s CTC as the director invoices read, each line its kind, nothing at zero', () => {
+    expect(rechargeParts({ ctc: CTC.get('co-hc') }, 'director_attribution', '2026-09')).toEqual([
+      { kind: 'Salary', description: "Salary - Sep'26", amount: 22800 },
+      { kind: 'EPF', description: "EPF - Sep'26", amount: 2736 },
+      { kind: 'SOCSO', description: "SOCSO - Sep'26", amount: 208.3 },
+      { kind: 'EIS', description: "EIS - Sep'26", amount: 23.8 },
     ])
   })
 
-  it('several companies: one invoice each, at each company’s amount', () => {
-    const out = plan([HC, C2990], [{ mode: 'hr_attribution', category: '5050', amount: 0 }], false, true)
-    expect(out.map((p) => [p.label, p.kind === 'one' ? p.amount : null])).toEqual([
-      ['HOUZS Century (HC)', 25768.1],
-      ['2990 (2990)', 9642.13],
+  it('a shared-services department’s staff cost as Multi-line invoice wrote it', () => {
+    expect(rechargeParts({ staff: STAFF }, 'finance_attribution', '2026-09').map((p) => [p.kind, p.description])).toEqual([
+      ['Salary', "Salary - Sep'26 (Finance)"],
+      ['Allowance', "Allowance - Sep'26 (Finance)"],
+      ['EPF', "EPF - Sep'26 (Finance)"],
+      ['SOCSO', "SOCSO - Sep'26 (Finance)"],
+      ['EIS', "EIS - Sep'26 (Finance)"],
     ])
+    expect(rechargeParts({}, 'hr_attribution', '2026-09')).toEqual([])
   })
 
-  it('one party split: each line its own invoice at the line’s amount, named by its mode', () => {
-    const out = plan(
-      [{ ...HC, amount: 1000 }],
-      [
-        { mode: 'hr_attribution', category: '5050', amount: 600 },
-        { mode: 'finance_attribution', category: '5050', amount: 400 },
+  it('the description each starts with', () => {
+    expect(hrDescription('hr_attribution', '2026-09')).toBe("Salary - HR - Sep'26")
+    expect(hrDescription('director_attribution', '2026-09')).toBe('Director salary CTC — September 2026')
+  })
+})
+
+describe('what Several companies writes', () => {
+  const parts = (companyId: string) => {
+    const c = CTC.get(companyId)
+    return c ? rechargeParts({ ctc: c }, 'director_attribution', '2026-09') : []
+  }
+  const ACCOUNTS = { Salary: '5050', Allowance: '5051', EPF: '5052', SOCSO: '5052', EIS: '5052' }
+
+  // 2026-10-30 (user: "往后 director 的我也要 split category").
+  it('a company at HR’s figure is itemised, each line on the account picked for its kind', () => {
+    const out = planCompanyInvoices({
+      rows: [
+        { companyId: 'co-hc', amount: 25768.1 },
+        { companyId: 'co-2990', amount: 9642.13 },
       ],
-      true,
-      false,
-    )
-    expect(out.map((p) => [p.label, p.mode, p.kind === 'one' ? p.amount : null])).toEqual([
-      ['HOUZS Century (HC) · HR attribution', 'hr_attribution', 600],
-      ['HOUZS Century (HC) · Finance attribution', 'finance_attribution', 400],
-    ])
-  })
-
-  it('several companies split: the lines are proportions of each company’s amount, to the sen', () => {
-    const out = plan(
-      [
-        { ...HC, amount: 1000 },
-        { ...C2990, amount: 333.33 },
-      ],
-      [
-        { mode: 'hr_attribution', category: '5050', amount: 2 },
-        { mode: 'finance_attribution', category: '5050', amount: 1 },
-      ],
-      true,
-      true,
-    )
-    expect(out.map((p) => (p.kind === 'one' ? p.amount : null))).toEqual([666.67, 333.33, 222.22, 111.11])
-  })
-
-  it('a line or a company at nothing writes nothing', () => {
-    const out = plan([{ ...HC, amount: 0 }, C2990], [{ mode: 'hr_attribution', category: '5050', amount: 0 }], false, true)
-    expect(out.map((p) => p.label)).toEqual(['2990 (2990)'])
-  })
-
-  // 2026-10-06 (user: "director 要 bill back 的我要拆 detail 可以吗？" → "可以").
-  it('a director CTC at HR’s figure is itemised — Salary / Allowance / EPF / SOCSO / EIS, nothing at zero', () => {
-    const out = plan([HC, C2990], [{ mode: 'director_attribution', category: '5050', amount: 0 }], false, true, CTC)
+      parts,
+      description: 'Director salary CTC — September 2026',
+      account: '',
+      kinds: ['Salary', 'Allowance', 'EPF', 'SOCSO', 'EIS'],
+      kindAccounts: ACCOUNTS,
+    })
     expect(out[0]).toEqual({
-      kind: 'lines',
-      label: 'HOUZS Century (HC)',
-      target: HC,
-      mode: 'director_attribution',
+      companyId: 'co-hc',
       lines: [
         { description: "Salary - Sep'26", amount: 22800, categoryCode: '5050' },
-        { description: "EPF - Sep'26", amount: 2736, categoryCode: '5050' },
-        { description: "SOCSO - Sep'26", amount: 208.3, categoryCode: '5050' },
-        { description: "EIS - Sep'26", amount: 23.8, categoryCode: '5050' },
+        { description: "EPF - Sep'26", amount: 2736, categoryCode: '5052' },
+        { description: "SOCSO - Sep'26", amount: 208.3, categoryCode: '5052' },
+        { description: "EIS - Sep'26", amount: 23.8, categoryCode: '5052' },
       ],
     })
-    expect(out[1].kind === 'lines' && out[1].lines.map((l) => l.description)).toEqual(["Salary - Sep'26", "Allowance - Sep'26", "EPF - Sep'26", "SOCSO - Sep'26", "EIS - Sep'26"])
+    expect(out[1].lines.map((l) => [l.description, l.categoryCode])).toEqual([
+      ["Salary - Sep'26", '5050'],
+      ["Allowance - Sep'26", '5051'],
+      ["EPF - Sep'26", '5052'],
+      ["SOCSO - Sep'26", '5052'],
+      ["EIS - Sep'26", '5052'],
+    ])
   })
 
-  it('a director CTC Finance changed goes out as one line; the others still itemised', () => {
-    const out = plan([{ ...HC, amount: 25000 }, C2990], [{ mode: 'director_attribution', category: '5050', amount: 0 }], false, true, CTC)
-    expect(out[0]).toEqual(expect.objectContaining({ kind: 'one', amount: 25000, category: '5050' }))
-    expect(out[1].kind).toBe('lines')
+  it('an amount Finance changed, or a company HR has nothing for, is one line on Salary’s account', () => {
+    const out = planCompanyInvoices({
+      rows: [
+        { companyId: 'co-hc', amount: 25000 },
+        { companyId: 'co-conts', amount: 800 },
+      ],
+      parts,
+      description: 'Director salary CTC — September 2026',
+      account: '',
+      kinds: ['Salary', 'EPF', 'SOCSO', 'EIS'],
+      kindAccounts: ACCOUNTS,
+    })
+    expect(out).toEqual([
+      { companyId: 'co-hc', lines: [{ description: 'Director salary CTC — September 2026', amount: 25000, categoryCode: '5050' }] },
+      { companyId: 'co-conts', lines: [{ description: 'Director salary CTC — September 2026', amount: 800, categoryCode: '5050' }] },
+    ])
   })
 
+  it('typed amounts, no kind of HR’s line: one line each, in the invoice’s words, on the one account', () => {
+    const out = planCompanyInvoices({
+      rows: [
+        { companyId: 'co-hc', amount: 300 },
+        { companyId: 'co-2990', amount: 150 },
+      ],
+      parts,
+      description: 'Claude AI Claim - YH',
+      account: '9087',
+      kinds: [],
+      kindAccounts: {},
+    })
+    expect(out.map((p) => p.lines)).toEqual([[{ description: 'Claude AI Claim - YH', amount: 300, categoryCode: '9087' }], [{ description: 'Claude AI Claim - YH', amount: 150, categoryCode: '9087' }]])
+  })
+})
+
+describe('a batch', () => {
   it('names what failed among what went in', () => {
     expect(partialSentence(2, [{ label: 'HOUZS Sofa (HS) · HR attribution', reason: 'Period 2026-09 is closed' }])).toBe(
       'Created 2 of 3 — HOUZS Sofa (HS) · HR attribution: Period 2026-09 is closed',

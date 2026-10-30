@@ -7,7 +7,6 @@ import { DialogConfirm, DialogMenu, Field, FinDialog, Input, type DialogMenuItem
 import { money } from '@/components/finv/form-words'
 import { invoiceSteps, type InvoiceCan, type InvoiceStepKey } from './InvoiceDrawer'
 import SettleDialog from './SettleDialog'
-import CreateInvoiceDialog from './CreateInvoiceDialog'
 import InvoiceLinesDialog from './InvoiceLinesDialog'
 import CreditNoteDialog from './CreditNoteDialog'
 import ChangeAccountDialog from './ChangeAccountDialog'
@@ -41,7 +40,7 @@ const rm = (n: number) => `RM ${f2(n)}`
 const r2 = (n: number) => Math.round(n * 100) / 100
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
-export type InvoiceDialogKind = 'single' | 'multi' | 'marketing' | 'consolidated' | 'reconcile' | 'own-share' | 'edit' | 'credit_note' | 'reassign'
+export type InvoiceDialogKind = 'new' | 'marketing' | 'consolidated' | 'reconcile' | 'own-share' | 'edit' | 'credit_note' | 'reassign'
 export type InvoiceMenu = 'create' | 'payroll' | 'export' | 'bulk'
 type Ask =
   | { kind: 'void'; ids: string[] }
@@ -255,8 +254,8 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
   })
   const openDialog = (kind: InvoiceDialogKind) => () => setDialog({ kind, nonce: Date.now(), open: true })
   const createItems: DialogMenuItem[] = [
-    menuItem('single', 'Single invoice', openDialog('single')),
-    menuItem('multi', 'Multi-line invoice', openDialog('multi'), 'Several lines on one invoice'),
+    // One window for one line or several (2026-10-30), where Single invoice and Multi-line invoice were two.
+    menuItem('new', 'New invoice', openDialog('new'), 'One line or several'),
     menuItem(
       'marketing',
       'Import Marketing billing',
@@ -453,20 +452,7 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
       </FinDialog>
 
       {/* The invoice dialogs (the design's inv-form), and the system's own for the rest, mounted open for what asked. */}
-      {dialog?.kind === 'single' ? (
-        <CreateInvoiceDialog
-          key={dialog.nonce}
-          open={dialog.open}
-          onClose={closeDialog}
-          onDone={dialogDone}
-          period={hub.period}
-          today={today}
-          companies={hub.companies}
-          departments={hub.departments}
-          categories={hub.categories}
-          extraModes={hub.extraModes}
-        />
-      ) : dialog?.kind === 'multi' ? (
+      {dialog?.kind === 'new' ? (
         <InvoiceLinesDialog
           key={dialog.nonce}
           open={dialog.open}

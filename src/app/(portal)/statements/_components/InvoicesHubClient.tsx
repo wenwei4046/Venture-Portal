@@ -165,7 +165,7 @@ export default function InvoicesHubClient({
     const receipt = url.searchParams.get('receipt')
     const fresh = url.searchParams.get('new') === '1'
     if (receipt) flash(returnedNote(receipt))
-    if (fresh && openNew && can.create) work.openDialog('single')
+    if (fresh && openNew && can.create) work.openDialog('new')
     if (receipt || url.searchParams.has('new')) {
       url.searchParams.delete('receipt')
       url.searchParams.delete('new')

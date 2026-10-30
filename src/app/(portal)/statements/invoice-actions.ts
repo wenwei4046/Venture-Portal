@@ -188,7 +188,7 @@ const partyOf = (p: HubInvoiceParty) => ({
   freetextEmail: p.billKind === 'freetext' ? p.email?.trim() : undefined,
 })
 
-/** Create invoice: one draft — a party, a billing mode, a category, an amount. Its number back. */
+/** One draft without lines — a party, a billing mode, a category, an amount (Single invoice's, until 2026-10-30, when the one Create invoice window began writing every invoice with lines). Its number back. */
 export async function hubCreateInvoice(payload: HubInvoiceParty & HubInvoiceHead & { category: string; amount: number }): Promise<HubResult<string>> {
   await requireActionOn('/invoices/[id]', 'billing', 'create')
   return attempt(async () => {
@@ -215,7 +215,7 @@ export async function hubCreateInvoice(payload: HubInvoiceParty & HubInvoiceHead
   })
 }
 
-/** A draft with lines: Multi-line invoice, or a director's CTC itemised the way HR keyed it. Its number back. */
+/** A draft with lines: Create invoice's, one line or several — and each of its several companies', HR's figure itemised the way HR keyed it. Its number back. */
 export async function hubCreateLinesInvoice(payload: HubInvoiceParty & HubInvoiceHead & { lines: InvoiceLineInput[] }): Promise<HubResult<string | null>> {
   await requireActionOn('/statements', 'billing', 'create')
   return attempt(async () => {
