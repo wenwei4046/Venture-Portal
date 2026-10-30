@@ -10,6 +10,7 @@
  * replies · Auto replies) · Camera in one pill, the mic held to record or Send;
  * "/" for quick replies; after the reply window, approved templates only.
  */
+import { HUMAN_AGENT_APPROVED } from "@/lib/messenger/send";
 import { sourceOf } from "@/lib/member/crm-source";
 import { DEFAULT_APPT_TYPES } from "@/lib/member/crm-data";
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
@@ -105,6 +106,14 @@ export function windowLeft(c: CrmCustomer, now: Date): string {
  * refuses the QuickTime box), a converted video that had lost its picture, and an iPhone voice recording (a fragmented
  * MP4) — each is now made into what WhatsApp takes before it goes (shared/video-fit.ts), so one sent before says so.
  */
+/**
+ * A reply past Messenger's 24-hour window says nothing under it until Human Agent is approved (the owner, 2026-10-30:
+ * "不要那个 not sent … 真的完全不显示。过后等 human agent 好了之后再恢复") — flipping HUMAN_AGENT_APPROVED brings it back.
+ * A message refused for any other reason (a file WhatsApp could not open …) still says so.
+ */
+export const quietFailure = (status: string | null | undefined, error: string | null | undefined, approved = HUMAN_AGENT_APPROVED) =>
+  status === "failed" && !approved && !!error && /since the customer’s last message/.test(error);
+
 export function failNote(error: string | null | undefined): string {
   // A reply past Meta's window is kept here and never sent (crm-actions › keptUnsent, 2026-10-30).
   if (error && /since the customer’s last message/.test(error)) return `Saved but not sent · ${error}`;
@@ -182,7 +191,7 @@ export function chatVM(ctx: SalesCtx) {
       pDisp: !md && !card && m.text ? "inline" : card || (mk === "file" && (!m.text || m.text === md?.name)) || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: typePx(16.3) /* 15 px on a phone, frame M04 */, textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : m.text),
       // A starred message shows ★ by its time (the message menu's Star, 2026-10-14).
       timeJustify: "flex-end", timeColor: mine ? MINE_TIME : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
-      failNote: mine && m.status === "failed" ? failNote(m.error) : "",
+      failNote: mine && m.status === "failed" && !quietFailure(m.status, m.error) ? failNote(m.error) : "",
       tick: mine, tickColor: tickColor(read ? "read" : m.status), tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
       // Sending: a small clock until it went (then the two ticks); not delivered: a "!" (shared/chat-media.ts).
       tickPath: tickPathOf(m.status),

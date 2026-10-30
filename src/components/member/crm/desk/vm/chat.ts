@@ -13,6 +13,7 @@ import { sourceOf } from "@/lib/member/crm-source";
 import type { CrmChatMessage, CrmCustomer } from "@/lib/member/crm-data";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { first, initials } from "./data";
+import { quietFailure } from "../../sales/vm/chat";
 import type { DeskCtx } from "./ctx";
 import { albumsOf, galleryOf, mediaOf, mediaWord, MINE_BG, MINE_TIME, NO_MEDIA, tickColor } from "../../shared/chat-media";
 import { MENU_ICON, REACTIONS, openMsgView, openStarred } from "../../shared/msg-menu";
@@ -112,7 +113,7 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       reactBar: REACTIONS.map(e => ({ e, bg: rx === e ? "var(--crm-field)" : "transparent", pick: () => { patch({ msgMenu: null }); void act.react(m.id, rx === e ? "" : e); } })),
       // Your own bubble: the brand's orange, white words, white time and ticks (the owner, 2026-10-16 — the phone's, chat-media.ts).
       outBg: MINE_BG, outFg: "#fff", outTime: MINE_TIME,
-      acts, tick: tickColor(m.status), hasTick: mine && m.status !== "failed" && m.status !== "sending", failed: m.status === "failed",
+      acts, tick: tickColor(m.status), hasTick: mine && m.status !== "failed" && m.status !== "sending", failed: m.status === "failed" && !quietFailure(m.status, m.error),
       quote: q ? { who: q.from === "me" ? "You" : c.name, text: q.text || mediaWord(q) } : null, quoteMargin: media.pad === NO_MEDIA.pad ? "0 0 6px" : "0 0 4px", appt,
     };
   });
