@@ -87,6 +87,16 @@ export function categoryGroups(categories: ReadonlyArray<InvoiceCategory>): Arra
 
 // ── Months ──
 
+/**
+ * A new invoice's date: today while it is billed in this month (or one ahead); billed for a month gone by, that
+ * month's last day — a payroll bill back keyed the month after is dated in its own month, as every one has been
+ * (2026-10-30, asked whether a past month's invoice should start at its last day: "Yes, fix it"; Single invoice's
+ * "我开的invoice 应该是31/07", 2026-08-13).
+ */
+export function newInvoiceDate(month: string, today: string): string {
+  return month < today.slice(0, 7) ? dayjs(`${month}-01`).endOf('month').format('YYYY-MM-DD') : today
+}
+
 export const plusDays = (iso: string, days: number) => dayjs(iso).add(days, 'day').format('YYYY-MM-DD')
 
 /** The months an invoice may belong to: a year before the hub's to three after, and the one it has. */

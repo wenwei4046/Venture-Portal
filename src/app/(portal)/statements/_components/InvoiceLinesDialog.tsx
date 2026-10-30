@@ -12,6 +12,7 @@ import {
   billToValue,
   hrDescription,
   hrSource,
+  newInvoiceDate,
   parseBillTo,
   partialSentence,
   planCompanyInvoices,
@@ -41,8 +42,11 @@ import { loadMalaysia } from '@/lib/address/malaysia'
 // Create invoice (2026-10-30 — the user: "single-invoice 和 multi-invoice 的
 // 功能能不能做在一起？", then, on its sample, "可以"): one window for an invoice
 // of one line or several, where Single invoice and Multi-line invoice were two.
-// Bill to with the Invoice date beside it, today ("把 invoice date 放上去，和
-// bill to 同排"; "invoice date 默认今天"); the Description; the Billing mode,
+// Bill to with the Invoice date beside it ("把 invoice date 放上去，和 bill to
+// 同排"): today ("invoice date 默认今天"), or, billed for a month gone by, that
+// month's last day — a payroll bill back is keyed the month after, and dated in
+// its own (asked on 2026-10-30: "Yes, fix it") — moving with the Period until a
+// date is picked; the Description; the Billing mode,
 // none until picked; the lines, each its Account, its words and its amount on
 // one row ("类别 - 全部一行"; "把 description 和 category 倒反…改成 account"),
 // every line's account needed; then the Due date, none until picked ("due
@@ -163,7 +167,9 @@ export default function InvoiceLinesDialog({
   // None until picked: the two windows started on different modes, and a mode routes the invoice's pool.
   const [mode, setMode] = useState(init?.billing_mode ?? '')
   const [month, setMonth] = useState(init?.period_month ? init.period_month.slice(0, 7) : hubMonth)
-  const [invoiceDate, setInvoiceDate] = useState(init ? (init.invoice_date ?? '') : today)
+  const [invoiceDate, setInvoiceDate] = useState(init ? (init.invoice_date ?? '') : newInvoiceDate(hubMonth, today))
+  /** A date picked by hand stays where it is when the month moves. */
+  const datePicked = useRef(false)
   const [dueDate, setDueDate] = useState(init ? (init.due_date ?? '') : '')
   const [reference, setReference] = useState(init?.reference_no ?? '')
   const [showPeriod, setShowPeriod] = useState(false)
@@ -267,9 +273,14 @@ export default function InvoiceLinesDialog({
     appliedRows.current = ''
     setSeveral(true)
   }
+  // A new invoice's date moves with its month until one is picked: today in this month, a month gone by's last day.
+  const moveMonth = (next: string) => {
+    setMonth(next)
+    if (!editing && !datePicked.current) setInvoiceDate(newInvoiceDate(next, today))
+  }
   // What a small button hides is not sent: the month it had, no reference.
   const togglePeriod = () => {
-    if (showPeriod) setMonth(init?.period_month ? init.period_month.slice(0, 7) : hubMonth)
+    if (showPeriod) moveMonth(init?.period_month ? init.period_month.slice(0, 7) : hubMonth)
     setShowPeriod(!showPeriod)
   }
   const toggleRef = () => {
@@ -488,7 +499,16 @@ export default function InvoiceLinesDialog({
             </Field>
           )}
           <Field label="Invoice date">
-            <DateField value={invoiceDate} onChange={setInvoiceDate} today={today} label="Invoice date" emptyText="No invoice date" />
+            <DateField
+              value={invoiceDate}
+              onChange={(d) => {
+                datePicked.current = true
+                setInvoiceDate(d)
+              }}
+              today={today}
+              label="Invoice date"
+              emptyText="No invoice date"
+            />
           </Field>
         </div>
         {several ? null : (
@@ -586,7 +606,7 @@ export default function InvoiceLinesDialog({
 
         {showPeriod ? (
           <Field label="Period" htmlFor="il-period">
-            <PeriodSelect id="il-period" value={month} onChange={setMonth} around={hubMonth} disabled={locked} />
+            <PeriodSelect id="il-period" value={month} onChange={moveMonth} around={hubMonth} disabled={locked} />
           </Field>
         ) : null}
         {showRef ? (
