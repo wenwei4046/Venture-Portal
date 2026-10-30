@@ -5,6 +5,7 @@
  * address (the old one stops opening), and the bookings still to come. The pane: one booking as it came in — when, where,
  * who booked it, the customer, the remarks and the booker's note — with Cancel for CRM · Manage.
  */
+import { partnerLinkUrl } from "@/lib/crm-partner/model";
 import { useState } from "react";
 import type { CrmPartnerBooking, CrmPartnerLink } from "@/lib/member/crm-data";
 
@@ -20,7 +21,7 @@ export interface BookingLinkBits {
 export function DeskBookingLink({ v }: { v: BookingLinkBits }) {
   const [busy, setBusy] = useState(false);
   if (!v.can) return <div style={{ padding: "24px 0", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Only CRM · Manage sees and changes the booking link.</div>;
-  const urlOf = (l: CrmPartnerLink) => `${typeof window === "undefined" ? "" : window.location.origin}/b/${l.code}`;
+  const urlOf = (l: CrmPartnerLink) => partnerLinkUrl(l.code);
   const run = (p: Promise<boolean>) => { setBusy(true); void p.finally(() => setBusy(false)); };
   const copy = (l: CrmPartnerLink) => { void navigator.clipboard?.writeText(urlOf(l)).then(() => v.toast("Link copied"), () => v.toast(urlOf(l))); };
   return (
@@ -103,7 +104,7 @@ export function DeskPartnerPane({ v, close }: { v: PartnerPaneBits | null; close
 export function DeskBookingBar({ v }: { v: BookingLinkBits }) {
   const [busy, setBusy] = useState(false);
   if (!v.can || !v.links.length) return null;
-  const urlOf = (l: CrmPartnerLink) => `${typeof window === "undefined" ? "" : window.location.origin}/b/${l.code}`;
+  const urlOf = (l: CrmPartnerLink) => partnerLinkUrl(l.code);
   const run = (p: Promise<boolean>) => { setBusy(true); void p.finally(() => setBusy(false)); };
   const copy = (l: CrmPartnerLink) => { void navigator.clipboard?.writeText(urlOf(l)).then(() => v.toast("Link copied"), () => v.toast(urlOf(l))); };
   return (

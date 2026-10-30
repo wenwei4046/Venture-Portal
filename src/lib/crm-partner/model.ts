@@ -26,6 +26,11 @@ export interface PartnerBooked {
 /** Starts already booked at a showroom (ISO → how many), the CRM's and the partner's together. */
 export type PartnerTaken = Record<string, number>;
 
+/** The company's own address for the booking link (the owner, 2026-10-31: the link read venture-portal-chi… — "改成公司现在的 domain"),
+ *  whatever address the CRM itself was opened on. */
+export const PARTNER_LINK_ORIGIN = "https://erp.houzsventure.com";
+export const partnerLinkUrl = (code: string) => `${PARTNER_LINK_ORIGIN}/b/${code}`;
+
 export const isPartnerCode = (v: unknown): v is string => typeof v === "string" && /^pc-[A-HJ-NP-Z2-9]{8}$/.test(v);
 export const isPartnerRef = (v: unknown): v is string => typeof v === "string" && /^TC-[A-HJ-NP-Z2-9]{6}$/i.test(v.trim());
 export const isYmd = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
