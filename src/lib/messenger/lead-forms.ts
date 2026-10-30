@@ -20,13 +20,17 @@ export const messengerLeadRow = (l: MsgLead): LeadRow => ({ kind: "messenger", p
 
 /** "full_name" → "Full name"; Meta's own field names read as words. */
 const words = (name: string) => { const s = name.replace(/[_-]+/g, " ").trim(); return s ? s[0].toUpperCase() + s.slice(1) : name; };
-const PHONE = /^(phone(_number)?|mobile(_number)?|contact_number|whatsapp(_number)?|电话|手机)$/i;
+// A form's phone question may be its whole sentence ("sounds_good,_{{user_first_name}}._what_is_the_best_phone_number…").
+const PHONE = /phone|mobile|whatsapp|contact_number|电话|手机/i;
 const NAME = /^(full_name|name|姓名)$/i;
 const FIRST = /^first_name$/i, LAST = /^last_name$/i;
 
 /** An Instant Form lead's answers (Meta's field_data) → the row: its questions and answers, phone, name. */
 export function instantLeadRow(ref: InstantLeadRef, lead: { field_data?: { name?: string; values?: unknown[] }[]; ad_id?: string; form_id?: string; created_time?: string }): LeadRow {
   const fields = (lead.field_data ?? []).filter(f => f?.name).map(f => ({ key: String(f.name), value: (f.values ?? []).map(v => String(v)).join(", ").trim() }));
+  // A Messenger lead ad's lead is in Leads Center too (its form carries inbox_url): its chat brings it (the referral or
+  // the summary), so it is not made a second customer on WhatsApp (found 2026-10-30 on The Conts' only form).
+  if (fields.some(f => f.key === "inbox_url")) return { kind: "instant", pageId: ref.pageId, leadId: ref.leadId, error: "from a Messenger lead ad — taken by its chat" };
   const pick = (re: RegExp) => fields.find(f => re.test(f.key) && f.value)?.value ?? null;
   const name = pick(NAME) ?? ([pick(FIRST), pick(LAST)].filter(Boolean).join(" ") || null);
   const brand = brandOf(ref.pageId);
