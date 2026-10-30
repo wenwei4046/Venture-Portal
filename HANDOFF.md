@@ -1,5 +1,17 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-30 v (SHIPPED, #877) — the two invoice windows 680px wide
+
+Session e73c0205. The user, on Multi-line invoice: "这个可以帮我做宽有点，因为我key line 时key description看到不是很清楚",
+then "普通invoice 也是一样" → a width sample (now 520 / 680 / 840; the app's file view runs no script, so its switch is
+radios + CSS), the user: "用 680px" → branch `feat/invoice-dialogs-wide`. **No migration.**
+
+- `CreateInvoiceDialog` and `InvoiceLinesDialog` (so Edit invoice too) take `FinDialog`'s `wide`: 680px on a desktop,
+  as Create payment; the phone's sheet ignores it. A line shows about 65 characters of its description instead of 40.
+- Production's 738 invoice lines: a quarter longer than 44 characters, the longest 86. A line over about 65 still scrolls
+  inside its box — the user picked 680 over 840 knowing it.
+- MERGED on "全绿就 merge" once CI was green (7 of 7; the SQL job 24m48s): squash `adfc9446`.
+
 ## CHECKPOINT 2026-10-29 u (SHIPPED, #858) — the phone's Payment request, the old pages retired
 
 Session e73c0205. "可以，先把pr6 的代码写好" → the phone sample (`mockups/pr6-phone-payment-request.html`), the user:
