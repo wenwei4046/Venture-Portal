@@ -50,6 +50,8 @@ describe('a fixed-term plan', () => {
       months: 12, paidCount: 2, outstandingDue: 600 + 9 * 11200, firstDue: '2026-02-15', firstInstallment: 11200,
       totalInterest: 14400, principalPaid: 30000, interestPaid: 3000, principalOwed: 90000,
     })
+    // 2026-10-26 — the schedule's fourth card: the next installment still to fall due.
+    expect(plan.next).toEqual({ due: '2026-07-15', amount: 11200, principal: 10000, interest: 1200 })
   })
 
   it('puts the last cent of principal on the last installment', () => {
@@ -172,6 +174,10 @@ describe('a deal with no fixed term', () => {
     expect(plan.rows[7].balance).toBe(51000) // the base January re-bases on
     expect(plan.rows[17].balance).toBe(41000)
     expect(plan.principalOwed).toBe(41000)
+    // No fixed term: the month after the last, its interest on the base it keeps, no principal asked.
+    const last = plan.rows[plan.rows.length - 1]
+    expect(plan.next).toMatchObject({ principal: 0, interest: last.interest, amount: last.interest })
+    expect(plan.next!.due > last.due).toBe(true)
 
     const open = buildRepaymentPlan({
       terms: { principal: 100000, startYM: '2026-03', firstDueYM: '2026-04', current: { rate: 0.01, months: null, compounding: false, effectiveFrom: null }, history: [] },
@@ -287,6 +293,8 @@ describe('a deal with no fixed term', () => {
     // The table's total adds up: what was due = what came in + what was rolled in + what is overdue.
     const due = Math.round(plan.rows.reduce((s, r) => s + r.installment, 0) * 100) / 100
     expect([due, Math.round((plan.compound!.paidToDate + plan.compound!.addedToBalance + plan.overdue) * 100) / 100]).toEqual([33584.52, 33584.52])
+    // The next installment: November's 4% on the whole balance owed after October.
+    expect(plan.next).toEqual({ due: '2026-11-05', amount: 2447.38, principal: 0, interest: 2447.38 })
   })
 
   it('says what is overdue on a no-fixed-term plan’s head, and on a fixed plan’s nothing changes', () => {
@@ -364,6 +372,7 @@ describe('the live book’s rounding', () => {
     })
     expect(plan.rows).toHaveLength(8)
     expect(plan.rows[7]).toMatchObject({ ym: '2026-08', interest: 525.49, balance: 0, tone: 'ledger', remark: 'Paid 20 Aug 2026 · HV-PV-202608-0297', paid: 26799.95 })
+    expect(plan.next).toBeNull()
     expect(plan.rows[0]).toMatchObject({ interest: 457.47, balance: 23330.97, remark: 'Unpaid · 457.47 to balance' })
   })
 })
