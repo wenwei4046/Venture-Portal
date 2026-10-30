@@ -1,5 +1,26 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-30 x (SHIPPED, #883) — a past month's invoice starts at its last day
+
+Session e73c0205. The user: "帮我检查如果是payroll bill back 回会有问题吗？只是检查" → one problem found: the director
+CTC bill back is keyed the month after and was always dated the payroll month's last day (30 Jun · 31 Jul · 31 Aug ·
+30 Sep, keyed 8 Jul · 4 Aug · 2 Sep · 6 Oct), but the one window (#879) started at today — the invoice would print, and
+post at Issue (the issue entry takes the invoice date), in the next month. Asked, the user: "Yes, fix it". **No
+migration.**
+
+- `newInvoiceDate(month, today)` (`statements/_lib/invoice-form.ts`): today in this month or one ahead; a month gone
+  by's last day. The window starts at it for the hub's month; until a date is picked it moves with *Period* (and back
+  when Period is put away); a picked date stays; Edit keeps its own date.
+- Fine as they were (checked, nothing changed): *Generate payroll invoices* and the own-share invoice (always month
+  end); Several companies' director CTC itemising (total_ctc = the six parts to the sen, Jun–Sep); payroll PVs never ask
+  Bill back (only claim / direct-pay shares do).
+- MERGED on "全绿就 merge": squash `ace24f42`. The first run's *Next.js build check* failed on a Turbopack
+  next/font/google error unrelated to the change (the code commit's own run passed it); re-run once the SQL job ended
+  (`gh run rerun` refuses while a job still runs), then 7 of 7.
+- Next in this session: Minimum pay interest gets a start month (the user picked sample A, then "照这个做") — branch
+  `feat/min-pay-from-month`, migration `20261030080000_min_pay_interest_from.sql` (goes to production before its merge,
+  on the user's word).
+
 ## CHECKPOINT 2026-10-30 w (SHIPPED, #879) — one Create invoice window (Single + Multi-line merged)
 
 Session e73c0205. The user: "single-invoice 和 multi-invoice 的功能能不能做在一起？" → three samples (scratchpad
