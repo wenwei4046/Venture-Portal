@@ -1,5 +1,19 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-31 z (SHIPPED, #884) — Minimum pay interest from a month, merged
+
+Session e73c0205, on "继续" / "现在看并 merge". Checkpoint y below is the build (OPEN then); this closes it.
+
+- **MERGED:** squash `983132b1` (2026-10-30 16:59Z = 31 Oct 00:59 MYT). The migration
+  `20261030080000_min_pay_interest_from.sql` has been on production since 30 Oct ~12:35Z.
+- Overnight main gained #885 (which took DESIGN.md **v4.204**), #886 and #887: #884's entry became **v4.205** (dated
+  2026-10-31), main merged into the branch (`fb3a2528`).
+- That run's *SQL checks* failed only in `tests/member-sql/validate-marketing-pic-calendar.mjs:335` (`words.includes(D1)`,
+  "never a date off the PIC's calendar") — a clock window: it fails between 00:00 and 08:00 MYT (UTC still the day
+  before); another branch (`feat-kiv-bedframe-cost`, 00:31 MYT) failed the same line; #884's previous head passed the
+  whole chain at 20:30 MYT. Merged under the user's standing rule for Marketing's tests ("只做我的part": ours green —
+  units, build, Cloudflare, Vercel). Marketing's test is not ours to fix.
+
 ## CHECKPOINT 2026-10-30 y (OPEN, #884 — merge on the user's next word) — Minimum pay interest from a month
 
 Session e73c0205. The user: "minimn pay interest 可以set 几时开始吗？" → it could not (an undated on/off: on, every
