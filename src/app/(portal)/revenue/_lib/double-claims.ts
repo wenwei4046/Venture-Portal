@@ -155,7 +155,8 @@ export async function loadDoubleClaimEvidence(
   const ids = [...new Set(bills.map(b => b.orderId))]
   const nos = [...new Set(bills.map(b => b.orderNo))]
   const erpNos = [...new Set(bills.filter(b => b.source === 'erp_sync').map(b => b.orderNo))]
-  const refs = [...new Set(groups.map(g => g.billRef))]
+  // Every paper of every group: a drop or upsell is filed under its bill's first paper, which may be any of them.
+  const refs = [...new Set(groups.flatMap(g => g.billRefs))]
 
   const cutoverRead = supabase.from('comm_cutovers').select('first_paid_month, note')
     .eq('sub_department_id', subDepartmentId).maybeSingle()
@@ -243,7 +244,7 @@ export async function loadDoubleClaimEvidence(
   // group's first bill.
   const adjustmentsOf = new Map<string, ClaimAdjustment[]>()
   for (const a of adjustments) {
-    const group = groups.find(g => g.billRef === a.original_ref)
+    const group = groups.find(g => a.original_ref !== null && g.billRefs.includes(a.original_ref))
     const target = bills.find(b => a.erp_doc_no && b.orderNo === a.erp_doc_no)
       ?? group?.bills.find(b => b.orderNo === a.original_ref)
       ?? group?.bills[0]
