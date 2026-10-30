@@ -60,6 +60,19 @@ describe('DoubleClaimPanel', () => {
     await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1))
   })
 
+  it('three documents on the same papers are one group, named by every paper and answered under the first (2026-10-31)', async () => {
+    const groups = groupDoubleClaims(['HC12933', 'HC12931', 'HC12932'].flatMap(ref => [
+      bill(ref, 'HC-SO-013268', '2026-09-01'), bill(ref, 'HC-SO-013271', '2026-09-01'), bill(ref, 'HC-SO-013319', '2026-09-01'),
+    ]))
+    render(<DoubleClaimPanel {...props} groups={groups} carried={[]} />)
+    const panel = screen.getByRole('region', { name: 'Possible double claims' })
+    expect(panel).toHaveTextContent('To check1')
+    expect(within(panel).getByRole('article', { name: 'HC12931 · HC12932 · HC12933 on 3 bills' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Checked — separate sales' }))
+    expect(window.confirm).toHaveBeenCalledWith('HC12931 · HC12932 · HC12933: these 3 bills are separate sales, not one bill claimed twice?')
+    await waitFor(() => expect(dismiss).toHaveBeenCalledWith('fair', 'HC12931'))
+  })
+
   it('an answered pair steps aside but can be asked again', async () => {
     render(<DoubleClaimPanel {...props} groups={hc11366(true)} carried={[]} />)
     expect(screen.getByRole('region', { name: 'Possible double claims' })).toHaveTextContent('To check0')

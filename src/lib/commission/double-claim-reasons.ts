@@ -790,8 +790,10 @@ export function explainDoubleClaim(
   // What is already claimed first — the thing the others would pay again —
   // then how the rest arrived, what they share, where they part, and what
   // the pattern of the two says.
+  // (2026-10-31) A Ref No. may name several papers; these bills may share more than one.
+  const papers = group.billRefs
   const reasons: string[] = [
-    `Paper ${group.billRef} is on ${plural(bills.length, 'bill')}: ${list(bills.map(b => `${b.orderNo} (${claimMonth(b.periodMonth)})`))}.`,
+    `${papers.length > 1 ? `Papers ${list(papers)} are` : `Paper ${group.billRef} is`} on ${plural(bills.length, 'bill')}: ${list(bills.map(b => `${b.orderNo} (${claimMonth(b.periodMonth)})`))}.`,
     ...claimedSentences(bills, evs, standings, ctx),
     ...bills.flatMap((b, i) => (standings[i].kind === 'open' ? [arrivalSentence(b, evs[i])] : [])),
   ]

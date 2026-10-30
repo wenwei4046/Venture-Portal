@@ -3,6 +3,7 @@ import {
   carriedFromUnpaidMonths,
   claimsInMonth,
   groupDoubleClaims,
+  groupPapers,
   openClaimsByMonth,
   type DoubleClaimBill,
 } from './double-claims'
@@ -44,6 +45,53 @@ describe('possible double claims', () => {
       bill('HC11366', 'B', '2026-09-01', { dismissed: false }),
     ])
     expect(groups[0].dismissed).toBe(false)
+  })
+})
+
+describe('every paper a Ref No. names (2026-10-31)', () => {
+  // The database answers one row per paper and bill: three documents naming the same three papers in three orders.
+  const three = ['HC12932', 'HC12931', 'HC12933'].flatMap(ref => [
+    bill(ref, 'HC-SO-013268', '2026-09-01'),
+    bill(ref, 'HC-SO-013271', '2026-09-01'),
+    bill(ref, 'HC-SO-013319', '2026-09-01'),
+  ])
+
+  it('papers on exactly the same bills are one question, under all of them', () => {
+    const groups = groupDoubleClaims(three)
+    expect(groups.map(g => [g.billRef, g.billRefs, g.bills.map(b => b.orderNo)])).toEqual([
+      ['HC12931', ['HC12931', 'HC12932', 'HC12933'], ['HC-SO-013268', 'HC-SO-013271', 'HC-SO-013319']],
+    ])
+    // Each bill carries the paper the group goes by, the one an answer is saved under.
+    expect(groups[0].bills.map(b => b.billRef)).toEqual(['HC12931', 'HC12931', 'HC12931'])
+    expect(groupPapers(groups[0])).toBe('HC12931 · HC12932 · HC12933')
+  })
+
+  it("a bill's second paper on another bill is a group of its own — the first paper's pair stays as it was", () => {
+    // HC-SO-2610-300 is HC9882+ZNT4864: ZNT4864 is the August claim form's; HC9882 is also on HC-SO-2610-301.
+    const groups = groupDoubleClaims([
+      bill('HC9882', 'HC-SO-2610-300', '2026-10-01'),
+      bill('HC9882', 'HC-SO-2610-301', '2026-10-01'),
+      bill('ZNT4864', 'HC-SO-2610-300', '2026-10-01'),
+      bill('ZNT4864', 'ZNT4864', '2026-08-01', { source: 'file' }),
+    ])
+    expect(groups.map(g => [g.billRefs, g.bills.map(b => b.orderNo)])).toEqual([
+      [['ZNT4864'], ['ZNT4864', 'HC-SO-2610-300']],
+      [['HC9882'], ['HC-SO-2610-300', 'HC-SO-2610-301']],
+    ])
+  })
+
+  it('a paper on one bill alone is nothing to ask, even when that bill shares another paper', () => {
+    const groups = groupDoubleClaims([
+      bill('HC13375', 'HC-SO-2609-268', '2026-09-01'),
+      bill('HC13375', 'HC-SO-2609-389', '2026-09-01'),
+      bill('ZNT6737', 'HC-SO-2609-268', '2026-09-01'),
+    ])
+    expect(groups.map(g => g.billRefs)).toEqual([['HC13375']])
+  })
+
+  it('answered together: the merged group is answered when its bills were', () => {
+    const answered = three.map(b => ({ ...b, dismissed: true }))
+    expect(groupDoubleClaims(answered)[0].dismissed).toBe(true)
   })
 })
 

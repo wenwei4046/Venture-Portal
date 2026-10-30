@@ -307,4 +307,14 @@ describe('explainDoubleClaim', () => {
     expect(x.reasons[1]).toBe('HC30000 counts in August 2026, a month paid outside the portal (June–August paid from the claim forms).')
     expect(x.history['HC-SO-2609-900'].map(e => e.text)).toEqual(['No delivery of it from the ERP is logged.', 'Not paid yet — September 2026’s commission counts it.'])
   })
+
+  it('names every paper two bills share (2026-10-31: a Ref No. may name several)', () => {
+    const [group] = groupDoubleClaims(['HC12932', 'HC12931'].flatMap(ref => [
+      bill(ref, 'HC-SO-013268', '2026-09-01', '2026-09-02', 3_000),
+      bill(ref, 'HC-SO-013271', '2026-09-01', '2026-09-02', 2_500),
+    ]))
+    const x = explainDoubleClaim(group, new Map(), CTX)
+    expect(x.billRef).toBe('HC12931')
+    expect(x.reasons[0]).toBe('Papers HC12931 and HC12932 are on 2 bills: HC-SO-013268 (September 2026) and HC-SO-013271 (September 2026).')
+  })
 })
