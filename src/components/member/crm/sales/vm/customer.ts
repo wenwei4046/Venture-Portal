@@ -59,6 +59,8 @@ export function infoRows(c: CrmCustomer, data?: Pick<CrmData, "forms">) {
     ["Requirement", c.details.req || "—"], ["Budget", c.details.budget ? "RM " + c.details.budget : "—"],
     // The form's own questions, after the built-in ones (CRM Desktop rev 1, B5).
     ...(f?.extra ?? []).flatMap(s => s.fields.map(q => [q.label, c.extra?.[q.id] || "—"])),
+    // A lead form ad's answers (2026-10-30), each under the question Meta asked.
+    ...(c.leadForm ? [[c.leadForm.kind === "instant" ? "Facebook form" : "Lead form", c.leadForm.complete ? "Filled in" : "Not finished"], ...c.leadForm.answers.map(x => [x.q, x.a || "—"])] : []),
   ] as [string, string][]).filter(([k]) => !f || !dropped[k] || f.has[dropped[k]])
     .map(([k, v], n) => ({ k, v, rule: n ? "1px solid var(--crm-rule)" : "0", vFg: v === "—" ? "var(--crm-faint)" : "var(--crm-ink)",
       // The Ad opens the ad itself, so the salesperson sees what the customer saw (the owner, 2026-10-15).

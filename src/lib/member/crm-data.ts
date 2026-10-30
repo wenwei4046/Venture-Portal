@@ -121,6 +121,8 @@ export interface CrmCustomer {
   details: CrmDetails;
   /** CRM Desktop rev 1 (B5): answers to the fields the Principal / Director added to the Customer info form. */
   extra?: Record<string, string>;
+  /** A lead form ad's answers (2026-10-30): a Messenger lead ad's or a Facebook Instant Form's, as Meta sent them. */
+  leadForm?: CrmLeadForm;
   /** Book visit's customer form was saved once (then a booking goes straight to the time). */
   detailsSaved: boolean;
   messages: CrmChatMessage[];
@@ -388,6 +390,8 @@ export interface CrmForm {
   /** `page` / `pageTitle`: the page a section is on (0 = the first) since the paged form (2026-10-16); none — one page. */
   sections: { id: string; title: string; fields: CrmFormField[]; page?: number; pageTitle?: string }[];
 }
+/** A lead form ad's answers on a customer (2026-10-30). */
+export interface CrmLeadForm { kind: "messenger" | "instant"; complete: boolean; at: string | null; answers: { q: string; a: string }[] }
 export interface CrmNote { id: string; customerId: string; by: string | null; text: string; at: string }
 
 /** A cold lead template. `body` writes the customer's first name as {name}; `metaName` is what Meta keeps it by. */
@@ -435,6 +439,7 @@ export interface CrmContactRowX extends CrmContactRow {
   held_reason?: string | null;
   /** CRM Desktop rev 1 (B5): answers to the form's own questions. */
   extra?: Record<string, string> | null;
+  lead_form?: { kind?: string; complete?: boolean; at?: string; answers?: { q?: string; a?: string }[] } | null;
 }
 export interface CrmMessageRowX extends CrmMessageRow {
   reply_to?: string | null;
@@ -594,6 +599,8 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
       req: row.requirement ?? "", budget: row.budget ?? "",
     },
     ...(row.extra && Object.keys(row.extra).length ? { extra: row.extra } : {}),
+    ...(row.lead_form && Array.isArray(row.lead_form.answers) ? { leadForm: { kind: row.lead_form.kind === "instant" ? "instant" as const : "messenger" as const, complete: row.lead_form.complete !== false,
+      at: row.lead_form.at ?? null, answers: row.lead_form.answers.filter(x => x?.q).map(x => ({ q: String(x.q), a: String(x.a ?? "") })) } } : {}),
     detailsSaved: !!row.details_at,
     messages: messages.filter(m => m.contact_id === row.id).sort((a, b) => a.sent_at.localeCompare(b.sent_at)).map(chatMessage),
   };
