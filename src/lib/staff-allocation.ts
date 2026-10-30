@@ -296,18 +296,19 @@ export function periodShortLabel(period: string): string {
   return dayjs(period.length === 7 ? `${period}-01` : period).format("MMM[']YY")
 }
 
+/** Each line with its kind (Salary, Allowance, EPF …): Create invoice picks an account for each kind (2026-10-30). */
 export function buildAllocationInvoiceLines(
   components: AllocationComponents,
   periodShort: string,
   deptName: string,
-): InvoiceLineDraft[] {
+): Array<InvoiceLineDraft & { kind: string }> {
   const suffix = `- ${periodShort} (${deptName})`
   return [
-    { description: `Salary ${suffix}`, amount: components.salary },
-    { description: `Allowance ${suffix}`, amount: components.allowance },
-    { description: `EPF ${suffix}`, amount: components.epf },
-    { description: `SOCSO ${suffix}`, amount: components.socso },
-    { description: `EIS ${suffix}`, amount: components.eis },
+    { kind: 'Salary', description: `Salary ${suffix}`, amount: components.salary },
+    { kind: 'Allowance', description: `Allowance ${suffix}`, amount: components.allowance },
+    { kind: 'EPF', description: `EPF ${suffix}`, amount: components.epf },
+    { kind: 'SOCSO', description: `SOCSO ${suffix}`, amount: components.socso },
+    { kind: 'EIS', description: `EIS ${suffix}`, amount: components.eis },
   ].filter((l) => l.amount > 0)
 }
 

@@ -51,7 +51,7 @@ export function FinDialog({
   tall?: boolean
   /**
    * 680px on a desktop for a form with fields side by side (Create payment, 2026-10-22), or with long descriptions to
-   * read as they are typed (Create invoice / Multi-line invoice, 2026-10-30); a phone's sheet ignores it.
+   * read as they are typed (Create invoice, 2026-10-30); a phone's sheet ignores it.
    */
   wide?: boolean
   /**

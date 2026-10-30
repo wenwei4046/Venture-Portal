@@ -42,8 +42,9 @@ vi.mock('@/app/(portal)/statements/invoice-actions', () => ({
   hubVoidCreditNote: vi.fn(),
   hubDeleteCreditNote: vi.fn(),
 }))
-vi.mock('@/app/(portal)/statements/_components/CreateInvoiceDialog', () => ({ default: ({ open }: { open: boolean }) => (open ? <div data-testid="create-invoice" /> : null) }))
-vi.mock('@/app/(portal)/statements/_components/InvoiceLinesDialog', () => ({ default: () => null }))
+vi.mock('@/app/(portal)/statements/_components/InvoiceLinesDialog', () => ({
+  default: ({ open, editing }: { open: boolean; editing?: unknown }) => (open && !editing ? <div data-testid="create-invoice" /> : null),
+}))
 vi.mock('@/app/(portal)/statements/_components/CreditNoteDialog', () => ({ default: () => null }))
 vi.mock('@/app/(portal)/statements/_components/ChangeAccountDialog', () => ({ default: () => null }))
 vi.mock('@/app/(portal)/statements/_components/SettleDialog', () => ({
@@ -358,7 +359,7 @@ describe('Daily › Invoice on the phone', () => {
     draw()
     fireEvent.click(screen.getByRole('button', { name: 'Create invoice ▾' }))
     const menu = await screen.findByRole('menu')
-    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Single invoice' }))
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /^New invoice/ }))
     expect(screen.getByTestId('create-invoice')).toBeInTheDocument()
   })
 })

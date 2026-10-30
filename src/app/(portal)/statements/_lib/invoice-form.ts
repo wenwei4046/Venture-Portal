@@ -1,14 +1,16 @@
 // The invoice dialogs' rules (2026-10-14, the Finance revamp v2 — D10's
 // `inv-form`): who an invoice bills, the billing modes in the hub's words,
-// the accounts an invoice posts to, the months it may belong to, and what
-// Create invoice makes of its fields — one invoice per company and billing
-// mode, a director's CTC itemised the way HR keyed it. Pure, so the dialogs'
-// arithmetic is tested here; the dialogs only draw it.
+// the accounts an invoice posts to, the months it may belong to, HR's figures
+// as the lines they are itemised into, and what Several companies makes of its
+// rows — an invoice for each company, HR's figure itemised on an account for
+// each kind of line. Pure, so the dialogs' arithmetic is tested here; the
+// dialogs only draw it.
 
 import dayjs from 'dayjs'
 import { typeLabel, type AccountType } from '@/lib/coa'
-import { directorCtcInvoiceLines, type DirectorCtcComponents, type DirectorCtcLine } from '@/lib/director-ctc-lines'
+import { directorCtcParts, type DirectorCtcComponents } from '@/lib/director-ctc-lines'
 import { billingModeLabel } from '@/lib/invoice-labels'
+import { buildAllocationInvoiceLines, periodShortLabel, type AllocationComponents } from '@/lib/staff-allocation'
 
 export type BillKind = 'subsidiary' | 'director' | 'dept_pool' | 'freetext'
 
@@ -85,9 +87,6 @@ export function categoryGroups(categories: ReadonlyArray<InvoiceCategory>): Arra
 
 // ── Months ──
 
-/** "2026-10" → "2026-10-31": a single invoice's date, while it follows its month (2026-08-13: "我开的invoice 应该是31/07"). */
-export const monthEnd = (month: string) => dayjs(`${month}-01`).endOf('month').format('YYYY-MM-DD')
-
 export const plusDays = (iso: string, days: number) => dayjs(iso).add(days, 'day').format('YYYY-MM-DD')
 
 /** The months an invoice may belong to: a year before the hub's to three after, and the one it has. */
@@ -99,68 +98,73 @@ export function periodChoices(month: string, keep?: string | null): Array<{ valu
   return out.sort().reverse().map((value) => ({ value, label: dayjs(`${value}-01`).format('MMMM YYYY') }))
 }
 
-// ── Create invoice ──
+// ── HR's figures as lines ──
 
-export interface InvoiceTarget {
-  /** Who it bills, in the failure's words ("HOUZS Century (HC)"). */
-  label: string
-  billKind: BillKind
-  companyId?: string
-  deptId?: string
-  name?: string
-  /** Several companies: the company's amount; one party: the Amount field. */
+/** The kinds of line HR's figures are itemised into, in the order an invoice lists them. */
+export const PART_KINDS: readonly string[] = ['Salary', 'KPI', 'Allowance', 'EPF', 'SOCSO', 'EIS']
+
+export interface RechargePart {
+  /** Salary, KPI, Allowance, EPF, SOCSO or EIS. */
+  kind: string
+  description: string
   amount: number
 }
-
-export interface InvoicePool {
-  mode: string
-  category: string
-  /** Split: the line's amount — a proportion when several companies share the split. */
-  amount: number
-}
-
-export type PlannedInvoice =
-  | { kind: 'one'; label: string; target: InvoiceTarget; mode: string; category: string; amount: number }
-  | { kind: 'lines'; label: string; target: InvoiceTarget; mode: string; lines: DirectorCtcLine[] }
-
-const r2 = (n: number) => Math.round(n * 100) / 100
 
 /**
- * What Save draft writes: an invoice for each party and each billing mode.
- * Without a split, each party's amount on the one mode and category. Split,
- * one party: each line its own invoice at the line's amount (the lines add up
- * to the amount). Split across several companies: the lines are proportions
- * — each company's amount divided by them (the old Create Invoice's template).
- * A director recharge on a company HR keyed the CTC for, at exactly that CTC,
- * goes out itemised (Salary / KPI / Allowance / EPF / SOCSO / EIS); an amount
- * Finance changed goes out as one line.
+ * HR's figure for a company as the lines it is itemised into, a zero part left
+ * out: a shared-services department's staff cost as Multi-line invoice wrote
+ * it ("Salary - Sep'26 (HR)"), a director's CTC as the director invoices read
+ * ("Salary - Sep'26").
  */
-export function planCreateInvoices(input: {
-  targets: InvoiceTarget[]
-  pools: InvoicePool[]
-  split: boolean
-  several: boolean
-  /** "2026-10". */
-  period: string
-  ctc: ReadonlyMap<string, DirectorCtcComponents>
-  modeLabel?: (mode: string) => string
-}): PlannedInvoice[] {
-  const { targets, pools, split, several, period, ctc } = input
-  const modeLabel = input.modeLabel ?? ((m: string) => billingModeLabel(m))
-  const ratioSum = pools.reduce((s, p) => s + p.amount, 0)
-  const out: PlannedInvoice[] = []
-  for (const target of targets) {
-    for (const pool of pools) {
-      const amount = !split ? target.amount : several ? (ratioSum > 0 ? r2((target.amount * pool.amount) / ratioSum) : 0) : r2(pool.amount)
-      if (!(amount > 0)) continue
-      const label = split ? `${target.label} · ${modeLabel(pool.mode)}` : target.label
-      const components = pool.mode === 'director_attribution' && target.companyId ? ctc.get(target.companyId) : undefined
-      const lines = components ? directorCtcInvoiceLines(components, amount, period, pool.category) : null
-      if (lines && lines.length >= 2) out.push({ kind: 'lines', label, target, mode: pool.mode, lines })
-      else out.push({ kind: 'one', label, target, mode: pool.mode, category: pool.category, amount })
-    }
-  }
-  return out
+export function rechargeParts(figure: { staff?: AllocationComponents; ctc?: DirectorCtcComponents }, mode: string, month: string): RechargePart[] {
+  if (figure.ctc) return directorCtcParts(figure.ctc, month)
+  const dept = STAFF_MODE_DEPT[mode]
+  return figure.staff && dept ? buildAllocationInvoiceLines(figure.staff, periodShortLabel(month), dept) : []
+}
+
+/** The description a recharge from HR's figures starts with ("Salary - HR - Sep'26", "Director salary CTC — September 2026"). */
+export function hrDescription(mode: string, month: string): string {
+  if (mode === 'director_attribution') return `Director salary CTC — ${dayjs(`${month}-01`).format('MMMM YYYY')}`
+  return `Salary - ${STAFF_MODE_DEPT[mode]} - ${periodShortLabel(month)}`
+}
+
+// ── Several companies ──
+
+export interface CompanyInvoice {
+  companyId: string
+  lines: Array<{ description: string; amount: number; categoryCode: string }>
+}
+
+const cents = (n: number) => Math.round(n * 100)
+
+/**
+ * What Several companies writes (Create invoice, 2026-10-30): an invoice for
+ * each company. Billed at exactly HR's figure to the sen, a company's invoice
+ * is itemised as HR keyed it, each line on the account picked for its kind
+ * (the user: "往后 director 的我也要 split category"); any other amount — one
+ * Finance typed or changed — is one line in the invoice's own words, on the
+ * one account, or, while HR's kinds are being billed, on the first kind's
+ * (Salary's).
+ */
+export function planCompanyInvoices(input: {
+  rows: ReadonlyArray<{ companyId: string; amount: number }>
+  /** HR's lines for a company — none for a company HR keyed nothing for. */
+  parts: (companyId: string) => RechargePart[]
+  description: string
+  /** The one account, when no kind of HR's line is being billed. */
+  account: string
+  /** The kinds of HR's line being billed, and the account picked for each. */
+  kinds: readonly string[]
+  kindAccounts: Readonly<Record<string, string>>
+}): CompanyInvoice[] {
+  const { rows, parts, description, account, kinds, kindAccounts } = input
+  const oneLine = kinds.length > 0 ? (kindAccounts[kinds[0]] ?? '') : account
+  return rows.map((r) => {
+    const own = kinds.length > 0 ? parts(r.companyId) : []
+    if (own.length > 0 && own.reduce((s, p) => s + cents(p.amount), 0) === cents(r.amount))
+      return { companyId: r.companyId, lines: own.map((p) => ({ description: p.description, amount: p.amount, categoryCode: kindAccounts[p.kind] ?? '' })) }
+    return { companyId: r.companyId, lines: [{ description, amount: r.amount, categoryCode: oneLine }] }
+  })
 }
 
 /** "Created 2 of 3 — HOUZS Sofa (HS) · HR attribution: the period is closed." */

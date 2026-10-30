@@ -4,6 +4,8 @@
 // summed per company by get_director_ctc_by_company); Create Invoice used to
 // bill the total as one line. The lines read like the consolidated payroll
 // invoice's, so a subsidiary sees the same shape for staff and directors.
+// Since 2026-10-30 each line carries its kind, and Create invoice puts each
+// kind on an account of its own (the user: "往后 director 的我也要 split category").
 import { periodShortLabel } from './staff-allocation'
 
 export interface DirectorCtcComponents {
@@ -15,10 +17,11 @@ export interface DirectorCtcComponents {
   eis: number
 }
 
-export interface DirectorCtcLine {
+export interface DirectorCtcPart {
+  /** Salary, KPI, Allowance, EPF, SOCSO or EIS. */
+  kind: string
   description: string
   amount: number
-  categoryCode: string
 }
 
 const COMPONENTS: Array<[keyof DirectorCtcComponents, string]> = [
@@ -32,22 +35,15 @@ const COMPONENTS: Array<[keyof DirectorCtcComponents, string]> = [
 
 const cents = (n: number) => Math.round(n * 100)
 
-/** The component lines for `amount`, or null when `amount` is not the sum of
- *  the components to the sen — Finance changed the figure in the table, and a
- *  split HR did not give cannot be read off it, so that invoice stays one
- *  line. Zero components are left out, as on the payroll invoice. */
-export function directorCtcInvoiceLines(
-  c: DirectorCtcComponents,
-  amount: number,
-  period: string,
-  categoryCode: string,
-): DirectorCtcLine[] | null {
-  const total = COMPONENTS.reduce((sum, [key]) => sum + cents(c[key]), 0)
-  if (total !== cents(amount)) return null
+/** The component lines ("Salary - Sep'26"), zero components left out, as on
+ *  the payroll invoice. An amount Finance changed is not their sum, and a
+ *  split HR did not give cannot be read off it — the caller bills it as one
+ *  line. */
+export function directorCtcParts(c: DirectorCtcComponents, period: string): DirectorCtcPart[] {
   const periodShort = periodShortLabel(period)
   return COMPONENTS.filter(([key]) => cents(c[key]) > 0).map(([key, label]) => ({
+    kind: label,
     description: `${label} - ${periodShort}`,
     amount: c[key],
-    categoryCode,
   }))
 }

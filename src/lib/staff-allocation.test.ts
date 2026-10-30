@@ -146,11 +146,11 @@ describe('allocationPreview', () => {
       'HR',
     )
     expect(lines).toEqual([
-      { description: "Salary - May'26 (HR)", amount: 2580.0 },
-      { description: "Allowance - May'26 (HR)", amount: 295.5 },
-      { description: "EPF - May'26 (HR)", amount: 309.6 },
-      { description: "SOCSO - May'26 (HR)", amount: 31.25 },
-      { description: "EIS - May'26 (HR)", amount: 3.57 },
+      { kind: 'Salary', description: "Salary - May'26 (HR)", amount: 2580.0 },
+      { kind: 'Allowance', description: "Allowance - May'26 (HR)", amount: 295.5 },
+      { kind: 'EPF', description: "EPF - May'26 (HR)", amount: 309.6 },
+      { kind: 'SOCSO', description: "SOCSO - May'26 (HR)", amount: 31.25 },
+      { kind: 'EIS', description: "EIS - May'26 (HR)", amount: 3.57 },
     ])
     const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
     expect(total).toBe(3219.92)

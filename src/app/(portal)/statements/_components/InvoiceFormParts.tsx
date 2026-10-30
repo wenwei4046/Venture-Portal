@@ -55,6 +55,7 @@ export function BillToSelect({
   companies,
   departments,
   disabled = false,
+  tall = false,
 }: {
   id: string
   value: string
@@ -62,9 +63,11 @@ export function BillToSelect({
   companies: DialogCompany[]
   departments: DialogDepartment[]
   disabled?: boolean
+  /** Beside a date field: as tall as it (Create invoice's Bill to | Invoice date). */
+  tall?: boolean
 }) {
   return (
-    <Select id={id} round={12} className={fm.select} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
+    <Select id={id} round={12} className={tall ? `${fm.select} ${fm.tall}` : fm.select} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
       <option value="">Choose who to bill</option>
       <optgroup label="Companies">
         {companies.map((c) => (
