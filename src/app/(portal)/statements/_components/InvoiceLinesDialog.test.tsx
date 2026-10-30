@@ -3,7 +3,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import type { InvoiceEditInitial } from '../_lib/invoice-model'
 
 // Create invoice and Edit (2026-10-30 — one window where Single invoice and
-// Multi-line invoice were two): Bill to beside the Invoice date (today), the
+// Multi-line invoice were two): Bill to beside the Invoice date (today, or a
+// month gone by's last day, moving with the Period until one is picked), the
 // Description, the Billing mode (none until picked), the lines — each its
 // account, its words and its amount — and the Due date (none until picked);
 // a lone line's blank words are the Description; HR's staff cost or director
@@ -44,7 +45,7 @@ const DIRECTORS = [
 const flush = () => act(async () => {
   await new Promise((r) => setTimeout(r, 0))
 })
-function draw(editing: InvoiceEditing | null = null) {
+function draw(editing: InvoiceEditing | null = null, period = '2026-09-01') {
   const onDone = vi.fn()
   const onClose = vi.fn()
   render(
@@ -52,7 +53,7 @@ function draw(editing: InvoiceEditing | null = null) {
       open
       onClose={onClose}
       onDone={onDone}
-      period="2026-09-01"
+      period={period}
       today="2026-10-14"
       companies={companies}
       departments={departments}
@@ -117,8 +118,8 @@ describe('Create invoice', () => {
     const row = screen.getByLabelText('Bill to').parentElement?.parentElement
     expect(row).toContainElement(within(dialog()).getByRole('button', { name: /^Invoice date/ }))
     expect(row).not.toContainElement(screen.getByLabelText('Description'))
-    // Today, and no due date until one is picked.
-    expect(within(dialog()).getByRole('button', { name: /^Invoice date/ })).toHaveTextContent('Wed, 14 Oct 2026')
+    // The hub is on September, a month gone by: its last day. No due date until one is picked.
+    expect(within(dialog()).getByRole('button', { name: /^Invoice date/ })).toHaveTextContent('Wed, 30 Sep 2026')
     expect(within(dialog()).getByRole('button', { name: /^Due date/ })).toHaveTextContent('No due date')
     expect(screen.getByLabelText('Billing mode')).toHaveValue('')
     // One line to start: its account, its words (the Description's while it is the only one), its amount.
@@ -170,7 +171,7 @@ describe('Create invoice', () => {
       name: undefined,
       mode: 'venture_attribution',
       period: '2026-09',
-      invoiceDate: '2026-10-14',
+      invoiceDate: '2026-09-30',
       dueDate: '',
       description: "Office Rental - Nov'26",
       reference: '',
@@ -214,7 +215,7 @@ describe('Create invoice', () => {
       email: '',
       mode: 'marketing_project',
       period: '2026-09',
-      invoiceDate: '2026-10-14',
+      invoiceDate: '2026-09-30',
       dueDate: '',
       description: 'Marketing service — Sep',
       reference: '',
@@ -225,11 +226,31 @@ describe('Create invoice', () => {
     })
   })
 
-  it('Period moves the month and leaves the date; Reference no is sent', async () => {
+  it('the Invoice date is today in this month: a month gone by starts at its last day, as a payroll bill back keyed the month after', () => {
+    draw(null, '2026-10-01')
+    const date = () => within(dialog()).getByRole('button', { name: /^Invoice date/ })
+    expect(date()).toHaveTextContent('Wed, 14 Oct 2026')
+    press('Period')
+    set('Period', '2026-09')
+    expect(date()).toHaveTextContent('Wed, 30 Sep 2026')
+    set('Period', '2026-11')
+    expect(date()).toHaveTextContent('Wed, 14 Oct 2026')
+    // Period put away: the hub's month again, and its date.
+    set('Period', '2026-09')
+    press('Period')
+    expect(date()).toHaveTextContent('Wed, 14 Oct 2026')
+  })
+
+  it('Period moves the month, and the date with it until one is picked; Reference no is sent', async () => {
     draw()
+    const date = () => within(dialog()).getByRole('button', { name: /^Invoice date/ })
     press('Period')
     set('Period', '2026-08')
-    expect(within(dialog()).getByRole('button', { name: /^Invoice date/ })).toHaveTextContent('Wed, 14 Oct 2026')
+    expect(date()).toHaveTextContent('Mon, 31 Aug 2026')
+    fireEvent.click(date())
+    fireEvent.click(within(dialog()).getByRole('button', { name: '20 August 2026' }))
+    set('Period', '2026-07')
+    expect(date()).toHaveTextContent('Thu, 20 Aug 2026')
     press('Reference no')
     set('Reference no', 'PO-881')
     set('Bill to', 'co:co-hc')
@@ -239,7 +260,7 @@ describe('Create invoice', () => {
     set('Line 1 amount', '100')
     press('Save draft')
     await flush()
-    expect(mocks.createLines).toHaveBeenLastCalledWith(expect.objectContaining({ period: '2026-08', invoiceDate: '2026-10-14', reference: 'PO-881' }))
+    expect(mocks.createLines).toHaveBeenLastCalledWith(expect.objectContaining({ period: '2026-07', invoiceDate: '2026-08-20', reference: 'PO-881' }))
   })
 
   it('a refusal is said in words, and the window stays', async () => {

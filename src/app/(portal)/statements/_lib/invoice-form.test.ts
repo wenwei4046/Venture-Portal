@@ -5,6 +5,7 @@ import {
   hrDescription,
   hrSource,
   modeOptions,
+  newInvoiceDate,
   parseBillTo,
   partialSentence,
   periodChoices,
@@ -93,6 +94,16 @@ describe('the months', () => {
 
   it('thirty days on', () => {
     expect(plusDays('2026-10-14', 30)).toBe('2026-11-13')
+  })
+
+  it('a new invoice’s date: today in this month or one ahead, a month gone by’s last day', () => {
+    expect(newInvoiceDate('2026-10', '2026-10-30')).toBe('2026-10-30')
+    expect(newInvoiceDate('2026-11', '2026-10-30')).toBe('2026-10-30')
+    // October's director CTC billed back on 5 November, as September's was on 6 October (dated 30 Sep).
+    expect(newInvoiceDate('2026-10', '2026-11-05')).toBe('2026-10-31')
+    expect(newInvoiceDate('2026-09', '2026-10-06')).toBe('2026-09-30')
+    expect(newInvoiceDate('2026-02', '2026-03-02')).toBe('2026-02-28')
+    expect(newInvoiceDate('2025-12', '2026-01-04')).toBe('2025-12-31')
   })
 })
 
