@@ -1,5 +1,27 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-10-30 w (SHIPPED, #879) — one Create invoice window (Single + Multi-line merged)
+
+Session e73c0205. The user: "single-invoice 和 multi-invoice 的功能能不能做在一起？" → three samples (scratchpad
+`inv-merge`; radios + CSS, the file view runs no script) → "可以，但是往后 director 的我也要 split category" → "开没有" →
+branch `feat/one-invoice-window`. **No migration** — lines already carry their account (`invoice_lines.category_code`).
+
+- *Create invoice ▾* › *New invoice · One line or several* opens `InvoiceLinesDialog`, the one window (Edit invoice
+  too; `?new=1` opens it). `CreateInvoiceDialog` and its test are deleted.
+- The window: Bill to | Invoice date (today; the select 40px beside the date, `.pair select.select.tall`), Description
+  (now required — production had none blank), Billing mode (none until picked), lines *Account* ▾ | words | amount on
+  one row (`acct-item`; every line's account needed; a lone line's blank words take the Description), Due date (none
+  until picked: "due date default 不用"). More: Several companies · Period · Reference no. Split billing modes dropped
+  ("拿掉先" — never used).
+- HR's staff cost and a director's CTC fill a company's lines (`rechargeParts`), each account still picked. Several
+  companies: an invoice each (`planCompanyInvoices`) — HR's figure itemised on *Account for each line* (one account
+  per kind: Salary / KPI / Allowance / EPF / SOCSO / EIS), a changed amount one line on Salary's, typed amounts one line
+  on the one *Account*. Every invoice is now written with lines (`hubCreateLinesInvoice`); `hubCreateInvoice` is kept
+  but no window calls it.
+- My calls the user may still overrule: Billing mode blank; HR-filled lines' accounts blank (all 123 past HR lines were
+  5050); the menu word *New invoice*; a changed several-companies amount on Salary's account.
+- MERGED on "全绿就 merge" once CI was green (7 of 7; SQL 22m55s): squash `3af22e3e`. Not seen live by me (no login).
+
 ## CHECKPOINT 2026-10-30 v (SHIPPED, #877) — the two invoice windows 680px wide
 
 Session e73c0205. The user, on Multi-line invoice: "这个可以帮我做宽有点，因为我key line 时key description看到不是很清楚",
