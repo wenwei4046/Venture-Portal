@@ -45,6 +45,10 @@ import { loadMalaysia } from '@/lib/address/malaysia'
 // payment's do; a staff or director recharge on one company fills its amount
 // from HR as the batch did. The invoice date follows the month until it is
 // touched (2026-08-13), the due date is thirty days on.
+//
+// On a desktop it is the kit's wide window, 680px, as Multi-line invoice is
+// (2026-10-30 — the user: "普通invoice 也是一样"): a long description shows
+// whole. The phone's sheet is unchanged.
 
 interface CompanyRow {
   key: number
@@ -343,7 +347,7 @@ export default function CreateInvoiceDialog({
   )
 
   return (
-    <FinDialog open={open} onClose={() => !busy && onClose()} title="Create invoice" sub="Saved as draft · approve to issue" locked={busy} tall>
+    <FinDialog open={open} onClose={() => !busy && onClose()} title="Create invoice" sub="Saved as draft · approve to issue" locked={busy} tall wide>
       <DialogForm
         buttons={
           partly ? (

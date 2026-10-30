@@ -99,6 +99,11 @@ describe('the design’s form', () => {
     expect(within(dialog()).getByRole('group', { name: 'More' })).toHaveTextContent('Several companiesSplit billing modesPeriodReference no')
   })
 
+  it('on a desktop it is the wide window (680px), as Multi-line invoice is', () => {
+    draw()
+    expect(dialog()).toHaveAttribute('data-wide')
+  })
+
   it('Bill to holds the companies, the department pools, a director or someone else', () => {
     draw()
     const groups = Array.from(screen.getByLabelText('Bill to').querySelectorAll('optgroup')).map((g) => [g.label, Array.from(g.querySelectorAll('option')).map((o) => o.textContent)])
