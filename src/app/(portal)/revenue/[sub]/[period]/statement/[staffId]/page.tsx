@@ -395,7 +395,8 @@ export default async function CommissionStatementPage({ params }: PageProps) {
                     <td className="num">{formatMoney(Number(b.revenue))}</td>
                     <td className="num">{formatMoney(Number(b.cost))}</td>
                     <td className={b.margin_pct === null ? 'num neg' : 'num'}>
-                      {b.margin_pct === null ? 'no cost' : pct(b.margin_pct)}
+                      {/* A brand only given away: its cost and no sales (2026-10-30). */}
+                      {b.margin_pct === null ? (Number(b.revenue) <= 0 && Number(b.cost) > 0 ? 'no sales' : 'no cost') : pct(b.margin_pct)}
                     </td>
                   </tr>
                 ))}

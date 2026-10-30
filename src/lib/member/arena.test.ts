@@ -134,4 +134,23 @@ describe("Arena margin incentive", () => {
     expect(result.brands.map(b=>b.brand)).toEqual(["AKEMI"]);
     expect(result.amount).toBe(2500);
   });
+
+  // HC-SO-2610-096 (2026-10-30): WEI PIN sold Zanotti and gave an Akemi item away on a bill of its own — the engine's rule.
+  const given = (cost: number, blindOrders = 0) => ({ sales:0, held:0, orders:1, kpiQty:0, marginRevenue:0, marginCost:cost, blindOrders });
+  it("reads a brand given away and never sold as below every tier — judged, not held", () => {
+    const result = arenaIncentive(seller({ AKEMI: given(214.29), ZANOTTI: at(.40) }), LADDER);
+    expect(result).toMatchObject({ amount:0, earned:[], blocked:null });
+    expect(result.brands.find(b=>b.brand==="AKEMI")).toMatchObject({ noSales:true, marginPct:null, cleared:[], next:null });
+    expect(result.brands.find(b=>b.brand==="ZANOTTI")).toMatchObject({ noSales:false, cleared:["incentive_tier_1","incentive_tier_2"] });
+  });
+
+  it("holds the incentive while a gift on its own still waits for a cost, as an uncosted sale does", () => {
+    const result = arenaIncentive(seller({ AKEMI: given(214.29, 1), ZANOTTI: at(.40) }), LADDER);
+    expect(result.blocked).toEqual({ reason:"no_cost", brand:"AKEMI" });
+    expect(result.brands.find(b=>b.brand==="AKEMI")?.noSales).toBe(false);
+  });
+
+  it("still names a bill with no brand first", () => {
+    expect(arenaIncentive(seller({ AKEMI: given(100), UNCLASSIFIED: at(.50) }), LADDER).blocked).toEqual({ reason:"no_brand" });
+  });
 });

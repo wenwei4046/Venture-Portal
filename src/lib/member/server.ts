@@ -196,6 +196,17 @@ const legacyLabels: Record<string, string> = {
 };
 const legacyLabel = (value: string): string => legacyLabels[value] ?? value;
 
+/** A book's bills and its margins by brand, their brands named as everywhere else. */
+function relabelBook(book: MemberOrderBook): MemberOrderBook {
+  return {
+    ...book,
+    orders: book.orders.map((order) => ({ ...order, brand: legacyLabel(order.brand) })),
+    ...(book.margins ? {
+      margins: { ...book.margins, brands: Object.fromEntries(Object.entries(book.margins.brands).map(([code, pct]) => [legacyLabel(code), pct])) },
+    } : {}),
+  };
+}
+
 function publicProduct(
   p: MemberProduct & {
     image_url?: unknown;
@@ -420,7 +431,7 @@ export async function loadMemberOrderBook(
     });
     const book = readOrderBook(data);
     if (!book) throw new Error("Your bills are temporarily unavailable.");
-    return { ...book, orders: book.orders.map((order) => ({ ...order, brand: legacyLabel(order.brand) })) };
+    return relabelBook(book);
   });
 }
 
@@ -719,7 +730,7 @@ export async function loadDepartmentOrderBook(subDepartmentId: string, from: str
       p_sub_department: subDepartmentId, p_from: from, p_until: until,
     }));
     if (!book) throw new Error("The bills are temporarily unavailable.");
-    return { ...book, orders: book.orders.map((order) => ({ ...order, brand: legacyLabel(order.brand) })) };
+    return relabelBook(book);
   });
 }
 

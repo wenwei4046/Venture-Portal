@@ -3,7 +3,7 @@ import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { payLinesTotal, type IncomeBill, type IncomeMonth, type IncomeOverride, type MemberIncome } from "@/lib/member/income";
 import { arenaMonthFridays } from "@/lib/member/arena";
 import { brandLadder, rowFor } from "../insight/ladder";
-import { brandName } from "../insight/insight-model";
+import { brandName, noSalesBill } from "../insight/insight-model";
 import { monthName, monthShort, rm, rm2, shortDay } from "../format";
 import type { CoRowVM, CoSheetVM, IncomeOrdersVM, IncomePastVM, IncomeRowVM, IncomeVM, Tone } from "./profile-vm";
 
@@ -33,10 +33,15 @@ function heroOf(m: IncomeMonth): { label: string; note: string } {
   return { label: "Estimated income · not settled", note: "Settles after month-end costing. Check your official payslip for payment." };
 }
 
+/** A brand still waiting for a cost — never one given away and not sold, whose cost is known (2026-10-30). */
+const pendingBrands = (m: IncomeMonth) => m.brands.filter(b => b.marginPct === null && !b.noSales).map(b => b.code);
+
 function incentiveSub(m: IncomeMonth): string {
-  const pending = m.brands.filter(b => b.marginPct === null).map(b => b.code);
+  const pending = pendingBrands(m);
+  const given = m.brands.filter(b => b.noSales).map(b => b.code);
   if (m.incentive > 0 && m.bandKey) return `${brandList(m.brands.map(b => b.code))} at ${bandText(m.bandKey).replace(/^Incentive /, "")}`;
   if (pending.length) return `Held · ${brandList(pending)} ${pending.length === 1 ? "has" : "have"} a bill without cost`;
+  if (given.length) return `No tier · ${brandList(given)} ${given.length === 1 ? "has" : "have"} no sales`;
   return m.brands.length ? "No incentive tier reached yet" : "No sales yet";
 }
 
@@ -92,7 +97,7 @@ export function incomeVM(data: MemberIncome, hidden: boolean, hasTeam = false): 
     { label: "Balance commission", sub: "What your commission leaves", amt: signed(pay.balance), neg: pay.balance < 0 },
   ] : null;
   const hero = heroOf(m);
-  const pending = m.brands.filter(b => b.marginPct === null).map(b => b.code);
+  const pending = pendingBrands(m);
   const past: IncomePastVM[] = data.past.filter(p => p.period !== m.period).map(p => ({
     period: p.period,
     month: `${monthName(p.period)} ${p.period.slice(0, 4)}`,
@@ -132,9 +137,11 @@ function weekOf(order: MemberBookOrder | undefined): string | null {
 }
 
 function toneOf(bill: IncomeBill, order: MemberBookOrder | undefined, bands: readonly MemberBand[]): Tone {
-  const margin = bill.marginPct ?? order?.margin ?? null;
+  // A gift on a bill of its own sits at the foot of its brand's ladder (2026-10-30).
+  const gift = !!order && noSalesBill(order) && bill.marginPct === null;
+  const margin = gift ? -Infinity : bill.marginPct ?? order?.margin ?? null;
   const brand = order?.brand ?? bill.brand ?? "";
-  return rowFor(margin, brandLadder(bands.filter(b => b.brand === brand)))?.tone ?? "neutral";
+  return rowFor(margin, brandLadder(bands.filter(b => b.brand === brand)))?.tone ?? (gift ? "bad" : "neutral");
 }
 
 /** Commission by order: the member's bills, then the override from their team. */
@@ -158,11 +165,12 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
     const goodsTotal = goods.reduce((a, l) => a + l.amount, 0);
     const commission = Math.round((b.personal + b.openBill) * 100) / 100;
     const margin = b.marginPct ?? o?.margin ?? null;
+    const gift = margin === null && !!o && noSalesBill(o);
     sheets[id] = {
       no: b.no,
       meta: [o?.customer, weekOf(o), o?.venue].filter(Boolean).join(" · ") || brand,
-      tag: waiting ? "Waiting for deposit" : margin === null ? "Cost pending" : `${margin.toFixed(1)}% margin`,
-      tone: waiting || margin === null ? "warn" : toneOf(b, o, bands),
+      tag: waiting ? "Waiting for deposit" : gift ? "No sales" : margin === null ? "Cost pending" : `${margin.toFixed(1)}% margin`,
+      tone: waiting || (margin === null && !gift) ? "warn" : toneOf(b, o, bands),
       amt: rm(o?.total ?? b.orderTotal ?? b.commissionable),
       commLabel: "Commission",
       comm: waiting ? "Waiting" : money(commission),

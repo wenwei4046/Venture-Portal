@@ -463,6 +463,11 @@ export interface BrandMargin {
   cost: number
   /** null when cost data was missing for that brand. */
   marginPct: number | null
+  /**
+   * Every bill of the brand that month had no sales of its own and its cost is known (2026-10-30): a cost and no
+   * margin to read — below every tier. Left out when false.
+   */
+  noSales?: true
 }
 
 /** An order held back because its deposit has not reached the threshold. */

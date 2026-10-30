@@ -128,6 +128,24 @@ describe('commission workbench ledger', () => {
     reconcile(board)
   })
 
+  // 2026-10-30: a gift on a bill of its own at RM 0 has no margin, and its cost counts against the month's.
+  it('reads a bill with no sales as No sales at its cost, and lets that cost pull the month under its tier', () => {
+    const gift: SalesOrder = {
+      id: 'gift', orderNo: 'SO-gift', staffId: 'agent', periodMonth: '2026-08-01', orderDate: '2026-08-13', eventDate: '2026-08-13',
+      orderTotal: 0, paidAmount: 0, brandCode: 'AKEMI',
+      lines: [{ id: 'gift-goods', itemGroup: 'ACC', productCode: 'AK-PROTECTOR', brandCode: 'AKEMI', qty: 1, lineAmount: 0, costAmount: 150 }],
+    }
+    const without = buildCommissionWorkbench(input())
+    const board = buildCommissionWorkbench(input({ orders: [sale('one'), sale('two', 2_000), gift] }))
+    expect(board.personalRows.find(row => row.orderId === 'gift')).toMatchObject({ noSales: true, marginPct: null, marginCost: 150, totalCommission: 0 })
+    expect(board.personalRows.find(row => row.orderId === 'one')).not.toHaveProperty('noSales')
+    // Akemi: 2,960 sold at 1,800 of cost (39.2%) clears Reward's 36%; the gift's 150 takes it to 34.1%.
+    const agent = (b: CommissionWorkbench) => b.people.find(person => person.staffId === 'agent')!.statement!
+    expect([agent(without).marginIncentive, agent(board).marginIncentive]).toEqual([1_000, 0])
+    expect(agent(board).marginByBrand).toEqual([{ brandCode: 'AKEMI', revenue: 2_960, cost: 1_950, marginPct: expect.closeTo(1_010 / 2_960, 10) }])
+    reconcile(board)
+  })
+
   it('does not create a margin from incomplete costs and uses the configured Revenue Team cost divisor', () => {
     const missing = sale('one')
     delete missing.lines[0].costAmount

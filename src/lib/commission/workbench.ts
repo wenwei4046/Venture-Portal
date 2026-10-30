@@ -1,6 +1,6 @@
 import {
   billMargin, classifyLine, computeCommissionRun, costBasisOf, EMPTY_KPI_INDEX, indexItemGroups,
-  indexKpiItems, isDepositMet, marginBase, orderRevenueSplit, penaltyBandFor, round2,
+  indexKpiItems, isDepositMet, marginBase, noSalesCost, orderRevenueSplit, penaltyBandFor, round2,
 } from './engine'
 import { kpiItemLabel, kpiSourceOf } from './kpi'
 import type { BillShare, EngineInput, EngineResult, MarginSource, OpenBillTag, SalesOrder, Statement } from './types'
@@ -81,6 +81,11 @@ export interface CommissionOrderRow {
   marginCost: number | null
   marginPct: number | null
   marginSource: MarginSource
+  /**
+   * The bill has no sales of its own — a gift on a bill of its own — and every goods line is costed (2026-10-30): no
+   * margin to read, its cost (`marginCost`) counted against the month.
+   */
+  noSales?: boolean
   status: CommissionOrderStatus
   productRate: number
   productCommission: number
@@ -312,6 +317,8 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     const meta = orderMeta.get(order.id)
     const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis, order.brandCode ?? null)
     const margin = billMargin(order, base)
+    const giftCost = noSalesCost(order.lines, base, groupIndex)
+    const noSales = typeof giftCost === 'number' && margin.pct === null
     const split = orderRevenueSplit(order, kpiIndex, groupIndex)
     const productRevenue = split.main
     const status: CommissionOrderStatus = excluded.has(order.id) ? 'excluded'
@@ -342,8 +349,8 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       commissionableValue: orderCommissionableValue(order, groupIndex),
       paidAmount: order.paidAmount,
       productRevenue, marginRevenue: base.revenue,
-      marginCost: margin.source === 'none' ? null : margin.cost,
-      marginPct: margin.pct, marginSource: margin.source, status,
+      marginCost: noSales && typeof giftCost === 'number' ? giftCost : margin.source === 'none' ? null : margin.cost,
+      marginPct: margin.pct, marginSource: margin.source, ...(noSales ? { noSales: true } : {}), status,
       productRate: statement?.productRate ?? rankOf(order.staffId)?.productRate ?? 0,
       productCommission: component('product_revenue'),
       kpiQty: sourceLines.filter(line => line.component === 'kpi_item').reduce((qty, line) => qty + (line.qty ?? 0), 0),
