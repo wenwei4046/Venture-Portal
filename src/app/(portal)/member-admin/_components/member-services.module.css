@@ -3,10 +3,16 @@
 /* ── Request reviews ── */
 .reqGrid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px; align-items: start; }
 .card { border: 1px solid rgb(var(--hv-hairline)); border-radius: 12px; padding: 16px; min-width: 0; background: rgb(255 255 255); }
+/* The list scrolls on its own (2026-11-01, the user, circling it: "make it scroll able" — 28 requests ran 1,700px down
+   the page). The card ends where the window does as the page opens (it starts 250px down — the frame, the head and the
+   tabs — and 34px of sheet and frame stay below it; never under 360px), so its whole box shows at once; only its rows
+   scroll, with 4px of room inside for a row's focus ring. A long request on the right scrolls the page, and the list
+   stays in view, 16px under the sheet's top. */
+.card { position: sticky; top: 16px; display: flex; flex-direction: column; max-height: max(360px, calc(100vh - 284px)); }
 .listHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .listTitle { font-size: 15px; font-weight: 500; margin: 0; }
 .filters { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
-.rows { display: flex; flex-direction: column; gap: 6px; }
+.rows { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow-y: auto; margin: -4px; padding: 4px; scrollbar-width: thin; }
 .row {
   display: flex;
   align-items: center;
