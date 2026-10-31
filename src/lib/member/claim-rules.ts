@@ -40,6 +40,12 @@ export interface ClaimRegion {
   spots: number;
   /** Flown to: the claim is the plane ticket's price, with its invoice. */
   planeTicket: boolean;
+  /**
+   * Claimed as the base is, whatever its spots — no outstation claim, no Airbnb (2026-11-01, the user: "select a spot
+   * that can be no claim for transport and airbnb, even though it is not a base spot"). Never flown to. Absent from a
+   * read older than it.
+   */
+  noClaim?: boolean;
 }
 
 /** A fair a claim can be for now, and the region HR set for its venue (null = not yet). */
@@ -119,9 +125,26 @@ export function fairRegion(rates: ClaimRates, fairId: string | null): { venue: s
   return { venue: fair.venue, region: rates.regions.find(r => r.id === fair.regionId) ?? null };
 }
 
-/** Away from the base: a route of spots, or flown to. Only such a fair has an Airbnb claim (user 2026-10-06). */
+/**
+ * Away from the base: a route of spots, or flown to — and not a region HR set as no claim (2026-11-01). Only such a
+ * fair has an Airbnb claim (user 2026-10-06).
+ */
 export function isOutstation(region: ClaimRegion): boolean {
-  return region.planeTicket || region.spots > 0;
+  return !region.noClaim && (region.planeTicket || region.spots > 0);
+}
+
+/**
+ * Why a fair in this region has no claim of this kind, or null: HR set the region as no claim (2026-11-01), or it is
+ * local to the base — 0 spots and not flown to; an Airbnb stay is for an outstation fair only. `member_claim_detail_for`
+ * refuses the same.
+ */
+export function regionClaimProblem(region: ClaimRegion, venue: string, base: string, type: "outstation" | "airbnb"): string | null {
+  const kind = type === "outstation" ? "outstation" : "Airbnb";
+  if (region.noClaim) return `${venue} is in ${region.name}, which HR set as no claim, so there is no ${kind} claim.`;
+  if (type === "outstation" ? !region.planeTicket && region.spots <= 0 : !isOutstation(region)) {
+    return `${venue} is local to ${base}, so there is no ${kind} claim.`;
+  }
+  return null;
 }
 
 /** The day `n` days after `day` (before it, for a negative `n`), both `YYYY-MM-DD`. */
@@ -217,11 +240,11 @@ export function airbnbCap(rates: ClaimRates, pax: number, nights: number): numbe
   return rates.perPaxNight === null || rates.perPaxNight <= 0 ? null : round2(pax * nights * rates.perPaxNight);
 }
 
-/** The claim's amount, RM — 0 when it cannot be worked out (no rate, local, no nights, nothing typed). */
+/** The claim's amount, RM — 0 when it cannot be worked out (no rate, local or no claim, no nights, nothing typed). */
 export function claimAmount(rates: ClaimRates, input: ClaimInput): number {
   if (input.type === "outstation") {
     const region = rates.regions.find(r => r.id === input.regionId);
-    if (!region) return 0;
+    if (!region || region.noClaim) return 0;
     if (region.planeTicket) return input.ticket && input.ticket > 0 ? round2(input.ticket) : 0;
     if (rates.perSpot === null || region.spots <= 0) return 0;
     return round2(region.spots * rates.perSpot);
@@ -423,7 +446,7 @@ export function readClaimRates(raw: unknown): ClaimRates {
       const x = r && typeof r === "object" ? (r as Record<string, unknown>) : null;
       const spots = x ? Number(x.spots) : NaN;
       return x && typeof x.id === "string" && typeof x.name === "string" && Number.isInteger(spots) && spots >= 0
-        ? [{ id: x.id, name: x.name, spots, planeTicket: x.planeTicket === true }] : [];
+        ? [{ id: x.id, name: x.name, spots, planeTicket: x.planeTicket === true, ...(x.noClaim === true ? { noClaim: true } : {}) }] : [];
     }),
     fairs,
     food: readFood(o.food, money),

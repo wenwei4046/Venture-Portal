@@ -9,7 +9,7 @@ import StayCalendar from "./StayCalendar";
 import Reveal from "./Reveal";
 import {
   airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
-  foodMonthOver, isOutstation, monthOfWeek, nightsBetween, stayProblem, stayWindow, transportPartProblem,
+  foodMonthOver, monthOfWeek, nightsBetween, regionClaimProblem, stayProblem, stayWindow, transportPartProblem,
 } from "@/lib/member/claim-rules";
 import { applicationFormHtml, BUILTIN_FIELDS, FORM_KINDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingField } from "@/lib/commission/waiting-form";
 import { answersFor, blankRequired, capacityLine, fillIn, priorAnswers } from "@/lib/member/waiting-answers";
@@ -206,6 +206,8 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   // A part of the claim their title is not ticked for (2026-10-31): the plane ticket is the air ticket's tick, by
   // road and an Airbnb stay the transport claim's — said in place of the part's fields, and refused on send.
   const partProblem = transportPartProblem(parts, cat, regionRow, options.title);
+  // A fair local to the base, or in a region HR set as no claim (2026-11-01): nothing of this kind to claim there.
+  const regionProblem = regionRow ? regionClaimProblem(regionRow, venue, options.rates.base, cat) : null;
   const ticketValue = money(ticket);
   const stayValue = money(stay);
   const nights = nightsBetween(checkIn, checkOut);
@@ -301,6 +303,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       if (cat === "outstation") {
         if (!regionRow) return setError(`HR has not set the region for ${venue} yet, so it cannot be claimed.`);
         if (partProblem) return setError(partProblem);
+        if (regionProblem) return setError(regionProblem);
         if (regionRow.planeTicket) {
           if (!(amount > 0)) return setError("Enter the air ticket's price, as its invoice shows.");
           if (!file) return setError("Add the air ticket's invoice.");
@@ -308,11 +311,11 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
           form.set("amount", ticket.trim());
           form.set("invoice", file);
         } else if (!(amount > 0)) {
-          return setError(regionRow.spots > 0 ? "HR has not set the rate per spot yet." : `${venue} is local to ${options.rates.base}, so there is no outstation claim.`);
+          return setError("HR has not set the rate per spot yet.");
         }
       } else {
         if (!regionRow) return setError(`HR has not set the region for ${venue} yet, so it cannot be claimed.`);
-        if (!isOutstation(regionRow)) return setError(`${venue} is local to ${options.rates.base}, so there is no Airbnb claim.`);
+        if (regionProblem) return setError(regionProblem);
         if (!checkIn || !checkOut || nights === null || nights < 1) return setError("Tap your check-in and check-out days on the calendar.");
         if (stayIssue) return setError(stayIssue);
         if (male + female < 1) return setError("Add who stayed.");
@@ -569,7 +572,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                     ) : <p className={s.local}>HR has not set the region for {venue} yet. It can be claimed once they have.</p>}
                   </div>
                   {partProblem && <p className={s.local}>{partProblem}</p>}
-                  {!partProblem && regionRow?.planeTicket && (
+                  {!partProblem && !regionProblem && regionRow?.planeTicket && (
                     <>
                       <div className={s.spots}>
                         <span className={s.spotsN}><Svg d={PLANE} size={26} sw={1.9} /></span>
@@ -585,7 +588,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                       <Invoice file={file} fileRef={fileRef} onFile={setFile} />
                     </>
                   )}
-                  {!partProblem && regionRow && !regionRow.planeTicket && regionRow.spots > 0 && (
+                  {!partProblem && !regionProblem && regionRow && !regionRow.planeTicket && regionRow.spots > 0 && (
                     <>
                       <div className={s.spots}>
                         <span className={s.spotsN}>{regionRow.spots}</span>
@@ -599,16 +602,16 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                       </div>
                     </>
                   )}
-                  {!partProblem && regionRow && !regionRow.planeTicket && regionRow.spots === 0 && <p className={s.local}>{venue} is local to {options.rates.base}, so there is no outstation claim.</p>}
+                  {!partProblem && regionProblem && <p className={s.local}>{regionProblem}</p>}
                 </>
               ) : null
             ) : !weekRow?.claimable ? null : partProblem ? (
               <p className={s.local}>{partProblem}</p>
             ) : !regionRow ? (
               <p className={s.local}>HR has not set the region for {venue} yet. It can be claimed once they have.</p>
-            ) : !isOutstation(regionRow) ? (
-              // Airbnb is for an outstation fair only (user 2026-10-06).
-              <p className={s.local}>{venue} is local to {options.rates.base}, so there is no Airbnb claim.</p>
+            ) : regionProblem ? (
+              // Airbnb is for an outstation fair only (user 2026-10-06) — never one in a region set as no claim (2026-11-01).
+              <p className={s.local}>{regionProblem}</p>
             ) : (
               <>
                 <div className={s.field}><span className={s.fieldLabel}>Check-in and check-out</span>

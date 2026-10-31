@@ -97,10 +97,10 @@ DECLARE
 BEGIN
   SELECT string_agg(x.sig || ' ' || coalesce(md5(replace(p.prosrc, E'\r', '')), 'missing'), '; ') INTO v_bad
     FROM (VALUES
-      ('public.member_admin_claim_settings()', 'TBD'),
-      ('public.member_claim_settings()', 'TBD'),
-      ('public.member_admin_save_claim_settings(text, numeric, numeric, jsonb, integer, numeric, jsonb)', 'TBD'),
-      ('public.member_claim_detail_for(jsonb, uuid, uuid)', 'TBD')
+      ('public.member_admin_claim_settings()', '17b3608829ef4485a39d2005ba719f52'),
+      ('public.member_claim_settings()', '9cc85ec508ae8f9b552133535994f01b'),
+      ('public.member_admin_save_claim_settings(text, numeric, numeric, jsonb, integer, numeric, jsonb)', '260bc18e06396b0f967ce6e66907c65b'),
+      ('public.member_claim_detail_for(jsonb, uuid, uuid)', '5f80433fcc26c26f3030afa89dad396b')
     ) AS x(sig, want)
     LEFT JOIN pg_proc p ON p.oid = to_regprocedure(x.sig)
    WHERE md5(replace(p.prosrc, E'\r', '')) IS DISTINCT FROM x.want;

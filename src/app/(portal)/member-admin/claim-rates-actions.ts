@@ -52,7 +52,8 @@ export async function saveClaimRatesAdmin(input: ClaimRatesToSave): Promise<{ ok
     const db = await backOffice();
     const { data, error } = await db.rpc("member_admin_save_claim_settings", {
       p_base: input.base, p_per_spot: input.perSpot, p_per_pax_night: input.perPaxNight,
-      p_regions: input.regions.map(g => ({ id: g.id, name: g.name, spots: g.spots, planeTicket: g.planeTicket })),
+      // noClaim (2026-11-01): a region claimed as the base is; absent = kept as stored.
+      p_regions: input.regions.map(g => ({ id: g.id, name: g.name, spots: g.spots, planeTicket: g.planeTicket, noClaim: g.noClaim })),
       p_group_max_pax: input.groupMaxPax, p_group_cap: input.groupCapPerNight,
       p_venues: input.venues,
     });
