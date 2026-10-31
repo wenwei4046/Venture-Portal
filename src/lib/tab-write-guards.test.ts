@@ -22,6 +22,7 @@ const NOT_GUARDED: Readonly<Record<string, string>> = {
   get_staff_billing_allocation: 'a read: who is billed for whom, for the invoice about to be made',
   get_staff_own_share_allocation: 'a read: the own-share split, for the invoice about to be made',
   payroll_month_closed: 'a read: is the payroll month closed',
+  revenue_seller_checks: 'a read: the move an answer is about — whom the bill goes to, so the closes are asked first',
   hiring_orphan_files: 'a read: the files no record names, for the sweep after a write',
   payroll_reopen_month: 'the Principal’s alone — its own check asks the account’s kind, not a cell a box stands for',
   lead_ai_more: 'a read: the agent’s settings, answers, playbook and sources, for the draft about to be written',

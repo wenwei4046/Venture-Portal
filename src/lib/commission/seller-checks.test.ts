@@ -48,6 +48,15 @@ describe('sellerChecksFromRow', () => {
     expect(sellerCheckFromRow(odd)!.orders.map(o => o.docNo)).toEqual(['HC-SO-008712'])
   })
 
+  it('reads a move: whose it was, whose the ERP made it — and its answer puts the bill with the one kept', () => {
+    const c = sellerCheckFromRow({ ...STEPHY, orderNo: 'HC-SO-2610-600', kind: 'erp_moved', counts: true, held: false,
+      evidence: { from: { staffId: 'kingsley', name: 'KINGSLEY' }, to: { staffId: 'shawn', name: 'SHAWN' }, movedAt: '2026-10-31T01:30:00Z' } })!
+    expect([c.kind, c.move, c.orders]).toEqual(['erp_moved',
+      { from: { staffId: 'kingsley', name: 'KINGSLEY' }, to: { staffId: 'shawn', name: 'SHAWN' }, movedAt: '2026-10-31T01:30:00Z' }, []])
+    expect(answered(c, { orderNo: c.orderNo, status: 'not_theirs', counts: true })).toMatchObject({ staffName: 'KINGSLEY', counts: true, held: false })
+    expect(sellerCheckFromRow(STEPHY)).toMatchObject({ kind: 'paper', move: null })
+  })
+
   it('a bill counted again by hand still waits for its answer', () => {
     const c = sellerCheckFromRow({ ...STEPHY, counts: true, held: false })!
     expect([isWaiting(c), c.counts, c.held]).toEqual([true, true, false])

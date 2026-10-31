@@ -859,6 +859,18 @@ applied as it was; its log says `whose_sale` when the bill was held and
 ERP still gets its 200. The ERP's *Shared with* (`collaborator_staff_ids`) is
 read as who looks after an order, never a part of its sale.
 
+**A salesperson changed on a bill the portal has (2026-10-31, mig
+`20261031040000`).** An applied delivery whose `salespersonId` differs from the
+one before — from one of the portal's people to somebody else — is stopped: the
+bill stays with whom it was (pinned, as *Move a bill to another salesperson*
+pins it) until HR answers on Comm Cal › Whose sale. The delivery is still
+applied and logged; its log says `whose_sale_moved`, or
+`whose_sale_move_failed` when the check faulted — never a failed delivery.
+Moved again while HR has not answered, the question follows the ERP: given on
+to another of the portal's people, it is asked about them now (`whose_sale_moved`
+again); given back to whom it was kept for, the stop comes off
+(`whose_sale_move_undone`).
+
 **When a change is a drop or an upsell to answer.** While a bill's commission
 has not been given, a change simply counts in its own month. Once it has — a
 salesperson's close released it (since the unified payroll no run is applied,
