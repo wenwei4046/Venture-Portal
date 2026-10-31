@@ -181,3 +181,6 @@
 .choices { display: flex; flex-wrap: wrap; gap: 6px; }
 .choice { padding: 7px 12px; border-radius: 999px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); font: 500 13px Inter, system-ui, sans-serif; color: rgb(43 31 23); cursor: pointer; }
 .choice.on { background: rgb(189 74 25); border-color: rgb(189 74 25); color: rgb(255 255 255); }
+
+/* Copy for customer on the phone's Booked screen, the whole width above Home / Book another (2026-10-31). */
+.copyWide { width: 100%; margin-bottom: 10px; }

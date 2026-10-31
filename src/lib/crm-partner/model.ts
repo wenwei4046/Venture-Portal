@@ -4,6 +4,7 @@
  * the showroom's rules as the database keeps them (crm_slot_check), worked on the office's day as text, never a Date in
  * the browser's own time zone.
  */
+import { mapLinks, visitCardText } from "@/lib/member/crm-maps";
 
 export interface PartnerBlock { a: string; b?: string | null; t1?: string | null; t2?: string | null; ranges?: { f: string; t: string }[] | null }
 export interface PartnerRoom { id: string; name: string; address: string; slots: string[]; cap: number; weekly: number[]; blocks: PartnerBlock[] }
@@ -43,6 +44,16 @@ export const partnerCodeOf = (raw: string) => { let s = String(raw ?? ""); try {
 export const isPartnerCode = (v: unknown): v is string => typeof v === "string" && /^pc-[A-HJ-NP-Z2-9]{8}$/.test(v);
 export const isPartnerRef = (v: unknown): v is string => typeof v === "string" && /^TC-[A-HJ-NP-Z2-9]{6}$/i.test(v.trim());
 export const isYmd = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/**
+ * The visit as the customer receives it from the CRM (the owner, 2026-10-31: "能不能有按钮能复制，发给客户可以看到他的预约
+ * 日期、时间、地点、地址、waze，就跟 crm 客户收到时一样的"): WhatsApp's words (visitCardText, bold) and the Waze link the CRM's
+ * card carries as its button, here on a line of its own — the salesperson pastes it into the customer's chat.
+ */
+export function customerVisitText(start: string, room: string, addr: string): string {
+  const card = { kind: 'Confirmed' as const, start, room, addr }
+  return addr.trim() ? `${visitCardText(card, true)}\n\n🚗 *Waze:* ${mapLinks(addr).waze}` : visitCardText(card, true)
+}
 
 const str = (v: unknown) => (typeof v === "string" ? v : v == null ? "" : String(v));
 const INFO_KEYS = ["project", "unit", "type", "size", "pax", "budget"] as const;

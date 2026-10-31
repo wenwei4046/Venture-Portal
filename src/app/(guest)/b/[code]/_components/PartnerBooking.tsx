@@ -13,6 +13,7 @@ import {
   type PartnerBooked, type PartnerForm, type PartnerInfo, type PartnerPage, type PartnerTaken,
 } from '@/lib/crm-partner/model'
 import s from './partner.module.css'
+import { customerVisitText } from '@/lib/crm-partner/model'
 
 // How far ahead a visit may be booked (the database allows 120 days).
 const AHEAD = 119
@@ -225,7 +226,10 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
               {done.remarks && <><dt>Remarks</dt><dd>{done.remarks}</dd></>}
               {done.note && <><dt>Your note</dt><dd>{done.note}</dd></>}
             </dl>
-            <button type="button" className={s.primary} onClick={again}>Book another</button>
+            <div className={s.navRow}>
+              {done.state !== 'cancelled' && <CopyForCustomer done={done} rooms={page.rooms} />}
+              <button type="button" className={s.primary} onClick={again}>Book another</button>
+            </div>
           </section>
         ) : (
           <div className={s.grid}>
@@ -384,6 +388,7 @@ function Open({ code, page }: { code: string; page: Extract<PartnerPage, { on: t
               {done.remarks && <><dt>Remarks</dt><dd>{done.remarks}</dd></>}
               {done.note && <><dt>Your note</dt><dd>{done.note}</dd></>}
             </dl>
+            {done.state !== 'cancelled' && <CopyForCustomer done={done} rooms={page.rooms} wide />}
             <div className={s.navRow}>
               <button type="button" className={s.ghost} onClick={() => { again(); go('home') }}>Home</button>
               <button type="button" className={s.primary} onClick={() => { again(); go('room') }}>Book another</button>
@@ -557,4 +562,17 @@ function BookingFields({ form, f, set, setInfo }: { form: PartnerForm; f: Form; 
       </div>
     ))}
   </>)
+}
+
+function CopyForCustomer({ done, rooms, wide }: { done: PartnerBooked; rooms: { id: string; address: string }[]; wide?: boolean }) {
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    const text = customerVisitText(done.start, done.showroomName, rooms.find(x => x.id === done.showroom)?.address ?? '')
+    try { await navigator.clipboard.writeText(text) } catch {
+      const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'
+      document.body.appendChild(t); t.select(); try { document.execCommand('copy') } catch { /* nothing more to try */ } t.remove()
+    }
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
+  }
+  return <button type="button" className={wide ? `${s.ghost} ${s.copyWide}` : s.ghost} onClick={() => void copy()}>{copied ? 'Copied ✓' : 'Copy for customer'}</button>
 }
