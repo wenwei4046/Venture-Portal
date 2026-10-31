@@ -35,6 +35,11 @@ const savedOn = (at: string) => formatIntlDate(new Date(at), { day: 'numeric', m
  *
  * Right of Save, ⋯ (2026-10-20): who may claim it — the titles ticked, in a window with its own Save
  * (`TransportTitlesWindow`), as Food claim picks its titles.
+ *
+ * Under Base, No claim (2026-11-01 — the user: "a option for select a spot that can be no claim for transport and
+ * airbnb, even though it is not a base spot"): the regions claimed as the base is, each a chip with ×, then a select
+ * to add one (never the base, nor a region flown to). Such a region's Outstation pays reads *No claim*; its spots and
+ * its Air ticket box rest until it is taken off.
  */
 export default function ClaimRatesPanel({ initial, transport: initialTransport = null }: { initial: ClaimRatesAdmin | null; transport?: TransportClaimAdmin | null }) {
   const [saved, setSaved] = useState(initial)
@@ -55,6 +60,10 @@ export default function ClaimRatesPanel({ initial, transport: initialTransport =
   }
   const names = draft.regions.map(g => g.name.trim()).filter(Boolean)
   const baseOptions = draft.base.trim() && !names.includes(draft.base.trim()) ? [draft.base.trim(), ...names] : names
+  // No claim (2026-11-01): the regions claimed as the base is. Any named region but the base and one flown to.
+  const noClaimRegions = draft.regions.filter(g => g.noClaim)
+  const noClaimOptions = draft.regions.filter(g => !g.noClaim && !g.planeTicket && g.name.trim() && g.name.trim() !== draft.base.trim())
+  const setNoClaim = (key: string, on: boolean) => edit({ regions: draft.regions.map(x => (x.key === key ? { ...x, noClaim: on } : x)) })
   const rate = Number(draft.perSpot)
   const regionOf = (venue: string) => (draft.regions.some(g => g.key === draft.venues[venue]) ? draft.venues[venue] : '')
 
@@ -120,6 +129,44 @@ export default function ClaimRatesPanel({ initial, transport: initialTransport =
               ))}
             </Select>
           </label>
+          <div className={s.crLine} title="Fairs in these regions are claimed as the base's: no outstation claim and no Airbnb, whatever their spots">
+            <span className={s.crLabel}>No claim</span>
+            <span className={s.crNoClaim}>
+              {noClaimRegions.map(g => (
+                <span key={g.key} className={s.crChip}>
+                  {g.name.trim() || 'New region'}
+                  <button
+                    type="button"
+                    className={s.crChipX}
+                    disabled={saving}
+                    aria-label={`Take ${g.name.trim() || 'the new region'} off No claim`}
+                    onClick={() => setNoClaim(g.key, false)}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {noClaimOptions.length ? (
+                <Select
+                  bare
+                  className={s.crSelect}
+                  value=""
+                  disabled={saving}
+                  aria-label="Add a region with no claim"
+                  onChange={e => {
+                    if (e.target.value) setNoClaim(e.target.value, true)
+                  }}
+                >
+                  <option value="">{noClaimRegions.length ? '+ Add region' : 'None'}</option>
+                  {noClaimOptions.map(g => (
+                    <option key={g.key} value={g.key}>{g.name.trim()}</option>
+                  ))}
+                </Select>
+              ) : noClaimRegions.length ? null : (
+                <span className={s.crLabel}>None</span>
+              )}
+            </span>
+          </div>
           <label className={s.crLine} title={'Spots × this rate, counted from the base. Blank = not set; members see "Rate not set yet"'}>
             <span className={s.crLabel}>Rate per spot</span>
             <span className={s.crUnit}>
@@ -166,9 +213,11 @@ export default function ClaimRatesPanel({ initial, transport: initialTransport =
             <span role="columnheader" />
           </div>
           {draft.regions.map((g, i) => {
-            const pays = g.planeTicket
-              ? 'ticket + invoice'
-              : /^\d{1,3}$/.test(g.spots.trim()) && Number.isFinite(rate) && draft.perSpot.trim() !== '' ? formatMoney(Number(g.spots) * rate) : '—'
+            const pays = g.noClaim
+              ? 'No claim'
+              : g.planeTicket
+                ? 'ticket + invoice'
+                : /^\d{1,3}$/.test(g.spots.trim()) && Number.isFinite(rate) && draft.perSpot.trim() !== '' ? formatMoney(Number(g.spots) * rate) : '—'
             return (
               <div key={g.key} className={s.crTRow} role="row" data-zebra={i % 2 ? 'true' : undefined} style={{ gridTemplateColumns: REGION_COLS }}>
                 <input
@@ -189,7 +238,7 @@ export default function ClaimRatesPanel({ initial, transport: initialTransport =
                   className={s.crSpots}
                   inputMode="numeric"
                   value={g.spots}
-                  disabled={saving || g.planeTicket}
+                  disabled={saving || g.planeTicket || g.noClaim}
                   aria-label={`Spots for ${g.name || `region ${i + 1}`}`}
                   onChange={e => edit({ regions: draft.regions.map(x => (x.key === g.key ? { ...x, spots: e.target.value } : x)) })}
                 />
@@ -199,7 +248,8 @@ export default function ClaimRatesPanel({ initial, transport: initialTransport =
                   role="checkbox"
                   aria-checked={g.planeTicket}
                   aria-label={`${g.name || `Region ${i + 1}`} is flown to`}
-                  disabled={saving}
+                  title={g.noClaim ? 'No claim — take it off No claim first' : undefined}
+                  disabled={saving || g.noClaim}
                   onClick={() => edit({ regions: draft.regions.map(x => (x.key === g.key ? { ...x, planeTicket: !x.planeTicket } : x)) })}
                 >
                   <span className={s.crBox14} data-on={g.planeTicket ? 'true' : undefined} aria-hidden="true">{g.planeTicket ? '✓' : ''}</span>

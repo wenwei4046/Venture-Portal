@@ -217,6 +217,11 @@
   background: rgb(255 255 255);
 }
 .crSelect { width: 150px; padding: 7px 8px; border: 1px solid rgb(var(--hv-hairline)); border-radius: 6px; font: inherit; font-size: 13px; line-height: normal; background: rgb(255 255 255); color: rgb(var(--hv-ink)); }
+/* No claim (2026-11-01): the regions claimed as the base is — a chip with × each, then the select that adds one. */
+.crNoClaim { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; min-width: 0; }
+.crChip { display: inline-flex; align-items: center; gap: 2px; padding: 4px 4px 4px 10px; border: 1px solid rgb(var(--hv-hairline)); border-radius: 999px; font-size: 12.5px; line-height: normal; background: rgb(var(--hv-panel)); color: rgb(var(--hv-ink)); }
+.crChipX { padding: 0 6px; border: 0; background: none; font: inherit; font-size: 13px; line-height: 1; cursor: pointer; color: rgb(var(--hv-brown)); }
+.crChipX:hover:not(:disabled) { color: rgb(var(--hv-ink)); }
 .crAir { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .crAirField { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .crAirLabel { font-size: 12px; color: rgb(var(--hv-body-2)); }
