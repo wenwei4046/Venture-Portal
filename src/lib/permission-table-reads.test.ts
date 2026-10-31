@@ -40,13 +40,14 @@ describe('TABLE_READS', () => {
   it('is the migrations’ permission_table_reads, row for row', () => {
     const rows = new Map<string, string[]>()
     for (const f of files) {
-      for (const m of sqlOf(f).matchAll(/INSERT INTO public\.permission_table_reads[^;]*;/g)) {
+      const sql = sqlOf(f)
+      for (const m of sql.matchAll(/INSERT INTO public\.permission_table_reads[^;]*;/g)) {
         for (const r of m[0].matchAll(/\('([a-z_0-9]+)', ARRAY\[([^\]]*)\]\)/g)) {
           rows.set(r[1], [...r[2].matchAll(/'([^']+)'/g)].map(a => a[1]))
         }
       }
       // A table that went takes its row with it (2026-10-31, Open Bill's three).
-      for (const m of sqlOf(f).matchAll(/DELETE FROM public\.permission_table_reads\s+WHERE table_name IN \(([^)]*)\);/g)) {
+      for (const m of sql.matchAll(/DELETE FROM public\.permission_table_reads\s+WHERE table_name IN \(([^)]*)\);/g)) {
         for (const t of m[1].matchAll(/'([^']+)'/g)) rows.delete(t[1])
       }
     }
