@@ -1686,7 +1686,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
 
   const frame = device === "ios" ? s.frameIos : device === "android" ? s.frameAndroid : device === "desktop" ? s.frameDesk : "";
   return (
-    <div ref={appRef} className={`${base.root} ${s.app}`} data-revenue-app style={!live ? { width: device === "desktop" ? 1440 : device === "android" ? 410 : 414 } : undefined}>
+    <div ref={appRef} className={`${base.root} ${s.app} ${live ? s.appLive : ""}`} data-revenue-app style={!live ? { width: device === "desktop" ? 1440 : device === "android" ? 410 : 414 } : undefined}>
       {live ? screen : <div className={`${s.frame} ${frame}`}>{screen}</div>}
       {switching?.to === "crm" && (
         <ViewSwitchCurtain from="Revenue" to="CRM" ready={crmReady} screen={screenRef}
