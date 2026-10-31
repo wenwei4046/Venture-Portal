@@ -169,6 +169,7 @@ describe('the phone apps fill the screen they are shown on, not 100dvh', () => {
   it.each([
     ['src/components/hr-app/hr-app.module.css', '.app'],
     ['src/components/member/app/shell.module.css', '.screenLive'],
+    ['src/components/member/app/shell.module.css', '.appLive'],
   ])('%s %s is fixed to the screen', (file, selector) => {
     const body = rule(file, selector)
     expect(body).toMatch(/position:\s*fixed;/)
@@ -181,6 +182,15 @@ describe('the phone apps fill the screen they are shown on, not 100dvh', () => {
     'src/app/(hr-app)/hr-app/layout.tsx',
   ])('%s sizes nothing by the viewport’s height', file => {
     expect(uncommented(readFileSync(resolve(ROOT, file), 'utf8'))).not.toMatch(/\d+[dsl]?vh\b/)
+  })
+
+  // 2026-10-31, LOUIS's iPhone: Safari before 18.2 (his: iOS 17.6.1) places every fixed box inside a query container in that container
+  // (WebKit bug 284945); `.app` held nothing in flow, so the whole Revenue app was a strip at the top of a white page.
+  it('the Revenue app’s query container is the screen wherever the live app or its loading frame draws', () => {
+    const app = uncommented(readFileSync(resolve(ROOT, 'src/components/member/app/RevenueApp.tsx'), 'utf8'))
+    const frame = uncommented(readFileSync(resolve(ROOT, 'src/components/member/app/shell/AppFrame.tsx'), 'utf8'))
+    expect(app).toMatch(/\$\{s\.app\} \$\{live \? s\.appLive : ""\}/)
+    expect(frame).toMatch(/\$\{s\.app\} \$\{s\.appLive\}/)
   })
 
   it('the HR app’s ground is fixed too, so no page under the frame can scroll', () => {

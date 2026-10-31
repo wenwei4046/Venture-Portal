@@ -28,7 +28,7 @@ export default function AppFrame({ children }: { children: ReactNode }) {
   const vars = { "--status-bg": "var(--rv-white)", "--status-h": "env(safe-area-inset-top, 0px)" } as CSSProperties;
 
   return (
-    <div className={`${base.root} ${s.app}`} data-revenue-app>
+    <div className={`${base.root} ${s.app} ${s.appLive}`} data-revenue-app>
       <div className={`${s.screen} ${s.screenLive}`} style={vars} data-platform={android ? "android" : "ios"}>
         <div className={f.inert} inert>
           <DeskAside active={screen} count={0} notifOpen={false} onGo={noop} onQuote={noop} onNotif={noop} onProfile={noop} />

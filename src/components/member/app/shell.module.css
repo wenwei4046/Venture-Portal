@@ -14,6 +14,15 @@
   container-name: rv;
   width: 100%;
 }
+/* The live app's container is the screen itself (2026-10-31 — LOUIS's iPhone drew a white page, the
+   notification question's scrim only a strip at the top): Safari before 18.2 (LOUIS: iOS 17.6.1) makes a query
+   container the box every `position: fixed` inside it is placed in (WebKit bug 284945), and `.app`
+   held nothing in flow — so `.screenLive`, the sheets and the curtain were squeezed into a strip. Fixed
+   to the screen, `.app` is the same box whichever way a browser reads it. */
+.appLive {
+  position: fixed;
+  inset: 0;
+}
 
 /* ── previews only: the device the prototype draws around the app ── */
 .frame {
