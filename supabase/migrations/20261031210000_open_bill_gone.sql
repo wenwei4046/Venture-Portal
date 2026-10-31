@@ -35,10 +35,10 @@
 -- the Open Bill page's in permission_page_tabs. What the tables' rows said stays in audit_events (7 rows).
 --
 -- Kept: the enum value comm_component 'open_bill' (a value does not drop; nothing writes it); and
--- sales_order_reassignments.open_bill_rank / _auto / _tagged_by / _tagged_at — 20261031040000 (#894, merged, not yet on
--- production when this was written) reads v_pin.open_bill_rank in erp_sync_note_seller_move. Nothing writes them any
--- more, so they stay empty; they go once nothing reads them. erp_sync_check_seller's body still says "its Open Bill pick"
--- in a comment.
+-- sales_order_reassignments.open_bill_rank / _auto / _tagged_by / _tagged_at — erp_sync_note_seller_move
+-- (20261031040000, #894, that day's) reads v_pin.open_bill_rank; it is left as it is, its comment too, so an older copy
+-- of it applied again still runs. Nothing writes the four any more, so they stay empty; they go once nothing reads them.
+-- erp_sync_check_seller's body still says "its Open Bill pick" in a comment.
 --
 -- August 2026: the claim form paid its Open Bill. Comm Cal's working of August and the Revenue app's portal working of
 -- it no longer show any; what was paid does not move.
