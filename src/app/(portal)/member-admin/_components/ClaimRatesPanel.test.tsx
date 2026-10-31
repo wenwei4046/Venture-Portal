@@ -87,6 +87,7 @@ describe('ClaimRatesPanel', () => {
 describe('Transport claim — who may claim it', () => {
   const transport: TransportClaimAdmin = {
     titleIds: ['t-leader', 't-spec'],
+    airTicketTitleIds: ['t-spec'],
     titles: [
       { id: 't-dir', name: 'Revenue Director', level: 'Management', people: 0, active: true },
       { id: 't-leader', name: 'Team Leader', level: 'Senior Manager', people: 5, active: true },
@@ -96,8 +97,19 @@ describe('Transport claim — who may claim it', () => {
     updatedAt: null,
     updatedBy: null,
   }
+  type Change = { titleId: string; transport?: boolean; airTicket?: boolean }
+  /** The database's answer: the boxes sent, over the lists as they stood. */
+  const applied = (changes: Change[]): TransportClaimAdmin => {
+    const road = new Set(transport.titleIds)
+    const plane = new Set(transport.airTicketTitleIds)
+    for (const c of changes) {
+      if (c.transport !== undefined) (c.transport ? road.add(c.titleId) : road.delete(c.titleId))
+      if (c.airTicket !== undefined) (c.airTicket ? plane.add(c.titleId) : plane.delete(c.titleId))
+    }
+    return { ...transport, titleIds: [...road], airTicketTitleIds: [...plane] }
+  }
   beforeEach(() => {
-    saveTitles.mockReset().mockImplementation(async (ids: string[]) => ({ ok: true, data: { ...transport, titleIds: ids } }))
+    saveTitles.mockReset().mockImplementation(async (changes: Change[]) => ({ ok: true, data: applied(changes) }))
   })
   const more = () => screen.getByRole('button', { name: 'Who can claim transport' })
   const win = () => screen.getByRole('dialog', { name: 'Who can claim transport' })
@@ -108,40 +120,58 @@ describe('Transport claim — who may claim it', () => {
     const saveButton = screen.getByRole('button', { name: 'Saved' })
     expect(saveButton.compareDocumentPosition(more()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(more()).toHaveTextContent('⋯')
-    expect(more()).toHaveAttribute('title', 'Who can claim · 2 of 4 titles')
+    expect(more()).toHaveAttribute('title', 'Who can claim · 4 titles · 2 transport · 1 air ticket')
   })
 
-  it('opens every Revenue title, the ticked ones ticked, as Food claim lists them', () => {
+  it('opens every Revenue title with its two boxes — Transport claim and Air ticket claim — as stored', () => {
     render(<ClaimRatesPanel initial={rates} transport={transport} />)
     fireEvent.click(more())
     const w = win()
+    expect(within(w).getAllByRole('columnheader').map(h => h.textContent)).toEqual(['Title', 'Level', 'People', 'Transport claim', 'Air ticket claim'])
     expect(within(w).getAllByRole('row').slice(1).map(r => r.textContent)).toEqual([
-      'Revenue DirectorManagement0 peopleCan claim',
-      'Team LeaderSenior Manager5 people✓Can claim',
-      'Team AssistantAssistant Manager9 peopleCan claim',
-      'Revenue SpecialistExecutive1 person✓Can claim',
+      'Revenue DirectorManagement0 peopleCan claimCan claim',
+      'Team LeaderSenior Manager5 people✓Can claimCan claim',
+      'Team AssistantAssistant Manager9 peopleCan claimCan claim',
+      'Revenue SpecialistExecutive1 person✓Can claim✓Can claim',
     ])
-    expect(within(w).getAllByRole('checkbox').map(c => c.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false', 'true'])
-    expect(within(w).getByText('2 of 4 titles')).toBeInTheDocument()
+    expect(within(w).getAllByRole('checkbox', { name: /may claim transport$/ }).map(c => c.getAttribute('aria-checked'))).toEqual(['false', 'true', 'false', 'true'])
+    expect(within(w).getAllByRole('checkbox', { name: /may claim an air ticket$/ }).map(c => c.getAttribute('aria-checked'))).toEqual(['false', 'false', 'false', 'true'])
+    expect(within(w).getByText('4 titles · 2 transport · 1 air ticket')).toBeInTheDocument()
     expect(within(w).getByRole('button', { name: 'Saved' })).toBeDisabled()
   })
 
-  it('saves the ticks on their own — the rates stay as they are — and says how many may claim', async () => {
+  // The user, 2026-10-31: "有一些人如果不可以 claim 普通 transport claim，但他可以 claim Air ticket claim".
+  it('ticks a title for the air ticket alone, and saves only the boxes changed', async () => {
     render(<ClaimRatesPanel initial={rates} transport={transport} />)
     fireEvent.click(more())
-    fireEvent.click(within(win()).getByRole('checkbox', { name: 'Team Assistant may claim transport' }))
-    fireEvent.click(within(win()).getByRole('checkbox', { name: 'Revenue Specialist may claim transport' }))
-    expect(within(win()).getByText('2 of 4 titles')).toBeInTheDocument()
+    fireEvent.click(within(win()).getByRole('checkbox', { name: 'Team Assistant may claim an air ticket' }))
+    fireEvent.click(within(win()).getByRole('checkbox', { name: 'Team Leader may claim transport' }))
+    fireEvent.click(within(win()).getByRole('checkbox', { name: 'Team Leader may claim an air ticket' }))
+    expect(within(win()).getByText('4 titles · 1 transport · 3 air ticket')).toBeInTheDocument()
     await act(async () => {
       fireEvent.click(within(win()).getByRole('button', { name: 'Save' }))
     })
-    expect(saveTitles).toHaveBeenCalledWith(['t-asst', 't-leader'])
+    expect(saveTitles).toHaveBeenCalledWith([
+      { titleId: 't-asst', airTicket: true },
+      { titleId: 't-leader', transport: false, airTicket: true },
+    ])
     expect(save).not.toHaveBeenCalled()
-    expect(flash).toHaveBeenCalledWith('Transport claim: 2 of 4 titles can claim')
+    expect(flash).toHaveBeenCalledWith('Who can claim saved · 4 titles · 1 transport · 3 air ticket')
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.getByRole('button', { name: 'Saved' })).toBeDisabled()
     fireEvent.click(more())
-    expect(within(win()).getAllByRole('checkbox').map(c => c.getAttribute('aria-checked'))).toEqual(['false', 'true', 'true', 'false'])
+    expect(within(win()).getAllByRole('checkbox', { name: /may claim transport$/ }).map(c => c.getAttribute('aria-checked'))).toEqual(['false', 'false', 'false', 'true'])
+    expect(within(win()).getAllByRole('checkbox', { name: /may claim an air ticket$/ }).map(c => c.getAttribute('aria-checked'))).toEqual(['false', 'true', 'true', 'true'])
+  })
+
+  it('a box ticked and unticked again is no change', () => {
+    render(<ClaimRatesPanel initial={rates} transport={transport} />)
+    fireEvent.click(more())
+    const box = within(win()).getByRole('checkbox', { name: 'Revenue Director may claim an air ticket' })
+    fireEvent.click(box)
+    expect(within(win()).getByRole('button', { name: 'Save' })).toBeEnabled()
+    fireEvent.click(box)
+    expect(within(win()).getByRole('button', { name: 'Saved' })).toBeDisabled()
   })
 
   it('shows a refusal in the window and keeps the ticks; Cancel drops them', async () => {

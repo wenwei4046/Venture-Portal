@@ -344,6 +344,86 @@ describe("a member's own claim (user 2026-10-06)", () => {
   });
 });
 
+// The user, 2026-10-31: "我要加多一个 Air ticket claim 的 column … if the venue is accept for air ticket, then these guys
+// with tick can claim，就算他们没有 tick transport claim，但是其他除了 ticket 以外，他就不能给 因为他没有 tick 那个
+// transport claim". HR's two ticks: by road and an Airbnb stay (Transport claim), the plane ticket (Air ticket claim).
+describe("a transport claim's parts, as HR ticked the title (2026-10-31)", () => {
+  const planeOnly: FormOptions = { ...options, transport: { road: false, plane: true }, title: "Team Leader" };
+  const roadOnly: FormOptions = { ...options, transport: { road: true, plane: false }, title: "Revenue Specialist" };
+
+  it("a title ticked for the air ticket alone opens on its newest fair flown to, and claims the plane ticket", async () => {
+    const onSubmit = vi.fn(async (form: FormData) => { void form; return { ok: true as const, code: "RQ-2610-010" }; });
+    const { container } = claimForm(false, onSubmit, planeOnly);
+    expect(screen.getByText("A plane ticket to a fair you fly to")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Zanotti week/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^Outstation/ })).toHaveTextContent("Plane ticket only");
+    expect(screen.queryByRole("button", { name: /Airbnb accommodation/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Plane ticket")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("e.g. 456.70"), { target: { value: "380" } });
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [new File(["%PDF-1.7"], "flight.pdf", { type: "application/pdf" })] } });
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+    expect(await screen.findByText("RQ-2610-010")).toBeInTheDocument();
+    const { invoice, ...fields } = sent(onSubmit);
+    expect((invoice as File).name).toBe("flight.pdf");
+    expect(fields).toEqual({ kind: "claim", subDepartmentId: "fair", claimType: "outstation", week: "2026-09-18", notes: "", amount: "380" });
+  });
+
+  it("but not a fair reached by road, nor a local one — said in place of the spots, and nothing goes", () => {
+    const onSubmit = vi.fn();
+    claimForm(false, onSubmit, planeOnly);
+    pick(/PENANG WATERFRONT/);
+    const why = "Team Leader may claim a plane ticket only. HR picks the titles that may claim the rest.";
+    expect(screen.getByText(why)).toBeInTheDocument();
+    expect(screen.queryByText("spots, worked out for you")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(why);
+    pick(/MID VALLEY/);
+    expect(screen.getByText(why)).toBeInTheDocument();
+    expect(screen.queryByText(/is local to Klang Valley/)).not.toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("a fair whose region HR has not set says so first, as for anybody", () => {
+    claimForm(false, vi.fn(), planeOnly);
+    pick(/MVEC SOUTHKEY/);
+    expect(screen.getByText("HR has not set the region for MVEC SOUTHKEY yet. It can be claimed once they have.")).toBeInTheDocument();
+    expect(screen.queryByText(/may claim a plane ticket only/)).not.toBeInTheDocument();
+  });
+
+  it("a title ticked for the transport claim alone claims by road and an Airbnb stay, not the plane ticket", () => {
+    const onSubmit = vi.fn();
+    claimForm(false, onSubmit, roadOnly);
+    expect(screen.getByText("Outstation or Airbnb stay for a fair")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /PENANG WATERFRONT/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("RM 200.00")).toBeInTheDocument();
+    pick(/Zanotti week/);
+    const why = "A plane ticket claim is not open to Revenue Specialist. HR picks the titles that may claim it.";
+    expect(screen.getByText(why)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("e.g. 456.70")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+    expect(screen.getByRole("alert")).toHaveTextContent(why);
+    expect(onSubmit).not.toHaveBeenCalled();
+    pick(/Airbnb accommodation/);
+    expect(screen.getByRole("group", { name: "Check-in and check-out" })).toBeInTheDocument();
+    expect(screen.queryByText(why)).not.toBeInTheDocument();
+  });
+
+  it("both ticks: everything, as before", () => {
+    claimForm(false, vi.fn(), { ...options, transport: { road: true, plane: true }, title: "Revenue Specialist" });
+    expect(screen.getByRole("button", { name: /^Outstation/ })).toHaveTextContent("Fixed by spots for the route");
+    expect(screen.getByRole("button", { name: /Airbnb accommodation/ })).toBeInTheDocument();
+    pick(/Zanotti week/);
+    expect(screen.getByPlaceholderText("e.g. 456.70")).toBeInTheDocument();
+  });
+
+  it("the Requests row says a plane ticket for a title ticked for it alone", () => {
+    const { rerender } = render(<RequestsPage rows={[]} filter="all" planeOnly onFilter={() => {}} onBack={() => {}} onNew={() => {}} onOpen={() => {}} />);
+    expect(screen.getByRole("button", { name: /Submit transport claim/ })).toHaveTextContent("Plane tickets to a fair you fly to");
+    rerender(<RequestsPage rows={[]} filter="all" onFilter={() => {}} onBack={() => {}} onNew={() => {}} onOpen={() => {}} />);
+    expect(screen.getByRole("button", { name: /Submit transport claim/ })).toHaveTextContent("Outstation and Airbnb stays");
+  });
+});
+
 // HR revamp 7a (2026-10-10): the waiting list is drawn from the form Sales Groups › Form settings
 // versions — the four built-ins, HR's own questions, the application form to download and upload.
 describe("a waiting list, on HR's form", () => {
