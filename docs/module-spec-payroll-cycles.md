@@ -313,7 +313,7 @@ found by someone noticing a number moved; a variance report finds them on the
 
 The Revenue drill-downs shipped on 2026-09-16 (PR #121) sit *underneath*
 report 1 for the revenue cycle: the month's bills, one bill's lines, the pay
-board, and a payslip showing Open Bill bill by bill. They are the evidence
+board, and a payslip bill by bill. They are the evidence
 behind the register, which is what makes the register checkable.
 
 ---

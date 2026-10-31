@@ -499,7 +499,7 @@ The second package (`.design/hr-r2/handoff`, README §10–18; the file wins) ad
   - Read the key from `useSearchParams()` and render the one section.
   - A tab may carry a small mono count (`TabItem.count`).
 - **A rail in the middle of a page is the section's heading.** Its labels are the titles those panels would have carried, so each panel drops its own heading — two titles for one thing is what to avoid.
-- **Render every panel on the server** and hand them to the client rail as nodes (`openBill={<Panel … />}`) rather than making the rail fetch. Server-built children handed over as a list need their own `key`s.
+- **Render every panel on the server** and hand them to the client rail as nodes (`belowDeposit={<Panel … />}`) rather than making the rail fetch. Server-built children handed over as a list need their own `key`s.
 - **Tabs are for the sections of one view.** Choosing between views of a thing (Comm Cal / Sales Groups / Rules of a sub-department, the People pages) is navigation, and it lives in the sidebar.
 
 ### Navigation feedback (v3.8, 2026-09-26 — every page)
@@ -1060,7 +1060,7 @@ HV pays a share of the directors' CTC out of the department pools HR picks. The 
 - Five cards. The latest month's commission reads amber *Not computed*, never a walnut "—".
 - The months as a grid, each source a chip with its file under it.
 
-**The month** is ONE table design. `CommissionWorkbench` holds the rail: *Total Sales Orders · KPI Items · Open Bill · Below deposit · Sales exhibition · Drops & upsells · Double claims · Whose sale · Requests*.
+**The month** is ONE table design. `CommissionWorkbench` holds the rail: *Total Sales Orders · KPI Items · Below deposit · Sales exhibition · Drops & upsells · Double claims · Whose sale · Requests*.
 - **Every panel** is a framed table with a sticky first column and a sticky answer column (Total commission, Allocated bonus, **Still to collect**, Sales value), plus a `tfoot` subtotal.
 - **A panel that summarises** opens on four figures.
 - **A salesperson's page** adds *Below deposit* beside Personal / Overriding.
