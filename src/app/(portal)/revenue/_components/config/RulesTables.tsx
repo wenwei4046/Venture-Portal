@@ -505,6 +505,16 @@ export function BrandsAndBands({ data, scheme }: { data: CommissionSettingsData;
                 placeholder="AK-, AKE"
               />
             </label>
+            {/* The ERP brandings that ARE this brand (2026-10-31: HAPPI SLEEP is
+                Akemi's) — its calculator, its margin ladder. */}
+            <label className="text-xs flex-1 min-w-[12rem]">
+              <span className="block mb-1 font-medium">Sub-brands (comma separated)</span>
+              <Field
+                name="sub_brands"
+                defaultValue={(activeBrand?.sub_brands ?? []).join(', ')}
+                placeholder="ERP brandings"
+              />
+            </label>
             <SaveButton pending={pending} label={activeBrand ? 'Save brand' : 'Add brand'} />
           </div>
         )}

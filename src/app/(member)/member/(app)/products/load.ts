@@ -5,6 +5,7 @@ import { priceGridOf, type PriceCell } from '@/lib/catalogue/pricing'
 import { calcCategoryOf, defaultGift, needsBrandPick, sellsUnderBrand, skuOptionLabel } from '@/lib/catalogue/options'
 import { normaliseComboModules } from '@/lib/catalogue/combos'
 import { isKivSize, type KivSize } from '@/lib/catalogue/edits'
+import { brandCodeFor, type BrandWords } from '@/lib/brand-code'
 
 /**
  * What the Product List reads: the ERP's catalogue as mirrored (`erp_*`, items
@@ -67,40 +68,35 @@ function newness(rows: Row[]): (firstSeen: string | null) => boolean {
 
 // ─── Brands — the margin ladder a model sells under ─────────────────────────
 
-export interface BrandRef {
-  code: string
-  name: string
-}
+/** A brand by its code, its name and its sub-brands (`lib/brand-code.ts`). */
+export type BrandRef = BrandWords
 
 async function loadBrands(sb: SupabaseClient): Promise<BrandRef[]> {
   const data = await all((from, to) => sb
     .from('comm_brands')
-    .select('code, name, is_active, created_at')
+    .select('code, name, sub_brands, is_active, created_at')
     .eq('is_active', true)
     .order('created_at')
     .order('id')
     .range(from, to))
-  const seen = new Set<string>()
-  const out: BrandRef[] = []
+  const byCode = new Map<string, BrandRef>()
   for (const r of (data ?? []) as Row[]) {
     const code = String(r.code)
-    if (seen.has(code)) continue
-    seen.add(code)
-    out.push({ code, name: String(r.name ?? code) })
+    const subBrands = Array.isArray(r.sub_brands) ? r.sub_brands.map(String) : []
+    const seen = byCode.get(code)
+    // One brand per code, as the database names it — and every scheme's sub-brands
+    // of it, as erp_sync_brand_code reads every active row.
+    if (seen) seen.subBrands = [...new Set([...(seen.subBrands ?? []), ...subBrands])]
+    else byCode.set(code, { code, name: String(r.name ?? code), subBrands })
   }
-  return out
-}
-
-/** `erp_sync_brand_code` in TypeScript: a brand by its code or its name. */
-function brandByName(name: string | null, brands: BrandRef[]): string | null {
-  const n = (name ?? '').trim().toUpperCase()
-  if (!n) return null
-  return brands.find(b => b.code.toUpperCase() === n || b.name.toUpperCase() === n)?.code ?? null
+  return [...byCode.values()]
 }
 
 /**
  * `catalogue_brand_of`: only a mattress or a sofa sells under a brand; every
  * other category is a rider (user 2026-09-12), whatever the ERP writes on it.
+ * The brand is the one the ERP's branding names — by its code, its name or a
+ * sub-brand (HAPPI SLEEP is Akemi's, 2026-10-31), `brandCodeFor`.
  */
 export function brandOf(
   category: string | null,
@@ -109,7 +105,7 @@ export function brandOf(
   brands: BrandRef[],
 ): string | null {
   if (!sellsUnderBrand(category)) return null
-  return brandByName(modelBranding, brands) ?? brandByName(skuBranding, brands)
+  return brandCodeFor(modelBranding, brands) ?? brandCodeFor(skuBranding, brands)
 }
 
 // ─── The mirror's pulse ─────────────────────────────────────────────────────

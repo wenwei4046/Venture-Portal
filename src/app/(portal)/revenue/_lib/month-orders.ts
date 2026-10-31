@@ -297,7 +297,11 @@ export async function loadOrderBrandPicks(
   return new Map(rows.map(r => [r.order_id, r.brand_code]))
 }
 
-/** The brands a bill can be given by hand: the scheme's margin-ladder brands. */
+/**
+ * The brands a bill can be given by hand: the scheme's margin-ladder brands —
+ * with their sub-brands, so a booth the ERP calls HAPPI SLEEP is Akemi's
+ * exhibition (`exhibitionBrandOf`), as SQL reads it.
+ */
 export async function loadBrandOptions(
   supabase: SupabaseClient,
   schemeId: string | null,
@@ -305,12 +309,13 @@ export async function loadBrandOptions(
   if (!schemeId) return []
   const { data, error } = await supabase
     .from('comm_brands')
-    .select('code, name')
+    .select('code, name, sub_brands')
     .eq('scheme_id', schemeId)
     .eq('is_active', true)
     .order('code')
   if (error) throw new Error(`Could not read the brands: ${error.message}`)
-  return ((data ?? []) as Array<{ code: string; name: string | null }>).map(b => ({ code: b.code, name: b.name ?? b.code }))
+  return ((data ?? []) as Array<{ code: string; name: string | null; sub_brands: string[] | null }>)
+    .map(b => ({ code: b.code, name: b.name ?? b.code, subBrands: b.sub_brands ?? [] }))
 }
 
 // ─── Shared bills (2026-09-24) ──────────────────────────────────────────────

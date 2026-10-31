@@ -9,6 +9,7 @@ import { officeMonth, officeToday } from '@/lib/office-time'
 import { mintRankKey, rankName, rankLabelOf, rankPayError, rankPayOf, resequenceLadder } from '@/lib/commission/ranks'
 import { newSchemeSettings, type SchemeSettings } from '@/lib/commission/scheme-defaults'
 import { checkDirectorPay } from '@/lib/commission/director-pay'
+import { parseSubBrands } from '@/lib/brand-code'
 
 /**
  * Revenue → Rules. Every rule, threshold and per-person tick for the Revenue
@@ -241,7 +242,7 @@ async function cloneSchemeChildren(
 
   const { data: brands } = await supabase
     .from('comm_brands')
-    .select('id, code, name, item_code_prefixes, note, is_active')
+    .select('id, code, name, item_code_prefixes, sub_brands, note, is_active')
     .eq('scheme_id', fromSchemeId)
 
   for (const brand of (brands ?? []) as Array<Record<string, unknown>>) {
@@ -252,6 +253,7 @@ async function cloneSchemeChildren(
         code: brand.code,
         name: brand.name,
         item_code_prefixes: brand.item_code_prefixes,
+        sub_brands: brand.sub_brands ?? [],
         note: brand.note,
         is_active: brand.is_active,
       })
@@ -747,13 +749,35 @@ export async function upsertBrand(formData: FormData) {
     .map(s => s.trim().toUpperCase())
     .filter(Boolean)
 
-  const row = {
+  const row: Record<string, unknown> = {
     scheme_id: required(formData, 'scheme_id', 'Scheme'),
     code: required(formData, 'code', 'Brand code').toUpperCase(),
     name: required(formData, 'name', 'Brand name'),
     item_code_prefixes: prefixes,
-    note: text(formData, 'note') || null,
-    is_active: formData.get('is_active') !== 'off',
+  }
+  // Only what the form carries (2026-10-31): the brand form has no note and no
+  // Active box, and a save wrote null over the note and true over the switch.
+  if (formData.has('note')) row.note = text(formData, 'note') || null
+  if (formData.has('is_active')) row.is_active = formData.get('is_active') !== 'off'
+  // The ERP brandings that ARE this brand (HAPPI SLEEP is Akemi's) — never
+  // another brand's word. A page opened before the box existed sends none and
+  // leaves them as they are.
+  if (formData.has('sub_brands')) {
+    let othersRead = supabase
+      .from('comm_brands')
+      .select('code, name, sub_brands')
+      .eq('is_active', true)
+      .neq('code', row.code)
+    // A brand being recoded is not "another brand" to itself.
+    if (id) othersRead = othersRead.neq('id', id)
+    const { data: others, error } = await othersRead
+    check(error, 'Could not read the other brands')
+    row.sub_brands = parseSubBrands(
+      text(formData, 'sub_brands'),
+      { code: String(row.code), name: String(row.name) },
+      ((others ?? []) as Array<{ code: string; name: string; sub_brands: string[] | null }>)
+        .map(b => ({ code: b.code, name: b.name, subBrands: b.sub_brands ?? [] })),
+    )
   }
 
   check(
