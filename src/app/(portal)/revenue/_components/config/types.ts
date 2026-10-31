@@ -172,6 +172,8 @@ export interface BrandRow {
   code: string
   name: string
   item_code_prefixes: string[]
+  /** The ERP brandings that are this brand (Akemi's: HAPPI SLEEP, 2026-10-31). */
+  sub_brands: string[]
   note: string | null
   is_active: boolean
 }

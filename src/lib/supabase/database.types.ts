@@ -1290,6 +1290,7 @@ export type Database = {
           name: string
           note: string | null
           scheme_id: string
+          sub_brands: string[]
         }
         Insert: {
           code: string
@@ -1300,6 +1301,7 @@ export type Database = {
           name: string
           note?: string | null
           scheme_id: string
+          sub_brands?: string[]
         }
         Update: {
           code?: string
@@ -1310,6 +1312,7 @@ export type Database = {
           name?: string
           note?: string | null
           scheme_id?: string
+          sub_brands?: string[]
         }
         Relationships: [
           {

@@ -20,6 +20,7 @@
  * the margin ladder still reads the bill's own brand.
  */
 
+import { brandCodeFor, type BrandWords } from './brand-code'
 import { venueKey, venueName } from './venues'
 
 /** One row of *Sales exhibition*: a brand at a fair, or a brand's bills at a place no fair claims. */
@@ -77,22 +78,13 @@ function brandOf(code: string | null | undefined): string | null {
   return code?.trim() || null
 }
 
-/** A brand the portal sells under: its code and its name. */
-export interface BrandName {
-  code: string
-  name: string
-}
-
 /**
- * The portal's brand an ERP brand name stands for — `DUNLOPILLO` is `DUNLOP`.
- * The twin of SQL's `erp_sync_brand_code`: the code or the name, case and
- * surrounding spaces aside. Null for a brand the portal does not know.
+ * A brand the portal sells under: its code, its name and its sub-brands. The
+ * portal's brand an ERP brand name stands for — `DUNLOPILLO` is `DUNLOP`,
+ * `HAPPI SLEEP` is `AKEMI` — is `brandCodeFor`, SQL's `erp_sync_brand_code`.
  */
-export function brandCodeFor(name: string | null | undefined, brands: readonly BrandName[]): string | null {
-  const wanted = name?.trim().toUpperCase()
-  if (!wanted) return null
-  return brands.find(b => b.code.trim().toUpperCase() === wanted || b.name.trim().toUpperCase() === wanted)?.code ?? null
-}
+export type BrandName = BrandWords
+export { brandCodeFor }
 
 /**
  * The booth a bill was written at, as the ERP's fair picker named it

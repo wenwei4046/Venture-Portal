@@ -145,6 +145,44 @@ describe('Product List readers', () => {
     expect(models[3]).toMatchObject({ derivedBrand: null, brand: 'RIDER', brandOverride: 'RIDER', calcCategory: 'Mattress', calcOverride: null })
   })
 
+  // 2026-10-31 (user: "happisleep is the subbrand of akemi … i dont differentiate it out with 2 calcualtor, i wnat
+  // make them into one"): a branding a brand lists as its sub-brand IS that brand — EASE COOL sells under Akemi, in
+  // Akemi's calculator, and Modular asks no ladder for it — as erp_sync_brand_code reads it.
+  it('reads a sub-brand’s branding as its brand — HAPPI SLEEP is Akemi', async () => {
+    tables.erp_products = [
+      product(0, { item_code: 'HAPPI SLEEP EASE COOL MATT (Q)', category: 'MATTRESS', branding: 'HAPPI SLEEP' }),
+      product(1, { item_code: 'HAPPI SLEEP FRESH COOL MATT (Q)', category: 'MATTRESS', branding: 'HAPPI SLEEP' }),
+      product(2, { item_code: 'MYLATEX LUXE MATT (K)', category: 'MATTRESS', branding: 'MYLATEX' }),
+    ]
+    tables.erp_product_models = [
+      model(0, { model_code: 'EASE COOL', name: 'EASE COOL', category: 'MATTRESS', branding: 'HAPPI SLEEP' }),
+      model(1, { model_code: 'FRESH COOL', name: 'FRESH COOL', category: 'MATTRESS', branding: null }),
+      model(2, { model_code: 'MYLATEX LUXE', name: 'MYLATEX LUXE', category: 'MATTRESS', branding: 'MYLATEX' }),
+    ]
+    tables.catalogue_models = [0, 1, 2].map(i => ({ erp_model_id: `model-${id(i)}`, offered: true, brand_code: 'ZANOTTI' }))
+    tables.comm_brands = [
+      { id: 'a', code: 'AKEMI', name: 'Akemi', sub_brands: ['HAPPI SLEEP'], is_active: true, created_at: '2026-08-31' },
+      { id: 'z', code: 'ZANOTTI', name: 'Zanotti', sub_brands: [], is_active: true, created_at: '2026-08-31' },
+      // Another scheme's Akemi adds its own sub-brands to the one brand, as the database reads every row.
+      { id: 'a2', code: 'AKEMI', name: 'Akemi', sub_brands: ['HAPPI SLEEP', 'HAPPI KIDS'], is_active: true, created_at: '2026-09-30' },
+    ]
+    const { models, brands } = await loadModels()
+    expect(models.map(m => [m.code, m.derivedBrand, m.brand, m.brandOverride])).toEqual([
+      ['EASE COOL', 'AKEMI', 'AKEMI', null],
+      // Its model names no brand: its SKUs' HAPPI SLEEP does, as catalogue_brand_of falls back.
+      ['FRESH COOL', 'AKEMI', 'AKEMI', null],
+      // A branding no brand answers to still asks for a ladder, and reads the one picked.
+      ['MYLATEX LUXE', null, 'ZANOTTI', 'ZANOTTI'],
+    ])
+    expect(brands).toEqual([
+      { code: 'AKEMI', name: 'Akemi', subBrands: ['HAPPI SLEEP', 'HAPPI KIDS'] },
+      { code: 'ZANOTTI', name: 'Zanotti', subBrands: [] },
+    ])
+    expect((await loadSkus()).map(s => [s.code, s.brand])).toEqual([
+      ['HAPPI SLEEP EASE COOL MATT (Q)', 'AKEMI'], ['HAPPI SLEEP FRESH COOL MATT (Q)', 'AKEMI'], ['MYLATEX LUXE MATT (K)', null],
+    ])
+  })
+
   // 2026-10-19 (user: "sofa category same as mattress have the model name … then it can be add and edit"): the
   // name typed on Modular is the portal's own and shows before the ERP's on every tab that names the model.
   it('names a model by the portal’s own name first — SKU Master, Modular and Combo Pricing alike', async () => {

@@ -163,6 +163,21 @@ describe('RulesView', () => {
     expect(within(list()).getByRole('button', { name: 'Scheme rules' })).toHaveAttribute('aria-current', 'page')
   })
 
+  // 2026-10-31 (user: "happisleep is the subbrand of akemi … i wnat make them into one"): a brand's sub-brands —
+  // the ERP brandings that ARE it — sit beside its Item code prefixes; a brand without one shows an empty box.
+  it('shows a brand’s sub-brands beside its prefixes on Brands & margin bands', () => {
+    nav.params = new URLSearchParams('tab=brands')
+    const brand = (id: string, code: string, name: string, prefixes: string[], subs: string[]) =>
+      ({ id, code, name, item_code_prefixes: prefixes, sub_brands: subs, note: null, is_active: true })
+    renderView(true, { data: dataWith(true, { brands: [brand('a', 'AKEMI', 'Akemi', ['AK-', 'AKE'], ['HAPPI SLEEP']), brand('z', 'ZANOTTI', 'Zanotti', [], [])] }) })
+    // Field names each box by its form name.
+    expect(screen.getByRole('textbox', { name: 'item_code_prefixes' })).toHaveValue('AK-, AKE')
+    expect(screen.getByRole('textbox', { name: 'sub_brands' })).toHaveValue('HAPPI SLEEP')
+    expect(screen.getByText('Sub-brands (comma separated)')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Zanotti/ }))
+    expect(screen.getByRole('textbox', { name: 'sub_brands' })).toHaveValue('')
+  })
+
   it('says so when the sub-department has no scheme yet', () => {
     renderView(true, { data: { ...dataWith(true), scheme: null } })
     expect(screen.getByText('Fair has no scheme yet.')).toBeInTheDocument()
