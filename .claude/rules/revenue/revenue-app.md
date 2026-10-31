@@ -10,6 +10,8 @@ paths:
 
 # Revenue tab — the Revenue app (`/member`)
 
+**REQUEST REVIEWS' LIST SCROLLS IN ITS CARD (2026-11-01 — the user, circling the Requests list that ran 28 rows, 1,700px, down the page: "make it scroll able"; DESIGN.md v4.212):** the card is as tall as the window leaves it when the page opens (`max(360px, calc(100vh − 284px))` — it starts 250px down, 34px of sheet and frame below), its title and filters stay put and only the rows scroll; it is sticky 16px under the sheet's top, so a long request on the right scrolls the page with the list still in view. CSS only (`member-services.module.css` › `.card`, `.rows`). Checked on localhost as HR at 1280×720, 1500×860 and 1920×1080: the card ends 24px above the sheet's bottom each time, a wheel over the list moves the list and not the page, and the last row, scrolled to, opens.
+
 **A REGION MAY BE "NO CLAIM" (2026-11-01 — the user, circling Member services › Transport claim's Outstation box, its *Base* and *Rate per spot*: "i need a option for select a spot that can be no claim for transport and airbnb, evendo it is not a base spot"; mig `20261101023700_transport_no_claim_regions`, DESIGN.md v4.211):**
 - **Why:** until now only a region of 0 spots was local, so venues outside the Klang Valley that are not paid for (AEON NILAI SOLO, AEON RAWANG SOLO …) sat in *KL*.
 - **HR's side:** the Outstation card's line under *Base*, **No claim** — the regions picked, each a chip with ×, and a select adding one (never the base, nor a region flown to). Saved with the rest (one Save). The regions table: *Outstation pays* reads *No claim*; its spots and *Flown to* box rest while it is one.

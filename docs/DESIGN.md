@@ -1363,6 +1363,7 @@ The matrix is **Permissions by view and tab** (Part III). Around it:
 
 `member-admin/_components/`
 - **Request reviews** — the list card beside the request card: facts, the step with its note and buttons, then AUDIT HISTORY.
+  - **The list scrolls in its card** (v4.212, 2026-11-01): the card ends where the window does as the page opens (`max(360px, 100vh − 284px)`), its title and filters stay, only the rows scroll (a thin scrollbar); a long request on the right scrolls the page while the list stays in view, 16px under the sheet's top.
   - *View ↗* on a signed form (v4.102) opens a PDF or a picture in a new tab. A Word form, which a browser saves rather than shows, downloads under the name it was sent with, and the page says *Downloads name*.
 - **Brand weeks** — read only (v3.64). A column per Friday; each week is a chip in its brand's colours (solid for Sales Attending, dashed for auto-located, faint for "No fair"), with the venue under it. The foot says when the ERP last sent it.
 - **Transport claim** (v4.105 — *Claim rates* until 2026-10-20) — Outstation / Airbnb, regions, venues. Save reads "Saved" until something differs. The regions table's ticket column is **Air ticket** (*Plane ticket* until v4.210), its box *Flown to*.
@@ -1828,6 +1829,7 @@ Marketing's own desktop view: the Claude Design handoff **HOUZS Marketing Module
 
 ## Part IV — Version index
 
+- **v4.212** · 2026-11-01 · **Request reviews' list scrolls in its card** (the user, circling it: "make it scroll able"): the card fits the window as the page opens, only its rows scroll, and it stays in view while a long request scrolls the page → Member services
 - **v4.211** · 2026-11-01 · **No claim** (the user: "a option for select a spot that can be no claim for transport and airbnb, even though it is not a base spot"): Member services › Transport claim's Outstation card picks the regions claimed as the base is; their *Outstation pays* reads *No claim*; the Revenue app's form says a fair there has no outstation or Airbnb claim → Member services; The Revenue app › A transport claim
 - **v4.210** · 2026-11-01 · **Air ticket, in every word** (the user: "go with the same name Air ticket claim"): *Plane ticket* is gone from every screen — Member services' regions column *Air ticket*; the Revenue app's flown-to box *Air ticket*, *Air ticket only*, *Air tickets / An air ticket to a fair you fly to*, the refusals and the price / invoice prompts; My requests' *Air ticket claim · <venue>* (one sent before it too) (#903) → Member services; The Revenue app › A transport claim
 - **v4.209** · 2026-10-31 · **Air ticket claim** (the user, on *Who can claim transport*: "我要加多一个 Air ticket claim 的 column … 就算他们没有 tick transport claim，但是其他除了 ticket 以外，他就不能给"): the window gains *Air ticket claim* beside *Transport claim* — 740px, a *Can claim* box each, the count *7 titles · 2 transport · 4 air ticket*, Save sending only the boxes changed; in the Revenue app a title ticked for the air ticket alone reads *Plane tickets to a fair you fly to* and its form offers *Outstation · Plane ticket only* (#900) → Member services; The Revenue app › A transport claim
