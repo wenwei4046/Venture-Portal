@@ -89,7 +89,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   const parts = options.transport ?? { road: true, plane: true };
   const planeOnly = parts.plane && !parts.road;
   const [title, textSub, cta, doneText] = TEXT[kind];
-  const sub = kind === "claim" && planeOnly ? "A plane ticket to a fair you fly to" : textSub;
+  const sub = kind === "claim" && planeOnly ? "An air ticket to a fair you fly to" : textSub;
   const prior = revising?.detail ?? {};
   const str = (key: string) => (typeof prior[key] === "string" ? (prior[key] as string) : "");
   const idem = useRef<string>("");
@@ -302,8 +302,8 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
         if (!regionRow) return setError(`HR has not set the region for ${venue} yet, so it cannot be claimed.`);
         if (partProblem) return setError(partProblem);
         if (regionRow.planeTicket) {
-          if (!(amount > 0)) return setError("Enter the plane ticket's price, as its invoice shows.");
-          if (!file) return setError("Add the plane ticket's invoice.");
+          if (!(amount > 0)) return setError("Enter the air ticket's price, as its invoice shows.");
+          if (!file) return setError("Add the air ticket's invoice.");
           if (file.size > 100 * 1024 * 1024) return setError("The invoice must be 100 MB or smaller.");
           form.set("amount", ticket.trim());
           form.set("invoice", file);
@@ -527,7 +527,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
             <div className={s.field}><span className={s.fieldLabel}>Claim category</span>
               <div className={s.cats}>
                 {/* An Airbnb stay is the transport claim's tick: a title ticked for the air ticket alone sees Outstation, a plane ticket only (2026-10-31). */}
-                {([["outstation", "Outstation", planeOnly ? "Plane ticket only" : "Fixed by spots for the route", CAT_OUT], ["airbnb", "Airbnb accommodation", perPax !== null ? `Up to ${rm0(perPax)} per pax per night` : "Rate not set yet", CAT_AIR]] as const)
+                {([["outstation", "Outstation", planeOnly ? "Air ticket only" : "Fixed by spots for the route", CAT_OUT], ["airbnb", "Airbnb accommodation", perPax !== null ? `Up to ${rm0(perPax)} per pax per night` : "Rate not set yet", CAT_AIR]] as const)
                   .filter(([id]) => id === "outstation" || parts.road || cat === id).map(([id, label, note, d]) => (
                   <button key={id} className={`${s.cat} ${cat === id ? s.catOn : ""}`} onClick={() => { setCat(id); setError(null); }} aria-pressed={cat === id}>
                     <span className={s.catIcon}><Svg d={d} size={17} sw={1.9} /></span>
@@ -573,7 +573,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                     <>
                       <div className={s.spots}>
                         <span className={s.spotsN}><Svg d={PLANE} size={26} sw={1.9} /></span>
-                        <span className={s.spotsText}><span className={s.spotsTitle}>Plane ticket</span><span className={s.spotsRoute}>{options.rates.base} → {regionRow.name} · the price on its invoice</span></span>
+                        <span className={s.spotsText}><span className={s.spotsTitle}>Air ticket</span><span className={s.spotsRoute}>{options.rates.base} → {regionRow.name} · the price on its invoice</span></span>
                       </div>
                       <label className={s.field}><span className={s.fieldLabel}>Ticket price (RM)</span>
                         <input type="text" inputMode="decimal" className={s.input} placeholder="e.g. 456.70" value={ticket} onChange={e => setTicket(e.target.value)} maxLength={12} />
@@ -829,7 +829,7 @@ function save(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-/** The invoice: an Airbnb stay's, or a plane ticket's. */
+/** The invoice: an Airbnb stay's, or an air ticket's. */
 function Invoice({ file, fileRef, onFile }: { file: File | null; fileRef: RefObject<HTMLInputElement | null>; onFile: (file: File | null) => void }) {
   return (
     <div className={s.field}><span className={s.fieldLabel}>Invoice</span>

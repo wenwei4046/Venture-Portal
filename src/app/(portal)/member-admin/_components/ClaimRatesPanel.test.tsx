@@ -41,6 +41,9 @@ describe('ClaimRatesPanel', () => {
     expect(screen.getByRole('combobox', { name: 'Base' })).toHaveValue('KL')
     expect(regionRow(2)).toHaveTextContent('RM 100.00')
     expect(regionRow(3)).toHaveTextContent('ticket + invoice')
+    // "Air ticket", as the window's column (the user, 2026-11-01: "go with the same name Air ticket claim").
+    expect(within(screen.getByRole('table', { name: 'Regions' })).getAllByRole('columnheader').map(h => h.textContent))
+      .toEqual(['Region', 'Spots from KL', 'Air ticket', 'Outstation pays', ''])
     expect(screen.getByRole('combobox', { name: 'Region of SPICE ARENA' })).toHaveDisplayValue('Penang')
     expect(screen.getByText('3 fairs · last 26 Sep 2026')).toBeInTheDocument()
   })

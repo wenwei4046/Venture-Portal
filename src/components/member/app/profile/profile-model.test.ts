@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MemberMemo, MemberMembership, MemberOrgMap, MemberRequest } from "@/lib/member/types";
 import type { ArenaPerson, MemberArenaSnapshot } from "@/lib/member/arena";
 import {
-  claimClosedMonth, claimWeeks, memoCat, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, requestStatus, teamVM, trackedCount, trackVM, vaGroupsVM, waitingChoices,
+  claimClosedMonth, claimWeeks, memoCat, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, requestStatus, requestSummary, teamVM, trackedCount, trackVM, vaGroupsVM, waitingChoices,
   type RequestEvent,
 } from "./profile-model";
 
@@ -19,6 +19,17 @@ describe("requests", () => {
   it("lists a request by what it is for, its number and its day in Kuala Lumpur", () => {
     const [row] = requestRowsVM([request()], nameOf);
     expect(row).toMatchObject({ title: "Outstation claim · Mid Valley Megamall", sub: "RQ-2610-001 · 5 Oct", status: "Pending review", tone: "pending" });
+  });
+
+  // The user, 2026-11-01: "go with the same name Air ticket claim" — a flown-to claim sent before the rename reads so too.
+  it("calls a flown-to claim an air ticket claim", () => {
+    const flown = request({
+      title: "Plane ticket claim · SABAH INTERNATIONAL CONVENTION CENTRE",
+      detail: { claimType: "outstation", planeTicket: true, location: "SABAH INTERNATIONAL CONVENTION CENTRE", regionName: "Sabah", amount: 990 },
+    });
+    const [row] = requestRowsVM([flown], nameOf);
+    expect(row.title).toBe("Air ticket claim · SABAH INTERNATIONAL CONVENTION CENTRE");
+    expect(requestSummary(flown, nameOf)).toBe("Sabah · air ticket · RM 990.00");
   });
 
   it("names a replacement by the member it replaces, and leaves drafts out", () => {
