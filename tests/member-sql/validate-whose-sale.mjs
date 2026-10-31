@@ -98,7 +98,8 @@ await db.exec(`
     $$ SELECT jsonb_strip_nulls(jsonb_build_object('salespersonId', p_order->>'salespersonId', 'salesperson', p_order->>'salespersonName')) $$;
   -- Move a bill to another salesperson (20261012170000) — not under test: it pins the bill (or takes the pin off when
   -- the bill goes to the salesperson the ERP names) and records that it was asked.
-  CREATE TABLE public.sales_order_reassignments(order_id uuid PRIMARY KEY, staff_id uuid NOT NULL, from_staff_id uuid);
+  CREATE TABLE public.sales_order_reassignments(order_id uuid PRIMARY KEY, staff_id uuid NOT NULL, from_staff_id uuid,
+    open_bill_rank smallint, share_taken_pct numeric);
   CREATE TABLE public.moves_asked(order_id uuid, staff_id uuid, note text);
   CREATE FUNCTION public.revenue_move_order(p_order_id uuid, p_staff_id uuid, p_note text DEFAULT NULL) RETURNS jsonb
   LANGUAGE plpgsql AS $$
@@ -476,5 +477,70 @@ const m4 = await moved({ no: 'HC-SO-2610-603', to: SHAWN, toSp: E.SHAWN, toName:
 check([m4.result.status, await warningsOf(m4.eventId)], ['applied', ['whose_sale_move_failed']], 'a fault asking is a warning on the delivery')
 await db.exec(`DROP FUNCTION public.erp_sync_note_seller_move(uuid, jsonb, jsonb, uuid);
   ALTER FUNCTION public.kept_move(uuid, jsonb, jsonb, uuid) RENAME TO erp_sync_note_seller_move;`)
+
+// ── Moved again in the ERP before HR answers: the question follows the ERP ──
+// A pinned bill keeps its holder through every ERP save (sales_orders_reassigned), so the receiver writes KINGSLEY.
+const k5 = await deliver({ no: 'HC-SO-2610-604', staff: KINGSLEY, sp: 'erp-kingsley', agent: 'Kingsley', ref: 'HC99005' })
+await moved({ no: 'HC-SO-2610-604', to: SHAWN, toSp: E.SHAWN, toName: 'Shawn' })
+check((await moveOf('HC-SO-2610-604')).status, 'waiting', 'KINGSLEY\'s bill given to SHAWN: stopped and asked')
+await db.exec(`DELETE FROM moves_asked`)
+const onTo = await moved({ no: 'HC-SO-2610-604', to: KINGSLEY, toSp: E.LUCAS, toName: 'Lucas', fromSp: E.SHAWN, fromName: 'Shawn' })
+const q5 = await moveOf('HC-SO-2610-604')
+check([q5.status, q5.staff_id, q5.seller_name, q5.evidence.from, q5.evidence.to],
+  ['waiting', LUCAS, 'KINGSLEY', { staffId: KINGSLEY, name: 'KINGSLEY' }, { staffId: LUCAS, name: 'LUCAS' }],
+  'given on to LUCAS before HR answered: still waiting — asked about LUCAS now')
+check(await warningsOf(onTo.eventId), ['whose_sale_moved'], 'the delivery says so')
+check([await one(`SELECT staff_id FROM sales_orders WHERE id = $1`, [k5.orderId]),
+  await one(`SELECT staff_id FROM sales_order_reassignments WHERE order_id = $1`, [k5.orderId])], [KINGSLEY, KINGSLEY],
+'still stopped: KINGSLEY\'s, pinned')
+check(await q(`SELECT staff_id, note FROM moves_asked`), [{ staff_id: KINGSLEY, note: 'Kept as KINGSLEY\'s until HR answers — the ERP gave it to LUCAS' }],
+  'the pin says whom the ERP gave it to now')
+check(await one(`SELECT count(*)::int FROM sales_order_seller_checks WHERE order_id = $1`, [k5.orderId]), 1, 'still one question')
+// Given back to KINGSLEY before HR answered (as 9 Sep's handover to SHAWN was undone on 10 Sep): nothing left to ask.
+await db.exec(`DELETE FROM moves_asked`)
+const back = await moved({ no: 'HC-SO-2610-604', to: KINGSLEY, toSp: 'erp-kingsley', toName: 'Kingsley', fromSp: E.LUCAS, fromName: 'Lucas' })
+check([await moveOf('HC-SO-2610-604'), await one(`SELECT count(*)::int FROM sales_order_reassignments WHERE order_id = $1`, [k5.orderId])],
+  [undefined, 0], 'given back in the ERP: the stop comes off — no question, no pin')
+check([await one(`SELECT staff_id FROM sales_orders WHERE id = $1`, [k5.orderId]), await warningsOf(back.eventId),
+  await one(`SELECT count(*)::int FROM moves_asked`)], [KINGSLEY, ['whose_sale_move_undone'], 0],
+'KINGSLEY\'s, as it always was; the delivery says the stop came off')
+// It follows the ERP again: the next move is stopped afresh, and HR's "LUCAS's now" sends it where the ERP gave it on.
+await moved({ no: 'HC-SO-2610-604', to: SHAWN, toSp: E.SHAWN, toName: 'Shawn' })
+await moved({ no: 'HC-SO-2610-604', to: KINGSLEY, toSp: E.LUCAS, toName: 'Lucas', fromSp: E.SHAWN, fromName: 'Shawn' })
+check((await answerMove(k5.orderId, false, null)).staffId, LUCAS, 'LUCAS\'s now: to whom the ERP gave it on, not the first move\'s SHAWN')
+check([await one(`SELECT count(*)::int FROM sales_order_reassignments WHERE order_id = $1`, [k5.orderId]), (await moveOf('HC-SO-2610-604')).status],
+  [0, 'theirs'], 'the pin off')
+
+// What stays as it was asked: still waiting, about SHAWN, nothing on the delivery.
+const k6 = await deliver({ no: 'HC-SO-2610-605', staff: KINGSLEY, sp: 'erp-kingsley', agent: 'Kingsley', ref: 'HC99006' })
+await moved({ no: 'HC-SO-2610-605', to: SHAWN, toSp: E.SHAWN, toName: 'Shawn' })
+const stays = async (args, what) => {
+  const warned = await warningsOf((await moved(args)).eventId)
+  const asked = await moveOf(args.no)
+  check([warned, asked?.status, asked?.evidence.to.name], [[], 'waiting', 'SHAWN'], what)
+}
+await stays({ no: 'HC-SO-2610-605', to: KINGSLEY, toSp: 'erp-stranger', toName: 'Stranger', fromSp: E.SHAWN, fromName: 'Shawn' },
+  'given to somebody not ours')
+await stays({ no: 'HC-SO-2610-605', to: KINGSLEY, toSp: E.SHAWN, toName: 'Shawn', fromSp: 'erp-stranger', fromName: 'Stranger' },
+  'and back to SHAWN: whom it is asked about already')
+await q(`UPDATE sales_order_reassignments SET open_bill_rank = 1 WHERE order_id = $1`, [k6.orderId])
+await stays({ no: 'HC-SO-2610-605', to: KINGSLEY, toSp: 'erp-kingsley', toName: 'Kingsley', fromSp: E.SHAWN, fromName: 'Shawn' },
+  'given back, but the pin took its Open Bill pick: HR answers it, and Move gives the pick back')
+await q(`UPDATE sales_order_reassignments SET open_bill_rank = NULL, share_taken_pct = 0.5 WHERE order_id = $1`, [k6.orderId])
+await stays({ no: 'HC-SO-2610-605', to: KINGSLEY, toSp: 'erp-kingsley', toName: 'Kingsley', fromSp: E.SHAWN, fromName: 'Shawn' },
+  'given back, but the pin took a part of the bill: the same')
+await q(`UPDATE sales_order_reassignments SET share_taken_pct = NULL, staff_id = $2 WHERE order_id = $1`, [k6.orderId, LUCAS])
+await stays({ no: 'HC-SO-2610-605', to: LUCAS, toSp: 'erp-kingsley', toName: 'Kingsley', fromSp: E.SHAWN, fromName: 'Shawn' },
+  'moved by hand to LUCAS while it waited: HR\'s move stands, whatever the ERP does')
+// Kept by HR while the ERP still names SHAWN: the pin is HR's word, and a later ERP move asks nothing.
+const k7 = await deliver({ no: 'HC-SO-2610-606', staff: KINGSLEY, sp: 'erp-kingsley', agent: 'Kingsley', ref: 'HC99007' })
+await moved({ no: 'HC-SO-2610-606', to: SHAWN, toSp: E.SHAWN, toName: 'Shawn' })
+check((await answerMove(k7.orderId, true, null)).staffId, KINGSLEY, 'HR keeps it KINGSLEY\'s')
+const keptOn = await moved({ no: 'HC-SO-2610-606', to: KINGSLEY, toSp: E.LUCAS, toName: 'Lucas', fromSp: E.SHAWN, fromName: 'Shawn' })
+check([await warningsOf(keptOn.eventId), (await moveOf('HC-SO-2610-606')).status, (await moveOf('HC-SO-2610-606')).evidence.to.name],
+  [[], 'not_theirs', 'SHAWN'], 'once HR has answered, a later ERP move asks nothing')
+const keptBack = await moved({ no: 'HC-SO-2610-606', to: KINGSLEY, toSp: 'erp-kingsley', toName: 'Kingsley', fromSp: E.LUCAS, fromName: 'Lucas' })
+check([await warningsOf(keptBack.eventId), await one(`SELECT staff_id FROM sales_order_reassignments WHERE order_id = $1`, [k7.orderId])],
+  [[], KINGSLEY], 'nor its giving back: HR\'s pin stays')
 
 console.log(`whose sale: ${checks} checks passed`)

@@ -19,6 +19,11 @@
 --    in a month no run has paid, NOT moved on Comm Cal already (by hand, or kept by an earlier question — its holder is
 --    the portal's then, whatever the ERP says), whose ERP salesperson before was one of OUR people (an alias) and is now
 --    somebody else. Writes the question, keeps the bill with whom it was, marks the delivery `whose_sale_moved`.
+--    Moved AGAIN before HR answers (its question waiting, its pin as the stop left it), the question follows the ERP:
+--    given on to another of ours, it is asked about them now — still kept, the pin's note saying so; given back to whom
+--    it was kept for (as 9 Sep's handover to SHAWN was undone on 10 Sep), nothing is left to ask and the stop comes off,
+--    its question and its pin (`whose_sale_move_undone`) — unless the pin took a part of the bill or its Open Bill pick,
+--    which only Move's own way gives back: HR answers that one. Given to somebody not ours, it stays as it was asked.
 -- 3. erp_sync_after_delivery — 20261031030100's body (md5 9bd424e8…, refused otherwise) with one more block after the
 --    whose-sale one: an APPLIED delivery of a bill the portal had (not `created`) whose `salespersonId` changed asks.
 --    In a block of its own: a fault is a `whose_sale_move_failed` warning, never the delivery's failure.
@@ -61,8 +66,11 @@ SET search_path = public
 AS $fn$
 DECLARE
     v_me        public.sales_orders%ROWTYPE;
+    v_pin       public.sales_order_reassignments%ROWTYPE;
+    v_asked     public.sales_order_seller_checks%ROWTYPE;
     v_sub       UUID;
     v_from      UUID;
+    v_now       UUID;
     v_from_name TEXT;
     v_to_name   TEXT;
     v_ev        JSONB;
@@ -78,14 +86,57 @@ BEGIN
     IF NOT FOUND OR v_me.source <> 'erp_sync' OR v_me.cancelled OR v_me.order_total <= 0 OR v_me.staff_id IS NULL THEN
         RETURN NULL;
     END IF;
-    -- Moved on Comm Cal already — by hand, or kept by an earlier question: its holder is the portal's, whatever the ERP
-    -- says — nothing to ask.
-    IF EXISTS (SELECT 1 FROM public.sales_order_reassignments r WHERE r.order_id = p_order_id) THEN
-        RETURN NULL;
-    END IF;
     SELECT b.sub_department_id INTO v_sub FROM public.sales_import_batches b WHERE b.id = v_me.batch_id;
     IF v_sub IS NULL OR public.commission_order_period_locked(v_sub, v_me.period_month) THEN
         RETURN NULL;
+    END IF;
+    SELECT r.* INTO v_pin FROM public.sales_order_reassignments r WHERE r.order_id = p_order_id;
+    IF FOUND THEN
+        -- Moved on Comm Cal already — by hand, or kept by HR's answer: its holder is the portal's, whatever the ERP says
+        -- — nothing to ask. Only a bill this check stopped, its question still waiting and its pin as the stop left it,
+        -- follows the ERP's later moves.
+        SELECT c.* INTO v_asked FROM public.sales_order_seller_checks c
+         WHERE c.order_id = p_order_id AND c.kind = 'erp_moved' AND c.status = 'waiting';
+        IF NOT FOUND OR v_pin.staff_id IS DISTINCT FROM NULLIF(v_asked.evidence->'from'->>'staffId', '')::UUID THEN
+            RETURN NULL;
+        END IF;
+        SELECT a.staff_id INTO v_now
+          FROM public.comm_agent_aliases a
+         WHERE a.erp_salesperson_id = NULLIF(BTRIM(p_after->>'salespersonId'), '') AND a.staff_id IS NOT NULL
+         LIMIT 1;
+        -- Given to somebody not ours, or to whom it is asked about already: it stays as it was asked.
+        IF v_now IS NULL OR v_now IS NOT DISTINCT FROM NULLIF(v_asked.evidence->'to'->>'staffId', '')::UUID THEN
+            RETURN NULL;
+        END IF;
+        IF v_now = v_pin.staff_id THEN
+            -- Given back before HR answered (as 9 Sep's handover to SHAWN was undone on 10 Sep): nothing is left to ask,
+            -- and the stop comes off — its question and its pin; the bill is theirs already and stays so. A pin that
+            -- took a part of the bill or its Open Bill pick is left for HR: only Move's own way gives those back.
+            IF v_pin.share_taken_pct IS NOT NULL OR v_pin.open_bill_rank IS NOT NULL THEN
+                RETURN NULL;
+            END IF;
+            DELETE FROM public.sales_order_seller_checks WHERE order_id = p_order_id AND kind = 'erp_moved';
+            DELETE FROM public.sales_order_reassignments WHERE order_id = p_order_id;
+            IF p_event_id IS NOT NULL THEN
+                UPDATE public.erp_sync_events SET warnings = ARRAY_APPEND(warnings, 'whose_sale_move_undone') WHERE id = p_event_id;
+            END IF;
+            RETURN JSONB_BUILD_OBJECT('undone', TRUE, 'staffId', v_now);
+        END IF;
+        -- Given on to another of ours: still kept, and asked about where the ERP puts it now — so "LUCAS's now" sends it
+        -- to LUCAS, and the closes asked first are LUCAS's.
+        SELECT s.employee_name INTO v_to_name FROM public.hr_staff_costs s WHERE s.id = v_now;
+        v_ev := JSONB_BUILD_OBJECT('from', v_asked.evidence->'from',
+            'to', JSONB_BUILD_OBJECT('staffId', v_now, 'name', COALESCE(v_to_name, p_after->>'salesperson', '(somebody)')),
+            'movedAt', NOW());
+        UPDATE public.sales_order_seller_checks
+           SET staff_id = v_now, evidence = v_ev, event_id = p_event_id, asked_at = NOW()
+         WHERE order_id = p_order_id AND kind = 'erp_moved';
+        PERFORM public.revenue_move_order(p_order_id, v_pin.staff_id,
+            LEFT(FORMAT('Kept as %s''s until HR answers — the ERP gave it to %s', v_ev->'from'->>'name', v_ev->'to'->>'name'), 500));
+        IF p_event_id IS NOT NULL THEN
+            UPDATE public.erp_sync_events SET warnings = ARRAY_APPEND(warnings, 'whose_sale_moved') WHERE id = p_event_id;
+        END IF;
+        RETURN v_ev;
     END IF;
     -- Whose it was: the ERP's salesperson before, one of ours through its alias.
     SELECT a.staff_id INTO v_from
@@ -119,7 +170,7 @@ END
 $fn$;
 
 COMMENT ON FUNCTION public.erp_sync_note_seller_move(UUID, JSONB, JSONB, UUID) IS
-    'Whose sale? A bill the ERP gave to another salesperson after the portal had it is stopped: kept with whom it was (revenue_move_order — pinned) and asked (kind erp_moved) until HR answers (revenue_answer_seller_move). Only a counting bill of the feed, its month unpaid, not moved on Comm Cal already, whose ERP salesperson was one of ours before. Called by erp_sync_after_delivery (20261031040000).';
+    'Whose sale? A bill the ERP gave to another salesperson after the portal had it is stopped: kept with whom it was (revenue_move_order — pinned) and asked (kind erp_moved) until HR answers (revenue_answer_seller_move). Only a counting bill of the feed, its month unpaid, not moved on Comm Cal already, whose ERP salesperson was one of ours before. Moved again while it waits, the question follows the ERP: given on to another of ours, asked about them; given back to whom it was kept for, the question and its pin come off (whose_sale_move_undone) unless the pin took a share or an Open Bill pick. Called by erp_sync_after_delivery (20261031040000).';
 
 REVOKE ALL ON FUNCTION public.erp_sync_note_seller_move(UUID, JSONB, JSONB, UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.erp_sync_note_seller_move(UUID, JSONB, JSONB, UUID) TO authenticated, service_role;
