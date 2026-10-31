@@ -184,7 +184,6 @@ export interface MemberIncome {
   personal: number;
   override: number;
   kpi: number;
-  openBill: number;
   incentive: number;
   group: number;
   total: number;

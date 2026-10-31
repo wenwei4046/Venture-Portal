@@ -41,7 +41,6 @@ const COMPONENT_ORDER = [
   'product_revenue',
   'kpi_item',
   'kpi_threshold',
-  'open_bill',
   'override',
   'margin_incentive',
   'group_incentive',
@@ -51,7 +50,6 @@ const COMPONENT_LABEL: Record<string, string> = {
   product_revenue: 'Product commission',
   kpi_item: 'KPI allowance',
   kpi_threshold: 'KPI quantity bonus',
-  open_bill: 'Open Bill bonus',
   override: 'Override on the downline',
   margin_incentive: 'Margin incentive',
   group_incentive: 'Group incentive',
@@ -81,7 +79,6 @@ interface StatementRow {
   kpi_base: number | string
   kpi_threshold_pct: number | string
   kpi_commission: number | string
-  open_bill_bonus: number | string
   override_commission: number | string
   margin_revenue: number | string
   margin_cost: number | string
@@ -519,7 +516,6 @@ export default async function CommissionStatementPage({ params }: PageProps) {
             <tbody>
               <Sum name="Product commission" value={Number(s.product_commission)} />
               <Sum name="KPI allowance" value={Number(s.kpi_commission)} />
-              <Sum name="Open Bill bonus" value={Number(s.open_bill_bonus)} />
               <Sum name="Override" value={Number(s.override_commission)} />
               <Sum name="Margin incentive" value={Number(s.margin_incentive)} />
               {Number(s.group_incentive) > 0 ? <Sum name="Group incentive" value={Number(s.group_incentive)} /> : null}

@@ -66,7 +66,6 @@ export function incomeVM(data: MemberIncome, hidden: boolean, hasTeam = false): 
     rows.push({ label: "Team override", sub: sellers ? `From ${plural(sellers, "person", "people")} in your team` : "From your team's sales", amt: money(m.override) });
   }
   if (m.switches.kpi || m.kpi !== 0) rows.push({ label: "KPI pay", sub: plural(m.kpiQty, "item"), amt: money(m.kpi) });
-  if (m.switches.openBill || m.openBill !== 0) rows.push({ label: "Open Bill bonus", sub: plural(m.bills.filter(b => b.openBill > 0).length, "open bill"), amt: money(m.openBill) });
   if (m.switches.incentive || m.incentive !== 0) rows.push({ label: "Margin incentive", sub: incentiveSub(m), amt: money(m.incentive) });
   if (m.switches.group || m.group !== 0) rows.push({ label: "Group incentive", sub: "Your team's group reward", amt: money(m.group) });
   if (m.director !== 0) rows.push({ label: "Director pay", sub: "Fixed amount and incentive", amt: money(m.director) });
@@ -163,7 +162,7 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
     const kpiQtyTotal = (o?.lines ?? []).reduce((a, l) => a + l.kpiQty, 0);
     const goods = (o?.lines ?? []).filter(l => l.goods);
     const goodsTotal = goods.reduce((a, l) => a + l.amount, 0);
-    const commission = Math.round((b.personal + b.openBill) * 100) / 100;
+    const commission = Math.round(b.personal * 100) / 100;
     const margin = b.marginPct ?? o?.margin ?? null;
     const gift = margin === null && !!o && noSalesBill(o);
     sheets[id] = {
@@ -209,7 +208,7 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
 
   const counted = bills.filter(b => b.status !== "deposit_pending");
   const held = bills.length - counted.length;
-  const commission = counted.reduce((a, b) => a + b.personal + b.openBill, 0);
+  const commission = counted.reduce((a, b) => a + b.personal, 0);
   const kpi = counted.reduce((a, b) => a + b.kpi, 0);
   const rates = [...new Set(m.overrides.map(o => o.rate))];
   const kpiOn = m.switches.kpi || kpi > 0;

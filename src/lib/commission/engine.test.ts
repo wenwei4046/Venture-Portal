@@ -97,11 +97,9 @@ const ZANOTTI_BANDS: MarginBand[] = [
 const MARGIN_BANDS = [...AKEMI_BANDS, ...ZANOTTI_BANDS]
 
 const SCHEME: CommissionScheme = {
-  openBillBasis: 'uplift_on_commission',
   overrideIncludesKpi: false,
   enableProductRevenue: true,
   enableKpi: true,
-  enableOpenBill: true,
   enableOverride: true,
   enableMarginPenalty: true,
   enableMarginIncentive: true,
@@ -112,12 +110,6 @@ const SCHEME: CommissionScheme = {
 
 const KPI_ITEMS = [{ productCode: 'AK-CS AIRLOFT COMFY PIL', kpiAmount: 50 }]
 const KPI_THRESHOLDS = [{ minQty: 10, bonusPct: 0.2 }]
-const OPEN_BILL_RULES = [
-  { rank: 1 as const, pct: 0.5 },
-  { rank: 2 as const, pct: 0.4 },
-  { rank: 3 as const, pct: 0.3 },
-]
-
 function node(
   staffId: string,
   uplineStaffId: string | null,
@@ -188,8 +180,6 @@ function run(partial: Partial<EngineInput>) {
     orders: [],
     kpiItems: KPI_ITEMS,
     kpiThresholds: KPI_THRESHOLDS,
-    openBillRules: OPEN_BILL_RULES,
-    openBillTags: [],
     marginBands: MARGIN_BANDS,
     hierarchy: CHAIN,
     priorMonths: [],
@@ -277,14 +267,12 @@ describe('deposit gate', () => {
         ['MATTRESS', 'M1', 1, 10_000],
         ['ACC', 'AK-CS AIRLOFT COMFY PIL', 4, 0],
       ], { paidAmount: 2_000 })],
-      openBillTags: [{ orderId: '1', rank: 1 }],
     })
     const rs = find(r.statements, 'rs')
     expect(rs.productRevenue).toBe(0)
     // The four pillows' RM 200 is KPI, not sales — what waits is 9,800.
     expect(rs.deferredRevenue).toBe(9_800)
     expect(rs.kpiCommission).toBe(0) // the free pillows wait too
-    expect(rs.openBillBonus).toBe(0)
     expect(rs.totalCommission).toBe(0)
   })
 
@@ -594,7 +582,7 @@ describe('can recruit — the title decides, not the month\'s rank', () => {
   it('accepts IR Specialist peers without inventing an override between equal 3% rates', () => {
     const specialist: Rank = { ...RANKS[0], rankKey: 'rs_3', label: 'Rank C', productRate: 0.03, canRecruit: true }
     const result = run({
-      scheme: { ...SCHEME, enableKpi: false, enableOpenBill: false,
+      scheme: { ...SCHEME, enableKpi: false,
         enableMarginPenalty: false, enableMarginIncentive: false, overrideDepth: 2 },
       ranks: [specialist],
       hierarchy: [node('boss', null, 'rs_3', 'fixed', T_RS), node('peer', 'boss', 'rs_3', 'fixed', T_RS)],
@@ -863,78 +851,6 @@ describe('a SKU judged at its own cost ratio — 2026-09-27', () => {
   })
 })
 
-// ─── Open Bill ──────────────────────────────────────────────────────────────
-
-describe('Open Bill bonus', () => {
-  const orders = [order('1', 'ta', [['MATTRESS', 'M1', 1, 10_000]])]
-
-  it('matches the brief: Team Assistant on 7%, 10,000 → 700 then +50%', () => {
-    const r = run({ orders, openBillTags: [{ orderId: '1', rank: 1 }] })
-    const ta = find(r.statements, 'ta')
-    expect(ta.productCommission).toBe(700)
-    expect(ta.openBillBonus).toBe(350)
-    expect(ta.productCommission + ta.openBillBonus).toBe(1_050)
-  })
-
-  it('matches the brief: Revenue Specialist on 5%, 10,000 → 500 then +50%', () => {
-    const r = run({
-      orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]])],
-      openBillTags: [{ orderId: '1', rank: 1 }],
-    })
-    const rs = find(r.statements, 'rs')
-    expect(rs.productCommission).toBe(500)
-    expect(rs.openBillBonus).toBe(250)
-  })
-
-  it('follows the EFFECTIVE rate, so a variable promotion lifts the bonus too', () => {
-    const solo = [node('x', null, 'rs_6', 'variable')]
-    const big = [order('1', 'x', [['MATTRESS', 'M', 1, 400_000]])]
-    const r = run({ hierarchy: solo, orders: big, openBillTags: [{ orderId: '1', rank: 1 }] })
-    const x = find(r.statements, 'x')
-    expect(x.productRate).toBe(0.07) // climbed on 400k group sales
-    expect(x.openBillBonus).toBe(14_000) // 400,000 x 7% x 50%
-  })
-
-  it('grades the 2nd and 3rd bill of the day down to 40% and 30%', () => {
-    const two = run({ orders, openBillTags: [{ orderId: '1', rank: 2 }] })
-    const three = run({ orders, openBillTags: [{ orderId: '1', rank: 3 }] })
-    expect(find(two.statements, 'ta').openBillBonus).toBe(280) // 700 x 40%
-    expect(find(three.statements, 'ta').openBillBonus).toBe(210) // 700 x 30%
-  })
-
-  it("bases the bonus on the main sales: transport out, KPI items' amounts off", () => {
-    const r = run({
-      orders: [order('1', 'ta', [
-        ['MATTRESS', 'M1', 1, 10_000],
-        ['TRANS', 'TRANSPORTATION CHARGES', 1, 500],
-        ['ACC', 'AK-CS AIRLOFT COMFY PIL', 2, 300],
-      ])],
-      openBillTags: [{ orderId: '1', rank: 1 }],
-    })
-    // (10,300 − 2 × 50) × 7% × 50%
-    expect(find(r.statements, 'ta').openBillBonus).toBe(357)
-  })
-
-  it('warns when a tagged rank has no configured rate', () => {
-    const r = run({
-      orders,
-      openBillTags: [{ orderId: '1', rank: 3 }],
-      openBillRules: [{ rank: 1, pct: 0.5 }],
-    })
-    expect(find(r.statements, 'ta').openBillBonus).toBe(0)
-    expect(r.warnings.join(' ')).toMatch(/no bonus rate is configured/)
-  })
-
-  it('supports the pct_of_revenue basis for a future sub-department', () => {
-    const r = run({
-      orders,
-      openBillTags: [{ orderId: '1', rank: 1 }],
-      scheme: { ...SCHEME, openBillBasis: 'pct_of_revenue' },
-    })
-    expect(find(r.statements, 'ta').openBillBonus).toBe(5_000)
-  })
-})
-
 // ─── Hierarchy override ─────────────────────────────────────────────────────
 
 describe('hierarchy override — differential roll-up', () => {
@@ -1003,18 +919,15 @@ describe('scheme component switches', () => {
     ['MATTRESS', 'M1', 1, 10_000],
     ['ACC', 'AK-CS AIRLOFT COMFY PIL', 10, 0],
   ])]
-  const tags = [{ orderId: '1', rank: 1 as const }]
 
   it('a sub-department can pay product revenue only', () => {
     const r = run({
       orders,
-      openBillTags: tags,
-      scheme: { ...SCHEME, enableKpi: false, enableOpenBill: false, enableOverride: false },
+      scheme: { ...SCHEME, enableKpi: false, enableOverride: false },
     })
     const ta = find(r.statements, 'ta')
     expect(ta.productCommission).toBe(700)
     expect(ta.kpiCommission).toBe(0)
-    expect(ta.openBillBonus).toBe(0)
     expect(ta.totalCommission).toBe(700)
     expect(find(r.statements, 'tl').overrideCommission).toBe(0)
   })
@@ -1045,7 +958,6 @@ describe('run invariants', () => {
       order('2', 'rs', [['SOFA', 'S1', 1, 10_000, 6_700]]),
       order('3', 'rs', [['BEDFRAME', 'B1', 2, 3_333.33, 2_233.33]]),
     ],
-    openBillTags: [{ orderId: '1', rank: 1 }],
   })
 
   it('every statement total equals the sum of its lines', () => {
@@ -1317,14 +1229,6 @@ describe('below-margin penalty, end to end', () => {
     expect(rs.marginPct).toBeCloseTo(0.26, 10)
     expect(rs.productCommission).toBe(250) // 10,000 x 5% = 500, halved
     expect(rs.marginPenaltyWithheld).toBe(250)
-  })
-
-  it('halves the Open Bill bonus on the same bill', () => {
-    const r = run({ orders: [badBill], openBillTags: [{ orderId: '1', rank: 1 }] })
-    const rs = find(r.statements, 'rs')
-    expect(rs.openBillBonus).toBe(125) // 250 full, halved
-    expect(rs.marginPenaltyWithheld).toBe(375) // 250 + 125
-    expect(rs.totalCommission).toBe(375)
   })
 
   it('does NOT scale the flat KPI allowance', () => {
@@ -1726,12 +1630,10 @@ describe('unranked salesperson', () => {
 
   it('pays a head nothing on their own bills, whatever the month switches on', () => {
     const r = run({
-      scheme: { ...SCHEME, openBillBasis: 'pct_of_revenue' },
       orders: [order('1', 'director', [
         ['MATTRESS', 'M1', 1, 10_000, 5_000, 'AKEMI'],
         ['ACC', 'AK-CS AIRLOFT COMFY PIL', 10, 0, 0, 'AKEMI'],
       ])],
-      openBillTags: [{ orderId: '1', rank: 1 }],
       departmentHeadIds: ['director'],
     })
     const s = find(r.statements, 'director')
@@ -1739,7 +1641,7 @@ describe('unranked salesperson', () => {
     // the ten pillows' RM 500 of KPI value comes off the bill whoever sold it
     // (2026-09-27), as the month page shows it, and a head is paid neither part…
     expect(s.productRevenue).toBe(9_500)
-    // …and earns no KPI allowance, Open Bill bonus or margin incentive.
+    // …and earns no KPI allowance or margin incentive.
     expect(s.lines).toEqual([])
     expect(s.totalCommission).toBe(0)
     expect(r.warnings).toEqual([])
@@ -1775,25 +1677,22 @@ describe('Revenue Director pay', () => {
   it('pays their own bills at the rung rate, and nothing else', () => {
     const r = run({
       ranks: LADDER,
-      scheme: { ...SCHEME, openBillBasis: 'pct_of_revenue' },
       orders: [order('1', 'director', [
         ['MATTRESS', 'M1', 1, 10_000, 9_000, 'AKEMI'],
         ['ACC', 'AK-CS AIRLOFT COMFY PIL', 10, 0, 0, 'AKEMI'],
       ])],
-      openBillTags: [{ orderId: '1', rank: 1 }],
       departmentHeadIds: ['director'],
       directors: [terms()],
     })
     const s = find(r.statements, 'director')
     // The main sales (the pillows' KPI value comes off every bill) at 12%:
-    // no KPI allowance, no Open Bill, no margin penalty for a 10% margin.
+    // no KPI allowance, no margin penalty for a 10% margin.
     expect(s.productRevenue).toBe(9_500)
     expect(s.lines.map(l => [l.component, l.amount])).toEqual([['product_revenue', 1_140]])
     expect(s.productRate).toBe(0.12)
     expect(s.effectiveRankKey).toBe('rd_12')
     expect(s.promotesToTitleId).toBeNull()
     expect(s.kpiCommission).toBe(0)
-    expect(s.openBillBonus).toBe(0)
     expect(s.marginIncentive).toBe(0)
     expect(s.totalCommission).toBe(1_140)
     expect(r.warnings).toEqual([])

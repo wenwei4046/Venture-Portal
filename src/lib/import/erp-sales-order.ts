@@ -36,8 +36,9 @@
  *  2. NO TIME OF DAY. Every `Date` cell is midnight. The order in which bills
  *     were written on a day can only come from the running `Doc. No.`
  *     (SO-012578 … SO-013266; sorting 688 orders by number produced just 2
- *     date inversions), which is what `sequenceInDay` exposes for the Open
- *     Bill suggestion.
+ *     date inversions), which is what `sequenceInDay` exposes — a bill's
+ *     place in its salesperson's day (Open Bill's suggestion read it until
+ *     Open Bill went, 2026-10-31).
  */
 
 import { read, utils, type WorkBook } from 'xlsx'
@@ -61,8 +62,8 @@ export interface ErpSalesOrder {
   /** YYYY-MM-DD */
   orderDate: string
   /**
-   * The event day the Open Bill race is run on. Defaults to the order date —
-   * the ERP has nothing better — but stays a separate field because a 3-day
+   * The event day the bill was written on. Defaults to the order date — the
+   * ERP has nothing better — but stays a separate field because a 3-day
    * roadshow can straddle a cut-off and late-entered orders get the following
    * day's date.
    */

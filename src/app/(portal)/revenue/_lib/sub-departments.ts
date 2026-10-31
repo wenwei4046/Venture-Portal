@@ -15,8 +15,8 @@ export type RevenuePageArea = Exclude<ReachArea, 'crm'>
  *
  * Every page under `/revenue/[sub]` is scoped to exactly one of these, and so
  * is every rule row it renders: `comm_ranks`, `comm_item_groups`,
- * `comm_kpi_items`, `comm_kpi_thresholds`, `comm_open_bill_rules`,
- * `comm_brands`, `comm_margin_bands`, `comm_promotion_rules` and
+ * `comm_kpi_items`, `comm_kpi_thresholds`, `comm_brands`,
+ * `comm_margin_bands`, `comm_promotion_rules` and
  * `comm_hierarchy` all carry a `scheme_id`, and a scheme belongs to one
  * sub-department. Resolving the slug to its scheme once, here, is what keeps
  * Fair's ladder off IR's page when the second one is created.

@@ -565,7 +565,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
           <div className={styles.menuHeading}>Don&apos;t count {bill.orderNo}?</div>
           <p className={styles.confirmCopy}>
             It leaves <strong>{monthLabel}</strong>&apos;s commission — no commission on it, no group sales or
-            override, no KPI or Open Bill — as if the ERP had cancelled it, and it stays out whatever the ERP
+            override, no KPI — as if the ERP had cancelled it, and it stays out whatever the ERP
             sends next until somebody counts it again.
           </p>
           <label className={styles.dateField} htmlFor={noteId}>

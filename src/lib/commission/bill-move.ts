@@ -11,9 +11,8 @@
  * ledger and their Revenue app — and stays theirs through every ERP re-send;
  * moving it to the salesperson the ERP names takes the move off. The new
  * holder's share of it goes (they hold it all) — remembered, and theirs again
- * when the bill leaves them (mig 20261012190000), so an Undo is an undo; its
- * Open Bill pick goes with it and comes back on the move back. A paid month
- * refuses (23RUN), a bill that does not count refuses (23EXC), and the action
+ * when the bill leaves them (mig 20261012190000), so an Undo is an undo. A
+ * paid month refuses (23RUN), a bill that does not count refuses (23EXC), and the action
  * refuses a bill or a salesperson whose month is closed, and anybody off the
  * team. This file only decides what the menu shows and says what happened.
  */
@@ -44,10 +43,6 @@ export interface BillMoveResult {
   from: BillHolder
   /** It went back to the salesperson the ERP names: the move came off. */
   movedBack: boolean
-  /** The Open Bill rank it gave up, if it held one. */
-  openBillRank: number | null
-  /** The rank it got back on the move back. */
-  openBillBack: number | null
   /** The part of it the new holder had held, now all theirs. */
   shareTaken: number | null
   /** The part `from` held before a move made all of it theirs, theirs again now. */
@@ -83,8 +78,6 @@ export function moveProblem(owner: BillHolder, staffId: string): string | null {
   return null
 }
 
-const RANKS = ['1st', '2nd', '3rd']
-
 /** The notice above the table once a bill has moved. */
 export function moveMessage(result: BillMoveResult): string {
   if (!result.changed) return `${result.orderNo} is ${result.to.name}’s already — nothing moved.`
@@ -103,12 +96,7 @@ export function moveMessage(result: BillMoveResult): string {
         ? ` ${result.from.name}’s ${sharePct(result.shareNotBack)} share did not come back — with the shares held now it would leave ${result.to.name} nothing. Share it again if it should be.`
         : ` ${result.from.name}’s ${sharePct(result.shareNotBack)} share did not come back — nobody holds the bill to share it with.`
       : ''
-  const pick = result.openBillBack
-    ? ` Its Open Bill pick (${RANKS[result.openBillBack - 1] ?? result.openBillBack}) is back.`
-    : result.openBillRank
-      ? ` Its Open Bill pick (${RANKS[result.openBillRank - 1] ?? result.openBillRank}) came off — it ranked ${result.from.name}’s day.`
-      : ''
-  return `${head}${share}${shareBack}${pick}`
+  return `${head}${share}${shareBack}`
 }
 
 /** A bill that was moved, as its ledger row and its page say it. */

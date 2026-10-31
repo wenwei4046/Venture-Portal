@@ -100,7 +100,7 @@ function profileMain(): ProfileFixture["main"] {
 
 function income(hide: boolean): IncomeVM {
   const amt = (v: number) => (hide ? "RM ••••" : rm2(v));
-  const rows: [string, string, number][] = [["Fixed salary", "Monthly base", 2500], ["Personal sales commission", "RM 51,730 costed sales · 2 orders held", 2637.4], ["Team override", "4 direct reports", 486.2], ["KPI pay", "27 items × RM 25", 675], ["Open Bill bonus", "2 open bills closed", 120], ["Margin incentive", "Akemi, Ergotex and Zanotti at Tier 1 or 2", 423.9]];
+  const rows: [string, string, number][] = [["Fixed salary", "Monthly base", 2500], ["Personal sales commission", "RM 51,730 costed sales · 2 orders held", 2637.4], ["Team override", "4 direct reports", 606.2], ["KPI pay", "27 items × RM 25", 675], ["Margin incentive", "Akemi, Ergotex and Zanotti at Tier 1 or 2", 423.9]];
   const total = hide ? "RM ••••••" : rm2(6842.5);
   return {
     period: "2026-09", periodLabel: "Sep 2026", heroLabel: "Estimated income · not settled", amount: total,

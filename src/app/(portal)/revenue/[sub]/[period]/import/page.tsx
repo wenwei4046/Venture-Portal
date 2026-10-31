@@ -1,13 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn, requirePage } from '@/lib/auth'
-import { createClient } from '@/lib/supabase/server'
 import { revenuePath } from '@/lib/revenue'
 import { loadAgentMatchingData } from '../../../import-actions'
 import SalesImportWizard from './_components/SalesImportWizard'
 import { requireSubDepartment } from '../../../_lib/sub-departments'
-import { openBillOnFor } from '../../../_lib/open-bill-month'
 
 interface PageProps {
   params: Promise<{ sub: string; period: string }>
@@ -30,9 +27,6 @@ export default async function SalesImportPage({ params }: PageProps) {
 
   const subDept = await requireSubDepartment(sub, 'comm_cal')
   const { staff, aliases } = await loadAgentMatchingData()
-  const supabase = (await createClient()) as unknown as SupabaseClient
-  // Whether THIS month pays Open Bill: its own setting, else Rules (2026-09-26).
-  const openBillOn = subDept.schemeId ? await openBillOnFor(supabase, subDept.id, period) : false
 
   return (
     <div>
@@ -58,7 +52,6 @@ export default async function SalesImportPage({ params }: PageProps) {
         period={period}
         subDeptSlug={subDept.slug}
         subDepartmentId={subDept.id}
-        enableOpenBill={openBillOn}
         staff={staff}
         aliases={aliases}
       />

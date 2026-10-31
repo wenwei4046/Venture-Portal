@@ -267,7 +267,7 @@ Every delivery becomes one row in the portal's `erp_sync_events` and one of:
 
 | Outcome | When | Written? |
 |---|---|---|
-| `applied` | a new order, an update, or an order becoming excluded | yes — header upserted, lines replaced, day re-sequenced, Open Bill suggestions re-derived, batch counters refreshed |
+| `applied` | a new order, an update, or an order becoming excluded | yes — header upserted, lines replaced, day re-sequenced, batch counters refreshed |
 | `duplicate` | same `snapshotAt` as the row already holds | no |
 | `stale` | an older `snapshotAt` than the row already holds (out-of-order retry) | no |
 | `held` | the month's commission run is **applied/locked**, the month is **closed to the feed** (`erp_feed_closed_months`, 2026-09-26 — a delivery that would write into OR out of it), or the month was **file-imported**. Since 2026-10-12 (mig `20261012200000`) a NEW document whose sale month is paid or closed is no longer held: it is `applied` in the first month still open from the month it was keyed in (message *created — keyed late: sold in September 2026, which is paid, so it counts in October 2026*); held only when no month up to the office's own is open | no — payload kept; HR replays after reopening the run or the month |

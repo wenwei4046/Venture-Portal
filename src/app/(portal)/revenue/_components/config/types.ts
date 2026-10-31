@@ -21,11 +21,9 @@ export interface SchemeRow {
   id: string
   sub_department_id: string
   scheme_name: string
-  open_bill_basis: 'uplift_on_commission' | 'pct_of_revenue'
   override_includes_kpi: boolean
   enable_product_revenue: boolean
   enable_kpi: boolean
-  enable_open_bill: boolean
   enable_override: boolean
   enable_margin_penalty: boolean
   enable_margin_incentive: boolean
@@ -159,12 +157,6 @@ export interface KpiThresholdRow {
   min_qty: number
   bonus_pct: number
   effective_from: string
-}
-
-export interface OpenBillRuleRow {
-  id: string
-  bill_rank: number
-  pct: number
 }
 
 export interface BrandRow {
@@ -319,7 +311,6 @@ export interface CommissionSettingsData {
   kpiFabricSeries: KpiFabricSeriesRow[]
   /** SKU items whose SKU the ERP has since removed (their `erp_product_id`). */
   kpiGoneSkus: string[]
-  openBillRules: OpenBillRuleRow[]
   brands: BrandRow[]
   marginBands: MarginBandRow[]
   promotionRules: PromotionRuleRow[]

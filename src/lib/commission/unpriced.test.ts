@@ -17,8 +17,8 @@ function input(orders: SalesOrder[]): Pick<EngineInput, 'orders' | 'scheme'> {
   return {
     orders,
     scheme: {
-      openBillBasis: 'uplift_on_commission', overrideIncludesKpi: false,
-      enableProductRevenue: true, enableKpi: false, enableOpenBill: false, enableOverride: true,
+      overrideIncludesKpi: false,
+      enableProductRevenue: true, enableKpi: false, enableOverride: true,
       enableMarginPenalty: false, enableMarginIncentive: false,
       itemGroups: [
         { group: 'mattress', commissionable: true }, { group: 'bedframe', commissionable: true },

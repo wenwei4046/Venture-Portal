@@ -66,8 +66,6 @@ export interface MonthOrder {
   marginSource: MarginSource
   linesWithoutCost: number
   linesWithoutBrand: number
-  openBillRank: number | null
-  openBillAuto: boolean | null
   depositRequired: number | null
   depositMet: boolean
   /**
@@ -115,8 +113,6 @@ interface Row {
   margin_source: MarginSource
   lines_without_cost: number
   lines_without_brand: number
-  open_bill_rank: number | null
-  open_bill_auto: boolean | null
   deposit_required: number | string | null
   deposit_met: boolean
   ref_no: string | null
@@ -181,8 +177,6 @@ export async function loadMonthOrders(
     marginSource: r.margin_source,
     linesWithoutCost: r.lines_without_cost,
     linesWithoutBrand: r.lines_without_brand,
-    openBillRank: r.open_bill_rank,
-    openBillAuto: r.open_bill_auto,
     depositRequired: r.deposit_required === null ? null : Number(r.deposit_required),
     depositMet: r.deposit_met,
     // Absent until 20261003170000 is applied: the column then reads as unknown.

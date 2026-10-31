@@ -35,7 +35,7 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'my_sub_department_reach', 'person_sub_department_reach',
   'ar_account_code_for', 'ar_account_for_invoice', 'audit_changes', 'audit_overview', 'bank_gl_codes', 'bridge_mirror_slices',
   'bridge_ref_flags', 'build_hr_cost_submission_payload', 'calculate_dept_np', 'claim_payment_queue', 'comm_home_sub_department',
-  'comm_open_bill_on', 'comm_staff_can_recruit', 'commission_order_period_locked', 'crm_can_reply', 'crm_my_can', 'crm_people',
+  'comm_staff_can_recruit', 'commission_order_period_locked', 'crm_can_reply', 'crm_my_can', 'crm_people',
   'current_actions', 'current_permissions', 'current_sensitive_fields', 'current_tabs', 'dashboard_summary', 'department_modes',
   'dept_invoice_settlements', 'director_private_fields', 'erp_feed_month_closed', 'erp_sync_ignored_agents', 'erp_sync_sub_department',
   'erp_sync_unmatched_agents', 'get_dept_opex_rows', 'get_director_advance_opening_balance', 'get_director_ctc_by_company',

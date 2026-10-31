@@ -226,7 +226,6 @@ async function cloneSchemeChildren(
     ['comm_kpi_items', ['source', 'product_code', 'product_name', 'erp_product_id', 'option_pool', 'option_value', 'kpi_amount', 'effective_from', 'effective_to']],
     ['comm_cost_ratios', ['erp_product_id', 'product_code', 'ratio', 'note']],
     ['comm_kpi_thresholds', ['tier_label', 'min_qty', 'bonus_pct', 'effective_from', 'effective_to']],
-    ['comm_open_bill_rules', ['bill_rank', 'pct', 'effective_from', 'effective_to']],
     ['comm_promotion_rules', ['from_rank_key', 'to_rank_key', 'alternative_group', 'criterion', 'threshold_amount', 'threshold_qty', 'margin_band_key', 'consecutive_months', 'is_enforced', 'note']],
   ]
 
@@ -314,10 +313,6 @@ export async function updateScheme(formData: FormData) {
   // and this Save wrote back what its form had loaded — 1 when blank — over
   // whatever Costing Setting had set since.
 
-  const basis = text(formData, 'open_bill_basis')
-  if (basis && !['uplift_on_commission', 'pct_of_revenue'].includes(basis)) {
-    throw new Error('Unknown Open Bill basis')
-  }
   const rateMode = text(formData, 'default_rate_mode')
   if (rateMode && !['fixed', 'variable'].includes(rateMode)) {
     throw new Error('Unknown rate mode')
@@ -330,7 +325,6 @@ export async function updateScheme(formData: FormData) {
         .update({
           enable_product_revenue: formData.get('enable_product_revenue') === 'on',
           enable_kpi: formData.get('enable_kpi') === 'on',
-          enable_open_bill: formData.get('enable_open_bill') === 'on',
           enable_override: formData.get('enable_override') === 'on',
           enable_margin_penalty: formData.get('enable_margin_penalty') === 'on',
           enable_margin_incentive: formData.get('enable_margin_incentive') === 'on',
@@ -339,7 +333,6 @@ export async function updateScheme(formData: FormData) {
           override_depth: overrideDepth,
           direct_line_limit: directLimit,
           override_includes_kpi: formData.get('override_includes_kpi') === 'on',
-          open_bill_basis: basis || 'uplift_on_commission',
           default_rate_mode: rateMode || 'variable',
           deposit_threshold_pct: depositOn ? depositPct : null,
           updated_at: new Date().toISOString(),
@@ -722,20 +715,6 @@ export async function deleteKpiThreshold(id: string) {
   refresh()
 }
 
-// ─── Open Bill ──────────────────────────────────────────────────────────────
-
-export async function updateOpenBillRule(formData: FormData) {
-  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
-  const supabase = await client()
-
-  const id = required(formData, 'id', 'Rule')
-  const p = pct(formData, 'pct')
-  if (p === null || p < 0 || p > 1) throw new Error('Open Bill bonus must be between 0 and 100%')
-
-  check((await supabase.from('comm_open_bill_rules').update({ pct: p }).eq('id', id)).error, 'Could not save the Open Bill rate')
-  refresh()
-}
-
 // ─── Brands and margin bands ────────────────────────────────────────────────
 
 export async function upsertBrand(formData: FormData) {
@@ -849,62 +828,16 @@ export async function deleteMarginBand(id: string) {
  * together; Rules still sets them apart. Off means the run pays none of it;
  * every run computed afterwards follows.
  */
-export type SchemeSwitch = 'open_bill' | 'margin' | 'kpi'
-
-/**
- * Open Bill for ONE month (2026-09-26 — user: "open for august, not
- * september"). Rules › Scheme rules sets every month; a month may carry its
- * own setting over it (`comm_open_bill_months`), which is what the run, the
- * picks and the feed's suggestions for that month read (`comm_open_bill_on`).
- * `null`, or the same value as Rules, clears it: the month follows Rules again.
- * A month whose run has paid keeps what it paid.
- */
-export async function setMonthOpenBill(subDepartmentId: string, period: string, on: boolean | null): Promise<void> {
-  const user = await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'manage')
-  if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('A month is its first day, e.g. 2026-08-01')
-  const supabase = await client()
-
-  const [{ data: locked, error: lockError }, { data: scheme, error: schemeError }] = await Promise.all([
-    supabase.rpc('commission_order_period_locked', { p_sub_department_id: subDepartmentId, p_period: period }),
-    supabase.from('comm_schemes').select('enable_open_bill')
-      .eq('sub_department_id', subDepartmentId).eq('is_active', true).is('effective_to', null).maybeSingle(),
-  ])
-  if (lockError) throw new Error(`Could not check the commission run: ${lockError.message}`)
-  if (locked) throw new Error(`The ${period.slice(0, 7)} month is in payroll, so what it pays cannot change.`)
-  if (schemeError) throw new Error(`Could not read Rules: ${schemeError.message}`)
-  const rules = Boolean((scheme as { enable_open_bill: boolean } | null)?.enable_open_bill)
-
-  if (on === null || on === rules) {
-    check(
-      (await supabase.from('comm_open_bill_months').delete()
-        .eq('sub_department_id', subDepartmentId).eq('period_month', period)).error,
-      'Could not change the month',
-    )
-  } else {
-    check(
-      (await supabase.from('comm_open_bill_months').upsert({
-        sub_department_id: subDepartmentId,
-        period_month: period,
-        enabled: on,
-        set_by: user.id,
-        set_by_name: user.name,
-        set_at: new Date().toISOString(),
-      })).error,
-      'Could not change the month',
-    )
-  }
-  refresh()
-}
+export type SchemeSwitch = 'margin' | 'kpi'
 
 export async function setSchemeSwitch(schemeId: string, which: SchemeSwitch, on: boolean): Promise<void> {
   await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'manage')
+  if (which !== 'margin' && which !== 'kpi') throw new Error('Unknown switch')
   const supabase = await client()
   const patch =
-    which === 'open_bill'
-      ? { enable_open_bill: on }
-      : which === 'kpi'
-        ? { enable_kpi: on }
-        : { enable_margin_penalty: on, enable_margin_incentive: on }
+    which === 'kpi'
+      ? { enable_kpi: on }
+      : { enable_margin_penalty: on, enable_margin_incentive: on }
   check(
     (await supabase.from('comm_schemes').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', schemeId)).error,
     'Could not change the switch',

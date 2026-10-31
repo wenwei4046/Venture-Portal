@@ -8,7 +8,7 @@
  *   A  classify lines, apply the DEPOSIT GATE, get each person's own revenue
  *   B  GROUP revenue — own + the whole downline subtree
  *   C  resolve the EFFECTIVE RATE (fixed vs variable, off group revenue)
- *   D  C1 product revenue · C2 KPI items · C3 Open Bill,
+ *   D  C1 product revenue · C2 KPI items,
  *      each bill scaled by its BELOW-MARGIN PENALTY
  *   E  C4 override, on the PENALTY-WEIGHTED revenue of each downline
  *   F  the monthly MARGIN INCENTIVE, which every brand must clear
@@ -31,7 +31,6 @@ import type {
   KpiThreshold,
   MarginBand,
   MarginSource,
-  OpenBillRank,
   PenalisedOrder,
   PriorMonth,
   Rank,
@@ -767,9 +766,6 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     }
   }
 
-  const openBillPct = new Map<OpenBillRank, number>(input.openBillRules.map(r => [r.rank, r.pct]))
-  const tagByOrder = new Map<string, OpenBillRank>(input.openBillTags.map(t => [t.orderId, t.rank]))
-
   const ordersByStaff = new Map<string, SalesOrder[]>()
   for (const order of input.orders) {
     const list = ordersByStaff.get(order.staffId)
@@ -982,13 +978,13 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     overrideRateOf.set(staffId, comparisonRate)
   }
 
-  // ── Pass D: C1 / C2 / C3, each bill scaled by its margin penalty ───────
+  // ── Pass D: C1 / C2, each bill scaled by its margin penalty ────────────
   let ordersWithoutCost = 0
 
   for (const draft of drafts.values()) {
     // A department head's own bills pay the rate of their title's rung and
-    // NOTHING else — no KPI allowance, Open Bill bonus, margin penalty or
-    // incentive (user 2026-09-27: 如果自己有做 sales，就只拿自己的 rate 罢了).
+    // NOTHING else — no KPI allowance, margin penalty or incentive
+    // (user 2026-09-27: 如果自己有做 sales，就只拿自己的 rate 罢了).
     // Without a rung, no rate: their sales still stand on the statement and
     // the bills still close with the month.
     if (heads.has(draft.staffId)) {
@@ -1099,41 +1095,6 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           amount: hit.amount,
           note: `${order.orderNo} · ${kpiItemLabel(hit.item)} × ${hit.qty} @ ${hit.item.kpiAmount}`,
         })
-      }
-
-      // C3 — Open Bill: the 1st / 2nd / 3rd bill written on an event day.
-      if (scheme.enableOpenBill) {
-        // An upsale is not a bill written on the day, so it holds no rank.
-        const rank = order.upsale ? undefined : tagByOrder.get(order.id)
-        const pct = rank === undefined ? undefined : openBillPct.get(rank)
-        if (rank !== undefined && pct === undefined) {
-          warnings.push(
-            `Order ${order.orderNo} is tagged Open Bill ${rank}, but no bonus rate is configured for that rank.`,
-          )
-        } else if (rank !== undefined && pct !== undefined) {
-          const full =
-            scheme.openBillBasis === 'pct_of_revenue'
-              ? round2(opr * pct)
-              : round2(opr * rate * pct)
-          const paid = round2(full * multiplier)
-          withheldOnThisBill = round2(withheldOnThisBill + (full - paid))
-          if (paid !== 0) {
-            draft.lines.push({
-              component: 'open_bill',
-              sourceOrderId: order.id,
-              basisAmount: opr,
-              rate: pct,
-              qty: null,
-              amount: paid,
-              note:
-                `${ordinal(rank)} bill · ${order.eventDate} · ${order.orderNo}` +
-                (scheme.openBillBasis === 'pct_of_revenue'
-                  ? ` · ${round2(pct * 100)}% of revenue`
-                  : ` · +${round2(pct * 100)}% on ${round2(rate * 100)}% commission`) +
-                penaltyNote,
-            })
-          }
-        }
       }
 
       if (penaltyBand) {
@@ -1318,14 +1279,13 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
     const productCommission = by('product_revenue')
     const kpiCommission = round2(by('kpi_item') + by('kpi_threshold'))
-    const openBillBonus = by('open_bill')
     const overrideCommission = by('override')
     const marginIncentive = by('margin_incentive')
     const groupIncentive = by('group_incentive')
     const directorFixed = by('director_fixed')
     const directorIncentive = by('director_incentive')
     const totalCommission = round2(
-      productCommission + kpiCommission + openBillBonus + overrideCommission + marginIncentive + groupIncentive
+      productCommission + kpiCommission + overrideCommission + marginIncentive + groupIncentive
         + directorFixed + directorIncentive,
     )
 
@@ -1381,7 +1341,6 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       kpiBase: d.kpiBase,
       kpiThresholdPct: d.kpiThresholdPct,
       kpiCommission,
-      openBillBonus,
       overrideCommission,
       marginRevenue: sum((margin?.brands ?? []).map(b => b.revenue)),
       marginCost: sum((margin?.brands ?? []).map(b => b.cost)),
@@ -1410,8 +1369,4 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     penalised,
     warnings,
   }
-}
-
-function ordinal(n: OpenBillRank): string {
-  return n === 1 ? '1st' : n === 2 ? '2nd' : '3rd'
 }
