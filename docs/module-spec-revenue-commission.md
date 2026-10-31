@@ -1734,7 +1734,7 @@ New tables. `sales_*` = imported facts, `comm_*` = config + results. The dormant
 | `comm_kpi_items` / `comm_kpi_thresholds` | KPI items — a SKU (`product_code`), a special or a fabric series (`option_pool` / `option_value`; the series since 2026-10-29), effective-dated — and the qty ladder |
 | `comm_cost_ratios` | a SKU's own Revenue Team cost ratio, per scheme (2026-09-27) |
 | `comm_open_bill_rules` | 50 / 40 / 30% |
-| `comm_brands` | Akemi / Zanotti / Ergotex + the Item-Code prefixes that identify them |
+| `comm_brands` | Akemi / Zanotti / Ergotex + the Item-Code prefixes that identify them, and the ERP brandings that are them (`sub_brands`: HAPPI SLEEP is Akemi's, 2026-10-31) |
 | `comm_margin_bands` | each brand's margin ladder (incentive / reference / penalty) |
 | `comm_promotion_rules` | the promotion criteria, recorded with `is_enforced = FALSE` |
 | `comm_hierarchy` | effective-dated upline + attained rank + `rate_mode`; one position per person |

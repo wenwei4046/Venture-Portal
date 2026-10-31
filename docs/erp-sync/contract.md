@@ -133,7 +133,7 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | customer | `header.debtor_name`, `header.debtor_code` | |
 | branch | `header.sales_location` | the WAREHOUSE the goods ship from (KL / PG / SRW). Stored as `location`; descriptive only |
 | **venue** | `header.venue` | **the fair itself** — "SUNWAY PYRAMID CONVENTION CENTRE", "MIDVALLEY SOUTHKEY JB". Free text the ERP types (`venue_id` is present but never populated). Its own column since 2026-09-16, with sales grouped by it on the month page |
-| brand | `header.branding`, then `vpBrand`, then `fair.brand` | matched to `comm_brands` by code or name, case-insensitive: the ERP's Branding when it names a brand; else the brand the salesperson picked (§3.5); else the brand of the fair booth (not a cancelled one); else from the lines' `branding`; else Item Code prefixes; else none (warning). `erp_sync_order_brand`, mig `20260927080000` |
+| brand | `header.branding`, then `vpBrand`, then `fair.brand` | matched to `comm_brands` by code, name or sub-brand (`sub_brands` — HAPPI SLEEP is Akemi's, mig `20261031200000`), case-insensitive: the ERP's Branding when it names a brand; else the brand the salesperson picked (§3.5); else the brand of the fair booth (not a cancelled one); else from the lines' `branding`; else Item Code prefixes; else none (warning). `erp_sync_order_brand`, mig `20260927080000` |
 | sales value | `header.local_total_sen` / 100 | the list's "Amount" (`subtotal_sen` as fallback) |
 | balance | `header.balance_sen_live` / 100 (else `balance_sen`) | what the deposit gate measures |
 | created at | `header.created_at` | orders the 1st / 2nd / 3rd bill of the day |
@@ -169,7 +169,7 @@ ERP's `branding` is never changed by it.
 
 | Value | Means |
 |---|---|
-| a `project_brands` name (`AKEMI`, `DUNLOPILLO`, …) | the bill is that brand's — matched to `comm_brands` like Branding (`DUNLOPILLO` → `DUNLOP`) |
+| a `project_brands` name (`AKEMI`, `DUNLOPILLO`, …) | the bill is that brand's — matched to `comm_brands` like Branding (`DUNLOPILLO` → `DUNLOP`, `HAPPI SLEEP` → `AKEMI`) |
 | `null` / absent | not asked (the products name a brand), or skipped |
 
 Anything but a string is no pick — never a reason to refuse the sale. The
