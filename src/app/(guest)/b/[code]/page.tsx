@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { readPartnerPage } from '@/lib/crm-partner/read'
+import { partnerCodeOf } from '@/lib/crm-partner/model'
 import PartnerBooking from './_components/PartnerBooking'
 
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,7 @@ export const metadata: Metadata = {
  * wrong one, an old one, or while the CRM has the link off. Never requirePage — there is no account here.
  */
 export default async function PartnerBookingPage({ params }: { params: Promise<{ code: string }> }) {
-  const { code } = await params
+  // internal-booking-<8> and pc-<8> are the same link (2026-10-31).
+  const code = partnerCodeOf((await params).code)
   return <PartnerBooking code={code} initial={await readPartnerPage(code)} />
 }

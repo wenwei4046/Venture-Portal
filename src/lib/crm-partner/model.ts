@@ -29,7 +29,16 @@ export type PartnerTaken = Record<string, number>;
 /** The company's own address for the booking link (the owner, 2026-10-31: the link read venture-portal-chi… — "改成公司现在的 domain"),
  *  whatever address the CRM itself was opened on. */
 export const PARTNER_LINK_ORIGIN = "https://erp.houzsventure.com";
-export const partnerLinkUrl = (code: string) => `${PARTNER_LINK_ORIGIN}/b/${code}`;
+/**
+ * The address carries a name the partner can read before the link's random part (the owner, 2026-10-31: "pc-4JMEM6CZ,
+ * 能改成 internal booking嗎？" — asked, "1": a readable name, the random part kept, the old address still working):
+ * the database keeps `pc-<8>`; the link reads `internal-booking-<8>`, and either opens the same page (`partnerCodeOf`).
+ * The random part stays the key: the page shows its bookings' customers and phones with no sign-in.
+ */
+export const LINK_NAME = "internal-booking";
+export const partnerLinkUrl = (code: string) => `${PARTNER_LINK_ORIGIN}/b/${code.replace(/^pc-/, `${LINK_NAME}-`)}`;
+/** The address's code as the database keeps it: `internal-booking-<8>` → `pc-<8>`; anything else as it came. */
+export const partnerCodeOf = (raw: string) => { let s = String(raw ?? ""); try { s = decodeURIComponent(s); } catch { /* a broken address stays as it came */ } s = s.trim(); return s.startsWith(`${LINK_NAME}-`) ? `pc-${s.slice(LINK_NAME.length + 1)}` : s; };
 
 export const isPartnerCode = (v: unknown): v is string => typeof v === "string" && /^pc-[A-HJ-NP-Z2-9]{8}$/.test(v);
 export const isPartnerRef = (v: unknown): v is string => typeof v === "string" && /^TC-[A-HJ-NP-Z2-9]{6}$/i.test(v.trim());
