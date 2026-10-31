@@ -26,8 +26,8 @@ function input(extra: Partial<EngineInput> = {}): EngineInput {
   return {
     periodMonth: '2026-08-01',
     scheme: {
-      openBillBasis: 'uplift_on_commission', overrideIncludesKpi: false,
-      enableProductRevenue: true, enableKpi: true, enableOpenBill: true, enableOverride: true,
+      overrideIncludesKpi: false,
+      enableProductRevenue: true, enableKpi: true, enableOverride: true,
       enableMarginPenalty: true, enableMarginIncentive: true,
       itemGroups: [{ group: 'SOFA', commissionable: true }, { group: 'ACC', commissionable: true }],
       depositThresholdPct: 0.3, defaultRateMode: 'fixed',
@@ -40,8 +40,6 @@ function input(extra: Partial<EngineInput> = {}): EngineInput {
     orders: [sale('one'), sale('two', 2_000)],
     kpiItems: [{ productCode: 'PILLOW', kpiAmount: 20 }],
     kpiThresholds: [{ minQty: 2, bonusPct: 0.2 }],
-    openBillRules: [{ rank: 1, pct: 0.5 }, { rank: 2, pct: 0.4 }, { rank: 3, pct: 0.3 }],
-    openBillTags: [{ orderId: 'one', rank: 1 }],
     marginBands: [
       { brandCode: 'AKEMI', bandKey: 'reward', label: 'Reward', kind: 'incentive', marginPct: 0.36, monthlyIncentive: 1_000, commissionMultiplier: 1 },
       { brandCode: 'AKEMI', bandKey: 'penalty', label: 'Penalty', kind: 'penalty', marginPct: 0.25, monthlyIncentive: 0, commissionMultiplier: 0.5 },
@@ -80,18 +78,18 @@ describe('commission workbench ledger', () => {
       staffName: 'Anthony', venue: 'Arena', eventName: 'Home Fair', organizer: 'Fair Co', location: 'KL',
       productRevenue: 980, productCommission: 49, kpiQty: 1, kpiBase: 20, kpiBonus: 4,
       marginIncentive: 331.08, marginAllocationBasis: 'eligible_goods_revenue',
-      openBillBonus: 24.5, totalCommission: 428.58,
+      totalCommission: 404.08,
     })
     expect(anthony.personalRows[1].marginIncentive).toBe(668.92)
-    expect(anthony.totalCommission).toBe(1220.5)
+    expect(anthony.totalCommission).toBe(1196)
     expect(board.overridingRows.map(row => [row.downlineName, row.downlineTitle, row.downlineRank, row.overrideRate, row.overrideAmount]))
       .toEqual([['Anthony', 'Revenue Specialist', '5%', 0.03, 29.4], ['Anthony', 'Revenue Specialist', '5%', 0.03, 59.4]])
     expect(board.kpi.find(row => row.staffId === 'agent')).toMatchObject({ qty: 2, base: 40, bonus: 8, total: 48, thresholdPct: 0.2 })
-    expect(board.totalCommission).toBe(1309.3)
+    expect(board.totalCommission).toBe(1284.8)
     reconcile(board)
   })
 
-  it('excluding and restoring a bill recalculates the monthly threshold, downline override, and open-bill payout', () => {
+  it('excluding and restoring a bill recalculates the monthly threshold and downline override', () => {
     const source = input()
     const before = JSON.stringify(source)
     const excluded = buildCommissionWorkbench(source, { excludedOrderIds: ['one'] })
@@ -102,17 +100,15 @@ describe('commission workbench ledger', () => {
     expect(excluded.overridingRows.map(row => row.orderId)).toEqual(['two'])
     expect(excluded.people.find(person => person.staffId === 'agent')?.totalCommission).toBe(1119)
     const restored = buildCommissionWorkbench(source, { excludedOrderIds: [] })
-    expect(restored.totalCommission).toBe(1309.3)
+    expect(restored.totalCommission).toBe(1284.8)
     expect(JSON.stringify(source)).toBe(before)
     reconcile(excluded)
     reconcile(restored)
   })
 
-  it('allocates open-bill on the actual selected order and never treats deposit-pending or previously released bills as payable', () => {
+  it('never treats deposit-pending or previously released bills as payable', () => {
     const source = input({ orders: [sale('one'), sale('two', 2000), sale('pending', 1000, { paidAmount: 20 }), sale('released', 1000, { alreadyReleased: true })] })
-    const board = buildCommissionWorkbench(source, { openBillTags: [{ orderId: 'two', rank: 2 }, { orderId: 'pending', rank: 1 }] })
-    expect(board.personalRows.find(row => row.orderId === 'one')?.openBillBonus).toBe(0)
-    expect(board.personalRows.find(row => row.orderId === 'two')).toMatchObject({ openBillBonus: 39.6, openBillRate: 0.4, openBillRank: 2 })
+    const board = buildCommissionWorkbench(source)
     expect(board.personalRows.find(row => row.orderId === 'pending')).toMatchObject({ status: 'deposit_pending', totalCommission: 0 })
     expect(board.personalRows.find(row => row.orderId === 'released')).toMatchObject({ status: 'already_released', totalCommission: 0 })
     expect(board.overridingRows.map(row => row.orderId)).toEqual(['one', 'two'])
@@ -120,10 +116,10 @@ describe('commission workbench ledger', () => {
     reconcile(board)
   })
 
-  it('uses engine margin penalties for personal/open-bill/override, while KPI stays unpenalised', () => {
+  it('uses engine margin penalties for personal/override, while KPI stays unpenalised', () => {
     const order = sale('one', 1000, { manualMarginPct: 0.2 })
     const board = buildCommissionWorkbench(input({ orders: [order] }))
-    expect(board.personalRows[0]).toMatchObject({ productCommission: 24.5, openBillBonus: 12.25, kpiBase: 20, penaltyWithheld: 36.75, marginPct: 0.2, marginCost: 784, marginSource: 'manual' })
+    expect(board.personalRows[0]).toMatchObject({ productCommission: 24.5, kpiBase: 20, penaltyWithheld: 24.5, marginPct: 0.2, marginCost: 784, marginSource: 'manual' })
     expect(board.overridingRows[0]).toMatchObject({ overrideBasis: 490, overrideRate: 0.03, overrideAmount: 14.7 })
     reconcile(board)
   })
@@ -163,7 +159,7 @@ describe('commission workbench ledger', () => {
   it('conserves cents when monthly KPI, margin, and overriding amounts cannot evenly divide among orders', () => {
     const source = input({
       orders: ['one', 'two', 'three'].map(id => sale(id, 0.11)),
-      kpiItems: [{ productCode: 'PILLOW', kpiAmount: 0.01 }], openBillTags: [],
+      kpiItems: [{ productCode: 'PILLOW', kpiAmount: 0.01 }],
       marginBands: [{ brandCode: 'AKEMI', bandKey: 'reward', label: 'Reward', kind: 'incentive', marginPct: 0, monthlyIncentive: 0.01, commissionMultiplier: 1 }],
     })
     const board = buildCommissionWorkbench(source)
@@ -213,7 +209,6 @@ describe('commission workbench ledger', () => {
     expect(board.personalRows.map(row => row.originalOrderId)).toEqual(['one', 'one'])
     expect(board.personalRows.map(row => row.orderTotal)).toEqual([500, 500])
     expect(new Set(board.personalRows.map(row => row.key)).size).toBe(2)
-    expect(board.personalRows.map(row => row.openBillBonus)).toEqual([12.25, 19.6]) // 490 each
     const excluded = buildCommissionWorkbench(source, { excludedOrderIds: ['one'] })
     expect(excluded.totalCommission).toBe(0)
     expect(excluded.personalRows.every(row => row.status === 'excluded')).toBe(true)
@@ -224,7 +219,7 @@ describe('commission workbench ledger', () => {
 
   it('keeps fixed monthly group incentives separate and excludes non-cash subsidy from the commission total', () => {
     const source = input({ orders: [sale('one')] })
-    source.scheme = { ...source.scheme, enableKpi: false, enableOpenBill: false, enableMarginIncentive: false, enableGroupIncentive: true, groupSalesDepth: 2, overrideDepth: 2 }
+    source.scheme = { ...source.scheme, enableKpi: false, enableMarginIncentive: false, enableGroupIncentive: true, groupSalesDepth: 2, overrideDepth: 2 }
     source.ranks.push(rank('package', 0, 3, { groupSalesThreshold: 1000, groupIncentiveAmount: 6000, groupSubsidyCap: 2000 }))
     source.hierarchy[1].baseRankKey = 'package'
     source.hierarchy[1].titleId = 'package'
@@ -304,7 +299,7 @@ describe('a Revenue Director on the ledger', () => {
     expect(kris.titleLabel).toBe('Revenue Director')
     expect(kris.rankLabel).toBe('Rank SS')
     expect(kris.productRate).toBe(0.12)
-    // RM 2,000 less the RM 20 KPI pillow, at 12%; no KPI allowance, no Open Bill.
+    // RM 2,000 less the RM 20 KPI pillow, at 12%; no KPI allowance.
     expect(kris.personalRows.map(row => [row.orderNo, row.productCommission, row.kpiBase, row.totalCommission])).toEqual([['SO-mine', 237.6, 0, 237.6]])
     expect(kris.monthlyDirectorPay).toBe(43_000)
     expect(kris.overrideTotal).toBe(0)
@@ -353,7 +348,7 @@ describe('what on a bill earns commission (2026-09-26)', () => {
         { id: 'o-unknown', itemGroup: 'UNGROUPED', productCode: 'MISC', qty: 1, lineAmount: 60 },
       ],
     })
-    const board = buildCommissionWorkbench(input({ scheme, orders: [kuching(), odd], openBillTags: [] }))
+    const board = buildCommissionWorkbench(input({ scheme, orders: [kuching(), odd] }))
     expect(board.personalRows.find(row => row.orderId === 'kuching')).toMatchObject({
       orderTotal: 1_247, commissionableValue: 1_100, productRevenue: 1_080, // the pillow's 20 is KPI
     })
@@ -361,7 +356,7 @@ describe('what on a bill earns commission (2026-09-26)', () => {
   })
 
   it('with KPI switched off a KPI item is judged by its group, like the engine judges it', () => {
-    const board = buildCommissionWorkbench(input({ scheme: { ...scheme, enableKpi: false }, orders: [kuching()], openBillTags: [] }))
+    const board = buildCommissionWorkbench(input({ scheme: { ...scheme, enableKpi: false }, orders: [kuching()] }))
     expect(board.personalRows[0]).toMatchObject({ commissionableValue: 1_100, productRevenue: 1_100 })
   })
 
@@ -371,7 +366,7 @@ describe('what on a bill earns commission (2026-09-26)', () => {
       lines: [{ id: 'up-line', itemGroup: 'UPSALE', productCode: 'UPSALE', qty: 1, lineAmount: 700, upsale: true }],
     })
     const shared = splitOrdersByShares([kuching()], [{ orderId: 'kuching', staffId: 'leader', pct: 0.5 }])
-    const board = buildCommissionWorkbench(input({ scheme, orders: [...shared, up], openBillTags: [] }))
+    const board = buildCommissionWorkbench(input({ scheme, orders: [...shared, up] }))
     expect(board.personalRows.find(row => row.orderId === 'up')?.commissionableValue).toBe(700)
     const parts = board.personalRows.filter(row => row.orderId === 'kuching')
     expect(parts).toHaveLength(2)
@@ -389,7 +384,7 @@ describe('a KPI special on a bed frame (2026-09-27)', () => {
       ],
     })
     const source = input({
-      orders: [order], openBillTags: [],
+      orders: [order],
       scheme: { ...input().scheme, itemGroups: [...input().scheme.itemGroups, { group: 'BEDFRAME', commissionable: true }] },
       kpiItems: [{ source: 'option', optionPool: 'bedframe_specials', optionValue: 'HB Straight', kpiAmount: 200 }],
     })

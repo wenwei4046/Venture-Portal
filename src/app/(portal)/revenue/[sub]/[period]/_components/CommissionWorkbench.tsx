@@ -17,9 +17,8 @@ import { revenuePath } from '@/lib/revenue'
 import { computeRevenuePay } from '@/lib/revenue-pay'
 import { personPayLinesLock } from '@/lib/revenue-pay-lines'
 import { brandLabel, exhibitionQuery, NO_BRAND, type ExhibitionSales } from '@/lib/exhibitions'
-import type { OpenBillTag } from '@/lib/commission/types'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
-import { excludeOrder, includeOrder, saveOpenBillPicks } from '../../../run-actions'
+import { excludeOrder, includeOrder } from '../../../run-actions'
 import { nameWarnings, payrollState, unmatchedWarnings, type RunStatus } from '@/lib/commission/payroll-send'
 import { useEntryScroll } from '@/components/layout/useEntryScroll'
 import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillMoveOutcome, type BillShareOutcome } from '../orders/_components/BillContextMenu'
@@ -48,7 +47,7 @@ import { Select } from '@/components/hrv/select'
 
 type Tab = WorkbenchTab
 const TABS: [Tab, string][] = [
-  ['sales', 'Total Sales Orders'], ['kpi', 'KPI Items'], ['open', 'Open Bill'],
+  ['sales', 'Total Sales Orders'], ['kpi', 'KPI Items'],
   // Sales exhibition (2026-10-03) — Sales by venue until the user said a result
   // is read by BRAND at a venue, organiser and date, not by the venue.
   ['deposit', 'Below deposit'], ['exhibition', 'Sales exhibition'],
@@ -63,7 +62,7 @@ const TABS: [Tab, string][] = [
 ]
 /** The tabs that are the page's panels rather than cuts of the workbench's own board. */
 const REVIEW_TABS: readonly Tab[] = ['changes', 'claims', 'sellers', 'requests']
-type Column = 'status' | 'ref' | 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
+type Column = 'status' | 'ref' | 'salesperson' | 'date' | 'venue' | 'event' | 'organizer' | 'location' | 'brand' | 'category' | 'sales' | 'commissionable' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive'
 // Status (2026-10-12): why a row from another month is on this month's ledger
 // — Top up deposit, Late key-in, Upsell, Drop sales (`row-origin.ts`). First,
 // so it is read without scrolling.
@@ -77,7 +76,7 @@ const COLUMNS: [Column, string][] = [
   ['location', 'Sales location'], ['brand', 'Brand'], ['category', 'Category'], ['sales', 'Sales value'],
   ['commissionable', 'Commissionable value'],
   ['margin', 'Margin'], ['rank', 'Title / rank'], ['product', 'Product commission'], ['kpi', 'KPI amount'],
-  ['incentive', 'Margin incentive'], ['open', 'Open Bill'],
+  ['incentive', 'Margin incentive'],
 ]
 const NUMERIC_COLUMNS: Column[] = ['sales', 'commissionable', 'margin', 'product', 'kpi', 'incentive']
 const money = formatMoney
@@ -85,7 +84,6 @@ const quantity = (value: number) => new Intl.NumberFormat('en-MY', { maximumFrac
 const pct = (n: number | null | undefined) => n == null ? '—' : `${(n * 100).toFixed(1).replace('.0', '')}%`
 const sum = <T,>(rows: T[], get: (row: T) => number) => Math.round(rows.reduce((a, r) => a + get(r), 0) * 100) / 100
 const statusLabel = { eligible: 'Included', excluded: 'Excluded from draft', deposit_pending: 'Deposit pending', already_released: 'Previously paid' }
-const tagFingerprint = (tags: readonly OpenBillTag[]) => JSON.stringify(tags.map(t => `${t.orderId}:${t.rank}`).sort())
 const monthName = (month: string) => new Date(`${month}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 const HEAD_TITLE = 'Department head'
 const HEAD_NOTE = 'Own bills earn no commission'
@@ -241,11 +239,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     setBrandValue(here.brand)
     setSortValue(here.sort)
   }
-  const [picks, setPicks] = useState<OpenBillTag[] | null>(null)
-  const [picksSource, setPicksSource] = useState<string | null>(null)
   const [currentTeam, setCurrentTeam] = useState(false)
   const [showExcluded, setShowExcluded] = useState(false)
-  const [showAllOpen, setShowAllOpen] = useState(false)
   const [hidden, setHidden] = useState<Column[]>(['location'])
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -257,16 +252,12 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   // answers on the same notice, with the same Undo, as the right-click menu.
   const [billPending, startBill] = useTransition()
   const [billBusy, setBillBusy] = useState<string | null>(null)
-  const [saving, startSaving] = useTransition()
   const [hydrated, setHydrated] = useState(false)
   const restoredKey = useRef('')
   const storageKey = `commission-draft:${sub}:${period}`
   // Which columns are showing, and whether the bills taken out by hand are: kept for
   // the month so a return from a bill finds the table laid out as it was left.
   const layoutKey = `commission-layout:${sub}:${period}`
-  const tags = picks ?? data.input.openBillTags
-  const sourceFingerprint = tagFingerprint(data.input.openBillTags)
-  const stalePicks = picks !== null && picksSource !== sourceFingerprint
   const locked = runStatus === 'applied' || runStatus === 'locked'
 
   useEffect(() => {
@@ -276,42 +267,29 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       const raw = sessionStorage.getItem(storageKey)
       if (raw) {
         const draft = JSON.parse(raw)
-        const ids = new Set(data.input.orders.map(o => o.id))
-        if (Array.isArray(draft.picks)) {
-          if (draft.picksSource === sourceFingerprint) {
-            setPicks(draft.picks.filter((pick: OpenBillTag) => ids.has(pick.orderId) && [1, 2, 3].includes(pick.rank)))
-            setPicksSource(draft.picksSource)
-          } else setNotice('Saved Open Bill picks changed since this draft. Its Open Bill edits were discarded; other draft settings were restored.')
-        }
         if (typeof draft.currentTeam === 'boolean') setCurrentTeam(draft.currentTeam)
         // A draft saved before 2026-09-28 may still carry `previewFeatures` —
-        // the incentive toggles that saved nothing. They are gone; so is it.
+        // the incentive toggles that saved nothing — and one before 2026-10-31
+        // its Open Bill `picks`. They are gone; so are they.
       }
       const layout = JSON.parse(sessionStorage.getItem(layoutKey) ?? 'null')
       if (Array.isArray(layout?.hidden)) setHidden(layout.hidden.filter((key: unknown) => COLUMNS.some(([column]) => column === key)))
       if (typeof layout?.showExcluded === 'boolean') setShowExcluded(layout.showExcluded)
     } catch { /* Storage is optional; the table still works in memory. */ }
     setHydrated(true)
-  }, [storageKey, layoutKey, data.input.orders, sourceFingerprint])
+  }, [storageKey, layoutKey])
 
   useEffect(() => {
     if (hydrated) {
-      try { sessionStorage.setItem(storageKey, JSON.stringify({ picks, picksSource, currentTeam })) } catch { /* private mode */ }
+      try { sessionStorage.setItem(storageKey, JSON.stringify({ currentTeam })) } catch { /* private mode */ }
     }
-  }, [storageKey, picks, picksSource, currentTeam, hydrated])
+  }, [storageKey, currentTeam, hydrated])
 
   useEffect(() => {
     if (hydrated) {
       try { sessionStorage.setItem(layoutKey, JSON.stringify({ hidden, showExcluded })) } catch { /* private mode */ }
     }
   }, [layoutKey, hidden, showExcluded, hydrated])
-
-  useEffect(() => {
-    if (!picks) return
-    const guard = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
-    window.addEventListener('beforeunload', guard)
-    return () => window.removeEventListener('beforeunload', guard)
-  }, [picks])
 
   // What the month pays is the scheme's own switches, as saved (Review settings
   // › This month pays): a switch there is saved, and the page follows it with
@@ -321,11 +299,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     hierarchy: currentTeam ? data.currentHierarchy : data.input.hierarchy,
   }), [data, currentTeam])
   const board = useMemo(() => buildCommissionWorkbench(effectiveInput, {
-    people: data.people, orders: data.orders, openBillTags: tags,
-  }), [data, effectiveInput, tags])
-  // What sending would put in payroll: the month as saved — no unsaved picks
-  // or previews. The server works out the same.
-  const drafting = picks !== null || currentTeam
+    people: data.people, orders: data.orders,
+  }), [data, effectiveInput])
+  // What sending would put in payroll: the month as saved — no preview. The
+  // server works out the same.
+  const drafting = currentTeam
   const sendBoard = useMemo(() => drafting
     ? buildCommissionWorkbench(data.input, { people: data.people, orders: data.orders })
     : board, [drafting, data, board])
@@ -359,10 +337,10 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const closer = useSalespersonCloses({ subDepartmentId: closeFacts?.subDepartmentId ?? '', period, closes: closeFacts?.closes ?? [],
     scope: `/revenue/${sub}/${period}`, staffIds: listIds })
   const monthLabel = monthName(period)
-  // `drafting` (above) — unsaved picks or previews — is exactly what a close must not lock.
+  // `drafting` (above) — a preview — is exactly what a close must not lock.
   const closeBlocked = closeFacts?.unavailable
     ?? (data.input.hierarchy.length === 0 ? `No team ranks are effective in ${monthLabel} — set them before closing anybody.`
-      : drafting ? 'A close locks the month as saved — save the Open Bill picks, or reset the preview, first.' : null)
+      : drafting ? 'A close locks the month as saved — reset the preview first.' : null)
   const listRows: ListRow[] = useMemo(() => {
     const live = board.people.map(person => {
       const close = closer.closedById.get(person.staffId)
@@ -402,9 +380,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const salary = selected && salarySource ? computeRevenuePay({ ...salarySource.input,
     commission: (selectedClose?.total ?? selected.totalCommission) + salarySource.commissionElsewhere + salarySource.payrollAdjustment,
   }) : null
-  const openEnabled = effectiveInput.scheme.enableOpenBill
-  const hasOpen = openEnabled || tags.length > 0
-  const isVisible = (key: Column) => !hidden.includes(key) && (key !== 'open' || hasOpen)
+  const isVisible = (key: Column) => !hidden.includes(key)
   const columns = COLUMNS.filter(([key]) => isVisible(key))
   const brands = [...new Set(board.personalRows.flatMap(r => r.brands))].sort()
   const carriedCount = new Set(data.input.orders.filter(o => !o.upsale && o.periodMonth !== period).map(o => o.id)).size
@@ -414,7 +390,6 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     kpiQty: board.kpi.reduce((total, p) => total + p.soldQty, 0),
     kpiBase: sum(board.people, p => (p.statement?.kpiBase ?? 0)),
     kpiTotal: sum(board.people, p => (p.statement?.kpiCommission ?? 0)),
-    open: sum(board.people, p => (p.statement?.openBillBonus ?? 0)),
     margin: sum(board.people, p => (p.statement?.marginIncentive ?? 0)),
   }
 
@@ -446,7 +421,6 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const badges: Record<Tab, ReactNode> = {
     sales: new Set(data.input.orders.filter(o => !o.upsale && o.periodMonth === period).map(o => o.id)).size,
     kpi: quantity(totals.kpiQty),
-    open: new Set(tags.map(t => t.orderId)).size,
     deposit: heldTotals.bills,
     exhibition: exhibitions.length,
     changes: reviews?.changes?.count ?? 0,
@@ -712,55 +686,11 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       } finally { setBillBusy(null) }
     })
   }
-  function changePick(orderId: string, rank: 1 | 2 | 3 | null) {
-    const order = data.input.orders.find(o => o.id === orderId)
-    if (!order || order.upsale) return
-    if (picks === null) setPicksSource(sourceFingerprint)
-    const conflicting = new Set(data.input.orders.filter(o => o.staffId === order.staffId && o.eventDate === order.eventDate).map(o => o.id))
-    setPicks(current => {
-      const remaining = (current ?? data.input.openBillTags).filter(t => t.orderId !== orderId && !(rank && conflicting.has(t.orderId) && t.rank === rank))
-      return rank ? [...remaining, { orderId, rank: rank }] : remaining
-    })
-    setNotice('Open Bill draft recalculated across all salespeople. Save picks to keep this allocation.')
-  }
-  function savePicks() {
-    if (!data.input.scheme.enableOpenBill || stalePicks) return
-    setError(''); setNotice('')
-    startSaving(async () => {
-      const before = new Map(data.input.openBillTags.map(t => [t.orderId, t.rank]))
-      const after = new Map(tags.map(t => [t.orderId, t.rank]))
-      const changed = [...new Set([...before.keys(), ...after.keys()])].filter(id => before.get(id) !== after.get(id))
-      try {
-        await saveOpenBillPicks(changed.map(orderId => ({ orderId, before: before.get(orderId) ?? null, after: after.get(orderId) ?? null })))
-        setPicks(null)
-        setPicksSource(null)
-        setNotice('Open Bill picks saved. Payroll takes them as each salesperson is sent.')
-        router.refresh()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not save picks. Refresh before retrying.')
-      }
-    })
-  }
-  function reset() { setPicks(null); setPicksSource(null); setCurrentTeam(false); setNotice('Draft reset to the current source orders.'); setError('') }
+  function reset() { setCurrentTeam(false); setNotice('Draft reset to the current source orders.'); setError('') }
   function matches(row: CommissionOrderRow | OverrideOrderRow) {
     const q = query.trim().toLowerCase()
     // A shared bill answers to every holder's name — ADRIAN finds the part on ANTHONY's ledger.
     return (!brand || row.brands.includes(brand)) && (!q || [row.orderNo, row.refNo, row.staffName, row.venue, row.organizer, row.eventName, ...row.brands, ...row.categories, ...(row.share?.parts.map(p => p.name) ?? [])].some(v => v?.toLowerCase().includes(q)))
-  }
-  function pickControl(row: CommissionOrderRow) {
-    const order = data.input.orders.find(o => o.id === row.orderId)
-    const closed = closedHolder(row, 'changing this pick')
-    return <div className="flex items-center gap-2">
-      <input type="checkbox" aria-label={`Open Bill ${row.orderNo}`} checked={row.openBillRank != null}
-        disabled={!openEnabled || locked || saving || !!order?.upsale || !!closed}
-        title={closed ?? undefined}
-        onChange={e => changePick(row.orderId, e.target.checked ? 1 : null)} />
-      {row.openBillRank != null && <Select bare aria-label={`Open Bill rank ${row.orderNo}`} value={row.openBillRank}
-        disabled={!openEnabled || locked || saving || !!closed} onChange={e => changePick(row.orderId, Number(e.target.value) as 1 | 2 | 3)}>
-        <option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option>
-      </Select>}
-      <span>{money(row.openBillBonus)}</span>
-    </div>
   }
   function cell(row: CommissionOrderRow | OverrideOrderRow, key: Column, overriding: boolean, origin: RowOrigin | null = null) {
     const own = row as CommissionOrderRow
@@ -794,17 +724,16 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         : <>{pct(row.marginPct)}<small className={s.muted}>{row.marginCost == null ? 'Cost incomplete' : money(row.marginRevenue - row.marginCost)}</small></>
       case 'rank': return overriding ? <>{(row as OverrideOrderRow).downlineTitle}<small>{(row as OverrideOrderRow).downlineRank}</small></>
         : <>{selected?.titleLabel}<small>{selected?.rankLabel} · {pct(own.productRate)}</small></>
-      case 'product': return overriding ? money((row as OverrideOrderRow).overrideBasis) : <>{money(own.productCommission)}<small title={own.penaltyWithheld > 0 ? 'Includes the margin penalty on product commission and Open Bill bonus.' : undefined}>{pct(own.productRate)}{own.penaltyWithheld > 0 ? ` · −${money(own.penaltyWithheld)} total bill cut` : ''}</small></>
+      case 'product': return overriding ? money((row as OverrideOrderRow).overrideBasis) : <>{money(own.productCommission)}<small title={own.penaltyWithheld > 0 ? 'Includes the margin penalty on product commission.' : undefined}>{pct(own.productRate)}{own.penaltyWithheld > 0 ? ` · −${money(own.penaltyWithheld)} total bill cut` : ''}</small></>
       case 'kpi': return overriding ? '—' : <>{money(own.kpiBase)}<small className={own.kpiBonus ? s.positive : s.muted}>+ {money(own.kpiBonus)} · {pct(own.kpiThresholdPct)} bonus</small></>
       case 'incentive': return overriding ? '—' : <>{money(own.marginIncentive)}<small className={s.muted}>Monthly allocation</small></>
-      case 'open': return overriding ? '—' : pickControl(own)
     }
   }
   function orderTable(rows: (CommissionOrderRow | OverrideOrderRow)[], overriding: boolean) {
     const filtered = rows.filter(matches)
       .sort((a, b) => (sort === 'commission_desc' ? b.totalCommission - a.totalCommission : sort === 'date_desc' ? b.orderDate.localeCompare(a.orderDate) : a.orderDate.localeCompare(b.orderDate)) || a.orderNo.localeCompare(b.orderNo))
     // Overriding names the downline in a column of its own.
-    const visibleColumns = columns.filter(([key]) => !overriding || !['salesperson', 'kpi', 'incentive', 'open'].includes(key))
+    const visibleColumns = columns.filter(([key]) => !overriding || !['salesperson', 'kpi', 'incentive'].includes(key))
     const fromOtherMonths = filtered.filter(row => originOf(row)?.paysHere).length
     return <div className={s.tableFrame} key={overriding ? 'overriding' : 'personal'}>
       <div className={s.tableScroll} role="region" aria-label={`${overriding ? 'Overriding' : 'Personal'} commission table, scroll horizontally`} tabIndex={0}>
@@ -911,15 +840,13 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       outcome={moveDone} className={s.notice} buttonClassName={s.ghostButton} onChange={setMoveDone}
       onOpenHolder={openMovedHolder} currentStaffId={isPersonView ? personId : null} />}
     {error && <p className={s.warning} role="alert">{error}</p>}
-    {stalePicks && <p className={s.warning} role="alert">Saved Open Bill picks changed while this draft was open. Reset draft to use the latest picks before saving.</p>}
-    {picks && <div className={s.toolbar}><button className={s.primaryButton} disabled={saving || locked || stalePicks || !data.input.scheme.enableOpenBill} onClick={savePicks}>{saving ? 'Saving…' : 'Save Open Bill picks'}</button><span className={s.muted}>{data.input.scheme.enableOpenBill ? 'Unsaved until you save them — payroll is unchanged.' : 'Open Bill is switched off for this month, so these picks pay nothing and cannot be saved. Switch it on under Review settings › This month pays first.'}</span></div>}
   </>
 
   return <section ref={workspaceRef} className={s.workspace} aria-label="Commission workbench">
     {!isPersonView && <>
     {monthOverview}
     <CommissionMonthSummary stats={monthStats} peopleCount={board.people.length} totalCommission={board.totalCommission}
-      status={currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks ? 'Draft calculation' : 'Live calculation'} />
+      status={currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : 'Live calculation'} />
     {payroll && payrollView && <PayrollBar monthLabel={payroll.monthLabel} period={period} state={payrollView} draft={drafting} />}
     <div className={s.tabs} role="tablist" aria-label="Commission views">
       {TABS.filter(([key]) => drawn(key)).map(([key, text]) =>
@@ -940,7 +867,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {(carriedCount > 0 || upsaleCount > 0) && <p className={s.settingsNote}>The month’s sales figures above stay unchanged. This commission calculation also includes {carriedCount} carried orders and {upsaleCount} recorded upsales.</p>}
     {data.input.hierarchy.length === 0 && !currentTeam && <p className={s.warning}>No team ranks are effective in {period.slice(0, 7)}. Product commission and overriding need an effective rank. Other configured incentives may still apply. You can try the current team below without changing history.</p>}
     {data.currentHierarchy.length > 0 && <div className={s.settingsLine}><label className={s.chip}><input type="checkbox" checked={currentTeam} onChange={e => setCurrentTeam(e.target.checked)} />Use current team & dated rules for preview</label><span className={s.muted}>A preview — nothing is saved.</span></div>}
-    {drafting && <div className={s.notice} role="status"><span>{[currentTeam && 'Current team preview', picks && 'Open Bill picks changed'].filter(Boolean).join(' · ')}. Payroll is unchanged.</span><button className={s.ghostButton} onClick={reset}>Reset draft</button></div>}
+    {drafting && <div className={s.notice} role="status"><span>Current team preview. Payroll is unchanged.</span><button className={s.ghostButton} onClick={reset}>Reset draft</button></div>}
     </div>
     </details>
     </div>
@@ -1008,7 +935,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {tab === 'sales' && selected && <>
       <nav className={s.breadcrumb} aria-label="Commission navigation"><button onClick={backToPeople}>← Sales people</button><span>/</span><span>{selected.name}</span></nav>
       <div className={s.personHeader}>
-        <div className={s.personHeroTop}><span className={s.eyebrow}>COMMISSION · {new Date(`${period}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</span><span className={s.heroStatus}>{selectedClose ? 'Closed' : currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : picks ? 'Draft calculation' : 'Monthly calculation'}</span></div>
+        <div className={s.personHeroTop}><span className={s.eyebrow}>COMMISSION · {new Date(`${period}T00:00:00Z`).toLocaleDateString('en-MY', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</span><span className={s.heroStatus}>{selectedClose ? 'Closed' : currentTeam ? 'Current team preview' : data.input.hierarchy.length === 0 ? 'Rank history not set' : 'Monthly calculation'}</span></div>
         <div className={s.personHeroBody}><div className={s.avatar}>{selected.name.slice(0, 2)}</div><div className={s.personIdentity}><h2>{selected.name}</h2><p>{heads.has(selected.staffId)
           ? selected.rankLabel
             ? <>{selected.titleLabel ?? HEAD_TITLE}<span>{selected.rankLabel} · {pct(selected.productRate)} · {DIRECTOR_NOTE}</span></>
@@ -1104,18 +1031,6 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       {effectiveInput.kpiItems.length === 0 && <p className={s.warning}>No KPI items are configured for this date. <Link href={`${revenuePath(sub, 'rules')}?tab=kpi`}>Choose the SKUs and specials and their amounts on Rules › KPI items</Link> to calculate quantities and expenses.</p>}
       <div className={s.summaryGrid}><Summary label="KPI items" value={quantity(totals.kpiQty)} /><Summary label="Base expense" value={money(totals.kpiBase)} /><Summary label="Threshold bonus" value={money(totals.kpiTotal - totals.kpiBase)} /><Summary label="Total KPI expense" value={money(totals.kpiTotal)} /></div>
       <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="KPI expense by salesperson"><thead><tr><th>Sales person</th><th>Title / rank</th><th>KPI items</th><th>Base amount</th><th>Threshold bonus</th><th className={s.stickyTotal}>Total KPI expense</th></tr></thead><tbody>{board.people.map(p => <tr key={p.staffId}><td><button className={s.ghostButton} onClick={() => choosePerson(p.staffId)}>{p.name} ↗</button></td><td>{p.titleLabel}<small>{p.rankLabel}</small></td><td>{quantity(board.kpi.find(k => k.staffId === p.staffId)?.soldQty ?? 0)}<small>{quantity(p.statement?.kpiQty ?? 0)} payable · {quantity(board.kpi.find(k => k.staffId === p.staffId)?.heldQty ?? 0)} held</small></td><td className={s.numeric}>{money((p.statement?.kpiBase ?? 0))}</td><td className={s.numeric}>+ {money((p.statement?.kpiCommission ?? 0) - (p.statement?.kpiBase ?? 0))}<small>{pct(p.statement?.kpiThresholdPct)}</small></td><td className={s.stickyTotal}>{money((p.statement?.kpiCommission ?? 0))}</td></tr>)}</tbody><tfoot><tr><td colSpan={5}>Total KPI expense</td><td className={s.stickyTotal}>{money(totals.kpiTotal)}</td></tr></tfoot></table></div></div>
-    </>}
-
-    {tab === 'open' && <>
-      {/* The month's state, not a sentence (2026-10-12): a badge says why every bonus is RM 0. */}
-      <div className={s.topLine}><div className="flex flex-wrap items-center gap-2"><h2 className={s.sectionHeading}>Open Bill allocation</h2>
-        {!openEnabled && <span className={s.warningBadge}>Payout off this month</span>}</div>
-        <div className={s.overviewTotal}><span>Total Open Bill bonus</span><strong>{money(totals.open)}</strong></div></div>
-      <div className={s.toolbar}><input className={s.search} aria-label="Search Open Bill orders" placeholder="Search order, Ref No. or salesperson…" value={query} onChange={e => setQuery(e.target.value)} /><label className={s.chip}><input type="checkbox" checked={showAllOpen} onChange={e => setShowAllOpen(e.target.checked)} />Show all orders to add picks</label></div>
-      <div className={s.tableFrame}><div className={s.tableScroll}><table className={s.table} aria-label="Open Bill orders"><thead><tr><th className={s.stickyFirst}>Sales order</th><th>Ref No.</th><th>Sales person</th><th>Event date</th><th>Venue</th><th>Brand / category</th><th>Sales value</th><th>Open Bill selection</th><th>Rate</th><th>Status</th><th className={s.stickyTotal}>Allocated bonus</th></tr></thead><tbody>{board.personalRows.filter(r => (showAllOpen || r.openBillRank != null) && matches(r)).map(r => <tr key={`${r.orderId}:${r.staffId}`}
-        onDoubleClick={event => billMenu.onRowDoubleClick(event, rowHref(r))} onMouseDown={billMenu.onRowMouseDown}>
-        <td className={s.stickyFirst}>{(() => { const href = rowHref(r); return href ? <Link href={href}>{r.orderNo}</Link> : r.orderNo })()}</td><td>{r.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={r.refNo} paperNo={r.paperNo} />}</td><td><button className={s.ghostButton} onClick={() => choosePerson(r.staffId)}>{r.staffName}</button></td><td>{r.eventDate}</td><td>{r.venue || '—'}</td><td>{r.brands.join(', ')}<small>{r.categories.join(', ')}</small></td><td className={s.numeric}>{money(r.orderTotal)}</td><td>{pickControl(r)}</td><td>{pct(r.openBillRate)}</td><td>{statusLabel[r.status]}</td><td className={s.stickyTotal}>{money(r.openBillBonus)}</td></tr>)}</tbody></table></div></div>
-      <div className={s.footerTotal}><span>All selected bills · allocated bonus</span><strong>{money(totals.open)}</strong></div>
     </>}
 
     {tab === 'deposit' && <>

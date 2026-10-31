@@ -70,8 +70,8 @@ export default function NewSubDepartmentForm({
             </label>
           </div>
           <p className="text-xs mt-3 mb-4">
-            Copying brings across every rank, item group, KPI item, threshold, Open Bill rate, brand
-            and margin band. Starting blank brings nothing: every scheme rule is switched off and
+            Copying brings across every rank, item group, KPI item, threshold, brand and margin
+            band. Starting blank brings nothing: every scheme rule is switched off and
             every table is empty until you write it. Neither brings across people — nobody can hold
             two positions at once. The new sub-department appears in the sidebar under Revenue.
           </p>

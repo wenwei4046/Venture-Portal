@@ -1583,44 +1583,6 @@ export type Database = {
           },
         ]
       }
-      comm_open_bill_rules: {
-        Row: {
-          bill_rank: number
-          created_at: string
-          effective_from: string
-          effective_to: string | null
-          id: string
-          pct: number
-          scheme_id: string
-        }
-        Insert: {
-          bill_rank: number
-          created_at?: string
-          effective_from: string
-          effective_to?: string | null
-          id?: string
-          pct: number
-          scheme_id: string
-        }
-        Update: {
-          bill_rank?: number
-          created_at?: string
-          effective_from?: string
-          effective_to?: string | null
-          id?: string
-          pct?: number
-          scheme_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comm_open_bill_rules_scheme_id_fkey"
-            columns: ["scheme_id"]
-            isOneToOne: false
-            referencedRelation: "comm_schemes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       comm_order_releases: {
         Row: {
           id: string
@@ -1956,12 +1918,10 @@ export type Database = {
           enable_kpi: boolean
           enable_margin_incentive: boolean
           enable_margin_penalty: boolean
-          enable_open_bill: boolean
           enable_override: boolean
           enable_product_revenue: boolean
           id: string
           is_active: boolean
-          open_bill_basis: Database["public"]["Enums"]["comm_open_bill_basis"]
           override_includes_kpi: boolean
           scheme_name: string
           sub_department_id: string
@@ -1978,12 +1938,10 @@ export type Database = {
           enable_kpi?: boolean
           enable_margin_incentive?: boolean
           enable_margin_penalty?: boolean
-          enable_open_bill?: boolean
           enable_override?: boolean
           enable_product_revenue?: boolean
           id?: string
           is_active?: boolean
-          open_bill_basis?: Database["public"]["Enums"]["comm_open_bill_basis"]
           override_includes_kpi?: boolean
           scheme_name: string
           sub_department_id: string
@@ -2000,12 +1958,10 @@ export type Database = {
           enable_kpi?: boolean
           enable_margin_incentive?: boolean
           enable_margin_penalty?: boolean
-          enable_open_bill?: boolean
           enable_override?: boolean
           enable_product_revenue?: boolean
           id?: string
           is_active?: boolean
-          open_bill_basis?: Database["public"]["Enums"]["comm_open_bill_basis"]
           override_includes_kpi?: boolean
           scheme_name?: string
           sub_department_id?: string
@@ -2165,7 +2121,6 @@ export type Database = {
           margin_pct: number | null
           margin_penalty_withheld: number
           margin_revenue: number
-          open_bill_bonus: number
           override_commission: number
           penalty_weighted_revenue: number
           product_commission: number
@@ -2198,7 +2153,6 @@ export type Database = {
           margin_pct?: number | null
           margin_penalty_withheld?: number
           margin_revenue?: number
-          open_bill_bonus?: number
           override_commission?: number
           penalty_weighted_revenue?: number
           product_commission?: number
@@ -2231,7 +2185,6 @@ export type Database = {
           margin_pct?: number | null
           margin_penalty_withheld?: number
           margin_revenue?: number
-          open_bill_bonus?: number
           override_commission?: number
           penalty_weighted_revenue?: number
           product_commission?: number
@@ -6711,61 +6664,6 @@ export type Database = {
           },
         ]
       }
-      sales_order_open_bill_tags: {
-        Row: {
-          auto_suggested: boolean
-          bill_rank: number
-          event_date: string
-          id: string
-          order_id: string
-          staff_id: string
-          tagged_at: string
-          tagged_by: string | null
-        }
-        Insert: {
-          auto_suggested?: boolean
-          bill_rank: number
-          event_date: string
-          id?: string
-          order_id: string
-          staff_id: string
-          tagged_at?: string
-          tagged_by?: string | null
-        }
-        Update: {
-          auto_suggested?: boolean
-          bill_rank?: number
-          event_date?: string
-          id?: string
-          order_id?: string
-          staff_id?: string
-          tagged_at?: string
-          tagged_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sales_order_open_bill_tags_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "sales_orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_order_open_bill_tags_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "hr_staff_costs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_order_open_bill_tags_tagged_by_fkey"
-            columns: ["tagged_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       sales_orders: {
         Row: {
           agent_key: string
@@ -8625,7 +8523,6 @@ export type Database = {
         | "override"
         | "margin_incentive"
       comm_margin_band_kind: "incentive" | "reference" | "penalty"
-      comm_open_bill_basis: "uplift_on_commission" | "pct_of_revenue"
       comm_promotion_criterion:
         | "personal_sales"
         | "group_sales"
@@ -8934,7 +8831,6 @@ export const Constants = {
         "margin_incentive",
       ],
       comm_margin_band_kind: ["incentive", "reference", "penalty"],
-      comm_open_bill_basis: ["uplift_on_commission", "pct_of_revenue"],
       comm_promotion_criterion: [
         "personal_sales",
         "group_sales",

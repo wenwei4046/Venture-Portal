@@ -40,18 +40,18 @@ describe('moveMessage', () => {
   const result: BillMoveResult = {
     orderId: 'o', orderNo: 'HC-SO-2609-070', changed: true,
     to: { staffId: 'anthony', name: 'ANTHONY' }, from: ADRIAN, movedBack: false,
-    openBillRank: null, openBillBack: null, shareTaken: null, shareBack: null, shareNotBack: null,
+    shareTaken: null, shareBack: null, shareNotBack: null,
   }
   it('says whose it is now and whose it was', () => {
     expect(moveMessage(result)).toBe('HC-SO-2609-070 is ANTHONY’s now — moved from ADRIAN.')
   })
-  it('says what became of a part and a pick', () => {
-    expect(moveMessage({ ...result, shareTaken: 0.5, openBillRank: 1 }))
-      .toBe('HC-SO-2609-070 is ANTHONY’s now — moved from ADRIAN. ANTHONY held 50% of it; all of it is theirs now. Its Open Bill pick (1st) came off — it ranked ADRIAN’s day.')
+  it('says what became of a part', () => {
+    expect(moveMessage({ ...result, shareTaken: 0.5 }))
+      .toBe('HC-SO-2609-070 is ANTHONY’s now — moved from ADRIAN. ANTHONY held 50% of it; all of it is theirs now.')
   })
-  it('says a move back hands it to the ERP’s salesperson, pick and all', () => {
-    expect(moveMessage({ ...result, to: ADRIAN, from: { staffId: 'anthony', name: 'ANTHONY' }, movedBack: true, openBillBack: 2 }))
-      .toBe('HC-SO-2609-070 is back with ADRIAN, the salesperson the ERP names. Its Open Bill pick (2nd) is back.')
+  it('says a move back hands it to the ERP’s salesperson', () => {
+    expect(moveMessage({ ...result, to: ADRIAN, from: { staffId: 'anthony', name: 'ANTHONY' }, movedBack: true }))
+      .toBe('HC-SO-2609-070 is back with ADRIAN, the salesperson the ERP names.')
   })
   it('says nothing moved when nothing did', () => {
     expect(moveMessage({ ...result, changed: false })).toBe('HC-SO-2609-070 is ANTHONY’s already — nothing moved.')

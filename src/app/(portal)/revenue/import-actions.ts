@@ -70,8 +70,6 @@ export interface CommitInput {
   agentMap: Record<string, string>
   /** Remember those matches so next month's import needs no confirming. */
   saveAliases: boolean
-  /** Pre-fill the 1st/2nd/3rd bill picks from the running document number. */
-  suggestOpenBills: boolean
 }
 
 export interface CommitResult {
@@ -81,7 +79,6 @@ export interface CommitResult {
   unmatchedAgents: string[]
   linesWithoutCost: number
   linesWithoutBrand: number
-  openBillsSuggested: number
 }
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -324,12 +321,7 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     }
   }
 
-  const { data: suggested, error: commitError } = await supabase.rpc('commit_sales_import_batch', {
-    p_batch_id: batchId,
-    // The commit asks the MONTH whether Open Bill pays (comm_open_bill_on,
-    // 2026-09-26) — Rules alone would say no for a month set on for itself.
-    p_suggest_open_bills: input.suggestOpenBills,
-  })
+  const { error: commitError } = await supabase.rpc('commit_sales_import_batch', { p_batch_id: batchId })
   if (commitError) throw new Error(`Import written but could not be committed: ${commitError.message}`)
 
   revalidatePath('/revenue', 'layout')
@@ -341,7 +333,6 @@ export async function commitSalesImport(input: CommitInput): Promise<CommitResul
     unmatchedAgents,
     linesWithoutCost,
     linesWithoutBrand,
-    openBillsSuggested: Number(suggested ?? 0),
   }
 }
 

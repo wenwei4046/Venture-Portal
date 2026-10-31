@@ -16,8 +16,8 @@ interface PageProps {
 /**
  * Every rule the commission engine reads for ONE sub-department, in the HR
  * revamp's side list (2026-10-10): Pay structure (Scheme rules, Title ladder,
- * Ranks, Directors) · Item rules (Item groups, KPI items, Open Bill rates,
- * Brands & margin bands — each only while the switch that reads it is on) ·
+ * Ranks, Directors) · Item rules (Item groups, KPI items, Brands & margin
+ * bands — each only while the switch that reads it is on) ·
  * Headcount (Capacity, moved here from Member services) · Policy (Promotion
  * criteria). One URL, the section in `?tab=`. The salespeople themselves live
  * on Sales Groups' Members tab.

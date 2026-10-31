@@ -398,7 +398,7 @@ function navEntries(data: NavData): NavEntry[] {
                 href: revenuePath(subs.cc),
                 // "Comm Cal", not "Commission Calculation" (user 2026-09-01).
                 // A month opened from the calculation list — /revenue/fair/
-                // 2026-08-01 and the import, open-bill and statement pages
+                // 2026-08-01 and the import, orders and statement pages
                 // under it — is still Calculation, so no `exact` here.
                 label: 'Comm Cal',
                 notPaths: [revenuePath(subs.cc, 'hierarchy'), revenuePath(subs.cc, 'rules')],

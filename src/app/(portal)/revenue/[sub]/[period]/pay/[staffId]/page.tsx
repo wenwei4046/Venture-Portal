@@ -27,15 +27,6 @@ function pct(v: number | null, digits = 1): string {
   return v === null ? '—' : `${(v * 100).toFixed(digits)}%`
 }
 
-interface OpenBillLine {
-  id: string
-  amount: number | string
-  basis_amount: number | string
-  rate: number | string | null
-  note: string | null
-  source_order_id: string | null
-}
-
 /**
  * One salesperson's payslip for the month, before payroll has written a thing.
  *
@@ -45,8 +36,8 @@ interface OpenBillLine {
  * the gross commission, and walks it down: the employer's contributions come
  * out of it first (that is what a commissioned payroll means), then the
  * employee's, then the tax, and what is left is the payment. Every figure is
- * accompanied by the rule that produced it, Open Bill included, because a
- * payslip nobody can argue with is a payslip somebody can check.
+ * accompanied by the rule that produced it, because a payslip nobody can
+ * argue with is a payslip somebody can check.
  */
 export default async function StaffPayPage({ params }: PageProps) {
   await requirePage('/revenue/[sub]/[period]/pay/[staffId]')
@@ -61,28 +52,10 @@ export default async function StaffPayPage({ params }: PageProps) {
   const row = board.rows.find(r => r.staffId === staffId)
   if (!row) notFound()
 
-  const [{ data: statementData }, { data: rankRows }] = await Promise.all([
-    supabase
-      .from('comm_statements')
-      .select('id')
-      .eq('run_id', board.runId ?? '')
-      .eq('staff_id', staffId)
-      .maybeSingle(),
-    subDept.schemeId
-      ? supabase.from('comm_ranks').select('rank_key, label').eq('scheme_id', subDept.schemeId)
-      : Promise.resolve({ data: null }),
-  ])
-
-  const statementId = (statementData as { id: string } | null)?.id ?? null
-  const { data: lineData } = statementId
-    ? await supabase
-        .from('comm_statement_lines')
-        .select('id, amount, basis_amount, rate, note, source_order_id')
-        .eq('statement_id', statementId)
-        .eq('component', 'open_bill')
+  const { data: rankRows } = subDept.schemeId
+    ? await supabase.from('comm_ranks').select('rank_key, label').eq('scheme_id', subDept.schemeId)
     : { data: null }
 
-  const openBillLines = (lineData ?? []) as unknown as OpenBillLine[]
   const ladder = (rankRows ?? []) as Array<{ rank_key: string; label: string }>
   const rankName = row.components?.rankKey
     ? (ladder.find(x => x.rank_key === row.components?.rankKey)?.label ?? row.components.rankKey)
@@ -96,7 +69,6 @@ export default async function StaffPayPage({ params }: PageProps) {
     ? [
         ['Product commission', c.productCommission, `${ratePct(c.productRate)} of own commissionable sales`],
         ['KPI allowance', c.kpiCommission, 'A flat amount for each KPI unit moved'],
-        ['Open Bill bonus', c.openBillBonus, 'The 1st / 2nd / 3rd bill of an event day'],
         ['Override on the downline', c.overrideCommission, 'The rate differential on their downline’s sales'],
         ['Margin incentive', c.marginIncentive, 'Monthly, and only if every brand sold clears the tier'],
         ['Group incentive', c.groupIncentive, 'One fixed reward per qualifying direct-line group'],
@@ -253,62 +225,6 @@ export default async function StaffPayPage({ params }: PageProps) {
             </tfoot>
           </table>
         </div>
-      </section>
-
-      {/* ── Open Bill, and the rule that pays it ────────────────────────── */}
-      <section className="mb-10">
-        <div className="sect-head">
-          <h2>Open Bill</h2>
-          <span className="rule" aria-hidden />
-          <span className="count">{formatMoney(c?.openBillBonus ?? 0)}</span>
-        </div>
-        {openBillLines.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="ledger-table">
-              <thead>
-                <tr>
-                  <th>Bill</th>
-                  <th className="right m-hide">Commissionable</th>
-                  <th className="right m-hide">Uplift</th>
-                  <th className="right">Bonus</th>
-                  <th className="lt-toggle" aria-hidden />
-                </tr>
-              </thead>
-              <tbody>
-                {openBillLines.map(l => (
-                  <LedgerRow key={l.id}>
-                    <td>
-                      {l.source_order_id ? (
-                        <Link
-                          href={revenuePath(subDept.slug, period, 'orders', l.source_order_id)}
-                          className="font-medium"
-                        >
-                          {l.note ?? '—'}
-                        </Link>
-                      ) : (
-                        <span className="font-medium">{l.note ?? '—'}</span>
-                      )}
-                    </td>
-                    <td className="num m-hide" data-label="Commissionable">
-                      {formatMoney(Number(l.basis_amount))}
-                    </td>
-                    <td className="num m-hide" data-label="Uplift">
-                      {l.rate === null ? '—' : pct(Number(l.rate), 0)}
-                    </td>
-                    <td className="num">{formatMoney(Number(l.amount))}</td>
-                  </LedgerRow>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
-            <p className="text-sm">
-              No bill of theirs was tagged as an Open Bill this month
-              {c && c.openBillBonus !== 0 ? ', yet the statement carries a bonus — recompute the run.' : '.'}
-            </p>
-          </div>
-        )}
       </section>
 
       <section className="mb-10">

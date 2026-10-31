@@ -18,7 +18,6 @@ vi.mock('../../config-actions', () => ({
   saveRankDef: vi.fn(),
   removeRankDef: vi.fn(),
   deleteMarginBand: vi.fn(),
-  updateOpenBillRule: vi.fn(),
   upsertBrand: vi.fn(),
   upsertDirectorPay: vi.fn(),
   upsertItemGroup: vi.fn(),
@@ -39,11 +38,9 @@ const scheme = (on: boolean): SchemeRow => ({
   id: 'scheme-fair',
   sub_department_id: FAIR,
   scheme_name: 'Fair scheme',
-  open_bill_basis: 'uplift_on_commission',
   override_includes_kpi: false,
   enable_product_revenue: true,
   enable_kpi: on,
-  enable_open_bill: on,
   enable_override: true,
   enable_margin_penalty: on,
   enable_margin_incentive: on,
@@ -67,7 +64,6 @@ function dataWith(on: boolean, over: Partial<CommissionSettingsData> = {}): Comm
     kpiSpecials: [],
     kpiFabricSeries: [],
     kpiGoneSkus: [],
-    openBillRules: [],
     brands: [],
     marginBands: [],
     promotionRules: on
@@ -114,7 +110,7 @@ describe('RulesView', () => {
     const groups = within(list()).getAllByRole('group').map(g => [g.getAttribute('aria-label'), within(g).getAllByRole('button').map(b => b.textContent)])
     expect(groups).toEqual([
       ['Pay structure', ['Scheme rules', 'Title ladder', 'Ranks', 'Directors']],
-      ['Item rules', ['Item groups', 'KPI items', 'Open Bill rates', 'Brands & margin bands']],
+      ['Item rules', ['Item groups', 'KPI items', 'Brands & margin bands']],
       ['Headcount', ['Capacity']],
       ['Policy', ['Promotion criteria']],
     ])
@@ -135,11 +131,18 @@ describe('RulesView', () => {
 
   // The section's one line under its title went on 2026-10-12: the title alone.
   it('opens the section the URL names, under its title alone', () => {
+    nav.params = new URLSearchParams('tab=ladder')
+    renderView(true)
+    expect(within(list()).getByRole('button', { name: 'Title ladder' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getAllByText('Title ladder')).toHaveLength(2) // the list's row and the section's title
+  })
+
+  // Open Bill went (2026-10-31), its rates with it: a link saved before opens Scheme rules.
+  it('opens Scheme rules from a link to the old Open Bill rates', () => {
     nav.params = new URLSearchParams('tab=open-bill')
     renderView(true)
-    expect(within(list()).getByRole('button', { name: 'Open Bill rates' })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getAllByText('Open Bill rates')).toHaveLength(2) // the list's row and the section's title
-    expect(screen.queryByText('The uplift paid on an Open Bill.')).toBeNull()
+    expect(within(list()).getByRole('button', { name: 'Scheme rules' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByText(/Open Bill/)).toBeNull()
   })
 
   it('keeps KPI items mounted, hidden, while another section is read', () => {

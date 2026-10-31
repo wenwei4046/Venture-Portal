@@ -19,7 +19,7 @@ import CommissionStatementPage from './statement/[staffId]/page'
 
 function database() {
   const statement = Object.fromEntries(['product_revenue','group_revenue','deferred_revenue','excluded_revenue','penalty_weighted_revenue',
-    'kpi_commission','kpi_qty','kpi_base','kpi_threshold_pct','open_bill_bonus','override_commission','margin_incentive','group_incentive',
+    'kpi_commission','kpi_qty','kpi_base','kpi_threshold_pct','override_commission','margin_incentive','group_incentive',
     'group_subsidy_cap','margin_penalty_withheld','margin_revenue','margin_cost'].map(key => [key,0]))
   Object.assign(statement, { id:'statement', staff_id:'staff', product_commission:10000, total_commission:10000, product_rate:0.03,
     rank_key:'a', group_breakdown:[], full_spec:false })

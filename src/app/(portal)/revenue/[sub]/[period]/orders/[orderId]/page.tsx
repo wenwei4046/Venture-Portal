@@ -214,7 +214,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: tagData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -235,7 +235,6 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             .lte('effective_from', asAt)
             .or(`effective_to.is.null,effective_to.gte.${asAt}`)
         : Promise.resolve({ data: null }),
-      supabase.from('sales_order_open_bill_tags').select('bill_rank, auto_suggested').eq('order_id', orderId).maybeSingle(),
       // The organiser is a fact about the FAIR this bill was written at, not
       // about the hall and not about the month: one hall holds two or three
       // fairs a month and each has its own organiser (REX at MVEC SOUTHKEY
@@ -308,7 +307,6 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       g.commissionable,
     ]),
   )
-  const tag = tagData as { bill_rank: number; auto_suggested: boolean } | null
   const organiser = (venueData as string | null) || null
   const scheme = schemeData as {
     deposit_threshold_pct: number | string | null
@@ -626,18 +624,6 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             ) : null}
           </Fact>
           <Fact label="Event day">{formatDate(order.event_date)}</Fact>
-          <Fact label="Open Bill">
-            {tag ? (
-              <>
-                bill {tag.bill_rank} of the day
-                <span className="font-mono text-xs">
-                  {tag.auto_suggested ? ' · suggested' : ' · set by hand'}
-                </span>
-              </>
-            ) : (
-              <span>not tagged</span>
-            )}
-          </Fact>
           <Fact label="ERP status">
             {order.erp_status ?? '—'}
             {order.synced_at ? (

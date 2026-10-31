@@ -52,8 +52,8 @@ function monthName(period: string): string {
 
 /**
  * Refuses a change to any of these bills while somebody paid on them has
- * their month closed — an Open Bill pick, a share, taking a bill out or
- * counting it again, a keyed margin. Asked here rather than by trigger
+ * their month closed — a share, taking a bill out or counting it again, a
+ * keyed margin. Asked here rather than by trigger
  * because the ERP receiver writes the same tables and must never be refused;
  * the close itself cannot move either way.
  */

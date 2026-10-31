@@ -554,18 +554,18 @@ export async function loadMemberIncome(
     };
     const empty = (state: IncomeMonth["state"], notice: string): IncomeMonth => ({
       ...extra, state, asOf: new Date().toISOString(), closedAt: null, rankLabel: null, rate: 0,
-      personal: 0, kpi: 0, kpiQty: 0, openBill: 0, incentive: 0, override: 0, group: 0, director: 0,
+      personal: 0, kpi: 0, kpiQty: 0, incentive: 0, override: 0, group: 0, director: 0,
       commission: 0, countedSales: 0, bandKey: null, brands: [],
-      bills: [], overrides: [], switches: { kpi: false, openBill: false, incentive: false, override: false, group: false }, notice,
+      bills: [], overrides: [], switches: { kpi: false, incentive: false, override: false, group: false }, notice,
       pay: null,
     });
 
     const { data: scheme, error: schemeError } = await admin.from("comm_schemes")
-      .select("enable_kpi, enable_open_bill, enable_margin_incentive, enable_override, enable_group_incentive")
+      .select("enable_kpi, enable_margin_incentive, enable_override, enable_group_incentive")
       .eq("sub_department_id", subDepartmentId).eq("is_active", true).is("effective_to", null).maybeSingle();
     if (schemeError) throw new Error(schemeError.message);
     const sw = (scheme ?? {}) as Record<string, boolean | null>;
-    const switches = { kpi: !!sw.enable_kpi, openBill: !!sw.enable_open_bill, incentive: !!sw.enable_margin_incentive, override: !!sw.enable_override, group: !!sw.enable_group_incentive };
+    const switches = { kpi: !!sw.enable_kpi, incentive: !!sw.enable_margin_incentive, override: !!sw.enable_override, group: !!sw.enable_group_incentive };
 
     // Closed by HR: the close's own figures, fixed.
     const close = closes.data as { closed_at: string; summary: unknown; statement: StatementDto | null; deferred_orders: { orderId: string }[] | null } | null;

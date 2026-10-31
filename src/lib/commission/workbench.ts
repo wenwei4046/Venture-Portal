@@ -3,7 +3,7 @@ import {
   indexKpiItems, isDepositMet, marginBase, noSalesCost, orderRevenueSplit, penaltyBandFor, round2,
 } from './engine'
 import { kpiItemLabel, kpiSourceOf } from './kpi'
-import type { BillShare, EngineInput, EngineResult, MarginSource, OpenBillTag, SalesOrder, Statement } from './types'
+import type { BillShare, EngineInput, EngineResult, MarginSource, SalesOrder, Statement } from './types'
 
 /** Display metadata only; financial facts always come from EngineInput. */
 export interface WorkbenchPersonMeta {
@@ -34,7 +34,6 @@ export interface WorkbenchOrderMeta {
 
 export interface WorkbenchOptions {
   excludedOrderIds?: readonly string[]
-  openBillTags?: readonly OpenBillTag[]
   people?: readonly WorkbenchPersonMeta[]
   orders?: readonly WorkbenchOrderMeta[]
 }
@@ -96,9 +95,6 @@ export interface CommissionOrderRow {
   /** Display allocation of the monthly award, not an extra order-level award. */
   marginIncentive: number
   marginAllocationBasis: 'eligible_goods_revenue' | null
-  openBillRank: 1 | 2 | 3 | null
-  openBillRate: number
-  openBillBonus: number
   penaltyMultiplier: number
   penaltyWithheld: number
   totalCommission: number
@@ -197,7 +193,6 @@ export interface CommissionWorkbench {
   personalRows: CommissionOrderRow[]
   overridingRows: OverrideOrderRow[]
   kpi: KpiAgentSummary[]
-  openBillRows: CommissionOrderRow[]
   totalCommission: number
 }
 
@@ -268,11 +263,9 @@ export function workbenchStaffIds(input: EngineInput): string[] {
  */
 export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchOptions = {}): CommissionWorkbench {
   const excluded = new Set(options.excludedOrderIds ?? [])
-  const tags = [...(options.openBillTags ?? input.openBillTags)]
   const effectiveInput: EngineInput = {
     ...input,
     orders: input.orders.filter(order => !excluded.has(order.id)),
-    openBillTags: tags,
   }
   const result = computeCommissionRun(effectiveInput)
   const statements = new Map(result.statements.map(statement => [statement.staffId, statement]))
@@ -283,8 +276,6 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
   const kpiIndex = input.scheme.enableKpi ? configuredKpiIndex : EMPTY_KPI_INDEX
   const groupIndex = indexItemGroups(input.scheme.itemGroups)
   const costBasis = costBasisOf(input.scheme.costDivisor, input.scheme.costRatios)
-  const tagByOrder = new Map(tags.map(tag => [tag.orderId, tag.rank]))
-  const openBillRates = new Map(input.openBillRules.map(rule => [rule.rank, rule.pct]))
   const nameOf = (staffId: string) => personMeta.get(staffId)?.name ?? staffId
   const rankOf = (staffId: string) => input.ranks.find(rank =>
     rank.rankKey === (statements.get(staffId)?.effectiveRankKey ?? hierarchy.get(staffId)?.baseRankKey))
@@ -329,11 +320,10 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       ? penaltyBandFor(margin.pct, base.brandCode, input.marginBands) : null
     const multiplier = penalty?.commissionMultiplier ?? 1
     const sourceLines = eligible ? statement?.lines.filter(line => line.sourceOrderId === order.id) ?? [] : []
-    const component = (kind: 'product_revenue' | 'kpi_item' | 'open_bill') => sum(sourceLines.filter(line => line.component === kind).map(line => line.amount))
+    const component = (kind: 'product_revenue' | 'kpi_item') => sum(sourceLines.filter(line => line.component === kind).map(line => line.amount))
     const key = `${order.staffId}:${order.id}`
     const kpiRevenue = split.kpiAmount
     overrideBases.set(key, eligible ? round2(round2(productRevenue * multiplier) + (input.scheme.overrideIncludesKpi ? kpiRevenue : 0)) : 0)
-    const openBillRank = order.upsale ? null : tagByOrder.get(order.id) ?? null
     return {
       key, orderId: order.id, originalOrderId: order.id, orderNo: order.orderNo,
       refNo: meta?.refNo ?? null, paperNo: meta?.paperNo ?? null,
@@ -357,8 +347,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       kpiBase: component('kpi_item'), kpiBonus: 0,
       kpiThresholdPct: eligible ? statement?.kpiThresholdPct ?? 0 : 0,
       marginIncentive: 0, marginAllocationBasis: null,
-      openBillRank, openBillRate: openBillRank ? openBillRates.get(openBillRank) ?? 0 : 0,
-      openBillBonus: component('open_bill'), penaltyMultiplier: multiplier,
+      penaltyMultiplier: multiplier,
       penaltyWithheld: eligible ? sum(result.penalised.filter(row => row.staffId === order.staffId && row.orderId === order.id).map(row => row.withheld)) : 0,
       totalCommission: 0,
       share: shareOf(order.share),
@@ -376,7 +365,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       row.kpiBonus = bonuses[index]
       row.marginIncentive = margins[index]
       row.marginAllocationBasis = statement?.marginIncentive && row.status === 'eligible' && row.marginRevenue > 0 ? 'eligible_goods_revenue' : null
-      row.totalCommission = sum([row.productCommission, row.kpiBase, row.kpiBonus, row.openBillBonus, row.marginIncentive])
+      row.totalCommission = sum([row.productCommission, row.kpiBase, row.kpiBonus, row.marginIncentive])
     })
 
     const overridingRows: OverrideOrderRow[] = (statement?.lines ?? [])
@@ -462,7 +451,6 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
   return {
     result, people, personalRows, overridingRows: people.flatMap(person => person.overridingRows),
     kpi,
-    openBillRows: personalRows.filter(row => row.openBillRank !== null),
     totalCommission: result.totalCommission,
   }
 }

@@ -58,6 +58,11 @@ describe('TABLE_WRITES', () => {
           rows.set(`${r[1]} ${r[2]}`, [...r[3].matchAll(/'([^']+)'/g)].map(a => a[1]))
         }
       }
+      // A table that went takes its rows with it (2026-10-31, Open Bill's three).
+      for (const m of sqlOf(f).matchAll(/DELETE FROM public\.permission_table_writes\s+WHERE table_name IN \(([^)]*)\);/g)) {
+        const gone = new Set([...m[1].matchAll(/'([^']+)'/g)].map(a => a[1]))
+        for (const key of [...rows.keys()]) if (gone.has(key.split(' ')[0])) rows.delete(key)
+      }
     }
     const twin = new Map(tableWriteRows().map(r => [`${r.table} ${r.command}`, r.actions as string[]]))
     expect(rows.size).toBeGreaterThan(300)
@@ -153,7 +158,7 @@ const INVOKER_WRITES: Readonly<Record<string, Readonly<Record<string, readonly W
   comm_close_salespeople: { comm_salesperson_closes: ['INSERT', 'UPDATE'] },
   comm_reopen_salespeople: { comm_salesperson_closes: ['UPDATE'] },
   comm_replace_membership_position: { comm_hierarchy: ['INSERT', 'UPDATE'] },
-  commit_sales_import_batch: { sales_import_batches: ['UPDATE'], sales_order_open_bill_tags: ['INSERT', 'DELETE'] },
+  commit_sales_import_batch: { sales_import_batches: ['UPDATE'] },
   employee_chart_lifecycle: { hr_staff_costs: ['UPDATE'], comm_hierarchy: ['INSERT', 'UPDATE', 'DELETE'] },
   erp_feed_close_month: { erp_feed_closed_months: ['INSERT', 'UPDATE'] },
   erp_feed_reopen_month: { erp_feed_closed_months: ['UPDATE', 'DELETE'] },
@@ -162,18 +167,18 @@ const INVOKER_WRITES: Readonly<Record<string, Readonly<Record<string, readonly W
   ingest_erp_sales_order: {
     sales_orders: ['INSERT', 'UPDATE'], sales_order_lines: ['INSERT', 'UPDATE', 'DELETE'], comm_upsales: ['INSERT', 'UPDATE'],
     comm_venues: ['INSERT', 'UPDATE'], comm_venue_events: ['INSERT', 'UPDATE'], comm_organisers: ['INSERT'],
-    sales_import_batches: ['INSERT', 'UPDATE'], sales_order_open_bill_tags: ['INSERT', 'DELETE'], erp_sync_events: ['INSERT'],
+    sales_import_batches: ['INSERT', 'UPDATE'], erp_sync_events: ['INSERT'],
   },
   ladder_delete_level: { title_levels: ['UPDATE', 'DELETE'] },
   ladder_insert_level: { title_levels: ['INSERT', 'UPDATE'] },
-  match_erp_salesperson: { comm_agent_aliases: ['INSERT', 'UPDATE'], sales_orders: ['UPDATE'], sales_order_open_bill_tags: ['INSERT', 'DELETE'] },
+  match_erp_salesperson: { comm_agent_aliases: ['INSERT', 'UPDATE'], sales_orders: ['UPDATE'] },
   member_transfer_waiting: { hr_staff_costs: ['INSERT'] },
   revenue_apply_fair_calendar: { sales_import_batches: ['UPDATE'], sales_orders: ['UPDATE'] },
   revenue_dismiss_double_claim: { comm_double_claim_dismissals: ['INSERT', 'UPDATE'] },
   revenue_restore_double_claim: { comm_double_claim_dismissals: ['DELETE'] },
-  revenue_exclude_order: { sales_order_exclusions: ['INSERT'], sales_order_open_bill_tags: ['UPDATE', 'DELETE'], sales_orders: ['UPDATE'] },
-  revenue_include_order: { sales_order_exclusions: ['DELETE'], sales_order_open_bill_tags: ['INSERT', 'UPDATE'], sales_orders: ['UPDATE'] },
-  revenue_move_order: { sales_order_reassignments: ['INSERT', 'UPDATE', 'DELETE'], sales_order_open_bill_tags: ['INSERT', 'DELETE'], sales_order_shares: ['DELETE'], sales_orders: ['UPDATE'] },
+  revenue_exclude_order: { sales_order_exclusions: ['INSERT'], sales_orders: ['UPDATE'] },
+  revenue_include_order: { sales_order_exclusions: ['DELETE'], sales_orders: ['UPDATE'] },
+  revenue_move_order: { sales_order_reassignments: ['INSERT', 'UPDATE', 'DELETE'], sales_order_shares: ['DELETE'], sales_orders: ['UPDATE'] },
   revenue_set_order_brand: { sales_order_brand_picks: ['INSERT', 'UPDATE', 'DELETE'], sales_order_lines: ['UPDATE'], sales_orders: ['UPDATE'] },
 }
 

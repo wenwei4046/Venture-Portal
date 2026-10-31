@@ -20,11 +20,9 @@ const ir: SchemeRow = {
   id: 'scheme-ir',
   sub_department_id: 'sub-ir',
   scheme_name: 'IR scheme',
-  open_bill_basis: 'uplift_on_commission',
   override_includes_kpi: false,
   enable_product_revenue: true,
   enable_kpi: false,
-  enable_open_bill: false,
   enable_override: true,
   enable_margin_penalty: false,
   enable_margin_incentive: false,
@@ -50,7 +48,6 @@ describe('SchemePanel', () => {
     expect(components).toEqual([
       'Product revenue commission',
       'KPI item allowance',
-      'Open Bill bonus',
       'Hierarchy override',
       'Below-margin penalty',
       'Monthly margin incentive',
@@ -92,13 +89,16 @@ describe('SchemePanel', () => {
   it('saves every switch and setting in one go, then refreshes the list of sections', async () => {
     act.saveSchemeRules.mockResolvedValue({ ok: true })
     render(<SchemePanel scheme={ir} canManage />)
-    fireEvent.click(sw('Open Bill bonus'))
+    fireEvent.click(sw('Below-margin penalty'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(act.saveSchemeRules).toHaveBeenCalledTimes(1))
     const fd = act.saveSchemeRules.mock.calls[0][0] as FormData
     expect(fd.get('scheme_id')).toBe('scheme-ir')
-    expect(fd.get('enable_open_bill')).toBe('on')
+    expect(fd.get('enable_margin_penalty')).toBe('on')
     expect(fd.get('enable_kpi')).toBeNull()
+    // Open Bill went (2026-10-31): neither its switch nor its basis is sent.
+    expect(fd.has('enable_open_bill')).toBe(false)
+    expect(fd.has('open_bill_basis')).toBe(false)
     expect(fd.get('deposit_gate_on')).toBe('on')
     expect(fd.get('deposit_threshold_pct')).toBe('30')
     expect(fd.has('revenue_cost_divisor')).toBe(false)
@@ -110,10 +110,10 @@ describe('SchemePanel', () => {
   it('says why a save was refused, and keeps the draft', async () => {
     act.saveSchemeRules.mockResolvedValue({ ok: false, reason: 'Give the deposit gate a threshold, or switch it off' })
     render(<SchemePanel scheme={ir} canManage />)
-    fireEvent.click(sw('Open Bill bonus'))
+    fireEvent.click(sw('Below-margin penalty'))
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Give the deposit gate a threshold, or switch it off')
-    expect(sw('Open Bill bonus')).toHaveAttribute('aria-checked', 'true')
+    expect(sw('Below-margin penalty')).toHaveAttribute('aria-checked', 'true')
     expect(nav.refresh).not.toHaveBeenCalled()
   })
 

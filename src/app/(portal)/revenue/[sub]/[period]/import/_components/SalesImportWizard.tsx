@@ -22,7 +22,6 @@ import { Select } from '@/components/hrv/select'
 interface Props {
   period: string
   subDepartmentId: string
-  enableOpenBill: boolean
   subDeptSlug: string
   staff: Array<{ id: string; name: string; code: string | null }>
   aliases: Record<string, string>
@@ -40,14 +39,13 @@ interface Props {
  * cancelled) and what it cannot resolve (unmatched agents), not with what it
  * will keep.
  */
-export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId, enableOpenBill, staff, aliases }: Props) {
+export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId, staff, aliases }: Props) {
   const router = useRouter()
   const [stage, setStage] = useState<'upload' | 'review' | 'done'>('upload')
   const [fileName, setFileName] = useState('')
   const [parsed, setParsed] = useState<ErpParseResult | null>(null)
   const [agentMap, setAgentMap] = useState<Record<string, string>>({})
   const [saveAliases, setSaveAliases] = useState(true)
-  const [suggestOpenBills, setSuggestOpenBills] = useState(enableOpenBill)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<CommitResult | null>(null)
   const [pending, startTransition] = useTransition()
@@ -112,7 +110,6 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
           orders: selection.selected.map(toDto),
           agentMap,
           saveAliases,
-          suggestOpenBills,
         })
         setResult(r)
         setStage('done')
@@ -164,7 +161,6 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
           <StatCards label="What the import wrote">
             <StatCard label="Orders imported" value={String(result.orderCount)} icon="receipt" tone="primary" />
             <StatCard label="Order lines" value={String(result.lineCount)} icon="layers" />
-            <StatCard label="Open Bill picks suggested" value={String(result.openBillsSuggested)} icon="tag" />
             <StatCard
               label="Lines without a cost"
               value={String(result.linesWithoutCost)}
@@ -373,15 +369,6 @@ export default function SalesImportWizard({ period, subDeptSlug, subDepartmentId
             />
             Remember these matches for next month
           </label>
-          {enableOpenBill ? <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={suggestOpenBills}
-              onChange={e => setSuggestOpenBills(e.target.checked)}
-              className="h-4 w-4"
-            />
-            Suggest the 1st/2nd/3rd bill of each day from the document numbers
-          </label> : null}
         </div>
 
         {unmatched.length > 0 ? (

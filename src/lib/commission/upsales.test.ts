@@ -16,11 +16,9 @@ const RANKS: Rank[] = [
 ]
 
 const SCHEME: CommissionScheme = {
-  openBillBasis: 'uplift_on_commission',
   overrideIncludesKpi: false,
   enableProductRevenue: true,
   enableKpi: true,
-  enableOpenBill: true,
   enableOverride: true,
   enableMarginPenalty: true,
   enableMarginIncentive: true,
@@ -54,8 +52,6 @@ function input(orders: SalesOrder[], over: Partial<EngineInput> = {}): EngineInp
     orders,
     kpiItems: [],
     kpiThresholds: [],
-    openBillRules: [{ rank: 1, pct: 0.5 }],
-    openBillTags: [],
     marginBands: [
       { brandCode: 'AKEMI', bandKey: 't1', label: 'Tier 1', kind: 'incentive', marginPct: 0.36, commissionMultiplier: 1, monthlyIncentive: 1_000 },
       { brandCode: 'AKEMI', bandKey: 'p1', label: 'Below 27%', kind: 'penalty', marginPct: 0.27, commissionMultiplier: 0.5, monthlyIncentive: 0 },
@@ -116,13 +112,6 @@ describe('an upsale through the engine', () => {
     expect(s.deferredRevenue).toBe(0)
   })
 
-  it('never holds an Open Bill rank, even if one were tagged on it', () => {
-    const s = statementsOf(
-      input(upsalesToOrders([UPSALE], '2026-08-01'), { openBillTags: [{ orderId: 'u1', rank: 1 }] }),
-    ).get('yuny')!
-    expect(s.openBillBonus).toBe(0)
-  })
-
   it('is commissionable even when its code is a KPI item or its group is unknown', () => {
     const s = statementsOf(
       input(upsalesToOrders([UPSALE], '2026-08-01'), { kpiItems: [{ productCode: 'UPSALE', kpiAmount: 50 }] }),
@@ -177,11 +166,11 @@ describe('an upsale on its way to the database', () => {
     const rows: RunSourceRows = {
       periodMonth: '2026-08-01',
       scheme: {
-        id: 's', sub_department_id: 'fair', open_bill_basis: 'uplift_on_commission', override_includes_kpi: false,
+        id: 's', sub_department_id: 'fair', override_includes_kpi: false,
         deposit_threshold_pct: '0.3', default_rate_mode: 'fixed', enable_product_revenue: true, enable_kpi: false,
-        enable_open_bill: false, enable_override: true, enable_margin_penalty: false, enable_margin_incentive: false,
+        enable_override: true, enable_margin_penalty: false, enable_margin_incentive: false,
       },
-      ranks: [], itemGroups: [], kpiItems: [], kpiThresholds: [], openBillRules: [], openBillTags: [],
+      ranks: [], itemGroups: [], kpiItems: [], kpiThresholds: [],
       marginBands: [], hierarchy: [], orders: [], releasedOrderNos: [], priorMonths: [],
       upsales: [UPSALE],
     }
@@ -257,11 +246,11 @@ describe('a change of a shared bill', () => {
     const rows: RunSourceRows = {
       periodMonth: '2026-09-01',
       scheme: {
-        id: 's', sub_department_id: 'fair', open_bill_basis: 'uplift_on_commission', override_includes_kpi: false,
+        id: 's', sub_department_id: 'fair', override_includes_kpi: false,
         deposit_threshold_pct: '0.3', default_rate_mode: 'fixed', enable_product_revenue: true, enable_kpi: false,
-        enable_open_bill: false, enable_override: true, enable_margin_penalty: false, enable_margin_incentive: false,
+        enable_override: true, enable_margin_penalty: false, enable_margin_incentive: false,
       },
-      ranks: [], itemGroups: [], kpiItems: [], kpiThresholds: [], openBillRules: [], openBillTags: [],
+      ranks: [], itemGroups: [], kpiItems: [], kpiThresholds: [],
       marginBands: [], hierarchy: [], orders: [], releasedOrderNos: [], priorMonths: [],
       upsales: [{ ...DROP, erp_doc_no: 'HC-SO-013911', settled_order_id: 'bill-1' }],
       upsaleShares: sharesOfUpsales([{ ...DROP, settled_order_id: 'bill-1' }], new Map(), [SHARE]),
@@ -282,11 +271,11 @@ describe('a change of a shared bill', () => {
     const eng = toEngineInput({
       periodMonth: '2026-09-01',
       scheme: {
-        id: 's', sub_department_id: 'fair', open_bill_basis: 'uplift_on_commission', override_includes_kpi: false,
+        id: 's', sub_department_id: 'fair', override_includes_kpi: false,
         deposit_threshold_pct: '0.3', default_rate_mode: 'fixed', enable_product_revenue: true, enable_kpi: false,
-        enable_open_bill: false, enable_override: true, enable_margin_penalty: false, enable_margin_incentive: false,
+        enable_override: true, enable_margin_penalty: false, enable_margin_incentive: false,
       },
-      ranks: [], itemGroups: [], kpiItems: [], kpiThresholds: [], openBillRules: [], openBillTags: [],
+      ranks: [], itemGroups: [], kpiItems: [], kpiThresholds: [],
       marginBands: [], hierarchy: [], orders: [], releasedOrderNos: [], priorMonths: [],
       ...rows,
     })

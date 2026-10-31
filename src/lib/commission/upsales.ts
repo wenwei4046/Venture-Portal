@@ -21,7 +21,7 @@ import type { SalesOrder } from './types'
  *     both include their upsales, to the ringgit);
  *   - paid in the month it is recorded under; HR records it once it is paid,
  *     so the deposit gate does not ask;
- *   - not a bill: no Open Bill, no KPI, no margin.
+ *   - not a bill: no KPI, no margin.
  *
  * Each becomes a one-line `SalesOrder` flagged `upsale`, so the engine needs no
  * second idea of what it pays commission on.

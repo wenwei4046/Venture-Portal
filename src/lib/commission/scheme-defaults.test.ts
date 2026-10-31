@@ -14,13 +14,11 @@ const fair: SchemeSettings & { id: string; scheme_name: string } = {
   scheme_name: 'Fair 2026',
   enable_product_revenue: true,
   enable_kpi: true,
-  enable_open_bill: true,
   enable_override: true,
   enable_margin_penalty: true,
   enable_margin_incentive: true,
   override_includes_kpi: false,
   deposit_threshold_pct: '0.500000',
-  open_bill_basis: 'uplift_on_commission',
   default_rate_mode: 'variable',
   revenue_cost_divisor: '0.7000',
 }
@@ -54,7 +52,7 @@ describe('newSchemeSettings', () => {
     expect(copied).not.toHaveProperty('id')
     expect(copied).not.toHaveProperty('scheme_name')
     expect(Object.keys(copied).sort()).toEqual(
-      [...SCHEME_SWITCHES, 'override_includes_kpi', 'deposit_threshold_pct', 'open_bill_basis', 'default_rate_mode', 'enable_group_incentive', 'group_sales_depth', 'override_depth', 'direct_line_limit', 'revenue_cost_divisor'].sort(),
+      [...SCHEME_SWITCHES, 'override_includes_kpi', 'deposit_threshold_pct', 'default_rate_mode', 'enable_group_incentive', 'group_sales_depth', 'override_depth', 'direct_line_limit', 'revenue_cost_divisor'].sort(),
     )
   })
 

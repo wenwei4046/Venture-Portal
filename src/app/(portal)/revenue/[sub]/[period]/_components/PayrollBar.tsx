@@ -11,8 +11,8 @@ interface Props {
   period?: string
   state: PayrollState
   /**
-   * The screen holds a draft — Open Bill picks not yet saved, a preview. The
-   * figures in this bar leave it out.
+   * The screen holds a draft — the current-team preview. The figures in this
+   * bar leave it out.
    */
   draft?: boolean
 }
@@ -129,7 +129,7 @@ export default function PayrollBar({ monthLabel, period, state, draft = false }:
           )}
           {draft && (state.kind === 'not_sent' || state.kind === 'sent') && (
             <p className={s.payrollNote}>
-              This screen holds a draft — Open Bill picks not yet saved, or the current-team preview. The figures in this bar are the month as saved.
+              This screen holds a draft — the current-team preview. The figures in this bar are the month as saved.
             </p>
           )}
         </div>

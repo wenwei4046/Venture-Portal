@@ -18,8 +18,6 @@ import type {
   KpiItemRow,
   KpiThresholdRow,
   MarginBandRow,
-  OpenBillRuleRow,
-  OpenBillTagRow,
   OrderShareRow,
   PriorMonthRow,
   RankRow,
@@ -77,7 +75,7 @@ export interface CommissionInputContext {
   /** Today's team, kept separate for an explicitly selected what-if preview. */
   currentHierarchy: EngineInput['hierarchy']
   /** Current effective dated rules; selecting these does not enable scheme switches. */
-  currentRules: Pick<EngineInput, 'hierarchy' | 'kpiItems' | 'kpiThresholds' | 'openBillRules'>
+  currentRules: Pick<EngineInput, 'hierarchy' | 'kpiItems' | 'kpiThresholds'>
   batchId: string
   schemeId: string
   subDepartmentId: string
@@ -121,7 +119,7 @@ export async function loadCommissionInput(
   const supabase = existingClient ?? (await createClient()) as unknown as SupabaseClient
   const schemes = await readRows<SchemeRow>('the commission scheme', (from, to) =>
     supabase.from('comm_schemes')
-      .select('id, sub_department_id, open_bill_basis, override_includes_kpi, deposit_threshold_pct, default_rate_mode, enable_product_revenue, enable_kpi, enable_open_bill, enable_override, enable_margin_penalty, enable_margin_incentive, enable_group_incentive, group_sales_depth, override_depth, revenue_cost_divisor')
+      .select('id, sub_department_id, override_includes_kpi, deposit_threshold_pct, default_rate_mode, enable_product_revenue, enable_kpi, enable_override, enable_margin_penalty, enable_margin_incentive, enable_group_incentive, group_sales_depth, override_depth, revenue_cost_divisor')
       .eq('is_active', true).is('effective_to', null).order('id').range(from, to),
   )
   if (schemes.length === 0) {
@@ -160,8 +158,8 @@ export async function loadCommissionInput(
   // margin ladder; the brands of what rides on it do not (2026-09-27).
   const orderSelect = 'id, order_no, staff_id, order_date, event_date, period_month, order_total, paid_amount, manual_margin_pct, brand_code'
   const [thisMonth, earlier, releases, ranks, itemGroups, kpiItems, kpiThresholds,
-    openBillRules, marginBands, hierarchy, upsales, currentHierarchyRows,
-    currentKpiItems, currentKpiThresholds, currentOpenBillRules, cutover, openBillThisMonth,
+    marginBands, hierarchy, upsales, currentHierarchyRows,
+    currentKpiItems, currentKpiThresholds, cutover,
     costRatios, heads, directorRows, directorPayRows, standingCloses, appliedRuns] = await Promise.all([
     readRows<SalesOrderRow>('the sales orders', (from, to) =>
       supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId)
@@ -188,10 +186,6 @@ export async function loadCommissionInput(
         .or(`effective_to.is.null,effective_to.gte.${asAt}`).order('id').range(from, to)),
     readRows<KpiThresholdRow>('KPI thresholds', (from, to) =>
       supabase.from('comm_kpi_thresholds').select('min_qty, bonus_pct')
-        .eq('scheme_id', scheme.id).lte('effective_from', asAt)
-        .or(`effective_to.is.null,effective_to.gte.${asAt}`).order('id').range(from, to)),
-    readRows<OpenBillRuleRow>('Open Bill rules', (from, to) =>
-      supabase.from('comm_open_bill_rules').select('bill_rank, pct')
         .eq('scheme_id', scheme.id).lte('effective_from', asAt)
         .or(`effective_to.is.null,effective_to.gte.${asAt}`).order('id').range(from, to)),
     readRows<MarginBandRow>('margin bands', (from, to) =>
@@ -221,23 +215,11 @@ export async function loadCommissionInput(
       supabase.from('comm_kpi_thresholds').select('min_qty, bonus_pct')
         .eq('scheme_id', scheme.id).lte('effective_from', currentDate)
         .or(`effective_to.is.null,effective_to.gte.${currentDate}`).order('id').range(from, to)) : Promise.resolve<KpiThresholdRow[]>([]),
-    options.includeCurrentRules ? readRows<OpenBillRuleRow>('current Open Bill rules', (from, to) =>
-      supabase.from('comm_open_bill_rules').select('bill_rank, pct')
-        .eq('scheme_id', scheme.id).lte('effective_from', currentDate)
-        .or(`effective_to.is.null,effective_to.gte.${currentDate}`).order('id').range(from, to)) : Promise.resolve<OpenBillRuleRow[]>([]),
     supabase.from('comm_cutovers').select('first_paid_month')
       .eq('sub_department_id', scheme.sub_department_id).maybeSingle()
       .then(({ data, error }: { data: unknown; error: { message: string } | null }) => {
         if (error) throw new Error(`Could not read when the portal starts paying: ${error.message}`)
         return (data as { first_paid_month: string } | null)?.first_paid_month ?? null
-      }),
-    // Open Bill may be set for this month alone, over Rules (2026-09-26:
-    // on for August, which the claim form paid; September follows Rules).
-    supabase.from('comm_open_bill_months').select('enabled')
-      .eq('sub_department_id', scheme.sub_department_id).eq('period_month', period).maybeSingle()
-      .then(({ data, error }: { data: unknown; error: { message: string } | null }) => {
-        if (error) throw new Error(`Could not read this month's Open Bill setting: ${error.message}`)
-        return (data as { enabled: boolean } | null)?.enabled ?? null
       }),
     // SKUs judged at their own cost ratio (Product List › Costing Setting).
     readRows<CostRatioRow>('the cost ratios', (from, to) =>
@@ -301,14 +283,11 @@ export async function loadCommissionInput(
   }))]
   // A KPI item that is a fabric series (2026-10-29) finds a line's fabric on the ERP's fabric list.
   const needsFabrics = namesFabricSeries([...kpiItems, ...currentKpiItems])
-  const [lines, openBillTags, shares, priorRuns, upsaleBillShares, fabrics] = await Promise.all([
+  const [lines, shares, priorRuns, upsaleBillShares, fabrics] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
         .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
         .in('order_id', chunk).order('id').range(from, to)),
-    readByKeys<OpenBillTagRow>('Open Bill picks', orderIds, (chunk, from, to) =>
-      supabase.from('sales_order_open_bill_tags').select('order_id, bill_rank')
-        .in('order_id', chunk).order('order_id').range(from, to)),
     readByKeys<OrderShareRow>('sales order shares', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_shares').select('order_id, staff_id, share_pct')
         .in('order_id', chunk).order('order_id').order('staff_id').range(from, to)),
@@ -372,10 +351,9 @@ export async function loadCommissionInput(
     ? monthCommissionableValue(options.monthOrders ?? await loadMonthOrders(supabase, scheme.sub_department_id, period))
     : undefined
 
-  const schemeForMonth = openBillThisMonth === null ? scheme : { ...scheme, enable_open_bill: openBillThisMonth }
   const sourceRows = {
-    periodMonth: period, scheme: schemeForMonth, ranks, itemGroups, kpiItems, kpiThresholds,
-    openBillRules, openBillTags, marginBands, hierarchy, orders: orderRows,
+    periodMonth: period, scheme, ranks, itemGroups, kpiItems, kpiThresholds,
+    marginBands, hierarchy, orders: orderRows,
     releasedOrderNos, priorMonths, shares, upsales, upsaleShares, costRatios, fabrics,
     departmentHeadIds: heads.map(head => head.id),
     directors,
@@ -383,7 +361,7 @@ export async function loadCommissionInput(
   }
   const currentInput = toEngineInput({
     ...sourceRows, hierarchy: currentHierarchyRows, kpiItems: currentKpiItems,
-    kpiThresholds: currentKpiThresholds, openBillRules: currentOpenBillRules,
+    kpiThresholds: currentKpiThresholds,
     orders: [], shares: [], upsales: [], upsaleShares: [],
   })
   return {
@@ -391,7 +369,7 @@ export async function loadCommissionInput(
     currentHierarchy: currentInput.hierarchy,
     currentRules: {
       hierarchy: currentInput.hierarchy, kpiItems: currentInput.kpiItems,
-      kpiThresholds: currentInput.kpiThresholds, openBillRules: currentInput.openBillRules,
+      kpiThresholds: currentInput.kpiThresholds,
     },
     batchId,
     schemeId: scheme.id,

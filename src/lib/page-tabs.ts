@@ -68,7 +68,6 @@ export const PAGE_TABS = {
   '/revenue/[sub]': COMM_CAL,
   '/revenue/[sub]/[period]': COMM_CAL,
   '/revenue/[sub]/[period]/import': COMM_CAL,
-  '/revenue/[sub]/[period]/open-bill': COMM_CAL,
   '/revenue/[sub]/[period]/orders': COMM_CAL,
   '/revenue/[sub]/[period]/orders/[orderId]': COMM_CAL,
   '/revenue/[sub]/[period]/pay': COMM_CAL,

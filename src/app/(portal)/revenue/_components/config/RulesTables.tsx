@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { compareRankPay, rankLetters, rankPayLabelOf, rankPayOf } from '@/lib/commission/ranks'
 import {
   deleteMarginBand,
-  updateOpenBillRule,
   upsertBrand,
   upsertDirectorPay,
   upsertItemGroup,
@@ -28,7 +27,7 @@ import type { CommissionSettingsData, SchemeRow } from './types'
 /**
  * The Rules tables that stayed as they were (2026-10-10, the HR revamp — the
  * prototype draws them "same content as today"): the Title ladder, the
- * Directors' pay, Item groups, Open Bill rates, Brands & margin bands. Each
+ * Directors' pay, Item groups, Brands & margin bands. Each
  * sits under its section's title and one line (`RulesView`), so none carries
  * a head of its own any more. Scheme rules, Ranks and Capacity were redrawn
  * (`../rules/`).
@@ -376,42 +375,6 @@ export function ItemGroups({ data, scheme }: { data: CommissionSettingsData; sch
                 </tr>
               )}
             </RowForm>
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
-}
-
-// ─── Open Bill ──────────────────────────────────────────────────────────────
-
-export function OpenBillRates({ data }: { data: CommissionSettingsData }) {
-  return (
-    <section>
-      <div className="max-w-lg overflow-x-auto">
-        <table className="ledger-table">
-          <thead>
-            <tr>
-              <th>Bill of the day</th>
-              <th className="right">Bonus %</th>
-              <th className="w-24"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.openBillRules.map(o => (
-              <RowForm key={o.id} action={updateOpenBillRule}>
-                {({ pending }) => (
-                  <tr>
-                    <td>
-                      <Hidden name="id" value={o.id} />
-                      {o.bill_rank === 1 ? '1st bill' : o.bill_rank === 2 ? '2nd bill' : '3rd bill'}
-                    </td>
-                    <td className="num"><Field name="pct" type="number" step="0.01" width="w-24" defaultValue={toPct(o.pct)} /></td>
-                    <td><SaveButton pending={pending} /></td>
-                  </tr>
-                )}
-              </RowForm>
-            ))}
           </tbody>
         </table>
       </div>

@@ -181,7 +181,6 @@ export async function loadCommissionSettings(
     kpiSpecials: [],
     kpiFabricSeries: [],
     kpiGoneSkus: [],
-    openBillRules: [],
     brands: [],
     marginBands: [],
     promotionRules: [],
@@ -202,7 +201,6 @@ export async function loadCommissionSettings(
     kpiThresholds,
     kpiSpecials,
     kpiFabrics,
-    openBillRules,
     brands,
     marginBands,
     promotionRules,
@@ -224,7 +222,6 @@ export async function loadCommissionSettings(
     // the ERP's fabric list, about 900 fabrics in some 130 series. A list that
     // cannot be read offers none, as the specials above, never a page that fails.
     readFabricSeries(supabase).catch((): FabricSeriesRow[] => []),
-    supabase.from('comm_open_bill_rules').select('*').eq('scheme_id', schemeId).is('effective_to', null).order('bill_rank'),
     supabase.from('comm_brands').select('*').eq('scheme_id', schemeId).order('code'),
     supabase.from('comm_margin_bands').select('*').eq('scheme_id', schemeId).order('sort_order'),
     supabase.from('comm_promotion_rules').select('*').eq('scheme_id', schemeId).order('from_rank_key').order('alternative_group'),
@@ -289,7 +286,6 @@ export async function loadCommissionSettings(
     kpiGoneSkus: rows<{ erp_id: string; removed_at: string | null }>(kpiSkus.data)
       .filter(p => p.removed_at !== null && p.removed_at !== undefined)
       .map(p => p.erp_id),
-    openBillRules: rows(openBillRules.data),
     brands: rows(brands.data),
     marginBands: rows(marginBands.data),
     promotionRules: rows(promotionRules.data),

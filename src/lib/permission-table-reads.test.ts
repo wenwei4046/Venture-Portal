@@ -45,6 +45,10 @@ describe('TABLE_READS', () => {
           rows.set(r[1], [...r[2].matchAll(/'([^']+)'/g)].map(a => a[1]))
         }
       }
+      // A table that went takes its row with it (2026-10-31, Open Bill's three).
+      for (const m of sqlOf(f).matchAll(/DELETE FROM public\.permission_table_reads\s+WHERE table_name IN \(([^)]*)\);/g)) {
+        for (const t of m[1].matchAll(/'([^']+)'/g)) rows.delete(t[1])
+      }
     }
     const twin = new Map(tableReadRows().map(r => [r.table, r.actions as string[]]))
     expect(rows.size).toBeGreaterThan(120)

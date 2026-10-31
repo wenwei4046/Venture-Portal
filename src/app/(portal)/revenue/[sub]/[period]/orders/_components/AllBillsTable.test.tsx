@@ -15,7 +15,6 @@ vi.mock('../../../../run-actions', () => ({
   setOrderBrand: mocks.setOrderBrand,
   shareOrder: mocks.shareOrder,
   unshareOrder: vi.fn(),
-  setOpenBillRank: vi.fn(),
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh, push: mocks.push }) }))
 
@@ -33,8 +32,7 @@ function bill(extra: Partial<BillRow> = {}): BillRow {
     staff: { id: 's-1', name: 'ANTHONY', code: 'HV008', href: '/revenue/fair/2026-09-01/orders?staff=s-1' },
     agent: null, shares: [], shareDisabled: false, shareDisabledReason: '',
     title: 'Revenue Specialist', rank: 'B', rate: 0.05,
-    openBill: { rank: null, suggested: false, disabled: true, disabledReason: '' },
-    commission: { product: 225, kpi: 0, marginIncentive: 0, openBill: 0, total: 225 },
+    commission: { product: 225, kpi: 0, marginIncentive: 0, total: 225 },
     ...extra,
   }
 }
@@ -46,15 +44,15 @@ const BRANDS = [
 
 function table(rows: BillRow[] = [bill()], hasRun = true) {
   return render(
-    <AllBillsTable rows={rows} team={[]} openBillPaid={false} commissionNote={null}
+    <AllBillsTable rows={rows} team={[]} commissionNote={null}
       initialShowExcluded={false} monthLabel="September 2026" hasRun={hasRun} brandOptions={BRANDS} />,
   )
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.excludeOrder.mockResolvedValue({ orderNo: 'HC-SO-013493', changed: true, openBillRank: null })
-  mocks.includeOrder.mockResolvedValue({ orderNo: 'HC-SO-013493', changed: true, counts: true, stillOut: null, openBillRank: null })
+  mocks.excludeOrder.mockResolvedValue({ orderNo: 'HC-SO-013493', changed: true })
+  mocks.includeOrder.mockResolvedValue({ orderNo: 'HC-SO-013493', changed: true, counts: true, stillOut: null })
 })
 
 describe('AllBillsTable — the bill menu', () => {
@@ -206,7 +204,7 @@ describe('AllBillsTable — Share this bill…', () => {
       parts: [{ staffId: 's-1', name: 'ANTHONY', pct: 0.6 }, { staffId: 's-2', name: 'ADRIAN', pct: 0.4 }],
     } })
     render(
-      <AllBillsTable rows={[shared()]} team={TEAM} openBillPaid={false} commissionNote={null}
+      <AllBillsTable rows={[shared()]} team={TEAM} commissionNote={null}
         initialShowExcluded={false} monthLabel="September 2026" hasRun brandOptions={BRANDS} />,
     )
     fireEvent.contextMenu(screen.getByText('Sarida'), { clientX: 400, clientY: 260 })
@@ -225,7 +223,7 @@ describe('AllBillsTable — Share this bill…', () => {
 
   it('locks the share in a month whose run has paid, and says why', () => {
     render(
-      <AllBillsTable rows={[bill({ shareDisabled: true, shareDisabledReason: 'x' })]} team={TEAM} openBillPaid={false}
+      <AllBillsTable rows={[bill({ shareDisabled: true, shareDisabledReason: 'x' })]} team={TEAM}
         commissionNote={null} initialShowExcluded={false} monthLabel="September 2026" hasRun brandOptions={BRANDS} />,
     )
     fireEvent.contextMenu(screen.getByText('Sarida'), { clientX: 400, clientY: 260 })

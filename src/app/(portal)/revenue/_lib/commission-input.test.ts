@@ -59,9 +59,9 @@ function fixture(): Record<string, Row[]> {
   return {
     comm_schemes: [{
       id: 'scheme-1', sub_department_id: 'sub-1', is_active: true, effective_to: null,
-      open_bill_basis: 'uplift_on_commission', override_includes_kpi: false,
+      override_includes_kpi: false,
       deposit_threshold_pct: 0.3, default_rate_mode: 'fixed',
-      enable_product_revenue: true, enable_kpi: true, enable_open_bill: true,
+      enable_product_revenue: true, enable_kpi: true,
       enable_override: true, enable_margin_penalty: true, enable_margin_incentive: true,
     }],
     sales_import_batches: [{ id: 'batch-current', sub_department_id: 'sub-1', period_month: '2026-09-01', status: 'committed' }],
@@ -96,9 +96,11 @@ describe('authoritative commission input', () => {
     const saved = await loadCommissionInput('2026-09-01', 'sub-1', db.client)
     expect(saved.input.orders.map(row => [row.id, row.alreadyReleased])).toEqual([['current', true]])
     expect(saved.currentHierarchy).toEqual([])
-    for (const table of ['comm_hierarchy', 'comm_kpi_items', 'comm_kpi_thresholds', 'comm_open_bill_rules']) {
+    for (const table of ['comm_hierarchy', 'comm_kpi_items', 'comm_kpi_thresholds']) {
       expect(db.requests.filter(request => request.table === table)).toHaveLength(1)
     }
+    // Open Bill went (2026-10-31): none of its tables is read, its picks included.
+    expect(db.requests.filter(request => /open_bill/.test(request.table))).toEqual([])
 
     const preview = await loadCommissionInput('2026-09-01', 'sub-1', db.client, { replayRunId: 'run-current' })
     expect(preview.input.orders.map(row => [row.id, row.alreadyReleased])).toEqual([['current', false], ['carry', false]])
@@ -165,22 +167,6 @@ describe('authoritative commission input', () => {
     data.comm_salesperson_closes = []
     data.comm_runs = [...fixture().comm_runs, { id: 'run-aug', sub_department_id: 'sub-1', period_month: '2026-08-01', status: 'applied' }]
     expect(await ids()).toEqual(['current', 'a-aug', 'b-aug'])
-  })
-
-  it('pays Open Bill in a month set on for itself, whatever Rules say (open for August, not September)', async () => {
-    const data = fixture()
-    data.comm_schemes[0].enable_open_bill = false
-    data.comm_open_bill_months = [{ sub_department_id: 'sub-1', period_month: '2026-09-01', enabled: true }]
-    expect((await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)).input.scheme.enableOpenBill).toBe(true)
-
-    // Another month's setting is not this one's; without its own, Rules decide.
-    data.comm_open_bill_months = [{ sub_department_id: 'sub-1', period_month: '2026-08-01', enabled: true }]
-    expect((await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)).input.scheme.enableOpenBill).toBe(false)
-
-    // And a month can be switched off under Rules that are on.
-    data.comm_schemes[0].enable_open_bill = true
-    data.comm_open_bill_months = [{ sub_department_id: 'sub-1', period_month: '2026-09-01', enabled: false }]
-    expect((await loadCommissionInput('2026-09-01', 'sub-1', database(data).client)).input.scheme.enableOpenBill).toBe(false)
   })
 
   it('pays the upsales and drops somebody answered, never one still waiting', async () => {
@@ -254,19 +240,16 @@ describe('authoritative commission input', () => {
         { id: 'kpi-expired', scheme_id: 'scheme-1', product_code: 'EXPIRED', kpi_amount: 30, effective_from: '2026-10-01', effective_to: '2026-10-15' },
       ]
       data.comm_kpi_thresholds = [{ id: 'threshold-1', scheme_id: 'scheme-1', min_qty: 10, bonus_pct: '0.2', effective_from: '2026-10-01', effective_to: null }]
-      data.comm_open_bill_rules = [{ id: 'open-1', scheme_id: 'scheme-1', bill_rank: 1, pct: '0.5', effective_from: '2026-10-01', effective_to: null }]
       const loaded = await loadCommissionInput('2026-09-01', 'sub-1', database(data).client, { includeCurrentRules: true })
       expect(loaded.input.hierarchy).toEqual([])
       expect(loaded.input.kpiItems).toEqual([])
       expect(loaded.input.kpiThresholds).toEqual([])
-      expect(loaded.input.openBillRules).toEqual([])
       expect(loaded.input.scheme.enableKpi).toBe(false)
       expect(loaded.currentHierarchy).toMatchObject([{ staffId: 'person-a', baseRankKey: 'r5', titleId: 'title-1' }])
       expect(loaded.currentRules).toEqual({
         hierarchy: loaded.currentHierarchy,
         kpiItems: [{ source: 'sku', productCode: 'PILLOW', label: null, kpiAmount: 20 }],
         kpiThresholds: [{ minQty: 10, bonusPct: 0.2 }],
-        openBillRules: [{ rank: 1, pct: 0.5 }],
       })
     } finally {
       vi.useRealTimers()

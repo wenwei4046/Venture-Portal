@@ -33,7 +33,6 @@ export interface PayBoardRow extends PayRow {
     deferredRevenue: number
     productCommission: number
     kpiCommission: number
-    openBillBonus: number
     overrideCommission: number
     marginIncentive: number
     groupIncentive: number
@@ -95,7 +94,6 @@ interface StatementRow {
   deferred_revenue: number | string
   product_commission: number | string
   kpi_commission: number | string
-  open_bill_bonus: number | string
   override_commission: number | string
   margin_incentive: number | string
   group_incentive: number | string
@@ -160,7 +158,7 @@ export async function loadPayBoard(
     run ? fetchAllRows<StatementRow>((from, to) => supabase
       .from('comm_statements')
       .select(
-        'staff_id, rank_key, product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, open_bill_bonus, override_commission, margin_incentive, group_incentive, margin_penalty_withheld, margin_pct',
+        'staff_id, rank_key, product_rate, product_revenue, group_revenue, deferred_revenue, product_commission, kpi_commission, override_commission, margin_incentive, group_incentive, margin_penalty_withheld, margin_pct',
       )
       .eq('run_id', run.id).order('id').range(from, to)) : Promise.resolve([]),
   ])
@@ -183,7 +181,6 @@ export async function loadPayBoard(
         deferredRevenue: Number(s.deferred_revenue),
         productCommission: Number(s.product_commission),
         kpiCommission: Number(s.kpi_commission),
-        openBillBonus: Number(s.open_bill_bonus),
         overrideCommission: Number(s.override_commission),
         marginIncentive: Number(s.margin_incentive),
         groupIncentive: Number(s.group_incentive),

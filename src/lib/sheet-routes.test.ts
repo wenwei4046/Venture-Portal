@@ -18,7 +18,6 @@ describe('isSheetRoute', () => {
       '/revenue/fair/2026-09-01/orders',
       '/revenue/fair/hierarchy',
       '/revenue/fair/rules',
-      '/revenue/fair/2026-09-01/open-bill',
       '/claims',
     ]) {
       expect(isSheetRoute(path), path).toBe(true)

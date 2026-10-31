@@ -26,7 +26,6 @@ import {
 } from '../../../_lib/month-orders'
 import { loadCommissionWorkbench } from '../../../_lib/commission-workbench'
 import { loadOrderFairs, type OrderFair } from '../../../_lib/order-fairs'
-import { openBillOnFor } from '../../../_lib/open-bill-month'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import workbenchStyles from '../_components/commission-workbench.module.css'
 import CostGapPanel from './_components/CostGapPanel'
@@ -53,20 +52,15 @@ function label(period: string): string {
  * which is right, and useless when the question is whether the figures started
  * from the right bills. This reads the ORDERS, so the answer is checkable
  * against the ERP document by document: the customer, the venue, the brand,
- * what was paid, whether the deposit gate holds it, which Open Bill of its day
- * it is, and what its lines cost.
+ * what was paid, whether the deposit gate holds it, and what its lines cost.
  *
  * Filters are links, not state: a person's bills are a URL somebody can send
  * to the person whose bills they are. So is an exhibition's (2026-10-03): the
  * month's *Sales exhibition* rows open here on `?fair=` and `?brand=` — a
  * brand at a fair — with `?fair=none&venue=` for a place no fair claims.
  *
- * IT IS ALSO WHERE THE OPEN BILL PICK IS MADE (2026-09-16). The pick used to
- * live on its own board, which showed the order number and the value and
- * nothing else — but which of a day's bills came first is argued from the
- * margin, the venue and the customer, and those were one page away. So the
- * decision moved to the row that carries its evidence. The board stays as the
- * narrow queue: only the days still resting on a suggestion.
+ * It was also where the Open Bill pick was made (2026-09-16), until Open Bill
+ * went (2026-10-31).
  */
 export default async function MonthOrdersPage({ params, searchParams }: PageProps) {
   await requirePage('/revenue/[sub]/[period]/orders')
@@ -84,16 +78,10 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     loadUncostedProducts(supabase, subDept.id, period),
   ])
 
-  // The Open Bill pick belongs on the row, but only where the scheme pays one
-  // and only while the run it would change is still open.
-  // Whether THIS month pays Open Bill: its own setting, else Rules (2026-09-26).
-  const [openBillPaid, { data: locked, error: lockError }] = await Promise.all([
-    subDept.schemeId ? openBillOnFor(supabase, subDept.id, period) : Promise.resolve(false),
-    supabase.rpc('commission_order_period_locked', {
-      p_sub_department_id: subDept.id,
-      p_period: period,
-    }),
-  ])
+  const { data: locked, error: lockError } = await supabase.rpc('commission_order_period_locked', {
+    p_sub_department_id: subDept.id,
+    p_period: period,
+  })
   if (lockError) throw new Error(`Could not check the commission run: ${lockError.message}`)
   const runLocked = Boolean(locked)
 
@@ -207,8 +195,6 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   // A gift on a bill of its own has no margin, and waits for no cost (2026-10-30).
   const blind = live.filter(o => o.marginPct === null && !readsNoSales(o))
   const blindValue = blind.reduce((a, o) => a + o.orderTotal, 0)
-  const tagged = live.filter(o => o.openBillRank !== null)
-  const stillSuggested = tagged.filter(o => o.openBillAuto).length
 
   const base = revenuePath(subDept.slug, period, 'orders')
   const keep = (extra: Record<string, string | undefined>) => {
@@ -279,21 +265,11 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       title: who?.titleLabel ?? null,
       rank: who?.rankLabel ?? null,
       rate: who ? who.productRate : null,
-      openBill: {
-        rank: o.openBillRank === 1 || o.openBillRank === 2 || o.openBillRank === 3 ? o.openBillRank : null,
-        suggested: o.openBillAuto === true,
-        disabled: runLocked || o.cancelled || !o.staffId,
-        disabledReason: runLocked
-          ? 'The run for this month has paid — reopen it before changing the picks'
-          : o.cancelled
-            ? `${reason} — no Open Bill bonus`
-            : 'This bill has no matched salesperson yet',
-      },
       commission: paid
-        ? { product: paid.product, kpi: paid.kpi, marginIncentive: paid.marginIncentive, openBill: paid.openBill, total: paid.total }
+        ? { product: paid.product, kpi: paid.kpi, marginIncentive: paid.marginIncentive, total: paid.total }
         : o.cancelled || commissionNote
           ? null
-          : { product: 0, kpi: 0, marginIncentive: 0, openBill: 0, total: 0 },
+          : { product: 0, kpi: 0, marginIncentive: 0, total: 0 },
       // Keyed in this month for another month's fair (2026-10-12): this month
       // pays it, and says so as the salesperson's ledger does.
       origin: o.cancelled ? null : rowOrigin(
@@ -371,22 +347,6 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
           <span className="rule" aria-hidden />
           <span className="count">{rows.length} BILLS</span>
         </div>
-        {/* The picks' count, not a sentence on how the list is ordered (2026-10-12). */}
-        {openBillPaid ? (
-          <p className="text-sm mb-4 max-w-3xl">
-            {tagged.length} of {live.length} carry a pick
-            {stillSuggested > 0 ? (
-              <>
-                ,{' '}
-                <span className="chip alert">
-                  <span className="dot" />
-                  {stillSuggested} still the importer&apos;s guess
-                </span>
-              </>
-            ) : null}
-          </p>
-        ) : null}
-
         {base0.length === 0 ? (
           <div className="border border-hairline rounded-card bg-surface-2 p-6 text-center">
             <p className="text-sm">No bills match.</p>
@@ -395,7 +355,6 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
           <AllBillsTable
             rows={billRows}
             team={team}
-            openBillPaid={openBillPaid}
             commissionNote={commissionNote}
             initialShowExcluded={includeExcluded}
             monthLabel={monthLabel}

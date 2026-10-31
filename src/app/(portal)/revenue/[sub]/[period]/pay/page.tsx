@@ -142,7 +142,6 @@ export default async function MonthPayPage({ params }: PageProps) {
                     <th className="right m-hide">Own sales</th>
                     <th className="right m-hide">Product</th>
                     <th className="right m-hide">KPI</th>
-                    <th className="right m-hide">Open Bill</th>
                     <th className="right m-hide">Override</th>
                     <th className="right m-hide">Incentive</th>
                     <th className="right">Gross commission</th>
@@ -204,9 +203,6 @@ export default async function MonthPayPage({ params }: PageProps) {
                       </td>
                       <td className="num m-hide" data-label="KPI">
                         {r.components ? formatMoney(r.components.kpiCommission) : '—'}
-                      </td>
-                      <td className="num m-hide" data-label="Open Bill">
-                        {r.components ? formatMoney(r.components.openBillBonus) : '—'}
                       </td>
                       <td className="num m-hide" data-label="Override">
                         {r.components ? formatMoney(r.components.overrideCommission) : '—'}

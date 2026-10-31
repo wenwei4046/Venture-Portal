@@ -45,8 +45,8 @@ function menu(action: BillCountAction, extra: Partial<Parameters<typeof BillCont
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.excludeOrder.mockResolvedValue({ orderNo: 'HC-SO-013493', changed: true, openBillRank: null })
-  mocks.includeOrder.mockResolvedValue({ orderNo: 'HC-SO-013493', changed: true, counts: true, stillOut: null, openBillRank: null })
+  mocks.excludeOrder.mockResolvedValue({ orderNo: 'HC-SO-013493', changed: true })
+  mocks.includeOrder.mockResolvedValue({ orderNo: 'HC-SO-013493', changed: true, counts: true, stillOut: null })
 })
 
 describe('BillContextMenu', () => {
@@ -361,7 +361,7 @@ describe('BillContextMenu — Move to another salesperson…', () => {
   const moved = (over = {}) => ({
     orderId: 'order-1', orderNo: 'HC-SO-013493', changed: true,
     to: { staffId: 'anthony', name: 'ANTHONY' }, from: OWNER, movedBack: false,
-    openBillRank: null, openBillBack: null, shareTaken: null, shareBack: null, shareNotBack: null, ...over,
+    shareTaken: null, shareBack: null, shareNotBack: null, ...over,
   })
   function moveMenu(action: BillMoveAction = { kind: 'move', owner: OWNER, named: null },
     parts: { staffId: string; name: string; pct: number }[] | null = null) {

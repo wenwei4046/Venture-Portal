@@ -27,7 +27,6 @@ import {
 import { officeTime } from '@/lib/office-time'
 import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
 import { loadErpFeedMonth } from '../../_lib/erp-feed-month'
-import { loadOpenBillMonthSetting, resolveOpenBill } from '../../_lib/open-bill-month'
 import { loadDoubleClaimEvidence, loadDoubleClaims } from '../../_lib/double-claims'
 import { carriedFromUnpaidMonths, claimsInMonth } from '@/lib/commission/double-claims'
 import { explainDoubleClaim } from '@/lib/commission/double-claim-reasons'
@@ -74,7 +73,6 @@ interface BatchRow {
 }
 
 interface SchemeRow {
-  enable_open_bill: boolean
   enable_kpi: boolean
   enable_margin_penalty: boolean
   enable_margin_incentive: boolean
@@ -99,13 +97,14 @@ interface StatementRow {
  * and the payroll bar under the month's cards says which (2026-09-27). It
  * replaced *Payroll & source tools*, a folded section at the foot of the page
  * that held the saved run, its warnings, the button that sent it (Recompute &
- * sync payroll), the Open Bill cost and the upsales HR typed by hand: the
+ * sync payroll), the Open Bill cost and the upsales HR typed by hand (Open
+ * Bill itself went on 2026-10-31): the
  * live figure read as money already in payroll — September had never been
  * sent — and every drop and upsell now comes from the ERP (user 2026-09-27).
  *
  * ONE RAIL AT THE TOP (2026-09-26): the workbench's tabs — Total Sales
- * Orders, KPI Items, Open Bill, Below deposit and Sales exhibition (Sales by
- * venue until 2026-10-03) — are every cut of the month's bills, in one table
+ * Orders, KPI Items, Below deposit and Sales exhibition (Sales by venue until
+ * 2026-10-03; Open Bill until 2026-10-31) — are every cut of the month's bills, in one table
  * design. Since 2026-09-30 the rail also carries the month's two review
  * panels, which sat stacked above the cards: *Drops & upsells* (what the ERP
  * changed on settled bills) and *Double claims*, where every group says why it
@@ -166,7 +165,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     ? once(
         supabase
           .from('comm_schemes')
-          .select('enable_open_bill, enable_kpi, enable_margin_penalty, enable_margin_incentive')
+          .select('enable_kpi, enable_margin_penalty, enable_margin_incentive')
           .eq('id', subDept.schemeId)
           .maybeSingle(),
       ).then(({ data }) => data as SchemeRow | null)
@@ -191,13 +190,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       .eq('run_id', run.id)
     return (data ?? []) as unknown as StatementRow[]
   })
-
-  // Whether THIS month pays Open Bill: its own setting over Rules (2026-09-26 —
-  // on for August, which the claim form paid; September follows Rules).
-  const openBillMonthRead = Promise.all([
-    schemeRead,
-    subDept.schemeId ? loadOpenBillMonthSetting(supabase, subDept.id, period) : Promise.resolve(null),
-  ]).then(([scheme, month]) => resolveOpenBill(Boolean(scheme?.enable_open_bill), month))
 
   // Can the month's payroll still take commission? Asked of the same guard the
   // send uses, so the bar can say so before anybody clicks. Unanswerable (the
@@ -307,7 +299,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     [paidAdjustments, monthLock],
     workbench,
     [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments],
-    openBillMonth,
     payrollClosed,
     earlierLocks,
     closes,
@@ -351,7 +342,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         pendingAdjustmentsRead,
       ]),
     ),
-    openBillMonthRead,
     payrollClosedRead,
     earlierLocksRead,
     closesRead,
@@ -632,10 +622,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         switches={subDept.schemeId && scheme ? (
           <SchemeSwitches
             schemeId={subDept.schemeId}
-            subDepartmentId={subDept.id}
-            period={period}
-            monthLabel={label(period)}
-            openBill={openBillMonth}
             margin={scheme.enable_margin_penalty || scheme.enable_margin_incentive}
             kpi={scheme.enable_kpi}
           />

@@ -15,7 +15,6 @@ import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type Bill
 import BillCountNotice from './BillCountNotice'
 import BillShareNotice from './BillShareNotice'
 import BillMoveNotice from './BillMoveNotice'
-import OpenBillPicker from './OpenBillPicker'
 import ShareControl, { type ShareHolder, type TeamMember } from './ShareControl'
 import { useBillMenu } from './useBillMenu'
 import { Select } from '@/components/hrv/select'
@@ -76,13 +75,7 @@ export interface BillRow {
   title: string | null
   rank: string | null
   rate: number | null
-  openBill: {
-    rank: 1 | 2 | 3 | null
-    suggested: boolean
-    disabled: boolean
-    disabledReason: string
-  }
-  commission: { product: number; kpi: number; marginIncentive: number; openBill: number; total: number } | null
+  commission: { product: number; kpi: number; marginIncentive: number; total: number } | null
   /**
    * A bill keyed in another month than its fair's (2026-10-12): paid in this
    * month, said in Status and drawn in the other-month colour, as on a
@@ -95,7 +88,7 @@ export interface BillRow {
 
 type Column =
   | 'origin' | 'ref' | 'salesperson' | 'date' | 'customer' | 'venue' | 'event' | 'organizer' | 'location' | 'brand'
-  | 'category' | 'sales' | 'commissionable' | 'paid' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive' | 'open'
+  | 'category' | 'sales' | 'commissionable' | 'paid' | 'margin' | 'rank' | 'product' | 'kpi' | 'incentive'
 
 // Status (2026-10-12): why a bill sold in another month is paid in this one.
 // Ref No. (2026-10-03, user: follow erp sales order number, but with reference
@@ -107,7 +100,7 @@ const COLUMNS: [Column, string][] = [
   ['category', 'Category'], ['sales', 'Sales value'], ['commissionable', 'Commissionable value'],
   ['paid', 'Paid'], ['margin', 'Margin'],
   ['rank', 'Title / rank'], ['product', 'Product commission'], ['kpi', 'KPI amount'],
-  ['incentive', 'Margin incentive'], ['open', 'Open Bill'],
+  ['incentive', 'Margin incentive'],
 ]
 const NUMERIC: Column[] = ['sales', 'commissionable', 'paid', 'margin', 'product', 'kpi', 'incentive']
 const money = formatMoney
@@ -117,8 +110,6 @@ const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
 interface Props {
   rows: BillRow[]
   team: TeamMember[]
-  /** The scheme pays Open Bill: the column carries the picker rather than a label. */
-  openBillPaid: boolean
   /** Null when the live calculation could not be produced; the columns then say why. */
   commissionNote: string | null
   initialShowExcluded: boolean
@@ -134,8 +125,8 @@ interface Props {
  * Every bill of the month in the salesperson ledger's format (2026-09-25) —
  * the same toolbar, sticky order / total columns and Columns menu as a
  * person's Personal table on the month page, plus the one thing a person's
- * table never needs: WHOSE bill it is. The Open Bill pick and *Share…* stay
- * on the row, because the evidence for both is the rest of the row.
+ * table never needs: WHOSE bill it is. *Share…* stays on the row, because the
+ * evidence for it is the rest of the row.
  *
  * RIGHT-CLICK A BILL (2026-09-27) for its menu — open it, *Share this bill…*
  * (2026-09-30, the same write as *Share…* under the name), or *Don't count
@@ -143,7 +134,7 @@ interface Props {
  * (`BillContextMenu`). The ⋯ beside the order number opens the same menu,
  * because a right-click alone is invisible on a phone and to a keyboard.
  */
-export default function AllBillsTable({ rows, team, openBillPaid, commissionNote, initialShowExcluded, monthLabel, hasRun, brandOptions = [] }: Props) {
+export default function AllBillsTable({ rows, team, commissionNote, initialShowExcluded, monthLabel, hasRun, brandOptions = [] }: Props) {
   const [query, setQuery] = useState('')
   const [brand, setBrand] = useState('')
   const [sort, setSort] = useState('date_asc')
@@ -291,14 +282,6 @@ export default function AllBillsTable({ rows, team, openBillPaid, commissionNote
       case 'product': return money0(r.commission?.product)
       case 'kpi': return money0(r.commission?.kpi)
       case 'incentive': return money0(r.commission?.marginIncentive)
-      case 'open': return openBillPaid
-        ? <div className="flex items-center gap-2">
-            <OpenBillPicker orderId={r.orderId} staffName={r.staff?.name ?? null} eventDate={r.eventDate}
-              rank={r.openBill.rank} suggested={r.openBill.suggested}
-              disabled={r.openBill.disabled} disabledReason={r.openBill.disabledReason} />
-            {r.commission && r.commission.openBill > 0 && <span>{money(r.commission.openBill)}</span>}
-          </div>
-        : r.openBill.rank ? `Open Bill ${r.openBill.rank}` : '—'
     }
   }
 

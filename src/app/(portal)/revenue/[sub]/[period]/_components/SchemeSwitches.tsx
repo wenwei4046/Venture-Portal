@@ -2,25 +2,16 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { setMonthOpenBill, setSchemeSwitch, type SchemeSwitch } from '../../../config-actions'
-import type { OpenBillMonth } from '../../../_lib/open-bill-month'
+import { setSchemeSwitch, type SchemeSwitch } from '../../../config-actions'
 
 interface Props {
   schemeId: string
-  subDepartmentId: string
-  /** YYYY-MM-01 — the month Open Bill is set for. */
-  period: string
-  /** "August 2026". */
-  monthLabel: string
-  /** This month's Open Bill: its own setting over Rules. */
-  openBill: OpenBillMonth
   /** On when EITHER the penalty or the incentive is on — the switch sets both. */
   margin: boolean
   kpi: boolean
 }
 
 const ITEMS: { key: SchemeSwitch; label: string; hint: string }[] = [
-  { key: 'open_bill', label: 'Open Bill', hint: 'the 1st / 2nd / 3rd bill bonus of an event day' },
   { key: 'margin', label: 'Margin incentive & penalty', hint: 'the monthly margin incentive and the below-margin cut' },
   { key: 'kpi', label: 'KPI item', hint: 'the flat allowance per KPI unit' },
 ]
@@ -29,52 +20,45 @@ const ITEMS: { key: SchemeSwitch; label: string; hint: string }[] = [
  * What the month pays (2026-09-24; the payroll bar's foot row from
  * 2026-09-27, Review settings since 2026-09-28).
  *
- * Open Bill is THIS month's (2026-09-26 — user: "open for august, not
- * september"): switching it here sets the month alone, over Rules, and Follow
- * Rules hands it back. Margin and KPI are still Rules › Scheme rules, reached
- * from the month so trying a month with and without one is two clicks. Off =
- * that component pays nothing: the commission follows at once, payroll as
- * each salesperson is sent.
+ * Margin and KPI are Rules › Scheme rules, reached from the month so trying a
+ * month with and without one is two clicks. Off = that component pays
+ * nothing: the commission follows at once, payroll as each salesperson is
+ * sent. (Open Bill, set here for one month alone, went with Open Bill on
+ * 2026-10-31.)
  *
  * The page's ONE set of these (2026-09-28, user: 保留一个就好): Review settings
  * also held KPI / Open Bill / Margin checkboxes that previewed a switch without
- * saving it — the same three words twice, one of them doing nothing — so they
- * went and these moved in beside them.
+ * saving it — the same words twice, one of them doing nothing — so they went
+ * and these moved in beside them.
  */
-export default function SchemeSwitches({ schemeId, subDepartmentId, period, monthLabel, openBill, margin, kpi }: Props) {
+export default function SchemeSwitches({ schemeId, margin, kpi }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   // Local state, flipped the moment it is clicked: the server's answer arrives
   // with the refresh, and until then a second click must send the OTHER value,
   // not the stale one again. Keyed by the props so a refresh re-seeds it.
-  const [state, setState] = useState<Record<SchemeSwitch, boolean>>({ open_bill: openBill.on, margin, kpi })
-  const seedOf = `${openBill.on}${openBill.month}${margin}${kpi}`
+  const [state, setState] = useState<Record<SchemeSwitch, boolean>>({ margin, kpi })
+  const seedOf = `${margin}${kpi}`
   const [seed, setSeed] = useState(seedOf)
   if (seed !== seedOf) {
     setSeed(seedOf)
-    setState({ open_bill: openBill.on, margin, kpi })
+    setState({ margin, kpi })
   }
 
-  function save(key: SchemeSwitch, next: boolean, action: () => Promise<void>) {
+  function flip(key: SchemeSwitch) {
+    const next = !state[key]
     setError(null)
     setState(s => ({ ...s, [key]: next }))
     startTransition(async () => {
       try {
-        await action()
+        await setSchemeSwitch(schemeId, key, next)
         router.refresh()
       } catch (err) {
         setState(s => ({ ...s, [key]: !next }))
         setError(err instanceof Error ? err.message : 'That did not save')
       }
     })
-  }
-
-  function flip(key: SchemeSwitch) {
-    const next = !state[key]
-    save(key, next, () =>
-      key === 'open_bill' ? setMonthOpenBill(subDepartmentId, period, next) : setSchemeSwitch(schemeId, key, next),
-    )
   }
 
   return (
@@ -102,27 +86,12 @@ export default function SchemeSwitches({ schemeId, subDepartmentId, period, mont
               >
                 {on ? 'On' : 'Off'}
               </button>
-              {item.key === 'open_bill' && openBill.month !== null ? (
-                <>
-                  <span className="font-mono text-[10px] text-graphite">
-                    {monthLabel} only · Rules: {openBill.rules ? 'On' : 'Off'}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={isPending}
-                    onClick={() => save('open_bill', openBill.rules, () => setMonthOpenBill(subDepartmentId, period, null))}
-                    className="font-mono text-[10px] uppercase tracking-wide text-accent underline-offset-2 hover:underline disabled:opacity-40"
-                  >
-                    Follow Rules
-                  </button>
-                </>
-              ) : null}
             </li>
           )
         })}
       </ul>
       <p className="text-[11px] leading-relaxed mt-1.5 mb-0">
-        Saved as you switch. Open Bill is set for {monthLabel} alone; margin and KPI are Rules › Scheme rules for every month.
+        Saved as you switch, for every month: margin and KPI are Rules › Scheme rules.
         The commission follows a switch at once — payroll as each salesperson is sent.
       </p>
       {error ? <p className="text-danger text-xs mt-1 mb-0" role="alert">{error}</p> : null}

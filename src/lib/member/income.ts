@@ -42,8 +42,7 @@ export interface IncomeBill {
   personal: number;
   kpi: number;
   kpiQty: number;
-  openBill: number;
-  /** personal + KPI + Open Bill: what the bill pays the member this month. */
+  /** personal + KPI: what the bill pays the member this month. */
   pay: number;
   marginPct: number | null;
   /** The member's part of a shared bill (0.5); null when it is theirs alone. */
@@ -84,7 +83,6 @@ export interface IncomeMonth {
   personal: number;
   kpi: number;
   kpiQty: number;
-  openBill: number;
   incentive: number;
   override: number;
   group: number;
@@ -101,7 +99,7 @@ export interface IncomeMonth {
   bills: IncomeBill[];
   overrides: IncomeOverride[];
   payLines: IncomePayLine[];
-  switches: { kpi: boolean; openBill: boolean; incentive: boolean; override: boolean; group: boolean };
+  switches: { kpi: boolean; incentive: boolean; override: boolean; group: boolean };
   notice: string | null;
   /**
    * What the month pays, as HR's payroll pays it (2026-10-20): the fixed
@@ -146,8 +144,7 @@ function bill(row: CommissionOrderRow): IncomeBill {
     personal: row.productCommission,
     kpi,
     kpiQty: row.kpiQty,
-    openBill: row.openBillBonus,
-    pay: round2(row.productCommission + kpi + row.openBillBonus),
+    pay: round2(row.productCommission + kpi),
     marginPct: row.marginPct,
     sharePct: row.share && part ? part.pct : null,
     brand: row.brands[0] ?? null,
@@ -174,7 +171,6 @@ export function liveIncome(person: WorkbenchPerson | null, extra: Pick<IncomeMon
     personal: st?.productCommission ?? 0,
     kpi: st?.kpiCommission ?? 0,
     kpiQty: st?.kpiQty ?? 0,
-    openBill: st?.openBillBonus ?? 0,
     incentive: st?.marginIncentive ?? 0,
     override: person?.overrideTotal ?? 0,
     group: person?.monthlyGroupIncentive ?? 0,
@@ -212,13 +208,12 @@ export function closedIncome(close: {
 }, facts: ReadonlyMap<string, OverrideFacts>, extra: Pick<IncomeMonth, "period" | "basic" | "payLines" | "switches" | "payrollStatus" | "paidOn">): IncomeMonth {
   const st = close.statement;
   const lines = st?.lines ?? [];
-  const byOrder = new Map<string, { personal: number; kpi: number; kpiQty: number; openBill: number; basis: number }>();
+  const byOrder = new Map<string, { personal: number; kpi: number; kpiQty: number; basis: number }>();
   for (const l of lines) {
     if (!l.source_order_id || l.component === "override") continue;
-    const o = byOrder.get(l.source_order_id) ?? { personal: 0, kpi: 0, kpiQty: 0, openBill: 0, basis: 0 };
+    const o = byOrder.get(l.source_order_id) ?? { personal: 0, kpi: 0, kpiQty: 0, basis: 0 };
     if (l.component === "product_revenue") { o.personal = round2(o.personal + l.amount); o.basis = round2(o.basis + l.basis_amount); }
     else if (l.component === "kpi_item" || l.component === "kpi_threshold") { o.kpi = round2(o.kpi + l.amount); o.kpiQty += l.qty ?? 0; }
-    else if (l.component === "open_bill") o.openBill = round2(o.openBill + l.amount);
     byOrder.set(l.source_order_id, o);
   }
   const deferred = new Set(close.deferred.map(d => d.orderId));
@@ -227,7 +222,7 @@ export function closedIncome(close: {
     return {
       orderId: b.id, no: b.no, status: deferred.has(b.id) ? "deposit_pending" : b.status, upsale: false,
       commissionable: o?.basis ?? 0, orderTotal: 0, personal: o?.personal ?? 0, kpi: o?.kpi ?? 0, kpiQty: o?.kpiQty ?? 0,
-      openBill: o?.openBill ?? 0, pay: round2((o?.personal ?? 0) + (o?.kpi ?? 0) + (o?.openBill ?? 0)), marginPct: null, sharePct: null, brand: null,
+      pay: round2((o?.personal ?? 0) + (o?.kpi ?? 0)), marginPct: null, sharePct: null, brand: null,
     };
   });
   const overrides: IncomeOverride[] = lines.filter(l => l.component === "override").map(l => {
@@ -248,7 +243,6 @@ export function closedIncome(close: {
     personal: st?.product_commission ?? s.personal,
     kpi: st?.kpi_commission ?? 0,
     kpiQty: st?.kpi_qty ?? 0,
-    openBill: st?.open_bill_bonus ?? 0,
     incentive: st?.margin_incentive ?? 0,
     override: s.overriding,
     group: s.groupIncentive,
@@ -275,7 +269,7 @@ export function snapshotIncome(m: IncomeMonth, schemeId: string): SnapshotIncome
   return {
     schemeId, period: m.period,
     status: m.state === "closed" || m.payrollStatus === "paid" ? "locked" : m.state === "manual" ? "applied" : "computed",
-    personal: m.personal, override: m.override, kpi: m.kpi, openBill: m.openBill, incentive: m.incentive, group: m.group,
+    personal: m.personal, override: m.override, kpi: m.kpi, incentive: m.incentive, group: m.group,
     total: m.commission, sales: m.countedSales, groupSales: 0,
     deferred: sum(m.bills.filter(b => b.status === "deposit_pending").map(b => b.commissionable)),
     rank: m.rankLabel ?? "", rate: m.rate, kpis: [], brands: [],

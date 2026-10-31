@@ -20,7 +20,7 @@ const { closeSalespeople, reopenSalespeople, refresh, url } = vi.hoisted(() => {
   }
 })
 vi.mock('../../../close-actions', () => ({ closeSalespeople, reopenSalespeople }))
-vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: vi.fn(), excludeOrder: vi.fn(), includeOrder: vi.fn() }))
+vi.mock('../../../run-actions', () => ({ excludeOrder: vi.fn(), includeOrder: vi.fn() }))
 vi.mock('next/navigation', async () => {
   const { useMemo, useSyncExternalStore } = await import('react')
   return {
@@ -54,8 +54,8 @@ function fixture(orders = [sale('one', 1_000, 'agent'), sale('two', 2_000, 'agen
   const input: EngineInput = {
     periodMonth: '2026-09-01',
     scheme: {
-      openBillBasis: 'uplift_on_commission', overrideIncludesKpi: false,
-      enableProductRevenue: true, enableKpi: false, enableOpenBill: true, enableOverride: true,
+      overrideIncludesKpi: false,
+      enableProductRevenue: true, enableKpi: false, enableOverride: true,
       enableMarginPenalty: false, enableMarginIncentive: false,
       itemGroups: [{ group: 'SOFA', commissionable: true }],
       depositThresholdPct: 0.3, defaultRateMode: 'fixed',
@@ -67,13 +67,11 @@ function fixture(orders = [sale('one', 1_000, 'agent'), sale('two', 2_000, 'agen
       { staffId: 'leader', uplineStaffId: null, baseRankKey: 'leader', titleId: 'leader', rateMode: 'fixed' },
     ],
     orders,
-    kpiItems: [], kpiThresholds: [],
-    openBillRules: [{ rank: 1, pct: 0.5 }, { rank: 2, pct: 0.4 }, { rank: 3, pct: 0.3 }],
-    openBillTags: [], marginBands: [], priorMonths: [],
+    kpiItems: [], kpiThresholds: [], marginBands: [], priorMonths: [],
   }
   return {
     input, currentHierarchy: input.hierarchy,
-    currentRules: { hierarchy: input.hierarchy, kpiItems: input.kpiItems, kpiThresholds: input.kpiThresholds, openBillRules: input.openBillRules },
+    currentRules: { hierarchy: input.hierarchy, kpiItems: input.kpiItems, kpiThresholds: input.kpiThresholds },
     unmatchedOrderNos: [], payRows: [], payUnavailable: true,
     people: [
       { staffId: 'agent', name: 'ANTHONY', employeeCode: 'HV010' },
@@ -310,14 +308,6 @@ describe('closing one salesperson from their ledger', () => {
     expect(screen.queryByRole('button', { name: /Close ANTHONY/ })).toBeNull()
   })
 
-  it('locks the Open Bill picks of a closed person', () => {
-    renderBoard({ closes: [closed('agent', 'ANTHONY', 150, [['one', 'SO-one', 50], ['two', 'SO-two', 100]])] })
-    fireEvent.click(screen.getByRole('tab', { name: /^Open Bill/ }))
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Show all orders to add picks' }))
-    expect(screen.getByRole('checkbox', { name: 'Open Bill SO-one' })).toBeDisabled()
-    expect(screen.getByRole('checkbox', { name: 'Open Bill SO-three' })).toBeEnabled()
-  })
-
   it('says on a closed person’s bill menu that their bills stay as closed', () => {
     renderBoard({ closes: [closed('agent', 'ANTHONY', 150, [['one', 'SO-one', 50], ['two', 'SO-two', 100]])] })
     openLedger('ANTHONY')
@@ -330,10 +320,11 @@ describe('closing one salesperson from their ledger', () => {
 
   it('turns Close off while the page holds a draft', () => {
     renderBoard()
-    openLedger('ANTHONY')
-    // An Open Bill pick not yet saved is a draft: the close would lock a figure payroll never sees.
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Open Bill SO-one' }))
-    expect(screen.getByRole('button', { name: /Close ANTHONY/ })).toBeDisabled()
-    expect(screen.getByText(/A close locks the month as saved/)).toBeVisible()
+    // The current-team preview is a draft: the close would lock a figure payroll never sees.
+    // (An Open Bill pick not yet saved was the other, until Open Bill went on 2026-10-31.)
+    fireEvent.click(screen.getByText('Review settings', { exact: true }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use current team & dated rules for preview' }))
+    expect(within(bar()).getByRole('button', { name: 'Close all 3' })).toBeDisabled()
+    expect(bar()).toHaveTextContent('A close locks the month as saved — reset the preview first.')
   })
 })
