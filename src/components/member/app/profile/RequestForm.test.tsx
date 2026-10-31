@@ -377,7 +377,9 @@ describe("a transport claim's parts, as HR ticked the title (2026-10-31)", () =>
     expect(screen.queryByText("spots, worked out for you")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
     expect(screen.getByRole("alert")).toHaveTextContent(why);
+    // Another fair is another claim: the refusal goes with the one it was about.
     pick(/MID VALLEY/);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByText(why)).toBeInTheDocument();
     expect(screen.queryByText(/is local to Klang Valley/)).not.toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();

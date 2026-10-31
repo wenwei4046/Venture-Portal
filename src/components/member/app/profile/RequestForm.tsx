@@ -228,6 +228,9 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   /** Another brand week: a stay picked for the last one stays only if it falls in this one's days. */
   const pickWeek = (w: ClaimWeek) => {
     setWeek(w.key);
+    // A refusal was about the claim as it stood: another fair is another claim (2026-10-31 — the way out of a part their
+    // title is not ticked for is another fair or the other category).
+    setError(null);
     const next = stayWindow(w, w.key);
     const fits = (day: string) => !day || (day >= next.first && day <= next.last);
     if (!fits(checkIn) || !fits(checkOut)) { setCheckIn(""); setCheckOut(""); }
@@ -526,7 +529,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                 {/* An Airbnb stay is the transport claim's tick: a title ticked for the air ticket alone sees Outstation, a plane ticket only (2026-10-31). */}
                 {([["outstation", "Outstation", planeOnly ? "Plane ticket only" : "Fixed by spots for the route", CAT_OUT], ["airbnb", "Airbnb accommodation", perPax !== null ? `Up to ${rm0(perPax)} per pax per night` : "Rate not set yet", CAT_AIR]] as const)
                   .filter(([id]) => id === "outstation" || parts.road || cat === id).map(([id, label, note, d]) => (
-                  <button key={id} className={`${s.cat} ${cat === id ? s.catOn : ""}`} onClick={() => setCat(id)} aria-pressed={cat === id}>
+                  <button key={id} className={`${s.cat} ${cat === id ? s.catOn : ""}`} onClick={() => { setCat(id); setError(null); }} aria-pressed={cat === id}>
                     <span className={s.catIcon}><Svg d={d} size={17} sw={1.9} /></span>
                     <span className={s.catLabel}>{label}</span>
                     <span className={s.catSub}>{note}</span>

@@ -269,4 +269,28 @@ GRANT EXECUTE ON FUNCTION public.member_admin_save_transport_claim(jsonb) TO aut
 COMMENT ON FUNCTION public.member_admin_save_transport_claim(uuid[]) IS
   'Member services › Transport claim''s Who can claim, saved as one list (2026-10-20): the titles ticked for the transport claim; the air ticket''s ticks stay as they are. For a page opened before 2026-10-31 — the window sends member_admin_save_transport_claim(jsonb) since.';
 
+-- ── What runs now is what was tested ────────────────────────────────────────
+-- The PGlite check (tests/member-sql/validate-air-ticket-claim.mjs, over production's bodies) and a dry run on
+-- production that rolled back gave these same six bodies; anything else refuses the whole migration.
+DO $do$
+DECLARE
+  v_bad text;
+BEGIN
+  SELECT string_agg(x.sig || ' ' || coalesce(md5(replace(p.prosrc, E'\r', '')), 'missing'), '; ') INTO v_bad
+    FROM (VALUES
+      ('public.member_transport_claim_open(uuid, uuid, text)', '803609ae58d3744f10b3d87757bee215'),
+      ('public.member_transport_claim_open(uuid, uuid)', 'fb90fd16f6cbff698d9e654ac522c9bb'),
+      ('public.member_claim_detail_for(jsonb, uuid, uuid)', 'bc4ef9747001861a4c4125c154e73e29'),
+      ('public.member_claim_settings()', 'e85bb4d3cb59f459579d0c1c6af8638e'),
+      ('public.member_admin_transport_claim()', '4603245344b2a4ba7c68fce2f732b11d'),
+      ('public.member_admin_save_transport_claim(jsonb)', 'b1ee6563a0d46dc0fb3667202c10aafe')
+    ) AS x(sig, want)
+    LEFT JOIN pg_proc p ON p.oid = to_regprocedure(x.sig)
+   WHERE md5(replace(p.prosrc, E'\r', '')) IS DISTINCT FROM x.want;
+  IF v_bad IS NOT NULL THEN
+    RAISE EXCEPTION 'Not the bodies that were tested: %', v_bad;
+  END IF;
+END
+$do$;
+
 NOTIFY pgrst, 'reload schema';
