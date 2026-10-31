@@ -94,6 +94,10 @@ describe("the booking form the CRM puts in use (2026-10-29)", () => {
 describe("the booking link's address (2026-10-31)", () => {
   it("is the company's domain, whatever address the CRM is opened on", async () => {
     const { partnerLinkUrl } = await import("./model");
-    expect(partnerLinkUrl("pc-4JMEM6CZ")).toBe("https://erp.houzsventure.com/b/pc-4JMEM6CZ");
+    expect(partnerLinkUrl("pc-4JMEM6CZ")).toBe("https://erp.houzsventure.com/b/internal-booking-4JMEM6CZ");
+    const { partnerCodeOf } = await import("./model");
+    expect(partnerCodeOf("internal-booking-4JMEM6CZ")).toBe("pc-4JMEM6CZ");
+    expect(partnerCodeOf("pc-4JMEM6CZ")).toBe("pc-4JMEM6CZ");
+    expect(partnerCodeOf("internal-booking")).toBe("internal-booking");
   });
 });
