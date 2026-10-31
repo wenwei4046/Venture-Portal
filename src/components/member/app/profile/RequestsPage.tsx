@@ -20,7 +20,7 @@ const FILTERS: { id: RequestFilter; label: string }[] = [
 ];
 
 /** The transport claim's row for a title HR ticked for the air ticket alone (2026-10-31). */
-const PLANE_ONLY = "Plane tickets to a fair you fly to";
+const PLANE_ONLY = "Air tickets to a fair you fly to";
 
 /** The prototype's three; a food claim is offered only to whom HR opened it (Fair, a title HR picked — 2026-10-13). */
 const ALL_KINDS: readonly RequestKindVM[] = ["claim", "replacement", "waiting"];

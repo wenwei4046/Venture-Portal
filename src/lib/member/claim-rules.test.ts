@@ -395,10 +395,10 @@ describe("a transport claim's parts", () => {
     const flown = { planeTicket: true }, road = { planeTicket: false };
     const planeOnly = { road: false, plane: true }, roadOnly = { road: true, plane: false };
     expect(transportPartProblem(planeOnly, "outstation", flown, "Team Leader")).toBeNull();
-    expect(transportPartProblem(planeOnly, "outstation", road, "Team Leader")).toBe("Team Leader may claim a plane ticket only. HR picks the titles that may claim the rest.");
-    expect(transportPartProblem(planeOnly, "airbnb", flown, "Team Leader")).toBe("Team Leader may claim a plane ticket only. HR picks the titles that may claim the rest.");
+    expect(transportPartProblem(planeOnly, "outstation", road, "Team Leader")).toBe("Team Leader may claim an air ticket only. HR picks the titles that may claim the rest.");
+    expect(transportPartProblem(planeOnly, "airbnb", flown, "Team Leader")).toBe("Team Leader may claim an air ticket only. HR picks the titles that may claim the rest.");
     expect(transportPartProblem(planeOnly, "outstation", null, "Team Leader")).toBeNull();
-    expect(transportPartProblem(roadOnly, "outstation", flown, "Senior Revenue Specialist")).toBe("A plane ticket claim is not open to Senior Revenue Specialist. HR picks the titles that may claim it.");
+    expect(transportPartProblem(roadOnly, "outstation", flown, "Senior Revenue Specialist")).toBe("An air ticket claim is not open to Senior Revenue Specialist. HR picks the titles that may claim it.");
     expect(transportPartProblem(roadOnly, "outstation", road, "Senior Revenue Specialist")).toBeNull();
     expect(transportPartProblem(roadOnly, "airbnb", flown, "Senior Revenue Specialist")).toBeNull();
     expect(transportPartProblem({ road: false, plane: false }, "airbnb", null, null)).toBe("A transport claim is not open to your title. HR picks the titles that may claim it.");

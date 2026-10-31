@@ -161,7 +161,7 @@ export default function ClaimRatesPanel({ initial, transport: initialTransport =
           <div className={s.crTHead} role="row" style={{ gridTemplateColumns: REGION_COLS }}>
             <span role="columnheader">Region</span>
             <span role="columnheader" style={{ textAlign: 'right' }}>Spots from {draft.base.trim() || 'the base'}</span>
-            <span role="columnheader">Plane ticket</span>
+            <span role="columnheader">Air ticket</span>
             <span role="columnheader" style={{ textAlign: 'right' }}>Outstation pays</span>
             <span role="columnheader" />
           </div>

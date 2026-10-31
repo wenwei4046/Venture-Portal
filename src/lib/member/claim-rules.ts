@@ -261,19 +261,20 @@ export function transportOpenTo(rates: Pick<ClaimRates, "transport"> | null | un
 }
 
 /**
- * Why this member cannot send this transport claim, or null (2026-10-31): a plane ticket needs the air ticket's tick,
+ * Why this member cannot send this transport claim, or null (2026-10-31; "air ticket" in every word since 2026-11-01 —
+ * the user: "go with the same name Air ticket claim"): a plane ticket needs the air ticket's tick,
  * Outstation by road and an Airbnb stay the transport claim's — `member_transport_claim_open` refuses the same.
  * `region` is the fair's (null while HR has not set it: the claim's own checks say so).
  */
 export function transportPartProblem(parts: TransportParts, type: "outstation" | "airbnb", region: Pick<ClaimRegion, "planeTicket"> | null, title?: string | null): string | null {
   const who = title?.trim() || "your title";
   if (type === "outstation" && region?.planeTicket) {
-    return parts.plane ? null : `A plane ticket claim is not open to ${who}. HR picks the titles that may claim it.`;
+    return parts.plane ? null : `An air ticket claim is not open to ${who}. HR picks the titles that may claim it.`;
   }
   if (type === "outstation" && !region) return null;
   if (parts.road) return null;
   return parts.plane
-    ? `${title?.trim() || "Your title"} may claim a plane ticket only. HR picks the titles that may claim the rest.`
+    ? `${title?.trim() || "Your title"} may claim an air ticket only. HR picks the titles that may claim the rest.`
     : `A transport claim is not open to ${who}. HR picks the titles that may claim it.`;
 }
 

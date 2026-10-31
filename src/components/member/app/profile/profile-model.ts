@@ -107,7 +107,8 @@ export function requestTitle(r: MemberRequest, nameOf: (staffId: string) => stri
     const type = str(d.claimType);
     const where = str(d.location);
     if (type === "food") return `Food claim${foodMonth(d) ? ` · ${foodMonth(d)}` : ""}`;
-    if (type === "outstation" && d.planeTicket === true) return `Plane ticket claim${where ? ` · ${where}` : ""}`;
+    // An air ticket (*Plane ticket* until 2026-11-01 — the user: "go with the same name Air ticket claim").
+    if (type === "outstation" && d.planeTicket === true) return `Air ticket claim${where ? ` · ${where}` : ""}`;
     if (type === "outstation") return `Outstation claim${where ? ` · ${where}` : ""}`;
     if (type === "airbnb") return `Airbnb claim${where ? ` · ${where}` : ""}`;
     return r.title;
@@ -137,7 +138,7 @@ export function requestSummary(r: MemberRequest, nameOf: (staffId: string) => st
       const days = foodDays(d);
       return [days.length ? `${days.length} day${days.length === 1 ? "" : "s"}` : "", foodMonth(d), money].filter(Boolean).join(" · ");
     }
-    if (str(d.claimType) === "outstation" && d.planeTicket === true) return [str(d.regionName), "plane ticket", money].filter(Boolean).join(" · ");
+    if (str(d.claimType) === "outstation" && d.planeTicket === true) return [str(d.regionName), "air ticket", money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "outstation") return [str(d.regionName) || str(d.region), Number.isFinite(num(d.spots)) ? `${num(d.spots)} spots` : "", money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "airbnb") {
       const pax = num(d.pax), nights = num(d.nights);

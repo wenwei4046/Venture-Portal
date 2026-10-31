@@ -1291,7 +1291,7 @@ export async function submitMemberRequest(
         const price = field(form, "amount");
         if (price) {
           const amount = cents(price);
-          if (amount === null || amount < 1) throw new Error("Enter the plane ticket's price, as its invoice shows.");
+          if (amount === null || amount < 1) throw new Error("Enter the air ticket's price, as its invoice shows.");
           verified = await invoice(form);
           Object.assign(detail, {
             amount: amount / 100,
