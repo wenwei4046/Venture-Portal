@@ -9,7 +9,7 @@ import StayCalendar from "./StayCalendar";
 import Reveal from "./Reveal";
 import {
   airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
-  foodMonthOver, isOutstation, monthOfWeek, nightsBetween, stayProblem, stayWindow,
+  foodMonthOver, isOutstation, monthOfWeek, nightsBetween, stayProblem, stayWindow, transportPartProblem,
 } from "@/lib/member/claim-rules";
 import { applicationFormHtml, BUILTIN_FIELDS, FORM_KINDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingField } from "@/lib/commission/waiting-form";
 import { answersFor, blankRequired, capacityLine, fillIn, priorAnswers } from "@/lib/member/waiting-answers";
@@ -85,7 +85,11 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   /** This kind's Download form: the waiting list's, or the replacement's. */
   formLink?: FormLink;
 }) {
-  const [title, sub, cta, doneText] = TEXT[kind];
+  // What of a transport claim their title may send (2026-10-31): by road and an Airbnb stay, a plane ticket.
+  const parts = options.transport ?? { road: true, plane: true };
+  const planeOnly = parts.plane && !parts.road;
+  const [title, textSub, cta, doneText] = TEXT[kind];
+  const sub = kind === "claim" && planeOnly ? "A plane ticket to a fair you fly to" : textSub;
   const prior = revising?.detail ?? {};
   const str = (key: string) => (typeof prior[key] === "string" ? (prior[key] as string) : "");
   const idem = useRef<string>("");
@@ -93,9 +97,13 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
 
   // ── claim ──
   const [cat, setCat] = useState<"outstation" | "airbnb">(str("claimType") === "airbnb" ? "airbnb" : "outstation");
-  // The newest weekend with a brand week until the member picks another (the list may arrive after the form opens).
+  // The newest weekend with a brand week until the member picks another (the list may arrive after the form opens) —
+  // for a title that may claim a plane ticket alone, the newest at a fair flown to.
   const [weekPick, setWeek] = useState(() => str("week"));
-  const week = weekPick || options.weeks.find(w => w.claimable)?.key || "";
+  const claimableWeeks = options.weeks.filter(w => w.claimable);
+  const week = weekPick
+    || (planeOnly ? claimableWeeks.find(w => fairRegion(options.rates, w.fairId).region?.planeTicket)?.key : undefined)
+    || claimableWeeks[0]?.key || "";
   const [ticket, setTicket] = useState(() => (prior.planeTicket === true && typeof prior.amount === "number" ? String(prior.amount) : ""));
   const [stay, setStay] = useState(() => (typeof prior.invoiceAmount === "number" ? String(prior.invoiceAmount) : ""));
   const [male, setMale] = useState(() => Number(prior.male ?? options.initial?.male ?? 0));
@@ -195,6 +203,9 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   const fair = fairRegion(options.rates, weekRow?.fairId ?? null);
   const regionRow = fair.region;
   const venue = fair.venue ?? weekRow?.venue ?? "this fair";
+  // A part of the claim their title is not ticked for (2026-10-31): the plane ticket is the air ticket's tick, by
+  // road and an Airbnb stay the transport claim's — said in place of the part's fields, and refused on send.
+  const partProblem = transportPartProblem(parts, cat, regionRow, options.title);
   const ticketValue = money(ticket);
   const stayValue = money(stay);
   const nights = nightsBetween(checkIn, checkOut);
@@ -217,6 +228,9 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   /** Another brand week: a stay picked for the last one stays only if it falls in this one's days. */
   const pickWeek = (w: ClaimWeek) => {
     setWeek(w.key);
+    // A refusal was about the claim as it stood: another fair is another claim (2026-10-31 — the way out of a part their
+    // title is not ticked for is another fair or the other category).
+    setError(null);
     const next = stayWindow(w, w.key);
     const fits = (day: string) => !day || (day >= next.first && day <= next.last);
     if (!fits(checkIn) || !fits(checkOut)) { setCheckIn(""); setCheckOut(""); }
@@ -283,8 +297,10 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       form.set("claimType", cat);
       form.set("week", weekRow.key);
       form.set("notes", notes.trim());
+      if (cat === "airbnb" && partProblem) return setError(partProblem);
       if (cat === "outstation") {
         if (!regionRow) return setError(`HR has not set the region for ${venue} yet, so it cannot be claimed.`);
+        if (partProblem) return setError(partProblem);
         if (regionRow.planeTicket) {
           if (!(amount > 0)) return setError("Enter the plane ticket's price, as its invoice shows.");
           if (!file) return setError("Add the plane ticket's invoice.");
@@ -510,8 +526,10 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
           <>
             <div className={s.field}><span className={s.fieldLabel}>Claim category</span>
               <div className={s.cats}>
-                {([["outstation", "Outstation", "Fixed by spots for the route", CAT_OUT], ["airbnb", "Airbnb accommodation", perPax !== null ? `Up to ${rm0(perPax)} per pax per night` : "Rate not set yet", CAT_AIR]] as const).map(([id, label, note, d]) => (
-                  <button key={id} className={`${s.cat} ${cat === id ? s.catOn : ""}`} onClick={() => setCat(id)} aria-pressed={cat === id}>
+                {/* An Airbnb stay is the transport claim's tick: a title ticked for the air ticket alone sees Outstation, a plane ticket only (2026-10-31). */}
+                {([["outstation", "Outstation", planeOnly ? "Plane ticket only" : "Fixed by spots for the route", CAT_OUT], ["airbnb", "Airbnb accommodation", perPax !== null ? `Up to ${rm0(perPax)} per pax per night` : "Rate not set yet", CAT_AIR]] as const)
+                  .filter(([id]) => id === "outstation" || parts.road || cat === id).map(([id, label, note, d]) => (
+                  <button key={id} className={`${s.cat} ${cat === id ? s.catOn : ""}`} onClick={() => { setCat(id); setError(null); }} aria-pressed={cat === id}>
                     <span className={s.catIcon}><Svg d={d} size={17} sw={1.9} /></span>
                     <span className={s.catLabel}>{label}</span>
                     <span className={s.catSub}>{note}</span>
@@ -550,7 +568,8 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                       </div>
                     ) : <p className={s.local}>HR has not set the region for {venue} yet. It can be claimed once they have.</p>}
                   </div>
-                  {regionRow?.planeTicket && (
+                  {partProblem && <p className={s.local}>{partProblem}</p>}
+                  {!partProblem && regionRow?.planeTicket && (
                     <>
                       <div className={s.spots}>
                         <span className={s.spotsN}><Svg d={PLANE} size={26} sw={1.9} /></span>
@@ -566,7 +585,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                       <Invoice file={file} fileRef={fileRef} onFile={setFile} />
                     </>
                   )}
-                  {regionRow && !regionRow.planeTicket && regionRow.spots > 0 && (
+                  {!partProblem && regionRow && !regionRow.planeTicket && regionRow.spots > 0 && (
                     <>
                       <div className={s.spots}>
                         <span className={s.spotsN}>{regionRow.spots}</span>
@@ -580,10 +599,12 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                       </div>
                     </>
                   )}
-                  {regionRow && !regionRow.planeTicket && regionRow.spots === 0 && <p className={s.local}>{venue} is local to {options.rates.base}, so there is no outstation claim.</p>}
+                  {!partProblem && regionRow && !regionRow.planeTicket && regionRow.spots === 0 && <p className={s.local}>{venue} is local to {options.rates.base}, so there is no outstation claim.</p>}
                 </>
               ) : null
-            ) : !weekRow?.claimable ? null : !regionRow ? (
+            ) : !weekRow?.claimable ? null : partProblem ? (
+              <p className={s.local}>{partProblem}</p>
+            ) : !regionRow ? (
               <p className={s.local}>HR has not set the region for {venue} yet. It can be claimed once they have.</p>
             ) : !isOutstation(regionRow) ? (
               // Airbnb is for an outstation fair only (user 2026-10-06).

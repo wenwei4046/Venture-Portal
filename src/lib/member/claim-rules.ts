@@ -70,8 +70,21 @@ export interface ClaimRates {
 
 /** The transport claim's titles as HR ticked them (Member services › Transport claim's ⋯). */
 export interface TransportClaimRates {
-  /** The names of the titles whose holders may send one. */
+  /** The names of the titles whose holders may claim Outstation by road and an Airbnb stay. */
   titles: string[];
+  /**
+   * The names of the titles whose holders may claim a plane ticket — a fair in a region flown to (2026-10-31), ticked
+   * on its own. Absent from a read older than it: the transport titles claimed the plane ticket too.
+   */
+  airTicketTitles?: string[];
+}
+
+/** What of a transport claim a member's title may send (2026-10-31). */
+export interface TransportParts {
+  /** Outstation by road, and an Airbnb stay — HR's *Transport claim* tick. */
+  road: boolean;
+  /** A plane ticket to a fair in a region flown to — HR's *Air ticket claim* tick. */
+  plane: boolean;
 }
 
 /** The food claim as HR set it: Fair's, a rate a day, and the titles that may claim it. */
@@ -221,15 +234,47 @@ export function claimAmount(rates: ClaimRates, input: ClaimInput): number {
 // ── Who may send a transport claim (2026-10-20) ──
 
 /**
- * May this member send a transport claim — Outstation, a plane ticket, an Airbnb stay: their title is one HR ticked
- * (the user: "选择什么 title 的人可以 claim 这个 transport"). Rates not read yet, or read from before the list existed,
- * say yes — what Requests showed before; the database asks again when it is sent (`member_transport_claim_open`).
+ * What of a transport claim this member may send (2026-10-31, the user: "我要加多一个 Air ticket claim 的 column … if
+ * the venue is accept for air ticket, then these guys with tick can claim，就算他们没有 tick transport claim，但是其他
+ * 除了 ticket 以外，他就不能给"): Outstation by road and an Airbnb stay when their title is ticked for the transport
+ * claim, a plane ticket when it is ticked for the air ticket — each its own. Rates not read yet, or read from before
+ * the list existed, open both — what Requests showed before; a read from before the air ticket's own tick lets the
+ * transport titles claim the plane ticket, as they did. The database asks again when it is sent
+ * (`member_transport_claim_open`).
+ */
+export function transportPartsFor(rates: Pick<ClaimRates, "transport"> | null | undefined, title: string | null | undefined): TransportParts {
+  const transport = rates?.transport;
+  if (!transport) return { road: true, plane: true };
+  const mine = (title ?? "").trim().toLowerCase();
+  const ticked = (names: readonly string[]) => !!mine && names.some(t => t.trim().toLowerCase() === mine);
+  const road = ticked(transport.titles);
+  return { road, plane: transport.airTicketTitles ? ticked(transport.airTicketTitles) : road };
+}
+
+/**
+ * May this member send a transport claim at all — Outstation by road, a plane ticket, an Airbnb stay: their title is
+ * ticked for any of it (the user: "选择什么 title 的人可以 claim 这个 transport"; the air ticket alone since 2026-10-31).
  */
 export function transportOpenTo(rates: Pick<ClaimRates, "transport"> | null | undefined, title: string | null | undefined): boolean {
-  const transport = rates?.transport;
-  if (!transport) return true;
-  const mine = (title ?? "").trim().toLowerCase();
-  return !!mine && transport.titles.some(t => t.trim().toLowerCase() === mine);
+  const parts = transportPartsFor(rates, title);
+  return parts.road || parts.plane;
+}
+
+/**
+ * Why this member cannot send this transport claim, or null (2026-10-31): a plane ticket needs the air ticket's tick,
+ * Outstation by road and an Airbnb stay the transport claim's — `member_transport_claim_open` refuses the same.
+ * `region` is the fair's (null while HR has not set it: the claim's own checks say so).
+ */
+export function transportPartProblem(parts: TransportParts, type: "outstation" | "airbnb", region: Pick<ClaimRegion, "planeTicket"> | null, title?: string | null): string | null {
+  const who = title?.trim() || "your title";
+  if (type === "outstation" && region?.planeTicket) {
+    return parts.plane ? null : `A plane ticket claim is not open to ${who}. HR picks the titles that may claim it.`;
+  }
+  if (type === "outstation" && !region) return null;
+  if (parts.road) return null;
+  return parts.plane
+    ? `${title?.trim() || "Your title"} may claim a plane ticket only. HR picks the titles that may claim the rest.`
+    : `A transport claim is not open to ${who}. HR picks the titles that may claim it.`;
 }
 
 // ── The food claim (2026-10-13) ──
@@ -388,7 +433,11 @@ export function readClaimRates(raw: unknown): ClaimRates {
 function readTransport(raw: unknown): TransportClaimRates | null {
   const t = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
   if (!t || !Array.isArray(t.titles)) return null;
-  return { titles: t.titles.filter((x): x is string => typeof x === "string" && x.trim() !== "") };
+  const names = (list: unknown[]) => list.filter((x): x is string => typeof x === "string" && x.trim() !== "");
+  return {
+    titles: names(t.titles),
+    ...(Array.isArray(t.airTicketTitles) ? { airTicketTitles: names(t.airTicketTitles) } : {}),
+  };
 }
 
 function readFood(raw: unknown, money: (v: unknown) => number | null): FoodClaimRates {

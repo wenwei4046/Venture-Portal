@@ -1,4 +1,4 @@
-import type { ClaimRates } from "@/lib/member/claim-rules";
+import type { ClaimRates, TransportParts } from "@/lib/member/claim-rules";
 import type { MemberWaitingForm } from "@/lib/member/server";
 import type { EditField } from "@/lib/member/request-edit";
 
@@ -335,4 +335,11 @@ export interface FormOptions {
   today?: string;
   /** The member's own food claims — a month (or a day) one of them holds is not offered again; its number says which. */
   foodClaims?: { id: string; kind: string; status: string; detail: Record<string, unknown>; requestNo?: string | null }[];
+  /**
+   * What of a transport claim their title may send (2026-10-31): by road and an Airbnb stay, a plane ticket — HR's two
+   * ticks (`transportPartsFor`). Absent (the design preview's forms): all of it.
+   */
+  transport?: TransportParts;
+  /** Their seat title, to name it where the form says a part is not theirs. */
+  title?: string | null;
 }

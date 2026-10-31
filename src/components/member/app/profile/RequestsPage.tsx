@@ -19,6 +19,9 @@ const FILTERS: { id: RequestFilter; label: string }[] = [
   { id: "waiting", label: "Waiting list" },
 ];
 
+/** The transport claim's row for a title HR ticked for the air ticket alone (2026-10-31). */
+const PLANE_ONLY = "Plane tickets to a fair you fly to";
+
 /** The prototype's three; a food claim is offered only to whom HR opened it (Fair, a title HR picked — 2026-10-13). */
 const ALL_KINDS: readonly RequestKindVM[] = ["claim", "replacement", "waiting"];
 
@@ -28,18 +31,20 @@ const ALL_KINDS: readonly RequestKindVM[] = ["claim", "replacement", "waiting"];
  * `kinds`: the ones they may send (2026-10-11) — a claim (and a food claim) is this page's
  * Create, a waiting list or replacement Waiting list & replacements'. The Food claim filter
  * shows only while a food claim is offered or one was sent.
+ * `planeOnly` (2026-10-31): their title is ticked for the air ticket alone — the transport claim's row says so.
  */
-export default function RequestsPage({ rows, filter, kinds = ALL_KINDS, onFilter, onBack, onNew, onOpen }: {
+export default function RequestsPage({ rows, filter, kinds = ALL_KINDS, planeOnly = false, onFilter, onBack, onNew, onOpen }: {
   rows: RequestRowVM[];
   filter: RequestFilter;
   kinds?: readonly RequestKindVM[];
+  planeOnly?: boolean;
   onFilter: (filter: RequestFilter) => void;
   onBack: () => void;
   onNew: (kind: RequestKindVM) => void;
   onOpen: (id: string) => void;
 }) {
   const shown = rows.filter(r => filter === "all" || r.kind === filter);
-  const starts = NEW.filter(n => kinds.includes(n.kind));
+  const starts = NEW.filter(n => kinds.includes(n.kind)).map(n => (n.kind === "claim" && planeOnly ? { ...n, sub: PLANE_ONLY } : n));
   const filters = FILTERS.filter(f => f.id !== "food" || kinds.includes("food") || rows.some(r => r.kind === "food"));
   return (
     <div className={s.page}>

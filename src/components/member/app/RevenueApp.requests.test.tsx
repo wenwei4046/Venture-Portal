@@ -328,6 +328,24 @@ describe("a transport claim", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: /Submit transport claim/ })).not.toBeInTheDocument());
   });
 
+  // The user, 2026-10-31: "有一些人如果不可以 claim 普通 transport claim，但他可以 claim Air ticket claim".
+  it("is offered to a title ticked for the air ticket alone — a plane ticket, nothing else", async () => {
+    const planeForLeaders: ClaimRates = { ...TRANSPORT(["Revenue Specialist"]), transport: { titles: ["Revenue Specialist"], airTicketTitles: ["Team Leader"] } };
+    // Jia En is a Team Leader in Fair.
+    await open(memberData, "?page=account&view=requests&department=fair", planeForLeaders);
+    const row = await screen.findByRole("button", { name: /Submit transport claim/ });
+    expect(row).toHaveTextContent("Plane tickets to a fair you fly to");
+    fireEvent.click(row);
+    const claim = within(form("Submit transport claim"));
+    expect(claim.getByText("A plane ticket to a fair you fly to")).toBeInTheDocument();
+    expect(claim.getByRole("button", { name: /^Outstation/ })).toHaveTextContent("Plane ticket only");
+    expect(claim.queryByRole("button", { name: /Airbnb accommodation/ })).not.toBeInTheDocument();
+    cleanup();
+    // …and in IR, where she is a Revenue Specialist, the transport claim as before.
+    await open(memberData, "?page=account&view=requests&department=ir", planeForLeaders);
+    expect(await screen.findByRole("button", { name: /Submit transport claim/ })).toHaveTextContent("Outstation and Airbnb stays");
+  });
+
   it("in View as follows the viewed person's title", async () => {
     await open(principalData, "?page=account&view=requests&department=fair&staff=anthony", TRANSPORT(["Team Leader"]));
     expect(await screen.findByRole("button", { name: /Submit transport claim/ })).toBeInTheDocument();

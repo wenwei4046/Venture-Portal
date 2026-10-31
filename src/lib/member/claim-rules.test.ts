@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
   foodMonthOver, foodOpenTo, isOutstation, monthOfWeek, nightsBetween, readClaimRates, readFoodWeeks, shiftDay, stayProblem, stayWindow, tapStayDay,
-  type ClaimRates, type StayPick, transportOpenTo } from "./claim-rules";
+  type ClaimRates, type StayPick, transportOpenTo, transportPartProblem, transportPartsFor } from "./claim-rules";
 
 const rates: ClaimRates = {
   base: "Klang Valley",
@@ -356,5 +356,52 @@ describe("transportOpenTo", () => {
     expect(readClaimRates({ transport: { titles: ["Team Leader", "", 3] } }).transport).toEqual({ titles: ["Team Leader"] });
     expect(readClaimRates({}).transport).toBeUndefined();
     expect(readClaimRates({ transport: "x" }).transport).toBeUndefined();
+  });
+
+  it("is open to a title ticked for the air ticket alone (2026-10-31)", () => {
+    const rates = { transport: { titles: ["Revenue Specialist"], airTicketTitles: ["Team Leader"] } };
+    expect(transportOpenTo(rates, "team leader")).toBe(true);
+    expect(transportOpenTo(rates, "Team Assistant")).toBe(false);
+  });
+});
+
+// The user, 2026-10-31: "我要加多一个 Air ticket claim 的 column … if the venue is accept for air ticket, then these guys
+// with tick can claim，就算他们没有 tick transport claim，但是其他除了 ticket 以外，他就不能给 因为他没有 tick 那个
+// transport claim".
+describe("a transport claim's parts", () => {
+  const rates = { transport: { titles: ["Revenue Specialist", "Senior Revenue Specialist"], airTicketTitles: ["Team Leader", "Revenue Specialist"] } };
+
+  it("by road and an Airbnb stay are the transport tick's, the plane ticket the air ticket's — each its own", () => {
+    expect(transportPartsFor(rates, "Team Leader")).toEqual({ road: false, plane: true });
+    expect(transportPartsFor(rates, " revenue specialist")).toEqual({ road: true, plane: true });
+    expect(transportPartsFor(rates, "Senior Revenue Specialist")).toEqual({ road: true, plane: false });
+    expect(transportPartsFor(rates, "Team Assistant")).toEqual({ road: false, plane: false });
+    expect(transportPartsFor(rates, null)).toEqual({ road: false, plane: false });
+  });
+
+  it("an answer from before the air ticket's tick lets the transport titles claim it, as they did; none read, all of it", () => {
+    expect(transportPartsFor({ transport: { titles: ["Team Leader"] } }, "Team Leader")).toEqual({ road: true, plane: true });
+    expect(transportPartsFor({ transport: { titles: ["Team Leader"] } }, "Team Assistant")).toEqual({ road: false, plane: false });
+    expect(transportPartsFor(null, "Team Assistant")).toEqual({ road: true, plane: true });
+  });
+
+  it("is read from the database's answer", () => {
+    expect(readClaimRates({ transport: { titles: ["Revenue Specialist"], airTicketTitles: ["Team Leader", "", 7] } }).transport)
+      .toEqual({ titles: ["Revenue Specialist"], airTicketTitles: ["Team Leader"] });
+    expect(readClaimRates({ transport: { titles: [], airTicketTitles: "x" } }).transport).toEqual({ titles: [] });
+  });
+
+  it("says why a part is not theirs, in the database's words", () => {
+    const flown = { planeTicket: true }, road = { planeTicket: false };
+    const planeOnly = { road: false, plane: true }, roadOnly = { road: true, plane: false };
+    expect(transportPartProblem(planeOnly, "outstation", flown, "Team Leader")).toBeNull();
+    expect(transportPartProblem(planeOnly, "outstation", road, "Team Leader")).toBe("Team Leader may claim a plane ticket only. HR picks the titles that may claim the rest.");
+    expect(transportPartProblem(planeOnly, "airbnb", flown, "Team Leader")).toBe("Team Leader may claim a plane ticket only. HR picks the titles that may claim the rest.");
+    expect(transportPartProblem(planeOnly, "outstation", null, "Team Leader")).toBeNull();
+    expect(transportPartProblem(roadOnly, "outstation", flown, "Senior Revenue Specialist")).toBe("A plane ticket claim is not open to Senior Revenue Specialist. HR picks the titles that may claim it.");
+    expect(transportPartProblem(roadOnly, "outstation", road, "Senior Revenue Specialist")).toBeNull();
+    expect(transportPartProblem(roadOnly, "airbnb", flown, "Senior Revenue Specialist")).toBeNull();
+    expect(transportPartProblem({ road: false, plane: false }, "airbnb", null, null)).toBe("A transport claim is not open to your title. HR picks the titles that may claim it.");
+    expect(transportPartProblem({ road: true, plane: true }, "outstation", flown)).toBeNull();
   });
 });
