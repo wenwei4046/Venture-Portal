@@ -336,6 +336,11 @@ export interface FormOptions {
   /** The member's own food claims — a month (or a day) one of them holds is not offered again; its number says which. */
   foodClaims?: { id: string; kind: string; status: string; detail: Record<string, unknown>; requestNo?: string | null }[];
   /**
+   * The food claim's weekends (2026-11-01 — a day is claimed in its own month): `weeks` and, before each month read, the
+   * weekend whose fair runs into it (`claimWeeks` › `spill`). Absent (the design preview's forms): `weeks`.
+   */
+  foodWeeks?: ClaimWeek[];
+  /**
    * What of a transport claim their title may send (2026-10-31): by road and an Airbnb stay, a plane ticket — HR's two
    * ticks (`transportPartsFor`). Absent (the design preview's forms): all of it.
    */

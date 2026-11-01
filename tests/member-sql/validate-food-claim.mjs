@@ -13,7 +13,9 @@
 // the sent claim (titled "Food claim · Sep 2026", no invoice, its claims row's line); a month claimed once and a day
 // claimed once — refused before anything is written, free again once the other is cancelled or rejected, another
 // person's never in the way, a claim HR sent back staying sent back, a stranded draft revisable; Outstation and Airbnb
-// as before. No live I/O.
+// as before. Then mig 20261101223000 (2026-11-01 — the user, over a fair of 29 Oct – 1 Nov: "那它 11 月 1 号就是 claim 在
+// 11 月"; "按日期拆"): a DAY goes with its own month — a weekend across two months is on both claims, each taking its
+// own days; a day of the other month is refused in words; a weekend two months off is not one of the month. No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -251,18 +253,21 @@ try {
   await q(`INSERT INTO member_claim_venue_regions VALUES ('MIDVALLEY', $1), ('PWCC', $2)`, [KL_REGION, PENANG_REGION])
   const booth = (fairId, more) => JSON.stringify({ fairId, brand: 'ZANOTTI', source: 'erp', picked: true, ...more })
   // ANTHONY in September: a fair with no days (4 Sep), Mid Valley (11–13), the ERP's MITEC booth no fair has (18–20),
-  // Penang (25–27); and a weekend of a month still to come.
+  // Penang (25–27); a weekend of a month still to come; and the ERP's KUCHING booth of 31 Jul – 2 Aug, across two months.
   await q(`INSERT INTO test_booths VALUES
     ($1, $4, '2026-09-04', $6::jsonb), ($1, $4, '2026-09-11', $7::jsonb), ($1, $4, '2026-09-18', $8::jsonb), ($1, $4, '2026-09-25', $9::jsonb),
-    ($1, $4, '2099-01-02', $10::jsonb), ($1, $5, '2026-09-11', $7::jsonb), ($2, $4, '2026-09-11', $7::jsonb), ($3, $4, '2026-09-11', $7::jsonb)`,
+    ($1, $4, '2099-01-02', $10::jsonb), ($1, $5, '2026-09-11', $7::jsonb), ($2, $4, '2026-09-11', $7::jsonb), ($3, $4, '2026-09-11', $7::jsonb),
+    ($1, $4, '2026-07-31', $11::jsonb)`,
   [ANTHONY, YUNY, ZED, FAIR, IR, booth(NODAYS), booth(MIDVALLEY), booth(null, { venueKey: 'MITEC', venue: 'MITEC', start: '2026-09-18', end: '2026-09-20' }),
-    booth(PENANG), booth(null, { venueKey: 'FUTURE', venue: 'FUTURE HALL', start: '2099-01-02', end: '2099-01-04' })])
+    booth(PENANG), booth(null, { venueKey: 'FUTURE', venue: 'FUTURE HALL', start: '2099-01-02', end: '2099-01-04' }),
+    booth(null, { venueKey: 'KUCHING', venue: 'KUCHING HALL', start: '2026-07-31', end: '2026-08-02' })])
 
   // ── The three migrations, each twice: a second run changes nothing ──
   const bodies = async () => q(`SELECT proname, md5(prosrc) AS m FROM pg_proc WHERE proname IN
     ('member_claim_settings', 'member_claim_detail_for', 'member_prepare_request', 'member_submit_request', 'member_claim_food_detail',
      'member_food_claim_check', 'member_food_claim_taken', 'member_food_claim_line') ORDER BY proname`)
-  for (const name of ['20261013150000_member_food_claim', '20261013160000_member_food_claim_hardening', '20261013200000_member_food_claim_by_month']) {
+  for (const name of ['20261013150000_member_food_claim', '20261013160000_member_food_claim_hardening', '20261013200000_member_food_claim_by_month',
+    '20261101223000_member_food_claim_days_by_month']) {
     const migration = await migrationText(name)
     await db.exec(migration)
     const first = await bodies()
@@ -334,7 +339,19 @@ try {
   await q(`UPDATE member_claim_rates SET food_title_ids = ARRAY[NULL, $1]::uuid[]`, [RS])
   await refused(ANTHONY, FAIR, food('2026-09', { '2026-09-11': ['2026-09-11'] }), /not open to Team Leader/, 'a NULL in the list lets nobody through')
   await q(`UPDATE member_claim_rates SET food_title_ids = ARRAY[$1]::uuid[]`, [TL])
-  await refused(ANTHONY, FAIR, food('2026-09', { '2026-10-02': ['2026-10-02'] }), /The weekend of 2 Oct is not one of Sep 2026/, 'a weekend of another month')
+  await refused(ANTHONY, FAIR, food('2026-09', { '2026-11-06': ['2026-11-06'] }), /The weekend of 6 Nov is not one of Sep 2026/, 'a weekend two months off')
+  await refused(ANTHONY, FAIR, food('2026-09', { '2026-07-31': ['2026-08-01'] }), /The weekend of 31 Jul is not one of Sep 2026/, 'nor one two months before')
+  // A day goes with its own month (2026-11-01): the weekend of 31 Jul – 2 Aug is on July's claim for its 31 Jul and on
+  // August's for its 1 and 2 Aug — and a day of the other month is refused in words.
+  const august = await detail(ANTHONY, FAIR, food('2026-08', { '2026-07-31': ['2026-08-02', '2026-08-01'] }))
+  check([august.month, august.weeks.map(w => [w.week, w.location, w.fairStart, w.fairEnd, w.days]), august.days, august.dayCount, august.amount],
+    ['2026-08', [['2026-07-31', 'KUCHING HALL', '2026-07-31', '2026-08-02', ['2026-08-01', '2026-08-02']]], ['2026-08-01', '2026-08-02'], 2, 40],
+    'August takes the 1 and 2 Aug of a weekend whose Friday is July’s')
+  check((await detail(ANTHONY, FAIR, food('2026-07', { '2026-07-31': ['2026-07-31'] }))).days, ['2026-07-31'], 'July takes its 31 Jul')
+  await refused(ANTHONY, FAIR, food('2026-07', { '2026-07-31': ['2026-07-31', '2026-08-01'] }), /1 Aug is claimed with Aug 2026's food: a day goes with its own month/,
+    'August’s 1 Aug on July’s claim')
+  await refused(ANTHONY, FAIR, food('2026-08', { '2026-07-31': ['2026-07-31', '2026-08-01'] }), /31 Jul is claimed with Jul 2026's food: a day goes with its own month/,
+    'July’s 31 Jul on August’s claim')
   await refused(ANTHONY, FAIR, { claimType: 'food', month: '2026-09', weeks: [{ week: '2026-09-11', days: ['2026-09-11'] }, { week: '2026-09-11', days: ['2026-09-12'] }] },
     /Tick the days you worked at the fairs/, 'a weekend twice')
   await refused(ANTHONY, FAIR, food('2026-08', { '2026-08-28': ['2026-08-28'] }), /no brand week the weekend of 28 Aug/, 'a weekend with no booth')
@@ -399,6 +416,13 @@ try {
   await q(`UPDATE member_requests SET status = 'draft' WHERE id = $1`, [held])
   check((await revise(ANTHONY_USER, FAIR, held, september)).status, 'submitted', 'a stranded draft is sent again')
   check(await amountOf(held), '120.00', 'and its claims row with it')
+
+  // A weekend across two months, sent (2026-11-01): July's claim takes its 31 Jul, the line HR reads names it.
+  const july = await send(ANTHONY_USER, FAIR, food('2026-07', { '2026-07-31': ['2026-07-31'] }))
+  check([july.status, july.title, Number(july.detail.amount)], ['submitted', 'Food claim · Jul 2026', 20], 'July’s, sent')
+  await asSystem()
+  check(await one(`SELECT description FROM claims WHERE id = $1`, [july.claimId]), 'Food · 1 day × RM 20.00 · Jul 2026; KUCHING HALL 31 Jul',
+    'its claims row: the weekend’s July day alone')
 
   // Outstation by road still needs no invoice; Airbnb still does.
   check((await send(ANTHONY_USER, FAIR, { claimType: 'outstation', week: '2026-09-25' })).title, 'Outstation claim · Penang Waterfront', 'Outstation as before')

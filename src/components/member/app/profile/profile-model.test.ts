@@ -312,6 +312,25 @@ describe("the request forms' choices", () => {
     expect(claimWeeks([oct, null], "2026-10-16").map(w => w.month)).toEqual(["OCT", "OCT", "OCT"]);
   });
 
+  // 2026-11-01 — a day is claimed in its own month (the user: "那它 11 月 1 号就是 claim 在 11 月"). On 1 Dec, November's
+  // food is sent with November's read alone (still being worked): its read carries October's brand weeks, so the
+  // Borneo weekend of 30 Oct – 1 Nov comes too, for its 1 Nov — as October's W5. The transport claim's list stays as it was.
+  it("brings the food claim the weekend before a month whose fair runs into it", () => {
+    const borneo = { ...brandWeek("2026-10-30", "erp", "AKEMI", "BCCK", "f9"), start: "2026-10-29", end: "2026-11-01" };
+    const nov = { period: "2026-11", selfId: "an", brandWeeks: null,
+      history: { events: [], weeks: [brandWeek("2026-10-23", "erp", "ERGOTEX", "MVEC", "f8"), borneo, brandWeek("2026-11-06", "erp", "AKEMI", "SICC", "f10")] } } as unknown as MemberArenaSnapshot;
+    const food = claimWeeks([nov, null, null], "2026-12-01", { spill: true });
+    expect(food.map(w => [w.key, w.month, w.n, w.dates, w.worked])).toEqual([
+      ["2026-11-27", "NOV", "W4", "27–29 Nov", false], ["2026-11-20", "NOV", "W3", "20–22 Nov", false], ["2026-11-13", "NOV", "W2", "13–15 Nov", false],
+      ["2026-11-06", "NOV", "W1", "6–8 Nov", true],
+      // October's 23 Oct weekend ends in October: not brought.
+      ["2026-10-30", "OCT", "W5", "29 Oct – 1 Nov", true],
+    ]);
+    expect(claimWeeks([nov, null, null], "2026-12-01").map(w => w.key)).not.toContain("2026-10-30");
+    // Read with October's own snapshot too, the weekend is there once.
+    expect(claimWeeks([oct, nov], "2026-12-01", { spill: true }).filter(w => w.key === "2026-10-30")).toHaveLength(1);
+  });
+
   it("lets a member replace only somebody in their own team below them", () => {
     const membership: MemberMembership = {
       id: "fair", schemeId: "s", name: "Fair", code: "FAIR", title: "Senior Executive", rank: "Rank B", rate: 0.05, calculator: true,

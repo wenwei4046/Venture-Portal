@@ -543,15 +543,31 @@ export function brandWeekTone(brand: string | null): [string, string] {
  * lists them nowhere — the booth they opened the most bills at (the read's
  * `weeks`; `member_claim_brand_week` reads the same two layers). No brand week,
  * or a booth the portal has no fair for yet, = nothing to claim that weekend.
+ *
+ * `spill` — the food claim's (2026-11-01: a day is claimed in its own month): each month also brings the weekend
+ * before it whose fair runs into it, a fair of 29 Oct – 1 Nov on November's claim for its 1 Nov. A month's read
+ * carries the brand weeks of the two months before it, so that booth is there though last month's read may not be.
  */
-export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | undefined)[], today: string): ClaimWeek[] {
+export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | undefined)[], today: string, opts: { spill?: boolean } = {}): ClaimWeek[] {
   const out = new Map<string, ClaimWeek>();
+  type Booth = { brand: string | null; venue: string | null; organizer: string | null; start: string | null; end: string | null; fairId: string | null };
+  const put = (friday: string, month: string, n: number, booth: Booth | null, auto: boolean) => {
+    const brand = booth?.brand ?? null;
+    const [color, tint] = brandWeekTone(brand);
+    out.set(friday, {
+      key: friday, month, n: `W${n}`, brandWeek: brand ? `${WEEK_BRAND[brand] ?? brand} week` : "No brand week", brand,
+      dates: booth?.start && booth.end ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null,
+      fairId: booth?.fairId ?? null, start: booth?.start ?? null, end: booth?.end ?? null,
+      auto, claimable: !!booth?.fairId, worked: !!booth, color, tint,
+    });
+  };
+  const label = (period: string) => (MONTHS_SHORT[Number(period.slice(5, 7)) - 1] ?? "").toUpperCase();
   for (const snap of snapshots) {
     if (!snap) continue;
     const me = snap.selfId;
     const events = snap.history?.events ?? [];
     const weeks = snap.history?.weeks;
-    const month = (MONTHS_SHORT[Number(snap.period.slice(5, 7)) - 1] ?? "").toUpperCase();
+    const month = label(snap.period);
     arenaMonthFridays(snap.period).forEach((friday, i) => {
       if (friday > today || out.has(friday)) return;
       const week = weeks?.find(w => w.week === friday && (!me || w.staffId === me));
@@ -562,14 +578,15 @@ export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | und
         : scoring
           ? { brand: scoring.brand ?? null, venue: scoring.venue, organizer: scoring.organizer ?? null, start: scoring.start, end: scoring.end, fairId: scoring.fairId ?? null }
           : null;
-      const brand = booth?.brand ?? null;
-      const [color, tint] = brandWeekTone(brand);
-      out.set(friday, {
-        key: friday, month, n: `W${i + 1}`, brandWeek: brand ? `${WEEK_BRAND[brand] ?? brand} week` : "No brand week", brand,
-        dates: booth?.start && booth.end ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null,
-        fairId: booth?.fairId ?? null, start: booth?.start ?? null, end: booth?.end ?? null,
-        auto: week ? week.source === "auto" : !!scoring, claimable: !!booth?.fairId, worked: !!booth, color, tint,
-      });
+      put(friday, month, i + 1, booth, week ? week.source === "auto" : !!scoring);
+    });
+    if (!opts.spill || !weeks) continue;
+    const before = addMonths(snap.period, -1);
+    arenaMonthFridays(before).forEach((friday, i) => {
+      if (friday > today || out.has(friday)) return;
+      const week = weeks.find(w => w.week === friday && (!me || w.staffId === me));
+      if (!week?.end || week.end < `${snap.period}-01`) return;
+      put(friday, label(before), i + 1, week, week.source === "auto");
     });
   }
   return [...out.values()].sort((a, b) => b.key.localeCompare(a.key));

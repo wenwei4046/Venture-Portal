@@ -1255,7 +1255,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const canRoad = transportParts.road;
   const canPlane = transportParts.plane;
   const formOptions: FormOptions = useMemo(() => {
-    if (fxp) return fxp.form;
+    // The design preview's form on the preview's own day (2026-11-01): a food claim offers last month and this month.
+    if (fxp) return { ...fxp.form, today: fxp.form.today ?? today };
     return {
       subName: membership?.name ?? "",
       weeks: claimWeeks([arena, arenaNow, arenaClosed.snapshot], today),
@@ -1269,6 +1270,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       // The food claim (2026-10-13): a fair day still to come cannot be claimed, nor one another of theirs holds.
       today,
       foodClaims: myRequests,
+      // …and a day is claimed in its own month (2026-11-01): a weekend before a month whose fair runs into it comes too.
+      foodWeeks: claimWeeks([arena, arenaNow, arenaClosed.snapshot], today, { spill: true }),
       transport: { road: canRoad, plane: canPlane },
       title: me.title ?? null,
     };

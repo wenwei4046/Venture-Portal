@@ -8,8 +8,8 @@ import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
 import StayCalendar from "./StayCalendar";
 import Reveal from "./Reveal";
 import {
-  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
-  foodMonthOver, monthOfWeek, nightsBetween, regionClaimProblem, stayProblem, stayWindow, transportPartProblem,
+  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairDaysIn, fairRegion, foodAmount, foodClaimMonths, foodDayState,
+  foodMonthOpensOn, foodMonthOver, inFoodMonth, monthOfDay, nightsBetween, regionClaimProblem, stayProblem, stayWindow, transportPartProblem,
 } from "@/lib/member/claim-rules";
 import { applicationFormHtml, BUILTIN_FIELDS, FORM_KINDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingField } from "@/lib/commission/waiting-form";
 import { answersFor, blankRequired, capacityLine, fillIn, priorAnswers } from "@/lib/member/waiting-answers";
@@ -114,27 +114,32 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   const fileRef = useRef<HTMLInputElement>(null);
   const [notes, setNotes] = useState(str("notes"));
   // ── food (2026-10-13): a MONTH at a time (the user: "submit by total month … dont by week submit") — every brand
-  // week of it, each opened to its fair's days, every day they may claim ticked to start; sent once the month is over ──
+  // week of it, each opened to its fair's days, every day they may claim ticked to start; sent once the month is over.
+  // A day is claimed in its own month (2026-11-01): a weekend across two months is on both, the other month's days
+  // faded (*Nov claim*) ──
   const today = options.today ?? klToday();
   const perDay = options.rates.food?.perDay ?? null;
   // A month, and a day, another food claim of theirs holds is not offered again — this one's own, sent back by HR, still is.
   const takenDays = useMemo(() => claimedFoodDays(options.foodClaims ?? [], revising?.id), [options.foodClaims, revising?.id]);
   const takenMonths = useMemo(() => claimedFoodMonths(options.foodClaims ?? [], revising?.id), [options.foodClaims, revising?.id]);
-  const openDaysOf = (w: ClaimWeek) => fairDays(w, w.key).filter(d => foodDayState(d, today, takenDays) === "open");
-  // The months with a weekend they worked, newest first; the form opens on the newest that is over and not claimed.
-  const foodMonths = useMemo(() => [...new Set(options.weeks.filter(w => w.worked).map(w => monthOfWeek(w.key)))].sort().reverse(), [options.weeks]);
+  const foodWeekList = options.foodWeeks ?? options.weeks;
+  // Last month's and this month's, each with a day of a weekend they worked, newest first; the form opens on the newest
+  // that is over and not claimed.
+  const foodMonths = useMemo(() => foodClaimMonths(foodWeekList, today), [foodWeekList, today]);
   const [foodMonthPick, setFoodMonth] = useState(() => str("month"));
   const foodMonth = foodMonthPick || foodMonths.find(m => foodMonthOver(m, today) && !takenMonths.has(m))
     || foodMonths.find(m => foodMonthOver(m, today)) || foodMonths[0] || "";
-  const monthWeeks = options.weeks.filter(w => monthOfWeek(w.key) === foodMonth).sort((a, b) => a.key.localeCompare(b.key));
-  // The days ticked, a weekend at a time; a weekend not in it = every day of it still open, until the member taps one
-  // (a returned claim's weekends start as it was sent — one it left out, with none).
+  const monthWeeks = foodWeekList.filter(w => inFoodMonth(w, foodMonth)).sort((a, b) => a.key.localeCompare(b.key));
+  // The days ticked, a month's weekend at a time; one not in it = every day of it in the month still open, until the
+  // member taps one (a returned claim's weekends start as it was sent — one it left out, with none).
   const [dayPick, setDayPick] = useState<Record<string, string[]>>(() => priorFoodDays(prior));
   const revisingMonth = str("claimType") === "food" ? str("month") : "";
   const [openWeeks, setOpenWeeks] = useState<ReadonlySet<string>>(() => new Set());
+  const pickKey = (w: ClaimWeek) => `${foodMonth}|${w.key}`;
+  const openDaysOf = (w: ClaimWeek) => fairDaysIn(w, w.key, foodMonth).filter(d => foodDayState(d, today, takenDays) === "open");
   const daysOf = (w: ClaimWeek) => (!w.worked ? []
-    : (dayPick[w.key] ?? (monthOfWeek(w.key) === revisingMonth ? [] : openDaysOf(w)))
-      .filter(d => fairDays(w, w.key).includes(d) && foodDayState(d, today, takenDays) === "open").sort());
+    : (dayPick[pickKey(w)] ?? (foodMonth === revisingMonth ? [] : openDaysOf(w)))
+      .filter(d => fairDaysIn(w, w.key, foodMonth).includes(d) && foodDayState(d, today, takenDays) === "open").sort());
   const foodWeeks = monthWeeks.map(w => ({ week: w, days: daysOf(w) }));
   const foodDays = foodWeeks.flatMap(x => x.days).sort();
   const foodTotal = foodAmount(perDay, foodDays.length);
@@ -154,7 +159,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   });
   const toggleDay = (w: ClaimWeek, day: string) => {
     const now = daysOf(w);
-    setDayPick(prev => ({ ...prev, [w.key]: now.includes(day) ? now.filter(d => d !== day) : [...now, day].sort() }));
+    setDayPick(prev => ({ ...prev, [pickKey(w)]: now.includes(day) ? now.filter(d => d !== day) : [...now, day].sort() }));
     setError(null);
   };
   // ── replacement ──
@@ -492,16 +497,19 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                           <Reveal className={s.foodDays} role="group" aria-label={`Days of the ${w.brandWeek}, ${w.dates}`}>
                             {fairDays(w, w.key).map(day => {
                               const state = foodDayState(day, today, takenDays);
-                              const ticked = state === "open" && days.includes(day);
+                              // A day of the other month is claimed with that month's food (2026-11-01): shown, faded.
+                              const elsewhere = monthOfDay(day) !== foodMonth;
+                              const ticked = !elsewhere && state === "open" && days.includes(day);
+                              const mon = MONTHS_SHORT[Number(day.slice(5, 7)) - 1];
                               return (
-                                <button key={day} className={`${s.foodDay} ${ticked ? s.foodDayOn : ""}`} disabled={state !== "open"} aria-pressed={ticked}
-                                  aria-label={`${weekdayShort(day)} ${Number(day.slice(8, 10))} ${MONTHS_SHORT[Number(day.slice(5, 7)) - 1]}${state === "claimed" ? ", claimed" : state === "ahead" ? ", not yet" : ""}`}
+                                <button key={day} className={`${s.foodDay} ${ticked ? s.foodDayOn : ""}`} disabled={elsewhere || state !== "open"} aria-pressed={ticked}
+                                  aria-label={`${weekdayShort(day)} ${Number(day.slice(8, 10))} ${mon}${state === "claimed" ? ", claimed" : elsewhere ? `, ${mon} claim` : state === "ahead" ? ", not yet" : ""}`}
                                   onClick={() => toggleDay(w, day)}>
                                   <span className={s.foodDayWk}>{weekdayShort(day)}</span>
                                   <span className={s.foodDayN}>{Number(day.slice(8, 10))}</span>
                                   <span className={s.foodDayNote}>
-                                    {state === "claimed" ? "Claimed" : state === "ahead" ? "Not yet"
-                                      : ticked ? <Svg d={ICON.tick} size={13} sw={2.6} /> : MONTHS_SHORT[Number(day.slice(5, 7)) - 1]}
+                                    {state === "claimed" ? "Claimed" : elsewhere ? `${mon} claim` : state === "ahead" ? "Not yet"
+                                      : ticked ? <Svg d={ICON.tick} size={13} sw={2.6} /> : mon}
                                   </span>
                                 </button>
                               );
@@ -806,10 +814,12 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
 
 /** A returned food claim's weekends and their days, as it was sent (`detail.weeks`). */
 function priorFoodDays(prior: Record<string, unknown>): Record<string, string[]> {
-  if (prior.claimType !== "food" || !Array.isArray(prior.weeks)) return {};
+  if (prior.claimType !== "food" || !Array.isArray(prior.weeks) || typeof prior.month !== "string") return {};
+  const month = prior.month;
+  // Keyed by its month and weekend, as the form picks them — a weekend across two months is picked in each.
   return Object.fromEntries(prior.weeks.flatMap(w => {
     const x = w && typeof w === "object" ? (w as Record<string, unknown>) : null;
-    return x && typeof x.week === "string" && Array.isArray(x.days) ? [[x.week, x.days.filter((d): d is string => typeof d === "string")]] : [];
+    return x && typeof x.week === "string" && Array.isArray(x.days) ? [[`${month}|${x.week}`, x.days.filter((d): d is string => typeof d === "string")]] : [];
   }));
 }
 
