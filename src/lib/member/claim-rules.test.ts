@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
-  foodMonthOver, foodOpenTo, isOutstation, monthOfWeek, nightsBetween, readClaimRates, readFoodWeeks, shiftDay, stayProblem, stayWindow, tapStayDay,
+  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairDaysIn, fairRegion, foodAmount, foodClaimMonths, foodDayState,
+  foodMonthOpensOn, foodMonthOver, foodOpenTo, inFoodMonth, isOutstation, monthOfDay, nightsBetween, readClaimRates, readFoodWeeks, shiftDay, shiftMonth,
+  stayProblem, stayWindow, tapStayDay,
   type ClaimRates, type StayPick, transportOpenTo, transportPartProblem, transportPartsFor } from "./claim-rules";
 
 const rates: ClaimRates = {
@@ -305,13 +306,41 @@ describe("the food claim", () => {
 
 // A food claim is a month (2026-10-13 — "they will submit by total month, for every pax, dont by week submit").
 describe("the food claim's month", () => {
-  it("is the month of each weekend's Friday, claimed from the 1st of the next", () => {
-    expect(monthOfWeek("2026-10-30")).toBe("2026-10");
+  it("is claimed from the 1st of the next", () => {
     expect(foodMonthOpensOn("2026-10")).toBe("2026-11-01");
     expect(foodMonthOpensOn("2026-12")).toBe("2027-01-01");
     expect(foodMonthOver("2026-10", "2026-10-31")).toBe(false);
     expect(foodMonthOver("2026-10", "2026-11-01")).toBe(true);
     expect(foodMonthOver("2026-09", "2026-10-13")).toBe(true);
+    expect([shiftMonth("2026-11", 1), shiftMonth("2026-12", 1), shiftMonth("2027-01", -1), shiftMonth("2026-10", -1)]).toEqual(["2026-12", "2027-01", "2026-12", "2026-09"]);
+  });
+
+  // 2026-11-01 — the user, over a fair of 29 Oct – 1 Nov: "那它 11 月 1 号就是 claim 在 11 月"; asked, "按日期拆".
+  it("claims a day in its own month: a weekend across two months gives each its days", () => {
+    const borneo = { key: "2026-10-30", worked: true, start: "2026-10-29", end: "2026-11-01" };
+    expect(monthOfDay("2026-11-01")).toBe("2026-11");
+    expect(fairDaysIn(borneo, borneo.key, "2026-10")).toEqual(["2026-10-29", "2026-10-30", "2026-10-31"]);
+    expect(fairDaysIn(borneo, borneo.key, "2026-11")).toEqual(["2026-11-01"]);
+    // On October's claim by its Friday, on November's for its 1 Nov; a weekend with no booth only by its Friday.
+    expect([inFoodMonth(borneo, "2026-10"), inFoodMonth(borneo, "2026-11"), inFoodMonth(borneo, "2026-12")]).toEqual([true, true, false]);
+    expect(inFoodMonth({ ...borneo, worked: false }, "2026-11")).toBe(false);
+    // A fair that opens before its Friday's month: 30 Sep is September's.
+    const early = { key: "2026-10-02", worked: true, start: "2026-09-30", end: "2026-10-04" };
+    expect([inFoodMonth(early, "2026-09"), fairDaysIn(early, early.key, "2026-09")]).toEqual([true, ["2026-09-30"]]);
+  });
+
+  it("offers last month and this month, each with a day of a weekend they worked — two months back is not offered", () => {
+    const weeks = [
+      { key: "2026-10-30", worked: true, start: "2026-10-29", end: "2026-11-01" },
+      { key: "2026-10-23", worked: true, start: "2026-10-23", end: "2026-10-25" },
+      { key: "2026-09-25", worked: true, start: "2026-09-24", end: "2026-09-27" },
+      { key: "2026-11-06", worked: false, start: null, end: null },
+    ];
+    // On 1 Nov: October (over) and November (its 1 Nov) — September is two months back.
+    expect(foodClaimMonths(weeks, "2026-11-01")).toEqual(["2026-11", "2026-10"]);
+    // On 31 Oct: September and October — the 1 Nov still to come is next month's.
+    expect(foodClaimMonths(weeks, "2026-10-31")).toEqual(["2026-10", "2026-09"]);
+    expect(foodClaimMonths(weeks, "2026-12-01")).toEqual(["2026-11"]);
   });
 
   it("knows the months a member's live food claims hold, with their numbers", () => {
@@ -328,6 +357,13 @@ describe("the food claim's month", () => {
   it("reads the weekends sent strictly: of the month, each once, real days", () => {
     expect(readFoodWeeks([{ week: "2026-09-18", days: ["2026-09-20", "2026-09-18", "2026-09-18"] }, { week: "2026-09-11", days: ["2026-09-11"] }], "2026-09"))
       .toEqual([{ week: "2026-09-11", days: ["2026-09-11"] }, { week: "2026-09-18", days: ["2026-09-18", "2026-09-20"] }]);
+    // A weekend across two months: its days of the month, whichever month its Friday is in.
+    expect(readFoodWeeks([{ week: "2026-10-30", days: ["2026-11-01"] }, { week: "2026-11-06", days: ["2026-11-06"] }], "2026-11"))
+      .toEqual([{ week: "2026-10-30", days: ["2026-11-01"] }, { week: "2026-11-06", days: ["2026-11-06"] }]);
+    expect(readFoodWeeks([{ week: "2026-10-02", days: ["2026-09-30"] }], "2026-09")).toEqual([{ week: "2026-10-02", days: ["2026-09-30"] }]);
+    // …never a day of another month, nor a weekend two months off.
+    expect(readFoodWeeks([{ week: "2026-10-30", days: ["2026-10-31", "2026-11-01"] }], "2026-11")).toBeNull();
+    expect(readFoodWeeks([{ week: "2026-09-04", days: ["2026-11-01"] }], "2026-11")).toBeNull();
     for (const bad of [null, [], "x", [{ week: "2026-10-02", days: ["2026-10-02"] }], [{ week: "2026-09-11", days: [] }], [{ week: "2026-09-11", days: ["2026-09-31"] }],
       [{ week: "2026-09-11", days: ["11 Sep"] }], [{ week: "2026-09-11", days: ["2026-09-11"] }, { week: "2026-09-11", days: ["2026-09-12"] }],
       Array.from({ length: 7 }, (_, i) => ({ week: `2026-09-0${i + 1}`, days: [`2026-09-0${i + 1}`] }))]) {

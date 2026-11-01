@@ -342,18 +342,52 @@ export function foodAmount(perDay: number | null | undefined, days: number): num
 }
 
 /**
- * A food claim is sent for a MONTH (the user, 2026-10-13: "they will submit by total month … dont by week submit"):
- * the brand weeks whose Friday falls in it, and once it is over — from the 1st of the next month, so none of its
- * days is still to come. `member_claim_food_detail` refuses the same.
+ * A food claim is sent for a MONTH (the user, 2026-10-13: "they will submit by total month … dont by week submit"),
+ * once it is over — from the 1st of the next month, so none of its days is still to come. A DAY is claimed in its own
+ * month (2026-11-01 — the user, over a fair of 29 Oct – 1 Nov: "那它 11 月 1 号就是 claim 在 11 月"): a weekend across
+ * two months is claimed a part in each, its 29–31 Oct with October's food and its 1 Nov with November's.
+ * `member_claim_food_detail` refuses the same.
  */
-export function monthOfWeek(week: string): string {
-  return week.slice(0, 7);
+export function monthOfDay(day: string): string {
+  return day.slice(0, 7);
+}
+
+/** `YYYY-MM` moved by `n` months. */
+export function shiftMonth(month: string, n: number): string {
+  const [y, m] = month.split("-").map(Number);
+  const t = y * 12 + (m - 1) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
+}
+
+/** The days of a brand week's fair that fall in a month — a weekend across two months gives each its own. */
+export function fairDaysIn(fair: { start: string | null; end: string | null }, weekend: string, month: string): string[] {
+  return fairDays(fair, weekend).filter(day => monthOfDay(day) === month);
+}
+
+/**
+ * A weekend on a month's food claim: one whose Friday is in it (a weekend with no booth too, greyed), or one they
+ * worked whose fair has a day in it — the weekend of 30 Oct on November's, for its 1 Nov.
+ */
+export function inFoodMonth(week: { key: string; worked?: boolean; start: string | null; end: string | null }, month: string): boolean {
+  return monthOfDay(week.key) === month || (!!week.worked && fairDaysIn(week, week.key, month).length > 0);
+}
+
+/**
+ * The months a food claim can be sent for, newest first: last month's — over, so it can be sent — and this month's,
+ * each with a day of a weekend they worked. A month's food is sent in the month after it; two months back is not
+ * offered (asked whether September's could still be sent in November, the user: "不补，规则照旧").
+ */
+export function foodClaimMonths(weeks: readonly { key: string; worked?: boolean; start: string | null; end: string | null }[], today: string): string[] {
+  const now = monthOfDay(today);
+  const open = new Set([shiftMonth(now, -1), now]);
+  const months = new Set<string>();
+  for (const w of weeks) if (w.worked) for (const day of fairDays(w, w.key)) if (open.has(monthOfDay(day))) months.add(monthOfDay(day));
+  return [...months].sort().reverse();
 }
 
 /** The 1st of the month after `YYYY-MM`, `YYYY-MM-DD` — the day its food can be claimed from. */
 export function foodMonthOpensOn(month: string): string {
-  const [y, m] = month.split("-").map(Number);
-  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  return `${shiftMonth(month, 1)}-01`;
 }
 
 export function foodMonthOver(month: string, today: string): boolean {
@@ -388,17 +422,19 @@ const isDay = (v: unknown): v is string => {
 };
 
 /**
- * The weekends a food claim sends, read strictly — 1 to 6 weekends of the month, each once, each with 1 to 31 real
- * days; null when anything else arrives (the server refuses it; the database checks every day against the fair).
+ * The weekends a food claim sends, read strictly — 1 to 6 weekends, each once, its Friday in the month or the one
+ * either side (a weekend across two months), each with 1 to 31 real days, every one of them in the month; null when
+ * anything else arrives (the server refuses it; the database checks every day against the fair).
  */
 export function readFoodWeeks(raw: unknown, month: string): FoodWeekPick[] | null {
   if (!Array.isArray(raw) || raw.length < 1 || raw.length > 6) return null;
+  const near = new Set([shiftMonth(month, -1), month, shiftMonth(month, 1)]);
   const seen = new Set<string>();
   const out: FoodWeekPick[] = [];
   for (const item of raw) {
     const x = item && typeof item === "object" ? (item as Record<string, unknown>) : null;
-    if (!x || !isDay(x.week) || monthOfWeek(x.week) !== month || seen.has(x.week)) return null;
-    if (!Array.isArray(x.days) || x.days.length < 1 || x.days.length > 31 || !x.days.every(isDay)) return null;
+    if (!x || !isDay(x.week) || !near.has(monthOfDay(x.week)) || seen.has(x.week)) return null;
+    if (!Array.isArray(x.days) || x.days.length < 1 || x.days.length > 31 || !x.days.every(d => isDay(d) && monthOfDay(d) === month)) return null;
     seen.add(x.week);
     out.push({ week: x.week, days: [...new Set(x.days as string[])].sort() });
   }
