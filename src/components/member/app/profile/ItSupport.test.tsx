@@ -156,6 +156,8 @@ describe("Send to IT", () => {
     expect(screen.getByText("Something is broken or wrong")).toBeInTheDocument();
     send();
     expect(screen.getByRole("alert")).toHaveTextContent("Add a title.");
+    // Over the button, as the request forms' (2026-11-01): in sight wherever the form is scrolled.
+    expect(screen.getByRole("alert").nextElementSibling).toBe(screen.getByRole("button", { name: "Send to IT" }));
     expect(f.onSubmit).not.toHaveBeenCalled();
   });
 

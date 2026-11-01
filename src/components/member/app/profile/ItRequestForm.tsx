@@ -146,9 +146,10 @@ function FormBody({ readOnly, onSubmit, onClose, upload }: {
           <ItFileList items={files.items} full={files.full} disabled={readOnly || busy} onAdd={files.add} onRemove={files.remove} />
           <span className={t.hint}>Pictures, videos, PDF, Office, zip — up to 10, 2 GB each.</span>
         </div>
-        {error && <p className={s.formError} role="alert">{error}</p>}
       </div>
       <div className={s.rfFoot}>
+        {/* Over the button, as the request forms' (2026-11-01): wherever the form is scrolled, a refusal is in sight. */}
+        {error && <p className={s.formError} role="alert">{error}</p>}
         <button className={s.rfCta} onClick={() => void send()} disabled={busy || readOnly}>
           {readOnly ? "Read-only while viewing as" : busy ? "Sending…" : files.busy ? "Uploading files…" : "Send to IT"}
         </button>
