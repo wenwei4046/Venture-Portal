@@ -790,9 +790,11 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
             </div>
           </>
         )}
-        {error && <p className={s.formError} role="alert">{error}</p>}
       </div>
       <div className={s.rfFoot}>
+        {/* A refusal stands over the button (2026-11-01): at the end of the form it was out of sight wherever the form was
+            scrolled, so a press seemed to do nothing — an October food claim sent on 31 Oct, its weekends open on screen. */}
+        {error && <p className={s.formError} role="alert">{error}</p>}
         {/* View as: the form opens and fills in as the member's would, and sends nothing (the Quote's add button reads the same). */}
         <button className={s.rfCta} onClick={() => void submit()} disabled={busy || readOnly}>
           {readOnly ? "Read-only while viewing as" : busy ? "Sending…" : revising ? "Send the update" : cta}

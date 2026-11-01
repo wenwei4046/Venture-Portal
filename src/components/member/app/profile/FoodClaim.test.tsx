@@ -110,6 +110,22 @@ describe("Submit food claim — a month at a time", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("the refusal stands over the button, not at the form's end — in sight wherever the form is scrolled", () => {
+    // 2026-11-01: an October food claim pressed on 31 Oct at 23:25, its weekends open on screen — the refusal sat after
+    // the summary and the notes, out of sight, so the press seemed to do nothing (a video from the Fair).
+    const onSubmit = ok();
+    foodForm(onSubmit, { ...options, today: "2026-10-31" });
+    fireEvent.click(screen.getByRole("button", { name: "Oct 2026" }));
+    fireEvent.click(weekCard(/Akemi week · 2–4 Oct/));
+    const cta = screen.getByRole("button", { name: "Review & submit claim" });
+    fireEvent.click(cta);
+    const refusal = screen.getByRole("alert");
+    expect(refusal).toHaveTextContent("Food for Oct 2026 is claimed once the month is over, from 1 Nov.");
+    expect(refusal.nextElementSibling).toBe(cta);
+    expect(document.querySelector("[data-rq-form-scroll]")).not.toContainElement(refusal);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("a month already claimed is said so, and sends nothing — a month is claimed once", () => {
     const onSubmit = ok();
     const opts: FormOptions = {
