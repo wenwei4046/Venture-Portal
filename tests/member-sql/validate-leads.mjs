@@ -1889,6 +1889,14 @@ await db.exec(`
   await as(CS_USER, ALL)
   await q(`select public.lead_give_to_ai($1, false)`, [ga])
   check([(await aiOf(ga)).ai_on, (await lastEvent(ga)).startsWith('Taken back from the AI Agent')], [false, true], 'taken back')
+  // The service role on a connection where the old-style claim once was set (reads back as '') — mig 20261102220000.
+  await db.exec(await f('20261102220000_lead_need_service_role.sql'))
+  await as(null, [])
+  await db.exec(`select set_config('request.jwt.claims', '{"role":"service_role"}', false), set_config('request.jwt.claim.role', '', false)`)
+  check(Array.isArray((await q(`select public.lead_outbox($1::uuid[]) o`, [[ga]]))[0].o), true, 'the service role sends though the old claim reads back empty')
+  await db.exec(`select set_config('request.jwt.claims', '', false)`)
+  await refuses(`select public.lead_outbox($1::uuid[])`, [[ga]], /Lead View · Create/, 'and nobody else does')
+  await as(CS_USER, ALL)
   for (const sig of ['lead_ai_claim(uuid[])', 'lead_outbox(uuid[])', 'lead_give_to_ai(uuid,boolean)']) {
     check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
   }
