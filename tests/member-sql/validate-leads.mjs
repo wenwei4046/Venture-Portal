@@ -1674,6 +1674,37 @@ await db.exec(`
   for (const sig of ['lead_data_subtree(uuid)', 'lead_data_chain(uuid)', 'lead_knowledge_tidy()']) {
     check((await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, false, `${sig}: only the functions’`)
   }
+
+  // ── The reply rules answer every message, not only the first (mig 20261102150000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_flow_on_message'`))[0].m, 'c0c1d012577bacd7933939655f74a5d0', 'the runner here is production’s')
+  await db.exec(await f('20261102150000_lead_rules_every_message.sql'))
+  await db.exec(await f('20261102150000_lead_rules_every_message.sql'))
+  // A customer who wrote before, on the rule's ad: each later message runs the rule again while nobody of ours answers.
+  await inMsg('7704001', 'hi', { sourceId: AGAIN_AD, headline: 'Skip the markup' })
+  const ev = await contactOf('7704001')
+  check(await welcomes(ev), 1, 'the first message gets the rule’s template')
+  await settle(ev)
+  await inMsg('7704001', 'hello?')
+  check(await welcomes(ev), 2, 'a later message gets it again')
+  // A template waiting on the customer answers the message itself.
+  await q(`update public.lead_contacts set flow_state = 'running', flow_id = $2, flow_step = 'w' where id = $1`, [ev, backFlow])
+  await inMsg('7704001', 'ok')
+  check(await welcomes(ev), 2, 'a template waiting: no new start')
+  // CS, or a person in Business Suite, wrote in the last day: nothing automatic.
+  await settle(ev)
+  await q(`insert into public.lead_messages (contact_id, direction, sender, by_name, body, delivery) values ($1, 'out', 'page', 'Business Suite', 'Hi, how can we help?', 'sent')`, [ev])
+  await inMsg('7704001', 'price?')
+  check(await welcomes(ev), 2, 'the Page answered in the last day: nothing automatic')
+  await q(`update public.lead_messages set created_at = now() - interval '25 hours' where contact_id = $1 and sender = 'page'`, [ev])
+  await inMsg('7704001', 'still there?')
+  check(await welcomes(ev), 3, 'a day later the rule runs again')
+  // No rule for the conversation: a later message keeps today's triggers (none here) — nothing.
+  await inMsg('7704002', 'hi')
+  const nr = await contactOf('7704002')
+  await settle(nr)
+  const nrFlows = (await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and sender = 'flow'`, [nr]))[0].n
+  await inMsg('7704002', 'hello again')
+  check((await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and sender = 'flow'`, [nr]))[0].n, nrFlows, 'no rule that answers: no new start')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)
