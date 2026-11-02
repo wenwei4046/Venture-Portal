@@ -62,6 +62,7 @@ export async function agentMore(client: SupabaseClient, brandId: string, today: 
   // Knowledge › General info: the cards switched off for this brand's agent.
   const infoFor = info.ok ? { ...info.data, cards: info.data.cards.filter(c => !settings.infoOff.includes(c.id)) } : null
   return {
+    settings,
     ask: { system, documents },
     cards: (old: KnowledgeCard[]) => agentCards(old, infoFor, brandId, today, m.answers, files),
   }

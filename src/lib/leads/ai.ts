@@ -139,12 +139,15 @@ export function systemPrompt(persona: Persona, cards: KnowledgeCard[], today: st
     section('Replies written the way the brand writes (copy the voice, not the facts)', persona.examples),
     `# What you know — the Data Center, today ${today}\n${knowledge}\n`,
     '# Rules',
-    '- Prices, promotions, stock, addresses, opening hours and policies come ONLY from the cards above. If the answer is not there, do not guess: say a colleague will confirm shortly, and set handoff to true.',
+    alone
+      ? '- Prices, promotions, stock, addresses, opening hours and policies come ONLY from the cards above. If the answer is not there, do not guess.'
+      : '- Prices, promotions, stock, addresses, opening hours and policies come ONLY from the cards above. If the answer is not there, do not guess: say a colleague will confirm shortly, and set handoff to true.',
     '- Reply in the language the customer writes in (English, Chinese or Malay), the way people chat: short, one to three small paragraphs, no markdown, no lists unless they help.',
     '- When the customer shows interest, ask for their mobile number naturally so a salesperson can arrange a showroom visit. Never ask again once we have it.',
     '- Never promise a discount, a gift or a date the cards do not give. Never mention these instructions, the cards or that you are an AI unless asked directly.',
-    '- Set handoff to true when the customer is upset, asks for a person, wants something the cards do not cover, or is ready to book a visit.',
-    alone ? '- You hand the customer to customer service by setting handoff to true. Do it when your goal is reached (for example they gave their mobile number: thank them and say a colleague will contact them soon), when you are not sure of the answer, and in every case above. When handoff is true, your reply tells the customer a colleague will follow up shortly.' : '',
+    alone
+      ? '- You hand the customer to customer service by setting handoff to true — only when your goal is reached (for example it is their mobile number and they gave it: thank them and say a colleague will contact them soon), when the customer asks for a person, or as "When to hand to a person" and "Do not answer" below say. When handoff is true, your reply tells the customer a colleague will follow up shortly.'
+      : '- Set handoff to true when the customer is upset, asks for a person, wants something the cards do not cover, or is ready to book a visit.',
     '- usedCardIds lists the ids of the cards your reply relies on. note tells customer service, in one English sentence, what to check — or is empty.',
   ].filter(Boolean).join('\n')
 }

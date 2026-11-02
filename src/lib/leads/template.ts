@@ -41,6 +41,8 @@ export interface TemplateStep {
   doneLabel?: string
   /** What it says when it comes back; empty = 'Anything else? Pick another, or tap "That's all".' */
   againText?: string
+  /** A ‹ Back button: the customer may go back to the step that waited before this one (mig 20261102180000). */
+  back?: boolean
   pos?: { x: number; y: number }
   lib?: { id: string; ver: number }
   /**
@@ -258,6 +260,13 @@ export function normDigits(v: string): string {
   return v.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[零〇一幺二两三四五六七八九]/g, c => CN[c] ?? c)
 }
 
+/** The ‹ Back button (a Messenger quick reply), and the words a customer may type for it — twin of lead_flow_on_message. */
+export const BACK_LABEL = '‹ Back'
+const BACK_WORDS = ['‹ back', 'back', '返回', '上一步', 'kembali']
+export function isBack(answer: string): boolean {
+  return BACK_WORDS.includes(answer.trim().toLowerCase())
+}
+
 export interface Said { from: 'bot' | 'customer' | 'system'; text: string; buttons?: string[]; file?: StepFile }
 
 export interface Walk {
@@ -268,6 +277,8 @@ export interface Walk {
   ended: 'done' | 'person' | 'ai' | 'stopped' | null
   /** The options picked so far on a question that takes more than one (lead_contacts.flow_picked). */
   picked?: number[]
+  /** The steps that waited in this run, oldest first, for ‹ Back (lead_contacts.flow_trail). */
+  trail?: string[]
 }
 
 const NUMBERS = /^\s*\d{1,2}((\s*([,，、/&+]|和|及|and)\s*|\s+)\d{1,2})*\s*$/i
@@ -307,15 +318,20 @@ function endWith(t: { endMsg: string }, own: string | undefined, said: Said[]) {
 }
 
 /** Send from a step on. Twin of lead_flow_send. */
-export function walkFrom(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, from: string, before: Said[] = []): Walk {
+export function walkFrom(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, from: string, before: Said[] = [], trail: string[] = []): Walk {
   const said = [...before]
   let at: string | null | undefined = from
   for (let hops = 0; hops < 40; hops++) {
     const s = t.steps.find(x => x.id === at)
     if (!s) return { said, waiting: null, tries: 0, ended: 'done' }
     if (s.file) said.push({ from: 'bot', text: '', file: s.file })
-    if (s.text?.trim()) said.push({ from: 'bot', text: s.text, buttons: s.kind === 'question' ? (s.buttons ?? []).map(b => b.label) : undefined })
-    if (s.kind === 'question' || s.kind === 'phone' || s.kind === 'text') return { said, waiting: s.id, tries: 0, ended: null }
+    const waits = s.kind === 'question' || s.kind === 'phone' || s.kind === 'text'
+    // Twin of lead_flow_buttons: the options, then ‹ Back when something waited before this step in the run.
+    const back = waits && !!s.back && s.id !== t.steps[0]?.id && trail.some(x => x !== s.id)
+    const opts = s.kind === 'question' ? (s.buttons ?? []).map(b => b.label) : undefined
+    const buttons = back ? [...(opts ?? []), BACK_LABEL] : opts
+    if (s.text?.trim()) said.push({ from: 'bot', text: s.text, buttons })
+    if (waits) return { said, waiting: s.id, tries: 0, ended: null, trail: s.id === t.steps[0]?.id ? [s.id] : [...trail, s.id] }
     if (s.kind === 'handoff' || s.kind === 'ai') {
       said.push({ from: 'system', text: s.kind === 'ai' ? 'Goes to the AI Agent · it reads the chat and answers from here' : 'Goes to a person · waits in the Inbox' })
       return { said, waiting: null, tries: 0, ended: s.kind === 'ai' ? 'ai' : 'person' }
@@ -332,6 +348,11 @@ export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, w: Walk, 
   const said: Said[] = [...w.said, { from: 'customer', text: answer }]
   const s = t.steps.find(x => x.id === w.waiting)
   if (!s) return { said, waiting: null, tries: 0, ended: 'stopped' }
+  const trail = w.trail ?? []
+  if (s.back && isBack(answer) && trail.length > 1 && trail[trail.length - 1] === s.id) {
+    said.push({ from: 'system', text: 'Back to the question before' })
+    return walkFrom(t, trail[trail.length - 2], said, trail.slice(0, -2))
+  }
   let next: string | null = null
   let end: string | undefined
   if (s.kind === 'question') {
@@ -356,7 +377,7 @@ export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, w: Walk, 
       const left = (s.buttons ?? []).map((b, i) => ({ b, i })).filter(x => !had.includes(x.i)).map(x => x.b.label)
       if (!hit.finish && left.length) {
         said.push({ from: 'bot', text: againOf(s), buttons: [...left, doneOf(s)] })
-        return { said, waiting: s.id, tries: 0, ended: null, picked: had }
+        return { said, waiting: s.id, tries: 0, ended: null, picked: had, trail }
       }
       next = s.next ?? ''
       end = s.endMsg
@@ -371,7 +392,7 @@ export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, w: Walk, 
     else if (s.retryText?.trim()) {
       if (s.retryMax == null || w.tries < Number(s.retryMax)) {
         said.push({ from: 'bot', text: s.retryText })
-        return { said, waiting: s.id, tries: w.tries + 1, ended: null }
+        return { said, waiting: s.id, tries: w.tries + 1, ended: null, trail }
       }
       if ((s.failNext ?? 'person') === 'person') { said.push({ from: 'system', text: 'Still not a phone · goes to a person' }); return { said, waiting: null, tries: 0, ended: 'person' } }
       next = s.failNext ?? ''
@@ -379,7 +400,7 @@ export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, w: Walk, 
   }
   if (next === null) { said.push({ from: 'system', text: 'Typed their own answer · the template stops for CS' }); return { said, waiting: null, tries: 0, ended: 'stopped' } }
   if (next === '') { endWith(t, end, said); return { said, waiting: null, tries: 0, ended: 'done' } }
-  return walkFrom(t, next, said)
+  return walkFrom(t, next, said, trail)
 }
 
 // ── The library ──

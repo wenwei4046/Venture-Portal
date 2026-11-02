@@ -401,7 +401,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
 
   const send = () => {
     const body = text.trim()
-    if (!body || sending || botOn) return
+    if (!body || sending) return
     setError(null)
     startSending(async () => {
       const r = replyingTo ? await replyToMessage(contact.id, body, replyingTo.id) : await replyToLead(contact.id, body)
@@ -416,13 +416,13 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
   }
   // A still photo opens the editor first; anything else goes as picked.
   const pickFile = (file: File | undefined) => {
-    if (!file || sending || botOn) return
+    if (!file || sending) return
     setError(null)
     if (editable(file)) setEditing(file)
     else sendFile(file)
   }
   const sendFile = (file: File | undefined) => {
-    if (!file || sending || botOn) return
+    if (!file || sending) return
     setError(null)
     if (file.size > FILE_LIMIT) { setError(TOO_BIG); return }
     const caption = text.trim()
@@ -611,7 +611,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
           ) : null}
           {used ? <span className={s.composeNote}>From an AI draft — check it before sending.</span> : null}
           <div className={s.composer}>
-            <Popover open={!!(qm && qm.matches.length && !botOn)} onClose={() => setText(t => t + ' ')} className={`${s.popUp} ${s.quickMenu}`} label="Shortcuts">
+            <Popover open={!!(qm && qm.matches.length)} onClose={() => setText(t => t + ' ')} className={`${s.popUp} ${s.quickMenu}`} label="Shortcuts">
               {(qm?.matches ?? []).slice(0, 6).map(r => (
                 <button key={r.id} type="button" role="option" aria-selected={false} className={`${u.menuItem} ${s.quickItem}`} onMouseDown={e => e.preventDefault()} onClick={() => putQuick(r)}>
                   <span className={s.quickKey}>{r.shortcut}</span><span className={s.quickText}>{r.body}</span>
@@ -619,29 +619,29 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
               ))}
             </Popover>
             <div className={s.composerTools}>
-              <button type="button" className={s.tool} title="File" aria-label="File" disabled={botOn || sending} onClick={() => filePick.current?.click()}><LeadIcon name="paperclip" size={18} /></button>
-              <button type="button" className={s.tool} title="Photo or video" aria-label="Photo or video" disabled={botOn || sending} onClick={() => photoPick.current?.click()}><LeadIcon name="image" size={18} /></button>
-              <button type="button" className={s.tool} title="Emoji" aria-label="Emoji" disabled={botOn || sending} aria-expanded={emojiOpen} onClick={() => setEmojiOpen(o => !o)}><LeadIcon name="smile" size={18} /></button>
+              <button type="button" className={s.tool} title="File" aria-label="File" disabled={sending} onClick={() => filePick.current?.click()}><LeadIcon name="paperclip" size={18} /></button>
+              <button type="button" className={s.tool} title="Photo or video" aria-label="Photo or video" disabled={sending} onClick={() => photoPick.current?.click()}><LeadIcon name="image" size={18} /></button>
+              <button type="button" className={s.tool} title="Emoji" aria-label="Emoji" disabled={sending} aria-expanded={emojiOpen} onClick={() => setEmojiOpen(o => !o)}><LeadIcon name="smile" size={18} /></button>
               <input ref={photoPick} type="file" accept="image/*,video/*" hidden onChange={e => { pickFile(e.target.files?.[0]); e.target.value = '' }} />
               <input ref={filePick} type="file" hidden onChange={e => { pickFile(e.target.files?.[0]); e.target.value = '' }} />
             </div>
             <EmojiMenu open={emojiOpen} onClose={() => setEmojiOpen(false)} onPick={putEmoji} />
-            <textarea ref={replyBox} className={s.reply} rows={1} value={text} onChange={e => setText(e.target.value)} maxLength={2000} disabled={botOn}
-              aria-label="Reply" placeholder={botOn ? `${now.label} is replying` : `Type your reply to ${first}, or / for shortcuts`}
+            <textarea ref={replyBox} className={s.reply} rows={1} value={text} onChange={e => setText(e.target.value)} maxLength={2000}
+              aria-label="Reply" placeholder={botOn ? `${now.label} is waiting on ${first} — a reply from you stops it` : `Type your reply to ${first}, or / for shortcuts`}
               onKeyDown={e => {
                 // Tab takes the first shortcut offered; Enter sends, Shift+Enter starts a new line.
-                if (e.key === 'Tab' && qm?.matches.length && !botOn) { e.preventDefault(); putQuick(qm.matches[0]); return }
+                if (e.key === 'Tab' && qm?.matches.length) { e.preventDefault(); putQuick(qm.matches[0]); return }
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() }
               }} />
-            <button type="button" className={s.infoBtn} title="General info" aria-label="General info" disabled={botOn || !info} aria-expanded={infoOpen} onClick={() => setInfoOpen(o => !o)}><LeadIcon name="book-open" size={18} /></button>
+            <button type="button" className={s.infoBtn} title="General info" aria-label="General info" disabled={!info} aria-expanded={infoOpen} onClick={() => setInfoOpen(o => !o)}><LeadIcon name="book-open" size={18} /></button>
             <InfoMenu open={infoOpen} info={info} brandId={contact.brandId} today={today} onClose={() => setInfoOpen(false)}
               onInsert={(v, whole) => setText(t => (whole ? (t ? t.replace(/\s*$/, '') + '\n\n' : '') + v : t + (t && !/\s$/.test(t) ? ' ' : '') + v))} />
             {!draft ? (
-              <button type="button" className={s.aiPill} onClick={askDraft} disabled={drafting || botOn || !aiOn || !aiConnected} title={aiTitle}>
+              <button type="button" className={s.aiPill} onClick={askDraft} disabled={drafting || !aiOn || !aiConnected} title={aiTitle}>
                 <LeadIcon name="sparkles" size={14} />{drafting ? 'Drafting…' : 'AI draft'}
               </button>
             ) : null}
-            <button type="button" className={s.send} title="Send" aria-label="Send" onClick={send} disabled={sending || botOn || !text.trim()}><LeadIcon name="arrow-up" size={18} /></button>
+            <button type="button" className={s.send} title="Send" aria-label="Send" onClick={send} disabled={sending || !text.trim()}><LeadIcon name="arrow-up" size={18} /></button>
           </div>
         </div>
       ) : null}

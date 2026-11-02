@@ -37,7 +37,7 @@ describe('answerLeads', () => {
     askModel.mockResolvedValue({ ok: true, model: 'm', text: JSON.stringify({ reply: 'RM 2,990.', usedCardIds: [], handoff: false, note: '' }) })
     const { client, calls } = fakeClient()
     expect(await answerLeads(client, ['c1'], 'tok')).toBe(1)
-    expect(calls.find(c => c[0] === 'lead_ai_answered')?.[1]).toEqual({ p_contact: 'c1', p_body: 'RM 2,990.', p_name: 'Aina', p_handoff: false, p_note: '' })
+    expect(calls.find(c => c[0] === 'lead_ai_answered')?.[1]).toEqual({ p_contact: 'c1', p_body: 'RM 2,990.', p_name: 'Aina', p_handoff: false, p_note: '', p_max: null })
     expect(sendLeadOutbox).toHaveBeenCalledWith(client, ['c1'], 'tok')
   })
 

@@ -171,3 +171,34 @@ describe('several replies to an option; picking more than one (2026-10-29, mig 2
     expect(templateProblem(bad({ doneLabel: 'x'.repeat(21) }))).toMatch(/finish button/)
   })
 })
+
+describe('‹ Back to the question before (2026-11-02, mig 20261102180000)', () => {
+  const t = {
+    endMsg: '',
+    steps: [
+      { id: 'q1', kind: 'question', text: 'Sofa or bed?', back: true, buttons: [{ label: 'Sofa', next: 'q2' }, { label: 'Bed', next: 'q2' }] },
+      { id: 'q2', kind: 'question', text: 'Budget?', back: true, buttons: [{ label: 'Under 3k', next: 'p' }] },
+      { id: 'p', kind: 'phone', text: 'Your number?', back: true, next: '' },
+    ] as TemplateStep[],
+  }
+  it('offers ‹ Back only after something was asked, never on the first step', () => {
+    const w = walkFrom(t, 'q1')
+    expect(w.said.at(-1)?.buttons).toEqual(['Sofa', 'Bed'])
+    const w2 = walkAnswer(t, w, 'Sofa')
+    expect(w2.said.at(-1)?.buttons).toEqual(['Under 3k', '‹ Back'])
+    expect(w2.trail).toEqual(['q1', 'q2'])
+  })
+  it('goes back one question at a time, as typed or tapped', () => {
+    let w = walkAnswer(t, walkAnswer(t, walkFrom(t, 'q1'), 'Sofa'), 'Under 3k')
+    expect(w.waiting).toBe('p')
+    w = walkAnswer(t, w, '返回')
+    expect([w.waiting, w.trail]).toEqual(['q2', ['q1', 'q2']])
+    w = walkAnswer(t, w, '‹ Back')
+    expect([w.waiting, w.trail, w.said.at(-1)?.buttons]).toEqual(['q1', ['q1'], ['Sofa', 'Bed']])
+  })
+  it('a step without it takes "back" as its own answer', () => {
+    const plain = { ...t, steps: t.steps.map(s => ({ ...s, back: false })) }
+    const w = walkAnswer(plain, walkAnswer(plain, walkFrom(plain, 'q1'), 'Sofa'), 'back')
+    expect(w.ended).toBe('stopped')
+  })
+})

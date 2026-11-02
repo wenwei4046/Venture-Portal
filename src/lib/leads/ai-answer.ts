@@ -26,7 +26,7 @@ export function lastingFailure(reason: string): string | null {
  * The AI Agent answering by itself (mig 20261102170000): after a webhook delivery, the conversations in its hands whose
  * customer wrote last (or that were just handed to it) are claimed (`lead_ai_claim`), each read as a draft is — the
  * brand's agent, its Knowledge, General info, fixed answers and the last 30 messages — and its reply kept
- * (`lead_ai_answered`, which hands the customer to CS when the model asks or on the 10th reply), then sent by the outbox.
+ * (`lead_ai_answered`, which hands the customer to CS when the model asks or at How it replies' "after N replies"), then sent by the outbox.
  * A lasting failure (no API key, the brand's agent not set up) hands the customer to CS; a passing one lets the claim go
  * for the next message. Handed the webhook's client (the service role). Never throws.
  */
@@ -79,6 +79,7 @@ async function answerOne(client: SupabaseClient, id: string): Promise<Stop | nul
   if (!draft) return { keep: true }
   const kept = await client.rpc('lead_ai_answered', {
     p_contact: id, p_body: draft.reply, p_name: persona.agentName, p_handoff: draft.handoff, p_note: draft.note,
+    p_max: more?.settings.maxOn ? more.settings.maxReplies : null,
   })
   if (kept.error) {
     console.error('lead_ai_answered failed:', kept.error.message)

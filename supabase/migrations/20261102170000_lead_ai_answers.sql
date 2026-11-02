@@ -9,7 +9,7 @@
 -- draft's own reading), and records the reply (`lead_ai_answered`, sender 'ai'), which the outbox sends as a template's
 -- messages go (`lead_outbox` now takes 'ai' too). It hands the customer to CS — `ai_on` off, "AI Agent handed the
 -- customer to Customer Service" on the timeline — when the model says a person should take over (unsure, upset, the
--- goal reached), after 10 replies (`ai_turns`), or when it cannot answer at all (`lead_ai_stop`). A message from CS in
+-- goal reached), at the brand's reply limit (How it replies › When to hand over; 30 at most, `ai_turns`), or when it cannot answer at all (`lead_ai_stop`). A message from CS in
 -- Lead View or a person in Business Suite takes it off too. While it is on, the reply rules and keyword triggers leave
 -- the customer's messages to it.
 --
@@ -158,8 +158,9 @@ END
 $$;
 
 -- The AI Agent's reply, kept to be sent (the outbox). Nothing when the conversation left its hands meanwhile (CS
--- replied). It hands the customer to CS when the model says so or on its 10th reply.
-CREATE OR REPLACE FUNCTION public.lead_ai_answered(p_contact uuid, p_body text, p_name text, p_handoff boolean, p_note text)
+-- replied). It hands the customer to CS when the model says so, or at the brand's reply limit (AI Agent › How it replies
+-- › When to hand over, "after N replies" — p_max; none set: 30 at most).
+CREATE OR REPLACE FUNCTION public.lead_ai_answered(p_contact uuid, p_body text, p_name text, p_handoff boolean, p_note text, p_max integer)
 RETURNS bigint
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp
@@ -168,6 +169,7 @@ DECLARE
   c public.lead_contacts;
   v_id bigint;
   v_done boolean;
+  v_limit integer;
 BEGIN
   SELECT * INTO c FROM public.lead_contacts WHERE id = p_contact FOR UPDATE;
   IF NOT FOUND OR NOT c.ai_on THEN
@@ -179,14 +181,15 @@ BEGIN
   INSERT INTO public.lead_messages (contact_id, direction, sender, by_name, body)
   VALUES (p_contact, 'out', 'ai', left(coalesce(nullif(btrim(p_name), ''), 'AI Agent'), 80), left(btrim(p_body), 2000))
   RETURNING id INTO v_id;
-  v_done := coalesce(p_handoff, false) OR c.ai_turns + 1 >= 10;
+  v_limit := greatest(1, least(coalesce(p_max, 30), 30));
+  v_done := coalesce(p_handoff, false) OR c.ai_turns + 1 >= v_limit;
   UPDATE public.lead_contacts SET last_at = now(), last_dir = CASE WHEN v_done THEN 'in' ELSE 'out' END, last_text = left(btrim(p_body), 200),
          updated_at = now(), ai_turns = ai_turns + 1, ai_busy_at = NULL, ai_on = NOT v_done
    WHERE id = p_contact;
   IF v_done THEN
     INSERT INTO public.lead_events (contact_id, what, actor_name)
     VALUES (p_contact, 'AI Agent handed the customer to Customer Service'
-              || CASE WHEN NOT coalesce(p_handoff, false) THEN ' — 10 replies' WHEN btrim(coalesce(p_note, '')) <> '' THEN ' — ' || left(btrim(p_note), 200) ELSE '' END,
+              || CASE WHEN NOT coalesce(p_handoff, false) THEN ' — ' || v_limit || ' replies' WHEN btrim(coalesce(p_note, '')) <> '' THEN ' — ' || left(btrim(p_note), 200) ELSE '' END,
             'AI Agent');
   END IF;
   RETURN v_id;
@@ -214,10 +217,10 @@ END
 $$;
 
 REVOKE ALL ON FUNCTION public.lead_ai_claim(uuid[]) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.lead_ai_answered(uuid, text, text, boolean, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.lead_ai_answered(uuid, text, text, boolean, text, integer) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.lead_ai_stop(uuid, text, boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.lead_ai_claim(uuid[]) TO service_role;
-GRANT EXECUTE ON FUNCTION public.lead_ai_answered(uuid, text, text, boolean, text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.lead_ai_answered(uuid, text, text, boolean, text, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.lead_ai_stop(uuid, text, boolean) TO service_role;
 
 NOTIFY pgrst, 'reload schema';

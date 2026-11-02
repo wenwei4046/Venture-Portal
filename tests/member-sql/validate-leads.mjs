@@ -1738,19 +1738,19 @@ await db.exec(`
   check(await aiOf(ai1), { ai_on: true, ai_turns: 0, busy: false, flow_state: 'done' }, 'the AI Agent step puts the conversation in the AI’s hands')
   check(await claim([ai1]), [ai1], 'just handed over, though the template wrote last: the AI answers at once')
   check(await claim([ai1]), [], 'claimed once: a second delivery leaves it')
-  await q(`select public.lead_ai_answered($1, 'Hi! Looking for a sofa?', 'Aina', false, '')`, [ai1])
+  await q(`select public.lead_ai_answered($1, 'Hi! Looking for a sofa?', 'Aina', false, '', null)`, [ai1])
   check(await claim([ai1]), [], 'it wrote last: nothing more')
   await inMsg('7706001', 'how much is the L-shape?')
   check(await moments(ai1), 1, 'the AI’s customer: no template again')
   check(await claim([ai1]), [ai1], 'the customer wrote last: claimed')
-  const aiMsg = (await q(`select public.lead_ai_answered($1, 'RM 2,990 this week.', 'Aina', false, '') i`, [ai1]))[0].i
+  const aiMsg = (await q(`select public.lead_ai_answered($1, 'RM 2,990 this week.', 'Aina', false, '', null) i`, [ai1]))[0].i
   check((await q(`select sender, by_name, delivery from public.lead_messages where id = $1`, [aiMsg]))[0], { sender: 'ai', by_name: 'Aina', delivery: 'recorded' }, 'the AI’s reply is kept as its own, to send')
   check(await aiOf(ai1), { ai_on: true, ai_turns: 2, busy: false, flow_state: 'done' }, 'still the AI’s, two replies')
   check((await q(`select public.lead_outbox($1::uuid[]) o`, [[ai1]]))[0].o.some(r => r.id === aiMsg), true, 'the outbox sends it')
   check(await claim([ai1]), [], 'it wrote last: nothing more')
   await inMsg('7706001', 'ok my number is 0123456789')
   check(await claim([ai1]), [ai1], 'the customer again: claimed')
-  await q(`select public.lead_ai_answered($1, 'Thanks! A colleague will call you.', 'Aina', true, 'Got the phone')`, [ai1])
+  await q(`select public.lead_ai_answered($1, 'Thanks! A colleague will call you.', 'Aina', true, 'Got the phone', null)`, [ai1])
   check([(await aiOf(ai1)).ai_on, await lastEvent(ai1)], [false, 'AI Agent handed the customer to Customer Service — Got the phone'], 'the goal reached: handed to CS, the timeline says why')
   await inMsg('7706001', 'when will they call?')
   check([await moments(ai1), await claim([ai1])], [1, []], 'handed over: no template, no AI, until CS answers')
@@ -1765,17 +1765,22 @@ await db.exec(`
   await inMsg('7706003', 'hello', { sourceId: AI_AD, headline: 'Beds' })
   const ai3 = await contactOf('7706003')
   check([(await aiOf(ai3)).ai_on, await claim([ai3])], [true, [ai3]], 'a rule set to AI Agent: the AI answers the first message')
-  // Ten replies at most.
-  await q(`update public.lead_contacts set ai_turns = 9 where id = $1`, [ai3])
-  await q(`select public.lead_ai_answered($1, 'Here you go.', '', false, '')`, [ai3])
-  check([(await aiOf(ai3)).ai_on, await lastEvent(ai3)], [false, 'AI Agent handed the customer to Customer Service — 10 replies'], 'the tenth reply hands the customer to CS')
+  // The brand’s limit (How it replies › When to hand over), else 30 at most.
+  await q(`update public.lead_contacts set ai_turns = 4 where id = $1`, [ai3])
+  await q(`select public.lead_ai_answered($1, 'Here you go.', '', false, '', 6)`, [ai3])
+  check((await aiOf(ai3)).ai_on, true, 'under the brand’s limit: still the AI’s')
+  await q(`select public.lead_ai_answered($1, 'And this.', '', false, '', 6)`, [ai3])
+  check([(await aiOf(ai3)).ai_on, await lastEvent(ai3)], [false, 'AI Agent handed the customer to Customer Service — 6 replies'], 'its 6th reply, the brand’s limit, hands the customer to CS')
+  await q(`update public.lead_contacts set ai_on = true, ai_turns = 29 where id = $1`, [ai3])
+  await q(`select public.lead_ai_answered($1, 'Here you go.', '', false, '', null)`, [ai3])
+  check(await lastEvent(ai3), 'AI Agent handed the customer to Customer Service — 30 replies', 'no limit set: 30 at most')
   // It could not answer: a passing failure keeps it, a lasting one hands over.
   await q(`update public.lead_contacts set ai_on = true, ai_busy_at = now() where id = $1`, [ai3])
   await q(`select public.lead_ai_stop($1, 'busy', true)`, [ai3])
-  check(await aiOf(ai3), { ai_on: true, ai_turns: 10, busy: false, flow_state: 'none' }, 'a passing failure lets the claim go')
+  check(await aiOf(ai3), { ai_on: true, ai_turns: 30, busy: false, flow_state: 'none' }, 'a passing failure lets the claim go')
   await q(`select public.lead_ai_stop($1, 'The AI Agent is not set up for this brand', false)`, [ai3])
   check([(await aiOf(ai3)).ai_on, await lastEvent(ai3)], [false, 'AI Agent handed the customer to Customer Service — The AI Agent is not set up for this brand'], 'a lasting one hands over')
-  check((await q(`select public.lead_ai_answered($1, 'late', '', false, '') i`, [ai3]))[0].i, null, 'no longer the AI’s: a late reply is not kept')
+  check((await q(`select public.lead_ai_answered($1, 'late', '', false, '', null) i`, [ai3]))[0].i, null, 'no longer the AI’s: a late reply is not kept')
   // The app's server may read what the draft reads; anybody else is asked as before.
   await as(null, [])
   await refuses(`select public.lead_ai_more($1)`, [b1], /Lead View · View/, 'no session, no role: refused')
@@ -1783,9 +1788,41 @@ await db.exec(`
   check(typeof (await q(`select public.lead_ai_more($1) m`, [b1]))[0].m, 'object', 'the service role reads the agent')
   await db.exec(`select set_config('request.jwt.claim.role', '', false)`)
   await as(CS_USER, ALL)
-  for (const sig of ['lead_ai_claim(uuid[])', 'lead_ai_answered(uuid,text,text,boolean,text)', 'lead_ai_stop(uuid,text,boolean)']) {
+  for (const sig of ['lead_ai_claim(uuid[])', 'lead_ai_answered(uuid,text,text,boolean,text,integer)', 'lead_ai_stop(uuid,text,boolean)']) {
     check((await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, false, `${sig}: the service role’s alone`)
   }
+
+  // ── {name} and ‹ Back (mig 20261102180000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_flow_on_message'`))[0].m, '4b2ca8a6f45ad49bbb7dab46710968c7', 'the runner here is 20261102170000’s')
+  await db.exec(await f('20261102180000_lead_name_and_back.sql'))
+  await db.exec(await f('20261102180000_lead_name_and_back.sql'))
+  const BACK_AD = '120249999000004'
+  const backTpl = (await q(`insert into public.lead_flows (name, template, trigger_kind, trigger_value, active, steps) values ('With back', 'custom', 'first', '', false, $1::jsonb) returning id`,
+    [JSON.stringify([
+      { id: 'q1', kind: 'question', text: 'Hi *{name}*! Sofa or bed?', back: true, buttons: [{ label: 'Sofa', next: 'q2' }, { label: 'Bed', next: 'q2' }] },
+      { id: 'q2', kind: 'question', text: 'Budget?', back: true, buttons: [{ label: 'Under 3k', next: 'p' }] },
+      { id: 'p', kind: 'phone', text: 'Your number?', back: true, next: '' },
+    ])]))[0].id
+  await q(`insert into public.lead_reply_rules (ad_id, at_when, reply) values ($1, 'any', $2)`, [BACK_AD, backTpl])
+  const lastFlow = async id => (await q(`select body, buttons from public.lead_messages where contact_id = $1 and sender = 'flow' order by id desc limit 1`, [id]))[0]
+  const where = async id => (await q(`select flow_step, flow_trail from public.lead_contacts where id = $1`, [id]))[0]
+  await inMsg('7707001', 'hi', { sourceId: BACK_AD, headline: 'Sofas' })
+  const bk = await contactOf('7707001')
+  check(await lastFlow(bk), { body: 'Hi *Back Again*! Sofa or bed?', buttons: ['Sofa', 'Bed'] }, '{name} is the customer’s name; no ‹ Back on the first step')
+  await inMsg('7707001', 'Sofa')
+  check([await lastFlow(bk), await where(bk)], [{ body: 'Budget?', buttons: ['Under 3k', '‹ Back'] }, { flow_step: 'q2', flow_trail: ['q1', 'q2'] }], 'the next question offers ‹ Back')
+  await inMsg('7707001', 'Under 3k')
+  check([await lastFlow(bk), await where(bk)], [{ body: 'Your number?', buttons: ['‹ Back'] }, { flow_step: 'p', flow_trail: ['q1', 'q2', 'p'] }], 'a phone step offers it too')
+  await inMsg('7707001', '返回')
+  check([(await lastFlow(bk)).body, await where(bk)], ['Budget?', { flow_step: 'q2', flow_trail: ['q1', 'q2'] }], 'typed back: the question before, again')
+  await inMsg('7707001', '‹ Back')
+  check([await lastFlow(bk), await where(bk)], [{ body: 'Hi *Back Again*! Sofa or bed?', buttons: ['Sofa', 'Bed'] }, { flow_step: 'q1', flow_trail: ['q1'] }], 'tapped back to the first question')
+  check((await q(`select count(*)::int n from public.lead_events where contact_id = $1 and what = 'Went back to the question before'`, [bk]))[0].n, 2, 'the timeline says so')
+  await inMsg('7707002', 'hi')
+  const nn = await contactOf('7707002')
+  await q(`update public.lead_contacts set name = '' where id = $1`, [nn])
+  await q(`select public.lead_flow_say($1, 'T', 'Hello {name}!', null)`, [nn])
+  check((await lastFlow(nn)).body, 'Hello there!', 'no name: "there"')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

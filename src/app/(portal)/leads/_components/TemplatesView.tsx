@@ -9,7 +9,7 @@ import { infoEntries, type LeadInfo } from '@/lib/leads/info'
 import { createClient } from '@/lib/supabase/client'
 import { wrapMark } from '@/lib/leads/rich'
 import {
-  ALSO_MAX, OPTION_MAX, RETRY_PHONE, SAVE_AS, doneOf, freshId, fromLibrary, templateProblem, toLibrary, updateFromLibrary, usedBy, walkAnswer, walkFrom,
+  ALSO_MAX, BACK_LABEL, OPTION_MAX, RETRY_PHONE, SAVE_AS, doneOf, freshId, fromLibrary, templateProblem, toLibrary, updateFromLibrary, usedBy, walkAnswer, walkFrom,
   type LibraryItem, type ReplyRules, type ReplyTemplate, type StepFile, type StepKind, type TemplateStep, type Walk,
 } from '@/lib/leads/template'
 import { ATTACH_ACCEPT, NODE, STEP_TYPES, edgePath, extOf, inPort, isImage, mapPlaced, mapRows, nodeHeight, rowPort, sizeLabel, typeOf } from '@/lib/leads/template-map'
@@ -631,6 +631,11 @@ function MoreOptions({ step, steps, canEdit, set, setStep, lib, info, today, tex
           <label className={s.field}>Still wrong, goes to {goes(step.failNext ?? 'person', v => set({ failNext: v }), 'Still wrong', [{ v: 'person', l: 'Hand to a person' }])}</label>
         </>
       ) : null}
+      {['question', 'text', 'phone'].includes(step.kind) ? (
+        <label className={s.check} title="Not shown on the template's first step, or before the customer was asked anything">
+          <input type="checkbox" checked={!!step.back} disabled={dis} onChange={e => set({ back: e.target.checked || undefined })} />Customer can go back (‹ Back button)
+        </label>
+      ) : null}
       {['phone', 'message', 'text'].includes(step.kind) && !step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
       {step.kind === 'question' && step.multi && !step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
     </div>
@@ -845,11 +850,13 @@ function Rail({ open, setOpen, draft, from, brand, urlOf }: {
       else out.push({ k: 'bot', text: x.text.replace(/\{name\}/g, 'Jason') })
     }
     const waiting = w.waiting ? draft.steps.find(x => x.id === w.waiting) : undefined
+    const lastBtns = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons
+    const back = waiting?.kind !== 'question' && lastBtns?.includes(BACK_LABEL) ? [BACK_LABEL] : []
     if (waiting?.kind === 'question') {
       const shown = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons ?? (waiting.buttons ?? []).map(b => b.label)
       if (shown.length) out.push({ k: 'btns', text: '', btns: waiting.multi ? [...shown, doneOf(waiting)] : shown })
-    } else if (waiting?.kind === 'phone') out.push({ k: 'btns', text: '', btns: ['Send my number'] })
-    else if (waiting?.kind === 'text') out.push({ k: 'btns', text: '', btns: ['Type an answer'] })
+    } else if (waiting?.kind === 'phone') out.push({ k: 'btns', text: '', btns: ['Send my number', ...back] })
+    else if (waiting?.kind === 'text') out.push({ k: 'btns', text: '', btns: ['Type an answer', ...back] })
     return out
   }, [draft.steps, draft.endMsg, startId, picks, urlOf])
   const answer = (b: string) => add(b === 'Send my number' ? '012-338 4721' : b === 'Type an answer' ? 'Next Saturday afternoon' : b)
