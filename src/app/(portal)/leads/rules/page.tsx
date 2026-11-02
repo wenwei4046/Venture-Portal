@@ -1,7 +1,7 @@
 import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
-import { NOT_SET_UP, loadAds, loadChangesOf, loadFlows, loadLeadConfig, loadPages, loadReplyRules } from '@/lib/leads/server'
+import { NOT_SET_UP, loadAdPosts, loadAds, loadChangesOf, loadFlows, loadLeadConfig, loadPages, loadReplyRules } from '@/lib/leads/server'
 import { managedPages } from '@/lib/leads/pages-server'
 import { routeRows, ruleLog, type LeadPage } from '@/lib/leads/pages'
 import type { ReplyRules, ReplyTemplate, TemplateStep } from '@/lib/leads/template'
@@ -17,8 +17,8 @@ export const dynamic = 'force-dynamic'
 export default async function Page() {
   await requirePage('/leads/rules')
   const user = await requirePermission('leads')
-  const [config, rules, ads, flows, pages, managed, changes] = await Promise.all([
-    loadLeadConfig(), loadReplyRules(), loadAds(), loadFlows(), loadPages(), managedPages(), loadChangesOf(['lead_reply_pages', 'lead_reply_rules']),
+  const [config, rules, ads, flows, pages, managed, changes, posts] = await Promise.all([
+    loadLeadConfig(), loadReplyRules(), loadAds(), loadFlows(), loadPages(), managedPages(), loadChangesOf(['lead_reply_pages', 'lead_reply_rules']), loadAdPosts(),
   ])
   if (!config.ok || (!rules.ok && rules.reason !== NOT_SET_UP)) {
     return (
@@ -42,7 +42,9 @@ export default async function Page() {
       brandId: f.brandId, triggerKind: f.triggerKind, triggerValue: f.triggerValue, active: f.active, updatedAt: f.updatedAt,
     }
   }) : []
-  const adList = ads.ok ? ads.data : []
+  // Each ad's own post and picture (before mig 20261102250000, none: the arrow is not drawn).
+  const postOf = new Map((posts.ok ? posts.data : []).map(p => [p.adId, p]))
+  const adList = (ads.ok ? ads.data : []).map(a => ({ ...a, ...(postOf.has(a.adId) ? { postUrl: postOf.get(a.adId)!.postUrl, picture: postOf.get(a.adId)!.picture, video: postOf.get(a.adId)!.video } : {}) }))
   const log = changes.ok ? ruleLog(changes.data, {
     brand: id => brands.find(b => b.id === id)?.name ?? 'A brand',
     ad: id => { const a = adList.find(x => x.adId === id); return a ? (a.name || a.headline || `Ad ${id}`) : `Ad ${id}` },
