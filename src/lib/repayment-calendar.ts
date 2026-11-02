@@ -1,9 +1,10 @@
 // The Repayment Schedule's calendar (2026-10-09, the user's Claude Design
 // handoff) reads each deal's repayment plan (lib/repayment-plan): the month's
-// installments become its entries, standing as part paid (some of it in),
-// overdue (nothing in and its day gone) or due. One with nothing left on it —
-// paid, paid ahead or settled early — is no entry (2026-11-02, user: 已经settle
-// 了就别出现哦).
+// installments become its entries, standing as paid (nothing left on it),
+// part paid (some of it in), overdue (nothing in and its day gone) or due.
+// One paid before its month — paid ahead, or a deal settled early — is no
+// entry (2026-11-02, the user: 已经settle 了就别出现哦 → 还了要显示，只是像那种
+// 提早settle 了就不要显示 → b, "提前预付的期数也算").
 
 import type { RepaymentPlan } from './repayment-plan'
 
@@ -20,25 +21,28 @@ export interface CalendarEntry extends CalendarDeal {
   date: string
   amount: number
   outstanding: number
-  status: 'due' | 'partial' | 'overdue'
+  status: 'paid' | 'due' | 'partial' | 'overdue'
   no: number
   months: number | null
 }
 
+/** A row paid in full before its own month began — paid ahead, or settled early with the deal. */
+const paidAhead = (r: RepaymentPlan['rows'][number]) => r.outstanding <= 0.005 && !!r.paidOn && r.paidOn.slice(0, 7) < r.ym
+
 export function monthEvents(plan: RepaymentPlan, deal: CalendarDeal, month: string, today: string): CalendarEntry[] {
   return plan.rows
     // A month with nothing to pay — an interest-free deal with no fixed term —
-    // is no entry (2026-10-12, user: 把0.00拿掉); nor is one already settled
-    // (2026-11-02): CONTS's 300,000 repaid in full on 26 Oct 2026 and HC's
-    // 300,000 paid 35 instalments ahead on 5 Aug 2026 had stood on November's
-    // 1st, green, 10,000.13 each.
-    .filter((r) => r.ym === month && r.installment > 0.005 && r.outstanding > 0.005)
+    // is no entry (2026-10-12, user: 把0.00拿掉); nor is one paid before its month
+    // (2026-11-02): CONTS's 300,000, repaid in full by 26 Oct 2026, and HC's
+    // 300,000, paid 35 instalments ahead on 5 Aug 2026, had stood on November's
+    // 1st, green, 10,000.13 each. Paid in its month or after, it stays — paid.
+    .filter((r) => r.ym === month && r.installment > 0.005 && !paidAhead(r))
     .map((r) => ({
       ...deal,
       date: r.due,
       amount: r.installment,
       outstanding: r.outstanding,
-      status: r.outstanding < r.installment - 0.005 ? 'partial' : r.due < today ? 'overdue' : 'due',
+      status: r.outstanding <= 0.005 ? 'paid' : r.outstanding < r.installment - 0.005 ? 'partial' : r.due < today ? 'overdue' : 'due',
       no: r.no,
       months: plan.months,
     }))

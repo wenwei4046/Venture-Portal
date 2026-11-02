@@ -4,12 +4,13 @@ import { buildRepaymentPlan, type PlanPayment, type RepaymentPlan } from './repa
 import { isFundSourcePrincipal, isLoanPrincipal, termsForFundSource, termsForLoan } from './treasury-terms-data'
 
 // 2026-10-09 — the Repayment Schedule's calendar reads each deal's plan: the
-// month's installments become its entries, standing as part paid, overdue or
-// due by what is still unpaid on them and their day. 2026-11-02 (user: 已经settle
-// 了就别出现哦): one with nothing left on it is no entry — it had stood, green.
+// month's installments become its entries, standing as paid, part paid,
+// overdue or due by what is still unpaid on them and their day. 2026-11-02
+// (the user: 还了要显示，只是像那种提早settle 了就不要显示 → b): one paid before its
+// month — paid ahead, or settled early with its deal — is no entry.
 
-const row = (no: number, due: string, installment: number, outstanding: number) => ({
-  no, ym: due.slice(0, 7), due, installment, principal: installment - 400, interest: 400, balance: 0, outstanding, remark: '', tone: '' as const,
+const row = (no: number, due: string, installment: number, outstanding: number, paidOn?: string) => ({
+  no, ym: due.slice(0, 7), due, installment, principal: installment - 400, interest: 400, balance: 0, outstanding, remark: '', tone: '' as const, paidOn,
 })
 const plan = (rows: ReturnType<typeof row>[], months: number | null = 6): RepaymentPlan => ({
   kind: months ? 'fixed' : 'open', rows, months, paidCount: 0, outstandingDue: 0, overdue: 0, overdueSince: null, overdueDays: 0, firstDue: rows[0]?.due ?? null, firstInstallment: 0,
@@ -18,7 +19,7 @@ const plan = (rows: ReturnType<typeof row>[], months: number | null = 6): Repaym
 const deal = { kind: 'collect' as const, name: 'CAR', href: '/fund-out/l1', rate: 0.04, principal: 60000 }
 
 describe('monthEvents', () => {
-  it('takes the month’s installments still unpaid and says where each stands', () => {
+  it('takes the month’s installments and says where each stands', () => {
     const p = plan([
       row(4, '2026-09-02', 12400, 0),
       row(5, '2026-10-02', 12400, 0),
@@ -27,11 +28,25 @@ describe('monthEvents', () => {
       row(8, '2026-10-20', 12400, 12400),
     ])
     expect(monthEvents(p, deal, '2026-10', '2026-10-09').map((e) => [e.date, e.status, e.outstanding, e.no, e.months])).toEqual([
+      ['2026-10-02', 'paid', 0, 5, 6],
       ['2026-10-30', 'partial', 2400, 6, 6],
       ['2026-10-05', 'overdue', 12400, 7, 6],
       ['2026-10-20', 'due', 12400, 8, 6],
     ])
     expect(monthEvents(p, deal, '2026-10', '2026-10-09')[0]).toMatchObject({ kind: 'collect', name: 'CAR', href: '/fund-out/l1', amount: 12400, rate: 0.04, principal: 60000 })
+  })
+
+  // 2026-11-02 (the user: 还了要显示，只是像那种提早settle 了就不要显示 → b): paid in
+  // its month, early or late, it stays; paid in a month before — even 19 Sep for
+  // 5 Oct — it is no entry.
+  it('leaves out one paid before its month; paid in its month or after, it stays — paid', () => {
+    const p = plan([
+      row(5, '2026-10-05', 1950, 0, '2026-09-19'),
+      row(6, '2026-10-15', 1950, 0, '2026-10-03'),
+      row(7, '2026-10-20', 1950, 0, '2026-11-02'),
+      row(8, '2026-10-25', 1950, 1950),
+    ])
+    expect(monthEvents(p, deal, '2026-10', '2026-11-05').map((e) => [e.no, e.status])).toEqual([[6, 'paid'], [7, 'paid'], [8, 'overdue']])
   })
 
   it('has nothing for a month the plan does not reach', () => {
@@ -48,9 +63,9 @@ describe('monthEvents', () => {
 
 // 2026-11-02 — the user's November: CONTS's 300,000 loan and HC's 300,000 fund
 // source (36 instalments of 10,000.13 from January 2025, due the 1st) stood on
-// the 1st, green, though CONTS had repaid all 36 by 26 Oct 2026 and HC had
-// been paid 35 ahead on 5 Aug 2026.
-describe('monthEvents · what is settled is off the calendar', () => {
+// the 1st, green, though CONTS had repaid all 36 by 26 Oct 2026 (22 of them
+// with July's lump) and HC had been paid 35 ahead on 5 Aug 2026.
+describe('monthEvents · what was paid before its month is off the calendar', () => {
   const pays = (lump: Array<[string, string, number]>): PlanPayment[] => [
     ...Array.from({ length: 13 }, (_, i) => {
       const date = `${2025 + Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, '0')}-01`
@@ -81,13 +96,22 @@ describe('monthEvents · what is settled is off the calendar', () => {
   const CONTS = { kind: 'collect' as const, name: 'CONTS', href: '/fund-out/conts', rate: 0.005556, principal: 300000 }
   const HC = { kind: 'pay' as const, name: 'HC', href: '/fund-in/hc', rate: 0.005556, principal: 300000 }
 
-  it('a loan repaid in full has no instalment on November 1st, nor on any month after', () => {
-    expect(conts.rows.find((r) => r.ym === '2026-11')).toMatchObject({ installment: 10000.13, outstanding: 0 })
+  it('a loan repaid ahead has no instalment from August on — July’s lump paid them before their months', () => {
+    expect(conts.rows.find((r) => r.ym === '2026-11')).toMatchObject({ installment: 10000.13, outstanding: 0, paidOn: '2026-07-31' })
+    expect(monthEvents(conts, CONTS, '2026-10', TODAY)).toEqual([])
     expect(monthEvents(conts, CONTS, '2026-11', TODAY)).toEqual([])
     expect(monthEvents(conts, CONTS, '2027-12', TODAY)).toEqual([])
   })
 
-  it('a fund source paid 35 ahead has none in November — its one instalment left stays on its day', () => {
+  it('keeps what was paid in its month, or after it, as paid', () => {
+    // July's own instalment, paid on the 31st; February's, paid late with the same lump.
+    expect(monthEvents(conts, CONTS, '2026-07', TODAY)).toMatchObject([{ name: 'CONTS', date: '2026-07-01', status: 'paid' }])
+    expect(monthEvents(conts, CONTS, '2026-02', TODAY)).toMatchObject([{ date: '2026-02-01', status: 'paid' }])
+    expect(monthEvents(hc, HC, '2026-08', TODAY)).toMatchObject([{ name: 'HC', date: '2026-08-01', status: 'paid' }])
+  })
+
+  it('a fund source paid 35 ahead has none from September — its one instalment left stays on its day', () => {
+    expect(monthEvents(hc, HC, '2026-09', TODAY)).toEqual([])
     expect(monthEvents(hc, HC, '2026-11', TODAY)).toEqual([])
     expect(monthEvents(hc, HC, '2027-12', TODAY)).toMatchObject([{ kind: 'pay', name: 'HC', date: '2027-12-01', outstanding: 10000.13, no: 36, months: 36 }])
   })
