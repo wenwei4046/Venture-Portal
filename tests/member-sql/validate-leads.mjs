@@ -1705,6 +1705,25 @@ await db.exec(`
   const nrFlows = (await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and sender = 'flow'`, [nr]))[0].n
   await inMsg('7704002', 'hello again')
   check((await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and sender = 'flow'`, [nr]))[0].n, nrFlows, 'no rule that answers: no new start')
+
+  // ── …but not after a template handed the customer to a person or the AI Agent, until we answer (mig 20261102160000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_flow_on_message'`))[0].m, 'cbd0ae0587d55cc19247de7ead45a0e1', 'the runner here is production’s after 20261102150000')
+  await db.exec(await f('20261102160000_lead_rules_not_after_handoff.sql'))
+  await db.exec(await f('20261102160000_lead_rules_not_after_handoff.sql'))
+  const HAND_AD = '120249999000002'
+  const handFlow = (await q(`insert into public.lead_flows (name, template, trigger_kind, trigger_value, active, steps) values ('Hand to AI', 'custom', 'first', '', false, $1::jsonb) returning id`,
+    [JSON.stringify([{ id: 'h', kind: 'ai', text: 'One moment, checking for you.', next: '' }])]))[0].id
+  await q(`insert into public.lead_reply_rules (ad_id, at_when, reply) values ($1, 'any', $2)`, [HAND_AD, handFlow])
+  const moments = async id => (await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and sender = 'flow' and body = 'One moment, checking for you.'`, [id]))[0].n
+  await inMsg('7705001', 'hi', { sourceId: HAND_AD, headline: 'Sofas' })
+  const ho = await contactOf('7705001')
+  check([await moments(ho), (await q(`select flow_state from public.lead_contacts where id = $1`, [ho]))[0].flow_state], [1, 'done'], 'the template hands the customer to the AI Agent')
+  await inMsg('7705001', 'hello?')
+  check(await moments(ho), 1, 'handed over and nobody answered yet: no new start')
+  await q(`insert into public.lead_messages (contact_id, direction, sender, by_name, body, delivery, created_at) values ($1, 'out', 'cs', 'CS', 'Here you go.', 'sent', now() - interval '25 hours')`, [ho])
+  await q(`update public.lead_events set at = now() - interval '26 hours' where contact_id = $1 and what like '%handed the customer to%'`, [ho])
+  await inMsg('7705001', 'one more question')
+  check(await moments(ho), 2, 'CS answered after the hand-off, a day ago: the rule runs again')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)
