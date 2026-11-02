@@ -1,5 +1,20 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-02 c (SHIPPED, #914) — the calendar: paid stays, paid ahead does not (corrects #911)
+
+Session e73c0205, on "全绿就 merge" → "现在看并 merge".
+
+- **MERGED:** squash `65465ef6` (2026-11-02 06:18Z), every check green on `749d034a`. #911 had left every paid
+  instalment off the calendar; the user, on October's: "这个不对，还了要显示，只是像那种提早settle 了就不要显示，先确定，别做"
+  → asked A (only a deal settled in full) or B (an instalment paid ahead too) → **"b"**.
+- **The rule now:** a paid instalment shows, green *Paid*, when paid in its own month or after; it is left out only when
+  paid in full in an EARLIER month (`PlanRow.paidOn`: the reach date oldest first; settled early, the payoff day). So
+  HC's 300,000 shows August as paid and nothing from September to Nov 2027; CONTS's 300,000 nothing from August (July's
+  lump), October included; a payment on 19 Sep for 5 Oct leaves October without it — the user chose B knowing so.
+  The legend's Paid, the `.paid` CSS and the phone's chip are back. DESIGN.md v4.225 corrects v4.223. No migration.
+- Auto-merge: the repo refuses it ("Auto merge is not allowed for this repository"); the user may turn on *Allow
+  auto-merge* in GitHub's settings — a repo-wide choice, theirs.
+
 ## CHECKPOINT 2026-11-02 b (SHIPPED, #912) — Repayment Schedule's tabs' row, merged
 
 Session e73c0205, on "现在看并 merge". Checkpoint a below has #911 (shipped) and #912 (open then); this closes #912.
