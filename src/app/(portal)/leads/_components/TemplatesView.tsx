@@ -255,6 +255,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
         {mode === 'list' ? (
           <ListView steps={draft.steps} sel={sel} editing={editing} canEdit={canEdit} library={library} libIds={libIds} urlOf={urlOf}
             onPick={id => { setSel(id); if (canEdit) setEditing(id) }} onCtx={(id, x, y) => setCtx({ id, x, y })}
+            onBlank={() => { setEditing(null); setSel(null) }}
             onAdd={(k, item) => addStep(k, item, null)} editor={id => <StepEditor key={id} step={draft.steps.find(x => x.id === id)!} {...editProps} />} />
         ) : (
           <FlowMap steps={draft.steps} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing} canEdit={canEdit} library={library} libIds={libIds}
@@ -310,7 +311,7 @@ function railBrand(id: string, rules: ReplyRules, brandName: (id: string) => str
 
 // ── List view ──
 
-function ListView({ steps, sel, editing, canEdit, library, libIds, urlOf, onPick, onCtx, onAdd, editor }: {
+function ListView({ steps, sel, editing, canEdit, library, libIds, urlOf, onPick, onCtx, onBlank, onAdd, editor }: {
   steps: TemplateStep[]
   sel: string | null
   editing: string | null
@@ -320,12 +321,17 @@ function ListView({ steps, sel, editing, canEdit, library, libIds, urlOf, onPick
   urlOf: (f: StepFile | null | undefined) => string
   onPick: (id: string) => void
   onCtx: (id: string, x: number, y: number) => void
+  /** A click on the blank around the steps closes the open one (the user, 2026-11-02: "点空白处可以关"). */
+  onBlank: () => void
   onAdd: (k: StepKind | null, item: LibraryItem | null) => void
   editor: (id: string) => React.ReactNode
 }) {
   const nameOf = (id: string) => steps.find(x => x.id === id)?.name || (id ? 'Untitled' : 'Not connected')
   return (
-    <div className={s.listView}>
+    <div className={s.listView} onClick={e => {
+      const t = e.target as HTMLElement
+      if (!t.closest(`.${s.card}, button, input, textarea, select, label, a, [role=menu], [role=dialog]`)) onBlank()
+    }}>
       {steps.map((st, i) => {
         const t = typeOf(st.kind)
         const isEd = editing === st.id

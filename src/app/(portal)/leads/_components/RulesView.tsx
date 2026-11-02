@@ -9,6 +9,7 @@ import { adSlots, replyLabel, withAdSlots, type PageChannel, type RuleLogLine, t
 import { extOf } from '@/lib/leads/template-map'
 import { walkAnswer, walkFrom, type ReplyRules, type ReplyTemplate, type Walk } from '@/lib/leads/template'
 import RichText from './RichText'
+import Dropdown from './ui/Dropdown'
 import s from './rules.module.css'
 
 /**
@@ -44,6 +45,7 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
   const [pagesOpen, setPagesOpen] = useState(true)
   const [adsOpen, setAdsOpen] = useState(true)
   const [adF, setAdF] = useState<'all' | 'none' | 'has'>('all')
+  const [adBrand, setAdBrand] = useState<string>('all')
   const [pick, setPick] = useState<Pick | null>(null)
   const [adding, setAdding] = useState(false)
   const [railOpen, setRailOpen] = useState(false)
@@ -100,7 +102,9 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
     setAd(rest[0], rest[1] === 'w' ? v : slots.w, rest[1] === 'a' ? v : slots.a)
   }
 
-  const counted = adList.map(a => ({ a, has: d.ads.some(r => r.adId === a.adId) }))
+  // The brand picked above the ads (All brands, or one): the counts and the list follow it.
+  const inBrand = (a: LeadAd) => adBrand === 'all' || a.brandIds.includes(adBrand)
+  const counted = adList.filter(inBrand).map(a => ({ a, has: d.ads.some(r => r.adId === a.adId) }))
   const shown = counted.filter(x => adF === 'all' || (adF === 'has' ? x.has : !x.has))
   const free = adList.filter(a => !d.ads.some(r => r.adId === a.adId))
   const newAd = free.some(a => a.adId === newRule.ad) ? newRule.ad : (free[0]?.adId ?? '')
@@ -176,6 +180,8 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
                   </button>
                 ))}
               </span>
+              <Dropdown value={adBrand} onChange={setAdBrand} icon="store"
+                options={[{ value: 'all', label: 'All brands', count: adList.length }, ...brands.map(b => ({ value: b.id, label: b.name, count: adList.filter(a => a.brandIds.includes(b.id)).length }))]} />
             </span>
             {colHeads}
             <span className={s.addCell}>
