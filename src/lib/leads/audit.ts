@@ -24,6 +24,7 @@ export const AUDIT_MODULES: Readonly<Record<string, { module: string; href: stri
   lead_business_hours: { module: 'Working hours', href: '/leads/hours' },
   lead_staff_leave: { module: 'Working hours', href: '/leads/hours' },
   lead_pages: { module: 'Settings', href: '/leads/settings' },
+  lead_agent_brands: { module: 'Settings', href: '/leads/settings' },
   lead_campaigns: { module: 'Campaigns', href: '/leads/campaigns' },
   lead_brands: { module: 'Settings', href: '/leads/settings' },
   lead_sales: { module: 'Settings', href: '/leads/settings' },

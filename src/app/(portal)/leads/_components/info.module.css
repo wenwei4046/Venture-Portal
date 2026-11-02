@@ -49,6 +49,9 @@
 .mDot { width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; flex: none; }
 .box { width: 16px; height: 16px; box-sizing: border-box; border-radius: 4px; border: 1.5px solid rgb(var(--lv-focus-line)); background: rgb(var(--lv-surface)); color: rgb(var(--lv-surface)); display: flex; align-items: center; justify-content: center; margin-right: 10px; flex: none; }
 .box[data-on] { border-color: rgb(var(--lv-pos)); background: rgb(var(--lv-pos)); }
+/* A row of a tick box and a name only: the box keeps its 16px — the row rule above would stretch it (the second span from the end). */
+.menuItem > span.box { flex: none; }
+.menuItem > span.box + span:last-child { flex: 1; }
 .rows { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: 0 8px 8px; }
 .group { display: flex; flex-direction: column; gap: 2px; }
 .groupHead { font-size: 11px; letter-spacing: 0.1em; color: rgb(var(--lv-fg-4)); padding: 12px 10px 6px; }

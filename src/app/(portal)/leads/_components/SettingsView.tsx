@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import { LeadIcon, type LeadIconName } from '@/components/layout/lead-icons'
-import { connectPage, disconnectPage, fetchAdNames, listManagedPages, nameAd, saveLeadBrand, sendTestEnquiry, setPage } from '@/lib/leads/actions'
+import { connectPage, disconnectPage, saveAgentBrands, fetchAdNames, listManagedPages, nameAd, saveLeadBrand, sendTestEnquiry, setPage } from '@/lib/leads/actions'
 import { adsManagerLink, type LeadAd } from '@/lib/leads/ads'
 import { STATE_LABEL, connectable, replyLabel, followersLabel, pageName, pageState, type LeadPage, type ManagedPage, type PageChannel } from '@/lib/leads/pages'
 import type { ReplyRules } from '@/lib/leads/template'
@@ -22,10 +22,10 @@ import s from './settings.module.css'
  * the Test enquiry, as two more sections under the drawn two.
  */
 
-type View = 'pages' | 'brands' | 'ads' | 'test'
+type View = 'pages' | 'brands' | 'team' | 'ads' | 'test'
 const CH_SUB: Record<PageChannel, string> = { messenger: 'Messenger', instagram: 'Instagram' }
 
-export default function SettingsView({ brands, pages, ready, managed, rules, templates, ads, canManage, canTest }: {
+export default function SettingsView({ brands, pages, ready, managed, rules, templates, ads, canManage, canTest, team }: {
   brands: LeadBrand[]
   pages: LeadPage[]
   /** Is mig 20261102110000 applied? Before it the pages are read off the brands and nothing about them saves. */
@@ -37,6 +37,8 @@ export default function SettingsView({ brands, pages, ready, managed, rules, tem
   ads: LeadAd[] | null
   canManage: boolean
   canTest: boolean
+  /** Settings › Team: the CS people and the brands each handles (none = every brand); null when it could not be read. */
+  team: Array<{ id: string; name: string; brandIds: string[] }> | null
 }) {
   const router = useRouter()
   const [view, setView] = useState<View>('pages')
@@ -78,6 +80,7 @@ export default function SettingsView({ brands, pages, ready, managed, rules, tem
   const nav: Array<{ v: View; l: string; icon: LeadIconName; n: string; bad?: boolean; sep?: boolean }> = [
     { v: 'pages', l: 'Pages', icon: 'radio-tower', n: bad ? `${bad} !` : String(pages.length), bad: bad > 0 },
     { v: 'brands', l: 'Brands', icon: 'store', n: String(brands.length) },
+    { v: 'team', l: 'Team', icon: 'users', n: team ? String(team.length) : '' },
     { v: 'ads', l: 'Ads', icon: 'megaphone', n: ads ? String(ads.length) : '', sep: true },
     { v: 'test', l: 'Test enquiry', icon: 'send', n: '' },
   ]
@@ -160,6 +163,8 @@ export default function SettingsView({ brands, pages, ready, managed, rules, tem
               ) : null}
             </div>
           </>
+        ) : view === 'team' ? (
+          <TeamPanel team={team} brands={brands} canManage={canManage} />
         ) : view === 'ads' ? (
           <AdsSection ads={ads} brands={brands} canManage={canManage} />
         ) : (
@@ -516,6 +521,54 @@ function TestSection({ brands, canTest }: { brands: LeadBrand[]; canTest: boolea
         <div className={s.askRow}>
           <button type="button" className={s.go} onClick={send} disabled={!canTest || busy || !form.brand || !form.name.trim() || !form.body.trim()}>{busy ? 'Sending…' : 'Send to the Inbox'}</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Settings › Team (2026-11-02 — the user: "有一个人会carress & 2990mini；另一个会专门负责2990，有办法设定这两个人登入时只看到自己
+ * 负责的part吗？"; mig 20261102270000): each CS with the brands they handle. Ticked, they see only those brands' chats in the
+ * Inbox, Leads and an opened chat; none ticked, every brand. Lead View · Manage always sees every brand. A tick saves at once.
+ */
+function TeamPanel({ team, brands, canManage }: { team: Array<{ id: string; name: string; brandIds: string[] }> | null; brands: LeadBrand[]; canManage: boolean }) {
+  const router = useRouter()
+  const [picks, setPicks] = useState<Record<string, string[]>>(() => Object.fromEntries((team ?? []).map(t => [t.id, t.brandIds])))
+  const [busy, start] = useTransition()
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const namesOf = (ids: string[]) => brands.filter(b => ids.includes(b.id)).map(b => b.name).join(', ')
+  const toggle = (person: { id: string; name: string }, brandId: string) => {
+    const was = picks[person.id] ?? []
+    const next = was.includes(brandId) ? was.filter(x => x !== brandId) : [...was, brandId]
+    setPicks(p => ({ ...p, [person.id]: next }))
+    start(async () => {
+      const r = await saveAgentBrands(person.id, next)
+      if (!r.ok) { setPicks(p => ({ ...p, [person.id]: was })); setMsg({ ok: false, text: r.reason }); return }
+      setMsg({ ok: true, text: next.length ? `${person.name} sees ${namesOf(next)} only.` : `${person.name} sees every brand.` })
+      router.refresh()
+    })
+  }
+  return (
+    <div className={s.mid}>
+      <div className={s.midHead}><span className={s.rowName}>Who handles which brand</span></div>
+      {msg ? <div style={{ padding: '0 18px 8px' }} className={msg.ok ? s.ok : s.error} role={msg.ok ? 'status' : 'alert'}>{msg.text}</div> : null}
+      <div className={s.list}>
+        {!team ? <div className={s.empty}>The team could not be read.</div> : !team.length ? <div className={s.empty}>Nobody yet — a CS appears here once HR gives their own login Lead View › Inbox.</div> : team.map(t => {
+          const mine = picks[t.id] ?? []
+          return (
+            <div key={t.id} className={s.row}>
+              <div className={s.rowText}>
+                <span className={s.rowName}>{t.name}</span>
+                <span className={s.rowSub}>{mine.length ? `Sees ${namesOf(mine)} only` : 'Sees every brand'}</span>
+              </div>
+              <div className={s.teamBrands} role="group" aria-label={`Brands ${t.name} handles`}>
+                {brands.map(b => (
+                  <button key={b.id} type="button" className={s.teamBrand} aria-pressed={mine.includes(b.id)} disabled={!canManage || busy} onClick={() => toggle(t, b.id)}>{b.name}</button>
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

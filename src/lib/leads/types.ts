@@ -106,6 +106,9 @@ export interface LeadContact {
   phoneTyped?: boolean
   /** The AI Agent answers this chat (mig 20261102170000; on the card since mig 20261102210000). */
   aiOn?: boolean
+  /** Blocked in Lead View (mig 20261102270000): kept, never answered, out of the Inbox's list but under Blocked. */
+  blockedAt?: string | null
+  blockedBy?: string
 }
 
 export type LeadLanguage = 'Mandarin' | 'English' | 'Malay' | 'Other'

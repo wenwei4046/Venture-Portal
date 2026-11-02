@@ -116,4 +116,5 @@ workflow
 x
 panel-left-close panel-left-open rotate-cw pen-line layout-grid triangle-alert undo grip-vertical forward image-plus file-pen chevron-down camera crop type navigation scroll-text trash-2 book-open chart-column credit-card shield-check file-text calendar-clock map-pin
 wrench
- circle-check arrow-up
+ circle-check arrow-up house
+ban

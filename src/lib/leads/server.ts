@@ -194,6 +194,11 @@ export function loadAdPosts(): Promise<Read<Array<{ adId: string; postUrl: strin
   return rpc('lead_ad_posts', undefined, 'The ads’ posts')
 }
 
+/** Settings › Team: who handles which brands (mig 20261102270000). */
+export function loadAgentBrands(): Promise<Read<Array<{ userId: string; brandIds: string[] }>>> {
+  return rpc('lead_agent_brands', undefined, 'Who handles which brand')
+}
+
 /** One set of tables' latest history (audit_changes, the reader's own permissions) — Reply rules' rail. */
 export async function loadChangesOf(tables: string[], limit = 60): Promise<Read<AuditChange[]>> {
   return rpc<AuditChange[]>('audit_changes', { p_tables: tables, p_limit: limit }, 'The history')

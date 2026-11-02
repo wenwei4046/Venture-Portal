@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { assignLead, draftLeadReply, giveToAi, readRuleOf, leadAgents, leadMediaLinks, markUnread, quickReplyUsed, reactToMessage, readThread, replyToLead, replyToMessage, sendLeadMedia, setDraftOutcome, startOver, type DraftForInbox } from '@/lib/leads/actions'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import { assignLead, blockLead, draftLeadReply, giveToAi, readRuleOf, leadAgents, leadMediaLinks, markUnread, quickReplyUsed, reactToMessage, readThread, replyToLead, replyToMessage, sendLeadMedia, setDraftOutcome, startOver, type DraftForInbox } from '@/lib/leads/actions'
 import { FILE_LIMIT, TOO_BIG } from '@/lib/leads/messenger'
 import { createClient } from '@/lib/supabase/client'
 import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
@@ -49,6 +50,8 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: 'handed', label: 'Handed' },
 ]
 const LIST_REFRESH_MS = 15_000
+/** A message lands as a row or two (the message, a template's answer): read once, a moment after the last. */
+const LIVE_SETTLE_MS = 300
 
 export default function InboxView({
   config,
@@ -97,6 +100,8 @@ export default function InboxView({
   const [query, setQuery] = useState(initialQuery)
   const [label, setLabel] = useState<string>('')
   const [unreadOnly, setUnreadOnly] = useState(false)
+  // Blocked chats stay out of the list; this filter shows them alone (mig 20261102270000).
+  const [blockedOnly, setBlockedOnly] = useState(false)
   const [selected, setSelected] = useState<string | null>(initialThread?.contact.id ?? contacts[0]?.id ?? null)
   const [threads, setThreads] = useState<Record<string, LeadThread>>(initialThread ? { [initialThread.contact.id]: initialThread } : {})
   const [loading, startLoading] = useTransition()
@@ -116,6 +121,7 @@ export default function InboxView({
   const qDigits = q.replace(/[\s-]/g, '')
   const labelsOf = (c: LeadContact) => threads[c.id]?.contact.labels ?? c.labels ?? []
   const found = contacts.filter(c => {
+    if (!!(threads[c.id]?.contact.blockedAt ?? c.blockedAt) !== blockedOnly) return false
     if (label && !labelsOf(c).some(l => l.id === label)) return false
     if (unreadOnly && !(c.unread ?? 0) && !marks.has(c.id)) return false
     if (!q) return true
@@ -154,13 +160,31 @@ export default function InboxView({
     window.history.replaceState(null, '', `/leads?c=${id}`)
     load(id)
   }
-  // The list stays live: read again every 15 s while this tab is in view, and at once when it comes back.
+  // The list stays live: read again the moment a message is kept (the private channel `leads:inbox`, mig
+  // 20261102260000 — a moment after the last of a burst), every 15 s as a fallback while this tab is in view, and at
+  // once when it comes back.
   const router = useRouter()
   useEffect(() => {
     const fresh = () => { if (document.visibilityState === 'visible') router.refresh() }
     const timer = window.setInterval(fresh, LIST_REFRESH_MS)
     document.addEventListener('visibilitychange', fresh)
-    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', fresh) }
+    let soon: ReturnType<typeof setTimeout> | undefined
+    const ping = () => { clearTimeout(soon); soon = setTimeout(fresh, LIVE_SETTLE_MS) }
+    const db = createClient()
+    let channel: RealtimeChannel | null = null
+    let gone = false
+    // A private channel joins with the session's own token: Realtime asks realtime.messages' policy who may listen.
+    void db.realtime.setAuth().catch(() => undefined).then(() => {
+      if (gone) return
+      channel = db.channel('leads:inbox', { config: { private: true } }).on('broadcast', { event: 'message' }, ping).subscribe()
+    })
+    return () => {
+      gone = true
+      clearTimeout(soon)
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', fresh)
+      if (channel) void db.removeChannel(channel)
+    }
   }, [router])
   const lastAt = contacts.find(c => c.id === selected)?.lastAt
   const seen = useRef(lastAt)
@@ -184,7 +208,7 @@ export default function InboxView({
   const contact = thread?.contact ?? contacts.find(c => c.id === selected) ?? null
   const brandOf = contact ? brands.get(contact.brandId) : undefined
   const brandLabel = brand === 'all' ? 'All brands' : brands.get(brand)?.name ?? 'All brands'
-  const filtering = !!q || unreadOnly || !!label
+  const filtering = !!q || unreadOnly || !!label || blockedOnly
 
   return (
     <div className={s.grid}>
@@ -214,6 +238,7 @@ export default function InboxView({
                 </label>
                 <div className={s.filterChips} role="group" aria-label="Quick filters">
                   <button type="button" className={s.filterChip} aria-pressed={unreadOnly} onClick={() => setUnreadOnly(v => !v)}>Unread</button>
+                  <button type="button" className={s.filterChip} aria-pressed={blockedOnly} onClick={() => setBlockedOnly(v => !v)}>Blocked</button>
                   {labels.map(l => (
                     <button key={l.id} type="button" className={s.filterChip} aria-pressed={label === l.id} onClick={() => setLabel(cur => (cur === l.id ? '' : l.id))}>{l.name}</button>
                   ))}
@@ -268,7 +293,7 @@ export default function InboxView({
           <Chat key={contact.id} contact={contact} thread={thread} brand={brandOf} csName={csName}
             canReply={canReply} canManage={canManage} aiOn={aiBrands.includes(contact.brandId)} aiConnected={aiConnected} info={info} quick={quick} today={config.today}
             loading={loading && !thread} onSent={() => load(contact.id)}
-            others={contacts.filter(c => c.id !== contact.id)} brands={brands} onMarkUnread={() => markLater(contact.id)} />
+            others={contacts.filter(c => c.id !== contact.id)} brands={brands} onMarkUnread={() => markLater(contact.id)} canEdit={canEdit} />
         ) : (
           <div className={s.empty}>Pick a conversation</div>
         )}
@@ -314,7 +339,7 @@ export default function InboxView({
   )
 }
 
-function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiConnected, info, quick, today, loading, onSent, others, brands, onMarkUnread }: {
+function Chat({ contact, thread, brand, csName, canReply, canManage, canEdit, aiOn, aiConnected, info, quick, today, loading, onSent, others, brands, onMarkUnread }: {
   contact: LeadContact
   thread: LeadThread | null
   brand: LeadBrand | undefined
@@ -331,6 +356,8 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
   others: LeadContact[]
   brands: Map<string, LeadBrand>
   onMarkUnread: () => void
+  /** Lead View · Edit: may block or unblock the customer. */
+  canEdit: boolean
 }) {
   const [text, setText] = useState('')
   const [editing, setEditing] = useState<File | null>(null)
@@ -394,6 +421,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
   }, [text])
 
   const now = replyingNow(contact, csName)
+  const blockedAt = (thread?.contact ?? contact).blockedAt ?? null
   const botOn = now.kind !== 'cs'
   const state = inboxState({ ...contact, unread: 0 })
   const ad = adLabel(contact)
@@ -492,6 +520,18 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
                     <LeadIcon name="rotate-ccw" size={16} className={s.moreIcon} />Start over
                   </button>
                 ) : null}
+                {canEdit ? (
+                  // Block (2026-11-02 — the user: "增加block功能"; mig 20261102270000): Lead View's own — Meta lets a Page block only in Business Suite.
+                  <button type="button" role="menuitem" className={s.moreItem}
+                    onClick={() => {
+                      setMenuOpen(false)
+                      const on = !blockedAt
+                      if (on && !window.confirm(`Block ${first}? No template or AI will answer them, and their chat leaves the Inbox list (Filters › Blocked shows it). Their messages still come in.`)) return
+                      startSending(async () => { const r = await blockLead(contact.id, on); if (!r.ok) setError(r.reason); else onSent() })
+                    }}>
+                    <LeadIcon name="ban" size={16} className={s.moreIcon} />{blockedAt ? 'Unblock' : 'Block'}
+                  </button>
+                ) : null}
                 {contact.adLink || manager ? <div className={s.moreSep} /> : null}
                 {contact.adLink ? (
                   <a role="menuitem" className={s.moreItem} href={contact.adLink} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>
@@ -572,7 +612,8 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
                   ) : null}
                 </div>
                 {m.reaction ? <span className={s.reaction} title="The Page's reaction">{m.reaction}</span> : null}
-                {m.buttons?.length ? <div className={s.buttons}>{m.buttons.map(b => <span key={b} style={{ whiteSpace: 'nowrap' }}>↳ {b}</span>)}</div> : null}
+                {/* Its buttons as the customer sees them: one button each (2026-11-02 — the user: "button能弄成按钮式的吗？"). */}
+                {m.buttons?.length ? <div className={s.buttons}>{m.buttons.map(b => <span key={b} className={s.buttonPill}>{b}</span>)}</div> : null}
                 {m.phoneFound ? <span className={s.found}>Phone found · {formatPhone(m.phoneFound)}</span> : null}
                 {run.last || (out && m.delivery !== 'sent') ? (
                   <span className={s.time}>
@@ -621,6 +662,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
               </div>
             </div>
           ) : null}
+          {blockedAt ? <span className={s.composeNote}>Blocked{(thread?.contact ?? contact).blockedBy ? ` by ${(thread?.contact ?? contact).blockedBy}` : ''} — no template or AI answers this chat.</span> : null}
           {used ? <span className={s.composeNote}>From an AI draft — check it before sending.</span> : null}
           <div className={s.composer}>
             <Popover open={!!(qm && qm.matches.length)} onClose={() => setText(t => t + ' ')} className={`${s.popUp} ${s.quickMenu}`} label="Shortcuts">
