@@ -1897,6 +1897,14 @@ await db.exec(`
   await db.exec(`select set_config('request.jwt.claims', '', false)`)
   await refuses(`select public.lead_outbox($1::uuid[])`, [[ga]], /Lead View · Create/, 'and nobody else does')
   await as(CS_USER, ALL)
+  // A long note still fits the timeline (mig 20261102230000).
+  await db.exec(await f('20261102230000_lead_ai_event_length.sql'))
+  await q(`select public.lead_give_to_ai($1, true)`, [ga])
+  check(typeof (await q(`select public.lead_ai_answered($1, 'Thanks!', '', true, $2, null) i`, [ga, 'x'.repeat(250)]))[0].i, 'number', 'a 250-character note: the reply is kept')
+  check((await lastEvent(ga)).length, 200, 'and its timeline line is cut to 200')
+  await q(`select public.lead_give_to_ai($1, true)`, [ga])
+  await q(`select public.lead_ai_stop($1, $2, false)`, [ga, 'y'.repeat(250)])
+  check((await lastEvent(ga)).length, 200, 'a long reason to stop is cut too')
   for (const sig of ['lead_ai_claim(uuid[])', 'lead_outbox(uuid[])', 'lead_give_to_ai(uuid,boolean)']) {
     check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
   }
