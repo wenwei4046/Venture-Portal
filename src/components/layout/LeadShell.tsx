@@ -87,6 +87,11 @@ export default function LeadShell({ user, children }: { user: User; children: Re
             </div>
           ))}
           <div className={s.spacer} />
+          {/* Back to the portal's home (2026-11-02 — the user: "要有一个可以回到首页的按钮"): `/` opens the account's own home. */}
+          <Link href="/" className={s.item} title="Home">
+            <LeadIcon name="house" size={18} />
+            <span className={s.fade}>Home</span>
+          </Link>
           <button type="button" className={s.me} onClick={() => { setOpen(true); setMenu(m => !m) }} aria-expanded={menu} aria-haspopup="menu">
             <span className={s.avatar} aria-hidden="true">{initialsOf(name)}</span>
             <span className={`${s.meText} ${s.fade}`}>

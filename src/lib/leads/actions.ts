@@ -167,6 +167,18 @@ async function deliverMedia(messageId: number, path: string, mime: string): Prom
  * Mark a chat unread for oneself, to answer later (mig 20261028110000 — the user: "把讯息unread 来提醒自己稍后回复").
  * Lead View's alone: Meta lets no app mark a Messenger chat unread. Opening the chat again clears it.
  */
+/** Block a customer, or unblock (mig 20261102270000): no template or AI answers them; their chat leaves the Inbox's list. */
+export async function blockLead(contactId: string, on: boolean) {
+  await requireActionOn('/leads', 'leads', 'edit')
+  return call<null>('lead_block', { p_contact: contactId, p_on: on }, on ? 'The customer was not blocked.' : 'The customer was not unblocked.')
+}
+
+/** Settings › Team: the brands one CS handles (none = every brand; mig 20261102270000). */
+export async function saveAgentBrands(userId: string, brandIds: string[]) {
+  await requireActionOn('/leads/settings', 'leads', 'manage')
+  return call<null>('lead_save_agent_brands', { p_user: userId, p_brands: brandIds }, 'Their brands were not saved.')
+}
+
 /** Which reply rule the chat follows now (mig 20261102240000): the chat header's Rule chip. */
 export async function readRuleOf(contactId: string): Promise<LeadOutcome<RuleOf>> {
   await requireActionOn('/leads', 'leads', 'view')

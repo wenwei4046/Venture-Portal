@@ -1938,6 +1938,50 @@ await db.exec(`
   await inMsg('7710001', 'hello, anyone?')
   check((await q(`select count(*)::int n from public.lead_messages`))[0].n > liveBefore, true, 'a message is kept though the ping cannot be sent (no Realtime here)')
   check((await q(`select has_function_privilege('authenticated', 'public.lead_inbox_ping()', 'execute') a`))[0].a, false, 'the ping is nobody’s to call')
+
+  // ── Block, and each CS's brands (mig 20261102270000) ──
+  await db.exec(await f('20261102270000_lead_block_and_brands.sql'))
+  await db.exec(await f('20261102270000_lead_block_and_brands.sql'))
+  await db.exec(await f('20261102270100_lead_block_and_brands_guards.sql'))
+  await inMsg('7711001', 'hi', { sourceId: BACK_AD, headline: 'Sofas' })
+  const bl = await contactOf('7711001')
+  await as(CS_USER, ['leads.view', 'leads.create'])
+  await refuses(`select public.lead_block($1, true)`, [bl], /Lead View · Edit/, 'blocking needs Lead View · Edit')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_block($1, true)`, [bl])
+  const blRow = (await q(`select blocked_at is not null b, flow_state from public.lead_contacts where id = $1`, [bl]))[0]
+  check([blRow.b, blRow.flow_state], [true, 'stopped'], 'blocked: marked, the template waiting stops')
+  check((await q(`select public.lead_contact_json(c) j from public.lead_contacts c where id = $1`, [bl]))[0].j.blockedAt !== null, true, 'the card says so')
+  const blFlows = async () => (await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and sender = 'flow'`, [bl]))[0].n
+  const blBefore = await blFlows()
+  await inMsg('7711001', 'hello again')
+  check([await blFlows(), (await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and body = 'hello again'`, [bl]))[0].n], [blBefore, 1], 'a blocked customer’s message is kept and nothing answers it')
+  await q(`select public.lead_block($1, false)`, [bl])
+  check((await q(`select blocked_at from public.lead_contacts where id = $1`, [bl]))[0].blocked_at, null, 'unblocked')
+
+  // Brands: OTHER handles one brand and reads only its chats; no ticks = every brand; Manage reads all.
+  const brandOfBl = (await q(`select brand_id from public.lead_contacts where id = $1`, [bl]))[0].brand_id
+  const another = (await q(`select id from public.lead_brands where id <> $1 limit 1`, [brandOfBl]))[0].id
+  await as(OTHER, ['leads.view', 'leads.create'])
+  await refuses(`select public.lead_save_agent_brands($1, $2::uuid[])`, [OTHER, [another]], /Lead View · Manage/, 'saving who handles which brand needs Manage')
+  const inboxIds = async () => (await q(`select public.lead_inbox() j`))[0].j.map(x => x.id)
+  check((await inboxIds()).includes(bl), true, 'no ticks: every brand')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_save_agent_brands($1, $2::uuid[])`, [OTHER, [another]])
+  check((await q(`select public.lead_agent_brands() j`))[0].j.find(x => x.userId === OTHER)?.brandIds, [another], 'Settings › Team reads it back')
+  await as(OTHER, ['leads.view', 'leads.create'])
+  check((await inboxIds()).includes(bl), false, 'another brand’s chat is out of their Inbox')
+  check((await q(`select public.lead_thread($1) t`, [bl]))[0].t, null, 'and cannot be opened')
+  check((await q(`select public.lead_leads(null, null) j`))[0].j.some(x => x.id === bl), false, 'nor listed on Leads')
+  await as(OTHER, ALL)
+  check((await inboxIds()).includes(bl), true, 'with Lead View · Manage: every brand')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_save_agent_brands($1, '{}'::uuid[])`, [OTHER])
+  check((await q(`select count(*)::int n from public.lead_agent_brands where user_id = $1`, [OTHER]))[0].n, 0, 'untick all: back to every brand')
+  for (const sig of ['lead_block(uuid,boolean)', 'lead_save_agent_brands(uuid,uuid[])', 'lead_agent_brands()']) {
+    check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
+  }
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_my_brands()', 'execute') a`))[0].a, false, 'lead_my_brands: only the functions’')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)
