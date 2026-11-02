@@ -3,6 +3,7 @@
  * the prototype's own names (CrmFrame.dc.html; vm/proto-logic.ts is its logic, verbatim, for the pixel comparison) —
  * from the CRM's data, the phone's writes and permissions, and the desktop's own (PROPOSALS.md B1–B9).
  */
+import { deskLabelsVM } from "./labels";
 import type { DeskCtx } from "./ctx";
 import { frameVM } from "./frame";
 import { frame4aVM, heads4a } from "./frame4a";
@@ -103,6 +104,7 @@ export function deskVM(ctx: DeskCtx) {
     ibBook: () => { if (ui.chat) patch({ menu: false, kind: "book", book: null }); },
     openNote: () => { if (ui.chat) patch({ menu: false, kind: "note" }); },
     editInfo: () => patch({ kind: "form", cform: null }),
+    ibLabels: deskLabelsVM(ctx, cur),
     kBook: ui.kind === "book", kNote: ui.kind === "note", kForm: ui.kind === "form",
     book: bookVM(ctx, cur), note: noteVM(ctx, cur), cform: customerFormVM(ctx, data.customers.find(c => c.id === (ui.infoId ?? ui.chat ?? ""))), history: historyVM(ctx),
     cyclePeriod: () => { const order = ["month", "week", "day"] as const, i = order.indexOf(ui.insPer as (typeof order)[number]); patch({ insPer: order[(i + 1) % order.length], insRange: null }); },

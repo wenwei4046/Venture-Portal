@@ -19,6 +19,7 @@ import { adHref } from "../../shared/AdLink";
 import { isNewChat } from "../../shared/new-chat";
 import { saidInChat, snippetAround } from "../../shared/chat-search";
 import { jobTitle, personOf, teamAssignees } from "../../shared/people";
+import { labelsOn } from "./labels";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
 
@@ -86,11 +87,17 @@ export function inboxVM(ctx: DeskCtx) {
       const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q) || sourceOf(x.c).label.toLowerCase().includes(q) || !!saidInChat(x.c, q);
       // Found further back in the chat: the row shows the message that holds the words, not the last one.
       const preview = (x: ChatRow) => { if (!q || x.msg.toLowerCase().includes(q)) return x.msg; const m = saidInChat(x.c, q); return m ? snippetAround(m.text, q) : x.msg; };
-      const rows = [...shown.filter(cur[1]).filter(hit)].sort((a, b) => Number(!!pref(b.id)?.pinned) - Number(!!pref(a.id)?.pinned));
+      // One's own labels (2026-11-02): a filter by one of them, the chats carrying it; the tabs count inside it.
+      const lab = ui.ibLabel && (data.labels ?? []).some(l => l.id === ui.ibLabel) ? ui.ibLabel : null;
+      const hasLab = (x: ChatRow) => !lab || (data.customerLabels?.[x.id] ?? []).includes(lab);
+      const used = (data.labels ?? []).filter(l => shown.some(x => (data.customerLabels?.[x.id] ?? []).includes(l.id)));
+      const rows = [...shown.filter(cur[1]).filter(hasLab).filter(hit)].sort((a, b) => Number(!!pref(b.id)?.pinned) - Number(!!pref(a.id)?.pinned));
       const DAY_MS = 86400000, fmtVisit = (t: Date) => `${t.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, ${t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase()}`;
       return {
         q: ui.ibQ ?? "", setQ: (e: { target: { value: string } }) => patch({ ibQ: e.target.value }),
-        tabs: T4.map(([label, f, hot]) => ({ label, count: shown.filter(f).length, on: label === cur[0], hot, pick: () => patch({ inbF: label }) })),
+        tabs: T4.map(([label, f, hot]) => ({ label, count: shown.filter(f).filter(hasLab).length, on: label === cur[0], hot, pick: () => patch({ inbF: label }) })),
+        labels: used.map(l => ({ id: l.id, name: l.name, color: l.color, on: l.id === lab, count: shown.filter(cur[1]).filter(x => (data.customerLabels?.[x.id] ?? []).includes(l.id)).length,
+          pick: () => patch({ ibLabel: l.id === lab ? null : l.id }) })),
         rows: rows.map(x => {
           const p = pref(x.id), n = x.c.unread, dot = !n && !!p?.markedUnread, [avBg, avFg] = avatarTint(x.name);
           const u = urgencyOf(x.c, now), visit = data.visits.filter(v => v.customerId === x.id && v.state === "booked" && new Date(v.start) >= now).sort((a, b) => a.start.localeCompare(b.start))[0];
@@ -100,7 +107,7 @@ export function inboxVM(ctx: DeskCtx) {
               : isCold(x) && lastIn ? { text: `Cold · ${Math.max(1, Math.floor((now.getTime() - lastIn) / DAY_MS))} d`, kind: "mute" } : null;
           const sel = ui.pane === "docked" && ui.chat === x.id;
           return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: [sourceOf(x.c).brandLabel, x.ad].filter(Boolean).join(" · "), msg: preview(x), time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
-            hot: n > 0 || dot, owner: x.owner, pinned: !!p?.pinned, muted: !!p?.muted, sel,
+            hot: n > 0 || dot, owner: x.owner, pinned: !!p?.pinned, muted: !!p?.muted, sel, tags: labelsOn(data, x.id).map(l => ({ t: l.name, c: l.color })),
             note: note?.text ?? "", noteColor: !note ? "" : note.kind === "hot" ? "var(--crm-oxblood)" : note.kind === "warm" ? "var(--crm-ink)" : note.kind === "calm" ? "var(--crm-ink-soft)" : "var(--crm-faint)",
             noteWeight: note?.kind === "hot" ? 600 : 500, noteIcon: !note ? null : note.kind === "calm" ? "calendar" : note.kind === "hot" && u.level === "overdue" ? "triangle-alert" : "clock",
             open: () => patch({ pane: "docked", kind: "chat", chat: x.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }) };

@@ -364,8 +364,9 @@ interface InboxListBits {
   list4: {
     q: string; setQ: (e: { target: { value: string } }) => void;
     tabs: { label: string; count: number; on: boolean; hot: boolean; pick: () => void }[];
+    labels?: { id: string; name: string; color: string; on: boolean; count: number; pick: () => void }[];
     rows: { id: string; name: string; ini: string; avBg: string; avFg: string; ch: "whatsapp" | "messenger"; ad: string; msg: string; time: string; unread: string; dot: boolean; hot: boolean;
-      owner: string; pinned: boolean; muted: boolean; sel: boolean; note: string; noteColor: string; noteWeight: number; open: () => void }[];
+      owner: string; pinned: boolean; muted: boolean; sel: boolean; note: string; noteColor: string; noteWeight: number; open: () => void; tags?: { t: string; c: string }[] }[];
   };
 }
 
@@ -427,6 +428,18 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
             </button>
           ))}
         </div>
+        {/* One's own labels (2026-11-02): a chip each label in use, a click filters to it, again clears. */}
+        {!!L.labels?.length && (
+          <div aria-label="Labels" style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {L.labels.map(l => (
+              <button key={l.id} type="button" onClick={l.pick} aria-pressed={l.on} style={{ ...BTN, height: "24px", padding: "0 9px", borderRadius: "12px", display: "flex", alignItems: "center", gap: "5px",
+                font: `${l.on ? 600 : 500} 11.5px Inter, sans-serif`, border: `1px solid ${l.on ? l.color : "var(--crm-line)"}`, background: l.on ? l.color : "#fff", color: l.on ? "#fff" : "var(--crm-ink)" }}>
+                {!l.on && <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: l.color }} />}{l.name}
+                <span style={{ fontVariantNumeric: "tabular-nums", opacity: 0.75 }}>{l.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }} data-inbox-list="">
         {L.rows.map(r => (
@@ -451,6 +464,11 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
                   font: `600 10px ${TIGHT}`, background: "var(--crm-rust)", color: "#fff" }}>{r.unread}</span>}
                 {r.dot && <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "var(--crm-rust)" }} />}
               </span>
+              {!!r.tags?.length && (
+                <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                  {r.tags.map(g => <span key={g.t} style={{ padding: "1px 7px", borderRadius: "9px", font: "500 10.5px Inter, sans-serif", color: "#fff", background: g.c }}>{g.t}</span>)}
+                </span>
+              )}
               {(r.note || r.owner) && (
                 <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
                   {r.note && <span style={{ font: `${r.noteWeight} 11px Inter, sans-serif`, color: r.noteColor, whiteSpace: "nowrap" }}>{r.note}</span>}
@@ -473,6 +491,8 @@ interface InboxSideBits {
   ibCpOpen: boolean; ibCpToggle: () => void; ibCpW?: number; dragCp?: (e: never) => void; resetCp?: () => void;
   ibCp: { audit4: { what: string; detail: string; who: string; time: string; main: boolean; hot: boolean }[] };
   ibBook: () => void; editInfo: () => void;
+  ibLabels?: { editing: boolean; toggleEdit: () => void; items: { key: string; name: string; color: string; on: boolean; toggle: () => void; remove: () => void }[];
+    draft: string; setDraft: (e: { target: { value: string } }) => void; canAdd: boolean; add: () => void };
 }
 
 function Strip({ label, icon, bg, onOpen }: { label: string; icon: "user-round" | "history"; bg: string; onOpen: () => void }) {
@@ -501,6 +521,30 @@ export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: str
         <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column" }}>
           {v.ibNone && <span style={{ padding: "40px 20px", textAlign: "center", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Pick a chat to see the customer</span>}
           {v.ibHas && (<>
+            {v.ibLabels && (() => { const lb = v.ibLabels; return (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "16px 20px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>My labels</span>
+                  <button type="button" onClick={lb.toggleEdit} style={{ ...BTN, marginLeft: "auto", font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>{lb.editing ? "Done" : "Edit"}</button>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {lb.items.map(l => (
+                    <span key={l.key} style={{ display: "flex", alignItems: "center" }}>
+                      <button type="button" onClick={lb.editing ? undefined : () => void l.toggle()} aria-pressed={l.on} title={lb.editing ? undefined : l.on ? "Take this label off" : "Put this label on"}
+                        style={{ ...BTN, height: "26px", padding: "0 10px", borderRadius: "13px", display: "flex", alignItems: "center", gap: "5px", cursor: lb.editing ? "default" : "pointer",
+                          font: `${l.on ? 600 : 500} 12px Inter, sans-serif`, border: `1px solid ${l.on ? l.color : "var(--crm-line)"}`, background: l.on ? l.color : "#fff", color: l.on ? "#fff" : "var(--crm-ink)" }}>
+                        {l.on ? <Ic name="check" size={12} /> : <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: l.color }} />}{l.name}
+                      </button>
+                      {lb.editing && <button type="button" onClick={() => void l.remove()} title={`Delete ${l.name}`} aria-label={`Delete ${l.name}`} style={{ ...BTN, marginLeft: "2px", display: "flex", color: "var(--crm-oxblood)" }}><Ic name="x" size={13} /></button>}
+                    </span>
+                  ))}
+                </div>
+                <form onSubmit={e => { e.preventDefault(); if (lb.canAdd) void lb.add(); }} style={{ display: "flex", gap: "6px" }}>
+                  <input value={lb.draft} onChange={lb.setDraft} placeholder="New label" aria-label="New label" maxLength={30}
+                    style={{ flex: 1, minWidth: 0, height: "30px", boxSizing: "border-box", padding: "0 10px", border: "1px solid var(--crm-line)", borderRadius: "7px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink)", background: "#fff", outline: "none" }} />
+                  <button type="submit" disabled={!lb.canAdd} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "7px", font: "500 12px Inter, sans-serif", background: lb.canAdd ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", cursor: lb.canAdd ? "pointer" : "default" }}>Add</button>
+                </form>
+              </div>); })()}
             {v.ibInfo.groups.map(g => (
               <div key={g.label} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "16px 20px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
                 <div style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{g.label}</div>
