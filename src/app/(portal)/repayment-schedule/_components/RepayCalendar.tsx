@@ -9,10 +9,11 @@ import { formatMoney, formatMoneyBare } from '@/lib/utils'
 // handoff). Each installment of the month sits on its day, read off the
 // deal's repayment plan (lib/repayment-plan — the same rows as its page's
 // Repayment schedule): ↓ money we collect (a Fund OUT loan), ↑ money we pay (a
-// Fund IN source), tinted by where it stands — paid green, due white, part
-// paid amber, overdue red. A hover shows the installment's card, a click opens
-// the deal, and a day with more than four shows "+N more". On a phone the
-// month reads as a list of days instead.
+// Fund IN source), tinted by where it stands — due white, part paid amber,
+// overdue red; one already settled is not on it (2026-11-02, user: 已经settle
+// 了就别出现哦 — it was green). A hover shows the installment's card, a click
+// opens the deal, and a day with more than four shows "+N more". On a phone
+// the month reads as a list of days instead.
 
 export interface CalendarEvent {
   /** YYYY-MM-DD */
@@ -22,7 +23,7 @@ export interface CalendarEvent {
   amount: number
   /** What is still unpaid on it. */
   outstanding: number
-  status: 'paid' | 'due' | 'partial' | 'overdue'
+  status: 'due' | 'partial' | 'overdue'
   /** Its number in the plan, and how many the plan has (null: no fixed term). */
   no: number
   months: number | null
@@ -33,14 +34,14 @@ export interface CalendarEvent {
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const STATUS_LABEL: Record<CalendarEvent['status'], string> = { paid: 'paid', due: 'due', partial: 'part paid', overdue: 'overdue' }
+const STATUS_LABEL: Record<CalendarEvent['status'], string> = { due: 'due', partial: 'part paid', overdue: 'overdue' }
 const MAX = 4
 
-// 2026-10-10 — the handoff's legend: the two sides, then the four states, each a swatch.
+// 2026-10-10 — the handoff's legend: the two sides, then the states, each a
+// swatch (Paid went with the settled instalments, 2026-11-02).
 const LEGEND: Array<[string, string]> = [
   ['sch-collect', '↓ We collect (Fund OUT)'],
   ['sch-pay', '↑ We pay (Fund IN)'],
-  ['sch-paid', 'Paid'],
   ['sch-due', 'Due'],
   ['sch-partial', 'Part paid'],
   ['sch-overdue', 'Overdue'],

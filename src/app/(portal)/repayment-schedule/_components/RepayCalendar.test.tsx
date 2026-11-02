@@ -4,8 +4,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 // 2026-10-09 — the Repayment Schedule's calendar (the user's Claude Design
 // handoff): the month's installments on their days, money we collect (↓,
 // Fund OUT) and money we pay (↑, Fund IN), each tinted by where it stands —
-// paid, due, part paid, overdue; a card on hover, the record on a click, and
-// "+N more" when a day holds more than four.
+// due, part paid, overdue (a settled one is no entry since 2026-11-02, so
+// there is no Paid); a card on hover, the record on a click, and "+N more"
+// when a day holds more than four.
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }))
@@ -13,13 +14,13 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }))
 import RepayCalendar, { type CalendarEvent } from './RepayCalendar'
 
 const ev = (date: string, kind: 'collect' | 'pay', name: string, amount: number, status: CalendarEvent['status'], over: Partial<CalendarEvent> = {}): CalendarEvent => ({
-  date, kind, name, amount, status, outstanding: status === 'paid' ? 0 : amount, no: 3, months: 6, rate: 0.04, principal: 60000,
+  date, kind, name, amount, status, outstanding: amount, no: 3, months: 6, rate: 0.04, principal: 60000,
   href: `/fund-${kind === 'collect' ? 'out' : 'in'}/${name}`, ...over,
 })
 
 const EVENTS: CalendarEvent[] = [
   ev('2026-10-02', 'collect', 'CAR', 12400, 'overdue'),
-  ev('2026-10-02', 'pay', 'HC', 8333.33, 'paid'),
+  ev('2026-10-02', 'pay', 'HC', 8333.33, 'overdue'),
   ev('2026-10-15', 'collect', 'HK', 12200, 'partial', { outstanding: 2200 }),
   ...['A', 'B', 'C', 'D', 'E', 'F'].map((n) => ev('2026-10-20', 'collect', n, 1000, 'due')),
 ]
@@ -40,7 +41,7 @@ describe('the repayment calendar', () => {
     const items = within(second).getAllByRole('link')
     expect(items.map((i) => i.textContent)).toEqual(['↓CAR12,400.00', '↑HC8,333.33'])
     expect(items[0]).toHaveClass('overdue')
-    expect(items[1]).toHaveClass('paid')
+    expect(items[1]).toHaveClass('pay', 'overdue')
     expect(items[0]).toHaveAttribute('href', '/fund-out/CAR')
   })
 
@@ -95,10 +96,10 @@ describe('the repayment calendar, per the handoff', () => {
     expect(head).toHaveTextContent('9 INSTALMENTS · OCTOBER 2026')
   })
 
-  it('names the legend the handoff’s way, each with a swatch', () => {
+  it('names the legend the handoff’s way, each with a swatch — no Paid, a settled one being off the calendar', () => {
     render(<RepayCalendar month="2026-10" today="2026-10-09" events={EVENTS} />)
     const legend = Array.from(document.querySelectorAll('.cal-legend > span'))
-    expect(legend.map((s) => s.textContent)).toEqual(['↓ We collect (Fund OUT)', '↑ We pay (Fund IN)', 'Paid', 'Due', 'Part paid', 'Overdue'])
+    expect(legend.map((s) => s.textContent)).toEqual(['↓ We collect (Fund OUT)', '↑ We pay (Fund IN)', 'Due', 'Part paid', 'Overdue'])
     expect(legend.every((s) => s.querySelector('.sch-swatch'))).toBe(true)
   })
 
@@ -130,7 +131,7 @@ describe('the repayment calendar, per the handoff', () => {
     const hc = items.find((i) => i.textContent?.includes('HC')) as HTMLElement
     expect(hc).toHaveTextContent('Pay · instalment 3 of 6')
     expect(hc).not.toHaveTextContent('short')
-    expect(hc.querySelector('.cal-card-status')).toHaveTextContent('paid')
+    expect(hc.querySelector('.cal-card-status')).toHaveTextContent('overdue')
     expect(hc).toHaveAttribute('href', '/fund-in/HC')
   })
 })

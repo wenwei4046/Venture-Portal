@@ -36,9 +36,10 @@ const SCHEDULE: RepaymentSchedule = {
   repayMin: [],
   repayCompound: [],
   repayNoTerm: [],
+  // A settled instalment is no entry (lib/repayment-calendar, 2026-11-02): none here is paid.
   events: [
     ev({ name: 'HC', amount: 1100, outstanding: 1100, status: 'overdue', no: 3 }),
-    ev({ kind: 'pay', name: 'PETER', href: '/fund-in/fs-f?from=calendar&month=2026-10', amount: 300, outstanding: 0, status: 'paid', no: 1, months: 6 }),
+    ev({ kind: 'pay', name: 'PETER', href: '/fund-in/fs-f?from=calendar&month=2026-10', date: '2026-10-20', amount: 300, outstanding: 300, status: 'due', no: 1, months: 6 }),
     ev({ name: 'HS', href: '/fund-out/loan-b?from=calendar', date: '2026-10-20', amount: 550, outstanding: 550, status: 'due', no: 9 }),
   ],
 }
@@ -94,12 +95,13 @@ describe('repaymentModel', () => {
   it('the calendar as days: each day’s net, collections first, where each instalment stands', () => {
     const g = card('calendar').groups
     expect(g.map((x) => [x.title, x.count])).toEqual([
-      ['Mon 5 Oct 2026', '+1,100.00  −300.00'],
-      ['Tue 20 Oct 2026', '+550.00'],
+      ['Mon 5 Oct 2026', '+1,100.00'],
+      ['Tue 20 Oct 2026', '+550.00  −300.00'],
     ])
-    expect(g[0].lines.map((l) => [l.label, l.sub, l.chip?.text, l.open?.href])).toEqual([
-      ['↓ HC', 'Collect · instalment 3 of 12', 'overdue', '/fin-app/fund/out?id=loan-a'],
-      ['↑ PETER', 'Pay · instalment 1 of 6', 'paid', '/fin-app/fund/in?id=fs-f'],
+    expect(g[0].lines.map((l) => [l.label, l.sub, l.chip?.text, l.open?.href])).toEqual([['↓ HC', 'Collect · instalment 3 of 12', 'overdue', '/fin-app/fund/out?id=loan-a']])
+    expect(g[1].lines.map((l) => [l.label, l.sub, l.chip?.text, l.open?.href])).toEqual([
+      ['↓ HS', 'Collect · instalment 9 of 12', 'due', '/fin-app/fund/out?id=loan-b'],
+      ['↑ PETER', 'Pay · instalment 1 of 6', 'due', '/fin-app/fund/in?id=fs-f'],
     ])
   })
 
