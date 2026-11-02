@@ -161,7 +161,8 @@ function noTermGroup(rows: NoTermRow[], side: Side): PageGroup[] {
   ]
 }
 
-const STATUS: Record<CalendarEntry['status'], { text: string; tone: 'def' | 'alert' | 'danger' }> = {
+const STATUS: Record<CalendarEntry['status'], { text: string; tone: 'ledger' | 'def' | 'alert' | 'danger' }> = {
+  paid: { text: 'paid', tone: 'ledger' },
   due: { text: 'due', tone: 'def' },
   partial: { text: 'part paid', tone: 'alert' },
   overdue: { text: 'overdue', tone: 'danger' },

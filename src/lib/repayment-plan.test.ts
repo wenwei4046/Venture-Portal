@@ -46,6 +46,8 @@ describe('a fixed-term plan', () => {
     expect(plan.rows[4]).toMatchObject({ due: '2026-06-15', remark: 'Overdue 5 days', tone: 'danger' })
     expect(plan.rows[5]).toMatchObject({ due: '2026-07-15', outstanding: 11200, remark: '', tone: '' })
     expect(plan.rows[11]).toMatchObject({ due: '2027-01-15', balance: 0 })
+    // The day each row was paid in full (2026-11-02 — the calendar leaves out a row paid before its month).
+    expect(plan.rows.slice(0, 3).map((r) => r.paidOn)).toEqual(['2026-02-15', '2026-03-15', undefined])
     expect(plan).toMatchObject({
       months: 12, paidCount: 2, outstandingDue: 600 + 9 * 11200, firstDue: '2026-02-15', firstInstallment: 11200,
       totalInterest: 14400, principalPaid: 30000, interestPaid: 3000, principalOwed: 90000,
@@ -72,6 +74,8 @@ describe('a fixed-term plan', () => {
     expect(plan.rows[1]).toMatchObject({ remark: 'Paid 10 Mar 2026 · HV-OR-2', tone: 'ledger', outstanding: 0 })
     expect(plan.rows[2]).toMatchObject({ remark: 'Settled early · 10 Mar 2026', tone: 'info', outstanding: 0 })
     expect(plan.rows[11]).toMatchObject({ tone: 'info', outstanding: 0 })
+    // Settled early, a row is paid on the day the principal was all repaid — before its month.
+    expect([plan.rows[1].paidOn, plan.rows[2].paidOn, plan.rows[11].paidOn]).toEqual(['2026-03-10', '2026-03-10', '2026-03-10'])
     expect(plan).toMatchObject({ paidCount: 2, outstandingDue: 0, principalOwed: 0 })
   })
 

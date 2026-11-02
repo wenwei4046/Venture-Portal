@@ -5760,6 +5760,7 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .repay-cal .cal-legend .swatch { width: 10px; height: 10px; border-radius: 3px; border: 1px solid rgb(var(--hairline)); }
 .repay-cal .bar.collect { background: rgb(21 110 78); }
 .repay-cal .bar.pay { background: rgb(233 154 83); }
+.repay-cal .swatch.paid { background: rgb(222 240 232); border-color: rgb(21 110 78 / 0.4); }
 .repay-cal .swatch.due { background: #fff; }
 .repay-cal .swatch.partial { background: rgb(249 238 214); border-color: rgb(150 100 12 / 0.4); }
 .repay-cal .swatch.overdue { background: rgb(250 228 224); border-color: rgb(176 40 34 / 0.4); }
@@ -5781,6 +5782,7 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .repay-cal .cal-item.pay { border-left-color: rgb(233 154 83); }
 .repay-cal .cal-item .who { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .repay-cal .cal-item .amt { flex: none; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
+.repay-cal :is(.cal-item, .cal-agenda-item).paid { background: rgb(222 240 232); color: rgb(21 110 78); }
 .repay-cal :is(.cal-item, .cal-agenda-item).due { background: #fff; color: #000; box-shadow: inset 0 0 0 1px rgb(var(--hairline)); }
 .repay-cal :is(.cal-item, .cal-agenda-item).partial { background: rgb(249 238 214); color: rgb(150 100 12); }
 .repay-cal :is(.cal-item, .cal-agenda-item).overdue { background: rgb(250 228 224); color: rgb(176 40 34); }
@@ -5810,6 +5812,7 @@ table.ledger-table.audit-saves td { vertical-align: top; }
 .cal-card dt { color: rgb(117 100 86); }
 .cal-card dd { margin: 0; font-family: var(--font-mono), 'Chivo Mono', Menlo, monospace; }
 .cal-card-status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; }
+.cal-card-status.paid { background: rgb(222 240 232); color: rgb(21 110 78); }
 .cal-card-status.due { background: rgb(246 246 244); color: #000; }
 .cal-card-status.partial { background: rgb(249 238 214); color: rgb(150 100 12); }
 .cal-card-status.overdue { background: rgb(250 228 224); color: rgb(176 40 34); }
@@ -5820,6 +5823,7 @@ table.ledger-table.audit-saves td { vertical-align: top; }
   .repay-cal .cal-dots i { width: 6px; height: 6px; border-radius: 999px; }
   .repay-cal .cal-dots i.collect { background: rgb(120 170 145); }
   .repay-cal .cal-dots i.pay { background: rgb(233 154 83); }
+  .repay-cal .cal-dots i.paid { background: rgb(21 110 78); }
   .repay-cal .cal-dots i.overdue { background: rgb(176 40 34); }
   .repay-cal .cal-dots i.partial { background: rgb(150 100 12); }
   .repay-cal .cal-agenda { display: grid; gap: 10px; margin-top: 12px; }
@@ -7319,10 +7323,11 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
 .sch-tool-btn:hover { background: rgb(var(--surface-2)); }
 .sch-tool-btn .caret { font-size: 10px; color: rgb(var(--muted)); }
 /* ── Repayment Schedule · the calendar ── */
-/* The legend: the two sides edged in their colour, the states filled (no Paid: a settled instalment is off the calendar, 2026-11-02). */
+/* The legend: the two sides edged in their colour, the four states filled. */
 .sch-swatch { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; border: 1px solid rgb(160 150 138); background: #fff; }
 .sch-swatch.sch-collect { border-color: #156E4E; }
 .sch-swatch.sch-pay { border-color: #E99A53; }
+.sch-swatch.sch-paid { background: #DEF0E8; border-color: #156E4E; }
 .sch-swatch.sch-due { background: #fff; border-color: rgb(160 150 138); }
 .sch-swatch.sch-partial { background: #F9EED6; border-color: #96640C; }
 .sch-swatch.sch-overdue { background: #FAE4E0; border-color: #B02822; }
