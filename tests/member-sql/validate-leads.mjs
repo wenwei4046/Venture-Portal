@@ -1823,6 +1823,29 @@ await db.exec(`
   await q(`update public.lead_contacts set name = '' where id = $1`, [nn])
   await q(`select public.lead_flow_say($1, 'T', 'Hello {name}!', null)`, [nn])
   check((await lastFlow(nn)).body, 'Hello there!', 'no name: "there"')
+
+  // ── The customer asks for a person (mig 20261102190000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_flow_on_message'`))[0].m, '8c0cc780f5294f58f17013ba406f29ae', 'the runner here is production’s after 20261102180000')
+  await db.exec(await f('20261102190000_lead_asks_for_person.sql'))
+  await db.exec(await f('20261102190000_lead_asks_for_person.sql'))
+  const asks = async t => (await q(`select public.lead_asks_for_person($1) a`, [t]))[0].a
+  for (const t of ['我要找客服', '转人工', 'Customer service please', 'can I talk to a real person?', 'are you human?', 'nak cakap dengan orang']) check(await asks(t), true, `asks for a person: ${t}`)
+  for (const t of ['2 person sofa', 'L-shape for 5 people', 'service centre?']) check(await asks(t), false, `not asking for a person: ${t}`)
+  const personEvents = async id => (await q(`select count(*)::int n from public.lead_events where contact_id = $1 and what like 'Customer asked for a person%'`, [id]))[0].n
+  // A template waiting on the customer stops.
+  await inMsg('7708001', 'hi', { sourceId: BACK_AD, headline: 'Sofas' })
+  const askA = await contactOf('7708001')
+  check((await q(`select flow_state from public.lead_contacts where id = $1`, [askA]))[0].flow_state, 'running', 'a template is waiting')
+  await inMsg('7708001', 'can I talk to a real person?')
+  check([(await q(`select flow_state from public.lead_contacts where id = $1`, [askA]))[0].flow_state, await personEvents(askA)], ['stopped', 1], 'asked for a person: the template stops, the timeline says so')
+  await inMsg('7708001', '客服')
+  check([await personEvents(askA), (await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and sender = 'flow' and created_at > now() - interval '1 minute'`, [askA]))[0].n], [1, 1], 'asked again: nothing more, and no template starts')
+  // The AI Agent steps aside.
+  await inMsg('7708002', 'hello', { sourceId: AI_AD, headline: 'Beds' })
+  const askB = await contactOf('7708002')
+  check((await aiOf(askB)).ai_on, true, 'the AI’s customer')
+  await inMsg('7708002', '转人工')
+  check([(await aiOf(askB)).ai_on, await personEvents(askB)], [false, 1], 'asked for a person: the AI steps aside')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

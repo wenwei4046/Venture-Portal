@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampSide, SIDE_W, fromLibrary, normDigits, rowsOf, runsOn, templateProblem, tidy, toLibrary, updateFromLibrary, walkAnswer, walkFrom, type TemplateStep } from './template'
+import { asksForPerson, clampSide, SIDE_W, fromLibrary, normDigits, rowsOf, runsOn, templateProblem, tidy, toLibrary, updateFromLibrary, walkAnswer, walkFrom, type TemplateStep } from './template'
 
 // The same template tests/member-sql/validate-leads.mjs runs through the database's runner.
 const steps: TemplateStep[] = [
@@ -200,5 +200,18 @@ describe('‹ Back to the question before (2026-11-02, mig 20261102180000)', () 
     const plain = { ...t, steps: t.steps.map(s => ({ ...s, back: false })) }
     const w = walkAnswer(plain, walkAnswer(plain, walkFrom(plain, 'q1'), 'Sofa'), 'back')
     expect(w.ended).toBe('stopped')
+  })
+})
+
+describe('the customer asks for a person (2026-11-02, mig 20261102190000)', () => {
+  it('knows the ways people ask, in English, Chinese and Malay', () => {
+    for (const s of ['我要找客服', '转人工', '有真人吗', 'Customer service please', 'can I talk to a real person?', 'speak to someone', 'are you human?', 'nak cakap dengan orang', 'khidmat pelanggan'])
+      expect(asksForPerson(s), s).toBe(true)
+    for (const s of ['2 person sofa', 'how much', 'L-shape for 5 people', 'service centre?'])
+      expect(asksForPerson(s), s).toBe(false)
+  })
+  it('stops the walk for a person', () => {
+    const t = { endMsg: '', steps: [{ id: 'q', kind: 'question', text: 'Sofa?', buttons: [{ label: 'Yes', next: '' }] }] as TemplateStep[] }
+    expect(walkAnswer(t, walkFrom(t, 'q'), 'customer service').ended).toBe('person')
   })
 })

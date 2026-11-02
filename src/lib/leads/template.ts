@@ -267,6 +267,20 @@ export function isBack(answer: string): boolean {
   return BACK_WORDS.includes(answer.trim().toLowerCase())
 }
 
+/**
+ * Does the customer ask for a person (客服, 真人, customer service, a real person, khidmat pelanggan …)? Then no template or
+ * AI answers: the chat waits for CS. Twin of lead_asks_for_person (mig 20261102190000).
+ */
+const ASKS_FOR_PERSON = new RegExp([
+  '客服|真人|人工|找人|转人工|轉人工|联系人员|聯繫人員',
+  '\\bcustomer (service|support|care)\\b', '\\breal (person|people|human)\\b', '\\bhuman\\b', '\\blive (agent|chat|person)\\b',
+  '\\b(talk|speak|chat) (to|with) (a |an |your |someone|somebody|person|people|human|agent|staff|sales)', '\\bcustomer servise\\b',
+  '\\bkhidmat pelanggan\\b', '\\borang sebenar\\b', '\\b(cakap|bercakap) dengan (orang|staf|ejen)\\b',
+].join('|'))
+export function asksForPerson(text: string): boolean {
+  return ASKS_FOR_PERSON.test(text.toLowerCase())
+}
+
 export interface Said { from: 'bot' | 'customer' | 'system'; text: string; buttons?: string[]; file?: StepFile }
 
 export interface Walk {
@@ -348,6 +362,10 @@ export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, w: Walk, 
   const said: Said[] = [...w.said, { from: 'customer', text: answer }]
   const s = t.steps.find(x => x.id === w.waiting)
   if (!s) return { said, waiting: null, tries: 0, ended: 'stopped' }
+  if (asksForPerson(answer)) {
+    said.push({ from: 'system', text: 'Asked for a person · goes to a person' })
+    return { said, waiting: null, tries: 0, ended: 'person' }
+  }
   const trail = w.trail ?? []
   if (s.back && isBack(answer) && trail.length > 1 && trail[trail.length - 1] === s.id) {
     said.push({ from: 'system', text: 'Back to the question before' })
