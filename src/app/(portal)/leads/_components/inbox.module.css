@@ -362,10 +362,14 @@ button.assignee { cursor: pointer; }
   line-height: 1.45;
   color: rgb(var(--lv-fg));
   max-height: 140px;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: none;
   box-sizing: border-box;
 }
-.reply::placeholder { color: rgb(var(--lv-fg-4)); opacity: 1; white-space: nowrap; text-overflow: ellipsis; }
+/* No scroll arrows or bar in the pill: it still scrolls past 140px by wheel or keys. */
+.reply::-webkit-scrollbar { display: none; }
+.reply::placeholder { color: rgb(var(--lv-fg-4)); opacity: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reply:disabled { cursor: default; }
 .infoBtn { cursor: pointer; flex: none; display: flex; border: none; background: transparent; padding: 0; color: rgb(var(--lv-fg-3)); }
 .infoBtn:disabled { cursor: default; opacity: 0.5; }
