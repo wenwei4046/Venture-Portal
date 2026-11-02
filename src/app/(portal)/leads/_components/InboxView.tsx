@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import { assignLead, draftLeadReply, giveToAi, readRuleOf, leadAgents, leadMediaLinks, markUnread, quickReplyUsed, reactToMessage, readThread, replyToLead, replyToMessage, sendLeadMedia, setDraftOutcome, startOver, type DraftForInbox } from '@/lib/leads/actions'
 import { FILE_LIMIT, TOO_BIG } from '@/lib/leads/messenger'
 import { createClient } from '@/lib/supabase/client'
@@ -49,6 +50,8 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
   { id: 'handed', label: 'Handed' },
 ]
 const LIST_REFRESH_MS = 15_000
+/** A message lands as a row or two (the message, a template's answer): read once, a moment after the last. */
+const LIVE_SETTLE_MS = 300
 
 export default function InboxView({
   config,
@@ -154,13 +157,31 @@ export default function InboxView({
     window.history.replaceState(null, '', `/leads?c=${id}`)
     load(id)
   }
-  // The list stays live: read again every 15 s while this tab is in view, and at once when it comes back.
+  // The list stays live: read again the moment a message is kept (the private channel `leads:inbox`, mig
+  // 20261102260000 — a moment after the last of a burst), every 15 s as a fallback while this tab is in view, and at
+  // once when it comes back.
   const router = useRouter()
   useEffect(() => {
     const fresh = () => { if (document.visibilityState === 'visible') router.refresh() }
     const timer = window.setInterval(fresh, LIST_REFRESH_MS)
     document.addEventListener('visibilitychange', fresh)
-    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', fresh) }
+    let soon: ReturnType<typeof setTimeout> | undefined
+    const ping = () => { clearTimeout(soon); soon = setTimeout(fresh, LIVE_SETTLE_MS) }
+    const db = createClient()
+    let channel: RealtimeChannel | null = null
+    let gone = false
+    // A private channel joins with the session's own token: Realtime asks realtime.messages' policy who may listen.
+    void db.realtime.setAuth().catch(() => undefined).then(() => {
+      if (gone) return
+      channel = db.channel('leads:inbox', { config: { private: true } }).on('broadcast', { event: 'message' }, ping).subscribe()
+    })
+    return () => {
+      gone = true
+      clearTimeout(soon)
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', fresh)
+      if (channel) void db.removeChannel(channel)
+    }
   }, [router])
   const lastAt = contacts.find(c => c.id === selected)?.lastAt
   const seen = useRef(lastAt)
@@ -572,7 +593,8 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
                   ) : null}
                 </div>
                 {m.reaction ? <span className={s.reaction} title="The Page's reaction">{m.reaction}</span> : null}
-                {m.buttons?.length ? <div className={s.buttons}>{m.buttons.map(b => <span key={b} style={{ whiteSpace: 'nowrap' }}>↳ {b}</span>)}</div> : null}
+                {/* Its buttons as the customer sees them: one button each (2026-11-02 — the user: "button能弄成按钮式的吗？"). */}
+                {m.buttons?.length ? <div className={s.buttons}>{m.buttons.map(b => <span key={b} className={s.buttonPill}>{b}</span>)}</div> : null}
                 {m.phoneFound ? <span className={s.found}>Phone found · {formatPhone(m.phoneFound)}</span> : null}
                 {run.last || (out && m.delivery !== 'sent') ? (
                   <span className={s.time}>

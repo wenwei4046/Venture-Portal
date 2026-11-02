@@ -1931,6 +1931,13 @@ await db.exec(`
   await as(CS_USER, [])
   await refuses(`select public.lead_ad_posts()`, [], /Lead View · View/, 'reading them needs Lead View · View')
   await as(CS_USER, ALL)
+  // ── The Inbox hears a new message (mig 20261102260000) ──
+  await db.exec(await f('20261102260000_lead_live_inbox.sql'))
+  await db.exec(await f('20261102260000_lead_live_inbox.sql'))
+  const liveBefore = (await q(`select count(*)::int n from public.lead_messages`))[0].n
+  await inMsg('7710001', 'hello, anyone?')
+  check((await q(`select count(*)::int n from public.lead_messages`))[0].n > liveBefore, true, 'a message is kept though the ping cannot be sent (no Realtime here)')
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_inbox_ping()', 'execute') a`))[0].a, false, 'the ping is nobody’s to call')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

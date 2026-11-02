@@ -261,7 +261,8 @@ button.assignee { cursor: pointer; }
 .msg[data-out] .bubble { background: rgb(var(--lv-sel)); border-color: rgb(var(--lv-sel-edge)); }
 .bubbleRow .bubble { max-width: none; }
 .bubbleRow { max-width: 72%; }
-.buttons { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: rgb(var(--lv-accent)); max-width: 72%; justify-content: flex-end; }
+.buttons { display: flex; flex-direction: column; gap: 6px; width: min(300px, 72%); }
+.buttonPill { display: block; padding: 7px 14px; border: 1px solid rgb(var(--lv-line)); border-radius: 999px; background: rgb(var(--lv-surface)); color: rgb(var(--lv-accent)); font-size: 13px; line-height: 1.35; text-align: center; overflow-wrap: anywhere; }
 .time { font-size: 11px; color: rgb(var(--lv-fg-4)); display: inline-flex; align-items: center; gap: 4px; }
 .timeWarn { color: rgb(var(--lv-accent)); }
 .ticks { font-size: 11px; letter-spacing: -2px; color: rgb(var(--lv-fg-4)); }
