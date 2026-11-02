@@ -4,12 +4,17 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { saveLeadLabels, setLeadLabels } from '@/lib/leads/actions'
 import { LABEL_TONES, type LabelTone, type LeadContact, type LeadLabel } from '@/lib/leads/types'
-import s from './inbox.module.css'
+import { LeadIcon } from '@/components/layout/lead-icons'
+import Modal from './ui/Modal'
+import Popover from './ui/Popover'
+import s from './handoff.module.css'
+import f from './inbox.module.css'
 
 /**
  * A customer's labels on the customer card (2026-10-27 — the user: "是否可以label 客户？比方说待考量之类的", showing Meta's
- * lead stages; mig 20261027190000). Lead View · Edit ticks them on and off (any number, saved at each tick); Lead View
- * · Manage also edits the list — names, colours, order, delete — saved whole.
+ * lead stages; mig 20261027190000; v2 2026-11-02 — kept though not drawn, on the v2 popover and modal). Lead View ·
+ * Edit ticks them on and off (any number, saved at each tick); Lead View · Manage also edits the list — names,
+ * colours, order, delete — saved whole.
  */
 export default function LabelPicker({ contact, labels, canEdit, canManage, onSaved }: {
   contact: LeadContact
@@ -34,37 +39,31 @@ export default function LabelPicker({ contact, labels, canEdit, canManage, onSav
   })
 
   return (
-    <div className={s.block} style={{ gap: 6 }}>
-      <span className={s.caps}>LABELS</span>
-      <div className={s.labelRow}>
+    <div className={f.field} style={{ alignItems: 'start', padding: '10px 0' }}>
+      <span className={f.fieldKey}><LeadIcon name="tag" size={15} />Labels</span>
+      <div className={s.row}>
         {on.map(l => <span key={l.id} className={s.label} data-tone={l.tone}>{l.name}</span>)}
-        {!on.length ? <span className={s.sub}>No labels</span> : null}
-        {canEdit && labels.length ? (
-          <span className={s.nowWrap}>
-            <button type="button" className={s.textLink} onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open} disabled={busy}>+ Label</button>
-            {open ? (
-              <>
-                <div className={s.scrim} onClick={() => setOpen(false)} aria-hidden="true" />
-                <div className={s.menu} role="menu" aria-label="Labels" style={{ left: 0, right: 'auto', top: 24 }}>
-                  {labels.map(l => {
-                    const ticked = on.some(x => x.id === l.id)
-                    return (
-                      <button key={l.id} type="button" role="menuitemcheckbox" aria-checked={ticked} className={s.menuItem} onClick={() => toggle(l.id)} disabled={busy}>
-                        <span className={s.label} data-tone={l.tone}>{l.name}</span>
-                        <span style={{ flex: 1 }} />
-                        <span className={s.menuTick}>{ticked ? '✓' : ''}</span>
-                      </button>
-                    )
-                  })}
-                  {canManage ? (
-                    <button type="button" className={s.menuItem} onClick={() => { setOpen(false); setEditing(true) }}>Edit labels…</button>
-                  ) : null}
-                </div>
-              </>
-            ) : null}
+        {!on.length && !canEdit ? <span className={f.fieldValue} data-empty="">—</span> : null}
+        {canEdit && (labels.length || canManage) ? (
+          <span className={s.wrap}>
+            <button type="button" className={s.add} onClick={() => (labels.length ? setOpen(o => !o) : setEditing(true))} aria-haspopup="menu" aria-expanded={open} disabled={busy}>+ Label</button>
+            <Popover open={open} onClose={() => setOpen(false)} className={s.menu} label="Labels">
+              {labels.map(l => {
+                const ticked = on.some(x => x.id === l.id)
+                return (
+                  <button key={l.id} type="button" role="menuitemcheckbox" aria-checked={ticked} className={s.item} onClick={() => toggle(l.id)} disabled={busy}>
+                    <span className={s.label} data-tone={l.tone}>{l.name}</span><span /><span className={s.tick}>{ticked ? '✓' : ''}</span>
+                  </button>
+                )
+              })}
+              {canManage ? (
+                <>
+                  <div className={s.sep} role="separator" />
+                  <button type="button" className={s.item} onClick={() => { setOpen(false); setEditing(true) }}><LeadIcon name="pencil" size={14} /><span>Edit labels…</span></button>
+                </>
+              ) : null}
+            </Popover>
           </span>
-        ) : canManage ? (
-          <button type="button" className={s.textLink} onClick={() => setEditing(true)}>Edit labels…</button>
         ) : null}
       </div>
       {error ? <span className={s.error} role="alert">{error}</span> : null}
@@ -103,29 +102,25 @@ function LabelEditor({ labels, onClose, onSaved }: { labels: LeadLabel[]; onClos
     onClose()
   })
   return (
-    <>
-      <div className={s.scrim} onClick={onClose} aria-hidden="true" />
-      <div className={s.labelEditor} role="dialog" aria-label="Edit labels">
-        <div className={s.menuKicker}>EDIT LABELS</div>
-        {rows.map((x, i) => (
-          <div key={x.id ?? `new-${i}`} className={s.labelEditRow}>
-            <input className={s.input} value={x.name} maxLength={40} onChange={e => put(i, { name: e.target.value })} aria-label="Label name" />
-            <select className={s.input} value={x.tone} onChange={e => put(i, { tone: e.target.value as LabelTone })} aria-label="Colour">
-              {LABEL_TONES.map(t => <option key={t} value={t}>{TONE_NAME[t]}</option>)}
-            </select>
-            <span className={s.label} data-tone={x.tone}>{x.name || '…'}</span>
-            <button type="button" className={s.iconBtn} onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up">↑</button>
-            <button type="button" className={s.iconBtn} onClick={() => move(i, 1)} disabled={i === rows.length - 1} aria-label="Move down">↓</button>
-            <button type="button" className={s.iconBtn} onClick={() => drop(i)} aria-label="Delete">×</button>
-          </div>
-        ))}
-        <button type="button" className={s.textLink} onClick={() => setRows(r => [...r, { name: '', tone: 'grey', used: 0 }])} disabled={rows.length >= 30}>+ Add label</button>
-        {error ? <span className={s.error} role="alert">{error}</span> : null}
-        <div className={s.labelEditFoot}>
-          <button type="button" className={s.btn} data-quiet="" onClick={onClose}>Cancel</button>
-          <button type="button" className={s.btn} data-strong="" onClick={save} disabled={busy || rows.some(x => !x.name.trim())}>{busy ? 'Saving…' : 'Save'}</button>
+    <Modal open onClose={onClose} title="Edit labels" width={520}
+      foot={<>
+        <button type="button" className={s.cancel} onClick={onClose}>Cancel</button>
+        <button type="button" className={s.go} onClick={save} disabled={busy || rows.some(x => !x.name.trim())}>{busy ? 'Saving…' : 'Save'}</button>
+      </>}>
+      {rows.map((x, i) => (
+        <div key={x.id ?? `new-${i}`} className={s.editRow}>
+          <input className={s.input} value={x.name} maxLength={40} onChange={e => put(i, { name: e.target.value })} aria-label="Label name" />
+          <select className={s.input} value={x.tone} onChange={e => put(i, { tone: e.target.value as LabelTone })} aria-label="Colour">
+            {LABEL_TONES.map(t => <option key={t} value={t}>{TONE_NAME[t]}</option>)}
+          </select>
+          <span className={s.label} data-tone={x.tone}>{x.name || '…'}</span>
+          <button type="button" className={s.icon} onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up"><LeadIcon name="arrow-up" size={14} /></button>
+          <button type="button" className={s.icon} onClick={() => move(i, 1)} disabled={i === rows.length - 1} aria-label="Move down"><LeadIcon name="arrow-down" size={14} /></button>
+          <button type="button" className={s.icon} onClick={() => drop(i)} aria-label="Delete"><LeadIcon name="x" size={14} /></button>
         </div>
-      </div>
-    </>
+      ))}
+      <button type="button" className={s.more} onClick={() => setRows(r => [...r, { name: '', tone: 'grey', used: 0 }])} disabled={rows.length >= 30}>+ Add label</button>
+      {error ? <span className={s.error} role="alert">{error}</span> : null}
+    </Modal>
   )
 }

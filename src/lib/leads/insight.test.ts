@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adRowsOf, byReplyOf, dropOf, funnelOf, insightRange, speedOf } from './insight'
+import { adRowsOf, byReplyOf, dropOf, funnelOf, insightRange, speedOf, trendLabel, trendOf } from './insight'
 import type { LeadContact } from './types'
 
 const c = (o: Partial<LeadContact>): LeadContact => ({
@@ -21,9 +21,23 @@ describe('Insight v2', () => {
   it('counts from message to sale, each step against the one before', () => {
     const rows = [c({ phone: '0123' , handedAt: 'x', shown: 'came' as never, closedAt: 'y' }), c({ phone: '0124' }), c({}), c({})]
     expect(funnelOf(rows).map(f => [f.label, f.n, f.rate])).toEqual([
-      ['Conversations', 4, 'all chats'], ['Gave a phone', 2, '50% of previous'], ['Handed to sales', 1, '50% of previous'],
-      ['Came to showroom', 1, '100% of previous'], ['Bought', 1, '100% of previous'],
+      ['Chats', 4, 'Started a chat'], ['Got phone', 2, '50% of previous'], ['Handed to sales', 1, '50% of previous'],
+      ['Came to showroom', 1, '100% of previous'], ['Closed', 1, '100% of previous'],
     ])
+  })
+
+  it('reads Today, Custom and its bounds', () => {
+    expect(insightRange('today', '2026-11-02')).toMatchObject({ key: 'today', from: '2026-11-02', to: '2026-11-02', listTo: '2026-11-03' })
+    expect(insightRange('custom', '2026-11-02', '2026-10-01', '2026-10-18')).toMatchObject({ from: '2026-10-01', to: '2026-10-18', label: '1 Oct – 18 Oct' })
+    expect(insightRange('custom', '2026-11-02', '2026-10-20', '2026-12-01')).toMatchObject({ to: '2026-11-02' })
+    expect(insightRange('custom', '2026-11-02', '2020-01-01', '2026-11-02').from).toBe('2025-11-02')
+  })
+
+  it('draws the trend by day, or by hour for one day', () => {
+    const rows = [{ createdAt: '2026-10-31T02:00:00Z', phoneAt: '2026-11-01T03:00:00Z' }, { createdAt: '2026-11-01T01:00:00Z', phoneAt: null }]
+    expect(trendOf(rows, '2026-10-31', '2026-11-01')).toEqual({ unit: 'day', keys: ['2026-10-31', '2026-11-01'], chats: [1, 1], phones: [0, 1] })
+    const h = trendOf(rows, '2026-11-01', '2026-11-01')
+    expect([h.unit, h.chats[9], h.phones[11], trendLabel('13', 'hour'), trendLabel('2026-11-01', 'day')]).toEqual(['hour', 1, 1, '1pm', '1 Nov'])
   })
 
   it('puts ads on their own rows and the rest under Organic per brand', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, brandCounts, isMediaPlaceholder, mediaKind, receiptOf, readPanels, replyingNow, RIGHT_W, unreadLabel, noteOf, runsOf, inMessengerOrder } from './inbox'
+import { clampWidth, isVisitDate, LIST_W, phoneStage, phoneSteps, readLayout, brandCounts, isMediaPlaceholder, mediaKind, receiptOf, readPanels, replyingNow, RIGHT_W, unreadLabel, noteOf, runsOf, inMessengerOrder, phoneLabel, rowStatus, chatSub, visitShown, bylineOf } from './inbox'
 import { dayLabel } from './time'
 
 describe('the Inbox columns the browser keeps', () => {
@@ -157,5 +157,35 @@ describe('runs, as Messenger groups a sender’s messages (2026-10-28)', () => {
       { first: true, last: true },
       { first: true, last: true },
     ])
+  })
+})
+
+describe('Lead View v2 — the Inbox as the handoff draws it', () => {
+  const base = { phone: null, phoneState: 'none' as const, handedAt: null, handedSalesName: null, flowState: 'done' as const, flowName: null, phoneTyped: false }
+  it('names where the phone came from', () => {
+    expect(phoneLabel(base)).toBe('Phone')
+    expect(phoneLabel({ ...base, phone: '0123384721', phoneState: 'detected' })).toBe('Phone · found in the chat')
+    expect(phoneLabel({ ...base, phone: '0123384721', phoneState: 'confirmed' })).toBe('Phone · confirmed')
+    expect(phoneLabel({ ...base, phone: '+65 9123 4567', phoneState: 'confirmed', phoneTyped: true })).toBe('Phone · added by you')
+    expect(phoneLabel({ ...base, phone: '0123384721', phoneState: 'confirmed', handedAt: '2026-10-18T06:00:00Z' })).toBe('Phone · confirmed')
+  })
+  it('gives each row its status line and colour', () => {
+    expect(rowStatus(base, 'waiting')).toEqual({ text: 'No phone yet', tone: 'rust' })
+    expect(rowStatus(base, 'answered')).toEqual({ text: 'Follow up', tone: 'muted' })
+    expect(rowStatus({ ...base, phone: '0123384721', phoneState: 'detected' }, 'waiting')).toEqual({ text: 'Phone found', tone: 'rust' })
+    expect(rowStatus({ ...base, phone: '0123384721', phoneState: 'confirmed', handedAt: 'x' }, 'handed')).toEqual({ text: 'Handed to Sales group', tone: 'pos' })
+  })
+  it('writes the chat header line', () => {
+    expect(chatSub('2990s mini', 'Instagram', '', '17 Oct')).toBe('2990s mini · Instagram · Organic · since 17 Oct')
+    expect(chatSub('2990s', 'Messenger', 'Oct Sofa Week', '16 Oct')).toBe('2990s · Messenger · Ad · Oct Sofa Week · since 16 Oct')
+  })
+  it('shows a visit day as the panel does', () => {
+    expect(visitShown('2026-10-24')).toBe('Sat 24 Oct')
+    expect(visitShown('next week')).toBe('next week')
+  })
+  it('bylines each sender', () => {
+    expect(bylineOf({ sender: 'cs', byName: 'Mei Ling' })).toBe('CS · Mei Ling')
+    expect(bylineOf({ sender: 'flow', byName: 'Size question' })).toBe('Template · Size question')
+    expect(bylineOf({ sender: 'ai', byName: '' })).toBe('✦ AI Agent')
   })
 })

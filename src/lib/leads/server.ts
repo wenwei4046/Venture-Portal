@@ -9,7 +9,9 @@ import type { LeadFlow } from './flow'
 import type { BusinessHours, LeadInfo } from './info'
 import type { LibraryItem, ReplyRules } from './template'
 import type { AgentMore, Correction, DataFile } from './agent'
+import type { DataFolder } from './data-center'
 import type { QuickReply } from './quick'
+import type { LeadPage, StaffLeave } from './pages'
 import type { AuditChange, AuditTableLine } from '@/lib/audit/changes'
 import { AUDIT_TABLES } from './audit'
 import type { LeadConfig, LeadContact, LeadLabel, LeadThread } from './types'
@@ -38,6 +40,26 @@ async function rpc<T>(fn: string, args: Record<string, unknown> | undefined, wha
 /** The brands, their salespeople, and the sidebar's counts. */
 export function loadLeadConfig(): Promise<Read<LeadConfig>> {
   return rpc<LeadConfig>('lead_config', undefined, 'Lead View')
+}
+
+/** Settings' connected pages (mig 20261102110000). */
+export function loadPages(): Promise<Read<LeadPage[]>> {
+  return rpc<LeadPage[]>('lead_pages', undefined, 'The pages')
+}
+
+/** Working hours' On Leave (mig 20261102110000). */
+export function loadLeave(): Promise<Read<StaffLeave[]>> {
+  return rpc<StaffLeave[]>('lead_leave', undefined, 'The leave list')
+}
+
+/** Who works the Inbox (lead_agents — the logins Lead View › Inbox's Create opens). */
+export function loadAgents(): Promise<Read<Array<{ id: string; name: string }>>> {
+  return rpc<Array<{ id: string; name: string }>>('lead_agents', undefined, 'The team')
+}
+
+/** AI corrections dismissed (mig 20261102130000): the drafts' ids. */
+export function loadDismissed(): Promise<Read<number[]>> {
+  return rpc<number[]>('lead_ai_dismissed', undefined, 'The corrections')
 }
 
 /** The Inbox's list, latest first. */
@@ -105,6 +127,11 @@ export function loadDataFiles(): Promise<Read<DataFile[]>> {
   return rpc<DataFile[]>('lead_data_files', undefined, 'The Data Center')
 }
 
+/** The Data Center's folders (mig 20261102140000). */
+export function loadDataFolders(): Promise<Read<DataFolder[]>> {
+  return rpc<DataFolder[]>('lead_data_folders', undefined, 'The Data Center’s folders')
+}
+
 /** Customer Service's labels (mig 20261027190000). */
 export function loadLabels(): Promise<Read<LeadLabel[]>> {
   return rpc<LeadLabel[]>('lead_labels', undefined, 'The labels')
@@ -160,6 +187,11 @@ export function loadInsightMore(from: string | null, to: string | null): Promise
 /** Every ad conversations came from, with its name, campaign, ad set and link where known. */
 export function loadAds(): Promise<Read<LeadAd[]>> {
   return rpc<LeadAd[]>('lead_ads', undefined, 'The ads')
+}
+
+/** One set of tables' latest history (audit_changes, the reader's own permissions) — Reply rules' rail. */
+export async function loadChangesOf(tables: string[], limit = 60): Promise<Read<AuditChange[]>> {
+  return rpc<AuditChange[]>('audit_changes', { p_tables: tables, p_limit: limit }, 'The history')
 }
 
 /**

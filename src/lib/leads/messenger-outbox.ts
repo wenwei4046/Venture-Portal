@@ -1,6 +1,6 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { deliver, type Outgoing } from './messenger'
+import { deliver, deliverFile, type Delivered, type Outgoing } from './messenger'
 
 /**
  * A template's messages for the conversations a webhook delivery reached (mig 20261026110000): what the runner wrote
@@ -19,7 +19,7 @@ export async function sendLeadOutbox(client: SupabaseClient, contacts: string[],
   const results: Array<{ id: number; mid?: string; error?: string }> = []
   // One after another: a template's messages must reach the customer in their order.
   for (const row of rows) {
-    const r = await deliver(row, systemToken)
+    const r = row.mediaPath ? await sendFile(client, row, systemToken) : await deliver(row, systemToken)
     results.push('mid' in r ? { id: row.id, mid: r.mid } : { id: row.id, error: r.error })
   }
   if (results.length) {
@@ -27,4 +27,13 @@ export async function sendLeadOutbox(client: SupabaseClient, contacts: string[],
     if (done.error) console.error('lead_outbox_done failed:', done.error.message)
   }
   return results.filter(r => r.mid).length
+}
+
+/** A template's photo or file (mig 20261102120000), read back from `lead-media` with the webhook's client and sent as CS's files go. */
+async function sendFile(client: SupabaseClient, row: Outgoing, systemToken: string | undefined): Promise<Delivered> {
+  const { data: file, error } = await client.storage.from('lead-media').download(row.mediaPath!)
+  if (error || !file) return { error: 'The template’s file could not be read back to send it.' }
+  // chat/tpl/<uuid>/<name>: the name as it was picked.
+  const filename = row.mediaPath!.replace(/^.*\//, '')
+  return deliverFile(row, file, filename, row.mediaMime ?? file.type ?? '', systemToken)
 }

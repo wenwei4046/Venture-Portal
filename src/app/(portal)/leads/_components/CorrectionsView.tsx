@@ -1,185 +1,216 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { saveAgent } from '@/lib/leads/actions'
+import { flash } from '@/components/hrv/toast'
+import { LeadIcon } from '@/components/layout/lead-icons'
+import { dismissCorrection, saveAgent } from '@/lib/leads/actions'
 import { CORRECTION_TOPICS, topicOf, type AgentMore, type Correction } from '@/lib/leads/agent'
 import { whenFull } from '@/lib/leads/time'
-import s from './replies.module.css'
+import b from './settings.module.css'
+import s from './corrections.module.css'
 
 /**
- * Lead View › AI corrections (2026-10-23, the redesign v2 handoff `Auto Reply.dc.html?view=corrections`): a brand's AI
- * drafts that CS changed before sending — what the customer asked, what the AI said (struck through) and what CS sent.
- * Saving one makes (or updates) the fixed answer for that question, through the AI Agent's save; the correction itself
- * never changes — an edited fixed answer shows IN USE over EARLIER · CS FIX. List or Summary (by topic), CSV, the period
- * (?d=) and page size at the foot.
+ * Lead View v2 › AI corrections (2026-11-02, the v2 handoff §7.11): replies CS changed before sending an AI draft.
+ * STATUS (All · To review · Saved · Dismissed; To review by default) and TOPIC on the left; the corrections; the picked
+ * one — CUSTOMER ASKED, AI SAID (struck through), CORRECT ANSWER (editable), Topic, Corrected by, Chat — with Save as
+ * fixed answer (it really makes the brand's fixed answer, through the AI Agent's save) or Dismiss
+ * (lead_ai_dismiss, mig 20261102130000). Every brand's at once. Kept though not drawn (the user's point 2): the period
+ * and Export CSV, at the foot of the left column.
  */
 
-const RANGES: ReadonlyArray<[string, number | null]> = [['7 days', 7], ['30 days', 30], ['90 days', 90], ['All', null]]
-const SIZES = [10, 20, 50] as const
+type St = 'open' | 'saved' | 'dism'
+export type BrandCorrection = Correction & { brandId: string }
+const ST_LABEL: Record<St, string> = { open: 'To review', saved: 'Saved', dism: 'Dismissed' }
+const TOPICS = CORRECTION_TOPICS.map(([t]) => t).filter(t => t !== 'Other')
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const dateOf = (iso: string) => { const d = new Date(new Date(iso).getTime() + 8 * 3600e3); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}` }
 
-export default function CorrectionsView({ brands, brandId, days, corrections, more, ready, canManage }: {
+export default function CorrectionsView({ corrections, more, brands, dismissed, days, ready, canManage }: {
+  corrections: BrandCorrection[]
+  /** Each brand's AI Agent settings, answers and playbook — what Save as fixed answer saves through. */
+  more: Record<string, AgentMore | null>
   brands: Array<{ id: string; name: string }>
-  brandId: string
+  dismissed: number[]
   days: number | null
-  corrections: Correction[]
-  more: AgentMore | null
   ready: boolean
   canManage: boolean
 }) {
   const router = useRouter()
-  const [view, setView] = useState<'list' | 'summary'>('list')
-  const [size, setSize] = useState<number>(10)
-  const [page, setPage] = useState(0)
+  const [st, setSt] = useState<'all' | St>('open')
+  const [topic, setTopic] = useState<string>('All')
+  const [q, setQ] = useState('')
+  const [sel, setSel] = useState<number | null>(null)
   const [edits, setEdits] = useState<Record<number, string>>({})
-  const [asking, setAsking] = useState<Correction | null>(null)
-  const [error, setError] = useState('')
+  const [ctx, setCtx] = useState<{ id: number; x: number; y: number } | null>(null)
   const [busy, start] = useTransition()
-  const brandName = brands.find(b => b.id === brandId)?.name ?? '—'
-  const go = (b: string, d: number | null) => router.push(`/leads/corrections?b=${b}${d === null ? '&d=all' : `&d=${d}`}`)
-  const answerOf = (c: Correction) => (c.answerId ? more?.answers.find(a => a.id === c.answerId) ?? null : null)
-  const pages = Math.max(1, Math.ceil(corrections.length / size))
-  const p = Math.min(page, pages - 1)
-  const shown = corrections.slice(p * size, (p + 1) * size)
-  const fresh = (c: Correction) => Date.now() - Date.parse(c.at) < 2 * 864e5
-  // The page's Save (as drawn): the edited rows, each saved through the same question as its own Save.
-  const pending = corrections.filter(c => edits[c.id] !== undefined && edits[c.id] !== (answerOf(c)?.answer ?? c.right))
-  const saveNext = () => { if (pending[0]) setAsking(pending[0]) }
+  const [error, setError] = useState('')
+  const gone = useMemo(() => new Set(dismissed), [dismissed])
 
-  const saveAsAnswer = (c: Correction, raw: string) => {
-    if (!more) return
-    const text = raw.trim()
+  const answerOf = (c: BrandCorrection) => (c.answerId ? more[c.brandId]?.answers.find(a => a.id === c.answerId) ?? null : null)
+  const stOf = (c: BrandCorrection): St => (answerOf(c) ? 'saved' : gone.has(c.id) ? 'dism' : 'open')
+  const topicOfC = (c: BrandCorrection) => topicOf(c.question ?? '')
+  const ql = q.trim().toLowerCase()
+  const inQ = (c: BrandCorrection) => !ql || `${c.question ?? ''} ${c.wrong} ${c.right}`.toLowerCase().includes(ql)
+  const vis = corrections.filter(c => inQ(c) && (st === 'all' || stOf(c) === st) && (topic === 'All' || topicOfC(c) === topic))
+  const cur = vis.find(c => c.id === sel) ?? vis[0] ?? null
+  const brandName = (id: string) => brands.find(x => x.id === id)?.name ?? '—'
+
+  const save = (c: BrandCorrection) => {
+    const m = more[c.brandId]
+    if (!m) { setError('This brand’s AI Agent could not be read, so the fixed answer cannot be saved.'); return }
+    const text = (edits[c.id] ?? c.right).trim()
+    if (!text) { setError('Write the correct answer first.'); return }
     const existing = answerOf(c)
     const answers = existing
-      ? more.answers.map(a => (a.id === existing.id ? { ...a, answer: text } : a))
-      : [...more.answers, { id: `new-${c.id}`, question: (c.question ?? '').slice(0, 500) || 'Customer’s question', answer: text, draftId: c.id }]
+      ? m.answers.map(a => (a.id === existing.id ? { ...a, answer: text } : a))
+      : [...m.answers, { id: `new-${c.id}`, question: (c.question ?? '').slice(0, 500) || 'Customer’s question', answer: text, draftId: c.id }]
     start(async () => {
-      const r = await saveAgent(brandId, { settings: more.settings, answers, playbook: more.playbook, sources: more.sources.map(x => ({ fileId: x.fileId, paused: x.paused })) })
+      setError('')
+      const r = await saveAgent(c.brandId, { settings: m.settings, answers, playbook: m.playbook })
       if (!r.ok) { setError(r.reason); return }
-      setEdits(e => { const n = { ...e }; delete n[c.id]; return n })
-      setAsking(null)
+      if (gone.has(c.id)) await dismissCorrection(c.id, false)
+      flash('Saved as fixed answer')
       router.refresh()
     })
   }
+  const dismiss = (c: BrandCorrection, on: boolean) => start(async () => {
+    setError('')
+    const r = await dismissCorrection(c.id, on)
+    if (!r.ok) { setError(r.reason); return }
+    router.refresh()
+  })
   const csv = () => {
-    const rows = [['Date', 'By', 'Customer asked', 'AI said', 'CS sent', 'Fixed answer now', 'Conversation'], ...corrections.map(c => [whenFull(c.at), c.by, c.question ?? '', c.wrong, c.right, answerOf(c)?.answer ?? '', c.conversation])]
+    const rows = [['Date', 'Brand', 'By', 'Topic', 'Customer asked', 'AI said', 'CS sent', 'Fixed answer now', 'Status', 'Chat'],
+      ...corrections.map(c => [whenFull(c.at), brandName(c.brandId), c.by, topicOfC(c), c.question ?? '', c.wrong, c.right, answerOf(c)?.answer ?? '', ST_LABEL[stOf(c)], c.conversation])]
     const text = '﻿' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
-    a.download = `AI corrections ${brandName}.csv`
+    a.download = 'AI corrections.csv'
     document.body.appendChild(a); a.click(); a.remove()
   }
-  const topics = CORRECTION_TOPICS.map(([t]) => ({ t, n: corrections.filter(c => topicOf(c.question ?? '') === t).length })).filter(x => x.n > 0)
-  const top = [...topics].sort((a, b) => b.n - a.n)[0]
+
+  const count = (k: 'all' | St) => corrections.filter(c => inQ(c) && (k === 'all' || stOf(c) === k)).length
+  const ctxC = ctx ? corrections.find(c => c.id === ctx.id) ?? null : null
+  const ctxSt = ctxC ? stOf(ctxC) : null
 
   return (
-    <div className={s.page}>
-      <div className={s.head}>
-        <div className={s.titles}>
-          <span className={s.eyebrow}>FILES</span>
-          <h1 className={s.title}>AI corrections</h1>
+    <div className={b.wrap}>
+      <section className={b.board} style={{ gridTemplateColumns: '200px minmax(0, 1fr) 400px' }}>
+        <div className={b.nav}>
+          <span className={s.navKicker}>STATUS</span>
+          {(['all', 'open', 'saved', 'dism'] as const).map(k => {
+            const n = count(k)
+            return (
+              <button key={k} type="button" className={b.navBtn} aria-pressed={st === k} onClick={() => setSt(k)}>
+                <span className={s.dot} data-st={k === 'all' ? undefined : k} />
+                <span className={b.navLabel}>{k === 'all' ? 'All' : ST_LABEL[k]}</span>
+                <span className={s.count} data-rust={(k === 'open' && n > 0) || undefined}>{n}</span>
+              </button>
+            )
+          })}
+          <div className={s.navGap} />
+          <span className={s.navKicker}>TOPIC</span>
+          {['All', ...TOPICS].map(t => (
+            <button key={t} type="button" className={b.navBtn} aria-pressed={topic === t} onClick={() => setTopic(t)}>
+              <span className={s.dot} />
+              <span className={b.navLabel}>{t === 'All' ? 'All topics' : t}</span>
+              <span className={s.count}>{corrections.filter(c => inQ(c) && (st === 'all' || stOf(c) === st) && (t === 'All' || topicOfC(c) === t)).length}</span>
+            </button>
+          ))}
+          <div className={s.navGap} />
+          <span className={s.navKicker}>PERIOD</span>
+          {([[7, 'Last 7 days'], [30, 'Last 30 days'], [90, 'Last 90 days'], [null, 'All time']] as const).map(([d, l]) => (
+            <button key={l} type="button" className={b.navBtn} aria-pressed={days === d} onClick={() => router.push(`/leads/corrections?d=${d ?? 'all'}`)}>
+              <span className={s.dot} /><span className={b.navLabel}>{l}</span>
+            </button>
+          ))}
+          <button type="button" className={b.navBtn} onClick={csv} disabled={!corrections.length}>
+            <LeadIcon name="download" size={16} className={b.navIcon} /><span className={b.navLabel}>Export CSV</span>
+          </button>
         </div>
-        {canManage ? <button type="button" className={s.btn} data-strong="" disabled={!pending.length || busy || !ready} onClick={saveNext}>Save changes</button> : null}
-      </div>
-      <div className={s.panel}>
-        <div className={s.agentHead}>
-          <span className={s.agentTitle}>AI corrections · {brandName}</span>
-          <span className={s.brandSeg} role="group" aria-label="Brand">
-            {brands.map(b => <button key={b.id} type="button" aria-pressed={b.id === brandId} onClick={() => go(b.id, days)}>{b.name}</button>)}
-          </span>
-        </div>
-        <div className={s.scroll} style={{ paddingTop: 4 }}>
-          {!ready ? <div className={s.note}>Waiting for the database update — corrections appear once drafts keep what CS sent.</div> : null}
-          <span className={s.chipRow}>
-            <span className={s.kicker}>CORRECTIONS FROM THE INBOX</span><span className={s.small}>{corrections.length} in total</span>
-            <span className={s.fill} />
-            <span className={s.brandSeg}>
-              <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button>
-              <button type="button" aria-pressed={view === 'summary'} onClick={() => setView('summary')}>Summary</button>
-            </span>
-            <button type="button" className={s.btn} onClick={csv} disabled={corrections.length === 0}>Download CSV ↓</button>
-          </span>
-          {error ? <div className={s.error} role="alert">{error}</div> : null}
 
-          {view === 'list' ? (
-            <div className={s.box} style={{ maxWidth: 'none' }}>
-              {shown.map(c => {
-                const fixed = answerOf(c)
-                const value = edits[c.id] ?? fixed?.answer ?? c.right
-                const dirty = edits[c.id] !== undefined && edits[c.id] !== (fixed?.answer ?? c.right)
-                return (
-                  <div key={c.id} className={s.corrRow}>
-                    <span className={s.small} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{whenFull(c.at)}<span>{c.by}</span>{fresh(c) ? <span className={s.newTag}>NEW</span> : null}</span>
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-                      <span style={{ fontWeight: 500 }}>“{c.question ?? '—'}”</span>
-                      <span className={s.corrLine}><span className={s.corrKicker} style={{ color: 'rgb(var(--lv-accent))' }}>AI SAID</span><s className={s.small}>{c.wrong}</s></span>
-                      <span className={s.corrLine}>
-                        <span className={s.corrKicker}>{fixed?.editedAt ? 'IN USE' : 'RIGHT'}</span>
-                        <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <textarea className={s.faqIn} rows={1} value={value} maxLength={2000} disabled={!canManage || !more} title="Edit · saved as a fixed answer"
-                            onChange={e => setEdits(x => ({ ...x, [c.id]: e.target.value }))} aria-label="The right answer" />
-                          {dirty ? <span style={{ display: 'flex', gap: 6 }}><button type="button" className={s.btn} data-strong="" onClick={() => setAsking(c)}>Save</button><button type="button" className={s.btn} data-quiet="" onClick={() => setEdits(x => { const n = { ...x }; delete n[c.id]; return n })}>Cancel</button></span> : null}
-                          {fixed?.editedAt ? (
-                            <>
-                              <span className={s.small}>Edited {whenFull(fixed.editedAt)}</span>
-                              <span className={s.earlier}><span className={s.corrKicker}>EARLIER · CS FIX {whenFull(c.at)}</span><span className={s.small}>{c.right}</span></span>
-                            </>
-                          ) : null}
-                        </span>
-                      </span>
-                    </span>
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-                      {fixed ? <Link className={s.status} data-tone="green" href="/leads/ai">Fixed answer →</Link> : canManage && more ? <button type="button" className={s.link} onClick={() => { setEdits(x => ({ ...x, [c.id]: value })); setAsking(c) }}>Make it a fixed answer</button> : null}
-                      <Link className={s.link} href={`/leads?c=${c.contactId}`}>{c.conversation || 'Conversation'} ↗</Link>
-                    </span>
+        <div className={b.mid}>
+          <div className={b.midHead}>
+            <div className={b.search}>
+              <LeadIcon name="search" size={15} />
+              <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search questions and replies" aria-label="Search questions and replies" />
+            </div>
+          </div>
+          <div className={b.list}>
+            {vis.map(c => {
+              const k = stOf(c)
+              return (
+                <div key={c.id} className={s.row} role="option" aria-selected={cur?.id === c.id} tabIndex={0}
+                  onClick={() => setSel(c.id)} onKeyDown={e => { if (e.key === 'Enter') setSel(c.id) }}
+                  onContextMenu={e => { if (!canManage) return; e.preventDefault(); setSel(c.id); setCtx({ id: c.id, x: Math.min(e.clientX, window.innerWidth - 220), y: Math.min(e.clientY, window.innerHeight - 160) }) }}>
+                  <div className={s.rowText}>
+                    <span className={s.q}>{c.question || 'Customer’s question'}</span>
+                    <span className={s.sub}>{topicOfC(c)} · {c.by || 'CS'} · {dateOf(c.at)}</span>
                   </div>
-                )
-              })}
-              {corrections.length === 0 ? <div className={s.corrRow}><span /><span className={s.small}>No corrections in this period. A correction is an AI draft CS changed before sending it.</span><span /></div> : null}
-            </div>
-          ) : (
-            <div className={s.box} style={{ maxWidth: 640, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <span className={s.kicker}>Corrections by topic</span>
-              {topics.map(t => (
-                <span key={t.t} className={s.bar}><span style={{ width: 130 }}>{t.t}</span><span className={s.barTrack}><span className={s.barFill} style={{ width: `${(t.n / Math.max(...topics.map(x => x.n))) * 100}%` }} /></span><span className={s.small}>{t.n}</span></span>
-              ))}
-              {topics.length === 0 ? <span className={s.small}>Nothing yet.</span> : null}
-              {top ? <span className={s.small}>Most corrections are about {top.t.toLowerCase()} — add the right facts to General info or the Data Center, or a fixed answer, so the agent stops guessing.</span> : null}
-            </div>
-          )}
-        </div>
-        {view === 'list' ? (
-          <div className={s.foot} style={{ flexWrap: 'wrap' }}>
-            <span className={s.small}>Last</span>
-            <span className={s.brandSeg}>{RANGES.map(([l, v]) => <button key={l} type="button" aria-pressed={days === v} onClick={() => go(brandId, v)}>{l}</button>)}</span>
-            <span className={s.small}>Per page</span>
-            <span className={s.brandSeg}>{SIZES.map(n => <button key={n} type="button" aria-pressed={size === n} onClick={() => { setSize(n); setPage(0) }}>{n}</button>)}</span>
-            <span className={s.fill} />
-            <span className={s.small}>{corrections.length ? `${p * size + 1}–${Math.min(corrections.length, (p + 1) * size)} of ${corrections.length}` : '0 of 0'}</span>
-            <button type="button" className={s.cardIcon} disabled={p === 0} onClick={() => setPage(p - 1)} title="Previous page">‹</button>
-            <button type="button" className={s.cardIcon} disabled={p >= pages - 1} onClick={() => setPage(p + 1)} title="Next page">›</button>
-          </div>
-        ) : null}
-        <div className={s.foot}>
-          <span className={s.hint} data-dirty={pending.length || undefined}>{pending.length ? `${pending.length} unsaved ${pending.length === 1 ? 'change' : 'changes'}` : 'No changes yet'}</span>
-          <span className={s.fill} />
-          <button type="button" className={s.btn} data-quiet="" disabled={!pending.length || busy} onClick={() => setEdits({})}>Discard</button>
-          <button type="button" className={s.btn} data-strong="" disabled={!pending.length || busy || !ready || !canManage} onClick={saveNext}>Save</button>
-        </div>
-      </div>
-      {asking ? (
-        <div className={s.modalScrim} onClick={e => { if (e.target === e.currentTarget && !busy) setAsking(null) }}>
-          <div className={s.modal} role="dialog" aria-modal="true" aria-label="Save as a new fixed answer">
-            <span className={s.agentTitle}>Save as a new fixed answer?</span>
-            <span className={s.small}>The AI will use it word for word when a customer asks something like “{asking.question ?? '—'}”. The original correction stays as history.</span>
-            <div className={s.libBox} style={{ whiteSpace: 'pre-wrap' }}>{edits[asking.id] ?? asking.right}</div>
-            <span style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" className={s.btn} data-quiet="" disabled={busy} onClick={() => setAsking(null)}>Keep editing</button>
-              <button type="button" className={s.btn} data-strong="" disabled={busy || !ready || !(edits[asking.id] ?? asking.right).trim()} onClick={() => saveAsAnswer(asking, edits[asking.id] ?? asking.right)}>{busy ? 'Saving…' : 'Save as new'}</button>
-            </span>
+                  <span className={s.st} data-st={k}>{ST_LABEL[k]}</span>
+                </div>
+              )
+            })}
+            {!vis.length ? <div className={b.empty}>{ready ? 'Nothing here' : 'Waiting for the database update'}</div> : null}
           </div>
         </div>
+
+        <div className={b.side}>
+          {cur ? (() => {
+            const k = stOf(cur)
+            return (
+              <div className={b.detail}>
+                <div className={s.block}><span className={b.sectKicker}>CUSTOMER ASKED</span><span className={s.asked}>{cur.question || 'Customer’s question'}</span></div>
+                <div className={s.block}><span className={b.sectKicker}>AI SAID</span><div className={s.said}>{cur.wrong}</div></div>
+                <div className={s.block}>
+                  <span className={b.sectKicker}>CORRECT ANSWER</span>
+                  <textarea className={s.right} rows={4} value={edits[cur.id] ?? answerOf(cur)?.answer ?? cur.right} maxLength={2000} disabled={!canManage}
+                    aria-label="Correct answer" onChange={e => setEdits(x => ({ ...x, [cur.id]: e.target.value }))} />
+                </div>
+                <div className={b.kv}>
+                  <div className={b.kvRow}><span>Topic</span><span>{topicOfC(cur)}</span></div>
+                  <div className={b.kvRow}><span>Corrected by</span><span>{cur.by || 'CS'} · {dateOf(cur.at)}</span></div>
+                  <div className={b.kvRow}><span>Chat</span><span><Link href={`/leads?c=${cur.contactId}`} style={{ color: 'inherit' }}>{cur.conversation}</Link> · {brandName(cur.brandId)}</span></div>
+                </div>
+                {error ? <span className={b.error} role="alert">{error}</span> : null}
+                {k === 'open' && canManage ? (
+                  <div className={s.acts}>
+                    <button type="button" className={s.save} disabled={busy} onClick={() => save(cur)}>Save as fixed answer</button>
+                    <button type="button" className={s.dismiss} disabled={busy || !ready} onClick={() => dismiss(cur, true)}>Dismiss</button>
+                  </div>
+                ) : null}
+                {k === 'saved' ? (
+                  <div className={s.done} data-st="saved">
+                    <span>Saved as fixed answer</span>
+                    {canManage && edits[cur.id] !== undefined && edits[cur.id] !== answerOf(cur)?.answer
+                      ? <button type="button" className={s.doneBtn} disabled={busy} onClick={() => save(cur)}>Update</button>
+                      : <Link className={s.doneBtn} href={`/leads/ai?b=${cur.brandId}&tab=answers`}>View</Link>}
+                  </div>
+                ) : null}
+                {k === 'dism' ? (
+                  <div className={s.done} data-st="dism">
+                    <span>Dismissed</span>
+                    {canManage ? <button type="button" className={s.doneBtn} disabled={busy} onClick={() => dismiss(cur, false)}>Undo</button> : null}
+                  </div>
+                ) : null}
+              </div>
+            )
+          })() : null}
+        </div>
+      </section>
+
+      {ctx && ctxC ? (
+        <>
+          <div className={s.ctxCatch} onClick={() => setCtx(null)} onContextMenu={e => { e.preventDefault(); setCtx(null) }} aria-hidden="true" />
+          <div className={s.ctx} role="menu" style={{ left: ctx.x, top: ctx.y }}>
+            {ctxSt !== 'saved' ? <button type="button" role="menuitem" className={s.ctxItem} onClick={() => { setCtx(null); save(ctxC) }}>Save as fixed answer</button> : null}
+            {ctxSt === 'open' ? <button type="button" role="menuitem" className={s.ctxItem} onClick={() => { setCtx(null); dismiss(ctxC, true) }}>Dismiss</button> : null}
+            {ctxSt === 'dism' ? <button type="button" role="menuitem" className={s.ctxItem} onClick={() => { setCtx(null); dismiss(ctxC, false) }}>Move back to review</button> : null}
+            {ctxSt === 'saved' ? <Link role="menuitem" className={s.ctxItem} href={`/leads/ai?b=${ctxC.brandId}&tab=answers`}>View fixed answer</Link> : null}
+          </div>
+        </>
       ) : null}
     </div>
   )

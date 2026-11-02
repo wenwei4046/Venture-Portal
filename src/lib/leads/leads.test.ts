@@ -52,6 +52,9 @@ describe('handing a lead over', () => {
       'Budget 预算: -',
       'Showroom 门市: -',
       'Date 日期: 週六',
+      // Lead View v2's panel (2026-11-02): the language and any special request go to the salesperson too.
+      'Language 语言: -',
+      'Special request 特别要求: -',
       'Source 来源: Ad · Oct Sofa Week',
       'Note 备注: -',
       'CS: Mei Ling',

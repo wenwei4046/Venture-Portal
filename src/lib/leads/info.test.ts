@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HALF_HOURS, cardStatus, hoursProblem, infoEntries, isLive, resolveTokens, slug, tokenOf, type InfoCard, type LeadInfo } from './info'
+import { HALF_HOURS, cardStatus, forBrand, infoKind, hoursProblem, infoEntries, isLive, resolveTokens, slug, tokenOf, type InfoCard, type LeadInfo } from './info'
 
 const card = (over: Partial<InfoCard> = {}): InfoCard => ({
   id: 'k', catId: 'shop', brandId: 'b1', name: 'KL showroom', code: 'kl', status: 'on', validFrom: null, validUntil: null, note: '',
@@ -59,5 +59,32 @@ describe('business hours', () => {
     expect(hoursProblem({ week: week.map(d => (d.day === 2 ? { ...d, to: '00:00' } : d)), specials: [] })).toBeNull()
     expect(hoursProblem({ week, specials: [{ id: 's', name: 'Deepavali', from: '2026-11-09', to: '2026-11-08', mode: 'closed', open: '10:00', close: '18:00' }] }))
       .toBe('Deepavali ends before it starts.')
+  })
+})
+
+describe('forBrand (mig 20261102130000)', () => {
+  it('reads the brands list, empty = every brand; else the one brand', () => {
+    expect(forBrand({ brandId: null, brandIds: [] }, 'b1')).toBe(true)
+    expect(forBrand({ brandId: null, brandIds: ['b1', 'b2'] }, 'b2')).toBe(true)
+    expect(forBrand({ brandId: null, brandIds: ['b1', 'b2'] }, 'b3')).toBe(false)
+    expect(forBrand({ brandId: 'b1' }, 'b1')).toBe(true)
+    expect(forBrand({ brandId: null }, 'b9')).toBe(true)
+    expect(forBrand({ brandId: 'b1' }, 'b2')).toBe(false)
+  })
+})
+
+describe('infoKind (General info v2)', () => {
+  const c = (o: Partial<Pick<InfoCard, 'status' | 'validFrom' | 'validUntil'>>) => ({ status: 'on' as const, validFrom: null, validUntil: null, ...o })
+  it('reads the dates as the handoff does', () => {
+    expect(infoKind(c({}), '2026-11-02')).toEqual({ kind: 'live', label: 'In use' })
+    expect(infoKind(c({ validFrom: '2026-11-08' }), '2026-11-02')).toEqual({ kind: 'scheduled', label: 'Starts 8 Nov' })
+    expect(infoKind(c({ validUntil: '2026-10-30' }), '2026-11-02')).toEqual({ kind: 'expired', label: 'Expired 30 Oct' })
+    expect(infoKind(c({ validUntil: '2026-11-16' }), '2026-11-02')).toEqual({ kind: 'soon', label: 'Ends in 14 days' })
+    expect(infoKind(c({ validUntil: '2026-11-17' }), '2026-11-02')).toEqual({ kind: 'live', label: 'In use' })
+    expect(infoKind(c({ validUntil: '2026-11-03' }), '2026-11-02').label).toBe('Ends in 1 day')
+  })
+  it('reads a card switched off, or a draft, as Paused', () => {
+    expect(infoKind(c({ status: 'off' }), '2026-11-02').kind).toBe('paused')
+    expect(infoKind(c({ status: 'draft' }), '2026-11-02').kind).toBe('paused')
   })
 })

@@ -1,35 +1,42 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { removeTemplate, saveLibraryItem, saveTemplate } from '@/lib/leads/actions'
-import { infoEntries, type LeadInfo } from '@/lib/leads/info'
-import {
-  ALSO_MAX, CARD_W, KINDS, OPTION_MAX, doneOf, moveItem, SIDE_W, clampSide, RETRY_PHONE, SAVE_AS, fromLibrary, kindOf, placed, rowsOf, runsOn, stepAfter, templateProblem, tidy, toLibrary,
-  updateFromLibrary, walkAnswer, walkFrom, freshId, type LibraryItem, type ReplyRules, type ReplyTemplate, type StepKind, type StepOption, type TemplateStep, type Walk,
-} from '@/lib/leads/template'
+import { flash } from '@/components/hrv/toast'
 import { LeadIcon } from '@/components/layout/lead-icons'
+import { leadMediaLinks, removeTemplate, saveLibraryItem, saveTemplate } from '@/lib/leads/actions'
+import { infoEntries, type LeadInfo } from '@/lib/leads/info'
+import { createClient } from '@/lib/supabase/client'
 import { wrapMark } from '@/lib/leads/rich'
+import {
+  ALSO_MAX, OPTION_MAX, RETRY_PHONE, SAVE_AS, doneOf, freshId, fromLibrary, templateProblem, toLibrary, updateFromLibrary, usedBy, walkAnswer, walkFrom,
+  type LibraryItem, type ReplyRules, type ReplyTemplate, type StepFile, type StepKind, type TemplateStep, type Walk,
+} from '@/lib/leads/template'
+import { ATTACH_ACCEPT, NODE, STEP_TYPES, edgePath, extOf, inPort, isImage, mapPlaced, mapRows, nodeHeight, rowPort, sizeLabel, typeOf } from '@/lib/leads/template-map'
+import Modal from './ui/Modal'
 import RichText from './RichText'
-import s from './replies.module.css'
+import s from './templates.module.css'
 
 /**
- * Lead View › Reply templates (2026-10-23, the redesign v2 handoff `Auto Reply.dc.html?view=template`): the templates on
- * the left; the chosen one's name, description, where the reply rules run it and its closing message; its steps as a
- * map (pan, zoom, Fit, Tidy up; drag a card by its head; "+" on an End row makes the next step; right-click a card for
- * the library); and the right panel — Edit step (message, General info tokens, what the customer does and where it
- * goes) or Test as customer (the runner's walk). Saved as a whole (lead_save_template). Kept for later, said in the
- * rules file: dragging a line's end to re-route it (the panel's "Goes to" does it), attachments (the Data Center's
- * files, step 5).
+ * Lead View v2 › Reply templates (2026-11-02, the v2 handoff §7.6): the templates; the chosen one's name, "Used by",
+ * List | Flow map and Save; the steps as a straight list or as a map in columns (zoom, Fit, drag a node, drag a row's
+ * dot to another node); the same step editor in both (name, message, a photo or file, the buttons and where each goes,
+ * Then, Done); "+ Add step" with the six types and FROM LIBRARY; right-click → Edit, Save to library, Duplicate, Delete;
+ * and the preview rail (collapsed by default) running the template from the picked step as the customer sees it.
+ * Kept though the reference does not draw them (the user's point 2), behind the editor's "More": bold / italic,
+ * General info fields, picking more than one, an option's other replies, keeping an answer, the phone's retry,
+ * closing messages; and on a template's right-click its description, closing message, Duplicate and Delete.
+ * Saved as a whole (lead_save_template).
  */
 
 type Draft = Pick<ReplyTemplate, 'id' | 'name' | 'description' | 'endMsg' | 'steps'>
 const blank = (): Draft => ({
   id: `new-${Date.now().toString(36)}`, name: 'New template', description: '', endMsg: '',
-  steps: [{ id: 's1', kind: 'question', name: 'Welcome', text: 'Hi {name}! What are you looking for today?', buttons: [{ label: 'Sofa', next: '' }, { label: 'Talk to a person', next: '' }], pos: { x: 40, y: 40 } }],
+  steps: [{ id: 's1', kind: 'question', name: 'Welcome', text: 'Hi {name}! What are you looking for today?', buttons: [{ label: 'Option 1', next: '' }] }],
 })
-const draftOf = (t: ReplyTemplate): Draft => ({ id: t.id, name: t.name, description: t.description ?? '', endMsg: t.endMsg ?? '', steps: placed(t.steps) })
-const toneStyle = (k: StepKind) => ({ ['--tone' as string]: `var(${kindOf(k).tone})` }) as CSSProperties
+const draftOf = (t: ReplyTemplate): Draft => ({ id: t.id, name: t.name, description: t.description ?? '', endMsg: t.endMsg ?? '', steps: mapPlaced(t.steps) })
+const tileStyle = (k: StepKind) => { const t = typeOf(k); return { ['--tint' as string]: `var(${t.tint})`, ['--fg' as string]: `var(${t.fg})` } as CSSProperties }
+const FILE_LIMIT = 25 * 1024 * 1024
 
 export default function TemplatesView({ templates, rules, ads, brands, library, info, today, ready, initialId, canEdit }: {
   templates: ReplyTemplate[]
@@ -39,7 +46,6 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
   library: LibraryItem[]
   info: LeadInfo | null
   today: string
-  /** Is step 4's migration applied? Before it, the canvas can be tried but not saved. */
   ready: boolean
   initialId: string | null
   canEdit: boolean
@@ -52,37 +58,16 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
   const [past, setPast] = useState<Draft[]>([])
   const [future, setFuture] = useState<Draft[]>([])
   const [dirty, setDirty] = useState(false)
-  const [savedNote, setSavedNote] = useState('')
   const [error, setError] = useState('')
   const [busy, start] = useTransition()
   const [sel, setSel] = useState<string | null>(draft.steps[0]?.id ?? null)
-  // Folded as drawn; whether it was left open is the viewer's (localStorage `ar-test-open`, the handoff's key).
-  const [panel, setPanelState] = useState<'edit' | 'test' | null>(null)
-  const setPanel = (p: 'edit' | 'test' | null) => {
-    setPanelState(p)
-    try { localStorage.setItem('ar-test-open', p ?? '') } catch { /* private window */ }
-  }
-  useEffect(() => {
-    try { const v = localStorage.getItem('ar-test-open'); if (v === 'edit' || v === 'test') setPanelState(v) } catch { /* private window */ }
-  }, [])
-  const [toast, setToast] = useState('')
-  // The right panel's width (2026-10-28 — the user: "做可调整宽度"): its left edge drags, 300–720px; the viewer's
-  // (localStorage `ar-side-w`); a double-click puts it back.
-  const [sideW, setSideW] = useState(SIDE_W.start)
-  useEffect(() => {
-    try { const v = Number(localStorage.getItem('ar-side-w')); if (v) setSideW(clampSide(v)) } catch { /* private window */ }
-  }, [])
-  const keepSide = (w: number) => { try { localStorage.setItem('ar-side-w', String(w)) } catch { /* private window */ } }
-  const dragSide = (e: ReactMouseEvent) => {
-    e.preventDefault()
-    const x0 = e.clientX, w0 = sideW
-    let w = w0
-    const move = (ev: MouseEvent) => { w = clampSide(w0 + (x0 - ev.clientX)); setSideW(w) }
-    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); document.body.style.cursor = ''; keepSide(w) }
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', up)
-    document.body.style.cursor = 'col-resize'
-  }
+  const [editing, setEditing] = useState<string | null>(null)
+  const [mode, setMode] = useState<'list' | 'map'>('list')
+  const [railOpen, setRailOpen] = useState(false)
+  const [ctx, setCtx] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [tplCtx, setTplCtx] = useState<{ t: ReplyTemplate; x: number; y: number } | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [localUrls, setLocalUrls] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!dirty) return
@@ -90,31 +75,72 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
     window.addEventListener('beforeunload', ask)
     return () => window.removeEventListener('beforeunload', ask)
   }, [dirty])
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 2600); return () => clearTimeout(t) }, [toast])
 
-  /** Every change goes through here: undo keeps the one before. */
   const change = useCallback((fn: (d: Draft) => Draft) => {
     setDraft(d => { setPast(p => [...p.slice(-49), d]); setFuture([]); return fn(d) })
     setDirty(true)
-    setSavedNote('')
     setError('')
   }, [])
-  const setStep = (id: string, o: Partial<TemplateStep> | ((x: TemplateStep) => Partial<TemplateStep>)) =>
-    change(d => ({ ...d, steps: d.steps.map(x => (x.id === id ? { ...x, ...(typeof o === 'function' ? o(x) : o) } : x)) }))
+  const setStep = useCallback((id: string, o: Partial<TemplateStep> | ((x: TemplateStep) => Partial<TemplateStep>)) =>
+    change(d => ({ ...d, steps: d.steps.map(x => (x.id === id ? { ...x, ...(typeof o === 'function' ? o(x) : o) } : x)) })), [change])
   const undo = () => { if (!past.length) return; setFuture(f => [draft, ...f]); setDraft(past[past.length - 1]); setPast(p => p.slice(0, -1)); setDirty(true) }
   const redo = () => { if (!future.length) return; setPast(p => [...p, draft]); setDraft(future[0]); setFuture(f => f.slice(1)); setDirty(true) }
 
+  const isNew = draft.id.startsWith('new-')
+  const brandName = (id: string) => brands.find(b => b.id === id)?.name ?? '—'
+  const adName = (id: string) => ads.find(a => a.adId === id)?.name || `Ad ${id}`
+  const libById = useMemo(() => new Map(library.map(l => [l.id, l])), [library])
+  const libIds = useMemo(() => new Set(library.map(l => l.id)), [library])
+
+  // Photos and files: signed links for the saved ones (an hour), the browser's own for those just picked.
+  const [links, setLinks] = useState<Record<string, string>>({})
+  const paths = useMemo(() => [...new Set(draft.steps.map(x => x.file?.path).filter((p): p is string => !!p))].sort().join('|'), [draft.steps])
+  useEffect(() => {
+    const want = paths ? paths.split('|').filter(p => !links[p] && !localUrls[p]) : []
+    if (!want.length) return
+    let live = true
+    leadMediaLinks(want).then(r => { if (live && r.ok) setLinks(l => ({ ...l, ...r.data })) })
+    return () => { live = false }
+  }, [paths, links, localUrls])
+  const urlOf = (f: StepFile | null | undefined) => (f ? localUrls[f.path] ?? links[f.path] ?? '' : '')
+
   const open = (t: ReplyTemplate | null) => {
-    // Already on a new template nobody has touched: + New template has nothing to do (2026-10-27 — the user, asked to
-    // leave without saving at every click: "我要加template 为什么会一直这样？").
-    if (!t && draft.id.startsWith('new-') && !dirty) return
+    if (!t && isNew && !dirty) return
     if (dirty && !window.confirm('Leave this template without saving its changes?')) return
     const d = t ? draftOf(t) : blank()
-    // A new template counts as changed only once something is edited; it can be saved as it stands (isNew below).
-    setDraft(d); setPast([]); setFuture([]); setDirty(false); setSel(d.steps[0]?.id ?? null); setError(''); setSavedNote('')
+    setDraft(d); setPast([]); setFuture([]); setDirty(false); setSel(d.steps[0]?.id ?? null); setEditing(null); setError('')
     window.history.replaceState(null, '', t ? `/leads/flows?t=${t.id}` : '/leads/flows')
   }
+  const save = () => {
+    if (!(dirty || isNew) || busy) return
+    const problem = templateProblem(draft.steps)
+    if (problem) { setError(problem); return }
+    start(async () => {
+      const r = await saveTemplate(isNew ? null : draft.id, { name: draft.name, description: draft.description, endMsg: draft.endMsg, steps: draft.steps })
+      if (!r.ok) { setError(r.reason); return }
+      if (isNew) { setDraft(d => ({ ...d, id: r.data })); window.history.replaceState(null, '', `/leads/flows?t=${r.data}`) }
+      setDirty(false)
+      router.refresh()
+    })
+  }
+  const removeTpl = (t: ReplyTemplate) => {
+    if (!window.confirm(`Delete “${t.name}”? Rules that use it will need another reply.`)) return
+    start(async () => {
+      const r = await removeTemplate(t.id)
+      if (!r.ok) { setError(r.reason); return }
+      setList(l => l.filter(x => x.id !== t.id))
+      if (draft.id === t.id) { setDirty(false); const next = list.find(x => x.id !== t.id) ?? null; const d = next ? draftOf(next) : blank(); setDraft(d); setSel(d.steps[0]?.id ?? null) }
+      router.refresh()
+    })
+  }
+  const copyTpl = (t: ReplyTemplate) => {
+    if (dirty && !window.confirm('Leave this template without saving its changes?')) return
+    const d = { ...draftOf(t), id: `new-${Date.now().toString(36)}`, name: `${t.name} copy`.slice(0, 60) }
+    setDraft(d); setDirty(true); setSel(d.steps[0]?.id ?? null); setEditing(null)
+  }
+
   const removeStep = (id: string) => {
+    if (draft.steps.length <= 1) { setError('A template keeps at least one step.'); return }
     change(d => ({
       ...d,
       steps: d.steps.filter(x => x.id !== id).map(x => ({
@@ -124,513 +150,362 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
         ...(x.failNext === id ? { failNext: 'person' } : {}),
       })),
     }))
-    setSel(null)
+    if (sel === id) setSel(null)
+    if (editing === id) setEditing(null)
   }
-  const save = () => {
-    const problem = templateProblem(draft.steps)
-    if (problem) { setError(problem); return }
+  const duplicateStep = (id: string) => {
+    const src = draft.steps.find(x => x.id === id)
+    if (!src) return
+    const nid = freshId(draft.steps)
+    const copy: TemplateStep = { ...src, id: nid, name: `${src.name || typeOf(src.kind).label} copy`.slice(0, 40), pos: src.pos ? { x: src.pos.x + 30, y: src.pos.y + 30 } : undefined }
+    delete copy.lib
+    if (copy.buttons) copy.buttons = copy.buttons.map(b => ({ ...b }))
+    change(d => { const i = d.steps.findIndex(x => x.id === id); return { ...d, steps: [...d.steps.slice(0, i + 1), copy, ...d.steps.slice(i + 1)] } })
+    setSel(nid)
+  }
+  const toLib = (step: TemplateStep) => {
+    if (step.lib && libById.has(step.lib.id)) return
     start(async () => {
-      const isNew = draft.id.startsWith('new-')
-      const r = await saveTemplate(isNew ? null : draft.id, { name: draft.name, description: draft.description, endMsg: draft.endMsg, steps: draft.steps })
+      const r = await saveLibraryItem(null, { kind: 'step', name: (step.name || typeOf(step.kind).label).slice(0, 60), description: '', steps: toLibrary(draft.steps, step.id, false) })
       if (!r.ok) { setError(r.reason); return }
-      if (isNew) { setDraft(d => ({ ...d, id: r.data })); window.history.replaceState(null, '', `/leads/flows?t=${r.data}`) }
-      setDirty(false)
-      setSavedNote('Saved · just now')
+      setStep(step.id, { lib: { id: r.data, ver: 1 } })
+      flash(`Saved “${step.name || typeOf(step.kind).label}” to Step library`)
       router.refresh()
     })
   }
-  const discard = () => {
-    const t = list.find(x => x.id === draft.id)
-    const d = t ? draftOf(t) : blank()
-    setDraft(d); setDirty(false); setPast([]); setFuture([]); setError('')
-  }
-  const removeTpl = (t: ReplyTemplate) => {
-    if (!window.confirm(`Delete “${t.name}”? Rules that use it will need another reply.`)) return
-    start(async () => {
-      const r = await removeTemplate(t.id)
-      if (!r.ok) { setError(r.reason); return }
-      setList(l => l.filter(x => x.id !== t.id))
-      if (draft.id === t.id) { const next = list.find(x => x.id !== t.id) ?? null; setDirty(false); open(next) }
-      router.refresh()
-    })
-  }
-  const copyTpl = (t: ReplyTemplate) => {
-    if (dirty && !window.confirm('Leave this template without saving its changes?')) return
-    const d = { ...draftOf(t), id: `new-${Date.now().toString(36)}`, name: `${t.name} (copy)`.slice(0, 60) }
-    setDraft(d); setDirty(false); setSel(d.steps[0]?.id ?? null)
+  /** A new step: the reference names it by its type (or the library's name); in List view a Then-less last step leads to it. */
+  const addStep = (kind: StepKind | null, item: LibraryItem | null, at: { x: number; y: number } | null) => {
+    const last = draft.steps[draft.steps.length - 1]
+    const where = at ?? (last?.pos ? { x: last.pos.x, y: last.pos.y + nodeHeight(last) + NODE.gap } : { x: NODE.start, y: NODE.start })
+    let added: TemplateStep[]
+    if (item) added = fromLibrary(draft.steps, item, where).map(x => ({ ...x, name: x.name || item.name }))
+    else {
+      const k = kind ?? 'question'
+      added = [{ id: freshId(draft.steps), kind: k, name: typeOf(k).label, text: '', ...(k === 'question' ? { buttons: [{ label: 'Option 1', next: '' }] } : { next: '' }), ...(k === 'phone' ? { retryText: RETRY_PHONE, retryMax: '2', failNext: 'person' } : {}), pos: where }]
+    }
+    const first = added[0]
+    change(d => ({
+      ...d,
+      steps: [...(at === null && last && ['phone', 'message', 'text'].includes(last.kind) && !last.next ? d.steps.map(x => (x.id === last.id ? { ...x, next: first.id } : x)) : d.steps), ...added],
+    }))
+    setSel(first.id)
+    if (at === null) setEditing(first.id)
   }
 
-  // ── Library from the canvas ──
-  const libById = useMemo(() => new Map(library.map(l => [l.id, l])), [library])
-  const toLib = (step: TemplateStep, withAfter: boolean, asNew = false) => {
-    const steps = toLibrary(draft.steps, step.id, withAfter)
-    const linked = step.lib && libById.has(step.lib.id) && !asNew && !withAfter
-    start(async () => {
-      const r = await saveLibraryItem(linked ? step.lib!.id : null, {
-        kind: steps.length > 1 ? 'flow' : 'step',
-        name: (step.name || step.text).slice(0, 60) || 'Step',
-        description: linked ? libById.get(step.lib!.id)!.description : '',
-        steps,
-      })
-      if (!r.ok) { setError(r.reason); return }
-      if (!withAfter) setStep(step.id, { lib: { id: r.data, ver: linked ? step.lib!.ver + 1 : 1 } })
-      setToast(linked ? 'Saved to the library as a new version' : 'Saved to the library')
-      router.refresh()
-    })
-  }
-
-  const step = draft.steps.find(x => x.id === sel) ?? null
-  const brandName = (id: string) => brands.find(b => b.id === id)?.name ?? '—'
-  const adName = (id: string) => ads.find(a => a.adId === id)?.name || `Ad ${id}`
-  const isNew = draft.id.startsWith('new-')
-
-  // Keyboard: ←/→ steps, undo / redo, Delete.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement | null)?.isContentEditable) return
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return }
-      if (!canEdit && (e.key === 'Delete' || e.key === 'Backspace')) return
-      const i = draft.steps.findIndex(x => x.id === sel)
-      if (e.key === 'ArrowRight' && i < draft.steps.length - 1) setSel(draft.steps[i + 1].id)
-      if (e.key === 'ArrowLeft' && i > 0) setSel(draft.steps[i - 1].id)
-      if ((e.key === 'Delete' || e.key === 'Backspace') && sel && draft.steps.length > 1) removeStep(sel)
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo() }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
 
-  return (
-    <div className={s.page}>
-      <div className={s.head}>
-        <div className={s.titles}>
-          <span className={s.eyebrow}>REPLIES</span>
-          <h1 className={s.title}>Reply templates</h1>
-        </div>
-        {canEdit ? <button type="button" className={s.btn} data-strong="" disabled={!(dirty || isNew) || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
-      </div>
-      <div className={s.panel}>
-        <div className={s.split}>
-          <aside className={s.list} aria-label="Templates">
-            <span className={s.kicker} style={{ padding: '2px 4px 6px' }}>TEMPLATES</span>
-            {list.map(t => (
-              <button key={t.id} type="button" className={s.listItem} aria-current={t.id === draft.id} onClick={() => t.id !== draft.id && open(t)}>
-                <span className={s.listName}>{t.id === draft.id ? draft.name : t.name}</span>
-                <span className={s.listSub}>{t.steps.length} step{t.steps.length === 1 ? '' : 's'}</span>
-                {canEdit ? (
-                  <span className={s.listTools}>
-                    <span role="button" tabIndex={0} className={s.cardIcon} title="Copy" onClick={e => { e.stopPropagation(); copyTpl(t) }} onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); copyTpl(t) } }}><LeadIcon name="copy" size={11} /></span>
-                    <span role="button" tabIndex={0} className={s.cardIcon} title="Delete" onClick={e => { e.stopPropagation(); removeTpl(t) }} onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); removeTpl(t) } }}><LeadIcon name="trash" size={11} /></span>
-                  </span>
-                ) : null}
-              </button>
-            ))}
-            {isNew ? <button type="button" className={s.listItem} aria-current><span className={s.listName}>{draft.name}</span><span className={s.listSub}>Not saved yet</span></button> : null}
-            {canEdit ? <button type="button" className={s.link} style={{ padding: '6px 4px', textAlign: 'left' }} onClick={() => open(null)}>+ New template</button> : null}
-          </aside>
+  const used = isNew ? 'Not used yet' : usedBy(draft.id, rules, brandName, adName)
+  const ctxStep = ctx ? draft.steps.find(x => x.id === ctx.id) ?? null : null
+  const inLib = ctxStep?.lib ? libById.has(ctxStep.lib.id) : false
+  const editProps = { steps: draft.steps, canEdit, setStep, setLocalUrls, urlOf, libById, info, today, onDone: () => setEditing(null), onFlash: setError }
 
-          <section className={s.editor}>
-            <div className={s.tplHead}>
-              <div className={s.tplInfo}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input className={s.tplName} value={draft.name} maxLength={60} disabled={!canEdit} aria-label="Template name"
-                    onChange={e => change(d => ({ ...d, name: e.target.value }))} />
-                  <span style={{ color: 'rgb(var(--lv-accent-text))', display: 'flex' }}><LeadIcon name="filePen" size={14} /></span>
-                </span>
-                <input className={s.bare} value={draft.description} maxLength={300} disabled={!canEdit} placeholder="Add a description, e.g. when to use this template" aria-label="Description"
-                  onChange={e => change(d => ({ ...d, description: e.target.value }))} />
-                <span className={s.small}>{isNew ? 'Not used by any reply rule yet' : runsOn(draft.id, rules, brandName, adName)}</span>
-                <span className={s.closing}>Closing message
-                  <input className={s.bare} value={draft.endMsg} maxLength={1000} disabled={!canEdit} placeholder="Sent when a chat reaches End, e.g. Thanks! We'll be in touch soon 😊" aria-label="Closing message"
-                    onChange={e => change(d => ({ ...d, endMsg: e.target.value }))} />
-                </span>
-              </div>
-              {canEdit ? (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className={s.hint} data-dirty={dirty || undefined}>{dirty ? 'Unsaved changes' : isNew ? 'New template — not saved yet' : savedNote || 'No changes yet'}</span>
-                  <button type="button" className={s.btn} data-quiet="" disabled={!dirty || busy} onClick={discard}>Discard</button>
-                  <button type="button" className={s.btn} data-strong="" disabled={!(dirty || isNew) || busy || !ready} onClick={save} title={!ready ? 'Waiting for the database update' : undefined}>{busy ? 'Saving…' : 'Save'}</button>
-                </span>
-              ) : null}
-            </div>
-            {!ready ? <div className={s.note} style={{ margin: '8px 14px 0' }}>Waiting for the database update — you can try the canvas, but nothing is saved yet.</div> : null}
-            {error ? <div className={s.error} role="alert" style={{ margin: '8px 14px 0' }}>{error}</div> : null}
-            <div className={s.tplBody}>
-              <Canvas draft={draft} sel={sel} setSel={id => { setSel(id); if (id && panel === null) setPanel('edit') }} canEdit={canEdit} library={library} libById={libById}
-                change={change} setStep={setStep} removeStep={removeStep} toLib={toLib} setPanel={setPanel} />
-              {panel === null ? (
-                <div className={s.sideClosed}>
-                  <button type="button" className={s.cardIcon} title="Open the panel" onClick={() => setPanel('edit')}>«</button>
-                  <button type="button" className={s.vertical} onClick={() => setPanel('edit')}>Edit step</button>
-                  <button type="button" className={s.vertical} onClick={() => setPanel('test')}>Test as customer</button>
-                </div>
-              ) : (
-                <aside className={s.side} aria-label="Step" style={{ width: sideW }}>
-                  <div className={s.sideGrip} onMouseDown={dragSide} onDoubleClick={() => { setSideW(SIDE_W.start); keepSide(SIDE_W.start) }} title="Drag to resize · double-click to reset" aria-hidden="true" />
-                  <div className={s.sideTabs}>
-                    <button type="button" className={s.sideTab} aria-pressed={panel === 'edit'} onClick={() => setPanel('edit')}>Edit step</button>
-                    <button type="button" className={s.sideTab} aria-pressed={panel === 'test'} onClick={() => setPanel('test')}>Test as customer</button>
-                    <span className={s.fill} />
-                    <button type="button" className={s.cardIcon} title="Close the panel" onClick={() => setPanel(null)}>»</button>
-                  </div>
-                  {panel === 'test' ? (
-                    <TestChat key={draft.id + draft.steps.length} draft={draft} />
-                  ) : step ? (
-                    <EditStep key={step.id} step={step} draft={draft} setSel={setSel} canEdit={canEdit} setStep={setStep} removeStep={removeStep}
-                      insertAfter={() => {
-                        const n = stepAfter(draft.steps, step, 'New step')
-                        change(d => ({ ...d, steps: [...d.steps, { ...n, name: '' }] }))
-                        setSel(n.id)
-                      }}
-                      newReply={(j, label) => {
-                        // An option's other reply: a new "Send a message" step, added to the option's `also` (mig 20261029150010).
-                        const n = stepAfter(draft.steps, step, label)
-                        const placed = { ...n, pos: { x: n.pos!.x, y: (step.pos?.y ?? 40) + j * 40 + (step.buttons?.[j]?.also?.length ?? 0) * 30 } }
-                        change(d => ({ ...d, steps: [...d.steps.map(x => (x.id !== step.id ? x : { ...x, buttons: (x.buttons ?? []).map((b, k) => (k === j ? { ...b, also: [...(b.also ?? []), n.id] } : b)) })), placed] }))
-                        setSel(n.id)
-                      }}
-                      lib={step.lib ? libById.get(step.lib.id) ?? null : null} toLib={toLib} info={info} today={today} />
-                  ) : (
-                    <div className={s.sideBody}><span className={s.small}>Pick a step on the map to edit it.</span></div>
-                  )}
-                </aside>
-              )}
-              {toast ? <div className={s.toast} role="status">{toast}</div> : null}
-            </div>
-          </section>
+  return (
+    <div className={s.grid} style={{ gridTemplateColumns: `280px minmax(0, 1fr) ${railOpen ? '380px' : '48px'}` }}>
+      <section className={s.list} aria-label="Templates">
+        <div className={s.listHead}>
+          <span className={s.listTitle}>Templates</span>
+          {canEdit ? <button type="button" className={s.newBtn} onClick={() => open(null)}><LeadIcon name="plus" size={14} />New</button> : null}
         </div>
-      </div>
+        <div className={s.items}>
+          {list.map(t => (
+            <div key={t.id} className={s.item} role="button" tabIndex={0} aria-current={t.id === draft.id}
+              onClick={() => { if (t.id !== draft.id) open(t) }} onKeyDown={e => { if (e.key === 'Enter' && t.id !== draft.id) open(t) }}
+              onContextMenu={e => { if (!canEdit) return; e.preventDefault(); setTplCtx({ t, x: Math.min(e.clientX, window.innerWidth - 210), y: Math.min(e.clientY, window.innerHeight - 170) }) }}>
+              <div className={s.itemTop}>
+                <span className={s.itemName}>{t.id === draft.id ? draft.name : t.name}</span>
+                <span className={s.itemCount}>{(t.id === draft.id ? draft.steps : t.steps).length} steps</span>
+              </div>
+              <span className={s.itemUsed}>{usedBy(t.id, rules, brandName, adName)}</span>
+            </div>
+          ))}
+          {isNew ? (
+            <div className={s.item} aria-current>
+              <div className={s.itemTop}><span className={s.itemName}>{draft.name}</span><span className={s.itemCount}>{draft.steps.length} steps</span></div>
+              <span className={s.itemUsed}>Not saved yet</span>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className={s.editor} aria-label="Template">
+        <div className={s.head}>
+          <div className={s.titles}>
+            <input className={s.name} value={draft.name} maxLength={60} disabled={!canEdit} aria-label="Template name" onChange={e => change(d => ({ ...d, name: e.target.value }))} />
+            <span className={s.used}>Used by {used}</span>
+          </div>
+          <div className={s.views} role="group" aria-label="View">
+            <button type="button" className={s.view} aria-pressed={mode === 'list'} title="List" onClick={() => setMode('list')}><LeadIcon name="list" size={14} />List</button>
+            <button type="button" className={s.view} aria-pressed={mode === 'map'} title="Flow map" onClick={() => setMode('map')}><LeadIcon name="workflow" size={14} />Flow map</button>
+          </div>
+          {canEdit ? (
+            <button type="button" className={s.save} data-dirty={(dirty || isNew) && ready ? '' : undefined} disabled={!(dirty || isNew) || busy || !ready}
+              title={!ready ? 'Waiting for the database update' : undefined} onClick={save}>{busy ? 'Saving…' : dirty || isNew ? 'Save changes' : 'Saved'}</button>
+          ) : null}
+        </div>
+        {error ? <div className={s.alert} role="alert">{error}</div> : null}
+        {mode === 'list' ? (
+          <ListView steps={draft.steps} sel={sel} editing={editing} canEdit={canEdit} library={library} libIds={libIds} urlOf={urlOf}
+            onPick={id => { setSel(id); if (canEdit) setEditing(id) }} onCtx={(id, x, y) => setCtx({ id, x, y })}
+            onAdd={(k, item) => addStep(k, item, null)} editor={id => <StepEditor key={id} step={draft.steps.find(x => x.id === id)!} {...editProps} />} />
+        ) : (
+          <FlowMap steps={draft.steps} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing} canEdit={canEdit} library={library} libIds={libIds}
+            setStep={setStep} change={change} onCtx={(id, x, y) => setCtx({ id, x, y })} onDelete={removeStep} onAdd={(k, item, at) => addStep(k, item, at)}
+            editor={id => <StepEditor key={id} step={draft.steps.find(x => x.id === id)!} {...editProps} />} />
+        )}
+      </section>
+
+      <Rail open={railOpen} setOpen={setRailOpen} draft={draft} from={sel} brand={railBrand(draft.id, rules, brandName, brands)} urlOf={urlOf} />
+
+      {ctx && ctxStep ? (
+        <>
+          <div className={s.ctxCatch} onClick={() => setCtx(null)} onContextMenu={e => { e.preventDefault(); setCtx(null) }} aria-hidden="true" />
+          <div className={s.ctx} role="menu" style={{ left: Math.min(ctx.x, window.innerWidth - 210), top: Math.min(ctx.y, window.innerHeight - 160) }}>
+            <button type="button" role="menuitem" className={s.ctxItem} onClick={() => { setCtx(null); setSel(ctxStep.id); setEditing(ctxStep.id) }}><LeadIcon name="pencil" size={14} />Edit</button>
+            <button type="button" role="menuitem" className={s.ctxItem} onClick={() => { setCtx(null); duplicateStep(ctxStep.id) }}><LeadIcon name="copy" size={14} />Duplicate</button>
+            <button type="button" role="menuitem" className={s.ctxItem} data-tone={inLib ? 'muted' : 'pos'} disabled={inLib || !ready}
+              onClick={() => { setCtx(null); toLib(ctxStep) }}><LeadIcon name="blocks" size={14} />{inLib ? 'Already in library' : 'Save to library'}</button>
+            <button type="button" role="menuitem" className={s.ctxItem} data-tone="rust" onClick={() => { setCtx(null); removeStep(ctxStep.id) }}><LeadIcon name="trash-2" size={14} />Delete</button>
+          </div>
+        </>
+      ) : null}
+
+      {tplCtx ? (
+        <>
+          <div className={s.ctxCatch} onClick={() => setTplCtx(null)} onContextMenu={e => { e.preventDefault(); setTplCtx(null) }} aria-hidden="true" />
+          <div className={s.ctx} role="menu" style={{ left: tplCtx.x, top: tplCtx.y }}>
+            <button type="button" role="menuitem" className={s.ctxItem} onClick={() => { const t = tplCtx.t; setTplCtx(null); if (t.id !== draft.id) open(t); setSettingsOpen(true) }}><LeadIcon name="pencil" size={14} />Description and closing</button>
+            <button type="button" role="menuitem" className={s.ctxItem} onClick={() => { const t = tplCtx.t; setTplCtx(null); copyTpl(t) }}><LeadIcon name="copy" size={14} />Duplicate</button>
+            <button type="button" role="menuitem" className={s.ctxItem} data-tone="rust" onClick={() => { const t = tplCtx.t; setTplCtx(null); removeTpl(t) }}><LeadIcon name="trash-2" size={14} />Delete</button>
+          </div>
+        </>
+      ) : null}
+
+      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title={draft.name} width={440}
+        foot={<button type="button" className={s.done} onClick={() => setSettingsOpen(false)}>Done</button>}>
+        <label className={s.field}>Description
+          <input className={s.edInput} value={draft.description} maxLength={300} placeholder="When to use this template" onChange={e => change(d => ({ ...d, description: e.target.value }))} />
+        </label>
+        <label className={s.field}>Closing message · sent when a chat reaches the end of a step that goes nowhere
+          <textarea className={s.edText} rows={3} value={draft.endMsg} maxLength={1000} placeholder="e.g. Thanks! We’ll be in touch soon 😊" onChange={e => change(d => ({ ...d, endMsg: e.target.value }))} />
+        </label>
+      </Modal>
     </div>
   )
 }
 
-// ── The map ──
+/** The brand the preview names: the first page or ad whose reply rules run the template, else the first brand. */
+function railBrand(id: string, rules: ReplyRules, brandName: (id: string) => string, brands: Array<{ id: string; name: string }>): string {
+  const p = rules.pages.find(x => x.work === id || x.after === id)
+  return p ? brandName(p.brandId) : brands[0]?.name ?? 'Your page'
+}
 
-type Line = { key: string; d: string; tone: string; to: string; from: string; head: string; also?: boolean }
+// ── List view ──
 
-function Canvas({ draft, sel, setSel, canEdit, library, libById, change, setStep, removeStep, toLib, setPanel }: {
-  draft: Draft
+function ListView({ steps, sel, editing, canEdit, library, libIds, urlOf, onPick, onCtx, onAdd, editor }: {
+  steps: TemplateStep[]
   sel: string | null
-  setSel: (id: string | null) => void
+  editing: string | null
   canEdit: boolean
   library: LibraryItem[]
-  libById: Map<string, LibraryItem>
-  change: (fn: (d: Draft) => Draft) => void
-  setStep: (id: string, o: Partial<TemplateStep> | ((x: TemplateStep) => Partial<TemplateStep>)) => void
-  removeStep: (id: string) => void
-  toLib: (step: TemplateStep, withAfter: boolean, asNew?: boolean) => void
-  setPanel: (p: 'edit' | 'test' | null) => void
+  libIds: Set<string>
+  urlOf: (f: StepFile | null | undefined) => string
+  onPick: (id: string) => void
+  onCtx: (id: string, x: number, y: number) => void
+  onAdd: (k: StepKind | null, item: LibraryItem | null) => void
+  editor: (id: string) => React.ReactNode
 }) {
-  const box = useRef<HTMLDivElement>(null)
-  const world = useRef<HTMLDivElement>(null)
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [panning, setPanning] = useState(false)
-  const [lines, setLines] = useState<Line[]>([])
-  const [hover, setHover] = useState<string | null>(null)
-  const [addMenu, setAddMenu] = useState(false)
-  const [libOpen, setLibOpen] = useState(false)
-  const [libQ, setLibQ] = useState('')
-  const [libKind, setLibKind] = useState<'all' | 'step' | 'flow'>('all')
-  const [ctx, setCtx] = useState<{ x: number; y: number; id: string } | null>(null)
-  // A card being dragged: its place moves live; one undo step when let go.
-  const [dragPos, setDragPos] = useState<{ id: string; x: number; y: number } | null>(null)
-  const posOf = (st: TemplateStep) => (dragPos?.id === st.id ? { x: dragPos.x, y: dragPos.y } : st.pos ?? { x: 40, y: 40 })
-
-  // Lines: measured from the cards as drawn (rows' right edge → the target card's left, top).
-  useLayoutEffect(() => {
-    const w = world.current
-    if (!w) return
-    const at = (el: Element) => { const r = el.getBoundingClientRect(); const o = w.getBoundingClientRect(); return { x: (r.left - o.left) / zoom, y: (r.top - o.top) / zoom, w: r.width / zoom, h: r.height / zoom } }
-    const next: Line[] = []
-    for (const st of draft.steps) {
-      const tone = kindOf(st.kind).tone
-      // An option's other replies draw dashed lines beside its way on (mig 20261029150010).
-      const outs: Array<{ i: number; to: string; also?: boolean }> = rowsOf(st).flatMap(r => [...(r.also ?? []).map(to => ({ i: r.i, to, also: true })), ...(r.next ? [{ i: r.i, to: r.next }] : [])])
-      if (st.kind === 'phone' && st.failNext && st.failNext !== 'person') outs.push({ i: -2, to: st.failNext })
-      for (const o of outs) {
-        const port = w.querySelector(`[data-port="${st.id}:${o.i === -2 ? -1 : o.i}"]`)
-        const card = w.querySelector(`[data-card="${o.to}"]`)
-        if (!port || !card) continue
-        const p = at(port), c = at(card)
-        const x1 = p.x + p.w, y1 = p.y + p.h / 2 + (o.i === -2 ? 4 : 0), x2 = c.x - 2, y2 = c.y + 14
-        next.push({ key: `${st.id}:${o.i}:${o.to}:${o.also ? 'a' : 'n'}`, d: orth(x1, y1, x2, y2), tone, to: o.to, from: st.id, head: `M${x2 - 7},${y2 - 4} L${x2},${y2} L${x2 - 7},${y2 + 4}`, also: o.also })
-      }
-    }
-    setLines(prev => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next))
-  }, [zoom, draft.steps, dragPos])
-
-  const fit = () => {
-    const el = box.current
-    if (!el || draft.steps.length === 0) return
-    const xs = draft.steps.map(x => x.pos?.x ?? 0), ys = draft.steps.map(x => x.pos?.y ?? 0)
-    const minX = Math.min(...xs) - 30, minY = Math.min(...ys) - 50, maxX = Math.max(...xs) + CARD_W + 40, maxY = Math.max(...ys) + 260
-    // Readable first: never below 60%; the toolbar keeps its 48px at the top.
-    const z = Math.max(0.6, Math.min(1, Math.min(el.clientWidth / (maxX - minX), (el.clientHeight - 48) / (maxY - minY))))
-    setZoom(Math.round(z * 100) / 100)
-    setPan({ x: -minX * z, y: -minY * z + 48 })
-  }
-  // A template opens at 100%, its first steps at the top left, as drawn; Fit is the button's.
-  const place = () => {
-    if (draft.steps.length === 0) return
-    const minX = Math.min(...draft.steps.map(x => x.pos?.x ?? 0)) - 30, minY = Math.min(...draft.steps.map(x => x.pos?.y ?? 0)) - 50
-    setZoom(1)
-    setPan({ x: -minX, y: -minY + 48 })
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { place() }, [draft.id])
-
-  const onBgDown = (e: ReactMouseEvent) => {
-    if (e.button !== 0 || (e.target as HTMLElement).closest('[data-card],[data-ui]')) return
-    setSel(null); setLibOpen(false); setAddMenu(false)
-    const x0 = e.clientX, y0 = e.clientY, p0 = pan
-    setPanning(true)
-    const move = (ev: MouseEvent) => setPan({ x: p0.x + ev.clientX - x0, y: p0.y + ev.clientY - y0 })
-    const up = () => { setPanning(false); window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up) }
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', up)
-  }
-  const onCardDrag = (e: ReactMouseEvent, st: TemplateStep) => {
-    if (e.button !== 0 || !canEdit || (e.target as HTMLElement).closest('button,input')) return
-    e.preventDefault()
-    setSel(st.id)
-    const x0 = e.clientX, y0 = e.clientY, p0 = st.pos ?? { x: 40, y: 40 }
-    let last = p0
-    const move = (ev: MouseEvent) => { last = { x: Math.round(p0.x + (ev.clientX - x0) / zoom), y: Math.round(p0.y + (ev.clientY - y0) / zoom) }; setDragPos({ id: st.id, ...last }) }
-    const up = () => {
-      window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up)
-      setDragPos(null)
-      if (last.x !== p0.x || last.y !== p0.y) setStep(st.id, { pos: last })
-    }
-    window.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', up)
-  }
-  const onWheel = (e: React.WheelEvent) => {
-    if (!e.ctrlKey && !e.metaKey) { setPan(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY })); return }
-    const z = Math.max(0.4, Math.min(1.6, zoom * (e.deltaY > 0 ? 0.9 : 1.1)))
-    setZoom(Math.round(z * 100) / 100)
-  }
-  const worldPoint = (clientX: number, clientY: number) => {
-    const r = box.current!.getBoundingClientRect()
-    return { x: Math.round((clientX - r.left - pan.x) / zoom), y: Math.round((clientY - r.top - pan.y) / zoom) }
-  }
-  const centre = () => { const el = box.current!; return worldPoint(el.getBoundingClientRect().left + el.clientWidth / 2 - CARD_W / 2, el.getBoundingClientRect().top + 80) }
-  const addBlank = () => {
-    const at = centre()
-    const id = freshId(draft.steps)
-    change(d => ({ ...d, steps: [...d.steps, { id, kind: 'message', name: '', text: '', next: '', pos: at }] }))
-    setSel(id); setPanel('edit'); setAddMenu(false)
-  }
-  const addFromLib = (item: LibraryItem, at = centre()) => {
-    const copies = fromLibrary(draft.steps, item, at)
-    change(d => ({ ...d, steps: [...d.steps, ...copies] }))
-    setSel(copies[0]?.id ?? null); setAddMenu(false)
-  }
-  const shownLib = library.filter(l => (libKind === 'all' || l.kind === libKind) && (!libQ.trim() || `${l.name} ${l.description}`.toLowerCase().includes(libQ.trim().toLowerCase())))
-
+  const nameOf = (id: string) => steps.find(x => x.id === id)?.name || (id ? 'Untitled' : 'Not connected')
   return (
-    <div ref={box} className={s.canvas} data-panning={panning || undefined} onMouseDown={onBgDown} onWheel={onWheel}
-      onDragOver={e => { if (e.dataTransfer.types.includes('text/lead-lib')) e.preventDefault() }}
-      onDrop={e => { const id = e.dataTransfer.getData('text/lead-lib'); const item = library.find(l => l.id === id); if (item && canEdit) { e.preventDefault(); addFromLib(item, worldPoint(e.clientX, e.clientY)) } }}>
-      {canEdit ? (
-        <div className={s.toolbar} data-ui="">
-          <span style={{ position: 'relative' }}>
-            <button type="button" className={s.toolBtn} onClick={() => setAddMenu(o => !o)} aria-expanded={addMenu}><LeadIcon name="plus" size={13} />Step<LeadIcon name="chevronDown" size={12} /></button>
-            {addMenu ? (
-              <>
-                <div className={s.scrim} onClick={() => setAddMenu(false)} aria-hidden="true" />
-                <div className={s.menu} style={{ top: 32, left: 0 }} role="menu">
-                  <button type="button" className={s.menuItem} onClick={addBlank}>Blank step</button>
-                  {library.length ? <div className={s.menuGroup}>FROM LIBRARY</div> : null}
-                  {library.slice(0, 5).map(l => <button key={l.id} type="button" className={s.menuItem} onClick={() => addFromLib(l)}>{l.name}<span className={s.small}>{l.kind === 'flow' ? `${l.steps.length} steps` : kindOf(l.steps[0]?.kind ?? 'message').short}</span></button>)}
-                  <div className={s.menuRule} />
-                  <button type="button" className={s.menuItem} onClick={() => { setLibOpen(true); setAddMenu(false) }}>Browse library…</button>
-                </div>
-              </>
-            ) : null}
-          </span>
-          <button type="button" className={s.toolBtn} data-plain="" aria-pressed={libOpen} onClick={() => setLibOpen(o => !o)}><LeadIcon name="bookOpen" size={13} />Library</button>
-        </div>
-      ) : null}
-      {libOpen ? (
-        <div className={s.libPanel} data-ui="">
-          <div className={s.libSideHead}>
-            <input className={s.input} value={libQ} onChange={e => setLibQ(e.target.value)} placeholder="Search steps and flows" aria-label="Search the library" />
-            <span className={s.seg}>
-              {(['all', 'step', 'flow'] as const).map(k => <button key={k} type="button" className={s.segBtn} aria-pressed={libKind === k} onClick={() => setLibKind(k)}>{k === 'all' ? 'All' : k === 'step' ? 'Steps' : 'Flows'}</button>)}
-            </span>
-          </div>
-          <div className={s.libList}>
-            {shownLib.length === 0 ? <span className={s.small}>Nothing in the library yet — right-click a step to save it here.</span> : shownLib.map(l => (
-              <div key={l.id} className={s.libCard} draggable onDragStart={e => e.dataTransfer.setData('text/lead-lib', l.id)} title="Drag onto the map, or Add">
-                <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                  <span className={s.listName}>{l.name}</span>
-                  <span className={s.listSub}>{l.kind === 'flow' ? `Flow · ${l.steps.length} steps` : `${kindOf(l.steps[0]?.kind ?? 'message').short} step`} · v{l.ver}</span>
-                </span>
-                <button type="button" className={s.link} onClick={() => addFromLib(l)}>Add</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      <div ref={world} className={s.world} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-        <svg className={s.lines} width={1} height={1} aria-hidden="true">
-          {lines.map(l => {
-            const on = hover === l.key || sel === l.from || sel === l.to
-            return (
-              <g key={l.key} style={{ color: `rgb(var(${l.tone}))`, opacity: on ? 1 : 0.7 }}>
-                <path d={l.d} fill="none" stroke="currentColor" strokeWidth={on ? 2.25 : 1.4} strokeDasharray={l.also ? '5 4' : undefined} />
-                <path d={l.head} fill="none" stroke="currentColor" strokeWidth={on ? 2.25 : 1.4} />
-                <path d={l.d} fill="none" stroke="transparent" strokeWidth={10} style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
-                  onMouseEnter={() => setHover(l.key)} onMouseLeave={() => setHover(null)} onClick={() => setSel(l.to)} />
-              </g>
-            )
-          })}
-        </svg>
-        {draft.steps.map((st, idx) => {
-          const p = posOf(st)
-          const linked = st.lib ? libById.get(st.lib.id) : undefined
-          const rows = rowsOf(st)
-          return (
-            <div key={st.id} data-card={st.id} className={s.card} style={{ left: p.x, top: p.y, ...toneStyle(st.kind) }} aria-selected={sel === st.id}
-              onMouseDown={e => { if (e.button === 0) setSel(st.id) }}
-              onContextMenu={e => { if (!canEdit) return; e.preventDefault(); const r = box.current!.getBoundingClientRect(); setCtx({ x: e.clientX - r.left, y: e.clientY - r.top, id: st.id }) }}>
-              <div className={s.cardHead} onMouseDown={e => onCardDrag(e, st)}>
-                <span className={s.num} data-start={idx === 0 || undefined} title={idx === 0 ? 'Start' : undefined}>{idx + 1}</span>
-                {st.lib ? <span className={s.libDot} data-old={linked && linked.ver > st.lib.ver ? '' : undefined} title={linked ? `From library · ${linked.name} · v${st.lib.ver}${linked.ver > st.lib.ver ? ` (v${linked.ver} is newer)` : ''}` : 'From the library (item removed)'}><LeadIcon name="bookOpen" size={12} /></span> : null}
-                <span className={s.cardName}>{st.name || kindOf(st.kind).label}</span>
-                <button type="button" className={s.cardIcon} title="Edit step" onClick={() => { setSel(st.id); setPanel('edit') }}><LeadIcon name="filePen" size={11} /></button>
-                {canEdit && draft.steps.length > 1 ? <button type="button" className={s.cardIcon} title="Delete step" onClick={() => removeStep(st.id)}><LeadIcon name="trash" size={11} /></button> : null}
-              </div>
-              <div className={s.cardText} data-empty={st.text?.trim() ? undefined : ''}>{st.text?.trim() || (st.kind === 'handoff' || st.kind === 'ai' ? 'No message' : 'Write the message…')}</div>
-              {rows.length ? (
-                <div className={s.rows}>
-                  {rows.map(r => (
-                    <div key={r.i} className={s.row}>
-                      <span className={s.pill} data-summary={r.i === -1 ? '' : undefined}>{r.label || '—'}</span>
-                      <span className={s.target}>{(() => {
-                        const to = [...(r.also ?? []), r.next].filter(Boolean).map(id => draft.steps.findIndex(x => x.id === id) + 1)
-                        return to.length ? `→ ${to.join(', ')}` : st.multi && r.i >= 0 ? 'Kept' : 'End'
-                      })()}</span>
-                      {canEdit && st.multi && r.i >= 0 && (r.also?.length ?? 0) < ALSO_MAX ? (
-                        <button type="button" className={s.plus} title="Add a reply to this option"
-                          onClick={() => {
-                            const n = stepAfter(draft.steps, st, r.label)
-                            change(d => ({
-                              ...d,
-                              steps: [...d.steps.map(x => (x.id !== st.id ? x : { ...x, buttons: (x.buttons ?? []).map((b, j) => (j === r.i ? { ...b, also: [...(b.also ?? []), n.id] } : b)) })), { ...n, pos: { x: n.pos!.x, y: p.y + r.i * 40 + (r.also?.length ?? 0) * 30 } }],
-                            }))
-                            setSel(n.id); setPanel('edit')
-                          }}><LeadIcon name="plus" size={10} /></button>
-                      ) : null}
-                      {!r.next && canEdit && !(st.multi && r.i >= 0) ? (
-                        <button type="button" className={s.plus} title="Add the next step"
-                          onClick={() => {
-                            const n = stepAfter(draft.steps, st, r.i === -1 ? '' : r.label)
-                            change(d => ({
-                              ...d,
-                              steps: [...d.steps.map(x => (x.id !== st.id ? x : r.i === -1 ? { ...x, next: n.id } : { ...x, buttons: x.buttons!.map((b, j) => (j === r.i ? { ...b, next: n.id } : b)) })), { ...n, pos: { x: n.pos!.x, y: p.y + (r.i > 0 ? r.i * 40 : 0) } }],
-                            }))
-                            setSel(n.id); setPanel('edit')
-                          }}><LeadIcon name="plus" size={10} /></button>
-                      ) : null}
-                      {r.next || r.also?.length ? <span className={s.port} data-port={`${st.id}:${r.i}`} /> : <span data-port={`${st.id}:${r.i}`} style={{ width: 0 }} />}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className={s.waitRow}>{st.kind === 'ai' ? '→ AI Agent drafts · waits for CS' : '→ Waiting in the Inbox'}</div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {ctx ? (() => {
-        const st = draft.steps.find(x => x.id === ctx.id)
-        if (!st) return null
-        const linked = st.lib && libById.get(st.lib.id)
+    <div className={s.listView}>
+      {steps.map((st, i) => {
+        const t = typeOf(st.kind)
+        const isEd = editing === st.id
         return (
-          <>
-            <div className={s.scrim} onClick={() => setCtx(null)} onContextMenu={e => { e.preventDefault(); setCtx(null) }} aria-hidden="true" />
-            <div className={s.menu} style={{ left: ctx.x, top: ctx.y }} role="menu" data-ui="">
-              {linked ? (
+          <div key={st.id} className={s.slot}>
+            <div className={s.card} data-sel={sel === st.id || undefined} data-editing={isEd || undefined} role="button" tabIndex={0}
+              onClick={() => { if (!isEd) onPick(st.id) }} onKeyDown={e => { if (e.key === 'Enter' && !isEd) onPick(st.id) }}
+              onContextMenu={e => { if (!canEdit) return; e.preventDefault(); onCtx(st.id, e.clientX, e.clientY) }}>
+              {isEd ? editor(st.id) : (
                 <>
-                  <button type="button" className={s.menuItem} onClick={() => { toLib(st, false); setCtx(null) }}>Save my changes to the library</button>
-                  <button type="button" className={s.menuItem} onClick={() => { toLib(st, false, true); setCtx(null) }}>Save as a new library item</button>
-                  <a className={s.menuItem} href={`/leads/library?i=${linked.id}`}>Open in library</a>
-                  <button type="button" className={s.menuItem} onClick={() => { setStep(st.id, { lib: undefined }); setCtx(null) }}>Unlink from library</button>
-                </>
-              ) : (
-                <>
-                  <button type="button" className={s.menuItem} onClick={() => { toLib(st, false); setCtx(null) }}>Save to library</button>
-                  <button type="button" className={s.menuItem} onClick={() => { toLib(st, true); setCtx(null) }}>Save with the steps after it</button>
+                  <div className={s.cardTop}>
+                    <span className={s.tile} style={tileStyle(st.kind)}><LeadIcon name={t.icon} size={13} /></span>
+                    <span className={s.cardName}>{st.name || 'Untitled'}</span>
+                    {st.lib && libIds.has(st.lib.id) ? <span className={s.libMark} title="From step library"><LeadIcon name="blocks" size={13} /></span> : null}
+                    <span className={s.type}>{t.label}</span>
+                  </div>
+                  <span className={s.text}>{st.text}</span>
+                  {st.file ? <FileChip file={st.file} url={urlOf(st.file)} /> : null}
+                  {st.kind === 'question' ? (
+                    <div className={s.opts}>{(st.buttons ?? []).map((b, j) => <span key={j} className={s.opt}><span>{b.label}</span><span className={s.optTo}>→ {nameOf(b.next)}</span></span>)}</div>
+                  ) : null}
+                  {['phone', 'message', 'text'].includes(st.kind) && st.next ? <span className={s.then}>Then → {nameOf(st.next)}</span> : null}
                 </>
               )}
-              <div className={s.menuRule} />
-              <button type="button" className={s.menuItem} onClick={() => { setSel(st.id); setPanel('edit'); setCtx(null) }}>Edit step</button>
             </div>
-          </>
+            {i < steps.length - 1 ? <span className={s.wire} aria-hidden="true" /> : null}
+          </div>
         )
-      })() : null}
-
-      <div className={s.zoom} data-ui="">
-        <button type="button" onClick={() => setZoom(z => Math.max(0.4, Math.round((z - 0.1) * 100) / 100))} aria-label="Zoom out">−</button>
-        <span>{Math.round(zoom * 100)}%</span>
-        <button type="button" onClick={() => setZoom(z => Math.min(1.6, Math.round((z + 0.1) * 100) / 100))} aria-label="Zoom in">+</button>
-        <button type="button" onClick={fit}>Fit</button>
-        {canEdit ? <button type="button" onClick={() => { change(d => ({ ...d, steps: tidy(d.steps) })); setTimeout(fit, 0) }}>Tidy up</button> : null}
-      </div>
+      })}
+      {canEdit ? <AddStep up library={library} onAdd={onAdd} /> : null}
     </div>
   )
 }
 
-/** An orthogonal line with rounded corners: right from the row, then to the card's left edge (around it when behind). */
-function orth(x1: number, y1: number, x2: number, y2: number): string {
-  const r = 6
-  const pts: Array<[number, number]> = x2 > x1 + 24
-    ? [[x1, y1], [x1 + Math.max(16, (x2 - x1) / 2), y1], [x1 + Math.max(16, (x2 - x1) / 2), y2], [x2, y2]]
-    : [[x1, y1], [x1 + 18, y1], [x1 + 18, y1 + (y2 > y1 ? 1 : -1) * Math.max(30, Math.abs(y2 - y1) / 2)], [x2 - 18, y1 + (y2 > y1 ? 1 : -1) * Math.max(30, Math.abs(y2 - y1) / 2)], [x2 - 18, y2], [x2, y2]]
-  let d = `M${pts[0][0]},${pts[0][1]}`
-  for (let i = 1; i < pts.length - 1; i++) {
-    const [px, py] = pts[i - 1], [cx, cy] = pts[i], [nx, ny] = pts[i + 1]
-    const k1 = Math.min(r, Math.hypot(cx - px, cy - py) / 2), k2 = Math.min(r, Math.hypot(nx - cx, ny - cy) / 2)
-    const ax = cx - Math.sign(cx - px) * k1, ay = cy - Math.sign(cy - py) * k1
-    const bx = cx + Math.sign(nx - cx) * k2, by = cy + Math.sign(ny - cy) * k2
-    d += ` L${ax},${ay} Q${cx},${cy} ${bx},${by}`
-  }
-  const last = pts[pts.length - 1]
-  return `${d} L${last[0]},${last[1]}`
+function FileChip({ file, url }: { file: StepFile; url: string }) {
+  return (
+    <div className={s.chipFile}>
+      {isImage(file.mime) ? <span className={s.thumb} style={{ backgroundImage: url ? `url("${url}")` : undefined }} /> : <span className={s.ext}>{extOf(file.name)}</span>}
+      <span>{file.name}</span>
+    </div>
+  )
 }
 
-// ── Edit step ──
+/** "+ Add step": the six types, then FROM LIBRARY. Opens up in List view, down on the map; a click outside closes it. */
+function AddStep({ up, library, onAdd }: { up?: boolean; library: LibraryItem[]; onAdd: (k: StepKind | null, item: LibraryItem | null) => void }) {
+  const [open, setOpen] = useState(false)
+  const steps = library.filter(l => l.kind === 'step')
+  return (
+    <div className={up ? s.addWrap : undefined} style={up ? undefined : { position: 'relative' }}>
+      <button type="button" className={s.addBtn} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)}><LeadIcon name="plus" size={14} />Add step</button>
+      {open ? (
+        <>
+          <div className={s.catcher} onClick={() => setOpen(false)} aria-hidden="true" />
+          <div className={s.addMenu} data-up={up || undefined} data-down={up ? undefined : ''} role="menu">
+            {STEP_TYPES.map(t => (
+              <button key={t.kind} type="button" role="menuitem" className={s.addItem} onClick={() => { setOpen(false); onAdd(t.kind, null) }}><LeadIcon name={t.icon} size={14} />{t.label}</button>
+            ))}
+            <span className={s.addHead}>FROM LIBRARY</span>
+            {steps.map(l => (
+              <button key={l.id} type="button" role="menuitem" className={s.addItem} data-lib="" onClick={() => { setOpen(false); onAdd(null, l) }}><LeadIcon name="blocks" size={14} />{l.name}</button>
+            ))}
+            {!steps.length ? <span className={s.addNone}>Nothing in the library yet</span> : null}
+          </div>
+        </>
+      ) : null}
+    </div>
+  )
+}
 
-function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAfter, newReply, lib, toLib, info, today }: {
+// ── The step editor (List view inline; the map's floating panel) ──
+
+function StepEditor({ step, steps, canEdit, setStep, setLocalUrls, urlOf, libById, info, today, onDone, onFlash }: {
   step: TemplateStep
-  draft: Draft
-  setSel: (id: string | null) => void
+  steps: TemplateStep[]
   canEdit: boolean
   setStep: (id: string, o: Partial<TemplateStep> | ((x: TemplateStep) => Partial<TemplateStep>)) => void
-  removeStep: (id: string) => void
-  insertAfter: () => void
-  /** A new "Send a message" step as one more reply of option j. */
-  newReply: (j: number, label: string) => void
-  lib: LibraryItem | null
-  toLib: (step: TemplateStep, withAfter: boolean, asNew?: boolean) => void
+  setLocalUrls: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  urlOf: (f: StepFile | null | undefined) => string
+  libById: Map<string, LibraryItem>
   info: LeadInfo | null
   today: string
+  onDone: () => void
+  onFlash: (m: string) => void
 }) {
-  const i = draft.steps.findIndex(x => x.id === step.id)
+  const t = typeOf(step.kind)
   const dis = !canEdit
   const set = (o: Partial<TemplateStep>) => setStep(step.id, o)
   const text = useRef<HTMLTextAreaElement>(null)
-  // The message box grows with its words (the user, 2026-10-29: "要可以拉动"); its corner still drags it taller.
-  useLayoutEffect(() => {
-    const el = text.current
-    if (el && el.scrollHeight > el.clientHeight) el.style.height = `${Math.min(el.scrollHeight + 2, 520)}px`
-  }, [step.text, step.id])
-  // *Bold* / _italic_ around the selection, as Messenger reads them (lib/leads/rich.ts).
+  const [uploading, setUploading] = useState(false)
+  const [more, setMore] = useState(false)
+  const lib = step.lib ? libById.get(step.lib.id) ?? null : null
+  const targets = steps.filter(x => x.id !== step.id)
+  const target = (value: string, onChange: (v: string) => void, label: string) => (
+    <select className={s.edSelect} value={value} disabled={dis} aria-label={label} onChange={e => onChange(e.target.value)}>
+      <option value="">Not connected</option>
+      {targets.map(x => <option key={x.id} value={x.id}>{x.name || 'Untitled'}</option>)}
+    </select>
+  )
+  const pick = async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > FILE_LIMIT) { onFlash('A photo or file is 25 MB at most.'); return }
+    setUploading(true)
+    const name = file.name.replace(/[\\/]/g, '_').slice(-120) || 'file'
+    const path = `chat/tpl/${crypto.randomUUID()}/${name}`
+    const up = await createClient().storage.from('lead-media').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
+    setUploading(false)
+    if (up.error) { onFlash('The file could not be uploaded. Please try again.'); return }
+    setLocalUrls(u => ({ ...u, [path]: URL.createObjectURL(file) }))
+    set({ file: { path, name, mime: file.type || 'application/octet-stream', size: file.size } })
+  }
+  const attach = (label: string) => (
+    <label className={s.attachSm}><LeadIcon name="paperclip" size={13} />{label}
+      <input type="file" accept={ATTACH_ACCEPT} className={s.hidden} disabled={dis || uploading} onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }} />
+    </label>
+  )
+  const rows = mapRows(step)
+  return (
+    <div className={s.ed} onClick={e => e.stopPropagation()}>
+      <div className={s.cardTop}>
+        <span className={s.tile} style={tileStyle(step.kind)}><LeadIcon name={t.icon} size={13} /></span>
+        <input className={s.edName} value={step.name ?? ''} maxLength={40} disabled={dis} placeholder="Step name" aria-label="Step name" onChange={e => set({ name: e.target.value })} />
+        <span className={s.type}>{t.label}</span>
+      </div>
+      <textarea ref={text} className={s.edText} rows={3} value={step.text ?? ''} maxLength={1000} disabled={dis} placeholder="Write the message…" aria-label="Message" onChange={e => set({ text: e.target.value })} />
+      {step.kind === 'message' || step.file ? (
+        step.file ? (
+          <div className={s.fileBox}>
+            {isImage(step.file.mime) ? <span className={s.thumb} data-size="40" style={{ backgroundImage: urlOf(step.file) ? `url("${urlOf(step.file)}")` : undefined }} /> : <span className={s.ext} data-size="40">{extOf(step.file.name)}</span>}
+            <div className={s.fileText}><span className={s.fileName}>{step.file.name}</span><span className={s.fileMeta}>{sizeLabel(step.file.size)}</span></div>
+            {canEdit ? (
+              <>
+                <label className={s.replace}>Replace<input type="file" accept={ATTACH_ACCEPT} className={s.hidden} onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }} /></label>
+                <button type="button" className={s.x} title="Remove" aria-label="Remove the file" onClick={() => set({ file: null })}><LeadIcon name="x" size={14} /></button>
+              </>
+            ) : null}
+          </div>
+        ) : canEdit ? attach(uploading ? 'Uploading…' : 'Attach photo or file') : null
+      ) : null}
+      {rows.map(r => (
+        <div key={String(r.slot)} className={s.edRow}>
+          {r.edit
+            ? <input className={s.edInput} value={r.label} maxLength={OPTION_MAX} disabled={dis} aria-label={`Button ${Number(r.slot) + 1}`} onChange={e => set({ buttons: (step.buttons ?? []).map((b, j) => (j === r.slot ? { ...b, label: e.target.value } : b)) })} />
+            : <span className={s.edFixed}>{r.label}</span>}
+          <LeadIcon name="arrow-right" size={13} className={s.edArrow} />
+          {target(r.to, v => set(r.slot === 'next' ? { next: v } : { buttons: (step.buttons ?? []).map((b, j) => (j === r.slot ? { ...b, next: v } : b)) }), `${r.label} goes to`)}
+          {r.edit && canEdit ? (
+            <button type="button" className={s.x} title="Remove button" aria-label="Remove button" disabled={(step.buttons ?? []).length <= 1}
+              onClick={() => set({ buttons: (step.buttons ?? []).filter((_, j) => j !== r.slot) })}><LeadIcon name="x" size={14} /></button>
+          ) : null}
+        </div>
+      ))}
+      <div className={s.edFoot}>
+        {step.kind === 'question' && canEdit ? (
+          <button type="button" className={s.addOpt} disabled={(step.buttons ?? []).length >= 13}
+            onClick={() => set({ buttons: [...(step.buttons ?? []), { label: `Option ${(step.buttons ?? []).length + 1}`, next: '' }] })}><LeadIcon name="plus" size={13} />Add button</button>
+        ) : null}
+        <button type="button" className={s.moreToggle} onClick={() => setMore(m => !m)} aria-expanded={more}><LeadIcon name={more ? 'chevron-down' : 'chevron-right'} size={12} />More</button>
+        <span className={s.fill} />
+        <button type="button" className={s.done} onClick={e => { e.stopPropagation(); onDone() }}>Done</button>
+      </div>
+      {more ? <MoreOptions step={step} steps={steps} canEdit={canEdit} set={set} setStep={setStep} lib={lib} info={info} today={today} text={text} /> : null}
+    </div>
+  )
+}
+
+/** Kept, not drawn (the user's point 2): what the step can also do, behind "More". */
+function MoreOptions({ step, steps, canEdit, set, setStep, lib, info, today, text }: {
+  step: TemplateStep
+  steps: TemplateStep[]
+  canEdit: boolean
+  set: (o: Partial<TemplateStep>) => void
+  setStep: (id: string, o: Partial<TemplateStep> | ((x: TemplateStep) => Partial<TemplateStep>)) => void
+  lib: LibraryItem | null
+  info: LeadInfo | null
+  today: string
+  text: React.RefObject<HTMLTextAreaElement | null>
+}) {
+  const dis = !canEdit
+  const [infoOpen, setInfoOpen] = useState(false)
+  const entries = info ? info.cards.flatMap(c => infoEntries({ ...info, cards: [c] }, c.brandId, today)) : []
   const mark = (m: '*' | '_') => {
     const el = text.current
     const v = step.text ?? ''
@@ -638,20 +513,7 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
     set({ text: r.text.slice(0, 1000) })
     requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(r.caret, r.caret) })
   }
-  // An option dragged by its grip to another place (2026-10-29 — the user: "下方then 可以拉动调整，无需删掉重写").
-  const [optDrag, setOptDrag] = useState<{ from: number; over: number; after: boolean } | null>(null)
-  const dropOption = () => {
-    if (!optDrag || !step.buttons) return
-    const at = optDrag.after ? optDrag.over + 1 : optDrag.over
-    set({ buttons: moveItem(step.buttons, optDrag.from, optDrag.from < at ? at - 1 : at) })
-    setOptDrag(null)
-  }
-  const [kindOpen, setKindOpen] = useState(false)
-  const [infoOpen, setInfoOpen] = useState(false)
-  const [infoCard, setInfoCard] = useState(0)
-  // Every live card, whatever its brand: a template may run on any page.
-  const allEntries = info ? info.cards.flatMap(c => infoEntries({ ...info, cards: [c] }, c.brandId, today)) : []
-  const insertToken = (token: string) => {
+  const insert = (token: string) => {
     const el = text.current
     const v = step.text ?? ''
     const at = el ? el.selectionStart ?? v.length : v.length
@@ -659,300 +521,385 @@ function EditStep({ step, draft, setSel, canEdit, setStep, removeStep, insertAft
     setInfoOpen(false)
   }
   const goes = (value: string | null | undefined, onChange: (v: string) => void, label: string, extra: Array<{ v: string; l: string }> = []) => (
-    <select className={s.select} value={value ?? ''} disabled={dis} aria-label={label} onChange={e => onChange(e.target.value)}>
+    <select className={s.edSelect} value={value ?? ''} disabled={dis} aria-label={label} onChange={e => onChange(e.target.value)}>
       {extra.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-      <option value="">End here</option>
-      {draft.steps.map((x, j) => <option key={x.id} value={x.id}>{j + 1} · {x.name || kindOf(x.kind).label}</option>)}
+      <option value="">Not connected</option>
+      {steps.filter(x => x.id !== step.id).map(x => <option key={x.id} value={x.id}>{x.name || 'Untitled'}</option>)}
     </select>
   )
+  const named = (id: string) => steps.find(x => x.id === id)?.name || 'Message'
   const closing = (value: string | undefined, onChange: (v: string) => void) => (
-    <label className={s.field}>Closing message when it ends here · empty uses the template’s
-      <input className={s.input} value={value ?? ''} maxLength={1000} disabled={dis} placeholder={draft.endMsg || 'e.g. Thanks! Our salesperson will WhatsApp you soon 😊'} onChange={e => onChange(e.target.value)} />
+    <label className={s.field}>Closing message when it ends here
+      <input className={s.edInput} value={value ?? ''} maxLength={1000} disabled={dis} placeholder="Empty: the template’s own" onChange={e => onChange(e.target.value)} />
     </label>
   )
-  // An option's other replies — "Send a message" steps sent first, in order (2026-10-29, mig 20261029150010).
-  const alsoList = (j: number, b: StepOption, title: string) => {
-    const ids = b.also ?? []
-    const setAlso = (next: string[]) => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, also: next } : x)) })
-    const pickable = draft.steps.filter(x => x.kind === 'message' && x.id !== step.id && !ids.includes(x.id))
-    const named = (x: TemplateStep | undefined) => x?.name || x?.text?.trim().slice(0, 28) || 'Message'
-    return (
-      <div className={s.field}>{title}
-        {ids.length ? (
-          <span className={s.alsoList}>
-            {ids.map((id, k) => {
-              const t = draft.steps.findIndex(x => x.id === id)
-              return (
-                <span key={id} className={s.alsoChip}>
-                  <span className={s.num}>{k + 1}</span><span style={{ flex: 1, minWidth: 0 }}>→ {t + 1} · {named(draft.steps[t])}</span>
-                  {canEdit ? <button type="button" className={s.x} title="Take this reply off" onClick={() => setAlso(ids.filter(x => x !== id))}>×</button> : null}
-                </span>
-              )
-            })}
-          </span>
-        ) : null}
-        {canEdit && ids.length < ALSO_MAX ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <select className={s.select} style={{ flex: 1 }} value="" aria-label={`${title} · option ${j + 1}`} onChange={e => { if (e.target.value) setAlso([...ids, e.target.value]) }}>
-              <option value="">+ Add a message step…</option>
-              {pickable.map(x => <option key={x.id} value={x.id}>{draft.steps.indexOf(x) + 1} · {named(x)}</option>)}
-            </select>
-            <button type="button" className={s.link} onClick={() => newReply(j, b.label)}>+ New message</button>
-          </span>
-        ) : null}
-      </div>
-    )
-  }
-  // More than one: each option's Goes to becomes one of its replies when it is a message, and goes nowhere itself.
   const setMulti = (on: boolean) => set(on
-    ? {
-        multi: true,
-        buttons: (step.buttons ?? []).map(b => {
-          const t = draft.steps.find(x => x.id === b.next)
-          const also = [...(t?.kind === 'message' ? [t.id] : []), ...(b.also ?? [])].filter((id, k, a) => a.indexOf(id) === k).slice(0, ALSO_MAX)
-          return { ...b, next: '', also }
-        }),
-      }
+    ? { multi: true, buttons: (step.buttons ?? []).map(b => { const t = steps.find(x => x.id === b.next); return { ...b, next: '', also: [...(t?.kind === 'message' ? [t.id] : []), ...(b.also ?? [])].filter((id, k, a) => a.indexOf(id) === k).slice(0, ALSO_MAX) } }) }
     : { multi: false })
-  const setKind = (k: StepKind) => {
-    const o: Partial<TemplateStep> = { kind: k }
-    if (k === 'question' && !(step.buttons ?? []).length) o.buttons = [{ label: 'Option 1', next: step.next ?? '' }]
-    if (k !== 'question') o.next = step.next ?? step.buttons?.[0]?.next ?? ''
-    if (k === 'phone' && !step.retryText) { o.retryText = RETRY_PHONE; o.retryMax = '2'; o.failNext = 'person' }
-    set(o)
-  }
-
   return (
-    <>
-      <div className={s.sideHead} style={toneStyle(step.kind)}>
-        <span className={s.num} data-start={i === 0 || undefined}>{i + 1}</span>
-        <input className={s.input} style={{ flex: 1 }} value={step.name ?? ''} maxLength={40} disabled={dis} placeholder={kindOf(step.kind).label} aria-label="Step name" onChange={e => set({ name: e.target.value })} />
-        <button type="button" className={s.cardIcon} disabled={i <= 0} title="Previous step" onClick={() => setSel(draft.steps[i - 1].id)}>‹</button>
-        <span className={s.small}>{i + 1} / {draft.steps.length}</span>
-        <button type="button" className={s.cardIcon} disabled={i >= draft.steps.length - 1} title="Next step" onClick={() => setSel(draft.steps[i + 1].id)}>›</button>
-        {canEdit ? (
-          <>
-            <button type="button" className={s.cardIcon} title={step.lib && lib ? 'Save changes to library' : 'Save to library'} onClick={() => toLib(step, false)}><LeadIcon name="bookOpen" size={11} /></button>
-            <button type="button" className={s.cardIcon} title="Insert a step after" onClick={insertAfter}><LeadIcon name="plus" size={11} /></button>
-            {draft.steps.length > 1 ? <button type="button" className={s.cardIcon} title="Delete step" onClick={() => removeStep(step.id)}><LeadIcon name="trash" size={11} /></button> : null}
-          </>
-        ) : null}
-      </div>
-      <div className={s.sideBody}>
-        {step.lib ? <div className={s.libBox}>From library · {lib?.name ?? 'an item since removed'} · v{step.lib.ver}</div> : null}
-        {step.lib && lib && lib.ver > step.lib.ver ? (
-          <div className={s.oldBox}>
-            The library has a newer version (v{lib.ver}). Update this step?
-            <span style={{ display: 'flex', gap: 8 }}>
-              <button type="button" className={s.btn} data-strong="" disabled={dis} onClick={() => setStep(step.id, x => updateFromLibrary(x, lib))}>Update</button>
-              <button type="button" className={s.btn} data-quiet="" disabled={dis} onClick={() => set({ lib: { id: lib.id, ver: lib.ver } })}>Keep mine</button>
-            </span>
-          </div>
-        ) : null}
-
-        <span className={s.label}>MESSAGE</span>
-        <textarea ref={text} className={s.textarea} rows={6} value={step.text ?? ''} maxLength={1000} disabled={dis} aria-label="Message"
-          placeholder={step.kind === 'handoff' ? 'Optional — e.g. One of our team will reply shortly.' : 'What the customer reads'} onChange={e => set({ text: e.target.value })} />
-        <span style={{ display: 'flex', gap: 8, position: 'relative', flexWrap: 'wrap' }}>
-          <button type="button" className={s.toolBtn} data-plain="" disabled={dis} title="Bold — Messenger shows *words* in bold" aria-label="Bold" onMouseDown={e => e.preventDefault()} onClick={() => mark('*')}><b>B</b></button>
-          <button type="button" className={s.toolBtn} data-plain="" disabled={dis} title="Italic — Messenger shows _words_ in italic" aria-label="Italic" onMouseDown={e => e.preventDefault()} onClick={() => mark('_')}><i>I</i></button>
-          <button type="button" className={s.toolBtn} data-plain="" disabled={dis || !info} onClick={() => setInfoOpen(o => !o)} title={!info ? 'General info waits for its database update' : undefined}><LeadIcon name="bookOpen" size={12} />General info<LeadIcon name="chevronDown" size={12} /></button>
-          <button type="button" className={s.toolBtn} data-plain="" disabled title="Attachments come with the Data Center’s files (step 5)"><LeadIcon name="paperclip" size={12} />Attach</button>
-          {infoOpen ? (
-            <>
-              <div className={s.scrim} onClick={() => setInfoOpen(false)} aria-hidden="true" />
-              <div className={s.menu} style={{ top: 32, left: 0, width: 320 }}>
-                <span style={{ display: 'flex', alignItems: 'center', padding: '6px 8px' }}><span className={s.label} style={{ flex: 1 }}>INSERT GENERAL INFO</span><button type="button" className={s.x} onClick={() => setInfoOpen(false)}>×</button></span>
-                {allEntries.length === 0 ? <span className={s.small} style={{ padding: 8 }}>Nothing in use on General info yet.</span> : (
-                  <>
-                    <select className={s.select} style={{ margin: '0 8px 6px' }} value={infoCard} onChange={e => setInfoCard(Number(e.target.value))} aria-label="Info card">
-                      {allEntries.map((e2, j) => <option key={e2.card.id} value={j}>{e2.card.name || e2.card.code}</option>)}
-                    </select>
-                    {(allEntries[infoCard]?.fields ?? []).map(f => (
-                      <div key={f.token} className={s.menuItem} style={{ cursor: 'default' }}>
-                        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                          <span className={s.small}>{f.label}</span>
-                          <span style={{ whiteSpace: 'normal', fontSize: 12 }}>{f.value}</span>
-                        </span>
-                        <button type="button" className={s.chip} onClick={() => insertToken(f.token)}>+ Insert</button>
-                      </div>
-                    ))}
-                    <span className={s.small} style={{ padding: '6px 8px', display: 'flex', gap: 8 }}>Inserts a live field · updates when General info changes<a className={s.link} href="/leads/info">Edit ↗</a></span>
-                  </>
-                )}
-              </div>
-            </>
-          ) : null}
-        </span>
-
-        <span className={s.label}>THEN</span>
-        {/* A dropdown, as drawn (the user, 2026-10-23: "原本应该是下拉式的"): the step's type, opening the radio list. */}
-        <div className={s.kindPick}>
-          <button type="button" className={s.kindTrigger} style={toneStyle(step.kind)} disabled={dis} aria-haspopup="listbox" aria-expanded={kindOpen} onClick={() => setKindOpen(o => !o)}>
-            <span className={s.kindDot} />
-            <span className={s.kindText}>{KINDS.find(k => k.kind === step.kind)?.label}<span className={s.kindHint}>{KINDS.find(k => k.kind === step.kind)?.hint}</span></span>
-            <LeadIcon name="chevronDown" size={14} />
-          </button>
-          {kindOpen ? (
-            <>
-              <div className={s.kindScrim} onClick={() => setKindOpen(false)} aria-hidden="true" />
-              <div className={s.kinds} data-menu="" role="radiogroup" aria-label="Then">
-                {KINDS.map(k => (
-                  <button key={k.kind} type="button" role="radio" aria-checked={step.kind === k.kind} className={s.kind} style={toneStyle(k.kind)} disabled={dis} onClick={() => { if (step.kind !== k.kind) setKind(k.kind); setKindOpen(false) }}>
-                    <span className={s.kindDot} />
-                    <span className={s.kindText}>{k.label}<span className={s.kindHint}>{k.hint}</span></span>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : null}
+    <div className={s.more}>
+      {lib && step.lib && lib.ver > step.lib.ver ? (
+        <div className={s.libNote}>
+          <span>The library has a newer version (v{lib.ver}).</span>
+          <button type="button" className={s.libBtn} disabled={dis} onClick={() => setStep(step.id, x => updateFromLibrary(x, lib))}>Update</button>
+          <button type="button" className={s.libBtnQuiet} disabled={dis} onClick={() => set({ lib: { id: lib.id, ver: lib.ver } })}>Keep mine</button>
         </div>
-
-        {step.kind === 'question' ? (
+      ) : null}
+      <div className={s.tools}>
+        <button type="button" className={s.tool} disabled={dis} title="Bold — Messenger shows *words* in bold" onMouseDown={e => e.preventDefault()} onClick={() => mark('*')}><b>B</b></button>
+        <button type="button" className={s.tool} disabled={dis} title="Italic — Messenger shows _words_ in italic" onMouseDown={e => e.preventDefault()} onClick={() => mark('_')}><i>I</i></button>
+        <button type="button" className={s.tool} disabled={dis || !info} onClick={() => setInfoOpen(o => !o)}><LeadIcon name="book-open" size={12} />General info</button>
+        {infoOpen ? (
           <>
-            {/* Picking more than one (2026-10-29 — the user: "then 是否能做多选的选项呢？"). */}
-            <label className={s.checkRow}>
-              <input type="checkbox" checked={!!step.multi} disabled={dis} onChange={e => setMulti(e.target.checked)} />
-              Customer can pick more than one
-            </label>
-            <span className={s.small}>{step.multi
-              ? `Each option tapped sends its replies, then the question comes back with the options left and “${doneOf(step)}”. Customers may also type the numbers, e.g. 1,3.`
-              : 'Customers tap an option, or type its number.'}</span>
-            {(step.buttons ?? []).map((b, j) => (
-              <div key={j} className={s.option} data-opt="" data-dragging={optDrag?.from === j || undefined}
-                data-drop={optDrag && optDrag.over === j && optDrag.from !== j ? (optDrag.after ? 'after' : 'before') : undefined}
-                onDragOver={e => {
-                  if (!optDrag) return
-                  e.preventDefault()
-                  const r = e.currentTarget.getBoundingClientRect()
-                  const after = e.clientY > r.top + r.height / 2
-                  if (optDrag.over !== j || optDrag.after !== after) setOptDrag({ ...optDrag, over: j, after })
-                }}
-                onDrop={e => { e.preventDefault(); dropOption() }}>
-                <span className={s.optionTop}>
-                  {canEdit && step.buttons!.length > 1 ? (
-                    <span className={s.grip} draggable title="Drag to move this option" aria-label={`Move option ${j + 1}`}
-                      onDragStart={e => {
-                        e.dataTransfer.effectAllowed = 'move'
-                        e.dataTransfer.setData('text/plain', String(j))
-                        const card = e.currentTarget.closest('[data-opt]')
-                        if (card) e.dataTransfer.setDragImage(card, 12, 12)
-                        setOptDrag({ from: j, over: j, after: false })
-                      }}
-                      onDragEnd={() => setOptDrag(null)}><LeadIcon name="grip" size={14} /></span>
-                  ) : null}
-                  <span className={s.num}>{j + 1}</span>
-                  <input className={s.input} style={{ flex: 1 }} value={b.label} maxLength={OPTION_MAX} disabled={dis} aria-label={`Option ${j + 1}`}
-                    onChange={e => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, label: e.target.value } : x)) })} />
-                  {canEdit && step.buttons!.length > 1 ? <button type="button" className={s.x} title="Remove option" onClick={() => set({ buttons: step.buttons!.filter((_, k) => k !== j) })}>×</button> : null}
-                </span>
-                {step.multi ? alsoList(j, b, '↳ Replies with') : (
-                  <>
-                    {alsoList(j, b, '↳ Also sends first')}
-                    <label className={s.field}>↳ Goes to {goes(b.next, v => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, next: v } : x)) }), `Option ${j + 1} goes to`)}</label>
-                    {!b.next ? closing(b.endMsg, v => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, endMsg: v } : x)) })) : null}
-                  </>
-                )}
-              </div>
-            ))}
-            {canEdit ? (
-              <span style={{ display: 'flex', gap: 14 }}>
-                <button type="button" className={s.link} disabled={(step.buttons ?? []).length >= 13} onClick={() => set({ buttons: [...(step.buttons ?? []), { label: `Option ${(step.buttons ?? []).length + 1}`, next: '' }] })}>+ Add option</button>
-                {!step.multi ? <button type="button" className={s.link} onClick={() => set({ buttons: step.buttons!.map(x => ({ ...x, next: step.buttons![0].next })) })}>Same for all</button> : null}
-              </span>
-            ) : null}
-            {step.multi ? (
-              <>
-                <label className={s.field}>Finish button · 20 characters
-                  <input className={s.input} value={step.doneLabel ?? ''} maxLength={20} disabled={dis} placeholder="That's all" onChange={e => set({ doneLabel: e.target.value })} />
-                </label>
-                <label className={s.field}>When it comes back, it says
-                  <input className={s.input} value={step.againText ?? ''} maxLength={1000} disabled={dis} placeholder={`Anything else? Pick another, or tap "${doneOf(step)}".`} onChange={e => set({ againText: e.target.value })} />
-                </label>
-                <label className={s.field}>After “{doneOf(step)}”, goes to {goes(step.next, v => set({ next: v }), 'After the finish button, goes to')}</label>
-                {!step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
-              </>
-            ) : null}
-            <label className={s.field}>Keep the answer in
-              <select className={s.select} value={step.saveAs ?? ''} disabled={dis} onChange={e => set({ saveAs: (e.target.value || null) as TemplateStep['saveAs'] })}>
-                <option value="">Don’t keep it</option>
-                {SAVE_AS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-              </select>
-            </label>
+            <div className={s.catcher} onClick={() => setInfoOpen(false)} aria-hidden="true" />
+            <div className={s.infoMenu} role="menu">
+              {entries.flatMap(e => e.fields.map(f => (
+                <div key={f.token} className={s.infoRow}>
+                  <span className={s.infoVal}><span className={s.infoLabel}>{e.card.name || e.card.code} · {f.label}</span><span>{f.value}</span></span>
+                  <button type="button" className={s.tool} onClick={() => insert(f.token)}>Insert</button>
+                </div>
+              )))}
+              {!entries.length ? <span className={s.busy}>Nothing in use on General info yet.</span> : null}
+            </div>
           </>
         ) : null}
-
-        {step.kind === 'text' ? (
-          <>
-            <label className={s.field}>Save answer to
-              <select className={s.select} value={step.saveAs ?? 'note'} disabled={dis} onChange={e => set({ saveAs: e.target.value as TemplateStep['saveAs'] })}>
-                {SAVE_AS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
-              </select>
-            </label>
-            <label className={s.field}>Then go to {goes(step.next, v => set({ next: v }), 'Then go to')}</label>
-            {!step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
-          </>
-        ) : null}
-
-        {step.kind === 'phone' ? (
-          <>
-            <span className={s.small}>When they send a valid number, it’s saved to the Phone card and the chat moves on.</span>
-            <label className={s.field}>Next step {goes(step.next, v => set({ next: v }), 'Next step')}</label>
-            {!step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
-            <span className={s.label}>IF IT’S NOT A PHONE</span>
-            <textarea className={s.textarea} rows={2} value={step.retryText ?? ''} maxLength={1000} disabled={dis} placeholder="Empty: the template stops and CS takes over" aria-label="Retry message" onChange={e => set({ retryText: e.target.value })} />
-            <label className={s.field}>Ask again up to
-              <select className={s.select} value={step.retryMax ?? ''} disabled={dis} onChange={e => set({ retryMax: e.target.value || null })}>
-                {['1', '2', '3', '4', '5'].map(n => <option key={n} value={n}>{n} time{n === '1' ? '' : 's'}</option>)}
-                <option value="">No limit</option>
-              </select>
-            </label>
-            <label className={s.field}>Still wrong {goes(step.failNext ?? 'person', v => set({ failNext: v }), 'Still wrong', [{ v: 'person', l: 'Hand to a person' }])}</label>
-          </>
-        ) : null}
-
-        {step.kind === 'message' ? (
-          <>
-            <label className={s.field}>Then go to {goes(step.next, v => set({ next: v }), 'Then go to')}</label>
-            {!step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
-          </>
-        ) : null}
-        {step.kind === 'handoff' ? <span className={s.small}>The chat moves to Waiting in the Inbox. The message above, if any, is sent first.</span> : null}
-        {step.kind === 'ai' ? <span className={s.small}>The brand’s AI Agent takes it from here — a copilot today: it drafts, CS sends. <a className={s.link} href="/leads/ai">Edit this AI Agent →</a></span> : null}
       </div>
-    </>
+      {step.kind === 'question' ? (
+        <>
+          <label className={s.check}><input type="checkbox" checked={!!step.multi} disabled={dis} onChange={e => setMulti(e.target.checked)} />Customer can pick more than one</label>
+          {(step.buttons ?? []).map((b, j) => (
+            <div key={j} className={s.field}>{b.label || `Button ${j + 1}`} · {step.multi ? 'replies with' : 'also sends first'}
+              {b.also?.length ? (
+                <span className={s.alsoChips}>{b.also.map(id => (
+                  <span key={id} className={s.alsoChip}>{named(id)}
+                    {canEdit ? <button type="button" className={s.x} aria-label="Take off" onClick={() => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, also: (x.also ?? []).filter(a => a !== id) } : x)) })}><LeadIcon name="x" size={12} /></button> : null}
+                  </span>
+                ))}</span>
+              ) : null}
+              {canEdit && (b.also?.length ?? 0) < ALSO_MAX ? (
+                <select className={s.edSelect} value="" aria-label={`${b.label} also sends`} onChange={e => { const v = e.target.value; if (v) set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, also: [...(x.also ?? []), v] } : x)) }) }}>
+                  <option value="">+ Add a message step…</option>
+                  {steps.filter(x => x.kind === 'message' && x.id !== step.id && !(b.also ?? []).includes(x.id)).map(x => <option key={x.id} value={x.id}>{x.name || 'Message'}</option>)}
+                </select>
+              ) : null}
+              {!step.multi && !b.next ? closing(b.endMsg, v => set({ buttons: step.buttons!.map((x, k) => (k === j ? { ...x, endMsg: v } : x)) })) : null}
+            </div>
+          ))}
+          {step.multi ? (
+            <>
+              <label className={s.field}>Finish button · 20 characters
+                <input className={s.edInput} value={step.doneLabel ?? ''} maxLength={20} disabled={dis} placeholder="That's all" onChange={e => set({ doneLabel: e.target.value })} />
+              </label>
+              <label className={s.field}>When it comes back, it says
+                <input className={s.edInput} value={step.againText ?? ''} maxLength={1000} disabled={dis} placeholder={`Anything else? Pick another, or tap "${doneOf(step)}".`} onChange={e => set({ againText: e.target.value })} />
+              </label>
+              <label className={s.field}>After “{doneOf(step)}”, goes to {goes(step.next, v => set({ next: v }), 'After the finish button, goes to')}</label>
+            </>
+          ) : null}
+          <label className={s.field}>Keep the answer in
+            <select className={s.edSelect} value={step.saveAs ?? ''} disabled={dis} onChange={e => set({ saveAs: (e.target.value || null) as TemplateStep['saveAs'] })}>
+              <option value="">Don’t keep it</option>
+              {SAVE_AS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+            </select>
+          </label>
+        </>
+      ) : null}
+      {step.kind === 'text' ? (
+        <label className={s.field}>Save the answer to
+          <select className={s.edSelect} value={step.saveAs ?? 'note'} disabled={dis} onChange={e => set({ saveAs: e.target.value as TemplateStep['saveAs'] })}>
+            {SAVE_AS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+          </select>
+        </label>
+      ) : null}
+      {step.kind === 'phone' ? (
+        <>
+          <label className={s.field}>If it’s not a phone, it says
+            <textarea className={s.edText} rows={2} value={step.retryText ?? ''} maxLength={1000} disabled={dis} placeholder="Empty: the template stops and CS takes over" onChange={e => set({ retryText: e.target.value })} />
+          </label>
+          <label className={s.field}>Ask again up to
+            <select className={s.edSelect} value={step.retryMax ?? ''} disabled={dis} onChange={e => set({ retryMax: e.target.value || null })}>
+              {['1', '2', '3', '4', '5'].map(n => <option key={n} value={n}>{n} time{n === '1' ? '' : 's'}</option>)}
+              <option value="">No limit</option>
+            </select>
+          </label>
+          <label className={s.field}>Still wrong, goes to {goes(step.failNext ?? 'person', v => set({ failNext: v }), 'Still wrong', [{ v: 'person', l: 'Hand to a person' }])}</label>
+        </>
+      ) : null}
+      {['phone', 'message', 'text'].includes(step.kind) && !step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
+      {step.kind === 'question' && step.multi && !step.next ? closing(step.endMsg, v => set({ endMsg: v })) : null}
+    </div>
   )
 }
 
-// ── Test as customer ──
+// ── Flow map ──
 
-function TestChat({ draft }: { draft: Draft }) {
-  const begin = () => (draft.steps[0] ? walkFrom(draft, draft.steps[0].id) : { said: [], waiting: null, tries: 0, ended: 'done' as const })
-  const [w, setW] = useState<Walk>(begin)
-  const [typed, setTyped] = useState('')
-  const end = useRef<HTMLDivElement>(null)
-  useEffect(() => { end.current?.scrollIntoView({ block: 'end' }) }, [w.said.length])
-  const waiting = draft.steps.find(x => x.id === w.waiting)
-  const answer = (v: string) => { if (!v.trim()) return; setW(x => walkAnswer(draft, x, v)); setTyped('') }
+type View = { x: number; y: number; z: number }
+const clampZ = (z: number) => Math.min(2, Math.max(0.3, z))
+
+function FlowMap({ steps, sel, setSel, editing, setEditing, canEdit, library, libIds, setStep, change, onCtx, onDelete, onAdd, editor }: {
+  steps: TemplateStep[]
+  sel: string | null
+  setSel: (id: string | null) => void
+  editing: string | null
+  setEditing: (id: string | null) => void
+  canEdit: boolean
+  library: LibraryItem[]
+  libIds: Set<string>
+  setStep: (id: string, o: Partial<TemplateStep> | ((x: TemplateStep) => Partial<TemplateStep>)) => void
+  change: (fn: (d: Draft) => Draft) => void
+  onCtx: (id: string, x: number, y: number) => void
+  onDelete: (id: string) => void
+  onAdd: (k: StepKind | null, item: LibraryItem | null, at: { x: number; y: number }) => void
+  editor: (id: string) => React.ReactNode
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [v, setV] = useState<View>({ x: 0, y: 0, z: 1 })
+  const [panning, setPanning] = useState(false)
+  const [link, setLink] = useState<{ from: string; slot: number | 'next'; x: number; y: number; over: string | null } | null>(null)
+  const byId = useMemo(() => new Map(steps.map(x => [x.id, x])), [steps])
+  const toLayer = (cx: number, cy: number) => { const r = ref.current!.getBoundingClientRect(); return { x: (cx - r.left - v.x) / v.z, y: (cy - r.top - v.y) / v.z } }
+  const zoomAt = (z: number, px: number, py: number) => setV(o => { const nz = clampZ(z); return { z: nz, x: px - (px - o.x) * (nz / o.z), y: py - (py - o.y) * (nz / o.z) } })
+  const fit = useCallback(() => {
+    const el = ref.current
+    if (!el || !steps.length) return
+    const xs = steps.map(x => x.pos!.x), ys = steps.map(x => x.pos!.y)
+    const minX = Math.min(...xs), minY = Math.min(...ys)
+    const maxX = Math.max(...steps.map(x => x.pos!.x + NODE.w)), maxY = Math.max(...steps.map(x => x.pos!.y + nodeHeight(x)))
+    const r = el.getBoundingClientRect()
+    const z = clampZ(Math.min(1, (r.width - 80) / (maxX - minX), (r.height - 80) / (maxY - minY)))
+    setV({ z, x: (r.width - (maxX - minX) * z) / 2 - minX * z, y: (r.height - (maxY - minY) * z) / 2 - minY * z })
+  }, [steps])
+  useEffect(() => { fit() }, []) // eslint-disable-line react-hooks/exhaustive-deps -- once, on opening the map
+
+  // Wheel zooms at the pointer (React's onWheel is passive: preventDefault needs a listener of our own).
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const wheel = (e: WheelEvent) => {
+      if ((e.target as HTMLElement).closest('[data-float]')) return
+      e.preventDefault()
+      const r = el.getBoundingClientRect()
+      setV(o => { const nz = clampZ(o.z * (e.deltaY < 0 ? 1.1 : 1 / 1.1)), px = e.clientX - r.left, py = e.clientY - r.top; return { z: nz, x: px - (px - o.x) * (nz / o.z), y: py - (py - o.y) * (nz / o.z) } })
+    }
+    el.addEventListener('wheel', wheel, { passive: false })
+    return () => el.removeEventListener('wheel', wheel)
+  }, [])
+
+  const drag = (move: (e: MouseEvent) => void, up: (e: MouseEvent) => void) => {
+    const m = (e: MouseEvent) => move(e)
+    const u = (e: MouseEvent) => { window.removeEventListener('mousemove', m); window.removeEventListener('mouseup', u); up(e) }
+    window.addEventListener('mousemove', m)
+    window.addEventListener('mouseup', u)
+  }
+  const downBg = (e: ReactMouseEvent) => {
+    if (e.button !== 0) return
+    const sx = e.clientX, sy = e.clientY, v0 = v
+    let moved = false
+    setPanning(true)
+    drag(ev => { if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) > 4) moved = true; setV({ ...v0, x: v0.x + ev.clientX - sx, y: v0.y + ev.clientY - sy }) },
+      () => { setPanning(false); if (!moved) setEditing(null) })
+  }
+  const downNode = (e: ReactMouseEvent, st: TemplateStep) => {
+    if (e.button !== 0) return
+    const tag = (e.target as HTMLElement).tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || (e.target as HTMLElement).closest('[data-port]')) { setSel(st.id); return }
+    e.stopPropagation()
+    setSel(st.id)
+    if (!canEdit) return
+    const sx = e.clientX, sy = e.clientY, p0 = st.pos!
+    let first = true
+    drag(ev => {
+      const dx = (ev.clientX - sx) / v.z, dy = (ev.clientY - sy) / v.z
+      if (first && Math.abs(dx) + Math.abs(dy) < 3) return
+      const pos = { x: Math.round(p0.x + dx), y: Math.round(p0.y + dy) }
+      if (first) { first = false; setStep(st.id, { pos }) } else change(d => ({ ...d, steps: d.steps.map(x => (x.id === st.id ? { ...x, pos } : x)) }))
+    }, () => {})
+  }
+  const downPort = (e: ReactMouseEvent, st: TemplateStep, slot: number | 'next') => {
+    if (!canEdit || e.button !== 0) return
+    e.stopPropagation()
+    e.preventDefault()
+    const at = toLayer(e.clientX, e.clientY)
+    setLink({ from: st.id, slot, x: at.x, y: at.y, over: null })
+    drag(ev => {
+      const p = toLayer(ev.clientX, ev.clientY)
+      const over = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest('[data-node]')?.getAttribute('data-node') ?? null
+      setLink(l => (l ? { ...l, x: p.x, y: p.y, over: over !== st.id ? over : null } : l))
+    }, ev => {
+      const over = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest('[data-node]')?.getAttribute('data-node') ?? null
+      setLink(null)
+      if (!over || over === st.id) return
+      setStep(st.id, slot === 'next' ? { next: over } : x => ({ buttons: (x.buttons ?? []).map((b, j) => (j === slot ? { ...b, next: over } : b)) }))
+    })
+  }
+
+  const paths: Array<{ key: string; d: string; hot: boolean }> = []
+  for (const st of steps) {
+    mapRows(st).forEach((r, i) => {
+      const t = r.to ? byId.get(r.to) : undefined
+      if (!t) return
+      const a = rowPort(st, i), b = inPort(t)
+      paths.push({ key: `${st.id}-${i}`, d: edgePath(a.x, a.y, b.x, b.y), hot: st.id === sel || t.id === sel })
+    })
+  }
+  const linkFrom = link ? byId.get(link.from) : undefined
+  const center = () => { const r = ref.current?.getBoundingClientRect(); return r ? toLayer(r.left + r.width / 2, r.top + r.height / 2) : { x: 40, y: 40 } }
+
   return (
-    <>
-      <div className={s.chat}>
-        {w.said.map((m, i) => m.from === 'system' ? <span key={i} className={s.sys}>{m.text}</span> : (
-          <div key={i} style={{ display: 'contents' }}>
-            <div className={s.bubble} data-from={m.from}><RichText text={m.text} /></div>
-            {m.buttons && i === w.said.length - 1 && waiting?.kind === 'question' ? (
-              <div className={s.chips}>{m.buttons.map(b => <button key={b} type="button" className={s.chip} onClick={() => answer(b)}>{b}</button>)}</div>
-            ) : null}
-          </div>
-        ))}
-        <div ref={end} />
+    <div ref={ref} className={s.map} data-panning={panning || undefined} onMouseDown={downBg}
+      style={{ backgroundSize: `${20 * v.z}px ${20 * v.z}px`, backgroundPosition: `${v.x}px ${v.y}px` }}>
+      <div className={s.layer} style={{ transform: `translate(${v.x}px, ${v.y}px) scale(${v.z})` }}>
+        <svg className={s.edges} aria-hidden="true">
+          {paths.map(p => <path key={p.key} d={p.d} fill="none" stroke={p.hot ? 'rgb(var(--lv-accent))' : 'rgb(var(--lv-focus-line))'} strokeWidth={p.hot ? 2 : 1.5} />)}
+          {link && linkFrom ? (() => { const a = link.slot === 'next' ? rowPort(linkFrom, 0) : rowPort(linkFrom, link.slot); return <path d={edgePath(a.x, a.y, link.x, link.y)} fill="none" stroke="rgb(var(--lv-accent))" strokeWidth={2} strokeDasharray="5 4" /> })() : null}
+        </svg>
+        {steps.map(st => {
+          const t = typeOf(st.kind)
+          const on = st.id === sel
+          return (
+            <div key={st.id} data-node={st.id} className={s.node} data-sel={on || undefined} data-drop={link?.over === st.id || undefined}
+              style={{ left: st.pos!.x, top: st.pos!.y, height: nodeHeight(st) }}
+              onMouseDown={e => downNode(e, st)}
+              onDoubleClick={e => { const tag = (e.target as HTMLElement).tagName; if (tag !== 'INPUT' && tag !== 'TEXTAREA' && canEdit) setEditing(st.id) }}
+              onContextMenu={e => { if (!canEdit) return; e.preventDefault(); e.stopPropagation(); setSel(st.id); onCtx(st.id, e.clientX, e.clientY) }}>
+              <span className={s.inDot} aria-hidden="true" />
+              <div className={s.nHead}>
+                <span className={s.tile} style={tileStyle(st.kind)}><LeadIcon name={t.icon} size={13} /></span>
+                <input className={s.nName} value={st.name ?? ''} placeholder="Untitled" maxLength={40} disabled={!canEdit} aria-label="Step name" onChange={e => setStep(st.id, { name: e.target.value })} />
+                {st.lib && libIds.has(st.lib.id) ? <span className={s.libMark} title="From step library"><LeadIcon name="blocks" size={13} /></span> : null}
+                {on && canEdit ? <button type="button" className={s.nDel} title="Delete step" aria-label="Delete step" onClick={e => { e.stopPropagation(); onDelete(st.id) }}><LeadIcon name="trash-2" size={13} /></button> : null}
+              </div>
+              <textarea className={s.nText} value={st.text ?? ''} placeholder="Write the message…" maxLength={1000} disabled={!canEdit} aria-label="Message" onChange={e => setStep(st.id, { text: e.target.value })} />
+              {mapRows(st).map((r, i) => (
+                <div key={String(r.slot)} className={s.nRow}>
+                  {r.edit
+                    ? <input className={s.nRowInput} value={r.label} maxLength={OPTION_MAX} disabled={!canEdit} aria-label={`Button ${i + 1}`} onChange={e => setStep(st.id, x => ({ buttons: (x.buttons ?? []).map((b, j) => (j === i ? { ...b, label: e.target.value } : b)) }))} />
+                    : <span className={s.nRowFixed}>{r.label}</span>}
+                  <span className={s.nTo} data-none={!r.to || !byId.has(r.to) || undefined}>{r.to && byId.has(r.to) ? `→ ${byId.get(r.to)!.name || 'Untitled'}` : 'Not connected'}</span>
+                  <span className={s.port} data-port="" data-on={(r.to && byId.has(r.to)) || undefined} title="Drag to a step to connect" onMouseDown={e => downPort(e, st, r.slot)} />
+                </div>
+              ))}
+              {st.kind === 'question' && canEdit ? (
+                <button type="button" className={s.nAdd} disabled={(st.buttons ?? []).length >= 13}
+                  onClick={e => { e.stopPropagation(); setStep(st.id, x => ({ buttons: [...(x.buttons ?? []), { label: `Option ${(x.buttons ?? []).length + 1}`, next: '' }] })) }}>
+                  <LeadIcon name="plus" size={12} />Add button
+                </button>
+              ) : null}
+            </div>
+          )
+        })}
       </div>
-      <form className={s.chatInput} onSubmit={e => { e.preventDefault(); answer(typed) }}>
-        <input className={s.input} style={{ flex: 1 }} value={typed} onChange={e => setTyped(e.target.value)} disabled={!w.waiting}
-          placeholder={w.waiting ? (waiting?.kind === 'phone' ? 'e.g. 012-345 6789 or 〇一二…' : 'Type as the customer') : 'The chat ended'} aria-label="Type as the customer" />
-        <button type="submit" className={s.btn} disabled={!w.waiting || !typed.trim()}>Send</button>
-        <button type="button" className={s.btn} data-quiet="" onClick={() => setW(begin())}>Restart</button>
-      </form>
-    </>
+      {canEdit ? (
+        <div className={s.mapAdd} onMouseDown={e => e.stopPropagation()}>
+          <AddStep library={library} onAdd={(k, item) => { const c = center(); onAdd(k, item, { x: Math.round(c.x - NODE.w / 2), y: Math.round(c.y - 80) }) }} />
+        </div>
+      ) : null}
+      <div className={s.zoom} onMouseDown={e => e.stopPropagation()}>
+        <button type="button" className={s.zBtn} title="Zoom out" aria-label="Zoom out" onClick={() => { const r = ref.current!.getBoundingClientRect(); zoomAt(v.z / 1.2, r.width / 2, r.height / 2) }}><LeadIcon name="minus" size={14} /></button>
+        <span className={s.zPct}>{Math.round(v.z * 100)}%</span>
+        <button type="button" className={s.zBtn} title="Zoom in" aria-label="Zoom in" onClick={() => { const r = ref.current!.getBoundingClientRect(); zoomAt(v.z * 1.2, r.width / 2, r.height / 2) }}><LeadIcon name="plus" size={14} /></button>
+        <button type="button" className={s.zText} onClick={fit}>Fit</button>
+      </div>
+      {editing && byId.has(editing) ? (
+        <div className={s.floatEd} data-float="" onMouseDown={e => e.stopPropagation()}>{editor(editing)}</div>
+      ) : null}
+    </div>
+  )
+}
+
+// ── The preview rail ──
+
+type PvLine = { k: 'cust' | 'bot' | 'img' | 'doc' | 'btns' | 'wait'; text: string; url?: string; btns?: string[] }
+
+function Rail({ open, setOpen, draft, from, brand, urlOf }: {
+  open: boolean
+  setOpen: (o: boolean) => void
+  draft: Draft
+  from: string | null
+  brand: string
+  urlOf: (f: StepFile | null | undefined) => string
+}) {
+  const [dev, setDev] = useState<'phone' | 'desk'>('phone')
+  const startId = from && draft.steps.some(x => x.id === from) ? from : draft.steps[0]?.id ?? null
+  const key = `${draft.id}|${startId}`
+  const [run, setRun] = useState<{ key: string; picks: string[] }>({ key, picks: [] })
+  const picks = useMemo(() => (run.key === key ? run.picks : []), [run, key])
+  const add = (p: string) => setRun({ key, picks: [...picks, p] })
+  const scroll = useRef<HTMLDivElement>(null)
+  const lines = useMemo<PvLine[]>(() => {
+    if (!startId) return []
+    const t = { steps: draft.steps, endMsg: draft.endMsg }
+    let w: Walk = walkFrom(t, startId)
+    for (const p of picks) { if (!w.waiting) break; w = walkAnswer(t, w, p) }
+    const out: PvLine[] = []
+    for (const x of w.said) {
+      if (x.from === 'customer') out.push({ k: 'cust', text: x.text })
+      else if (x.from === 'system') out.push({ k: 'wait', text: x.text.startsWith('Goes to the AI') ? 'AI Agent takes over' : x.text.startsWith('Goes to a person') ? 'Handed to a person' : x.text })
+      else if (x.file) out.push(isImage(x.file.mime) ? { k: 'img', text: x.file.name, url: urlOf(x.file) } : { k: 'doc', text: x.file.name })
+      else out.push({ k: 'bot', text: x.text.replace(/\{name\}/g, 'Jason') })
+    }
+    const waiting = w.waiting ? draft.steps.find(x => x.id === w.waiting) : undefined
+    if (waiting?.kind === 'question') {
+      const shown = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons ?? (waiting.buttons ?? []).map(b => b.label)
+      if (shown.length) out.push({ k: 'btns', text: '', btns: waiting.multi ? [...shown, doneOf(waiting)] : shown })
+    } else if (waiting?.kind === 'phone') out.push({ k: 'btns', text: '', btns: ['Send my number'] })
+    else if (waiting?.kind === 'text') out.push({ k: 'btns', text: '', btns: ['Type an answer'] })
+    return out
+  }, [draft.steps, draft.endMsg, startId, picks, urlOf])
+  const answer = (b: string) => add(b === 'Send my number' ? '012-338 4721' : b === 'Type an answer' ? 'Next Saturday afternoon' : b)
+  useEffect(() => { scroll.current?.scrollTo({ top: scroll.current.scrollHeight }) }, [lines, dev])
+
+  if (!open) {
+    return (
+      <section className={s.rail} aria-label="Preview">
+        <div className={s.railShut}><button type="button" className={s.railBtn} title="Show preview" aria-label="Show preview" onClick={() => setOpen(true)}><LeadIcon name="smartphone" size={16} /></button></div>
+      </section>
+    )
+  }
+  const body = (desk: boolean) => {
+    const items = lines.map((m, i) => m.k === 'cust' ? <div key={i} className={s.cust}>{m.text}</div>
+      : m.k === 'bot' ? <div key={i} className={s.bot}><RichText text={m.text} /></div>
+      : m.k === 'img' ? <span key={i} className={s.img} style={{ backgroundImage: m.url ? `url("${m.url}")` : undefined }} role="img" aria-label={m.text} />
+      : m.k === 'doc' ? <div key={i} className={s.doc}><span className={s.docExt}>{extOf(m.text)}</span>{m.text}</div>
+      : m.k === 'btns' ? <div key={i} className={s.btns}>{m.btns!.map(b => <button key={b} type="button" className={s.pBtn} onClick={() => answer(b)}>{b}</button>)}</div>
+      : <span key={i} className={s.wait}>{m.text}</span>)
+    return (
+      <div ref={scroll} className={s.msgs} data-desk={desk || undefined}>
+        <div className={s.spacer} />
+        {desk ? <div className={s.deskCol}>{items}</div> : items}
+      </div>
+    )
+  }
+  return (
+    <section className={s.rail} aria-label="Preview">
+      <div className={s.railHead}>
+        <span className={s.fill} />
+        <button type="button" className={s.railBtn} title="Hide preview" aria-label="Hide preview" onClick={() => setOpen(false)}><LeadIcon name="panel-right-close" size={16} /></button>
+      </div>
+      <div className={s.pvBody}>
+        <div className={s.pvCtl}>
+          <div className={s.devs} role="group" aria-label="Device">
+            <button type="button" className={s.dev} title="Phone" aria-label="Phone" aria-pressed={dev === 'phone'} onClick={() => setDev('phone')}><LeadIcon name="smartphone" size={14} /></button>
+            <button type="button" className={s.dev} title="Desktop" aria-label="Desktop" aria-pressed={dev === 'desk'} onClick={() => setDev('desk')}><LeadIcon name="monitor" size={14} /></button>
+          </div>
+          <button type="button" className={s.restart} title="Restart" aria-label="Restart" onClick={() => setRun({ key, picks: [] })}><LeadIcon name="rotate-ccw" size={14} /></button>
+        </div>
+        {dev === 'phone' ? (
+          <div className={s.phone}>
+            <div className={s.status}><span>9:41</span><span className={s.notch} /><span className={s.icons}><LeadIcon name="signal" size={14} /><LeadIcon name="wifi" size={14} /><LeadIcon name="battery-full" size={18} /></span></div>
+            <div className={s.pHead}><span className={s.av}>H</span><span className={s.pBrand}>{brand}</span></div>
+            {body(false)}
+            <div className={s.home}><span /></div>
+          </div>
+        ) : (
+          <div className={s.desk}>
+            <div className={s.dBar}><span className={s.dDot} /><span className={s.dDot} /><span className={s.dDot} /><span className={s.dTitle}>Messenger</span></div>
+            <div className={s.dHead}><span className={s.av} data-desk="">H</span><div className={s.dWho}><span className={s.pBrand}>{brand}</span><span className={s.dSub}>Typically replies within minutes</span></div></div>
+            {body(true)}
+            <div className={s.dComposer}>Aa</div>
+          </div>
+        )}
+      </div>
+    </section>
   )
 }
