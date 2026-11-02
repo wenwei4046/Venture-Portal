@@ -5,13 +5,15 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, type DraftOutcome, type KnowledgeCard, type KnowledgeKind, type Persona, type PersonaFields, type Turn } from './ai'
-import { askModel, type AgentDocument } from './ai-model'
-import { agentCards, agentReads, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation } from './agent'
+import { askModel } from './ai-model'
+import { agentMore as readAgent } from './agent-read'
+import { answerLeads } from './ai-answer'
+import { type AgentMore, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
 import { managedPages, subscribePage } from './pages-server'
 import type { ManagedPage, PageChannel, StaffLeave } from './pages'
 import { quickProblem, type QuickReply } from './quick'
-import { knowledgeReads, linkDue, type DataFolder, type FolderColor } from './data-center'
+import type { FolderColor } from './data-center'
 import { readLink } from './link-read'
 import { deliver, deliverFile, sendReaction } from './messenger'
 import { markSeen } from './meta-sync'
@@ -170,6 +172,15 @@ export async function markUnread(contactId: string): Promise<LeadOutcome<null>> 
 }
 
 /**
+ * Start over (mig 20261102200000): the conversation's next message runs the reply rules as a first message does — a
+ * template waiting stops, the AI Agent steps aside. Nothing is sent to the customer.
+ */
+export async function startOver(contactId: string): Promise<LeadOutcome<null>> {
+  await requireActionOn('/leads', 'leads', 'create')
+  return call<null>('lead_start_over', { p_contact: contactId }, 'The chat could not be started over.')
+}
+
+/**
  * Forward a message to another conversation (2026-10-28 — the user: "转发就好，不需要删除"): Meta has no forward for an
  * app, so it is sent there as a new reply from this person — words through replyToLead; a photo, video or file copied
  * into that conversation's folder (ours, else fetched from Meta's address) and sent through sendLeadMedia, its words
@@ -248,6 +259,22 @@ export async function saveLeadLabels(labels: Array<{ id?: string; name: string; 
 export async function assignLead(contactId: string, userId: string | null) {
   await requireActionOn('/leads', 'leads', 'manage')
   return call<null>('lead_assign', { p_contact: contactId, p_user: userId }, 'The conversation was not given.')
+}
+
+/**
+ * The chat's CS menu › ✦ AI Agent (mig 20261102210000): the chat goes to the AI Agent, which answers at once — the
+ * webhook's own path (lib/leads/ai-answer.ts) run with this person's session. Off: the chat comes back to people.
+ * Answers how many replies the AI sent now (0 when it could not: outside Meta's 24 hours, the agent not set up …).
+ */
+export async function giveToAi(contactId: string, on: boolean): Promise<LeadOutcome<{ answered: number }>> {
+  await requireActionOn('/leads', 'leads', 'manage')
+  const given = await call<null>('lead_give_to_ai', { p_contact: contactId, p_on: on }, 'The chat was not given to the AI Agent.')
+  if (!given.ok) return given
+  if (!on) return { ok: true, data: { answered: 0 } }
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const answered = await answerLeads(supabase, [contactId], process.env.META_SYSTEM_USER_TOKEN?.trim())
+  revalidatePath('/leads', 'layout')
+  return { ok: true, data: { answered } }
 }
 
 /** The customer card: name, phone, interest, budget, showroom, time, note. */
@@ -603,75 +630,9 @@ export async function setDraftOutcome(draftId: number, outcome: DraftOutcome, se
   return quiet<null>('lead_ai_draft_outcome', { p_id: draftId, p_outcome: outcome }, 'The draft’s outcome was not kept.')
 }
 
-/**
- * The agent's v2 knowledge for a brand: its settings and answers as a second instruction block, the cards it may cite
- * (General info, fixed answers, files) and the files it reads attached — PDFs, pictures and text, at most six and
- * 24 MB, read with the session's own storage access. Null before mig 20261023200000 (the draft runs as before).
- */
+/** The agent's reading (lib/leads/agent-read.ts), under the caller's own session. */
 async function agentMore(brandId: string, today: string, override?: Pick<AgentMore, 'settings' | 'answers' | 'playbook' | 'knowledge'>) {
-  const [more, info, dataFiles, folders, quick] = await Promise.all([
-    quiet<AgentMore>('lead_ai_more', { p_brand: brandId }, ''),
-    quiet<LeadInfo>('lead_info', {}, ''),
-    quiet<DataFile[]>('lead_data_files', {}, ''),
-    quiet<DataFolder[]>('lead_data_folders', {}, ''),
-    quiet<QuickReply[]>('lead_quick_replies', {}, ''),
-  ])
-  if (!more.ok) return null
-  const m = { ...more.data, ...(override ?? {}) }
-  const settings = settingsOf(m.settings)
-  const all = dataFiles.ok ? dataFiles.data : []
-  // What AI Agent › Knowledge picked (mig 20261102140000), on and in date; before it, the brand's folder and Shared.
-  const picked = m.knowledge ? knowledgeReads(m.knowledge, all, folders.ok ? folders.data : []) : agentReads(all, brandId)
-  const files: DataFile[] = picked.filter(s => !s.paused && fileStatus(s.file, today).usable).map(s => s.file)
-  const documents: AgentDocument[] = []
-  const supabase = (await createClient()) as unknown as SupabaseClient
-  let total = 0
-  for (const f of files) {
-    const how = readable(f)
-    if (!f.path || !how || how === 'link' || documents.length >= 6 || f.sizeBytes > 10_000_000 || total + f.sizeBytes > 24_000_000) continue
-    const { data } = await supabase.storage.from('lead-data').download(f.path)
-    if (!data) continue
-    total += f.sizeBytes
-    const buf = Buffer.from(await data.arrayBuffer())
-    if (how === 'pdf') documents.push({ kind: 'pdf', title: f.name, base64: buf.toString('base64') })
-    else if (how === 'text') documents.push({ kind: 'text', title: f.name, text: buf.toString('utf8').slice(0, 200_000) })
-    else documents.push({ kind: 'image', title: f.name, base64: buf.toString('base64'), mediaType: (f.mime as 'image/png') || 'image/png' })
-  }
-  const links = await linkPages(files.filter(f => f.kind === 'link'))
-  // The Data Center's quick replies are CS's own words; the agent may use them as fixed answers (the handoff).
-  const quickLines = (quick.ok ? quick.data : []).filter(q => q.brandId === null || q.brandId === brandId).map(q => `- ${q.body}`)
-  const system = [
-    settingsPrompt(settings),
-    answersPrompt(m.answers, m.playbook),
-    documents.length ? `# Files you read\nThe documents attached before the conversation are the brand's files; cite one by its card id (file-…).` : '',
-    links.length ? `# Web pages the brand keeps (their words as last read)\n${links.join('\n\n')}` : '',
-    quickLines.length ? `# Quick replies Customer Service uses (reuse them word for word when they answer the question)\n${quickLines.join('\n')}` : '',
-  ].filter(Boolean).join('\n\n')
-  // Knowledge › General info: the cards switched off for this brand's agent.
-  const infoFor = info.ok ? { ...info.data, cards: info.data.cards.filter(c => !settings.infoOff.includes(c.id)) } : null
-  return {
-    ask: { system, documents },
-    cards: (old: KnowledgeCard[]) => agentCards(old, infoFor, brandId, today, m.answers, files),
-  }
-}
-
-/**
- * The agent's web links: each one's words as Check now last kept them, read again (not kept — only the Data Center's
- * Check now keeps) when that reading is older than the link's frequency. Five links, 20,000 characters each at most.
- */
-async function linkPages(links: DataFile[]): Promise<string[]> {
-  if (!links.length) return []
-  const pick = links.slice(0, 5)
-  const kept = await quiet<Array<{ id: string; content: string; checkedAt: string | null }>>('lead_link_text', { p_ids: pick.map(l => l.id) }, '')
-  const now = Date.now()
-  return Promise.all(pick.map(async l => {
-    let text = (kept.ok ? kept.data.find(k => k.id === l.id)?.content : '') ?? ''
-    if (linkDue(l, now) || !text) {
-      const fresh = await readLink(l.url ?? '')
-      if ('text' in fresh) text = fresh.text
-    }
-    return text ? `<page url="${l.url}">\n${text.slice(0, 20_000)}\n</page>` : `- ${l.url} (could not be read)`
-  }))
+  return readAgent((await createClient()) as unknown as SupabaseClient, brandId, today, override)
 }
 
 /**

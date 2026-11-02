@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampSide, SIDE_W, fromLibrary, normDigits, rowsOf, runsOn, templateProblem, tidy, toLibrary, updateFromLibrary, walkAnswer, walkFrom, type TemplateStep } from './template'
+import { asksForPerson, clampSide, SIDE_W, fromLibrary, normDigits, rowsOf, runsOn, templateProblem, tidy, toLibrary, updateFromLibrary, walkAnswer, walkFrom, type TemplateStep } from './template'
 
 // The same template tests/member-sql/validate-leads.mjs runs through the database's runner.
 const steps: TemplateStep[] = [
@@ -169,5 +169,49 @@ describe('several replies to an option; picking more than one (2026-10-29, mig 2
     expect(templateProblem(bad({ buttons: [{ label: 'Sofa', next: '', also: ['ph'] }] }))).toMatch(/"Send a message" steps/)
     expect(templateProblem(bad({ buttons: [{ label: 'Sofa', next: 'ms' }] }))).toMatch(/takes more than one/)
     expect(templateProblem(bad({ doneLabel: 'x'.repeat(21) }))).toMatch(/finish button/)
+  })
+})
+
+describe('‹ Back to the question before (2026-11-02, mig 20261102180000)', () => {
+  const t = {
+    endMsg: '',
+    steps: [
+      { id: 'q1', kind: 'question', text: 'Sofa or bed?', back: true, buttons: [{ label: 'Sofa', next: 'q2' }, { label: 'Bed', next: 'q2' }] },
+      { id: 'q2', kind: 'question', text: 'Budget?', back: true, buttons: [{ label: 'Under 3k', next: 'p' }] },
+      { id: 'p', kind: 'phone', text: 'Your number?', back: true, next: '' },
+    ] as TemplateStep[],
+  }
+  it('offers ‹ Back only after something was asked, never on the first step', () => {
+    const w = walkFrom(t, 'q1')
+    expect(w.said.at(-1)?.buttons).toEqual(['Sofa', 'Bed'])
+    const w2 = walkAnswer(t, w, 'Sofa')
+    expect(w2.said.at(-1)?.buttons).toEqual(['Under 3k', '‹ Back'])
+    expect(w2.trail).toEqual(['q1', 'q2'])
+  })
+  it('goes back one question at a time, as typed or tapped', () => {
+    let w = walkAnswer(t, walkAnswer(t, walkFrom(t, 'q1'), 'Sofa'), 'Under 3k')
+    expect(w.waiting).toBe('p')
+    w = walkAnswer(t, w, '返回')
+    expect([w.waiting, w.trail]).toEqual(['q2', ['q1', 'q2']])
+    w = walkAnswer(t, w, '‹ Back')
+    expect([w.waiting, w.trail, w.said.at(-1)?.buttons]).toEqual(['q1', ['q1'], ['Sofa', 'Bed']])
+  })
+  it('a step without it takes "back" as its own answer', () => {
+    const plain = { ...t, steps: t.steps.map(s => ({ ...s, back: false })) }
+    const w = walkAnswer(plain, walkAnswer(plain, walkFrom(plain, 'q1'), 'Sofa'), 'back')
+    expect(w.ended).toBe('stopped')
+  })
+})
+
+describe('the customer asks for a person (2026-11-02, mig 20261102190000)', () => {
+  it('knows the ways people ask, in English, Chinese and Malay', () => {
+    for (const s of ['我要找客服', '转人工', '有真人吗', 'Customer service please', 'can I talk to a real person?', 'speak to someone', 'are you human?', 'nak cakap dengan orang', 'khidmat pelanggan'])
+      expect(asksForPerson(s), s).toBe(true)
+    for (const s of ['2 person sofa', 'how much', 'L-shape for 5 people', 'service centre?'])
+      expect(asksForPerson(s), s).toBe(false)
+  })
+  it('stops the walk for a person', () => {
+    const t = { endMsg: '', steps: [{ id: 'q', kind: 'question', text: 'Sofa?', buttons: [{ label: 'Yes', next: '' }] }] as TemplateStep[] }
+    expect(walkAnswer(t, walkFrom(t, 'q'), 'customer service').ended).toBe('person')
   })
 })

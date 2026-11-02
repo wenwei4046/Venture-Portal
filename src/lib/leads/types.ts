@@ -104,6 +104,8 @@ export interface LeadContact {
   specialRequest?: string
   /** The phone was typed by CS, kept as typed (mig 20261102100000) — "Phone · added by you". */
   phoneTyped?: boolean
+  /** The AI Agent answers this chat (mig 20261102170000; on the card since mig 20261102210000). */
+  aiOn?: boolean
 }
 
 export type LeadLanguage = 'Mandarin' | 'English' | 'Malay' | 'Other'

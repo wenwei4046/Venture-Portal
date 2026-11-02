@@ -235,7 +235,20 @@ function Note({ value, placeholder, disabled, onChange }: { value: string; place
   if (!open && !value) return disabled ? null : <button type="button" className={a.more} onClick={() => setOpen(true)}>+ Add in your own words</button>
   return <textarea className={a.area} rows={2} value={value} maxLength={1000} placeholder={placeholder} disabled={disabled} autoFocus={!value} onChange={e => onChange(e.target.value)} />
 }
-const digits = (v: string, lo: number, hi: number, fallback: number) => { const n = Number(v.replace(/\D/g, '').slice(0, 3)); return Number.isFinite(n) && n >= lo ? Math.min(hi, n) : fallback }
+/**
+ * A number box typed freely (2026-11-02 — the user: "这不能设定任意数字"): the words are the box's own while it is typed in,
+ * so it can be emptied and retyped; each whole number from 1 up is kept as it is typed, and leaving the box shows the
+ * number kept.
+ */
+function NumBox({ value, onChange, label, disabled, sm }: { value: number; onChange: (n: number) => void; label: string; disabled: boolean; sm?: boolean }) {
+  const [text, setText] = useState<string | null>(null)
+  return (
+    <input className={`${a.input} ${a.num}`} data-sm={sm ? '' : undefined} inputMode="numeric" value={text ?? String(value)} disabled={disabled} aria-label={label}
+      onFocus={e => { setText(String(value)); e.target.select() }}
+      onChange={e => { const t = e.target.value.replace(/\D/g, '').slice(0, 3); setText(t); const n = Number(t); if (t && n >= 1) onChange(n) }}
+      onBlur={() => setText(null)} />
+  )
+}
 
 // ── How it replies ──
 
@@ -296,7 +309,7 @@ function HowTab({ d, dis, setS, setPhone }: { d: Draft; dis: boolean; setS: (o: 
                 <div className={a.nest}>
                   <div className={a.togLine}>
                     <Tog on={ph.afterOn} disabled={dis} label="After agent replies" onChange={afterOn => setPhone({ afterOn })} /><span>After</span>
-                    <input className={`${a.input} ${a.num}`} inputMode="numeric" value={String(ph.after)} disabled={dis} aria-label="Agent replies" onFocus={e => e.target.select()} onChange={e => setPhone({ after: digits(e.target.value, 1, 20, ph.after) })} />
+                    <NumBox value={ph.after} disabled={dis} label="Agent replies" onChange={after => setPhone({ after })} />
                     <span>agent replies</span>
                   </div>
                   {ph.afterOn ? <textarea className={a.area} rows={2} value={ph.ask} maxLength={600} disabled={dis} aria-label="How it asks" onChange={e => setPhone({ ask: e.target.value })} /> : null}
@@ -321,7 +334,7 @@ function HowTab({ d, dis, setS, setPhone }: { d: Draft; dis: boolean; setS: (o: 
               <div className={a.togRow}>
                 <Tog on={s.maxOn} disabled={dis} label="After agent replies" onChange={maxOn => setS({ maxOn })} />
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>After
-                  <input className={`${a.input} ${a.num}`} data-sm="" inputMode="numeric" value={String(s.maxReplies)} disabled={dis} aria-label="Agent replies before a person" onFocus={e => e.target.select()} onChange={e => setS({ maxReplies: digits(e.target.value, 1, 50, s.maxReplies) })} />
+                  <NumBox sm value={s.maxReplies} disabled={dis} label="Agent replies before a person" onChange={maxReplies => setS({ maxReplies })} />
                   agent replies</span>
               </div>
             </Field>

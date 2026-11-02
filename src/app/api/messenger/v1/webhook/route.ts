@@ -9,6 +9,7 @@ import { parseMessengerDelivery } from '@/lib/messenger/webhook'
 import { pageToken, profileName } from '@/lib/messenger/send'
 import { messengerLeadRow, readInstantLead } from '@/lib/messenger/lead-forms'
 import { sendLeadOutbox } from '@/lib/leads/messenger-outbox'
+import { answerLeads } from '@/lib/leads/ai-answer'
 import { adAccountName } from '@/lib/leads/ad-account'
 import { parseInstagramDelivery, takeInstagram } from '@/lib/leads/instagram'
 import { leadPageEvents } from '@/lib/leads/page-events'
@@ -49,6 +50,8 @@ import { keepMedia } from '@/lib/leads/media-keep'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// The AI Agent answers after the delivery (`after`, lib/leads/ai-answer.ts): the model can take a while.
+export const maxDuration = 60
 
 function client(): SupabaseClient {
   return adminClient() as unknown as SupabaseClient
@@ -135,7 +138,9 @@ export async function POST(request: Request) {
       leadsFailed = true
     } else {
       const contacts = ((lead.data as { contacts?: string[] } | null)?.contacts ?? []).filter(Boolean)
-      if (contacts.length) after(() => sendLeadOutbox(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => undefined))
+      // …then the AI Agent answers the conversations in its hands (lib/leads/ai-answer.ts, mig 20261102170000).
+      if (contacts.length) after(() => sendLeadOutbox(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim())
+        .then(() => answerLeads(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim())).then(() => undefined))
       // A conversation Lead View has never filled in gets its earlier messages from Meta (lib/leads/meta-sync.ts).
       // …then every photo, video and file still only at Meta's address is copied into lead-media (lib/leads/media-keep.ts).
       if (contacts.length) after(() => fillHistory(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => keepMedia(client())).then(() => undefined))

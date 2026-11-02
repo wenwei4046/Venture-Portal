@@ -10,8 +10,8 @@ const today = '2026-10-23'
 describe('the agent’s settings', () => {
   it('read safely, with the defaults where something is missing or wrong', () => {
     expect(settingsOf(null)).toEqual(DEFAULT_SETTINGS)
-    const s = settingsOf({ tone: 'Shouty', length: 'Detailed', rules: ['No emoji', 'No emoji', 3], phone: { on: false, after: 99 } }, 'Book a visit')
-    expect([s.tone, s.length, s.rules, s.phone.on, s.phone.after, s.goal]).toEqual(['Friendly', 'Detailed', ['No emoji'], false, 20, 'Book a visit'])
+    const s = settingsOf({ tone: 'Shouty', length: 'Detailed', rules: ['No emoji', 'No emoji', 3], phone: { on: false, after: 5000 } }, 'Book a visit')
+    expect([s.tone, s.length, s.rules, s.phone.on, s.phone.after, s.goal]).toEqual(['Friendly', 'Detailed', ['No emoji'], false, 999, 'Book a visit'])
   })
   it('turn into the prompt’s instructions', () => {
     const p = settingsPrompt(settingsOf({ tone: 'Concise', rules: ['No emoji'], blocked: ['Competitor prices'], phone: { on: true, afterOn: true, after: 3, wordsOn: true, words: ['Price'] }, maxOn: true, maxReplies: 5 }))
