@@ -8,6 +8,7 @@ import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, 
 import { askModel } from './ai-model'
 import { agentMore as readAgent } from './agent-read'
 import { answerLeads } from './ai-answer'
+import type { RuleOf } from './rule-of'
 import { type AgentMore, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
 import { managedPages, subscribePage } from './pages-server'
@@ -166,6 +167,12 @@ async function deliverMedia(messageId: number, path: string, mime: string): Prom
  * Mark a chat unread for oneself, to answer later (mig 20261028110000 — the user: "把讯息unread 来提醒自己稍后回复").
  * Lead View's alone: Meta lets no app mark a Messenger chat unread. Opening the chat again clears it.
  */
+/** Which reply rule the chat follows now (mig 20261102240000): the chat header's Rule chip. */
+export async function readRuleOf(contactId: string): Promise<LeadOutcome<RuleOf>> {
+  await requireActionOn('/leads', 'leads', 'view')
+  return quiet<RuleOf>('lead_rule_of', { p_contact: contactId }, 'The chat’s rule could not be read.')
+}
+
 export async function markUnread(contactId: string): Promise<LeadOutcome<null>> {
   await requireActionOn('/leads', 'leads', 'view')
   return call<null>('lead_mark_unread', { p_contact: contactId }, 'The chat could not be marked unread.')

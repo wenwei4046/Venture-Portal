@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { assignLead, draftLeadReply, giveToAi, leadAgents, leadMediaLinks, markUnread, quickReplyUsed, reactToMessage, readThread, replyToLead, replyToMessage, sendLeadMedia, setDraftOutcome, startOver, type DraftForInbox } from '@/lib/leads/actions'
+import { assignLead, draftLeadReply, giveToAi, readRuleOf, leadAgents, leadMediaLinks, markUnread, quickReplyUsed, reactToMessage, readThread, replyToLead, replyToMessage, sendLeadMedia, setDraftOutcome, startOver, type DraftForInbox } from '@/lib/leads/actions'
 import { FILE_LIMIT, TOO_BIG } from '@/lib/leads/messenger'
 import { createClient } from '@/lib/supabase/client'
 import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
@@ -19,6 +19,7 @@ import PhotoEditor from './PhotoEditor'
 import ForwardDialog from './ForwardDialog'
 import RichText from './RichText'
 import type { LeadBrand, LeadConfig, LeadContact, LeadLabel, LeadMessage, LeadThread } from '@/lib/leads/types'
+import { answeringNow, ruleReply, ruleSource, type RuleOf } from '@/lib/leads/rule-of'
 import { infoEntries, type LeadInfo } from '@/lib/leads/info'
 import { LeadIcon } from '@/components/layout/lead-icons'
 import { CHANNEL_LABEL, initials } from './bits'
@@ -468,6 +469,7 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
           <span className={s.whoName}>{contact.name || '—'}</span>
           <span className={s.whoSub}>{chatSub(brand?.name ?? '', CHANNEL_LABEL[contact.channel], ad, dayLabel(contact.createdAt))}</span>
         </div>
+        <RuleChip contact={thread?.contact ?? contact} />
         <Assignee contact={thread?.contact ?? contact} canManage={canManage} onChanged={onSent} />
         <div className={s.anchor}>
           <button type="button" className={s.more} title="More" aria-label="More" aria-expanded={menuOpen} onClick={() => setMenuOpen(o => !o)}>
@@ -660,6 +662,38 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
 }
 
 /** The assignee (the reference's "Mei Ling" chip): the CS who handles the chat; Lead View · Manage may give it to another. */
+/**
+ * Which reply rule this chat follows and who answers it now (2026-11-02 — the user: "是否能显示目前这个对话是用什么回复
+ * 规则呢？"): the rule read when the chat opens or changes (lead_rule_of), the details and a way to Reply rules on a click.
+ */
+function RuleChip({ contact }: { contact: LeadContact }) {
+  const [open, setOpen] = useState(false)
+  const [rule, setRule] = useState<{ id: string; r: RuleOf | null; error?: string } | null>(null)
+  const stamp = `${contact.id}|${contact.aiOn}|${contact.flowState}|${contact.lastAt}`
+  useEffect(() => {
+    let live = true
+    void readRuleOf(contact.id).then(r => { if (live) setRule(r.ok ? { id: stamp, r: r.data } : { id: stamp, r: null, error: r.reason }) })
+    return () => { live = false }
+  }, [contact.id, stamp])
+  const r = rule?.r ?? null
+  const label = r ? ruleReply(r) : rule?.error ? 'Rule ?' : '…'
+  return (
+    <span className={s.anchor}>
+      <button type="button" className={s.assignee} onClick={() => setOpen(o => !o)} aria-haspopup="dialog" aria-expanded={open} title="Which reply rule this chat follows">
+        <LeadIcon name="workflow" size={15} className={s.assigneeIcon} />Rule · {label}<LeadIcon name="chevron-down" size={14} className={s.assigneeChev} />
+      </button>
+      <Popover open={open} onClose={() => setOpen(false)} style={{ top: 38, right: 0, width: 320 }} label="This chat’s reply rule">
+        <div className={s.moreHead}>REPLY RULE</div>
+        <div className={s.ruleLine}>{r ? `${ruleReply(r)} — ${ruleSource(r)}` : rule?.error ?? 'Reading…'}</div>
+        <div className={s.moreHead}>NOW</div>
+        <div className={s.ruleLine}>{answeringNow(contact)}</div>
+        {r ? <div className={s.ruleLine}>{r.open ? 'Inside working hours.' : 'Outside working hours.'}</div> : null}
+        <a className={s.ruleLink} href="/leads/rules">Open Reply rules ›</a>
+      </Popover>
+    </span>
+  )
+}
+
 function Assignee({ contact, canManage, onChanged }: { contact: LeadContact; canManage: boolean; onChanged: () => void }) {
   const [open, setOpen] = useState(false)
   const [agents, setAgents] = useState<Array<{ id: string; name: string }> | null>(null)

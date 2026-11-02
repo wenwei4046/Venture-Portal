@@ -1905,6 +1905,15 @@ await db.exec(`
   await q(`select public.lead_give_to_ai($1, true)`, [ga])
   await q(`select public.lead_ai_stop($1, $2, false)`, [ga, 'y'.repeat(250)])
   check((await lastEvent(ga)).length, 200, 'a long reason to stop is cut too')
+  // Which rule a chat follows (mig 20261102240000).
+  await db.exec(await f('20261102240000_lead_rule_of.sql'))
+  const ro = (await q(`select public.lead_rule_of($1) r`, [ai3]))[0].r
+  check([ro.source, ro.reply, ro.when, ro.adId], ['ad', 'ai', 'any', AI_AD], 'a chat from an ad with its own rule: that rule')
+  const ruleT = (await q(`select public.lead_rule_of($1) r`, [askA]))[0].r
+  check([ruleT.source, ruleT.templateName], ['ad', 'With back'], 'a template rule names its template')
+  await as(CS_USER, [])
+  await refuses(`select public.lead_rule_of($1)`, [ai3], /Lead View · View/, 'reading it needs Lead View · View')
+  await as(CS_USER, ALL)
   for (const sig of ['lead_ai_claim(uuid[])', 'lead_outbox(uuid[])', 'lead_give_to_ai(uuid,boolean)']) {
     check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
   }
