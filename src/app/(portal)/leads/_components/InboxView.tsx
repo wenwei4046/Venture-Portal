@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { assignLead, draftLeadReply, leadAgents, leadMediaLinks, markUnread, quickReplyUsed, reactToMessage, readThread, replyToLead, replyToMessage, sendLeadMedia, setDraftOutcome, startOver, type DraftForInbox } from '@/lib/leads/actions'
+import { assignLead, draftLeadReply, giveToAi, leadAgents, leadMediaLinks, markUnread, quickReplyUsed, reactToMessage, readThread, replyToLead, replyToMessage, sendLeadMedia, setDraftOutcome, startOver, type DraftForInbox } from '@/lib/leads/actions'
 import { FILE_LIMIT, TOO_BIG } from '@/lib/leads/messenger'
 import { createClient } from '@/lib/supabase/client'
 import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
@@ -665,8 +665,8 @@ function Assignee({ contact, canManage, onChanged }: { contact: LeadContact; can
   const [agents, setAgents] = useState<Array<{ id: string; name: string }> | null>(null)
   const [busy, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const label = contact.assignedTo ? (contact.assignedName || 'A colleague') : 'No CS yet'
-  const body = <><LeadIcon name="headset" size={15} className={s.assigneeIcon} />{label}<LeadIcon name="chevron-down" size={14} className={s.assigneeChev} /></>
+  const label = contact.aiOn ? 'AI Agent' : contact.assignedTo ? (contact.assignedName || 'A colleague') : 'No CS yet'
+  const body = <><LeadIcon name={contact.aiOn ? 'sparkles' : 'headset'} size={15} className={s.assigneeIcon} />{label}<LeadIcon name="chevron-down" size={14} className={s.assigneeChev} /></>
   if (!canManage) return <span className={s.assignee} title="Who handles this chat">{body}</span>
   const toggle = () => {
     setOpen(o => !o)
@@ -674,20 +674,32 @@ function Assignee({ contact, canManage, onChanged }: { contact: LeadContact; can
   }
   const give = (id: string | null) => start(async () => {
     setError(null)
+    // A person (or Nobody) picked takes the chat back from the AI Agent first.
+    if (contact.aiOn) { const off = await giveToAi(contact.id, false); if (!off.ok) { setError(off.reason); return } }
     const r = await assignLead(contact.id, id)
     if (!r.ok) { setError(r.reason); return }
     setOpen(false)
     onChanged()
+  })
+  // ✦ AI Agent: the chat goes to the AI, which answers at once (or says why it could not).
+  const toAi = () => start(async () => {
+    setError(null)
+    const r = await giveToAi(contact.id, true)
+    if (!r.ok) { setError(r.reason); return }
+    onChanged()
+    if (r.data.answered) setOpen(false)
+    else setError('Given to the AI Agent. It did not answer yet — it answers within Meta’s 24 hours of the customer’s last message, once its brand is set up on AI Agent (see the timeline).')
   })
   return (
     <span className={s.anchor}>
       <button type="button" className={s.assignee} onClick={toggle} aria-haspopup="menu" aria-expanded={open} disabled={busy} title="Give this chat to a CS">{body}</button>
       <Popover open={open} onClose={() => setOpen(false)} style={{ top: 38, right: 0 }} label="Give this chat to">
         {agents === null && !error ? <div className={s.moreHead}>Loading…</div> : null}
+        <MenuItem selected={!!contact.aiOn} disabled={busy || !!contact.aiOn} onSelect={toAi}>✦ AI Agent</MenuItem>
         {(agents ?? []).map(a => (
-          <MenuItem key={a.id} selected={contact.assignedTo === a.id} disabled={busy} onSelect={() => give(a.id)}>{a.name}</MenuItem>
+          <MenuItem key={a.id} selected={!contact.aiOn && contact.assignedTo === a.id} disabled={busy} onSelect={() => give(a.id)}>{a.name}</MenuItem>
         ))}
-        <MenuItem selected={!contact.assignedTo} disabled={busy} onSelect={() => give(null)}>Nobody</MenuItem>
+        <MenuItem selected={!contact.aiOn && !contact.assignedTo} disabled={busy} onSelect={() => give(null)}>Nobody</MenuItem>
         {error ? <div className={s.moreHead} role="alert">{error}</div> : null}
       </Popover>
     </span>

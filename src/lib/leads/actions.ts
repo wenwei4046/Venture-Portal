@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, type DraftOutcome, type KnowledgeCard, type KnowledgeKind, type Persona, type PersonaFields, type Turn } from './ai'
 import { askModel } from './ai-model'
 import { agentMore as readAgent } from './agent-read'
+import { answerLeads } from './ai-answer'
 import { type AgentMore, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
 import { managedPages, subscribePage } from './pages-server'
@@ -258,6 +259,22 @@ export async function saveLeadLabels(labels: Array<{ id?: string; name: string; 
 export async function assignLead(contactId: string, userId: string | null) {
   await requireActionOn('/leads', 'leads', 'manage')
   return call<null>('lead_assign', { p_contact: contactId, p_user: userId }, 'The conversation was not given.')
+}
+
+/**
+ * The chat's CS menu › ✦ AI Agent (mig 20261102210000): the chat goes to the AI Agent, which answers at once — the
+ * webhook's own path (lib/leads/ai-answer.ts) run with this person's session. Off: the chat comes back to people.
+ * Answers how many replies the AI sent now (0 when it could not: outside Meta's 24 hours, the agent not set up …).
+ */
+export async function giveToAi(contactId: string, on: boolean): Promise<LeadOutcome<{ answered: number }>> {
+  await requireActionOn('/leads', 'leads', 'manage')
+  const given = await call<null>('lead_give_to_ai', { p_contact: contactId, p_on: on }, 'The chat was not given to the AI Agent.')
+  if (!given.ok) return given
+  if (!on) return { ok: true, data: { answered: 0 } }
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const answered = await answerLeads(supabase, [contactId], process.env.META_SYSTEM_USER_TOKEN?.trim())
+  revalidatePath('/leads', 'layout')
+  return { ok: true, data: { answered } }
 }
 
 /** The customer card: name, phone, interest, budget, showroom, time, note. */

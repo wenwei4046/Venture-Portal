@@ -1789,7 +1789,7 @@ await db.exec(`
   await db.exec(`select set_config('request.jwt.claim.role', '', false)`)
   await as(CS_USER, ALL)
   for (const sig of ['lead_ai_claim(uuid[])', 'lead_ai_answered(uuid,text,text,boolean,text,integer)', 'lead_ai_stop(uuid,text,boolean)']) {
-    check((await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, false, `${sig}: the service role’s alone`)
+    check((await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a, false, `${sig}: not the publishable key’s`)
   }
 
   // ── {name} and ‹ Back (mig 20261102180000) ──
@@ -1869,6 +1869,29 @@ await db.exec(`
   await q(`update public.lead_contacts set ai_on = true, ai_turns = 35 where id = $1`, [ai3])
   await q(`select public.lead_ai_answered($1, 'More.', '', false, '', 40)`, [ai3])
   check((await aiOf(ai3)).ai_on, true, 'a limit of 40 set: still the AI’s at 36 replies (no 30 ceiling)')
+
+  // ── A chat handed to the AI by hand (mig 20261102210000) ──
+  await db.exec(await f('20261102210000_lead_give_to_ai.sql'))
+  await db.exec(await f('20261102210000_lead_give_to_ai.sql'))
+  await inMsg('7709001', 'hello there')
+  const ga = await contactOf('7709001')
+  await as(CS_USER, ['leads.view', 'leads.create'])
+  await refuses(`select public.lead_give_to_ai($1, true)`, [ga], /Lead View · Manage/, 'giving a chat to the AI needs Manage')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_give_to_ai($1, true)`, [ga])
+  check([(await aiOf(ga)).ai_on, await lastEvent(ga)], [true, 'Given to the AI Agent by ' + (await q(`select public.lead_actor_name() n`))[0].n], 'given to the AI: on, the timeline says by whom')
+  check((await q(`select public.lead_contact_json(c) j from public.lead_contacts c where id = $1`, [ga]))[0].j.aiOn, true, 'the card says the AI has it')
+  check(await claim([ga]), [ga], 'a signed-in person with Create may have it answered at once')
+  await q(`select public.lead_ai_stop($1, '', true)`, [ga])
+  await as(CS_USER, ['leads.view'])
+  await refuses(`select public.lead_ai_claim($1::uuid[])`, [[ga]], /Lead View · Create/, 'View alone may not')
+  await refuses(`select public.lead_outbox($1::uuid[])`, [[ga]], /Lead View · Create/, 'nor read the outbox')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_give_to_ai($1, false)`, [ga])
+  check([(await aiOf(ga)).ai_on, (await lastEvent(ga)).startsWith('Taken back from the AI Agent')], [false, true], 'taken back')
+  for (const sig of ['lead_ai_claim(uuid[])', 'lead_outbox(uuid[])', 'lead_give_to_ai(uuid,boolean)']) {
+    check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
+  }
 }
 
 console.log(`validate-leads: ${checks} checks passed`)
