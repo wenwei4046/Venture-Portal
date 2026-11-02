@@ -194,7 +194,18 @@ export default function RulesView({ rules, ready, rows, ads, brands, templates, 
             const x: Sel = { kind: 'ad', adId: a.adId }
             return (
               <div key={a.adId} className={s.adRow} role="option" aria-selected={isSel(x)} tabIndex={0} onClick={() => pickSel(x)} onKeyDown={e => { if (e.key === 'Enter') pickSel(x) }}>
-                <span className={s.adName}><span>{adLabel(a)}</span><span className={s.adMeta}>{adMeta(a)}</span></span>
+                <span className={s.adName}>
+                  <span className={s.adTitle}>
+                    <span className={s.adTitleText}>{adLabel(a)}</span>
+                    {a.postUrl ? (
+                      // The ad as the customer saw it (2026-11-02 — the user: "点小箭头就导入到看该广告"): its Facebook post.
+                      <a className={s.adOpen} href={a.postUrl} target="_blank" rel="noopener noreferrer" title="View the ad on Facebook" aria-label={`View the ad ${adLabel(a)} on Facebook`}>
+                        <LeadIcon name="external-link" size={13} />
+                      </a>
+                    ) : null}
+                  </span>
+                  <span className={s.adMeta}>{adMeta(a)}</span>
+                </span>
                 {chip(slots.w, `ad|${a.adId}|w`, true, pageReply(pg.brandId, pg.channel, 'work'))}
                 {chip(slots.a, `ad|${a.adId}|a`, true, pageReply(pg.brandId, pg.channel, 'after'))}
                 {has && canEdit ? (

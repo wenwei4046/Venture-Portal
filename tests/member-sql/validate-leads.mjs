@@ -1917,6 +1917,20 @@ await db.exec(`
   for (const sig of ['lead_ai_claim(uuid[])', 'lead_outbox(uuid[])', 'lead_give_to_ai(uuid,boolean)']) {
     check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
   }
+
+  // ── Each ad's post and picture from Meta's deliveries (mig 20261102250000) ──
+  await db.exec(await f('20261102250000_lead_ad_posts.sql'))
+  const postPayload = { object: 'page', entry: [{ id: P, messaging: [{ sender: { id: '79' }, referral: { ad_id: AI_AD, source: 'ADS', type: 'OPEN_THREAD',
+    ads_context_data: { post_id: '122151015069199078', ad_title: 'Beds', photo_url: 'https://www.facebook.com/ads/image/?d=x' } } }] }] }
+  await q(`insert into public.crm_channel_events (channel, status, payload) values ('messenger', 'ok', $1::jsonb)`, [JSON.stringify(postPayload)])
+  await q(`insert into public.crm_channel_events (channel, status, payload) values ('messenger', 'ok', $1::jsonb)`, [JSON.stringify({ ...postPayload, entry: [{ id: P, messaging: [{ referral: { ad_id: '999', ads_context_data: { post_id: '1' } } }] }] })])
+  const adPosts = (await q(`select public.lead_ad_posts() p`))[0].p
+  const adPost = adPosts.find(x => x.adId === AI_AD)
+  check([adPost?.postUrl, adPost?.picture], [`https://www.facebook.com/${P}_122151015069199078`, 'https://www.facebook.com/ads/image/?d=x'], 'an ad’s post and picture as Meta sent them')
+  check(adPosts.some(x => x.adId === '999'), false, 'an ad no chat came from is left out')
+  await as(CS_USER, [])
+  await refuses(`select public.lead_ad_posts()`, [], /Lead View · View/, 'reading them needs Lead View · View')
+  await as(CS_USER, ALL)
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

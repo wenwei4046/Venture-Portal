@@ -23,6 +23,10 @@ export interface LeadAd {
   accountId: string
   status: string
   link: string
+  /** The ad's own Facebook post and its picture / video, from Meta's delivery (lead_ad_posts, mig 20261102250000). */
+  postUrl?: string | null
+  picture?: string | null
+  video?: string | null
   /** null = nothing known yet; manual = named by hand; meta = from Ads Manager. */
   source: 'manual' | 'meta' | null
   fetchedAt: string | null

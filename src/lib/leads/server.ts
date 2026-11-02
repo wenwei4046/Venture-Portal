@@ -189,6 +189,11 @@ export function loadAds(): Promise<Read<LeadAd[]>> {
   return rpc<LeadAd[]>('lead_ads', undefined, 'The ads')
 }
 
+/** Each ad's own post and picture as Meta sent them with its chats (mig 20261102250000). */
+export function loadAdPosts(): Promise<Read<Array<{ adId: string; postUrl: string | null; picture: string | null; video: string | null }>>> {
+  return rpc('lead_ad_posts', undefined, 'The ads’ posts')
+}
+
 /** One set of tables' latest history (audit_changes, the reader's own permissions) — Reply rules' rail. */
 export async function loadChangesOf(tables: string[], limit = 60): Promise<Read<AuditChange[]>> {
   return rpc<AuditChange[]>('audit_changes', { p_tables: tables, p_limit: limit }, 'The history')
