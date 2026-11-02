@@ -26,18 +26,21 @@ export function statColumns(count: number): { wide: number; medium: number } {
   return { wide, medium: Math.min(wide, 3) }
 }
 
-export function StatCards({ label, children, note }: {
+export function StatCards({ label, children, note, size }: {
   /** What the row sums up — read out to a screen reader. */
   label: string
   children: ReactNode
   /** One quiet line under the cards ("Unmatched agents 0"). */
   note?: ReactNode
+  /** Small cards (2026-11-02, the Repayment Schedule — the user: "card 可以做小，就一排就好"): the label and its icon
+   *  on one line, then the figure, then the note — the same parts, two-thirds the height. */
+  size?: 'small'
 }) {
   // Conditional cards (`{x ? <StatCard/> : null}`) do not count.
   const { wide, medium } = statColumns(Children.toArray(children).length)
   const columns = { '--stat-cols': wide, '--stat-cols-md': medium } as CSSProperties
   return (
-    <section className="stat-cards" aria-label={label}>
+    <section className="stat-cards" data-size={size} aria-label={label}>
       <div className="stat-cards-grid" style={columns}>{children}</div>
       {note ? <p className="stat-cards-note">{note}</p> : null}
     </section>

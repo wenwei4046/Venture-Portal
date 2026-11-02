@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { withActions } from '@/test/with-actions'
 import { FinViewProvider } from '@/components/layout/fin-view'
@@ -242,16 +242,56 @@ describe('Due to pay', () => {
 })
 
 // 2026-10-10 — the head's Export (the handoff; user: 做完他): the month's two
-// due tables as a spreadsheet, for the month on show.
-describe('the Repayment Schedule’s head', () => {
-  it('offers Export for the month on show', async () => {
+// due tables as a spreadsheet, for the month on show. 2026-11-02 (the user:
+// "帮我把日期选择器和export 做在这一排" · "没有办法export pdf？" → on its sample,
+// "一个export 就行"): the month and one Export ▾ on the tabs' row — Excel or
+// PDF — and the five cards small, in one row.
+describe('the Repayment Schedule’s tabs’ row', () => {
+  afterEach(() => vi.unstubAllGlobals())
+  const row = () => document.querySelector('.sch-tabrow') as HTMLElement
+
+  it('holds the month and Export at the right of the tabs; the head only its title', async () => {
     await page()
-    expect(screen.getByRole('link', { name: 'Export' })).toHaveAttribute('href', '/repayment-schedule/export?month=2026-10')
+    expect(within(row()).getByRole('button', { name: 'Calendar' })).toBeInTheDocument()
+    expect(within(row()).getByRole('button', { name: 'Previous month' })).toBeInTheDocument()
+    expect(within(row()).getByText('October 2026')).toBeInTheDocument()
+    expect(within(row()).getByRole('button', { name: 'Export' })).toHaveClass('sch-tool-btn')
+    const head = document.querySelector('.page-head') as HTMLElement
+    expect(within(head).queryByRole('button', { name: 'Previous month' })).toBeNull()
+    expect(within(head).queryByText('Export')).toBeNull()
   })
 
-  it('not to an account that may read the treasury but not export it', async () => {
+  it('opens Export for the month on show: Excel, or PDF in a tab of its own', async () => {
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign })
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    await page()
+    fireEvent.click(within(row()).getByRole('button', { name: 'Export' }))
+    const menu = await screen.findByRole('dialog', { name: 'Export' })
+    expect(within(menu).getByText('October 2026')).toBeInTheDocument()
+    expect(within(menu).getByRole('menuitem', { name: /Excel/ })).toHaveTextContent('repayment-schedule-2026-10.xlsx')
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Excel/ }))
+    expect(assign).toHaveBeenCalledWith('/repayment-schedule/export?month=2026-10&format=xlsx')
+    fireEvent.click(within(row()).getByRole('button', { name: 'Export' }))
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Export' })).getByRole('menuitem', { name: /PDF/ }))
+    expect(open).toHaveBeenCalledWith('/repayment-schedule/export?month=2026-10&format=pdf', '_blank', 'noopener,noreferrer')
+    open.mockRestore()
+  })
+
+  it('no Export for an account that may read the treasury but not export it', async () => {
     mocks.requirePermission.mockResolvedValue({ ...withActions({ role: 'finance', permissions: ['treasury'] }), actions: { 'treasury.view': 'all' } })
     await page()
-    expect(screen.queryByRole('link', { name: 'Export' })).toBeNull()
+    expect(within(row()).queryByRole('button', { name: 'Export' })).toBeNull()
+    expect(within(row()).getByRole('button', { name: 'Previous month' })).toBeInTheDocument()
+  })
+
+  it('stands the five cards small, in one row', async () => {
+    await page()
+    const cards = screen.getByRole('region', { name: 'Repayment Schedule' })
+    expect(cards).toHaveAttribute('data-size', 'small')
+    expect((cards.querySelector('.stat-cards-grid') as HTMLElement).style.getPropertyValue('--stat-cols')).toBe('5')
+    fireEvent.click(tab(/^We collect/))
+    const side = screen.getByRole('region', { name: 'Repayment Schedule' })
+    expect((side.querySelector('.stat-cards-grid') as HTMLElement).style.getPropertyValue('--stat-cols')).toBe('5')
   })
 })

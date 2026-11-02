@@ -5,18 +5,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 // to collect", then "Due to pay" — each row as the page shows it (its terms,
 // type, principal, interest, total due, what came in or went out, what is
 // short: in brackets, "clear" when nothing is), each side closed by its Total.
+// 2026-11-02 (the user: "没有办法export pdf？" → "一个export 就行"): `?format=pdf`
+// is the same two tables as a PDF.
 
 const mocks = vi.hoisted(() => ({
   requireActionOn: vi.fn(),
   createClient: vi.fn(),
   load: vi.fn(),
   exportXlsxResponse: vi.fn(),
+  exportPdfResponse: vi.fn(),
   buildXlsxBuffer: vi.fn(),
 }))
 vi.mock('@/lib/auth', () => ({ requirePage: async () => undefined, requireActionOn: mocks.requireActionOn }))
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('../_lib/schedule-data', () => ({ loadRepaymentSchedule: mocks.load }))
-vi.mock('@/lib/export/response', () => ({ exportXlsxResponse: mocks.exportXlsxResponse }))
+vi.mock('@/lib/export/response', () => ({ exportXlsxResponse: mocks.exportXlsxResponse, exportPdfResponse: mocks.exportPdfResponse }))
 vi.mock('@/lib/export/excel', () => ({ buildXlsxBuffer: mocks.buildXlsxBuffer }))
 
 import { GET } from './route'
@@ -50,6 +53,7 @@ beforeEach(() => {
   mocks.load.mockResolvedValue(SCHEDULE)
   mocks.buildXlsxBuffer.mockImplementation((args: unknown) => args)
   mocks.exportXlsxResponse.mockReturnValue(new Response('xlsx'))
+  mocks.exportPdfResponse.mockResolvedValue(new Response('pdf'))
 })
 
 describe('the Repayment Schedule export', () => {
@@ -91,5 +95,43 @@ describe('the Repayment Schedule export', () => {
   it('reads this month when none is asked', async () => {
     await GET(req())
     expect(mocks.load.mock.calls[0][1]).toBeNull()
+  })
+})
+
+describe('the Repayment Schedule PDF', () => {
+  type Table = { columns: Array<{ label: string; width: number }>; rows: unknown[][]; rowKinds: string[]; numberFormat: string; repeatHeader: boolean }
+  const pdfOf = () => {
+    const { filename, element } = mocks.exportPdfResponse.mock.calls[0][0] as { filename: string; element: { props: Record<string, unknown> & { children: { props: Table } } } }
+    return { filename, doc: element.props, table: element.props.children.props }
+  }
+
+  it('is the same two tables, each under its band and closed by its Total', async () => {
+    await GET(req('?month=2026-09&format=pdf'))
+    expect(mocks.requireActionOn).toHaveBeenCalledWith(expect.any(String), 'treasury', 'export')
+    expect(mocks.buildXlsxBuffer).not.toHaveBeenCalled()
+    const { filename, doc, table } = pdfOf()
+    expect(filename).toBe('repayment-schedule-2026-09')
+    expect(doc).toMatchObject({ title: 'Repayment Schedule', periodLabel: 'September 2026', orientation: 'landscape' })
+    expect(table.columns.map((c) => c.label)).toEqual(['Counterparty', 'Terms', 'Type', 'Principal', 'Interest', 'Total due', 'Received / paid · Sep', 'Short', 'Note'])
+    expect(table.rows.map((r) => r[0])).toEqual(['Due to collect · September 2026', 'HK', 'HC', 'HD', 'HM', 'HB', 'Total', 'Due to pay · September 2026', 'CONTS', 'Total'])
+    expect(table.rowKinds).toEqual(['sectionPositive', 'detail', 'detail', 'detail', 'detail', 'detail', 'total', 'sectionWarning', 'detail', 'total'])
+    // The spreadsheet's rows, cell for cell: short as a negative (in brackets on the page), clear when nothing is.
+    expect(table.rows[1]).toEqual(['HK', 'RM 120,000.00 @ 1.000%/mo · 12mo · 8 left', 'principal + interest', 10000, 1200, 11200, null, -11200, 'Source of capital: HC'])
+    expect(table.rows[2][7]).toBe('clear')
+    expect(table.rows[6]).toEqual(['Total', '5 items', null, 20000, 10468.52, 30468.52, 16200, -12200, null])
+    expect(table.rows[9]).toEqual(['Total', '1 item', null, 50000, 6000, 56000, 0, -56000, null])
+    expect(table).toMatchObject({ numberFormat: 'money', repeatHeader: true })
+  })
+
+  it('fits its columns between an A4 landscape page’s margins', async () => {
+    await GET(req('?format=pdf'))
+    // 842pt across, 36pt a margin.
+    expect(pdfOf().table.columns.reduce((w, c) => w + c.width, 0)).toBeLessThanOrEqual(770)
+  })
+
+  it('is the spreadsheet for any other format', async () => {
+    await GET(req('?month=2026-09&format=xlsx'))
+    expect(mocks.exportPdfResponse).not.toHaveBeenCalled()
+    expect(mocks.exportXlsxResponse).toHaveBeenCalledTimes(1)
   })
 })

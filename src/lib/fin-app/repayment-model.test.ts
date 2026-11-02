@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RepaymentSchedule } from '@/app/(portal)/repayment-schedule/_lib/schedule-data'
-import { askedScheduleMonth, entryHref, repaymentModel, repaymentPlace } from './repayment-model'
+import { askedScheduleMonth, entryHref, repaymentFiles, repaymentModel, repaymentPlace } from './repayment-model'
 
 // Fund › Repayment Schedule in the Finance phone app (2026-10-15, part 5c): the
 // desktop page's month — its cards' figures, its due tables, its Full plans,
@@ -133,5 +133,15 @@ describe('the page’s month and its deals', () => {
     expect(entryHref({ kind: 'collect', href: '/fund-out/loan-a?from=calendar&month=2026-10' })).toBe('/fin-app/fund/out?id=loan-a')
     expect(entryHref({ kind: 'pay', href: '/fund-in/fs-f?from=calendar' })).toBe('/fin-app/fund/in?id=fs-f')
     expect(entryHref({ kind: 'pay', href: '/elsewhere' })).toBeNull()
+  })
+})
+
+// 2026-11-02 (the user: "没有办法export pdf？"): the desktop's Export offers Excel or PDF, and so does the app's bar.
+describe('the page’s files', () => {
+  it('are the month’s two tables as a PDF, then as a spreadsheet', () => {
+    expect(repaymentFiles('2026-11')).toEqual([
+      { key: 'pdf', label: 'Export PDF', href: '/repayment-schedule/export?month=2026-11&format=pdf', format: 'pdf' },
+      { key: 'xlsx', label: 'Export Excel', href: '/repayment-schedule/export?month=2026-11&format=xlsx', format: 'xlsx' },
+    ])
   })
 })
