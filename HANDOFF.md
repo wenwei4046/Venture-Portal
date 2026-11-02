@@ -1,5 +1,24 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-02 a (#911 SHIPPED · #912 OPEN, merge once green: "全绿就 merge") — Repayment Schedule
+
+Session e73c0205.
+
+- **#911 SHIPPED** — squash `1568da13` (2026-11-02 04:11Z), deployed. The user, on November's calendar: "已经settle
+  了就别出现哦". CONTS's 300,000 (LO#19, all 36 repaid by 26 Oct) and HC's 300,000 fund source (35 of 36 paid ahead
+  on 5 Aug) stood green on the 1st, 10,000.13 each. `lib/repayment-calendar` `monthEvents` now drops a row with nothing
+  left on it (paid, paid ahead, settled early); the legend has no Paid; the phone's Calendar card follows. DESIGN.md
+  **v4.223** (#910's Lead View v2 took v4.215–v4.222 the same morning).
+- **#912 OPEN** — `feat/schedule-tab-row`, head `b7ef5dcc` (main merged in; DESIGN.md / rules conflicts with #911, both
+  kept). The user: "帮我把日期选择器和export 做在这一排 · card 可以做小，就一排就好 · export 的字体优化？ 没有办法export
+  pdf？" → a sample (scratchpad `sched-row/sched-row-sample.html`) → "一个export 就行". The month and one Export ▾ (Excel
+  / PDF: `?format=pdf`, A4 landscape) at the right of the tabs; the five cards small in one row (`StatCards
+  size="small"`; a Fragment had counted as one card, so they stood 3 + 2); the phone's bar Export PDF · Export Excel.
+  DESIGN.md **v4.224**. **Next:** `gh pr checks 912`; all green → squash-merge #912 (the user's word is given), read
+  the deploy once. No migration in either.
+- Local false failures (not ours): `erp-sync/catalogue` and `crm/palette` (`sales/wall.ts:7`, a comment) — CRLF;
+  `permission-actions` and `design-system-tokens` time out under the full run and pass alone.
+
 ## CHECKPOINT 2026-10-31 z (SHIPPED, #884) — Minimum pay interest from a month, merged
 
 Session e73c0205, on "继续" / "现在看并 merge". Checkpoint y below is the build (OPEN then); this closes it.
