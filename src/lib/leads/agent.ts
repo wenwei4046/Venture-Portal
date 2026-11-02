@@ -98,10 +98,10 @@ export function settingsOf(raw: unknown, soulGoal = ''): AgentSettings {
     blocked: list(r.blocked, 30),
     length: LENGTHS.some(t => t[0] === r.length) ? (r.length as string) : d.length,
     phone: {
-      on: bool(p.on, d.phone.on), afterOn: bool(p.afterOn, d.phone.afterOn), after: num(p.after, 1, 20, d.phone.after),
+      on: bool(p.on, d.phone.on), afterOn: bool(p.afterOn, d.phone.afterOn), after: num(p.after, 1, 999, d.phone.after),
       ask: str(p.ask, 600, d.phone.ask), wordsOn: bool(p.wordsOn, false), words: list(p.words, 20), wordsAsk: str(p.wordsAsk, 600, ''),
     },
-    unsure: bool(r.unsure, d.unsure), upset: bool(r.upset, d.upset), maxOn: bool(r.maxOn, false), maxReplies: num(r.maxReplies, 1, 50, d.maxReplies),
+    unsure: bool(r.unsure, d.unsure), upset: bool(r.upset, d.upset), maxOn: bool(r.maxOn, false), maxReplies: num(r.maxReplies, 1, 999, d.maxReplies),
     infoOff: list(r.infoOff, 300), autoLearn: bool(r.autoLearn, d.autoLearn), learnOthers: bool(r.learnOthers, d.learnOthers),
   }
 }

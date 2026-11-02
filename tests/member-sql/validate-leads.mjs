@@ -1846,6 +1846,29 @@ await db.exec(`
   check((await aiOf(askB)).ai_on, true, 'the AI’s customer')
   await inMsg('7708002', '转人工')
   check([(await aiOf(askB)).ai_on, await personEvents(askB)], [false, 1], 'asked for a person: the AI steps aside')
+
+  // ── Start over (mig 20261102200000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_flow_on_message'`))[0].m, 'b227eaecf216c073dd5140b8d5e609e6', 'the runner here is production’s after 20261102190000')
+  await db.exec(await f('20261102200000_lead_start_over.sql'))
+  await db.exec(await f('20261102200000_lead_start_over.sql'))
+  await db.exec(await f('20261102200100_lead_start_over_guards.sql'))
+  // askA asked for a person: nothing runs until we answer — Start over makes the next message run the rules.
+  await inMsg('7708001', 'hello again')
+  check(await personEvents(askA), 1, 'handed to a person: nothing runs')
+  const askAFlows = async () => (await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and sender = 'flow'`, [askA]))[0].n
+  const soBefore = await askAFlows()
+  await as(CS_USER, ['leads.view'])
+  await refuses(`select public.lead_start_over($1)`, [askA], /Lead View · Create/, 'Start over needs Lead View · Create')
+  await as(CS_USER, ALL)
+  await q(`select public.lead_start_over($1)`, [askA])
+  check((await q(`select restart_at is not null r, flow_state from public.lead_contacts where id = $1`, [askA]))[0], { r: true, flow_state: 'none' }, 'started over: marked, nothing waiting')
+  check(await askAFlows(), soBefore, 'nothing is sent at once')
+  await inMsg('7708001', 'hi')
+  check([(await askAFlows()) > soBefore, (await q(`select restart_at from public.lead_contacts where id = $1`, [askA]))[0].restart_at], [true, null], 'the next message runs the rules again, once')
+  check((await q(`select has_function_privilege('anon', 'public.lead_start_over(uuid)', 'execute') a`))[0].a, false, 'not the publishable key’s')
+  await q(`update public.lead_contacts set ai_on = true, ai_turns = 35 where id = $1`, [ai3])
+  await q(`select public.lead_ai_answered($1, 'More.', '', false, '', 40)`, [ai3])
+  check((await aiOf(ai3)).ai_on, true, 'a limit of 40 set: still the AI’s at 36 replies (no 30 ceiling)')
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

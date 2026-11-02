@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { assignLead, draftLeadReply, leadAgents, leadMediaLinks, markUnread, quickReplyUsed, reactToMessage, readThread, replyToLead, replyToMessage, sendLeadMedia, setDraftOutcome, type DraftForInbox } from '@/lib/leads/actions'
+import { assignLead, draftLeadReply, leadAgents, leadMediaLinks, markUnread, quickReplyUsed, reactToMessage, readThread, replyToLead, replyToMessage, sendLeadMedia, setDraftOutcome, startOver, type DraftForInbox } from '@/lib/leads/actions'
 import { FILE_LIMIT, TOO_BIG } from '@/lib/leads/messenger'
 import { createClient } from '@/lib/supabase/client'
 import { insertQuick, quickMatches, type QuickReply } from '@/lib/leads/quick'
@@ -480,6 +480,16 @@ function Chat({ contact, thread, brand, csName, canReply, canManage, aiOn, aiCon
                 <button type="button" role="menuitem" className={s.moreItem} onClick={() => { setMenuOpen(false); onMarkUnread() }}>
                   <LeadIcon name="mail" size={16} className={s.moreIcon} />Mark as unread
                 </button>
+                {canReply ? (
+                  <button type="button" role="menuitem" className={s.moreItem} title="The customer's next message runs the reply rules again, as a first message does. Nothing is sent now."
+                    onClick={() => {
+                      setMenuOpen(false)
+                      if (!window.confirm('Start over? The customer’s next message runs the reply rules again, as a first message does. Nothing is sent now.')) return
+                      startSending(async () => { const r = await startOver(contact.id); if (!r.ok) setError(r.reason); else onSent() })
+                    }}>
+                    <LeadIcon name="rotate-ccw" size={16} className={s.moreIcon} />Start over
+                  </button>
+                ) : null}
                 {contact.adLink || manager ? <div className={s.moreSep} /> : null}
                 {contact.adLink ? (
                   <a role="menuitem" className={s.moreItem} href={contact.adLink} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>

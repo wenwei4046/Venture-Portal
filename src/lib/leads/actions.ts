@@ -171,6 +171,15 @@ export async function markUnread(contactId: string): Promise<LeadOutcome<null>> 
 }
 
 /**
+ * Start over (mig 20261102200000): the conversation's next message runs the reply rules as a first message does — a
+ * template waiting stops, the AI Agent steps aside. Nothing is sent to the customer.
+ */
+export async function startOver(contactId: string): Promise<LeadOutcome<null>> {
+  await requireActionOn('/leads', 'leads', 'create')
+  return call<null>('lead_start_over', { p_contact: contactId }, 'The chat could not be started over.')
+}
+
+/**
  * Forward a message to another conversation (2026-10-28 — the user: "转发就好，不需要删除"): Meta has no forward for an
  * app, so it is sent there as a new reply from this person — words through replyToLead; a photo, video or file copied
  * into that conversation's folder (ours, else fetched from Meta's address) and sent through sendLeadMedia, its words
