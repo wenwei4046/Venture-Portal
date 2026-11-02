@@ -2,20 +2,24 @@ import { requirePage, requirePermission } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { HvPage, PageHead } from '@/components/hrv/kit'
 import type { AgentMore } from '@/lib/leads/agent'
-import { NOT_SET_UP, loadAiMore, loadDataFiles, loadLeadConfig, loadPersonas } from '@/lib/leads/server'
+import { NOT_SET_UP, loadAiMore, loadChangesOf, loadDataFiles, loadDataFolders, loadInfo, loadLeadConfig, loadPersonas } from '@/lib/leads/server'
 import AgentView from '../_components/AgentView'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Lead View › AI Agent (2026-10-16; v2 2026-10-23, redesign v2 step 5 — mig 20261023200000): each brand's agent —
- * settings, sources, fixed answers, playbook — and a test chat. Lead View · View reads it; Manage edits. Before the
- * migration is applied the page shows the defaults and cannot save.
+ * Lead View › AI Agent (2026-10-16; v2 2026-10-23; the v2 handoff 2026-11-02 — mig 20261102140000): each brand's agent
+ * — How it replies, Knowledge (Data Center folders, files and links, General info, History), Fixed answers, Sales
+ * playbook, Memory — and the Test chat. ?b=<brand>&tab=answers opens a brand's tab (AI corrections' View). Lead View ·
+ * View reads it; Manage edits. Before a migration the page shows what it can and cannot save.
  */
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<{ b?: string; tab?: string }> }) {
   await requirePage('/leads/ai')
   const user = await requirePermission('leads')
-  const [config, personas, files] = await Promise.all([loadLeadConfig(), loadPersonas(), loadDataFiles()])
+  const sp = await searchParams
+  const [config, personas, files, folders, info, history] = await Promise.all([
+    loadLeadConfig(), loadPersonas(), loadDataFiles(), loadDataFolders(), loadInfo(), loadChangesOf(['lead_ai_knowledge'], 300),
+  ])
   if (!config.ok || !personas.ok) {
     return (
       <HvPage>
@@ -37,7 +41,8 @@ export default async function Page() {
     )
   }
   return (
-    <AgentView personas={personas.data} more={byBrand} files={files.ok ? files.data : []} today={config.data.today}
-      connected={Boolean(process.env.ANTHROPIC_API_KEY)} ready={ready} canManage={canDo(user, 'leads', 'manage')} />
+    <AgentView personas={personas.data} more={byBrand} files={files.ok ? files.data : []} folders={folders.ok ? folders.data : []} foldersReady={folders.ok}
+      info={info.ok ? info.data : null} history={history.ok ? history.data : []} today={config.data.today}
+      connected={Boolean(process.env.ANTHROPIC_API_KEY)} ready={ready} canManage={canDo(user, 'leads', 'manage')} initialBrand={sp.b} initialTab={sp.tab} />
   )
 }

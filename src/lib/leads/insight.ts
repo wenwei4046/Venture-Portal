@@ -77,8 +77,9 @@ export interface InsightMore {
   steps: Array<{ flowId: string; brandId: string; test: boolean; stepId: string; n: number }>
 }
 
-export type InsightRange = '7' | '30' | 'q'
-export const INSIGHT_RANGES: ReadonlyArray<[InsightRange, string]> = [['7', '7 days'], ['30', '30 days'], ['q', 'This quarter']]
+/** The v2 handoff's ranges (Today · 7 days · 30 days · Custom); 'q' (this quarter) is kept as a Custom preset. */
+export type InsightRange = 'today' | '7' | '30' | 'custom' | 'q'
+export const INSIGHT_RANGES: ReadonlyArray<[InsightRange, string]> = [['today', 'Today'], ['7', '7 days'], ['30', '30 days'], ['custom', 'Custom']]
 
 const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 864e5).toISOString().slice(0, 10)
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -89,7 +90,15 @@ const dayLabel = (day: string) => `${Number(day.slice(8))} ${MON[Number(day.slic
  * The period, both days included. `listTo` is the day after `to`: lead_list's end is exclusive, so handing it `to` left
  * today's conversations out — on Lead View's first live day Insight read 0 (2026-10-27).
  */
-export function insightRange(raw: string | undefined, today: string): { key: InsightRange; from: string; to: string; listTo: string; label: string } {
+export function insightRange(raw: string | undefined, today: string, cFrom?: string, cTo?: string): { key: InsightRange; from: string; to: string; listTo: string; label: string } {
+  const iso = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null)
+  if (raw === 'custom') {
+    const to = iso(cTo) && iso(cTo)! <= today ? iso(cTo)! : today
+    const lo = addDays(today, -365)
+    const from = iso(cFrom) && iso(cFrom)! <= to ? (iso(cFrom)! < lo ? lo : iso(cFrom)!) : addDays(to, -29)
+    return { key: 'custom', from, to, listTo: addDays(to, 1), label: `${dayLabel(from)} – ${dayLabel(to)}` }
+  }
+  if (raw === 'today') return { key: 'today', from: today, to: today, listTo: addDays(today, 1), label: 'Today' }
   const key: InsightRange = raw === '7' || raw === 'q' ? raw : '30'
   if (key === 'q') {
     const m = Number(today.slice(5, 7))
@@ -102,16 +111,53 @@ export function insightRange(raw: string | undefined, today: string): { key: Ins
 
 const came = (c: LeadContact) => !!c.cameAt || c.shown === 'came'
 
+/** "2026-10-01" … "2026-10-30": every day of a range, both ends included. */
+export function daysOf(from: string, to: string): string[] {
+  const out: string[] = []
+  for (let d = from; d <= to && out.length < 400; d = addDays(d, 1)) out.push(d)
+  return out
+}
+
+/** The trend: chats started and phones got per office day — or, for one day, per hour (0–23). */
+export function trendOf(rows: Pick<LeadContact, 'createdAt' | 'phoneAt'>[], from: string, to: string): { unit: 'day' | 'hour'; keys: string[]; chats: number[]; phones: number[] } {
+  const local = (iso: string) => new Date(Date.parse(iso) + 8 * 3600e3).toISOString()
+  const hourly = from === to
+  const keys = hourly ? Array.from({ length: 24 }, (_, h) => String(h)) : daysOf(from, to)
+  const at = (iso: string | null | undefined) => {
+    if (!iso) return -1
+    const l = local(iso)
+    if (hourly) return l.slice(0, 10) === from ? Number(l.slice(11, 13)) : -1
+    return keys.indexOf(l.slice(0, 10))
+  }
+  const chats = keys.map(() => 0), phones = keys.map(() => 0)
+  for (const c of rows) {
+    const i = at(c.createdAt), j = at(c.phoneAt)
+    if (i >= 0) chats[i]++
+    if (j >= 0) phones[j]++
+  }
+  return { unit: hourly ? 'hour' : 'day', keys, chats, phones }
+}
+
+/** "1 Oct" for a day key, "10am" for an hour. */
+export function trendLabel(key: string, unit: 'day' | 'hour'): string {
+  if (unit === 'day') return dayLabel(key)
+  const h = Number(key)
+  return h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`
+}
+
 /** From message to sale: each step with its share of the step before. */
 export function funnelOf(rows: LeadContact[]): Array<{ label: string; n: number; rate: string }> {
   const steps: Array<[string, number]> = [
-    ['Conversations', rows.length],
-    ['Gave a phone', rows.filter(c => c.phone).length],
+    ['Chats', rows.length],
+    ['Got phone', rows.filter(c => c.phone).length],
     ['Handed to sales', rows.filter(c => c.handedAt).length],
     ['Came to showroom', rows.filter(came).length],
-    ['Bought', rows.filter(c => c.closedAt).length],
+    ['Closed', rows.filter(c => c.closedAt).length],
   ]
-  return steps.map(([label, n], i) => ({ label, n, rate: i === 0 ? 'all chats' : `${rate(n, steps[i - 1][1]) ?? 0}% of previous` }))
+  return steps.map(([label, n], i) => {
+    const prev = i ? steps[i - 1][1] : 0
+    return { label, n, rate: i === 0 ? 'Started a chat' : prev ? `${rate(n, prev)}% of previous` : '— of previous' }
+  })
 }
 
 export interface AdRow { key: string; name: string; brandId: string; channel: 'messenger' | 'instagram'; organic: boolean; chats: number; phones: number; came: number; bought: number }

@@ -7,7 +7,7 @@ export interface InfoCat {
   kind: 'showroom' | 'topic'
   label: string
   icon: string
-  /** Added by CS — may be deleted; the four seeded may not. */
+  /** Added by CS (the seeded four may be renamed and deleted too since mig 20261023500000 / 20261102130000). */
   custom: boolean
 }
 
@@ -16,13 +16,22 @@ export interface InfoField {
   key: 'address' | 'hours' | 'phone' | 'maps' | 'waze' | null
   label: string
   value: string
+  /** What the value is (mig 20261102130000): the input it gets. */
+  type?: InfoFieldType
 }
+
+export type InfoFieldType = 'text' | 'number' | 'date' | 'time' | 'tel' | 'url'
+export const FIELD_TYPES: ReadonlyArray<{ v: InfoFieldType; l: string }> = [
+  { v: 'text', l: 'Text' }, { v: 'number', l: 'Number' }, { v: 'date', l: 'Date' }, { v: 'time', l: 'Time' }, { v: 'tel', l: 'Phone' }, { v: 'url', l: 'Link' },
+]
 
 export interface InfoCard {
   id: string
   catId: string
-  /** null = every brand. */
+  /** null = every brand, or more than one (brandIds says which). */
   brandId: string | null
+  /** Its brands (mig 20261102130000); empty = every brand. */
+  brandIds?: string[]
   name: string
   code: string
   status: 'draft' | 'on' | 'off'
@@ -92,11 +101,17 @@ export interface InfoEntry {
   fields: Array<{ label: string; value: string; token: string }>
 }
 
+/** Is a card for this brand? Its brands (empty = every brand), else the one brandId (before mig 20261102130000). */
+export function forBrand(c: Pick<InfoCard, 'brandId' | 'brandIds'>, brandId: string | null): boolean {
+  if (c.brandIds) return c.brandIds.length === 0 || (brandId !== null && c.brandIds.includes(brandId))
+  return c.brandId === null || c.brandId === brandId
+}
+
 /** What the Inbox's General info menu offers for a conversation's brand: live cards of that brand or every brand, filled fields and the note. */
 export function infoEntries(info: LeadInfo, brandId: string | null, today: string): InfoEntry[] {
   const cats = new Map(info.cats.map(c => [c.id, c]))
   return info.cards
-    .filter(c => isLive(c, today) && (c.brandId === null || c.brandId === brandId))
+    .filter(c => isLive(c, today) && forBrand(c, brandId))
     .map(card => ({
       card,
       cat: cats.get(card.catId),
@@ -180,4 +195,23 @@ export const DEFAULT_INFO: LeadInfo = {
 export const DEFAULT_HOURS: BusinessHours = {
   week: DAY_NAMES.map((_, i) => ({ day: i + 1, on: i < 5, from: '10:00', to: '22:00' })),
   specials: [],
+}
+
+/** General info v2's statuses (the handoff's INFO_KIND, plus Paused for a card switched off): kind, words, filter. */
+export type InfoKind = 'live' | 'soon' | 'scheduled' | 'expired' | 'paused'
+export const INFO_KIND_LABEL: Record<InfoKind, string> = { live: 'In use', soon: 'Ending soon', scheduled: 'Scheduled', expired: 'Expired', paused: 'Paused' }
+
+/**
+ * A card's status from its dates (§7.9): before the start → Scheduled ("Starts 1 Nov"); past the end → Expired
+ * ("Expired 30 Oct"); 14 days or less before the end → Ending soon ("Ends in N days"); else In use. Off or Draft → Paused.
+ */
+export function infoKind(c: Pick<InfoCard, 'status' | 'validFrom' | 'validUntil'>, today: string): { kind: InfoKind; label: string } {
+  if (c.status !== 'on') return { kind: 'paused', label: 'Paused' }
+  if (c.validUntil && c.validUntil < today) return { kind: 'expired', label: `Expired ${dayMonth(c.validUntil)}` }
+  if (c.validFrom && c.validFrom > today) return { kind: 'scheduled', label: `Starts ${dayMonth(c.validFrom)}` }
+  if (c.validUntil) {
+    const n = daysBetween(today, c.validUntil)
+    if (n <= 14) return { kind: 'soon', label: n === 0 ? 'Ends today' : `Ends in ${n} ${n === 1 ? 'day' : 'days'}` }
+  }
+  return { kind: 'live', label: 'In use' }
 }

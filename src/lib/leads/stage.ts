@@ -18,6 +18,13 @@ export const STAGE_LABEL: Readonly<Record<LeadStage, string>> = {
   appt: 'Appointment', came: 'Came', closed: 'Closed', lost: 'Lost',
 }
 
+/** Each status's words and dot colours, as the v2 handoff's `ST` (`--lv-*` token names). */
+export const STAGE_TONE: Readonly<Record<LeadStage, { fg: string; dot: string }>> = {
+  nophone: { fg: 'fg-3', dot: 'faint' }, new: { fg: 'accent', dot: 'accent' }, handed: { fg: 'fg-2', dot: 'fg-3' },
+  contacted: { fg: 'fg-2', dot: 'amber-dot' }, appt: { fg: 'warn', dot: 'amber-dot' }, came: { fg: 'pos', dot: 'chart-phone' },
+  closed: { fg: 'pos', dot: 'pos' }, lost: { fg: 'fg-4', dot: 'line-4' },
+}
+
 /** The tabs over the list. */
 export const STAGE_TABS: ReadonlyArray<{ id: LeadStage | 'all'; label: string }> = [
   { id: 'all', label: 'All' }, { id: 'nophone', label: 'No phone' }, { id: 'new', label: 'Not handed' },
@@ -77,6 +84,9 @@ export const RANGES: ReadonlyArray<{ id: RangeId; label: string }> = [
   { id: 'today', label: 'Today' }, { id: 'yest', label: 'Yesterday' }, { id: 'week', label: 'This week' },
   { id: 'month', label: 'This month' }, { id: 'last', label: 'Last month' }, { id: 'all', label: 'All time' }, { id: 'custom', label: 'Custom' },
 ]
+
+/** The range menu as the v2 handoff draws it (Today · Yesterday · This week · This month · Custom); old ?r=last / all links still read. */
+export const RANGE_MENU: ReadonlyArray<{ id: RangeId; label: string }> = RANGES.filter(r => r.id !== 'last' && r.id !== 'all')
 
 const day = (iso: string, plus: number) => new Date(Date.parse(iso + 'T00:00:00Z') + plus * 864e5).toISOString().slice(0, 10)
 const isDay = (v: string | undefined): v is string => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v + 'T00:00:00Z'))

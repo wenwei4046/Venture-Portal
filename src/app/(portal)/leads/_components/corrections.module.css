@@ -1,0 +1,42 @@
+/* Lead View v2 › AI corrections (the handoff's reference, `Lead View App.dc.html` lines 1307–1337; README §7.11). The
+   board, nav, search, rows and detail are Settings' (settings.module.css); these are its own. */
+
+.navKicker { font-size: 11px; letter-spacing: 0.1em; color: rgb(var(--lv-fg-4)); padding: 4px 10px 6px; }
+.navGap { height: 10px; }
+.dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: transparent; }
+.dot[data-st='open'] { background: rgb(var(--lv-warn)); }
+.dot[data-st='saved'] { background: rgb(var(--lv-pos)); }
+.dot[data-st='dism'] { background: rgb(var(--lv-fg-4)); }
+.count { font-size: 12px; color: rgb(var(--lv-fg-3)); }
+.count[data-rust] { color: rgb(var(--lv-accent)); }
+.row { cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 11px 10px; border-radius: 10px; background: transparent; }
+.row:hover { background: rgb(var(--lv-surface-hover)); }
+.row[aria-selected='true'] { background: rgb(var(--lv-surface-sel)); }
+.rowText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.q { font-size: 14px; font-weight: 500; color: rgb(var(--lv-fg)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { font-size: 12px; color: rgb(var(--lv-fg-3)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st { flex: none; display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+.st::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.st[data-st='open'] { color: rgb(var(--lv-warn)); }
+.st[data-st='saved'] { color: rgb(var(--lv-pos)); }
+.st[data-st='dism'] { color: rgb(var(--lv-fg-4)); }
+.block { display: flex; flex-direction: column; gap: 6px; }
+.asked { font-family: var(--lv-font-title); font-size: 18px; line-height: 1.35; color: rgb(var(--lv-fg)); overflow-wrap: anywhere; }
+.said { padding: 10px 12px; border-radius: 10px; background: rgb(var(--lv-surface-sel)); font-size: 13px; line-height: 1.5; color: rgb(var(--lv-fg-3)); text-decoration: line-through; text-decoration-color: rgb(var(--lv-disabled)); white-space: pre-wrap; overflow-wrap: anywhere; }
+.right { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid rgb(var(--lv-line)); background: rgb(var(--lv-surface)); font-family: inherit; font-size: 14px; line-height: 1.5; color: rgb(var(--lv-fg)); outline: none; resize: vertical; }
+.right:focus { border-color: rgb(var(--lv-focus-line)); }
+.acts { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.save { white-space: nowrap; cursor: pointer; height: 36px; border: none; border-radius: 9px; background: rgb(var(--lv-accent)); font-family: inherit; font-size: 13px; font-weight: 500; line-height: normal; color: rgb(var(--lv-surface)); }
+.save:disabled { cursor: default; background: rgb(var(--lv-disabled)); }
+.dismiss { white-space: nowrap; cursor: pointer; height: 36px; padding: 0 14px; border: 1px solid rgb(var(--lv-line)); border-radius: 9px; background: rgb(var(--lv-surface)); font-family: inherit; font-size: 13px; line-height: normal; color: rgb(var(--lv-fg-2)); }
+.dismiss:hover:not(:disabled) { background: rgb(var(--lv-surface-hover)); }
+.done { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+.done > span { flex: 1; }
+.done[data-st='saved'] { background: rgb(var(--lv-pos-tint)); color: rgb(var(--lv-pos)); }
+.done[data-st='dism'] { background: rgb(var(--lv-page)); color: rgb(var(--lv-fg-2)); }
+.doneBtn { white-space: nowrap; cursor: pointer; height: 28px; padding: 0 10px; border: none; border-radius: 7px; background: rgb(var(--lv-surface)); font-family: inherit; font-size: 12px; line-height: 28px; color: rgb(var(--lv-fg)); text-decoration: none; }
+.done[data-st='saved'] .doneBtn { color: rgb(var(--lv-pos)); }
+.ctxCatch { position: fixed; inset: 0; z-index: 60; }
+.ctx { position: fixed; z-index: 61; min-width: 200px; box-sizing: border-box; display: flex; flex-direction: column; padding: 5px; border-radius: 11px; background: rgb(var(--lv-surface)); border: 1px solid rgb(var(--lv-line)); box-shadow: 0 10px 28px rgba(43, 33, 28, 0.14); }
+.ctxItem { cursor: pointer; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: none; border-radius: 7px; background: transparent; font-family: inherit; font-size: 13px; line-height: normal; color: rgb(var(--lv-fg)); text-align: left; white-space: nowrap; }
+.ctxItem:hover { background: rgb(var(--lv-surface-sel)); }

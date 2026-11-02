@@ -99,7 +99,15 @@ export interface LeadContact {
   /** Customer Service's labels on this customer (mig 20261027190000). */
   labels?: LeadLabelChip[]
   updatedAt?: string
+  /** For the salesperson (Lead View v2, mig 20261102100000): the customer's language and anything special. */
+  language?: LeadLanguage | ''
+  specialRequest?: string
+  /** The phone was typed by CS, kept as typed (mig 20261102100000) — "Phone · added by you". */
+  phoneTyped?: boolean
 }
+
+export type LeadLanguage = 'Mandarin' | 'English' | 'Malay' | 'Other'
+export const LEAD_LANGUAGES: LeadLanguage[] = ['Mandarin', 'English', 'Malay', 'Other']
 
 export type LabelTone = 'grey' | 'amber' | 'green' | 'red' | 'clay' | 'blue'
 export const LABEL_TONES: LabelTone[] = ['grey', 'amber', 'green', 'red', 'clay', 'blue']
@@ -152,4 +160,6 @@ export interface LeadCardFields {
   showroom?: string
   preferredTime?: string
   note?: string
+  language?: LeadLanguage | ''
+  specialRequest?: string
 }

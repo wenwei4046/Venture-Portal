@@ -1425,6 +1425,255 @@ await db.exec(`
 
   check((await q(`select public.lead_ingest_ad_return($1::jsonb) n`, [JSON.stringify([{ pageId: P, psid: '7703999', ad: { sourceId: AGAIN_AD } }, { pageId: P, psid: '7703001', ad: { sourceId: 'x' } }])]))[0].n, 0, 'nobody we have, or no ad: nothing')
   check((await q(`select has_function_privilege('authenticated', 'public.lead_ingest_ad_return(jsonb)', 'execute') a`))[0].a, false, 'the service role’s alone')
+
+  // ── Lead View v2's customer panel: Language, Special request, a phone typed by hand (mig 20261102100000) ──
+  check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_save_card', 'lead_contact_json') order by 1`)).map(r => [r.proname, r.m]),
+    [['lead_contact_json', 'f5de0ecb6a72fc1f34247c333a11f7a9'], ['lead_save_card', '0cc93c19a0d0c3d20b6888eb56c33e70']], 'the card’s save and reader here are production’s')
+  await db.exec(await f('20261102100000_lead_v2_card.sql'))
+  await as(CS_USER, ALL)
+  const v2card = async () => (await q(`select phone, phone_state, phone_typed, language, special_request from public.lead_contacts where id = $1`, [ba]))[0]
+  await q(`update public.lead_contacts set phone = null, phone_state = 'none', phone_typed = false where id = $1`, [ba])
+  await q(`select public.lead_save_card($1, '{"phone":"+65 9123 4567"}')`, [ba])
+  check(await v2card(), { phone: '+65 9123 4567', phone_state: 'confirmed', phone_typed: true, language: '', special_request: '' }, 'a foreign number typed by hand is kept as typed')
+  await q(`select public.lead_save_card($1, '{"phone":"012 338 4721"}')`, [ba])
+  check((await v2card()).phone, '0123384721', 'a Malaysian mobile typed by hand is kept as its digits')
+  check((await v2card()).phone_typed, true, 'and says it was typed')
+  await refuses(`select public.lead_save_card($1, '{"phone":"call me"}')`, [ba], /Type a phone number/, 'words with no number are not a phone')
+  await q(`update public.lead_contacts set phone = '0198765432', phone_state = 'detected', phone_typed = false where id = $1`, [ba])
+  await q(`select public.lead_save_card($1, '{"phone":"0198765432"}')`, [ba])
+  check(await v2card(), { phone: '0198765432', phone_state: 'confirmed', phone_typed: false, language: '', special_request: '' }, 'the number found in the chat, confirmed, is not typed')
+  await q(`select public.lead_save_card($1, '{"language":"Malay","specialRequest":"  Needs delivery to 3rd floor  "}')`, [ba])
+  check([(await v2card()).language, (await v2card()).special_request], ['Malay', 'Needs delivery to 3rd floor'], 'language and special request are kept')
+  await q(`select public.lead_save_card($1, '{"language":"Klingon"}')`, [ba])
+  check((await v2card()).language, 'Malay', 'a language off the list is not taken')
+  await refuses(`update public.lead_contacts set phone = '+65 9123 4567', phone_typed = false where id = $1`, [ba], /phone_check/, 'only a typed phone may be outside the Malaysian form')
+  const cardJson = (await q(`select public.lead_contact_json(c) j from public.lead_contacts c where id = $1`, [ba]))[0].j
+  check([cardJson.language, cardJson.specialRequest, cardJson.phoneTyped, 'psid' in cardJson], ['Malay', 'Needs delivery to 3rd floor', false, true], 'the card carries the three keys beside the rest')
+  await q(`select public.lead_save_card($1, '{"phone":""}')`, [ba])
+  check((await v2card()).phone_typed, false, 'a cleared phone is no longer typed')
+
+  // Leads' bulk hand-over (mig 20261102100100): the sales group's hand-over asks no page of its own any more.
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_handoff_group'`))[0].m, '3f611e3a93e94b9504c6f32f10763042', 'the hand-over here is production’s')
+  await db.exec(await f('20261102100100_lead_v2_card_guards.sql'))
+  const hg = (await q(`select prosrc, prosecdef from pg_proc where proname = 'lead_handoff_group'`))[0]
+  check([hg.prosrc.includes('tab_write_guard'), hg.prosrc.includes(`lead_need(ARRAY['leads.edit']`), hg.prosecdef], [false, true, true], 'it keeps its own check, DEFINER, and no page guard')
+  check([(await q(`select has_function_privilege('authenticated', 'public.lead_handoff_group(uuid)', 'execute') a`))[0].a,
+    (await q(`select has_function_privilege('anon', 'public.lead_handoff_group(uuid)', 'execute') a`))[0].a], [true, false], 'authenticated may call it, anon may not')
+  // ── Lead View v2 › Settings' Pages and Working hours' On Leave (mig 20261102110000 / 100) ──
+  const colsBefore = await q(`select id, fb_page_id, ig_account_id from public.lead_brands where deleted_at is null order by id`)
+  await db.exec(await f('20261102110000_lead_v2_pages_leave.sql'))
+  await db.exec(await f('20261102110100_lead_v2_pages_leave_guards.sql'))
+  for (const [fn, page] of [['lead_connect_page', '/leads/settings'], ['lead_set_page', '/leads/settings'], ['lead_disconnect_page', '/leads/settings'], ['lead_save_leave', '/leads/hours']]) {
+    const src = (await q('select prosrc from pg_proc where proname = $1', [fn]))[0].prosrc
+    check(src.includes(`PERFORM public.tab_write_guard(ARRAY['${page}'], ARRAY['leads.manage']);`), true, `${fn} asks ${page}`)
+  }
+  await as(CS_USER, ALL)
+  const seeded = (await q(`select public.lead_pages() p`))[0].p
+  check(seeded.length, colsBefore.reduce((n, b) => n + (b.fb_page_id ? 1 : 0) + (b.ig_account_id ? 1 : 0), 0), 'every Page and Instagram id on a brand is seeded as a page')
+  const brandCols = async id => (await q(`select fb_page_id f, ig_account_id i from public.lead_brands where id = $1`, [id]))[0]
+  const b4 = (await q(`select id from public.lead_brands where name = 'Brand Four'`))[0].id
+  await refuses(`select public.lead_connect_page('{"channel":"messenger","externalId":"abc","brandId":"${b4}"}')`, [], /Pick a page/, 'a page id is digits')
+  if (seeded[0]) await refuses(`select public.lead_connect_page($1::jsonb)`, [JSON.stringify({ channel: seeded[0].channel, externalId: seeded[0].externalId, brandId: b4 })], /connected already/, 'a page is connected once')
+  const pg4 = (await q(`select public.lead_connect_page($1::jsonb) i`, [JSON.stringify({ channel: 'messenger', externalId: '555000111', name: 'Brand Four Page', brandId: b4, reply: 'ai' })]))[0].i
+  check((await brandCols(b4)).f, '555000111', 'connecting puts the Page in its brand (the ingest finds it there)')
+  check((await q(`select work_reply, after_reply from public.lead_reply_pages where brand_id = $1 and channel = 'messenger'`, [b4]))[0], { work_reply: 'ai', after_reply: 'ai' }, 'and Reply rules gets its row with the first reply')
+  await refuses(`select public.lead_connect_page($1::jsonb)`, [JSON.stringify({ channel: 'messenger', externalId: '555000222', brandId: b4 })], /has a Facebook Page already/, 'one Facebook Page a brand')
+  await q(`select public.lead_set_page($1, '{"paused":true}')`, [pg4])
+  check((await brandCols(b4)).f, null, 'a paused page leaves its brand (its messages are ignored)')
+  await q(`select public.lead_set_page($1, '{"paused":false}')`, [pg4])
+  check((await brandCols(b4)).f, '555000111', 'resumed, it is back')
+  const nb = (await q(`select public.lead_connect_page($1::jsonb) i`, [JSON.stringify({ channel: 'instagram', externalId: '666000111', pageId: '555000111', name: '@five', newBrand: 'Brand Five', reply: 'cs' })]))[0].i
+  const b5 = (await q(`select brand_id from public.lead_pages where id = $1`, [nb]))[0].brand_id
+  check([(await q(`select name from public.lead_brands where id = $1`, [b5]))[0].name, (await brandCols(b5)).i], ['Brand Five', '666000111'], '+ New brand makes the brand and puts the account in it')
+  await q(`select public.lead_set_page($1, $2::jsonb)`, [nb, JSON.stringify({ brandId: b4 })])
+  check([(await brandCols(b5)).i, (await brandCols(b4)).i], [null, '666000111'], 'moving it to another brand moves the id')
+  await q(`select public.lead_disconnect_page($1)`, [nb])
+  check([(await brandCols(b4)).i, (await q(`select count(*)::int n from public.lead_pages where id = $1`, [nb]))[0].n], [null, 0], 'disconnected: gone, and its brand no longer finds it')
+  await refuses(`select public.lead_disconnect_page($1)`, [nb], /not connected any more/, 'twice: said')
+  await as(CS_USER, ['leads.view'])
+  await refuses(`select public.lead_set_page($1, '{"paused":true}')`, [pg4], /Lead View · Manage/, 'pages need Manage')
+  await refuses(`select public.lead_save_leave('[]')`, [], /Lead View · Manage/, 'leave needs Manage')
+  check(Array.isArray((await q(`select public.lead_pages() p`))[0].p), true, 'View reads the pages')
+  await as(CS_USER, ALL)
+  await refuses(`select public.lead_save_leave('[{"name":"Mei Ling","from":"2026-11-04","to":"2026-11-02"}]')`, [], /same day or later/, 'leave runs forwards')
+  await q(`select public.lead_save_leave('[{"name":"Mei Ling","from":"2026-11-02","to":"2026-11-04"},{"name":"Jia Hui","from":"2026-12-24","to":"2026-12-24"}]')`)
+  const lv = (await q(`select public.lead_leave() l`))[0].l
+  check(lv.map(x => [x.name, x.from, x.to]), [['Mei Ling', '2026-11-02', '2026-11-04'], ['Jia Hui', '2026-12-24', '2026-12-24']], 'leave kept, in date order')
+  await q(`select public.lead_save_leave($1::jsonb)`, [JSON.stringify([{ ...lv[0], to: '2026-11-05' }])])
+  check((await q(`select public.lead_leave() l`))[0].l.map(x => [x.id, x.to]), [[lv[0].id, '2026-11-05']], 'saved whole: one kept and changed, one left out removed')
+  for (const sig of ['lead_pages()', 'lead_connect_page(jsonb)', 'lead_set_page(uuid,jsonb)', 'lead_disconnect_page(uuid)', 'lead_leave()', 'lead_save_leave(jsonb)']) {
+    check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
+  }
+  check((await q(`select has_function_privilege('authenticated', 'public.lead_page_sync(uuid,text)', 'execute') a`))[0].a, false, 'the sync is only for the functions')
+  // ── Lead View v2 › Reply templates and the Step library (mig 20261102120000) ──
+  check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_flow_send', 'lead_flow_also', 'lead_outbox', 'lead_save_library_item') order by 1`)).map(r => [r.proname, r.m]),
+    [['lead_flow_also', '372865466dfcca837b8f0bfeb7d19296'], ['lead_flow_send', '35120029381043ad3520aaeab83e45ec'], ['lead_outbox', '2313898ccd6174412078db73754855e3'], ['lead_save_library_item', 'f7ed4ccd027b1d47957b599931e32560']],
+    'the runner, the outbox and the library save here are production’s')
+  await db.exec(await f('20261102120000_lead_v2_templates.sql'))
+  const srcOf = async n => (await q('select prosrc from pg_proc where proname = $1', [n]))[0].prosrc
+  check([(await srcOf('lead_flow_send')).includes('lead_flow_say_file(p_contact, p_flow.name, s);'), (await srcOf('lead_flow_also')).includes('lead_flow_say_file(p_contact, p_flow.name, s);'),
+    (await srcOf('lead_outbox')).includes('mediaPath'), (await srcOf('lead_save_library_item')).includes('lead_library_push(p_id)')], [true, true, true, true], 'each body has its one statement')
+  check([(await q(`select has_function_privilege('authenticated', 'public.lead_flow_say_file(uuid,text,jsonb)', 'execute') a`))[0].a,
+    (await q(`select has_function_privilege('authenticated', 'public.lead_library_push(uuid)', 'execute') a`))[0].a], [false, false], 'the two helpers are the functions’ alone')
+
+  // A template step's photo goes just before its words.
+  const FILE_AD = '120249999000077'
+  const PIC = 'chat/tpl/11111111-2222-3333-4444-555555555555/sofa.jpg'
+  await q(`insert into public.file_objects (bucket_id, name) values ('lead-media', $1)`, [PIC])
+  const picFlow = (await q(`insert into public.lead_flows (name, template, trigger_kind, trigger_value, active, steps) values ('Photo first', 'custom', 'first', '', false, $1::jsonb) returning id`,
+    [JSON.stringify([{ id: 'w', kind: 'message', text: 'Here is our sofa.', next: '', file: { path: PIC, name: 'sofa.jpg', mime: 'image/jpeg', size: 1000 } }])]))[0].id
+  await q(`insert into public.lead_reply_rules (ad_id, at_when, reply) values ($1, 'any', $2)`, [FILE_AD, picFlow])
+  await inMsg('7709001', 'hi', { sourceId: FILE_AD, headline: 'Sofa photo' })
+  const picC = await contactOf('7709001')
+  const picSent = await q(`select body, media_path, media_mime from public.lead_messages where contact_id = $1 and sender = 'flow' order by id`, [picC])
+  check(picSent.map(m => [m.body, m.media_path, m.media_mime]), [['[Photo]', PIC, 'image/jpeg'], ['Here is our sofa.', null, null]], 'the photo, then the words')
+  const picOut = (await q('select public.lead_outbox($1::uuid[]) o', [[picC]]))[0].o
+  check(picOut.map(o => [o.body, o.mediaPath ?? null, o.mediaMime ?? null]), [['[Photo]', PIC, 'image/jpeg'], ['Here is our sofa.', null, null]], 'the outbox hands the file’s path and type')
+  await q(`select public.lead_flow_say_file($1, 'x', $2::jsonb)`, [picC, JSON.stringify({ file: { path: 'chat/tpl/11111111-2222-3333-4444-555555555555/not-there.pdf', mime: 'application/pdf' } })])
+  await q(`select public.lead_flow_say_file($1, 'x', $2::jsonb)`, [picC, JSON.stringify({ file: { path: '../secret', mime: 'image/png' } })])
+  check((await q(`select count(*)::int n from public.lead_messages where contact_id = $1 and sender = 'flow'`, [picC]))[0].n, 2, 'a file not uploaded, or outside the templates’ folder, sends nothing')
+
+  // A library save updates every template that uses the step, each keeping its own way on.
+  await as(CS_USER, ALL)
+  const libId = (await q(`select public.lead_save_library_item(null, $1::jsonb) i`, [JSON.stringify({ kind: 'step', name: 'Pick a size', steps: [{ id: 's1', kind: 'question', name: 'Pick a size', text: 'Which size?', buttons: [{ label: '4 seater', next: '' }, { label: '6 seater', next: '' }] }] })]))[0].i
+  const useTpl = async name => (await q(`select public.lead_save_template(null, $1::jsonb) i`, [JSON.stringify({ name, steps: [
+    { id: 'a', kind: 'question', name: 'Pick a size', text: 'Which size?', buttons: [{ label: '4 seater', next: 'b', endMsg: '' }, { label: '6 seater', next: '', endMsg: 'Bye' }], lib: { id: libId, ver: 1 }, pos: { x: 40, y: 40 } },
+    { id: 'b', kind: 'handoff', name: 'To a person', text: 'One of our team will reply.' },
+  ] })]))[0].i
+  const useA = await useTpl('Uses the step'), useB = await useTpl('Uses it too')
+  await q(`select public.lead_save_library_item($1, $2::jsonb)`, [libId, JSON.stringify({ kind: 'step', name: 'Pick a size', steps: [{ id: 's1', kind: 'question', name: 'Seats', text: 'How many seats?', buttons: [{ label: '4 seats', next: '' }, { label: '6 seats', next: '' }, { label: '8 seats', next: '' }] }] })])
+  for (const id of [useA, useB]) {
+    const lst = (await q(`select steps from public.lead_flows where id = $1`, [id]))[0].steps[0]
+    check([lst.name, lst.text, lst.buttons.map(b => [b.label, b.next, b.endMsg ?? null]), lst.lib.ver, lst.pos], ['Seats', 'How many seats?', [['4 seats', 'b', ''], ['6 seats', '', 'Bye'], ['8 seats', '', null]], 2, { x: 40, y: 40 }], 'the template takes the new words and keeps its way on')
+  }
+  check((await q(`select public.lead_library() l`))[0].l.find(x => x.id === libId).usedIn.map(u => u.outdated), [0, 0], 'no copy left behind')
+  await q(`select public.lead_remove_library_item($1)`, [libId])
+  check((await q(`select steps->0->>'text' t from public.lead_flows where id = $1`, [useA]))[0].t, 'How many seats?', 'deleting from the library changes no template')
+  // ── Lead View v2 › AI corrections and General info (mig 20261102130000 / 100) ──
+  check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_info', 'lead_save_info') order by 1`)).map(r => [r.proname, r.m]),
+    [['lead_info', '8d45c4ab8c9101ddb9a1f044132b355a'], ['lead_save_info', '8958b0b63084b31b06f965ea30777f9b']], 'General info’s reader and save here are production’s')
+  await db.exec(await f('20261102130000_lead_v2_corrections_info.sql'))
+  await db.exec(await f('20261102130100_lead_v2_corrections_info_guards.sql'))
+  check((await q(`select prosrc from pg_proc where proname = 'lead_ai_dismiss'`))[0].prosrc.includes("PERFORM public.tab_write_guard(ARRAY['/leads/corrections'], ARRAY['leads.manage']);"), true, 'Dismiss asks AI corrections')
+  check((await q(`select prosrc from pg_proc where proname = 'lead_save_info'`))[0].prosrc.includes("PERFORM public.tab_write_guard(ARRAY['/leads/info'], ARRAY['leads.manage']);"), true, 'the info save keeps its guard')
+  await as(CS_USER, ALL)
+  const dCon = (await q(`select id from public.lead_contacts limit 1`))[0].id
+  const dId = (await q(`insert into public.lead_ai_drafts (contact_id, draft, outcome, sent_text) values ($1, 'We deliver everywhere', 'edited', 'Klang Valley only') returning id`, [dCon]))[0].id
+  await q(`select public.lead_ai_dismiss($1, true)`, [dId])
+  check((await q(`select public.lead_ai_dismissed() d`))[0].d, [Number(dId)], 'a dismissed correction is listed')
+  await q(`select public.lead_ai_dismiss($1, false)`, [dId])
+  check((await q(`select public.lead_ai_dismissed() d`))[0].d, [], 'moved back to review')
+  await refuses(`select public.lead_ai_dismiss(-1, true)`, [], /That correction is gone/, 'a draft that is no correction')
+  await as(CS_USER, ['leads.view'])
+  await refuses(`select public.lead_ai_dismiss($1, true)`, [dId], /Lead View · Manage/, 'dismissing needs Manage')
+  await as(CS_USER, ALL)
+
+  const inf = (await q(`select public.lead_info() i`))[0].i
+  const bs = (await q(`select id from public.lead_brands where deleted_at is null order by sort_order, name limit 2`)).map(r => r.id)
+  const two = (await q(`select public.lead_save_info($1::jsonb) i`, [JSON.stringify({
+    cats: [...inf.cats.map(c => ({ id: c.id, label: c.id === inf.cats[0].id ? 'Our showrooms' : c.label, icon: c.id === inf.cats[0].id ? 'sofa' : c.icon })), { id: 'new-c', label: 'Warranty', icon: 'shield-check' }],
+    cards: [...inf.cards, { catId: 'new-c', brandIds: bs, name: 'Two-brand warranty', code: '', status: 'on', validFrom: null, validUntil: null, note: '',
+      fields: [{ key: null, label: 'Years', value: '5', type: 'number' }, { key: null, label: 'Odd', value: 'x', type: 'weird' }], uses: [] }],
+  })]))[0].i
+  const wc = two.cards.find(c => c.name === 'Two-brand warranty')
+  check([wc.brandIds.slice().sort(), wc.brandId, wc.fields.map(f => f.type)], [bs.slice().sort(), null, ['number', 'text']], 'several brands kept (no single brandId), a detail’s type kept, an unknown one read as text')
+  check([two.cats[0].label, two.cats[0].icon, two.cats.find(c => c.label === 'Warranty').icon], ['Our showrooms', 'sofa', 'shield-check'], 'a category is renamed and re-iconed; a new one keeps its icon')
+  const one = (await q(`select public.lead_save_info($1::jsonb) i`, [JSON.stringify({ cats: two.cats, cards: two.cards.map(c => (c.id === wc.id ? { ...c, brandIds: [bs[0]] } : c)) })]))[0].i
+  check(one.cards.find(c => c.id === wc.id).brandId, bs[0], 'one brand: brandId is that brand, for older readers')
+  await refuses(`select public.lead_save_info($1::jsonb)`, [JSON.stringify({ cats: one.cats, cards: one.cards.map(c => (c.id === wc.id ? { ...c, brandIds: ['00000000-0000-0000-0000-000000000000'] } : c)) })], /brand that is not there/, 'a brand that is not there')
+  for (const sig of ['lead_ai_dismissed()', 'lead_ai_dismiss(bigint,boolean)']) {
+    check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
+  }
+
+  // ── Lead View v2 › Data Center and the AI Agent's Knowledge (mig 20261102140000 / 100) ──
+  check((await q(`select proname, md5(prosrc) m from pg_proc where proname in ('lead_data_file_json', 'lead_save_data_file', 'lead_remove_data_file', 'lead_ai_more', 'lead_save_ai') order by 1`)).map(r => [r.proname, r.m]),
+    [['lead_ai_more', '1d99ad70ccfb20873222f9b85428fca5'], ['lead_data_file_json', '419b0ce8a9265dce2dc289111dba9f5a'], ['lead_remove_data_file', '70861acfc3c61b047c9f229b8aa6bf8b'],
+      ['lead_save_ai', 'd809a916bd4b5e7df55c6785cc1b8af5'], ['lead_save_data_file', 'cd0f1d7f77b55d8548c3267c3cafdf7e']], 'the five bodies here are production’s')
+  // A source picked before the migration becomes a file of Knowledge.
+  const [b1, b2] = bs
+  const oldFile = (await q(`select id from public.lead_data_files where deleted_at is null and kind = 'file' limit 1`))[0].id
+  await q(`update public.lead_data_files set brand_id = null where id = $1`, [oldFile])
+  await q(`insert into public.lead_ai_sources (brand_id, file_id, paused, added_by_name) values ($1, $2, true, 'Mei Ling') on conflict (brand_id, file_id) do update set paused = true, added_by_name = 'Mei Ling'`, [b1, oldFile])
+  await db.exec(await f('20261102140000_lead_v2_data_center.sql'))
+  await db.exec(await f('20261102140100_lead_v2_data_center_guards.sql'))
+  for (const [fn, pages] of [['lead_save_data_folder', "ARRAY['/leads/knowledge']"], ['lead_remove_data_folder', "ARRAY['/leads/knowledge']"], ['lead_link_checked', "ARRAY['/leads/knowledge']"], ['lead_data_file_until', "ARRAY['/leads/knowledge', '/leads/ai']"]]) {
+    check((await q(`select prosrc from pg_proc where proname = $1`, [fn]))[0].prosrc.includes(`PERFORM public.tab_write_guard(${pages}, ARRAY['leads.manage']);`), true, `${fn} asks its page`)
+  }
+  check((await q(`select kind, paused, added_by_name from public.lead_ai_knowledge where brand_id = $1 and ref = $2`, [b1, oldFile]))[0], { kind: 'file', paused: true, added_by_name: 'Mei Ling' }, 'a source became Knowledge, paused as it was')
+  check((await q(`select count(*)::int n from public.lead_data_file_versions where file_id = $1`, [oldFile]))[0].n, 1, 'a file there before has its version')
+
+  // Folders: nested, coloured, unique among their siblings, moved across brands with what is inside.
+  const fold = async (idv, d) => (await q(`select public.lead_save_data_folder($1, $2::jsonb) i`, [idv, JSON.stringify(d)]))[0].i
+  const cat = await fold(null, { brandId: b1, parentId: null, name: 'Catalogues' })
+  const promo = await fold(null, { brandId: b1, parentId: null, name: 'Promotions', color: 'rust' })
+  const raya = await fold(null, { brandId: null, parentId: promo, name: 'Raya 2026' })
+  check((await q(`select brand_id from public.lead_data_folders where id = $1`, [raya]))[0].brand_id, b1, 'a folder takes its parent’s brand')
+  await refuses(`select public.lead_save_data_folder(null, $1::jsonb)`, [JSON.stringify({ brandId: b1, name: 'catalogues' })], /already has that name/, 'two folders of one name side by side')
+  await refuses(`select public.lead_save_data_folder($1, $2::jsonb)`, [promo, JSON.stringify({ parentId: raya, name: 'Promotions' })], /inside itself/, 'a folder inside its own folder')
+  await refuses(`select public.lead_save_data_folder(null, $1::jsonb)`, [JSON.stringify({ brandId: b1, name: 'X', color: 'pink' })], /folder colours/, 'a colour that is not one of the six')
+  const pPath = `files/${'6'.repeat(8)}-6666-6666-6666-${'6'.repeat(12)}/raya.pdf`, pPath2 = `files/${'7'.repeat(8)}-7777-7777-7777-${'7'.repeat(12)}/raya.pdf`
+  await db.exec(`insert into public.file_objects (bucket_id, name) values ('lead-data', '${pPath}'), ('lead-data', '${pPath2}')`)
+  const rayaFile = (await q(`select public.lead_save_data_file(null, $1::jsonb) i`, [JSON.stringify({ kind: 'file', name: 'Raya promo.pdf', folderId: raya, brandId: b2, path: pPath, mime: 'application/pdf', sizeBytes: 900 })]))[0].i
+  check((await q(`select brand_id, folder_id from public.lead_data_files where id = $1`, [rayaFile]))[0], { brand_id: b1, folder_id: raya }, 'a file’s brand is its folder’s, whatever was sent')
+  const fileRow = async () => (await q(`select public.lead_data_file_json(f) j from public.lead_data_files f where id = $1`, [rayaFile]))[0].j
+  await q(`select public.lead_save_data_file($1, $2::jsonb)`, [rayaFile, JSON.stringify({ kind: 'file', name: 'Raya promo.pdf', folderId: raya, path: pPath2, mime: 'application/pdf', sizeBytes: 950 })])
+  check((await fileRow()).versions.map(v => v.ver), [2, 1], 'Replace file adds a version')
+  await q(`select public.lead_save_data_file($1, $2::jsonb)`, [rayaFile, JSON.stringify({ kind: 'file', name: 'Raya promo 2026.pdf', folderId: raya, path: pPath2 })])
+  check([(await fileRow()).ver, (await fileRow()).versions.length, (await fileRow()).name], [2, 2, 'Raya promo 2026.pdf'], 'a rename is no new version')
+
+  // Knowledge: a folder picked reads what is in it; usedBy says so; only its brand's folder or Shared.
+  const more = async b => (await q(`select public.lead_ai_more($1) m`, [b]))[0].m
+  const m1 = await more(b1)
+  check([Object.keys(m1).includes('sources'), m1.knowledge.length], [false, 1], 'lead_ai_more hands knowledge, not sources')
+  const save = (b, knowledge) => q(`select public.lead_save_ai($1, $2::jsonb)`, [b, JSON.stringify({ settings: m1.settings, answers: [], playbook: [], ...(knowledge ? { knowledge } : {}) })])
+  await save(b1, [{ kind: 'folder', ref: promo, paused: false }, { kind: 'file', ref: oldFile, paused: true }])
+  check((await fileRow()).usedBy, [{ brandId: b1, paused: false }], 'a file in a picked folder’s folder is used by that agent')
+  await save(b1, null)
+  check((await more(b1)).knowledge.length, 2, 'a save without knowledge (AI corrections) leaves Knowledge alone')
+  await refuses(`select public.lead_save_ai($1, $2::jsonb)`, [b2, JSON.stringify({ settings: {}, answers: [], playbook: [], knowledge: [{ kind: 'folder', ref: promo }] })], /its brand’s folder or Shared|its brand''s folder or Shared|its brand's folder or Shared/, 'another brand’s folder')
+  // Moving the folder to the other brand takes its folders and files along and out of the first agent.
+  await fold(promo, { brandId: b2, parentId: null, name: 'Promotions', color: 'green' })
+  check([(await q(`select brand_id from public.lead_data_folders where id = $1`, [raya]))[0].brand_id, (await q(`select brand_id from public.lead_data_files where id = $1`, [rayaFile]))[0].brand_id],
+    [b2, b2], 'a folder moved to another brand takes its folders and files')
+  check((await more(b1)).knowledge.map(k => k.kind), ['file'], 'and leaves the first brand’s agent')
+
+  // A file's end date, Restore.
+  await q(`update public.lead_data_files set valid_from = '2026-10-01' where id = $1`, [rayaFile])
+  await refuses(`select public.lead_data_file_until($1, '2026-09-01')`, [rayaFile], /end before it starts/, 'an end before the start')
+  await q(`update public.lead_data_files set status = 'paused' where id = $1`, [rayaFile])
+  await q(`select public.lead_data_file_until($1, '2026-12-31')`, [rayaFile])
+  check((await q(`select valid_until::text u, status from public.lead_data_files where id = $1`, [rayaFile]))[0], { u: '2026-12-31', status: 'active' }, 'Restore gives a new end date and turns it back on')
+
+  // Web links: checked how often, Check now keeps what it read; another address drops it.
+  const link = (await q(`select public.lead_save_data_file(null, $1::jsonb) i`, [JSON.stringify({ kind: 'link', name: '2990s.com.my/sofas', url: 'https://2990s.com.my/sofas', brandId: b1, folderId: cat, checkEvery: 'hour' })]))[0].i
+  check((await q(`select folder_id, check_every from public.lead_data_files where id = $1`, [link]))[0], { folder_id: null, check_every: 'hour' }, 'a link sits in no folder; its check frequency kept')
+  await refuses(`select public.lead_save_data_file($1, $2::jsonb)`, [link, JSON.stringify({ kind: 'link', name: 'x', url: 'https://2990s.com.my/sofas', checkEvery: 'minute' })], /every hour, day or week/, 'a frequency that is not offered')
+  await q(`select public.lead_link_checked($1, 'L-shape sofas from RM 2,990', 3, '')`, [link])
+  await q(`select public.lead_link_checked($1, '', 0, 'The page answered 404')`, [link])
+  check((await q(`select public.lead_link_text($1::uuid[]) t`, [[link]]))[0].t.map(x => x.content), ['L-shape sofas from RM 2,990'], 'a failed check keeps what the last one read')
+  const lj = (await q(`select public.lead_data_file_json(f) j from public.lead_data_files f where id = $1`, [link]))[0].j
+  check([lj.pagesRead, lj.hasContent, lj.checkError, 'content' in lj], [3, true, 'The page answered 404', false], 'the file’s JSON says what a check found, never the text')
+  await q(`select public.lead_save_data_file($1, $2::jsonb)`, [link, JSON.stringify({ kind: 'link', name: 'carress', url: 'https://carress.my/mattresses', brandId: b1, checkEvery: 'day' })])
+  check((await q(`select content, pages_read, checked_at from public.lead_data_files where id = $1`, [link]))[0], { content: '', pages_read: 0, checked_at: null }, 'another address is another page')
+  await save(b1, [{ kind: 'link', ref: link }])
+  await q(`select public.lead_remove_data_file($1)`, [link])
+  check((await more(b1)).knowledge.length, 0, 'a link deleted leaves Knowledge')
+
+  // Deleting a folder deletes its folders and their files.
+  await save(b2, [{ kind: 'folder', ref: raya }])
+  await q(`select public.lead_remove_data_folder($1)`, [promo])
+  check([(await q(`select count(*)::int n from public.lead_data_folders where id in ($1, $2)`, [promo, raya]))[0].n, (await q(`select deleted_at is not null d from public.lead_data_files where id = $1`, [rayaFile]))[0].d, (await more(b2)).knowledge.length],
+    [0, true, 0], 'a deleted folder takes its folders, its files and Knowledge’s picks')
+  await as(CS_USER, ['leads.view', 'leads.create'])
+  await refuses(`select public.lead_save_data_folder(null, $1::jsonb)`, [JSON.stringify({ brandId: b1, name: 'Y' })], /Lead View · Manage/, 'folders need Manage')
+  await refuses(`select public.lead_link_checked($1, 'x', 1, '')`, [oldFile], /Lead View · Manage/, 'a check needs Manage')
+  await as(CS_USER, ALL)
+  for (const sig of ['lead_data_folders()', 'lead_save_data_folder(uuid,jsonb)', 'lead_remove_data_folder(uuid)', 'lead_data_file_until(uuid,date)', 'lead_link_checked(uuid,text,integer,text)', 'lead_link_text(uuid[])']) {
+    check([(await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, (await q(`select has_function_privilege('anon', 'public.${sig}', 'execute') a`))[0].a], [true, false], `${sig}: authenticated, not anon`)
+  }
+  for (const sig of ['lead_data_subtree(uuid)', 'lead_data_chain(uuid)', 'lead_knowledge_tidy()']) {
+    check((await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, false, `${sig}: only the functions’`)
+  }
 }
 
 console.log(`validate-leads: ${checks} checks passed`)

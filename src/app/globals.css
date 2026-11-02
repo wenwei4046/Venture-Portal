@@ -7615,52 +7615,86 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-lead-view] {
   color-scheme: light;
-  /* One clean, formal face for every word (2026-10-28 — the user: "所有字体能不能换成看起来比较正式，舒服的字体 … 一定要可以套用
-     在全部字体上，不会出现看不懂的符号"): Inter, the portal's own, for Latin; Noto Sans SC for Chinese; then the system's
-     faces for any other script and its emoji fonts — a customer's name or message never falls back to boxes. */
-  --lv-font: var(--font-sans), 'Inter', var(--font-cjk), system-ui, -apple-system, 'Segoe UI', 'Noto Sans', 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
-  --lv-font-title: var(--lv-font);
-  --lv-ink: 43 33 28;
-  --lv-page: 243 240 236;
-  --lv-white: 255 255 255;
-  --lv-hair: 235 230 224;
-  --lv-border: 230 224 217;
-  --lv-frame: 218 210 200;
-  --lv-muted: 242 238 233;
-  --lv-hover: 246 243 239;
-  --lv-chat: 248 246 243;
-  --lv-chat-head: 250 248 245;
-  --lv-text-2: 88 76 68;
-  --lv-text-3: 104 92 84;
-  --lv-text-4: 120 108 100;
-  --lv-text-5: 150 140 130;
-  --lv-accent: 199 111 70;
-  --lv-accent-text: 176 92 54;
-  --lv-tint: 252 240 232;
-  --lv-tint-2: 246 240 232;
-  --lv-cream: 240 226 206;
-  --lv-out: 250 234 224;
-  --lv-out-edge: 240 208 190;
-  --lv-green: 76 110 80;
-  --lv-green-bg: 230 240 231;
-  /* Insight's second series (the handoff's "sand": phones, templates). */
-  --lv-sage: 141 165 143;
-  --lv-amber: 214 150 40;
-  --lv-amber-bg: 249 238 214;
-  --lv-amber-text: 110 74 10;
-  --lv-red: 168 60 40;
-  --lv-red-bg: 250 232 226;
-  --lv-nav: 46 33 26;
-  --lv-nav-text: 255 244 235;
-  --lv-nav-hover: 244 212 166;
-  --lv-nav-count: 177 165 107;
-  --lv-avatar: 140 6 16;
-  --lv-shadow-card: 0 1px 2px rgb(43 33 28 / 0.05);
+  /* The v2 handoff's faces (2026-11-02 — the user: "字体，颜色，设计，排版，名称（完全跟claude design 画的）"; supersedes
+     2026-10-28's Inter): Figtree for every word (LeadShell loads it, `--font-figtree`), Georgia for titles. Behind them
+     Noto Sans SC for Chinese, then the system's faces for any other script and the emoji fonts — a customer's name or
+     message never falls back to boxes. */
+  --lv-font: var(--font-figtree, 'Figtree'), var(--font-cjk), system-ui, -apple-system, 'Segoe UI', 'Noto Sans', 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  --lv-font-title: Georgia, var(--font-cjk), 'Times New Roman', serif;
+  --lv-font-mono: ui-monospace, Menlo, monospace;
+
+  /* README §4.1, name for name (r g b triples). */
+  --lv-fg: 43 33 28;            /* ink */
+  --lv-fg-2: 94 82 74;          /* ink-2 */
+  --lv-fg-3: 138 126 117;       /* muted */
+  --lv-fg-4: 163 151 141;       /* muted-2 */
+  --lv-disabled: 196 185 174;   /* disabled */
+  --lv-accent: 163 64 26;       /* accent (rust) */
+  --lv-accent-tint: 251 239 231;
+  --lv-accent-line: 217 184 166;
+  --lv-nav-cream: 255 244 235;
+  --lv-nav-dot: 255 217 191;
+  --lv-pos: 48 103 58;          /* positive */
+  --lv-pos-tint: 233 238 231;
+  --lv-warn: 138 90 18;
+  --lv-warn-tint: 244 240 230;
+  --lv-slate: 78 97 112;
+  --lv-slate-tint: 238 240 244;
+  --lv-plum: 122 79 110;
+  --lv-plum-tint: 243 236 241;
+  --lv-sel: 233 233 199;        /* olive-sel */
+  --lv-sel-line: 201 199 154;   /* olive-sel-line */
+  --lv-page: 244 242 232;       /* page-bg */
+  --lv-body: 233 230 221;       /* body-bg */
+  --lv-rail: 234 232 218;       /* panel-bg */
+  --lv-rail-2: 223 220 203;     /* panel-bg-2 */
+  --lv-surface: 255 255 255;
+  --lv-surface-hover: 251 250 244;
+  --lv-surface-sel: 247 246 238;
+  --lv-line: 231 229 212;
+  --lv-line-2: 243 241 231;
+  --lv-line-3: 236 234 219;
+  --lv-line-4: 222 220 200;
+  --lv-focus-line: 207 201 176;
+  --lv-chart-chats: 224 138 99;
+  --lv-chart-phone: 127 168 134;
+  --lv-amber-dot: 214 150 40;
+  /* Drawn by the reference but not in README §4.1: the Inbox's avatar, a row's last line, an outgoing bubble's edge,
+     the ✓ button's ring, the phone block's hover. */
+  --lv-avatar-bg: 239 238 221;
+  --lv-fg-last: 107 95 87;
+  --lv-sel-edge: 220 220 180;
+  --lv-ok-line: 207 220 207;
+  /* Leads: a lead's missing phone / salesperson, Needs follow-up when on. */
+  --lv-faint: 201 192 182;
+  --lv-stale-bg: 246 226 214;
+  --lv-stale-line: 232 194 172;
+  /* Reply templates and the Step library (TCOL): Gives a phone's tile, AI Agent's tile, the upload box's dashes. */
+  --lv-phone-tint: 230 238 223;
+  --lv-ai-tint: 243 233 225;
+  --lv-dash-line: 217 207 192;
+  /* General info's Ending soon pill. */
+  --lv-soon-tint: 246 235 214;
+  /* README §4.3 */
+  --lv-shadow-pop: 0 10px 28px rgb(43 33 28 / 0.14);
   --lv-shadow-menu: 0 10px 28px rgb(43 33 28 / 0.16);
+  --lv-shadow-modal: 0 20px 50px rgb(43 33 28 / 0.2);
+  --lv-shadow-drawer: 0 18px 48px rgb(43 33 28 / 0.2);
+  --lv-shadow-nav: 8px 0 32px rgb(43 33 28 / 0.22);
+  --lv-shadow-phone: 0 12px 32px rgb(43 33 28 / 0.22);
+  --lv-shadow-seg: 0 1px 2px rgb(43 33 28 / 0.08);
+  --lv-shadow-composer: 0 2px 8px rgb(43 33 28 / 0.05);
+  --lv-backdrop: rgb(43 33 28 / 0.28);
+
+
   font-family: var(--lv-font);
-  color: rgb(var(--lv-ink));
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgb(var(--lv-fg));
   background: rgb(var(--lv-page));
 }
+/* The reference leaves a button its browser line-height (normal); the portal's reset makes it inherit. */
+:where([data-lead-view]) button { line-height: normal; }
 [data-lead-view] :is(button, input, textarea, select):focus-visible {
   outline: 2px solid rgb(var(--lv-accent));
   outline-offset: 1px;

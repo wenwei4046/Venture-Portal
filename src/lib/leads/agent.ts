@@ -4,7 +4,7 @@
 // agent.test.ts. The soul (lib/leads/ai.ts) and the model call (ai-model.ts) stay; this is what step 5 adds to them.
 
 import type { KnowledgeCard } from './ai'
-import { isLive, type LeadInfo } from './info'
+import { forBrand, isLive, type LeadInfo } from './info'
 
 export const TONES: ReadonlyArray<[string, string]> = [
   ['Professional', 'Polite and precise. No emoji.'], ['Friendly', 'Warm and casual, like a helpful shop assistant.'],
@@ -32,7 +32,6 @@ export const SALES_HABITS: ReadonlyArray<[string, string]> = [
   ['Max 3 products', 'Recommend at most 3 products at a time.'],
   ['Ask room size', 'For sofas and tables, ask the room size or number of people before recommending.'],
   ['Ask budget', 'Ask the customer’s budget politely before suggesting products.'],
-  ['Send photos via sales', 'When the customer wants more photos, say the salesperson will WhatsApp them.'],
 ]
 export const AVOIDS: ReadonlyArray<[string, string]> = [
   ['No stock promises', 'Never promise stock or delivery dates. Say the salesperson will confirm.'],
@@ -62,13 +61,18 @@ export interface AgentSettings {
   upset: boolean
   maxOn: boolean
   maxReplies: number
+  /** Knowledge › General info: the cards this brand's agent does not read (v2, 2026-11-02). */
+  infoOff: string[]
+  /** Memory › Settings, as drawn (learning itself is not built). */
+  autoLearn: boolean
+  learnOthers: boolean
 }
 
 export const DEFAULT_SETTINGS: AgentSettings = {
   goal: GOALS[0][1], tone: 'Friendly', toneNote: '', rules: ['Customer’s language', 'One question at a time'], instr: '',
   habits: [], sellNote: '', avoid: ['No stock promises'], avoidNote: '', blocked: [], length: 'Short',
   phone: { on: true, afterOn: true, after: 2, ask: 'May I have your mobile number? Our salesperson will WhatsApp you the details.', wordsOn: false, words: [], wordsAsk: '' },
-  unsure: true, upset: true, maxOn: false, maxReplies: 6,
+  unsure: true, upset: true, maxOn: false, maxReplies: 6, infoOff: [], autoLearn: true, learnOthers: false,
 }
 
 const str = (v: unknown, max: number, fallback: string) => (typeof v === 'string' ? v.slice(0, max) : fallback)
@@ -98,6 +102,7 @@ export function settingsOf(raw: unknown, soulGoal = ''): AgentSettings {
       ask: str(p.ask, 600, d.phone.ask), wordsOn: bool(p.wordsOn, false), words: list(p.words, 20), wordsAsk: str(p.wordsAsk, 600, ''),
     },
     unsure: bool(r.unsure, d.unsure), upset: bool(r.upset, d.upset), maxOn: bool(r.maxOn, false), maxReplies: num(r.maxReplies, 1, 50, d.maxReplies),
+    infoOff: list(r.infoOff, 300), autoLearn: bool(r.autoLearn, d.autoLearn), learnOthers: bool(r.learnOthers, d.learnOthers),
   }
 }
 
@@ -122,7 +127,20 @@ export interface DataFile {
   updatedByName: string
   updatedAt: string
   usedBy: Array<{ brandId: string; paused: boolean }>
+  /** Since mig 20261102140000: the folder it sits in (null = right in its brand's folder; a link never). */
+  folderId?: string | null
+  /** A link: how often it is checked for changes, and what the last check found. */
+  checkEvery?: 'hour' | 'day' | 'week'
+  checkedAt?: string | null
+  pagesRead?: number
+  hasContent?: boolean
+  checkError?: string
+  /** Every upload, newest first. */
+  versions?: Array<{ ver: number; at: string; byName: string; sizeBytes: number }>
 }
+
+/** What a brand's agent reads, picked on AI Agent › Knowledge (mig 20261102140000): a folder (all that is in it), a file or a link. */
+export interface KnowledgePick { kind: 'folder' | 'file' | 'link'; ref: string; paused: boolean; addedAt?: string; addedByName?: string }
 
 export interface AgentSource { fileId: string; paused: boolean; addedAt?: string; addedByName?: string; file: DataFile }
 
@@ -131,7 +149,10 @@ export interface AgentMore {
   settings: unknown
   answers: FixedAnswer[]
   playbook: PlaySituation[]
-  sources: AgentSource[]
+  /** Before mig 20261102140000 only. */
+  sources?: AgentSource[]
+  /** Since mig 20261102140000. */
+  knowledge?: KnowledgePick[]
 }
 
 /** The Data Center's categories (the handoff's six); CS may type others. */
@@ -216,7 +237,7 @@ export function answersPrompt(answers: FixedAnswer[], playbook: PlaySituation[])
  */
 export function agentCards(old: KnowledgeCard[], info: LeadInfo | null, brandId: string, today: string, answers: FixedAnswer[], files: DataFile[]): KnowledgeCard[] {
   const infoCards: KnowledgeCard[] = info ? info.cards
-    .filter(c => isLive(c, today) && (c.brandId === null || c.brandId === brandId))
+    .filter(c => isLive(c, today) && forBrand(c, brandId))
     .map(c => ({
       id: `info-${c.id}`, brandId: c.brandId, kind: 'note', title: c.name || c.code,
       body: [...c.fields.filter(f => f.value.trim()).map(f => `${f.label}: ${f.value}`), c.note.trim()].filter(Boolean).join('\n').slice(0, 4000) || '-',
