@@ -1,5 +1,13 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-02 b (SHIPPED, #912) — Repayment Schedule's tabs' row, merged
+
+Session e73c0205, on "现在看并 merge". Checkpoint a below has #911 (shipped) and #912 (open then); this closes #912.
+
+- **MERGED:** squash `b2cab00d` (2026-11-02 04:41Z), every check green on `b7ef5dcc` (SQL 27m32s). The month and one
+  Export ▾ (Excel / PDF) at the right of Calendar / We collect / We pay; the five cards small, in one row; the phone's
+  bar Export PDF · Export Excel. DESIGN.md v4.224 over #911's v4.223. No migration.
+
 ## CHECKPOINT 2026-11-02 a (#911 SHIPPED · #912 OPEN, merge once green: "全绿就 merge") — Repayment Schedule
 
 Session e73c0205.
