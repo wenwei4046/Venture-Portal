@@ -17,6 +17,9 @@ export interface Outgoing {
   lastInAt: string | null
   /** Meta's id of the message this reply answers (mig 20261027220000); Meta quotes it above the reply. */
   replyToMid?: string | null
+  /** A template's photo or file (mig 20261102120000): its object in `lead-media` and its type. */
+  mediaPath?: string | null
+  mediaMime?: string | null
 }
 
 export type Delivered = { mid: string } | { error: string }

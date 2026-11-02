@@ -174,6 +174,6 @@ Rules every new or amended page follows:
 8. **Faces.**
    - Page titles: Newsreader (`--font-display`). Body: Inter. Figures: Chivo Mono.
    - The Revenue app's titles and amounts: Inter Tight (`--font-display-rv`).
-   - Georgia is for print only. `src/lib/design-system-tokens.test.ts` guards the tokens and the faces.
+   - Georgia is for print only — but for Lead View, whose own faces are Figtree and Georgia titles (`.claude/rules/leads/lead-view.md`). `src/lib/design-system-tokens.test.ts` guards the tokens and the faces.
 
 Canonical reference pages: DESIGN.md › Part II › Canonical reference pages (the sheet page is `src/app/(portal)/hr-costing/page.tsx`).

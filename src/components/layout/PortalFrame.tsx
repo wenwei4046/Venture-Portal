@@ -139,7 +139,7 @@ export default function PortalFrame({
         <div className="print:hidden contents md:hidden">
           <TopBar user={user} fin={false} />
         </div>
-        <LeadShell user={user} initialCollapsed={hrNavCollapsed}>{children}</LeadShell>
+        <LeadShell user={user}>{children}</LeadShell>
         <BottomTabBar role={user.role} viewer={navUser} moreOpen={moreOpen} onMoreClick={() => setMoreOpen((o) => !o)} fin={false} />
         <MoreSheet user={navUser} navData={navData} open={moreOpen} onClose={() => setMoreOpen(false)} push={push} />
         <Suspense fallback={null}>

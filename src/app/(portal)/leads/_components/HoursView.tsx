@@ -2,25 +2,37 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { saveHours } from '@/lib/leads/actions'
+import { flash } from '@/components/hrv/toast'
+import { LeadIcon } from '@/components/layout/lead-icons'
+import { saveHours, saveLeave } from '@/lib/leads/actions'
 import { DAY_NAMES, HALF_HOURS, hoursProblem, type BusinessHours, type SpecialDate, type WeekDay } from '@/lib/leads/info'
-import s from './setup.module.css'
+import { dayRange, holidayMode, type StaffLeave } from '@/lib/leads/pages'
+import s from './hours.module.css'
 
 /**
- * Lead View › Business hours (2026-10-22, the redesign v2 handoff `Business Hours.dc.html`): one week for every page
- * (Kuala Lumpur time) and special dates — a public holiday, staff leave, a closed showroom — that replace it on those
- * days, closed all day or with other hours. Saved together (lead_save_hours). The reply rules (step 4) answer the
- * after-hours customer by these; today's away flows still keep their own hours until then.
+ * Lead View v2 › Working hours (2026-11-02, the v2 handoff §7.12; renamed from Business hours, the user's point 1).
+ * Weekly hours — outside them each page uses its after-hours reply (Reply rules) — saved by *Save changes*; Public
+ * holidays replace the week on their days (the business hours' special dates: closed all day, or other hours) and On
+ * Leave lists who is away (mig 20261102110000); both save as each is added or removed. Kuala Lumpur time.
  */
-export default function HoursView({ hours, ready, today, canEdit }: { hours: BusinessHours; ready: boolean; today: string; canEdit: boolean }) {
+export default function HoursView({ hours, leave, agents, ready, leaveReady, today, canEdit }: {
+  hours: BusinessHours
+  leave: StaffLeave[]
+  /** Who can be on leave: the logins Lead View's Inbox lists (lead_agents). */
+  agents: Array<{ id: string; name: string }>
+  ready: boolean
+  leaveReady: boolean
+  today: string
+  canEdit: boolean
+}) {
   const router = useRouter()
-  const [tab, setTab] = useState<'week' | 'special'>('week')
   const [week, setWeek] = useState<WeekDay[]>(hours.week)
-  const [specials, setSpecials] = useState<SpecialDate[]>(hours.specials)
   const [dirty, setDirty] = useState(false)
-  const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const [busy, start] = useTransition()
+  const [addingH, setAddingH] = useState(false)
+  const [addingL, setAddingL] = useState(false)
+  const year = Number(today.slice(0, 4))
 
   useEffect(() => {
     if (!dirty) return
@@ -29,117 +41,188 @@ export default function HoursView({ hours, ready, today, canEdit }: { hours: Bus
     return () => window.removeEventListener('beforeunload', ask)
   }, [dirty])
 
-  const touch = () => { setDirty(true); setNote(''); setError('') }
-  const setDay = (i: number, o: Partial<WeekDay>) => { touch(); setWeek(w => w.map((d, j) => (j === i ? { ...d, ...o } : d))) }
-  const setSp = (i: number, o: Partial<SpecialDate>) => { touch(); setSpecials(x => x.map((d, j) => (j === i ? { ...d, ...o } : d))) }
-  const save = () => {
-    const problem = hoursProblem({ week, specials })
+  const setDay = (i: number, o: Partial<WeekDay>) => { setDirty(true); setError(''); setWeek(w => w.map((d, j) => (j === i ? { ...d, ...o } : d))) }
+  const copyMonday = () => { const m = week[0]; setDirty(true); setWeek(w => w.map(d => (d.on ? { ...d, from: m.from, to: m.to } : d))) }
+  const saveWeek = () => {
+    const problem = hoursProblem({ week, specials: hours.specials })
     if (problem) { setError(problem); return }
     start(async () => {
-      const r = await saveHours(week, specials)
+      const r = await saveHours(week, hours.specials)
       if (!r.ok) { setError(r.reason); return }
       setDirty(false)
-      setNote('Saved · just now')
+      flash('Working hours saved')
       router.refresh()
     })
   }
-  const upcoming = specials.filter(x => x.to >= today).length
-  const dis = !canEdit
+  // A holiday saves at once, over the week as last saved (unsaved week edits stay unsaved).
+  const saveSpecials = (specials: SpecialDate[], done?: () => void) => {
+    const problem = hoursProblem({ week: hours.week, specials })
+    if (problem) { setError(problem); return }
+    start(async () => {
+      setError('')
+      const r = await saveHours(hours.week, specials)
+      if (!r.ok) { setError(r.reason); return }
+      done?.()
+      router.refresh()
+    })
+  }
+  const keepLeave = (rows: StaffLeave[], done?: () => void) => start(async () => {
+    setError('')
+    const r = await saveLeave(rows)
+    if (!r.ok) { setError(r.reason); return }
+    done?.()
+    router.refresh()
+  })
+  const holidays = hours.specials.filter(x => x.to >= today)
+  const away = leave.filter(x => x.to >= today)
+  const dis = !canEdit || !ready
 
   return (
-    <div className={s.page}>
-      <div className={s.head}>
-        <div className={s.titles}>
-          <span className={s.eyebrow}>SET UP</span>
-          <h1 className={s.title}>Business hours</h1>
+    <div className={s.grid}>
+      <section className={s.card} aria-label="Weekly hours">
+        <div className={s.head}>
+          <div className={s.titles}>
+            <span className={s.title}>Weekly hours</span>
+            <span className={s.sub}>Outside these hours, each page uses its after-hours reply. Kuala Lumpur time (GMT+8).</span>
+          </div>
+          <span className={s.open}>{week.filter(d => d.on).length} open days</span>
         </div>
-        {note ? <span className={s.saved}>{note}</span> : dirty ? <span className={s.saveHint} data-dirty="">Unsaved changes</span> : null}
-        {canEdit ? <button type="button" className={s.btn} data-strong="" onClick={save} disabled={busy || !dirty || !ready}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
-      </div>
-      <div className={s.tabs} role="group" aria-label="Business hours">
-        <button type="button" className={s.tab} aria-pressed={tab === 'week'} onClick={() => setTab('week')} title={`${week.filter(d => d.on).length} open days`}>Weekly hours</button>
-        <button type="button" className={s.tab} aria-pressed={tab === 'special'} onClick={() => setTab('special')} title={`${upcoming} upcoming`}>Special dates</button>
-      </div>
-      {!ready ? <div className={s.notReady}>Waiting for the database update — you can try the page, but nothing is saved yet.</div> : null}
-      {error ? <div className={s.error} role="alert"><span>{error}</span></div> : null}
+        {week.map((d, i) => (
+          <div key={d.day} className={s.day}>
+            <button type="button" role="switch" aria-checked={d.on} aria-label={`${DAY_NAMES[d.day - 1]} open`} title="Open / closed" className={s.toggle} disabled={dis} onClick={() => setDay(i, { on: !d.on })} />
+            <span className={s.name}>{DAY_NAMES[d.day - 1]}</span>
+            {d.on ? (
+              <div className={s.times}>
+                <TimeSelect value={d.from} onChange={v => setDay(i, { from: v })} disabled={dis} label={`${DAY_NAMES[d.day - 1]} opens`} />
+                <span className={s.to}>to</span>
+                <TimeSelect value={d.to} onChange={v => setDay(i, { to: v })} disabled={dis} label={`${DAY_NAMES[d.day - 1]} closes`} />
+              </div>
+            ) : <span className={s.closed}>Closed</span>}
+          </div>
+        ))}
+        <div className={s.foot}>
+          <button type="button" className={s.copy} onClick={copyMonday} disabled={dis}>Copy Monday’s hours to all open days</button>
+          {canEdit ? <button type="button" className={s.save} onClick={saveWeek} disabled={busy || !ready} title={ready ? undefined : 'Waiting for the database update'}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
+        </div>
+        {error ? <div className={s.error} role="alert">{error}</div> : null}
+      </section>
 
-      {tab === 'week' ? (
-        <div className={s.sheet}>
-          <div>
-            <div className={s.sheetTitle}>Weekly hours</div>
-            <div className={s.sheetSub}>Outside these hours, each page uses its after-hours reply. Kuala Lumpur time (GMT+8).</div>
-          </div>
-          <div className={s.days}>
-            {week.map((d, i) => (
-              <div key={d.day} className={s.day}>
-                <span className={s.dayName} data-off={d.on ? undefined : ''}>{DAY_NAMES[d.day - 1]}</span>
-                <button type="button" role="switch" aria-checked={d.on} aria-label={`${DAY_NAMES[d.day - 1]} open`} className={s.switch} disabled={dis} onClick={() => setDay(i, { on: !d.on })} title="Open or closed" />
-                {d.on ? (
-                  <span className={s.times}>
-                    <TimeSelect value={d.from} onChange={v => setDay(i, { from: v })} disabled={dis} label={`${DAY_NAMES[d.day - 1]} opens`} />
-                    to
-                    <TimeSelect value={d.to} onChange={v => setDay(i, { to: v })} disabled={dis} label={`${DAY_NAMES[d.day - 1]} closes`} />
-                  </span>
-                ) : <span className={s.closed}>Closed</span>}
-              </div>
-            ))}
-          </div>
-          {canEdit ? (
-            <button type="button" className={s.linkBtn} style={{ alignSelf: 'flex-start' }}
-              onClick={() => { touch(); setWeek(w => w.map(x => (x.on ? { ...x, from: w[0].from, to: w[0].to } : x))) }}>
-              Copy Monday’s hours to all open days
-            </button>
-          ) : null}
-        </div>
-      ) : (
-        <div className={s.sheet}>
-          <div className={s.sheetHead}>
-            <div style={{ flex: 1 }}>
-              <div className={s.sheetTitle}>Special dates</div>
-              <div className={s.sheetSub}>Public holidays, staff leave or a closed showroom. Replaces the weekly hours on those days.</div>
+      <div className={s.col}>
+        <section className={s.card} aria-label="Public holidays">
+          <div className={s.head}>
+            <div className={s.titles}>
+              <span className={s.title}>Public holidays</span>
+              <span className={s.sub}>Showroom closed or on shorter hours. Replaces the weekly hours on those days.</span>
             </div>
-            {canEdit ? (
-              <button type="button" className={s.addBtn} onClick={() => {
-                touch()
-                setSpecials(x => [...x, { id: `new-${Date.now().toString(36)}`, name: '', from: today, to: today, mode: 'closed', open: '10:00', close: '18:00' }])
-              }}>+ Add date</button>
-            ) : null}
+            {canEdit && ready ? <button type="button" className={s.add} onClick={() => setAddingH(true)}><LeadIcon name="plus" size={14} />Add holiday</button> : null}
           </div>
-          <div style={{ borderTop: '1px solid rgb(var(--lv-border))' }}>
-            {specials.map((sp, i) => (
-              <div key={sp.id} className={s.special}>
-                <input className={s.input} value={sp.name} onChange={e => setSp(i, { name: e.target.value })} placeholder="e.g. Deepavali" maxLength={80} disabled={dis} aria-label="Name" />
-                <span className={s.times}>
-                  <input type="date" className={s.date} value={sp.from} onChange={e => setSp(i, { from: e.target.value })} disabled={dis} aria-label="From" />
-                  to
-                  <input type="date" className={s.date} value={sp.to} min={sp.from} onChange={e => setSp(i, { to: e.target.value })} disabled={dis} aria-label="To" />
-                </span>
-                <select className={s.timeSel} value={sp.mode} onChange={e => setSp(i, { mode: e.target.value as SpecialDate['mode'] })} disabled={dis} aria-label="Hours">
-                  <option value="closed">Closed all day</option>
-                  <option value="custom">Custom hours</option>
-                </select>
-                {sp.mode === 'custom' ? (
-                  <span className={s.times}>
-                    <TimeSelect value={sp.open} onChange={v => setSp(i, { open: v })} disabled={dis} label="Opens" />
-                    to
-                    <TimeSelect value={sp.close} onChange={v => setSp(i, { close: v })} disabled={dis} label="Closes" />
-                  </span>
-                ) : <span className={s.closed}>Closed</span>}
-                {canEdit ? <button type="button" className={s.x} title="Remove" onClick={() => { touch(); setSpecials(x => x.filter((_, j) => j !== i)) }}>×</button> : <span />}
-              </div>
-            ))}
-            {specials.length === 0 ? <div className={s.closed} style={{ padding: '14px 0' }}>No special dates. The weekly hours apply every day.</div> : null}
+          {addingH ? (
+            <HolidayForm today={today} busy={busy} onCancel={() => setAddingH(false)}
+              onAdd={h => saveSpecials([...hours.specials, h], () => { setAddingH(false); flash(`${h.name} added`) })} />
+          ) : null}
+          {holidays.map(x => (
+            <div key={x.id} className={s.row}>
+              <span className={s.icon}><LeadIcon name="calendar-x-2" size={18} /></span>
+              <div className={s.text}><span>{x.name || 'Holiday'}</span><span className={s.date}>{dayRange(x.from, x.to, year)}</span></div>
+              <span className={s.mode} data-closed={x.mode === 'closed' || undefined}>{holidayMode(x)}</span>
+              {canEdit && ready ? (
+                <button type="button" className={s.trash} title="Remove" aria-label={`Remove ${x.name}`} disabled={busy}
+                  onClick={() => saveSpecials(hours.specials.filter(y => y.id !== x.id))}><LeadIcon name="trash-2" size={15} /></button>
+              ) : null}
+            </div>
+          ))}
+          {!holidays.length && !addingH ? <div className={s.none}>No holidays coming up.</div> : null}
+        </section>
+
+        <section className={s.card} aria-label="On Leave">
+          <div className={s.head}>
+            <div className={s.titles}>
+              <span className={s.title}>On Leave</span>
+              <span className={s.sub}>Staff away. Their chats go to the rest of the team while they’re on leave.</span>
+            </div>
+            {canEdit && leaveReady ? <button type="button" className={s.add} onClick={() => setAddingL(true)}><LeadIcon name="plus" size={14} />Add leave</button> : null}
           </div>
-        </div>
-      )}
+          {addingL ? (
+            <LeaveForm agents={agents} today={today} busy={busy} onCancel={() => setAddingL(false)}
+              onAdd={l => keepLeave([...leave, l], () => { setAddingL(false); flash(`${l.name}’s leave added`) })} />
+          ) : null}
+          {away.map(x => (
+            <div key={x.id} className={s.row}>
+              <span className={s.icon} data-leave=""><LeadIcon name="plane" size={18} /></span>
+              <div className={s.text}><span>{x.name}</span><span className={s.date}>{dayRange(x.from, x.to, year)}</span></div>
+              <span className={s.mode}>Away all day</span>
+              {canEdit && leaveReady ? (
+                <button type="button" className={s.trash} title="Remove" aria-label={`Remove ${x.name}’s leave`} disabled={busy}
+                  onClick={() => keepLeave(leave.filter(y => y.id !== x.id))}><LeadIcon name="trash-2" size={15} /></button>
+              ) : null}
+            </div>
+          ))}
+          {!away.length && !addingL ? <div className={s.none}>{leaveReady ? 'Nobody is on leave.' : 'Waiting for the database update.'}</div> : null}
+        </section>
+      </div>
     </div>
   )
 }
 
-function TimeSelect({ value, onChange, disabled, label }: { value: string; onChange: (v: string) => void; disabled: boolean; label: string }) {
+function TimeSelect({ value, onChange, disabled, label }: { value: string; onChange: (v: string) => void; disabled?: boolean; label: string }) {
   return (
-    <select className={s.timeSel} value={value} onChange={e => onChange(e.target.value)} disabled={disabled} aria-label={label}>
-      {HALF_HOURS.map(t => <option key={t.v} value={t.v}>{t.l}</option>)}
+    <select className={s.time} value={value} onChange={e => onChange(e.target.value)} disabled={disabled} aria-label={label}>
+      {HALF_HOURS.map(h => <option key={h.v} value={h.v}>{h.v === '00:00' && label.endsWith('closes') ? 'Midnight' : h.l}</option>)}
     </select>
+  )
+}
+
+function HolidayForm({ today, busy, onAdd, onCancel }: { today: string; busy: boolean; onAdd: (h: SpecialDate) => void; onCancel: () => void }) {
+  const [h, setH] = useState<SpecialDate>({ id: '', name: '', from: today, to: today, mode: 'closed', open: '10:00', close: '18:00' })
+  return (
+    <div className={s.form}>
+      <label className={`${s.field} ${s.grow}`}>Name<input value={h.name} onChange={e => setH({ ...h, name: e.target.value })} maxLength={80} placeholder="Deepavali" autoFocus /></label>
+      <label className={s.field}>From<input type="date" value={h.from} onChange={e => setH({ ...h, from: e.target.value, to: e.target.value > h.to ? e.target.value : h.to })} /></label>
+      <label className={s.field}>To<input type="date" value={h.to} min={h.from} onChange={e => setH({ ...h, to: e.target.value })} /></label>
+      <label className={s.field}>Hours
+        <select value={h.mode} onChange={e => setH({ ...h, mode: e.target.value as SpecialDate['mode'] })}>
+          <option value="closed">Closed all day</option>
+          <option value="custom">Shorter hours</option>
+        </select>
+      </label>
+      {h.mode === 'custom' ? (
+        <>
+          <label className={s.field}>Opens<select value={h.open} onChange={e => setH({ ...h, open: e.target.value })}>{HALF_HOURS.map(x => <option key={x.v} value={x.v}>{x.l}</option>)}</select></label>
+          <label className={s.field}>Closes<select value={h.close} onChange={e => setH({ ...h, close: e.target.value })}>{HALF_HOURS.map(x => <option key={x.v} value={x.v}>{x.v === '00:00' ? 'Midnight' : x.l}</option>)}</select></label>
+        </>
+      ) : null}
+      <div className={s.formBtns}>
+        <button type="button" className={s.cancel} onClick={onCancel}>Cancel</button>
+        <button type="button" className={s.ok} disabled={busy || !h.name.trim() || !h.from || !h.to} onClick={() => onAdd({ ...h, name: h.name.trim() })}>Add</button>
+      </div>
+    </div>
+  )
+}
+
+function LeaveForm({ agents, today, busy, onAdd, onCancel }: { agents: Array<{ id: string; name: string }>; today: string; busy: boolean; onAdd: (l: StaffLeave) => void; onCancel: () => void }) {
+  const [who, setWho] = useState(agents[0]?.id ?? '')
+  const [name, setName] = useState('')
+  const [from, setFrom] = useState(today)
+  const [to, setTo] = useState(today)
+  const typed = who === '' || !agents.length
+  const person = typed ? name.trim() : agents.find(a => a.id === who)?.name ?? ''
+  return (
+    <div className={s.form}>
+      {agents.length ? (
+        <label className={`${s.field} ${s.grow}`}>Who
+          <select value={who} onChange={e => setWho(e.target.value)}>
+            {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+            <option value="">Someone else…</option>
+          </select>
+        </label>
+      ) : null}
+      {typed ? <label className={`${s.field} ${s.grow}`}>Name<input value={name} onChange={e => setName(e.target.value)} maxLength={80} autoFocus /></label> : null}
+      <label className={s.field}>From<input type="date" value={from} onChange={e => { setFrom(e.target.value); if (e.target.value > to) setTo(e.target.value) }} /></label>
+      <label className={s.field}>To<input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} /></label>
+      <div className={s.formBtns}>
+        <button type="button" className={s.cancel} onClick={onCancel}>Cancel</button>
+        <button type="button" className={s.ok} disabled={busy || !person || !from || !to} onClick={() => onAdd({ id: '', userId: typed ? null : who, name: person, from, to })}>Add</button>
+      </div>
+    </div>
   )
 }

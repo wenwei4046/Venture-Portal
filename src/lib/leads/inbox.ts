@@ -196,3 +196,50 @@ export function brandCounts(rows: Array<Pick<LeadContact, 'brandId'>>): Record<s
   for (const r of rows) n[r.brandId] = (n[r.brandId] ?? 0) + 1
   return n
 }
+
+// ── Lead View v2 (2026-11-02, the handoff `docs/design_handoff_lead_view_v2`, §7.1 — `renderVals` of the reference) ──
+
+/** The phone block's label: "Phone", "· found in the chat", "· confirmed" (handed too), or "· added by you" (typed). */
+export function phoneLabel(c: Pick<LeadContact, 'phone' | 'phoneState' | 'handedAt' | 'phoneTyped'>): string {
+  if (!c.phone || c.phoneState === 'none') return 'Phone'
+  if (c.phoneTyped) return 'Phone · added by you'
+  if (c.handedAt || c.phoneState === 'confirmed') return 'Phone · confirmed'
+  return 'Phone · found in the chat'
+}
+
+export type RowTone = 'rust' | 'pos' | 'muted'
+
+/**
+ * A row's status line (the reference's `status` / `stC`): where the lead stands for CS — rust while it waits, green once
+ * handed, muted otherwise.
+ */
+export function rowStatus(c: Pick<LeadContact, 'phone' | 'phoneState' | 'handedAt' | 'handedSalesName' | 'flowState' | 'flowName'>, state: 'waiting' | 'answered' | 'handed'): { text: string; tone: RowTone } {
+  const tone: RowTone = state === 'waiting' ? 'rust' : state === 'handed' ? 'pos' : 'muted'
+  if (c.handedAt) return { text: `Handed to ${c.handedSalesName ?? 'Sales group'}`, tone }
+  if (c.flowState === 'running') return { text: `Template · ${c.flowName?.trim() || 'running'}`, tone }
+  if (!c.phone || c.phoneState === 'none') return { text: state === 'waiting' ? 'No phone yet' : 'Follow up', tone }
+  return { text: c.phoneState === 'detected' ? 'Phone found' : 'Phone confirmed', tone }
+}
+
+/** The chat header's line: "2990s mini · Instagram · Organic · since 17 Oct" (an ad: "Ad · <its name>"). */
+export function chatSub(brand: string, channel: string, ad: string, since: string): string {
+  return [brand, channel, ad ? `Ad · ${ad}` : 'Organic', `since ${since}`].filter(Boolean).join(' · ')
+}
+
+/** A visit day as the panel shows it: 2026-10-24 → "Sat 24 Oct"; words typed before the date box stay as typed. */
+export function visitShown(value: string): string {
+  if (!isVisitDate(value)) return value
+  const d = new Date(value.trim() + 'T00:00:00Z')
+  const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()]
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()]
+  return `${DAY} ${d.getUTCDate()} ${MON}`
+}
+
+/** Who an outgoing message is from, as the bubble's byline reads: "CS · Mei Ling", "Template · Size question", "✦ AI Agent". */
+export function bylineOf(m: Pick<LeadMessage, 'sender' | 'byName'>): string {
+  if (m.sender === 'cs') return `CS · ${m.byName}`
+  if (m.sender === 'ai') return '✦ AI Agent'
+  if (m.sender === 'campaign') return `Campaign · ${m.byName}`
+  if (m.sender === 'page') return `Page · ${m.byName || 'Business Suite'}`
+  return `Template · ${m.byName}`
+}

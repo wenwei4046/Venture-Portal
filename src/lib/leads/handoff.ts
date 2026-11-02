@@ -30,6 +30,8 @@ export function handoffText(contact: LeadContact, _brandName: string, sales: Pic
     `Budget 预算: ${or(contact.budget)}`,
     `Showroom 门市: ${or(contact.showroom)}`,
     `Date 日期: ${visitDay(contact.preferredTime)}`,
+    `Language 语言: ${or(contact.language ?? '')}`,
+    `Special request 特别要求: ${or(contact.specialRequest ?? '')}`,
     `Source 来源: ${ad ? `Ad · ${ad}` : 'Organic'}`,
     `Note 备注: ${or(contact.note)}`,
     `CS: ${csName}`,

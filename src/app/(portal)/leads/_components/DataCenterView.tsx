@@ -1,24 +1,32 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { openDataFile, removeDataFile, saveDataFile, saveQuickReplies } from '@/lib/leads/actions'
-import { cleanShortcut, type QuickReply } from '@/lib/leads/quick'
-import type { LeadIconName } from '@/components/layout/lead-icons'
-import { DATA_CATEGORIES, fileStatus, readable, type DataFile } from '@/lib/leads/agent'
-import { whenFull } from '@/lib/leads/time'
+import { checkLink, openDataFile, removeDataFile, removeDataFolder, saveDataFile, saveDataFolder, saveQuickReplies, setDataFileUntil } from '@/lib/leads/actions'
+import { cleanShortcut, quickProblem, type QuickReply } from '@/lib/leads/quick'
+import type { DataFile } from '@/lib/leads/agent'
+import {
+  CHECK_EVERY, FOLDER_COLORS, checkedLabel, dayMon, dcState, dcTree, extOf, freeName, hostOf, isBrandPlace, placeOf,
+  type CheckEvery, type DataFolder, type FolderColor, type Place,
+} from '@/lib/leads/data-center'
 import { LeadIcon } from '@/components/layout/lead-icons'
-import s from './replies.module.css'
+import ContextMenu from './ui/ContextMenu'
+import Modal from './ui/Modal'
+import d from './data-center.module.css'
 
 /**
- * Lead View › Data Center (2026-10-16 text cards; files and links since 2026-10-23, the redesign v2 handoff `Data
- * Center.dc.html` — mig 20261023200000): what the AI Agent reads, in a brand's folder or Shared, by category, with
- * dates, a version and on / paused. Files go straight from the browser to the private bucket `lead-data` (R2 since mig 20261026100000)
- * (files/<uuid>/<name>, a Lead View · Manage session may upload), then lead_save_data_file records them; a new upload on
- * a file is its next version. USED BY: the brand's agent reads its folder, every agent reads Shared (pausing a file is
- * here only, as drawn). The old text cards are General info's job now. Blank templates: CSV starters for the most useful
- * tables. The second tab is Quick replies (mig 20261023300000): shortcuts CS types in the Inbox (/instal), saved whole.
+ * Lead View v2 › Data Center (2026-11-02, the v2 handoff §7.10 — mig 20261102140000). Three tabs:
+ * - **Files**: the tree (Data center › each brand's own folder and Shared › their folders), the folder's folders and
+ *   files, the picked one's detail (the LINK FOR AI AGENT that AI Agent › Knowledge takes, USED BY, VERSIONS, Replace
+ *   file). Right-click: the six colours (a folder), Open, Rename, Move to ›, Copy link, Replace file, Delete. Upload asks
+ *   for a folder. Files go from the browser to the private R2 bucket `lead-data` (files/<uuid>/<name>), then
+ *   lead_save_data_file keeps them; a replaced file is its next version.
+ * - **Web links**: by brand (or Shared), checked for changes every hour · day · week; Check now reads the page.
+ * - **Shortcuts**: the Inbox's quick replies (`/instal`), saved as you type once the list is whole.
+ * A brand's own folder and Shared are the brands themselves: they cannot be renamed, coloured, moved or deleted.
+ * Kept though not drawn (the user's point 2): a file opens from its preview; its end date is set on its Valid row;
+ * the blank CSV templates sit at the tab bar's right.
  */
 
 const TEMPLATES: ReadonlyArray<{ label: string; rows: string[][] }> = [
@@ -27,19 +35,16 @@ const TEMPLATES: ReadonlyArray<{ label: string; rows: string[][] }> = [
   { label: 'Promotion', rows: [['Promotion name', 'What it gives', 'Products', 'Start (YYYY-MM-DD)', 'End (YYYY-MM-DD)', 'Conditions'], ['Oct Sofa Week', 'Extra RM 200 off', 'All L-shape sofas', '2026-10-01', '2026-10-31', 'Not with other vouchers']] },
   { label: 'Showrooms and hours', rows: [['Showroom', 'Address', 'Opening hours', 'Phone', 'Waze / Google Maps link'], ['KL', 'Jalan Klang Lama', '10am–10pm daily', '03-0000 0000', '']] },
 ]
-const ALL = '__all'
-/** The handoff's category glyphs; a category CS typed is a folder. */
-const CAT_ICON: Record<string, LeadIconName> = {
-  [ALL]: 'grid', 'Products & prices': 'tag', 'Product details': 'fileText', 'Photos & videos': 'image', Promotions: 'percent', Catalogues: 'bookOpen', 'After-sales': 'wrench',
-}
-const SHARED = '__shared'
-const ext = (f: Pick<DataFile, 'kind' | 'name'>) => (f.kind === 'link' ? 'URL' : (f.name.split('.').pop() ?? 'FILE').slice(0, 4).toUpperCase())
-const size = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1000))} KB`)
+type Tab = 'files' | 'links' | 'short'
+type Ctx = { key: string; x: number; y: number; mode: 'main' | 'move' | 'del' }
+const SHARED = 'shared'
 
-export default function DataCenterView({ files, quick, quickReady, brands, today, ready, canManage }: {
+export default function DataCenterView({ files: allFiles, folders, foldersReady, quick, quickReady, brands, today, ready, canManage }: {
   files: DataFile[]
+  folders: DataFolder[]
+  /** lead_data_folders is there (mig 20261102140000): folders, links' checks, versions. */
+  foldersReady: boolean
   quick: QuickReply[]
-  /** Quick replies' table is there (mig 20261023300000). */
   quickReady: boolean
   brands: Array<{ id: string; name: string }>
   today: string
@@ -47,289 +52,652 @@ export default function DataCenterView({ files, quick, quickReady, brands, today
   canManage: boolean
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<'files' | 'quick'>('files')
-  const [cat, setCat] = useState(ALL)
-  const [extraCats, setExtraCats] = useState<string[]>([])
-  const [catIn, setCatIn] = useState<string | null>(null)
-  const [q, setQ] = useState('')
-  const [brand, setBrand] = useState(ALL)
-  const [status, setStatus] = useState(ALL)
-  const [addOpen, setAddOpen] = useState(false)
-  const [editing, setEditing] = useState<Partial<DataFile> & { kind: 'file' | 'link' } | null>(null)
-  const [pending, setPending] = useState<File | null>(null)
+  const [tab, setTab] = useState<Tab>('files')
   const [error, setError] = useState('')
   const [busy, start] = useTransition()
-  const picker = useRef<HTMLInputElement>(null)
-  const picker2 = useRef<HTMLInputElement>(null)
-  const cats = useMemo(() => [...new Set([...DATA_CATEGORIES, ...files.map(f => f.category).filter(Boolean), ...extraCats])], [files, extraCats])
+  const files = useMemo(() => allFiles.filter(f => f.kind === 'file'), [allFiles])
+  const links = useMemo(() => allFiles.filter(f => f.kind === 'link'), [allFiles])
+  const t = useMemo(() => dcTree(brands, folders, allFiles), [brands, folders, allFiles])
+  const can = canManage && ready && foldersReady
   const brandName = (id: string | null) => (id ? brands.find(b => b.id === id)?.name ?? '—' : 'Shared')
-  const shown = files.filter(f => (cat === ALL || f.category === cat)
-    && (brand === ALL || (brand === SHARED ? f.brandId === null : f.brandId === brand))
-    && (status === ALL || fileStatus(f, today).label.startsWith(status) || (status === 'In use' && fileStatus(f, today).usable))
-    && (!q.trim() || f.name.toLowerCase().includes(q.trim().toLowerCase())))
-
+  const [copied, setCopied] = useState<string | null>(null)
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const copy = (text: string) => {
+    void navigator.clipboard?.writeText(text).catch(() => undefined)
+    setCopied(text)
+    if (copyTimer.current) clearTimeout(copyTimer.current)
+    copyTimer.current = setTimeout(() => setCopied(null), 1500)
+  }
+  const run = (fn: () => Promise<{ ok: true } | { ok: false; reason: string }>, after?: () => void) => start(async () => {
+    setError('')
+    const r = await fn()
+    if (!r.ok) { setError(r.reason); return }
+    after?.()
+    router.refresh()
+  })
   const upload = async (file: File): Promise<{ path: string } | { error: string }> => {
-    const id = crypto.randomUUID()
     const name = file.name.replace(/[^\w.\- ()]+/g, '_').slice(0, 120) || 'file'
-    const path = `files/${id}/${name}`
+    const path = `files/${crypto.randomUUID()}/${name}`
     const { error: e } = await createClient().storage.from('lead-data').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
     return e ? { error: 'The file could not be uploaded — 50 MB at most.' } : { path }
   }
-  const saveEditing = () => {
-    if (!editing) return
-    setError('')
+  /** Everything lead_save_data_file takes, from a file as it stands and the change. */
+  const fileData = (f: DataFile, over: Partial<DataFile> & { mime?: string; sizeBytes?: number; path?: string | null } = {}) => ({
+    kind: f.kind, name: f.name, brandId: f.brandId, folderId: f.folderId ?? null, category: f.category ?? '', url: f.url, checkEvery: f.checkEvery ?? 'day',
+    validFrom: f.validFrom, validUntil: f.validUntil, status: f.status, ...over,
+  })
+  const download = (tp: (typeof TEMPLATES)[number]) => {
+    const text = '﻿' + tp.rows.map(r => r.map(v => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
+    a.download = `${tp.label}.csv`
+    document.body.appendChild(a); a.click(); a.remove()
+  }
+  const [tplOpen, setTplOpen] = useState<{ x: number; y: number } | null>(null)
+
+  // ── Files ──
+  const [cur, setCur] = useState<Place | null>(null)
+  const [sel, setSel] = useState<string | null>(null)
+  const [shut, setShut] = useState<Record<string, boolean>>({})
+  const [rootShut, setRootShut] = useState(false)
+  const [q, setQ] = useState('')
+  const [ren, setRen] = useState<{ key: string; value: string } | null>(null)
+  const [ctx, setCtx] = useState<Ctx | null>(null)
+  const [asking, setAsking] = useState<string | null>(null)
+  const [up, setUp] = useState<{ place: Place | null; file: File | null } | null>(null)
+  const [untilOpen, setUntilOpen] = useState(false)
+  const replacer = useRef<HTMLInputElement>(null)
+  const replaceFor = useRef<string | null>(null)
+  const curOk = cur && t.get(cur) ? cur : null
+  const open = (p: Place) => {
+    setShut(x => { const n = { ...x }; for (const c of t.chain(p)) delete n[c.place]; return n })
+    setCur(p); setSel(`F:${p}`); setQ('')
+  }
+  const ql = q.trim().toLowerCase()
+  const scope = curOk ? new Set(t.desc(curOk)) : null
+  const subs = ql ? [...t.nodes.values()].filter(n => n.folder && (!scope || (scope.has(n.place) && n.place !== curOk)) && n.name.toLowerCase().includes(ql)) : curOk ? t.kids(curOk) : t.roots
+  const shownFiles = ql ? files.filter(f => (!scope || scope.has(placeOf(f))) && f.name.toLowerCase().includes(ql)) : curOk ? t.filesIn(curOk) : []
+  const selKey = sel ?? (curOk ? `F:${curOk}` : null)
+  const selPlace = selKey?.startsWith('F:') && t.get(selKey.slice(2)) ? selKey.slice(2) : null
+  const selFile = selKey && !selKey.startsWith('F:') ? files.find(f => f.id === selKey) ?? null : null
+  const ctxAt = (e: ReactMouseEvent, key: string) => {
+    e.preventDefault(); e.stopPropagation()
+    setSel(key)
+    if (canManage) setCtx({ key, x: e.clientX, y: e.clientY, mode: 'main' })
+  }
+  const delQ = (key: string) => {
+    if (!key.startsWith('F:')) return 'Delete this file?'
+    const n = t.count(key.slice(2))
+    return n ? `Delete folder and ${n} ${n === 1 ? 'file' : 'files'}?` : 'Delete this folder?'
+  }
+  const delKey = (key: string) => {
+    setCtx(null); setAsking(null)
+    if (key.startsWith('F:')) {
+      const p = key.slice(2), node = t.get(p)
+      run(() => removeDataFolder(p), () => { if (curOk && t.desc(p).includes(curOk)) setCur(node?.parent ?? null); setSel(null) })
+    } else run(() => removeDataFile(key), () => setSel(null))
+  }
+  const saveRen = () => {
+    if (!ren) return
+    const v = ren.value.trim(), key = ren.key
+    setRen(null)
+    if (!v) return
+    if (key.startsWith('F:')) {
+      const fd = t.get(key.slice(2))?.folder
+      if (fd && v !== fd.name) run(() => saveDataFolder(fd.id, { brandId: fd.brandId, parentId: fd.parentId, name: v, color: fd.color }))
+    } else {
+      const f = files.find(x => x.id === key)
+      if (f && v !== f.name) run(() => saveDataFile(f.id, fileData(f, { name: v })))
+    }
+  }
+  const newFolder = () => {
+    if (!curOk) { setError('Open a brand’s folder or Shared first — a folder lives in one.'); return }
+    const node = t.get(curOk)!
+    const name = freeName(t.kids(curOk).map(k => k.name))
     start(async () => {
-      let path: string | undefined
-      if (pending) {
-        const up = await upload(pending)
-        if ('error' in up) { setError(up.error); return }
-        path = up.path
-      }
-      const r = await saveDataFile(editing.id ?? null, {
-        kind: editing.kind, name: editing.name ?? '', brandId: editing.brandId ?? null, category: editing.category ?? '', url: editing.url ?? null,
-        validFrom: editing.validFrom || null, validUntil: editing.validUntil || null, status: editing.status ?? 'active',
-        ...(path ? { path, mime: pending?.type ?? '', sizeBytes: pending?.size ?? 0 } : {}),
-      })
+      setError('')
+      const r = await saveDataFolder(null, { brandId: node.brandId, parentId: isBrandPlace(curOk) ? null : curOk, name, color: null })
       if (!r.ok) { setError(r.reason); return }
-      setEditing(null); setPending(null)
+      setSel(`F:${r.data}`); setRen({ key: `F:${r.data}`, value: name })
       router.refresh()
     })
   }
-  const remove = (f: DataFile) => {
-    if (!window.confirm(`Delete “${f.name}”? Every agent stops reading it.`)) return
+  const moveTo = (key: string, to: Place) => {
+    setCtx(null)
+    const node = t.get(to)
+    if (!node) return
+    const parentId = isBrandPlace(to) ? null : to
+    if (key.startsWith('F:')) {
+      const fd = t.get(key.slice(2))?.folder
+      if (fd) run(() => saveDataFolder(fd.id, { brandId: node.brandId, parentId, name: fd.name, color: fd.color }))
+    } else {
+      const f = files.find(x => x.id === key)
+      if (f) run(() => saveDataFile(f.id, fileData(f, { folderId: parentId, brandId: node.brandId })))
+    }
+  }
+  const setColor = (fd: DataFolder, color: FolderColor | null) => { setCtx(null); run(() => saveDataFolder(fd.id, { brandId: fd.brandId, parentId: fd.parentId, name: fd.name, color })) }
+  const replaceFile = (id: string) => { replaceFor.current = id; replacer.current?.click() }
+  const onReplace = (file: File | undefined) => {
+    const f = files.find(x => x.id === replaceFor.current)
+    if (!file || !f) return
     start(async () => {
-      const r = await removeDataFile(f.id)
-      if (!r.ok) setError(r.reason)
-      else router.refresh()
+      setError('')
+      const u = await upload(file)
+      if ('error' in u) { setError(u.error); return }
+      const r = await saveDataFile(f.id, fileData(f, { path: u.path, mime: file.type, sizeBytes: file.size }))
+      if (!r.ok) { setError(r.reason); return }
+      router.refresh()
     })
   }
-  const open = (f: DataFile) => {
-    if (f.kind === 'link' && f.url) { window.open(f.url, '_blank', 'noopener'); return }
+  const openFile = (f: DataFile) => {
     if (!f.path) return
-    const tab = window.open('', '_blank')
+    const w = window.open('', '_blank')
     start(async () => {
       const r = await openDataFile(f.path!)
-      if (!r.ok) { tab?.close(); setError(r.reason); return }
-      if (tab) tab.location.href = r.data
+      if (!r.ok) { w?.close(); setError(r.reason); return }
+      if (w) w.location.href = r.data
     })
   }
-  const download = (t: (typeof TEMPLATES)[number]) => {
-    const text = '﻿' + t.rows.map(r => r.map(v => `"${v.replace(/"/g, '""')}"`).join(',')).join('\n')
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
-    a.download = `${t.label}.csv`
-    document.body.appendChild(a); a.click(); a.remove()
+  const doUpload = () => {
+    if (!up?.place || !up.file) return
+    const node = t.get(up.place)
+    const file = up.file
+    if (!node) return
+    start(async () => {
+      setError('')
+      const u = await upload(file)
+      if ('error' in u) { setError(u.error); return }
+      const r = await saveDataFile(null, { kind: 'file', name: file.name, brandId: node.brandId, folderId: isBrandPlace(up.place) ? null : up.place, category: '', path: u.path, mime: file.type, sizeBytes: file.size, status: 'active' })
+      if (!r.ok) { setError(r.reason); return }
+      setUp(null); setCur(up.place); setSel(r.data)
+      router.refresh()
+    })
   }
+  const usedBy = (f: DataFile) => [...new Set((f.usedBy ?? []).map(u => brandName(u.brandId)))].map(n => `AI Agent · ${n}`)
+  const flat: Array<{ place: Place; name: string; depth: number }> = []
+  const walkAll = (p: Place | null, depth: number) => { for (const k of t.kids(p)) { flat.push({ place: k.place, name: k.name, depth }); walkAll(k.place, depth + 1) } }
+  walkAll(null, 0)
 
-  return (
-    <div className={s.page}>
-      <div className={s.head}>
-        <div className={s.titles}>
-          <span className={s.eyebrow}>SET UP</span>
-          <h1 className={s.title}>Data Center</h1>
-        </div>
-        <span className={s.chipRow}>
-          <span className={s.lineTabs} role="group" aria-label="Data Center">
-            <button type="button" className={s.lineTab} aria-pressed={tab === 'files'} onClick={() => setTab('files')}>Product data <span className={s.count}>{files.length}</span></button>
-            <button type="button" className={s.lineTab} aria-pressed={tab === 'quick'} onClick={() => setTab('quick')}>Quick replies <span className={s.count}>{quick.length}</span></button>
-          </span>
-          {tab === 'files' ? <button type="button" className={s.btn} disabled title="Links are read when the agent answers; re-reading web pages comes later"><LeadIcon name="history" size={13} /> Sync all</button> : null}
-          {canManage && tab === 'files' ? (
-            <span style={{ position: 'relative' }}>
-              <button type="button" className={s.btn} data-dark="" disabled={!ready} onClick={() => setAddOpen(o => !o)}>+ Add ▾</button>
-              {addOpen ? (
-                <>
-                  <div className={s.scrim} onClick={() => setAddOpen(false)} aria-hidden="true" />
-                  <div className={s.menu} style={{ right: 0, top: 34 }} role="menu">
-                    <button type="button" className={s.menuItem} onClick={() => { setAddOpen(false); picker.current?.click() }}><LeadIcon name="paperclip" size={13} />Upload a file</button>
-                    <button type="button" className={s.menuItem} onClick={() => { setAddOpen(false); setPending(null); setEditing({ kind: 'link', name: '', url: 'https://', brandId: null, category: cat === ALL ? '' : cat, status: 'active' }) }}><LeadIcon name="navigation" size={13} />Add a web link</button>
-                  </div>
-                </>
-              ) : null}
-              <input ref={picker} type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.csv,.md,.xlsx,.xls,.docx,.doc,.pptx,.mp4,.mov"
-                onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; setPending(f); setEditing({ kind: 'file', name: f.name, brandId: null, category: cat === ALL ? '' : cat, status: 'active' }) }} />
-            </span>
-          ) : null}
-        </span>
-      </div>
-      {tab === 'quick' ? <QuickReplies quick={quick} brands={brands} ready={quickReady} canManage={canManage} /> : null}
-      <div className={s.panel} style={tab === 'quick' ? { display: 'none' } : undefined}>
-        <div className={s.libSplit} style={{ gridTemplateColumns: '220px minmax(0, 1fr)' }}>
-          <aside className={s.libSide} style={{ background: 'rgb(var(--lv-chat-head))' }}>
-            <div className={s.libSideHead} style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <span className={s.kicker} style={{ flex: 1 }}>CATEGORY</span>
-              {canManage ? <button type="button" className={s.iconBtn} title="Add category" onClick={() => setCatIn('')}><LeadIcon name="plus" size={12} /></button> : null}
-            </div>
-            <div className={s.libRows}>
-              {[ALL, ...cats].map(c => (
-                <button key={c} type="button" className={s.libRow} data-glyph="" aria-current={cat === c} onClick={() => setCat(c)}>
-                  <span className={s.catGlyph}><LeadIcon name={CAT_ICON[c] ?? 'folder'} size={14} /></span>
-                  <span className={s.listName}>{c === ALL ? 'All' : c}</span>
-                  <span className={s.ver}>{c === ALL ? files.length : files.filter(f => f.category === c).length}</span>
-                </button>
-              ))}
-              {catIn !== null ? (
-                <input className={s.input} style={{ margin: 4 }} autoFocus value={catIn} maxLength={40} placeholder="Category name, press Enter" onChange={e => setCatIn(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && catIn.trim()) { setExtraCats(x => [...x, catIn.trim()]); setCat(catIn.trim()); setCatIn(null) } if (e.key === 'Escape') setCatIn(null) }}
-                  onBlur={() => { if (!catIn.trim()) setCatIn(null) }} />
-              ) : null}
-            </div>
-            <div style={{ padding: 12, borderTop: '1px solid rgb(var(--lv-hair))', display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span className={s.kicker}>BLANK TEMPLATES</span>
-              {TEMPLATES.map(t => <button key={t.label} type="button" className={s.link} style={{ textAlign: 'left' }} onClick={() => download(t)}>{t.label} ↓</button>)}
-            </div>
-          </aside>
-          <section className={s.libMain} style={{ padding: 0, gap: 0 }}>
-            {!ready ? <div className={s.note} style={{ margin: 12 }}>Waiting for the database update — files can be uploaded once it is in.</div> : null}
-            <div className={s.chipRow} style={{ padding: '10px 14px', borderBottom: '1px solid rgb(var(--lv-border))' }}>
-              <input className={s.input} style={{ width: 220 }} value={q} onChange={e => setQ(e.target.value)} placeholder="Search files" aria-label="Search files" />
-              <select className={s.select} value={brand} onChange={e => setBrand(e.target.value)} aria-label="Brand">
-                <option value={ALL}>Brand: All</option>
-                {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                <option value={SHARED}>Shared</option>
-              </select>
-              <select className={s.select} value={status} onChange={e => setStatus(e.target.value)} aria-label="Status">
-                <option value={ALL}>Status: All</option>
-                <option value="In use">In use</option>
-                <option value="Ends">Ending soon</option>
-                <option value="Expired">Expired</option>
-                <option value="Paused">Paused</option>
-              </select>
-              <span className={s.fill} />
-              <span className={s.small}>{shown.length} of {files.length} files</span>
-            </div>
-            {error ? <div className={s.error} role="alert" style={{ margin: '8px 14px' }}>{error}</div> : null}
-            <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-              <div className={s.filesTitle}>{cat === ALL ? 'All files' : cat}</div>
-              <div className={s.fileRow} style={{ fontWeight: 600, fontSize: 11, letterSpacing: '0.08em', color: 'rgb(var(--lv-text-2))' }}>
-                <span /><span>FILE</span><span>BRAND</span><span>TYPE</span><span>UPDATED</span><span>VALID</span><span>USED BY</span><span />
-              </div>
-              {shown.map(f => {
-                const st = fileStatus(f, today)
-                return (
-                  <div key={f.id} className={s.fileRow}>
-                    <span className={s.ext}>{ext(f)}</span>
-                    <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                      <button type="button" className={s.link} style={{ color: 'rgb(var(--lv-ink))', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }} onClick={() => open(f)} title="Open">{f.name}</button>
-                      <span className={s.small}>{f.kind === 'link' ? f.url : `${size(f.sizeBytes)} · v${f.ver}`}{f.kind === 'file' && !readable(f) ? ' · the agent can’t read this type yet' : ''}</span>
-                    </span>
-                    <span><span className={s.ext} style={{ padding: '2px 6px' }}>{f.brandId ? brandName(f.brandId) : 'Shared'}</span></span>
-                    <span className={s.small}>{f.category || '—'}</span>
-                    <span className={s.small} style={{ display: 'flex', flexDirection: 'column' }}>{whenFull(f.updatedAt)}<span>{f.updatedByName}</span></span>
-                    <span className={s.status} data-tone={st.tone}>{st.label}</span>
-                    <span className={s.chipRow}>{(f.brandId ? [f.brandId] : brands.map(b => b.id)).map(id => <span key={id} className={s.status} data-tone={f.status === 'paused' ? 'none' : 'green'}>AI · {brandName(id)} · {f.status === 'paused' ? 'paused' : 'in use'}</span>)}</span>
-                    <span style={{ display: 'flex', gap: 4 }}>
-                      {canManage ? <button type="button" className={s.cardIcon} title="Edit" onClick={() => { setPending(null); setEditing(f) }}><LeadIcon name="filePen" size={11} /></button> : null}
-                      {canManage ? <button type="button" className={s.cardIcon} title="Delete" onClick={() => remove(f)}><LeadIcon name="trash" size={11} /></button> : null}
-                    </span>
-                  </div>
-                )
-              })}
-              {shown.length === 0 ? <div className={s.small} style={{ padding: 24 }}>{files.length ? 'No files match.' : 'Nothing here yet. Upload a catalogue, a price list or a policy — PDFs work best — or add a web page.'}</div> : null}
-            </div>
-          </section>
-        </div>
-      </div>
+  // ── Web links and Shortcuts ──
+  const [br, setBr] = useState<string>('all')
+  const [lq, setLq] = useState('')
+  const [lSel, setLSel] = useState<string | null>(null)
+  const [sSel, setSSel] = useState<string | null>(null)
+  const [lAsk, setLAsk] = useState<string | null>(null)
+  const [lCtx, setLCtx] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [newLink, setNewLink] = useState<{ url: string; brand: string; every: CheckEvery } | null>(null)
+  const BR: Array<[string, string]> = [...brands.map(b => [b.id, b.name] as [string, string]), [SHARED, 'Shared']]
+  const brandOf = (id: string | null) => id ?? SHARED
+  const lql = lq.trim().toLowerCase()
 
-      {editing ? (
-        <div className={s.modalScrim} onClick={e => { if (e.target === e.currentTarget && !busy) { setEditing(null); setPending(null) } }}>
-          <div className={s.modal} role="dialog" aria-modal="true" aria-label={editing.id ? 'Edit file' : editing.kind === 'link' ? 'Add a web link' : 'Upload a file'}>
-            <span className={s.agentTitle}>{editing.id ? 'Edit' : editing.kind === 'link' ? 'Add a web link' : 'Upload a file'}</span>
-            <label className={s.field}>Name<input className={s.input} value={editing.name ?? ''} maxLength={160} onChange={e => setEditing({ ...editing, name: e.target.value })} /></label>
-            {editing.kind === 'link' ? <label className={s.field}>Address<input className={s.input} value={editing.url ?? ''} maxLength={500} onChange={e => setEditing({ ...editing, url: e.target.value })} /></label> : null}
-            {editing.kind === 'file' ? (
-              <span className={s.small}>{pending ? `${pending.name} · ${size(pending.size)}${editing.id ? ` — saved as v${(editing.ver ?? 1) + 1}` : ''}` : editing.id ? `v${editing.ver}` : ''}
-                {editing.id ? <> · <button type="button" className={s.link} onClick={() => picker2.current?.click()}>Upload a new version</button></> : null}
-              </span>
-            ) : null}
-            <input ref={picker2} type="file" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setPending(f) }} />
-            <span className={s.two2}>
-              <label className={s.field}>Folder
-                <select className={s.select} value={editing.brandId ?? SHARED} onChange={e => setEditing({ ...editing, brandId: e.target.value === SHARED ? null : e.target.value })}>
-                  <option value={SHARED}>Shared (every brand)</option>
-                  {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </label>
-              <label className={s.field}>Category
-                <select className={s.select} value={editing.category ?? ''} onChange={e => setEditing({ ...editing, category: e.target.value })}>
-                  <option value="">—</option>
-                  {cats.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </label>
-              <label className={s.field}>Valid from<input type="date" className={s.input} value={editing.validFrom ?? ''} onChange={e => setEditing({ ...editing, validFrom: e.target.value || null })} /></label>
-              <label className={s.field}>Valid until<input type="date" className={s.input} value={editing.validUntil ?? ''} min={editing.validFrom ?? undefined} onChange={e => setEditing({ ...editing, validUntil: e.target.value || null })} /></label>
-            </span>
-            <span className={s.toggleLine}>
-              <button type="button" role="switch" aria-checked={(editing.status ?? 'active') === 'active'} className={s.switch} onClick={() => setEditing({ ...editing, status: editing.status === 'paused' ? 'active' : 'paused' })} aria-label="In use" />
-              {(editing.status ?? 'active') === 'active' ? 'In use — agents that read it may use it' : 'Paused — no agent reads it'}
-            </span>
-            {error ? <div className={s.error} role="alert">{error}</div> : null}
-            <span style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button type="button" className={s.btn} data-quiet="" disabled={busy} onClick={() => { setEditing(null); setPending(null) }}>Cancel</button>
-              <button type="button" className={s.btn} data-strong="" disabled={busy || !ready || !(editing.name ?? '').trim() || (editing.kind === 'file' && !editing.id && !pending)} onClick={saveEditing}>{busy ? 'Saving…' : 'Save'}</button>
-            </span>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-/**
- * Quick replies (the handoff's second tab): SHORTCUT · BRAND · TEXT · USED, edited in place and saved as a whole.
- * Before mig 20261023300000 the list is empty and cannot be saved.
- */
-function QuickReplies({ quick, brands, ready, canManage }: { quick: QuickReply[]; brands: Array<{ id: string; name: string }>; ready: boolean; canManage: boolean }) {
-  const router = useRouter()
-  const [rows, setRows] = useState(quick)
-  const [error, setError] = useState('')
-  const [note, setNote] = useState('')
-  const [busy, start] = useTransition()
-  const dirty = JSON.stringify(rows) !== JSON.stringify(quick)
-  const dis = !canManage || busy
-  const set = (i: number, o: Partial<QuickReply>) => { setRows(r => r.map((x, j) => (j === i ? { ...x, ...o } : x))); setNote(''); setError('') }
-  const save = () => start(async () => {
-    const r = await saveQuickReplies(rows.map(x => ({ id: x.id, brandId: x.brandId, shortcut: x.shortcut, body: x.body })))
-    if (!r.ok) { setError(r.reason); return }
-    setNote('Saved · just now')
+  const linkQ = (f: DataFile) => !lql || (f.url ?? '').toLowerCase().includes(lql)
+  const visLinks = links.filter(f => linkQ(f) && (br === 'all' || brandOf(f.brandId) === br))
+  const curLink = visLinks.find(f => f.id === lSel) ?? visLinks[0] ?? null
+  const saveLink = (f: DataFile, over: Partial<DataFile>) => run(() => saveDataFile(f.id, fileData(f, over)))
+  const addLink = () => {
+    if (!newLink) return
+    const url = newLink.url.trim()
+    start(async () => {
+      setError('')
+      const r = await saveDataFile(null, { kind: 'link', name: hostOf(url).slice(0, 160), url, brandId: newLink.brand === SHARED ? null : newLink.brand, checkEvery: newLink.every, category: '', status: 'active' })
+      if (!r.ok) { setError(r.reason); return }
+      setNewLink(null); setLSel(r.data)
+      const c = await checkLink(r.data)
+      if (c.ok && c.data.error) setError(`Added — but the page could not be read: ${c.data.error}`)
+      router.refresh()
+    })
+  }
+  const checkNow = (f: DataFile) => start(async () => {
+    setError('')
+    const r = await checkLink(f.id)
+    if (!r.ok) setError(r.reason)
+    else if (r.data.error) setError(r.data.error)
     router.refresh()
   })
+  const newLinkOk = !!newLink && /^https:\/\/\S+\.\S+/.test(newLink.url.trim()) && !!newLink.brand
+
+  // Shortcuts: the list as it stands, saved whole once it is whole.
+  const [rows, setRows] = useState<QuickReply[]>(quick)
+  const dirty = useRef(false)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => { if (!dirty.current) setRows(quick) }, [quick])
+  const [skNote, setSkNote] = useState('')
+  const editRows = (fn: (xs: QuickReply[]) => QuickReply[]) => {
+    const next = fn(rows)
+    setRows(next)
+    dirty.current = true
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    const send = next.map(r => ({ id: r.id.startsWith('new-') ? '' : r.id, brandId: r.brandId, shortcut: r.shortcut, body: r.body }))
+    const problem = quickProblem(send)
+    setSkNote(problem ? `Not saved yet — ${problem.charAt(0).toLowerCase()}${problem.slice(1)}` : '')
+    if (problem) return
+    saveTimer.current = setTimeout(() => {
+      start(async () => {
+        const r = await saveQuickReplies(send)
+        if (!r.ok) { setSkNote(r.reason); return }
+        dirty.current = false
+        router.refresh()
+      })
+    }, 700)
+  }
+  const skQ = (r: QuickReply) => !lql || `${r.shortcut} ${r.body}`.toLowerCase().includes(lql)
+  const visShort = rows.filter(r => skQ(r) && (br === 'all' || brandOf(r.brandId) === br))
+  const curShort = visShort.find(r => r.id === sSel) ?? visShort.find(r => `${r.shortcut}|${r.brandId}` === sSel) ?? visShort[0] ?? null
+  const dup = curShort ? rows.some(r => r !== curShort && r.shortcut === curShort.shortcut && r.shortcut !== '/' && r.brandId === curShort.brandId) : false
+  const canShort = canManage && quickReady
+  const lList: Array<DataFile | QuickReply> = tab === 'links' ? links : rows
+  const lInQ = (x: DataFile | QuickReply) => ('kind' in x ? linkQ(x) : skQ(x))
+
+  const brandsCol = (
+    <div className={d.brands}>
+      <span className={d.brandsKicker}>BRAND</span>
+      {[['all', 'All'] as [string, string], ...BR].map(([k, l]) => (
+        <button key={k} type="button" className={d.brandBtn} aria-pressed={br === k} onClick={() => setBr(k)}>
+          <LeadIcon name="store" size={16} /><span className={d.brandL}>{l}</span>
+          <span className={d.brandN}>{lList.filter(x => lInQ(x) && (k === 'all' || brandOf(x.brandId) === k)).length}</span>
+        </button>
+      ))}
+    </div>
+  )
+
+  const ctxNode = ctx?.key.startsWith('F:') ? t.get(ctx.key.slice(2)) ?? null : null
+  const ctxFile = ctx && !ctx.key.startsWith('F:') ? files.find(f => f.id === ctx.key) ?? null : null
+  const banned = ctxNode ? new Set(t.desc(ctxNode.place)) : new Set<string>()
+  const lCtxItem = lCtx ? (tab === 'links' ? links.find(f => f.id === lCtx.id) : rows.find(r => r.id === lCtx.id)) ?? null : null
+
   return (
-    <div className={s.quickPage}>
-      <span className={s.small} style={{ fontSize: 14 }}>CS types the shortcut in the Inbox reply box, for example <b>/instal</b>, to insert the text. The AI Agent can use them as fixed answers too.</span>
-      {!ready ? <div className={s.note}>Waiting for the database update — quick replies can be saved once it is in.</div> : null}
-      {error ? <div className={s.error} role="alert">{error}</div> : null}
-      <div className={s.box} style={{ maxWidth: 1000 }}>
-        <div className={s.quickRow} data-head="">
-          <span>SHORTCUT</span><span>BRAND</span><span>TEXT</span><span style={{ textAlign: 'right' }}>USED</span><span />
+    <div className={d.wrap}>
+      <section className={d.card}>
+        <div className={d.tabs} role="tablist" aria-label="Data Center">
+          {([['files', 'Files', files.length], ['links', 'Web links', links.length], ['short', 'Shortcuts', rows.length]] as const).map(([k, l, n]) => (
+            <button key={k} type="button" role="tab" className={d.tab} aria-selected={tab === k} onClick={() => { setTab(k); setError('') }}>{l}<span className={d.tabN}>{n}</span></button>
+          ))}
+          <div className={d.tabsGap} />
+          <button type="button" className={d.ghost} onClick={e => setTplOpen({ x: e.clientX - 200, y: e.clientY + 14 })}><LeadIcon name="download" size={14} /> Blank templates</button>
         </div>
-        {rows.map((x, i) => (
-          <div key={x.id} className={s.quickRow}>
-            <input className={s.input} value={x.shortcut} disabled={dis} maxLength={31} aria-label="Shortcut" onChange={e => set(i, { shortcut: cleanShortcut(e.target.value) })} />
-            <select className={s.select} value={x.brandId ?? ''} disabled={dis} aria-label="Brand" onChange={e => set(i, { brandId: e.target.value || null })}>
-              <option value="">All brands</option>
-              {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            <textarea className={s.faqIn} rows={2} value={x.body} disabled={dis} maxLength={1000} aria-label="Text" onChange={e => set(i, { body: e.target.value })} />
-            <span className={s.small} style={{ textAlign: 'right', paddingTop: 7 }}>{x.used}×</span>
-            {canManage ? <button type="button" className={s.x} title="Remove" disabled={busy} onClick={() => setRows(r => r.filter((_, j) => j !== i))}>×</button> : <span />}
+        {error ? <span className={d.error} role="alert">{error}</span> : null}
+
+        {tab === 'files' ? (
+          <div className={d.cols}>
+            <div className={d.tree} role="tree" aria-label="Folders">
+              <div className={d.node} data-root="" role="treeitem" aria-selected={curOk === null} aria-current={curOk === null} aria-expanded={!rootShut} onClick={() => { setCur(null); setSel(null); setQ('') }} onContextMenu={e => e.preventDefault()}>
+                <button type="button" className={d.chev} aria-expanded={!rootShut} aria-label="Fold" onClick={e => { e.stopPropagation(); setRootShut(x => !x) }}><LeadIcon name="chevron-right" size={13} /></button>
+                <LeadIcon name="hard-drive" size={16} className={d.fIcon} />
+                <span className={d.nodeName}>Data center</span><span className={d.nodeN}>{files.length}</span>
+              </div>
+              {!rootShut ? (() => {
+                const out: ReactNode[] = []
+                const walk = (p: Place | null, depth: number) => {
+                  for (const n of t.kids(p)) {
+                    const has = t.kids(n.place).length > 0, isO = !shut[n.place], on = curOk === n.place
+                    out.push(
+                      <div key={n.place} className={d.node} role="treeitem" aria-selected={on} aria-current={on} style={{ paddingLeft: 8 + depth * 16 }}
+                        onClick={() => open(n.place)} onContextMenu={e => (n.folder ? ctxAt(e, `F:${n.place}`) : e.preventDefault())}>
+                        <button type="button" className={d.chev} data-off={has ? undefined : ''} aria-expanded={isO} aria-label="Fold"
+                          onClick={e => { e.stopPropagation(); if (has) setShut(x => ({ ...x, [n.place]: isO })) }}><LeadIcon name="chevron-right" size={13} /></button>
+                        <LeadIcon name={on ? 'folder-open' : 'folder'} size={16} className={d.fIcon} data-c={n.color ?? undefined} />
+                        <span className={d.nodeName}>{n.name}</span><span className={d.nodeN}>{t.count(n.place)}</span>
+                      </div>,
+                    )
+                    if (has && isO) walk(n.place, depth + 1)
+                  }
+                }
+                walk(null, 1)
+                return out
+              })() : null}
+            </div>
+
+            <div className={d.mid}>
+              <div className={d.midHead}>
+                <div className={d.midBar}>
+                  <div className={d.search}>
+                    <LeadIcon name="search" size={15} />
+                    <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search in this folder" aria-label="Search in this folder" />
+                  </div>
+                  {canManage ? (
+                    <>
+                      <button type="button" className={d.sq} title={curOk ? 'New folder' : 'Open a brand’s folder or Shared to add a folder'} aria-label="New folder" disabled={!can || busy || !curOk} onClick={newFolder}><LeadIcon name="folder-plus" size={16} /></button>
+                      <button type="button" className={d.sqRust} title="Upload" aria-label="Upload" disabled={!ready} onClick={() => setUp({ place: curOk, file: null })}><LeadIcon name="upload" size={16} /></button>
+                    </>
+                  ) : null}
+                </div>
+                <div className={d.crumbs}>
+                  {[{ l: 'Data center', p: null as Place | null }, ...(curOk ? t.chain(curOk).map(c => ({ l: c.name, p: c.place as Place | null })) : [])].map((c, i, arr) => (
+                    <span key={c.p ?? 'root'} style={{ display: 'contents' }}>
+                      {i > 0 ? <span className={d.crumbSep}><LeadIcon name="chevron-right" size={13} /></span> : null}
+                      <button type="button" className={d.crumb} aria-current={i === arr.length - 1} onClick={() => (c.p ? open(c.p) : (setCur(null), setSel(null)))}>{c.l}</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className={d.list} role="listbox" aria-label="Folders and files">
+                {subs.map(n => {
+                  const key = `F:${n.place}`, nk = t.kids(n.place).length, nf = t.filesIn(n.place).length
+                  return (
+                    <div key={key} className={d.row} role="option" aria-selected={selKey === key} onClick={() => open(n.place)} onDoubleClick={() => open(n.place)}
+                      onContextMenu={e => (n.folder ? ctxAt(e, key) : e.preventDefault())}>
+                      <span className={d.tile} data-c={n.color ?? undefined}><LeadIcon name="folder" size={17} /></span>
+                      <div className={d.rowText}>
+                        {ren?.key === key ? (
+                          <input className={d.ren} value={ren.value} autoFocus aria-label="Folder name" maxLength={80} onClick={e => e.stopPropagation()}
+                            onChange={e => setRen({ key, value: e.target.value })} onBlur={saveRen}
+                            onKeyDown={e => { if (e.key === 'Enter') saveRen(); if (e.key === 'Escape') setRen(null) }} />
+                        ) : <span className={d.rowName}>{n.name}</span>}
+                        <span className={d.rowSub}>{ql ? t.pathOf(n.parent) || 'Data center' : [nk ? `${nk} ${nk === 1 ? 'folder' : 'folders'}` : '', `${nf} ${nf === 1 ? 'file' : 'files'}`].filter(Boolean).join(' · ')}</span>
+                      </div>
+                      <span className={d.go}><LeadIcon name="chevron-right" size={15} /></span>
+                    </div>
+                  )
+                })}
+                {shownFiles.map(f => {
+                  const st = dcState(f, today), x = extOf(f.name, f.mime)
+                  return (
+                    <div key={f.id} className={d.row} role="option" aria-selected={selKey === f.id} onClick={() => setSel(f.id)} onDoubleClick={() => setSel(f.id)} onContextMenu={e => ctxAt(e, f.id)}>
+                      <span className={d.tile} data-c={x.tone === 'plain' ? undefined : x.tone}>{x.ext}</span>
+                      <div className={d.rowText}>
+                        {ren?.key === f.id ? (
+                          <input className={d.ren} value={ren.value} autoFocus aria-label="File name" maxLength={160} onClick={e => e.stopPropagation()}
+                            onChange={e => setRen({ key: f.id, value: e.target.value })} onBlur={saveRen}
+                            onKeyDown={e => { if (e.key === 'Enter') saveRen(); if (e.key === 'Escape') setRen(null) }} />
+                        ) : <span className={d.rowName}>{f.name}</span>}
+                        <span className={d.rowSub}>{ql ? `${t.pathOf(placeOf(f))} · ` : ''}Updated {dayMon(f.updatedAt)} · v{f.ver}</span>
+                      </div>
+                      <span className={d.st} data-t={st.tone}>{st.label}</span>
+                      <span className={d.go} data-off=""><LeadIcon name="chevron-right" size={15} /></span>
+                    </div>
+                  )
+                })}
+                {!subs.length && !shownFiles.length ? <div className={d.empty}>{ready ? 'Empty folder' : 'Waiting for the database update'}</div> : null}
+              </div>
+            </div>
+
+            <div className={d.side}>
+              {selPlace ? (() => {
+                const n = t.get(selPlace)!, link = t.linkOf(selPlace), key = `F:${selPlace}`
+                return (
+                  <div className={d.detail}>
+                    <div className={d.dHead}>
+                      <span className={d.dName}>{n.name}</span>
+                      {n.folder && canManage ? <button type="button" className={d.trash} title="Delete" aria-label="Delete" onClick={() => setAsking(key)}><LeadIcon name="trash-2" size={15} /></button> : null}
+                    </div>
+                    {asking === key ? <div className={d.ask}><span>{delQ(key)}</span><button type="button" className={d.askNo} onClick={() => setAsking(null)}>Cancel</button><button type="button" className={d.askYes} onClick={() => delKey(key)}>Delete</button></div> : null}
+                    <div className={d.big} data-c={n.color ?? undefined}><LeadIcon name="folder" size={28} /><span className={d.bigL}>{t.count(selPlace)} FILES</span></div>
+                    <div className={d.sect}>
+                      <span className={d.kicker}>LINK FOR AI AGENT</span>
+                      <div className={d.linkBox}><LeadIcon name="link" size={14} /><span className={d.linkText}>{link}</span><button type="button" className={d.copy} onClick={() => copy(link)}>{copied === link ? 'Copied' : 'Copy'}</button></div>
+                    </div>
+                    <div className={d.kv}>
+                      <div className={d.kvRow}><span>Location</span><span>{t.pathOf(n.parent) || 'Data center'}</span></div>
+                      <div className={d.kvRow}><span>Folders</span><span>{t.kids(selPlace).length}</span></div>
+                      <div className={d.kvRow}><span>Files</span><span>{t.count(selPlace)}</span></div>
+                    </div>
+                  </div>
+                )
+              })() : selFile ? (() => {
+                const f = selFile, st = dcState(f, today), x = extOf(f.name, f.mime), link = t.linkOf(placeOf(f), f.name), used = usedBy(f)
+                const vers = f.versions?.length ? f.versions : [{ ver: f.ver, at: f.updatedAt, byName: f.updatedByName, sizeBytes: f.sizeBytes }]
+                return (
+                  <div className={d.detail}>
+                    <div className={d.dHead}>
+                      <span className={d.dName}>{f.name}</span>
+                      <button type="button" className={d.pill} data-t={st.tone} title={st.expired ? 'Expired' : 'Pause / resume'} disabled={!canManage || st.expired || busy}
+                        onClick={() => run(() => saveDataFile(f.id, fileData(f, { status: f.status === 'paused' ? 'active' : 'paused' })))}>{st.label}</button>
+                      {canManage ? <button type="button" className={d.trash} title="Delete" aria-label="Delete" onClick={() => setAsking(f.id)}><LeadIcon name="trash-2" size={15} /></button> : null}
+                    </div>
+                    {asking === f.id ? <div className={d.ask}><span>{delQ(f.id)}</span><button type="button" className={d.askNo} onClick={() => setAsking(null)}>Cancel</button><button type="button" className={d.askYes} onClick={() => delKey(f.id)}>Delete</button></div> : null}
+                    <button type="button" className={d.big} data-c={x.tone === 'plain' ? undefined : x.tone} title="Open the file" onClick={() => openFile(f)}>
+                      <LeadIcon name="file-text" size={28} /><span className={d.bigL}>{x.ext} · v{f.ver}</span>
+                    </button>
+                    <div className={d.sect}>
+                      <span className={d.kicker}>LINK FOR AI AGENT</span>
+                      <div className={d.linkBox}><LeadIcon name="link" size={14} /><span className={d.linkText}>{link}</span><button type="button" className={d.copy} onClick={() => copy(link)}>{copied === link ? 'Copied' : 'Copy'}</button></div>
+                    </div>
+                    <div className={d.kv}>
+                      <div className={d.kvRow}><span>Location</span><span>{t.pathOf(placeOf(f))}</span></div>
+                      <div className={d.kvRow}>
+                        <span>Valid</span>
+                        {untilOpen && canManage ? (
+                          <input type="date" className={d.untilIn} autoFocus aria-label="Valid until" defaultValue={f.validUntil ?? ''} min={f.validFrom ?? undefined}
+                            onBlur={e => { setUntilOpen(false); const v = e.target.value || null; if (v !== f.validUntil) run(() => setDataFileUntil(f.id, v)) }}
+                            onKeyDown={e => { if (e.key === 'Escape') setUntilOpen(false); if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} />
+                        ) : (
+                          <button type="button" className={d.until} disabled={!canManage || !foldersReady} title={canManage ? 'Set the end date' : undefined} onClick={() => setUntilOpen(true)}>
+                            {f.validUntil ? `Until ${dayMon(f.validUntil)}` : 'No end date'}
+                          </button>
+                        )}
+                      </div>
+                      <div className={d.kvRow}><span>Uploaded by</span><span>{vers[vers.length - 1]?.byName || f.updatedByName || '—'}</span></div>
+                    </div>
+                    <div className={d.sect}>
+                      <span className={d.kicker}>USED BY</span>
+                      <div className={d.used}>{used.map(u => <span key={u} className={d.usedChip}>{u}</span>)}{!used.length ? <span className={d.none}>Not used</span> : null}</div>
+                    </div>
+                    <div className={d.sect2}>
+                      <div className={d.verHead}>
+                        <span className={d.verKicker}>VERSIONS</span>
+                        {canManage ? <button type="button" className={d.replace} disabled={!ready || busy} onClick={() => replaceFile(f.id)}><LeadIcon name="refresh-cw" size={12} />Replace file</button> : null}
+                      </div>
+                      {vers.map((v, i) => (
+                        <div key={v.ver} className={d.ver}>
+                          <span className={d.verN} data-cur={i === 0 || undefined}>v{v.ver}</span>
+                          <span className={d.verD}>{dayMon(v.at)} · {v.byName || '—'}</span>
+                          <span className={d.verCur}>{i === 0 ? 'Current' : ''}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })() : null}
+            </div>
+            <input ref={replacer} type="file" hidden onChange={e => { onReplace(e.target.files?.[0]); e.target.value = '' }} />
           </div>
-        ))}
-        {rows.length === 0 ? <div className={s.quickRow}><span className={s.small} style={{ gridColumn: '1 / -1' }}>No quick replies yet.</span></div> : null}
-        {canManage ? (
-          <div style={{ padding: '9px 14px' }}>
-            <button type="button" className={s.link} disabled={busy || !ready} onClick={() => setRows(r => [...r, { id: `new-${Date.now().toString(36)}`, brandId: null, shortcut: '/', body: '', used: 0 }])}>+ Add quick reply</button>
+        ) : (
+          <div className={d.cols} data-narrow="">
+            {brandsCol}
+            <div className={d.mid}>
+              <div className={d.midHeadOne}>
+                <div className={d.search}>
+                  <LeadIcon name="search" size={15} />
+                  <input value={lq} onChange={e => setLq(e.target.value)} placeholder={tab === 'links' ? 'Search links' : 'Search shortcuts'} aria-label={tab === 'links' ? 'Search links' : 'Search shortcuts'} />
+                </div>
+                {tab === 'links' && canManage ? <button type="button" className={d.sqRust} title="Add link" aria-label="Add link" disabled={!can} onClick={() => setNewLink({ url: '', brand: br === 'all' ? '' : br, every: 'day' })}><LeadIcon name="plus" size={16} /></button> : null}
+                {tab === 'short' && canManage ? (
+                  <button type="button" className={d.sqRust} title="New shortcut" aria-label="New shortcut" disabled={!canShort} onClick={() => {
+                    const id = `new-${Date.now()}`
+                    editRows(xs => [{ id, brandId: br === 'all' || br === SHARED ? null : br, shortcut: '/', body: '', used: 0 }, ...xs])
+                    setSSel(id); setLq('')
+                  }}><LeadIcon name="plus" size={16} /></button>
+                ) : null}
+              </div>
+              <div className={d.list} role="listbox" aria-label={tab === 'links' ? 'Web links' : 'Shortcuts'}>
+                {tab === 'links' ? visLinks.map(f => {
+                  const st = f.status === 'paused' ? { l: 'Paused', t: 'grey' } : { l: 'In use', t: 'green' }
+                  return (
+                    <div key={f.id} className={d.row} role="option" aria-selected={curLink?.id === f.id} onClick={() => setLSel(f.id)}
+                      onContextMenu={e => { e.preventDefault(); setLSel(f.id); setLCtx({ id: f.id, x: e.clientX, y: e.clientY }) }}>
+                      <span className={d.globe}><LeadIcon name="globe" size={17} /></span>
+                      <div className={d.rowText}>
+                        <span className={d.rowName}>{hostOf(f.url ?? '')}</span>
+                        <span className={d.rowSub}>{brandName(f.brandId)} · {(CHECK_EVERY.find(c => c[0] === (f.checkEvery ?? 'day'))?.[1] ?? 'Every day').toLowerCase()}</span>
+                      </div>
+                      <span className={d.st} data-t={st.t}>{st.l}</span>
+                    </div>
+                  )
+                }) : visShort.map(r => (
+                  <div key={r.id} className={d.skRow} role="option" aria-selected={curShort === r} onClick={() => setSSel(r.id)}
+                    onContextMenu={e => { e.preventDefault(); setSSel(r.id); if (canShort) setLCtx({ id: r.id, x: e.clientX, y: e.clientY }) }}>
+                    <span className={d.key}>{r.shortcut}</span>
+                    <div className={d.rowText}>
+                      <span className={d.skText}>{r.body || '—'}</span>
+                      <span className={d.rowSub}>{brandName(r.brandId)} · used {r.used} {r.used === 1 ? 'time' : 'times'}</span>
+                    </div>
+                  </div>
+                ))}
+                {(tab === 'links' ? !visLinks.length : !visShort.length) ? <div className={d.empty}>{(tab === 'links' ? ready : quickReady) ? 'Nothing here' : 'Waiting for the database update'}</div> : null}
+              </div>
+            </div>
+            <div className={d.side}>
+              {tab === 'links' && curLink ? (() => {
+                const f = curLink, url = f.url ?? '', st = f.status === 'paused' ? { l: 'Paused', t: 'grey' } : { l: 'In use', t: 'green' }
+                return (
+                  <div className={d.detail}>
+                    <div className={d.dHead}>
+                      <span className={d.dName}>{hostOf(url)}</span>
+                      <button type="button" className={d.pill} data-t={st.t} title="Pause / resume" disabled={!can || busy} onClick={() => saveLink(f, { status: f.status === 'paused' ? 'active' : 'paused' })}>{st.l}</button>
+                      {canManage ? <button type="button" className={d.trash} title="Delete" aria-label="Delete" onClick={() => setLAsk(f.id)}><LeadIcon name="trash-2" size={15} /></button> : null}
+                    </div>
+                    {lAsk === f.id ? <div className={d.ask}><span>Delete this link?</span><button type="button" className={d.askNo} onClick={() => setLAsk(null)}>Cancel</button><button type="button" className={d.askYes} onClick={() => { setLAsk(null); run(() => removeDataFile(f.id)) }}>Delete</button></div> : null}
+                    <div className={d.linkBox}><LeadIcon name="link" size={14} /><span className={d.linkText}>{url}</span><button type="button" className={d.copy} onClick={() => copy(url)}>{copied === url ? 'Copied' : 'Copy'}</button></div>
+                    <div className={d.sect}>
+                      <span className={d.kicker}>READ BY</span>
+                      <div className={d.chips}>{BR.map(([k, l]) => <button key={k} type="button" className={d.chip} aria-pressed={brandOf(f.brandId) === k} disabled={!can || busy} onClick={() => saveLink(f, { brandId: k === SHARED ? null : k })}>{l}</button>)}</div>
+                    </div>
+                    <div className={d.sect}>
+                      <span className={d.kicker}>CHECK FOR CHANGES</span>
+                      <div className={d.chips}>{CHECK_EVERY.map(([k, l]) => <button key={k} type="button" className={d.chip} aria-pressed={(f.checkEvery ?? 'day') === k} disabled={!can || busy} onClick={() => saveLink(f, { checkEvery: k })}>{l}</button>)}</div>
+                    </div>
+                    <div className={d.kv}>
+                      <div className={d.kvRow}><span>Last checked</span><span>{checkedLabel(f.checkedAt ?? null, Date.now())}</span></div>
+                      <div className={d.kvRow}><span>Pages read</span><span>{f.pagesRead ?? 0}</span></div>
+                    </div>
+                    {f.checkError ? <span className={d.bad}>Last check: {f.checkError}</span> : null}
+                    <button type="button" className={d.check} disabled={!can || busy} onClick={() => checkNow(f)}><LeadIcon name="refresh-cw" size={13} />{busy ? 'Checking…' : 'Check now'}</button>
+                  </div>
+                )
+              })() : null}
+              {tab === 'short' && curShort ? (
+                <div className={d.detail} data-tight="">
+                  <div className={d.dHead} style={{ alignItems: 'center' }}>
+                    <div className={d.keyBox}>
+                      <span>/</span>
+                      <input value={curShort.shortcut.slice(1)} placeholder="shortcut" aria-label="Shortcut" disabled={!canShort}
+                        onChange={e => { const v = cleanShortcut(e.target.value); editRows(xs => xs.map(x => (x === curShort ? { ...x, shortcut: v } : x))) }} />
+                    </div>
+                    {canShort ? <button type="button" className={d.trash} title="Delete" aria-label="Delete" onClick={() => setLAsk(curShort.id)}><LeadIcon name="trash-2" size={15} /></button> : null}
+                  </div>
+                  {lAsk === curShort.id ? <div className={d.ask}><span>Delete this shortcut?</span><button type="button" className={d.askNo} onClick={() => setLAsk(null)}>Cancel</button><button type="button" className={d.askYes} onClick={() => { setLAsk(null); editRows(xs => xs.filter(x => x !== curShort)) }}>Delete</button></div> : null}
+                  {dup ? <span className={d.bad}>Another shortcut already uses this</span> : null}
+                  <div className={d.sect}>
+                    <span className={d.kicker}>TEXT</span>
+                    <textarea className={d.text} rows={5} value={curShort.body} placeholder="What CS pastes" aria-label="Text" maxLength={1000} disabled={!canShort}
+                      onChange={e => { const v = e.target.value; editRows(xs => xs.map(x => (x === curShort ? { ...x, body: v } : x))) }} />
+                  </div>
+                  <div className={d.sect}>
+                    <span className={d.kicker}>BRAND</span>
+                    <div className={d.chips}>{BR.map(([k, l]) => <button key={k} type="button" className={d.chip} aria-pressed={brandOf(curShort.brandId) === k} disabled={!canShort}
+                      onClick={() => editRows(xs => xs.map(x => (x === curShort ? { ...x, brandId: k === SHARED ? null : k } : x)))}>{l}</button>)}</div>
+                  </div>
+                  <div className={d.kv}><div className={d.kvRow}><span>Used</span><span>{curShort.used} {curShort.used === 1 ? 'time' : 'times'}</span></div></div>
+                  {skNote ? <span className={d.note}>{skNote}</span> : null}
+                </div>
+              ) : null}
+            </div>
           </div>
+        )}
+      </section>
+
+      <ContextMenu at={ctx} onClose={() => setCtx(null)} width={210}>
+        {ctx && (ctxNode || ctxFile) ? (
+          ctx.mode === 'main' ? (
+            <>
+              {ctxNode?.folder ? (
+                <div className={d.swatches}>
+                  {FOLDER_COLORS.map(([n, c]) => <button key={n} type="button" className={d.swatch} data-c={c ?? 'default'} title={n} aria-label={n} aria-pressed={(ctxNode.color ?? null) === c} onClick={() => setColor(ctxNode.folder!, c)} />)}
+                </div>
+              ) : null}
+              {ctxNode ? <button type="button" className={d.ctxItem} onClick={() => { setCtx(null); open(ctxNode.place) }}><span>Open</span></button> : null}
+              <button type="button" className={d.ctxItem} onClick={() => {
+                setCtx(null)
+                if (ctxNode) { if (ctxNode.parent && ctxNode.parent !== curOk) open(ctxNode.parent); setSel(ctx.key); setRen({ key: ctx.key, value: ctxNode.name }) }
+                else if (ctxFile) { if (placeOf(ctxFile) !== curOk) setCur(placeOf(ctxFile)); setQ(''); setRen({ key: ctxFile.id, value: ctxFile.name }) }
+              }}><span>Rename</span></button>
+              <button type="button" className={d.ctxItem} onClick={() => setCtx({ ...ctx, mode: 'move' })}><span>Move to</span><span className={d.ctxArrow}>›</span></button>
+              <button type="button" className={d.ctxItem} onClick={() => { copy(ctxNode ? t.linkOf(ctxNode.place) : t.linkOf(placeOf(ctxFile!), ctxFile!.name)); setCtx(null) }}><span>Copy link</span></button>
+              {ctxFile ? <button type="button" className={d.ctxItem} onClick={() => { setCtx(null); replaceFile(ctxFile.id) }}><span>Replace file</span></button> : null}
+              <button type="button" className={d.ctxItem} data-danger="" onClick={() => setCtx({ ...ctx, mode: 'del' })}><span>Delete</span></button>
+            </>
+          ) : ctx.mode === 'move' ? (
+            <div style={{ maxHeight: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+              <span className={d.ctxHead}>MOVE TO</span>
+              {flat.filter(o => !banned.has(o.place)).map(o => {
+                const here = ctxNode ? ctxNode.parent === o.place : placeOf(ctxFile!) === o.place
+                return (
+                  <button key={o.place} type="button" className={d.ctxItem} style={{ paddingLeft: 10 + (o.depth + 1) * 14 }} onClick={() => (here ? setCtx(null) : moveTo(ctx.key, o.place))}>
+                    <LeadIcon name="folder" size={14} className={d.ctxIcon} /><span>{o.name}</span><span className={d.ctxMark}>{here ? '✓' : ''}</span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className={d.ctxDel}>
+              <span className={d.ctxDelQ}>{delQ(ctx.key)}</span>
+              <div className={d.ctxDelRow}><button type="button" className={d.askNo} onClick={() => setCtx(null)}>Cancel</button><button type="button" className={d.askYes} onClick={() => delKey(ctx.key)}>Delete</button></div>
+            </div>
+          )
         ) : null}
-      </div>
-      {canManage ? (
-        <div className={s.quickFoot}>
-          <span className={s.hint} data-dirty={dirty || undefined}>{dirty ? 'Unsaved changes' : note || 'No changes yet'}</span>
-          <span className={s.fill} />
-          <button type="button" className={s.btn} data-quiet="" disabled={!dirty || busy} onClick={() => setRows(quick)}>Discard</button>
-          <button type="button" className={s.btn} data-strong="" disabled={!dirty || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
+      </ContextMenu>
+
+      <ContextMenu at={lCtx} onClose={() => setLCtx(null)} width={180}>
+        {lCtx && lCtxItem ? ('kind' in lCtxItem ? (
+          <>
+            <button type="button" className={d.ctxItem} onClick={() => { window.open(lCtxItem.url ?? '', '_blank', 'noopener'); setLCtx(null) }}><span>Open</span></button>
+            <button type="button" className={d.ctxItem} onClick={() => { copy(lCtxItem.url ?? ''); setLCtx(null) }}><span>Copy link</span></button>
+            {can ? (
+              <>
+                <button type="button" className={d.ctxItem} onClick={() => { setLCtx(null); checkNow(lCtxItem) }}><span>Check now</span></button>
+                <button type="button" className={d.ctxItem} onClick={() => { setLCtx(null); saveLink(lCtxItem, { status: lCtxItem.status === 'paused' ? 'active' : 'paused' }) }}><span>{lCtxItem.status === 'paused' ? 'Resume' : 'Pause'}</span></button>
+                <button type="button" className={d.ctxItem} data-danger="" onClick={() => { setLCtx(null); setLAsk(lCtxItem.id) }}><span>Delete</span></button>
+              </>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <button type="button" className={d.ctxItem} onClick={() => {
+              const id = `new-${Date.now()}`, src = lCtxItem as QuickReply
+              editRows(xs => [...xs, { ...src, id, shortcut: cleanShortcut(`${src.shortcut}2`), used: 0 }])
+              setSSel(id); setLCtx(null)
+            }}><span>Duplicate</span></button>
+            <button type="button" className={d.ctxItem} data-danger="" onClick={() => { setLAsk(lCtxItem.id); setLCtx(null) }}><span>Delete</span></button>
+          </>
+        )) : null}
+      </ContextMenu>
+
+      <ContextMenu at={tplOpen} onClose={() => setTplOpen(null)} width={220}>
+        <span className={d.ctxHead}>BLANK TEMPLATES · CSV</span>
+        {TEMPLATES.map(tp => <button key={tp.label} type="button" className={d.ctxItem} onClick={() => { download(tp); setTplOpen(null) }}><span>{tp.label}</span></button>)}
+      </ContextMenu>
+
+      <Modal open={!!up} onClose={() => setUp(null)} title="Upload file" width={440}
+        foot={<><button type="button" className={d.mCancel} onClick={() => setUp(null)}>Cancel</button><button type="button" className={d.mGo} disabled={!up?.place || !up?.file || busy} onClick={doUpload}>{busy ? 'Uploading…' : 'Upload'}</button></>}>
+        <div className={d.mSect}>
+          <span className={d.mLabel}>TO FOLDER *</span>
+          <div className={d.mFolders} role="radiogroup" aria-label="To folder">
+            {flat.map(o => (
+              <button key={o.place} type="button" role="radio" className={d.mFolder} aria-checked={up?.place === o.place} style={{ paddingLeft: 10 + o.depth * 16 }} onClick={() => setUp(u => (u ? { ...u, place: o.place } : u))}>
+                <LeadIcon name="folder" size={14} />{o.name}
+              </button>
+            ))}
+          </div>
         </div>
-      ) : null}
+        <label className={d.drop}>
+          <LeadIcon name="upload" size={18} />{up?.file?.name ?? 'Choose a file'}
+          <input type="file" onChange={e => { const fl = e.target.files?.[0]; if (fl) setUp(u => (u ? { ...u, file: fl } : u)) }} />
+        </label>
+      </Modal>
+
+      <Modal open={!!newLink} onClose={() => setNewLink(null)} title="Add link" width={440}
+        foot={<><button type="button" className={d.mCancel} onClick={() => setNewLink(null)}>Cancel</button><button type="button" className={d.mGo} disabled={!newLinkOk || busy} onClick={addLink}>Add</button></>}>
+        <input className={d.mInput} value={newLink?.url ?? ''} placeholder="https://" autoFocus aria-label="Web address" onChange={e => setNewLink(n => (n ? { ...n, url: e.target.value } : n))} />
+        <div className={d.mSect}>
+          <span className={d.mLabel}>READ BY *</span>
+          <div className={d.chips}>{BR.map(([k, l]) => <button key={k} type="button" className={d.chip} aria-pressed={newLink?.brand === k} onClick={() => setNewLink(n => (n ? { ...n, brand: k } : n))}>{l}</button>)}</div>
+        </div>
+        <div className={d.mSect}>
+          <span className={d.mLabel}>CHECK FOR CHANGES</span>
+          <div className={d.chips}>{CHECK_EVERY.map(([k, l]) => <button key={k} type="button" className={d.chip} aria-pressed={newLink?.every === k} onClick={() => setNewLink(n => (n ? { ...n, every: k } : n))}>{l}</button>)}</div>
+        </div>
+      </Modal>
     </div>
   )
 }
+

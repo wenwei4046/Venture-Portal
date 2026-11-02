@@ -6,9 +6,13 @@ import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, type DraftOutcome, type KnowledgeCard, type KnowledgeKind, type Persona, type PersonaFields, type Turn } from './ai'
 import { askModel, type AgentDocument } from './ai-model'
-import { agentCards, agentReads, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile, type FixedAnswer, type PlaySituation } from './agent'
+import { agentCards, agentReads, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
+import { managedPages, subscribePage } from './pages-server'
+import type { ManagedPage, PageChannel, StaffLeave } from './pages'
 import { quickProblem, type QuickReply } from './quick'
+import { knowledgeReads, linkDue, type DataFolder, type FolderColor } from './data-center'
+import { readLink } from './link-read'
 import { deliver, deliverFile, sendReaction } from './messenger'
 import { markSeen } from './meta-sync'
 import { KEEP_LIMIT, metaCdnUrl } from './media-keep'
@@ -209,8 +213,9 @@ export async function forwardMessage(toContactId: string, m: { body: string; med
 
 /** Short-lived links (an hour) to the photos and files sent in a conversation, by their paths. */
 export async function leadMediaLinks(paths: string[]): Promise<LeadOutcome<Record<string, string>>> {
-  await requireActionOn('/leads', 'leads', 'view')
-  const wanted = [...new Set(paths)].filter(p => /^chat\/[0-9a-f-]{36}\/[^/]{1,200}$/.test(p)).slice(0, 100)
+  await requireActionOn(['/leads', '/leads/flows', '/leads/library'], 'leads', 'view')
+  // A chat's files, and a template's (chat/tpl/<uuid>/<name>, mig 20261102120000).
+  const wanted = [...new Set(paths)].filter(p => /^chat\/(tpl\/)?[0-9a-f-]{36}\/[^/]{1,200}$/.test(p)).slice(0, 100)
   if (!wanted.length) return { ok: true, data: {} }
   const supabase = (await createClient()) as unknown as SupabaseClient
   const links: Record<string, string> = {}
@@ -259,7 +264,8 @@ export async function handLeadOver(contactId: string, salesId: string) {
 
 /** Hand the lead to the brand's sales group (CS pastes the message into the WhatsApp group; nobody named). */
 export async function handLeadToGroup(contactId: string) {
-  await requireActionOn('/leads', 'leads', 'edit')
+  // The Inbox's hand-over window, and Leads' bulk *Hand over to sales* (Lead View v2).
+  await requireActionOn(['/leads', '/leads/list'], 'leads', 'edit')
   return call<null>('lead_handoff_group', { p_contact: contactId }, 'The lead was not handed over.')
 }
 
@@ -288,15 +294,27 @@ export async function reopenLead(contactId: string) {
 }
 
 /** General info's Save: every category and card as the page holds them (a card left out is deleted). */
-export async function saveInfo(cats: Array<Pick<InfoCat, 'id' | 'label'>>, cards: InfoCard[]) {
+export async function saveInfo(cats: Array<Pick<InfoCat, 'id' | 'label' | 'icon'>>, cards: InfoCard[]) {
   await requireActionOn('/leads/info', 'leads', 'manage')
   return call<LeadInfo>('lead_save_info', { p_data: { cats, cards } }, 'General info was not saved.')
 }
 
-/** Business hours' Save: the week and the special dates. */
+/** AI corrections: Dismiss (on) or Move back to review (mig 20261102130000). */
+export async function dismissCorrection(draftId: number, on: boolean) {
+  await requireActionOn('/leads/corrections', 'leads', 'manage')
+  return call<null>('lead_ai_dismiss', { p_draft: draftId, p_on: on }, 'The correction was not changed.')
+}
+
+/** Working hours' Save: the week and the public holidays. */
 export async function saveHours(week: BusinessHours['week'], specials: BusinessHours['specials']) {
   await requireActionOn('/leads/hours', 'leads', 'manage')
   return call<null>('lead_save_hours', { p_week: week, p_specials: specials }, 'The hours were not saved.')
+}
+
+/** Working hours › On Leave, as it stands (left out = removed). */
+export async function saveLeave(rows: Array<Pick<StaffLeave, 'id' | 'userId' | 'name' | 'from' | 'to'>>) {
+  await requireActionOn('/leads/hours', 'leads', 'manage')
+  return call<null>('lead_save_leave', { p_rows: rows }, 'The leave was not saved.')
 }
 
 /** Reply templates' Save: a template's name, description, closing message and steps (new: id null). Returns its id. */
@@ -329,8 +347,11 @@ export async function removeLibraryItem(itemId: string) {
   return call<null>('lead_remove_library_item', { p_id: itemId }, 'The library item was not removed.')
 }
 
-/** AI Agent's Save for one brand (also AI corrections' "Save as fixed answer"): settings, fixed answers, playbook, sources. */
-export async function saveAgent(brandId: string, data: { settings: unknown; answers: FixedAnswer[]; playbook: PlaySituation[]; sources: Array<{ fileId: string; paused: boolean }> }) {
+/**
+ * AI Agent's Save for one brand (also AI corrections' "Save as fixed answer"): settings, fixed answers, playbook and —
+ * from AI Agent only — Knowledge (mig 20261102140000); a save without it leaves Knowledge as it is.
+ */
+export async function saveAgent(brandId: string, data: { settings: unknown; answers: FixedAnswer[]; playbook: PlaySituation[]; knowledge?: KnowledgePick[] }) {
   await requireActionOn(['/leads/ai', '/leads/corrections'], 'leads', 'manage')
   return call<null>('lead_save_ai', {
     p_brand: brandId,
@@ -338,7 +359,7 @@ export async function saveAgent(brandId: string, data: { settings: unknown; answ
       settings: data.settings,
       answers: data.answers.map(a => ({ id: a.id.startsWith('new-') ? '' : a.id, question: a.question, answer: a.answer, draftId: a.draftId ?? null })),
       playbook: data.playbook.map(p => ({ ...p, id: p.id.startsWith('new-') ? '' : p.id })),
-      sources: data.sources,
+      ...(data.knowledge ? { knowledge: data.knowledge.map(k => ({ kind: k.kind, ref: k.ref, paused: k.paused })) } : {}),
     },
   }, 'The AI agent was not saved.')
 }
@@ -353,6 +374,48 @@ export async function saveDataFile(fileId: string | null, data: Partial<DataFile
 export async function removeDataFile(fileId: string) {
   await requireActionOn('/leads/knowledge', 'leads', 'manage')
   return call<null>('lead_remove_data_file', { p_id: fileId }, 'The file was not removed.')
+}
+
+/** The Data Center: a folder added (id null), renamed, coloured or moved. Returns its id. */
+export async function saveDataFolder(folderId: string | null, data: { brandId: string | null; parentId: string | null; name: string; color: FolderColor | null }) {
+  await requireActionOn('/leads/knowledge', 'leads', 'manage')
+  return call<string>('lead_save_data_folder', { p_id: folderId, p_data: data }, 'The folder was not saved.')
+}
+
+/** The Data Center: a folder gone, with its folders and their files. */
+export async function removeDataFolder(folderId: string) {
+  await requireActionOn('/leads/knowledge', 'leads', 'manage')
+  return call<null>('lead_remove_data_folder', { p_id: folderId }, 'The folder was not deleted.')
+}
+
+/** A file's end date — the Data Center, or AI Agent › Knowledge › History's Restore (it also turns the file back on). */
+export async function setDataFileUntil(fileId: string, until: string | null) {
+  await requireActionOn(['/leads/knowledge', '/leads/ai'], 'leads', 'manage')
+  return call<null>('lead_data_file_until', { p_id: fileId, p_until: until }, 'The end date was not saved.')
+}
+
+/**
+ * AI Agent › Knowledge › Add links: a web address the Data Center does not have yet — kept there, read by this brand
+ * and checked every day — so the agent can pick it. Returns its id.
+ */
+export async function addAgentLink(brandId: string, url: string) {
+  await requireActionOn('/leads/ai', 'leads', 'manage')
+  const u = url.trim()
+  const name = u.replace(/^https?:\/\//, '').replace(/\/$/, '').slice(0, 160)
+  return call<string>('lead_save_data_file', { p_id: null, p_data: { kind: 'link', name, url: u, brandId, checkEvery: 'day', category: '', status: 'active' } }, 'The link was not added.')
+}
+
+/** Web links › Check now: the page read by the server and what it said kept for the agent (or why it could not be). */
+export async function checkLink(fileId: string): Promise<LeadOutcome<{ error: string }>> {
+  await requireActionOn('/leads/knowledge', 'leads', 'manage')
+  const supabase = (await createClient()) as unknown as SupabaseClient
+  const { data, error } = await supabase.rpc('lead_link_text', { p_ids: [fileId] })
+  if (error) return { ok: false, reason: refusal(error, 'The link could not be read.') }
+  const url = (data as Array<{ url: string }> | null)?.[0]?.url
+  if (!url) return { ok: false, reason: 'That link is gone.' }
+  const read = await readLink(url)
+  const kept = await call<null>('lead_link_checked', { p_id: fileId, p_content: 'text' in read ? read.text : '', p_pages: 1, p_error: 'error' in read ? read.error : '' }, 'What the page said was not kept.')
+  return kept.ok ? { ok: true, data: { error: 'error' in read ? read.error : '' } } : kept
 }
 
 /** The Data Center's Quick replies tab: the whole list as it stands. */
@@ -371,7 +434,7 @@ export async function quickReplyUsed(id: string) {
 
 /** The Data Center: a short-lived link to open a file (the session's own storage access). */
 export async function openDataFile(path: string): Promise<LeadOutcome<string>> {
-  await requireActionOn('/leads/knowledge', 'leads', 'view')
+  await requireActionOn(['/leads/ai', '/leads/knowledge'], 'leads', 'view')
   if (!/^files\/[0-9a-f-]{36}\//.test(path)) return { ok: false, reason: 'That file is not in the Data Center.' }
   const supabase = (await createClient()) as unknown as SupabaseClient
   const { data, error } = await supabase.storage.from('lead-data').createSignedUrl(path, 120)
@@ -390,6 +453,35 @@ export async function sendTestEnquiry(brandId: string, channel: 'messenger' | 'i
     if (!tagged.ok) return tagged
   }
   return sent
+}
+
+/** Settings › Connect page: the system user's Pages (and their Instagram accounts), asked of Meta now. */
+export async function listManagedPages(): Promise<LeadOutcome<ManagedPage[]>> {
+  await requireActionOn('/leads/settings', 'leads', 'manage')
+  const pages = await managedPages(true)
+  return pages ? { ok: true, data: pages } : { ok: false, reason: 'Meta did not list the system user’s Pages — check META_SYSTEM_USER_TOKEN and that the Pages are assigned to the system user.' }
+}
+
+/** Settings › Connect page: the Page's webhook subscribed at Meta first (idempotent), then kept with its brand and first reply. */
+export async function connectPage(data: { channel: PageChannel; externalId: string; pageId: string | null; name: string; brandId: string | null; newBrand: string; reply: 'cs' | 'ai' }) {
+  await requireActionOn('/leads/settings', 'leads', 'manage')
+  const subscribe = data.channel === 'messenger' ? data.externalId : data.pageId
+  if (!subscribe) return { ok: false as const, reason: 'That Instagram account is not linked to a Facebook Page.' }
+  const refused = await subscribePage(subscribe)
+  if (refused) return { ok: false as const, reason: refused }
+  return call<string>('lead_connect_page', { p_data: data }, 'The page was not connected.')
+}
+
+/** Settings › a page: pause / resume receiving, or move it to another brand. */
+export async function setPage(pageId: string, data: { paused?: boolean; brandId?: string; name?: string }) {
+  await requireActionOn('/leads/settings', 'leads', 'manage')
+  return call<null>('lead_set_page', { p_id: pageId, p_data: data }, 'The page was not changed.')
+}
+
+/** Settings › Disconnect page: new messages stop; past chats stay in the Inbox. */
+export async function disconnectPage(pageId: string) {
+  await requireActionOn('/leads/settings', 'leads', 'manage')
+  return call<null>('lead_disconnect_page', { p_id: pageId }, 'The page was not disconnected.')
 }
 
 export async function saveLeadBrand(brandId: string | null, data: { name: string; tone?: string; fbPageId?: string; igAccountId?: string; handoffMode?: 'rotate' | 'pick' }) {
@@ -516,17 +608,21 @@ export async function setDraftOutcome(draftId: number, outcome: DraftOutcome, se
  * (General info, fixed answers, files) and the files it reads attached — PDFs, pictures and text, at most six and
  * 24 MB, read with the session's own storage access. Null before mig 20261023200000 (the draft runs as before).
  */
-async function agentMore(brandId: string, today: string, override?: Pick<AgentMore, 'settings' | 'answers' | 'playbook'>) {
-  const [more, info, dataFiles, quick] = await Promise.all([
+async function agentMore(brandId: string, today: string, override?: Pick<AgentMore, 'settings' | 'answers' | 'playbook' | 'knowledge'>) {
+  const [more, info, dataFiles, folders, quick] = await Promise.all([
     quiet<AgentMore>('lead_ai_more', { p_brand: brandId }, ''),
     quiet<LeadInfo>('lead_info', {}, ''),
     quiet<DataFile[]>('lead_data_files', {}, ''),
+    quiet<DataFolder[]>('lead_data_folders', {}, ''),
     quiet<QuickReply[]>('lead_quick_replies', {}, ''),
   ])
   if (!more.ok) return null
   const m = { ...more.data, ...(override ?? {}) }
-  // As drawn: everything in the brand's folder and Shared that is on and in date.
-  const files: DataFile[] = agentReads(dataFiles.ok ? dataFiles.data : [], brandId).filter(s => !s.paused && fileStatus(s.file, today).usable).map(s => s.file)
+  const settings = settingsOf(m.settings)
+  const all = dataFiles.ok ? dataFiles.data : []
+  // What AI Agent › Knowledge picked (mig 20261102140000), on and in date; before it, the brand's folder and Shared.
+  const picked = m.knowledge ? knowledgeReads(m.knowledge, all, folders.ok ? folders.data : []) : agentReads(all, brandId)
+  const files: DataFile[] = picked.filter(s => !s.paused && fileStatus(s.file, today).usable).map(s => s.file)
   const documents: AgentDocument[] = []
   const supabase = (await createClient()) as unknown as SupabaseClient
   let total = 0
@@ -541,27 +637,48 @@ async function agentMore(brandId: string, today: string, override?: Pick<AgentMo
     else if (how === 'text') documents.push({ kind: 'text', title: f.name, text: buf.toString('utf8').slice(0, 200_000) })
     else documents.push({ kind: 'image', title: f.name, base64: buf.toString('base64'), mediaType: (f.mime as 'image/png') || 'image/png' })
   }
-  const links = files.filter(f => f.kind === 'link').map(f => `- ${f.name}: ${f.url}`)
+  const links = await linkPages(files.filter(f => f.kind === 'link'))
   // The Data Center's quick replies are CS's own words; the agent may use them as fixed answers (the handoff).
   const quickLines = (quick.ok ? quick.data : []).filter(q => q.brandId === null || q.brandId === brandId).map(q => `- ${q.body}`)
   const system = [
-    settingsPrompt(settingsOf(m.settings)),
+    settingsPrompt(settings),
     answersPrompt(m.answers, m.playbook),
     documents.length ? `# Files you read\nThe documents attached before the conversation are the brand's files; cite one by its card id (file-…).` : '',
-    links.length ? `# Web pages (you see the address, not the page)\n${links.join('\n')}` : '',
+    links.length ? `# Web pages the brand keeps (their words as last read)\n${links.join('\n\n')}` : '',
     quickLines.length ? `# Quick replies Customer Service uses (reuse them word for word when they answer the question)\n${quickLines.join('\n')}` : '',
   ].filter(Boolean).join('\n\n')
+  // Knowledge › General info: the cards switched off for this brand's agent.
+  const infoFor = info.ok ? { ...info.data, cards: info.data.cards.filter(c => !settings.infoOff.includes(c.id)) } : null
   return {
     ask: { system, documents },
-    cards: (old: KnowledgeCard[]) => agentCards(old, info.ok ? info.data : null, brandId, today, m.answers, files),
+    cards: (old: KnowledgeCard[]) => agentCards(old, infoFor, brandId, today, m.answers, files),
   }
+}
+
+/**
+ * The agent's web links: each one's words as Check now last kept them, read again (not kept — only the Data Center's
+ * Check now keeps) when that reading is older than the link's frequency. Five links, 20,000 characters each at most.
+ */
+async function linkPages(links: DataFile[]): Promise<string[]> {
+  if (!links.length) return []
+  const pick = links.slice(0, 5)
+  const kept = await quiet<Array<{ id: string; content: string; checkedAt: string | null }>>('lead_link_text', { p_ids: pick.map(l => l.id) }, '')
+  const now = Date.now()
+  return Promise.all(pick.map(async l => {
+    let text = (kept.ok ? kept.data.find(k => k.id === l.id)?.content : '') ?? ''
+    if (linkDue(l, now) || !text) {
+      const fresh = await readLink(l.url ?? '')
+      if ('text' in fresh) text = fresh.text
+    }
+    return text ? `<page url="${l.url}">\n${text.slice(0, 20_000)}\n</page>` : `- ${l.url} (could not be read)`
+  }))
 }
 
 /**
  * AI Agent › Try it: a brand's cards for today and the soul as the form holds it (saved or not), on a pretend
  * conversation. Nothing is kept and nothing reaches a customer.
  */
-export async function tryAgent(brandId: string, fields: PersonaFields, turns: Turn[], v2?: Pick<AgentMore, 'settings' | 'answers' | 'playbook'>): Promise<LeadOutcome<AgentDraft>> {
+export async function tryAgent(brandId: string, fields: PersonaFields, turns: Turn[], v2?: Pick<AgentMore, 'settings' | 'answers' | 'playbook' | 'knowledge'>): Promise<LeadOutcome<AgentDraft>> {
   await requireActionOn('/leads/ai', 'leads', 'manage')
   const ctx = await quiet<{ persona: Persona; knowledge: KnowledgeCard[]; today: string }>(
     'lead_ai_try_context', { p_brand: brandId }, 'The brand could not be read.')

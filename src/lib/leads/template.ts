@@ -43,7 +43,14 @@ export interface TemplateStep {
   againText?: string
   pos?: { x: number; y: number }
   lib?: { id: string; ver: number }
+  /**
+   * A photo or file sent just before the step's words (2026-11-02, the v2 handoff's *Attach photo or file*; mig
+   * 20261102120000): the object in `lead-media` under chat/tpl/.
+   */
+  file?: StepFile | null
 }
+
+export interface StepFile { path: string; name: string; mime: string; size: number }
 
 export interface ReplyTemplate {
   id: string
@@ -251,7 +258,7 @@ export function normDigits(v: string): string {
   return v.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[零〇一幺二两三四五六七八九]/g, c => CN[c] ?? c)
 }
 
-export interface Said { from: 'bot' | 'customer' | 'system'; text: string; buttons?: string[] }
+export interface Said { from: 'bot' | 'customer' | 'system'; text: string; buttons?: string[]; file?: StepFile }
 
 export interface Walk {
   said: Said[]
@@ -306,6 +313,7 @@ export function walkFrom(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, from: strin
   for (let hops = 0; hops < 40; hops++) {
     const s = t.steps.find(x => x.id === at)
     if (!s) return { said, waiting: null, tries: 0, ended: 'done' }
+    if (s.file) said.push({ from: 'bot', text: '', file: s.file })
     if (s.text?.trim()) said.push({ from: 'bot', text: s.text, buttons: s.kind === 'question' ? (s.buttons ?? []).map(b => b.label) : undefined })
     if (s.kind === 'question' || s.kind === 'phone' || s.kind === 'text') return { said, waiting: s.id, tries: 0, ended: null }
     if (s.kind === 'handoff' || s.kind === 'ai') {
@@ -330,7 +338,7 @@ export function walkAnswer(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, w: Walk, 
     const shown = [...w.said].reverse().find(x => x.from === 'bot' && x.buttons)?.buttons ?? (s.buttons ?? []).map(b => b.label)
     const hit = answerPicks(s, answer, shown)
     const sayAlso = (ids: string[] | undefined) => {
-      for (const id of ids ?? []) { const t = t0.steps.find(x => x.id === id); if (t?.text?.trim()) said.push({ from: 'bot', text: t.text }) }
+      for (const id of ids ?? []) { const t = t0.steps.find(x => x.id === id); if (t?.file) said.push({ from: 'bot', text: '', file: t.file }); if (t?.text?.trim()) said.push({ from: 'bot', text: t.text }) }
     }
     if (hit && !s.multi) {
       const o = s.buttons![hit.picks[0]]
@@ -425,14 +433,47 @@ export function fromLibrary(steps: TemplateStep[], item: Pick<LibraryItem, 'id' 
   })
 }
 
-/** A linked step brought up to the library's version: its words and type, its place and its ways on kept. */
+/**
+ * A linked step brought up to the library's version — the twin of lead_library_push (mig 20261102120000): the library's
+ * type, name, message, file, options' words and extras; the template's own way on kept (where it and each option go,
+ * what each option also sends, its closing messages, its place).
+ */
 export function updateFromLibrary(step: TemplateStep, item: Pick<LibraryItem, 'id' | 'ver' | 'steps'>): TemplateStep {
   const src = item.steps[0]
   if (!src) return step
   const buttons = src.kind === 'question'
-    ? (src.buttons ?? []).map((b, i) => ({ ...b, next: step.buttons?.[i]?.next ?? '' }))
+    ? (src.buttons ?? []).map((b, i) => {
+        const own = step.buttons?.[i]
+        const o: StepOption = { ...b, next: own?.next ?? '' }
+        delete o.also
+        delete o.endMsg
+        if (own?.also) o.also = own.also
+        if (own?.endMsg) o.endMsg = own.endMsg
+        return o
+      })
     : undefined
-  return { ...step, kind: src.kind, name: src.name, text: src.text, buttons, endMsg: src.endMsg, saveAs: src.saveAs, retryText: src.retryText, retryMax: src.retryMax, lib: { id: item.id, ver: item.ver } }
+  const out: TemplateStep = { ...step, kind: src.kind, name: src.name, text: src.text, lib: { id: item.id, ver: item.ver } }
+  for (const k of ['file', 'saveAs', 'retryText', 'retryMax', 'multi', 'doneLabel', 'againText', 'buttons'] as const) delete out[k]
+  return {
+    ...out,
+    ...(src.file ? { file: src.file } : {}), ...(src.saveAs ? { saveAs: src.saveAs } : {}), ...(src.retryText ? { retryText: src.retryText } : {}),
+    ...(src.retryMax ? { retryMax: src.retryMax } : {}), ...(src.multi ? { multi: src.multi } : {}), ...(src.doneLabel ? { doneLabel: src.doneLabel } : {}),
+    ...(src.againText ? { againText: src.againText } : {}), ...(buttons ? { buttons } : {}),
+  }
+}
+
+/** "Used by …" as the reference writes it (the templates' list and the editor's head): where the reply rules run it. */
+export function usedBy(templateId: string, rules: ReplyRules, brandName: (id: string) => string, adName: (id: string) => string): string {
+  const where: string[] = []
+  for (const p of rules.pages) {
+    const ch = p.channel === 'instagram' ? 'Instagram' : 'Messenger'
+    if (p.work === templateId && p.after === templateId) where.push(`${brandName(p.brandId)} ${ch}`)
+    else if (p.work === templateId) where.push(`${brandName(p.brandId)} ${ch} working hours`)
+    else if (p.after === templateId) where.push(`${brandName(p.brandId)} ${ch} after hours`)
+  }
+  const ads = [...new Set(rules.ads.filter(a => a.reply === templateId).map(a => a.adId))]
+  for (const id of ads) where.push(`${adName(id)} ad`)
+  return where.length ? where.join(' · ') : 'Not used yet'
 }
 
 /** "Runs on …": where the reply rules start a template, in words. */

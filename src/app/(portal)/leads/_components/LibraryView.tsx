@@ -1,216 +1,290 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { removeLibraryItem, saveLibraryItem } from '@/lib/leads/actions'
-import { KINDS, RETRY_PHONE, freshId, kindOf, templateProblem, type LibraryItem, type StepKind, type TemplateStep } from '@/lib/leads/template'
+import { flash } from '@/components/hrv/toast'
 import { LeadIcon } from '@/components/layout/lead-icons'
-import s from './replies.module.css'
+import { leadMediaLinks, removeLibraryItem, saveLibraryItem } from '@/lib/leads/actions'
+import { createClient } from '@/lib/supabase/client'
+import { RETRY_PHONE, templateProblem, type LibraryItem, type StepFile, type StepKind, type TemplateStep } from '@/lib/leads/template'
+import { ATTACH_ACCEPT, STEP_TYPES, extOf, isImage, typeOf } from '@/lib/leads/template-map'
+import RichText from './RichText'
+import s from './library.module.css'
 
 /**
- * Lead View › Step library (2026-10-23, the redesign v2 handoff `Auto Reply.dc.html?view=library`): steps and short flows
- * to copy into templates. The list on the left (search, All / Steps / Flows, "+ New step", "+ New flow"); the item on
- * the right — its name, when to use it, its steps, and USED IN: each template holding a copy, and how many wait to
- * update. Saving makes the next version (lead_save_library_item); templates keep their copies and are asked first.
+ * Lead View v2 › Step library (2026-11-02, the v2 handoff §7.7): one table — Step · Message · Used in · Last edited,
+ * sortable, filtered by type. A row opens its panel (TYPE for a new one, MESSAGE, BUTTONS, ATTACHMENT, USED IN, a phone
+ * PREVIEW, Cancel / Save); **saving updates every template that uses the step** (the user's point 4 —
+ * lead_library_push, mig 20261102120000). Right-click: Edit, Duplicate, Delete — deleting changes no template.
  */
 
-type Draft = Pick<LibraryItem, 'id' | 'kind' | 'name' | 'description' | 'steps'> & { ver: number }
-const newDraft = (kind: 'step' | 'flow'): Draft => ({
-  id: `new-${Date.now().toString(36)}`, kind, ver: 0, name: kind === 'step' ? 'New step' : 'New flow', description: '',
-  steps: kind === 'step'
-    ? [{ id: 's1', kind: 'message', name: 'New step', text: '', next: '' }]
-    : [{ id: 's1', kind: 'question', name: 'First question', text: '', buttons: [{ label: 'Option 1', next: 's2' }] }, { id: 's2', kind: 'handoff', name: 'To a person', text: 'One of our team will reply shortly.' }],
-})
-const draftOf = (l: LibraryItem): Draft => ({ id: l.id, kind: l.kind, ver: l.ver, name: l.name, description: l.description, steps: l.steps })
+type Sort = 'name' | 'text' | 'used' | 'edited'
+type Draft = { id: string | null; type: StepKind; name: string; text: string; buttons: string[]; file: StepFile | null }
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const dayOf = (iso: string | undefined) => { if (!iso) return '—'; const d = new Date(iso); return `${d.toLocaleString('en-GB', { day: 'numeric', timeZone: 'Asia/Kuala_Lumpur' })} ${MON[Number(d.toLocaleString('en-GB', { month: 'numeric', timeZone: 'Asia/Kuala_Lumpur' })) - 1]}` }
+const draftOf = (l: LibraryItem): Draft => {
+  const st = l.steps[0]
+  return { id: l.id, type: st?.kind ?? 'message', name: l.name, text: st?.text ?? '', buttons: (st?.buttons ?? []).map(b => b.label), file: st?.file ?? null }
+}
+/** The one step a library item keeps, from the panel. */
+function stepOf(d: Draft, was: TemplateStep | undefined): TemplateStep {
+  const base: TemplateStep = { ...(was ?? {}), id: 's1', kind: d.type, name: d.name.trim(), text: d.text }
+  delete base.pos
+  delete base.lib
+  delete base.buttons
+  delete base.file
+  return {
+    ...base,
+    ...(d.type === 'question' ? { buttons: d.buttons.map(label => ({ label, next: '' })), next: '' } : d.type === 'handoff' || d.type === 'ai' ? {} : { next: '' }),
+    ...(d.type === 'phone' && !base.retryText ? { retryText: RETRY_PHONE, retryMax: '2', failNext: 'person' } : {}),
+    ...(d.file ? { file: d.file } : {}),
+  }
+}
 
 export default function LibraryView({ items, ready, initialId, canEdit }: { items: LibraryItem[]; ready: boolean; initialId: string | null; canEdit: boolean }) {
   const router = useRouter()
-  const [q, setQ] = useState('')
-  const [kind, setKind] = useState<'all' | 'step' | 'flow'>('all')
-  const first = items.find(l => l.id === initialId) ?? items[0] ?? null
-  const [d, setD] = useState<Draft | null>(first ? draftOf(first) : null)
+  const steps = useMemo(() => items.filter(l => l.kind === 'step'), [items])
+  const [type, setType] = useState<'all' | StepKind>('all')
+  const [sort, setSort] = useState<{ k: Sort; dir: 'asc' | 'desc' }>({ k: 'edited', dir: 'desc' })
+  const [d, setD] = useState<Draft | null>(() => { const l = steps.find(x => x.id === initialId); return l ? draftOf(l) : null })
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState('')
   const [busy, start] = useTransition()
-  useEffect(() => {
-    if (!dirty) return
-    const ask = (e: BeforeUnloadEvent) => { e.preventDefault() }
-    window.addEventListener('beforeunload', ask)
-    return () => window.removeEventListener('beforeunload', ask)
-  }, [dirty])
+  const [ctx, setCtx] = useState<{ l: LibraryItem; x: number; y: number } | null>(null)
+  const [asking, setAsking] = useState<LibraryItem | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [links, setLinks] = useState<Record<string, string>>({})
 
-  const shown = items.filter(l => (kind === 'all' || l.kind === kind) && (!q.trim() || `${l.name} ${l.description}`.toLowerCase().includes(q.trim().toLowerCase())))
-  const live = d ? items.find(l => l.id === d.id) ?? null : null
-  const open = (next: Draft) => {
-    if (dirty && !window.confirm('Leave this item without saving its changes?')) return
-    setD(next); setDirty(next.id.startsWith('new-')); setError('')
+  const filePath = d?.file?.path
+  useEffect(() => {
+    if (!filePath || links[filePath]) return
+    let live = true
+    leadMediaLinks([filePath]).then(r => { if (live && r.ok) setLinks(l => ({ ...l, ...r.data })) })
+    return () => { live = false }
+  }, [filePath, links])
+
+  const keyOf: Record<Sort, (l: LibraryItem) => string | number> = {
+    name: l => l.name.toLowerCase(), text: l => (l.steps[0]?.text ?? '').toLowerCase(), used: l => l.usedIn.length, edited: l => l.updatedAt ?? '',
   }
-  const edit = (fn: (x: Draft) => Draft) => { setD(x => (x ? fn(x) : x)); setDirty(true); setError('') }
-  const setStep = (i: number, o: Partial<TemplateStep>) => edit(x => ({ ...x, steps: x.steps.map((st, j) => (j === i ? { ...st, ...o } : st)) }))
+  const shown = steps.filter(l => type === 'all' || l.steps[0]?.kind === type).sort((a, b) => {
+    const p = keyOf[sort.k](a), q = keyOf[sort.k](b)
+    const c = typeof p === 'number' && typeof q === 'number' ? p - q : String(p).localeCompare(String(q))
+    return sort.dir === 'asc' ? c : -c
+  })
+  const live = d?.id ? steps.find(l => l.id === d.id) ?? null : null
+  const openItem = (next: Draft | null) => {
+    if (dirty && !window.confirm('Leave this step without saving its changes?')) return
+    setD(next); setDirty(false); setError('')
+  }
+  const edit = (o: Partial<Draft>) => { setD(x => (x ? { ...x, ...o } : x)); setDirty(true); setError('') }
   const save = () => {
-    if (!d) return
-    const problem = templateProblem(d.steps)
+    if (!d || busy) return
+    if (!d.name.trim()) { setError('Give the step a name.'); return }
+    const step = stepOf(d, live?.steps[0])
+    const problem = templateProblem([step])
     if (problem) { setError(problem); return }
     start(async () => {
-      const isNew = d.id.startsWith('new-')
-      const r = await saveLibraryItem(isNew ? null : d.id, { kind: d.steps.length > 1 ? 'flow' : 'step', name: d.name, description: d.description, steps: d.steps })
+      const r = await saveLibraryItem(d.id, { kind: 'step', name: d.name.trim(), description: live?.description ?? '', steps: [step] })
       if (!r.ok) { setError(r.reason); return }
-      setD(x => (x ? { ...x, id: r.data, ver: x.ver + 1, kind: x.steps.length > 1 ? 'flow' : 'step' } : x))
-      setDirty(false)
+      const n = live?.usedIn.length ?? 0
+      flash(d.id ? `Saved · updated ${n} ${n === 1 ? 'template' : 'templates'}` : `Added “${d.name.trim()}”`)
+      setD(null); setDirty(false)
       router.refresh()
     })
   }
-  const remove = () => {
-    if (!d || !live) return
-    if (!window.confirm(`Delete “${live.name}” from the library? Templates keep their copies.`)) return
-    start(async () => {
-      const r = await removeLibraryItem(live.id)
-      if (!r.ok) { setError(r.reason); return }
-      setDirty(false)
-      const next = items.find(l => l.id !== live.id)
-      setD(next ? draftOf(next) : null)
-      router.refresh()
-    })
+  const duplicate = (l: LibraryItem) => start(async () => {
+    const r = await saveLibraryItem(null, { kind: 'step', name: `${l.name} copy`.slice(0, 60), description: l.description, steps: l.steps })
+    if (!r.ok) { setError(r.reason); return }
+    flash(`Duplicated “${l.name}”`)
+    router.refresh()
+  })
+  const remove = (l: LibraryItem) => start(async () => {
+    const r = await removeLibraryItem(l.id)
+    setAsking(null)
+    if (!r.ok) { setError(r.reason); return }
+    if (d?.id === l.id) { setD(null); setDirty(false) }
+    flash(`Deleted “${l.name}”`)
+    router.refresh()
+  })
+  const pick = async (file: File | undefined) => {
+    if (!file) return
+    if (file.size > 25 * 1024 * 1024) { setError('A photo or file is 25 MB at most.'); return }
+    setUploading(true)
+    const name = file.name.replace(/[\\/]/g, '_').slice(-120) || 'file'
+    const path = `chat/tpl/${crypto.randomUUID()}/${name}`
+    const up = await createClient().storage.from('lead-media').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
+    setUploading(false)
+    if (up.error) { setError('The file could not be uploaded. Please try again.'); return }
+    setLinks(l => ({ ...l, [path]: URL.createObjectURL(file) }))
+    edit({ file: { path, name, mime: file.type || 'application/octet-stream', size: file.size } })
   }
-  const dis = !canEdit
-  const goes = (value: string | null | undefined, onChange: (v: string) => void, self: string) => (
-    <select className={s.select} value={value ?? ''} disabled={dis} onChange={e => onChange(e.target.value)} aria-label="Goes to">
-      <option value="">end</option>
-      {d!.steps.map((x, j) => (x.id === self ? null : <option key={x.id} value={x.id}>step {j + 1}</option>))}
-    </select>
-  )
+
+  const head = (k: Sort, l: string) => {
+    const on = sort.k === k
+    return (
+      <button type="button" className={s.sort} data-on={on || undefined}
+        onClick={() => setSort(on ? { k, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { k, dir: k === 'edited' || k === 'used' ? 'desc' : 'asc' })}>
+        {l}{on ? <LeadIcon name={sort.dir === 'asc' ? 'arrow-up' : 'arrow-down'} size={12} /> : <span className={s.idle}><LeadIcon name="arrow-up-down" size={12} /></span>}
+      </button>
+    )
+  }
+  const fileUrl = d?.file ? links[d.file.path] ?? '' : ''
+  const typeLabel = d ? typeOf(d.type).label : ''
 
   return (
-    <div className={s.page}>
-      <div className={s.head}>
-        <div className={s.titles}>
-          <span className={s.eyebrow}>REPLIES</span>
-          <h1 className={s.title}>Step library</h1>
+    <div className={s.wrap}>
+      <section className={s.card} aria-label="Step library">
+        <div className={s.bar}>
+          <div className={s.seg} role="group" aria-label="Type">
+            {[{ k: 'all' as const, l: 'All', n: steps.length }, ...STEP_TYPES.map(t => ({ k: t.kind, l: t.label, n: steps.filter(x => x.steps[0]?.kind === t.kind).length }))].map(o => (
+              <button key={o.k} type="button" className={s.segBtn} aria-pressed={type === o.k} onClick={() => setType(o.k)}>{o.l}<span className={s.segN}>{o.n}</span></button>
+            ))}
+          </div>
+          <span className={s.fill} />
+          {canEdit ? (
+            <button type="button" className={s.new} disabled={!ready} title={ready ? undefined : 'Waiting for the database update'}
+              onClick={() => openItem({ id: null, type: 'question', name: '', text: '', buttons: ['Option 1'], file: null })}><LeadIcon name="plus" size={15} />New step</button>
+          ) : null}
         </div>
-        {canEdit ? <button type="button" className={s.btn} data-strong="" disabled={!dirty || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button> : null}
-      </div>
-      <div className={s.panel}>
-        <div className={s.libSplit}>
-          <aside className={s.libSide} aria-label="Library">
-            <div className={s.libSideHead}>
-              <span className={s.kicker}>LIBRARY</span>
-              <input className={s.input} value={q} onChange={e => setQ(e.target.value)} placeholder="Search steps and flows" aria-label="Search the library" />
-              <span className={s.seg} style={{ alignSelf: 'stretch', display: 'flex' }}>
-                {(['all', 'step', 'flow'] as const).map(k => <button key={k} type="button" className={s.segBtn} style={{ flex: 1 }} aria-pressed={kind === k} onClick={() => setKind(k)}>{k === 'all' ? 'All' : k === 'step' ? 'Steps' : 'Flows'}</button>)}
-              </span>
-            </div>
-            <div className={s.libRows}>
-              {shown.map(l => (
-                <button key={l.id} type="button" className={s.libRow} aria-current={d?.id === l.id} onClick={() => d?.id !== l.id && open(draftOf(l))}>
-                  <span className={s.listName}>{l.name}</span>
-                  <span className={s.ver}>v{l.ver}</span>
-                  <span className={s.listSub} style={{ gridColumn: '1 / -1' }}>
-                    {l.kind === 'flow' ? `Flow · ${l.steps.length} steps` : `${kindOf(l.steps[0]?.kind ?? 'message').short} step`} · {l.usedIn.length ? `in ${l.usedIn.length} template${l.usedIn.length === 1 ? '' : 's'}` : 'not used yet'}
-                  </span>
-                </button>
-              ))}
-              {d?.id.startsWith('new-') ? <button type="button" className={s.libRow} aria-current><span className={s.listName}>{d.name}</span><span className={s.ver}>new</span></button> : null}
-              {shown.length === 0 && !d?.id.startsWith('new-') ? <span className={s.small} style={{ padding: 10 }}>Nothing here yet. Save a step from a template (right-click it), or start one below.</span> : null}
-            </div>
-            {canEdit ? (
-              <div className={s.libSideFoot}>
-                <button type="button" className={s.link} onClick={() => open(newDraft('step'))}>+ New step</button>
-                <button type="button" className={s.link} onClick={() => open(newDraft('flow'))}>+ New flow</button>
+        <div className={s.head}>{head('name', 'Step')}{head('text', 'Message')}{head('used', 'Used in')}{head('edited', 'Last edited')}</div>
+        <div className={s.body}>
+          {shown.map(l => {
+            const t = typeOf(l.steps[0]?.kind ?? 'message')
+            const n = l.usedIn.length
+            return (
+              <div key={l.id} className={s.row} role="option" aria-selected={d?.id === l.id} tabIndex={0} title={l.usedIn.map(u => u.flowName).join(' · ')}
+                onClick={() => openItem(draftOf(l))} onKeyDown={e => { if (e.key === 'Enter') openItem(draftOf(l)) }}
+                onContextMenu={e => { if (!canEdit) return; e.preventDefault(); setCtx({ l, x: Math.min(e.clientX, window.innerWidth - 190), y: Math.min(e.clientY, window.innerHeight - 120) }) }}>
+                <div className={s.step}><span className={s.tile}><LeadIcon name={t.icon} size={14} /></span><span className={s.name} title={t.label}>{l.name}</span></div>
+                <span className={s.msg}>{l.steps[0]?.text}</span>
+                <span className={s.usedN} data-none={!n || undefined}>{n ? `${n} ${n === 1 ? 'template' : 'templates'}` : '—'}</span>
+                <span className={s.edited}>{dayOf(l.updatedAt)}</span>
               </div>
-            ) : null}
-          </aside>
+            )
+          })}
+          {!shown.length ? <div className={s.empty}>{type === 'all' ? 'No steps yet' : `No ${typeOf(type).label} steps yet`}</div> : null}
+        </div>
 
-          {d ? (
-            <section className={s.libMain}>
-              {!ready ? <div className={s.note}>Waiting for the database update — you can try the page, but nothing is saved yet.</div> : null}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <input className={s.libTitle} value={d.name} maxLength={60} disabled={dis} aria-label="Name" onChange={e => edit(x => ({ ...x, name: e.target.value }))} />
-                  <input className={s.bare} style={{ maxWidth: 420 }} value={d.description} maxLength={200} disabled={dis} placeholder="When to use it" aria-label="When to use it" onChange={e => edit(x => ({ ...x, description: e.target.value }))} />
-                  <span className={s.small}>{d.steps.length > 1 ? `Flow · ${d.steps.length} steps` : `${kindOf(d.steps[0]?.kind ?? 'message').short} step`} · {d.ver ? `v${d.ver}` : 'not saved yet'}</span>
+        {d ? (
+          <>
+            <div className={s.scrim} onClick={() => openItem(null)} aria-hidden="true" />
+            <div className={s.panel} role="dialog" aria-label={d.name || 'New step'}>
+              <div className={s.pHead}>
+                <span className={s.pTile}><LeadIcon name="blocks" size={15} /></span>
+                <div className={s.pTitles}>
+                  <input className={s.pName} value={d.name} maxLength={60} placeholder="Step name" disabled={!canEdit} aria-label="Step name" onChange={e => edit({ name: e.target.value })} />
+                  <span className={s.pSub}>{d.id ? `${typeLabel} · Edited ${dayOf(live?.updatedAt)}` : 'New step'}</span>
                 </div>
-                {canEdit ? (
-                  <>
-                    {live ? <button type="button" className={s.iconBtn} title="Delete" onClick={remove} disabled={busy}><LeadIcon name="trash" size={13} /></button> : null}
-                    <button type="button" className={s.btn} data-quiet="" disabled={!dirty || busy} onClick={() => { setD(live ? draftOf(live) : null); setDirty(false) }}>Discard</button>
-                    <button type="button" className={s.btn} data-strong="" disabled={!dirty || busy || !ready} onClick={save}>{busy ? 'Saving…' : `Save as v${d.ver + 1}`}</button>
-                  </>
-                ) : null}
+                <button type="button" className={s.close} title="Close" aria-label="Close" onClick={() => openItem(null)}><LeadIcon name="x" size={16} /></button>
               </div>
-              {error ? <div className={s.error} role="alert">{error}</div> : null}
-
-              <span className={s.kicker}>STEPS</span>
-              {d.steps.map((st, i) => (
-                <div key={st.id} className={s.libStep}>
-                  <span className={s.num}>{i + 1}</span>
-                  <div className={s.libStepBody}>
-                    <div className={s.libStepTop}>
-                      <input className={s.input} value={st.name ?? ''} maxLength={40} disabled={dis} placeholder="Step name" aria-label="Step name" onChange={e => setStep(i, { name: e.target.value })} />
-                      <select className={s.select} value={st.kind} disabled={dis} aria-label="Type"
-                        onChange={e => {
-                          const k = e.target.value as StepKind
-                          setStep(i, { kind: k, ...(k === 'question' && !st.buttons?.length ? { buttons: [{ label: 'Option 1', next: '' }] } : {}), ...(k === 'phone' && !st.retryText ? { retryText: RETRY_PHONE, retryMax: '2', failNext: 'person' } : {}) })
-                        }}>
-                        {KINDS.map(k => <option key={k.kind} value={k.kind}>{k.label}</option>)}
-                      </select>
+              <div className={s.pBody}>
+                {!d.id ? (
+                  <div className={s.sect}>
+                    <span className={s.kicker}>TYPE</span>
+                    <div className={s.seg} role="group" aria-label="Type">
+                      {STEP_TYPES.map(t => <button key={t.kind} type="button" className={s.segBtn} aria-pressed={d.type === t.kind} onClick={() => edit({ type: t.kind, buttons: t.kind === 'question' && !d.buttons.length ? ['Option 1'] : d.buttons })}>{t.label}</button>)}
                     </div>
-                    <textarea className={s.textarea} rows={2} value={st.text ?? ''} maxLength={1000} disabled={dis} placeholder="What the customer reads" aria-label="Message" onChange={e => setStep(i, { text: e.target.value })} />
-                    {st.kind === 'question' ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-                        {(st.buttons ?? []).map((b, j) => (
-                          <span key={j} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <input className={s.input} style={{ width: 120 }} value={b.label} maxLength={200} disabled={dis} aria-label={`Option ${j + 1}`}
-                              onChange={e => setStep(i, { buttons: st.buttons!.map((x, k) => (k === j ? { ...x, label: e.target.value } : x)) })} />
-                            → {goes(b.next, v => setStep(i, { buttons: st.buttons!.map((x, k) => (k === j ? { ...x, next: v } : x)) }), st.id)}
-                            {canEdit && st.buttons!.length > 1 ? <button type="button" className={s.x} onClick={() => setStep(i, { buttons: st.buttons!.filter((_, k) => k !== j) })}>×</button> : null}
-                          </span>
-                        ))}
-                        {canEdit ? <button type="button" className={s.link} onClick={() => setStep(i, { buttons: [...(st.buttons ?? []), { label: `Option ${(st.buttons ?? []).length + 1}`, next: '' }] })}>+ Option</button> : null}
+                  </div>
+                ) : null}
+                <label className={s.label}>MESSAGE
+                  <textarea className={s.textarea} rows={5} value={d.text} maxLength={1000} disabled={!canEdit} onChange={e => edit({ text: e.target.value })} />
+                </label>
+                {d.type === 'question' ? (
+                  <div className={s.sect}>
+                    <span className={s.kicker}>BUTTONS</span>
+                    {d.buttons.map((b, i) => (
+                      <div key={i} className={s.optRow}>
+                        <input className={s.opt} value={b} maxLength={200} disabled={!canEdit} aria-label={`Button ${i + 1}`} onChange={e => edit({ buttons: d.buttons.map((x, j) => (j === i ? e.target.value : x)) })} />
+                        {canEdit ? <button type="button" className={s.x} title="Remove" aria-label="Remove button" disabled={d.buttons.length <= 1} onClick={() => edit({ buttons: d.buttons.filter((_, j) => j !== i) })}><LeadIcon name="x" size={14} /></button> : null}
                       </div>
-                    ) : st.kind !== 'handoff' && st.kind !== 'ai' ? (
-                      <span className={s.small} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Then → {goes(st.next, v => setStep(i, { next: v }), st.id)}</span>
-                    ) : null}
-                    {(st.kind === 'question' ? (st.buttons ?? []).some(b => !b.next) : !['handoff', 'ai'].includes(st.kind) && !st.next) ? (
-                      <label className={s.field}>Closing message when it ends here · empty uses the template’s
-                        <input className={s.input} value={st.endMsg ?? ''} maxLength={1000} disabled={dis} placeholder="e.g. Thanks! Our salesperson will WhatsApp you soon 😊" onChange={e => setStep(i, { endMsg: e.target.value })} />
+                    ))}
+                    {canEdit && d.buttons.length < 13 ? <button type="button" className={s.addOpt} onClick={() => edit({ buttons: [...d.buttons, `Option ${d.buttons.length + 1}`] })}><LeadIcon name="plus" size={13} />Add button</button> : null}
+                  </div>
+                ) : null}
+                {d.type === 'message' ? (
+                  <div className={s.sect}>
+                    <span className={s.kicker}>ATTACHMENT</span>
+                    {d.file ? (
+                      <div className={s.fileBox}>
+                        {isImage(d.file.mime) ? <span className={s.thumb} style={{ backgroundImage: fileUrl ? `url("${fileUrl}")` : undefined }} /> : <span className={s.ext}>{extOf(d.file.name)}</span>}
+                        <span className={s.fileName}>{d.file.name}</span>
+                        {canEdit ? (
+                          <>
+                            <label className={s.replace}>Replace<input type="file" accept={ATTACH_ACCEPT} className={s.hidden} onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }} /></label>
+                            <button type="button" className={s.x} title="Remove" aria-label="Remove the file" onClick={() => edit({ file: null })}><LeadIcon name="x" size={14} /></button>
+                          </>
+                        ) : null}
+                      </div>
+                    ) : canEdit ? (
+                      <label className={s.upload}><LeadIcon name="upload" size={18} />{uploading ? 'Uploading…' : 'Upload photo or file'}
+                        <input type="file" accept={ATTACH_ACCEPT} className={s.hidden} disabled={uploading} onChange={e => { void pick(e.target.files?.[0]); e.target.value = '' }} />
                       </label>
-                    ) : null}
+                    ) : <span className={s.none}>No attachment</span>}
                   </div>
-                  {canEdit && d.steps.length > 1 ? (
-                    <button type="button" className={s.x} title="Remove step"
-                      onClick={() => edit(x => ({ ...x, steps: x.steps.filter((_, j) => j !== i).map(y => ({ ...y, ...(y.next === st.id ? { next: '' } : {}), ...(y.buttons ? { buttons: y.buttons.map(b => (b.next === st.id ? { ...b, next: '' } : b)) } : {}) })) }))}>
-                      <LeadIcon name="trash" size={12} />
-                    </button>
-                  ) : <span />}
+                ) : null}
+                <div className={s.sect}>
+                  <span className={s.kicker}>USED IN</span>
+                  <div className={s.chips}>
+                    {(live?.usedIn ?? []).map(u => (
+                      <Link key={u.flowId} className={s.usedChip} href={`/leads/flows?t=${u.flowId}`} title="Open template">
+                        <LeadIcon name="workflow" size={12} />{u.flowName}<LeadIcon name="arrow-up-right" size={12} />
+                      </Link>
+                    ))}
+                    {!(live?.usedIn.length) ? <span className={s.none}>Not used in any template yet</span> : null}
+                  </div>
                 </div>
-              ))}
-              {canEdit ? (
-                <button type="button" className={s.link} style={{ alignSelf: 'flex-start' }}
-                  onClick={() => edit(x => {
-                    const id = freshId(x.steps)
-                    const last = x.steps[x.steps.length - 1]
-                    const steps = x.steps.map(y => (y.id === last.id && y.kind !== 'question' && y.kind !== 'handoff' && y.kind !== 'ai' && !y.next ? { ...y, next: id } : y))
-                    return { ...x, steps: [...steps, { id, kind: 'message', name: '', text: '', next: '' }] }
-                  })}>+ Add a step after</button>
-              ) : null}
-
-              <span className={s.kicker}>USED IN <span className={s.small} style={{ fontWeight: 400, letterSpacing: 0 }}>· Each template keeps its own copy and asks before taking a new version.</span></span>
-              <div className={s.used}>
-                {live && live.usedIn.length ? live.usedIn.map(u => (
-                  <div key={u.flowId} className={s.usedRow}>
-                    <Link className={s.link} href={`/leads/flows?t=${u.flowId}`}>{u.flowName}</Link>
-                    <span>{u.steps.join(', ')}</span>
-                    {u.outdated ? <Link className={`${s.link} ${s.amber}`} href={`/leads/flows?t=${u.flowId}`}>{u.outdated} waiting to update</Link> : <span className={s.green}>Up to date</span>}
+                <div className={s.sect}>
+                  <span className={s.kicker}>PREVIEW</span>
+                  <div className={s.phone}>
+                    <div className={s.notchRow}><span className={s.notch} /></div>
+                    <div className={s.screen}>
+                      <div className={s.spacer} />
+                      {d.file ? (isImage(d.file.mime)
+                        ? <span className={s.img} style={{ backgroundImage: fileUrl ? `url("${fileUrl}")` : undefined }} role="img" aria-label={d.file.name} />
+                        : <div className={s.doc}><span className={s.docExt}>{extOf(d.file.name)}</span>{d.file.name}</div>) : null}
+                      <div className={s.bot}><RichText text={(d.text || 'Write the message…').replace(/\{name\}/g, 'Jason')} /></div>
+                      {d.type === 'question' ? <div className={s.btns}>{d.buttons.map((b, i) => <div key={i} className={s.pBtn}>{b}</div>)}</div> : null}
+                      {d.type === 'phone' ? <div className={s.cust}>012-338 4721</div> : null}
+                    </div>
                   </div>
-                )) : <div className={s.usedRow}><span className={s.small}>Not used yet — add it from a template’s “+ Step” or Library.</span></div>}
+                </div>
               </div>
-            </section>
-          ) : (
-            <section className={s.libMain}><span className={s.small}>The library is empty. Right-click a step on a template to save it here, or start a new step.</span></section>
-          )}
-        </div>
-      </div>
+              <div className={s.foot}>
+                <span className={s.error} role={error ? 'alert' : undefined}>{error}</span>
+                <button type="button" className={s.cancel} onClick={() => openItem(null)}>Cancel</button>
+                {canEdit ? <button type="button" className={s.save} data-on={(dirty && ready) || undefined} disabled={!dirty || busy || !ready} onClick={save}>{busy ? 'Saving…' : 'Save'}</button> : null}
+              </div>
+            </div>
+          </>
+        ) : null}
+      </section>
+
+      {ctx ? (
+        <>
+          <div className={s.ctxCatch} onClick={() => setCtx(null)} onContextMenu={e => { e.preventDefault(); setCtx(null) }} aria-hidden="true" />
+          <div className={s.ctx} role="menu" style={{ left: ctx.x, top: ctx.y }}>
+            <button type="button" role="menuitem" className={s.ctxItem} onClick={() => { const l = ctx.l; setCtx(null); openItem(draftOf(l)) }}>Edit</button>
+            <button type="button" role="menuitem" className={s.ctxItem} onClick={() => { const l = ctx.l; setCtx(null); duplicate(l) }}>Duplicate</button>
+            <button type="button" role="menuitem" className={s.ctxItem} data-rust="" onClick={() => { const l = ctx.l; setCtx(null); setAsking(l) }}>Delete</button>
+          </div>
+        </>
+      ) : null}
+      {asking ? (
+        <>
+          <div className={s.backdrop} onClick={() => setAsking(null)} aria-hidden="true" />
+          <div className={s.confirm} role="dialog" aria-modal="true" aria-label={`Delete ${asking.name}`}>
+            <span className={s.cTitle}>Delete “{asking.name}”?</span>
+            <span className={s.cText}>{asking.usedIn.length
+              ? `Used in ${asking.usedIn.map(u => u.flowName).join(', ')}. The steps in these templates stay as they are. To remove them, delete them in each template.`
+              : 'Not used in any template.'}</span>
+            <div className={s.cRow}>
+              <button type="button" className={s.cancel} onClick={() => setAsking(null)}>Cancel</button>
+              <button type="button" className={s.del} disabled={busy} onClick={() => remove(asking)}>Delete</button>
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }

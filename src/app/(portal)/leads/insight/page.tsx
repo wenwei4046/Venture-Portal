@@ -7,11 +7,11 @@ import InsightView from '../_components/InsightView'
 export const dynamic = 'force-dynamic'
 
 /**
- * Lead View › Insight (2026-10-16; v2 2026-10-23, the redesign handoff — step 6): the conversations started in the
- * last 7 / 30 days or this quarter (?r=), by brand on the page. Who replied first and where customers drop off need
+ * Lead View › Insight (2026-10-16; v2 2026-10-23; the v2 handoff 2026-11-02): the conversations started today, in the last
+ * 7 / 30 days or a custom range (?r= today | 7 | 30 | custom&from=&to= | q, this quarter), by brand on the page. Who replied first and where customers drop off need
  * mig 20261023400000. Lead View · View reads it.
  */
-export default async function Page({ searchParams }: { searchParams: Promise<{ r?: string }> }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ r?: string; from?: string; to?: string }> }) {
   await requirePage('/leads/insight')
   await requirePermission('leads')
   const config = await loadLeadConfig()
@@ -23,7 +23,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
       </HvPage>
     )
   }
-  const range = insightRange((await searchParams).r, config.data.today)
+  const sp = await searchParams
+  const range = insightRange(sp.r, config.data.today, sp.from, sp.to)
   const [list, more, flows] = await Promise.all([loadLeadList(range.from, range.listTo), loadInsightMore(range.from, range.to), loadFlows()])
   if (!list.ok || (!more.ok && more.reason !== NOT_SET_UP)) {
     return (
@@ -36,7 +37,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
   // Only test conversations so far (before Meta is connected): count them, and say so.
   const onlyTests = list.data.length > 0 && list.data.every(c => c.isTest)
   return (
-    <InsightView contacts={onlyTests ? list.data : list.data.filter(c => !c.isTest)} onlyTests={onlyTests} range={range}
+    <InsightView contacts={onlyTests ? list.data : list.data.filter(c => !c.isTest)} onlyTests={onlyTests} range={range} today={config.data.today}
       brands={config.data.brands.map(b => ({ id: b.id, name: b.name }))}
       more={more.ok ? more.data : null} flows={flows.ok ? flows.data.map(f => ({ id: f.id, name: f.name, steps: f.steps })) : []} />
   )
