@@ -35,6 +35,22 @@ describe('StatCards', () => {
     expect(screen.getByRole('region', { name: 'Totals' })).toBeDefined()
   })
 
+  // 2026-11-02 (the Repayment Schedule — the user: "card 可以做小，就一排就好").
+  it('draws small cards when asked, ordinary ones otherwise', () => {
+    const { rerender } = render(
+      <StatCards label="Totals" size="small">
+        <StatCard label="A" value="1" icon="coin" />
+      </StatCards>,
+    )
+    expect(screen.getByRole('region', { name: 'Totals' })).toHaveAttribute('data-size', 'small')
+    rerender(
+      <StatCards label="Totals">
+        <StatCard label="A" value="1" icon="coin" />
+      </StatCards>,
+    )
+    expect(screen.getByRole('region', { name: 'Totals' })).not.toHaveAttribute('data-size')
+  })
+
   it('shows its quiet line under the cards', () => {
     render(
       <StatCards label="Totals" note="Unmatched agents 0">

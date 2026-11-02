@@ -4822,6 +4822,24 @@ a.stat-card:hover { border-color: rgb(var(--accent)); box-shadow: 0 4px 14px rgb
 .stat-card[data-tone='ledger'] .stat-card-value { color: rgb(var(--ledger)); }
 .stat-cards-note { margin-top: 12px; color: rgb(var(--card-note)); font-size: 11px; line-height: 1.5; }
 .stat-cards-note strong { margin-left: 7px; color: rgb(var(--ink)); font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Small cards (2026-11-02, the Repayment Schedule — the user: "card 可以做小，就一排就好"):
+   the same parts, about two-thirds the height — the label and its icon on one
+   line, then the figure, then the note (the foot gives up its box). */
+.stat-cards[data-size='small'] .stat-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'bar bar' 'label icon' 'value value' 'note note';
+  align-content: start;
+  min-height: 0;
+  padding: 11px 13px 12px;
+}
+.stat-cards[data-size='small'] .stat-card::before { grid-area: bar; margin-bottom: 9px; }
+.stat-cards[data-size='small'] .stat-card-label { grid-area: label; align-self: center; min-height: 0; }
+.stat-cards[data-size='small'] .stat-card-value { grid-area: value; margin-top: 4px; font-size: clamp(15px, 8.5cqw, 21px); }
+.stat-cards[data-size='small'] .stat-card-foot { display: contents; }
+.stat-cards[data-size='small'] .stat-card-foot > :not(.stat-card-icon) { grid-area: note; margin-top: 5px; }
+.stat-cards[data-size='small'] .stat-card-icon { grid-area: icon; width: 22px; height: 22px; border-radius: 6px; }
+.stat-cards[data-size='small'] .stat-card-icon svg { width: 13px; height: 13px; }
 @container stat-cards (max-width: 560px) {
   .stat-cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stat-card { min-height: 138px; padding: 13px 11px 10px; }
@@ -7273,6 +7291,33 @@ table.ledger-table td.fund-fig-in { color: rgb(21 110 78); }
 .sch-row-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .sch-row-acts { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 
+/* ── Repayment Schedule · the tabs' row (2026-11-02, the user: "帮我把日期选择器和export
+   做在这一排") — Calendar / We collect / We pay on the left, the month and
+   Export at its right, the rail's rule under both. ── */
+.sch-tabrow { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 20px; border-bottom: 1px solid rgb(var(--sheet-divider)); }
+.sch-tabrow > nav[data-variant] { flex: 1 1 auto; min-width: 0; margin-bottom: 0; border-bottom: 0; }
+.sch-tabrow-tools { display: flex; flex: none; align-items: center; gap: 8px; padding-bottom: 6px; }
+/* Its buttons in the page's own face, as tall as the month ("export 的字体优化" — it was
+   the quiet button's typewriter 11px). */
+.sch-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 8px;
+  background: rgb(var(--surface));
+  font-family: var(--font-sans), 'Inter', var(--font-cjk), sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  color: rgb(var(--ink));
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sch-tool-btn:hover { background: rgb(var(--surface-2)); }
+.sch-tool-btn .caret { font-size: 10px; color: rgb(var(--muted)); }
 /* ── Repayment Schedule · the calendar ── */
 /* The legend: the two sides edged in their colour, the states filled (no Paid: a settled instalment is off the calendar, 2026-11-02). */
 .sch-swatch { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 3px; border: 1px solid rgb(160 150 138); background: #fff; }
