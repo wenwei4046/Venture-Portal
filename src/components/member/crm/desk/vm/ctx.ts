@@ -66,6 +66,8 @@ export interface DeskUi {
   inbF: string;
   /** 4a's Inbox search (frame 02): a name, a message or an ad. */
   ibQ: string;
+  /** Labels (2026-11-02): the Inbox's label filter (one's own label id), Customer info's new label and its edit mode. */
+  ibLabel?: string | null; labNew?: string; labEdit?: boolean;
   /** 4a Calendar's Book a visit: its customer picker (open, the search). */
   bookPick: boolean; bookQ: string;
   // Assignment
