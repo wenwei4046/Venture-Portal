@@ -12,6 +12,7 @@ import { pageToken } from '@/lib/messenger/send'
 import { GRAPH_VERSION } from '@/lib/whatsapp/send'
 import { adAccountName } from './ad-account'
 import { sendLeadOutbox } from './messenger-outbox'
+import { answerLeads } from './ai-answer'
 
 const graph = (path: string) => `https://graph.facebook.com/${GRAPH_VERSION}/${path}`
 
@@ -80,7 +81,8 @@ export async function takeInstagram(
   const { data, error } = await client.rpc('lead_ingest_instagram', { p_messages: rows })
   if (error) return { ok: false, error: error.message }
   const contacts = ((data as { contacts?: string[] } | null)?.contacts ?? []).filter(Boolean)
-  if (contacts.length) later(() => sendLeadOutbox(client, contacts, systemToken))
+  // …then the AI Agent answers the conversations in its hands (lib/leads/ai-answer.ts).
+  if (contacts.length) later(() => sendLeadOutbox(client, contacts, systemToken).then(() => answerLeads(client, contacts, systemToken)))
   return { ok: true, data }
 }
 

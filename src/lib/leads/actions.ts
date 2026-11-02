@@ -5,13 +5,14 @@ import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js'
 import { requireActionOn } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 import { conversationPrompt, readDraft, systemPrompt, turnsOf, type AgentDraft, type DraftOutcome, type KnowledgeCard, type KnowledgeKind, type Persona, type PersonaFields, type Turn } from './ai'
-import { askModel, type AgentDocument } from './ai-model'
-import { agentCards, agentReads, answersPrompt, readable, settingsOf, settingsPrompt, fileStatus, type AgentMore, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation } from './agent'
+import { askModel } from './ai-model'
+import { agentMore as readAgent } from './agent-read'
+import { type AgentMore, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation } from './agent'
 import { fetchMetaAds } from './ads-server'
 import { managedPages, subscribePage } from './pages-server'
 import type { ManagedPage, PageChannel, StaffLeave } from './pages'
 import { quickProblem, type QuickReply } from './quick'
-import { knowledgeReads, linkDue, type DataFolder, type FolderColor } from './data-center'
+import type { FolderColor } from './data-center'
 import { readLink } from './link-read'
 import { deliver, deliverFile, sendReaction } from './messenger'
 import { markSeen } from './meta-sync'
@@ -603,75 +604,9 @@ export async function setDraftOutcome(draftId: number, outcome: DraftOutcome, se
   return quiet<null>('lead_ai_draft_outcome', { p_id: draftId, p_outcome: outcome }, 'The draft’s outcome was not kept.')
 }
 
-/**
- * The agent's v2 knowledge for a brand: its settings and answers as a second instruction block, the cards it may cite
- * (General info, fixed answers, files) and the files it reads attached — PDFs, pictures and text, at most six and
- * 24 MB, read with the session's own storage access. Null before mig 20261023200000 (the draft runs as before).
- */
+/** The agent's reading (lib/leads/agent-read.ts), under the caller's own session. */
 async function agentMore(brandId: string, today: string, override?: Pick<AgentMore, 'settings' | 'answers' | 'playbook' | 'knowledge'>) {
-  const [more, info, dataFiles, folders, quick] = await Promise.all([
-    quiet<AgentMore>('lead_ai_more', { p_brand: brandId }, ''),
-    quiet<LeadInfo>('lead_info', {}, ''),
-    quiet<DataFile[]>('lead_data_files', {}, ''),
-    quiet<DataFolder[]>('lead_data_folders', {}, ''),
-    quiet<QuickReply[]>('lead_quick_replies', {}, ''),
-  ])
-  if (!more.ok) return null
-  const m = { ...more.data, ...(override ?? {}) }
-  const settings = settingsOf(m.settings)
-  const all = dataFiles.ok ? dataFiles.data : []
-  // What AI Agent › Knowledge picked (mig 20261102140000), on and in date; before it, the brand's folder and Shared.
-  const picked = m.knowledge ? knowledgeReads(m.knowledge, all, folders.ok ? folders.data : []) : agentReads(all, brandId)
-  const files: DataFile[] = picked.filter(s => !s.paused && fileStatus(s.file, today).usable).map(s => s.file)
-  const documents: AgentDocument[] = []
-  const supabase = (await createClient()) as unknown as SupabaseClient
-  let total = 0
-  for (const f of files) {
-    const how = readable(f)
-    if (!f.path || !how || how === 'link' || documents.length >= 6 || f.sizeBytes > 10_000_000 || total + f.sizeBytes > 24_000_000) continue
-    const { data } = await supabase.storage.from('lead-data').download(f.path)
-    if (!data) continue
-    total += f.sizeBytes
-    const buf = Buffer.from(await data.arrayBuffer())
-    if (how === 'pdf') documents.push({ kind: 'pdf', title: f.name, base64: buf.toString('base64') })
-    else if (how === 'text') documents.push({ kind: 'text', title: f.name, text: buf.toString('utf8').slice(0, 200_000) })
-    else documents.push({ kind: 'image', title: f.name, base64: buf.toString('base64'), mediaType: (f.mime as 'image/png') || 'image/png' })
-  }
-  const links = await linkPages(files.filter(f => f.kind === 'link'))
-  // The Data Center's quick replies are CS's own words; the agent may use them as fixed answers (the handoff).
-  const quickLines = (quick.ok ? quick.data : []).filter(q => q.brandId === null || q.brandId === brandId).map(q => `- ${q.body}`)
-  const system = [
-    settingsPrompt(settings),
-    answersPrompt(m.answers, m.playbook),
-    documents.length ? `# Files you read\nThe documents attached before the conversation are the brand's files; cite one by its card id (file-…).` : '',
-    links.length ? `# Web pages the brand keeps (their words as last read)\n${links.join('\n\n')}` : '',
-    quickLines.length ? `# Quick replies Customer Service uses (reuse them word for word when they answer the question)\n${quickLines.join('\n')}` : '',
-  ].filter(Boolean).join('\n\n')
-  // Knowledge › General info: the cards switched off for this brand's agent.
-  const infoFor = info.ok ? { ...info.data, cards: info.data.cards.filter(c => !settings.infoOff.includes(c.id)) } : null
-  return {
-    ask: { system, documents },
-    cards: (old: KnowledgeCard[]) => agentCards(old, infoFor, brandId, today, m.answers, files),
-  }
-}
-
-/**
- * The agent's web links: each one's words as Check now last kept them, read again (not kept — only the Data Center's
- * Check now keeps) when that reading is older than the link's frequency. Five links, 20,000 characters each at most.
- */
-async function linkPages(links: DataFile[]): Promise<string[]> {
-  if (!links.length) return []
-  const pick = links.slice(0, 5)
-  const kept = await quiet<Array<{ id: string; content: string; checkedAt: string | null }>>('lead_link_text', { p_ids: pick.map(l => l.id) }, '')
-  const now = Date.now()
-  return Promise.all(pick.map(async l => {
-    let text = (kept.ok ? kept.data.find(k => k.id === l.id)?.content : '') ?? ''
-    if (linkDue(l, now) || !text) {
-      const fresh = await readLink(l.url ?? '')
-      if ('text' in fresh) text = fresh.text
-    }
-    return text ? `<page url="${l.url}">\n${text.slice(0, 20_000)}\n</page>` : `- ${l.url} (could not be read)`
-  }))
+  return readAgent((await createClient()) as unknown as SupabaseClient, brandId, today, override)
 }
 
 /**

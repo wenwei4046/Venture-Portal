@@ -25,11 +25,6 @@ const NOT_GUARDED: Readonly<Record<string, string>> = {
   revenue_seller_checks: 'a read: the move an answer is about — whom the bill goes to, so the closes are asked first',
   hiring_orphan_files: 'a read: the files no record names, for the sweep after a write',
   payroll_reopen_month: 'the Principal’s alone — its own check asks the account’s kind, not a cell a box stands for',
-  lead_ai_more: 'a read: the agent’s settings, answers, playbook and sources, for the draft about to be written',
-  lead_info: 'a read: General info, for the draft about to be written',
-  lead_data_files: 'a read: the Data Center files the agent reads, for the draft about to be written',
-  lead_quick_replies: 'a read: the quick replies the agent may reuse, for the draft about to be written',
-  lead_data_folders: 'a read: the Data Center’s folders, so the agent reads what is in the folders Knowledge picked, for the draft about to be written',
   lead_link_text: 'a read: a web link’s address and last reading, for Check now (its write, lead_link_checked, asks the page) and the draft about to be written',
   lead_reply_target: 'a read: the reply just saved, for Meta to send — its write (lead_reply) and its answer (lead_reply_sent) ask the page',
   hr_letter_file:

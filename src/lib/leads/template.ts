@@ -317,7 +317,7 @@ export function walkFrom(t: Pick<ReplyTemplate, 'steps' | 'endMsg'>, from: strin
     if (s.text?.trim()) said.push({ from: 'bot', text: s.text, buttons: s.kind === 'question' ? (s.buttons ?? []).map(b => b.label) : undefined })
     if (s.kind === 'question' || s.kind === 'phone' || s.kind === 'text') return { said, waiting: s.id, tries: 0, ended: null }
     if (s.kind === 'handoff' || s.kind === 'ai') {
-      said.push({ from: 'system', text: s.kind === 'ai' ? 'Goes to the AI Agent · waits for CS with a draft' : 'Goes to a person · waits in the Inbox' })
+      said.push({ from: 'system', text: s.kind === 'ai' ? 'Goes to the AI Agent · it reads the chat and answers from here' : 'Goes to a person · waits in the Inbox' })
       return { said, waiting: null, tries: 0, ended: s.kind === 'ai' ? 'ai' : 'person' }
     }
     if (!s.next) { endWith(t, s.endMsg, said); return { said, waiting: null, tries: 0, ended: 'done' } }

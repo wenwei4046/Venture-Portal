@@ -1724,6 +1724,68 @@ await db.exec(`
   await q(`update public.lead_events set at = now() - interval '26 hours' where contact_id = $1 and what like '%handed the customer to%'`, [ho])
   await inMsg('7705001', 'one more question')
   check(await moments(ho), 2, 'CS answered after the hand-off, a day ago: the rule runs again')
+
+  // ── The AI Agent answers by itself (mig 20261102170000) ──
+  check((await q(`select md5(prosrc) m from pg_proc where proname = 'lead_flow_on_message'`))[0].m, '33603adc96b3ac1bdaaf8b25a157f991', 'the runner here is 20261102160000’s')
+  await db.exec(await f('20261102170000_lead_ai_answers.sql'))
+  await db.exec(await f('20261102170000_lead_ai_answers.sql'))
+  const aiOf = async id => (await q(`select ai_on, ai_turns, ai_busy_at is not null busy, flow_state from public.lead_contacts where id = $1`, [id]))[0]
+  const claim = async ids => (await q(`select public.lead_ai_claim($1::uuid[]) c`, [ids]))[0].c
+  const lastEvent = async id => (await q(`select what from public.lead_events where contact_id = $1 order by at desc, id desc limit 1`, [id]))[0].what
+  // A template's AI Agent step hands the customer to the AI, which then answers.
+  await inMsg('7706001', 'hi', { sourceId: HAND_AD, headline: 'Sofas' })
+  const ai1 = await contactOf('7706001')
+  check(await aiOf(ai1), { ai_on: true, ai_turns: 0, busy: false, flow_state: 'done' }, 'the AI Agent step puts the conversation in the AI’s hands')
+  check(await claim([ai1]), [ai1], 'just handed over, though the template wrote last: the AI answers at once')
+  check(await claim([ai1]), [], 'claimed once: a second delivery leaves it')
+  await q(`select public.lead_ai_answered($1, 'Hi! Looking for a sofa?', 'Aina', false, '')`, [ai1])
+  check(await claim([ai1]), [], 'it wrote last: nothing more')
+  await inMsg('7706001', 'how much is the L-shape?')
+  check(await moments(ai1), 1, 'the AI’s customer: no template again')
+  check(await claim([ai1]), [ai1], 'the customer wrote last: claimed')
+  const aiMsg = (await q(`select public.lead_ai_answered($1, 'RM 2,990 this week.', 'Aina', false, '') i`, [ai1]))[0].i
+  check((await q(`select sender, by_name, delivery from public.lead_messages where id = $1`, [aiMsg]))[0], { sender: 'ai', by_name: 'Aina', delivery: 'recorded' }, 'the AI’s reply is kept as its own, to send')
+  check(await aiOf(ai1), { ai_on: true, ai_turns: 2, busy: false, flow_state: 'done' }, 'still the AI’s, two replies')
+  check((await q(`select public.lead_outbox($1::uuid[]) o`, [[ai1]]))[0].o.some(r => r.id === aiMsg), true, 'the outbox sends it')
+  check(await claim([ai1]), [], 'it wrote last: nothing more')
+  await inMsg('7706001', 'ok my number is 0123456789')
+  check(await claim([ai1]), [ai1], 'the customer again: claimed')
+  await q(`select public.lead_ai_answered($1, 'Thanks! A colleague will call you.', 'Aina', true, 'Got the phone')`, [ai1])
+  check([(await aiOf(ai1)).ai_on, await lastEvent(ai1)], [false, 'AI Agent handed the customer to Customer Service — Got the phone'], 'the goal reached: handed to CS, the timeline says why')
+  await inMsg('7706001', 'when will they call?')
+  check([await moments(ai1), await claim([ai1])], [1, []], 'handed over: no template, no AI, until CS answers')
+  // CS (or Business Suite) replying takes it off.
+  await inMsg('7706002', 'hi', { sourceId: HAND_AD, headline: 'Sofas' })
+  const ai2 = await contactOf('7706002')
+  await q(`insert into public.lead_messages (contact_id, direction, sender, by_name, body, delivery) values ($1, 'out', 'page', 'Business Suite', 'Hi there', 'sent')`, [ai2])
+  check([(await aiOf(ai2)).ai_on, await lastEvent(ai2)], [false, 'AI Agent stopped — a person replied'], 'a person replied: the AI stops')
+  // A reply rule set to AI Agent.
+  const AI_AD = '120249999000003'
+  await q(`insert into public.lead_reply_rules (ad_id, at_when, reply) values ($1, 'any', 'ai')`, [AI_AD])
+  await inMsg('7706003', 'hello', { sourceId: AI_AD, headline: 'Beds' })
+  const ai3 = await contactOf('7706003')
+  check([(await aiOf(ai3)).ai_on, await claim([ai3])], [true, [ai3]], 'a rule set to AI Agent: the AI answers the first message')
+  // Ten replies at most.
+  await q(`update public.lead_contacts set ai_turns = 9 where id = $1`, [ai3])
+  await q(`select public.lead_ai_answered($1, 'Here you go.', '', false, '')`, [ai3])
+  check([(await aiOf(ai3)).ai_on, await lastEvent(ai3)], [false, 'AI Agent handed the customer to Customer Service — 10 replies'], 'the tenth reply hands the customer to CS')
+  // It could not answer: a passing failure keeps it, a lasting one hands over.
+  await q(`update public.lead_contacts set ai_on = true, ai_busy_at = now() where id = $1`, [ai3])
+  await q(`select public.lead_ai_stop($1, 'busy', true)`, [ai3])
+  check(await aiOf(ai3), { ai_on: true, ai_turns: 10, busy: false, flow_state: 'none' }, 'a passing failure lets the claim go')
+  await q(`select public.lead_ai_stop($1, 'The AI Agent is not set up for this brand', false)`, [ai3])
+  check([(await aiOf(ai3)).ai_on, await lastEvent(ai3)], [false, 'AI Agent handed the customer to Customer Service — The AI Agent is not set up for this brand'], 'a lasting one hands over')
+  check((await q(`select public.lead_ai_answered($1, 'late', '', false, '') i`, [ai3]))[0].i, null, 'no longer the AI’s: a late reply is not kept')
+  // The app's server may read what the draft reads; anybody else is asked as before.
+  await as(null, [])
+  await refuses(`select public.lead_ai_more($1)`, [b1], /Lead View · View/, 'no session, no role: refused')
+  await db.exec(`select set_config('request.jwt.claim.role', 'service_role', false)`)
+  check(typeof (await q(`select public.lead_ai_more($1) m`, [b1]))[0].m, 'object', 'the service role reads the agent')
+  await db.exec(`select set_config('request.jwt.claim.role', '', false)`)
+  await as(CS_USER, ALL)
+  for (const sig of ['lead_ai_claim(uuid[])', 'lead_ai_answered(uuid,text,text,boolean,text)', 'lead_ai_stop(uuid,text,boolean)']) {
+    check((await q(`select has_function_privilege('authenticated', 'public.${sig}', 'execute') a`))[0].a, false, `${sig}: the service role’s alone`)
+  }
 }
 
 console.log(`validate-leads: ${checks} checks passed`)
