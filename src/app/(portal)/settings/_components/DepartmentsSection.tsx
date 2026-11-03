@@ -5,7 +5,7 @@ import { hasMode, type DepartmentMode } from '@/lib/department-mode'
 import { billingModeLabel } from '@/lib/invoice-labels'
 import DepartmentModeSwitch from '@/components/department/DepartmentModeSwitch'
 import SortableTable from '@/components/SortableTable'
-import { addDepartment, provisionDepartment, setDepartmentBillback } from '../actions'
+import { addDepartment, provisionDepartment, setDepartmentBillbackInWords } from '../actions'
 
 // Departments management (2026-08-24, dynamic departments). ADD + 转正
 // (provision): a lightweight department books under Venture; provisioning
@@ -77,15 +77,14 @@ export default function DepartmentsSection({
 
   // Own-share bill-back (2026-09-29): does the payroll this department did
   // not bill to a subsidiary go back to Venture Office, or stay in its own
-  // pool? Saved immediately — one switch, no form.
+  // pool? Saved immediately — one switch, no form. Answered in words (2026-11-03): production hides a thrown
+  // message, and a tick the database did not take must say so rather than spring back unexplained.
   function handleBillback(d: DeptRow, next: boolean) {
     setError(null)
     startTransition(async () => {
       try {
-        const fd = new FormData()
-        fd.set('id', d.id)
-        fd.set('own_share_billback', String(next))
-        await setDepartmentBillback(fd)
+        const res = await setDepartmentBillbackInWords(d.id, next)
+        if (!res.ok) setError(res.reason)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       }

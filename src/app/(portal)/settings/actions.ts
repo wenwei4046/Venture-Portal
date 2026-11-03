@@ -298,11 +298,17 @@ export async function setDepartmentBillback(formData: FormData) {
     throw new Error(`"${dept.name}" is the department that bears the bill-backs; it cannot bill itself`)
   }
 
-  const { error } = await supabase
+  // The row read back (2026-11-03): an update the table's policy lets through to no row raises nothing, and a
+  // Finance login's tick sprang back under the old principal-only policy as if it had been saved.
+  const { data: saved, error } = await supabase
     .from('departments')
     .update({ own_share_billback: billback })
     .eq('id', id)
+    .select('id')
   if (error) throw new Error(`Failed to save the bill-back setting: ${error.message}`)
+  if (!saved || saved.length === 0) {
+    throw new Error(`${dept.name}’s bill-back was not saved — your permissions do not let you change it (Settings · Manage).`)
+  }
 
   revalidatePath('/settings')
   revalidatePath('/billing')
