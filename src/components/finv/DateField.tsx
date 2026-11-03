@@ -119,7 +119,6 @@ export function DateField({
   const ym = month ?? v.slice(0, 7)
   useLayoutEffect(() => {
     if (open) place(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
   useLayoutEffect(() => {
     if (open) place(false)
@@ -146,7 +145,6 @@ export function DateField({
       document.removeEventListener('transitionend', moved, true)
       window.removeEventListener('resize', moved)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   // A press anywhere else closes it.
