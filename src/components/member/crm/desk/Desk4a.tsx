@@ -215,6 +215,12 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
           {f4.alertsN && <span style={{ position: "absolute", top: "-6px", right: "-6px", minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", display: "grid", placeItems: "center",
             background: "var(--crm-rust)", color: "#fff", font: "600 10px Inter, sans-serif", fontVariantNumeric: "tabular-nums", boxShadow: "0 0 0 2px #fff" }}>{f4.alertsN}</span>}
         </button>
+        {h.alt && (
+          <button type="button" onClick={h.alt.act} style={{ ...BTN, height: "36px", padding: "0 14px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", boxSizing: "border-box",
+            font: "500 13px Inter, sans-serif", whiteSpace: "nowrap", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">
+            <Ic name="file-text" size={15} />{h.alt.label}
+          </button>
+        )}
         {h.cta && (
           <span style={{ position: "relative" }}>
             <button type="button" onClick={h.cta.act} style={{ ...BTN, height: "36px", padding: "0 16px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px",
@@ -1681,6 +1687,7 @@ interface RoomsBits {
     remarks: string; setRemarks: (e: { target: { value: string } }) => void; canDelete: boolean; del: () => void;
     keys?: { on: boolean; can: boolean; toggle: () => void };
     move?: { can: boolean; earlier: () => void; later: () => void; earlierOff: boolean; laterOff: boolean };
+    draft?: { when: string; by: string; discard: () => void } | null;
   };
   srBlkOpen: boolean; srBlkToggle: () => void; srBlk: { from: string; to: string; reason: string };
   srBlkFrom: (e: { target: { value: string } }) => void; srBlkTo: (e: { target: { value: string } }) => void; srBlkReason: (e: { target: { value: string } }) => void;
@@ -1728,8 +1735,22 @@ export function DeskShowrooms4a({ v }: { v: RoomsBits }) {
           <button type="button" onClick={S.add} title="Add showroom" aria-label="Add showroom" style={{ ...BTN, marginLeft: "auto", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary"><Ic name="plus" size={16} /></button>
           {S.canDelete && <DeleteRoom name={S.name} del={S.del} />}
         </div>
-        <input value={S.name} onChange={S.setName} placeholder="Showroom name" aria-label="Showroom name" style={{ marginTop: "20px", width: "100%", border: 0, outline: "none", padding: 0, background: "transparent",
-          font: `500 26px ${TIGHT}`, letterSpacing: "-0.02em", color: "var(--crm-ink)" }} />
+        {S.draft && (
+          <div role="status" style={{ marginTop: "16px", padding: "10px 12px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px", background: "var(--crm-tint-attention)", font: "500 12px Inter, sans-serif", color: "var(--crm-ink)" }}>
+            <Ic name="file-text" size={14} style={{ color: "var(--crm-rust)", flex: "none" }} />
+            <span style={{ flex: 1, minWidth: 0 }}>Draft · saved {S.draft.when}{S.draft.by ? ` by ${S.draft.by}` : ""}<span style={{ display: "block", fontWeight: 400, color: "var(--crm-muted)" }}>Not live yet — salespeople see the showroom as last saved.</span></span>
+            <button type="button" onClick={S.draft.discard} style={{ ...BTN, flex: "none", font: "500 12px Inter, sans-serif", color: "var(--crm-oxblood)" }}>Discard draft</button>
+          </div>
+        )}
+        {/* The name, typed in place (the owner, 2026-11-03: "showroom的名字要能edit" — it was a borderless line that read as a title). */}
+        <label style={{ display: "block", marginTop: "18px", font: "500 12px Inter, sans-serif", color: "var(--crm-muted)" }}>
+          Showroom name
+          <span style={{ ...FIELD, marginTop: "6px", height: "46px", padding: "0 12px", display: "flex", alignItems: "center", gap: "8px", borderRadius: "8px" }}>
+            <input value={S.name} onChange={S.setName} placeholder="Showroom name" aria-label="Showroom name" maxLength={80} style={{ flex: 1, minWidth: 0, border: 0, outline: "none", padding: 0, background: "transparent",
+              font: `500 22px ${TIGHT}`, letterSpacing: "-0.02em", color: "var(--crm-ink)" }} />
+            <Ic name="pencil" size={15} style={{ color: "var(--crm-faint)", flex: "none" }} />
+          </span>
+        </label>
         {/* The address as a field of its own, seen and changed in place (the owner, 2026-10-27: "能不能有个可以看到我输入地址，可修改的地方？" —
             it was a borderless box the page drew blank). It is the visit card's location and the maps links' search. */}
         <label style={{ display: "block", marginTop: "14px", font: "500 12px Inter, sans-serif", color: "var(--crm-muted)" }}>

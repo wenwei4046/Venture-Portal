@@ -55,6 +55,8 @@ const CRM_WRITES = [
   "crm_save_showroom_remarks", "crm_delete_showroom",
   // A showroom's key handover and the showrooms' order (mig 20261029100000), CRM · Manage.
   "crm_set_showroom_keys", "crm_set_showroom_order",
+  // A showroom's draft, kept until Save (mig 20261103100000), CRM · Manage.
+  "crm_save_showroom_draft",
   // The reply library (mig 20261029170000), CRM · Manage.
   "crm_save_reply_library",
   // A partner's booking link (mig 20261029190000), CRM · Manage.
@@ -138,7 +140,7 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
   "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types",
-  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form", "crm_set_showroom_keys", "crm_set_showroom_order", "crm_save_reply_library", "crm_partner_link_set", "crm_partner_booking_cancel", "crm_save_leave", "crm_delete_leave",
+  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form", "crm_set_showroom_keys", "crm_set_showroom_order", "crm_save_showroom_draft", "crm_save_reply_library", "crm_partner_link_set", "crm_partner_booking_cancel", "crm_save_leave", "crm_delete_leave",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
@@ -198,7 +200,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
     const extra = new Map(more.extras.map(x => [x.id, x.extra]));
     const leadForm = new Map(more.leadForms.map(x => [x.id, x.lead_form]));
     const roomX = new Map(more.rooms.map(r => [r.id, r]));
-    return { ok: true, data: crmDataFromRows({
+    return { ok: true, data: withRoomDrafts(more.roomDrafts, crmDataFromRows({
       people, can, messages, visits, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, adRules, ftRules, templates,
       contacts: extra.size || leadForm.size ? contacts.map(c => ({ ...c, ...(extra.has(c.id) ? { extra: extra.get(c.id) } : {}), ...(leadForm.has(c.id) ? { lead_form: leadForm.get(c.id) } : {}) })) : contacts,
       rooms: rooms.map(r => {
@@ -210,7 +212,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
       forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
-    }) };
+    })) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
     return { ok: false, error: /schema cache|does not exist|could not find|permission denied for/i.test(message)
@@ -218,6 +220,11 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
   }
 }
 
+/** A showroom's draft by its id ('new' for one not added yet), its saver's staff id and when. */
+function withRoomDrafts(rows: { room: string; draft: unknown; saved_by: string | null; saved_at: string }[], d: CrmData): CrmData {
+  if (!rows.length) return d;
+  return { ...d, roomDrafts: Object.fromEntries(rows.map(r => [r.room, { draft: r.draft, by: r.saved_by, at: r.saved_at }])) };
+}
 /**
  * CRM Desktop rev 1's columns and tables (mig 20261013100000): forms, notes, the form's own answers, a showroom's
  * photo and map links, deleted notifications, and — for the desktop — every customer's journey. Each read on its own
@@ -227,7 +234,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order, kind")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -260,8 +267,10 @@ async function desktopRows(db: Db, journey: boolean) {
     (async () => { try { const { data, error } = await db.rpc("crm_partner_links_read"); return error || !Array.isArray(data) ? [] : (data as { id: string; name: string; code: string; on: boolean }[]); } catch { return []; } })(),
     // A lead form ad's answers (mig 20261030060000), read softly so the CRM opens before the column.
     soft<{ id: string; lead_form: CrmDataRows["contacts"][number]["lead_form"] }[]>(db.from("crm_contacts").select("id, lead_form").not("lead_form", "is", null).limit(5000)),
+    // Showrooms' drafts (mig 20261103100000): CRM · Manage only, [] for anybody else and before the table.
+    (async () => { try { const { data, error } = await db.rpc("crm_showroom_drafts_read"); return error || !Array.isArray(data) ? [] : (data as { room: string; draft: unknown; saved_by: string | null; saved_at: string }[]); } catch { return []; } })(),
   ]);
-  return { leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
+  return { roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */

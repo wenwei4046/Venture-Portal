@@ -325,6 +325,8 @@ export interface CrmData {
    * An ad's name by its id (mig 20261016120000, crm_ad_names): one the Principal / Director gave it, else Meta's once
    * ads_read is granted. A customer's `ad` already reads it; `adHeadline` keeps what Meta sent.
    */
+  /** A showroom's unsaved draft (mig 20261103100000, CRM · Manage only): by its id, 'new' for one not added yet. */
+  roomDrafts?: Record<string, { draft: unknown; by: string | null; at: string }>;
   adNames?: Record<string, { name: string; source: "manual" | "meta"; status?: string | null; statusAt?: string | null; added?: boolean; startAt?: string | null; endAt?: string | null; pageId?: string | null; pageName?: string | null; /** Taken off Ads performance (crm_hide_ad, 2026-10-24); its leads stay. */ hidden?: boolean }>;
   /** Members locked out of the dealing for now (mig 20261022130000, crm_staff.locked): off Assignment's lists. */
   lockedStaff?: string[];
