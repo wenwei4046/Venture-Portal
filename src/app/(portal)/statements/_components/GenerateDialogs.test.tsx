@@ -183,7 +183,7 @@ describe('Reconcile payroll', () => {
   ]
 
   it('a company a card: matches, under-billed, not invoiced; tops up the under-billed ones only', async () => {
-    mocks.delta.mockResolvedValue({ ok: true, value: ROWS })
+    mocks.delta.mockResolvedValue({ ok: true, value: { companies: ROWS, departments: [] } })
     mocks.topUp.mockResolvedValue({ ok: true, value: { generated: ['CAR'], overBilled: [], missingInvoice: ['CMI'] } })
     const onDone = vi.fn()
     render(<ReconcileDialog open onClose={vi.fn()} onDone={onDone} period="2026-09-01" />)
@@ -199,9 +199,39 @@ describe('Reconcile payroll', () => {
   })
 
   it('all square: nothing to top up', async () => {
-    mocks.delta.mockResolvedValue({ ok: true, value: [ROWS[0]] })
+    mocks.delta.mockResolvedValue({ ok: true, value: { companies: [ROWS[0]], departments: [] } })
     render(<ReconcileDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-09-01" />)
     await flush()
+    expect(within(dialog()).getByRole('button', { name: 'Nothing to top up' })).toHaveAttribute('data-off', 'true')
+  })
+
+  // Payroll moved between departments (2026-11-03): each receiving department against its internal invoices.
+  const dept = (id: string, name: string, billed: number, should: number, hasIssuedInvoice = true) => {
+    const delta = Math.round((should - billed) * 100) / 100
+    const s = { segment: 'director_office', deptLabel: 'Director Office', billed, should, delta, componentDeltas: null }
+    return { companyId: id, shortCode: name, name, should, billed, delta, segments: [s], hasIssuedInvoice, positiveTotal: Math.max(delta, 0), negatives: delta < 0 ? [s] : [] }
+  }
+
+  it('the departments payroll moved to: a card each under their own heading; an under-billed one is topped up with the companies', async () => {
+    mocks.delta.mockResolvedValue({ ok: true, value: { companies: [ROWS[1]], departments: [dept('d-hr', 'HR', 500, 700), dept('d-mkt', 'Marketing', 500, 500)] } })
+    mocks.topUp.mockResolvedValue({ ok: true, value: { generated: ['CAR', 'HR'], overBilled: [], missingInvoice: [] } })
+    render(<ReconcileDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-11-01" />)
+    await flush()
+    expect(within(dialog()).getByText('Departments · billed → should')).toBeInTheDocument()
+    expect(within(dialog()).getByRole('group', { name: 'HR' })).toHaveTextContent('HRunder-billed 200.00+200.00Billed 500.00should 700.00Director Office: 500.00 → 700.00 (+200.00)')
+    expect(within(dialog()).getByRole('group', { name: 'Marketing' })).toHaveTextContent('matches ✓')
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Top up · 2 drafts · RM 400.00' }))
+    await flush()
+    expect(mocks.topUp).toHaveBeenCalledWith('2026-11')
+  })
+
+  it('a department over-billed is listed with the way back; one with no internal invoice is Generate’s', async () => {
+    mocks.delta.mockResolvedValue({ ok: true, value: { companies: [ROWS[0]], departments: [dept('d-hr', 'HR', 3000, 2000), dept('d-fin', 'Finance', 0, 1000, false)] } })
+    render(<ReconcileDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-11-01" />)
+    await flush()
+    expect(within(dialog()).getByRole('group', { name: 'HR' })).toHaveTextContent('over-billed')
+    expect(hint()).toContain('HR over-billed — void the internal invoice and generate again.')
+    expect(hint()).toContain('Finance has no internal invoice this month — Generate payroll invoices makes it; it is not topped up here.')
     expect(within(dialog()).getByRole('button', { name: 'Nothing to top up' })).toHaveAttribute('data-off', 'true')
   })
 })

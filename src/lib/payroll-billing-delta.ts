@@ -80,6 +80,15 @@ export interface CompanyBillingDelta {
   negatives: SegmentDelta[]
 }
 
+/** The month's reconciliation: the companies against their payroll invoices,
+ *  and (2026-11-03) the departments payroll was moved to against their
+ *  internal invoices — a department's row carries its id in `companyId` and its
+ *  name in `shortCode` / `name`, its segments the SENDERS'. */
+export interface PayrollBillingDeltas {
+  companies: CompanyBillingDelta[]
+  departments: CompanyBillingDelta[]
+}
+
 interface Cell {
   should: number
   billed: number

@@ -14,7 +14,14 @@ vi.mock('server-only', () => ({}))
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }))
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
-import { approveInvoice, approveInvoicesForPeriod, generateConsolidatedPayrollInvoices, generateDeptMoveInvoices } from './actions'
+import {
+  approveInvoice,
+  approveInvoicesForPeriod,
+  fetchPayrollBillingDelta,
+  generateConsolidatedPayrollInvoices,
+  generateDeptMoveInvoices,
+  generatePayrollAdjustmentInvoices,
+} from './actions'
 
 const DEPTS: Row[] = [
   { id: 'd-do', name: 'Director Office', segment_key: 'director_office', pool_gl_code: '1060', billing_mode_key: 'director_office_attribution', is_internal: false },
@@ -225,5 +232,85 @@ describe('Issue: the sender recovers in its segment, the receiver bears it in it
     const db = database({ invoices: [INTERNAL('d-vo')], lines: DO_LINES })
     await approveInvoice(form({ id: 'inv-dpm' }))
     expect(journals(db).map((j) => j.p_segment)).toEqual(['director_office', 'corporate'])
+  })
+})
+
+// The reconciliation (对数补差) covers the internal invoices too: what a receiver should be billed is the moves now, by
+// sender segment and item; what it was billed is its issued internal invoices. Under-billed → one adjustment draft per
+// receiver; over-billed → listed, never undone here.
+describe('The reconciliation covers internal invoices', () => {
+  const issued = (id: string, over: Row): Row => ({ ...draft(id, over), status: 'issued' })
+  const itemLines = (invoiceId: string, segment: string, items: Array<[string, number]>): Row[] =>
+    items.map(([item, amount], i) => ({ invoice_id: invoiceId, line_no: i + 1, description: `${item} - Nov'26`, amount, category_code: '5050', segment }))
+  const MOVE_DO_HR = (salary: number, allowance: number, epf: number, socso: number, eis: number): Row => ({
+    from_department_id: 'd-do', from_department_name: 'Director Office', to_department_id: 'd-hr', to_department_name: 'HR',
+    staff_count: 1, amount: salary + allowance + epf + socso + eis, salary_amount: salary, allowance_amount: allowance, epf_amount: epf, socso_amount: socso, eis_amount: eis,
+  })
+  const HR_ISSUED = issued('dpm-hr', { billable_to_type: 'dept_pool', billable_to_department_id: 'd-hr', reference_no: 'DPM-202611', description: 'Payroll cost moved in — Nov\'26' })
+
+  it('Vivian’s line raised by a 40% pay rise: HR under-billed 200 → one adjustment draft to HR', async () => {
+    // Her line was 500 on the issued invoice; the rise makes it 700.
+    const db = database({
+      moves: [MOVE_DO_HR(560, 35, 84, 17.5, 3.5)],
+      invoices: [HR_ISSUED],
+      lines: itemLines('dpm-hr', 'director_office', [['Salary', 400], ['Allowance', 25], ['EPF', 60], ['SOCSO', 12.5], ['EIS', 2.5]]),
+    })
+    const { departments } = await fetchPayrollBillingDelta(PERIOD)
+    expect(departments).toHaveLength(1)
+    expect(departments[0]).toMatchObject({ companyId: 'd-hr', name: 'HR', billed: 500, should: 700, delta: 200, positiveTotal: 200, hasIssuedInvoice: true, negatives: [] })
+
+    const res = await generatePayrollAdjustmentInvoices(PERIOD)
+    const drafts = internalDrafts(db)
+    expect(drafts).toHaveLength(1)
+    expect(drafts[0]).toMatchObject({
+      billable_to_type: 'dept_pool', billable_to_department_id: 'd-hr', company_id: null, status: 'draft',
+      reference_no: 'DPM-202611', description: 'Payroll cost moved in — Nov\'26 · adjustment', total_amount: 200,
+    })
+    expect(linesOf(db, madeId(db, drafts[0])).map((l) => [l.description, l.amount, l.segment, l.category_code])).toEqual([
+      ['Director Office Salary adjustment - Nov\'26', 160, 'director_office', '5050'],
+      ['Director Office Allowance adjustment - Nov\'26', 10, 'director_office', '5050'],
+      ['Director Office EPF adjustment - Nov\'26', 24, 'director_office', '5050'],
+      ['Director Office SOCSO adjustment - Nov\'26', 5, 'director_office', '5050'],
+      ['Director Office EIS adjustment - Nov\'26', 1, 'director_office', '5050'],
+    ])
+    expect(res.generated).toEqual(['HV-INV-202611-0101 (HR +200.00)'])
+    // The companies were never invoiced this month: no company draft.
+    expect(inserted(db, 'invoices').filter((v) => v.billable_to_type === 'subsidiary')).toEqual([])
+  })
+
+  it('3,000 lowered to 2,000 after issue: HR over-billed 1,000, listed, no draft', async () => {
+    const db = database({
+      moves: [MOVE_DO_HR(1633.33, 100, 225.33, 34.7, 6.64)],
+      invoices: [HR_ISSUED],
+      lines: itemLines('dpm-hr', 'director_office', [['Salary', 2450], ['Allowance', 150], ['EPF', 338], ['SOCSO', 52.05], ['EIS', 9.95]]),
+    })
+    const { departments } = await fetchPayrollBillingDelta(PERIOD)
+    expect(departments[0]).toMatchObject({ name: 'HR', billed: 3000, should: 2000, delta: -1000, positiveTotal: 0 })
+    expect(departments[0].negatives.map((n) => [n.segment, n.delta])).toEqual([['director_office', -1000]])
+
+    await expect(generatePayrollAdjustmentInvoices(PERIOD)).rejects.toThrow(/nothing under-billed/)
+    expect(inserted(db, 'invoices')).toEqual([])
+  })
+
+  it('companies’ deltas unchanged by internal invoices', async () => {
+    const coInvoices = [
+      issued('co-2990-inv', { billable_to_type: 'subsidiary', company_id: 'co-2990', description: 'Payroll cost share — Nov\'26' }),
+      issued('co-car-inv', { billable_to_type: 'subsidiary', company_id: 'co-car', description: 'Payroll cost share — Nov\'26' }),
+    ]
+    const coLines = [
+      ...itemLines('co-2990-inv', 'director_office', [['Salary', 1225], ['Allowance', 75], ['EPF', 169], ['SOCSO', 26.02], ['EIS', 4.98]]),
+      ...itemLines('co-car-inv', 'director_office', [['Salary', 1225], ['Allowance', 75], ['EPF', 169], ['SOCSO', 26.03], ['EIS', 4.97]]),
+    ]
+    database({ moves: [], invoices: coInvoices, lines: coLines })
+    const alone = await fetchPayrollBillingDelta(PERIOD)
+
+    database({
+      invoices: [...coInvoices, HR_ISSUED],
+      lines: [...coLines, ...itemLines('dpm-hr', 'director_office', [['Salary', 2000]])],
+    })
+    const withInternal = await fetchPayrollBillingDelta(PERIOD)
+    expect(withInternal.companies).toEqual(alone.companies)
+    expect(withInternal.companies.every((c) => c.delta === 0)).toBe(true)
+    expect(withInternal.departments.map((d) => d.name).sort()).toEqual(['Finance', 'HR', 'Marketing'])
   })
 })

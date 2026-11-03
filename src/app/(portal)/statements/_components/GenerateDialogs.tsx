@@ -268,16 +268,60 @@ function tagOf(r: CompanyBillingDelta): { text: string; tone: 'ledger' | 'alert'
   return null
 }
 
+function DeltaCard({ r }: { r: CompanyBillingDelta }) {
+  const tag = tagOf(r)
+  return (
+    <div className={fm.summary} role="group" aria-label={r.name}>
+      <div className={fm.summaryRow} data-head="true">
+        <span className={fm.summaryLabel}>
+          {r.shortCode || r.name}
+          {tag ? (
+            <span className={fm.tag} data-tone={tag.tone}>
+              {tag.text}
+            </span>
+          ) : null}
+          {r.negatives.length > 0 ? (
+            <span className={fm.tag} data-tone="alert">
+              over-billed
+            </span>
+          ) : null}
+        </span>
+        <span className={fm.summaryValue}>{r.delta === 0 ? '—' : `${r.delta > 0 ? '+' : '−'}${money(Math.abs(r.delta))}`}</span>
+      </div>
+      <div className={fm.summaryRow}>
+        <span className={fm.summaryLabel}>Billed {money(r.billed)}</span>
+        <span className={fm.summaryValue}>should {money(r.should)}</span>
+      </div>
+      {r.segments
+        .filter((s) => s.delta !== 0)
+        .map((s) => (
+          <div key={s.segment} className={fm.summaryParts}>
+            {`${s.deptLabel}: ${money(s.billed)} → ${money(s.should)} (${s.delta > 0 ? '+' : '−'}${money(Math.abs(s.delta))})`}
+            {s.componentDeltas ? ` · ${s.componentDeltas.map((c) => `${c.label} ${money(c.amount)}`).join(' / ')}` : ''}
+          </div>
+        ))}
+    </div>
+  )
+}
+
+const namesOf = (rows: CompanyBillingDelta[]) => rows.map((r) => r.shortCode || r.name).join(', ')
+
 export function ReconcileDialog({ open, onClose, onDone, period }: GeneratorProps) {
   const hubMonth = period.slice(0, 7)
   const [month, setMonth] = useState(hubMonth)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const delta = usePreview(open, month, hubPayrollDelta)
-  const rows = delta.value ?? []
-  const under = rows.filter((r) => r.hasIssuedInvoice && r.positiveTotal > 0.005)
-  const missing = rows.filter((r) => !r.hasIssuedInvoice && r.positiveTotal > 0.005)
+  const rows = delta.value?.companies ?? []
+  // The departments payroll was moved to, each against its internal invoices (2026-11-03).
+  const depts = delta.value?.departments ?? []
+  const toTopUp = (r: CompanyBillingDelta) => r.hasIssuedInvoice && r.positiveTotal > 0.005
+  const notInvoiced = (r: CompanyBillingDelta) => !r.hasIssuedInvoice && r.positiveTotal > 0.005
+  const under = [...rows, ...depts].filter(toTopUp)
+  const missing = rows.filter(notInvoiced)
+  const deptsMissing = depts.filter(notInvoiced)
   const over = rows.filter((r) => r.negatives.length > 0)
+  const deptsOver = depts.filter((r) => r.negatives.length > 0)
   const topUp = r2(under.reduce((s, r) => s + r.positiveTotal, 0))
   const ok = !delta.loading && under.length > 0
 
@@ -318,51 +362,34 @@ export function ReconcileDialog({ open, onClose, onDone, period }: GeneratorProp
           <Hint>Reading payroll and the payroll invoices…</Hint>
         ) : delta.error ? (
           <Hint danger>{delta.error}</Hint>
-        ) : rows.length === 0 ? (
+        ) : rows.length === 0 && depts.length === 0 ? (
           <Hint>No payroll allocation and no payroll invoice in {monthWords(month)} — nothing to compare.</Hint>
         ) : (
-          <Field label="Billed → should">
-            {rows.map((r) => {
-              const tag = tagOf(r)
-              return (
-                <div key={r.companyId} className={fm.summary} role="group" aria-label={r.name}>
-                  <div className={fm.summaryRow} data-head="true">
-                    <span className={fm.summaryLabel}>
-                      {r.shortCode || r.name}
-                      {tag ? (
-                        <span className={fm.tag} data-tone={tag.tone}>
-                          {tag.text}
-                        </span>
-                      ) : null}
-                      {r.negatives.length > 0 ? (
-                        <span className={fm.tag} data-tone="alert">
-                          over-billed
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className={fm.summaryValue}>{r.delta === 0 ? '—' : `${r.delta > 0 ? '+' : '−'}${money(Math.abs(r.delta))}`}</span>
-                  </div>
-                  <div className={fm.summaryRow}>
-                    <span className={fm.summaryLabel}>Billed {money(r.billed)}</span>
-                    <span className={fm.summaryValue}>should {money(r.should)}</span>
-                  </div>
-                  {r.segments
-                    .filter((s) => s.delta !== 0)
-                    .map((s) => (
-                      <div key={s.segment} className={fm.summaryParts}>
-                        {`${s.deptLabel}: ${money(s.billed)} → ${money(s.should)} (${s.delta > 0 ? '+' : '−'}${money(Math.abs(s.delta))})`}
-                        {s.componentDeltas ? ` · ${s.componentDeltas.map((c) => `${c.label} ${money(c.amount)}`).join(' / ')}` : ''}
-                      </div>
-                    ))}
-                </div>
-              )
-            })}
-          </Field>
+          <>
+            {rows.length > 0 ? (
+              <Field label="Billed → should">
+                {rows.map((r) => (
+                  <DeltaCard key={r.companyId} r={r} />
+                ))}
+              </Field>
+            ) : null}
+            {depts.length > 0 ? (
+              <Field label="Departments · billed → should">
+                {depts.map((r) => (
+                  <DeltaCard key={r.companyId} r={r} />
+                ))}
+              </Field>
+            ) : null}
+          </>
         )}
         {missing.length > 0 ? (
-          <Hint>{missing.map((r) => r.shortCode || r.name).join(', ')} {missing.length === 1 ? 'has' : 'have'} no payroll invoice this month — Generate payroll invoices makes it; it is not topped up here.</Hint>
+          <Hint>{namesOf(missing)} {missing.length === 1 ? 'has' : 'have'} no payroll invoice this month — Generate payroll invoices makes it; it is not topped up here.</Hint>
+        ) : null}
+        {deptsMissing.length > 0 ? (
+          <Hint>{namesOf(deptsMissing)} {deptsMissing.length === 1 ? 'has' : 'have'} no internal invoice this month — Generate payroll invoices makes it; it is not topped up here.</Hint>
         ) : null}
         {over.length > 0 ? <Hint>Over-billed parts are not undone here — a payroll invoice takes no credit note; Finance settles them by hand.</Hint> : null}
+        {deptsOver.length > 0 ? <Hint>{namesOf(deptsOver)} over-billed — void the internal invoice and generate again.</Hint> : null}
         {error ? <Hint danger>{error}</Hint> : <Hint>The top-ups are drafts dated the month’s last day — they count in that month once issued.</Hint>}
       </DialogForm>
     </FinDialog>

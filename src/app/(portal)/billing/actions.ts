@@ -28,6 +28,7 @@ import {
   componentOfLine,
   computeBillingDeltas,
   type CompanyBillingDelta,
+  type PayrollBillingDeltas,
   type ShouldBillRow,
   type BilledRow,
 } from '@/lib/payroll-billing-delta'
@@ -2091,10 +2092,35 @@ export async function generateDeptMoveInvoices(
 const ADJUSTMENT_MARKER = '· adjustment'
 const BILLED_STATUSES = ['issued', 'paid', 'paid_via_netting'] as const
 
-async function loadPayrollBillingDeltas(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  period: string,
-): Promise<CompanyBillingDelta[]> {
+type BillingClient = Awaited<ReturnType<typeof createClient>>
+
+/** The lines of these invoices as billed rows, each under its invoice's payer. */
+async function billedLinesOf(
+  supabase: BillingClient,
+  payerByInvoice: Map<string, string>,
+): Promise<BilledRow[]> {
+  const invoiceIds = [...payerByInvoice.keys()]
+  if (invoiceIds.length === 0) return []
+  const { data: lines, error } = await supabase
+    .from('invoice_lines')
+    .select('invoice_id, segment, amount, description')
+    .in('invoice_id', invoiceIds)
+  if (error) throw new Error(`Failed to load invoice lines: ${error.message}`)
+  const billed: BilledRow[] = []
+  for (const l of lines ?? []) {
+    const companyId = payerByInvoice.get(l.invoice_id as string)
+    if (!companyId || !l.segment) continue
+    billed.push({
+      companyId,
+      segment: l.segment as string,
+      amount: Number(l.amount),
+      component: componentOfLine(l.description as string | null),
+    })
+  }
+  return billed
+}
+
+async function loadCompanyBillingDeltas(supabase: BillingClient, period: string): Promise<CompanyBillingDelta[]> {
   const [{ data: alloc, error: allocErr }, { data: invs, error: invErr }, { data: cos }] =
     await Promise.all([
       supabase.rpc('get_staff_billing_allocation', { p_period_month: period }),
@@ -2138,27 +2164,10 @@ async function loadPayrollBillingDeltas(
     })
   }
 
-  const invoiceIds = (invs ?? []).map((i) => i.id as string)
-  const companyByInvoice = new Map((invs ?? []).map((i) => [i.id as string, i.company_id as string]))
-  const billed: BilledRow[] = []
-  if (invoiceIds.length > 0) {
-    const { data: lines, error: linesErr } = await supabase
-      .from('invoice_lines')
-      .select('invoice_id, segment, amount, description')
-      .in('invoice_id', invoiceIds)
-    if (linesErr) throw new Error(`Failed to load invoice lines: ${linesErr.message}`)
-    for (const l of lines ?? []) {
-      const companyId = companyByInvoice.get(l.invoice_id as string)
-      if (!companyId || !l.segment) continue
-      billed.push({
-        companyId,
-        segment: l.segment as string,
-        amount: Number(l.amount),
-        component: componentOfLine(l.description as string | null),
-      })
-    }
-  }
-
+  const billed = await billedLinesOf(
+    supabase,
+    new Map((invs ?? []).map((i) => [i.id as string, i.company_id as string])),
+  )
   const companyMetaById = new Map(
     (cos ?? []).map((c) => [
       c.id as string,
@@ -2168,19 +2177,126 @@ async function loadPayrollBillingDeltas(
   return computeBillingDeltas(should, billed, PAYROLL_SEGMENT_LABEL, companyMetaById)
 }
 
-/** Read-only preview: per-company 已开 vs 应开 vs 差额 for the period. */
+/** Payroll moved between departments (2026-11-03): what each receiver should be
+ *  billed is the moves now, by the sender's segment and item; what it was billed
+ *  is its issued / paid internal invoices of the month (the marker), top-ups
+ *  included. A receiver's row is keyed by its department id. */
+async function loadDeptMoveBillingDeltas(supabase: BillingClient, period: string): Promise<CompanyBillingDelta[]> {
+  const [{ data: moveData, error: movesErr }, { data: invs, error: invErr }] = await Promise.all([
+    supabase.rpc('get_staff_dept_moves_allocation', { p_period_month: period }),
+    supabase
+      .from('invoices')
+      .select('id, billable_to_department_id')
+      .eq('period_month', period)
+      .eq('billing_mode', 'payroll_consolidated')
+      .eq('billable_to_type', 'dept_pool')
+      .eq('reference_no', deptMoveMarker(period))
+      .in('status', [...BILLED_STATUSES]),
+  ])
+  if (movesErr) throw new Error(`Failed to load the payroll moved between departments: ${movesErr.message}`)
+  if (invErr) throw new Error(`Failed to load the internal invoices: ${invErr.message}`)
+  const moves = (moveData ?? []) as unknown as DeptMoveRpcRow[]
+  const payerByInvoice = new Map((invs ?? []).map((i) => [i.id as string, i.billable_to_department_id as string]))
+
+  const deptIds = [
+    ...new Set([...moves.flatMap((m) => [m.from_department_id, m.to_department_id]), ...payerByInvoice.values()]),
+  ]
+  const { data: depts, error: deptsErr } = deptIds.length
+    ? await supabase.from('departments').select('id, name, segment_key').in('id', deptIds)
+    : { data: [], error: null }
+  if (deptsErr) throw new Error(`Failed to read the departments: ${deptsErr.message}`)
+  const deptById = new Map(
+    (depts ?? []).map((d) => [d.id as string, { name: d.name as string, segment: (d.segment_key as string | null) ?? null }]),
+  )
+
+  // A sender the payroll labels do not name (Marketing) goes by its own name, as on the internal invoice.
+  const labelBySegment: Record<string, string> = { ...PAYROLL_SEGMENT_LABEL }
+  const should: ShouldBillRow[] = []
+  for (const m of moves) {
+    const segment = deptById.get(m.from_department_id)?.segment
+    if (!segment) continue // no pool of its own: Generate refuses it, nothing was billed
+    labelBySegment[segment] ??= m.from_department_name
+    const components = {
+      salary: Number(m.salary_amount ?? 0),
+      allowance: Number(m.allowance_amount ?? 0),
+      epf: Number(m.epf_amount ?? 0),
+      socso: Number(m.socso_amount ?? 0),
+      eis: Number(m.eis_amount ?? 0),
+    }
+    should.push({
+      companyId: m.to_department_id,
+      shortCode: m.to_department_name,
+      name: m.to_department_name,
+      segment,
+      deptLabel: labelBySegment[segment],
+      amount: componentsTotal(components),
+      components,
+    })
+  }
+
+  const billed = await billedLinesOf(supabase, payerByInvoice)
+  const metaById = new Map([...deptById].map(([id, d]) => [id, { shortCode: d.name, name: d.name }]))
+  return computeBillingDeltas(should, billed, labelBySegment, metaById)
+}
+
+async function loadPayrollBillingDeltas(supabase: BillingClient, period: string): Promise<PayrollBillingDeltas> {
+  const [companies, departments] = await Promise.all([
+    loadCompanyBillingDeltas(supabase, period),
+    loadDeptMoveBillingDeltas(supabase, period),
+  ])
+  return { companies, departments }
+}
+
+/** Read-only preview: per-company and per-receiving-department 已开 vs 应开 vs 差额 for the period. */
 export async function fetchPayrollBillingDelta(
   periodMonth: string,
-): Promise<CompanyBillingDelta[]> {
+): Promise<PayrollBillingDeltas> {
   await requirePermission('billing')
   const supabase = await createClient()
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
   return loadPayrollBillingDeltas(supabase, period)
 }
 
-/** Create one DRAFT adjustment invoice per under-billed subsidiary (same
- *  payroll_consolidated format as the originals). Deltas are recomputed
- *  server-side; the client's preview is display-only. */
+/** The one category these invoices' lines carry — the adjustment reuses it.
+ *  Refuses on ambiguity rather than guessing a P&L account. */
+async function categoryOfLines(supabase: BillingClient, invoiceIds: string[], refusal: (found: string) => string): Promise<string> {
+  const { data: catRows, error: catErr } = invoiceIds.length
+    ? await supabase.from('invoice_lines').select('category_code').in('invoice_id', invoiceIds)
+    : { data: [], error: null }
+  if (catErr) throw new Error(`Failed to read original invoice categories: ${catErr.message}`)
+  const categories = [...new Set((catRows ?? []).map((r) => r.category_code as string | null).filter(Boolean))]
+  if (categories.length !== 1) throw new Error(refusal(categories.join(', ') || 'none'))
+  return categories[0] as string
+}
+
+/** A segment's gaps as adjustment lines — itemised like the original invoice
+ *  (user 2026-09-29), so the payer sees Salary / Allowance / EPF / SOCSO / EIS
+ *  rather than one lump. componentDeltas already sums to the segment gap to the
+ *  sen; when it is null the split could not be read, and one line is still right. */
+function adjustmentLines(d: CompanyBillingDelta, periodShort: string) {
+  return d.segments
+    .filter((s) => s.delta > 0.005)
+    .flatMap((s) =>
+      s.componentDeltas
+        ? s.componentDeltas.map((c) => ({
+            description: `${s.deptLabel} ${c.label} adjustment - ${periodShort}`,
+            amount: c.amount,
+            segment: s.segment as PayrollSegment,
+          }))
+        : [
+            {
+              description: `${s.deptLabel} payroll adjustment - ${periodShort}`,
+              amount: Math.round(s.delta * 100) / 100,
+              segment: s.segment as PayrollSegment,
+            },
+          ],
+    )
+}
+
+/** Create one DRAFT adjustment invoice per under-billed subsidiary, and one per
+ *  under-billed receiving department (an internal invoice, the month's marker
+ *  on it) — the same payroll_consolidated format as the originals. Deltas are
+ *  recomputed server-side; the client's preview is display-only. */
 export async function generatePayrollAdjustmentInvoices(
   periodMonth: string,
 ): Promise<{ generated: string[]; overBilled: string[]; missingInvoice: string[] }> {
@@ -2189,41 +2305,49 @@ export async function generatePayrollAdjustmentInvoices(
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
 
-  const deltas = await loadPayrollBillingDeltas(supabase, period)
-  const eligible = deltas.filter((d) => d.hasIssuedInvoice && d.positiveTotal > 0.005)
-  const overBilled = deltas.filter((d) => d.negatives.length > 0).map((d) => d.shortCode)
-  const missingInvoice = deltas
+  const { companies, departments } = await loadPayrollBillingDeltas(supabase, period)
+  const underBilled = (rows: CompanyBillingDelta[]) => rows.filter((d) => d.hasIssuedInvoice && d.positiveTotal > 0.005)
+  const eligibleCompanies = underBilled(companies)
+  const eligibleDepts = underBilled(departments)
+  const overBilled = [...companies, ...departments].filter((d) => d.negatives.length > 0).map((d) => d.shortCode)
+  const missingInvoice = [...companies, ...departments]
     .filter((d) => !d.hasIssuedInvoice && d.positiveTotal > 0.005)
     .map((d) => d.shortCode)
-  if (eligible.length === 0) {
+  if (eligibleCompanies.length === 0 && eligibleDepts.length === 0) {
     throw new Error('没有需要补开的差额 — nothing under-billed on issued invoices for this period.')
   }
 
-  // Adjustment lines reuse the category the originals were issued with. Refuse
-  // on ambiguity rather than guessing a P&L account.
-  const { data: origInvs, error: origErr } = await supabase
-    .from('invoices')
-    .select('id')
-    .eq('period_month', period)
-    .eq('billing_mode', 'payroll_consolidated')
-    .eq('billable_to_type', 'subsidiary')
-    .in('status', [...BILLED_STATUSES])
-  if (origErr) throw new Error(`Failed to load original invoices: ${origErr.message}`)
-  const origIds = (origInvs ?? []).map((r) => r.id as string)
-  const { data: catRows, error: catErr } = origIds.length
-    ? await supabase.from('invoice_lines').select('category_code').in('invoice_id', origIds)
-    : { data: [], error: null }
-  if (catErr) throw new Error(`Failed to read original invoice categories: ${catErr.message}`)
-  const categories = [...new Set((catRows ?? []).map((r) => r.category_code as string | null).filter(Boolean))]
-  if (categories.length !== 1) {
-    throw new Error(
-      `原发票的 revenue category 不唯一 (${categories.join(', ') || 'none'}) — 无法自动选账，请找 Finance 手动处理。`,
-    )
+  // Adjustment lines reuse the category the originals were issued with.
+  const originalIds = async (billableToType: 'subsidiary' | 'dept_pool') => {
+    let q = supabase
+      .from('invoices')
+      .select('id')
+      .eq('period_month', period)
+      .eq('billing_mode', 'payroll_consolidated')
+      .eq('billable_to_type', billableToType)
+    if (billableToType === 'dept_pool') q = q.eq('reference_no', deptMoveMarker(period))
+    const { data, error } = await q.in('status', [...BILLED_STATUSES])
+    if (error) throw new Error(`Failed to load original invoices: ${error.message}`)
+    return (data ?? []).map((r) => r.id as string)
   }
-  const category = categories[0] as string
+  const companyCategory = eligibleCompanies.length
+    ? await categoryOfLines(
+        supabase,
+        await originalIds('subsidiary'),
+        (found) => `原发票的 revenue category 不唯一 (${found}) — 无法自动选账，请找 Finance 手动处理。`,
+      )
+    : null
+  const deptCategory = eligibleDepts.length
+    ? await categoryOfLines(
+        supabase,
+        await originalIds('dept_pool'),
+        (found) => `The internal invoices carry more than one category (${found}) — Finance tops them up by hand.`,
+      )
+    : null
 
   const periodShort = periodShortLabel(period)
-  const description = `Payroll cost share — ${periodShort} ${ADJUSTMENT_MARKER}`
+  const companyDescription = `Payroll cost share — ${periodShort} ${ADJUSTMENT_MARKER}`
+  const deptDescription = `Payroll cost moved in — ${periodShort} ${ADJUSTMENT_MARKER}`
 
   // Idempotent: re-running replaces prior UN-issued adjustment drafts.
   const { data: priorDrafts } = await supabase
@@ -2232,7 +2356,7 @@ export async function generatePayrollAdjustmentInvoices(
     .eq('period_month', period)
     .eq('billing_mode', 'payroll_consolidated')
     .eq('status', 'draft')
-    .eq('description', description)
+    .in('description', [companyDescription, deptDescription])
   const priorIds = (priorDrafts ?? []).map((r) => r.id as string)
   if (priorIds.length > 0) {
     await supabase.from('invoice_lines').delete().in('invoice_id', priorIds)
@@ -2241,30 +2365,14 @@ export async function generatePayrollAdjustmentInvoices(
 
   const invoiceDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
   const generated: string[] = []
-  for (const d of eligible) {
-    // Itemised like the original invoice (user 2026-09-29), so the
-    // subsidiary sees Salary / Allowance / EPF / SOCSO / EIS rather than one
-    // lump. componentDeltas already sums to the segment gap to the sen; when
-    // it is null the split could not be read, and one line is still right.
-    const lines = d.segments
-      .filter((s) => s.delta > 0.005)
-      .flatMap((s) =>
-        s.componentDeltas
-          ? s.componentDeltas.map((c) => ({
-              description: `${s.deptLabel} ${c.label} adjustment - ${periodShort}`,
-              amount: c.amount,
-              segment: s.segment as PayrollSegment,
-            }))
-          : [
-              {
-                description: `${s.deptLabel} payroll adjustment - ${periodShort}`,
-                amount: Math.round(s.delta * 100) / 100,
-                segment: s.segment as PayrollSegment,
-              },
-            ],
-      )
+  const draftAdjustment = async (
+    d: CompanyBillingDelta,
+    category: string,
+    payer: { description: string; billable_to_type: 'subsidiary' | 'dept_pool'; company_id: string | null; billable_to_department_id?: string; reference_no?: string },
+  ) => {
+    const lines = adjustmentLines(d, periodShort)
     const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
-    if (lines.length === 0 || total <= 0) continue
+    if (lines.length === 0 || total <= 0) return
 
     const { data: invoiceNo, error: mintErr } = await supabase.rpc('mint_invoice_no', {
       p_period: period,
@@ -2285,10 +2393,8 @@ export async function generatePayrollAdjustmentInvoices(
         status: 'draft',
         invoice_date: invoiceDate,
         due_date: null,
-        description,
         created_by: user.id,
-        billable_to_type: 'subsidiary',
-        company_id: d.companyId,
+        ...payer,
       })
       .select('id')
       .single()
@@ -2315,6 +2421,25 @@ export async function generatePayrollAdjustmentInvoices(
       )
     }
     generated.push(`${invoiceNo as string} (${d.shortCode} +${total.toFixed(2)})`)
+  }
+
+  for (const d of eligibleCompanies) {
+    await draftAdjustment(d, companyCategory as string, {
+      description: companyDescription,
+      billable_to_type: 'subsidiary',
+      company_id: d.companyId,
+    })
+  }
+  // A receiver's top-up carries the month's marker, so the next reconciliation
+  // counts it as billed; Generate's own replace leaves it (its adjustment words).
+  for (const d of eligibleDepts) {
+    await draftAdjustment(d, deptCategory as string, {
+      description: deptDescription,
+      billable_to_type: 'dept_pool',
+      company_id: null,
+      billable_to_department_id: d.companyId,
+      reference_no: deptMoveMarker(period),
+    })
   }
 
   revalidatePath('/billing')

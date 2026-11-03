@@ -33,7 +33,7 @@ import {
   type OwnShareInvoicePreview,
   type StaffAllocationCompanyRow,
 } from '../billing/actions'
-import type { CompanyBillingDelta } from '@/lib/payroll-billing-delta'
+import type { PayrollBillingDeltas } from '@/lib/payroll-billing-delta'
 import type { Address } from '@/lib/address/address'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
@@ -357,13 +357,13 @@ export async function hubGeneratePayrollInvoices(month: string, category: string
   return attempt(() => generateConsolidatedPayrollInvoices(`${month}-01`, category.trim() || null))
 }
 
-/** Payroll now against the month's issued payroll invoices, a company each. */
-export async function hubPayrollDelta(month: string): Promise<HubResult<CompanyBillingDelta[]>> {
+/** Payroll now against the month's issued payroll invoices, a company each — and a receiving department each against its internal invoices. */
+export async function hubPayrollDelta(month: string): Promise<HubResult<PayrollBillingDeltas>> {
   await requirePermission('billing')
   return attempt(() => fetchPayrollBillingDelta(`${month}-01`))
 }
 
-/** The gaps under-billed, one adjustment draft a company. */
+/** The gaps under-billed, one adjustment draft a company or receiving department. */
 export async function hubTopUpPayroll(month: string): Promise<HubResult<{ generated: string[]; overBilled: string[]; missingInvoice: string[] }>> {
   await requireActionOn('/invoices/[id]', 'billing', 'create')
   return attempt(() => generatePayrollAdjustmentInvoices(`${month}-01`))
