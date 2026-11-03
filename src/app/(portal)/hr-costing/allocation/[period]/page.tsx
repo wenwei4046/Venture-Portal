@@ -185,8 +185,10 @@ export default async function AllocationPage({ params }: PageProps) {
         if (s.departmentId === d.id) continue
         const p = movePreview(s.employerCost, s.centralized ? [] : s.rows, s.moves)
         const line = p.moves.find((m) => m.departmentId === d.id)
+        const typed = s.moves.find((m) => m.departmentId === d.id)
         if (line && line.amount > 0) {
-          incoming.push({ name: s.name, fromDept: s.dept, amount: line.amount, parts: moveParts(s.pay, line.amount) })
+          const pct = typed?.kind === 'pct' ? typed.value : undefined
+          incoming.push({ name: s.name, fromDept: s.dept, amount: line.amount, parts: moveParts(s.pay, line.amount, pct) })
         }
       }
       return { department: d, incoming }

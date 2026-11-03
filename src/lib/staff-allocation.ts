@@ -110,7 +110,12 @@ export interface DeptMoveRow {
   value: number
 }
 
-const r2 = (n: number) => Math.round(n * 100) / 100
+/** To the sen, half away from zero, as NUMERIC's ROUND(x, 2): the float's noise
+ *  (2,500.055 held as 2,500.0549…) is cut off at 15 digits before rounding. */
+const r2 = (n: number) => {
+  const sen = Number((Math.abs(n) * 100).toPrecision(15))
+  return (Math.sign(n) * Math.round(sen)) / 100
+}
 const rm = (n: number) =>
   `RM ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -176,7 +181,7 @@ export interface MovePreview {
  *  department lines after them, HV the exact remainder (never below 0 — an
  *  overshoot of a sen comes off the last line). */
 export function movePreview(employerCost: number, companies: AllocationRow[], moves: DeptMoveRow[]): MovePreview {
-  const lines = companies.map((r) => ({ companyId: r.companyId, pct: r.pct, amount: Math.round(employerCost * r.pct) / 100 }))
+  const lines = companies.map((r) => ({ companyId: r.companyId, pct: r.pct, amount: r2((employerCost * r.pct) / 100) }))
   const moved = moves.map((m) => {
     const amount = moveAmount(employerCost, m)
     return { departmentId: m.departmentId, amount, pct: m.kind === 'pct' ? m.value : employerCost > 0 ? r2((amount / employerCost) * 100) : 0 }
@@ -204,11 +209,12 @@ export interface MovePay {
 }
 
 /** What one move carries of each cost item — payroll_moved_parts' split: each
- *  item in proportion, rounded to the sen, salary taking the rounding. */
-export function moveParts(pay: MovePay, amount: number): AllocationComponents {
+ *  item in proportion, rounded to the sen, salary taking the rounding. A %
+ *  line splits by its % (0–100), as the database does, not by its rounded amount. */
+export function moveParts(pay: MovePay, amount: number, pct?: number): AllocationComponents {
   const cost = pay.gross + pay.epfEr + pay.socsoEr + pay.eisEr
   if (cost <= 0) return { salary: 0, allowance: 0, epf: 0, socso: 0, eis: 0 }
-  const f = amount / cost
+  const f = pct !== undefined ? pct / 100 : amount / cost
   const allowance = r2((pay.gross - pay.salaryComp) * f)
   const epf = r2(pay.epfEr * f)
   const socso = r2(pay.socsoEr * f)
@@ -219,7 +225,7 @@ export function moveParts(pay: MovePay, amount: number): AllocationComponents {
 /** A receiving cost center's Bill to %: what moved in, to each company, and
  *  what stays in its pool — lines + stays = received to the sen. */
 export function billToPreview(received: number, rows: AllocationRow[]): { lines: AllocationPreviewLine[]; stays: number } {
-  const lines = rows.map((r) => ({ companyId: r.companyId, pct: r.pct, amount: Math.round(received * r.pct) / 100 }))
+  const lines = rows.map((r) => ({ companyId: r.companyId, pct: r.pct, amount: r2((received * r.pct) / 100) }))
   let stays = r2(received - lines.reduce((s, l) => s + l.amount, 0))
   if (stays < 0 && lines.length > 0) {
     const last = lines[lines.length - 1]

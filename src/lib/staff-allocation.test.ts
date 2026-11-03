@@ -482,6 +482,21 @@ describe('payroll moved to another department', () => {
     expect(Math.round((odd.salary + odd.allowance + odd.epf + odd.socso + odd.eis) * 100) / 100).toBe(1000)
   })
 
+  it('rounds half a sen up as the database’s NUMERIC does, not as a float', () => {
+    // 5,000.11 × 50% = 2,500.055 exactly; in floating point it is 2,500.0549… and rounded down.
+    const p = movePreview(5000.11, [{ companyId: 'co-2990', pct: 50 }], [toHr('pct', 30)])
+    expect(p.companies[0].amount).toBe(2500.06)
+    expect(movePreview(5000.11, [], [toHr('pct', 50)]).moves[0].amount).toBe(2500.06)
+    expect(p.hvAmount).toBe(1000.02) // 5,000.11 − 2,500.06 − 1,500.03
+    expect(billToPreview(5000.11, [{ companyId: 'a', pct: 50 }]).lines[0].amount).toBe(2500.06)
+  })
+
+  it('a % line’s items are split by its % as the database splits them, not by the rounded amount', () => {
+    // cost 5,000.11 (gross 4,400.11 of which salary 4,000; EPF 528, SOCSO 59.5, EIS 12.5), 50%: allowance 200.055 → 200.06.
+    const pay = { gross: 4400.11, salaryComp: 4000, epfEr: 528, socsoEr: 59.5, eisEr: 12.5 }
+    expect(moveParts(pay, 2500.06, 50)).toEqual({ salary: 2000, allowance: 200.06, epf: 264, socso: 29.75, eis: 6.25 })
+  })
+
   it('billToPreview(3,000, 30/30/20) → 900/900/600, stays 600', () => {
     const p = billToPreview(3000, [
       { companyId: 'a', pct: 30 },
