@@ -20,6 +20,7 @@ import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
 import { payerExpenseSplits, type NatureSplit } from '@/lib/inter-billing-nature'
 import { segmentForBillingMode, lineAttributions, type SegmentAttribution } from '@/lib/invoice-settlement'
+import { extraBillingModeToSegment, extraSegmentToPool, primeDeptRegistryFromDb } from '@/lib/dept-registry'
 
 // Nature splits for the inter-billing MIRROR rows (user 2026-07-24) — same
 // mapping billing/actions uses for the issue JE, so the dept-pool P&L and the
@@ -192,9 +193,14 @@ async function makePaymentVoucher(formData: FormData) {
         .from('invoice_lines')
         .select('amount, segment')
         .eq('invoice_id', invoiceId)
+      // A segment beyond the five cores (IT's) finds its pool in the department
+      // registry, read here — on a cold instance it folded into Venture
+      // (2026-11-03: an internal invoice's sender can be any department).
+      const registry = await primeDeptRegistryFromDb(supabase)
       const groups = lineAttributions(
         (consolLines ?? []).map((l) => ({ amount: Number(l.amount), segment: (l.segment as string | null) ?? null })),
         settleBillingMode,
+        { modeToSegment: extraBillingModeToSegment(registry), segmentToPool: extraSegmentToPool(registry) },
       )
       if (groups.length === 0) {
         throw new Error('Consolidated payroll invoice has no lines to settle')

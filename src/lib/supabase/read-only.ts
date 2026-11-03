@@ -41,6 +41,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'erp_sync_unmatched_agents', 'get_dept_opex_rows', 'get_director_advance_opening_balance', 'get_director_ctc_by_company',
   'get_hr_cost_submissions_list', 'get_hr_cost_summary', 'get_payroll_accrual_totals', 'get_payroll_accrual_totals_for',
   'get_payroll_breakdown_by_pool', 'get_payroll_funding_paid', 'get_staff_billing_allocation', 'get_staff_own_share_allocation',
+  // Payroll cost moved to another department (mig 20261103200000): STABLE, reading only.
+  'get_staff_dept_moves_allocation', 'get_payroll_moves_summary',
   'get_submitted_hr_summary', 'gl_net_by_account', 'hr_dashboard_summary', 'lookup_eis', 'lookup_epf', 'lookup_pcb', 'lookup_socso',
   'member_admin_brand_weeks', 'member_admin_claim_settings', 'member_admin_request_facts', 'member_admin_snapshot', 'member_capacity_of', 'member_catalogue',
   'member_memo_reads', 'member_sub_department_requests', 'member_waiting_form', 'member_waiting_transfer', 'next_staff_code',

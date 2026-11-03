@@ -21,6 +21,7 @@ const NOT_GUARDED: Readonly<Record<string, string>> = {
   erp_feed_month_closed: 'a read: is the ERP feed’s month closed',
   get_staff_billing_allocation: 'a read: who is billed for whom, for the invoice about to be made',
   get_staff_own_share_allocation: 'a read: the own-share split, for the invoice about to be made',
+  get_staff_dept_moves_allocation: 'a read: the payroll moved between departments, for the internal invoices about to be made',
   payroll_month_closed: 'a read: is the payroll month closed',
   revenue_seller_checks: 'a read: the move an answer is about — whom the bill goes to, so the closes are asked first',
   hiring_orphan_files: 'a read: the files no record names, for the sweep after a write',

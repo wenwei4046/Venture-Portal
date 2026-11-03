@@ -284,6 +284,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'get_dept_opex_rows', 'get_director_ctc_by_company', 'get_hr_cost_submissions_list',
   'get_hr_cost_summary', 'get_payroll_accrual_totals', 'get_payroll_accrual_totals_for', 'get_payroll_breakdown_by_pool',
   'get_payroll_funding_paid', 'get_staff_billing_allocation', 'get_staff_own_share_allocation', 'get_submitted_hr_summary',
+  // Payroll cost moved to another department (mig 20261103200000): the moves' lines, and what each receiver bills on —
+  // Billing or HR Costing · View, as the billing allocation.
+  'get_staff_dept_moves_allocation', 'get_payroll_moves_summary',
   'hr_dashboard_summary', 'log_data_access', 'lookup_pcb', 'mark_journal_entry_reversed', 'member_admin_brand_weeks',
   'member_admin_claim_settings', 'member_admin_save_claim_settings',
   // People › Member services › Food claim (mig 20261013150000): member_is_manager, and the save member.manage too.

@@ -14,7 +14,7 @@ export default function CopyAllocationsButton({ period }: { period: string }) {
     setNote(null)
     startTransition(async () => {
       try {
-        const { copiedStaff, lockedStaff, centralizedStaff, notOnPayrollStaff } =
+        const { copiedStaff, lockedStaff, centralizedStaff, notOnPayrollStaff, copiedMoves, copiedBillTo } =
           await copyAllocationsFromLastMonth(period)
         setNote(
           splitCopyNote({
@@ -22,6 +22,8 @@ export default function CopyAllocationsButton({ period }: { period: string }) {
             locked: lockedStaff,
             centralized: centralizedStaff,
             notOnPayroll: notOnPayrollStaff,
+            copiedMoves,
+            copiedBillTo,
           }),
         )
         router.refresh()

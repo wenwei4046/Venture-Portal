@@ -83,6 +83,25 @@ describe('payrollBillingLines', () => {
     ])
   })
 
+  // Payroll moved between departments (2026-11-03, method B): Vivian's RM 3,000 of Director Office's cost goes to HR on
+  // an internal invoice. Director Office's lines on it are billed; HR must now bill that 3,000 too.
+  it('the payroll basis reads Director Office fully billed and HR’s required including 3,000', () => {
+    const rows = payrollBillingLines({
+      fromPayroll: { hr: 5000, director_office: 6000 },
+      movedIn: { hr: 3000 },
+      invoices: [inv('c1', 'issued', 4500, 'payroll_consolidated'), inv('dpm', 'issued', 3000, 'payroll_consolidated')],
+      lines: [
+        { invoice_id: 'c1', amount: 3000, segment: 'director_office' },
+        { invoice_id: 'c1', amount: 1500, segment: 'hr' },
+        { invoice_id: 'dpm', amount: 3000, segment: 'director_office' },
+      ],
+    })
+    expect(rows).toEqual([
+      { key: 'hr', label: 'HR', required: 8000, billed: 1500, invoices: 1 },
+      { key: 'director_office', label: 'Director Office', required: 6000, billed: 6000, invoices: 2 },
+    ])
+  })
+
   it('leaves out a department with nothing from payroll and nothing billed', () => {
     const rows = payrollBillingLines({ fromPayroll: { ...fromPayroll, it: 0 }, invoices: invoices.filter((i) => i.billing_mode !== 'payroll_consolidated'), lines: [] })
     expect(rows.map((r) => r.key)).toEqual(['hr', 'finance', 'director_office', 'director', 'marketing'])

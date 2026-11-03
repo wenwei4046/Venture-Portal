@@ -186,9 +186,12 @@ export function PayrollInvoicesDialog({ open, onClose, onDone, period, categorie
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const preview = usePreview(open, month, hubPayrollPreview)
-  const companies = preview.value ?? []
+  const companies = preview.value?.companies ?? []
+  // Payroll moved between departments (2026-11-03): an internal invoice a receiver, then what each keeps.
+  const internal = preview.value?.internal ?? []
+  const staysIn = preview.value?.staysIn ?? []
   const total = r2(companies.reduce((s, c) => s + c.total, 0))
-  const ok = !preview.loading && companies.length > 0 && !!category
+  const ok = !preview.loading && (companies.length > 0 || internal.length > 0) && !!category
 
   const go = async () => {
     if (!ok || busy) return
@@ -197,7 +200,11 @@ export function PayrollInvoicesDialog({ open, onClose, onDone, period, categorie
     try {
       const res = await hubGeneratePayrollInvoices(month, category)
       if (!res.ok) return setError(res.reason)
-      onDone(`${plural(res.value.generated, 'payroll invoice', 'payroll invoices')} generated as drafts`)
+      const made = [
+        plural(res.value.companies.length, 'payroll invoice', 'payroll invoices'),
+        ...(res.value.receivers.length > 0 ? [plural(res.value.receivers.length, 'internal invoice', 'internal invoices')] : []),
+      ]
+      onDone(`${made.join(' and ')} generated as drafts`)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'It did not go through. Try again.')
@@ -230,8 +237,10 @@ export function PayrollInvoicesDialog({ open, onClose, onDone, period, categorie
           <Hint>Reading HR’s staff billing allocation…</Hint>
         ) : preview.error ? (
           <Hint danger>{preview.error}</Hint>
-        ) : companies.length === 0 ? (
+        ) : companies.length === 0 && internal.length === 0 ? (
           <Hint>No staff billing allocation for {monthWords(month)} — nothing to bill.</Hint>
+        ) : companies.length === 0 ? (
+          <Hint>No company is billed for {monthWords(month)} — only the internal invoices.</Hint>
         ) : (
           <Field label={`${plural(companies.length, 'company', 'companies')} · RM ${money(total)}`}>
             {companies.map((c) => (
@@ -253,6 +262,26 @@ export function PayrollInvoicesDialog({ open, onClose, onDone, period, categorie
             ))}
           </Field>
         )}
+        {!preview.loading && !preview.error && internal.length > 0 ? (
+          <Field label={`${plural(internal.length, 'internal invoice', 'internal invoices')} · payroll moved between departments`}>
+            <div className={fm.summary} role="group" aria-label="Internal invoices">
+              {internal.map((m) => (
+                <div key={`${m.from}→${m.to}`} className={fm.summaryRow}>
+                  <span className={fm.summaryLabel}>{`${m.from} → ${m.to} · RM ${money(m.amount)}`}</span>
+                </div>
+              ))}
+            </div>
+          </Field>
+        ) : null}
+        {!preview.loading && !preview.error && staysIn.length > 0 ? (
+          <div className={fm.summary} role="group" aria-label="Stays in departments">
+            {staysIn.map((s) => (
+              <div key={s.department} className={fm.summaryRow}>
+                <span className={fm.summaryLabel}>{`Stays in ${s.department} · RM ${money(s.amount)}`}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {error ? <Hint danger>{error}</Hint> : <Hint>Drafts — each line posts to its department’s P&amp;L once the invoice is approved.</Hint>}
       </DialogForm>
     </FinDialog>
@@ -268,16 +297,62 @@ function tagOf(r: CompanyBillingDelta): { text: string; tone: 'ledger' | 'alert'
   return null
 }
 
+function DeltaCard({ r }: { r: CompanyBillingDelta }) {
+  const tag = tagOf(r)
+  return (
+    <div className={fm.summary} role="group" aria-label={r.name}>
+      <div className={fm.summaryRow} data-head="true">
+        <span className={fm.summaryLabel}>
+          {r.shortCode || r.name}
+          {tag ? (
+            <span className={fm.tag} data-tone={tag.tone}>
+              {tag.text}
+            </span>
+          ) : null}
+          {r.negatives.length > 0 ? (
+            <span className={fm.tag} data-tone="alert">
+              over-billed
+            </span>
+          ) : null}
+        </span>
+        <span className={fm.summaryValue}>{r.delta === 0 ? '—' : `${r.delta > 0 ? '+' : '−'}${money(Math.abs(r.delta))}`}</span>
+      </div>
+      <div className={fm.summaryRow}>
+        <span className={fm.summaryLabel}>Billed {money(r.billed)}</span>
+        <span className={fm.summaryValue}>should {money(r.should)}</span>
+      </div>
+      {r.segments
+        .filter((s) => s.delta !== 0)
+        .map((s) => (
+          <div key={s.segment} className={fm.summaryParts}>
+            {`${s.deptLabel}: ${money(s.billed)} → ${money(s.should)} (${s.delta > 0 ? '+' : '−'}${money(Math.abs(s.delta))})`}
+            {s.componentDeltas ? ` · ${s.componentDeltas.map((c) => `${c.label} ${money(c.amount)}`).join(' / ')}` : ''}
+          </div>
+        ))}
+    </div>
+  )
+}
+
+const namesOf = (rows: CompanyBillingDelta[]) => rows.map((r) => r.shortCode || r.name).join(', ')
+
 export function ReconcileDialog({ open, onClose, onDone, period }: GeneratorProps) {
   const hubMonth = period.slice(0, 7)
   const [month, setMonth] = useState(hubMonth)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const delta = usePreview(open, month, hubPayrollDelta)
-  const rows = delta.value ?? []
-  const under = rows.filter((r) => r.hasIssuedInvoice && r.positiveTotal > 0.005)
-  const missing = rows.filter((r) => !r.hasIssuedInvoice && r.positiveTotal > 0.005)
+  const rows = delta.value?.companies ?? []
+  // The departments payroll was moved to, each against its internal invoices (2026-11-03).
+  const depts = delta.value?.departments ?? []
+  // HV's own share against its issued own-share invoice to Venture Office (2026-11-03, "做b").
+  const ownShare = delta.value?.ownShare ?? []
+  const toTopUp = (r: CompanyBillingDelta) => r.hasIssuedInvoice && r.positiveTotal > 0.005
+  const notInvoiced = (r: CompanyBillingDelta) => !r.hasIssuedInvoice && r.positiveTotal > 0.005
+  const under = [...rows, ...depts, ...ownShare].filter(toTopUp)
+  const missing = rows.filter(notInvoiced)
+  const deptsMissing = depts.filter(notInvoiced)
   const over = rows.filter((r) => r.negatives.length > 0)
+  const deptsOver = depts.filter((r) => r.negatives.length > 0)
   const topUp = r2(under.reduce((s, r) => s + r.positiveTotal, 0))
   const ok = !delta.loading && under.length > 0
 
@@ -318,51 +393,42 @@ export function ReconcileDialog({ open, onClose, onDone, period }: GeneratorProp
           <Hint>Reading payroll and the payroll invoices…</Hint>
         ) : delta.error ? (
           <Hint danger>{delta.error}</Hint>
-        ) : rows.length === 0 ? (
+        ) : rows.length === 0 && depts.length === 0 && ownShare.length === 0 ? (
           <Hint>No payroll allocation and no payroll invoice in {monthWords(month)} — nothing to compare.</Hint>
         ) : (
-          <Field label="Billed → should">
-            {rows.map((r) => {
-              const tag = tagOf(r)
-              return (
-                <div key={r.companyId} className={fm.summary} role="group" aria-label={r.name}>
-                  <div className={fm.summaryRow} data-head="true">
-                    <span className={fm.summaryLabel}>
-                      {r.shortCode || r.name}
-                      {tag ? (
-                        <span className={fm.tag} data-tone={tag.tone}>
-                          {tag.text}
-                        </span>
-                      ) : null}
-                      {r.negatives.length > 0 ? (
-                        <span className={fm.tag} data-tone="alert">
-                          over-billed
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className={fm.summaryValue}>{r.delta === 0 ? '—' : `${r.delta > 0 ? '+' : '−'}${money(Math.abs(r.delta))}`}</span>
-                  </div>
-                  <div className={fm.summaryRow}>
-                    <span className={fm.summaryLabel}>Billed {money(r.billed)}</span>
-                    <span className={fm.summaryValue}>should {money(r.should)}</span>
-                  </div>
-                  {r.segments
-                    .filter((s) => s.delta !== 0)
-                    .map((s) => (
-                      <div key={s.segment} className={fm.summaryParts}>
-                        {`${s.deptLabel}: ${money(s.billed)} → ${money(s.should)} (${s.delta > 0 ? '+' : '−'}${money(Math.abs(s.delta))})`}
-                        {s.componentDeltas ? ` · ${s.componentDeltas.map((c) => `${c.label} ${money(c.amount)}`).join(' / ')}` : ''}
-                      </div>
-                    ))}
-                </div>
-              )
-            })}
-          </Field>
+          <>
+            {rows.length > 0 ? (
+              <Field label="Billed → should">
+                {rows.map((r) => (
+                  <DeltaCard key={r.companyId} r={r} />
+                ))}
+              </Field>
+            ) : null}
+            {depts.length > 0 ? (
+              <Field label="Departments · billed → should">
+                {depts.map((r) => (
+                  <DeltaCard key={r.companyId} r={r} />
+                ))}
+              </Field>
+            ) : null}
+            {ownShare.length > 0 ? (
+              <Field label="HOUZS Venture’s own share · billed → should">
+                {ownShare.map((r) => (
+                  <DeltaCard key={r.companyId} r={r} />
+                ))}
+              </Field>
+            ) : null}
+          </>
         )}
         {missing.length > 0 ? (
-          <Hint>{missing.map((r) => r.shortCode || r.name).join(', ')} {missing.length === 1 ? 'has' : 'have'} no payroll invoice this month — Generate payroll invoices makes it; it is not topped up here.</Hint>
+          <Hint>{namesOf(missing)} {missing.length === 1 ? 'has' : 'have'} no payroll invoice this month — Generate payroll invoices makes it; it is not topped up here.</Hint>
+        ) : null}
+        {deptsMissing.length > 0 ? (
+          <Hint>{namesOf(deptsMissing)} {deptsMissing.length === 1 ? 'has' : 'have'} no internal invoice this month — Generate payroll invoices makes it; it is not topped up here.</Hint>
         ) : null}
         {over.length > 0 ? <Hint>Over-billed parts are not undone here — a payroll invoice takes no credit note; Finance settles them by hand.</Hint> : null}
+        {deptsOver.length > 0 ? <Hint>{namesOf(deptsOver)} over-billed — void the internal invoice and generate again.</Hint> : null}
+        {ownShare.some((r) => r.negatives.length > 0) ? <Hint>The own share is over-billed — void the own-share invoice, then generate it again.</Hint> : null}
         {error ? <Hint danger>{error}</Hint> : <Hint>The top-ups are drafts dated the month’s last day — they count in that month once issued.</Hint>}
       </DialogForm>
     </FinDialog>
@@ -462,7 +528,7 @@ export function OwnShareDialog({ open, onClose, onDone, period, categories }: Ge
         {error ? (
           <Hint danger>{error}</Hint>
         ) : (
-          <Hint>A department left unticked keeps its share in its own pool. The ticks are Settings › Departments’; a change here is this run only. It settles by netting.</Hint>
+          <Hint>A department left unticked keeps its share in its own pool. The ticks are Settings › Departments’; a change here is this run only. It settles by netting. Payroll moved to another department is not here — it is billed to that department on its internal invoice.</Hint>
         )}
       </DialogForm>
     </FinDialog>
