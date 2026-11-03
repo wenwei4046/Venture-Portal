@@ -75,7 +75,7 @@ Table and column names; where helpers live; the shape of the generate preview's 
 
 ## Settled after the builder check
 
-A. **Department lines lock at the first Submit to Finance.** A Resubmit or Second payroll does not reopen them; only Finance sending the batch back does, as with directors' HV share. Finance can send a batch back only while no funding PV has been raised for it, or after voiding one (`payroll_send_back_batch`). Once the funding PV completes, the money has moved, so that month's move is final. A month already submitted before this is built cannot take a move. (The user asked "如果 finance send back 他们才能改？" — answered yes; final OK pending with the whole document.)
+A. **Department lines lock at the first Submit to Finance.** A Resubmit or Second payroll does not reopen them; only Finance sending the batch back does, as with directors' HV share. Finance can send a batch back only while no funding PV has been raised for it, or after voiding one (`payroll_send_back_batch`). Once the funding PV completes, the money has moved, so that month's move is final. A month already submitted before this is built cannot take a move. (The user asked "如果 finance send back 他们才能改？" — answered yes.)
 
 B. **On a company's payroll invoice, the moved money is merged into the receiving department's own Salary / Allowance / EPF / SOCSO / EIS lines** ("就一起吧"). There are no separate lines and no source department named. The sample's ④ shows it merged.
 
@@ -84,6 +84,10 @@ C. **A change after Finance has billed the month** works as today when HR correc
    - a company now owes less: it is listed in the report only, because consolidated invoices take no credit note, and Finance decides whether to void and reissue.
 
    By A, a move itself cannot change once the funding has been paid. What can change after billing is HR's Bill to % (my call 6), or more moved-in money from a later batch that month.
+
+D. **Company splits keep today's behaviour.** A Resubmit or Second payroll reopens them, as now ("公司 split 维持现在" → "可以"): HR can correct a wrong % themselves, and Reconcile payroll shows any company over- or under-billed. Only department lines (A) stay locked until Finance sends the batch back.
+
+The user confirmed every point above and each of the calls below as they came up (2026-11-03, "可以了吗？"); this document is the approved design.
 
 ## My calls — not decided by the user, to check
 
