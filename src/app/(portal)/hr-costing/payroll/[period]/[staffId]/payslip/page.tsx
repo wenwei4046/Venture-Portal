@@ -7,6 +7,7 @@ import { OFFICE_TZ } from '@/lib/office-clock'
 import { calculateRevenuePayrollSplit } from '@/lib/revenue-payroll'
 import { normalisePayLine, payLineKind, payLineLabel } from '@/lib/revenue-pay-lines'
 import { round2 } from '@/lib/payroll-funding'
+import { noPayAmount } from '@/lib/payroll-grid'
 import PrintButton from './_components/PrintButton'
 import EditableStatLine from './_components/EditableStatLine'
 import ResetStaffStatutoryButton from './_components/ResetStaffStatutoryButton'
@@ -74,6 +75,18 @@ export default async function PayslipPage({ params }: PageProps) {
   const deptName = staff?.departments?.name ?? '—'
   const ratio = row.prorata_days_in_month > 0 ? roundProrataRatio(row.prorata_days_worked / row.prorata_days_in_month) : 0
   const split = row.source === 'commission' && row.commission_balance != null ? calculateRevenuePayrollSplit(row) : null
+  const noPay = noPayAmount({
+    source: row.source,
+    unpaid_leave_days: Number(row.unpaid_leave_days),
+    basic_salary: Number(row.basic_salary),
+    statutory_allowance: Number(row.statutory_allowance),
+    non_statutory_allowance: Number(row.non_statutory_allowance),
+    ot_amount: Number(row.ot_amount),
+    commission_amount: Number(row.commission_amount),
+    deduction_amount: Number(row.deduction_amount),
+    gross: Number(row.gross),
+    prorata_days_in_month: row.prorata_days_in_month,
+  })
   const netBasicSplit = row.payout_split_version === 2
 
   // A Revenue row's pay lines (2026-09-27) — a special claim, an allowance, an
@@ -165,8 +178,9 @@ export default async function PayslipPage({ params }: PageProps) {
               ? round2(Number(row.commission_amount) - split.basicGross - totalEr)
               : split ? round2(split.commissionBalance + Number(row.epf_ee)) : row.commission_amount} />
             {earningLines.map(line => <Line key={line.id} label={payLineLabel(line)} value={line.amount} />)}
-            {Number(row.unpaid_leave_days) > 0 && (
-              <Line label={`Unpaid Leave (${row.unpaid_leave_days} days)`} value={0} muted />
+            {Number(row.unpaid_leave_days) > 0 && (noPay > 0
+              ? <Line label={`No Pay (${row.unpaid_leave_days} days)`} value={-noPay} />
+              : <Line label={`Unpaid Leave (${row.unpaid_leave_days} days)`} value={0} muted />
             )}
             {Number(row.deduction_amount) > 0 && (
               <Line label="Deduction" value={-Number(row.deduction_amount)} />

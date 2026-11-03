@@ -177,7 +177,7 @@ export function dirtyFields(
  */
 export function rowUpdateFromEdit(
   edit: PayrollEdit,
-  saved: Partial<Record<PayrollEditField, number>>,
+  saved: Partial<Record<PayrollEditField, number>> & { no_pay_amount?: number },
   opts: { commissionDerived: boolean },
 ): Partial<PayrollEdit> {
   const out: Partial<PayrollEdit> = {}
@@ -185,10 +185,45 @@ export function rowUpdateFromEdit(
     if (f === 'commission_amount' && opts.commissionDerived) continue
     out[f] = edit[f]
   }
+  // The Deduct cell shows the No Pay with the deduction (noPayAmount); only
+  // the deduction is saved — the unpaid days already take the No Pay off.
+  out.deduction_amount = round2(edit.deduction_amount - (saved.no_pay_amount ?? 0))
   for (const f of dirtyFields(edit, saved)) {
     if (isStatutoryField(f)) out[f] = edit[f]
   }
   return out
+}
+
+/**
+ * The No Pay on a row, for the Deduct cell and the payslip (user 2026-11-03:
+ * the Deduct column shows the No Pay imported from InfoTech; the unpaid days
+ * stay too). Never stored, so it is never taken off twice: on an imported row
+ * it is what stands between the earnings and the file's gross (InfoTech's own
+ * No Pay, to the sen); on a row the portal works out, the unpaid days at the
+ * trigger's rate — (basic + statutory allowance) ÷ days in the month. A
+ * Revenue row's unpaid days only move its basic split: none.
+ */
+export function noPayAmount(row: {
+  source: string | null
+  unpaid_leave_days: number
+  basic_salary: number
+  statutory_allowance: number
+  non_statutory_allowance: number
+  ot_amount: number
+  commission_amount: number
+  deduction_amount: number
+  gross: number
+  prorata_days_in_month: number | null
+}): number {
+  if (!(row.unpaid_leave_days > 0) || row.source === 'commission') return 0
+  if (row.source === 'imported') {
+    const earnings = row.basic_salary + row.statutory_allowance + row.non_statutory_allowance
+      + row.ot_amount + row.commission_amount
+    return Math.max(round2(earnings - row.deduction_amount - row.gross), 0)
+  }
+  const days = row.prorata_days_in_month ?? 0
+  if (!(days > 0)) return 0
+  return round2((row.basic_salary + row.statutory_allowance) * Math.round(row.unpaid_leave_days) / days)
 }
 
 export const NO_DEPARTMENT = '— No department'
