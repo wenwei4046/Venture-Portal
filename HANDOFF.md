@@ -1,5 +1,34 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-03 a (SHIPPED, #921) — the date field's calendar is never cut off
+
+Session e73c0205. The user said "全绿就 merge", then "现在看并 merge" twice; the first was only far enough to re-run a flaky job.
+
+- **MERGED:** squash `8d6325aa` (2026-11-03 03:43Z). Every check was green on `0a542a81` after one re-run of
+  "Cloudflare worker build + PDF smoke". That job hit the known `next/font/google` flake; the same run's Next.js build
+  check had passed. No migration. DESIGN.md v4.226.
+- **The bug:** the user, on *Settle 1 invoice*, saw the calendar's month and first weeks hidden under the window's
+  head: "显示bug".
+  - `components/finv/DateField.tsx` drew the calendar `absolute` inside DialogForm's scroll (`overflow-y: auto`). It
+    opened up when the form had less than 390px below the field.
+  - Settle's form has 84px below the field and 187px above it, so the scroll cut off the calendar's top.
+- **The fix:**
+  - `.pop` is `position: fixed`, placed like hrv/select's soft menu: under the field when it fits in the window, else
+    over it when there is more room above, and 8px inside the edges.
+  - Positions count from a zero-size fixed probe (`[data-cal-origin]`), because the desktop dialog's
+    `transform: scale(1)` holds fixed children.
+  - The side holds while the months are walked. It follows scroll, resize and transitionend (a rising phone sheet),
+    and closes once the field has left `[data-cal-scope]`.
+  - On phone sheets the card is the field's width, via `--date-field-w`; `right: 0` would now be the window's edge.
+  - Every DateField gets the fix (17 files).
+- **Checked** with the real SettleDialog in headless Chrome, on a throwaway Vite page since deleted:
+  - before: the user's picture;
+  - after: 1280×800 opens over the field, whole; 1280×1000 opens under it; the 500×900 phone sheet opens over it at
+    the field's width.
+  - Headless Chrome's virtual clock freezes CSS transitions at their first frame, so the shots were taken with
+    transitions off.
+  - Not yet seen logged in on the live site.
+
 ## CHECKPOINT 2026-11-02 c (SHIPPED, #914) — the calendar: paid stays, paid ahead does not (corrects #911)
 
 Session e73c0205, on "全绿就 merge" → "现在看并 merge".
