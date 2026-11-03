@@ -193,6 +193,29 @@ export function movePreview(employerCost: number, companies: AllocationRow[], mo
   return { companies: lines, moves: moved, hvAmount, billedTotal: sum(lines), movedTotal: sum(moved) }
 }
 
+/** A person's pay as a move is split by it: gross, the salary part of it
+ *  (get_staff_billing_allocation's salary rule) and the employer statutory. */
+export interface MovePay {
+  gross: number
+  salaryComp: number
+  epfEr: number
+  socsoEr: number
+  eisEr: number
+}
+
+/** What one move carries of each cost item — payroll_moved_parts' split: each
+ *  item in proportion, rounded to the sen, salary taking the rounding. */
+export function moveParts(pay: MovePay, amount: number): AllocationComponents {
+  const cost = pay.gross + pay.epfEr + pay.socsoEr + pay.eisEr
+  if (cost <= 0) return { salary: 0, allowance: 0, epf: 0, socso: 0, eis: 0 }
+  const f = amount / cost
+  const allowance = r2((pay.gross - pay.salaryComp) * f)
+  const epf = r2(pay.epfEr * f)
+  const socso = r2(pay.socsoEr * f)
+  const eis = r2(pay.eisEr * f)
+  return { salary: r2(amount - allowance - epf - socso - eis), allowance, epf, socso, eis }
+}
+
 /** A receiving cost center's Bill to %: what moved in, to each company, and
  *  what stays in its pool — lines + stays = received to the sen. */
 export function billToPreview(received: number, rows: AllocationRow[]): { lines: AllocationPreviewLine[]; stays: number } {

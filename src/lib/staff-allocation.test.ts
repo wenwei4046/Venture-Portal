@@ -5,6 +5,7 @@ import {
   allocationPreview,
   billToPreview,
   movePreview,
+  moveParts,
   validateDeptMoves,
   periodShortLabel,
   buildAllocationInvoiceLines,
@@ -470,6 +471,15 @@ describe('payroll moved to another department', () => {
   it('centralized: companies refused, departments allowed', () => {
     expect(validateDeptMoves(COST, VIVIAN, [], 'd-mkt', true)).toEqual({ ok: false, error: 'A centralized department bills the companies by invoice — move cost to a department only' })
     expect(validateDeptMoves(COST, [], [{ departmentId: 'd-fin', kind: 'amount', value: 1000 }], 'd-mkt', true)).toEqual({ ok: true })
+  })
+
+  it('a move’s cost items, as payroll_moved_parts splits them: salary takes the rounding', () => {
+    // Vivian: gross 5,000 of which salary 4,900, EPF 676, SOCSO 104.10, EIS 19.90 → cost 5,800 (not 6,000, so the split shows).
+    const pay = { gross: 5000, salaryComp: 4900, epfEr: 676, socsoEr: 104.1, eisEr: 19.9 }
+    expect(moveParts(pay, 2900)).toEqual({ salary: 2450, allowance: 50, epf: 338, socso: 52.05, eis: 9.95 })
+    const odd = moveParts(pay, 1000)
+    expect(odd).toEqual({ salary: 844.83, allowance: 17.24, epf: 116.55, socso: 17.95, eis: 3.43 })
+    expect(Math.round((odd.salary + odd.allowance + odd.epf + odd.socso + odd.eis) * 100) / 100).toBe(1000)
   })
 
   it('billToPreview(3,000, 30/30/20) → 900/900/600, stays 600', () => {
