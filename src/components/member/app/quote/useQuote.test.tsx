@@ -138,12 +138,13 @@ describe("step 2's margin", () => {
   });
 });
 
-// A mattress brand's All models and Accessories only (2026-11-03): one quick sheet, on its own list; a sofa keeps its own.
+// A mattress brand's All models (2026-11-03): the quick sheet, its accessories on its second tab — step 1 has no
+// Accessories only for it (2026-11-04); a sofa keeps its own.
 describe("step 1's entries", () => {
   const SOFA: QCatalog = { ...CATALOG, brand: "ZANOTTI", name: "Zanotti", sofa: true, models: [] };
   const calc = () => vi.fn(async (): Promise<Outcome<QuoteResult>> => ({ ok: false, error: "not asked" }));
 
-  it("a mattress brand: All models and Accessories only open the quick sheet on their list; Add to cart adds to the cart's lines", () => {
+  it("a mattress brand: All models opens the quick sheet on its mattresses; Add to cart adds to the cart's lines", () => {
     const { result } = renderHook(() => useQuote(args(calc(), { pricing: false })));
     act(() => result.current.openAll());
     expect(result.current.sheet).toMatchObject({ mode: "quick", tab: "mattress", picks: {}, acc: {} });
@@ -153,8 +154,6 @@ describe("step 1's entries", () => {
     expect(result.current.sheet).toBeNull();
     expect(result.current.cart).toEqual([{ ...LINE, qty: 3 }]);
     expect(result.current.memory.sets.AKEMI).toEqual([{ kind: "mattress", key: "serene", size: "Q", bfs: [] }]);
-    act(() => result.current.openAccOnly());
-    expect(result.current.sheet).toMatchObject({ mode: "quick", tab: "acc" });
   });
 
   it("a sofa brand: All models is the list of models, Sofa accessories only its own sheet", () => {

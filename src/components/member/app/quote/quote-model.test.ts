@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BedframeBuild, MemberProduct } from "@/lib/member/types";
 import {
-  EMPTY_MEMORY, NO_SOFA_BUILD, NO_SOFA_CHOICES, accOnlyTitle, accOrder, accVariants, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
+  EMPTY_MEMORY, NO_SOFA_BUILD, NO_SOFA_CHOICES, accOnlyTitle, accOrder, accVariantMatches, accVariants, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
   mattressVariants, modelMatches, moduleCushions, moduleInfo, quickCounts, quickSheet, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
   variantMatches,
   type CartLine, type QCatalog, type QModel, type QModule, type SheetState,
@@ -270,6 +270,18 @@ describe("the quick sheet", () => {
     expect(variantMatches(apex, "SS", "super single")).toBe(true);
     expect(variantMatches(apex, "S", "super single")).toBe(false);
     expect(variantMatches(apex, "S", "")).toBe(true);
+  });
+
+  // 2026-11-04: the size stands beside an accessory's name, so what the row says can be typed.
+  it("finds an accessory by every word of its name and size; a one-size SKU by its name", () => {
+    const mp = { name: "AERO-MP" };
+    expect(accVariantMatches(mp, "Q", "aero queen")).toBe(true);
+    expect(accVariantMatches(mp, "SS", "aero-mp super single")).toBe(true);
+    expect(accVariantMatches(mp, "SK", "king aero")).toBe(true);
+    expect(accVariantMatches(mp, "Q", "aero king")).toBe(false);
+    expect(accVariantMatches({ name: "AK-CS AIRLOFT COMFY PIL" }, null, "airloft pil")).toBe(true);
+    expect(accVariantMatches({ name: "AK-CS AIRLOFT COMFY PIL" }, null, "airloft queen")).toBe(false);
+    expect(accVariantMatches(mp, null, "")).toBe(true);
   });
 
   it("adds each mattress picked, A–Z and by size, then each accessory — the ids a mattress's sheet and Accessories only add", () => {

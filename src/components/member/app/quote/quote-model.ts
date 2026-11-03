@@ -440,17 +440,19 @@ export type SheetState =
   /** Standalone accessories are picked by SKU so several fitted sizes can be bought together. */
   | { mode: "acc"; acc: Record<string, number>; accAll: boolean }
   /**
-   * A mattress brand's *All models* and *Accessories only* (2026-11-03 — the user: "直接出它的 variant … 直接按加号 …
-   * 可以在 mode 那边切换，分成 mattress 和 accessory"): every mattress in every size it comes in, and every accessory,
-   * each with − / +; *Mattress | Accessories* switches the list, and one *Add to cart* adds both. Picked by SKU.
+   * A mattress brand's *All models* (2026-11-03 — the user: "直接出它的 variant … 直接按加号 … 可以在 mode 那边切换，
+   * 分成 mattress 和 accessory"): every mattress in every size it comes in, and every accessory, each with − / +;
+   * *Mattress | Accessories* switches the list, and one *Add to cart* adds both. Picked by SKU. Its Accessories list is
+   * the brand's accessories on their own — step 1 has no *Accessories only* for a mattress brand (2026-11-04) — and
+   * is never folded, so it has no *Show all* to remember.
    */
-  | { mode: "quick"; tab: QuickTab; picks: Record<string, number>; acc: Record<string, number>; accAll: boolean; query: string };
+  | { mode: "quick"; tab: QuickTab; picks: Record<string, number>; acc: Record<string, number>; query: string };
 
 export type QuickTab = "mattress" | "acc";
 
 /** A mattress brand's quick sheet, empty, on one of its two lists. */
 export function quickSheet(tab: QuickTab): Extract<SheetState, { mode: "quick" }> {
-  return { mode: "quick", tab, picks: {}, acc: {}, accAll: false, query: "" };
+  return { mode: "quick", tab, picks: {}, acc: {}, query: "" };
 }
 
 /** Every size a mattress model comes in, as a SKU each — Single, Super Single, Queen, King, then Super King. */
@@ -463,8 +465,21 @@ export function mattressVariants(model: QModel): { size: SizeKey; productId: str
  * `apex q`, `queen apex` and `super single` each find what they say. `q` comes trimmed and in small letters.
  */
 export function variantMatches(model: QModel, size: SizeKey, q: string): boolean {
+  return everyWordIn([model.name, model.desc, sizeLabel(size)], q);
+}
+
+/**
+ * An accessory list's search, the same way: every word typed is in the accessory's name or its size's name — the size
+ * stands beside the name on the row (2026-11-04), so `aero queen` and `AERO-MP Super Single` find what the row says.
+ * A one-size SKU has only its name. `q` comes trimmed and in small letters.
+ */
+export function accVariantMatches(acc: Pick<QAcc, "name">, size: SizeKey | null, q: string): boolean {
+  return everyWordIn([acc.name, size ? sizeLabel(size) : ""], q);
+}
+
+function everyWordIn(parts: string[], q: string): boolean {
   if (!q) return true;
-  const hay = [model.name, model.desc, sizeLabel(size)].join(" ").toLowerCase();
+  const hay = parts.join(" ").toLowerCase();
   return q.split(/\s+/).every(word => hay.includes(word));
 }
 

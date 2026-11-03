@@ -168,7 +168,46 @@ describe("the quick sheet", () => {
     ]);
   });
 
-  it("opens on the accessories from Accessories only, and searches the mattresses by name and size", () => {
+  // 2026-11-04, the user: "不需要它下面再显示 Show all 84 accessories，直接 show 出来就好，因为现在它是 scroll 下来的".
+  it("lists every accessory at once on its tab — no Show all — and a row picked keeps its place", () => {
+    quick("acc");
+    const all = ["AERO-MP · Queen", "AERO-MP · King", "AERO-MP · Super King", ...Array.from({ length: 6 }, (_, i) => `Pillow ${i + 1}`), "Z Bolster"];
+    expect(rows()).toEqual(all);
+    expect(screen.queryByRole("button", { name: /Show all|Show fewer/ })).not.toBeInTheDocument();
+    addOne("Z Bolster");
+    addOne("Pillow 4");
+    expect(rows()).toEqual(all);
+    expect(screen.getByRole("tab", { name: /^Accessories/ })).toHaveTextContent("Accessories2");
+  });
+
+  // 2026-11-04, the user: "我要它显示在右边，不要在下面，因为在下面有点难看到".
+  it("writes each row's size beside its name, on the name's line", () => {
+    quick("mattress", { cart: [{ id: "m-bastion-Q", kind: "mattress", key: "bastion", name: "BASTION", size: "Queen", qty: 2, productId: "m-q" }] });
+    const name = (row: string, size: string) => within(screen.getByRole("group", { name: row })).getByText(size).parentElement;
+    expect(name("APEX · Super Single", "Super Single")).toHaveTextContent(/^APEX Super Single$/);
+    expect(name("BASTION · Queen", "Queen")).toHaveTextContent(/^BASTION Queen$/);
+    // What the cart holds stays a line of its own, under the name.
+    expect(within(screen.getByRole("group", { name: "BASTION · Queen" })).getByText("2 in cart").parentElement).toHaveTextContent(/^BASTION Queen2 in cart$/);
+    tab(/^Accessories/);
+    expect(name("AERO-MP · Super King", "Super King")).toHaveTextContent(/^AERO-MP Super King$/);
+  });
+
+  // The size reads as part of the name now, so it is typed as one: the accessories are searched as the mattresses are.
+  it("searches the accessories by every word of the name and the size, as the row reads", () => {
+    quick("acc");
+    const box = screen.getByRole("searchbox", { name: "Search accessories" });
+    expect(box).toHaveAttribute("placeholder", "Search by name or size");
+    search("AERO-MP Super King");
+    expect(rows()).toEqual(["AERO-MP · Super King"]);
+    search("aero  queen");
+    expect(rows()).toEqual(["AERO-MP · Queen"]);
+    search("king");
+    expect(rows()).toEqual(["AERO-MP · King", "AERO-MP · Super King"]);
+    search("pillow queen");
+    expect(screen.getByRole("status")).toHaveTextContent("No accessories match your search.");
+  });
+
+  it("opens on either list, and searches the mattresses by name and size", () => {
     quick("acc");
     expect(screen.getByRole("tab", { name: /^Accessories/ })).toHaveAttribute("aria-selected", "true");
     tab(/^Mattress/);

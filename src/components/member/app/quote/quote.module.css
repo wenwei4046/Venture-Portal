@@ -302,6 +302,9 @@
 .accText { flex: 1; min-width: 0; }
 .accName { display: block; font-size: calc(15px * var(--rv-type)); font-weight: 550; }
 .accSize { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); margin-top: 1px; font-variant-numeric: tabular-nums; }
+/* A row's size beside its name, read as one name — `AERO-MP Super Single` (2026-11-04: "我要它显示在右边，不要在下面");
+   lighter than the name, never split across two lines. */
+.accSizeBeside { font-weight: 450; color: var(--rv-ink); white-space: nowrap; }
 .accStep { display: grid; grid-template-columns: 38px 26px 38px; align-items: center; height: 40px; border-radius: 12px; border: 1px solid var(--rv-line); background: var(--rv-white); }
 .accStepOn { border-color: var(--rv-accent); background: var(--rv-cream); }
 .accBtn { height: 38px; border: 0; background: transparent; color: var(--rv-accent); font-size: calc(20px * var(--rv-type)); padding: 1px 6px; }
@@ -309,7 +312,7 @@
 .accStepOn .accQty { color: var(--rv-accent); }
 
 /* A mattress brand's quick sheet (2026-11-03): *Mattress | Accessories* under the head — Insight's Personal | My team,
-   in the sheet's padding — each list's picks counted beside its name; a variant the cart holds says so in green. */
+   in the sheet's padding — each list's picks counted beside its name; a variant the cart holds says so in green, under its name. */
 .quickBar { padding: 12px 20px 0; }
 .quickSeg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 13px; background: var(--rv-sand); }
 .quickSegBtn { display: flex; align-items: center; justify-content: center; gap: 6px; height: 38px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; color: var(--rv-sub); font-size: calc(14px * var(--rv-type)); font-weight: 500; }
