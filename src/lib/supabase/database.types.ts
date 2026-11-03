@@ -4587,6 +4587,61 @@ export type Database = {
           },
         ]
       }
+      hr_staff_dept_moves: {
+        Row: {
+          amount: number | null
+          created_at: string
+          created_by: string
+          department_id: string
+          id: string
+          pct: number | null
+          period_month: string
+          staff_id: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          created_by: string
+          department_id: string
+          id?: string
+          pct?: number | null
+          period_month: string
+          staff_id: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string
+          department_id?: string
+          id?: string
+          pct?: number | null
+          period_month?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_staff_dept_moves_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_staff_dept_moves_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_staff_dept_moves_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_staff_salary_history: {
         Row: {
           changed_at: string
