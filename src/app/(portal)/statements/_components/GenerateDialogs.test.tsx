@@ -253,6 +253,22 @@ describe('Reconcile payroll', () => {
     expect(mocks.topUp).toHaveBeenCalledWith('2026-11')
   })
 
+  it('HV’s own share against its own-share invoice: topped up with the rest; over-billed says the way back', async () => {
+    const own = (billed: number, should: number) => ({ ...dept('d-vo', 'Venture Office', billed, should), name: 'Venture Office' })
+    mocks.delta.mockResolvedValueOnce({ ok: true, value: { companies: [ROWS[0]], departments: [], ownShare: [own(2000, 3000)] } })
+    const { unmount } = render(<ReconcileDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-11-01" />)
+    await flush()
+    expect(within(dialog()).getByText('HOUZS Venture’s own share · billed → should')).toBeInTheDocument()
+    expect(within(dialog()).getByRole('group', { name: 'Venture Office' })).toHaveTextContent('under-billed 1,000.00')
+    expect(within(dialog()).getByRole('button', { name: 'Top up · 1 draft · RM 1,000.00' })).toBeInTheDocument()
+    unmount()
+
+    mocks.delta.mockResolvedValueOnce({ ok: true, value: { companies: [ROWS[0]], departments: [], ownShare: [own(3000, 2000)] } })
+    render(<ReconcileDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-11-01" />)
+    await flush()
+    expect(hint()).toContain('The own share is over-billed — void the own-share invoice, then generate it again.')
+  })
+
   it('a department over-billed is listed with the way back; one with no internal invoice is Generate’s', async () => {
     mocks.delta.mockResolvedValue({ ok: true, value: { companies: [ROWS[0]], departments: [dept('d-hr', 'HR', 3000, 2000), dept('d-fin', 'Finance', 0, 1000, false)] } })
     render(<ReconcileDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-11-01" />)

@@ -2293,12 +2293,58 @@ async function loadDeptMoveBillingDeltas(supabase: BillingClient, period: string
   return computeBillingDeltas(should, billed, labelBySegment, metaById)
 }
 
+/** HOUZS Venture's own share (2026-11-03 — the user: "做b"): what each department's leftover is now
+ *  (get_staff_own_share_allocation) against what the month's issued / paid own-share invoices to Venture Office billed.
+ *  The bill-back is picked per run, so only the segments those invoices carry are compared; with none issued there is
+ *  nothing to compare — a missing own-share invoice is its own Generate's. One row, keyed by Venture Office's id. */
+async function loadOwnShareBillingDeltas(supabase: BillingClient, period: string): Promise<CompanyBillingDelta[]> {
+  const { data: vo, error: voErr } = await supabase
+    .from('departments')
+    .select('id, name')
+    .eq('is_internal', true)
+    .eq('name', 'Venture Office')
+    .maybeSingle()
+  if (voErr) throw new Error(`Failed to read Venture Office: ${voErr.message}`)
+  if (!vo?.id) return []
+  const ventureOfficeId = vo.id as string
+  const { data: invs, error: invErr } = await supabase
+    .from('invoices')
+    .select('id')
+    .eq('period_month', period)
+    .eq('billing_mode', 'payroll_consolidated')
+    .eq('billable_to_type', 'dept_pool')
+    .eq('billable_to_department_id', ventureOfficeId)
+    .in('status', [...BILLED_STATUSES])
+  if (invErr) throw new Error(`Failed to load the own-share invoices: ${invErr.message}`)
+  const billed = await billedLinesOf(supabase, new Map((invs ?? []).map((i) => [i.id as string, ventureOfficeId])))
+  if (billed.length === 0) return []
+
+  const { data, error } = await supabase.rpc('get_staff_own_share_allocation' as never, { p_period_month: period } as never)
+  if (error) throw new Error(`Failed to load own-share allocation: ${error.message}`)
+  const billedSegments = new Set(billed.map((b) => b.segment))
+  const labelBySegment: Record<string, string> = { ...PAYROLL_SEGMENT_LABEL }
+  const should: ShouldBillRow[] = groupOwnShareAllocation((data ?? []) as unknown as OwnShareRpcRow[], billedSegments).map((g) => {
+    labelBySegment[g.segment] ??= g.deptLabel
+    return {
+      companyId: ventureOfficeId,
+      shortCode: 'Venture Office',
+      name: 'Venture Office',
+      segment: g.segment,
+      deptLabel: g.deptLabel,
+      amount: componentsTotal(g.components),
+      components: g.components,
+    }
+  })
+  return computeBillingDeltas(should, billed, labelBySegment, new Map([[ventureOfficeId, { shortCode: 'Venture Office', name: 'Venture Office' }]]))
+}
+
 async function loadPayrollBillingDeltas(supabase: BillingClient, period: string): Promise<PayrollBillingDeltas> {
-  const [companies, departments] = await Promise.all([
+  const [companies, departments, ownShare] = await Promise.all([
     loadCompanyBillingDeltas(supabase, period),
     loadDeptMoveBillingDeltas(supabase, period),
+    loadOwnShareBillingDeltas(supabase, period),
   ])
-  return { companies, departments }
+  return { companies, departments, ownShare }
 }
 
 /** Read-only preview: per-company and per-receiving-department 已开 vs 应开 vs 差额 for the period. */
@@ -2359,27 +2405,29 @@ export async function generatePayrollAdjustmentInvoices(
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
   await assertPeriodOpen(supabase, period)
 
-  const { companies, departments } = await loadPayrollBillingDeltas(supabase, period)
+  const { companies, departments, ownShare } = await loadPayrollBillingDeltas(supabase, period)
   const underBilled = (rows: CompanyBillingDelta[]) => rows.filter((d) => d.hasIssuedInvoice && d.positiveTotal > 0.005)
   const eligibleCompanies = underBilled(companies)
   const eligibleDepts = underBilled(departments)
-  const overBilled = [...companies, ...departments].filter((d) => d.negatives.length > 0).map((d) => d.shortCode)
+  const eligibleOwnShare = underBilled(ownShare)
+  const overBilled = [...companies, ...departments, ...ownShare].filter((d) => d.negatives.length > 0).map((d) => d.shortCode)
   const missingInvoice = [...companies, ...departments]
     .filter((d) => !d.hasIssuedInvoice && d.positiveTotal > 0.005)
     .map((d) => d.shortCode)
-  if (eligibleCompanies.length === 0 && eligibleDepts.length === 0) {
+  if (eligibleCompanies.length === 0 && eligibleDepts.length === 0 && eligibleOwnShare.length === 0) {
     throw new Error('没有需要补开的差额 — nothing under-billed on issued invoices for this period.')
   }
 
   // Adjustment lines reuse the category the originals were issued with.
-  const originalIds = async (billableToType: 'subsidiary' | 'dept_pool') => {
+  const originalIds = async (billableToType: 'subsidiary' | 'dept_pool', toDepartment?: string) => {
     let q = supabase
       .from('invoices')
       .select('id')
       .eq('period_month', period)
       .eq('billing_mode', 'payroll_consolidated')
       .eq('billable_to_type', billableToType)
-    if (billableToType === 'dept_pool') q = q.eq('reference_no', deptMoveMarker(period))
+    if (toDepartment) q = q.eq('billable_to_department_id', toDepartment)
+    else if (billableToType === 'dept_pool') q = q.eq('reference_no', deptMoveMarker(period))
     const { data, error } = await q.in('status', [...BILLED_STATUSES])
     if (error) throw new Error(`Failed to load original invoices: ${error.message}`)
     return (data ?? []).map((r) => r.id as string)
@@ -2398,10 +2446,18 @@ export async function generatePayrollAdjustmentInvoices(
         (found) => `The internal invoices carry more than one category (${found}) — Finance tops them up by hand.`,
       )
     : null
+  const ownShareCategory = eligibleOwnShare.length
+    ? await categoryOfLines(
+        supabase,
+        await originalIds('dept_pool', eligibleOwnShare[0].companyId),
+        (found) => `The own-share invoice carries more than one category (${found}) — Finance tops it up by hand.`,
+      )
+    : null
 
   const periodShort = periodShortLabel(period)
   const companyDescription = `Payroll cost share — ${periodShort} ${ADJUSTMENT_MARKER}`
   const deptDescription = `Payroll cost moved in — ${periodShort} ${ADJUSTMENT_MARKER}`
+  const ownShareDescription = `HV own-share payroll — ${periodShort} ${ADJUSTMENT_MARKER}`
 
   // Idempotent: re-running replaces prior UN-issued adjustment drafts.
   const { data: priorDrafts } = await supabase
@@ -2410,7 +2466,7 @@ export async function generatePayrollAdjustmentInvoices(
     .eq('period_month', period)
     .eq('billing_mode', 'payroll_consolidated')
     .eq('status', 'draft')
-    .in('description', [companyDescription, deptDescription])
+    .in('description', [companyDescription, deptDescription, ownShareDescription])
   const priorIds = (priorDrafts ?? []).map((r) => r.id as string)
   if (priorIds.length > 0) {
     await supabase.from('invoice_lines').delete().in('invoice_id', priorIds)
@@ -2493,6 +2549,15 @@ export async function generatePayrollAdjustmentInvoices(
       company_id: null,
       billable_to_department_id: d.companyId,
       reference_no: deptMoveMarker(period),
+    })
+  }
+  // HV's own share topped up on Venture Office (2026-11-03, "做b"): issued and settled as the own-share invoice.
+  for (const d of eligibleOwnShare) {
+    await draftAdjustment(d, ownShareCategory as string, {
+      description: ownShareDescription,
+      billable_to_type: 'dept_pool',
+      company_id: null,
+      billable_to_department_id: d.companyId,
     })
   }
 
@@ -2644,6 +2709,8 @@ export async function generateOwnShareInvoice(
     .eq('billing_mode', 'payroll_consolidated')
     .eq('billable_to_type', 'dept_pool')
     .eq('billable_to_department_id', ventureOfficeId)
+    // A top-up (the reconciliation's, "· adjustment") stays: it is not this Generate's.
+    .not('description', 'like', `%${ADJUSTMENT_MARKER}%`)
     .eq('status', 'draft')
   const existingIds = (existing ?? []).map((r) => r.id as string)
   if (existingIds.length > 0) {

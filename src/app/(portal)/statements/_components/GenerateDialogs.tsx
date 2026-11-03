@@ -344,9 +344,11 @@ export function ReconcileDialog({ open, onClose, onDone, period }: GeneratorProp
   const rows = delta.value?.companies ?? []
   // The departments payroll was moved to, each against its internal invoices (2026-11-03).
   const depts = delta.value?.departments ?? []
+  // HV's own share against its issued own-share invoice to Venture Office (2026-11-03, "做b").
+  const ownShare = delta.value?.ownShare ?? []
   const toTopUp = (r: CompanyBillingDelta) => r.hasIssuedInvoice && r.positiveTotal > 0.005
   const notInvoiced = (r: CompanyBillingDelta) => !r.hasIssuedInvoice && r.positiveTotal > 0.005
-  const under = [...rows, ...depts].filter(toTopUp)
+  const under = [...rows, ...depts, ...ownShare].filter(toTopUp)
   const missing = rows.filter(notInvoiced)
   const deptsMissing = depts.filter(notInvoiced)
   const over = rows.filter((r) => r.negatives.length > 0)
@@ -391,7 +393,7 @@ export function ReconcileDialog({ open, onClose, onDone, period }: GeneratorProp
           <Hint>Reading payroll and the payroll invoices…</Hint>
         ) : delta.error ? (
           <Hint danger>{delta.error}</Hint>
-        ) : rows.length === 0 && depts.length === 0 ? (
+        ) : rows.length === 0 && depts.length === 0 && ownShare.length === 0 ? (
           <Hint>No payroll allocation and no payroll invoice in {monthWords(month)} — nothing to compare.</Hint>
         ) : (
           <>
@@ -409,6 +411,13 @@ export function ReconcileDialog({ open, onClose, onDone, period }: GeneratorProp
                 ))}
               </Field>
             ) : null}
+            {ownShare.length > 0 ? (
+              <Field label="HOUZS Venture’s own share · billed → should">
+                {ownShare.map((r) => (
+                  <DeltaCard key={r.companyId} r={r} />
+                ))}
+              </Field>
+            ) : null}
           </>
         )}
         {missing.length > 0 ? (
@@ -419,6 +428,7 @@ export function ReconcileDialog({ open, onClose, onDone, period }: GeneratorProp
         ) : null}
         {over.length > 0 ? <Hint>Over-billed parts are not undone here — a payroll invoice takes no credit note; Finance settles them by hand.</Hint> : null}
         {deptsOver.length > 0 ? <Hint>{namesOf(deptsOver)} over-billed — void the internal invoice and generate again.</Hint> : null}
+        {ownShare.some((r) => r.negatives.length > 0) ? <Hint>The own share is over-billed — void the own-share invoice, then generate it again.</Hint> : null}
         {error ? <Hint danger>{error}</Hint> : <Hint>The top-ups are drafts dated the month’s last day — they count in that month once issued.</Hint>}
       </DialogForm>
     </FinDialog>

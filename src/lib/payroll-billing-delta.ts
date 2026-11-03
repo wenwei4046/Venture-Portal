@@ -87,6 +87,10 @@ export interface CompanyBillingDelta {
 export interface PayrollBillingDeltas {
   companies: CompanyBillingDelta[]
   departments: CompanyBillingDelta[]
+  /** HV's own share against its issued own-share invoice(s) to Venture Office
+   *  (2026-11-03, the user: "做b") — one row keyed by Venture Office's id, or
+   *  none while nothing was issued; only the segments that invoice billed back. */
+  ownShare: CompanyBillingDelta[]
 }
 
 interface Cell {

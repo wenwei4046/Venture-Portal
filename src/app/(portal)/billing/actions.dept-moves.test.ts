@@ -20,6 +20,7 @@ import {
   fetchPayrollBillingDelta,
   generateConsolidatedPayrollInvoices,
   generateDeptMoveInvoices,
+  generateOwnShareInvoice,
   generatePayrollAdjustmentInvoices,
 } from './actions'
 
@@ -65,6 +66,7 @@ const NOVEMBER_DRAFTS: Row[] = [
   draft('co-draft', { billable_to_type: 'subsidiary', company_id: 'co-2990', description: 'Payroll cost share — Nov\'26' }),
   draft('co-adjust', { billable_to_type: 'subsidiary', company_id: 'co-2990', description: 'Payroll cost share — Nov\'26 · adjustment' }),
   draft('own-share', { billable_to_type: 'dept_pool', billable_to_department_id: 'd-vo', description: 'HV own-share payroll — Nov\'26' }),
+  draft('own-adjust', { billable_to_type: 'dept_pool', billable_to_department_id: 'd-vo', description: 'HV own-share payroll — Nov\'26 · adjustment' }),
   draft('dpm-draft', { billable_to_type: 'dept_pool', billable_to_department_id: 'd-hr', reference_no: 'DPM-202611', description: 'Payroll cost moved in — Nov\'26' }),
   draft('dpm-adjust', { billable_to_type: 'dept_pool', billable_to_department_id: 'd-hr', reference_no: 'DPM-202611', description: 'Payroll cost moved in — Nov\'26 · adjustment' }),
 ]
@@ -73,6 +75,7 @@ interface Book {
   moves?: Row[]
   invoices?: Row[]
   lines?: Row[]
+  ownShare?: Row[]
 }
 
 function database(book: Book = {}) {
@@ -99,6 +102,7 @@ function database(book: Book = {}) {
     (fn) => {
       if (fn === 'get_staff_billing_allocation') return { data: COMPANY_ROWS }
       if (fn === 'get_staff_dept_moves_allocation') return { data: book.moves ?? MOVES }
+      if (fn === 'get_staff_own_share_allocation') return { data: book.ownShare ?? [] }
       if (fn === 'mint_invoice_no') return { data: `HV-INV-202611-0${++minted}` }
       if (fn === 'ar_account_for_invoice') return { data: '3073' }
       if (fn === 'post_journal_entry_as_caller') return { data: 'je-new' }
@@ -331,5 +335,66 @@ describe('The reconciliation covers internal invoices', () => {
     expect(withInternal.companies).toEqual(alone.companies)
     expect(withInternal.companies.every((c) => c.delta === 0)).toBe(true)
     expect(withInternal.departments.map((d) => d.name).sort()).toEqual(['Finance', 'HR', 'Marketing'])
+  })
+})
+
+// The own share is reconciled too (2026-11-03 — the user, on the gap the review found: "做b"): Vivian's RM 3,000 to HR
+// lowered to RM 2,000 after billing leaves Director Office's own share RM 1,000 more than its issued own-share invoice
+// to Venture Office billed. Only the departments that invoice billed back are compared — the bill-back is chosen per run.
+describe('The reconciliation covers the own share', () => {
+  const ownShareRow = (department_name: string, salary: number, allowance: number, epf: number, socso: number, eis: number): Row => ({
+    department_name, staff_count: 1, amount: salary + allowance + epf + socso + eis, salary_amount: salary, allowance_amount: allowance, epf_amount: epf, socso_amount: socso, eis_amount: eis,
+  })
+  const OWN_ISSUED: Row = { ...draft('own-issued', { billable_to_type: 'dept_pool', billable_to_department_id: 'd-vo', description: 'HV own-share payroll — Nov\'26' }), status: 'issued' }
+  const ownLines = (items: Array<[string, number]>): Row[] =>
+    items.map(([item, amount], i) => ({ invoice_id: 'own-issued', line_no: i + 1, description: `${item} - Nov'26`, amount, category_code: '5050', segment: 'director_office' }))
+  const BILLED_2000 = ownLines([['Salary', 1633.33], ['Allowance', 100], ['EPF', 225.33], ['SOCSO', 34.7], ['EIS', 6.64]])
+
+  it('Director Office’s own share up by 1,000 after the move was lowered → one adjustment draft to Venture Office', async () => {
+    const db = database({
+      moves: [],
+      invoices: [OWN_ISSUED],
+      lines: BILLED_2000,
+      ownShare: [ownShareRow('Director Office', 2450, 150, 338, 52.05, 9.95), ownShareRow('HR', 1000, 0, 130, 20, 4)],
+    })
+    const { ownShare } = await fetchPayrollBillingDelta(PERIOD)
+    expect(ownShare).toHaveLength(1)
+    // HR's own share was not billed back on that invoice: not compared.
+    expect(ownShare[0]).toMatchObject({ companyId: 'd-vo', billed: 2000, should: 3000, delta: 1000, positiveTotal: 1000, hasIssuedInvoice: true })
+    expect(ownShare[0].segments.map((s) => s.segment)).toEqual(['director_office'])
+
+    const res = await generatePayrollAdjustmentInvoices(PERIOD)
+    const drafts = internalDrafts(db)
+    expect(drafts).toHaveLength(1)
+    expect(drafts[0]).toMatchObject({
+      billable_to_type: 'dept_pool', billable_to_department_id: 'd-vo', company_id: null, status: 'draft',
+      description: 'HV own-share payroll — Nov\'26 · adjustment', total_amount: 1000,
+    })
+    expect(linesOf(db, madeId(db, drafts[0])).map((l) => [l.description, l.amount, l.segment, l.category_code])).toEqual([
+      ['Director Office Salary adjustment - Nov\'26', 816.67, 'director_office', '5050'],
+      ['Director Office Allowance adjustment - Nov\'26', 50, 'director_office', '5050'],
+      ['Director Office EPF adjustment - Nov\'26', 112.67, 'director_office', '5050'],
+      ['Director Office SOCSO adjustment - Nov\'26', 17.35, 'director_office', '5050'],
+      ['Director Office EIS adjustment - Nov\'26', 3.31, 'director_office', '5050'],
+    ])
+    expect(res.generated).toEqual(['HV-INV-202611-0101 (Venture Office +1000.00)'])
+  })
+
+  it('an own share that fell is listed, never drafted; with no own-share invoice issued there is nothing to compare', async () => {
+    database({ moves: [], invoices: [OWN_ISSUED], lines: BILLED_2000, ownShare: [ownShareRow('Director Office', 1000, 50, 100, 20, 5)] })
+    const { ownShare } = await fetchPayrollBillingDelta(PERIOD)
+    expect(ownShare[0]).toMatchObject({ delta: -825, positiveTotal: 0 })
+    expect(ownShare[0].negatives).toHaveLength(1)
+    await expect(generatePayrollAdjustmentInvoices(PERIOD)).rejects.toThrow(/nothing under-billed/)
+
+    database({ moves: [], invoices: [], lines: [], ownShare: [ownShareRow('Director Office', 2450, 150, 338, 52.05, 9.95)] })
+    expect((await fetchPayrollBillingDelta(PERIOD)).ownShare).toEqual([])
+  })
+
+  it('the own-share Generate keeps a top-up draft', async () => {
+    const db = database({ moves: [], ownShare: [ownShareRow('Director Office', 2450, 150, 338, 52.05, 9.95)] })
+    await generateOwnShareInvoice(PERIOD, '5050', ['director_office'])
+    expect(deletedInvoices(db)).toContain('own-share')
+    expect(deletedInvoices(db)).not.toContain('own-adjust')
   })
 })
