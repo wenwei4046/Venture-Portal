@@ -33,8 +33,9 @@
  *   OT Amt        → ot_amount (+ Shift + Rest/PH Amount folded in —
  *                   hourly-work earnings; schema has no separate columns)
  *   Allowance Add → non_statutory_allowance
- *   No Pay        → parsed for display; NOT converted to leave days —
- *                   the file's gross/net already reflect it
+ *   No Pay        → unpaid_leave_days (2026-11-03, noPayToUnpaidDays) —
+ *                   shown on the grid only; the gross/net written are the
+ *                   file's, which already reflect it
  *   Bonus         → commission_amount
  *   Gross         → gross (verbatim; the import writes Gross − Ded, see below)
  *   Ded           → deduction_amount (added 2026-07-02: withheld pay, e.g. a
@@ -72,7 +73,7 @@ export interface InfotechRow {
   basicSalary: number
   otAmount: number
   nonStatutoryAllowance: number
-  noPayDeduction: number // informational (negative in source, positive here)
+  noPayDeduction: number // negative in source, positive here; the import turns it into unpaid days
   bonus: number
   gross: number
   /** InfoTech "Ded" column — withheld pay, maps to deduction_amount. */
@@ -251,8 +252,11 @@ function buildColumnMap(headerRow: any[]): ColumnMap {
   const emplyrs = headers
     .map((h, i) => (h === 'Emplyr' ? i : -1))
     .filter((i) => i >= 0)
-  const [epf = -1, socso = -1, eis = -1] = emplyrs
+  // The "By Individual" export (Oct 2026) has no "PCB" column: PCB is a 4th
+  // triplet under a "PCB Contribution" section header, the tax in its Emp cell.
+  const [epf = -1, socso = -1, eis = -1, pcbTriplet = -1] = emplyrs
   const ee = (er: number) => (er === -1 ? -1 : er + 1)
+  const pcbColumn = at('PCB')
 
   return {
     code: at('Code'),
@@ -273,7 +277,7 @@ function buildColumnMap(headerRow: any[]): ColumnMap {
     socsoEe: ee(socso),
     eisEr: eis,
     eisEe: ee(eis),
-    pcb: at('PCB'),
+    pcb: pcbColumn !== -1 ? pcbColumn : ee(pcbTriplet),
     net: at('NettWgs'),
   }
 }
@@ -375,6 +379,20 @@ export function parseInfotechGrid(
 function cellStr(v: any): string {
   if (v == null) return ''
   return String(v)
+}
+
+/**
+ * The file's No Pay amount as unpaid days for the grid (user 2026-11-03: "no
+ * pay 应该是出现在 portal 里的 unpaid days 里面"). The day rate is the portal's
+ * own — basic ÷ days in the month — rounded to the half day: InfoTech's rate
+ * drifts a little (Oct 2026: 2,800 basic, 183.65 No Pay ≈ 2 days). The import
+ * still writes the file's gross and net, so the days never deduct twice.
+ */
+export function noPayToUnpaidDays(noPay: number, basicSalary: number, periodMonth: string): number {
+  const [year, month] = periodMonth.split('-').map(Number)
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  if (!(basicSalary > 0) || !(noPay > 0) || !daysInMonth) return 0
+  return Math.round((noPay / (basicSalary / daysInMonth)) * 2) / 2
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
