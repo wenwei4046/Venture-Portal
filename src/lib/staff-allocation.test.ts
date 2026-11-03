@@ -407,6 +407,13 @@ describe('splitCopyNote', () => {
     )
   })
 
+  it('says the department lines and Bill to % it brought (2026-11-03)', () => {
+    expect(splitCopyNote({ copied: 1, locked: 0, notOnPayroll: 0, copiedMoves: 2, copiedBillTo: 1 })).toBe(
+      'Copied splits for 1 staff. Copied department lines for 2 staff. Copied Bill to for 1 department.',
+    )
+    expect(splitCopyNote({ copied: 0, locked: 0, notOnPayroll: 0, copiedMoves: 0, copiedBillTo: 2 })).toBe('Copied Bill to for 2 departments.')
+  })
+
   it('keeps the old line when there was nothing to do', () => {
     expect(splitCopyNote({ copied: 0, locked: 0, notOnPayroll: 0 })).toBe(
       'Nothing to copy — no last-month splits, or everyone already set.',

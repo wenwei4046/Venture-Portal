@@ -338,13 +338,23 @@ export function planSplitCopy<T extends { staff_id: string }>(
 
 /** What a copy did, including who it left alone and why. */
 export function splitCopyNote(
-  counts: Pick<SplitCopyPlan<unknown>, 'copied' | 'locked' | 'notOnPayroll'> & { centralized?: number },
+  counts: Pick<SplitCopyPlan<unknown>, 'copied' | 'locked' | 'notOnPayroll'> & {
+    centralized?: number
+    /** Payroll moved to another department (2026-11-03): people whose department lines came along. */
+    copiedMoves?: number
+    /** Receiving departments whose Bill to % came along. */
+    copiedBillTo?: number
+  },
 ): string {
   const { copied, locked, notOnPayroll } = counts
   const centralized = counts.centralized ?? 0
+  const copiedMoves = counts.copiedMoves ?? 0
+  const copiedBillTo = counts.copiedBillTo ?? 0
   const were = (n: number) => (n === 1 ? 'was' : 'were')
   const parts: string[] = []
   if (copied > 0) parts.push(`Copied splits for ${copied} staff.`)
+  if (copiedMoves > 0) parts.push(`Copied department lines for ${copiedMoves} staff.`)
+  if (copiedBillTo > 0) parts.push(`Copied Bill to for ${copiedBillTo} ${copiedBillTo === 1 ? 'department' : 'departments'}.`)
   if (locked > 0) parts.push(`${locked} locked with their payroll ${were(locked)} left alone.`)
   if (centralized > 0) {
     parts.push(`${centralized} in a centralized department ${were(centralized)} skipped.`)
