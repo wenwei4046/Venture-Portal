@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn, requirePermission } from '@/lib/auth'
 import { assertPeriodOpen } from '@/lib/period-lock'
-import type { InfotechRow } from '@/lib/import/infotech-payroll'
+import { noPayToUnpaidDays, type InfotechRow } from '@/lib/import/infotech-payroll'
 import { buildStaffMatcher, type StaffMatchedBy } from '@/lib/import/staff-match'
 
 export interface PreviewResult {
@@ -139,8 +139,9 @@ export async function previewInfotechImport(
  *     Stamped statutory_overridden_at/by — same convention as the manual
  *     payslip statutory editor, so the grid shows these as file/manual values.
  *
- * unpaid_leave_days is reset to 0: the file's gross/net already reflect any
- * No Pay amount, so converting it to days would double-count.
+ * unpaid_leave_days is the file's No Pay in days (2026-11-03,
+ * noPayToUnpaidDays) so the grid shows it. Phase 2 still writes the file's
+ * gross/net, which already reflect the No Pay — the days never deduct twice.
  *
  * deduction_amount is auto-detected from the file's "Ded" column (2026-07-02):
  * InfoTech's Gross is BEFORE Ded while NettWgs is AFTER, but our schema's
@@ -205,7 +206,7 @@ export async function applyInfotechImport(
       ot_amount: row.otAmount,
       non_statutory_allowance: row.nonStatutoryAllowance,
       commission_amount: row.bonus,
-      unpaid_leave_days: 0,
+      unpaid_leave_days: noPayToUnpaidDays(row.noPayDeduction, row.basicSalary, period),
       deduction_amount: row.deduction,
       skbbk_amount: row.skbbk,
       source: 'imported',
@@ -232,7 +233,7 @@ export async function applyInfotechImport(
         ot_amount: row.otAmount,
         non_statutory_allowance: row.nonStatutoryAllowance,
         commission_amount: row.bonus,
-        unpaid_leave_days: 0,
+        unpaid_leave_days: noPayToUnpaidDays(row.noPayDeduction, row.basicSalary, period),
         deduction_amount: row.deduction,
         skbbk_amount: row.skbbk,
         source: 'imported',
