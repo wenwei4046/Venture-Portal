@@ -21,7 +21,7 @@ vi.mock('../actions', () => ({
   moveAccount: vi.fn(),
   addDepartment: vi.fn(),
   provisionDepartment: vi.fn(),
-  setDepartmentBillback: vi.fn(),
+  setDepartmentBillbackInWords: vi.fn(),
 }))
 vi.mock('../department-mode-actions', () => ({ setDepartmentCostModel: vi.fn() }))
 // The saved column layout is fetched from the browser client; here it has none.
@@ -170,11 +170,19 @@ describe('the Departments table', () => {
     expect(within(ops).getByRole('button', { name: 'Provision' })).toBeInTheDocument()
     expect(screen.getByText('Marketing').closest('tr')).toHaveTextContent('Full department')
 
+    vi.mocked(actions.setDepartmentBillbackInWords).mockResolvedValue({ ok: true })
     fireEvent.click(within(screen.getByText('Finance').closest('tr') as HTMLElement).getByRole('checkbox'))
-    await vi.waitFor(() => expect(actions.setDepartmentBillback).toHaveBeenCalledTimes(1))
-    const fd = vi.mocked(actions.setDepartmentBillback).mock.calls[0][0] as FormData
-    expect(fd.get('id')).toBe('d2')
-    expect(fd.get('own_share_billback')).toBe('true')
+    await vi.waitFor(() => expect(actions.setDepartmentBillbackInWords).toHaveBeenCalledWith('d2', true))
+  })
+
+  // 2026-11-03: a tick the database did not take sprang back with nothing said.
+  it('says why a bill-back tick was not saved', async () => {
+    const actions = await import('../actions')
+    const reason = 'Finance’s bill-back was not saved — your permissions do not let you change it (Settings · Manage).'
+    vi.mocked(actions.setDepartmentBillbackInWords).mockResolvedValue({ ok: false, reason })
+    render(<DepartmentsSection departments={DEPTS} />)
+    fireEvent.click(within(screen.getByText('Finance').closest('tr') as HTMLElement).getByRole('checkbox'))
+    expect(await screen.findByText(reason)).toBeInTheDocument()
   })
 
   it('lets the arrangement be kept as the default by whoever may', () => {
