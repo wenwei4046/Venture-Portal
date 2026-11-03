@@ -8039,6 +8039,17 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: number
       }
+      get_payroll_moves_summary: {
+        Args: { p_period_month: string }
+        Returns: {
+          billed: number
+          cost_model: string
+          department_id: string
+          department_name: string
+          moved_in: number
+          stays: number
+        }[]
+      }
       get_staff_billing_allocation: {
         Args: { p_period_month: string }
         Returns: {
@@ -8054,6 +8065,22 @@ export type Database = {
           salary_amount: number
           socso_amount: number
           staff_count: number
+        }[]
+      }
+      get_staff_dept_moves_allocation: {
+        Args: { p_period_month: string }
+        Returns: {
+          allowance_amount: number
+          amount: number
+          eis_amount: number
+          epf_amount: number
+          from_department_id: string
+          from_department_name: string
+          salary_amount: number
+          socso_amount: number
+          staff_count: number
+          to_department_id: string
+          to_department_name: string
         }[]
       }
       get_staff_own_share_allocation: {
@@ -8393,6 +8420,23 @@ export type Database = {
       payroll_month_status: {
         Args: { p_period: string }
         Returns: Json
+      }
+      payroll_moved_parts: {
+        Args: { p_period_month: string }
+        Returns: {
+          allowance_amount: number
+          amount: number
+          eis_amount: number
+          epf_amount: number
+          from_department_id: string
+          from_department_name: string
+          salary_amount: number
+          socso_amount: number
+          staff_id: string
+          to_cost_model: string
+          to_department_id: string
+          to_department_name: string
+        }[]
       }
       payroll_open_topup: {
         Args: { p_kind?: string; p_row_id: string; p_scope: string }

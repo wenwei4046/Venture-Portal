@@ -348,3 +348,475 @@ CREATE TRIGGER trg_departments_open_inter_billing_account
 -- The departments with a pool today (IT's is the one missing on 2026-11-03).
 SELECT public.ensure_inter_billing_account(id) FROM public.departments
  WHERE segment_key IS NOT NULL AND NOT is_internal ORDER BY name;
+
+
+-- ─── 4. Billing: the sender less what moved; cost-center receivers billing on ─
+-- What each person on the month's Finance-sent payroll moved to another department, in the five invoice items, the
+-- way the billing functions split a cost: a % of every item (a fixed RM as its share of the cost), the salary taking
+-- the rounding. A move into the department a person now sits in is no move. The sender is the person's roster
+-- department, as the billing functions read it.
+CREATE OR REPLACE FUNCTION public.payroll_moved_parts(p_period_month DATE)
+RETURNS TABLE(staff_id UUID, from_department_id UUID, from_department_name TEXT, to_department_id UUID,
+              to_department_name TEXT, to_cost_model TEXT, amount NUMERIC, salary_amount NUMERIC,
+              allowance_amount NUMERIC, epf_amount NUMERIC, socso_amount NUMERIC, eis_amount NUMERIC)
+LANGUAGE sql
+STABLE
+SET search_path = public
+AS $fn$
+    WITH staff_rows AS (
+        SELECT
+            hsc.department_id AS dept_id,
+            d.name            AS dept_name,
+            hmp.staff_id      AS sid,
+            (hmp.gross + hmp.epf_er + hmp.socso_er + hmp.eis_er) AS total_cost,
+            -- get_staff_billing_allocation's salary rule (20261005100000).
+            GREATEST(
+                LEAST(
+                    CASE WHEN hmp.source = 'imported' THEN hmp.basic_salary
+                         ELSE hmp.basic_salary
+                            * CASE WHEN COALESCE(hmp.prorata_days_in_month, 0) = 0 THEN 0
+                                   ELSE hmp.prorata_days_worked::NUMERIC
+                                        / hmp.prorata_days_in_month::NUMERIC END
+                    END
+                    - COALESCE(hmp.deduction_amount, 0),
+                    hmp.gross
+                ),
+                0
+            ) AS salary_comp,
+            hmp.gross    AS gross_amt,
+            hmp.epf_er   AS epf_er,
+            hmp.socso_er AS socso_er,
+            hmp.eis_er   AS eis_er
+        FROM hr_monthly_payroll hmp
+        JOIN hr_staff_costs hsc ON hsc.id = hmp.staff_id
+        JOIN departments d      ON d.id = hsc.department_id
+        WHERE hmp.period_month = p_period_month
+          AND hmp.status IN ('submitted', 'paid')
+    ),
+    moves AS (
+        SELECT sr.*, m.department_id AS to_id, td.name AS to_name, td.cost_model AS to_model,
+               CASE WHEN m.pct IS NOT NULL THEN ROUND(sr.total_cost * m.pct, 2)
+                    ELSE LEAST(m.amount, sr.total_cost) END AS m_amt,
+               CASE WHEN m.pct IS NOT NULL THEN m.pct
+                    ELSE LEAST(m.amount, sr.total_cost) / sr.total_cost END AS f
+        FROM staff_rows sr
+        JOIN hr_staff_dept_moves m ON m.staff_id = sr.sid AND m.period_month = p_period_month
+        JOIN departments td ON td.id = m.department_id
+        WHERE sr.total_cost > 0
+          AND m.department_id <> sr.dept_id
+    ),
+    parts AS (
+        SELECT mv.*,
+               ROUND((mv.gross_amt - mv.salary_comp) * mv.f, 2) AS al,
+               ROUND(mv.epf_er * mv.f, 2)   AS ep,
+               ROUND(mv.socso_er * mv.f, 2) AS so,
+               ROUND(mv.eis_er * mv.f, 2)   AS ei
+        FROM moves mv
+    )
+    SELECT p.sid, p.dept_id, p.dept_name::TEXT, p.to_id, p.to_name::TEXT, p.to_model::TEXT, p.m_amt,
+           p.m_amt - p.al - p.ep - p.so - p.ei, p.al, p.ep, p.so, p.ei
+      FROM parts p;
+$fn$;
+REVOKE ALL ON FUNCTION public.payroll_moved_parts(DATE) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.payroll_moved_parts(DATE) TO service_role;
+
+-- Production's bodies, as this file was written against them (read off pg_proc on 2026-11-03: 20261005100000's with
+-- 20261009040000's guard swapped in). The file refuses if either changed since — unless it is this file's own.
+DO $guard$
+BEGIN
+  IF md5((SELECT prosrc FROM pg_proc WHERE oid = 'public.get_staff_billing_allocation(date)'::regprocedure))
+       <> 'b3c79672245014edbee7021c4a8bc82d'
+     AND position('payroll_moved_parts' IN (SELECT prosrc FROM pg_proc WHERE oid = 'public.get_staff_billing_allocation(date)'::regprocedure)) = 0 THEN
+    RAISE EXCEPTION 'get_staff_billing_allocation changed on production since this file was written';
+  END IF;
+  IF md5((SELECT prosrc FROM pg_proc WHERE oid = 'public.get_staff_own_share_allocation(date)'::regprocedure))
+       <> '63e60f8a19d1c05687c6bf5e3dcf1c95'
+     AND position('payroll_moved_parts' IN (SELECT prosrc FROM pg_proc WHERE oid = 'public.get_staff_own_share_allocation(date)'::regprocedure)) = 0 THEN
+    RAISE EXCEPTION 'get_staff_own_share_allocation changed on production since this file was written';
+  END IF;
+END
+$guard$;
+
+-- The billing allocation (production's body, its guard as live): the sender's companies stay a % of the whole cost;
+-- its HOUZS Venture row is the cost less the companies AND what it moved. Each cost-center receiver bills what moved
+-- into it by its Bill to % (hr_pool_allocation), merged into its department × company rows; what moved in never feeds
+-- its HV row, and a centralized receiver's Bill to % is ignored (it bears what it receives).
+CREATE OR REPLACE FUNCTION public.get_staff_billing_allocation(p_period_month date)
+ RETURNS TABLE(department_id uuid, department_name text, company_id uuid, company_name text, company_short_code text, staff_count integer, amount numeric, salary_amount numeric, allowance_amount numeric, epf_amount numeric, socso_amount numeric, eis_amount numeric)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_role user_role;
+BEGIN
+    v_role := current_user_role();
+    IF auth.uid() IS NOT NULL AND NOT public.has_any_action(ARRAY['billing.view', 'hr_costing.view']) THEN RAISE EXCEPTION 'get_staff_billing_allocation: needs Billing or HR Costing · View' USING ERRCODE = '42501';
+    END IF;
+
+    RETURN QUERY
+    WITH staff_rows AS (
+        SELECT
+            hsc.department_id  AS dept_id,
+            d.name             AS dept_name,
+            hmp.staff_id       AS sid,
+            (hmp.gross + hmp.epf_er + hmp.socso_er + hmp.eis_er) AS total_cost,
+            -- The basic-pay part of gross. An InfoTech-imported row carries the
+            -- file's basic, already prorated by InfoTech for a mid-month joiner
+            -- or leaver, beside a gross kept verbatim from the file — so it is
+            -- taken as is. A row the compute trigger built holds the monthly
+            -- rate, and its gross was prorated from it, so the ratio applies.
+            GREATEST(
+                LEAST(
+                    CASE WHEN hmp.source = 'imported' THEN hmp.basic_salary
+                         ELSE hmp.basic_salary
+                            * CASE WHEN COALESCE(hmp.prorata_days_in_month, 0) = 0 THEN 0
+                                   ELSE hmp.prorata_days_worked::NUMERIC
+                                        / hmp.prorata_days_in_month::NUMERIC END
+                    END
+                    - COALESCE(hmp.deduction_amount, 0),
+                    hmp.gross
+                ),
+                0
+            ) AS salary_comp,
+            hmp.gross    AS gross_amt,
+            hmp.epf_er   AS epf_er,
+            hmp.socso_er AS socso_er,
+            hmp.eis_er   AS eis_er
+        FROM hr_monthly_payroll hmp
+        JOIN hr_staff_costs hsc ON hsc.id = hmp.staff_id
+        JOIN departments d      ON d.id = hsc.department_id
+        WHERE hmp.period_month = p_period_month
+          AND hmp.status IN ('submitted', 'paid')
+    ),
+    company_agg AS (
+        SELECT
+            sr.dept_id,
+            sr.dept_name,
+            hsa.company_id AS comp_id,
+            c.name         AS comp_name,
+            c.short_code   AS comp_code,
+            COUNT(DISTINCT sr.sid)::INT AS n_staff,
+            ROUND(SUM(sr.total_cost * hsa.allocation_pct), 2) AS amt,
+            ROUND(SUM((sr.gross_amt - sr.salary_comp) * hsa.allocation_pct), 2) AS allowance_amt,
+            ROUND(SUM(sr.epf_er * hsa.allocation_pct), 2) AS epf_amt,
+            ROUND(SUM(sr.socso_er * hsa.allocation_pct), 2) AS socso_amt,
+            ROUND(SUM(sr.eis_er * hsa.allocation_pct), 2) AS eis_amt
+        FROM staff_rows sr
+        JOIN hr_staff_allocation hsa ON hsa.staff_id = sr.sid
+                                    AND hsa.period_month = p_period_month
+                                    AND hsa.allocation_pct > 0
+        JOIN companies c ON c.id = hsa.company_id
+        GROUP BY sr.dept_id, sr.dept_name, hsa.company_id, c.name, c.short_code
+        HAVING ROUND(SUM(sr.total_cost * hsa.allocation_pct), 2) > 0
+    ),
+    dept_tot AS (
+        SELECT
+            sr.dept_id,
+            sr.dept_name,
+            COUNT(DISTINCT sr.sid)::INT AS n_staff,
+            ROUND(SUM(sr.total_cost), 2) AS amt,
+            ROUND(SUM(sr.gross_amt - sr.salary_comp), 2) AS allowance_amt,
+            ROUND(SUM(sr.epf_er), 2) AS epf_amt,
+            ROUND(SUM(sr.socso_er), 2) AS socso_amt,
+            ROUND(SUM(sr.eis_er), 2) AS eis_amt
+        FROM staff_rows sr
+        GROUP BY sr.dept_id, sr.dept_name
+    ),
+    moved AS (
+        SELECT * FROM public.payroll_moved_parts(p_period_month)
+    ),
+    -- What each department's people moved out, and its companies' total, a row a department.
+    moved_out AS (
+        SELECT mv.from_department_id AS dept_id, SUM(mv.amount) AS amt, SUM(mv.allowance_amount) AS allowance_amt,
+               SUM(mv.epf_amount) AS epf_amt, SUM(mv.socso_amount) AS socso_amt, SUM(mv.eis_amount) AS eis_amt
+        FROM moved mv GROUP BY mv.from_department_id
+    ),
+    company_tot AS (
+        SELECT ca.dept_id, SUM(ca.amt) AS amt, SUM(ca.allowance_amt) AS allowance_amt, SUM(ca.epf_amt) AS epf_amt,
+               SUM(ca.socso_amt) AS socso_amt, SUM(ca.eis_amt) AS eis_amt
+        FROM company_agg ca GROUP BY ca.dept_id
+    ),
+    hv_raw AS (
+        SELECT
+            dt.dept_id,
+            dt.dept_name,
+            dt.n_staff,
+            dt.amt           - COALESCE(ct.amt, 0)           - COALESCE(mo.amt, 0)           AS amt,
+            dt.allowance_amt - COALESCE(ct.allowance_amt, 0) - COALESCE(mo.allowance_amt, 0) AS allowance_amt,
+            dt.epf_amt       - COALESCE(ct.epf_amt, 0)       - COALESCE(mo.epf_amt, 0)       AS epf_amt,
+            dt.socso_amt     - COALESCE(ct.socso_amt, 0)     - COALESCE(mo.socso_amt, 0)     AS socso_amt,
+            dt.eis_amt       - COALESCE(ct.eis_amt, 0)       - COALESCE(mo.eis_amt, 0)       AS eis_amt
+        FROM dept_tot dt
+        LEFT JOIN company_tot ct ON ct.dept_id = dt.dept_id
+        LEFT JOIN moved_out mo   ON mo.dept_id = dt.dept_id
+        WHERE (dt.amt - COALESCE(ct.amt, 0) - COALESCE(mo.amt, 0)) >= 0.05
+    ),
+    hv_agg AS (
+        SELECT
+            hr.dept_id,
+            hr.dept_name,
+            NULL::UUID       AS comp_id,
+            'HOUZS Venture'  AS comp_name,
+            'HV'             AS comp_code,
+            hr.n_staff,
+            hr.amt,
+            hr.amt - GREATEST(hr.allowance_amt, 0) - GREATEST(hr.epf_amt, 0)
+                   - GREATEST(hr.socso_amt, 0) - GREATEST(hr.eis_amt, 0) AS salary_amt,
+            GREATEST(hr.allowance_amt, 0) AS allowance_amt,
+            GREATEST(hr.epf_amt, 0)       AS epf_amt,
+            GREATEST(hr.socso_amt, 0)     AS socso_amt,
+            GREATEST(hr.eis_amt, 0)       AS eis_amt
+        FROM hv_raw hr
+    ),
+    -- What moved into each cost-center receiver, then billed on by its Bill to %.
+    moved_in AS (
+        SELECT mv.to_department_id AS dept_id, mv.to_department_name AS dept_name, SUM(mv.amount) AS amt,
+               SUM(mv.allowance_amount) AS allowance_amt, SUM(mv.epf_amount) AS epf_amt,
+               SUM(mv.socso_amount) AS socso_amt, SUM(mv.eis_amount) AS eis_amt
+        FROM moved mv
+        WHERE mv.to_cost_model <> 'centralized'
+        GROUP BY mv.to_department_id, mv.to_department_name
+    ),
+    moved_billed AS (
+        SELECT mi.dept_id, mi.dept_name, pa.company_id AS comp_id, c.name AS comp_name, c.short_code AS comp_code,
+               0 AS n_staff,
+               ROUND(mi.amt * pa.split_pct, 2)           AS amt,
+               ROUND(mi.allowance_amt * pa.split_pct, 2) AS allowance_amt,
+               ROUND(mi.epf_amt * pa.split_pct, 2)       AS epf_amt,
+               ROUND(mi.socso_amt * pa.split_pct, 2)     AS socso_amt,
+               ROUND(mi.eis_amt * pa.split_pct, 2)       AS eis_amt
+        FROM moved_in mi
+        JOIN hr_pool_allocation pa ON pa.department_id = mi.dept_id
+                                  AND pa.period_month = p_period_month
+                                  AND pa.split_pct > 0
+        JOIN companies c ON c.id = pa.company_id
+        WHERE ROUND(mi.amt * pa.split_pct, 2) > 0
+    ),
+    -- A department's own people's rows and what it bills on, merged by company (the user: "就一起吧").
+    company_rows AS (
+        SELECT u.dept_id, u.dept_name, u.comp_id, u.comp_name, u.comp_code,
+               SUM(u.n_staff)::INT AS n_staff, SUM(u.amt) AS amt, SUM(u.allowance_amt) AS allowance_amt,
+               SUM(u.epf_amt) AS epf_amt, SUM(u.socso_amt) AS socso_amt, SUM(u.eis_amt) AS eis_amt
+        FROM (
+            SELECT ca.dept_id, ca.dept_name, ca.comp_id, ca.comp_name, ca.comp_code, ca.n_staff, ca.amt,
+                   ca.allowance_amt, ca.epf_amt, ca.socso_amt, ca.eis_amt
+            FROM company_agg ca
+            UNION ALL
+            SELECT mb.dept_id, mb.dept_name, mb.comp_id, mb.comp_name, mb.comp_code, mb.n_staff, mb.amt,
+                   mb.allowance_amt, mb.epf_amt, mb.socso_amt, mb.eis_amt
+            FROM moved_billed mb
+        ) u
+        GROUP BY u.dept_id, u.dept_name, u.comp_id, u.comp_name, u.comp_code
+    ),
+    combined AS (
+        SELECT cr.dept_id, cr.dept_name, cr.comp_id, cr.comp_name, cr.comp_code,
+               cr.n_staff, cr.amt,
+               cr.amt - cr.allowance_amt - cr.epf_amt - cr.socso_amt - cr.eis_amt AS salary_amt,
+               cr.allowance_amt, cr.epf_amt, cr.socso_amt, cr.eis_amt
+        FROM company_rows cr
+        UNION ALL
+        SELECT hv.dept_id, hv.dept_name, hv.comp_id, hv.comp_name, hv.comp_code,
+               hv.n_staff, hv.amt, hv.salary_amt, hv.allowance_amt,
+               hv.epf_amt, hv.socso_amt, hv.eis_amt
+        FROM hv_agg hv
+        WHERE EXISTS (SELECT 1 FROM company_rows cr2 WHERE cr2.dept_id = hv.dept_id)
+    )
+    SELECT
+        cb.dept_id,
+        cb.dept_name::TEXT,
+        cb.comp_id,
+        cb.comp_name::TEXT,
+        cb.comp_code::TEXT,
+        cb.n_staff,
+        cb.amt::DECIMAL,
+        cb.salary_amt::DECIMAL,
+        cb.allowance_amt::DECIMAL,
+        cb.epf_amt::DECIMAL,
+        cb.socso_amt::DECIMAL,
+        cb.eis_amt::DECIMAL
+    FROM combined cb
+    ORDER BY cb.dept_name, (cb.comp_id IS NULL), cb.comp_code;
+END;
+$function$;
+
+COMMENT ON FUNCTION public.get_staff_billing_allocation(date) IS
+'Staff billing allocation per department × subsidiary with five invoice components (Salary / Allowance / EPF / SOCSO / EIS ER), plus one HV own-share row per dept (company_id NULL, code HV) = dept total − billed − moved to other departments. SUBMITTED payroll rows only; aggregate-only; Billing or HR Costing · View. Since 2026-10-05 an InfoTech-imported row''s basic is taken as paid. Since 2026-11-03 a cost-center department bills on what moved into it (hr_staff_dept_moves) by its Bill to % (hr_pool_allocation), merged into its company rows.';
+
+-- The own share: each department's leftover less what its people moved to another department; nothing moved in.
+CREATE OR REPLACE FUNCTION public.get_staff_own_share_allocation(p_period_month date)
+ RETURNS TABLE(department_id uuid, department_name text, staff_count integer, amount numeric, salary_amount numeric, allowance_amount numeric, epf_amount numeric, socso_amount numeric, eis_amount numeric)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_role user_role;
+BEGIN
+    v_role := current_user_role();
+    IF auth.uid() IS NOT NULL AND NOT public.has_any_action(ARRAY['billing.view', 'hr_costing.view']) THEN RAISE EXCEPTION 'get_staff_own_share_allocation: needs Billing or HR Costing · View' USING ERRCODE = '42501';
+    END IF;
+
+    RETURN QUERY
+    WITH staff_rows AS (
+        SELECT
+            hsc.department_id AS dept_id,
+            d.name            AS dept_name,
+            hmp.staff_id      AS sid,
+            (hmp.gross + hmp.epf_er + hmp.socso_er + hmp.eis_er) AS total_cost,
+            -- Same rule as get_staff_billing_allocation: an imported row's
+            -- basic is already the month's figure; a computed row's is the
+            -- monthly rate and takes the ratio.
+            GREATEST(
+                LEAST(
+                    CASE WHEN hmp.source = 'imported' THEN hmp.basic_salary
+                         ELSE hmp.basic_salary
+                            * CASE WHEN COALESCE(hmp.prorata_days_in_month, 0) = 0 THEN 0
+                                   ELSE hmp.prorata_days_worked::NUMERIC
+                                        / hmp.prorata_days_in_month::NUMERIC END
+                    END
+                    - COALESCE(hmp.deduction_amount, 0),
+                    hmp.gross
+                ),
+                0
+            ) AS salary_comp,
+            hmp.gross    AS gross_amt,
+            hmp.epf_er   AS epf_er,
+            hmp.socso_er AS socso_er,
+            hmp.eis_er   AS eis_er
+        FROM hr_monthly_payroll hmp
+        JOIN hr_staff_costs hsc ON hsc.id = hmp.staff_id
+        JOIN departments d      ON d.id = hsc.department_id
+        WHERE hmp.period_month = p_period_month
+          AND hmp.status IN ('submitted', 'paid')
+    ),
+    company_agg AS (
+        SELECT
+            sr.dept_id,
+            ROUND(SUM(sr.total_cost * hsa.allocation_pct), 2) AS amt,
+            ROUND(SUM((sr.gross_amt - sr.salary_comp) * hsa.allocation_pct), 2) AS allowance_amt,
+            ROUND(SUM(sr.epf_er * hsa.allocation_pct), 2) AS epf_amt,
+            ROUND(SUM(sr.socso_er * hsa.allocation_pct), 2) AS socso_amt,
+            ROUND(SUM(sr.eis_er * hsa.allocation_pct), 2) AS eis_amt
+        FROM staff_rows sr
+        JOIN hr_staff_allocation hsa ON hsa.staff_id = sr.sid
+                                    AND hsa.period_month = p_period_month
+                                    AND hsa.allocation_pct > 0
+        GROUP BY sr.dept_id
+    ),
+    moved_out AS (
+        SELECT mv.from_department_id AS dept_id, SUM(mv.amount) AS amt, SUM(mv.allowance_amount) AS allowance_amt,
+               SUM(mv.epf_amount) AS epf_amt, SUM(mv.socso_amount) AS socso_amt, SUM(mv.eis_amount) AS eis_amt
+        FROM public.payroll_moved_parts(p_period_month) mv
+        GROUP BY mv.from_department_id
+    ),
+    dept_tot AS (
+        SELECT
+            sr.dept_id,
+            sr.dept_name,
+            COUNT(DISTINCT sr.sid)::INT AS n_staff,
+            ROUND(SUM(sr.total_cost), 2) AS amt,
+            ROUND(SUM(sr.gross_amt - sr.salary_comp), 2) AS allowance_amt,
+            ROUND(SUM(sr.epf_er), 2) AS epf_amt,
+            ROUND(SUM(sr.socso_er), 2) AS socso_amt,
+            ROUND(SUM(sr.eis_er), 2) AS eis_amt
+        FROM staff_rows sr
+        GROUP BY sr.dept_id, sr.dept_name
+    ),
+    hv_raw AS (
+        SELECT
+            dt.dept_id,
+            dt.dept_name,
+            dt.n_staff,
+            dt.amt           - COALESCE(ca.amt, 0)           - COALESCE(mo.amt, 0)           AS amt,
+            dt.allowance_amt - COALESCE(ca.allowance_amt, 0) - COALESCE(mo.allowance_amt, 0) AS allowance_amt,
+            dt.epf_amt       - COALESCE(ca.epf_amt, 0)       - COALESCE(mo.epf_amt, 0)       AS epf_amt,
+            dt.socso_amt     - COALESCE(ca.socso_amt, 0)     - COALESCE(mo.socso_amt, 0)     AS socso_amt,
+            dt.eis_amt       - COALESCE(ca.eis_amt, 0)       - COALESCE(mo.eis_amt, 0)       AS eis_amt
+        FROM dept_tot dt
+        LEFT JOIN company_agg ca ON ca.dept_id = dt.dept_id
+        LEFT JOIN moved_out mo   ON mo.dept_id = dt.dept_id
+        WHERE (dt.amt - COALESCE(ca.amt, 0) - COALESCE(mo.amt, 0)) >= 0.05
+    )
+    SELECT
+        hr.dept_id,
+        hr.dept_name::TEXT,
+        hr.n_staff,
+        hr.amt::DECIMAL,
+        (hr.amt - GREATEST(hr.allowance_amt,0) - GREATEST(hr.epf_amt,0)
+                - GREATEST(hr.socso_amt,0) - GREATEST(hr.eis_amt,0))::DECIMAL AS salary_amount,
+        GREATEST(hr.allowance_amt,0)::DECIMAL AS allowance_amount,
+        GREATEST(hr.epf_amt,0)::DECIMAL       AS epf_amount,
+        GREATEST(hr.socso_amt,0)::DECIMAL     AS socso_amount,
+        GREATEST(hr.eis_amt,0)::DECIMAL       AS eis_amount
+    FROM hv_raw hr
+    ORDER BY hr.dept_name;
+END;
+$function$;
+
+COMMENT ON FUNCTION public.get_staff_own_share_allocation(date) IS
+'HV own share of each department''s staff cost (dept total − subsidiary allocations − what its people moved to other departments) in the five invoice components, for the HV own-share payroll invoice. Same salary rule as get_staff_billing_allocation. Since 2026-11-03 what moved to another department (hr_staff_dept_moves) is billed to that department instead.';
+
+
+-- ─── 5. What moved, for the internal invoices and the preview ───────────────
+
+-- Per sending × receiving department, in the five items: the internal invoices' lines.
+CREATE OR REPLACE FUNCTION public.get_staff_dept_moves_allocation(p_period_month DATE)
+RETURNS TABLE(from_department_id UUID, from_department_name TEXT, to_department_id UUID, to_department_name TEXT,
+              staff_count INTEGER, amount NUMERIC, salary_amount NUMERIC, allowance_amount NUMERIC,
+              epf_amount NUMERIC, socso_amount NUMERIC, eis_amount NUMERIC)
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $fn$
+BEGIN
+    IF auth.uid() IS NOT NULL AND NOT public.has_any_action(ARRAY['billing.view', 'hr_costing.view']) THEN
+        RAISE EXCEPTION 'get_staff_dept_moves_allocation: needs Billing or HR Costing · View' USING ERRCODE = '42501';
+    END IF;
+    RETURN QUERY
+    SELECT mv.from_department_id, mv.from_department_name, mv.to_department_id, mv.to_department_name,
+           COUNT(DISTINCT mv.staff_id)::INT, SUM(mv.amount), SUM(mv.salary_amount), SUM(mv.allowance_amount),
+           SUM(mv.epf_amount), SUM(mv.socso_amount), SUM(mv.eis_amount)
+      FROM public.payroll_moved_parts(p_period_month) mv
+     GROUP BY mv.from_department_id, mv.from_department_name, mv.to_department_id, mv.to_department_name
+     ORDER BY mv.to_department_name, mv.from_department_name;
+END;
+$fn$;
+REVOKE ALL ON FUNCTION public.get_staff_dept_moves_allocation(DATE) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_staff_dept_moves_allocation(DATE) TO authenticated, service_role;
+
+-- Per receiver: what moved in, what its Bill to % bills to the companies (nought for a centralized one), what stays.
+CREATE OR REPLACE FUNCTION public.get_payroll_moves_summary(p_period_month DATE)
+RETURNS TABLE(department_id UUID, department_name TEXT, cost_model TEXT, moved_in NUMERIC, billed NUMERIC, stays NUMERIC)
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $fn$
+BEGIN
+    IF auth.uid() IS NOT NULL AND NOT public.has_any_action(ARRAY['billing.view', 'hr_costing.view']) THEN
+        RAISE EXCEPTION 'get_payroll_moves_summary: needs Billing or HR Costing · View' USING ERRCODE = '42501';
+    END IF;
+    RETURN QUERY
+    WITH moved_in AS (
+        SELECT mv.to_department_id AS dept_id, mv.to_department_name AS dept_name, mv.to_cost_model AS model,
+               SUM(mv.amount) AS amt
+          FROM public.payroll_moved_parts(p_period_month) mv
+         GROUP BY mv.to_department_id, mv.to_department_name, mv.to_cost_model
+    ),
+    billed AS (
+        SELECT mi.dept_id, SUM(ROUND(mi.amt * pa.split_pct, 2)) AS amt
+          FROM moved_in mi
+          JOIN hr_pool_allocation pa ON pa.department_id = mi.dept_id
+                                    AND pa.period_month = p_period_month
+                                    AND pa.split_pct > 0
+         WHERE mi.model <> 'centralized'
+         GROUP BY mi.dept_id
+    )
+    SELECT mi.dept_id, mi.dept_name, mi.model, mi.amt, COALESCE(b.amt, 0), mi.amt - COALESCE(b.amt, 0)
+      FROM moved_in mi
+      LEFT JOIN billed b ON b.dept_id = mi.dept_id
+     ORDER BY mi.dept_name;
+END;
+$fn$;
+REVOKE ALL ON FUNCTION public.get_payroll_moves_summary(DATE) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_payroll_moves_summary(DATE) TO authenticated, service_role;
