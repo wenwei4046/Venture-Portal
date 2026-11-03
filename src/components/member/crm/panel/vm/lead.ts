@@ -12,7 +12,7 @@ import { customBookVM, customPrefill } from "../../shared/custom-book";
 import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/lib/member/crm-data";
 import { chatStripOf, coldLine, DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
 import { avatarTint } from "../../shared/palette";
-import { failNote, roomClosed, roomSlots, slotAt, slotBlocked } from "../../sales/vm/chat";
+import { failNote, quietFailure, roomClosed, roomSlots, slotAt, slotBlocked } from "../../sales/vm/chat";
 import { bookingSkipsForm, infoRows } from "../../sales/vm/customer";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
@@ -26,6 +26,8 @@ import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "..
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { actionsOnScreen, closeActions, openActions, type ActionSheet } from "../../shared/action-sheet";
+import { fillWithFor, libraryFor, suggestReplies, waitingWords } from "../../shared/suggest-reply";
+import { openSuggest } from "../../shared/suggest-float";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -105,11 +107,11 @@ export function leadVM(ctx: PanelCtx) {
       tickC: tickColor(m.status), tickPath: tickPathOf(m.status),
       // Not delivered says why under it, as in Mine's chat (2026-10-17 — the owner: two videos WhatsApp refused showed
       // in the Team chat as sent; only Mine's said so).
-      failNote: mine && m.status === "failed" ? failNote(m.error) : "",
+      failNote: mine && m.status === "failed" && !quietFailure(m.status, m.error) ? failNote(m.error) : "",
       by, hasBy: !!by, align: mine ? "flex-end" : "flex-start", bg: mine ? MINE_BG : "#fff", bd: mine ? MINE_BG : "#fff", fg: mine ? "#fff" : "var(--crm-ink)", timeC: mine ? MINE_TIME : "var(--crm-muted)", radius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
       // A visit sent to the customer shows as the visit card, as in the salesperson's chat (sales/vm/chat.ts › ev), not
       // as its text with the map links (user 2026-10-11). Tap → Calendar on that day.
-      ...visitCard(m.card), pDisp: !md && !m.card && m.text ? "inline" : m.card || mk === "file" || (shows && !m.text) ? "none" : "block" };
+      ...visitCard(m.card), pDisp: !md && !m.card && m.text ? "inline" : m.card || (mk === "file" && (!m.text || m.text === md?.name)) || (shows && !m.text) ? "none" : "block" };
   });
   return {
     onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pReply: null, pCmp: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
@@ -229,14 +231,17 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const tile = (label: TileLabel) => {
     if (label === "Photos") document.getElementById("crm-panel-photo")?.click();
     else if (label === "Document") document.getElementById("crm-panel-file")?.click();
-    else openAttach({ ...textChoices, view: label === "Quick replies" ? "quick" : "auto" });
+    else if (label === "Quick replies") openAttach({ ...textChoices, view: "quick" });
+    else openSuggest();
   };
   const setCmp = (f: (s: ComposerState) => ComposerState) => set(u => ({ ...u, pCmp: { ...f(composerOf(u.pCmp, cid) ?? initialComposer()), chat: cid } }));
   // The composer (the chat composer handoff — sales/ChatComposer.tsx), Mine's exactly; its words this chat's draft.
   const cmp: ComposerIn = {
     key: cid, state: composerOf(ui.pCmp, cid) ?? initialComposer(), set: setCmp,
     placeholder: c ? `Reply to ${first(c.name)}…` : "", draft, setDraft, canSend: has, send: () => void send(),
-    warm: !shut, openTpl: () => void openTpl(), tplOn: ctx.data.settings?.suggestTemplate !== false, coldSub: c ? coldLine(c, now) : "",
+    warm: true, openTpl: () => void openTpl(), tplOn: ctx.data.settings?.suggestTemplate !== false, coldSub: c ? coldLine(c, now) : "",
+    suggest: c && !shut ? suggestReplies(c, ctx.data.replyExamples ?? [], ctx.data.quickReplies, 3, { library: ctx.data.replyLibrary, ...fillWithFor(ctx.data, c, ctx.me.name, now) }) : undefined, suggestLogo: !!c && !!waitingWords(c),
+    suggestLibrary: c && !shut ? libraryFor(c, ctx.data.replyLibrary, fillWithFor(ctx.data, c, ctx.me.name, now)) : undefined,
     reply: reply ? { who: reply.who, text: reply.text } : null, cancelReply: () => patch({ pReply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()) } : null,
@@ -323,7 +328,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     chanName: c?.channel === "messenger" ? "Messenger" : "WhatsApp",
     menuOpen: on && ui.pMenu, menuBg: on && ui.pMenu ? "var(--crm-field)" : "transparent", toggleMenu: () => set(u => ({ ...u, pMenu: !u.pMenu })),
     // The reply window closed: the cold-lead note in the header, and the composer's template button (Mine's words).
-    cold: on && shut,
+    cold: false, // no warning ahead of a send past the window: the reply is kept, marked not sent (2026-10-30, as Lead View)
     coldMsg: c?.channel === "messenger" ? "the 7-day Messenger reply window has closed. Only template messages can be sent until the customer writes again." : "the 24 h WhatsApp window has closed. Only template messages can be sent until the customer writes again.",
     menu: [
       // Assign to only for whom it can work (2026-10-23 — it showed to every leader, and the database refused all but CRM ·
@@ -331,6 +336,8 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
       ...(ctx.assign === "any" || assignees(ctx, c).length ? [{ label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "var(--crm-tint-cold)", fg: "var(--crm-ink-soft)", go: () => patch({ pMenu: false, reSheet: true }) }] : []),
       { label: "Customer info", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", bg: "var(--crm-tint-follow)", fg: "var(--crm-brown)", go: () => patch({ pMenu: false, pInfo: true }) },
       { label: "Appointment", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", bg: "var(--crm-tint-new)", fg: "var(--crm-ink-soft)", go: appointment },
+      // A WhatsApp chat past its 24 hours: the template is here, since the bar stays a bar (2026-10-30).
+      ...(c && shut && c.channel === "whatsapp" && ctx.data.settings?.suggestTemplate !== false ? [{ label: "Send template message", icon: "M4 6h16v12H4zM4 7l8 6 8-6", bg: "var(--crm-tint-attention)", fg: "var(--crm-rust)", go: () => { patch({ pMenu: false }); void openTpl(); } }] : []),
       // One's own starred messages in this chat (the message menu's Star, 2026-10-14).
       { label: "Starred messages", icon: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", bg: "var(--crm-tint-appt)", fg: "var(--crm-brown)", go: () => { patch({ pMenu: false }); if (c) openStarred(c.messages.filter(x => (ctx.data.starredMessages ?? []).includes(x.id)).map(x => ({ id: x.id, who: x.from === "me" ? "You" : c.name, text: x.text || (x.media ? mediaWord(x) : ""), at: msgTime(x.at) }))); } },
     ],

@@ -137,9 +137,9 @@ export default function ApprovalFullPage({
           ) : null}
 
           {r.terms ? (
-            <Card n={++n} title="Terms change" aside={`FROM ${r.terms.fromLabel.toUpperCase()}`}>
+            <Card n={++n} title="Terms change" aside={r.terms.scope.toUpperCase()}>
               {/* The month asked, its terms now beside the terms asked (lib/terms-change-request) — what Approve applies. */}
-              {r.terms.rows.length > 0 ? <TermsTable rows={r.terms.rows} fromLabel={r.terms.fromLabel} /> : null}
+              {r.terms.rows.length > 0 ? <TermsTable rows={r.terms.rows} scope={r.terms.scope} /> : null}
               {r.terms.why ? <p className={a.termsWhy}>{r.terms.why}</p> : null}
               <dl className={s.dl} style={{ marginTop: 14 }}>
                 {r.terms.rows.length === 0 ? <Row label="Asked" value={r.terms.words} /> : null}
@@ -208,12 +208,12 @@ export default function ApprovalFullPage({
 }
 
 /** A terms change's lines: now, and as asked from the month — the ones it moves picked out. */
-export function TermsTable({ rows, fromLabel }: { rows: NonNullable<ApprovalRecordModel['terms']>['rows']; fromLabel: string }) {
+export function TermsTable({ rows, scope }: { rows: NonNullable<ApprovalRecordModel['terms']>['rows']; scope: string }) {
   return (
     <div className={a.terms}>
       <span className={a.termsHead} />
       <span className={a.termsHead}>Now</span>
-      <span className={a.termsHead}>Asked · from {fromLabel}</span>
+      <span className={a.termsHead}>Asked · {scope}</span>
       {rows.map((row) => (
         <TermsLine key={row.label} row={row} />
       ))}

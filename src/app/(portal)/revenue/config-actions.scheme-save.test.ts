@@ -31,7 +31,6 @@ const FAIR = {
   group_sales_depth: '',
   override_depth: '',
   direct_line_limit: '',
-  open_bill_basis: 'uplift_on_commission',
   default_rate_mode: 'variable',
 }
 
@@ -57,6 +56,16 @@ describe('Rules › Scheme rules never writes the Revenue Team cost basis', () =
     mocks.createClient.mockResolvedValue(db.client)
     await expect(saveSchemeRules(form({ ...FAIR, revenue_cost_divisor: '1' }))).resolves.toEqual({ ok: true })
     expect(db.writes('comm_schemes')[0].values).not.toHaveProperty('revenue_cost_divisor')
+  })
+
+  // Open Bill went (2026-10-31), its two columns with it: a page loaded before still sends them.
+  it('ignores the Open Bill switch and basis a page loaded before 2026-10-31 sends', async () => {
+    const db = recordingSupabase()
+    mocks.createClient.mockResolvedValue(db.client)
+    await expect(saveSchemeRules(form({ ...FAIR, enable_open_bill: 'on', open_bill_basis: 'pct_of_revenue' }))).resolves.toEqual({ ok: true })
+    const values = db.writes('comm_schemes')[0].values as Record<string, unknown>
+    expect(values).not.toHaveProperty('enable_open_bill')
+    expect(values).not.toHaveProperty('open_bill_basis')
   })
 
   it('no longer refuses a save over a divisor it does not keep', async () => {

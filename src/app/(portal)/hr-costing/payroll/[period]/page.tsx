@@ -9,7 +9,7 @@ import { formatMoney, formatIntlDate } from '@/lib/utils'
 import { OFFICE_TZ } from '@/lib/office-clock'
 import { revenuePath, subDeptSlug } from '@/lib/revenue'
 import { round2 } from '@/lib/payroll-funding'
-import { typedStatutory } from '@/lib/payroll-grid'
+import { noPayAmount, typedStatutory } from '@/lib/payroll-grid'
 import {
   batchesHeadline,
   closeReadiness,
@@ -182,6 +182,18 @@ export default async function PayrollGridPage({ params }: PageProps) {
     const close = closes.get(r.staff_id)
     const s = sent.get(`staff:${r.id}`)
     const commCalSub = close?.subs[0] ?? null
+    const noPay = noPayAmount({
+      source: r.source,
+      unpaid_leave_days: Number(r.unpaid_leave_days),
+      basic_salary: Number(r.basic_salary),
+      statutory_allowance: Number(r.statutory_allowance),
+      non_statutory_allowance: Number(r.non_statutory_allowance),
+      ot_amount: Number(r.ot_amount),
+      commission_amount: Number(r.commission_amount),
+      deduction_amount: Number(r.deduction_amount),
+      gross: Number(r.gross),
+      prorata_days_in_month: r.prorata_days_in_month,
+    })
     return {
       id: r.id,
       staff_id: r.staff_id,
@@ -213,7 +225,9 @@ export default async function PayrollGridPage({ params }: PageProps) {
       basic_pay_net: r.basic_pay_net == null ? null : Number(r.basic_pay_net),
       pcb_override_amount: r.pcb_override_amount == null ? null : Number(r.pcb_override_amount),
       unpaid_leave_days: Number(r.unpaid_leave_days),
-      deduction_amount: Number(r.deduction_amount),
+      // The Deduct cell shows the No Pay too, as a director's row does; a save takes it back off.
+      deduction_amount: round2(Number(r.deduction_amount) + noPay),
+      no_pay_amount: noPay,
       skbbk_amount: Number(r.skbbk_amount ?? 0),
       pay_line_earnings: Number(r.pay_line_earnings ?? 0),
       pay_line_deductions: Number(r.pay_line_deductions ?? 0),

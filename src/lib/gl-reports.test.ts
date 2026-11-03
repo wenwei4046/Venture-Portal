@@ -103,6 +103,46 @@ describe('buildPnl', () => {
     expect(fee).toMatchObject({ debit: 1000, credit: 0, otherSide: '3000 · Bank HL +1' })
   })
 
+  // 2026-10-26 — the user: "就PNL 应该显示8月罢了不是？也不需要写paid 吧? 那个是cash flow part": an accrual reversed when the
+  // voucher paying it is posted shows once, in its own month; the payment is the cash flow's.
+  describe('an accrual reversed when it is paid', () => {
+    const accrual = entry('2026-05-31', [['9000', 800, 0], ['4000', 0, 800]]).map((l) => ({ ...l, entry_description: "Payroll May'26 — accrued at month end" }))
+    const paid = entry('2026-06-15', [['9000', 800, 0], ['3000', 0, 800]]).map((l) => ({ ...l, ref_type: 'payment_voucher', ref_id: 'pv-9', ref_no: 'HV-PV-202606-0009' }))
+    const reversal = entry('2026-06-15', [['4000', 800, 0], ['9000', 0, 800]]).map((l) => ({ ...l, entry_description: 'Reverse the payroll accrual of 31 May — paid today by HV-PV-202606-0009.' }))
+    const MAY_JUNE: ReportFilter = { current: { from: '2026-05-01', to: '2026-06-30' }, previous: monthPeriod('2026-04') }
+
+    it('lists the accrual alone: the reversal and the payment it names cancel out in their month', () => {
+      const fee = buildPnl([...LINES, ...accrual, ...paid, ...reversal], ACCOUNTS, MAY_JUNE).expense.nodes.find((n) => n.code === '9000')!
+      expect(fee.current).toBe(1000)
+      expect(fee.txns.map((t) => [t.date, t.debit, t.credit])).toEqual([['2026-05-15', 200, 0], ['2026-05-31', 800, 0]])
+    })
+
+    it('keeps a reversal with nothing to cancel in its month, and leaves the cash flow its payment', () => {
+      const fee = buildPnl([...accrual, ...reversal], ACCOUNTS, MAY_JUNE).expense.nodes.find((n) => n.code === '9000')!
+      expect(fee.txns.map((t) => [t.date, t.debit, t.credit])).toEqual([['2026-05-31', 800, 0], ['2026-06-15', 0, 800]])
+      const cf = buildCashFlow([...LINES, ...accrual, ...paid, ...reversal], ACCOUNTS, FILTER, BANKS)
+      expect(cf.outflow.nodes.find((n) => n.code === '9000')!.txns.map((t) => [t.date, t.debit])).toEqual([['2026-06-15', 800]])
+    })
+
+    it('cancels a payment split over the two vouchers the reversal names', () => {
+      const split = [
+        ...entry('2026-06-15', [['9000', 600, 0], ['3000', 0, 600]]).map((l) => ({ ...l, ref_type: 'payment_voucher', ref_id: 'pv-15', ref_no: 'HV-PV-202606-0515' })),
+        ...entry('2026-06-15', [['9000', 200, 0], ['3000', 0, 200]]).map((l) => ({ ...l, ref_type: 'payment_voucher', ref_id: 'pv-16', ref_no: 'HV-PV-202606-0516' })),
+        ...entry('2026-06-15', [['4000', 800, 0], ['9000', 0, 800]]).map((l) => ({ ...l, entry_description: 'Reverse the payroll accrual of 31 May — paid today by HV-PV-202606-0515 / 0516.' })),
+      ]
+      const fee = buildPnl([...accrual, ...split], ACCOUNTS, MAY_JUNE).expense.nodes.find((n) => n.code === '9000')!
+      expect(fee.txns.map((t) => [t.date, t.debit])).toEqual([['2026-05-31', 800]])
+    })
+
+    it('pairs a void with what it voids in the same month', () => {
+      const pv = entry('2026-06-05', [['9000', 300, 0], ['3000', 0, 300]]).map((l) => ({ ...l, ref_type: 'payment_voucher', ref_id: 'pv-3', ref_no: 'HV-PV-202606-0003' }))
+      const voided = entry('2026-06-09', [['3000', 300, 0], ['9000', 0, 300]]).map((l) => ({ ...l, ref_type: 'payment_voucher_void', ref_id: 'pv-3', ref_no: 'HV-PV-202606-0003' }))
+      const fee = buildPnl([...pv, ...voided], ACCOUNTS, FILTER).expense.nodes.find((n) => n.code === '9000')
+      expect(fee?.current ?? 0).toBe(0)
+      expect(fee?.txns ?? []).toEqual([])
+    })
+  })
+
   it('respects the segment filter', () => {
     const treasuryOnly = buildPnl(LINES, ACCOUNTS, { ...FILTER, segment: 'treasury' })
     expect(treasuryOnly.otherIncome.current).toBe(50)

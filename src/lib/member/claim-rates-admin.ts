@@ -18,11 +18,19 @@
  * amount, not like per pax fix this amount". More people than the small group
  * key their invoice's total as well, and are paid it up to the rate × people ×
  * nights; unlike Outstation's spots, nothing about Airbnb is worked out for them.
+ *
+ * 2026-11-01 (user: "a option for select a spot that can be no claim for transport and airbnb, even though it is not a
+ * base spot"): a region may be `noClaim`, picked under Outstation's Base — a fair in it is claimed as the base's: no
+ * outstation claim and no Airbnb stay, whatever its spots. A region flown to never is (its air ticket is the claim).
  */
 
 import { formatMoney } from "@/lib/utils";
 
-export interface ClaimRegionAdmin { id: string | null; name: string; spots: number; active: boolean; planeTicket: boolean }
+export interface ClaimRegionAdmin {
+  id: string | null; name: string; spots: number; active: boolean; planeTicket: boolean;
+  /** Claimed as the base is — no outstation claim, no Airbnb (2026-11-01). */
+  noClaim?: boolean;
+}
 
 /** A venue the ERP's fairs have named, and the region HR set for it (null = not yet). */
 export interface ClaimVenueAdmin { key: string; name: string; fairs: number; lastFair: string | null; regionId: string | null }
@@ -46,7 +54,7 @@ export interface ClaimRatesDraft {
   perPaxNight: string;
   groupMaxPax: string;
   groupCapPerNight: string;
-  regions: { key: string; id: string | null; name: string; spots: string; planeTicket: boolean }[];
+  regions: { key: string; id: string | null; name: string; spots: string; planeTicket: boolean; noClaim?: boolean }[];
   /** Venue key → the draft region's `key` it is in; "" = none. In the order the venues are listed. */
   venues: Record<string, string>;
 }
@@ -57,7 +65,7 @@ export interface ClaimRatesToSave {
   perPaxNight: number | null;
   groupMaxPax: number;
   groupCapPerNight: number | null;
-  regions: { id: string | null; name: string; spots: number; planeTicket: boolean }[];
+  regions: { id: string | null; name: string; spots: number; planeTicket: boolean; noClaim: boolean }[];
   /** Each venue's region by its name (a region added in the same save has no id yet); null = none. */
   venues: { key: string; region: string | null }[];
 }
@@ -80,7 +88,7 @@ export function readClaimRatesAdmin(raw: unknown): ClaimRatesAdmin | null {
     updatedBy: typeof r.updatedBy === "string" ? r.updatedBy : null,
     regions: (r.regions as Record<string, unknown>[]).filter(g => g && typeof g.name === "string").map(g => ({
       id: typeof g.id === "string" ? g.id : null, name: String(g.name), spots: Math.max(0, Math.trunc(Number(g.spots) || 0)), active: g.active !== false,
-      planeTicket: g.planeTicket === true,
+      planeTicket: g.planeTicket === true, noClaim: g.noClaim === true,
     })),
     venues: (Array.isArray(r.venues) ? (r.venues as Record<string, unknown>[]) : []).filter(v => v && typeof v.key === "string" && v.key.trim()).map(v => ({
       key: String(v.key), name: typeof v.name === "string" && v.name.trim() ? v.name : String(v.key),
@@ -94,7 +102,7 @@ const money = (n: number | null) => (n === null ? "" : String(n));
 
 /** The form as it opens: the active regions, in their order, and every venue with the region it is in. */
 export function claimRatesDraft(s: ClaimRatesAdmin): ClaimRatesDraft {
-  const regions = s.regions.filter(g => g.active).map((g, i) => ({ key: g.id ?? `r${i}`, id: g.id, name: g.name, spots: String(g.spots), planeTicket: g.planeTicket }));
+  const regions = s.regions.filter(g => g.active).map((g, i) => ({ key: g.id ?? `r${i}`, id: g.id, name: g.name, spots: String(g.spots), planeTicket: g.planeTicket, noClaim: g.noClaim === true }));
   return {
     base: s.base, perSpot: money(s.perSpot), perPaxNight: money(s.perPaxNight),
     groupMaxPax: String(s.groupMaxPax), groupCapPerNight: money(s.groupCapPerNight),
@@ -127,6 +135,7 @@ export function claimRatesProblems(d: ClaimRatesDraft): string[] {
     else if (seen.has(name.toLowerCase())) out.push(`Two regions are called ${name}.`);
     seen.add(name.toLowerCase());
     if (!/^\d{1,3}$/.test(g.spots.trim()) || Number(g.spots) > 100) out.push(`${name || `Region ${i + 1}`}: spots must be a whole number from 0 to 100.`);
+    if (g.noClaim && g.planeTicket) out.push(`${name || `Region ${i + 1}`} is flown to, so it cannot be set as no claim.`);
   });
   return out;
 }
@@ -139,7 +148,7 @@ export function claimRatesToSave(d: ClaimRatesDraft): ClaimRatesToSave {
     perPaxNight: rate(d.perPaxNight, "").value,
     groupMaxPax: Number(d.groupMaxPax.trim()),
     groupCapPerNight: rate(d.groupCapPerNight, "").value,
-    regions: d.regions.map(g => ({ id: g.id, name: g.name.trim(), spots: Number(g.spots.trim()), planeTicket: g.planeTicket })),
+    regions: d.regions.map(g => ({ id: g.id, name: g.name.trim(), spots: Number(g.spots.trim()), planeTicket: g.planeTicket, noClaim: g.noClaim === true })),
     // A venue whose region was removed from the list is in none.
     venues: Object.entries(d.venues).map(([key, region]) => ({ key, region: byKey.get(region) || null })),
   };
@@ -173,6 +182,8 @@ export function validClaimRatesToSave(v: unknown): v is ClaimRatesToSave {
   if (!okRate(r.perSpot) || !okRate(r.perPaxNight) || !okRate(r.groupCapPerNight)) return false;
   if (typeof r.groupMaxPax !== "number" || !Number.isInteger(r.groupMaxPax) || r.groupMaxPax < 1 || r.groupMaxPax > MAX_GROUP) return false;
   if ((r.regions as unknown[]).some(g => typeof (g as Record<string, unknown> | null)?.planeTicket !== "boolean")) return false;
+  // noClaim: ticked or not — absent from a page opened before it (2026-11-01), which the database then keeps as it was.
+  if ((r.regions as unknown[]).some(g => !["boolean", "undefined"].includes(typeof (g as Record<string, unknown> | null)?.noClaim))) return false;
   const names = new Set((r.regions as Record<string, unknown>[]).map(g => String(g?.name ?? "").trim().toLowerCase()));
   if ((r.venues as unknown[]).some(x => {
     const venue = (x ?? {}) as Record<string, unknown>;
@@ -184,7 +195,7 @@ export function validClaimRatesToSave(v: unknown): v is ClaimRatesToSave {
     groupMaxPax: String(r.groupMaxPax), groupCapPerNight: r.groupCapPerNight === null ? "" : String(r.groupCapPerNight),
     regions: (r.regions as unknown[]).map((g, i) => {
       const x = (g ?? {}) as Record<string, unknown>;
-      return { key: String(i), id: typeof x.id === "string" ? x.id : null, name: typeof x.name === "string" ? x.name : "", spots: typeof x.spots === "number" ? String(x.spots) : "x", planeTicket: x.planeTicket === true };
+      return { key: String(i), id: typeof x.id === "string" ? x.id : null, name: typeof x.name === "string" ? x.name : "", spots: typeof x.spots === "number" ? String(x.spots) : "x", planeTicket: x.planeTicket === true, noClaim: x.noClaim === true };
     }),
     venues: {},
   };

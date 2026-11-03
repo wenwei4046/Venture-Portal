@@ -9,6 +9,7 @@ import { officeMonth, officeToday } from '@/lib/office-time'
 import { mintRankKey, rankName, rankLabelOf, rankPayError, rankPayOf, resequenceLadder } from '@/lib/commission/ranks'
 import { newSchemeSettings, type SchemeSettings } from '@/lib/commission/scheme-defaults'
 import { checkDirectorPay } from '@/lib/commission/director-pay'
+import { parseSubBrands } from '@/lib/brand-code'
 
 /**
  * Revenue → Rules. Every rule, threshold and per-person tick for the Revenue
@@ -225,7 +226,6 @@ async function cloneSchemeChildren(
     ['comm_kpi_items', ['source', 'product_code', 'product_name', 'erp_product_id', 'option_pool', 'option_value', 'kpi_amount', 'effective_from', 'effective_to']],
     ['comm_cost_ratios', ['erp_product_id', 'product_code', 'ratio', 'note']],
     ['comm_kpi_thresholds', ['tier_label', 'min_qty', 'bonus_pct', 'effective_from', 'effective_to']],
-    ['comm_open_bill_rules', ['bill_rank', 'pct', 'effective_from', 'effective_to']],
     ['comm_promotion_rules', ['from_rank_key', 'to_rank_key', 'alternative_group', 'criterion', 'threshold_amount', 'threshold_qty', 'margin_band_key', 'consecutive_months', 'is_enforced', 'note']],
   ]
 
@@ -241,7 +241,7 @@ async function cloneSchemeChildren(
 
   const { data: brands } = await supabase
     .from('comm_brands')
-    .select('id, code, name, item_code_prefixes, note, is_active')
+    .select('id, code, name, item_code_prefixes, sub_brands, note, is_active')
     .eq('scheme_id', fromSchemeId)
 
   for (const brand of (brands ?? []) as Array<Record<string, unknown>>) {
@@ -252,6 +252,7 @@ async function cloneSchemeChildren(
         code: brand.code,
         name: brand.name,
         item_code_prefixes: brand.item_code_prefixes,
+        sub_brands: brand.sub_brands ?? [],
         note: brand.note,
         is_active: brand.is_active,
       })
@@ -312,10 +313,6 @@ export async function updateScheme(formData: FormData) {
   // and this Save wrote back what its form had loaded — 1 when blank — over
   // whatever Costing Setting had set since.
 
-  const basis = text(formData, 'open_bill_basis')
-  if (basis && !['uplift_on_commission', 'pct_of_revenue'].includes(basis)) {
-    throw new Error('Unknown Open Bill basis')
-  }
   const rateMode = text(formData, 'default_rate_mode')
   if (rateMode && !['fixed', 'variable'].includes(rateMode)) {
     throw new Error('Unknown rate mode')
@@ -328,7 +325,6 @@ export async function updateScheme(formData: FormData) {
         .update({
           enable_product_revenue: formData.get('enable_product_revenue') === 'on',
           enable_kpi: formData.get('enable_kpi') === 'on',
-          enable_open_bill: formData.get('enable_open_bill') === 'on',
           enable_override: formData.get('enable_override') === 'on',
           enable_margin_penalty: formData.get('enable_margin_penalty') === 'on',
           enable_margin_incentive: formData.get('enable_margin_incentive') === 'on',
@@ -337,7 +333,6 @@ export async function updateScheme(formData: FormData) {
           override_depth: overrideDepth,
           direct_line_limit: directLimit,
           override_includes_kpi: formData.get('override_includes_kpi') === 'on',
-          open_bill_basis: basis || 'uplift_on_commission',
           default_rate_mode: rateMode || 'variable',
           deposit_threshold_pct: depositOn ? depositPct : null,
           updated_at: new Date().toISOString(),
@@ -720,20 +715,6 @@ export async function deleteKpiThreshold(id: string) {
   refresh()
 }
 
-// ─── Open Bill ──────────────────────────────────────────────────────────────
-
-export async function updateOpenBillRule(formData: FormData) {
-  await requireActionOn('/revenue/[sub]/rules', 'revenue', 'manage')
-  const supabase = await client()
-
-  const id = required(formData, 'id', 'Rule')
-  const p = pct(formData, 'pct')
-  if (p === null || p < 0 || p > 1) throw new Error('Open Bill bonus must be between 0 and 100%')
-
-  check((await supabase.from('comm_open_bill_rules').update({ pct: p }).eq('id', id)).error, 'Could not save the Open Bill rate')
-  refresh()
-}
-
 // ─── Brands and margin bands ────────────────────────────────────────────────
 
 export async function upsertBrand(formData: FormData) {
@@ -747,13 +728,35 @@ export async function upsertBrand(formData: FormData) {
     .map(s => s.trim().toUpperCase())
     .filter(Boolean)
 
-  const row = {
+  const row: Record<string, unknown> = {
     scheme_id: required(formData, 'scheme_id', 'Scheme'),
     code: required(formData, 'code', 'Brand code').toUpperCase(),
     name: required(formData, 'name', 'Brand name'),
     item_code_prefixes: prefixes,
-    note: text(formData, 'note') || null,
-    is_active: formData.get('is_active') !== 'off',
+  }
+  // Only what the form carries (2026-10-31): the brand form has no note and no
+  // Active box, and a save wrote null over the note and true over the switch.
+  if (formData.has('note')) row.note = text(formData, 'note') || null
+  if (formData.has('is_active')) row.is_active = formData.get('is_active') !== 'off'
+  // The ERP brandings that ARE this brand (HAPPI SLEEP is Akemi's) — never
+  // another brand's word. A page opened before the box existed sends none and
+  // leaves them as they are.
+  if (formData.has('sub_brands')) {
+    let othersRead = supabase
+      .from('comm_brands')
+      .select('code, name, sub_brands')
+      .eq('is_active', true)
+      .neq('code', row.code)
+    // A brand being recoded is not "another brand" to itself.
+    if (id) othersRead = othersRead.neq('id', id)
+    const { data: others, error } = await othersRead
+    check(error, 'Could not read the other brands')
+    row.sub_brands = parseSubBrands(
+      text(formData, 'sub_brands'),
+      { code: String(row.code), name: String(row.name) },
+      ((others ?? []) as Array<{ code: string; name: string; sub_brands: string[] | null }>)
+        .map(b => ({ code: b.code, name: b.name, subBrands: b.sub_brands ?? [] })),
+    )
   }
 
   check(
@@ -825,62 +828,16 @@ export async function deleteMarginBand(id: string) {
  * together; Rules still sets them apart. Off means the run pays none of it;
  * every run computed afterwards follows.
  */
-export type SchemeSwitch = 'open_bill' | 'margin' | 'kpi'
-
-/**
- * Open Bill for ONE month (2026-09-26 — user: "open for august, not
- * september"). Rules › Scheme rules sets every month; a month may carry its
- * own setting over it (`comm_open_bill_months`), which is what the run, the
- * picks and the feed's suggestions for that month read (`comm_open_bill_on`).
- * `null`, or the same value as Rules, clears it: the month follows Rules again.
- * A month whose run has paid keeps what it paid.
- */
-export async function setMonthOpenBill(subDepartmentId: string, period: string, on: boolean | null): Promise<void> {
-  const user = await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'manage')
-  if (!/^\d{4}-\d{2}-01$/.test(period)) throw new Error('A month is its first day, e.g. 2026-08-01')
-  const supabase = await client()
-
-  const [{ data: locked, error: lockError }, { data: scheme, error: schemeError }] = await Promise.all([
-    supabase.rpc('commission_order_period_locked', { p_sub_department_id: subDepartmentId, p_period: period }),
-    supabase.from('comm_schemes').select('enable_open_bill')
-      .eq('sub_department_id', subDepartmentId).eq('is_active', true).is('effective_to', null).maybeSingle(),
-  ])
-  if (lockError) throw new Error(`Could not check the commission run: ${lockError.message}`)
-  if (locked) throw new Error(`The ${period.slice(0, 7)} month is in payroll, so what it pays cannot change.`)
-  if (schemeError) throw new Error(`Could not read Rules: ${schemeError.message}`)
-  const rules = Boolean((scheme as { enable_open_bill: boolean } | null)?.enable_open_bill)
-
-  if (on === null || on === rules) {
-    check(
-      (await supabase.from('comm_open_bill_months').delete()
-        .eq('sub_department_id', subDepartmentId).eq('period_month', period)).error,
-      'Could not change the month',
-    )
-  } else {
-    check(
-      (await supabase.from('comm_open_bill_months').upsert({
-        sub_department_id: subDepartmentId,
-        period_month: period,
-        enabled: on,
-        set_by: user.id,
-        set_by_name: user.name,
-        set_at: new Date().toISOString(),
-      })).error,
-      'Could not change the month',
-    )
-  }
-  refresh()
-}
+export type SchemeSwitch = 'margin' | 'kpi'
 
 export async function setSchemeSwitch(schemeId: string, which: SchemeSwitch, on: boolean): Promise<void> {
   await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'manage')
+  if (which !== 'margin' && which !== 'kpi') throw new Error('Unknown switch')
   const supabase = await client()
   const patch =
-    which === 'open_bill'
-      ? { enable_open_bill: on }
-      : which === 'kpi'
-        ? { enable_kpi: on }
-        : { enable_margin_penalty: on, enable_margin_incentive: on }
+    which === 'kpi'
+      ? { enable_kpi: on }
+      : { enable_margin_penalty: on, enable_margin_incentive: on }
   check(
     (await supabase.from('comm_schemes').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', schemeId)).error,
     'Could not change the switch',

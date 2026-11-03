@@ -9,7 +9,7 @@
  * behaviour is sales/vm/*.ts; every change is saved first (sales/actions.ts).
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react";
-import { fetchCrmData } from "@/app/(member)/member/crm-actions";
+import { fetchCrmData, fetchCrmReplyExamples } from "@/app/(member)/member/crm-actions";
 import { canFromRole, type CrmData } from "@/lib/member/crm-data";
 import { crmDemoData } from "@/lib/member/crm-demo-data";
 import H from "./crm.module.css";
@@ -22,7 +22,7 @@ import { lastAt } from "./sales/vm/inbox";
 import SalesScreens from "./sales/SalesScreens";
 import SalesShellBanners from "./sales/SalesShellBanners";
 import { shellVM } from "./sales/vm/header";
-import { byTeam, downlineOf } from "./shared/people";
+import { byTeam, downlineOf, jobTitle } from "./shared/people";
 import PanelScreens from "./panel/PanelScreens";
 import DeskScreens from "./desk/DeskScreens";
 import type { DeskApp as DeskAppFrame } from "./desk/vm/ctx";
@@ -145,7 +145,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
           const sig = JSON.stringify(r.data);
           if (sig === lastRead) return;
           lastRead = sig;
-          setData(prev => keepSending(prev, r.data));
+          // The suggested replies' examples are read once (below) and kept across the reads.
+          setData(prev => { const n = keepSending(prev, r.data); return prev?.replyExamples ? { ...n, replyExamples: prev.replyExamples } : n; });
           saveSnapshot(desk ? "desk" : "phone", r.data);
         }
       } finally { busy = false; }
@@ -156,6 +157,14 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     window.addEventListener("focus", back);
     return () => { stopped = true; clearInterval(t); document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); };
   }, [live, refs, desk]);
+  // What customers asked and our team answered, for the chat's suggested replies (2026-10-29): read once, once the CRM is there.
+  const haveData = !!data;
+  useEffect(() => {
+    if (!live || !haveData) return;
+    let current = true;
+    void fetchCrmReplyExamples().then(ex => { if (current && ex) setData(d => (d ? { ...d, replyExamples: ex } : d)); });
+    return () => { current = false; };
+  }, [live, haveData]);
   // Demo only: whose eyes, after the first paint (the server cannot read the address's ?crmAs).
   // Every chat's newest photos are fetched onto the phone ahead of being opened (shared/media-cache.ts › warmPhotos).
   useEffect(() => { if (live && data) warmPhotos(photosAhead(data.customers)); }, [live, data]);
@@ -279,7 +288,9 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   // already gives them only their line — beside their own CRM.
   const leads = !full && data.people.some(p => p.uplineId === me.id);
   // On a computer a leader opens on their Team side's desktop, as the Director does (2026-10-26); on a phone, their own CRM.
-  const mode = hodMode ?? (full || (desk && leads) ? "panel" : "crm");
+  // A Revenue Specialist too opens on a desktop of their own (the owner, 2026-10-29: "revenue specialist 也要做") — the same
+  // screens on their own customers, none of CRM · Manage's pages.
+  const mode = hodMode ?? (full || (desk && !!deskApp) ? "panel" : "crm");
   const nameOf = (id: string | null | undefined) => personOf(id, data.people)?.name ?? "—";
   const openCrmOf = (staffId: string, customerId?: string) => {
     setTeamAs(null);
@@ -292,7 +303,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const switchList = byTeam(below.map(id => personOf(id, data.people)!).filter(Boolean), data.people);
   const hasTeamSide = (p: { id: string; role: string }) => p.role === "hod" || data.people.some(q => q.uplineId === p.id);
   const viewed = viewing ? personOf(viewing, data.people) : undefined;
-  const panelFor = viewed && teamAs === viewed.id ? viewed : !viewing && (full || leads) && (!sells || mode === "panel") ? me : undefined;
+  const panelFor = viewed && teamAs === viewed.id ? viewed : !viewing && (full || leads || (desk && !!deskApp)) && (!sells || mode === "panel") ? me : undefined;
   if (panelFor) {
     // Their own view: the Director (or whoever holds View at All) every team; a leader their own line.
     const wide = panelFor.id === me.id ? full : panelFor.role === "hod";
@@ -324,10 +335,19 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     // Control panel: CRM Desktop rev 1, built to its prototype (2026-10-13), on the same data and writes. A leader too
     // (the owner, 2026-10-26: "team leader 的desktop 版本，畫面跟principal, Revenue director一樣，只是權限上有差別"): the same
     // screens on their own line — the database gives them only that — and none of CRM · Manage's pages (MANAGE_TABS).
-    if (desk && (full || leads) && panelFor.id === me.id && deskApp) {
+    // View as a team member on a computer (the owner, 2026-10-29: "view as 是要看他们的 desktop 版"): somebody who leads opens on
+    // THEIR desktop — their line's customers and their own cells, as they see it — with a strip to leave; a salesperson, whose
+    // CRM on a computer is the phone's screens, opens on those (below), with the phone's Switch · Exit banner.
+    if (desk && deskApp) {
+      const own = panelFor.id === me.id;
       return (
-        <DeskScreens data={data} me={me} now={now} live={live} act={panelAct} setData={setDataSafe} teams={teams} directors={pctx.directors}
-          nameOf={nameOf} app={deskApp} exit={onExit} toMine={pctx.toMyCrm} problem={problem} actToast={panelUi.toast} />
+        <DeskScreens key={panelFor.id} data={pdata} me={panelFor} now={now} live={live} act={panelAct} setData={setDataSafe} teams={teams} directors={pctx.directors}
+          nameOf={nameOf} app={deskApp} exit={onExit} toMine={own && (full || leads) ? pctx.toMyCrm : undefined} problem={problem} actToast={panelUi.toast}
+          viewAs={own ? { people: switchList.map(p => ({ id: p.id, name: p.name, title: jobTitle(p) })),
+            open: id => { const p = personOf(id, data.people); setViewing(id); setTeamAs(p ? id : null); setUi(u => ({ ...initialSalesUi(), toast: u.toast })); } } : undefined}
+          viewing={own ? undefined : { id: panelFor.id, name: panelFor.name, exit: () => { setTeamAs(null); setViewing(null); },
+            people: switchList.map(p => ({ id: p.id, name: p.name, title: jobTitle(p) })),
+            switchTo: id => { setViewing(id); setTeamAs(id); setUi(u => ({ ...initialSalesUi(), toast: u.toast })); } }} />
       );
     }
     // Viewing somebody's Team: the same "Viewing X's CRM · Switch · Exit" banner their own CRM has (user 2026-10-11).

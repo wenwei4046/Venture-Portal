@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mktNoticesFromRow, mktSearchFromRow, mktShellFromRow, noticeAge, subsForNav, subsTotal } from './shell'
 import { DEFAULT_LOOK, densityOf, lookFromCookie, lookToCookie } from './look'
-import { mktCrumb, mktNavActive, mktNavRows } from './nav'
+import { mktCrumb, mktFinancePage, mktNavActive, mktNavRows, mktOwnPage } from './nav'
 import { isMarketingView } from '../marketing-view'
 
 describe("Marketing's shell", () => {
@@ -20,7 +20,7 @@ describe("Marketing's shell", () => {
     })
     expect(s.me).toMatchObject({ first: 'Sia', team: 'manager', role: null })
     expect(s.subs.map(x => x.code)).toEqual(['CAR', '2990', 'HK'])
-    expect(s.counts).toEqual({ myspace: 3, calendar: 1, projects: 0, tracking: 0 })
+    expect(s.counts).toEqual({ myspace: 3, calendar: 1, projects: 0, tracking: 0, claims: 0 })
     // Those with something for the viewer first, most first — the rest as listed.
     expect(subsForNav(s.subs).map(x => x.code)).toEqual(['2990', 'HK', 'CAR'])
     expect(subsTotal(s.subs)).toBe(3)
@@ -29,7 +29,7 @@ describe("Marketing's shell", () => {
 
   it('reads the bell and the search', () => {
     expect(mktNoticesFromRow([{ id: 'n1', title: 'On the plan', at: '2026-10-22T02:00:00Z', read: false, ref: 'p1' }, { title: 'no id' }]))
-      .toEqual([{ id: 'n1', title: 'On the plan', body: '', ref: 'p1', at: '2026-10-22T02:00:00Z', read: false, type: null }])
+      .toEqual([{ id: 'n1', title: 'On the plan', body: '', ref: 'p1', at: '2026-10-22T02:00:00Z', read: false, type: null, refKind: 'mkt_project' }])
     expect(mktSearchFromRow({ projects: [{ trackId: 'MKT-CAR-2610-001', title: 'Year-End' }], people: [{ id: 'u', first: 'Mei' }] }))
       .toEqual({ projects: [{ trackId: 'MKT-CAR-2610-001', title: 'Year-End', kind: '', status: '', sub: null }], people: [{ id: 'u', first: 'Mei', full: '', title: null, team: null }] })
     const now = new Date('2026-10-22T10:00:00Z')
@@ -52,7 +52,27 @@ describe("Marketing's shell", () => {
     const staff = ['mkt.overview.view', 'mkt.calendar.view', 'mkt.projects.view', 'mkt.my_claims.view', 'mkt.meeting_rooms.view']
     expect(mktNavRows(staff).map(r => r.key)).toEqual(['myspace', 'calendar', 'subs', 'projects', 'library', 'claims', 'rooms'])
     expect(mktNavRows([...staff, 'mkt.tracking.view']).map(r => r.key)).toEqual(['myspace', 'calendar', 'subs', 'projects', 'library', 'tracking', 'workflow', 'product', 'minutes', 'replace', 'billing', 'claims', 'rooms'])
-    expect(mktNavRows(undefined).length).toBe(13)
+    expect(mktNavRows(undefined).length).toBe(14)
+    // PR ③ (2026-10-29, the mockup's ②): Claim & approve under the manager's tools, with the number waiting for them.
+    const claims = mktNavRows([...staff, 'mkt.claims_approve.view']).find(r => r.key === 'claims')!
+    expect([claims.label, claims.count, claims.manager, claims.foot]).toEqual(['Claim & approve', 'claims', true, false])
+    expect(mktNavRows(staff).find(r => r.key === 'claims')!.label).toBe('Claim')
+  })
+
+  // 2026-10-28: Marketing's own pool is a box of its own — the manager tools do not bring it, and it lists under them.
+  it('lists Pool for whoever holds Marketing view › Pool, after Billing', () => {
+    const manager = ['mkt.overview.view', 'mkt.calendar.view', 'mkt.projects.view', 'mkt.tracking.view', 'mkt.my_claims.view', 'mkt.meeting_rooms.view']
+    expect(mktNavRows(manager).some(r => r.key === 'pool')).toBe(false)
+    const rows = mktNavRows([...manager, 'mkt.pool.view'])
+    expect(rows.map(r => r.key).slice(-4)).toEqual(['billing', 'pool', 'claims', 'rooms'])
+    expect(rows.find(r => r.key === 'pool')).toMatchObject({ emoji: '🏦', label: 'Pool', href: '/marketing/pool', manager: true })
+    expect([mktNavActive('/marketing/pool', new URLSearchParams('view=pnl')), mktCrumb('/marketing/pool')]).toEqual(['pool', { emoji: '🏦', label: 'Pool' }])
+  })
+
+  it('draws the Pool on Finance’s sheet, as Dept Pool draws it — the handoff’s pages on Marketing’s card', () => {
+    expect(['/marketing', '/marketing/billing', '/marketing/projects/TSK-1'].map(mktOwnPage)).toEqual([true, true, true])
+    expect(['/marketing/pool', '/marketing/pool?view=pnl', '/claims', '/admin/rooms', '/marketing-x'].map(mktOwnPage)).toEqual([false, false, false, false, false])
+    expect(['/marketing/pool', '/marketing/pool/export', '/marketing/billing', '/claims'].map(mktFinancePage)).toEqual([true, true, false, false])
   })
 
   it('lights the row a page is under, a subsidiary by its projects', () => {

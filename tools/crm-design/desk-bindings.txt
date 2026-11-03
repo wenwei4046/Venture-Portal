@@ -31,6 +31,10 @@ apCmpOn
 apCmpShort
 apMainShort
 apRangeLabel
+apSrcCur
+apSrcOpen
+apSrcOpts
+apSrcToggle
 apStCur
 apStOpen
 apStOpts
@@ -248,6 +252,8 @@ isFtOp
 isGenOp
 isHistOp
 isLbaOp
+isLibOp
+isLinkOp
 isMwtOp
 isNtfOp
 isSrOp
@@ -267,12 +273,14 @@ kInsight
 kList
 kMetrics
 kNote
+kPartner
 kPeople
 kPick
 kReports
 kSection
 kTeam
 kTopMove
+kWorkspace
 leadsByAd
 listCards
 listMin
@@ -340,12 +348,15 @@ paneFull
 paneOn
 paneShown
 paneStyle
+partnerLink
+partnerPane
 people
 perfW
 personChats
 ph
 photo
 pickGroups
+pickSuggest
 pinShown
 pinText
 plainOp
@@ -353,6 +364,7 @@ ppPager
 ppStats
 rail
 railOn
+replyLib
 replyOn
 replyText
 replyWho
@@ -449,6 +461,10 @@ srTabs
 srTimeModes
 srWkFg
 srWkNote
+suggest
+suggestKey
+suggestLib
+suggestLogo
 sysLines
 teamName
 teamPeople
@@ -487,6 +503,7 @@ waOba
 waObaHas
 waObaNone
 waObaReq
+waPic
 waProf
 waStats
 waSubs
@@ -496,3 +513,4 @@ waUserHas
 waUserNone
 waWeb
 wn
+workspace

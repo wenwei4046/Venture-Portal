@@ -56,14 +56,14 @@ export function NoticesPanel({ onClose, onRead }: { onClose: () => void; onRead:
           {items.map(n => (
             <Link
               key={n.id}
-              href={n.ref ? noticeUrl({ refKind: 'mkt_project', refId: n.ref }, 'hr') : '/marketing'}
+              href={n.ref ? noticeUrl({ refKind: n.refKind, refId: n.ref }, 'hr') : '/marketing'}
               className={`${s.notice}${n.read ? '' : ` ${s.noticeUnread}`}`}
               onClick={() => {
                 if (!n.read) void readNotices([n.id]).then(r => (r.ok ? onRead() : undefined))
                 onClose()
               }}
             >
-              <span className={s.noticeIcon} aria-hidden="true">🎬</span>
+              <span className={s.noticeIcon} aria-hidden="true">{n.refKind === 'payment_request' ? '🧾' : '🎬'}</span>
               <span className={s.noticeText}>
                 <span className={s.noticeTitle}>{n.title}</span>
                 <span className={s.noticeMeta}>

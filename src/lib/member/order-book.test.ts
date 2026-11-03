@@ -51,6 +51,35 @@ describe("readOrderBook", () => {
   });
 });
 
+// 2026-10-30 (mig 20261030083500): a gift on a bill of its own has no margin, and its cost counts against the month —
+// which the server alone can add up, since no bill reaches the phone with a cost.
+describe("readOrderBook — a bill with no sales, and the margins the server works out", () => {
+  const MARGINS = { overall: 35.5, brands: { AKEMI: 35.5, DUNLOP: null }, months: { "2026-09": { overall: 35.5, brands: { AKEMI: 35.5, DUNLOP: null } } } };
+  const withMargins = (margins: unknown = MARGINS) => {
+    const r = raw();
+    Object.assign(r.orders[0], { revenue: 0, total: 0, noSales: true });
+    return { ...r, margins };
+  };
+  it("reads which bill has no sales — an answer from before says nothing", () => {
+    expect(readOrderBook(withMargins())!.orders[0].noSales).toBe(true);
+    expect(readOrderBook(raw())!.orders[0]).not.toHaveProperty("noSales");
+  });
+  it("reads the margins as percentages, each month's too — an answer from before has none", () => {
+    expect(readOrderBook(withMargins())!.margins).toEqual(MARGINS);
+    expect(readOrderBook(raw())).not.toHaveProperty("margins");
+  });
+  it("drops margins it cannot read, so the app adds the bills up itself", () => {
+    expect(readOrderBook(withMargins({ overall: "35%", brands: {} }))).not.toHaveProperty("margins");
+    expect(readOrderBook(withMargins({ overall: 35, brands: { AKEMI: "a lot" } }))).not.toHaveProperty("margins");
+    expect(readOrderBook(withMargins({ ...MARGINS, months: { Sep: { overall: 35, brands: {} } } }))).not.toHaveProperty("margins");
+  });
+  it("carries no cost with them, whatever the RPC adds", () => {
+    const book = readOrderBook(withMargins({ ...MARGINS, cost: 4500, months: { "2026-09": { ...MARGINS.months["2026-09"], cost: 4500 } } }))!;
+    expect(JSON.stringify(book.margins)).not.toContain("4500");
+    expect(book.orders[0]).not.toHaveProperty("cost");
+  });
+});
+
 describe("readInsightRange", () => {
   const score = { staffId: "s1", sales: 10, held: 0, orders: 1, kpiQty: 0, marginRevenue: 10, marginCost: 6, blindOrders: 0, lastOrder: "2026-09-30" };
   it("reads me and the downline", () => {

@@ -11,6 +11,7 @@
  */
 
 import { TIERS } from './pricing'
+import { isKivSize, KIV_SIZE_LABEL } from './edits'
 
 /** PRICE_2 → Tier 2, the way the calculator says it. */
 function tierLabelOf(tier: string): string {
@@ -58,6 +59,11 @@ export function costProvenance(
 
   switch (source) {
     case 'catalogue':
+      // A bed frame still to be chosen (2026-10-31): the dearest frame of its size, else of any size.
+      if (text(detail.how) === 'kiv') {
+        const size = text(detail.size)
+        return { label: `KIV bed frame · ${isKivSize(size) ? KIV_SIZE_LABEL[size] : 'the dearest size'}`, missing: false }
+      }
       return { label: ['Product List', ...how].join(' · '), missing: false }
     case 'catalogue_combo': {
       const combo = detail.combo && typeof detail.combo === 'object' ? (detail.combo as Detail) : {}
@@ -88,6 +94,9 @@ const CHARGE_WORD: Record<string, string> = {
   bedframe_specials: '',
   sofa_leg_heights: 'leg ',
   sofa_specials: '',
+  // Maintenance › Fabrics › upgrades (2026-10-29): the upgrade's name, the series it was found by after it.
+  bedframe_fabric_upgrades: '',
+  sofa_fabric_upgrades: '',
 }
 
 /**
@@ -95,7 +104,9 @@ const CHARGE_WORD: Record<string, string> = {
  * (`cost_detail.charges`, 20261005010000; every option since 20261006050000):
  * the customer's price for each, out of the margin and in the commission. A
  * sofa is charged once per sofa and the set's charge spread over its pieces
- * (`cost_detail.charge_set`), which the words say.
+ * (`cost_detail.charge_set`), which the words say; a sofa special charged by
+ * quantity once per compartment (2026-10-27, `by_quantity`, `count`) says how many;
+ * a fabric's upgrade (2026-10-29) the series it was found by — `Upgrade fabric (PC151)`.
  */
 export function chargeText(detail: unknown): string {
   const d: Detail = detail && typeof detail === 'object' && !Array.isArray(detail) ? (detail as Detail) : {}
@@ -104,7 +115,10 @@ export function chargeText(detail: unknown): string {
     const pool = text((c as Detail).pool)
     const value = text((c as Detail).value)
     const word = pool ? CHARGE_WORD[pool] : undefined
-    return word !== undefined && value ? [`${word}${value}`] : []
+    const count = Number((c as Detail).count)
+    const times = (c as Detail).by_quantity === true && Number.isInteger(count) && count > 0 ? ` ×${count}` : ''
+    const series = text((c as Detail).series)
+    return word !== undefined && value ? [`${word}${value}${series ? ` (${series})` : ''}${times}`] : []
   })
   const base = words.length ? `for ${words.join(' · ')}` : 'for its options'
   const set = d.charge_set && typeof d.charge_set === 'object' && !Array.isArray(d.charge_set) ? (d.charge_set as Detail) : null

@@ -1,9 +1,9 @@
 "use client";
 
-import { Fragment, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import Sheet, { SheetHandle } from "../Sheet";
 import { PageHead } from "./IncomePages";
-import type { PersonSheetVM, TeamDot, TeamNodeVM, TeamVM } from "./profile-vm";
+import type { PersonSheetVM, TeamDot, TeamKidVM, TeamNodeVM, TeamVM } from "./profile-vm";
 import s from "./profile.module.css";
 
 const DOT: Record<TeamDot, string> = { good: s.dotGood, wait: s.dotWait, up: s.dotUp };
@@ -11,19 +11,50 @@ const INK = { ink: "", good: s.psGood, up: s.psUp, wait: s.psWait } as const;
 
 /** A director's place on a shared level (`.peer`): the 132px card and the 24px between two. */
 const PEER_W = 156;
+/** Your own card (`.nodeMe`). */
+const ME_W = 150;
+/** A column below you (`.kid`): a direct report's is the prototype's 145 (its 580 shared by four), one further down 132
+ *  (the 120px card and 12 between) — or its own people's row, when that is wider. */
+const KID_W = 145;
+const DEEP_W = 132;
+
+/** Somebody below you, their column's width, and their own people's columns. */
+interface Placed {
+  node: TeamKidVM;
+  width: number;
+  kids: Placed[];
+  /** Room before their first person's column and after their last: the bar under them runs from the middle of the
+   *  first column to the middle of the last, and this keeps its middle — where their line comes down — under them. */
+  pad: [number, number];
+}
+
+function place(node: TeamKidVM, depth: number): Placed {
+  const kids = node.kids.map(k => place(k, depth + 1));
+  const pad = balance(kids);
+  const row = kids.reduce((sum, k) => sum + k.width, 0) + pad[0] + pad[1];
+  return { node, kids, pad, width: Math.max(depth ? DEEP_W : KID_W, row) };
+}
+
+/** A row whose first column is wider than its last leans that way: half the difference past the other end evens it. */
+function balance(row: Placed[]): [number, number] {
+  const lean = row.length > 1 ? (row[0].width - row[row.length - 1].width) / 2 : 0;
+  return lean > 0 ? [0, lean] : [-lean, 0];
+}
 
 /** Team & capacity (`team-style="b"`, lines 999–1080): the department's places, then the family chart. */
 export default function TeamPage({ vm, onBack, onPerson }: { vm: TeamVM | null; onBack: () => void; onPerson: (id: string) => void }) {
   const scroller = useRef<HTMLDivElement>(null);
   const meId = vm?.me.id;
-  const widest = vm ? Math.max(0, ...vm.ups.map(u => u.nodes.length)) * PEER_W : 0;
+  // The middle column — the levels above, then you — stands in the middle of the chart.
+  const middle = vm ? Math.max(ME_W, ...vm.ups.map(u => u.nodes.length * PEER_W)) : 0;
+  const below = vm ? vm.kids.map(k => place(k, 0)) : [];
   // The chart opens at its left edge, as drawn. On a phone that puts the middle
-  // column right of centre, and a second director would start half off-screen —
-  // then, and only then, it opens on the middle instead.
+  // column right of centre: when that would cut one of its cards — a second
+  // director, or you over a wide family — it opens on the middle instead.
   useLayoutEffect(() => {
     const box = scroller.current;
-    if (box && widest > PEER_W && (box.scrollWidth + widest) / 2 > box.clientWidth) box.scrollLeft = (box.scrollWidth - box.clientWidth) / 2;
-  }, [meId, widest]);
+    if (box && (box.scrollWidth + middle) / 2 > box.clientWidth) box.scrollLeft = (box.scrollWidth - box.clientWidth) / 2;
+  }, [meId, middle]);
   return (
     <div className={s.page}>
       <PageHead back="Profile" title="Team & capacity" lede={vm?.lede ?? ""} onBack={onBack} />
@@ -84,43 +115,46 @@ export default function TeamPage({ vm, onBack, onPerson }: { vm: TeamVM | null; 
                 <span className={s.level}>YOU</span>
                 <Node node={vm.me} kind="me" onClick={() => onPerson(vm.me.id)} />
                 {vm.kids.length > 0 && <span className={s.stem} style={{ height: 20 }} />}
-                <div className={s.kids}>
-                  {vm.kids.map((k, i) => (
-                    <div key={k.id} className={s.kid}>
-                      <div className={s.bus}>
-                        <span className={`${s.busHalf} ${i === 0 ? s.busGap : ""}`} />
-                        <span className={s.busMid} />
-                        <span className={`${s.busHalf} ${i === vm.kids.length - 1 ? s.busGap : ""}`} />
-                      </div>
-                      <span className={s.stem} style={{ height: 18 }} />
-                      <Node node={k} kind="kid" onClick={() => onPerson(k.id)} />
-                      {k.kids.length > 0 && (
-                        <>
-                          <span className={s.stem} style={{ height: 16 }} />
-                          <div className={s.grand}>
-                            {k.kids.map((g, j) => (
-                              <Fragment key={g.id}>
-                                <div className={s.grandWrap}>
-                                  <span className={s.stem} style={{ height: j === 0 ? 0 : 10 }} />
-                                  <button className={s.grandNode} onClick={() => onPerson(g.id)}>
-                                    <span className={s.grandAv}>{g.ini}</span>
-                                    <span className={s.grandText}><span className={s.grandName}>{g.name}</span><span className={s.grandTitle}>{g.title}</span></span>
-                                  </button>
-                                </div>
-                              </Fragment>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <Row row={below} pad={balance(below)} onPerson={onPerson} />
               </div>
             </div>
             <span className={s.swipe}>Swipe sideways to see everyone · tap a person for details</span>
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * One person's people, side by side on one bar under them, every level down (2026-10-27 — the user, of SHAWN's
+ * chart: "pei fen and wei shun should be same line, direct under sally", as the portal's Staff Hierarchy draws a team;
+ * the prototype had stacked the second level in a column, and drew no third).
+ */
+function Row({ row, pad, onPerson }: { row: Placed[]; pad: [number, number]; onPerson: (id: string) => void }) {
+  return (
+    <div className={s.kids}>
+      {row.map((k, i) => {
+        const first = i === 0;
+        const last = i === row.length - 1;
+        return (
+          <div key={k.node.id} className={s.kid} style={{ width: k.width, marginLeft: first && pad[0] ? pad[0] : undefined, marginRight: last && pad[1] ? pad[1] : undefined }}>
+            <div className={s.bus}>
+              <span className={`${s.busHalf} ${first ? s.busGap : ""}`} />
+              <span className={s.busMid} />
+              <span className={`${s.busHalf} ${last ? s.busGap : ""}`} />
+            </div>
+            <span className={s.stem} style={{ height: 18 }} />
+            <Node node={k.node} kind="kid" onClick={() => onPerson(k.node.id)} />
+            {k.kids.length > 0 && (
+              <>
+                <span className={s.stem} style={{ height: 16 }} />
+                <Row row={k.kids} pad={k.pad} onPerson={onPerson} />
+              </>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

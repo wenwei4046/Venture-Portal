@@ -31,7 +31,8 @@ describe("saved and read back", () => {
     expect(asked).not.toContain("status");
     expect(asked).not.toContain("loc");
     expect(saved.sections.flatMap(s => s.fields).filter(x => x.id === "first" || x.id === "status").every(x => x.sys === 1)).toBe(true);
-    expect(saved.sections[0].fields.filter(x => !x.sys).every(x => x.locked === 1)).toBe(true);
+    // Name and Phone are the owner's to set since 2026-10-29: required at first, no longer locked.
+    expect(saved.sections[0].fields.filter(x => !x.sys).map(x => [x.id, x.req, x.locked])).toEqual([["name", 1, undefined], ["phone", 1, undefined]]);
     const back = formV2({ forms: [{ id: "f1", name: saved.name, sections: saved.sections } as CrmForm] });
     const pets = back[3].fields.find(x => x.id === "pets")!;
     expect(pets).toMatchObject({ type: "Choice", opts: "Yes, No", req: true, kind: "own" });

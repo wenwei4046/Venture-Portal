@@ -9,6 +9,10 @@ import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
 import { formatMoney } from '@/lib/utils'
 import { bankShort, dealPreviewFigures, numberOrNull } from '@/lib/deal-preview'
 import AccountPicker, { type AccountOption } from '@/components/AccountPicker'
+import { NO_MIN_PAY_FROM, minPayFromField, minPayFromMissing, minPayLaterMonths, type MinPayFrom } from '@/lib/min-pay'
+import { resolveFirstDueYM } from '@/lib/treasury-terms'
+import { DealMinPayFrom } from '@/components/finv/DealTermsParts'
+import { neededSentence } from '@/components/finv/form-words'
 import {
   DealCard,
   DealCards,
@@ -66,6 +70,12 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
   const [rate, setRate] = useState<string>('')
   const [compound, setCompound] = useState(false)
   const [minPay, setMinPay] = useState(false)
+  // Minimum pay interest's month (2026-10-30): none chosen until one is; off, it goes with it.
+  const [minPayFrom, setMinPayFrom] = useState<MinPayFrom>(NO_MIN_PAY_FROM)
+  const pickMinPay = (on: boolean) => {
+    setMinPay(on)
+    if (!on) setMinPayFrom(NO_MIN_PAY_FROM)
+  }
   const [fromLabel, setFromLabel] = useState<string>('')
   const today = officeToday()
   const [effectiveDate, setEffectiveDate] = useState<string>(today)
@@ -133,8 +143,17 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
     'Rate locks at save · Principal must approve before money moves.',
   ].filter(Boolean)
 
+  // The first installment's month, and the later months minimum pay may start in.
+  const firstDueYM = resolveFirstDueYM(repaymentDate || null, effectiveDate || null)
+  const laterMonths = firstDueYM ? minPayLaterMonths(firstDueYM, today.slice(0, 7)) : []
+
   async function handleSubmit(formData: FormData) {
     setError(null)
+    const minPayMissing = minPay ? minPayFromMissing(minPayFrom, laterMonths) : null
+    if (minPayMissing) {
+      setError(neededSentence([minPayMissing]))
+      return
+    }
     startTransition(async () => {
       try {
         await createFundSource(formData)
@@ -382,9 +401,15 @@ export default function NewFundSourceForm({ companies, departments, liabilityAcc
               sub="Minimum pay interest"
               hint="勾选后代表约定「本金可以慢慢还，但每月利息一定要付」。Repayment schedule 会追踪当月利息付齐了没有，statement 上也会注明。"
               checked={minPay}
-              onChange={setMinPay}
+              onChange={pickMinPay}
             />
           </DealRow>
+          {minPay ? (
+            <>
+              <DealMinPayFrom value={minPayFrom} onChange={setMinPayFrom} firstDueYM={firstDueYM} laterMonths={laterMonths} idPrefix="nf" />
+              <input type="hidden" name="min_pay_interest_from" value={minPayFromField(minPayFrom)} />
+            </>
+          ) : null}
         </DealCard>
 
         {/* ───────── ③ 账务 ───────── */}

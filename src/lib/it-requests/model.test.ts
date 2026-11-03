@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  deviceLabel, fileSize, fileTag, isImage, itDay, itWhen, itContentType, itFileRefusal, itObjectPath, itRequestFromRow, itRequestsFromRow,
-  noteProblem, previewKind, submitProblem,
+  IT_DESK_STATUSES, IT_STATUSES, deviceLabel, fileSize, fileTag, isImage, itDay, itWhen, itContentType, itFileRefusal, itObjectPath, itRequestFromRow,
+  itRequestsFromRow, noteProblem, previewKind, senderMayClose, submitProblem,
 } from './model'
 
 // IT support (2026-10-20): what a request is as the app reads it, and what the app refuses before sending — the
@@ -49,6 +49,23 @@ describe('what is refused before it is sent', () => {
     expect(noteProblem({ body: '', files: 0, status: 'fixed', current: 'new' })).toBeNull()
     expect(noteProblem({ body: '', files: 1, status: null, current: 'new' })).toBeNull()
     expect(noteProblem({ body: 'z'.repeat(3001), files: 0, status: null, current: 'new' })).toMatch(/3,000/)
+  })
+})
+
+// 2026-10-27 — the user: "我这边写已经 fix 了，所以那个 close 是不需要的。等我这边按了已经 fix，这个 close 其实应该是由提出这个
+// request / support 的人去操作" (mig 20261026183719 asks the same).
+describe('who closes it', () => {
+  it('gives IT New, In progress and Fixed; Closed stays a status to read and filter by', () => {
+    expect(IT_DESK_STATUSES.map(s => s.label)).toEqual(['New', 'In progress', 'Fixed'])
+    expect(IT_STATUSES.map(s => s.id)).toEqual(['new', 'in_progress', 'fixed', 'closed'])
+  })
+  it('lets its sender close it once IT has marked it Fixed — never anybody else’s, never before', () => {
+    expect(senderMayClose({ mine: true, status: 'fixed' })).toBe(true)
+    for (const status of ['new', 'in_progress', 'closed'] as const) expect(senderMayClose({ mine: true, status })).toBe(false)
+    expect(senderMayClose({ mine: false, status: 'fixed' })).toBe(false)
+  })
+  it('a Close needs no words', () => {
+    expect(noteProblem({ body: '', files: 0, status: 'closed', current: 'fixed' })).toBeNull()
   })
 })
 

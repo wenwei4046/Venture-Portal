@@ -2,11 +2,12 @@
  * The customer form (Book visit step 1 of 2, and Customer info › Edit) and the
  * customer info rows — shared by Chat and Contacts.
  */
+import { sourceOf } from "@/lib/member/crm-source";
 import type { ChangeEvent } from "react";
 import type { ChangeEvent as InputEvent } from "react";
 import type { CrmCustomer, CrmData, CrmForm, CrmFormField } from "@/lib/member/crm-data";
 import type { CustomerForm } from "../ui";
-import { CHANNEL, STATUS_LABEL, day0, ini, lastReal, stop, timeLabel, type SalesCtx } from "./common";
+import { STATUS_LABEL, day0, ini, lastReal, stop, timeLabel, type SalesCtx } from "./common";
 import { adHref, adKindLabel } from "../../shared/AdLink";
 
 /** A Malaysian number as people write it: 60123456789 → 012-345 6789. */
@@ -36,7 +37,7 @@ const isBuiltIn = (id: string): id is BuiltIn => (BUILT_IN as readonly string[])
 export function formOf(data: Pick<CrmData, "forms">) {
   const form: CrmForm | undefined = data.forms?.[0];
   const ids = new Set(form?.sections.flatMap(s => s.fields.map(f => f.id)) ?? BUILT_IN);
-  const has = Object.fromEntries(BUILT_IN.map(k => [k, k === "name" || ids.has(k)])) as Record<BuiltIn, boolean>;
+  const has = Object.fromEntries(BUILT_IN.map(k => [k, ids.has(k)])) as Record<BuiltIn, boolean>;
   const extra = (form?.sections ?? []).map(s => ({ title: s.title, fields: s.fields.filter(f => !isBuiltIn(f.id) && !f.sys && f.id !== "status") })).filter(s => s.fields.length);
   // A form saved as pages (2026-10-16) is asked page by page, every question in its saved place (pagedQuestions).
   const paged = !!form && form.sections.some(s => typeof s.page === "number");
@@ -53,11 +54,13 @@ export function infoRows(c: CrmCustomer, data?: Pick<CrmData, "forms">) {
     ["Phone", phoneLabel(c.phone) || "—"],
     ["First contact", dmy(new Date(c.createdAt))],
     ["Last chat", last ? dmy(new Date(last.at)) : "—"],
-    ["Platform", CHANNEL[c.channel].name], ["Ad", c.adId ? `${adKindLabel(c)} · ${c.ad}` : c.ad], ["Status", STATUS_LABEL[c.status]],
+    ["Source", sourceOf(c).label], ["Ad", c.adId ? `${adKindLabel(c)} · ${c.ad}` : c.ad], ["Status", STATUS_LABEL[c.status]],
     ["Property type", c.details.type || "—"], ["Unit size", c.details.size || "—"], ["Location", c.details.loc || "—"],
     ["Requirement", c.details.req || "—"], ["Budget", c.details.budget ? "RM " + c.details.budget : "—"],
     // The form's own questions, after the built-in ones (CRM Desktop rev 1, B5).
     ...(f?.extra ?? []).flatMap(s => s.fields.map(q => [q.label, c.extra?.[q.id] || "—"])),
+    // A lead form ad's answers (2026-10-30), each under the question Meta asked.
+    ...(c.leadForm ? [[c.leadForm.kind === "instant" ? "Facebook form" : "Lead form", c.leadForm.complete ? "Filled in" : "Not finished"], ...c.leadForm.answers.map(x => [x.q, x.a || "—"])] : []),
   ] as [string, string][]).filter(([k]) => !f || !dropped[k] || f.has[dropped[k]])
     .map(([k, v], n) => ({ k, v, rule: n ? "1px solid var(--crm-rule)" : "0", vFg: v === "—" ? "var(--crm-faint)" : "var(--crm-ink)",
       // The Ad opens the ad itself, so the salesperson sees what the customer saw (the owner, 2026-10-15).
@@ -74,7 +77,7 @@ const BUILT_IN_Q: Record<BuiltIn, Omit<CrmFormField, "id" | "label" | "req">> = 
 };
 /** A paged form's questions (2026-10-16): the pages that ask something, the one being filled (`at`), its sections, every question. */
 export function pagedQuestions(form: CrmForm, page: number) {
-  const q = (x: CrmFormField): CrmFormField => (isBuiltIn(x.id) ? { ...BUILT_IN_Q[x.id], ...(x.opts?.length ? { opts: x.opts } : {}), id: x.id, label: x.label, req: x.id === "name" ? 1 : x.req } : x);
+  const q = (x: CrmFormField): CrmFormField => (isBuiltIn(x.id) ? { ...BUILT_IN_Q[x.id], ...(x.opts?.length ? { opts: x.opts } : {}), id: x.id, label: x.label, req: x.req } : x);
   const secs = form.sections.map(s => ({ title: s.title, page: s.page ?? 0, fields: s.fields.filter(x => !x.sys && x.id !== "status").map(q) })).filter(s => s.fields.length);
   const pages = [...new Set(secs.map(s => s.page))].sort((a, b) => a - b);
   const at = Math.max(0, Math.min(page, pages.length - 1));
@@ -143,7 +146,9 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
   const cfExtra: ExtraSection[] = pg ? pg.here.map(s => ({ title: s.title, fields: s.fields.map(q => extraField(q, valOf(q.id), putOf(q.id))) }))
     : extra.map(s => ({ title: s.title, fields: s.fields.map(q => extraField(q, ans(q.id), val => putX(q.id, val))) }));
   const missing = pg ? pg.all.some(q => q.req && !valOf(q.id).trim()) : extra.some(s => s.fields.some(q => q.req && !ans(q.id).trim()));
-  const ok = !!v("name").trim() && !missing;
+  // Name is required where the form asks it and marks it so (the designed form asks it, required — 2026-10-29).
+  const nameReq = pg ? false : has.name && (data.forms?.[0]?.sections.flatMap(s => s.fields).find(x => x.id === "name")?.req ?? 1) === 1;
+  const ok = (!nameReq || !!v("name").trim()) && !missing;
   const pageOk = !pg || pg.here.every(s => s.fields.every(q => !q.req || !!valOf(q.id).trim()));
   const more = !!pg && pg.at < pg.n - 1;
   return {
@@ -160,7 +165,9 @@ export function customerForm({ form: f, data, saveDetails, setForm, onSaved }: {
     cfSaveBg: (more ? pageOk : ok) ? "var(--crm-rust)" : "var(--crm-line)", cfSaveLabel: more ? "Next" : f.edit ? "Save" : "Save & choose a time",
     cfSave: more ? (pageOk ? () => put({ page: pg!.at + 1 }) : undefined) : ok ? async () => {
       const answers = f.extra ? Object.fromEntries(Object.entries(f.extra).map(([k, x]) => [k, x.trim() || null])) : undefined;
-      const saved = await saveDetails(c.id, { name: v("name"), phone: v("phone"), type: v("type"), size: v("size"), loc: v("loc"), req: v("req"), budget: v("budget"), ...(answers ? { extra: answers } : {}) });
+      // The database keeps a name on every customer: one the form did not ask, or left empty, stays as it was (else the phone).
+      const name = v("name").trim() || c.name || phoneLabel(c.phone) || "Customer";
+      const saved = await saveDetails(c.id, { name, phone: v("phone"), type: v("type"), size: v("size"), loc: v("loc"), req: v("req"), budget: v("budget"), ...(answers ? { extra: answers } : {}) });
       if (saved) onSaved(c, f.edit);
     } : undefined,
   };

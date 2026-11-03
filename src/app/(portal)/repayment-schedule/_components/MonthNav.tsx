@@ -8,6 +8,8 @@ import { officeMonth } from '@/lib/office-time'
 // pick one, so Finance can review a past (or upcoming) month's schedule.
 // 2026-10-09 (the Finance revamp): the handoff's pill beside the title —
 // ← October 2026 → — the label opening a month picker, like Daily Bank's day.
+// 2026-11-02 (the user: "帮我把日期选择器和export 做在这一排"): on the tabs' row,
+// This month in the row's own button.
 export default function MonthNav({ month, isCurrent }: { month: string; isCurrent: boolean }) {
   const router = useRouter()
   const go = (ym: string) => router.push(`/repayment-schedule?month=${ym}`)
@@ -29,7 +31,7 @@ export default function MonthNav({ month, isCurrent }: { month: string; isCurren
         </button>
       </div>
       {!isCurrent ? (
-        <button type="button" onClick={() => go(officeMonth())} className="btn-quiet-sheet">
+        <button type="button" onClick={() => go(officeMonth())} className="sch-tool-btn">
           This month
         </button>
       ) : null}

@@ -3,14 +3,16 @@
 // sidebar, drawn with Finance's categories —
 //
 //   Overview
-//   I.   DAILY        Payments · Receipt · Invoice · Billing Allocator · Daily Bank · Reconciliation · Journal Entries
+//   I.   DAILY        Payments (Payment voucher · Payment request) · Receipt · Invoice · Billing Allocator · Daily Bank ·
+//                     Reconciliation · Journal Entries
 //   II.  FUND         Fund IN · Fund OUT · Invoice Financing · Repayment · Statements
 //   III. REPORT       General Ledger · P&L · Cash Flow · Receipt & Payment · Balance Sheet · Trial Balance ·
 //                     Debtor Aging · Loan Aging · Company Statement · Chart of Account · Base Rate History
 //   IV.  DEPARTMENT   Dept Pool · each department · Venture Pool
 //
 // and Admin is no category: Audit Log, Departments and Meeting Rooms sit in the
-// footer's account menu with Edit profile and Change password (finAccountMenu).
+// footer's account menu with Edit profile and Change password (finAccountMenu)
+// — and Claim, one's own requests to Finance, under Account (2026-10-29).
 // The user's calls (2026-10-14): Approvals, which the design leaves out, shows
 // to whoever holds it — first in Daily; Overdue, which the design lists under
 // Fund, stays gone (its page went the same day). Claims stood last in
@@ -29,6 +31,7 @@ import { statementDepts, statementPath } from '@/lib/dept-statements'
 import {
   canAccessAuditLog,
   canAccessCategories,
+  canSendOwnClaims,
   canAccessDeptPool,
   canAccessDeptReports,
   canAccessMeetingRooms,
@@ -68,6 +71,9 @@ const link = (
   more: Partial<HrNavItem> = {},
 ): HrNavItem => ({ key, label, icon, href, visible, match, ...more })
 
+/** Payments' heading over Payment voucher and Payment request. */
+const PAYMENTS_GROUP: NonNullable<HrNavItem['group']> = { key: 'payments', label: 'Payments', icon: 'out' }
+
 /** Whose sidebar it is: Finance's view, or the Principal's own view on a computer (its own rows added). */
 export interface FinNavOptions {
   /** The Principal's own view (2026-10-17): OPEX at Department's foot; Access log and Settings in Admin. */
@@ -88,8 +94,15 @@ export function finNavSections(data: NavData, opts: FinNavOptions = {}): HrNavSe
       tone: 'clay',
       items: [
         link('approvals', 'Approvals', 'approve', '/approvals', canApprove),
-        // A receipt's form is Receipt's; a receipt's own page names Receipt itself (NavOwner).
-        link('payments', 'Payments', 'out', '/payments', canAccessTreasury, (p, q) => under(p, '/payments') && !receiptForm(p, q)),
+        // Payments (2026-10-29 — the user: "payment side bar 会有两个子account，一个是pv，一个是Payment request";
+        // "pv 改成payment voucher"): the vouchers and the requests waiting for one. A receipt's form is Receipt's; a
+        // receipt's own page names Receipt itself (NavOwner).
+        link('payments', 'Payment voucher', 'out', '/payments', canAccessTreasury, (p, q) => under(p, '/payments') && !under(p, '/payments/requests') && !receiptForm(p, q), {
+          group: PAYMENTS_GROUP,
+        }),
+        link('payment-requests', 'Payment request', 'inbox', '/payments/requests', canAccessTreasury, (p) => under(p, '/payments/requests'), {
+          group: PAYMENTS_GROUP,
+        }),
         link('receipts', 'Receipt', 'in', '/receipts', canAccessTreasury, (p, q) => under(p, '/receipts') || receiptForm(p, q)),
         // /statements is the Invoices landing; an invoice's own page and the billing forms are Invoice's.
         link('invoices', 'Invoice', 'invoice', '/statements', canAccessTreasury, (p) => p === '/statements' || under(p, '/invoices') || under(p, '/billing')),
@@ -163,6 +176,8 @@ export interface AccountMenuItem {
   window?: 'password'
   permissionTabs?: readonly string[]
   visible: (viewer: NavViewer) => boolean
+  /** Its name for this viewer, where it is not always the same (Claim, or Claim & approve for its holder — 2026-10-29). */
+  labelFor?: (viewer: NavViewer) => string
 }
 
 export interface AccountMenuGroup {
@@ -171,7 +186,8 @@ export interface AccountMenuGroup {
 }
 
 /**
- * The footer's menu (the design's D13): Account — password for a personal login, IT support for every account —, then Admin.
+ * The footer's menu (the design's D13): Account — password for a personal login, IT support for every account, Claim for
+ * whoever sends their own (2026-10-29) —, then Admin.
  * The Principal's own view adds Access log and Settings to Admin (2026-10-17, the user's pick: "Audit Log ·
  * Access log · Departments · Meeting Rooms · Settings") — Settings opens on Treasury, its strip reaching the rest.
  * No Edit profile (2026-10-17 — the user: one's record is changed through Me › Profile, which HR approves).
@@ -183,6 +199,9 @@ export function finAccountMenu(opts: FinNavOptions = {}): AccountMenuGroup[] {
       items: [
         { key: 'password', label: 'Change password', icon: 'lock', window: 'password', visible: canChangePassword },
         { key: 'it-support', label: 'IT support', icon: 'buoy', href: '/it-support', visible: viewer => !viewer.viewingAs },
+        // One's own claims and direct payments to Finance (2026-10-29, the claim process — every view's own Claim row).
+        // Claim & approve for whoever holds it in this view (PR ③).
+        { key: 'claim', label: 'Claim', labelFor: (v) => (v.tabs?.includes('fin.claims_approve.view') ? 'Claim & approve' : 'Claim'), icon: 'receipt', href: '/claims', visible: canSendOwnClaims },
       ],
     },
     {
@@ -208,7 +227,9 @@ export function visibleAccountMenu(groups: AccountMenuGroup[], viewer: NavViewer
   return groups
     .map((g) => ({
       ...g,
-      items: g.items.filter((i) => i.visible(viewer) && (i.href === undefined || opensPath(viewer.tabs, i.href, i.permissionTabs))),
+      items: g.items
+        .filter((i) => i.visible(viewer) && (i.href === undefined || opensPath(viewer.tabs, i.href, i.permissionTabs)))
+        .map((i) => (i.labelFor ? { ...i, label: i.labelFor(viewer) } : i)),
     }))
     .filter((g) => g.items.length > 0)
 }

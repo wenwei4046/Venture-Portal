@@ -61,10 +61,14 @@ export const PERMISSIONS = [
   'guest_link',
   // HR › Attendance (2026-10-15, mig 20261015030000): Attendance · View opens it.
   'attendance',
+  // Lead View (2026-10-16, mig 20261016300000): Lead View · View opens it.
+  'leads',
   // IT support's desk (2026-10-20, mig 20261021020000): IT requests · View opens it — a Revenue app account may hold it.
   'it_requests',
   // Marketing's own view (2026-10-23, mig 20261023214000): Marketing · View opens it.
   'marketing',
+  // Marketing's own pool in that view (2026-10-28, mig 20261028120000): Marketing pool · View opens it.
+  'marketing_pool',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

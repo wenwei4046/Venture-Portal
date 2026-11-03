@@ -7,6 +7,8 @@
  * bank_recon_*.
  */
 
+import type { KpiOptionPool } from '@/lib/commission/kpi'
+
 export interface SubDeptRow {
   id: string
   department_id: string
@@ -19,11 +21,9 @@ export interface SchemeRow {
   id: string
   sub_department_id: string
   scheme_name: string
-  open_bill_basis: 'uplift_on_commission' | 'pct_of_revenue'
   override_includes_kpi: boolean
   enable_product_revenue: boolean
   enable_kpi: boolean
-  enable_open_bill: boolean
   enable_override: boolean
   enable_margin_penalty: boolean
   enable_margin_incentive: boolean
@@ -115,13 +115,17 @@ export interface ItemGroupRow {
 
 export interface KpiItemRow {
   id: string
-  /** 'sku' = a code on a line; 'option' = a bed frame's or sofa's special (2026-09-27). */
+  /**
+   * 'sku' = a code on a line; 'option' = a bed frame's or sofa's special
+   * (2026-09-27) or fabric series (2026-10-29), by `option_pool`.
+   */
   source: 'sku' | 'option'
   product_code: string | null
+  /** A SKU's description; a fabric series' name with whose it is ("PC151 · Sofa fabric"). */
   product_name: string | null
   /** The SKU Master row a SKU item was picked from. */
   erp_product_id: string | null
-  option_pool: 'bedframe_specials' | 'sofa_specials' | null
+  option_pool: KpiOptionPool | null
   option_value: string | null
   kpi_amount: number
   effective_from: string
@@ -138,6 +142,15 @@ export interface KpiSpecialRow {
   removed: boolean
 }
 
+/** A fabric series on the ERP's fabric list — what Rules › KPI items picks a bed frame's or a sofa's from (2026-10-29). */
+export interface KpiFabricSeriesRow {
+  series: string
+  /** Its fabrics the ERP still lists. */
+  fabrics: number
+  /** Every fabric of it gone from the ERP: no new bill can carry it. */
+  removed: boolean
+}
+
 export interface KpiThresholdRow {
   id: string
   tier_label: string | null
@@ -146,17 +159,13 @@ export interface KpiThresholdRow {
   effective_from: string
 }
 
-export interface OpenBillRuleRow {
-  id: string
-  bill_rank: number
-  pct: number
-}
-
 export interface BrandRow {
   id: string
   code: string
   name: string
   item_code_prefixes: string[]
+  /** The ERP brandings that are this brand (Akemi's: HAPPI SLEEP, 2026-10-31). */
+  sub_brands: string[]
   note: string | null
   is_active: boolean
 }
@@ -298,9 +307,10 @@ export interface CommissionSettingsData {
   kpiThresholds: KpiThresholdRow[]
   /** The Bedframe and Sofa specials pools, for the KPI items picker. */
   kpiSpecials: KpiSpecialRow[]
+  /** The fabric series on the ERP's fabric list, for the same picker. */
+  kpiFabricSeries: KpiFabricSeriesRow[]
   /** SKU items whose SKU the ERP has since removed (their `erp_product_id`). */
   kpiGoneSkus: string[]
-  openBillRules: OpenBillRuleRow[]
   brands: BrandRow[]
   marginBands: MarginBandRow[]
   promotionRules: PromotionRuleRow[]

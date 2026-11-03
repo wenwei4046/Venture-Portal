@@ -172,7 +172,13 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
           <FullCard n={++n} title="Repayment settings">
             <div className="fin-form">
               <RepaymentStartEditor sourceId={source.id} current={source.start.set ? source.start.date : null} min={source.effectiveDate ?? undefined} />
-              <MinPayInterestToggle sourceId={source.id} current={source.minPayInterest} />
+              <MinPayInterestToggle
+                sourceId={source.id}
+                current={source.minPayInterest}
+                from={source.minPayFrom}
+                firstDueYM={source.start.date ? source.start.date.slice(0, 7) : null}
+                today={today}
+              />
             </div>
           </FullCard>
 

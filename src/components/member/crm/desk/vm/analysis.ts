@@ -4,10 +4,10 @@
  * salesperson, team, showroom, outcome, weekday, time, or the customer's platform, property type or ad; a pie with each
  * group's share beside its rows, folded until opened, as Contacts' chart.
  */
+import { sourceOf } from "@/lib/member/crm-source";
 import type { DeskCtx } from "./ctx";
 import type { VisitRow } from "./data";
 import { pieSlices } from "./people";
-import { CHANNEL } from "../../sales/vm/common";
 
 const COLS = ["var(--crm-rust)", "var(--crm-ink-soft)", "var(--crm-ink-soft)", "var(--crm-brown)", "var(--crm-brown)", "var(--crm-ink-soft)", "var(--crm-orange)", "var(--crm-ink-soft)", "var(--crm-brown)", "var(--crm-st-new)"];
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -29,7 +29,7 @@ export function calendarAnalysisVM(ctx: DeskCtx, vs: VisitRow[]) {
       case "status": return v.status;
       case "dow": return DOW[(v.at.getDay() + 6) % 7];
       case "time": return v.at.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
-      case "plat": { const c = cust(v); return c ? CHANNEL[c.channel].name : "—"; }
+      case "plat": { const c = cust(v); return c ? sourceOf(c).label : "—"; }
       case "type": return cust(v)?.details.type || "Not filled yet";
       case "ad": return cust(v)?.ad || "No ad";
     }

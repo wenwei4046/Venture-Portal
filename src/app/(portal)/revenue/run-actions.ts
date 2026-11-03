@@ -4,17 +4,16 @@ import { revalidatePath } from 'next/cache'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
-import { openBillOnFor } from './_lib/open-bill-month'
 import { assertBillsNotClosed, billsClosedReason, staffClosedReason } from './_lib/salesperson-closes'
 import { loadOrderShares, loadShareTeam } from './_lib/month-orders'
 import { holdersOf, type BillShareAnswer, type BillShareResult, type ShareHolder } from '@/lib/commission/bill-share'
 import type { BillMoveAnswer } from '@/lib/commission/bill-move'
-import { fetchByKeys } from '@/lib/paginate'
 
 /**
- * What a commission month's people change by hand: Open Bill picks, shares,
- * bills that do not count, keyed margins, a month's costs. Every write is one
- * SQL function or a guarded row write; none of them does commission maths.
+ * What a commission month's people change by hand: shares, moves, bills that
+ * do not count, keyed margins, a month's costs. Every write is one SQL
+ * function or a guarded row write; none of them does commission maths.
+ * (Open Bill picks went with Open Bill, 2026-10-31.)
  *
  * Sending to payroll is not here any more (2026-09-27): the whole-month send
  * went the day it came — the user's Send is per salesperson (Send = Complete),
@@ -26,229 +25,7 @@ async function client(): Promise<SupabaseClient> {
   return (await createClient()) as unknown as SupabaseClient
 }
 
-// ─── Review-board edits ─────────────────────────────────────────────────────
-
-type BillRank = 1 | 2 | 3
-interface OpenBillOrder {
-  id: string
-  staff_id: string | null
-  event_date: string
-  period_month: string
-  cancelled: boolean
-  sales_import_batches: { sub_department_id: string } | { sub_department_id: string }[]
-}
-
-export interface OpenBillPickChange {
-  orderId: string
-  before: BillRank | null
-  after: BillRank | null
-}
-
-function assertBillRank(rank: unknown): asserts rank is BillRank | null {
-  if (rank !== null && rank !== 1 && rank !== 2 && rank !== 3) {
-    throw new Error('Open Bill rank must be 1, 2, 3, or empty.')
-  }
-}
-
-function openBillSub(order: OpenBillOrder): string {
-  const batch = Array.isArray(order.sales_import_batches) ? order.sales_import_batches[0] : order.sales_import_batches
-  if (!batch?.sub_department_id) throw new Error('The sales order has no sub-department.')
-  return batch.sub_department_id
-}
-
-async function readOpenBillOrders(supabase: SupabaseClient, ids: readonly string[]): Promise<OpenBillOrder[]> {
-  return fetchByKeys<OpenBillOrder, string>(ids, chunk => supabase.from('sales_orders')
-    .select('id, staff_id, event_date, period_month, cancelled, sales_import_batches!inner (sub_department_id)')
-    .in('id', chunk) as unknown as PromiseLike<{ data: OpenBillOrder[] | null; error: { message: string } | null }>)
-}
-
-/**
- * Picks are taken only in a month Open Bill pays in: the month's own setting,
- * else Rules (2026-09-26, `comm_open_bill_on` — the rule the database asks).
- */
-async function assertOpenBillEnabled(supabase: SupabaseClient, subDepartmentId: string, period: string): Promise<void> {
-  if (!(await openBillOnFor(supabase, subDepartmentId, period))) {
-    throw new Error(`Open Bill is switched off for ${period.slice(0, 7)}. Preview settings do not enable saving picks. No picks were changed by this check.`)
-  }
-}
-
-/**
- * Validate the whole draft BEFORE freeing any rank. This prevents a stale
- * browser, a disabled source switch or a locked carried month from leaving a
- * half-cleared allocation. The subsequent REST writes are not a transaction;
- * failures are reported as partial and every single edit rechecks its locks.
- */
-export async function saveOpenBillPicks(changes: OpenBillPickChange[]): Promise<void> {
-  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
-  if (!Array.isArray(changes)) throw new Error('Open Bill changes must be a list.')
-  const ids = new Set<string>()
-  for (const change of changes) {
-    if (!change || typeof change.orderId !== 'string' || !change.orderId || ids.has(change.orderId)) {
-      throw new Error('Every Open Bill change must name a different sales order.')
-    }
-    assertBillRank(change.before)
-    assertBillRank(change.after)
-    ids.add(change.orderId)
-  }
-  const edits = changes.filter(change => change.before !== change.after)
-  if (edits.length === 0) return
-  const changedIds = new Set(edits.map(change => change.orderId))
-  const supabase = await client()
-  const orders = await readOpenBillOrders(supabase, edits.map(change => change.orderId))
-  if (orders.length !== edits.length) throw new Error('An Open Bill order is no longer available. Refresh before saving.')
-  const byOrder = new Map(orders.map(order => [order.id, order]))
-  const groups = new Map<string, { sub: string; staffId: string; eventDate: string }>()
-  const periods = new Map<string, { sub: string; period: string }>()
-  const desiredSlots = new Map<string, string>()
-  for (const change of edits) {
-    const order = byOrder.get(change.orderId)!
-    if (!order.staff_id) throw new Error('An Open Bill order no longer has a matched salesperson. Refresh before saving.')
-    if (order.cancelled && change.after !== null) throw new Error('An excluded sales order cannot receive an Open Bill pick.')
-    const sub = openBillSub(order)
-    const groupKey = JSON.stringify([sub, order.staff_id, order.event_date])
-    groups.set(groupKey, { sub, staffId: order.staff_id, eventDate: order.event_date })
-    periods.set(JSON.stringify([sub, order.period_month]), { sub, period: order.period_month })
-    if (change.after !== null) {
-      const slot = JSON.stringify([sub, order.staff_id, order.event_date, change.after])
-      if (desiredSlots.has(slot)) throw new Error('Two orders cannot hold the same Open Bill rank for one salesperson and event day.')
-      desiredSlots.set(slot, order.id)
-    }
-  }
-  await Promise.all([
-    ...[...periods.values()].map(({ sub, period }) => assertOpenBillEnabled(supabase, sub, period)),
-    ...[...periods.values()].map(({ sub, period }) => assertRunOpen(supabase, period, sub)),
-    assertBillsNotClosed(supabase, [...changedIds]),
-  ])
-  const tagGroups = await Promise.all([...groups.values()].map(async group => {
-    const { data, error } = await supabase.from('sales_order_open_bill_tags').select('order_id, bill_rank')
-      .eq('sub_department_id', group.sub).eq('staff_id', group.staffId).eq('event_date', group.eventDate)
-    if (error) throw new Error(`Could not read the current Open Bill picks: ${error.message}`)
-    return { group, tags: (data ?? []) as { order_id: string; bill_rank: BillRank }[] }
-  }))
-  const current = new Map(tagGroups.flatMap(({ tags }) => tags.map(tag => [tag.order_id, tag.bill_rank] as const)))
-  for (const change of edits) {
-    if ((current.get(change.orderId) ?? null) !== change.before) {
-      throw new Error('Open Bill picks changed since this page loaded. Refresh before saving; no picks were changed.')
-    }
-  }
-  const conflicts = tagGroups.flatMap(({ group, tags }) => tags.filter(tag => {
-    const target = desiredSlots.get(JSON.stringify([group.sub, group.staffId, group.eventDate, tag.bill_rank]))
-    return target && target !== tag.order_id && !changedIds.has(tag.order_id)
-  }))
-  if (conflicts.length > 0) {
-    const conflictOrders = await readOpenBillOrders(supabase, conflicts.map(tag => tag.order_id))
-    if (conflictOrders.length !== conflicts.length) throw new Error('An occupied Open Bill rank could not be checked. Refresh before saving.')
-    await Promise.all(conflictOrders.map(order => assertRunOpen(supabase, order.period_month, openBillSub(order))))
-    throw new Error('Another order now holds an Open Bill rank in this draft. Refresh and review that order before saving; no picks were changed.')
-  }
-
-  let completed = 0
-  try {
-    for (const change of edits) if (change.before !== null) { await writeOpenBillRank(change.orderId, null, false, change.before); completed++ }
-    for (const change of edits) if (change.after !== null) { await writeOpenBillRank(change.orderId, change.after, false, null); completed++ }
-  } catch (error) {
-    throw new Error(`${error instanceof Error ? error.message : 'Could not save Open Bill picks.'} ${completed > 0 ? 'Some picks were saved. ' : ''}Refresh before retrying.`)
-  } finally {
-    revalidatePath('/revenue', 'layout')
-  }
-}
-
-/**
- * Set (or clear) which of the day's bills this order is for its salesperson.
- *
- * The importer seeds these from the running document number because the ERP
- * carries no time of day; a human confirming or moving one clears
- * `auto_suggested`, which is how the board shows what has been reviewed.
- *
- * A rank is held by one order per person per day, so claiming a taken rank
- * moves it — refusing would make the board unusable, since correcting a
- * suggestion almost always means swapping two orders.
- */
-export async function setOpenBillRank(orderId: string, rank: 1 | 2 | 3 | null): Promise<void> {
-  await writeOpenBillRank(orderId, rank, true)
-}
-
-async function writeOpenBillRank(orderId: string, rank: BillRank | null, allowMove: boolean, expectedRank?: BillRank | null): Promise<void> {
-  const user = await requireActionOn('/revenue/[sub]/[period]/orders', 'revenue', 'edit')
-  assertBillRank(rank)
-  const supabase = await client()
-  const [order] = await readOpenBillOrders(supabase, [orderId])
-  if (!order) throw new Error('Order not found')
-  if (!order.staff_id) throw new Error('That order has no matched salesperson yet.')
-  if (order.cancelled && rank !== null) throw new Error('An excluded sales order cannot receive an Open Bill pick.')
-  const subDepartmentId = openBillSub(order)
-  await Promise.all([
-    assertRunOpen(supabase, order.period_month, subDepartmentId),
-    assertOpenBillEnabled(supabase, subDepartmentId, order.period_month),
-    assertBillsNotClosed(supabase, [orderId]),
-  ])
-
-  if (expectedRank !== undefined) {
-    const { data: latest, error } = await supabase.from('sales_order_open_bill_tags')
-      .select('bill_rank').eq('order_id', orderId).maybeSingle()
-    if (error) throw new Error(`Could not check the current Open Bill pick: ${error.message}`)
-    if (((latest as { bill_rank: BillRank } | null)?.bill_rank ?? null) !== expectedRank) {
-      throw new Error('Open Bill picks changed while saving. Refresh before retrying.')
-    }
-  }
-
-  if (rank === null) {
-    let removal = supabase.from('sales_order_open_bill_tags').delete().eq('order_id', orderId)
-    if (expectedRank !== undefined && expectedRank !== null) removal = removal.eq('bill_rank', expectedRank)
-    const { data: removed, error } = await removal.select('order_id')
-    if (error) throw new Error(error.message)
-    if (expectedRank !== undefined && expectedRank !== null && !removed?.length) {
-      throw new Error('Open Bill picks changed while saving. Refresh before retrying.')
-    }
-  } else {
-    const { data: occupied, error: occupiedError } = await supabase.from('sales_order_open_bill_tags')
-      .select('order_id').eq('sub_department_id', subDepartmentId).eq('staff_id', order.staff_id)
-      .eq('event_date', order.event_date).eq('bill_rank', rank)
-    if (occupiedError) throw new Error(`Could not check the occupied Open Bill rank: ${occupiedError.message}`)
-    const occupiedIds = ((occupied ?? []) as { order_id: string }[]).map(tag => tag.order_id).filter(id => id !== orderId)
-    if (!allowMove && occupiedIds.length > 0) throw new Error('Another order claimed this Open Bill rank while saving. Refresh before retrying.')
-    const occupiedOrders = await readOpenBillOrders(supabase, occupiedIds)
-    if (occupiedOrders.length !== occupiedIds.length) throw new Error('The occupied Open Bill rank could not be checked. Refresh before saving.')
-    await Promise.all([
-      ...occupiedOrders.map(row => assertRunOpen(supabase, row.period_month, openBillSub(row))),
-      assertBillsNotClosed(supabase, occupiedIds),
-    ])
-    // Only free the occupant we actually checked. A different order claiming
-    // the slot meanwhile must cause a unique-conflict failure, not be deleted.
-    if (occupiedIds.length > 0) {
-      const { error: freeError } = await supabase
-        .from('sales_order_open_bill_tags')
-        .delete()
-        .eq('sub_department_id', subDepartmentId)
-        .eq('staff_id', order.staff_id)
-        .eq('event_date', order.event_date)
-        .eq('bill_rank', rank)
-        .in('order_id', occupiedIds)
-      if (freeError) throw new Error(freeError.message)
-    }
-
-    const payload = {
-      order_id: orderId,
-      staff_id: order.staff_id,
-      event_date: order.event_date,
-      bill_rank: rank,
-      auto_suggested: false,
-      tagged_by: user.id,
-      tagged_at: new Date().toISOString(),
-    }
-    // A batch expects a vacant order after clearing. INSERT makes a concurrent
-    // pick for that same order a conflict instead of silently overwriting it.
-    const { error } = expectedRank === null
-      ? await supabase.from('sales_order_open_bill_tags').insert(payload)
-      : await supabase.from('sales_order_open_bill_tags').upsert(payload, { onConflict: 'order_id' })
-    if (error) {
-      revalidatePath('/revenue', 'layout')
-      throw new Error(`${error.message} The rank may have been cleared. Refresh before retrying.`)
-    }
-  }
-
-  revalidatePath('/revenue', 'layout')
-}
+// ─── Shares and moves ───────────────────────────────────────────────────────
 
 /** A bill as sharing needs it: whose it is, its month, and who holds a part now. */
 interface SharedBill {
@@ -420,9 +197,8 @@ const MOVE_REFUSALS = new Set(['23RUN', '23EXC', '23MOV'])
  * back. The rule is the database's (`revenue_move_order`, mig
  * 20261012170000): the bill becomes theirs everywhere a bill's salesperson
  * counts and stays theirs through every ERP re-send; the new holder's share
- * goes and is theirs again when the bill leaves them (mig 20261012190000), the
- * Open Bill pick goes (and comes back on the move back). This
- * refuses, as a share does, a bill somebody paid on it has closed, a new
+ * goes and is theirs again when the bill leaves them (mig 20261012190000).
+ * This refuses, as a share does, a bill somebody paid on it has closed, a new
  * holder whose own month is closed, and anybody off the sub-department's team.
  *
  * Answers with who holds it now, or with why not (`BillMoveAnswer`).
@@ -457,8 +233,6 @@ export async function moveOrder(orderId: string, staffId: string | null, note?: 
     staffId: string | null
     fromStaffId?: string | null
     movedBack?: boolean
-    openBillRank?: number | null
-    openBillBack?: number | null
     shareTaken?: number | string | null
     shareBack?: number | string | null
     shareNotBack?: number | string | null
@@ -474,8 +248,6 @@ export async function moveOrder(orderId: string, staffId: string | null, note?: 
       to: { staffId: moved.staffId, name: nameOf(moved.staffId) },
       from: { staffId: moved.fromStaffId ?? bill.ownerStaffId, name: moved.fromStaffId === undefined ? bill.ownerName : nameOf(moved.fromStaffId) },
       movedBack: moved.movedBack === true,
-      openBillRank: moved.openBillRank ?? null,
-      openBillBack: moved.openBillBack ?? null,
       shareTaken: partOf(moved.shareTaken),
       shareBack: partOf(moved.shareBack),
       shareNotBack: partOf(moved.shareNotBack),
@@ -508,14 +280,12 @@ export interface BillCountResult {
   counts?: boolean
   /** Count again: what still keeps it out — the ERP's verdict, or a salesperson who is not ours. */
   stillOut?: string | null
-  /** The Open Bill rank it gave up (taken out) or got back (counted again). */
-  openBillRank?: number | null
 }
 
 /**
  * Take one bill out of its month by hand (2026-09-27, right-click on Sales
  * orders): it stops counting everywhere a cancelled bill does — the month's
- * sales, own and group sales, override, KPI, Open Bill — and stays out through
+ * sales, own and group sales, override, KPI — and stays out through
  * every ERP re-send until somebody counts it again. The rule is the
  * database's (`revenue_exclude_order`, mig 20260927020000): it refuses a month
  * whose run has paid (23RUN) and a bill already out for another reason (23EXC).
@@ -534,8 +304,7 @@ export async function excludeOrder(orderId: string, note?: string | null): Promi
 
 /**
  * Count a bill taken out by hand again: it goes back to whatever its document
- * says (in, unless the ERP itself cancelled it meanwhile), with its Open Bill
- * pick back while nobody has claimed that rank by hand.
+ * says (in, unless the ERP itself cancelled it meanwhile).
  */
 export async function includeOrder(orderId: string): Promise<BillCountResult> {
   await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')

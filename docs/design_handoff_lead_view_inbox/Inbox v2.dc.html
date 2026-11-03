@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="hz-select.js"></script>
+<style>
+body{margin:0;background:rgb(243,240,236);}
+*{box-sizing:border-box;}
+a{color:rgb(176,92,54);text-decoration:none;}
+a:hover{text-decoration:underline;}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid rgb(199,111,70);outline-offset:1px;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:rgb(230,224,217);border-radius:4px;}
+</style>
+<script src="hz-basic.js"></script>
+</helmet>
+
+<div style="width:1440px;height:900px;display:flex;font-family:'Lora',Georgia,serif;font-size:15px;color:rgb(43,33,28);line-height:1.45;background:rgb(243,240,236);position:relative;overflow:hidden;">
+
+  <aside style="font-size:{{ navFs }};width:{{ navW }};transition:width .18s;overflow:hidden;flex:none;display:flex;flex-direction:column;padding:16px 12px;gap:2px;background:rgb(46,33,26);color:rgb(255,255,255);">
+    <div style="display:flex;align-items:center;gap:10px;padding:4px 6px 18px;">
+      <div style="flex:none;width:34px;height:34px;border-radius:7px;background:rgb(199,111,70);color:rgb(255,255,255);display:flex;align-items:center;justify-content:center;font-family:'Lora',Georgia,serif;font-weight:700;font-size:17px;">H</div>
+      <div style="display:flex;flex-direction:column;gap:1px;white-space:nowrap;opacity:{{ navLabelOp }};">
+        <div style="font-weight:600;font-size:15px;">HOUZS Venture</div>
+        <div style="font-size:13px;color:rgba(255,244,235,.55);">Internal ledger</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;background:rgba(255,255,255,.08);border:1px solid transparent;box-shadow:inset 3px 0 0 rgb(199,111,70);font-weight:600;white-space:nowrap;overflow:hidden;color:rgb(255,255,255);"><i data-lucide="inbox" style="width:16px;height:16px;flex:none;"></i><span style="flex:1;">Inbox</span><span style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(177,165,107);opacity:{{ navLabelOp }};">{{ waitingCount }}</span></div>
+    <a href="Leads.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="users" style="width:16px;height:16px;flex:none;"></i>Leads</a>
+    <a href="Insight.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="chart-column" style="width:16px;height:16px;flex:none;"></i>Insight</a>
+    <a href="Campaigns.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="megaphone" style="width:16px;height:16px;flex:none;"></i>Campaigns</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:18px 10px 6px;white-space:nowrap;overflow:hidden;opacity:{{ navLabelOp }};">REPLIES</div>
+    <a href="Auto Reply.dc.html?view=routing" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="split" style="width:16px;height:16px;flex:none;"></i>Reply rules</a>
+    <a href="Auto Reply.dc.html?view=template" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="workflow" style="width:16px;height:16px;flex:none;"></i>Reply templates</a>
+    <a href="Auto Reply.dc.html?view=library" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="blocks" style="width:16px;height:16px;flex:none;"></i>Step library</a>
+    <a href="Auto Reply.dc.html?view=ai" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="sparkles" style="width:16px;height:16px;flex:none;"></i>AI Agent</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;white-space:nowrap;overflow:hidden;opacity:{{ navLabelOp }};">FILES</div>
+    <a href="Basic Info.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="book-open" style="width:16px;height:16px;flex:none;"></i>General info</a>
+    <a href="Data Center.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="library" style="width:16px;height:16px;flex:none;"></i>Data Center</a>
+    <a href="Auto Reply.dc.html?view=corrections" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="history" style="width:16px;height:16px;flex:none;"></i>AI corrections</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;white-space:nowrap;overflow:hidden;opacity:{{ navLabelOp }};">ADMIN</div>
+    <a href="Business Hours.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;flex:none;"><i data-lucide="clock" style="width:16px;height:16px;flex:none;"></i></span>Business hours</a>
+    <a href="Audit Log.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;flex:none;"><i data-lucide="scroll-text" style="width:16px;height:16px;flex:none;"></i></span>Audit log</a>
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;white-space:nowrap;overflow:hidden;color:rgba(255,244,235,.72);border:1px solid transparent;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><i data-lucide="settings" style="width:16px;height:16px;flex:none;"></i>Settings</div>
+    <div style="flex:1;"></div>
+    <button onClick="{{ toggleNav }}" title="{{ navTip }}" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;border:1px solid transparent;background:transparent;white-space:nowrap;overflow:hidden;font-family:'Lora',Georgia,serif;font-size:inherit;color:rgba(255,244,235,.6);text-align:left;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;flex:none;"><i data-lucide="{{ navIcon }}" style="width:16px;height:16px;flex:none;"></i></span>Collapse</button>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px;border-top:1px solid rgba(255,244,235,.14);white-space:nowrap;overflow:hidden;">
+      <div style="flex:none;width:30px;height:30px;border-radius:50%;background:rgb(140,6,16);color:rgb(244,212,166);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;">ML</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:1px;opacity:{{ navLabelOp }};"><div style="font-weight:500;font-size:15px;">Mei Ling</div><div style="font-size:13px;color:rgba(255,244,235,.55);">Customer Service</div></div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgba(255,244,235,.45);opacity:{{ navLabelOp }};">v0.3</div>
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px;">
+    <header style="height:56px;flex:none;background:rgb(255,255,255);border:1px solid rgb(230,224,217);border-radius:10px;display:flex;align-items:center;padding:0 16px;gap:18px;box-shadow:0 1px 2px rgba(43,33,28,.05);">
+      <div style="flex:1;max-width:480px;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:8px;background:rgb(243,240,236);color:rgb(104,92,84);">
+        <span style="display:flex;"><i data-lucide="search" style="width:15px;height:15px;"></i></span>
+        <input placeholder="Search customers, phone numbers or chats" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);"></input>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgb(88,76,68);background:rgb(242,238,233);padding:4px 10px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:rgb(88,76,68);"></span>Test mode</div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(88,76,68);">Mon 19 Oct 2026</div>
+      <button title="Notifications" style="white-space:nowrap;flex-shrink:0;position:relative;cursor:pointer;width:34px;height:34px;border-radius:8px;border:1px solid rgb(230,224,217);background:rgb(255,255,255);color:rgb(88,76,68);display:flex;align-items:center;justify-content:center;"><span style="display:flex;"><i data-lucide="bell" style="width:16px;height:16px;"></i></span><span style="position:absolute;top:6px;right:7px;width:7px;height:7px;border-radius:50%;background:rgb(199,111,70);border:1.5px solid rgb(255,255,255);"></span></button>
+      <a href="#" style="font-size:13px;color:rgb(88,76,68);">Sign out</a>
+    </header>
+
+    <main style="flex:1;min-height:0;background:transparent;border:none;display:flex;flex-direction:column;padding:16px 8px 4px;">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;padding-bottom:14px;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;align-items:baseline;gap:14px;">
+            <h1 style="margin:0;line-height:1.15;letter-spacing:-.01em;font-family:'Cormorant Garamond',Georgia,serif;font-size:32px;font-weight:600;">Inbox</h1>
+          </div>
+        </div>
+        <sc-if value="{{ metaOff }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:rgb(88,76,68);background:rgb(242,238,233);padding:6px 12px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:rgb(88,76,68);"></span>Meta not connected · only test conversations · replies are recorded, not sent</div>
+        </sc-if>
+        <sc-if value="{{ metaOn }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:8px;font-size:14px;color:rgb(76,110,80);background:rgb(230,240,231);padding:6px 12px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:rgb(76,110,80);"></span>Messenger and Instagram connected</div>
+        </sc-if>
+      </div>
+
+      <div style="position:relative;flex:1;min-height:0;display:grid;grid-template-columns:{{ gridCols }};border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);overflow:hidden;">
+        <div onMouseDown="{{ dragList }}" title="Drag to resize" style="position:absolute;top:0;bottom:0;left:{{ listHandleX }};width:9px;margin-left:-5px;cursor:col-resize;z-index:6;display:flex;justify-content:center;" style-hover="background:rgba(176,92,54,.14);"></div>
+        <div onMouseDown="{{ dragRight }}" title="Drag to resize" style="position:absolute;top:0;bottom:0;right:{{ rightHandleX }};width:9px;margin-right:-4px;cursor:col-resize;z-index:6;" style-hover="background:rgba(176,92,54,.14);"></div>
+
+        <section style="display:flex;flex-direction:column;min-height:0;border-right:1px solid rgb(230,224,217);">
+          <div style="padding:12px 12px 0;display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;gap:4px;">
+              <sc-for list="{{ brandTabs }}" as="b" hint-placeholder-count="4">
+                <button onClick="{{ b.onClick }}" style="white-space:nowrap;flex-shrink:0;border:none;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:5px 10px;border-radius:5px;background:{{ b.bg }};color:{{ b.fg }};">{{ b.label }}</button>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;height:34px;">
+              <i data-lucide="search" style="width:14px;height:14px;color:rgb(120,108,100);"></i>
+              <input value="{{ q }}" onChange="{{ onSearch }}" placeholder="Name, phone, message or ad" style="flex:1;border:none;outline:none;font-family:'Lora',Georgia,serif;font-size:14px;background:transparent;"></input>
+            </div>
+            <div style="display:flex;border-bottom:1px solid rgb(230,224,217);">
+              <sc-for list="{{ stateTabs }}" as="t" hint-placeholder-count="4">
+                <button onClick="{{ t.onClick }}" style="white-space:nowrap;flex-shrink:0;flex:1;border:none;background:transparent;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:8px 0 9px;color:{{ t.fg }};border-bottom:2px solid {{ t.line }};margin-bottom:-1px;display:flex;justify-content:center;gap:5px;">{{ t.label }}<span style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(120,108,100);">{{ t.count }}</span></button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:1;min-height:0;overflow-y:auto;">
+            <sc-for list="{{ list }}" as="c" hint-placeholder-count="6">
+              <div onClick="{{ c.onClick }}" style="display:flex;gap:10px;padding:12px 12px 12px 10px;border-bottom:1px solid rgb(235,230,224);cursor:pointer;background:{{ c.bg }};border-left:2px solid {{ c.edge }};">
+                <div style="position:relative;width:34px;height:34px;flex:none;">
+                  <div style="width:34px;height:34px;border-radius:50%;background:rgb(242,238,233);color:rgb(43,33,28);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;">{{ c.initials }}</div>
+                  <div style="position:absolute;right:-3px;bottom:-3px;font-family:'Lora',Georgia,serif;font-size:8px;line-height:1;padding:2px 3px;border-radius:3px;border:1.5px solid rgb(255,255,255);background:{{ c.chBg }};color:rgb(255,255,255);">{{ c.ch }}</div>
+                </div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <div style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:{{ c.weight }};">{{ c.name }}</div>
+                    <sc-if value="{{ c.waiting }}" hint-placeholder-val="{{ false }}"><span style="width:6px;height:6px;border-radius:50%;background:rgb(199,111,70);"></span></sc-if>
+                    <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ c.time }}</div>
+                  </div>
+                  <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;color:rgb(88,76,68);">{{ c.lastShown }}</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                    <span style="font-family:'Lora',Georgia,serif;font-size:11px;padding:2px 6px;border-radius:3px;background:{{ c.bBg }};color:{{ c.bFg }};">{{ c.brand }}</span>
+                    
+                    <sc-if value="{{ c.botChip }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Lora',Georgia,serif;font-size:11px;padding:2px 6px;border-radius:3px;background:rgb(246,243,239);color:rgb(88,76,68);">{{ c.botChip }}</span></sc-if>
+                    <sc-if value="{{ c.test }}" hint-placeholder-val="{{ true }}"><span style="font-family:'Lora',Georgia,serif;font-size:11px;padding:1px 5px;border-radius:3px;border:1px solid rgb(218,210,200);color:rgb(120,108,100);">TEST</span></sc-if>
+                  </div>
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ listEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:40px 20px;text-align:center;color:rgb(120,108,100);font-size:14px;">Nothing here.</div>
+            </sc-if>
+          </div>
+        </section>
+
+        <section style="display:flex;flex-direction:column;min-height:0;background:rgb(248,246,243);">
+          <div style="min-height:60px;box-sizing:border-box;flex:none;display:flex;align-items:center;gap:12px;padding:8px 18px;background:rgb(250,248,245);border-bottom:1px solid rgb(230,224,217);">
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;">
+              <div style="font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ sel.name }}</div>
+              <div style="display:flex;align-items:center;gap:6px;min-width:0;font-size:14px;color:rgb(88,76,68);white-space:nowrap;overflow:hidden;">
+                <span style="flex:none;white-space:nowrap;font-family:'Lora',Georgia,serif;font-size:11px;padding:2px 6px;border-radius:3px;background:{{ sel.bBg }};color:{{ sel.bFg }};">{{ sel.brand }}</span>
+                <span style="flex:none;">{{ sel.channel }}</span><span style="flex:none;color:rgb(218,210,200);">·</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;">{{ sel.sourceLine }}</span>
+              </div>
+            </div>
+            <div style="position:relative;flex:none;">
+              <button onClick="{{ toggleWho }}" title="Change who replies" style="cursor:pointer;display:flex;align-items:center;gap:6px;height:28px;padding:0 8px 0 10px;border:1px solid rgb(176,92,54);border-radius:999px;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(43,33,28);background:rgb(255,255,255);" style-hover="background:rgb(246,240,232);">
+                <span style="display:flex;color:rgb(176,92,54);"><i data-lucide="{{ modeBar.whoIcon }}" style="width:14px;height:14px;"></i></span>
+                <span style="font-size:11px;letter-spacing:.06em;color:rgb(120,108,100);">NOW</span>
+                <span style="white-space:nowrap;font-weight:500;">{{ modeBar.who }}</span>
+                <i data-lucide="chevron-down" style="width:13px;height:13px;color:rgb(104,92,84);"></i>
+              </button>
+              <sc-if value="{{ whoOpen }}" hint-placeholder-val="{{ false }}">
+                <div onClick="{{ closeWho }}" style="position:fixed;inset:0;z-index:30;"></div>
+                <div style="position:absolute;top:34px;right:0;z-index:31;min-width:250px;padding:4px;border:1px solid rgb(218,210,200);border-radius:8px;background:rgb(255,255,255);box-shadow:0 8px 24px rgba(43,33,28,.14);display:flex;flex-direction:column;">
+                  <div style="padding:8px 10px 4px;font-size:11px;letter-spacing:.08em;color:rgb(120,108,100);">HAND THIS CHAT TO</div>
+                  <sc-for list="{{ whoMenu }}" as="o" hint-placeholder-count="4">
+                    <button onClick="{{ o.pick }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:8px;text-align:left;border:none;background:transparent;padding:8px 10px;border-radius:5px;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:{{ o.fw }};color:rgb(43,33,28);" style-hover="background:rgb(246,243,239);">
+                      <span style="display:flex;color:rgb(176,92,54);"><i data-lucide="{{ o.icon }}" style="width:14px;height:14px;"></i></span>
+                      <span style="flex:1;">{{ o.l }}</span>
+                      <span style="width:14px;color:rgb(176,92,54);">{{ o.check }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <div style="font-family:'Lora',Georgia,serif;font-size:13px;color:{{ sel.stFg }};background:{{ sel.stBg }};padding:3px 8px;border-radius:3px;">{{ sel.stateLabel }}</div>
+          </div>
+          <div style="flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:8px 18px;font-size:14px;color:rgb(88,76,68);background:rgb(242,238,233);border-bottom:1px solid rgb(235,230,224);">
+            <span style="font-size:11px;letter-spacing:.08em;color:rgb(120,108,100);">{{ sel.sourceKicker }}</span>
+            <sc-if value="{{ sel.hasAd }}" hint-placeholder-val="{{ true }}">
+              <span style="min-width:0;font-weight:600;color:rgb(43,33,28);">{{ sel.adName }}</span>
+              <span style="min-width:0;font-size:13px;">{{ sel.adPath }}</span>
+              <span style="flex:1;"></span>
+              <a href="#" style="white-space:nowrap;font-size:13px;">View the ad ↗</a>
+              <a href="#" style="white-space:nowrap;font-size:13px;">Ads Manager ↗</a>
+            </sc-if>
+            <sc-if value="{{ sel.organic }}" hint-placeholder-val="{{ false }}">
+              <span style="font-weight:500;color:rgb(43,33,28);">Organic · messaged the Page directly</span>
+            </sc-if>
+          </div>
+
+          <div ref="{{ chatRef }}" style="flex:1;min-height:0;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px;">
+            <sc-for list="{{ messages }}" as="m" hint-placeholder-count="4">
+              <div style="flex:none;display:flex;flex-direction:column;gap:5px;">
+                <sc-if value="{{ m.day }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:10px;margin:4px 0 6px;"><div style="flex:1;height:1px;background:rgb(235,230,224);"></div><div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ m.day }}</div><div style="flex:1;height:1px;background:rgb(235,230,224);"></div></div>
+                </sc-if>
+                <div style="display:flex;flex-direction:column;align-items:{{ m.align }};gap:4px;">
+                  <sc-if value="{{ m.out }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgb(88,76,68);">
+                      <span style="font-family:'Lora',Georgia,serif;font-size:10px;letter-spacing:.06em;padding:1px 6px;border-radius:3px;background:{{ m.who.tagBg }};color:{{ m.who.tagFg }};">{{ m.who.tag }}</span>
+                      <span style="font-weight:500;">{{ m.who.label }}</span>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ m.hasImages }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:{{ m.align }};max-width:76%;">
+                      <sc-for list="{{ m.images }}" as="im" hint-placeholder-count="0"><div title="{{ im.name }}" style="width:150px;height:150px;border-radius:10px;border:1px solid rgb(235,230,224);background-size:cover;background-position:center;background-image:{{ im.bg }};"></div></sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ m.hasFiles }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;flex-direction:column;gap:6px;max-width:76%;align-items:{{ m.align }};">
+                      <sc-for list="{{ m.files }}" as="fl" hint-placeholder-count="0">
+                        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;background:rgb(255,255,255);border:1px solid rgb(218,210,200);min-width:220px;">
+                          <div style="width:30px;height:36px;flex:none;border-radius:4px;background:rgb(242,238,233);color:rgb(88,76,68);display:flex;align-items:center;justify-content:center;font-family:'Lora',Georgia,serif;font-size:9px;">{{ fl.ext }}</div>
+                          <div style="min-width:0;display:flex;flex-direction:column;gap:2px;"><div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;">{{ fl.name }}</div><div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ fl.size }}</div></div>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ m.hasText }}" hint-placeholder-val="{{ true }}">
+                    <div style="width:max-content;max-width:76%;padding:9px 12px;border-radius:10px;line-height:1.45;white-space:pre-wrap;background:{{ m.bg }};color:{{ m.fg }};border:1px solid {{ m.border }};">{{ m.text }}</div>
+                  </sc-if>
+                  <sc-if value="{{ m.canFix }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ m.startFix }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;border:none;background:transparent;padding:0;font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(176,92,54);" style-hover="text-decoration:underline;">✎ Wrong answer? Correct it</button>
+                  </sc-if>
+                  <sc-if value="{{ m.fixing }}" hint-placeholder-val="{{ false }}">
+                    <div style="width:76%;display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:8px;border:1px solid rgb(199,111,70);background:rgb(255,255,255);">
+                      <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.1em;color:rgb(88,76,68);">CORRECT THE AI ANSWER</div>
+                      <div style="font-size:14px;color:rgb(88,76,68);">Customer asked: <span style="color:rgb(0,0,0);">{{ m.fixQ }}</span></div>
+                      <textarea value="{{ fixText }}" onChange="{{ onFixText }}" rows="3" placeholder="Write the right answer" style="border:1px solid rgb(218,210,200);border-radius:6px;padding:8px 10px;font-family:'Lora',Georgia,serif;font-size:15px;line-height:1.45;resize:vertical;"></textarea>
+                      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:rgb(43,33,28);cursor:pointer;"><input type="checkbox" checked="{{ fixSend }}" onChange="{{ toggleFixSend }}"></input>Also send the right answer to the customer now</label>
+                      <div style="font-size:13px;color:rgb(104,92,84);">Saved as a fixed answer for {{ m.fixBrand }}. The AI will use it word for word next time.</div>
+                      <div style="display:flex;gap:6px;justify-content:flex-end;">
+                        <button onClick="{{ cancelFix }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:6px 12px;border-radius:5px;border:none;background:transparent;color:rgb(104,92,84);">Cancel</button>
+                        <button onClick="{{ m.saveFix }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:6px 14px;border-radius:5px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);">Save correction</button>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ m.fixed }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:rgb(76,110,80);background:rgb(230,240,231);padding:3px 10px;border-radius:999px;">{{ m.fixed }}<a href="Auto Reply.dc.html" style="font-size:13px;">See in AI Agent ↗</a></div>
+                  </sc-if>
+                  <sc-if value="{{ m.hasButtons }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:76%;">
+                      <sc-for list="{{ m.buttons }}" as="btn" hint-placeholder-count="2"><span style="font-size:14px;color:rgb(176,92,54);border:1px solid rgb(176,92,54);border-radius:999px;padding:3px 10px;background:rgb(255,255,255);white-space:nowrap;">{{ btn }}</span></sc-for>
+                    </div>
+                  </sc-if>
+                  
+                  <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ m.meta }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="flex:none;padding:12px 18px 14px;background:rgb(255,255,255);border-top:1px solid rgb(230,224,217);display:flex;flex-direction:column;gap:10px;">
+            <sc-if value="{{ showDraft }}" hint-placeholder-val="{{ false }}">
+              <div style="background:rgb(246,243,239);border:1px solid rgb(199,111,70);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.1em;color:rgb(88,76,68);flex:1;">✦ AI DRAFT · NOT SENT</div>
+                  <div style="font-size:13px;color:rgb(104,92,84);">Used: {{ draft.cards }}</div>
+                </div>
+                <sc-if value="{{ draft.flag }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:14px;color:rgb(88,76,68);background:rgb(242,238,233);padding:6px 10px;border-radius:5px;">A person should take over · {{ draft.flag }}</div>
+                </sc-if>
+                <div style="line-height:1.5;">{{ draft.text }}</div>
+                <div style="display:flex;gap:6px;">
+                  <button onClick="{{ useDraft }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:6px 12px;border-radius:5px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);">Use</button>
+                  <button onClick="{{ anotherDraft }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:6px 12px;border-radius:5px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);color:rgb(88,76,68);" style-hover="background:rgb(243,240,236);">Another</button>
+                  <button onClick="{{ dismissDraft }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:6px 12px;border-radius:5px;border:none;background:transparent;color:rgb(104,92,84);" style-hover="color:rgb(0,0,0);">Dismiss</button>
+                </div>
+              </div>
+            </sc-if>
+            <div style="border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);display:flex;flex-direction:column;">
+              <sc-if value="{{ hasAttach }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 0;">
+                  <sc-for list="{{ attach }}" as="a" hint-placeholder-count="0">
+                    <div style="display:flex;align-items:center;gap:8px;padding:4px 6px 4px 4px;border:1px solid rgb(218,210,200);border-radius:6px;background:rgb(248,246,243);">
+                      <sc-if value="{{ a.isImage }}" hint-placeholder-val="{{ false }}"><div style="width:32px;height:32px;border-radius:4px;background-size:cover;background-position:center;background-image:{{ a.bg }};"></div></sc-if>
+                      <sc-if value="{{ a.isFile }}" hint-placeholder-val="{{ true }}"><div style="width:32px;height:32px;border-radius:4px;background:rgb(242,238,233);color:rgb(88,76,68);display:flex;align-items:center;justify-content:center;font-family:'Lora',Georgia,serif;font-size:9px;">{{ a.ext }}</div></sc-if>
+                      <div style="display:flex;flex-direction:column;gap:1px;"><div style="font-size:13px;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ a.name }}</div><div style="font-family:'Lora',Georgia,serif;font-size:9px;color:rgb(120,108,100);">{{ a.size }}</div></div>
+                      <button onClick="{{ a.remove }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;border:none;background:transparent;color:rgb(104,92,84);font-size:15px;padding:0 4px;">×</button>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <textarea value="{{ reply }}" onChange="{{ onReply }}" onKeyDown="{{ onReplyKey }}" placeholder="{{ replyPlaceholder }}" disabled="{{ botOn }}" rows="3" style="border:none;outline:none;resize:none;padding:10px 12px;font-family:'Lora',Georgia,serif;font-size:15px;line-height:1.45;border-radius:8px;background:{{ replyBg }};"></textarea>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 8px 8px;">
+                <input type="file" ref="{{ camRef }}" accept="image/*" capture="environment" onChange="{{ onPick }}" style="display:none;"></input>
+                <input type="file" ref="{{ fileRef }}" multiple="{{ true }}" onChange="{{ onPick }}" style="display:none;"></input>
+                <div style="display:flex;gap:2px;">
+                  <button onClick="{{ pickCam }}" title="Camera" style="white-space:nowrap;flex-shrink:0;cursor:pointer;width:30px;height:30px;border:none;border-radius:5px;background:transparent;color:rgb(88,76,68);display:flex;align-items:center;justify-content:center;" style-hover="background:rgb(240,226,206);color:rgb(43,33,28);"><i data-lucide="camera" style="width:16px;height:16px;"></i></button>
+                  <button onClick="{{ pickFile }}" title="Photo, video or file" style="white-space:nowrap;flex-shrink:0;cursor:pointer;width:30px;height:30px;border:none;border-radius:5px;background:transparent;color:rgb(88,76,68);display:flex;align-items:center;justify-content:center;" style-hover="background:rgb(240,226,206);color:rgb(43,33,28);"><i data-lucide="paperclip" style="width:16px;height:16px;"></i></button>
+                </div>
+                <div style="width:1px;height:18px;background:rgb(230,224,217);"></div>
+                <div style="position:relative;">
+                    <button onClick="{{ csBasic.toggle }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Lora',Georgia,serif;font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);"><span style="display:flex;color:rgb(176,92,54);"><i data-lucide="book-open" style="width:13px;height:13px;"></i></span>General info<i data-lucide="chevron-down" style="width:13px;height:13px;color:rgb(104,92,84);"></i></button>
+                    <sc-if value="{{ csBasic.open }}" hint-placeholder-val="{{ false }}">
+                      <div onClick="{{ csBasic.close }}" style="position:fixed;inset:0;z-index:40;"></div>
+                      <div style="position:absolute;bottom:34px;left:0;width:560px;max-width:calc(100vw - 40px);max-height:420px;display:flex;flex-direction:column;z-index:41;background:rgb(250,249,247);border:1px solid rgb(218,210,200);border-radius:10px;box-shadow:0 10px 28px rgba(43,33,28,.16);">
+                        <div style="flex:none;display:flex;align-items:baseline;gap:10px;padding:12px 14px 10px;border-bottom:1px solid rgb(235,230,224);">
+                          <span style="font-family:'Cormorant Garamond',Georgia,serif;font-size:18px;font-weight:600;color:rgb(43,33,28);">General info</span>
+                          <span style="flex:1;font-size:12px;color:rgb(120,108,100);">Pick a card to insert it, or one line only</span>
+                          <a href="Basic Info.dc.html" style="white-space:nowrap;font-size:13px;">Edit ↗</a>
+                        </div>
+                        <div style="flex:1;min-height:0;overflow-y:auto;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;">
+                          <sc-for list="{{ csBasic.groups }}" as="g" hint-placeholder-count="2">
+                            <div style="min-width:0;display:flex;flex-direction:column;background:rgb(255,255,255);border:1px solid rgb(218,210,200);border-radius:8px;overflow:hidden;" style-hover="border-color:rgb(176,92,54);">
+                              <button onClick="{{ g.insertAll }}" title="Insert the whole card" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px 12px;border:none;border-bottom:1px solid rgb(235,230,224);background:transparent;text-align:left;font-family:'Lora',Georgia,serif;" style-hover="background:rgb(246,240,232);">
+                                <span style="display:flex;color:rgb(176,92,54);"><i data-lucide="{{ g.icon }}" style="width:15px;height:15px;"></i></span>
+                                <span style="flex:1;min-width:0;font-family:'Cormorant Garamond',Georgia,serif;font-size:17px;font-weight:600;color:rgb(43,33,28);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ g.label }}</span>
+                                <span style="display:flex;align-items:center;gap:4px;font-size:12px;color:rgb(176,92,54);white-space:nowrap;"><i data-lucide="plus" style="width:12px;height:12px;"></i>Insert</span>
+                              </button>
+                              <div style="display:flex;flex-direction:column;padding:4px;">
+                                <sc-for list="{{ g.fields }}" as="q" hint-placeholder-count="3">
+                                  <button onClick="{{ q.onClick }}" title="Insert this line" style="cursor:pointer;display:flex;flex-direction:column;gap:1px;padding:5px 8px;border:none;border-radius:5px;background:transparent;text-align:left;font-family:'Lora',Georgia,serif;" style-hover="background:rgb(246,243,239);">
+                                    <span style="font-size:11px;letter-spacing:.04em;color:rgb(120,108,100);">{{ q.label }}</span>
+                                    <span style="max-width:100%;font-size:13px;line-height:1.4;color:rgb(43,33,28);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ q.value }}</span>
+                                  </button>
+                                </sc-for>
+                              </div>
+                            </div>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                <sc-if value="{{ aiButton }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ openDraft }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:5px 10px;border-radius:5px;border:1px solid rgb(199,111,70);background:rgb(246,243,239);color:rgb(88,76,68);" style-hover="background:rgb(240,226,206);">✦ AI draft</button>
+                </sc-if>
+                <sc-if value="{{ aiMissing }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:13px;color:rgb(199,111,70);background:rgb(250,232,226);padding:4px 8px;border-radius:4px;">AI not connected (no API key)</span>
+                </sc-if>
+                <div style="flex:1;font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ sendHint }}</div>
+                <button onClick="{{ send }}" disabled="{{ sendDisabled }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:6px 16px;border-radius:5px;border:none;background:rgb(43,33,28);color:rgb(240,226,206);opacity:{{ sendOpacity }};">Send</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section style="min-height:0;overflow-y:auto;border-left:1px solid rgb(230,224,217);padding:16px 18px 24px;display:flex;flex-direction:column;gap:16px;">
+          <div style="flex:none;display:flex;flex-direction:column;gap:4px;">
+            <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">CUSTOMER</div>
+            <div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:26px;line-height:1.1;">{{ sel.name }}</div>
+            <div style="font-size:14px;color:rgb(104,92,84);">{{ sel.channel }} · first contact {{ sel.first }}</div>
+          </div>
+
+          <div style="flex:none;border:1px solid {{ hero.border }};border-radius:10px;overflow:hidden;background:{{ hero.bg }};">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;padding:12px 14px 0;gap:4px 8px;">
+              <div style="flex:1;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">PHONE</div>
+              <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:11px;font-family:'Lora',Georgia,serif;color:{{ s.fg }};"><span style="width:7px;height:7px;border-radius:50%;background:{{ s.dot }};border:1px solid {{ s.ring }};"></span>{{ s.label }}</div>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ hero.none }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:10px 14px 14px;display:flex;flex-direction:column;gap:10px;">
+                <div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:24px;color:rgb(120,108,100);">No phone yet</div>
+                <div style="display:flex;gap:6px;">
+                  <input value="{{ typed }}" onChange="{{ onTyped }}" placeholder="012-345 6789" style="flex:1;min-width:0;height:34px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:15px;"></input>
+                  <button onClick="{{ addTyped }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:0 12px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);">Add</button>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ hero.detected }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:8px 14px 14px;display:flex;flex-direction:column;gap:8px;">
+                <div style="font-family:'Lora',Georgia,serif;font-size:28px;letter-spacing:.02em;overflow-wrap:anywhere;">{{ sel.phone }}</div>
+                <div style="font-size:14px;color:rgb(104,92,84);">Found in the chat · {{ sel.phoneAt }}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                  <button onClick="{{ confirmPhone }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:7px 14px;border-radius:6px;border:1px solid rgb(76,110,80);background:rgb(255,255,255);color:rgb(76,110,80);" style-hover="background:rgb(230,240,231);">Confirm number</button>
+                  <button onClick="{{ rejectPhone }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:7px 12px;border-radius:6px;border:none;background:transparent;color:rgb(104,92,84);" style-hover="color:rgb(0,0,0);">Not a phone</button>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ hero.confirmed }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:8px 14px 14px;display:flex;flex-direction:column;gap:6px;">
+                <div style="font-family:'Lora',Georgia,serif;font-size:28px;letter-spacing:.02em;overflow-wrap:anywhere;color:rgb(76,110,80);">{{ sel.phone }}</div>
+                <div style="font-size:14px;color:rgb(76,110,80);">Confirmed · {{ sel.confirmedBy }}</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ hero.handed }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:8px 14px 14px;display:flex;flex-direction:column;gap:10px;">
+                <div style="font-family:'Lora',Georgia,serif;font-size:28px;letter-spacing:.02em;overflow-wrap:anywhere;color:rgb(76,110,80);">{{ sel.phone }}</div>
+                <div style="border-top:1px solid rgb(235,230,224);padding-top:10px;display:flex;flex-direction:column;gap:2px;">
+                  <div style="font-weight:600;color:rgb(76,110,80);">Handed to {{ sel.handedTo }}</div>
+                  <div style="font-size:14px;color:rgb(88,76,68);">{{ sel.handedAt }} · by Mei Ling · via WhatsApp</div>
+                </div>
+                <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;">
+                  <label style="min-width:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:rgb(88,76,68);">Appointment
+                    <select value="{{ sel.appt }}" onChange="{{ onAppt }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"><option>Not known</option><option>Booked</option><option>Not booked</option></select>
+                  </label>
+                  <label style="min-width:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:rgb(88,76,68);">Came
+                    <select value="{{ sel.came }}" onChange="{{ onCame }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"><option>Not known</option><option>Came</option><option>No show</option></select>
+                  </label>
+                </div>
+                <button onClick="{{ openHand }}" style="white-space:nowrap;flex-shrink:0;align-self:flex-start;cursor:pointer;border:none;background:transparent;padding:0;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(176,92,54);">Hand again →</button>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ hero.canHand }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:6px;">
+                <button onClick="{{ openHand }}" disabled="{{ handDisabled }}" style="flex-shrink:0;cursor:pointer;min-height:42px;padding:8px 12px;line-height:1.3;text-wrap:balance;border:none;border-radius:7px;background:rgb(199,111,70);color:rgb(43,33,28);font-family:'Lora',Georgia,serif;font-size:15px;font-weight:600;opacity:{{ handOpacity }};" style-hover="background:rgb(176,92,54);">Hand over to {{ sel.brand }} sales</button>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <sc-if value="{{ hero.confirmed }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ backToConfirm }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;border:none;background:transparent;padding:0;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(176,92,54);" style-hover="text-decoration:underline;">← Back</button>
+                  </sc-if>
+                  <div style="flex:1;font-size:13px;color:rgb(104,92,84);text-align:center;">{{ handHint }}</div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:10px;">
+            <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">FOR THE SALESPERSON</div>
+            <label style="min-width:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:rgb(88,76,68);">Name
+              <input value="{{ sel.cardName }}" onChange="{{ f.cardName }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:15px;color:rgb(0,0,0);"></input>
+            </label>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;">
+              <label style="min-width:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:rgb(88,76,68);">Interest
+                <input value="{{ sel.interest }}" onChange="{{ f.interest }}" placeholder="e.g. L-shape sofa" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:15px;color:rgb(0,0,0);min-width:0;"></input>
+              </label>
+              <label style="min-width:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:rgb(88,76,68);">Budget
+                <input value="{{ sel.budget }}" onChange="{{ f.budget }}" placeholder="e.g. RM 3,000" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:15px;color:rgb(0,0,0);min-width:0;"></input>
+              </label>
+              <label style="min-width:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:rgb(88,76,68);">Showroom
+                <select value="{{ sel.showroom }}" onChange="{{ f.showroom }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:15px;background:rgb(255,255,255);min-width:0;">
+                  <option value="">—</option>
+                  <sc-for list="{{ showrooms }}" as="r" hint-placeholder-count="2"><option value="{{ r }}">{{ r }}</option></sc-for>
+                </select>
+              </label>
+              <label style="min-width:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:rgb(88,76,68);">Date
+                <input type="date" value="{{ sel.when }}" onChange="{{ f.when }}" style="font-family:'Lora',Georgia,serif;height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:15px;color:rgb(0,0,0);min-width:0;"></input>
+              </label>
+            </div>
+            <label style="min-width:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:rgb(88,76,68);">Note · the customer never sees it
+              <textarea value="{{ sel.note }}" onChange="{{ f.note }}" rows="2" style="border:1px solid rgb(218,210,200);border-radius:6px;padding:8px 10px;font-family:'Lora',Georgia,serif;font-size:15px;resize:vertical;background:rgb(246,243,239);color:rgb(0,0,0);"></textarea>
+            </label>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <button onClick="{{ save }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:6px 14px;border-radius:5px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);" style-hover="background:rgb(243,240,236);">Save</button>
+              <span style="font-size:13px;color:rgb(76,110,80);">{{ savedNote }}</span>
+            </div>
+          </div>
+
+          <div style="flex:none;display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid rgb(235,230,224);">
+            <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">TIMELINE</div>
+            <sc-for list="{{ timeline }}" as="e" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:86px 1fr;gap:8px;font-size:14px;">
+                <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);padding-top:2px;">{{ e.t }}</div>
+                <div style="color:rgb(43,33,28);">{{ e.text }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <sc-if value="{{ modal }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeHand }}" style="position:absolute;inset:0;background:rgba(43,33,28,.32);display:flex;align-items:center;justify-content:center;z-index:10;">
+      <div onClick="{{ stop }}" style="width:760px;background:rgb(255,255,255);border-radius:12px;border:1px solid rgb(218,210,200);box-shadow:0 20px 50px rgba(43,33,28,.2);display:flex;flex-direction:column;">
+        <div style="padding:20px 24px 14px;border-bottom:1px solid rgb(235,230,224);display:flex;align-items:flex-start;gap:12px;">
+          <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+            <div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:26px;line-height:1.1;">Hand over to {{ sel.brand }} sales</div>
+            <div style="font-size:14px;color:rgb(88,76,68);">{{ sel.name }} · <span style="font-family:'Lora',Georgia,serif;">{{ sel.phone }}</span></div>
+          </div>
+          <button onClick="{{ closeHand }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;width:30px;height:30px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);font-size:15px;color:rgb(88,76,68);">×</button>
+        </div>
+        <div style="display:grid;grid-template-columns:280px minmax(0,1fr);">
+          <div style="padding:16px 16px 20px 24px;border-right:1px solid rgb(235,230,224);display:flex;flex-direction:column;gap:6px;">
+            <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);padding-bottom:4px;">SALESPERSON · IN TURN</div>
+            <sc-for list="{{ salesList }}" as="p" hint-placeholder-count="3">
+              <div onClick="{{ p.onClick }}" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:7px;border:1px solid {{ p.border }};background:{{ p.bg }};">
+                <span style="width:14px;height:14px;border-radius:50%;border:1.5px solid {{ p.ring }};display:flex;align-items:center;justify-content:center;"><span style="width:6px;height:6px;border-radius:50%;background:{{ p.dot }};"></span></span>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
+                  <div style="display:flex;align-items:center;gap:6px;"><span style="font-weight:500;">{{ p.name }}</span><sc-if value="{{ p.next }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Lora',Georgia,serif;font-size:9px;padding:1px 5px;border-radius:3px;background:rgb(230,240,231);color:rgb(76,110,80);">NEXT</span></sc-if></div>
+                  <div style="font-size:13px;color:rgb(104,92,84);">{{ p.showroom }} · <span style="font-family:'Lora',Georgia,serif;">{{ p.mobile }}</span></div>
+                </div>
+                <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);text-align:right;">{{ p.week }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:16px 24px 20px 20px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">WHATSAPP MESSAGE · YOU CAN EDIT IT</div>
+              <button onClick="{{ copyWa }}" title="Copy message" style="white-space:nowrap;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;width:30px;height:30px;font-family:'Lora',Georgia,serif;font-size:15px;padding:0;border-radius:6px;border:1px solid {{ copyBtn.border }};background:{{ copyBtn.bg }};color:{{ copyBtn.fg }};" style-hover="background:rgb(246,243,239);">{{ copyBtn.label }}</button>
+            </div>
+            <textarea value="{{ waText }}" onChange="{{ onWa }}" rows="11" style="border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);padding:10px 12px;font-family:'Lora',Georgia,serif;font-size:14px;line-height:1.55;resize:none;background:rgb(248,246,243);"></textarea>
+            <div style="display:flex;align-items:center;gap:10px;padding-top:4px;">
+              <span style="flex:1;"></span>
+              <button onClick="{{ doHand }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:15px;font-weight:600;padding:8px 18px;border-radius:6px;border:none;background:rgb(199,111,70);color:rgb(255,255,255);" style-hover="background:rgb(176,92,54);">Mark as handed</button>
+            </div>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ copiedToast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;pointer-events:none;">
+      <div style="padding:10px 22px;border-radius:999px;background:rgba(43,33,28,.88);color:rgb(255,255,255);font-family:'Lora',Georgia,serif;font-size:15px;font-weight:500;box-shadow:0 8px 24px rgba(43,33,28,.2);">Copied</div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900},&quot;start&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;No phone yet&quot;,&quot;Phone found&quot;,&quot;Handed&quot;,&quot;AI replying&quot;,&quot;Template replying&quot;],&quot;default&quot;:&quot;Phone found&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Preview&quot;},&quot;aiMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Copilot&quot;,&quot;Off&quot;,&quot;Not connected&quot;],&quot;default&quot;:&quot;Copilot&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Preview&quot;},&quot;metaConnected&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Preview&quot;}}">
+const K = { dark:'rgb(43,33,28)', cream:'rgb(240,226,206)', accent:'rgb(199,111,70)', peach:'rgb(246,243,239)', otext:'rgb(88,76,68)', hair:'rgb(235,230,224)', frame:'rgb(218,210,200)', brown:'rgb(88,76,68)', faint:'rgb(120,108,100)', blue:'rgb(176,92,54)', blueBg:'rgb(242,238,233)', green:'rgb(76,110,80)', greenBg:'rgb(230,240,231)', amber:'rgb(88,76,68)', amberBg:'rgb(242,238,233)', info:'rgb(242,238,233)', white:'rgb(255,255,255)', ig:'rgb(104,92,84)' };
+const BRAND = { '2990s':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'}, '2990s mini':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'}, 'Carress':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'} };
+const SALES = {
+  '2990s':[{name:'Daniel Chew',mobile:'012-000 1101',showroom:'KL',week:1},{name:'Sharon Lee',mobile:'012-000 1102',showroom:'KL',week:0},{name:'Ahmad Faiz',mobile:'012-000 1103',showroom:'PJ',week:0}],
+  '2990s mini':[{name:'Kimberly Tan',mobile:'012-000 2201',showroom:'Cheras',week:0},{name:'Hafiz Ismail',mobile:'012-000 2202',showroom:'Kelana Jaya',week:0}],
+  'Carress':[{name:'Alvin Goh',mobile:'012-000 3301',showroom:'Puchong',week:1},{name:'Michelle Wong',mobile:'012-000 3302',showroom:'Puchong',week:0}]
+};
+const ROOMS = { '2990s':['KL','PJ'], '2990s mini':['Kelana Jaya','Puchong','Cheras'], 'Carress':['Puchong'] };
+const SEED = [
+  { id:'jason', name:'Jason Lim', initials:'JL', ch:'IG', channel:'Instagram', brand:'2990s mini', time:'14:48', state:'waiting', test:true, phone:'012-338 4721', phoneState:'detected', phoneAt:'18 Oct, 14:48', ad:null, first:'17 Oct, 21:04', cardName:'Jason Lim', interest:'小户型餐桌', budget:'', showroom:'Kelana Jaya', when:'2026-10-24', note:'', consent:'Not asked',
+    messages:[
+      {from:'customer',text:'Hi, 這張餐桌有幾種尺寸?',time:'21:04',day:'17 Oct'},
+      {from:'flow',by:'Size question',text:'Hi Jason! Which size are you looking at?',buttons:['4 seater','6 seater','Not sure yet'],time:'21:04'},
+      {from:'customer',text:'4 seater',time:'21:06'},
+      {from:'cs',by:'Mei Ling',text:'Hi Jason, the 4-seater comes in 1.2 m and 1.4 m. Would you like to see it at our Kelana Jaya showroom? Leave your number and our salesperson will arrange a time.',time:'10:12',day:'18 Oct'},
+      {from:'customer',text:'我的號碼 012-338 4721，週六可以看看',time:'14:48',phone:'012-338 4721'}],
+    timeline:[{t:'17 Oct 21:04',text:'Came in · Instagram · organic'},{t:'17 Oct 21:04',text:'Automation “Size question” ran'},{t:'18 Oct 14:48',text:'Phone found in the chat'}],
+    drafts:[{text:'Thank you Jason! Saturday works. Our salesperson at the Kelana Jaya showroom will WhatsApp you at 012-338 4721 to fix a time. Morning or afternoon?',cards:'Showroom · Kelana Jaya, Opening hours'},{text:'Got it, thanks! Would Saturday morning or afternoon suit you better? Our Kelana Jaya team will message you on WhatsApp to confirm.',cards:'Showroom · Kelana Jaya'}] },
+  { id:'aisyah', name:'Aisyah Rahman', initials:'AR', ch:'FB', channel:'Messenger', brand:'2990s', time:'14:53', state:'waiting', test:true, phone:'', phoneState:'none', ad:{name:'Oct Sofa Week（影片）',campaign:'Oct Sofa Week',adset:'KL Lookalike 25–45',id:'120210000000001'}, first:'16 Oct, 14:53', cardName:'Aisyah Rahman', interest:'L 型沙發', budget:'', showroom:'', when:'', note:'', consent:'Not asked',
+    messages:[
+      {from:'customer',text:'你好，我想問這款沙發',time:'14:31',day:'18 Oct'},
+      {from:'cs',by:'Mei Ling',text:'Hi! 謝謝你對 2990s 有興趣，你想看哪一種? 3 人座、L 型還是沙發床?',time:'14:40'},
+      {from:'customer',text:'L 型',time:'14:51'},
+      {from:'customer',text:'可以分期付款嗎?',time:'14:53'}],
+    timeline:[{t:'16 Oct 14:53',text:'Came in · Messenger · Ad “Oct Sofa Week”'}],
+    drafts:[{text:'Yes, you can pay in instalments: 0% for 12 months with selected cards. Would you like our salesperson to send you the L-shape options and prices on WhatsApp? Just leave your mobile number here.',cards:'Promo · Oct Sofa Week, Policy · Instalments'},{text:'Yes! Instalments are available on the L-shape sofas. Share your mobile number and our team will WhatsApp you the plans and this week’s Sofa Week price.',cards:'Promo · Oct Sofa Week'}] },
+  { id:'test01', name:'測試客戶 01', initials:'測', ch:'FB', channel:'Messenger', brand:'2990s', time:'13:21', state:'answered', test:true, mode:'ai', phone:'', phoneState:'none', ad:null, first:'18 Oct, 13:20', cardName:'', interest:'', budget:'', showroom:'', when:'', note:'', consent:'Not asked',
+    messages:[{from:'customer',text:'你好，這款沙發還有貨嗎?',time:'13:20',day:'18 Oct'},{from:'ai',by:'AI Agent',text:'你好！我们的 L 型沙发 RM 2,990 起，有沙色、橄榄绿和炭灰色。库存要跟门市确认，可以留下你的手机号码吗？我们的销售员会在 WhatsApp 联系你。',via:'Used: Product catalogue Oct 2026.pdf',time:'13:21'}],
+    timeline:[{t:'18 Oct 13:20',text:'Came in · Messenger · organic'},{t:'18 Oct 13:21',text:'AI Agent replied'}],
+    drafts:[{text:'Hi! Thanks for your message. Which sofa are you looking at? Send us a photo or the name and we’ll check for you.',cards:'none',flag:'asks about stock, which the Data Center doesn’t have'}] },
+  { id:'priya', name:'Priya S.', initials:'PS', ch:'IG', channel:'Instagram', brand:'Carress', time:'12:05', state:'answered', test:true, phone:'', phoneState:'none', ad:null, first:'18 Oct, 11:50', cardName:'Priya S.', interest:'Mattress, medium firm', budget:'', showroom:'', when:'', note:'', consent:'Not asked',
+    messages:[{from:'customer',text:'Which mattress is good for back pain?',time:'11:50',day:'18 Oct'},{from:'cs',by:'Mei Ling',text:'Our Medium firm is the most popular for back support. Would you like to try it at our Puchong showroom? Leave your number and we’ll arrange it.',time:'12:05'}],
+    timeline:[{t:'18 Oct 11:50',text:'Came in · Instagram · organic'}], drafts:[{text:'Just checking in, Priya. Would a weekend visit to Puchong suit you to try the Medium firm?',cards:'Showroom · Puchong'}] },
+  { id:'kelvin', name:'Kelvin Ong', initials:'KO', ch:'FB', channel:'Messenger', brand:'2990s mini', time:'Yesterday', state:'answered', test:true, mode:'flow:after', flowStep:'1 of 3', phone:'', phoneState:'none', ad:null, first:'17 Oct, 23:12', cardName:'Kelvin Ong', interest:'', budget:'', showroom:'', when:'', note:'Asking about a delivery, not a new lead.', consent:'Not asked',
+    messages:[{from:'customer',text:'我上個月訂的沙發什麼時候送到?',time:'23:12',day:'17 Oct'},{from:'flow',by:'After-hours reply',text:'Thanks for your message! We’re closed now (10am–10pm). Leave your mobile number and we’ll get back to you first thing.',time:'23:12'}],
+    timeline:[{t:'17 Oct 23:12',text:'Came in · Messenger · organic'},{t:'17 Oct 23:12',text:'Automation “After-hours reply” ran'}], drafts:[{text:'Good morning Kelvin! Could you share your order number or the phone number on the order? We’ll check the delivery date for you.',cards:'Policy · Delivery',flag:'delivery question for an existing order'}] },
+  { id:'nurul', name:'Nurul Huda', initials:'NH', ch:'IG', channel:'Instagram', brand:'Carress', time:'12:28', state:'handed', test:true, phone:'017-552 0193', phoneState:'confirmed', phoneAt:'18 Oct, 12:10', confirmedBy:'Mei Ling, 18 Oct 12:12', ad:null, first:'18 Oct, 11:02', cardName:'Nurul Huda', interest:'King 床褥', budget:'RM 4,000', showroom:'Puchong', when:'2026-10-25', note:'', consent:'Agreed', handedTo:'Alvin Goh', handedAt:'18 Oct, 12:28', appt:'Booked', came:'Not known',
+    messages:[{from:'customer',text:'Do you have king size mattresses on display?',time:'11:02',day:'18 Oct'},{from:'cs',by:'Mei Ling',text:'Yes, all our king sizes are at the Puchong showroom. May I have your mobile number so our salesperson can arrange a visit?',time:'11:15'},{from:'customer',text:'017-552 0193, Sunday afternoon ok',time:'12:10',phone:'017-552 0193'},{from:'cs',by:'Mei Ling',text:'Thank you! Alvin from our Puchong showroom will WhatsApp you shortly.',time:'12:29'}],
+    timeline:[{t:'18 Oct 11:02',text:'Came in · Instagram · organic'},{t:'18 Oct 12:10',text:'Phone found in the chat'},{t:'18 Oct 12:12',text:'Phone confirmed by Mei Ling'},{t:'18 Oct 12:28',text:'Handed to Alvin Goh'},{t:'18 Oct 15:40',text:'Appointment booked'}], drafts:[] },
+  { id:'chloe', name:'Chloe Tan', initials:'CT', ch:'FB', channel:'Messenger', brand:'2990s', time:'15 Oct', state:'handed', test:true, phone:'017-338 9011', phoneState:'confirmed', confirmedBy:'Mei Ling, 15 Oct 16:10', ad:{name:'Oct Sofa Week（影片）',campaign:'Oct Sofa Week',adset:'KL Lookalike 25–45',id:'120210000000001'}, first:'15 Oct, 15:30', cardName:'Chloe Tan', interest:'L 型沙發', budget:'', showroom:'KL', when:'', note:'', consent:'Not asked', handedTo:'Daniel Chew', handedAt:'15 Oct, 16:18', appt:'Booked', came:'Came',
+    messages:[{from:'customer',text:'L 型沙發有什麼顏色?',time:'15:30',day:'15 Oct'},{from:'cs',by:'Mei Ling',text:'We have it in sand, olive and charcoal. Leave your number and Daniel from our KL showroom will send you photos.',time:'15:42'},{from:'customer',text:'017-338 9011',time:'16:05',phone:'017-338 9011'}],
+    timeline:[{t:'15 Oct 15:30',text:'Came in · Messenger · Ad “Oct Sofa Week”'},{t:'15 Oct 16:10',text:'Phone confirmed by Mei Ling'},{t:'15 Oct 16:18',text:'Handed to Daniel Chew'},{t:'17 Oct 14:00',text:'Came to the showroom'}], drafts:[] }
+];
+const START = { 'No phone yet':'aisyah', 'Phone found':'jason', 'Handed':'nurul', 'AI replying':'test01', 'Template replying':'kelvin' };
+const BOTS = [{v:'ai',l:'AI Agent'},{v:'flow:sofa',l:'Template · Sofa enquiry'},{v:'flow:after',l:'Template · After-hours reply'},{v:'flow:size',l:'Template · Size question'}];
+const botName = m => { const b = BOTS.find(x => x.v === m); return b ? (m === 'ai' ? 'AI Agent' : 'template “' + b.l.replace('Template · ','') + '”') : ''; };
+const STATE = { waiting:{label:'Waiting',bg:K.amberBg,fg:K.amber}, answered:{label:'Answered',bg:K.info,fg:K.brown}, handed:{label:'Handed',bg:K.greenBg,fg:K.green} };
+const now = () => { const d = new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+
+class Component extends DCLogic {
+  state = { convs: SEED, selId: null, brand:'All', tab:'waiting', q:'', reply:'', draftOpen:{}, draftIdx:{}, fromDraft:false, modal:false, pick:null, waText:'', typed:'', saved:'', week:{}, attach:[], fix:null, fixText:'', fixSend:true };
+  chatRef = React.createRef(); camRef = React.createRef(); photoRef = React.createRef(); fileRef = React.createRef();
+  componentDidMount(){ this.icons(); this.scroll(); try { const p = JSON.parse(localStorage.getItem('inboxv2-layout') || '{}'); this.setState({ listW: p.listW || 304, rightW: p.rightW || 352, navOpen: p.navOpen !== false }); } catch (e) {} }
+  saveLayout(){ try { localStorage.setItem('inboxv2-layout', JSON.stringify({ listW:this.state.listW, rightW:this.state.rightW, navOpen:this.state.navOpen })); } catch (e) {} }
+  startDrag(e, key, dir, min, max){ e.preventDefault(); const x0 = e.clientX, w0 = this.state[key] || (key === 'listW' ? 304 : 352);
+    const mv = ev => this.setState({ [key]: Math.max(min, Math.min(max, w0 + dir * (ev.clientX - x0))) });
+    const up = () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); document.body.style.cursor = ''; document.body.style.userSelect = ''; this.saveLayout(); };
+    document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'; window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up); }
+  componentDidUpdate(pp, ps){ this.icons(); if (ps.selId !== this.state.selId || ps.convs !== this.state.convs) this.scroll(); }
+  icons(){ if (window.lucide) window.lucide.createIcons(); else setTimeout(() => this.icons(), 300); }
+  scroll(){ const el = this.chatRef.current; if (el) el.scrollTop = el.scrollHeight; }
+  fixVals(sel, m, mi){
+    if (m.from !== 'ai') return { canFix:false, fixing:false, fixed:false };
+    const st = this.state, fixing = !!st.fix && st.fix.id === sel.id && st.fix.i === mi;
+    const q = (sel.messages.slice(0, mi).reverse().find(x => x.from === 'customer') || {}).text || '';
+    const brand = sel.brand === 'Carress' ? 'Carress' : '2990s';
+    return { canFix: !m.corrected && !fixing, fixing, fixQ: q, fixBrand: brand, fixed: m.corrected ? 'Corrected by Mei Ling · saved as a fixed answer' : false,
+      startFix: () => this.setState({ fix:{id:sel.id, i:mi}, fixText:'', fixSend:true }),
+      saveFix: () => { const right = st.fixText.trim(); if (!right) return; const t = now();
+        const rec = { id:'c'+Date.now(), date:'18 Oct ' + t, brand, q, wrong:m.text, right, by:'Mei Ling', conv:sel.name };
+        try { const list = JSON.parse(localStorage.getItem('houzs-ai-corrections') || '[]'); localStorage.setItem('houzs-ai-corrections', JSON.stringify([rec, ...list])); } catch (e) {}
+        this.upd(sel.id, c => ({ ...c, messages: [...c.messages.map((x, j) => j === mi ? {...x, corrected:true} : x), ...(st.fixSend ? [{from:'cs', by:'Mei Ling', via:'correction', text:right, time:t}] : [])],
+          timeline: [...c.timeline, {t:'18 Oct ' + t, text:'AI answer corrected by Mei Ling · saved as fixed answer'}] }));
+        this.setState({ fix:null, fixText:'' }); } };
+  }
+  fallbackCopy(t){ const ta = document.createElement('textarea'); ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} ta.remove(); }
+  selId(){ return this.state.selId || START[this.props.start ?? 'Phone found'] || 'jason'; }
+  upd(id, fn){ this.setState(s => ({ convs: s.convs.map(c => c.id === id ? fn(c) : c) })); }
+  sales(brand){ return SALES[brand].map(p => ({...p, week: p.week + (this.state.week[p.name]||0)})); }
+  wa(c, p){
+    return `Hi ${p.name}, new lead from Lead View / 新客户\nName 姓名: ${c.cardName||c.name}\nPhone 电话: ${c.phone}\nInterest 兴趣: ${c.interest||'-'}\nBudget 预算: ${c.budget||'-'}\nShowroom 门市: ${c.showroom||'-'}\nDate 日期: ${c.when ? new Date(c.when).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) : '-'}\nSource 来源: ${c.ad ? 'Ad · '+c.ad.name : 'Organic'}\nNote 备注: ${c.note||'-'}\nCS: Mei Ling`;
+  }
+  renderVals(){
+    const st = this.state, metaOn = !!this.props.metaConnected, ai = this.props.aiMode ?? 'Copilot';
+    const id = this.selId();
+    const sel = st.convs.find(c => c.id === id);
+    const inBrand = st.convs.filter(c => st.brand === 'All' || c.brand === st.brand);
+    const q = st.q.trim().toLowerCase();
+    const searched = inBrand.filter(c => !q || [c.name, c.phone, c.ad && c.ad.name, ...c.messages.map(m => m.text)].join(' ').toLowerCase().includes(q.replace(/[\s-]/g,'')) || [c.name, c.phone, c.ad && c.ad.name, ...c.messages.map(m=>m.text)].join(' ').toLowerCase().includes(q));
+    const count = t => searched.filter(c => t === 'all' || c.state === t).length;
+    const shown = searched.filter(c => st.tab === 'all' || c.state === st.tab);
+    const select = cid => this.setState({ selId: cid, reply:'', fromDraft:false, typed:'', saved:'' });
+
+    const list = shown.map(c => {
+      const last = c.messages[c.messages.length-1];
+      const b = BRAND[c.brand], isSel = c.id === id;
+      const ph = c.phoneState === 'confirmed' ? {bg:K.greenBg,fg:K.green} : {bg:K.peach,fg:K.otext};
+      return { ...c, onClick: () => select(c.id), bg: isSel ? 'rgb(252,240,232)' : 'rgb(255,255,255)', edge: isSel ? K.accent : 'transparent', chBg: c.ch === 'IG' ? K.ig : K.blue,
+        weight: c.state === 'waiting' ? 600 : 500, waiting: c.state === 'waiting', lastShown: (last.from === 'customer' ? '' : '↩ ') + last.text,
+        bBg:b.bg, bFg:b.fg, botChip: c.mode === 'ai' ? '✦ AI' : (c.mode && c.mode.startsWith('flow:')) ? 'Template' : false, hasPhone: !!c.phone, phoneChip: c.phoneState === 'detected' ? c.phone + ' ?' : c.phone, pBg:ph.bg, pFg:ph.fg, auto: !!c.auto };
+    });
+
+    let prevDay = null;
+    const messages = sel.messages.map((m, mi) => {
+      const day = m.day && m.day !== prevDay ? m.day : false; if (m.day) prevDay = m.day;
+      const OUT = {bg:'rgb(250,234,224)',fg:'rgb(43,33,28)',border:'rgb(240,208,190)',align:'flex-end'};
+      const sty = m.from === 'customer' ? {bg:K.white,fg:'rgb(43,33,28)',border:K.hair,align:'flex-start'} : OUT;
+      const who = { cs:{ icon:'ML', label: m.by || 'Mei Ling', tag:'CS', tagBg:'rgb(43,33,28)', tagFg:'rgb(240,226,206)' }, flow:{ icon:'⚙', label:'Template · ' + (m.by || ''), tag:'AUTO', tagBg:'rgb(240,226,206)', tagFg:'rgb(88,76,68)' }, campaign:{ icon:'⚙', label:'Campaign · ' + (m.by || ''), tag:'AUTO', tagBg:'rgb(240,226,206)', tagFg:'rgb(88,76,68)' }, ai:{ icon:'✦', label:'AI Agent', tag:'AI', tagBg:'rgb(199,111,70)', tagFg:'rgb(255,255,255)' } }[m.from];
+      const delivery = m.delivery || (metaOn && !sel.test ? 'sent' : 'recorded');
+      const role = { cs:'CS', flow:'Flow', campaign:'Campaign', ai:'AI Agent' }[m.from];
+      const meta = m.from === 'customer' ? m.time : [m.via, m.time, delivery].filter(Boolean).join(' · ');
+      const att = m.attach || [];
+      return { ...m, ...sty, day, meta, out: !!who, who: who || {}, ...this.fixVals(sel, m, mi), hasText: !!m.text, images: att.filter(a => a.kind === 'image'), files: att.filter(a => a.kind !== 'image'), hasImages: att.some(a => a.kind === 'image'), hasFiles: att.some(a => a.kind !== 'image'), hasButtons: !!(m.buttons && m.buttons.length), phone: m.phone && sel.phoneState !== 'none' ? m.phone : false };
+    });
+
+    const ps = sel.state === 'handed' ? 'handed' : sel.phoneState;
+    const order = ['detected','confirmed','handed'];
+    const reached = ps === 'none' ? -1 : order.indexOf(ps);
+    const steps = ['Found','Confirmed','Handed'].map((label, i) => ({ label, fg: i <= reached ? K.green : K.faint, dot: i <= reached ? K.green : 'transparent', ring: i <= reached ? K.green : K.frame }));
+    const hero = { none: ps === 'none', detected: ps === 'detected', confirmed: ps === 'confirmed', handed: ps === 'handed', canHand: ps !== 'handed',
+      bg: K.white,
+      border: ps === 'detected' ? K.accent : K.frame };
+    const canHand = ps === 'confirmed';
+    const handHint = '';
+
+    const drafts = sel.drafts || [];
+    const di = (st.draftIdx[id] || 0) % Math.max(drafts.length, 1);
+    const draft = drafts[di] || {text:'',cards:''};
+    const showDraft = ai === 'Copilot' && !!st.draftOpen[id] && drafts.length > 0;
+
+    const b = BRAND[sel.brand], s = STATE[sel.state];
+    const salesRaw = this.sales(sel.brand);
+    const min = Math.min(...salesRaw.map(p => p.week));
+    const nextName = (salesRaw.find(p => p.week === min) || {}).name;
+    const pick = st.pick || nextName;
+    const salesList = salesRaw.map(p => { const on = p.name === pick; return { ...p, week: p.week + ' this wk', next: p.name === nextName, onClick: () => this.setState({ pick: p.name, waText: this.wa(sel, p) }), border: on ? K.accent : K.hair, bg: on ? 'rgb(252,240,232)' : 'rgb(255,255,255)', ring: on ? K.accent : K.frame, dot: on ? K.accent : 'transparent' }; });
+
+    const consentOpts = ['Not asked','Agreed','Unsubscribed'].map(l => { const on = sel.consent === l; const col = l === 'Agreed' ? [K.greenBg,K.green] : l === 'Unsubscribed' ? ['rgb(250,232,226)','rgb(199,111,70)'] : [K.info,K.brown];
+      return { label:l, disabled: !sel.test, onClick: () => this.upd(id, c => ({...c, consent:l, timeline:[...c.timeline,{t:'18 Oct '+now(), text:'Promotions: '+l}]})), bg: on ? col[0] : K.white, fg: on ? col[1] : K.faint, border: on ? col[0] : K.hair }; });
+
+    const f = {}; ['cardName','interest','budget','showroom','when','note'].forEach(k => f[k] = e => { const v = e.target.value; this.upd(id, c => ({...c, [k]: v})); this.setState({saved:''}); });
+
+    const send = () => {
+      const text = st.reply.trim(); if (!text && !st.attach.length) return;
+      const attach = st.attach;
+      this.upd(id, c => ({...c, state: c.state === 'handed' ? 'handed' : 'answered', time: now(), messages:[...c.messages, {from:'cs', by:'Mei Ling', via: st.fromDraft ? 'from AI draft' : null, text, attach, time: now()}]}));
+      this.setState(s2 => ({ reply:'', attach:[], fromDraft:false, draftOpen:{...s2.draftOpen, [id]:false} }));
+    };
+
+    const mode = sel.mode || 'person', botOn = mode !== 'person';
+    const modeBar = { bot: botOn, person: !botOn,
+      who: mode === 'ai' ? 'AI Agent' : botOn ? 'Template · ' + BOTS.find(x => x.v === mode).l.replace('Template · ','') : 'CS · Mei Ling',
+      whoIcon: mode === 'ai' ? 'sparkles' : botOn ? 'workflow' : 'headset',
+      title: mode === 'ai' ? '✦ AI Agent is replying' : botOn ? 'Template “' + BOTS.find(x => x.v === mode).l.replace('Template · ','') + '” is replying' : '',
+      sub: mode === 'ai' ? 'Friendly · short replies · answers from 4 files · hands to a person when unsure' : botOn ? 'Step ' + (sel.flowStep || '1') + ' · waiting for the customer' : '' };
+    return {
+      modeBar, botOn, botOpts: BOTS,
+      ...(() => { const lw = st.listW || 304, rw = st.rightW || 352, open = st.navOpen !== false;
+        return { gridCols: lw + 'px minmax(0,1fr) ' + rw + 'px', listHandleX: lw + 'px', rightHandleX: rw + 'px',
+          dragList: e => this.startDrag(e, 'listW', 1, 230, 460), dragRight: e => this.startDrag(e, 'rightW', -1, 290, 520),
+          navW: open ? '216px' : '62px', navLabelOp: open ? 1 : 0, navFs: open ? '15px' : '0px', navIcon: open ? 'panel-left-close' : 'panel-left-open', navTip: open ? 'Collapse menu' : 'Expand menu',
+          toggleNav: () => this.setState(s => ({ navOpen: s.navOpen === false }), () => this.saveLayout()) }; })(),
+      whoOpen: !!st.whoOpen, toggleWho: () => this.setState(s => ({whoOpen:!s.whoOpen}), () => this.icons && this.icons()), closeWho: () => this.setState({whoOpen:false}),
+      whoMenu: [{v:'person', l:'CS · Mei Ling', icon:'headset'}, ...BOTS.map(b => ({ v:b.v, l:b.l, icon: b.v === 'ai' ? 'sparkles' : 'workflow' }))].map(o => ({ ...o, on: o.v === mode, check: o.v === mode ? '✓' : '', fw: o.v === mode ? 600 : 400,
+        pick: () => { this.setState({whoOpen:false}); if (o.v === mode) return; this.upd(id, c => ({...c, mode:o.v, timeline:[...c.timeline, {t:'18 Oct '+now(), text: o.v === 'person' ? 'Mei Ling took over from ' + botName(mode) : (mode === 'person' ? 'Handed back to ' : 'Switched to ') + botName(o.v)}]})); } })),
+      handMenu: !!st.handMenu, toggleHandMenu: () => this.setState(s => ({handMenu:!s.handMenu})), closeHandMenu: () => this.setState({handMenu:false}),
+      botMenu: BOTS.map(b => ({ l:b.l, pick: () => { this.setState({handMenu:false}); this.upd(id, c => ({...c, mode:b.v, timeline:[...c.timeline, {t:'18 Oct '+now(), text:'Handed back to ' + botName(b.v)}]})); } })),
+      fixText: st.fixText, onFixText: e => this.setState({fixText:e.target.value}), fixSend: st.fixSend, toggleFixSend: () => this.setState(s => ({fixSend:!s.fixSend})), cancelFix: () => this.setState({fix:null}),
+      replyPlaceholder: botOn ? (mode === 'ai' ? 'AI Agent' : 'A template') + ' is replying. Switch to CS from “Now” above to reply yourself.' : 'Reply as Mei Ling…', replyBg: botOn ? K.info : K.white,
+      takeOver: () => this.upd(id, c => ({...c, mode:'person', timeline:[...c.timeline, {t:'18 Oct '+now(), text:'Mei Ling took over from ' + botName(mode)}]})),
+      handBack: e => { const v = e.target.value; if (!v) return; this.upd(id, c => ({...c, mode:v, timeline:[...c.timeline, {t:'18 Oct '+now(), text:'Handed back to ' + botName(v)}]})); },
+      waitingCount: st.convs.filter(c => c.state === 'waiting').length,
+      metaOn, metaOff: !metaOn,
+      brandTabs: ['All','2990s','2990s mini','Carress'].map(l => ({ label:l, onClick: () => this.setState({brand:l}), bg: st.brand === l ? K.dark : 'transparent', fg: st.brand === l ? K.cream : K.brown })),
+      q: st.q, onSearch: e => this.setState({q: e.target.value}),
+      stateTabs: [['waiting','Waiting'],['answered','Answered'],['handed','Handed'],['all','All']].map(([k,l]) => ({ label:l, count: count(k), onClick: () => this.setState({tab:k}), fg: st.tab === k ? 'rgb(0,0,0)' : K.brown, line: st.tab === k ? K.dark : 'transparent' })),
+      list, listEmpty: list.length === 0,
+      sel: { ...sel, bBg:b.bg, bFg:b.fg, stateLabel:s.label, stBg:s.bg, stFg:s.fg, sourceLine: sel.ad ? 'Ad: ' + sel.ad.name : 'Organic', hasAd: !!sel.ad, organic: !sel.ad, sourceKicker: sel.ad ? 'FROM THE AD' : 'SOURCE',
+        adName: sel.ad && sel.ad.name, adPath: sel.ad && (sel.channel + ' · ' + sel.ad.campaign + ' › ' + sel.ad.adset), adId: sel.ad && sel.ad.id, confirmedBy: sel.confirmedBy || 'Mei Ling, just now', appt: sel.appt || 'Not known', came: sel.came || 'Not known' },
+      chatRef: this.chatRef, messages,
+      showDraft, draft: { ...draft, flag: draft.flag || false },
+      aiButton: ai === 'Copilot' && !st.draftOpen[id] && drafts.length > 0, aiMissing: ai === 'Not connected',
+      openDraft: () => this.setState(s2 => ({ draftOpen:{...s2.draftOpen, [id]:true} })),
+      anotherDraft: () => this.setState(s2 => ({ draftIdx:{...s2.draftIdx, [id]:(s2.draftIdx[id]||0)+1} })),
+      dismissDraft: () => this.setState(s2 => ({ draftOpen:{...s2.draftOpen, [id]:false} })),
+      useDraft: () => this.setState(s2 => ({ reply: draft.text, fromDraft:true, draftOpen:{...s2.draftOpen, [id]:false} })),
+      csBasic: (() => { const H = window.HZBasic; const ent = H ? H.entries(null, sel.brand === '2990s mini' ? '2990s' : sel.brand) : [];
+        return { open: !!st.csBasicOpen, toggle: () => this.setState(s => ({ csBasicOpen: !s.csBasicOpen }), () => this.icons()), close: () => this.setState({ csBasicOpen:false }),
+          groups: ent.map(e => ({ label: e.card.name, icon: e.cat.icon || 'file-text',
+            insertAll: () => { const t = e.card.name + '\n' + e.fields.map(f => f.label + ': ' + f.value).join('\n'); this.setState(s => ({ reply: (s.reply ? s.reply.replace(/\s*$/, '') + '\n\n' : '') + t, csBasicOpen:false })); },
+            fields: e.fields.map(f => ({ label:f.label, value:f.value, onClick: () => this.setState(s => ({ reply: (s.reply || '') + (s.reply && !/\s$/.test(s.reply) ? ' ' : '') + f.value, csBasicOpen:false })) })) })) }; })(),
+      reply: st.reply, onReply: e => this.setState({reply: e.target.value}),
+      onReplyKey: e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } },
+      send, sendDisabled: !st.reply.trim() && !st.attach.length, sendOpacity: (st.reply.trim() || st.attach.length) ? 1 : .45,
+      camRef: this.camRef, photoRef: this.photoRef, fileRef: this.fileRef,
+      pickCam: () => this.camRef.current && this.camRef.current.click(),
+      pickPhoto: () => this.photoRef.current && this.photoRef.current.click(),
+      pickFile: () => this.fileRef.current && this.fileRef.current.click(),
+      onPick: e => { const fs = Array.from(e.target.files || []); e.target.value = '';
+        const add = fs.map(fl => { const img = fl.type.startsWith('image/'); const kb = fl.size / 1024;
+          return { name: fl.name, kind: img ? 'image' : 'file', url: img ? URL.createObjectURL(fl) : '', bg: img ? 'url("' + URL.createObjectURL(fl) + '")' : 'none', ext: (fl.name.split('.').pop() || 'FILE').slice(0,4).toUpperCase(), size: kb > 1024 ? (kb/1024).toFixed(1) + ' MB' : Math.max(1, Math.round(kb)) + ' KB' }; });
+        this.setState(s2 => ({ attach: [...s2.attach, ...add] })); },
+      hasAttach: st.attach.length > 0,
+      attach: st.attach.map((a, i) => ({ ...a, isImage: a.kind === 'image', isFile: a.kind !== 'image', remove: () => this.setState(s2 => ({ attach: s2.attach.filter((_, j) => j !== i) })) })),
+      sendHint: (metaOn && !sel.test) ? 'Ctrl + Enter to send' : '',
+      hero, steps, handHint, handDisabled: !canHand, handOpacity: canHand ? 1 : .45,
+      typed: st.typed, onTyped: e => this.setState({typed: e.target.value}),
+      addTyped: () => { const v = st.typed.trim(); if (!v) return; this.upd(id, c => ({...c, phone:v, phoneState:'confirmed', confirmedBy:'typed by Mei Ling, '+now(), timeline:[...c.timeline,{t:'18 Oct '+now(), text:'Phone typed by Mei Ling'}]})); this.setState({typed:''}); },
+      confirmPhone: () => this.upd(id, c => ({...c, phoneState:'confirmed', confirmedBy:'Mei Ling, 18 Oct '+now(), timeline:[...c.timeline,{t:'18 Oct '+now(), text:'Phone confirmed by Mei Ling'}]})),
+      backToConfirm: () => this.upd(id, c => ({...c, phoneState:'detected', phoneAt: c.phoneAt || 'earlier', timeline: c.timeline.filter(e => e.text !== 'Phone confirmed by Mei Ling')})),
+      rejectPhone: () => this.upd(id, c => ({...c, phone:'', phoneState:'none'})),
+      onAppt: e => { const v = e.target.value; this.upd(id, c => ({...c, appt:v})); },
+      onCame: e => { const v = e.target.value; this.upd(id, c => ({...c, came:v})); },
+      openHand: () => { if (!(canHand || ps === 'handed')) return; const p = salesRaw.find(x => x.name === nextName); this.setState({ modal:true, pick:nextName, waText: this.wa(sel, p) }); },
+      closeHand: () => this.setState({modal:false}), stop: e => e.stopPropagation(),
+      copyBtn: { label:'⧉', bg:'rgb(255,255,255)', fg:'rgb(43,33,28)', border:'rgb(218,210,200)' }, copiedToast: !!st.copied,
+      copyWa: () => { const t = st.waText; const done = () => { this.setState({copied:true}); clearTimeout(this._ct); this._ct = setTimeout(() => this.setState({copied:false}), 1200); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => { this.fallbackCopy(t); done(); }); else { this.fallbackCopy(t); done(); } },
+      modal: st.modal, salesList, pickName: pick, waText: st.waText, onWa: e => this.setState({waText: e.target.value}),
+      doHand: () => { const t = now(); this.upd(id, c => ({...c, state:'handed', handedTo:pick, handedAt:'18 Oct, '+t, timeline:[...c.timeline,{t:'18 Oct '+t, text:'Handed to '+pick}]})); this.setState(s2 => ({ modal:false, week:{...s2.week, [pick]:(s2.week[pick]||0)+1} })); },
+      showrooms: ROOMS[sel.brand], f,
+      save: () => this.setState({saved:'Saved · ' + now()}), savedNote: st.saved,
+      consentOpts, consentHint: sel.test ? 'Set by hand on test conversations only.' : 'Set by the customer’s reply to a promotion.',
+      timeline: [...sel.timeline].reverse()
+    };
+  }
+}
+</script>
+</body>
+</html>

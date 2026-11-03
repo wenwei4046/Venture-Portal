@@ -10,9 +10,11 @@ import { formatMoney, formatMoneyBare } from '@/lib/utils'
 // deal's repayment plan (lib/repayment-plan — the same rows as its page's
 // Repayment schedule): ↓ money we collect (a Fund OUT loan), ↑ money we pay (a
 // Fund IN source), tinted by where it stands — paid green, due white, part
-// paid amber, overdue red. A hover shows the installment's card, a click opens
-// the deal, and a day with more than four shows "+N more". On a phone the
-// month reads as a list of days instead.
+// paid amber, overdue red; one paid before its month (paid ahead, or settled
+// early with its deal) is not on it (2026-11-02, the user: 还了要显示，只是像那种
+// 提早settle 了就不要显示 → b). A hover shows the installment's card, a click
+// opens the deal, and a day with more than four shows "+N more". On a phone
+// the month reads as a list of days instead.
 
 export interface CalendarEvent {
   /** YYYY-MM-DD */

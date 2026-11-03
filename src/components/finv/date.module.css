@@ -1,9 +1,11 @@
 /* The date field and its calendar (2026-10-14, the Finance revamp v2 — the
    prototype's `dateField`, D08). Every value is the prototype's: a 40px button
    (its own box) with the date and the calendar glyph, ringed in the accent
-   while open; under it (or over it, when the form has no room below) a 300px
+   while open; under it (or over it, when there is no room below) a 300px
    card of days — content-box, as the prototype's divs are — fading in from 4px
-   over .16s. It sits in the form's scroll, as the prototype's does. */
+   over .16s. It is fixed to the window, its top and left set by the field
+   (2026-11-03): in the form's scroll, as the prototype had it, a short window
+   cut off its first weeks. */
 
 .wrap {
   position: relative;
@@ -39,8 +41,7 @@
 .glyph { display: grid; place-items: center; color: rgb(var(--hvs-graphite)); }
 
 .pop {
-  position: absolute;
-  left: 0;
+  position: fixed;
   z-index: 20;
   box-sizing: content-box;
   width: 300px;
@@ -53,9 +54,10 @@
   transform: translateY(-4px);
   transition: opacity 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.pop[data-side='down'] { top: calc(100% + 6px); }
-.pop[data-side='up'] { bottom: calc(100% + 6px); transform: translateY(4px); }
+.pop[data-side='up'] { transform: translateY(4px); }
 .pop[data-in='true'] { opacity: 1; transform: translateY(0); }
+/* Where the window's corner is drawn from the field: a dialog's transform moves it, and the calendar counts from it. */
+.origin { position: fixed; top: 0; left: 0; width: 0; height: 0; pointer-events: none; }
 
 .head {
   display: flex;
@@ -144,11 +146,12 @@
 }
 
 /* In the Finance phone app's sheets (2026-10-15, M08): the field 46px at 15px, the card the sheet's width, days
-   36px in 42px rows at 14.5px, the arrows 36px, Today 32px — the prototype's phone calendar. */
+   36px in 42px rows at 14.5px, the arrows 36px, Today 32px — the prototype's phone calendar. The card is as wide
+   as its field, which the field tells it (--date-field-w): fixed to the window, a right: 0 would be the window's. */
 [data-sheet] .field,
 [data-fin-app] .field { height: 46px; border-radius: 12px; font-size: 15px; }
 [data-sheet] .pop,
-[data-fin-app] .pop { right: 0; width: auto; }
+[data-fin-app] .pop { box-sizing: border-box; width: var(--date-field-w); }
 [data-sheet] .nav,
 [data-fin-app] .nav { width: 36px; height: 36px; font-size: 18px; }
 [data-sheet] .title,

@@ -1,3 +1,4 @@
+import { brandCodeFor } from '@/lib/brand-code'
 import type { BrandRef, CatalogueModel } from '../load'
 
 /**
@@ -7,7 +8,8 @@ import type { BrandRef, CatalogueModel } from '../load'
  *
  * A model's branding is the ERP's — its own, else its SKUs', the fallback
  * `derivedBrand` reads — named by the brand register's code when the register
- * knows it, so DUNLOPILLO sits under DUNLOP, the word on its cards; a branding
+ * knows it, so DUNLOPILLO sits under DUNLOP, the word on its cards, and a
+ * sub-brand under its brand (HAPPI SLEEP under AKEMI, 2026-10-31); a branding
  * the register does not know (MYLATEX) keeps the ERP's word. Choosing a margin
  * ladder in the model's window never moves its card: the ladder is the
  * portal's decision, the branding the ERP's fact. Brandings run A→Z and the
@@ -38,9 +40,8 @@ export interface BoardCategory {
 export function brandingOf(model: Pick<CatalogueModel, 'branding' | 'skus'>, brands: readonly BrandRef[]): Branding | null {
   const raw = model.branding?.trim() || model.skus.map(s => s.branding?.trim()).find(Boolean)
   if (!raw) return null
-  const word = raw.toUpperCase()
-  const known = brands.find(b => b.code.toUpperCase() === word || b.name.toUpperCase() === word)
-  const label = known ? known.code.toUpperCase() : word
+  const known = brandCodeFor(raw, brands)
+  const label = known ? known.toUpperCase() : raw.toUpperCase()
   return { key: label, label }
 }
 

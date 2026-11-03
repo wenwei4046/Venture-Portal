@@ -16,7 +16,7 @@ import { checkRaiseClaimVoucher, type RaiseClaimVoucherInput } from '@/lib/claim
 export async function raiseClaimVoucher(
   input: RaiseClaimVoucherInput,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  await requireActionOn('/payments/claim-requests', 'treasury', 'create')
+  await requireActionOn(['/payments/claim-requests', '/payments/requests'], 'treasury', 'create')
   const checked = checkRaiseClaimVoucher(input)
   if (!checked.ok) return checked
 
@@ -29,6 +29,7 @@ export async function raiseClaimVoucher(
   if (error) return { ok: false, reason: error.message }
 
   revalidatePath('/payments/claim-requests')
+  revalidatePath('/payments/requests')
   revalidatePath('/payments')
   revalidatePath('/approvals')
   revalidatePath('/member-admin')

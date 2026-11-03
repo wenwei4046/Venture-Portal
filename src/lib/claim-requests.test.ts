@@ -8,11 +8,11 @@ describe('readClaimQueueRow', () => {
   it('reads claim_payment_queue’s NUMERIC amount and its blanks', () => {
     expect(readClaimQueueRow({
       claim_id: CLAIM, claim_type: 'benefit', claimant_name: 'ANTHONY', department: 'Revenue Department',
-      amount: '450.00', description: 'Plane ticket', source_pool: 'venture_pool', request_no: 'RQ-2610-001',
+      amount: '450.00', description: 'Air ticket', source_pool: 'venture_pool', request_no: 'RQ-2610-001',
       approved_by_name: 'HR Manager', approved_at: '2026-10-08T09:00:00Z', voucher_id: null, voucher_no: null, voucher_status: null,
     })).toEqual({
       claimId: CLAIM, claimType: 'benefit', claimantName: 'ANTHONY', department: 'Revenue Department',
-      amount: 450, description: 'Plane ticket', sourcePool: 'venture_pool', requestNo: 'RQ-2610-001',
+      amount: 450, description: 'Air ticket', sourcePool: 'venture_pool', requestNo: 'RQ-2610-001',
       approvedByName: 'HR Manager', approvedAt: '2026-10-08T09:00:00Z', voucherId: null, voucherNo: null, voucherStatus: null,
     })
   })

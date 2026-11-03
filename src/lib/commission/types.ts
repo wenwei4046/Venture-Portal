@@ -66,6 +66,13 @@ export interface SalesLine {
    */
   specials?: string[]
   /**
+   * The series of the fabric the line carries, from the ERP's fabric list
+   * (`lineKpiFactsOf`, 2026-10-29) — how a bed frame's or a sofa's fabric
+   * series is found as a KPI item. Loaded only while the scheme has one to
+   * look for; absent = none.
+   */
+  fabricSeries?: string
+  /**
    * The one line of an upsale HR recorded by hand (`comm_upsales`, 2026-09-24).
    * Always commissionable whatever the scheme's item groups say, never a KPI
    * item, and never part of a margin — it carries no cost and it is not goods
@@ -84,7 +91,7 @@ export interface SalesOrder {
   /** YYYY-MM-01 of orderDate. Differs from the run's period for an order
    *  carried forward because its deposit only cleared later. */
   periodMonth: string
-  /** YYYY-MM-DD — the event day used for Open Bill (1st/2nd/3rd) grouping. */
+  /** YYYY-MM-DD — the event day the bill was written on. */
   eventDate: string
   /** ERP header `Total` — the deposit gate measures against this, not against
    *  the commissionable subset. */
@@ -118,7 +125,7 @@ export interface SalesOrder {
    * only the added amount earns (user: 跟着 upsells 的 amount 来算). It is paid
    * in the month it is recorded under — HR records it once it is paid, so the
    * deposit gate does not ask — and like any sale it counts toward the upline's
-   * override. It is never an Open Bill, never released, and never carried.
+   * override. It is never released, and never carried.
    */
   upsale?: boolean
   /**
@@ -158,20 +165,6 @@ export interface KpiThreshold {
   minQty: number
   /** 0.20 = +20%. */
   bonusPct: number
-}
-
-export type OpenBillRank = 1 | 2 | 3
-
-export interface OpenBillRule {
-  rank: OpenBillRank
-  /** 0.50 for the 1st bill of the day, 0.40 for the 2nd, 0.30 for the 3rd. */
-  pct: number
-}
-
-/** Manual pick: this order is that salesperson's Nth bill of the event day. */
-export interface OpenBillTag {
-  orderId: string
-  rank: OpenBillRank
 }
 
 export type MarginBandKind =
@@ -308,20 +301,11 @@ export interface CommissionScheme {
   overrideDepth?: number | null
   /** Enable monthly direct-line packages and their percentage fallback. */
   enableGroupIncentive?: boolean
-  /**
-   * How the Open Bill bonus is based (confirmed 2026-08-31):
-   *  - 'uplift_on_commission' → orderRevenue × personalRate × billPct.
-   *    "10,000 at 7% → compute the 7% first, then add 50%" → 700 + 350.
-   *  - 'pct_of_revenue' → orderRevenue × billPct. A documented alternative;
-   *    no sub-department uses it today.
-   */
-  openBillBasis: 'uplift_on_commission' | 'pct_of_revenue'
   /** Whether KPI-item revenue counts toward a downline's override base. */
   overrideIncludesKpi: boolean
   /** Per-component switches, so another sub-department can reuse a subset. */
   enableProductRevenue: boolean
   enableKpi: boolean
-  enableOpenBill: boolean
   enableOverride: boolean
   /** Below-margin penalty on a bill's own commission. */
   enableMarginPenalty: boolean
@@ -366,8 +350,6 @@ export interface EngineInput {
   orders: SalesOrder[]
   kpiItems: KpiItem[]
   kpiThresholds: KpiThreshold[]
-  openBillRules: OpenBillRule[]
-  openBillTags: OpenBillTag[]
   marginBands: MarginBand[]
   hierarchy: HierarchyNode[]
   /**
@@ -418,7 +400,6 @@ export type CommissionComponent =
   | 'product_revenue'
   | 'kpi_item'
   | 'kpi_threshold'
-  | 'open_bill'
   | 'override'
   | 'margin_incentive'
   | 'group_incentive'
@@ -456,6 +437,11 @@ export interface BrandMargin {
   cost: number
   /** null when cost data was missing for that brand. */
   marginPct: number | null
+  /**
+   * Every bill of the brand that month had no sales of its own and its cost is known (2026-10-30): a cost and no
+   * margin to read — below every tier. Left out when false.
+   */
+  noSales?: true
 }
 
 /** An order held back because its deposit has not reached the threshold. */
@@ -528,7 +514,6 @@ export interface Statement {
   kpiThresholdPct: number
   kpiCommission: number
 
-  openBillBonus: number
   overrideCommission: number
 
   /** Monthly margin across their eligible orders (goods only), all brands. */

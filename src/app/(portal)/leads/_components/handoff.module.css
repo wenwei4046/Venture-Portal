@@ -1,0 +1,62 @@
+/* Lead View v2 › the hand-over window and the customer's labels — kept though the reference draws neither (the user's
+   point 2), on the v2 system: the modal (README §6.4), the popover (§6.3), chips and buttons as the screens draw them. */
+
+/* Hand over */
+.who { font-size: 13px; color: rgb(var(--lv-fg-3)); margin-top: -8px; }
+.kicker { font-size: 11px; letter-spacing: 0.1em; color: rgb(var(--lv-fg-4)); }
+.msgHead { display: flex; align-items: center; gap: 8px; }
+.msgHead > .kicker { flex: 1; }
+.copy {
+  white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: none; border-radius: 7px;
+  background: rgb(var(--lv-surface-sel)); font-family: inherit; font-size: 12px; line-height: normal; color: rgb(var(--lv-fg));
+}
+.copy:disabled { cursor: default; opacity: 0.5; }
+.text {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px; border: 1px solid rgb(var(--lv-line)); background: rgb(var(--lv-surface));
+  font-family: inherit; font-size: 13px; line-height: 1.5; color: rgb(var(--lv-fg)); outline: none; resize: vertical;
+}
+.text:focus { border-color: rgb(var(--lv-focus-line)); }
+.hint { font-size: 12px; line-height: 1.5; color: rgb(var(--lv-fg-3)); }
+.error { font-size: 13px; color: rgb(var(--lv-accent)); }
+.cancel { cursor: pointer; height: 36px; padding: 0 14px; border: none; border-radius: 9px; background: transparent; font-family: inherit; font-size: 13px; line-height: normal; color: rgb(var(--lv-fg-2)); }
+.cancel:disabled { cursor: default; opacity: 0.5; }
+.go { cursor: pointer; height: 36px; padding: 0 16px; border: none; border-radius: 9px; background: rgb(var(--lv-accent)); font-family: inherit; font-size: 13px; font-weight: 500; line-height: normal; color: rgb(var(--lv-surface)); }
+.go:disabled { cursor: default; background: rgb(var(--lv-disabled)); }
+
+/* Labels */
+.row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.label { white-space: nowrap; display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 12px; background: rgb(var(--lv-page)); color: rgb(var(--lv-fg-2)); }
+.label[data-tone='amber'] { background: rgb(var(--lv-warn-tint)); color: rgb(var(--lv-warn)); }
+.label[data-tone='green'] { background: rgb(var(--lv-pos-tint)); color: rgb(var(--lv-pos)); }
+.label[data-tone='red'] { background: rgb(var(--lv-accent-tint)); color: rgb(var(--lv-accent)); }
+.label[data-tone='clay'] { background: rgb(var(--lv-ai-tint)); color: rgb(var(--lv-k-ai)); }
+.label[data-tone='blue'] { background: rgb(var(--lv-slate-tint)); color: rgb(var(--lv-slate)); }
+.wrap { position: relative; }
+.add {
+  white-space: nowrap; cursor: pointer; height: 24px; padding: 0 9px; border-radius: 999px; border: 1px dashed rgb(var(--lv-line-4)); background: transparent;
+  font-family: inherit; font-size: 12px; line-height: normal; color: rgb(var(--lv-fg-4));
+}
+.add:hover:not(:disabled) { color: rgb(var(--lv-fg)); }
+.menu { left: 0; top: 30px; min-width: 220px; padding: 5px; display: flex; flex-direction: column; }
+.item {
+  cursor: pointer; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border: none; border-radius: 7px; background: transparent;
+  font-family: inherit; font-size: 13px; line-height: normal; color: rgb(var(--lv-fg)); text-align: left;
+}
+.item:hover:not(:disabled) { background: rgb(var(--lv-surface-sel)); }
+.item > span:nth-child(2) { flex: 1; }
+.tick { color: rgb(var(--lv-pos)); }
+.sep { height: 1px; margin: 4px 6px; background: rgb(var(--lv-line-2)); }
+.editRow { display: grid; grid-template-columns: minmax(0, 1fr) 96px auto 28px 28px 28px; gap: 6px; align-items: center; }
+.input {
+  height: 34px; box-sizing: border-box; padding: 0 10px; border: 1px solid rgb(var(--lv-line)); border-radius: 9px; background: rgb(var(--lv-surface));
+  font-family: inherit; font-size: 13px; color: rgb(var(--lv-fg)); outline: none; min-width: 0;
+}
+.input:focus { border-color: rgb(var(--lv-focus-line)); }
+.icon {
+  cursor: pointer; width: 28px; height: 28px; padding: 0; display: flex; align-items: center; justify-content: center; border: none; border-radius: 7px;
+  background: transparent; font-family: inherit; font-size: 14px; line-height: 1; color: rgb(var(--lv-fg-3));
+}
+.icon:hover:not(:disabled) { background: rgb(var(--lv-surface-sel)); color: rgb(var(--lv-fg)); }
+.icon:disabled { cursor: default; opacity: 0.35; }
+.more { align-self: flex-start; cursor: pointer; padding: 0; border: none; background: transparent; font-family: inherit; font-size: 13px; line-height: normal; color: rgb(var(--lv-fg-3)); }
+.more:hover:not(:disabled) { color: rgb(var(--lv-fg)); }

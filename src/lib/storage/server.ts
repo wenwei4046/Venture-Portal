@@ -57,6 +57,8 @@ export interface FileBucketApi {
   download(path: string): Promise<Answer<Blob>>
   remove(paths: string[]): Promise<Answer<FileObjectRow[]>>
   copy(fromPath: string, toPath: string): Promise<Answer<{ path: string }>>
+  /** A copy into ANOTHER bucket in file storage — a request's receipt onto its payment voucher (2026-10-29). */
+  copyTo(toBucket: string, fromPath: string, toPath: string): Promise<Answer<{ path: string }>>
   createSignedUrl(path: string, expiresIn: number, options?: SignOptions): Promise<Answer<{ signedUrl: string }>>
   createSignedUrls(paths: string[], expiresIn: number): Promise<Answer<Array<{ path: string | null; signedUrl: string; error: string | null }>>>
   getPublicUrl(path: string): { data: { publicUrl: string } }
@@ -200,6 +202,40 @@ function r2Bucket(db: SupabaseClient, original: SupabaseStorage | null, id: stri
       }
       const { r2Copy, r2Location } = await r2()
       const copied = await r2Copy(r2Location(id, fromPath, b.public), r2Location(id, toPath, b.public)).catch(() => ({ ok: false as const, status: 502, message: '' }))
+      if (!copied.ok) {
+        await db.from('file_objects').delete().eq('id', rowId)
+        return fail('The file could not be copied. Please try again.', 502)
+      }
+      return { data: { path: toPath }, error: null }
+    },
+
+    // As copy, across two buckets: the source read under this bucket's SELECT policy, the copy's row written under the
+    // other's INSERT policy (its size and type rules too) — both buckets in R2, so the object is copied inside it.
+    async copyTo(toBucket, fromPath, toPath) {
+      const b = await which()
+      if (isError(b)) return fail(b.message, b.status)
+      if (b === 'supabase') return fail('Only a file in file storage is copied to another bucket.', 400)
+      let target: FileBucket | null
+      try {
+        target = await fileBucket(db, toBucket)
+      } catch {
+        return fail('File storage could not be reached. Please try again.', 503)
+      }
+      if (!target || target.backend !== 'r2') return fail('Only a file in file storage is copied to another bucket.', 400)
+      const problem = objectNameProblem(toPath)
+      if (problem) return fail(problem, 400)
+      const rows = await readable([fromPath])
+      if (isError(rows)) return fail(rows.message, rows.status)
+      const source = rows.get(fromPath)
+      if (!source) return fail('Object not found', 404)
+      const rowId = crypto.randomUUID()
+      const { error } = await db.from('file_objects').insert({ id: rowId, bucket_id: toBucket, name: toPath, metadata: source.metadata ?? {} })
+      if (error) {
+        const refusal = insertRefusal(error)
+        return fail(refusal.message, refusal.status)
+      }
+      const { r2Copy, r2Location } = await r2()
+      const copied = await r2Copy(r2Location(id, fromPath, b.public), r2Location(toBucket, toPath, target.public)).catch(() => ({ ok: false as const, status: 502, message: '' }))
       if (!copied.ok) {
         await db.from('file_objects').delete().eq('id', rowId)
         return fail('The file could not be copied. Please try again.', 502)

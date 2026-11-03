@@ -10,6 +10,8 @@
  * replies · Auto replies) · Camera in one pill, the mic held to record or Send;
  * "/" for quick replies; after the reply window, approved templates only.
  */
+import { HUMAN_AGENT_APPROVED } from "@/lib/messenger/send";
+import { sourceOf } from "@/lib/member/crm-source";
 import { DEFAULT_APPT_TYPES } from "@/lib/member/crm-data";
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, WheelEvent } from "react";
 import { customBookVM, customPrefill, type CustomBook } from "../../shared/custom-book";
@@ -25,12 +27,13 @@ import { pickedOf, pickVM } from "../../shared/pick";
 import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWord, NO_MEDIA, tickColor, tickPathOf } from "../../shared/chat-media";
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
-import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { typePx } from "../../shared/type";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "./composer";
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
+import { fillWithFor, libraryFor, suggestReplies, waitingWords } from "../../shared/suggest-reply";
+import { openSuggest } from "../../shared/suggest-float";
 import { avatarTint } from "../../shared/palette";
 
 const RUST = "var(--crm-rust)", INK = "var(--crm-ink)", SUB = "rgb(128 107 96)", BD = "var(--crm-rule)";
@@ -103,7 +106,17 @@ export function windowLeft(c: CrmCustomer, now: Date): string {
  * refuses the QuickTime box), a converted video that had lost its picture, and an iPhone voice recording (a fragmented
  * MP4) — each is now made into what WhatsApp takes before it goes (shared/video-fit.ts), so one sent before says so.
  */
+/**
+ * A reply past Messenger's 24-hour window says nothing under it until Human Agent is approved (the owner, 2026-10-30:
+ * "不要那个 not sent … 真的完全不显示。过后等 human agent 好了之后再恢复") — flipping HUMAN_AGENT_APPROVED brings it back.
+ * A message refused for any other reason (a file WhatsApp could not open …) still says so.
+ */
+export const quietFailure = (status: string | null | undefined, error: string | null | undefined, approved = HUMAN_AGENT_APPROVED) =>
+  status === "failed" && !approved && !!error && /since the customer’s last message/.test(error);
+
 export function failNote(error: string | null | undefined): string {
+  // A reply past Meta's window is kept here and never sent (crm-actions › keptUnsent, 2026-10-30).
+  if (error && /since the customer’s last message/.test(error)) return `Saved but not sent · ${error}`;
   if (error && /131053/.test(error)) return "Not delivered · WhatsApp could not open this file. Send it again — videos and voice notes are now made ready for WhatsApp first.";
   return error ? `Not delivered · ${error}` : "Not delivered";
 }
@@ -175,10 +188,10 @@ export function chatVM(ctx: SalesCtx) {
       } : null,
       // A document is its tile (name and type), never its name again under it (2026-10-14).
       ...mediaOf(m, gallery, al.lead.get(key)), ...(by ? { timeTop: "4px", ...(md?.kind === "audio" ? { inPad: "0 2px" } : {}) } : {}), ...(!md && !card && m.text ? INLINE_TIME : {}),
-      pDisp: !md && !card && m.text ? "inline" : card || mk === "file" || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: typePx(16.3) /* 15 px on a phone, frame M04 */, textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : mk === "file" ? "📄 " + m.text : m.text),
+      pDisp: !md && !card && m.text ? "inline" : card || (mk === "file" && (!m.text || m.text === md?.name)) || ((mk === "image" || mk === "video" || mk === "audio") && !m.text) ? "none" : "block", size: typePx(16.3) /* 15 px on a phone, frame M04 */, textStyle: "normal", textColor: "inherit", parts: parts(md && !m.text ? (mk === "image" ? "📷 Photo" : mk === "video" ? "🎥 Video" : mk === "audio" ? "🎤 Voice note" : "📄 " + (md.name ?? "Document")) : m.text),
       // A starred message shows ★ by its time (the message menu's Star, 2026-10-14).
       timeJustify: "flex-end", timeColor: mine ? MINE_TIME : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
-      failNote: mine && m.status === "failed" ? failNote(m.error) : "",
+      failNote: mine && m.status === "failed" && !quietFailure(m.status, m.error) ? failNote(m.error) : "",
       tick: mine, tickColor: tickColor(read ? "read" : m.status), tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
       // Sending: a small clock until it went (then the two ticks); not delivered: a "!" (shared/chat-media.ts).
       tickPath: tickPathOf(m.status),
@@ -261,6 +274,8 @@ export function chatVM(ctx: SalesCtx) {
       ...(superior ? [["Move", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), `Hand over to ${firstName(superior.name)}`, "var(--crm-tint-cold)", "var(--crm-ink-soft)"]] : []),
       ["Customer info", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => setHm({ menu: false, info: true }), "", "var(--crm-tint-follow)", "var(--crm-brown)"],
       ["Appointment", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => setHm({ menu: false, appt: true }), "", "var(--crm-tint-new)", "var(--crm-ink-soft)"],
+      // A WhatsApp chat past its 24 hours: the template is here, since the bar stays a bar (2026-10-30 — a reply typed is kept, not sent).
+      ...(shut && c.channel === "whatsapp" && data.settings?.suggestTemplate !== false ? [["Send template message", "M4 6h16v12H4zM4 7l8 6 8-6", () => { setHm({ menu: false }); void openTpl(); }, "Reopens the chat on WhatsApp", "var(--crm-tint-attention)", "var(--crm-rust)"]] : []),
       ["Starred messages", "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", () => { setHm({ menu: false }); openStarred(c.messages.filter(m => stars.has(m.id)).map(m => ({ id: m.id, who: m.from === "me" ? "You" : c.name, text: m.text || (m.media ? mediaWord(m) : ""), at: msgTime(m.at) }))); }, `${c.messages.filter(m => stars.has(m.id)).length} in this chat`, "var(--crm-tint-appt)", "var(--crm-brown)"],
     ] as [string, string, () => void, string, string, string][]).map(([label, icon, go, sub, bg, fg]) => ({ label, icon, go, sub, bg, fg })),
     apptOpen: !!hm.appt, apptHas: !!nextVisit, apptNone: !nextVisit,
@@ -487,14 +502,16 @@ export function chatVM(ctx: SalesCtx) {
     if (label === "Photos") document.getElementById("crm-pick-photo")?.click();
     else if (label === "Document") document.getElementById("crm-pick-file")?.click();
     else if (label === "Quick replies") patch({ qr: true });
-    // Auto replies: one's saved welcome / after-hours / keyword replies, into the reply box to send by hand.
-    else openAttach({ view: "auto", quick: [], auto: autoChoices(data.autoReplies), pick: text => setDraft(text) });
+    // Suggest reply (in Auto replies' place, 2026-10-29): the suggested replies' list over the chat.
+    else openSuggest();
   };
   const cmp: ComposerIn = {
     key: c.id, state: composerOf(ui.cmp, c.id) ?? initialComposer(), set: setCmp,
     placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
-    warm: !shut,
+    warm: true, // past the window too: the reply is kept in the chat, marked not sent (crm-actions › keptUnsent, 2026-10-30)
     openTpl: () => void openTpl(), tplOn: data.settings?.suggestTemplate !== false, coldSub: coldLine(c, now),
+    suggest: shut ? undefined : suggestReplies(c, data.replyExamples ?? [], data.quickReplies, 3, { library: data.replyLibrary, ...fillWithFor(data, c, owner.name, now) }), suggestLogo: !!waitingWords(c),
+    suggestLibrary: shut ? undefined : libraryFor(c, data.replyLibrary, fillWithFor(data, c, owner.name, now)),
     reply: ui.reply ? { who: ui.reply.from === "me" ? "You" : c.name, text: plain(ui.reply.text) } : null,
     cancelReply: () => patch({ reply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,
@@ -521,7 +538,7 @@ export function chatVM(ctx: SalesCtx) {
   async function openTpl() { patch({ tpl: true }); if (c!.channel === "whatsapp" && ui.templates == null) { const t = await act.loadTemplates(); patch({ templates: t ?? [] }); } }
 
   return {
-    cl: { name: c.name, ad: c.ad, first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], strip: chatStripOf(c, ctx.now) },
+    cl: { name: c.name, ad: [sourceOf(c).brandLabel, c.ad].filter(Boolean).join(" · "), first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], strip: chatStripOf(c, ctx.now) },
     wallBg: CHAT_WALL.bg, wallImg: CHAT_WALL.img, wallSize: CHAT_WALL.size,
     // Leaving a chat folds the composer's panel away, so the next chat opens tidy (the owner, 2026-10-13).
     closeChat: () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, hm: null, reply: null, cmp: null, pick: null })),

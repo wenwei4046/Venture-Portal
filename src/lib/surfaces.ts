@@ -53,15 +53,6 @@ export function readsEveryPool(holder: ActionHolder): boolean {
   return canDo(holder, 'dept_pool', 'view', 'all')
 }
 
-/**
- * Decides pool claims: Claims · Approve, and the treasury the claim's payment
- * voucher is raised in. (HR's untemplated account carries Claims · Approve from
- * its old key, for the claims report; pool claims were never HR's to decide.)
- */
-export function decidesPoolClaims(holder: ActionHolder): boolean {
-  return canDo(holder, 'claims', 'approve') && canDo(holder, 'treasury', 'view')
-}
-
 /** Every Settings tab (Settings · Manage); otherwise Finance's chart-of-accounts tabs. */
 export function seesAllSettings(holder: ActionHolder): boolean {
   return canDo(holder, 'settings', 'manage')

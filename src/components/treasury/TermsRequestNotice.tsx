@@ -44,7 +44,9 @@ export default function TermsRequestNotice({
     note.status === 'pending'
       ? 'Terms change waiting for the Principal'
       : note.status === 'approved'
-        ? `Terms change approved — in force from ${from}`
+        ? note.whole
+          ? `Terms change approved — the terms in force recalculated from ${from}`
+          : `Terms change approved — in force from ${from}`
         : 'Terms change turned down — the terms did not change'
   const filed = `Filed by ${note.by} · ${note.at}`
   const meta =
@@ -86,7 +88,7 @@ export default function TermsRequestNotice({
         <div className={c.text}>
           <div className={c.title}>{title}</div>
           <div className={c.line}>
-            <b>From {from}</b>
+            <b>{note.whole ? 'Whole deal from' : 'From'} {from}</b>
             {note.line ? ` · ${note.line}` : ''}
           </div>
           <div className={c.meta}>{meta}</div>

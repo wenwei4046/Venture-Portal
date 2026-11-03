@@ -7,6 +7,7 @@ import { canDo } from '@/lib/permission-actions'
 import { StatCard, StatCards } from '@/components/sheet/StatCard'
 import ScheduleView, { type SchedRow, type CompoundRow, type MinInterestRow } from './_components/ScheduleView'
 import MonthNav from './_components/MonthNav'
+import ExportMenu from './_components/ExportMenu'
 import { loadRepaymentSchedule } from './_lib/schedule-data'
 
 export const dynamic = 'force-dynamic'
@@ -74,16 +75,17 @@ export default async function RepaymentSchedulePage({
 
   // The cards (2026-10-09, the handoff): the calendar's read the month's
   // instalments; a list tab's (2026-10-10) read that side's minimum interest
-  // in cards 4–5 — what is in so far, what is not.
-  const headCards = (collectNote: string, payNote: string) => (
-    <>
-      <StatCard tone="ledger" label="To collect" value={formatMoney(toCollect)} icon="inbox" note={collectNote} />
-      <StatCard tone="danger" label="To pay" value={formatMoney(toPay)} icon="send" note={payNote} />
-      <StatCard tone="primary" label="Net this month" value={formatMoney(netMonth)} icon="swap" note={netMonth >= 0 ? 'Collect more than we pay' : 'Pay more than we collect'} />
-    </>
-  )
+  // in cards 4–5 — what is in so far, what is not. 2026-11-02 (the user: "card
+  // 可以做小，就一排就好"): small, the five in one row — the first three as a list,
+  // which StatCards counts card by card (as a fragment they counted as one, and
+  // the five stood three over two).
+  const headCards = (collectNote: string, payNote: string) => [
+    <StatCard key="collect" tone="ledger" label="To collect" value={formatMoney(toCollect)} icon="inbox" note={collectNote} />,
+    <StatCard key="pay" tone="danger" label="To pay" value={formatMoney(toPay)} icon="send" note={payNote} />,
+    <StatCard key="net" tone="primary" label="Net this month" value={formatMoney(netMonth)} icon="swap" note={netMonth >= 0 ? 'Collect more than we pay' : 'Pay more than we collect'} />,
+  ]
   const sideCards = (word: 'Received' | 'Paid', min: { got: number; short: number }) => (
-    <StatCards label="Repayment Schedule">
+    <StatCards label="Repayment Schedule" size="small">
       {headCards('From borrowers', 'To fund sources')}
       <StatCard tone="ledger" label={`${word} so far`} value={formatMoney(min.got)} icon="check" note={`Min interest · ${monShort}`} />
       <StatCard tone={min.short > 0 ? 'danger' : 'default'} label="Short" value={formatMoney(min.short)} icon="alert" note="Min interest not yet in" />
@@ -91,7 +93,7 @@ export default async function RepaymentSchedulePage({
   )
   const cards = {
     cal: (
-      <StatCards label="Repayment Schedule">
+      <StatCards label="Repayment Schedule" size="small">
         {headCards(`${plural(collectRows.length, 'instalment', 'instalments')} · Fund OUT`, `${plural(repayRows.length, 'instalment', 'instalments')} · Fund IN`)}
         <StatCard label="Done so far" value={formatMoney(r2(collected + paid))} icon="check" note={`Received ${formatMoney(collected)} · paid ${formatMoney(paid)}`} />
         <StatCard
@@ -117,22 +119,19 @@ export default async function RepaymentSchedulePage({
       <div className="page-head">
         <div className="min-w-0">
           <div className="page-eyebrow"><em>I.</em> TREASURY · {isCurrentMonth ? 'DUE THIS MONTH' : 'SCHEDULE FOR'} · {dayjs(`${currentYM}-01`).format('MMMM YYYY').toUpperCase()}</div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="page-title">Repayment Schedule</h1>
-            <MonthNav month={currentYM} isCurrent={isCurrentMonth} />
-          </div>
+          <h1 className="page-title">Repayment Schedule</h1>
         </div>
-        {canDo(user, 'treasury', 'export') ? (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {/* The month's two due tables as a spreadsheet (2026-10-10, the handoff). */}
-            <a href={`/repayment-schedule/export?month=${currentYM}`} className="btn-quiet-sheet" download>
-              Export
-            </a>
-          </div>
-        ) : null}
       </div>
 
       <ScheduleView
+        // The month and Export on the tabs' row (2026-11-02, the user: "帮我把日期选择器和export 做在这一排");
+        // Export — Excel or PDF, the month's two due tables — only for Treasury · Export, which its route asks.
+        tools={
+          <>
+            <MonthNav month={currentYM} isCurrent={isCurrentMonth} />
+            <ExportMenu month={currentYM} canExport={canDo(user, 'treasury', 'export')} />
+          </>
+        }
         monthLabel={monthLabel}
         month={currentYM}
         linkMonth={month ?? null}

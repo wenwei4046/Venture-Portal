@@ -15,6 +15,27 @@ cross-apply the two programmes.
 
 ---
 
+## Open Bill is gone — 2026-10-31 amendment
+
+Supersedes §4.4 (C3) and every line below that names Open Bill — what they say
+is what was. The user: "deltet the open bill in revenue team, cause this rules
+is no longer needed, anythigns related to this, may delete as well". It paid
+once — Fair's August 2026, by the claim form, never by the portal — and both
+schemes had it off.
+
+| | |
+|---|---|
+| The engine | no C3: a statement is C1 + C2 (KPI) + C4 (override) + margin incentive + group incentive — the five `components_tally` checks |
+| Comm Cal | no Open Bill tab, column or page (`…/[period]/open-bill` is gone; `?view=open` opens Sales); no picker on All bills; the payroll bar's scheme switches are margin and KPI |
+| Rules | no Open Bill tab (`?tab=open-bill` opens Scheme rules), no *Open Bill bonus* switch, no rates |
+| Bills | *Don't count* / *Count again* / *Move to another salesperson* take and give back no pick; the ERP feed and a file import suggest none; a bill's *#N of the day* (`sequence_in_day`) stays |
+| Revenue app | a month and a bill carry no Open Bill; August's portal working no longer shows what the claim form paid for it |
+| Database | `20261031210000_open_bill_gone`: `comm_open_bill_rules`, `comm_open_bill_months`, `sales_order_open_bill_tags`, `comm_open_bill_on()`, the suggestions, `comm_statements.open_bill_bonus`, `comm_schemes.enable_open_bill` / `open_bill_basis`, an exclusion's remembered pick — gone. Kept: the enum value `comm_component.open_bill`, and `sales_order_reassignments.open_bill_*` (empty; `erp_sync_note_seller_move` still reads the rank) |
+
+The rules and their history: `.claude/rules/revenue/comm-cal.md` › OPEN BILL IS GONE.
+
+---
+
 ## Send to payroll — 2026-09-27 amendment
 
 Supersedes the button of the 2026-09-11 amendment below (*Compute & sync
@@ -746,6 +767,30 @@ and only in its own category. A **bed frame** special counts per bed frame
 every module. Hand-typed AutoCount-era text ("HEADBOARD DO STRAIGHT") parses to
 nothing and is not found.
 
+**A fabric series (2026-10-29, mig `20261030010000`)** — user: *"kpi item can
+selected with fabric series as well. for sofa and bedframe"* — is a third kind,
+a bed frame's (`bedframe_fabric_series`) or a sofa's (`sofa_fabric_series`),
+each its own item and amount: a series on the ERP's fabric list
+(`erp_fabrics.series`: PC151, KS, BO315). Found by the fabric the line carries
+(`variants.fabricCode`, else the first word of `description2` — the fabric the
+costing reads its tier from) looked up on that list, code trimmed and in any
+case (`lineKpiFactsOf` / `indexFabricSeries`; SQL the same join). A **bed
+frame**'s series counts per bed frame; a **sofa**'s **once per sofa set**
+(*"Sofa 每组算一次"*): the bill's pieces of one model — the code before the
+first '-' — in that series, as many sets as its fewest pieces, so two PC151
+sofas on one bill are two and ×2 everywhere is two; a return takes them back,
+an exchange of a piece is none. A fabric keyed TBC carries no series; when the
+ERP saves the order again with its fabric, the order comes back whole and the
+month — worked out live — finds it. Named `PC151 · Sofa fabric` /
+`PC151 · Bed frame fabric` (stored as the item's `product_name`), since one
+series may be both pools' item. The calculator's cart names no fabric, so a
+quote finds none.
+
+```
+RM 4,000 bill: 8030 1A+CNR+1A in PC151-01, 9058 2A in PC151-18; sofa PC151 at RM 50
+  two sets → KPI 2 × 50 = RM 100     main 3,900 at the rate
+```
+
 **Only when the bill's sales cover them** (`coverKpi`). A RM 0.00 exchange
 that still prints the sofa's specials sold no add-on: it pays no KPI and keeps
 its sales, nothing off. Not a run warning — every warning blocks Apply.
@@ -773,7 +818,9 @@ each*) and kept the ladder as it is: every KPI unit of the month together,
 a % on the whole KPI amount — 12 cables at RM 30 with Tier 1 (10 · 20%) pay
 RM 360 + 20% = RM 432. How a bill is found to carry an item is unchanged.
 
-### 4.4 C3 — Open Bill (1st / 2nd / 3rd bill of the event day)
+### 4.4 C3 — Open Bill (1st / 2nd / 3rd bill of the event day) — gone 2026-10-31
+
+*Gone: see the Open Bill amendment at the top. What follows is what it was.*
 
 Rewards writing consecutive bills during a 3-day event. HR/Principal picks which
 of a salesperson's orders is that **day's** 1st, 2nd or 3rd bill.
@@ -1707,10 +1754,10 @@ New tables. `sales_*` = imported facts, `comm_*` = config + results. The dormant
 | `comm_schemes` | knobs, component switches, deposit threshold, default rate mode, `cloned_from_scheme_id` |
 | `comm_ranks` | `title_id` → `titles` (replaced `tier_key` / `tier_label` 2026-09-03), rank, rate, `can_recruit`, the monthly `group_sales_threshold`, the earned `personal_sales_threshold` × `consecutive_months` |
 | `comm_item_groups` | ERP group → commissionable? |
-| `comm_kpi_items` / `comm_kpi_thresholds` | KPI items — a SKU (`product_code`) or a special (`option_pool` / `option_value`), effective-dated — and the qty ladder |
+| `comm_kpi_items` / `comm_kpi_thresholds` | KPI items — a SKU (`product_code`), a special or a fabric series (`option_pool` / `option_value`; the series since 2026-10-29), effective-dated — and the qty ladder |
 | `comm_cost_ratios` | a SKU's own Revenue Team cost ratio, per scheme (2026-09-27) |
 | `comm_open_bill_rules` | 50 / 40 / 30% |
-| `comm_brands` | Akemi / Zanotti / Ergotex + the Item-Code prefixes that identify them |
+| `comm_brands` | Akemi / Zanotti / Ergotex + the Item-Code prefixes that identify them, and the ERP brandings that are them (`sub_brands`: HAPPI SLEEP is Akemi's, 2026-10-31) |
 | `comm_margin_bands` | each brand's margin ladder (incentive / reference / penalty) |
 | `comm_promotion_rules` | the promotion criteria, recorded with `is_enforced = FALSE` |
 | `comm_hierarchy` | effective-dated upline + attained rank + `rate_mode`; one position per person |
@@ -2055,10 +2102,10 @@ belongs to Fair; an IR file import cannot supersede Fair's batch.
 | `/revenue/<sub>` | **Commission Calculation** — months with sales data and this sub-department's run status against each. Sidebar: *Comm Cal* |
 | `…/<sub>/hierarchy` | **Staff Hierarchy** — the combined department chart, and `?tab=team` the route's Team table (both below) |
 | `…/<sub>/rules` | **Rules** — every rule the engine reads (§9) |
-| `…/<sub>/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / group / C1 / KPI / Open Bill / Override / Incentive / Total), warnings, penalised bills, orders waiting on a deposit, Compute + Apply + Reopen |
+| `…/<sub>/[period]` | run dashboard: hero total, per-salesperson `.ledger-table` (PR / group / C1 / KPI / Override / Incentive / Total), warnings, penalised bills, orders waiting on a deposit, Compute + Apply + Reopen |
 | `…/<sub>/[period]/statement/[staffId]` | one salesperson's month ringgit by ringgit — the figures, margin brand by brand, and a section per component drilling into `comm_statement_lines` |
 | `…/<sub>/[period]/import` | Sales import wizard: parse → period + cancelled report → **agent matching** → commit, scoped to this sub-department |
-| `…/<sub>/[period]/open-bill` | day-by-day board, pre-filled from `sequence_in_day`, reviewed by a human. Defaults to the salesperson-days still on a suggestion |
+| ~~`…/<sub>/[period]/open-bill`~~ | gone 2026-10-31 (the Open Bill amendment at the top) |
 | `/revenue/products` | item code → unit cost + brand — department-wide, Principal only |
 
 All of `/revenue` is Principal + HR (`canAccessRevenue`); the Product List

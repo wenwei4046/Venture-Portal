@@ -293,6 +293,26 @@
 .figExampleResult { font-size: 15px; font-weight: 700; color: var(--rv-accent); }
 .figExampleOp { font-size: 15px; color: var(--rv-sub); }
 
+/* ── Costing Setting › KIV bed frames (2026-10-31): the four sizes, a card each ── */
+.kivGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.kivCell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--rv-white);
+  border: 1px solid var(--rv-line);
+}
+.kivCell[data-edited] { border-color: var(--rv-accent); background: var(--rv-cream); }
+.kivSize { font-size: 12px; font-weight: 650; letter-spacing: .1em; color: var(--rv-accent); }
+.kivCost { font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 34px; color: var(--rv-ink); }
+.kivTeam { font-size: 12.5px; color: var(--rv-sub); }
+@media (max-width: 640px) {
+  .kivGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* ── a section heading ── */
 .heading { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: -8px; }
 .headingTitle { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 400; letter-spacing: -.01em; }
@@ -576,6 +596,40 @@
 }
 .cellInput[data-edited] { border-color: var(--rv-accent); background: var(--rv-cream); }
 .cellInput::placeholder { color: var(--rv-placeholder); }
+/* A name typed in a cell (Maintenance › Fabrics › upgrades): CellInput's box, left-aligned. */
+.textInput { width: 210px; text-align: left; }
+/* Untick a series: the chip's own ×. */
+.chipX {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--rv-sub);
+  font: inherit;
+  font-weight: 650;
+  line-height: 1;
+  cursor: pointer;
+}
+.chipX:disabled { cursor: default; opacity: .4; }
+/* + Add upgrade, under its table. */
+.addRow { padding: 12px 16px; border-top: 1px solid var(--rv-rule); }
+/* A choice in a cell (Maintenance › Sofa › Specials' CHARGED): CellInput's box, left-aligned. */
+.cellSelect {
+  width: 140px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--rv-line-strong);
+  background: var(--rv-white);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--rv-ink);
+  outline: 0;
+  box-sizing: border-box;
+}
+.cellSelect[data-edited] { border-color: var(--rv-accent); background: var(--rv-cream); }
+.cellSelect:disabled { color: var(--rv-sub); }
 .cellLink {
   height: 28px;
   padding: 0;

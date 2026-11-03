@@ -11,7 +11,9 @@ import DX from "./desk-extras.module.css";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
 import { DeskReports } from "./DeskReports";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskRail4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
+import { DeskWorkspace } from "./DeskWorkspace";
+import { SuggestFloat } from "../shared/suggest-float";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -175,7 +177,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </div>
               </>)}
               {!!(v.isSrOp) && (<DeskShowrooms4a v={v} />)}
-              {!!(v.cfOn) && (<DeskForm4a v={v} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} />)} {!!(v.isFrmOp) && (<>
+              {!!(v.cfOn) && (<DeskForm4a v={v} share={<DeskBookingBar4a v={v.partnerLink} />} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} />)} {!!(v.isFrmOp) && (<>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "14px" }}>
                   {(v.frmCards).map((fc, fc_i) => (<Fragment key={fc_i}>
                     <button type="button" onClick={fc.open} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "18px 20px", borderRadius: "18px", border: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", textAlign: "left", color: "var(--crm-ink)", cursor: "pointer", boxShadow: "0 1px 2px rgba(42,22,12,.04)" }} className={DH.h16}>
@@ -344,7 +346,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </div>
                 </div>
               </>)}
-              {!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isNtfOp) && (<>
+              {!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLibOp) && (<DeskReplyLibrary4a v={v.replyLib} />)}{!!(v.isLinkOp) && (<DeskBookingLink4a v={v.partnerLink} />)}{!!(v.isNtfOp) && (<>
                 <span style={{ fontSize: "15px", color: "var(--crm-muted)", marginTop: "-12px" }}>{v.ntfHead}</span>
                 <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
@@ -2225,7 +2227,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                             <div style={{ position: "sticky", top: "0", display: "flex", flexDirection: "column", gap: "8px", padding: "14px", borderRadius: "14px", background: "var(--crm-field)" }}>
                               <div style={{ display: "flex", flexDirection: "column", borderRadius: "12px", background: "#fff", overflow: "hidden" }}>
                                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", padding: "18px 14px 14px" }}>
-                                  <span style={{ width: "72px", height: "72px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "22px", fontWeight: "700", display: "grid", placeItems: "center" }}>{v.waIni}</span>
+                                  <span style={{ width: "72px", height: "72px", borderRadius: "50%", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontSize: "22px", fontWeight: "700", display: "grid", placeItems: "center" }}>{v.waPic ? <img src={v.waPic} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} /> : v.waIni}</span>
                                   <strong style={{ fontSize: "15px", textAlign: "center" }}>{v.wn.disp}</strong>
                                   <span style={{ fontSize: "12.5px", color: "var(--crm-ink)" }}>{v.wn.name}</span>
                                 </div>
@@ -2483,11 +2485,15 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </div>
               </>)}
               {!!(v.kPeople) && (<DeskContacts4a v={v} pager={<DeskPager v={v.ppPager} />} />)}
-              {!!(v.kAudit) && (<DeskAudit4a v={v} />)} {!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kAdsPerf) && (<>
+              {!!(v.kAudit) && (<DeskAudit4a v={v} />)} {!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>
                 <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "6px 0 10px" }}>
                   <span style={{ position: "relative" }}>
                     <button type="button" onClick={v.apStToggle} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.apStOpen) && (<><div onClick={v.apStToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", left: "0" }}>{(v.apStOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.dot }}></span><span style={{ flex: "1" }}>{o.label}</span><span style={{ color: "var(--crm-faint)" }}>{o.n}</span></button>))}</div></>)}
+                  </span>
+                  <span style={{ position: "relative" }}>
+                    <button type="button" onClick={v.apSrcToggle} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline">{v.apSrcCur.label}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    {!!(v.apSrcOpen) && (<><div onClick={v.apSrcToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", left: "0" }}>{(v.apSrcOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", flex: "none", whiteSpace: "nowrap", height: "34px", padding: "0 10px", paddingLeft: o.pad, border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", fontWeight: o.w, color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}>{o.label}</button>))}</div></>)}
                   </span>
                   <span style={{ position: "relative" }}>
                     <button type="button" onClick={v.dpOpen} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline">{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
@@ -2794,7 +2800,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </button>
                     </div>
                   </>)}
-                  <div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
+                  {v.suggest && <SuggestFloat key={v.suggestKey} list={v.suggest} pick={v.pickSuggest} library={v.suggestLib} showLogo={v.suggestLogo && !!v.suggest.length && !v.draft} desk />}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
                     <div style={{ flex: "1", minWidth: "0", height: "50px", borderRadius: "25px", display: "flex", alignItems: "center", gap: "16px", padding: "0 18px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-line)", boxShadow: "0 6px 20px rgba(42,22,12,.08)", color: "var(--crm-muted)" }}>
                       <span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" x2="9.01" y1="9" y2="9"></line><line x1="15" x2="15.01" y1="9" y2="9"></line></svg>{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}
@@ -3059,7 +3065,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     </Fragment>))}
                   </div>
                 </>)}
-                {!!(v.kInfo) && (<>
+                {!!(v.kPartner) && (<DeskPartnerPane4a v={v.partnerPane} close={v.closePane} />)}{!!(v.kInfo) && (<>
                   {!!(v.infoBack) && (<>
                     <button type="button" onClick={v.backToList} style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "6px", padding: "10px 16px", border: "0", borderBottom: "1px solid var(--crm-rule)", background: "#fff", font: "inherit", fontSize: "13px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer", textAlign: "left" }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="m15 6-6 6 6 6">

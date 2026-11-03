@@ -10,6 +10,7 @@ import { t12 } from "../../sales/vm/chat";
 import type { DeskCtx, SrBlk, SrBlock, SrDraft } from "./ctx";
 import { MON } from "./insight";
 import { apptTypesVM } from "./appt-types";
+import { keyLogVM } from "./key-log";
 
 const DN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], DS = ["M", "T", "W", "T", "F", "S", "S"], DI = [0, 1, 2, 3, 4, 5, 6];
 /** Every half hour a visit may start (the prototype's ALLT) and the hours a blocked time may run (HOURS) — the whole day,
@@ -45,6 +46,33 @@ export function roomOf(d: SrDraft): Omit<CrmRoom, "id"> & { id: string | null } 
     photo: d.photo || null, mapGoogle: d.manual ? d.gmap.trim() || null : null, mapWaze: d.manual ? d.waze.trim() || null : null };
 }
 
+/** The editor's draft as the database keeps it (crm_showroom_drafts): everything but a photo picked and not uploaded. */
+export function draftToStore(d: SrDraft): Record<string, unknown> {
+  const { photoFile: _photo, ...rest } = d;
+  void _photo;
+  return rest;
+}
+/** A kept draft back into the editor, laid over the showroom as it stands (a field the draft lacks keeps the showroom's). */
+export function draftFromStore(stored: unknown, r: CrmRoom | null): SrDraft {
+  const base = draftOf(r);
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) return base;
+  const s = stored as Partial<SrDraft>;
+  const arr = <T,>(v: unknown, d: T[]): T[] => (Array.isArray(v) ? (v as T[]) : d);
+  const str = (v: unknown, d: string) => (typeof v === "string" ? v : d);
+  return {
+    ...base, id: r?.id ?? null, photoFile: null,
+    dispName: str(s.dispName, base.dispName), addr: str(s.addr, base.addr), gmap: str(s.gmap, base.gmap), waze: str(s.waze, base.waze),
+    manual: typeof s.manual === "boolean" ? s.manual : base.manual, photo: str(s.photo, base.photo), remarks: str(s.remarks, base.remarks),
+    limit: typeof s.limit === "number" && s.limit >= 1 ? Math.min(20, Math.round(s.limit)) : base.limit,
+    times: arr<string>(s.times, base.times).filter(t => typeof t === "string"),
+    off: s.off && typeof s.off === "object" && !Array.isArray(s.off) ? (s.off as Record<string, 1>) : base.off,
+    weekDays: arr<number>(s.weekDays, base.weekDays).filter(n => Number.isInteger(n) && n >= 0 && n <= 6),
+    blocks: arr<SrBlock>(s.blocks, base.blocks),
+  };
+}
+const fdt = (iso: string) => { const t = new Date(iso); if (Number.isNaN(t.getTime())) return ""; const o = new Date(t.getTime() + 8 * 3_600_000);
+  const h = o.getUTCHours(), m = o.getUTCMinutes(); return `${o.getUTCDate()} ${MON[o.getUTCMonth()].slice(0, 3)}, ${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`; };
+
 export function showroomsVM(ctx: DeskCtx, opItem: string) {
   const { ui, set, patch, data, now } = ctx;
   const rooms = data.rooms.filter(r => r.active);
@@ -53,7 +81,7 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
   // 4a's Showrooms is always open to edit, so the first change starts the draft from the showroom on screen (it did nothing
   // then — "Closed every week on" and Add closure, the owner 2026-10-18: "点了没有功能").
   const upd = (x: Partial<SrDraft>) => set(u => (u.srDraft ? { ...u, srDraft: { ...u.srDraft, ...x } }
-    : { ...u, srEdit: u.srEdit ?? curRoom?.id ?? "new", srDraft: { ...draftOf(curRoom), ...x } }));
+    : { ...u, srEdit: u.srEdit ?? curRoom?.id ?? "new", srDraft: { ...baseOf(), ...x } }));
   const cnt = (off: Record<string, 1>, tm: string[]) => tm.length * 7 - Object.keys(off).filter(k => tm.includes(k.split("|")[0])).length;
   const timeTxt = (b: SrBlock) => (b.allDay || !b.ranges.length ? "All day" : b.ranges.map(r => `${r.f} – ${r.t}`).join(", "));
   const rangeTxt = (arr: number[]) => { if (arr.length === 7) return "Every day"; if (!arr.length) return "Closed"; const runs: string[] = []; let st = arr[0], pv = arr[0];
@@ -92,6 +120,8 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
   const okD = !!bk.from, rng = bk.from ? fd(bk.from) + (bk.to && bk.to !== bk.from ? ` – ${fd(bk.to)}` : "") : "";
   const cur = dr?.times ?? [], opts = ALLT.filter(x => !cur.includes(x)), nt = ui.srNewT && opts.includes(ui.srNewT) ? ui.srNewT : opts[0] ?? "", nd = ui.srNewD ?? DI, okT = !!nt && nd.length > 0;
   const save = async (all: boolean) => {
+    // A showroom opened on its kept draft and not touched since saves that draft.
+    const dr = ui.srDraft && ui.srEdit ? ui.srDraft : keptDraft, en = ui.srEdit ?? (keptDraft ? curRoom?.id ?? null : null);
     if (!dr || !en) return;
     const targets = all ? rooms : rooms.filter(r => r.id === en);
     const results = await Promise.all(targets.map(r => {
@@ -100,7 +130,10 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
       return ctx.act.saveRoom(roomOf(d)).then(id => !!id).then(ok => ok && mine ? ctx.deskAct.saveShowroomExtras(r.id, { photo: dr.photoFile, removePhoto: !dr.photo && !!r.photo, gmap: dr.manual ? dr.gmap : "", waze: dr.manual ? dr.waze : "" }) : ok)
         .then(ok => ok && mine && (dr.remarks ?? "") !== (r.remarks ?? "") ? ctx.deskAct.saveRoomRemarks(r.id, dr.remarks) : ok);
     }));
-    if (results.every(Boolean)) patch({ srEdit: null, srDraft: null, srBlkOpen: false, toast: all ? `Applied to all ${targets.length} showrooms` : `${dr.dispName || "Showroom"} saved` });
+    if (!results.every(Boolean)) return;
+    // Saved for real: its draft has done its job.
+    if (ctx.data.roomDrafts?.[en]) await ctx.deskAct.saveRoomDraft(en, null);
+    patch({ srEdit: null, srDraft: null, srBlkOpen: false, toast: all ? `Applied to all ${targets.length} showrooms` : `${dr.dispName || "Showroom"} saved` });
   };
   const empty = { manual: false, showAuto: false, showNoAddr: true, linkFields: [] as { bg: string; ch: string; ph: string; v: string; set: (e: { target: { value: string } }) => void }[], gmapUrl: "", wazeUrl: "", name: "", dispName: "", gmap: "", waze: "", photo: "", noPhoto: true, photoBd: "var(--crm-st-won)", addr: "", limit: "", blocks: [] as { tag: string; tagBg: string; tagFg: string; when: string; sub: string; remove: () => void }[], openN: "", allLabel: "", totN: "", slots: [] as { time: string; remove: () => void; cells: { on: boolean; bg: string; bd: string; toggle: () => void }[] }[] };
   // 4a (frame 07): one showroom at a time (‹ 1 / 2 ›, + adds one), always open to edit — the first change makes the
@@ -108,14 +141,26 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
   // an hour is open on a day when a visit time in it is; a tap opens the hour (a new time at :00 for that day) or closes it.
   const at = Math.min(Math.max(0, ui.srAt ?? 0), Math.max(0, rooms.length - 1));
   const curRoom = en === "new" ? null : rooms.find(r => r.id === en) ?? rooms[at] ?? null;
-  const d4: SrDraft = dr && en ? dr : draftOf(curRoom);
+  // A showroom with a draft opens on it (crm_showroom_drafts, the owner 2026-11-03: "存为草稿"); the showroom itself — what
+  // every salesperson's Book visit reads — is as saved until Save.
+  const draftKey = en === "new" ? "new" : curRoom?.id ?? null;
+  const kept = draftKey ? ctx.data.roomDrafts?.[draftKey] : undefined;
+  const keptDraft: SrDraft | null = kept ? draftFromStore(kept.draft, en === "new" ? null : curRoom) : null;
+  function baseOf(): SrDraft { return keptDraft ?? draftOf(curRoom); }
+  const d4: SrDraft = dr && en ? dr : baseOf();
   const edit4 = (x: Partial<SrDraft>) => set(u => ({ ...u, srEdit: u.srEdit ?? curRoom?.id ?? "new", srDraft: { ...(u.srDraft && u.srEdit ? u.srDraft : d4), ...x } }));
   const hourOf = (label: string) => { const h = Number(hm(label).slice(0, 2)); return h; };
   const sr4 = {
     has: rooms.length > 0 || en === "new", isNew: en === "new",
     pager: { at: en === "new" ? rooms.length + 1 : at + 1, n: rooms.length + (en === "new" ? 1 : 0), prev: () => patch({ srAt: Math.max(0, at - 1), srEdit: null, srDraft: null }),
       next: () => patch({ srAt: Math.min(rooms.length - 1, at + 1), srEdit: null, srDraft: null }), prevOff: at === 0 || en === "new", nextOff: at >= rooms.length - 1 || en === "new" },
-    add: () => patch({ srEdit: "new", srDraft: draftOf(null), srBlkOpen: false }),
+    add: () => { const k = ctx.data.roomDrafts?.new; patch({ srEdit: "new", srDraft: k ? draftFromStore(k.draft, null) : draftOf(null), srBlkOpen: false }); },
+    /** The draft kept for the showroom on screen: when, by whom; Discard takes it away and shows the showroom as saved. */
+    draft: kept ? { when: fdt(kept.at), by: ctx.data.people.find(p => p.id === kept.by)?.name ?? "", discard: () => { if (draftKey) void ctx.deskAct.saveRoomDraft(draftKey, null).then(ok => { if (ok) patch({ srEdit: null, srDraft: null, toast: "Draft discarded" }); }); } } : null,
+    /** Keep what is on screen as the draft, nothing live changes. */
+    saveDraft: () => { if (!draftKey) return; const d = dr && en ? dr : d4;
+      void ctx.deskAct.saveRoomDraft(draftKey, draftToStore(d)).then(ok => { if (ok) patch({ toast: d.photoFile ? "Draft saved · add the photo again when you save" : "Draft saved · not live until you save" }); }); },
+    draftable: !!draftKey && (!!en || !!kept),
     name: d4.dispName, setName: (e: { target: { value: string } }) => edit4({ dispName: e.target.value }),
     addr: d4.addr, setAddr: (e: { target: { value: string } }) => edit4({ addr: e.target.value }),
     links: d4.manual ? { g: d4.gmap || "", w: d4.waze || "" } : d4.addr ? mapU(d4.addr) : { g: "", w: "" },
@@ -131,7 +176,7 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
         const t = t12(`${h}:00`), off = { ...d4.off }; DI.forEach(x => { if (x !== di) off[`${t}|${x}`] = 1; });
         edit4({ off, times: [...d4.times, t].sort((a, b) => ALLT.indexOf(a) - ALLT.indexOf(b)), weekDays: d4.weekDays.filter(x => x !== di) }); } }; }) })),
     // A new showroom saves on its own (the phone panel's + does the same); an existing one through the editor's save.
-    save: () => { if (en === "new" && dr) { void ctx.act.saveRoom(roomOf(dr)).then(ok => { if (ok) patch({ srEdit: null, srDraft: null, srAt: rooms.length, toast: `${dr.dispName || "Showroom"} added` }); }); } else void save(false); },
+    save: () => { if (en === "new" && dr) { void ctx.act.saveRoom(roomOf(dr)).then(async ok => { if (!ok) return; if (ctx.data.roomDrafts?.new) await ctx.deskAct.saveRoomDraft("new", null); patch({ srEdit: null, srDraft: null, srAt: rooms.length, toast: `${dr.dispName || "Showroom"} added` }); }); } else void save(false); },
     dirty: !!en,
     // v2 frame 07 (note 04): opening hours typed in — All days + Apply to all, then each day on or off with its own hours.
     // They are the slots the weekly grid draws: a day's hours = its first open slot to the hour after its last.
@@ -159,11 +204,20 @@ export function showroomsVM(ctx: DeskCtx, opItem: string) {
     remarks: d4.remarks ?? "", setRemarks: (e: { target: { value: string } }) => edit4({ remarks: e.target.value.slice(0, 1000) }),
     // Delete showroom: asked again on screen; the database refuses it while visits are upcoming and says how many.
     canDelete: en !== "new" && !!curRoom,
+    // Key handover (the owner, 2026-10-29): on, a visit here takes the key photos on the phone; saved at once.
+    keys: { on: !!curRoom?.keys, can: en !== "new" && !!curRoom,
+      toggle: () => { if (!curRoom) return; const on = !curRoom.keys; void ctx.act.setRoomKeys(curRoom.id, on).then(ok => { if (ok) patch({ toast: on ? `${curRoom.name}: the key is handed over with photos` : `${curRoom.name}: no key photos` }); }); } },
+    // The order (2026-10-29: "我可以移动 showroom 的顺序"): this showroom one place earlier or later; every list follows it.
+    move: (() => {
+      const ids = rooms.map(r => r.id), go = (to: number) => { if (!curRoom || to < 0 || to >= ids.length) return; const next = ids.filter(x => x !== curRoom.id); next.splice(to, 0, curRoom.id);
+        void ctx.act.orderRooms(next).then(ok => { if (ok) patch({ srAt: to, srEdit: null, srDraft: null }); }); };
+      return { can: en !== "new" && !!curRoom && ids.length > 1, earlier: () => go(at - 1), later: () => go(at + 1), earlierOff: at === 0, laterOff: at >= ids.length - 1 };
+    })(),
     del: () => { if (!curRoom) return; void ctx.deskAct.deleteRoom(curRoom.id).then(ok => { if (ok) patch({ srEdit: null, srDraft: null, srAt: Math.max(0, at - 1), toast: `${curRoom.name} deleted` }); }); },
   };
   return {
     // Showrooms › Appointment types (2026-10-24).
-    srPage: ui.srPage ?? "rooms", at: apptTypesVM(ctx),
+    srPage: ui.srPage ?? "rooms", at: apptTypesVM(ctx), keyLog: keyLogVM(ctx),
     sr4, srOpen: false && srOpen, srCards, srN: String(rooms.length), srDays: DS.map(l => ({ l })),
     srLinkModes: ([[false, "Auto"], [true, "Paste link"]] as const).map(([v, label]) => { const on = !!dr?.manual === v; return { label, bg: on ? "#fff" : "transparent", sh: on ? "0 1px 3px rgba(42,22,12,.12)" : "none", fg: on ? "var(--crm-ink)" : "var(--crm-muted)", pick: () => upd({ manual: v }) }; }),
     srTabSlots: ui.srTab === "slots", srTabBlk: ui.srTab === "blk", srTabInfo: ui.srTab === "info",

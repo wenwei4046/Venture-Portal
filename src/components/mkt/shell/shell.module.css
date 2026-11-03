@@ -261,9 +261,6 @@
 }
 .lookReset { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; border: 0; background: transparent; padding: 0; color: rgb(var(--mk-muted)) !important; }
 
-/* The Principal's view switch (HR's and Finance's bars draw it as words). */
-.viewSelect {
-  height: 32px; border-radius: 8px; border: 1px solid rgb(var(--mk-field-line)); background: rgb(var(--mk-white));
-  padding: 0 28px 0 10px; font: inherit; font-size: .96em; color: rgb(var(--mk-ink)); cursor: pointer;
-}
-.viewSelect:hover, .viewSelect:focus { border-color: rgb(var(--mk-field-hover)); outline: none; }
+/* The Principal's view switch — the words, as on HR's and Finance's bars (2026-10-27, layout/ViewSwitch): 20px clear of
+   + New Project, as the words sit from the date there. */
+.view { display: flex; margin-right: 12px; }

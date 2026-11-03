@@ -80,6 +80,12 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
   .pair { grid-template-columns: minmax(0, 1fr); }
 }
 :global([data-sheet]) .pair { grid-template-columns: minmax(0, 1fr); }
+/* A select beside a date field (Create invoice's Bill to, 2026-10-30): the date's 40px while the two stand side
+   by side, its own 32px once the pair is one column. */
+@media (min-width: 768px) {
+  .pair select.select.tall { height: 40px; }
+  :global([data-sheet]) .pair select.select.tall { height: 32px; }
+}
 
 /* Files: a white card of the chosen files, then a dashed *+ Add files*. */
 .files {
@@ -189,11 +195,16 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
   gap: 6px;
   padding: 8px 10px 8px 12px;
 }
-/* A company and its amount · a mode, a category and an amount · an item and its amount (and its category). */
+/* A company and its amount · a mode, a category and an amount · an item and its amount. */
 .lineRow[data-shape='party'] { grid-template-columns: minmax(0, 1fr) 128px 28px; }
 .lineRow[data-shape='pool'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 100px 28px; }
 .lineRow[data-shape='item'] { grid-template-columns: minmax(0, 1fr) 128px 28px; }
-.lineRow[data-shape='item-cat'] { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) 112px 28px; }
+/* An invoice's line (Create invoice, 2026-10-30 — the user: "类别 - 全部一行", "把 description 和 category
+   倒反…改成 account"): its account, its words (the wider), its amount, on one row. */
+.lineRow[data-shape='acct-item'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) 112px 28px; }
+/* A kind of HR's lines and the account it goes on (Create invoice's Account for each line). */
+.lineRow[data-shape='part'] { grid-template-columns: 96px minmax(0, 1fr); }
+.partName { font-size: 13px; color: var(--ds-ink); }
 /* A journal voucher's line (the phone's voucher sheet, 2026-10-15): its account and ×, its debit and credit, its note. */
 .lineRow[data-shape='jv-account'] { grid-template-columns: minmax(0, 1fr) 28px; padding-bottom: 4px; }
 .lineRow[data-shape='jv-amounts'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding-top: 0; padding-bottom: 4px; }
@@ -201,9 +212,9 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
 /* A narrow dialog (a phone): a line of four takes two rows — its two selects, then its amount and its ×. */
 @media (max-width: 560px) {
   .lineRow[data-shape='pool'],
-  .lineRow[data-shape='item-cat'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .lineRow[data-shape='acct-item'] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .lineRow[data-shape='pool'] > :last-child,
-  .lineRow[data-shape='item-cat'] > :last-child { justify-self: end; }
+  .lineRow[data-shape='acct-item'] > :last-child { justify-self: end; }
 }
 .lineAmount {
   box-sizing: border-box;

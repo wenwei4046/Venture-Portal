@@ -398,7 +398,8 @@ function footSub(person: ArenaPerson | undefined, tiers: readonly ArenaTier[], p
   if (period.kind !== "monthly") return "Paid month by month · see Insight";
   if (!person) return "No costed sales yet";
   const inc = arenaIncentive(person, tiers);
-  const costed = inc.brands.filter(b => b.marginPct !== null);
+  // A brand given away and never sold clears no tier (2026-10-30), so it is in the intersection too.
+  const costed = inc.brands.filter(b => b.marginPct !== null || b.noSales);
   let keys = new Set(costed[0]?.cleared ?? []);
   for (const b of costed.slice(1)) keys = new Set([...keys].filter(k => b.cleared.includes(k)));
   const reached = costed.length ? tiers.filter(t => keys.has(t.bandKey)).sort((a, b) => b.amount - a.amount)[0]?.label ?? null : null;
@@ -409,6 +410,8 @@ function footSub(person: ArenaPerson | undefined, tiers: readonly ArenaTier[], p
   }
   if (inc.blocked?.reason === "no_brand") return reached ? `${reached} reached · held by a bill with no brand` : "Held by a bill with no brand";
   if (inc.blocked?.reason === "no_ladder") return `No margin ladder for ${brandLabel(inc.blocked.brand, names)}`;
+  const given = inc.brands.find(b => b.noSales);
+  if (given) return `No tier · ${brandLabel(given.brand, names)} has no sales`;
   if (inc.earned.length) return `${inc.earned[0].label} reached`;
   const lowest = [...tiers].sort((a, b) => a.marginPct - b.marginPct)[0];
   return lowest ? `Below ${lowest.label}` : "No margin ladder yet";

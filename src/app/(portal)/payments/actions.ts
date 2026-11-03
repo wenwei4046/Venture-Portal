@@ -9,7 +9,9 @@ import { officeDate } from '@/lib/office-clock'
 import { officeTime } from '@/lib/office-time'
 import { createClient } from '@/lib/supabase/server'
 import { dropStaged, dropStagedIn, formFile, formFiles, type FormFile } from '@/lib/storage/staged'
-import { requireActionOn, requireApproverOn, requirePermission } from '@/lib/auth'
+import type { FileBucketApi } from '@/lib/storage/server'
+import { openSplits, parseRequests, voucherStart } from '@/lib/payment-requests/model'
+import { mayActOn, requireActionOn, requireApproverOn, requirePermission } from '@/lib/auth'
 import { decision } from '@/lib/approval-domains'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
@@ -18,6 +20,7 @@ import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
 import { payerExpenseSplits, type NatureSplit } from '@/lib/inter-billing-nature'
 import { segmentForBillingMode, lineAttributions, type SegmentAttribution } from '@/lib/invoice-settlement'
+import { extraBillingModeToSegment, extraSegmentToPool, primeDeptRegistryFromDb } from '@/lib/dept-registry'
 
 // Nature splits for the inter-billing MIRROR rows (user 2026-07-24) — same
 // mapping billing/actions uses for the issue JE, so the dept-pool P&L and the
@@ -190,9 +193,14 @@ async function makePaymentVoucher(formData: FormData) {
         .from('invoice_lines')
         .select('amount, segment')
         .eq('invoice_id', invoiceId)
+      // A segment beyond the five cores (IT's) finds its pool in the department
+      // registry, read here — on a cold instance it folded into Venture
+      // (2026-11-03: an internal invoice's sender can be any department).
+      const registry = await primeDeptRegistryFromDb(supabase)
       const groups = lineAttributions(
         (consolLines ?? []).map((l) => ({ amount: Number(l.amount), segment: (l.segment as string | null) ?? null })),
         settleBillingMode,
+        { modeToSegment: extraBillingModeToSegment(registry), segmentToPool: extraSegmentToPool(registry) },
       )
       if (groups.length === 0) {
         throw new Error('Consolidated payroll invoice has no lines to settle')
@@ -898,6 +906,146 @@ export async function createPaymentFromDialog(formData: FormData): Promise<Dialo
   }
 }
 
+const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** A form field holding a JSON list, as far as it is one. */
+function jsonList(raw: FormDataEntryValue | null): unknown[] {
+  try {
+    const v = typeof raw === 'string' ? JSON.parse(raw) : null
+    return Array.isArray(v) ? v : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Create PV from Payments › Payment request (2026-10-29, PR ② of docs/module-spec-payment-requests.md): the voucher
+ * today's Create payment window makes (createPaymentVoucherInner — every rule), filled in from the staff requests it
+ * pays; then, in one database step, the requests are tied to it, each split's Bill back? answered in the window is kept
+ * and each Yes split's invoice is drafted (`payment_requests_attach_pv` — refused, the draft voucher is voided again and
+ * nothing is tied); then the requests' receipts are carried onto it; then, when asked, it is sent for approval.
+ * Answered in words, never a redirect.
+ */
+export async function createPaymentForRequests(formData: FormData): Promise<DialogPaymentResult> {
+  try {
+    await requireActionOn('/payments/requests', 'treasury', 'create')
+    if (formData.get('direction') !== 'debit') return { ok: false, reason: 'Create PV makes a payment voucher.' }
+    if (formData.get('return_to')) formData.delete('return_to')
+    const ids = [...new Set(jsonList(formData.get('payment_request_ids')).filter((v): v is string => typeof v === 'string' && REQUEST_ID.test(v)))].slice(0, 20)
+    if (ids.length === 0) return { ok: false, reason: 'Which requests? Reload the page and try again.' }
+    // Each split's Bill back?, answered in the window with the voucher; a Yes carries its category.
+    const bill = jsonList(formData.get('payment_request_bill')).flatMap((b) => {
+      const o = b && typeof b === 'object' ? (b as Record<string, unknown>) : {}
+      if (typeof o.share !== 'string' || !REQUEST_ID.test(o.share) || typeof o.billBack !== 'boolean') return []
+      return [o.billBack ? { share: o.share, billBack: true, category: typeof o.category === 'string' ? o.category.slice(0, 20) : '' } : { share: o.share, billBack: false }]
+    })
+
+    const supabase = await createClient()
+    // Asked before anything is written: still with Finance, one payee into one account — and every split the window asks
+    // answered (a request changed since the window opened is caught here, before a voucher number is taken).
+    const { data: ready, error: readyErr } = await supabase.rpc('payment_requests_for_pv', { p_ids: ids })
+    if (readyErr) return { ok: false, reason: readyErr.message }
+    const asked = openSplits(voucherStart(parseRequests((ready as { requests?: unknown } | null)?.requests)).splits)
+    if (asked.some((s) => !bill.some((b) => b.share === s.shareId))) {
+      return { ok: false, reason: 'Each split’s Bill back is needed — close the window and Create PV again.' }
+    }
+    if (bill.some((b) => b.billBack) && !(await mayActOn(['/ba', '/billing-allocator', '/statements'], 'billing', 'create'))) {
+      return { ok: false, reason: 'Billing back needs Invoice · Create — answer No, or ask for it.' }
+    }
+    const carry = ((ready as { files?: unknown } | null)?.files ?? []) as Array<{ id: string; path: string; name: string; contentType: string | null; size: number | null }>
+    const requestNos = new Map(
+      ((ready as { requests?: Array<{ id: string; requestNo: string | null; files?: Array<{ id: string }> }> } | null)?.requests ?? []).flatMap((r) =>
+        (r.files ?? []).map((f) => [f.id, r.requestNo ?? 'Payment request'] as const),
+      ),
+    )
+
+    const made = await createPaymentVoucherInner(formData)
+    const { error: tieErr } = await supabase.rpc('payment_requests_attach_pv', { p_ids: ids, p_pv: made.id, p_bill: bill as never })
+    if (tieErr) {
+      const voided = await voidHalfMadeVoucher(supabase, made.id)
+      return { ok: false, reason: `${clause(tieErr.message)} — ${voided ? `${made.voucherNo} was voided, nothing kept` : `void ${made.voucherNo}, it was not tied`}.` }
+    }
+
+    // The receipts, onto the voucher: each copied inside file storage and filed as its attachment.
+    let missed = 0
+    for (const f of carry) {
+      const target = `${made.id}/${crypto.randomUUID()}-${(f.name || 'file').replace(/[^\w.\-]/g, '_').slice(-80)}`
+      const copied = await (supabase.storage.from('payment-request-files') as unknown as FileBucketApi).copyTo('payment-attachments', f.path, target)
+      const filed = copied.error
+        ? { error: copied.error }
+        : await supabase.from('payment_attachments').insert({
+            voucher_id: made.id,
+            file_name: f.name,
+            file_type: f.contentType ?? 'application/octet-stream',
+            file_size: f.size ?? 0,
+            storage_path: target,
+            description: `From ${requestNos.get(f.id) ?? 'Payment request'}`,
+            uploaded_by: made.user.id,
+          })
+      if (filed.error) missed++
+    }
+    const notes = missed > 0 ? [`${missed === 1 ? 'A receipt' : `${missed} receipts`} could not be carried over — add ${missed === 1 ? 'it' : 'them'} on the voucher.`] : []
+
+    revalidatePath('/payments/requests')
+    revalidatePath('/claims')
+    revalidatePath('/statements')
+    if (formData.get('submit') !== '1') {
+      return { ok: true, id: made.id, voucherNo: made.voucherNo, submitted: false, ...(notes.length ? { note: `${made.voucherNo} saved as draft. ${notes[0]}` } : {}) }
+    }
+    try {
+      await submitDraftForApproval(supabase, made.user.id, made.id)
+      return { ok: true, id: made.id, voucherNo: made.voucherNo, submitted: true, ...(notes.length ? { note: `${made.voucherNo} submitted. ${notes[0]}` } : {}) }
+    } catch (err) {
+      return {
+        ok: true,
+        id: made.id,
+        voucherNo: made.voucherNo,
+        submitted: false,
+        note: [`Saved as a draft — it was not sent for approval: ${err instanceof Error ? err.message : 'unknown error'}`, ...notes].join(' '),
+      }
+    }
+  } catch (err) {
+    if (isRedirect(err)) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
+/**
+ * Submit together (2026-10-29, PR ④ — Payment request's Create payments): the drafts it just made, sent for approval as
+ * one batch — their approval requests share a group id, so the Principal approves them at once or splits them
+ * (Approvals' combined card: "Submitted together, they reach the Principal as one batch — approve all at once, or one
+ * by one"). One alone is sent as any other. A refusal leaves that one a draft, said by its id; the rest go on.
+ */
+export async function submitPaymentsTogether(
+  voucherIds: string[],
+): Promise<{ ok: true; submitted: string[]; failed: Array<{ id: string; reason: string }> } | { ok: false; reason: string }> {
+  try {
+    const user = await requireActionOn('/payments/requests', 'treasury', 'create')
+    const ids = [...new Set((Array.isArray(voucherIds) ? voucherIds : []).filter((v): v is string => typeof v === 'string' && REQUEST_ID.test(v)))]
+    if (ids.length === 0) return { ok: false, reason: 'Which vouchers? Reload the page and try again.' }
+    if (ids.length > 20) return { ok: false, reason: 'Up to 20 vouchers at once.' }
+
+    const supabase = await createClient()
+    const groupId = ids.length > 1 ? crypto.randomUUID() : null
+    const submitted: string[] = []
+    const failed: Array<{ id: string; reason: string }> = []
+    for (const id of ids) {
+      try {
+        await submitDraftForApproval(supabase, user.id, id, groupId)
+        submitted.push(id)
+      } catch (err) {
+        failed.push({ id, reason: err instanceof Error ? err.message : 'unknown error' })
+      }
+    }
+    revalidatePath('/payments/requests')
+    revalidatePath('/claims')
+    return { ok: true, submitted, failed }
+  } catch (err) {
+    if (isRedirect(err)) throw err
+    return { ok: false, reason: err instanceof Error ? err.message : 'Unknown error' }
+  }
+}
+
 /**
  * Settle an invoice on its official receipt, the Finance phone app's sheet
  * (2026-10-16, part E4b — what `/payments/new?invoice_id=` makes: a
@@ -953,8 +1101,11 @@ export async function submitForApproval(formData: FormData) {
   await submitDraftForApproval(supabase, user.id, id)
 }
 
-/** A draft sent to the approvals: its request, then the voucher pending. The caller has asked Treasury · Create. */
-async function submitDraftForApproval(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, id: string) {
+/**
+ * A draft sent to the approvals: its request, then the voucher pending. The caller has asked Treasury · Create. A group
+ * id (Create payments' Submit, PR ④) puts its request in a batch the Principal approves at once or splits.
+ */
+async function submitDraftForApproval(supabase: Awaited<ReturnType<typeof createClient>>, userId: string, id: string, groupId: string | null = null) {
   // Fetch voucher
   const { data: voucher, error: fetchError } = await supabase
     .from('payment_vouchers')
@@ -977,6 +1128,7 @@ async function submitDraftForApproval(supabase: Awaited<ReturnType<typeof create
       amount: voucher.amount,
       status: 'pending' as const,
       workflow_state: 'submitted' as const,
+      ...(groupId ? { group_id: groupId } : {}),
     })
 
   if (approvalError) throw new Error(`Failed to submit for approval: ${approvalError.message}`)

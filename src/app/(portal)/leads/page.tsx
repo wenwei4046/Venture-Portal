@@ -1,0 +1,54 @@
+import { requirePage, requirePermission } from '@/lib/auth'
+import { canDo } from '@/lib/permission-actions'
+import { HvPage, PageHead } from '@/components/hrv/kit'
+import { loadInbox, loadInfo, loadLabels, loadLeadConfig, loadPersonas, loadQuickReplies, loadThread, loadUnreadMarks } from '@/lib/leads/server'
+import { withMetaUnread } from '@/lib/leads/inbox'
+import { metaUnread } from '@/lib/leads/meta-sync'
+import InboxView from './_components/InboxView'
+
+export const dynamic = 'force-dynamic'
+
+/** Lead View › Inbox (2026-10-16; Inbox v2 2026-10-22). Lead View · View reads it; ?c= opens a conversation, ?q= searches (the top bar). */
+export default async function Page({ searchParams }: { searchParams: Promise<{ c?: string; q?: string }> }) {
+  await requirePage('/leads')
+  const user = await requirePermission('leads')
+  const { c, q } = await searchParams
+  const [config, inbox, personas, info, quick, labels, marks] = await Promise.all([loadLeadConfig(), loadInbox(), loadPersonas(), loadInfo(), loadQuickReplies(), loadLabels(), loadUnreadMarks()])
+  if (!config.ok || !inbox.ok) {
+    return (
+      <HvPage>
+        <PageHead eyebrow="Lead View" title="Inbox" />
+        <div className="sheet-danger">{!config.ok ? config.reason : !inbox.ok ? inbox.reason : null}</div>
+      </HvPage>
+    )
+  }
+  // Messenger's own unread counts, as Business Suite shows them (mig 20261028100000); Meta not answering keeps Lead View's.
+  const pages = inbox.data.filter(x => x.channel === 'messenger' && !x.isTest && x.pageId).map(x => x.pageId as string)
+  const pick = c && inbox.data.some(x => x.id === c) ? c : inbox.data[0]?.id
+  const [counts, thread] = await Promise.all([metaUnread(pages, process.env.META_SYSTEM_USER_TOKEN?.trim()), pick ? loadThread(pick) : null])
+  const contacts = withMetaUnread(inbox.data, counts)
+  return (
+    <InboxView
+      config={config.data}
+      contacts={contacts}
+      initialThread={thread?.ok ? thread.data : null}
+      initialQuery={q?.slice(0, 80) ?? ''}
+      canReply={canDo(user, 'leads', 'create')}
+      canEdit={canDo(user, 'leads', 'edit')}
+      canManage={canDo(user, 'leads', 'manage')}
+      csName={user.name || 'Customer Service'}
+      // An API key for the AI Agent (never its value) — without one the composer says so.
+      aiConnected={!!process.env.ANTHROPIC_API_KEY}
+      // General info for the composer's menu (null before its migration).
+      info={info.ok ? info.data : null}
+      // The Data Center's quick replies: "/shortcut" in the reply box (none before their migration).
+      quick={quick.ok ? quick.data : []}
+      // Customer Service's labels (none before mig 20261027190000).
+      labels={labels.ok ? labels.data : []}
+      // The chats this person marked unread to answer later (none before mig 20261028110000).
+      marked={marks.ok ? marks.data : []}
+      // Brands whose AI agent is a copilot: their conversations offer an AI draft (none while its tables are not there).
+      aiBrands={personas.ok ? personas.data.filter(p => p.mode === 'copilot').map(p => p.brandId) : []}
+    />
+  )
+}

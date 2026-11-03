@@ -1,7 +1,7 @@
 "use client";
 
 import { ICON, Svg } from "../icons";
-import { liveSets, setMeta, type QCatalog, type QuoteMemory, type RecentSet } from "./quote-model";
+import { accOnlyTitle, liveSets, setMeta, type QCatalog, type QuoteMemory, type RecentSet } from "./quote-model";
 import s from "./quote.module.css";
 
 const HISTORY = "M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2";
@@ -40,6 +40,7 @@ export default function QuoteProducts({ catalog, memory, onBrand, onSet, onAll, 
   const sets = liveSets(memory, catalog);
   const n = catalog.models.length;
   const kpi = catalog.kpis.length ? " · KPI items" : "";
+  const frames = !catalog.sofa && catalog.frames.length > 0;
   return (
     <div className={s.page}>
       <div>
@@ -83,10 +84,11 @@ export default function QuoteProducts({ catalog, memory, onBrand, onSet, onAll, 
           <Svg d={ICON.chevronDown} size={18} sw={2} stroke="var(--rv-accent)" />
         </button>
       </section>
-      {!catalog.sofa && (
+      {/* A sofa brand sells its sofa accessories on their own (2026-10-26); bed frames are a mattress's. */}
+      {(frames || catalog.accs.length > 0) && (
         <section>
           <div className={s.sepHead}><h2 className={s.secTitle}>Buy separately</h2></div>
-          {catalog.frames.length > 0 && (
+          {frames && (
             <button className={s.sepRow} onClick={onFrameOnly}>
               <span>
                 <span className={s.sepName}>Bed frame only</span>
@@ -98,7 +100,7 @@ export default function QuoteProducts({ catalog, memory, onBrand, onSet, onAll, 
           {catalog.accs.length > 0 && (
             <button className={s.sepRow} onClick={onAccOnly}>
               <span>
-                <span className={s.sepName}>Accessories only</span>
+                <span className={s.sepName}>{accOnlyTitle(catalog)}</span>
                 <span className={s.sepSub}>{`${catalog.accSummary} · ${catalog.name} margin`}</span>
               </span>
               <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />

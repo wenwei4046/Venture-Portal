@@ -11,6 +11,7 @@ const net = vi.hoisted(() => ({ fetchCrmData: vi.fn(), loadSnapshot: vi.fn() }))
 vi.mock("@/app/(member)/member/crm-actions", () => ({
   fetchCrmData: net.fetchCrmData,
   crmWrite: vi.fn(async () => ({ ok: true, data: null })),
+  fetchCrmReplyExamples: vi.fn(async () => null),
 }));
 vi.mock("./shared/snapshot", () => ({ loadSnapshot: net.loadSnapshot, saveSnapshot: vi.fn() }));
 

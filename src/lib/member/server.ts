@@ -196,6 +196,17 @@ const legacyLabels: Record<string, string> = {
 };
 const legacyLabel = (value: string): string => legacyLabels[value] ?? value;
 
+/** A book's bills and its margins by brand, their brands named as everywhere else. */
+function relabelBook(book: MemberOrderBook): MemberOrderBook {
+  return {
+    ...book,
+    orders: book.orders.map((order) => ({ ...order, brand: legacyLabel(order.brand) })),
+    ...(book.margins ? {
+      margins: { ...book.margins, brands: Object.fromEntries(Object.entries(book.margins.brands).map(([code, pct]) => [legacyLabel(code), pct])) },
+    } : {}),
+  };
+}
+
 function publicProduct(
   p: MemberProduct & {
     image_url?: unknown;
@@ -420,7 +431,7 @@ export async function loadMemberOrderBook(
     });
     const book = readOrderBook(data);
     if (!book) throw new Error("Your bills are temporarily unavailable.");
-    return { ...book, orders: book.orders.map((order) => ({ ...order, brand: legacyLabel(order.brand) })) };
+    return relabelBook(book);
   });
 }
 
@@ -543,18 +554,18 @@ export async function loadMemberIncome(
     };
     const empty = (state: IncomeMonth["state"], notice: string): IncomeMonth => ({
       ...extra, state, asOf: new Date().toISOString(), closedAt: null, rankLabel: null, rate: 0,
-      personal: 0, kpi: 0, kpiQty: 0, openBill: 0, incentive: 0, override: 0, group: 0, director: 0,
+      personal: 0, kpi: 0, kpiQty: 0, incentive: 0, override: 0, group: 0, director: 0,
       commission: 0, countedSales: 0, bandKey: null, brands: [],
-      bills: [], overrides: [], switches: { kpi: false, openBill: false, incentive: false, override: false, group: false }, notice,
+      bills: [], overrides: [], switches: { kpi: false, incentive: false, override: false, group: false }, notice,
       pay: null,
     });
 
     const { data: scheme, error: schemeError } = await admin.from("comm_schemes")
-      .select("enable_kpi, enable_open_bill, enable_margin_incentive, enable_override, enable_group_incentive")
+      .select("enable_kpi, enable_margin_incentive, enable_override, enable_group_incentive")
       .eq("sub_department_id", subDepartmentId).eq("is_active", true).is("effective_to", null).maybeSingle();
     if (schemeError) throw new Error(schemeError.message);
     const sw = (scheme ?? {}) as Record<string, boolean | null>;
-    const switches = { kpi: !!sw.enable_kpi, openBill: !!sw.enable_open_bill, incentive: !!sw.enable_margin_incentive, override: !!sw.enable_override, group: !!sw.enable_group_incentive };
+    const switches = { kpi: !!sw.enable_kpi, incentive: !!sw.enable_margin_incentive, override: !!sw.enable_override, group: !!sw.enable_group_incentive };
 
     // Closed by HR: the close's own figures, fixed.
     const close = closes.data as { closed_at: string; summary: unknown; statement: StatementDto | null; deferred_orders: { orderId: string }[] | null } | null;
@@ -719,7 +730,7 @@ export async function loadDepartmentOrderBook(subDepartmentId: string, from: str
       p_sub_department: subDepartmentId, p_from: from, p_until: until,
     }));
     if (!book) throw new Error("The bills are temporarily unavailable.");
-    return { ...book, orders: book.orders.map((order) => ({ ...order, brand: legacyLabel(order.brand) })) };
+    return relabelBook(book);
   });
 }
 
@@ -1042,6 +1053,23 @@ function quoteBuild(raw: unknown): QuoteInput["build"] {
   if (leg) build.leg = leg;
   const specials = options(b.specials, "sofa specials");
   if (specials) build.specials = specials;
+  // How many of each special charged by quantity (2026-10-26): whole numbers 1–100.
+  if (b.specialQty !== undefined && b.specialQty !== null) {
+    const raw = b.specialQty;
+    if (typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).length > 20)
+      throw new Error("The sofa special quantities are invalid.");
+    const quantities: Record<string, number> = {};
+    for (const [sp, n] of Object.entries(raw as Record<string, unknown>)) {
+      const value = option(sp, "sofa special");
+      if (!value || typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > 100)
+        throw new Error("The sofa special quantities are invalid.");
+      quantities[value] = n;
+    }
+    if (Object.keys(quantities).length) build.specialQty = quantities;
+  }
+  // The sofas' fabric upgrade, by name (2026-10-29); whether the cart is offered it is the calculator's check.
+  const fabricUpgrade = option(b.fabricUpgrade, "sofa fabric upgrade");
+  if (fabricUpgrade) build.fabricUpgrade = fabricUpgrade;
   const frame = bedframeBuild(b.bedframe);
   if (frame) build.bedframe = frame;
   return build;
@@ -1072,11 +1100,13 @@ function bedframeBuild(raw: unknown): BedframeBuild | undefined {
   if (f.specials !== undefined && f.specials !== null && (!Array.isArray(f.specials) || f.specials.length > 20))
     throw new Error("The bed frame specials are invalid.");
   const specials = [...new Set(((f.specials as unknown[] | undefined) ?? []).map((v) => option(v, "bed frame special")).filter((v): v is string => !!v))];
+  const fabricUpgrade = option(f.fabricUpgrade, "bed frame fabric upgrade");
   if (divan) frame.divan = divan;
   if (leg) frame.leg = leg;
   if (total) frame.total = total;
   if (gap) frame.gap = gap;
   if (specials.length) frame.specials = specials;
+  if (fabricUpgrade) frame.fabricUpgrade = fabricUpgrade;
   return Object.keys(frame).length ? frame : undefined;
 }
 
@@ -1261,7 +1291,7 @@ export async function submitMemberRequest(
         const price = field(form, "amount");
         if (price) {
           const amount = cents(price);
-          if (amount === null || amount < 1) throw new Error("Enter the plane ticket's price, as its invoice shows.");
+          if (amount === null || amount < 1) throw new Error("Enter the air ticket's price, as its invoice shows.");
           verified = await invoice(form);
           Object.assign(detail, {
             amount: amount / 100,

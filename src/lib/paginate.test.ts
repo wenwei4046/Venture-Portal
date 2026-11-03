@@ -1,5 +1,72 @@
 import { describe, it, expect } from 'vitest'
-import { fetchAllRows, fetchAllRowsAsWritten, fetchAllRowsParallel, fetchByKeys } from './paginate'
+import { fetchAllRows, fetchAllRowsAsWritten, fetchAllRowsParallel, fetchByKeys, isGatewayHiccup } from './paginate'
+
+// Cloudflare's own page, as supabase-js handed it back on Comm Cal's month (2026-10-31, digest 1562874446).
+const BAD_GATEWAY = '<html>\n<head><title>502 Bad Gateway</title></head>\n<body>\n<center><h1>502 Bad Gateway</h1></center>\n<hr><center>cloudflare</center>\n</body>\n</html>\n'
+
+describe('a moment’s gateway error is asked again', () => {
+  it('knows a gateway’s 502 / 503 / 504 from the database’s own answers', () => {
+    expect(isGatewayHiccup({ error: { message: BAD_GATEWAY }, status: 502 })).toBe(true)
+    expect(isGatewayHiccup({ error: { message: BAD_GATEWAY } })).toBe(true)
+    expect(isGatewayHiccup({ error: { message: 'Service Unavailable' }, status: 503 })).toBe(true)
+    expect(isGatewayHiccup({ error: { message: '504 Gateway Time-out' } })).toBe(true)
+    // The database's own refusals, a query that ran too long, a URL too long: never again.
+    expect(isGatewayHiccup({ error: { message: 'permission denied for table sales_orders' }, status: 403 })).toBe(false)
+    expect(isGatewayHiccup({ error: { message: 'canceling statement due to statement timeout' }, status: 500 })).toBe(false)
+    expect(isGatewayHiccup({ error: { message: 'TypeError: fetch failed' } })).toBe(false)
+    expect(isGatewayHiccup({ error: null, status: 200 })).toBe(false)
+  })
+
+  it('fetchByKeys: Comm Cal’s month no longer falls over on one 502 — the chunk is asked again', async () => {
+    let calls = 0
+    const rows = await fetchByKeys(['a', 'b'], chunk => {
+      calls++
+      return Promise.resolve(calls === 1
+        ? { data: null, error: { message: BAD_GATEWAY }, status: 502 }
+        : { data: chunk.map(k => ({ k })), error: null, status: 200 })
+    })
+    expect(rows).toEqual([{ k: 'a' }, { k: 'b' }])
+    expect(calls).toBe(2)
+  })
+
+  it('gives up after two more tries, under the caller’s label', async () => {
+    let calls = 0
+    await expect(fetchByKeys(['a'], () => {
+      calls++
+      return Promise.resolve({ data: null, error: { message: 'Service Unavailable' }, status: 503 })
+    }, 'loadMonthOrders')).rejects.toThrow(/^loadMonthOrders: Service Unavailable$/)
+    expect(calls).toBe(3)
+  })
+
+  it('asks a refusal only once', async () => {
+    let calls = 0
+    await expect(fetchByKeys(['a'], () => {
+      calls++
+      return Promise.resolve({ data: null, error: { message: 'permission denied for table sales_orders' }, status: 403 })
+    })).rejects.toThrow(/permission denied/)
+    expect(calls).toBe(1)
+  })
+
+  it('every page of the paged reads is asked again the same way', async () => {
+    const all = Array.from({ length: 2500 }, (_, i) => ({ id: i }))
+    const flaky = () => {
+      const failed = new Set<number>()
+      return (from: number, to: number) => {
+        // Each page's first answer is the gateway's; the second is the page.
+        if (!failed.has(from)) {
+          failed.add(from)
+          return Promise.resolve({ data: null, error: { message: BAD_GATEWAY }, status: 502, count: null })
+        }
+        return Promise.resolve({ data: all.slice(from, Math.min(to + 1, from + 1000)), error: null, status: 200, count: all.length })
+      }
+    }
+    expect((await fetchAllRows(flaky())).length).toBe(2500)
+    const parallel = flaky()
+    expect((await fetchAllRowsParallel((from, to) => parallel(from, to))).length).toBe(2500)
+    const written = flaky()
+    expect((await fetchAllRowsAsWritten(page => (page ? written(page.from, page.to) : written(0, 999)))).length).toBe(2500)
+  })
+})
 
 // Simulate PostgREST: a page is at most 1000 rows; .range(from, to) returns the slice.
 function pagedSource(total: number) {

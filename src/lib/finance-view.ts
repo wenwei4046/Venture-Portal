@@ -90,7 +90,7 @@ export function firstName(name: string | null | undefined, fallback = ''): strin
 // edge swipe on a phone leaves. The second segment names the row unless it is
 // one of the list's own sub-pages (a form, an export, a report).
 const DETAIL_ROOTS: Record<string, readonly string[]> = {
-  '/payments': ['new', 'export', 'voucher-doc', 'payroll-requests'],
+  '/payments': ['new', 'export', 'voucher-doc', 'payroll-requests', 'requests'],
   '/receipts': ['new', 'export'],
   '/fund-in': ['new'],
   '/fund-out': ['new'],
@@ -127,7 +127,9 @@ export function isFinanceDetailRoute(pathname: string | null | undefined): boole
 const TITLES: Array<[prefix: string, title: string, exact?: boolean]> = [
   ['/dashboard', 'Overview'],
   ['/approvals', 'Approvals'],
-  ['/payments', 'Payments'],
+  // Payments' two rows (2026-10-29): Payment request, and Payment voucher — a voucher's page is the latter's.
+  ['/payments/requests', 'Payment request'],
+  ['/payments', 'Payment voucher'],
   ['/receipts', 'Receipt'],
   ['/statements', 'Invoice', true],
   ['/statements/monthly', 'Statements'],

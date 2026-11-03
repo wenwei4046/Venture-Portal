@@ -30,6 +30,7 @@ import { opensPath } from '@/lib/page-tabs'
 import { revenuePath } from '@/lib/revenue'
 import {
   canAccessAttendance,
+  canSendOwnClaims,
   canAccessDirectorPool,
   canAccessDirectorSalary,
   canAccessDocumentation,
@@ -55,8 +56,15 @@ export interface HrNavItem {
   /** Is this the page being read? The query is handed in for a link into a tab (`/settings?tab=accounts`). */
   match: (pathname: string, search?: URLSearchParams | null) => boolean
   visible: (viewer: NavViewer) => boolean
+  /** Its name for this viewer, where it is not always the same (Claim, or Claim & approve for its holder — 2026-10-29). */
+  labelFor?: (viewer: NavViewer) => string
   /** The permission tabs any one of which shows the link, where its page's own list is not the answer — Settings' tabs share one page. */
   permissionTabs?: readonly string[]
+  /**
+   * A row under a heading of its own (2026-10-29 — Finance's Payments › Payment voucher and Payment request): the rows
+   * of one group stand together, the heading drawn once above the first; a heading is no page.
+   */
+  group?: { key: string; label: string; icon: HrIconName }
 }
 
 export interface HrNavSection {
@@ -221,6 +229,9 @@ export function hrNavSections(revenueSub: string | null | HrRevenueSubs): HrNavS
       label: 'Admin',
       tone: 'walnut',
       items: [
+        // One's own claims and direct payments to Finance (2026-10-29, the claim process: Claim above the rooms in every view).
+        // Claim & approve for whoever holds it in this view (PR ③): the same page, their department's requests beside their own.
+        { key: 'claim', label: 'Claim', labelFor: v => (v.tabs?.includes('hr.claims_approve.view') ? 'Claim & approve' : 'Claim'), icon: 'receipt', href: '/claims', match: p => under(p, '/claims'), visible: canSendOwnClaims },
         // Every view books a room (2026-10-11); its two tabs are rows here.
         { key: 'roomSched', label: 'Room schedule', icon: 'room', href: '/admin/rooms', match: roomOn('schedule'), visible: canAccessMeetingRooms },
         { key: 'roomRooms', label: 'Rooms', icon: 'room', href: '/admin/rooms?tab=rooms', match: roomOn('rooms'), visible: canAccessMeetingRooms },
@@ -249,7 +260,9 @@ export function visibleHrNav(sections: HrNavSection[], viewer: NavViewer): Array
   const out: Array<HrNavSection & { roman: string | null }> = []
   for (const section of sections) {
     // A link also asks its page's tabs (2026-10-11, 8b): it shows only where its page would open.
-    const items = section.items.filter(item => item.visible(viewer) && opensPath(viewer.tabs, item.href, item.permissionTabs))
+    const items = section.items
+      .filter(item => item.visible(viewer) && opensPath(viewer.tabs, item.href, item.permissionTabs))
+      .map(item => (item.labelFor ? { ...item, label: item.labelFor(viewer) } : item))
     if (items.length === 0) continue
     out.push({ ...section, items, roman: section.label ? ROMAN[n++] : null })
   }

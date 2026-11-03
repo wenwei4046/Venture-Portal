@@ -26,14 +26,14 @@ import {
   voidCreditNote,
   voidIssuedInvoices,
   type BillableToKind,
-  type ConsolidatedCompanyPreview,
+  type PayrollInvoicesPreview,
   type CreateInvoiceMode,
   type DirectorCtcRow,
   type InvoiceLineInput,
   type OwnShareInvoicePreview,
   type StaffAllocationCompanyRow,
 } from '../billing/actions'
-import type { CompanyBillingDelta } from '@/lib/payroll-billing-delta'
+import type { PayrollBillingDeltas } from '@/lib/payroll-billing-delta'
 import type { Address } from '@/lib/address/address'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
@@ -188,7 +188,7 @@ const partyOf = (p: HubInvoiceParty) => ({
   freetextEmail: p.billKind === 'freetext' ? p.email?.trim() : undefined,
 })
 
-/** Create invoice: one draft — a party, a billing mode, a category, an amount. Its number back. */
+/** One draft without lines — a party, a billing mode, a category, an amount (Single invoice's, until 2026-10-30, when the one Create invoice window began writing every invoice with lines). Its number back. */
 export async function hubCreateInvoice(payload: HubInvoiceParty & HubInvoiceHead & { category: string; amount: number }): Promise<HubResult<string>> {
   await requireActionOn('/invoices/[id]', 'billing', 'create')
   return attempt(async () => {
@@ -215,7 +215,7 @@ export async function hubCreateInvoice(payload: HubInvoiceParty & HubInvoiceHead
   })
 }
 
-/** A draft with lines: Multi-line invoice, or a director's CTC itemised the way HR keyed it. Its number back. */
+/** A draft with lines: Create invoice's, one line or several — and each of its several companies', HR's figure itemised the way HR keyed it. Its number back. */
 export async function hubCreateLinesInvoice(payload: HubInvoiceParty & HubInvoiceHead & { lines: InvoiceLineInput[] }): Promise<HubResult<string | null>> {
   await requireActionOn('/statements', 'billing', 'create')
   return attempt(async () => {
@@ -344,25 +344,27 @@ export async function hubImportMarketing(month: string): Promise<HubResult<{ mad
   })
 }
 
-/** What the payroll invoices would bill: a company each, its departments, their parts (HR's allocation). */
-export async function hubPayrollPreview(month: string): Promise<HubResult<ConsolidatedCompanyPreview[]>> {
+/** What the payroll invoices would bill: a company each, its departments, their parts (HR's allocation) — and the
+ *  internal invoices for payroll moved between departments, and what stays in a receiver. */
+export async function hubPayrollPreview(month: string): Promise<HubResult<PayrollInvoicesPreview>> {
   await requirePermission('billing')
   return attempt(() => fetchConsolidatedPayrollPreview(`${month}-01`))
 }
 
-/** One consolidated payroll invoice a company, drafts, on one category. */
-export async function hubGeneratePayrollInvoices(month: string, category: string): Promise<HubResult<{ generated: number; companies: string[] }>> {
+/** One consolidated payroll invoice a company, drafts, on one category — and one internal invoice a department that
+ *  payroll was moved into (2026-11-03). */
+export async function hubGeneratePayrollInvoices(month: string, category: string): Promise<HubResult<{ generated: number; companies: string[]; receivers: string[] }>> {
   await requireActionOn('/invoices/[id]', 'billing', 'create')
   return attempt(() => generateConsolidatedPayrollInvoices(`${month}-01`, category.trim() || null))
 }
 
-/** Payroll now against the month's issued payroll invoices, a company each. */
-export async function hubPayrollDelta(month: string): Promise<HubResult<CompanyBillingDelta[]>> {
+/** Payroll now against the month's issued payroll invoices, a company each — and a receiving department each against its internal invoices. */
+export async function hubPayrollDelta(month: string): Promise<HubResult<PayrollBillingDeltas>> {
   await requirePermission('billing')
   return attempt(() => fetchPayrollBillingDelta(`${month}-01`))
 }
 
-/** The gaps under-billed, one adjustment draft a company. */
+/** The gaps under-billed, one adjustment draft a company or receiving department. */
 export async function hubTopUpPayroll(month: string): Promise<HubResult<{ generated: string[]; overBilled: string[]; missingInvoice: string[] }>> {
   await requireActionOn('/invoices/[id]', 'billing', 'create')
   return attempt(() => generatePayrollAdjustmentInvoices(`${month}-01`))

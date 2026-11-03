@@ -89,7 +89,7 @@ export const MAINTENANCE_SECTIONS: Array<{ section: 'Bedframe' | 'Sofa'; pools: 
     pools: [
       { pool: 'sofa_sizes', label: 'Sizes', priced: false, charge: false, note: 'ERP choices only. This pool has no surcharge; model availability is set on Modular.' },
       { pool: 'sofa_leg_heights', label: 'Leg Heights', priced: true, charge: true, note: `What the customer pays (RM) for this leg height on the Quote, once per sofa. ${CHARGE_TAIL} Blank or 0 is FOC.` },
-      { pool: 'sofa_specials', label: 'Specials', priced: true, charge: true, note: `What the customer pays (RM) for this special on the Quote, once per sofa. ${CHARGE_TAIL} Blank or 0 is not offered.` },
+      { pool: 'sofa_specials', label: 'Specials', priced: true, charge: true, note: `What the customer pays (RM) for this special on the Quote — Full set: once per sofa; By quantity: each, times the quantity the member sets. ${CHARGE_TAIL} On a bill, the special order the ERP writes is what comes out of the margin. Blank or 0 is not offered.` },
     ],
   },
 ]

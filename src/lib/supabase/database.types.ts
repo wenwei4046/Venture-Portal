@@ -1290,6 +1290,7 @@ export type Database = {
           name: string
           note: string | null
           scheme_id: string
+          sub_brands: string[]
         }
         Insert: {
           code: string
@@ -1300,6 +1301,7 @@ export type Database = {
           name: string
           note?: string | null
           scheme_id: string
+          sub_brands?: string[]
         }
         Update: {
           code?: string
@@ -1310,6 +1312,7 @@ export type Database = {
           name?: string
           note?: string | null
           scheme_id?: string
+          sub_brands?: string[]
         }
         Relationships: [
           {
@@ -1573,44 +1576,6 @@ export type Database = {
           },
           {
             foreignKeyName: "comm_margin_bands_scheme_id_fkey"
-            columns: ["scheme_id"]
-            isOneToOne: false
-            referencedRelation: "comm_schemes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      comm_open_bill_rules: {
-        Row: {
-          bill_rank: number
-          created_at: string
-          effective_from: string
-          effective_to: string | null
-          id: string
-          pct: number
-          scheme_id: string
-        }
-        Insert: {
-          bill_rank: number
-          created_at?: string
-          effective_from: string
-          effective_to?: string | null
-          id?: string
-          pct: number
-          scheme_id: string
-        }
-        Update: {
-          bill_rank?: number
-          created_at?: string
-          effective_from?: string
-          effective_to?: string | null
-          id?: string
-          pct?: number
-          scheme_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comm_open_bill_rules_scheme_id_fkey"
             columns: ["scheme_id"]
             isOneToOne: false
             referencedRelation: "comm_schemes"
@@ -1953,12 +1918,10 @@ export type Database = {
           enable_kpi: boolean
           enable_margin_incentive: boolean
           enable_margin_penalty: boolean
-          enable_open_bill: boolean
           enable_override: boolean
           enable_product_revenue: boolean
           id: string
           is_active: boolean
-          open_bill_basis: Database["public"]["Enums"]["comm_open_bill_basis"]
           override_includes_kpi: boolean
           scheme_name: string
           sub_department_id: string
@@ -1975,12 +1938,10 @@ export type Database = {
           enable_kpi?: boolean
           enable_margin_incentive?: boolean
           enable_margin_penalty?: boolean
-          enable_open_bill?: boolean
           enable_override?: boolean
           enable_product_revenue?: boolean
           id?: string
           is_active?: boolean
-          open_bill_basis?: Database["public"]["Enums"]["comm_open_bill_basis"]
           override_includes_kpi?: boolean
           scheme_name: string
           sub_department_id: string
@@ -1997,12 +1958,10 @@ export type Database = {
           enable_kpi?: boolean
           enable_margin_incentive?: boolean
           enable_margin_penalty?: boolean
-          enable_open_bill?: boolean
           enable_override?: boolean
           enable_product_revenue?: boolean
           id?: string
           is_active?: boolean
-          open_bill_basis?: Database["public"]["Enums"]["comm_open_bill_basis"]
           override_includes_kpi?: boolean
           scheme_name?: string
           sub_department_id?: string
@@ -2162,7 +2121,6 @@ export type Database = {
           margin_pct: number | null
           margin_penalty_withheld: number
           margin_revenue: number
-          open_bill_bonus: number
           override_commission: number
           penalty_weighted_revenue: number
           product_commission: number
@@ -2195,7 +2153,6 @@ export type Database = {
           margin_pct?: number | null
           margin_penalty_withheld?: number
           margin_revenue?: number
-          open_bill_bonus?: number
           override_commission?: number
           penalty_weighted_revenue?: number
           product_commission?: number
@@ -2228,7 +2185,6 @@ export type Database = {
           margin_pct?: number | null
           margin_penalty_withheld?: number
           margin_revenue?: number
-          open_bill_bonus?: number
           override_commission?: number
           penalty_weighted_revenue?: number
           product_commission?: number
@@ -3884,6 +3840,8 @@ export type Database = {
           lock_in_months: number | null
           maturity_date: string | null
           min_pay_interest: boolean
+          min_pay_interest_from: string | null
+          principal_per_month: number | null
           notes: string | null
           penalty_on_early: number | null
           repaid_at: string | null
@@ -3915,6 +3873,8 @@ export type Database = {
           lock_in_months?: number | null
           maturity_date?: string | null
           min_pay_interest?: boolean
+          min_pay_interest_from?: string | null
+          principal_per_month?: number | null
           notes?: string | null
           penalty_on_early?: number | null
           repaid_at?: string | null
@@ -3946,6 +3906,8 @@ export type Database = {
           lock_in_months?: number | null
           maturity_date?: string | null
           min_pay_interest?: boolean
+          min_pay_interest_from?: string | null
+          principal_per_month?: number | null
           notes?: string | null
           penalty_on_early?: number | null
           repaid_at?: string | null
@@ -4625,6 +4587,61 @@ export type Database = {
           },
         ]
       }
+      hr_staff_dept_moves: {
+        Row: {
+          amount: number | null
+          created_at: string
+          created_by: string
+          department_id: string
+          id: string
+          pct: number | null
+          period_month: string
+          staff_id: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          created_by: string
+          department_id: string
+          id?: string
+          pct?: number | null
+          period_month: string
+          staff_id: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string
+          department_id?: string
+          id?: string
+          pct?: number | null
+          period_month?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_staff_dept_moves_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_staff_dept_moves_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_staff_dept_moves_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "hr_staff_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_staff_salary_history: {
         Row: {
           changed_at: string
@@ -5114,6 +5131,8 @@ export type Database = {
           effective_rate: number
           id: string
           min_pay_interest: boolean
+          min_pay_interest_from: string | null
+          principal_per_month: number | null
           principal: number
           repayment_start_month: string | null
           repayment_start_date: string | null
@@ -5137,6 +5156,8 @@ export type Database = {
           effective_rate: number
           id?: string
           min_pay_interest?: boolean
+          min_pay_interest_from?: string | null
+          principal_per_month?: number | null
           principal: number
           repayment_start_month?: string | null
           repayment_start_date?: string | null
@@ -5160,6 +5181,8 @@ export type Database = {
           effective_rate?: number
           id?: string
           min_pay_interest?: boolean
+          min_pay_interest_from?: string | null
+          principal_per_month?: number | null
           principal?: number
           repayment_start_month?: string | null
           repayment_start_date?: string | null
@@ -6696,61 +6719,6 @@ export type Database = {
           },
         ]
       }
-      sales_order_open_bill_tags: {
-        Row: {
-          auto_suggested: boolean
-          bill_rank: number
-          event_date: string
-          id: string
-          order_id: string
-          staff_id: string
-          tagged_at: string
-          tagged_by: string | null
-        }
-        Insert: {
-          auto_suggested?: boolean
-          bill_rank: number
-          event_date: string
-          id?: string
-          order_id: string
-          staff_id: string
-          tagged_at?: string
-          tagged_by?: string | null
-        }
-        Update: {
-          auto_suggested?: boolean
-          bill_rank?: number
-          event_date?: string
-          id?: string
-          order_id?: string
-          staff_id?: string
-          tagged_at?: string
-          tagged_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sales_order_open_bill_tags_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "sales_orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_order_open_bill_tags_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: false
-            referencedRelation: "hr_staff_costs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_order_open_bill_tags_tagged_by_fkey"
-            columns: ["tagged_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       sales_orders: {
         Row: {
           agent_key: string
@@ -7782,10 +7750,6 @@ export type Database = {
           out_staff_cost: number
         }[]
       }
-      cancel_dept_payment_request: {
-        Args: { p_reason?: string; p_request_id: string }
-        Returns: undefined
-      }
       cancel_loan_and_approval:
         | { Args: { p_loan_id: string }; Returns: undefined }
         | {
@@ -7939,6 +7903,19 @@ export type Database = {
         Returns: string
       }
       execute_loan_cancel: { Args: { p_loan_id: string }; Returns: string }
+      finance_member_claim_invoice: {
+        Args: { p_claim: string }
+        Returns: {
+          file_name: string
+          mime_type: string
+          object_path: string
+          size_bytes: number
+        }[]
+      }
+      finance_return_member_claim: {
+        Args: { p_claim: string; p_reason: string }
+        Returns: undefined
+      }
       format_invoice_no: { Args: { p_period: string }; Returns: string }
       generate_invoices_from_request: {
         Args: { p_request_id: string }
@@ -7947,14 +7924,6 @@ export type Database = {
       generate_monthly_invoices: {
         Args: { p_modes?: string[]; p_period_month: string }
         Returns: Json
-      }
-      generate_pv_for_dept_request: {
-        Args: {
-          p_pay_from_account_id: string
-          p_payment_method: string
-          p_request_id: string
-        }
-        Returns: string
       }
       get_current_base_rate: {
         Args: { p_as_of_date?: string }
@@ -8070,6 +8039,17 @@ export type Database = {
         Args: { p_request_id: string }
         Returns: number
       }
+      get_payroll_moves_summary: {
+        Args: { p_period_month: string }
+        Returns: {
+          billed: number
+          cost_model: string
+          department_id: string
+          department_name: string
+          moved_in: number
+          stays: number
+        }[]
+      }
       get_staff_billing_allocation: {
         Args: { p_period_month: string }
         Returns: {
@@ -8085,6 +8065,22 @@ export type Database = {
           salary_amount: number
           socso_amount: number
           staff_count: number
+        }[]
+      }
+      get_staff_dept_moves_allocation: {
+        Args: { p_period_month: string }
+        Returns: {
+          allowance_amount: number
+          amount: number
+          eis_amount: number
+          epf_amount: number
+          from_department_id: string
+          from_department_name: string
+          salary_amount: number
+          socso_amount: number
+          staff_count: number
+          to_department_id: string
+          to_department_name: string
         }[]
       }
       get_staff_own_share_allocation: {
@@ -8322,7 +8318,7 @@ export type Database = {
       }
       save_director_salary_results: { Args: { p_data: Json }; Returns: Json }
       set_fund_source_min_pay_interest: {
-        Args: { p_fund_source_id: string; p_value: boolean }
+        Args: { p_from?: string; p_fund_source_id: string; p_value: boolean }
         Returns: undefined
       }
       set_fund_source_notes: {
@@ -8338,7 +8334,7 @@ export type Database = {
         Returns: undefined
       }
       set_loan_min_pay_interest: {
-        Args: { p_loan_id: string; p_value: boolean }
+        Args: { p_from?: string; p_loan_id: string; p_value: boolean }
         Returns: undefined
       }
       set_loan_repayment_start: {
@@ -8425,6 +8421,23 @@ export type Database = {
         Args: { p_period: string }
         Returns: Json
       }
+      payroll_moved_parts: {
+        Args: { p_period_month: string }
+        Returns: {
+          allowance_amount: number
+          amount: number
+          eis_amount: number
+          epf_amount: number
+          from_department_id: string
+          from_department_name: string
+          salary_amount: number
+          socso_amount: number
+          staff_id: string
+          to_cost_model: string
+          to_department_id: string
+          to_department_name: string
+        }[]
+      }
       payroll_open_topup: {
         Args: { p_kind?: string; p_row_id: string; p_scope: string }
         Returns: undefined
@@ -8480,6 +8493,7 @@ export type Database = {
           p_interest_on_original?: boolean
           p_interest_keeps_base?: boolean
           p_no_fixed_term?: boolean
+          p_principal_per_month?: number | null
           p_reason: string | null
           p_remaining_months: number | null
         }
@@ -8494,6 +8508,7 @@ export type Database = {
           p_interest_on_original?: boolean
           p_interest_keeps_base?: boolean
           p_no_fixed_term?: boolean
+          p_principal_per_month?: number | null
           p_reason: string | null
           p_remaining_months: number | null
         }
@@ -8511,6 +8526,39 @@ export type Database = {
       voucher_party_refs: { Args: never; Returns: Json }
       withdraw_pending_fund_source: {
         Args: { p_fund_source_id: string }
+        Returns: undefined
+      }
+      payment_request_context: { Args: never; Returns: Json }
+      my_payment_requests: { Args: never; Returns: Json }
+      payment_request_save: {
+        Args: { p_request: string | null; p_data: Json; p_submit: boolean }
+        Returns: Json
+      }
+      payment_request_cancel: { Args: { p_request: string }; Returns: Json }
+      payment_request_file: { Args: { p_file: string }; Returns: Json }
+      payment_requests_for_finance: { Args: never; Returns: Json }
+      payment_request_reject: {
+        Args: { p_request: string; p_reason: string }
+        Returns: undefined
+      }
+      payment_requests_for_pv: { Args: { p_ids: string[] }; Returns: Json }
+      payment_requests_attach_pv: {
+        Args: { p_ids: string[]; p_pv: string; p_bill: Json }
+        Returns: Json
+      }
+      payment_requests_for_approval: { Args: never; Returns: Json }
+      payment_requests_waiting_count: { Args: never; Returns: number }
+      payment_request_approve: { Args: { p_ids: string[] }; Returns: number }
+      payment_request_send_back: {
+        Args: { p_ids: string[]; p_reason: string }
+        Returns: number
+      }
+      permission_template_flags_set: {
+        Args: { p_template: string; p_version: number; p_flags: string[] }
+        Returns: number
+      }
+      permission_user_flags_set: {
+        Args: { p_user: string; p_flags: Json }
         Returns: undefined
       }
     }
@@ -8574,7 +8622,6 @@ export type Database = {
         | "override"
         | "margin_incentive"
       comm_margin_band_kind: "incentive" | "reference" | "penalty"
-      comm_open_bill_basis: "uplift_on_commission" | "pct_of_revenue"
       comm_promotion_criterion:
         | "personal_sales"
         | "group_sales"
@@ -8883,7 +8930,6 @@ export const Constants = {
         "margin_incentive",
       ],
       comm_margin_band_kind: ["incentive", "reference", "penalty"],
-      comm_open_bill_basis: ["uplift_on_commission", "pct_of_revenue"],
       comm_promotion_criterion: [
         "personal_sales",
         "group_sales",

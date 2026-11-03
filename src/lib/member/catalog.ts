@@ -147,7 +147,9 @@ export function isCompatibleGift(
 export function bedframeKey(build: BedframeBuild | undefined): string {
   const one = (v: string | undefined) => (v ?? "").trim();
   const specials = [...new Set((build?.specials ?? []).map((s) => s.trim()).filter(Boolean))].sort();
-  return JSON.stringify([one(build?.divan), one(build?.leg), one(build?.gap), one(build?.total), specials]);
+  // Its fabric upgrade last, and only when it has one: a build with none keys as it always has.
+  const upgrade = one(build?.fabricUpgrade);
+  return JSON.stringify([one(build?.divan), one(build?.leg), one(build?.gap), one(build?.total), specials, ...(upgrade ? [upgrade] : [])]);
 }
 
 /**

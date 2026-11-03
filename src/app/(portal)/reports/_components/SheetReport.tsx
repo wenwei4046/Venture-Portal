@@ -44,6 +44,8 @@ export interface MonthlyDrill {
   report: MonthlyDrillAsk['report']
   /** '' = every segment. */
   segment: string
+  /** False leaves out the General Ledger's link under the lines — for a viewer its page would not open for. */
+  ledger?: boolean
 }
 
 type Line =
@@ -488,7 +490,7 @@ export default function SheetReport({
               }
               // On a department's page money out reads positive; its lines with it.
               const sign = inline && r.side === 'out' ? -1 : 1
-              const href = firstMonth && lastMonth ? ledgerHref(r.code, `${firstMonth}-01`, monthEnd(lastMonth)) : null
+              const href = monthly?.ledger !== false && firstMonth && lastMonth ? ledgerHref(r.code, `${firstMonth}-01`, monthEnd(lastMonth)) : null
               return (
                 <Fragment key={`${r.key}:lines`}>
                   {/* Newest first, as the months run. */}

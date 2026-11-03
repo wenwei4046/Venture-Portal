@@ -213,7 +213,7 @@ export default function MemberInsightPanel({
               : order.margin === null
               ? "No unit cost and no keyed-in margin, so this order counts toward sales but has no margin result."
               : band.multiplier < 1
-                ? `Product commission, Open Bill and the upline's override on this bill are multiplied by ${band.multiplier}. Fixed KPI allowances are not affected.`
+                ? `Product commission and the upline's override on this bill are multiplied by ${band.multiplier}. Fixed KPI allowances are not affected.`
                 : "This band reflects this order's own margin. Monthly incentives need every brand to qualify."}
             {order.carried &&
               " Written last month and carried into this one because its deposit cleared here."}

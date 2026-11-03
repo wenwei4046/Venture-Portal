@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition, type ReactNode } from 'react'
 import { formatMoney } from '@/lib/utils'
-import type { CarriedMonth, DoubleClaimBill, DoubleClaimGroup } from '@/lib/commission/double-claims'
+import { groupPapers, type CarriedMonth, type DoubleClaimBill, type DoubleClaimGroup } from '@/lib/commission/double-claims'
 import type { ClaimExplanation, ClaimVerdict, Sameness } from '@/lib/commission/double-claim-reasons'
 import { dismissDoubleClaim, restoreDoubleClaim } from '../../../double-claim-actions'
 import PaperRefCell from './PaperRefCell'
@@ -131,7 +131,7 @@ export default function DoubleClaimPanel({
       <button type="button" className={s.button} disabled={pending}
         title="Say so once; a new bill under this number asks again"
         onClick={() => {
-          if (window.confirm(`${g.billRef}: these ${g.bills.length} bills are separate sales, not one bill claimed twice?`)) {
+          if (window.confirm(`${groupPapers(g)}: these ${g.bills.length} bills are separate sales, not one bill claimed twice?`)) {
             answer(() => dismissDoubleClaim(subDepartmentId, g.billRef))
           }
         }}>
@@ -144,10 +144,10 @@ export default function DoubleClaimPanel({
   function plain(g: DoubleClaimGroup) {
     const across = g.months.length > 1
     return (
-      <article key={g.billRef} className={d.card} aria-label={`${g.billRef} on ${g.bills.length} bills`}>
+      <article key={g.billRef} className={d.card} aria-label={`${groupPapers(g)} on ${g.bills.length} bills`}>
         <div className={d.head}>
           <div className={d.headTop}>
-            <span className={d.ref}>{g.billRef}</span>
+            <span className={d.ref}>{groupPapers(g)}</span>
             <span className={d.meta}>
               {across ? `on ${g.bills.length} bills in ${list(g.months.map(m => monthName(m)))}` : `on ${g.bills.length} bills in ${monthName(g.months[0])}`}
             </span>
@@ -185,7 +185,7 @@ export default function DoubleClaimPanel({
         aria-labelledby={`claim-${g.billRef}`}>
         <div className={d.head}>
           <div className={d.headTop}>
-            <span className={d.ref}>{g.billRef}</span>
+            <span className={d.ref}>{groupPapers(g)}</span>
             <span className={`chip ${CHIP[x.verdict]}`}><span className="dot" />{x.label}</span>
             <span className={d.meta}>
               {g.bills.length} bills · {list(g.months.map(m => monthName(m)))} · {list(people)}

@@ -60,6 +60,7 @@ export { isNewChat } from "../../shared/new-chat";
 import { mediaWord } from "../../shared/chat-media";
 import { isNewChat } from "../../shared/new-chat";
 import { STATUS, avatarTint } from "../../shared/palette";
+import { saidInChat } from "../../shared/chat-search";
 
 /** The chats the panel shows: everyone's, and those waiting in a team. Organic Leads are Assignment's. */
 const listed = (ctx: PanelCtx) => ctx.data.customers.filter(c => c.assignedTo || c.teamId);
@@ -99,7 +100,7 @@ export type InboxVM = ReturnType<typeof inboxVM>;
 /** Contacts (from the Inbox): everyone's customers A–Z under letter heads; a row opens the chat in its owner's CRM. */
 export function contactsVM(ctx: PanelCtx) {
   const { ui, set } = ctx, q = ui.pcQ.trim().toLowerCase();
-  const rows = listed(ctx).map(c => chatRow(ctx, c)).filter(r => !q || r.name.toLowerCase().includes(q) || r.who.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
+  const rows = listed(ctx).map(c => chatRow(ctx, c)).filter(r => !q || r.name.toLowerCase().includes(q) || r.who.toLowerCase().includes(q) || !!saidInChat(r.c, q)).sort((a, b) => a.name.localeCompare(b.name));
   return {
     pcOpen: ui.pcOpen, pcQ: ui.pcQ, pcEmpty: !rows.length,
     closePc: () => set(u => ({ ...u, pcOpen: false, pcQ: "" })), setPcQ: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; set(u => ({ ...u, pcQ: v })); },

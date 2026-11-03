@@ -1371,7 +1371,6 @@ export default function MemberWorkspace({
           ["Personal sales commission", income?.personal],
           ["Team override", income?.override],
           ["KPI allowance", income?.kpi],
-          ["Open Bill bonus", income?.openBill],
           ["Margin incentive", income?.incentive],
         ]
       : [
@@ -1594,7 +1593,7 @@ export default function MemberWorkspace({
                               {hasNoGoodsMargin(o) ? "This order has no positive goods revenue as a margin basis. Its sales and KPI quantities remain in their totals; no goods margin applies." : o.margin === null
                                 ? "Cost data is incomplete. Margin cannot be assessed yet."
                                 : b.multiplier < 1
-                                  ? `Product commission, Open Bill and upline override for this order use ×${b.multiplier}. Fixed KPI allowances are unaffected.`
+                                  ? `Product commission and upline override for this order use ×${b.multiplier}. Fixed KPI allowances are unaffected.`
                                   : "This label reflects order margin. All brands must qualify for the monthly incentive."}
                             </p>
                           </div>

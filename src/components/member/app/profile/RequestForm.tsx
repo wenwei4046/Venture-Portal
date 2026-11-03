@@ -8,8 +8,8 @@ import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
 import StayCalendar from "./StayCalendar";
 import Reveal from "./Reveal";
 import {
-  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
-  foodMonthOver, isOutstation, monthOfWeek, nightsBetween, stayProblem, stayWindow,
+  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairDaysIn, fairRegion, foodAmount, foodClaimMonths, foodDayState,
+  foodMonthOpensOn, foodMonthOver, inFoodMonth, monthOfDay, nightsBetween, regionClaimProblem, stayProblem, stayWindow, transportPartProblem,
 } from "@/lib/member/claim-rules";
 import { applicationFormHtml, BUILTIN_FIELDS, FORM_KINDS, REPLACEMENT_BUILTIN_FIELDS, type WaitingField } from "@/lib/commission/waiting-form";
 import { answersFor, blankRequired, capacityLine, fillIn, priorAnswers } from "@/lib/member/waiting-answers";
@@ -85,7 +85,11 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   /** This kind's Download form: the waiting list's, or the replacement's. */
   formLink?: FormLink;
 }) {
-  const [title, sub, cta, doneText] = TEXT[kind];
+  // What of a transport claim their title may send (2026-10-31): by road and an Airbnb stay, a plane ticket.
+  const parts = options.transport ?? { road: true, plane: true };
+  const planeOnly = parts.plane && !parts.road;
+  const [title, textSub, cta, doneText] = TEXT[kind];
+  const sub = kind === "claim" && planeOnly ? "An air ticket to a fair you fly to" : textSub;
   const prior = revising?.detail ?? {};
   const str = (key: string) => (typeof prior[key] === "string" ? (prior[key] as string) : "");
   const idem = useRef<string>("");
@@ -93,9 +97,13 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
 
   // ── claim ──
   const [cat, setCat] = useState<"outstation" | "airbnb">(str("claimType") === "airbnb" ? "airbnb" : "outstation");
-  // The newest weekend with a brand week until the member picks another (the list may arrive after the form opens).
+  // The newest weekend with a brand week until the member picks another (the list may arrive after the form opens) —
+  // for a title that may claim a plane ticket alone, the newest at a fair flown to.
   const [weekPick, setWeek] = useState(() => str("week"));
-  const week = weekPick || options.weeks.find(w => w.claimable)?.key || "";
+  const claimableWeeks = options.weeks.filter(w => w.claimable);
+  const week = weekPick
+    || (planeOnly ? claimableWeeks.find(w => fairRegion(options.rates, w.fairId).region?.planeTicket)?.key : undefined)
+    || claimableWeeks[0]?.key || "";
   const [ticket, setTicket] = useState(() => (prior.planeTicket === true && typeof prior.amount === "number" ? String(prior.amount) : ""));
   const [stay, setStay] = useState(() => (typeof prior.invoiceAmount === "number" ? String(prior.invoiceAmount) : ""));
   const [male, setMale] = useState(() => Number(prior.male ?? options.initial?.male ?? 0));
@@ -106,27 +114,32 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   const fileRef = useRef<HTMLInputElement>(null);
   const [notes, setNotes] = useState(str("notes"));
   // ── food (2026-10-13): a MONTH at a time (the user: "submit by total month … dont by week submit") — every brand
-  // week of it, each opened to its fair's days, every day they may claim ticked to start; sent once the month is over ──
+  // week of it, each opened to its fair's days, every day they may claim ticked to start; sent once the month is over.
+  // A day is claimed in its own month (2026-11-01): a weekend across two months is on both, the other month's days
+  // faded (*Nov claim*) ──
   const today = options.today ?? klToday();
   const perDay = options.rates.food?.perDay ?? null;
   // A month, and a day, another food claim of theirs holds is not offered again — this one's own, sent back by HR, still is.
   const takenDays = useMemo(() => claimedFoodDays(options.foodClaims ?? [], revising?.id), [options.foodClaims, revising?.id]);
   const takenMonths = useMemo(() => claimedFoodMonths(options.foodClaims ?? [], revising?.id), [options.foodClaims, revising?.id]);
-  const openDaysOf = (w: ClaimWeek) => fairDays(w, w.key).filter(d => foodDayState(d, today, takenDays) === "open");
-  // The months with a weekend they worked, newest first; the form opens on the newest that is over and not claimed.
-  const foodMonths = useMemo(() => [...new Set(options.weeks.filter(w => w.worked).map(w => monthOfWeek(w.key)))].sort().reverse(), [options.weeks]);
+  const foodWeekList = options.foodWeeks ?? options.weeks;
+  // Last month's and this month's, each with a day of a weekend they worked, newest first; the form opens on the newest
+  // that is over and not claimed.
+  const foodMonths = useMemo(() => foodClaimMonths(foodWeekList, today), [foodWeekList, today]);
   const [foodMonthPick, setFoodMonth] = useState(() => str("month"));
   const foodMonth = foodMonthPick || foodMonths.find(m => foodMonthOver(m, today) && !takenMonths.has(m))
     || foodMonths.find(m => foodMonthOver(m, today)) || foodMonths[0] || "";
-  const monthWeeks = options.weeks.filter(w => monthOfWeek(w.key) === foodMonth).sort((a, b) => a.key.localeCompare(b.key));
-  // The days ticked, a weekend at a time; a weekend not in it = every day of it still open, until the member taps one
-  // (a returned claim's weekends start as it was sent — one it left out, with none).
+  const monthWeeks = foodWeekList.filter(w => inFoodMonth(w, foodMonth)).sort((a, b) => a.key.localeCompare(b.key));
+  // The days ticked, a month's weekend at a time; one not in it = every day of it in the month still open, until the
+  // member taps one (a returned claim's weekends start as it was sent — one it left out, with none).
   const [dayPick, setDayPick] = useState<Record<string, string[]>>(() => priorFoodDays(prior));
   const revisingMonth = str("claimType") === "food" ? str("month") : "";
   const [openWeeks, setOpenWeeks] = useState<ReadonlySet<string>>(() => new Set());
+  const pickKey = (w: ClaimWeek) => `${foodMonth}|${w.key}`;
+  const openDaysOf = (w: ClaimWeek) => fairDaysIn(w, w.key, foodMonth).filter(d => foodDayState(d, today, takenDays) === "open");
   const daysOf = (w: ClaimWeek) => (!w.worked ? []
-    : (dayPick[w.key] ?? (monthOfWeek(w.key) === revisingMonth ? [] : openDaysOf(w)))
-      .filter(d => fairDays(w, w.key).includes(d) && foodDayState(d, today, takenDays) === "open").sort());
+    : (dayPick[pickKey(w)] ?? (foodMonth === revisingMonth ? [] : openDaysOf(w)))
+      .filter(d => fairDaysIn(w, w.key, foodMonth).includes(d) && foodDayState(d, today, takenDays) === "open").sort());
   const foodWeeks = monthWeeks.map(w => ({ week: w, days: daysOf(w) }));
   const foodDays = foodWeeks.flatMap(x => x.days).sort();
   const foodTotal = foodAmount(perDay, foodDays.length);
@@ -146,7 +159,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   });
   const toggleDay = (w: ClaimWeek, day: string) => {
     const now = daysOf(w);
-    setDayPick(prev => ({ ...prev, [w.key]: now.includes(day) ? now.filter(d => d !== day) : [...now, day].sort() }));
+    setDayPick(prev => ({ ...prev, [pickKey(w)]: now.includes(day) ? now.filter(d => d !== day) : [...now, day].sort() }));
     setError(null);
   };
   // ── replacement ──
@@ -195,6 +208,11 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   const fair = fairRegion(options.rates, weekRow?.fairId ?? null);
   const regionRow = fair.region;
   const venue = fair.venue ?? weekRow?.venue ?? "this fair";
+  // A part of the claim their title is not ticked for (2026-10-31): the plane ticket is the air ticket's tick, by
+  // road and an Airbnb stay the transport claim's — said in place of the part's fields, and refused on send.
+  const partProblem = transportPartProblem(parts, cat, regionRow, options.title);
+  // A fair local to the base, or in a region HR set as no claim (2026-11-01): nothing of this kind to claim there.
+  const regionProblem = regionRow ? regionClaimProblem(regionRow, venue, options.rates.base, cat) : null;
   const ticketValue = money(ticket);
   const stayValue = money(stay);
   const nights = nightsBetween(checkIn, checkOut);
@@ -217,6 +235,9 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   /** Another brand week: a stay picked for the last one stays only if it falls in this one's days. */
   const pickWeek = (w: ClaimWeek) => {
     setWeek(w.key);
+    // A refusal was about the claim as it stood: another fair is another claim (2026-10-31 — the way out of a part their
+    // title is not ticked for is another fair or the other category).
+    setError(null);
     const next = stayWindow(w, w.key);
     const fits = (day: string) => !day || (day >= next.first && day <= next.last);
     if (!fits(checkIn) || !fits(checkOut)) { setCheckIn(""); setCheckOut(""); }
@@ -283,20 +304,23 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       form.set("claimType", cat);
       form.set("week", weekRow.key);
       form.set("notes", notes.trim());
+      if (cat === "airbnb" && partProblem) return setError(partProblem);
       if (cat === "outstation") {
         if (!regionRow) return setError(`HR has not set the region for ${venue} yet, so it cannot be claimed.`);
+        if (partProblem) return setError(partProblem);
+        if (regionProblem) return setError(regionProblem);
         if (regionRow.planeTicket) {
-          if (!(amount > 0)) return setError("Enter the plane ticket's price, as its invoice shows.");
-          if (!file) return setError("Add the plane ticket's invoice.");
+          if (!(amount > 0)) return setError("Enter the air ticket's price, as its invoice shows.");
+          if (!file) return setError("Add the air ticket's invoice.");
           if (file.size > 100 * 1024 * 1024) return setError("The invoice must be 100 MB or smaller.");
           form.set("amount", ticket.trim());
           form.set("invoice", file);
         } else if (!(amount > 0)) {
-          return setError(regionRow.spots > 0 ? "HR has not set the rate per spot yet." : `${venue} is local to ${options.rates.base}, so there is no outstation claim.`);
+          return setError("HR has not set the rate per spot yet.");
         }
       } else {
         if (!regionRow) return setError(`HR has not set the region for ${venue} yet, so it cannot be claimed.`);
-        if (!isOutstation(regionRow)) return setError(`${venue} is local to ${options.rates.base}, so there is no Airbnb claim.`);
+        if (regionProblem) return setError(regionProblem);
         if (!checkIn || !checkOut || nights === null || nights < 1) return setError("Tap your check-in and check-out days on the calendar.");
         if (stayIssue) return setError(stayIssue);
         if (male + female < 1) return setError("Add who stayed.");
@@ -473,16 +497,19 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                           <Reveal className={s.foodDays} role="group" aria-label={`Days of the ${w.brandWeek}, ${w.dates}`}>
                             {fairDays(w, w.key).map(day => {
                               const state = foodDayState(day, today, takenDays);
-                              const ticked = state === "open" && days.includes(day);
+                              // A day of the other month is claimed with that month's food (2026-11-01): shown, faded.
+                              const elsewhere = monthOfDay(day) !== foodMonth;
+                              const ticked = !elsewhere && state === "open" && days.includes(day);
+                              const mon = MONTHS_SHORT[Number(day.slice(5, 7)) - 1];
                               return (
-                                <button key={day} className={`${s.foodDay} ${ticked ? s.foodDayOn : ""}`} disabled={state !== "open"} aria-pressed={ticked}
-                                  aria-label={`${weekdayShort(day)} ${Number(day.slice(8, 10))} ${MONTHS_SHORT[Number(day.slice(5, 7)) - 1]}${state === "claimed" ? ", claimed" : state === "ahead" ? ", not yet" : ""}`}
+                                <button key={day} className={`${s.foodDay} ${ticked ? s.foodDayOn : ""}`} disabled={elsewhere || state !== "open"} aria-pressed={ticked}
+                                  aria-label={`${weekdayShort(day)} ${Number(day.slice(8, 10))} ${mon}${state === "claimed" ? ", claimed" : elsewhere ? `, ${mon} claim` : state === "ahead" ? ", not yet" : ""}`}
                                   onClick={() => toggleDay(w, day)}>
                                   <span className={s.foodDayWk}>{weekdayShort(day)}</span>
                                   <span className={s.foodDayN}>{Number(day.slice(8, 10))}</span>
                                   <span className={s.foodDayNote}>
-                                    {state === "claimed" ? "Claimed" : state === "ahead" ? "Not yet"
-                                      : ticked ? <Svg d={ICON.tick} size={13} sw={2.6} /> : MONTHS_SHORT[Number(day.slice(5, 7)) - 1]}
+                                    {state === "claimed" ? "Claimed" : elsewhere ? `${mon} claim` : state === "ahead" ? "Not yet"
+                                      : ticked ? <Svg d={ICON.tick} size={13} sw={2.6} /> : mon}
                                   </span>
                                 </button>
                               );
@@ -510,8 +537,10 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
           <>
             <div className={s.field}><span className={s.fieldLabel}>Claim category</span>
               <div className={s.cats}>
-                {([["outstation", "Outstation", "Fixed by spots for the route", CAT_OUT], ["airbnb", "Airbnb accommodation", perPax !== null ? `Up to ${rm0(perPax)} per pax per night` : "Rate not set yet", CAT_AIR]] as const).map(([id, label, note, d]) => (
-                  <button key={id} className={`${s.cat} ${cat === id ? s.catOn : ""}`} onClick={() => setCat(id)} aria-pressed={cat === id}>
+                {/* An Airbnb stay is the transport claim's tick: a title ticked for the air ticket alone sees Outstation, a plane ticket only (2026-10-31). */}
+                {([["outstation", "Outstation", planeOnly ? "Air ticket only" : "Fixed by spots for the route", CAT_OUT], ["airbnb", "Airbnb accommodation", perPax !== null ? `Up to ${rm0(perPax)} per pax per night` : "Rate not set yet", CAT_AIR]] as const)
+                  .filter(([id]) => id === "outstation" || parts.road || cat === id).map(([id, label, note, d]) => (
+                  <button key={id} className={`${s.cat} ${cat === id ? s.catOn : ""}`} onClick={() => { setCat(id); setError(null); }} aria-pressed={cat === id}>
                     <span className={s.catIcon}><Svg d={d} size={17} sw={1.9} /></span>
                     <span className={s.catLabel}>{label}</span>
                     <span className={s.catSub}>{note}</span>
@@ -550,11 +579,12 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                       </div>
                     ) : <p className={s.local}>HR has not set the region for {venue} yet. It can be claimed once they have.</p>}
                   </div>
-                  {regionRow?.planeTicket && (
+                  {partProblem && <p className={s.local}>{partProblem}</p>}
+                  {!partProblem && !regionProblem && regionRow?.planeTicket && (
                     <>
                       <div className={s.spots}>
                         <span className={s.spotsN}><Svg d={PLANE} size={26} sw={1.9} /></span>
-                        <span className={s.spotsText}><span className={s.spotsTitle}>Plane ticket</span><span className={s.spotsRoute}>{options.rates.base} → {regionRow.name} · the price on its invoice</span></span>
+                        <span className={s.spotsText}><span className={s.spotsTitle}>Air ticket</span><span className={s.spotsRoute}>{options.rates.base} → {regionRow.name} · the price on its invoice</span></span>
                       </div>
                       <label className={s.field}><span className={s.fieldLabel}>Ticket price (RM)</span>
                         <input type="text" inputMode="decimal" className={s.input} placeholder="e.g. 456.70" value={ticket} onChange={e => setTicket(e.target.value)} maxLength={12} />
@@ -566,7 +596,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                       <Invoice file={file} fileRef={fileRef} onFile={setFile} />
                     </>
                   )}
-                  {regionRow && !regionRow.planeTicket && regionRow.spots > 0 && (
+                  {!partProblem && !regionProblem && regionRow && !regionRow.planeTicket && regionRow.spots > 0 && (
                     <>
                       <div className={s.spots}>
                         <span className={s.spotsN}>{regionRow.spots}</span>
@@ -580,14 +610,16 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                       </div>
                     </>
                   )}
-                  {regionRow && !regionRow.planeTicket && regionRow.spots === 0 && <p className={s.local}>{venue} is local to {options.rates.base}, so there is no outstation claim.</p>}
+                  {!partProblem && regionProblem && <p className={s.local}>{regionProblem}</p>}
                 </>
               ) : null
-            ) : !weekRow?.claimable ? null : !regionRow ? (
+            ) : !weekRow?.claimable ? null : partProblem ? (
+              <p className={s.local}>{partProblem}</p>
+            ) : !regionRow ? (
               <p className={s.local}>HR has not set the region for {venue} yet. It can be claimed once they have.</p>
-            ) : !isOutstation(regionRow) ? (
-              // Airbnb is for an outstation fair only (user 2026-10-06).
-              <p className={s.local}>{venue} is local to {options.rates.base}, so there is no Airbnb claim.</p>
+            ) : regionProblem ? (
+              // Airbnb is for an outstation fair only (user 2026-10-06) — never one in a region set as no claim (2026-11-01).
+              <p className={s.local}>{regionProblem}</p>
             ) : (
               <>
                 <div className={s.field}><span className={s.fieldLabel}>Check-in and check-out</span>
@@ -766,9 +798,11 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
             </div>
           </>
         )}
-        {error && <p className={s.formError} role="alert">{error}</p>}
       </div>
       <div className={s.rfFoot}>
+        {/* A refusal stands over the button (2026-11-01): at the end of the form it was out of sight wherever the form was
+            scrolled, so a press seemed to do nothing — an October food claim sent on 31 Oct, its weekends open on screen. */}
+        {error && <p className={s.formError} role="alert">{error}</p>}
         {/* View as: the form opens and fills in as the member's would, and sends nothing (the Quote's add button reads the same). */}
         <button className={s.rfCta} onClick={() => void submit()} disabled={busy || readOnly}>
           {readOnly ? "Read-only while viewing as" : busy ? "Sending…" : revising ? "Send the update" : cta}
@@ -780,10 +814,12 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
 
 /** A returned food claim's weekends and their days, as it was sent (`detail.weeks`). */
 function priorFoodDays(prior: Record<string, unknown>): Record<string, string[]> {
-  if (prior.claimType !== "food" || !Array.isArray(prior.weeks)) return {};
+  if (prior.claimType !== "food" || !Array.isArray(prior.weeks) || typeof prior.month !== "string") return {};
+  const month = prior.month;
+  // Keyed by its month and weekend, as the form picks them — a weekend across two months is picked in each.
   return Object.fromEntries(prior.weeks.flatMap(w => {
     const x = w && typeof w === "object" ? (w as Record<string, unknown>) : null;
-    return x && typeof x.week === "string" && Array.isArray(x.days) ? [[x.week, x.days.filter((d): d is string => typeof d === "string")]] : [];
+    return x && typeof x.week === "string" && Array.isArray(x.days) ? [[`${month}|${x.week}`, x.days.filter((d): d is string => typeof d === "string")]] : [];
   }));
 }
 
@@ -808,7 +844,7 @@ function save(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
-/** The invoice: an Airbnb stay's, or a plane ticket's. */
+/** The invoice: an Airbnb stay's, or an air ticket's. */
 function Invoice({ file, fileRef, onFile }: { file: File | null; fileRef: RefObject<HTMLInputElement | null>; onFile: (file: File | null) => void }) {
   return (
     <div className={s.field}><span className={s.fieldLabel}>Invoice</span>

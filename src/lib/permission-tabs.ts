@@ -35,7 +35,7 @@ import {
   type SensitiveField,
 } from '@/lib/permission-matrix'
 
-export type TabView = 'hr' | 'fin' | 'pri' | 'dept' | 'mkt' | 'rev'
+export type TabView = 'hr' | 'fin' | 'pri' | 'dept' | 'mkt' | 'rev' | 'lead'
 export type TabAction = 'view' | 'create' | 'edit' | 'approve'
 /** `fn.action` — a cell of the function matrix. */
 export type FnAction = `${FunctionKey}.${Action}`
@@ -52,6 +52,8 @@ export const TAB_VIEWS: ReadonlyArray<{ id: TabView; label: string; reach: Scope
   // is the department's, so its reach is the company's.
   { id: 'mkt', label: 'Marketing view', reach: 'all' },
   { id: 'rev', label: 'Revenue app', reach: 'own' },
+  // Lead View (2026-10-16): Customer Service's inbox — every brand's enquiries are the company's.
+  { id: 'lead', label: 'Lead View', reach: 'all' },
 ]
 
 export interface PermissionTab {
@@ -94,12 +96,26 @@ const REVENUE_APP_SENDS: Opens = { view: ['revenue_app.view'], create: ['revenue
 const HIRING: Opens = { view: ['hiring.view'], create: ['hiring.create'], edit: ['hiring.edit'], approve: ['hiring.approve'] }
 const ROOMS: Opens = { view: ['rooms.view'], create: ['rooms.create'], edit: ['rooms.edit'] }
 const ROOMS_KEYS = ['meeting_rooms', 'meeting_rooms_manage']
+const LEADS_KEYS = ['leads']
 // One's own claims (the Department view's, and Marketing's since 2026-10-23).
 const MY_CLAIMS: Opens = { view: ['claims.view'], create: ['claims.create'], edit: ['claims.edit'] }
+// Claim & approve (2026-10-29, the claim process's PR ③): the department's requests read, and approved or rejected
+// before Finance — at the holder's own department in every view.
+const CLAIMS_APPROVE: Opens = { view: ['claims.view'], approve: ['claims.approve'] }
+const CLAIMS_APPROVE_HINTS = {
+  view: 'Their department’s requests — the page reads Claim & approve',
+  approve: 'Approve or reject their department’s requests before Finance',
+} as const
+const claimsApprove = (view: TabView, keys: readonly string[]): PermissionTab => ({
+  ...tab(view, 'claims_approve', 'Claim & approve', keys, CLAIMS_APPROVE, 'dept'),
+  hints: CLAIMS_APPROVE_HINTS,
+})
 // Marketing's own view (mig 20261023214000): its pages read with View; Create starts a project; Edit works the stages
 // one is on; Approve decides a stage as its approver; Manage — the manager tools — is each such page's View.
 const MARKETING: Opens = { view: ['marketing.view'], create: ['marketing.create'], edit: ['marketing.edit'], approve: ['marketing.approve'] }
 const MARKETING_MANAGE: Opens = { view: ['marketing.manage'] }
+// Marketing's own pool (mig 20261028120000): Finance's Marketing P&L and Cash Flow; their Excel and PDF ride with View.
+const MARKETING_POOL: Opens = { view: ['marketing_pool.view', 'marketing_pool.export'] }
 
 // The Overview is the company's in every view (the dashboard has no narrower reach).
 const tab = (view: TabView, id: string, label: string, keys: readonly string[], opens: Opens, reach?: Scope): PermissionTab => ({
@@ -153,6 +169,10 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   tab('hr', 'att_close', 'Month close', ['attendance'], { view: ['attendance.view'], edit: ['attendance.edit'] }),
   tab('hr', 'att_settings', 'Attendance settings', ['attendance'], { view: ['attendance.view'], edit: ['attendance.edit'] }),
   tab('hr', 'att_ready', 'Readiness', ['attendance'], { view: ['attendance.view'] }),
+  // One's own claims from HR's own view (2026-10-29, the claim process: "Claim" above Meeting Rooms in every view) — on
+  // HR's key, so only a template that opens HR's pages works it out here (Staff · Basic keeps the Department view's).
+  tab('hr', 'my_claims', 'Claim', ['hr_costing'], MY_CLAIMS, 'own'),
+  claimsApprove('hr', ['hr_costing']),
   // Every view books a room (the user, 2026-10-11): one page, a tab in each.
   shared('meeting_rooms', tab('hr', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
   tab('hr', 'guest_link', 'Guest Link', ['guest_link'], { view: ['guest_link.view'], edit: ['guest_link.edit'] }),
@@ -183,6 +203,10 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   shared('dept_pool', tab('fin', 'dept_pool', 'Dept Pool', ['dept_pool'], DEPT_POOL)),
   shared('venture_pool', tab('fin', 'venture_pool', 'Venture Pool', ['venture_pool'], VENTURE_POOL)),
   tab('fin', 'chart_of_account', 'Chart of Account', ['categories'], { view: ['categories.view'], edit: ['categories.manage'] }),
+  // One's own claims from Finance's own view (2026-10-29 — the account menu's Claim, beside Meeting Rooms), on the
+  // treasury's key as HR's is on HR's.
+  tab('fin', 'my_claims', 'Claim', TREASURY_KEYS, MY_CLAIMS, 'own'),
+  claimsApprove('fin', TREASURY_KEYS),
   shared('meeting_rooms', tab('fin', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
   // Finance reads Audit Log › Changes for its own areas, as HR does for theirs.
   shared('audit_changes', tab('fin', 'audit_log', 'Audit Log', AUDIT_CHANGES_KEYS, {})),
@@ -212,19 +236,28 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // The manager's tools — the Tracking Dashboard and the builders — one box: a second box for Marketing · Manage would
   // make the cell narrow, and every write asking it would have to ask the pages first (tab-write-guards).
   tab('mkt', 'tracking', 'Manager tools', ['marketing'], MARKETING_MANAGE),
+  // Marketing's own pool (2026-10-28 — the user, of Finance's Marketing - Cash Flow: "我要exactly 给他们看这个part"):
+  // that page for Marketing alone, every line it opens, its Excel and PDF. A box of its own, never Dept Pool's — the
+  // Marketing view reaches the whole company, and Dept Pool · View at All reads every department's pool.
+  {
+    ...tab('mkt', 'pool', 'Pool', ['marketing_pool'], MARKETING_POOL),
+    hints: { view: 'Marketing’s own P&L and Cash Flow, as Finance’s Dept Pool shows Marketing — with Excel and PDF' },
+  },
   // One's own claims, listed in Marketing's view for whoever holds Marketing (the key it opens on here, so the move
   // ticks it for Marketing's templates only — Staff · Basic keeps the Department view's). Marketing's tabs come before
   // the Department view's: a narrower tab is ticked only for what an earlier one has not given, so a Marketing
   // template's own claims land here, not there.
-  tab('mkt', 'my_claims', 'My claims', ['marketing'], MY_CLAIMS, 'own'),
+  tab('mkt', 'my_claims', 'Claim', ['marketing'], MY_CLAIMS, 'own'),
+  claimsApprove('mkt', ['marketing']),
   shared('meeting_rooms', tab('mkt', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS)),
 
   // ── Department view ── Staff · Basic's: the Overview, one's own claims, the rooms. The Dept Manager's
   // own-department boxes (Dept Pool, OPEX, My Billing, Claims, Reports, People at Dept) went with the kind
   // (2026-10-17 — the user: "全删"; each department gets a view of its own later).
   tab('dept', 'overview', 'Overview', [], OVERVIEW),
-  // Raising one's own claims — every member of staff's (Staff · Basic).
-  tab('dept', 'my_claims', 'My claims', ['claims'], MY_CLAIMS, 'own'),
+  // Raising one's own claims — every member of staff's (Staff · Basic). "Claim" since 2026-10-29 (the staff's word).
+  tab('dept', 'my_claims', 'Claim', ['claims'], MY_CLAIMS, 'own'),
+  claimsApprove('dept', ['claims']),
   // The rooms are the company's: booked at the company's reach from the Department view too.
   shared('meeting_rooms', tab('dept', 'meeting_rooms', 'Meeting Rooms', ROOMS_KEYS, ROOMS, 'all')),
 
@@ -255,6 +288,30 @@ export const PERMISSION_TABS: readonly PermissionTab[] = [
   // IT support's desk (2026-10-20, mig 20261021020000): everybody's IT requests — read them; write notes, set their status.
   // Sending one and following one's own need no box (open to all, as Memos).
   tab('rev', 'it_requests', 'IT requests', ['it_requests'], { view: ['it_requests.view'], edit: ['it_requests.edit'] }, 'all'),
+
+  // ── Lead View (2026-10-16, mig 20261016300000): one tab a page ──
+  tab('lead', 'inbox', 'Inbox', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.edit'] }),
+  tab('lead', 'leads', 'Leads', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.edit'] }),
+  tab('lead', 'insight', 'Insight', LEADS_KEYS, { view: ['leads.view'] }),
+  // Campaigns (mig 20261016340000): a brand's message to many customers — sent and scheduled with Manage, by its Edit.
+  tab('lead', 'campaigns', 'Campaigns', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // Flows (phase 2, mig 20261016310000): the button flows, set up as Settings is (Manage, with its Edit).
+  tab('lead', 'flows', 'Reply templates', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // Reply rules and the Step library (redesign v2 step 4, mig 20261023100010): set up as Settings is (Manage, with its Edit).
+  tab('lead', 'rules', 'Reply rules', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  tab('lead', 'library', 'Step library', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // AI Agent and its Data Center (mig 20261016330000): the soul and the cards it may quote, set up as Settings is.
+  tab('lead', 'ai', 'AI Agent', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  tab('lead', 'knowledge', 'Data Center', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // AI corrections (redesign v2 step 5, mig 20261023200000): the drafts CS changed; a fixed answer saved with Manage.
+  tab('lead', 'corrections', 'AI corrections', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // General info and Business hours (redesign v2 step 3, mig 20261022230000): set up as Settings is (Manage, with its Edit).
+  tab('lead', 'info', 'General info', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  tab('lead', 'hours', 'Business hours', LEADS_KEYS, { view: ['leads.view'], edit: ['leads.manage'] }),
+  // Audit log (redesign v2 step 6, mig 20261023400000): Lead View's own history, read through audit_changes(); nothing to write.
+  tab('lead', 'audit', 'Audit log', LEADS_KEYS, { view: ['leads.view'] }),
+  // Settings: the brands and their salespeople (Manage, with its Edit), and the test enquiry (Create).
+  tab('lead', 'settings', 'Settings', LEADS_KEYS, { view: ['leads.view'], create: ['leads.create'], edit: ['leads.manage'] }),
 ]
 
 export const TAB_BY_ID: ReadonlyMap<string, PermissionTab> = new Map(PERMISSION_TABS.map(t => [t.id, t]))

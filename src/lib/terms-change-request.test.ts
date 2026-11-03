@@ -44,7 +44,7 @@ describe('the terms once the change is applied', () => {
   it('closes January’s terms in September and runs October on with no fixed term — what the amend writes', () => {
     const after = termsAfterAsk('fund_source', BI7, OCTOBER)
     expect(after.history[1]).toMatchObject({ validFrom: '2026-01', validTo: '2026-09', rate: 0.00833, months: 51, nextInterestKeepsBase: true, nextInterestOnOriginal: false })
-    expect(after.current).toEqual({ rate: 0.00833, months: null, compounding: false, effectiveFrom: '2026-10' })
+    expect(after.current).toEqual({ rate: 0.00833, months: null, compounding: false, effectiveFrom: '2026-10', principalPerMonth: null })
     // The very segments BI#7 has since the user's own change (terms-interest-keeps-base.test.ts).
     expect(buildTermsSegments(after, BY_MONTH)[2]).toMatchObject({ fromYM: '2026-10', months: null, base: 42000, interestBase: 51000, interestKeepsBase: true, interestPerMonth: 424.83 })
   })
@@ -139,5 +139,124 @@ describe('what the deal’s page says', () => {
     expect(note(rejected, { id: 'fin', approves: false }, new Date('2026-12-01T00:00:00Z'))).toBeNull()
     expect(note(row({ status: 'withdrawn' }), { id: 'fin', approves: false })).toBeNull()
     expect(note(null, { id: 'fin', approves: false })).toBeNull()
+  })
+})
+
+// The terms in force recalculated, filed by Finance (2026-10-27, the mockup terms-first-month-mockup.html — "From the
+// first instalment"): Chai Meng Keat's 5,000 received 26 Mar 2026 at 0%, no fixed term, its first instalment April —
+// 0.833% from the first instalment asked.
+describe('a change of the whole terms', () => {
+  const CHAI: PositionTerms = {
+    principal: 5000,
+    startYM: '2026-03',
+    firstDueYM: '2026-04',
+    current: { rate: 0, months: null, compounding: false, effectiveFrom: null },
+    history: [],
+  }
+  const WHOLE: TermsAsk = {
+    fromYM: '2026-04',
+    rate: 0.00833,
+    remainingMonths: null,
+    compounding: null,
+    noFixedTerm: true,
+    interestOnOriginal: false,
+    interestKeepsBase: false,
+    wholeDeal: true,
+  }
+
+  it('says it is the whole deal, from when the terms in force began', () => {
+    expect(askWords(WHOLE)).toBe('Whole deal from Apr 2026 · 0.833% /mo · no fixed term')
+    expect(askWords({ ...WHOLE, noFixedTerm: false, remainingMonths: 12 })).toBe('Whole deal from Apr 2026 · 0.833% /mo · 12 months')
+    expect(askWords(OCTOBER)).toMatch(/^From Oct 2026 · /)
+  })
+
+  it('recalculates the terms in force in place — no new segment, no history', () => {
+    const after = termsAfterAsk('fund_source', CHAI, WHOLE)
+    expect(after.history).toEqual([])
+    expect(after.current).toEqual({ rate: 0.00833, months: null, compounding: false, effectiveFrom: null, principalPerMonth: null })
+  })
+
+  it('while it waits: the terms in force beside them recalculated; approved: the words alone', () => {
+    const view = termsAskView('fund_source', CHAI, {}, WHOLE, 'pending')
+    expect(view.ok).toBe(true)
+    if (view.ok) {
+      expect(view.before.rate).toBe(0)
+      expect(view.after).toMatchObject({ rate: 0.00833, months: null, interestPerMonth: 41.65 })
+    }
+    expect(termsAskView('fund_source', CHAI, {}, WHOLE, 'approved')).toEqual({ ok: false, why: 'Applied — the terms in force now read as asked.' })
+  })
+
+  it('the deal’s page says it is the whole deal', () => {
+    const note = termsRequestNote({
+      row: row({ whole_deal: true, effective_from: '2026-04-01', rate: 0.00833, interest_keeps_base: false, reason: null }),
+      kind: 'fund_source',
+      terms: CHAI,
+      principalByMonth: {},
+      nameOf: () => 'Finance Manager',
+      stamp: () => '27 Oct 2026 · 11:00',
+      readerId: 'fin',
+      readerApprovesAll: false,
+    })
+    expect(note).toMatchObject({ whole: true, fromYM: '2026-04', status: 'pending' })
+    expect(note?.line).toMatch(/^0\.833% \/mo · no fixed term/)
+  })
+})
+
+describe('BI#7 as one change: a fixed amount a month from January, no fixed term from October (2026-10-27)', () => {
+  // The deal before either change: 60,000 at 0.5% over 60, 1,000 repaid each month from April 2025.
+  const BEFORE: PositionTerms = {
+    principal: 60000,
+    startYM: '2025-04',
+    firstDueYM: '2025-05',
+    current: { rate: 0.005, months: 60, compounding: false, effectiveFrom: null },
+    history: [],
+  }
+  const ONE: TermsAsk = {
+    fromYM: '2026-01',
+    rate: 0.00833,
+    remainingMonths: null,
+    compounding: null,
+    noFixedTerm: false,
+    interestOnOriginal: false,
+    interestKeepsBase: false,
+    principalPerMonth: 1000,
+    openFromYM: '2026-10',
+  }
+
+  it('says both in words, as the queue’s title does', () => {
+    expect(askWords(ONE)).toBe('From Jan 2026 · 0.833% /mo · RM 1,000.00 a month · no fixed term from Oct 2026')
+    expect(askOf(row({ effective_from: '2026-01-01', rate: 0.00833, no_fixed_term: false, interest_keeps_base: false, principal_per_month: '1000.00', open_from: '2026-10-01' }))).toMatchObject({
+      fromYM: '2026-01',
+      principalPerMonth: 1000,
+      openFromYM: '2026-10',
+      noFixedTerm: false,
+    })
+  })
+
+  it('makes the very segments the two changes made by hand: 1,000 a month to September, then no fixed term on 51,000', () => {
+    const segs = buildTermsSegments(termsAfterAsk('fund_source', BEFORE, ONE), BY_MONTH)
+    expect(segs).toHaveLength(3)
+    expect(segs[1]).toMatchObject({ fromYM: '2026-01', toYM: '2026-09', base: 51000, fixedPrincipal: 1000, principalPerMonth: 1000, months: 51, interestPerMonth: 424.83 })
+    expect(segs[2]).toMatchObject({ fromYM: '2026-10', months: null, base: 42000, interestBase: 51000, interestKeepsBase: true, interestPerMonth: 424.83 })
+  })
+
+  it('lays the terms asked beside the terms now, their fixed term ending in September', () => {
+    const view = termsAskView('fund_source', BEFORE, BY_MONTH, ONE, 'pending')
+    expect(view.ok).toBe(true)
+    if (!view.ok) return
+    expect(view.after).toMatchObject({ fromYM: '2026-01', fixedPrincipal: 1000 })
+    expect(askLine(view.after)).toBe('0.833% /mo · RM 1,000.00 a month, 51 months · RM 1,000.00 + 424.83 a month · interest on RM 51,000.00')
+    const rows = comparisonRows(figuresAt(view.before, ONE.fromYM), figuresAt(view.after, ONE.fromYM, ONE.openFromYM), ONE.openFromYM)
+    expect(rows.find((r) => r.label === 'Term')?.asked).toBe('9 months · to Sep 2026')
+    expect(rows.find((r) => r.label === 'Principal a month')?.asked).toBe('RM 1,000.00')
+    expect(rows.find((r) => r.label === 'After that')).toEqual({ label: 'After that', now: '—', asked: 'No fixed term from Oct 2026 · interest RM 424.83 a month on RM 51,000.00', changed: true })
+  })
+
+  it('a fixed amount asked with months, or with no fixed term, gives way to them', () => {
+    const months = termsAfterAsk('fund_source', BEFORE, { ...ONE, principalPerMonth: null, remainingMonths: 12, openFromYM: null })
+    expect(months.current.principalPerMonth).toBeNull()
+    const kept = termsAfterAsk('fund_source', { ...BEFORE, current: { ...BEFORE.current, principalPerMonth: 2000 } }, { ...ONE, principalPerMonth: null, openFromYM: null })
+    expect(kept.current.principalPerMonth).toBe(2000)
+    expect(kept.history.at(-1)?.principalPerMonth).toBe(2000)
   })
 })

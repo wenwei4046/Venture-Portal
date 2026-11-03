@@ -17,11 +17,9 @@ const RANKS: Rank[] = [
 ]
 
 const SCHEME: CommissionScheme = {
-  openBillBasis: 'uplift_on_commission',
   overrideIncludesKpi: false,
   enableProductRevenue: true,
   enableKpi: false,
-  enableOpenBill: true,
   enableOverride: true,
   enableMarginPenalty: false,
   enableMarginIncentive: false,
@@ -48,7 +46,7 @@ function bill(over: Partial<SalesOrder> = {}): SalesOrder {
   }
 }
 
-function input(orders: SalesOrder[], openBill = false): EngineInput {
+function input(orders: SalesOrder[]): EngineInput {
   return {
     periodMonth: '2026-08-01',
     scheme: SCHEME,
@@ -56,8 +54,6 @@ function input(orders: SalesOrder[], openBill = false): EngineInput {
     orders,
     kpiItems: [],
     kpiThresholds: [],
-    openBillRules: [{ rank: 1, pct: 0.5 }],
-    openBillTags: openBill ? [{ orderId: 'o1', rank: 1 }] : [],
     marginBands: [],
     hierarchy: [
       { staffId: 'owner', uplineStaffId: null, baseRankKey: 'ta_8', rateMode: 'fixed' },
@@ -125,13 +121,6 @@ describe('a shared bill through the engine', () => {
     expect(by.get('member')!.productRevenue).toBe(5_000)
     expect(by.get('member')!.productCommission).toBe(250) // 5% × 5,000
     expect(by.get('leader')!.overrideCommission).toBe(200) // (9% − 5%) × 5,000
-  })
-
-  it('splits the Open Bill bonus by the same parts', () => {
-    const orders = splitOrdersByShares([bill()], [{ orderId: 'o1', staffId: 'member', pct: 0.5 }])
-    const by = new Map(computeCommissionRun(input(orders, true)).statements.map(s => [s.staffId, s]))
-    expect(by.get('owner')!.openBillBonus).toBe(200) // 5,000 × 8% × 50%
-    expect(by.get('member')!.openBillBonus).toBe(125) // 5,000 × 5% × 50%
   })
 
   it('holds every part when the whole bill is short of its deposit', () => {

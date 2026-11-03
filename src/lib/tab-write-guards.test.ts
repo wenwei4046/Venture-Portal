@@ -21,9 +21,13 @@ const NOT_GUARDED: Readonly<Record<string, string>> = {
   erp_feed_month_closed: 'a read: is the ERP feed’s month closed',
   get_staff_billing_allocation: 'a read: who is billed for whom, for the invoice about to be made',
   get_staff_own_share_allocation: 'a read: the own-share split, for the invoice about to be made',
+  get_staff_dept_moves_allocation: 'a read: the payroll moved between departments, for the internal invoices about to be made',
   payroll_month_closed: 'a read: is the payroll month closed',
+  revenue_seller_checks: 'a read: the move an answer is about — whom the bill goes to, so the closes are asked first',
   hiring_orphan_files: 'a read: the files no record names, for the sweep after a write',
   payroll_reopen_month: 'the Principal’s alone — its own check asks the account’s kind, not a cell a box stands for',
+  lead_link_text: 'a read: a web link’s address and last reading, for Check now (its write, lead_link_checked, asks the page) and the draft about to be written',
+  lead_reply_target: 'a read: the reply just saved, for Meta to send — its write (lead_reply) and its answer (lead_reply_sent) ask the page',
   hr_letter_file:
     'the new contract Renew files (renewContract, 2026-10-24): it rides with the renewal, the write People · Edit ' +
     'narrows (an UPDATE under the row policies); the letter is Documentation · Create’s, which only the Data ' +

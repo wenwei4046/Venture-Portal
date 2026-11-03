@@ -15,16 +15,50 @@
 // `label` prefixes the error, for the callers that had their own message.
 const PAGE_SIZE = 1000
 
+// A MOMENT'S GATEWAY ERROR IS ASKED AGAIN (2026-10-31). Supabase answers through
+// Cloudflare, which now and then hands back its own 502 / 503 / 504 page for a
+// request PostgREST never saw — supabase-js reports it as `{ error: { message:
+// '<html>…502 Bad Gateway…' }, status: 502 }`. One such answer threw the whole
+// of Comm Cal's month (Double claims: "This page didn't load", digest
+// 1562874446) and the same page opened at once on Try again. So a read these
+// helpers make is asked again, twice at most (after 0.3 s, then 0.9 s), when
+// and only when its answer is a gateway's: a refusal, a missing column, a
+// timeout of the query itself or `fetch failed` (the signature of a URL too
+// long, which a retry cannot mend) still fail at once, as before. Every read
+// here is a SELECT, so asking twice changes nothing.
+const RETRY_DELAYS_MS = [300, 900]
+const GATEWAY_STATUSES = new Set([502, 503, 504])
+
+type ReadAnswer = { error: { message: string } | null; status?: number }
+
+/** Whether an answer is a gateway's passing failure (502 / 503 / 504), not the database's. */
+export function isGatewayHiccup(answer: ReadAnswer): boolean {
+  if (!answer.error) return false
+  if (typeof answer.status === 'number') return GATEWAY_STATUSES.has(answer.status)
+  return /\b50[234]\s+(Bad Gateway|Service (Temporarily )?Unavailable|Gateway Time-?out)\b/i.test(answer.error.message ?? '')
+}
+
+/** Asks once — and again, twice at most, while the answer is a gateway's passing failure. */
+async function ask<A extends ReadAnswer>(once: () => PromiseLike<A>): Promise<A> {
+  let answer = await once()
+  for (const wait of RETRY_DELAYS_MS) {
+    if (!isGatewayHiccup(answer)) return answer
+    await new Promise(resolve => setTimeout(resolve, wait))
+    answer = await once()
+  }
+  return answer
+}
+
 export async function fetchAllRows<T>(
   buildPage: (
     from: number,
     to: number,
-  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null; status?: number }>,
   label = 'fetchAllRows',
 ): Promise<T[]> {
   const out: T[] = []
   for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await buildPage(from, from + PAGE_SIZE - 1)
+    const { data, error } = await ask(() => buildPage(from, from + PAGE_SIZE - 1))
     if (error) throw new Error(`${label}: ${error.message}`)
     if (data && data.length > 0) out.push(...data)
     if (!data || data.length < PAGE_SIZE) break
@@ -58,10 +92,10 @@ export async function fetchAllRows<T>(
 export async function fetchAllRowsAsWritten<T>(
   build: (
     page: { from: number; to: number } | null,
-  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null; status?: number }>,
   label = 'fetchAllRowsAsWritten',
 ): Promise<T[]> {
-  const { data, error } = await build(null)
+  const { data, error } = await ask(() => build(null))
   if (error) throw new Error(`${label}: ${error.message}`)
   const rows = data ?? []
   if (rows.length < PAGE_SIZE) return rows
@@ -105,10 +139,10 @@ export async function fetchAllRowsParallel<T>(
     from: number,
     to: number,
     withCount: boolean,
-  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null; count?: number | null }>,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null; count?: number | null; status?: number }>,
   label = 'fetchAllRowsParallel',
 ): Promise<T[]> {
-  const first = await buildPage(0, PAGE_SIZE - 1, true)
+  const first = await ask(() => buildPage(0, PAGE_SIZE - 1, true))
   if (first.error) throw new Error(`${label}: ${first.error.message}`)
   const pages: T[][] = [first.data ?? []]
 
@@ -122,7 +156,7 @@ export async function fetchAllRowsParallel<T>(
       while (next < counted && !failed) {
         const index = next++
         const from = index * PAGE_SIZE
-        const { data, error } = await buildPage(from, from + PAGE_SIZE - 1, false)
+        const { data, error } = await ask(() => buildPage(from, from + PAGE_SIZE - 1, false))
         if (error) {
           failed = true
           throw new Error(`${label}: ${error.message}`)
@@ -137,7 +171,7 @@ export async function fetchAllRowsParallel<T>(
   // Never stop on a full page.
   while (pages[pages.length - 1].length >= PAGE_SIZE) {
     const from = pages.length * PAGE_SIZE
-    const { data, error } = await buildPage(from, from + PAGE_SIZE - 1, false)
+    const { data, error } = await ask(() => buildPage(from, from + PAGE_SIZE - 1, false))
     if (error) throw new Error(`${label}: ${error.message}`)
     pages.push(data ?? [])
   }
@@ -171,7 +205,7 @@ const CHUNKS_IN_FLIGHT = 4
 
 export async function fetchByKeys<T, K extends string | number>(
   keys: readonly K[],
-  buildChunk: (chunk: K[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+  buildChunk: (chunk: K[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null; status?: number }>,
   label = 'fetchByKeys',
 ): Promise<T[]> {
   if (keys.length === 0) return []
@@ -183,7 +217,7 @@ export async function fetchByKeys<T, K extends string | number>(
   const worker = async () => {
     while (next < chunks.length) {
       const index = next++
-      const { data, error } = await buildChunk(chunks[index])
+      const { data, error } = await ask(() => buildChunk(chunks[index]))
       if (error) throw new Error(`${label}: ${error.message}`)
       results[index] = data ?? []
     }

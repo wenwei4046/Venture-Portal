@@ -436,6 +436,36 @@ answers auth.uid()), so a page that narrows rows only through RLS shows more
 than the person would. **A new function the portal reads goes on the list, or
 it fails while viewing as somebody.**
 
+**EVERY VIEW SWITCHER LISTS EVERY VIEW (2026-10-27 — the user, the Principal's
+top-bar menu beside the Revenue app's module menu (four rows) and Marketing's
+browser list (no Lead View): "我要全部是跟 principal 那种的，它能够显示出来全部的
+东西。然后在别的 App 上面，它照这样子的风格没问题 … marketing 的这个 dropdown 就照
+它的那个设计风格 … 它有显示到全部的 view 能够选，跟 module"; then, of the Revenue
+app: "view as person, no need in revenue app add on, others can, cause revenue
+app can use view as team member").** One list, `lib/view-switch.ts`
+`SWITCH_VIEWS`, in the Principal's order — Principal · Finance · HR · Marketing
+· Revenue · Lead View · View as a person… — with the portal's words (*Finance
+view*, *Revenue View*) and the apps' (*Finance*, *Revenue team*). Every switcher
+reads it. The portal's bars are ONE component, `layout/ViewSwitch`: HR's,
+Finance's and the Principal's (`HrTopBar`), Lead View's, the phone's
+(`PortalViewSwitcher`, its 44px field) and Marketing's, which had drawn the
+browser's own list without Lead View — the dot, the words, the soft menu
+(`hrv/select` `plain`). The Revenue app's module menu, the CRM's beside it and
+Profile's Switch view list `REVENUE_APP_VIEWS`: every view but View as a
+person… (a team member is viewed with the app's own View as; the portal's
+picker never lists a Revenue app account anyway — A PERSON'S OWN EDITS WIN ›
+"Still the KIND's"). The HR app's and the Finance app's Switch view list all
+seven, *View as a person…* opening the portal's picker over the app
+(`ViewAsPersonPicker` `z` 90, above Me's layer). A phone row says where it
+opens (`phoneWhere`): the Principal's own view and Finance's are the Finance
+app since 2026-10-17 (the HR app and the Revenue app still said *The portal*),
+Marketing and Lead View the portal's phone shell. Tests:
+`src/lib/view-switch-coverage.test.ts` finds every switcher by its name (*View
+portal as role*, *Switch module*, *Switch view*) and refuses one that does not
+read the list; `view-switch.test.ts`, `layout/ViewSwitch.test.tsx`,
+`shell/DeskAside.modules.test.tsx`, `crm/desk/Desk4a.modules.test.tsx`,
+`ProfileMain.views.test.tsx`, `HrApp.test.tsx`, `fin-app/ProfileScreen.test.tsx`.
+
 **SWITCHING VIEW KEEPS YOUR POWER (2026-10-11, the user: "switch view is still
 can be edit, full access means = ultimate access").** HR's and Finance's views
 are LENSES, no longer masks: `getUser` keeps the account's own keys, actions,
@@ -729,3 +759,7 @@ Do not `CREATE OR REPLACE` a function from its last copy in `supabase/migrations
 **IT REQUESTS — A FUNCTION OF ITS OWN: THE PRINCIPAL'S AND ULTIMATE FULL ACCESS'S (2026-10-20 — mig `20261021020000`; the module: `../revenue/revenue-app.md` › IT SUPPORT).** `it_requests` (Admin; View · Edit; reach all) and its key, scope none — no row policy opens for it: the module's tables are read and written only through its own DEFINER functions, each asking `has_any_action` (listed in `DEFINER_RPCS`; the three readers in `READS_WHILE_VIEWING_AS`). Held by the Principal login (role default) and the Ultimate full access template only — the user: "just principal or ulitmate full access", because a screenshot sent to IT can carry the sender's pay; never the Revenue Director (no Salary tick). The key is in `current_permissions()`'s member-app list; the tab `rev.it_requests` went into the database's registry by name, never a whole reseed. Sending a request and following one's own need no cell.
 
 **THE DORMANT MIDDLEWARE IS SESSION-MIDDLEWARE.TS — NEXT 16 WOULD HAVE SWITCHED IT ON (2026-10-21, the move to Next 16):** the root `middleware.ts` (session refresh, and every request without a session redirected to `/login`) was never loaded by Next 15, because the app lives in `src/` (found 2026-09-27; CLAUDE.md › Architecture). Next 16's Turbopack build loads it: the build listed `ƒ Proxy (Middleware)`, the Cloudflare worker's smoke request to `/api/wasm-health` came back as the sign-in page, and on the Vercel preview, with nobody signed in, `/g/<code>` (the guest link, `../hr/rooms.md`) and `/welcome` (an invitation, `../hr/people.md`) answered 307 → `/login`, where production answers 200. It is renamed `session-middleware.ts`, unchanged otherwise, so the portal runs as it did: no middleware, every page gating itself (`requireAuth`). `src/lib/no-active-middleware.test.ts` fails on a `middleware.*` or `proxy.*` at the root or in `src/`. Switching a middleware on stays its own decision — and its matcher would first need `/g/` and `/welcome`, which it does not exclude. `login-middleware.test.ts` and `sign-out-scope.test.ts` read the renamed file.
+
+**CLAIM IN EVERY VIEW (2026-10-29, PR ② of docs/module-spec-payment-requests.md — the claim process; mig `20261029180000`):** one's own payment requests (`/claims`, the Claim page: a claim or a direct payment to Finance) open from each view's own row — the Department view's and Marketing's `my_claims` (labelled **Claim** now), and two new tabs, **`hr.my_claims`** (HR's sidebar, Admin, above the rooms) and **`fin.my_claims`** (Finance's account menu, Account) — all four Claims · View / Create / Edit at **Own**, so `permission-tabs-coverage.test.ts` finds an HR and a Finance tab for the rows. Their keys are their view's (`hr_costing`, `treasury`): worked out from cells, an HR or a Finance template ticks its own view's beside the Department view's (one reach, side by side — the same cells, nothing gained), and Staff · Basic keeps the Department view's alone. HR · Payroll's stored ticks gain `hr.my_claims` View and Create (the cells it held). The HR and Finance rows show only for a login of one's own and never while viewing as (`canSendOwnClaims`, as My documents') — a shared login is no person: no People record, no salary account to pay. The staff's writes (`payment_request_save` / `_cancel`) ask Claims · Create at Own and no page box: every box standing for the cell is a tab of `/claims`, so nothing narrows (`narrows()` in tab-guards-scan). Finance's (Bill back, Reject, Create PV) ask `/payments/requests`' box (`tab_write_guard`). Finance AM holds no claims cells — giving it Claim is the user's tick to make, not a migration's.
+
+**CLAIM & APPROVE, AND BY MANAGEMENT APPROVE (2026-10-29, PR ③ of docs/module-spec-payment-requests.md — "可以，开始做 PR ③"; mig `20261029200000`, `tests/member-sql/validate-payment-request-approval.mjs`):** a department's approval before Finance. **Claim & approve** is a tab in the HR, Finance, Marketing and Department views (`claims_approve`, reach **Dept**: View → Claims · View, Approve → Claims · Approve), page `/claims` — for its holder the Claim page is Claim & approve (their department's requests beside their own). The row says so where a sidebar takes a per-viewer name (`labelFor` — HR's Admin, Finance's account menu; Marketing's row moves under MANAGER TOOLS with the number waiting, `mkt_shell`'s `claims`); the Department view's row stays *Claim* (its sidebar has no per-viewer names yet). **By management approve is not a cell** — it opens nothing, it routes one's own requests: `permission_template_flags (template_id, flag)` and `user_permission_flags (user_id, flag, granted)`, one flag today (`claims_review`), the person's own tick over their title's (the person wins; read as their boxes are, registered and audited). Drawn as a pill under each Claim row whose View is ticked (`TabMatrix` `review`), in a title's template (saved after its boxes, at the version they left — `permission_template_flags_set`) and in one person's window (`permission_user_flags_set`, sent by `setPersonTabs`); each is sent only when it moved. **Who holds Claim & approve in a department** (the routing, the window's names, the notices) is read from the CELLS — the person's own Claims · Approve cell when they have one (a removed one counts as none), else their title's template's, at Dept (`payment_request_approvers`) — because `current_actions()` answers for the caller only; every write still asks the caller's own cells. The approver's writes (`payment_request_approve` / `_send_back`) ask Claims · Approve at Dept and no page box: every box for that cell stands on `/claims`, so closing them closes the cell (`narrows()`). Seeded as §1 of the spec has it: Marketing · Staff ticks By management approve, Marketing · Manager holds Claim & approve (View, Approve; its Claims · View widened to Dept). Ticking By management approve for a department with nobody holding Claim & approve sends its requests straight to Finance — never stuck.

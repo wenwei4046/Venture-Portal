@@ -10,7 +10,6 @@ import { HUB_HREF, HUB_TITLE } from '@/lib/fin-app/routes'
 import { openVoucherPage } from '@/app/(portal)/payments/page-actions'
 import { cardLook, hubCards, plural, rm } from '@/app/(portal)/payments/_lib/hub-cards'
 import type { HubCardKey, HubLedger, HubRow } from '@/app/(portal)/payments/_lib/hub-ledger'
-import type { RequestItem } from '@/app/(portal)/payments/_lib/payments-hub'
 import type { VoucherDetail } from '@/app/(portal)/payments/_lib/voucher-detail'
 import type { VoucherPageExtras } from '@/app/(portal)/payments/_lib/voucher-page'
 import type { CreatePaymentOptions } from '@/app/(portal)/payments/_lib/create-payment-options'
@@ -47,6 +46,8 @@ export type VoucherStep =
   | { kind: 'record'; id: string; from: HubCardKey | null }
 
 const f2 = (n: number) => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+/** Payment request in the app (PR ⑥): the sidebar row's own screen. */
+const PAYMENT_REQUESTS_HREF = '/fin-app/page/payment-requests'
 const CARDS: readonly HubCardKey[] = ['all', 'draft', 'pending_approval', 'approved', 'paid', 'voided', 'payroll']
 const asCard = (v: string | null): HubCardKey | null => (v && (CARDS as readonly string[]).includes(v) ? (v as HubCardKey) : null)
 
@@ -95,9 +96,7 @@ export default function VoucherApp({
   create,
   prefix,
   today,
-  dept = [],
-  payroll = null,
-  claims = [],
+  requests = null,
 }: {
   hub: 'payments' | 'receipts'
   /** The address's query as the server read it (a refresh, a link). */
@@ -114,9 +113,11 @@ export default function VoucherApp({
   /** Receive: Create receipt's line. */
   prefix?: string
   today: string
-  dept?: RequestItem[]
-  payroll?: RequestItem[] | null
-  claims?: RequestItem[]
+  /**
+   * Payment's *Requests · N* (2026-10-29, PR ⑥ — the user picked it over a top tab): what waits for Finance on Payment
+   * request, which it opens; null — not offered (Receive).
+   */
+  requests?: number | null
 }) {
   const router = useRouter()
   const receipts = hub === 'receipts'
@@ -151,7 +152,7 @@ export default function VoucherApp({
   }, [recordId])
 
   // ── Windows ──
-  const [menu, setMenu] = useState<'dept' | 'payroll' | 'claims' | 'more' | 'export' | null>(null)
+  const [menu, setMenu] = useState<'export' | null>(null)
   const [making, setMaking] = useState<'payment' | 'receipt' | 'loan' | null>(create?.open ? 'payment' : null)
   const [query, setQuery] = useState<Record<string, string>>({})
   const [openBatches, setOpenBatches] = useState<Set<string>>(() => new Set(step.kind === 'batches' && step.batch ? [step.batch] : []))
@@ -202,22 +203,21 @@ export default function VoucherApp({
       ]
     : [
         ...(createBtn ? [createBtn] : []),
-        { key: 'dept', label: dept.length > 0 ? `Dept · ${dept.length}` : 'Dept', onClick: () => setMenu('dept') },
-        ...(payroll ? [{ key: 'payroll', label: payroll.length > 0 ? `Payroll · ${payroll.length}` : 'Payroll', onClick: () => setMenu('payroll') } as BarButton] : []),
-        { key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('more') },
+        // PR ⑥: one button for Payment request in place of Dept, Payroll and ⋯ › Claims (their old pages are gone).
+        ...(requests !== null
+          ? [
+              {
+                key: 'requests',
+                label: requests > 0 ? `Requests · ${requests}` : 'Requests',
+                onClick: () => {
+                  pushIntent()
+                  router.push(PAYMENT_REQUESTS_HREF)
+                },
+              } as BarButton,
+            ]
+          : []),
+        ...(canExport ? [{ key: 'more', label: '⋯', kind: 'more', onClick: () => setMenu('export') } as BarButton] : []),
       ]
-  // A queue opens on the request pressed (2026-10-16, part E4 — each queue is a page of the app now).
-  const requestItems = (items: RequestItem[], page: string, openLabel: string): DialogMenuItem[] => {
-    const inApp = page.startsWith('/fin-app/')
-    const goTo = (id?: string) => {
-      setMenu(null)
-      if (inApp) pushIntent()
-      router.push(inApp && id ? `${page}?f=waiting&id=${encodeURIComponent(id)}` : page)
-    }
-    return items.length > 0
-      ? items.map((it) => ({ key: it.key, label: it.label, sub: it.sub, onClick: () => goTo(it.key) }))
-      : [{ key: 'open', label: openLabel, sub: 'Nothing waiting', onClick: () => goTo() }]
-  }
 
   // ── A record's steps (the drawer's), with the full page's own in its ⋯ ──
   const v = step.kind === 'record' && record?.detail.id === step.id ? record.detail : null
@@ -378,30 +378,7 @@ export default function VoucherApp({
       {screen}
       {dialogs}
 
-      {/* The hub's windows: what waits for a voucher, the export, the makers. */}
-      {receipts ? null : (
-        <>
-          <FinDialog open={menu === 'dept'} onClose={() => setMenu(null)} title="Dept Requests" sub={dept.length > 0 ? `${dept.length} waiting for a voucher` : undefined}>
-            <DialogMenu items={requestItems(dept, '/fin-app/page/dept-requests', 'Open Dept Requests')} />
-          </FinDialog>
-          {payroll ? (
-            <FinDialog open={menu === 'payroll'} onClose={() => setMenu(null)} title="Payroll Requests" sub={payroll.length > 0 ? `${payroll.length} waiting` : undefined}>
-              <DialogMenu items={requestItems(payroll, '/fin-app/page/payroll-requests', 'Open Payroll Requests')} />
-            </FinDialog>
-          ) : null}
-          <FinDialog open={menu === 'claims'} onClose={() => setMenu(null)} title="Claim Requests" sub={claims.length > 0 ? `${claims.length} waiting for a voucher` : undefined}>
-            <DialogMenu items={requestItems(claims, '/fin-app/page/claim-requests', 'Open Claim Requests')} />
-          </FinDialog>
-          <FinDialog open={menu === 'more'} onClose={() => setMenu(null)} title="Payments">
-            <DialogMenu
-              items={[
-                { key: 'claims', label: claims.length > 0 ? `Claims · ${claims.length}` : 'Claims', sub: claims.length > 0 ? `${claims.length} waiting for a voucher` : 'Nothing waiting', onClick: () => setMenu('claims') },
-                ...(canExport ? [{ key: 'export', label: 'Export', sub: 'Excel or PDF of every voucher', onClick: () => setMenu('export') }] : []),
-              ]}
-            />
-          </FinDialog>
-        </>
-      )}
+      {/* The hub's windows: the export, the makers. */}
       <FinDialog open={menu === 'export'} onClose={() => setMenu(null)} title="Export" sub={receipts ? 'All receipts' : 'All vouchers'}>
         <DialogMenu
           items={[

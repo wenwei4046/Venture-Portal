@@ -125,6 +125,19 @@
   font-weight: 600;
 }
 .send:disabled { opacity: .55; }
+/* A Fixed request's sender (2026-10-27): Close request beside Send — they tried it; the desk reads it closed. */
+.composeActions { display: flex; align-items: center; gap: 8px; flex: none; }
+.closeRequest {
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid var(--rv-accent);
+  background: var(--rv-white);
+  color: var(--rv-accent);
+  font-size: calc(14.5px * var(--rv-type));
+  font-weight: 600;
+}
+.closeRequest:disabled { opacity: .55; }
 
 /* Keep Done full-width and comfortably tall even when a long thread fills the scrolling sheet. */
 .requestDone { width: 100%; flex: 0 0 48px; min-height: 48px; }

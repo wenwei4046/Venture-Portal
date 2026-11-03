@@ -87,6 +87,11 @@ export async function POST(request: Request) {
     const { error: rxError } = await client().rpc('crm_their_reactions', { p_reactions: delivery.reactions })
     if (rxError) console.error('crm_their_reactions failed:', rxError.message)
   }
+  // A document's own file name beside its caption (service role only, mig 20261027100000); a failure only warns.
+  if (delivery.names.length) {
+    const { error: nmError } = await client().rpc('crm_document_names', { p_names: delivery.names })
+    if (nmError) console.error('crm_document_names failed:', nmError.message)
+  }
   // Only a delivery with new messages can have told somebody something (a receipt-only one never does).
   if (Number((data as { messages?: unknown } | null)?.messages) > 0) pushSoon()
   // An ad with no name yet: Ads Manager's, asked once Meta has its answer (lib/member/crm-ad-names-meta.ts).

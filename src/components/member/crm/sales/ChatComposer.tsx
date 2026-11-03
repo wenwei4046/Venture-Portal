@@ -18,6 +18,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import SalesComposer from "./SalesComposer";
+import { SuggestFloat } from "../shared/suggest-float";
 import { BOX_MAX, BOX_MIN, HOLD_HINT, PANEL_H, composerVM, dropLast, flash, focusBox, togglePanel, type ComposerIn, type ComposerPanel } from "./vm/composer";
 
 /** A press held this long records; shorter is a tap. */
@@ -166,8 +167,10 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
       const H = ios ? baseH : window.innerHeight;
       app.style.bottom = `${Math.round(H - pan - (toKb ? vv.height : H))}px`;
       if (ios && toKb) {
+        // A rect that reads the pan itself is measured from the page's top, as WebKit's own does: the screen is already
+        // on what is visible (a salesperson's iPhone, 2026-10-28 — moved "back" by the pan, the screen went white).
         const off = app.getBoundingClientRect().top;
-        if (Math.abs(off) > 1) {
+        if (Math.abs(off) > 1 && Math.abs(off - pan) > 1) {
           app.style.top = `${Math.round(pan - off)}px`;
           app.style.bottom = `${Math.round(H - pan + off - vv.height)}px`;
         }
@@ -360,6 +363,8 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   return (<>
     {/* Where this composer is in the chat (the stack and the screen are found from it). */}
     <span ref={anchorRef} hidden />
+    {/* Suggested replies' floating logo (2026-10-29): there while the customer's words wait and the box is empty. */}
+    {v.suggest && <SuggestFloat key={v.key} list={v.suggest} library={v.suggestLibrary} pick={v.setDraft} showLogo={!!v.suggestLogo && !!v.suggest.length && !v.draft && !v.rec} />}
     <SalesComposer p={p} />
   </>);
 }

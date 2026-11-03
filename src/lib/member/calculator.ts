@@ -18,15 +18,17 @@ import {
   lineCharge,
   OptionPrices,
   sofaSetCharges,
+  specialQtyCharges,
   unitPrice,
   type ChargePart,
   type OptionPrice,
   type PriceCell,
 } from "@/lib/catalogue/pricing";
+import { valueKey } from "@/lib/catalogue/keys";
 import { pickCombo, spreadComboTotal, type PricedCombo } from "@/lib/catalogue/combos";
 import { costBasisOf, costDivisorFor } from "@/lib/commission/cost-basis";
 import { indexKpiItems, kpiItemLabel, orderKpiHits, type KpiLine } from "@/lib/commission/kpi";
-import { buildChoicesFor, buildError, buildKey, buildLines, frameBuildError, frameBuildText, kindOf } from "./build";
+import { buildChoicesFor, buildError, buildKey, buildLines, frameBuildError, frameBuildText, kindOf, specialQtyOf } from "./build";
 import { atPrice, cents } from "./quote-price";
 
 // The price's own arithmetic is shared with the Revenue app's keypad (2026-10-14).
@@ -93,8 +95,28 @@ const CHARGE_WORD: Record<ChargePart["pool"], string> = {
   bedframe_specials: "",
   sofa_leg_heights: "leg ",
   sofa_specials: "",
+  // A fabric upgrade (2026-10-29) is its own name: `Upgrade fabric`.
+  bedframe_fabric_upgrades: "",
+  sofa_fabric_upgrades: "",
 };
 const chargeWord = (p: ChargePart) => `${CHARGE_WORD[p.pool]}${p.value}`;
+
+/**
+ * The specials Maintenance charges BY QUANTITY on any of the cart's sofa models, by their
+ * folded spelling (2026-10-26). A value's mode is Maintenance's, whichever model lists it.
+ */
+function countedSpecials(models: readonly MemberCatalogueModel[], modelIds: readonly (string | null | undefined)[]): Set<string> {
+  const ids = new Set(modelIds.filter((id): id is string => !!id));
+  const out = new Set<string>();
+  for (const m of models) {
+    if (!ids.has(m.id)) continue;
+    for (const c of m.charges?.specials ?? []) {
+      const k = valueKey(c.value);
+      if (c.byQuantity && k !== null) out.add(k);
+    }
+  }
+  return out;
+}
 
 /** The sofa a module belongs to — its base model, as the combos and the run group a bill's sofa lines. */
 function sofaGroupOf(product: MemberProduct): string {
@@ -139,11 +161,11 @@ function costLines(
       line,
       product,
       unit: priced.price,
-      // A bed frame's divan, leg, gap, total height and specials are charged per frame.
+      // A bed frame's divan, leg, gap, total height, specials and fabric upgrade are charged per frame.
       ...chargeOf(kind === "BEDFRAME" && pricing
         ? lineCharge(kind, {
             divan: frame?.divan ?? null, leg: frame?.leg ?? null, gap: frame?.gap ?? null,
-            total: frame?.total ?? null, specials: frame?.specials ?? [],
+            total: frame?.total ?? null, specials: frame?.specials ?? [], fabricUpgrade: frame?.fabricUpgrade ?? null,
           }, prices)
         : null),
       noHeight: grid.length > 0 && priced.how !== "grid",
@@ -416,23 +438,35 @@ export function calculateQuote(
   // frame's per frame, a sofa's once per sofa (the cart's one sofa build on every
   // piece; the pieces of one base model are one sofa, as the run groups a bill).
   const charged = costed.filter((l) => l.charge > 0);
+  // A special Maintenance charges BY QUANTITY (2026-10-26) is charged each, times the quantity
+  // the member set, once for the cart; the leg and every other special once per sofa.
+  const sofaLines = costed.filter((l) => kindOf(l.product) === "SOFA");
+  const counted = countedSpecials(pricing?.models ?? [], sofaLines.map((l) => l.product.modelId));
+  const isCounted = (sp: string) => counted.has(valueKey(sp) ?? "");
+  const picked = input.build?.specials ?? [];
   const sofaSets = pricing
     ? sofaSetCharges(
-        costed
-          .filter((l) => kindOf(l.product) === "SOFA")
-          .map((l) => ({
-            group: sofaGroupOf(l.product),
-            qty: l.line.quantity,
-            leg: input.build?.leg ?? null,
-            specials: input.build?.specials ?? [],
-          })),
+        sofaLines.map((l) => ({
+          group: sofaGroupOf(l.product),
+          qty: l.line.quantity,
+          leg: input.build?.leg ?? null,
+          specials: picked.filter((sp) => !isCounted(sp)),
+          fabricUpgrade: input.build?.fabricUpgrade ?? null,
+        })),
+        new OptionPrices(pricing.options),
+      )
+    : [];
+  const byQuantity = pricing && sofaLines.length
+    ? specialQtyCharges(
+        picked.filter(isCounted).map((sp) => ({ value: sp, qty: specialQtyOf(input.build, sp) })),
         new OptionPrices(pricing.options),
       )
     : [];
   const sofaNames = new Map(costed.map((l) => [sofaGroupOf(l.product), l.product.name] as const));
   const charge =
     charged.reduce((sum, l) => sum + Math.round(l.charge * 100) * l.line.quantity, 0) +
-    sofaSets.reduce((sum, s) => sum + Math.round(s.total * 100), 0);
+    sofaSets.reduce((sum, s) => sum + Math.round(s.total * 100), 0) +
+    byQuantity.reduce((sum, s) => sum + Math.round(s.total * 100), 0);
   // The selling price's part — margin, band, the next tier and its price, what the
   // customer pays — is the keypad's too (2026-10-14): one function, so the phone's
   // answer at every other price is the one this would give. A cart of riders
@@ -493,6 +527,8 @@ export function calculateQuote(
         qty: s.sets,
         amount: s.total,
       })),
+      // A special charged by quantity: qty = how many the member set.
+      ...byQuantity.map((s) => ({ label: s.value, qty: s.qty, amount: s.total })),
     ],
     version: productVersions(selected.map(({ product }) => product!)),
     inputKey: quoteInputKey(input),

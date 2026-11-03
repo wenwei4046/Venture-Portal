@@ -74,7 +74,7 @@ export async function profileName(pageId: string, psid: string, token: string, f
 }
 
 /** The Send API request: a normal response inside 24 hours, the HUMAN_AGENT tag after. */
-export function messengerRequest(pageId: string, psid: string, body: string, token: string, window: Exclude<MessengerWindow, "shut">, message?: object) {
+export function messengerRequest(pageId: string, psid: string, body: string, token: string, window: Exclude<MessengerWindow, "shut">, message?: object, replyToMid?: string | null) {
   return {
     url: graph(`${encodeURIComponent(pageId)}/messages`),
     init: {
@@ -84,6 +84,8 @@ export function messengerRequest(pageId: string, psid: string, body: string, tok
         recipient: { id: psid },
         ...(window === "open" ? { messaging_type: "RESPONSE" } : { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" }),
         message: message ?? { text: body },
+        // Answering one message (Lead View, 2026-10-27): Meta quotes it above the reply.
+        ...(replyToMid ? { reply_to: { mid: replyToMid } } : {}),
       }),
     },
   };
@@ -100,10 +102,10 @@ export function messengerError(status: number, payload: unknown): string {
 }
 
 export async function sendMessengerText(
-  opts: { pageId: string; psid: string; body: string; token: string; window: Exclude<MessengerWindow, "shut">; message?: object },
+  opts: { pageId: string; psid: string; body: string; token: string; window: Exclude<MessengerWindow, "shut">; message?: object; replyToMid?: string | null },
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ ok: true; mid: string } | { ok: false; error: string }> {
-  const { url, init } = messengerRequest(opts.pageId, opts.psid, opts.body, opts.token, opts.window, opts.message);
+  const { url, init } = messengerRequest(opts.pageId, opts.psid, opts.body, opts.token, opts.window, opts.message, opts.replyToMid);
   let response: Response;
   try { response = await fetchImpl(url, init); } catch { return { ok: false, error: "Could not reach Messenger. Check the connection and send again." }; }
   const payload: unknown = await response.json().catch(() => null);

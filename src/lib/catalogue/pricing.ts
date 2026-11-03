@@ -136,7 +136,8 @@ export type Pool = (typeof POOLS)[number]
  *              margin on both sides, in the commissionable sales, never KPI.
  *              A bed frame's divan, leg, gap, total height and specials, per
  *              frame (`lineCharge`); a sofa's leg height and specials, ONCE
- *              PER SOFA however many pieces (`sofaSetCharges`).
+ *              PER SOFA however many pieces (`sofaSetCharges`) — or a special
+ *              BY QUANTITY on the Quote (`specialQtyCharges`, 2026-10-26).
  *   null     — no price: a sofa's seat size, which is the grid's own axis.
  *
  * No option adds to a line's COST any more (catalogue_line_surcharge answers 0).
@@ -193,15 +194,23 @@ export class OptionPrices {
   }
 }
 
+/**
+ * A fabric upgrade's part (Maintenance › Fabrics, 2026-10-29) — not a
+ * Maintenance pool (nothing is typed under these on the option tabs): the
+ * upgrade's name is its value, as a bill's `cost_detail.charges` part says it.
+ */
+export const UPGRADE_POOLS = ['bedframe_fabric_upgrades', 'sofa_fabric_upgrades'] as const
+export type UpgradePool = (typeof UPGRADE_POOLS)[number]
+
 export interface ChargePart {
-  pool: ChargedPool
+  pool: ChargedPool | UpgradePool
   value: string
   /** What the customer pays for it — always above zero. */
   price: number
 }
 
-/** The option values a line names, in the pools its category reads. */
-type ChargeFacts = Pick<LineFacts, 'divan' | 'leg' | 'gap' | 'total' | 'specials'>
+/** The option values a line names, in the pools its category reads — and on the Quote, the fabric upgrade picked. */
+type ChargeFacts = Pick<LineFacts, 'divan' | 'leg' | 'gap' | 'total' | 'specials'> & { fabricUpgrade?: string | null }
 
 /**
  * What one line's options are CHARGED to the customer, per unit — the twin of
@@ -210,7 +219,9 @@ type ChargeFacts = Pick<LineFacts, 'divan' | 'leg' | 'gap' | 'total' | 'specials
  * an option priced above zero is a charge; one nobody priced, or priced at 0,
  * is FOC. A special named twice counts once. Anything but a bed frame or a
  * sofa is never charged — and a sofa is charged once per SET, not per line
- * (`sofaSetCharges`).
+ * (`sofaSetCharges`). A bed frame's fabric upgrade (2026-10-29) is the Quote's
+ * pick by name, after its specials; a bill finds it by its fabric's series
+ * (catalogue_line_option_charge).
  */
 export function lineCharge(
   category: string | null,
@@ -235,7 +246,7 @@ export function lineCharge(
     return { amount: 0, parts: [] }
   }
   const parts: ChargePart[] = []
-  const add = (pool: ChargedPool, value: string | null) => {
+  const add = (pool: ChargedPool | UpgradePool, value: string | null) => {
     if (value === null || value.trim() === '') return
     const price = prices.get(pool, value)
     if (price === null || !(price > 0)) return
@@ -249,6 +260,7 @@ export function lineCharge(
     seen.add(k)
     add(specialsPool, sp)
   }
+  if (cat === 'BEDFRAME') add('bedframe_fabric_upgrades', facts.fabricUpgrade ?? null)
   return { amount: parts.reduce((a, p) => a + p.price, 0), parts }
 }
 
@@ -259,6 +271,8 @@ export interface SofaSetLine {
   qty: number
   leg: string | null
   specials: readonly string[]
+  /** The Quote's fabric upgrade, by name (2026-10-29): once per sofa, as a special charged as a full set. */
+  fabricUpgrade?: string | null
 }
 
 export interface SofaSetCharge {
@@ -279,7 +293,10 @@ export interface SofaSetCharge {
  * is charged once (priced above zero), times the sets — the smallest quantity
  * among the pieces. A group nothing is charged for is left out. (The SQL then
  * spreads each set's total over its lines by what they sell for; a quote needs
- * only the total.)
+ * only the total.) Since 2026-10-26 the Quote passes only the specials charged
+ * once per sofa (one charged by quantity is `specialQtyCharges`), and a bill's
+ * specials are what its special order charges — the run reads the leg alone
+ * at Maintenance's price.
  */
 export function sofaSetCharges(lines: readonly SofaSetLine[], prices: OptionPrices): SofaSetCharge[] {
   const groups = new Map<string, SofaSetLine[]>()
@@ -291,7 +308,7 @@ export function sofaSetCharges(lines: readonly SofaSetLine[], prices: OptionPric
   for (const [group, members] of groups) {
     const parts: ChargePart[] = []
     const seen = new Set<string>()
-    const add = (pool: ChargedPool, value: string | null) => {
+    const add = (pool: ChargedPool | UpgradePool, value: string | null) => {
       const k = valueKey(value)
       if (k === null || seen.has(`${pool}\u0000${k}`)) return
       seen.add(`${pool}\u0000${k}`)
@@ -301,10 +318,40 @@ export function sofaSetCharges(lines: readonly SofaSetLine[], prices: OptionPric
     }
     for (const m of members) add('sofa_leg_heights', m.leg)
     for (const m of members) for (const sp of m.specials) add('sofa_specials', sp)
+    for (const m of members) add('sofa_fabric_upgrades', m.fabricUpgrade ?? null)
     const unit = parts.reduce((a, p) => a + p.price, 0)
     if (!(unit > 0)) continue
     const sets = Math.max(1, Math.floor(Math.min(...members.map(m => m.qty))))
     out.push({ group, sets, unit, total: roundCents(unit * sets), parts })
+  }
+  return out
+}
+
+/** A special charged by quantity: its price each, how many, and what that comes to. */
+export interface SpecialQtyCharge {
+  value: string
+  price: number
+  qty: number
+  total: number
+}
+
+/**
+ * A sofa's specials charged BY QUANTITY (Product List › Maintenance, 2026-10-26 — the user:
+ * "change 8030 back cushion，一个沙发可能有三个 compartment（三个 seat），所以这个东西应该要乘三"):
+ * each priced above zero, times the quantity the member set — for the cart, never again per
+ * sofa. The Quote's figure alone: on a bill, what the ERP writes as the special order is what
+ * is charged (catalogue_apply_sofa_charges), so the run has no twin of this.
+ */
+export function specialQtyCharges(specials: readonly { value: string; qty: number }[], prices: OptionPrices): SpecialQtyCharge[] {
+  const out: SpecialQtyCharge[] = []
+  const seen = new Set<string>()
+  for (const s of specials) {
+    const k = valueKey(s.value)
+    if (k === null || seen.has(k) || !Number.isInteger(s.qty) || s.qty < 1) continue
+    seen.add(k)
+    const price = prices.get('sofa_specials', s.value)
+    if (price === null || !(price > 0)) continue
+    out.push({ value: s.value.trim(), price, qty: s.qty, total: roundCents(price * s.qty) })
   }
   return out
 }

@@ -35,15 +35,23 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'my_sub_department_reach', 'person_sub_department_reach',
   'ar_account_code_for', 'ar_account_for_invoice', 'audit_changes', 'audit_overview', 'bank_gl_codes', 'bridge_mirror_slices',
   'bridge_ref_flags', 'build_hr_cost_submission_payload', 'calculate_dept_np', 'claim_payment_queue', 'comm_home_sub_department',
-  'comm_open_bill_on', 'comm_staff_can_recruit', 'commission_order_period_locked', 'crm_can_reply', 'crm_my_can', 'crm_people',
+  'comm_staff_can_recruit', 'commission_order_period_locked', 'crm_can_reply', 'crm_my_can', 'crm_people',
   'current_actions', 'current_permissions', 'current_sensitive_fields', 'current_tabs', 'dashboard_summary', 'department_modes',
   'dept_invoice_settlements', 'director_private_fields', 'erp_feed_month_closed', 'erp_sync_ignored_agents', 'erp_sync_sub_department',
   'erp_sync_unmatched_agents', 'get_dept_opex_rows', 'get_director_advance_opening_balance', 'get_director_ctc_by_company',
   'get_hr_cost_submissions_list', 'get_hr_cost_summary', 'get_payroll_accrual_totals', 'get_payroll_accrual_totals_for',
   'get_payroll_breakdown_by_pool', 'get_payroll_funding_paid', 'get_staff_billing_allocation', 'get_staff_own_share_allocation',
+  // Payroll cost moved to another department (mig 20261103200000): STABLE, reading only.
+  'get_staff_dept_moves_allocation', 'get_payroll_moves_summary',
   'get_submitted_hr_summary', 'gl_net_by_account', 'hr_dashboard_summary', 'lookup_eis', 'lookup_epf', 'lookup_pcb', 'lookup_socso',
   'member_admin_brand_weeks', 'member_admin_claim_settings', 'member_admin_request_facts', 'member_admin_snapshot', 'member_capacity_of', 'member_catalogue',
   'member_memo_reads', 'member_sub_department_requests', 'member_waiting_form', 'member_waiting_transfer', 'next_staff_code',
+  // Payments › Payment request: a member claim's invoice (mig 20261029160000) — STABLE, reading only.
+  'finance_member_claim_invoice',
+  // …and the staff's own requests (mig 20261029180000): the window's lists, one's own, a file's path, Finance's list — STABLE.
+  'payment_request_context', 'my_payment_requests', 'payment_request_file', 'payment_requests_for_finance',
+  // …a department's approver's (mig 20261029200000): their department's requests, the number waiting — STABLE.
+  'payment_requests_for_approval', 'payment_requests_waiting_count',
   // Member services › Food claim (mig 20261013150000).
   'member_admin_food_claim',
   'member_admin_transport_claim',
@@ -118,6 +126,8 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'mkt_bill_import_preview',
   // Share order (mig 20261021150100): a bill's share sheet, one's own requests, Comm Cal's Requests — all STABLE.
   'member_share_order_context', 'member_share_requests', 'revenue_share_requests',
+  // Whose sale (mig 20261031030000): Comm Cal's held bills — STABLE.
+  'revenue_seller_checks',
   'payroll_batch_accrual_sums', 'payroll_line_accounts', 'payroll_month_closed', 'payroll_month_status', 'permission_history',
   'revenue_costing_gaps', 'revenue_fair_calendar', 'revenue_fair_calendar_moves', 'revenue_month_orders', 'revenue_payroll_adjustments',
   'revenue_possible_double_claims', 'revenue_uncosted_products', 'rnp_invoice_events', 'staff_private_fields', 'team_directory',
@@ -126,6 +136,9 @@ export const READS_WHILE_VIEWING_AS: ReadonlySet<string> = new Set([
   'meeting_rooms_range', 'meeting_rooms_booking', 'meeting_rooms_rooms', 'meeting_rooms_people',
   // HR › Attendance (mig 20261015030200; att_file, the file a short link is made for — mig 20261015200000):
   'att_config', 'att_month', 'att_requests_list', 'att_ledger', 'att_register', 'att_file',
+  // Lead View (mig 20261016300200):
+  'lead_config', 'lead_inbox', 'lead_my_unread_marks', 'lead_agent_brands', 'lead_rule_of', 'lead_ad_posts', 'lead_labels', 'lead_thread', 'lead_list', 'lead_leads', 'lead_info', 'lead_business_hours', 'lead_reply_rules', 'lead_library', 'lead_data_files', 'lead_data_folders', 'lead_link_text', 'lead_quick_replies', 'lead_pages', 'lead_leave', 'lead_ai_dismissed', 'lead_ai_more', 'lead_ai_corrections', 'lead_flows', 'lead_auto_categories', 'lead_knowledge', 'lead_personas',
+  'lead_campaigns', 'lead_campaign_audience', 'lead_consent', 'lead_insight_more', 'lead_ads',
   // Admin › Guest Link (mig 20261011091000):
   'guest_link_admin', 'guest_link_legend',
   // VOLATILE, read to write nothing:

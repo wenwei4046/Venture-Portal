@@ -1,17 +1,18 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { plainWa } from "@/lib/member/wa-text";
 import { headers } from "next/headers";
 import { getAccountUser, getMemberUser } from "@/lib/auth";
 import { canDo } from "@/lib/permission-actions";
 import { createClient } from "@/lib/supabase/server";
 import { cleanText, fetchWhatsAppTemplateStatuses, fillTemplate, mediaMessage, metaTemplateBody, metaTemplateName, reactionMessage, sendWhatsApp, submitWhatsAppTemplate, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
-import { messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
+import { HUMAN_AGENT_APPROVED, messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
 import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText, whatsappVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
 import { mediaKindOf, mediaLimit, mediaPath } from "@/lib/member/crm-media";
 import { fetchWhatsAppMedia, messengerMediaAddress } from "@/lib/whatsapp/media";
-import { crmAdNumbers, listMetaAds, metaAdDaily, metaAdInsights, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
+import { crmAdNumbers, crmPages, listMetaAds, metaAdBudget, metaAdDaily, metaAdInsights, metaAdThumbs, type MetaAdRow, type MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAllRowsParallel } from "@/lib/paginate";
 
 /**
@@ -30,6 +31,8 @@ const CRM_WRITES = [
   "crm_visit_outcome", "crm_save_details", "crm_set_pref", "crm_hide_message", "crm_save_labels", "crm_set_label",
   "crm_save_quick_replies", "crm_save_auto_replies", "crm_seen_notifications", "crm_invite", "crm_answer_invite",
   "crm_save_showroom_full", "crm_slot_counts", "crm_mark_reminded",
+  // The key handed over with a photo (mig 20261028130000).
+  "crm_set_key_photo",
   // The Control panel (mig 20261009180000).
   "crm_send_to", "crm_save_ad_assign", "crm_save_fulltime", "crm_read_notifs",
   // Save and apply to all's window: the ads ticked, each on its own or counted together (mig 20261025134700), CRM · Manage.
@@ -50,6 +53,16 @@ const CRM_WRITES = [
   "crm_save_settings",
   // v2 frame 07 · Showrooms: staff-only remarks, delete (mig 20261024150000), CRM · Manage.
   "crm_save_showroom_remarks", "crm_delete_showroom",
+  // A showroom's key handover and the showrooms' order (mig 20261029100000), CRM · Manage.
+  "crm_set_showroom_keys", "crm_set_showroom_order",
+  // A showroom's draft, kept until Save (mig 20261103100000), CRM · Manage.
+  "crm_save_showroom_draft",
+  // The reply library (mig 20261029170000), CRM · Manage.
+  "crm_save_reply_library",
+  // A partner's booking link (mig 20261029190000), CRM · Manage.
+  "crm_partner_link_set", "crm_partner_booking_cancel",
+  // Members' leave (mig 20261029220000), CRM · Manage.
+  "crm_save_leave", "crm_delete_leave",
   // v2 frame 08: put another form in use (mig 20261024160000), CRM · Manage.
   "crm_set_active_form",
   // v2 frames 02 / 03: a customer added by hand (mig 20261024180000), CRM · Edit (own).
@@ -127,11 +140,11 @@ const MANAGE_WRITES: ReadonlySet<string> = new Set([
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
   "crm_remind", "crm_save_form", "crm_delete_form", "crm_name_ad", "crm_add_ad", "crm_hide_ad", "crm_save_appt_types",
-  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form",
+  "crm_set_channel", "crm_save_settings", "crm_save_showroom_remarks", "crm_delete_showroom", "crm_set_active_form", "crm_set_showroom_keys", "crm_set_showroom_order", "crm_save_showroom_draft", "crm_save_reply_library", "crm_partner_link_set", "crm_partner_booking_cancel", "crm_save_leave", "crm_delete_leave",
 ]);
 const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
-  "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded",
+  "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded", "crm_set_key_photo",
   "crm_add_note", "crm_add_contact",
 ]);
 const friendly = (error: unknown, fallback: string) => {
@@ -164,9 +177,9 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
         .select("id, channel, account_id, external_id, name, phone, ad_source_id, ad_headline, ad_source_url, ad_media, status, lost_reason, lost_note, previous_status, assigned_to, team_id, last_customer_at, unread, created_at, property_type, unit_size, unit_location, requirement, budget, won_amount, details_at, assigned_at, assigned_by, held_reason", withCount ? { count: "exact" } : undefined)
         .order("created_at").order("id").range(from, to), "crm contacts"),
       fetchAllRowsParallel<CrmDataRows["messages"][number]>((from, to, withCount) => db.from("crm_messages")
-        .select("id, contact_id, direction, kind, body, media_id, media_path, media_url, media_mime, auto, sent_by, sent_at, status, error, reply_to, my_reaction, their_reaction, card", withCount ? { count: "exact" } : undefined)
+        .select("id, contact_id, direction, kind, body, media_id, media_path, media_url, media_mime, auto, sent_by, sent_at, status, error, reply_to, my_reaction, their_reaction, media_name, card", withCount ? { count: "exact" } : undefined)
         .order("sent_at").order("id").range(from, to), "crm messages"),
-      read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at, kind, meeting_link, place, remarks, type_id, answers")),
+      read<CrmDataRows["visits"]>(db.from("crm_appointments").select("id, contact_id, showroom, start_at, minutes, state, outcome, reminded_at, kind, meeting_link, place, remarks, type_id, answers, key_out_path, key_out_at, key_out_by, key_back_path, key_back_at, key_back_by")),
       read<CrmDataRows["rooms"]>(db.from("crm_showrooms").select("id, name, active, sort_order, address, slots, cap, weekly, blocks")),
       read<CrmDataRows["prefs"]>(db.from("crm_contact_prefs").select("contact_id, pinned, muted, hidden, blocked, pinned_message_id, marked_unread")),
       read<CrmDataRows["hides"]>(db.from("crm_message_hides").select("message_id")),
@@ -185,20 +198,21 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
     ]);
     const more = await desktopRows(db, !!opts.journey);
     const extra = new Map(more.extras.map(x => [x.id, x.extra]));
+    const leadForm = new Map(more.leadForms.map(x => [x.id, x.lead_form]));
     const roomX = new Map(more.rooms.map(r => [r.id, r]));
-    return { ok: true, data: crmDataFromRows({
+    return { ok: true, data: withRoomDrafts(more.roomDrafts, crmDataFromRows({
       people, can, messages, visits, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, adRules, ftRules, templates,
-      contacts: extra.size ? contacts.map(c => (extra.has(c.id) ? { ...c, extra: extra.get(c.id) } : c)) : contacts,
+      contacts: extra.size || leadForm.size ? contacts.map(c => ({ ...c, ...(extra.has(c.id) ? { extra: extra.get(c.id) } : {}), ...(leadForm.has(c.id) ? { lead_form: leadForm.get(c.id) } : {}) })) : contacts,
       rooms: rooms.map(r => {
         const x = roomX.get(r.id);
         const y = more.roomMore.find(m => m.id === r.id);
-        const r2 = y ? { ...r, remarks: y.remarks ?? "", deleted: !!y.deleted_at } : r;
+        const r2 = y ? { ...r, remarks: y.remarks ?? "", deleted: !!y.deleted_at, keys: !!y.key_handover } : r;
         return x ? { ...r2, photo_url: x.photo_path ? `/member/crm-room-photo/${encodeURIComponent(r.id)}?v=${encodeURIComponent(x.photo_path)}` : null, map_google: x.map_google, map_waze: x.map_waze } : r2;
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
-      forms: more.forms, notes: more.notes, stars: more.stars, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
-    }) };
+      forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
+    })) };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
     return { ok: false, error: /schema cache|does not exist|could not find|permission denied for/i.test(message)
@@ -206,6 +220,11 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
   }
 }
 
+/** A showroom's draft by its id ('new' for one not added yet), its saver's staff id and when. */
+function withRoomDrafts(rows: { room: string; draft: unknown; saved_by: string | null; saved_at: string }[], d: CrmData): CrmData {
+  if (!rows.length) return d;
+  return { ...d, roomDrafts: Object.fromEntries(rows.map(r => [r.room, { draft: r.draft, by: r.saved_by, at: r.saved_at }])) };
+}
 /**
  * CRM Desktop rev 1's columns and tables (mig 20261013100000): forms, notes, the form's own answers, a showroom's
  * photo and map links, deleted notifications, and — for the desktop — every customer's journey. Each read on its own
@@ -215,8 +234,8 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes] = await Promise.all([
-    soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order")),
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts] = await Promise.all([
+    soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order, kind")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
     soft<{ id: string; photo_path: string | null; map_google: string | null; map_waze: string | null }[]>(db.from("crm_showrooms").select("id, photo_path, map_google, map_waze")),
@@ -233,11 +252,25 @@ async function desktopRows(db: Db, journey: boolean) {
     // Members locked out of the dealing for now (mig 20261022130000).
     soft<{ staff_id: string }[]>(db.from("crm_staff").select("staff_id").eq("locked", true)),
     // Showrooms' staff-only remarks and the deleted ones (mig 20261024150000).
-    soft<{ id: string; remarks: string | null; deleted_at: string | null }[]>(db.from("crm_showrooms").select("id, remarks, deleted_at")),
+    // …and whether it hands a unit's key over (mig 20261029100000).
+    soft<{ id: string; remarks: string | null; deleted_at: string | null; key_handover?: boolean }[]>(db.from("crm_showrooms").select("id, remarks, deleted_at, key_handover")),
     // Appointment types (mig 20261025040000): null before it, so the two built in stay.
     (async () => { try { const { data, error } = await db.rpc("crm_appt_types_read"); return error ? null : (data as unknown); } catch { return null; } })(),
+    // The reply library (mig 20261029170000): empty before it.
+    soft<{ id: string; title: string; category: string; body: string; keywords: string[] | null; sort_order: number }[]>(db.from("crm_reply_library").select("id, title, category, body, keywords, sort_order").order("sort_order")),
+    // A partner's bookings through its link (mig 20261029190000), the last two months and ahead: on the calendar.
+    soft<NonNullable<CrmDataRows["partnerBookings"]>>(db.from("crm_partner_bookings").select("id, ref, partner, showroom, start_at, minutes, state, booker_name, booker_phone, customer_name, customer_phone, info, remarks, booker_note, created_at")
+      .gte("start_at", new Date(Date.now() - 62 * 86_400_000).toISOString()).order("start_at").limit(2000)),
+    // The partners' links with their codes, CRM · Manage only ([] for anybody else, and before the migration).
+    // Members' leave (mig 20261029220000): what has not ended yet (yesterday on, for the office's day).
+    soft<NonNullable<CrmDataRows["leaves"]>>(db.from("crm_staff_leave").select("id, staff_id, starts_on, ends_on, note").gte("ends_on", new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)).order("starts_on")),
+    (async () => { try { const { data, error } = await db.rpc("crm_partner_links_read"); return error || !Array.isArray(data) ? [] : (data as { id: string; name: string; code: string; on: boolean }[]); } catch { return []; } })(),
+    // A lead form ad's answers (mig 20261030060000), read softly so the CRM opens before the column.
+    soft<{ id: string; lead_form: CrmDataRows["contacts"][number]["lead_form"] }[]>(db.from("crm_contacts").select("id, lead_form").not("lead_form", "is", null).limit(5000)),
+    // Showrooms' drafts (mig 20261103100000): CRM · Manage only, [] for anybody else and before the table.
+    (async () => { try { const { data, error } = await db.rpc("crm_showroom_drafts_read"); return error || !Array.isArray(data) ? [] : (data as { room: string; draft: unknown; saved_by: string | null; saved_at: string }[]); } catch { return []; } })(),
   ]);
-  return { roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes };
+  return { roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */
@@ -252,7 +285,24 @@ async function roomMapLinks(db: Db, room: string): Promise<{ google?: string | n
 
 interface Reachable { id: string; channel: "whatsapp" | "messenger"; account_id: string; external_id: string; assigned_to: string | null; last_customer_at: string | null }
 
-/** The customer as the sender needs them — read under RLS, then asked may-you-reply, then Meta's window. */
+/**
+ * Why a reply past Meta's window was kept in the chat and not sent (2026-10-30, the owner: "crm 改成lead view的做法" —
+ * the salesperson types and sends as ever; the message stays here, marked not sent, with this under it).
+ */
+function windowShutReason(channel: "whatsapp" | "messenger"): string {
+  return channel === "messenger"
+    ? `More than ${HUMAN_AGENT_APPROVED ? "7 days" : "24 hours"} since the customer’s last message — Messenger does not allow a reply now.`
+    : "More than 24 hours since the customer’s last message — WhatsApp only allows an approved template now.";
+}
+
+/** A reply past the window: kept in the chat as ours, not sent (crm_record_unsent — not counted as a reply). */
+async function keptUnsent(db: Db, args: { contact: string; channel: "whatsapp" | "messenger"; kind: "text" | "image" | "document"; body: string; replyTo?: string | null }): Promise<CrmChatMessage> {
+  const { data, error } = await db.rpc("crm_record_unsent", { p_contact: args.contact, p_kind: args.kind, p_body: args.body, p_error: windowShutReason(args.channel), p_reply_to: args.replyTo ?? null });
+  if (error || !data) throw new Error(error?.message ?? "The message could not be kept.");
+  return chatMessage(data as Parameters<typeof chatMessage>[0]);
+}
+
+/** The customer as the sender needs them — read under RLS, then asked may-you-reply, then Meta's window ("shut" is the caller's to keep unsent). */
 async function reachable(db: Db, contactId: string, freeText: boolean): Promise<{ contact: Reachable; token: string; window: "open" | "human_agent" | "shut" }> {
   if (!/^[0-9a-f-]{36}$/i.test(contactId)) throw new Error("Choose a customer first.");
   // The customer and may-I-reply are asked side by side: each send waited for one, then the other.
@@ -264,11 +314,6 @@ async function reachable(db: Db, contactId: string, freeText: boolean): Promise<
   if (!contact) throw new Error("That customer is not in your CRM.");
   const c = contact as Reachable;
   const window = c.channel === "messenger" ? messengerWindow(c.last_customer_at) : windowOpen(c.last_customer_at) ? "open" : "shut";
-  if (freeText && window === "shut") {
-    throw new Error(c.channel === "messenger"
-      ? "More than 7 days since the customer's last message — Messenger no longer allows a reply."
-      : "More than 24 hours since the customer's last message — WhatsApp only allows an approved template now.");
-  }
   if (checkError) throw new Error(checkError.message);
   if (allowed !== true) throw new Error("You may not reply to this customer.");
   const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
@@ -293,6 +338,10 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
     if (!clean.ok) throw new Error(clean.error);
     const db = await session();
     const [, { contact, token, window }] = await Promise.all([requireCrm("edit"), reachable(db, contactId, true)]);
+    if (window === "shut") {
+      if (opts.card) throw new Error(windowShutReason(contact.channel));
+      return { ok: true, message: await keptUnsent(db, { contact: contactId, channel: contact.channel, kind: "text", body: clean.text, replyTo: opts.replyTo }) };
+    }
     let quote: string | null = null;
     if (opts.replyTo) {
       const { data: q } = await db.from("crm_messages").select("id, external_id, contact_id").eq("id", opts.replyTo).maybeSingle();
@@ -307,7 +356,7 @@ export async function sendCrmMessage(contactId: string, text: string, opts: { re
       // A visit card: WhatsApp's layout without bold, and Google Maps · Waze as buttons (through our /nav.html) when there is an address.
       const message = cardHasWay(opts.card) ? messengerVisitMessage(opts.card, await siteBase(), own)
         : opts.card ? { text: messengerCardText(opts.card) } : undefined;
-      const sent = await sendMessengerText({ pageId: contact.account_id, psid: contact.external_id, body: clean.text, token: pageAccess, window: window as "open" | "human_agent", message });
+      const sent = await sendMessengerText({ pageId: contact.account_id, psid: contact.external_id, body: plainWa(clean.text), token: pageAccess, window: window as "open" | "human_agent", message });
       if (!sent.ok) throw new Error(sent.error);
       externalId = sent.mid;
     } else {
@@ -344,6 +393,23 @@ export async function reactToMessage(messageId: string, emoji: string): Promise<
     return { ok: true };
   } catch (error) {
     return { ok: false, error: friendly(error, "The reaction could not be sent.") };
+  }
+}
+
+/**
+ * What customers asked and our team answered (crm_reply_examples, mig 20261029150000) — the chat's suggested replies' experience.
+ * Null when it cannot be read (before the migration, or not in the CRM); the chat then suggests from quick replies alone.
+ */
+export async function fetchCrmReplyExamples(): Promise<{ q: string; a: string; won?: boolean; appt?: boolean }[] | null> {
+  try {
+    const db = await session();
+    await requireCrm("view");
+    const { data, error } = await db.rpc("crm_reply_examples");
+    if (error || !Array.isArray(data)) return null;
+    return (data as { q?: unknown; a?: unknown; won?: unknown; appt?: unknown }[]).filter(x => typeof x.q === "string" && typeof x.a === "string")
+      .map(x => ({ q: x.q as string, a: x.a as string, won: !!x.won, appt: !!x.appt }));
+  } catch {
+    return null;
   }
 }
 
@@ -419,8 +485,8 @@ export async function fetchMetaAds(): Promise<{ ok: true; ads: MetaAdRow[] } | {
     await requireCrm("manage");
     const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
     if (!token) throw new Error("Meta is not connected on this server.");
-    // Only the ads that send people to the CRM's ad number(s) — 018-358 0219 (crmAdNumbers) — not every ad the system user sees.
-    return { ok: true, ads: await listMetaAds(token, fetch, { numbers: crmAdNumbers() }) };
+    // Only the ads that send people to the CRM's ad number(s) — 018-358 0219 (crmAdNumbers), or to Messenger on the CRM's Pages (crmPages) — not every ad the system user sees.
+    return { ok: true, ads: await listMetaAds(token, fetch, { numbers: crmAdNumbers(), pages: crmPages() }) };
   } catch (error) {
     return { ok: false, error: friendly(error, "Meta's ads could not be read.") };
   }
@@ -440,12 +506,26 @@ export async function fetchAdInsights(ids: string[], since: string, until: strin
     const ads = [...new Set(ids)].filter(id => /^\d{5,32}$/.test(id)).slice(0, 40), figs: Record<string, MetaFig | null> = {};
     for (let i = 0; i < ads.length; i += 4) {
       const part = ads.slice(i, i + 4);
-      const got = await Promise.all(part.map(id => metaAdInsights(id, token, since, until)));
-      part.forEach((id, k) => { figs[id] = got[k]; });
+      // Each ad's figures for the range and its budget as it stands today (2026-10-27: the daily budget).
+      const got = await Promise.all(part.map(id => Promise.all([metaAdInsights(id, token, since, until), metaAdBudget(id, token)])));
+      part.forEach((id, k) => { const [fig, budget] = got[k]; figs[id] = fig ? { ...fig, budget } : null; });
     }
     return { ok: true, figs };
   } catch (error) {
     return { ok: false, error: friendly(error, "Meta's figures could not be read.") };
+  }
+}
+
+/** Each ad's picture for Workspace's report (2026-10-27): Meta's image of its creative. CRM · Manage; the token stays here. */
+export async function fetchAdThumbs(ids: string[]): Promise<{ ok: true; thumbs: Record<string, string> } | { ok: false; error: string }> {
+  try {
+    await session();
+    await requireCrm("manage");
+    const token = process.env.META_SYSTEM_USER_TOKEN?.trim();
+    if (!token) throw new Error("Meta is not connected on this server.");
+    return { ok: true, thumbs: await metaAdThumbs(ids, token) };
+  } catch (error) {
+    return { ok: false, error: friendly(error, "The ads' pictures could not be read.") };
   }
 }
 
@@ -517,6 +597,15 @@ export async function sendCrmMedia(input: { contact: string; path: string; name:
     if (file.size > mediaLimit(contact.channel, kind)) {
       throw new Error(`${kind === "image" ? "A photo" : kind === "video" ? "A video" : kind === "audio" ? "A voice note" : "A file"} can be up to ${Math.round(mediaLimit(contact.channel, kind) / 1048576)} MB on ${contact.channel === "messenger" ? "Messenger" : "WhatsApp"}.`);
     }
+    if (window === "shut") {
+      const message = await keptUnsent(db, { contact: contactId, channel: contact.channel, kind: kind === "image" ? "image" : "document", body: caption || filename });
+      const { error: mediaError } = await db.rpc("crm_set_out_media", { p_message: message.id, p_path: input.path, p_mime: mime || "application/octet-stream", p_caption: caption });
+      if (mediaError) return { ok: true, message };
+      const shownName = (input.name || filename).trim().slice(0, 240) || filename;
+      if (kind === "document") await db.rpc("crm_name_out_file", { p_message: message.id, p_name: shownName });
+      const shown = kind === "document" ? "file" : kind;
+      return { ok: true, message: { ...message, kind, text: caption, media: { kind: shown, url: `/member/crm-media/${message.id}`, ...(shown === "file" ? { name: shownName } : {}) } } };
+    }
     let externalId: string;
     if (contact.channel === "messenger") {
       const pageAccess = await pageToken(contact.account_id, token);
@@ -547,8 +636,11 @@ export async function sendCrmMedia(input: { contact: string; path: string; name:
     if (!message) return { ok: false, error: "Sent to the customer, but it could not be saved here. Reload before sending again." };
     const { error: mediaError } = await db.rpc("crm_set_out_media", { p_message: message.id, p_path: input.path, p_mime: mime || "application/octet-stream", p_caption: caption });
     if (mediaError) return { ok: true, message };
+    // A document keeps its own name beside its caption (2026-10-27, mig 20261027110000) — a failure only leaves it named as before.
+    const shownName = (input.name || filename).trim().slice(0, 240) || filename;
+    if (kind === "document") await db.rpc("crm_name_out_file", { p_message: message.id, p_name: shownName });
     const shown = kind === "document" ? "file" : kind;
-    return { ok: true, message: { ...message, kind, text: kind === "document" ? message.text : caption, media: { kind: shown, url: `/member/crm-media/${message.id}`, ...(shown === "file" ? { name: filename } : {}) } } };
+    return { ok: true, message: { ...message, kind, text: caption, media: { kind: shown, url: `/member/crm-media/${message.id}`, ...(shown === "file" ? { name: shownName } : {}) } } };
   } catch (error) {
     return { ok: false, error: friendly(error, "The file could not be sent.") };
   }
@@ -633,7 +725,7 @@ export async function forwardCrmMessage(messageId: string, toContact: string): P
     if (!/^[0-9a-f-]{36}$/i.test(messageId) || !/^[0-9a-f-]{36}$/i.test(toContact)) throw new Error("Choose the message again.");
     const db = await session();
     await requireCrm("edit");
-    const { data: m } = await db.from("crm_messages").select("id, kind, body, media_id, media_path, media_url, media_mime").eq("id", messageId).maybeSingle();
+    const { data: m } = await db.from("crm_messages").select("id, kind, body, media_id, media_path, media_url, media_mime, media_name").eq("id", messageId).maybeSingle();
     if (!m) throw new Error("That message is not there any more.");
     const hasFile = !!(m.media_id || m.media_path || m.media_url);
     if (!hasFile) {
@@ -664,7 +756,8 @@ export async function forwardCrmMessage(messageId: string, toContact: string): P
     // The bucket's own limit (100 MB on R2); sendCrmMedia then holds it to the target channel's.
     if (blob.size > 100 * 1024 * 1024) throw new Error("A file can be forwarded up to 100 MB.");
     const kind = mediaKindOf(mime);
-    const name = kind === "document" ? (String(m.body ?? "").trim() || "file") : `${kind}`;
+    // A document forwarded under its own name (2026-10-27), else its words as before.
+    const name = kind === "document" ? (String(m.media_name ?? "").trim() || String(m.body ?? "").trim() || "file") : `${kind}`;
     const path = mediaPath(toContact, name, mime);
     const up = await db.storage.from("crm-media").upload(path, blob, { contentType: mime, upsert: false });
     if (up.error) throw new Error("You cannot send to that customer.");

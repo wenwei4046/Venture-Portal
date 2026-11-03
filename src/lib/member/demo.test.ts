@@ -26,7 +26,7 @@ describe("member preview demo catalogue", () => {
 
   it("offers only the leg heights every sofa in the cart was ticked for", () => {
     const choices = buildChoicesFor([byId("arc-2na"), byId("zan-sofa-3")], demoPricing.models);
-    expect(choices.sofa).toEqual({ legs: ['4"', '6"'], specials: ["Nylon Fabric"] });
+    expect(choices.sofa).toEqual({ legs: ['4"', '6"'], specials: ["Nylon Fabric"], upgrades: [] });
     expect(choices.bedframe).toBeNull();
   });
 

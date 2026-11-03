@@ -190,6 +190,28 @@ describe("a Revenue Director reads the boards (2026-10-14: on none of them)", ()
   });
 });
 
+describe("My margin incentive", () => {
+  const tiers = [
+    { brand: "AKEMI", bandKey: "incentive_tier_1", label: "Incentive Tier 1", marginPct: .36, amount: 1000 },
+    { brand: "ZANOTTI", bandKey: "incentive_tier_1", label: "Incentive Tier 1", marginPct: .33, amount: 1000 },
+  ];
+  const foot = (brands: Record<string, Partial<ArenaScore>>) =>
+    boardModel(input({ board: "margin", snapshot: snapshot([person("me", "ME", { sales: 500 }, true, brands)], { tiers }) })).foot;
+
+  it("reads the tier every brand sold clears", () => {
+    expect(foot({ ZANOTTI: { sales: 500, marginRevenue: 500, marginCost: 300 } })).toEqual({ title: "My margin incentive", sub: "Incentive Tier 1 reached" });
+  });
+  // HC-SO-2610-096 (2026-10-30): Zanotti sold at 40%, an Akemi item given away on a bill of its own.
+  it("names a brand given away and never sold as what holds the tier back", () => {
+    expect(foot({ ZANOTTI: { sales: 500, marginRevenue: 500, marginCost: 300 }, AKEMI: { orders: 1, marginCost: 214.29 } }))
+      .toEqual({ title: "My margin incentive", sub: "No tier · Akemi has no sales" });
+  });
+  it("calls it a cost pending while that gift still has no cost", () => {
+    expect(foot({ ZANOTTI: { sales: 500, marginRevenue: 500, marginCost: 300 }, AKEMI: { orders: 1, blindOrders: 1 } })?.sub)
+      .toBe("Incentive Tier 1 reached · held by 1 Akemi bill without cost");
+  });
+});
+
 describe("fairTallies", () => {
   it("counts only the brand week's booth, at the place held among everybody there", () => {
     const rows = fairTallies(people, history, "2026-09", "2026-09");

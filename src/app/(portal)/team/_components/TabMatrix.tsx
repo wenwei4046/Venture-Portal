@@ -25,6 +25,19 @@ export interface MatrixReach {
 }
 
 /**
+ * By management approve (2026-10-29, the claim process's PR ③ — the mockup's "Claim ☑ By management approve"): under
+ * each view's Claim row whose View is ticked, one pill — their requests go to their department's Claim & approve first.
+ * `mine`: a person's own tick over their title's (the red dot).
+ */
+export interface MatrixReview {
+  on: boolean
+  mine?: boolean
+  onToggle: () => void
+}
+
+const REVIEW_HINT = 'Their requests are approved by their department’s Claim & approve first, then go to Finance'
+
+/**
  * The handoff's permission matrix (2026-10-11, People › Permissions and the
  * person window): the views on the left with how many of their tabs are
  * seen ("8/8"), the open view's tabs on the right, each with View · Create ·
@@ -54,6 +67,7 @@ export default function TabMatrix({
   onAll,
   held,
   reach,
+  review,
   canEdit,
   compact = false,
 }: {
@@ -72,6 +86,8 @@ export default function TabMatrix({
   held?: ReadonlyMap<string, string>
   /** One person's sub-departments, on the Revenue rows that carry them. */
   reach?: MatrixReach
+  /** By management approve, under the Claim rows. */
+  review?: MatrixReview
   canEdit: boolean
   /** The person window's tighter rail. */
   compact?: boolean
@@ -128,6 +144,24 @@ export default function TabMatrix({
                 {t.label}
                 {why ? <span className={s.held}>{why}</span> : null}
                 {subs ? <SubDepartmentPills reach={reach!} area={subs} tab={t.label} canEdit={canEdit} /> : null}
+                {review && t.id.endsWith('.my_claims') && ticks.has(grantOf(t.id, 'view')) ? (
+                  <span className={s.subs} role="group" aria-label={`${t.label} · routing`}>
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={review.on}
+                      aria-label={`${t.label} · By management approve`}
+                      title={REVIEW_HINT}
+                      disabled={!canEdit}
+                      className={`${s.sub} ${review.on ? s.subOn : ''}`}
+                      onClick={review.onToggle}
+                    >
+                      <span className={s.subTick} aria-hidden>{review.on ? '✓' : ''}</span>
+                      By management approve
+                      {review.mine ? <span className={s.dot} aria-label="changed for this person" /> : null}
+                    </button>
+                  </span>
+                ) : null}
               </span>
               {TAB_ACTIONS.map(a => {
                 const g = grantOf(t.id, a)

@@ -9,6 +9,15 @@ describe('where a line’s cost came from', () => {
     ).toEqual({ label: 'Product List · seat 30 · Tier 2 · + RM 80.00 options', missing: false })
   })
 
+  it('names a bed frame still to be chosen by the size it was costed at (2026-10-31)', () => {
+    expect(costProvenance('catalogue', { how: 'kiv', unit: 820, size: 'Q', named: ['Q'], size_from: 'words' }, true))
+      .toEqual({ label: 'KIV bed frame · Queen', missing: false })
+    // No size, or one the four do not set (SK): the dearest of the four.
+    expect(costProvenance('catalogue', { how: 'kiv', unit: 1000 }, true).label).toBe('KIV bed frame · the dearest size')
+    expect(costProvenance('catalogue', { how: 'kiv', unit: 1000, named: ['SK'], size_from: 'code' }, true).label)
+      .toBe('KIV bed frame · the dearest size')
+  })
+
   it('names the combo a module was costed at', () => {
     expect(
       costProvenance('catalogue_combo', { combo: { label: 'L-shape', price: 2000, sets: 1 } }, true),
@@ -67,5 +76,36 @@ describe('what a line’s options were charged for', () => {
       .toBe('for leg 6" · Nylon Fabric — RM 300.00 for 2 sofas, spread over its 3 pieces')
     expect(chargeText({ ...sofa, charge_set: { unit: 150, sets: 1, total: 150, lines: 1 } }))
       .toBe('for leg 6" · Nylon Fabric — RM 150.00 once for the sofa')
+  })
+
+  // 2026-10-27: a sofa special charged by quantity, once per compartment, says how many.
+  it('says how many compartments a special charged by quantity was charged for', () => {
+    expect(chargeText({
+      charges: [
+        { pool: 'sofa_specials', value: 'Change 8030 Backcushion', price: 200, count: 3, by_quantity: true },
+        { pool: 'sofa_specials', value: 'Seat and Backcushion Firmer', price: 300, count: 1 },
+      ],
+      charge_set: { sets: 1, compartments: 3, total: 900, lines: 2 },
+    })).toBe('for Change 8030 Backcushion ×3 · Seat and Backcushion Firmer — RM 900.00 once for the sofa, spread over its 2 pieces')
+    // A part from 2026-10-26 (the bill's special order) reads as its name alone.
+    expect(chargeText({ charges: [{ pool: 'sofa_specials', value: 'Change 8030 Backcushion', price: 600, special_order: true }] }))
+      .toBe('for Change 8030 Backcushion')
+  })
+
+  // 2026-10-29: a fabric's upgrade (Maintenance › Fabrics › upgrades) names the series it was found by.
+  it('names a fabric upgrade and its series', () => {
+    expect(chargeText({
+      charges: [
+        { pool: 'bedframe_divan_heights', value: '12"', price: 100 },
+        { pool: 'bedframe_fabric_upgrades', value: 'Upgrade fabric', series: 'PC151', price: 150 },
+      ],
+    })).toBe('for divan 12" · Upgrade fabric (PC151)')
+    expect(chargeText({
+      charges: [
+        { pool: 'sofa_fabric_upgrades', value: 'Leather', series: 'LX', price: 500, count: 2 },
+        { pool: 'sofa_leg_heights', value: '5"', price: 200, count: 2 },
+      ],
+      charge_set: { sets: 2, compartments: 6, total: 1400, lines: 3 },
+    })).toBe('for Leather (LX) · leg 5" — RM 1400.00 for 2 sofas, spread over its 3 pieces')
   })
 })

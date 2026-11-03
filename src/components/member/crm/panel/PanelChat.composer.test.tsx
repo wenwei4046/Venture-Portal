@@ -105,22 +105,21 @@ describe("the Team chat is Mine's", () => {
     expect(emojiCells()[0].textContent).toBe("🛏️");
   });
 
-  it("Attach: Photos opens the photo picker; Quick replies and Auto replies open their lists", async () => {
+  it("Attach: Photos opens the photo picker; Suggest reply (Auto replies' place since 2026-10-29) opens the suggested replies", async () => {
     await openTeamChat();
     await tap(byTitle("Attach"));
     const panel = composer().querySelector<HTMLElement>("[data-attach]")!;
-    expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Auto replies"]);
+    expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Suggest reply"]);
     const photo = document.getElementById("crm-panel-photo")!, click = vi.spyOn(photo, "click");
     await tap(screen.getByText("Photos"));
     expect(click).toHaveBeenCalledTimes(1);
     expect(composer().querySelector("[data-attach]")).toBeNull();
     await tap(byTitle("Attach"));
-    await tap(screen.getByText("Auto replies"));
-    const sheet = screen.getByRole("dialog", { name: "Attach" });
-    expect(sheet.textContent).toContain("Auto replies");
+    await tap(screen.getByText("Suggest reply"));
+    const sheet = screen.getByRole("dialog", { name: "Suggested replies" });
+    expect(sheet.textContent).toContain("Suggested replies");
     const cam = document.getElementById("crm-panel-camera")!, camClick = vi.spyOn(cam, "click");
-    fireEvent.click(sheet);
-    await act(async () => {});
+    await tap(screen.getByRole("button", { name: "Close" }));
     await tap(byTitle("Camera"));
     expect(camClick).toHaveBeenCalledTimes(1);
   });
@@ -177,7 +176,10 @@ describe("the Team chat is Mine's", () => {
 
   it("a cold chat's templates are read each time: switched on in Profile, offered at once with the words each sends", async () => {
     await openTeamChat("Rajesh Kumar");
-    const sendTemplate = () => tap([...composer().querySelectorAll("span")].find(s => s.textContent === "Send template message") ?? null);
+    const sendTemplate = async () => {
+      await tap(head().querySelector('[title="More"]'));
+      await tap(screen.getAllByText("Send template message", { exact: true })[0]);
+    };
     await sendTemplate();
     fireEvent.click(screen.getByRole("dialog", { name: "No templates switched on" }));
     await act(async () => {});
@@ -193,14 +195,13 @@ describe("the Team chat is Mine's", () => {
     expect(sheet.textContent).toContain("Hi Rajesh, this is HOUZS.");
   });
 
-  it("a cold chat: frame M08's card in the bar's place — This chat is cold, who last wrote, Send template message — as Mine's", async () => {
+  it("a chat past its window keeps the reply bar (as Lead View, 2026-10-30): no cold card, the template in ⋮", async () => {
     await openTeamChat("Rajesh Kumar");
     expect(head().textContent).not.toContain("Cold lead ·");
-    const card = composer().querySelector("[data-cold-card]");
-    expect(card?.textContent).toContain("This chat is cold");
-    expect(card?.textContent).toMatch(/^.*Rajesh last wrote .* ago. WhatsApp only lets an approved template open the chat again./);
-    expect(composer().querySelector("textarea")).toBeNull();
-    await tap([...composer().querySelectorAll("span")].find(s => s.textContent === "Send template message") ?? null);
+    expect(composer().querySelector("[data-cold-card]")).toBeNull();
+    expect(composer().querySelector("textarea")).not.toBeNull();
+    await tap(head().querySelector('[title="More"]'));
+    await tap(screen.getAllByText("Send template message", { exact: true })[0]);
     // The demo's templates are all off: the sheet says where they are switched on.
     expect(screen.getByRole("dialog", { name: "No templates switched on" })).toBeInTheDocument();
   });

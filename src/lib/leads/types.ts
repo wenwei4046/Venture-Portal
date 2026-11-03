@@ -1,0 +1,170 @@
+// Lead View (2026-10-16): the shapes the lead_* functions answer (mig 20261016300200) as the screens read them.
+
+export type LeadChannel = 'messenger' | 'instagram'
+export type BrandTone = 'ink' | 'clay' | 'blue' | 'olive' | 'plum'
+export type PhoneState = 'none' | 'detected' | 'confirmed'
+export type Appt = 'unknown' | 'booked' | 'not_booked'
+export type Shown = 'unknown' | 'came' | 'no_show'
+
+export interface LeadSales {
+  id: string
+  name: string
+  /** Digits only, as typed less the country code: 0120001101. */
+  phone: string
+  showroom: string
+  sortOrder: number
+  /** Leads handed to them in the last seven days — the rotation's count. */
+  week: number
+}
+
+export interface LeadBrand {
+  id: string
+  name: string
+  tone: BrandTone
+  fbPageId: string | null
+  igAccountId: string | null
+  handoffMode: 'rotate' | 'pick'
+  sortOrder: number
+  sales: LeadSales[]
+}
+
+export interface LeadConfig {
+  today: string
+  brands: LeadBrand[]
+  /** Conversations whose customer spoke last and that are not handed over. */
+  waiting: number
+  /** Phones got but not handed to a salesperson yet. */
+  unhanded: number
+}
+
+export interface LeadContact {
+  id: string
+  brandId: string
+  channel: LeadChannel
+  isTest: boolean
+  name: string
+  sourceAd: string
+  phone: string | null
+  phoneState: PhoneState
+  phoneAt: string | null
+  interest: string
+  budget: string
+  showroom: string
+  preferredTime: string
+  note: string
+  handedSalesId: string | null
+  handedSalesName: string | null
+  handedAt: string | null
+  handedByName: string | null
+  appt: Appt
+  shown: Shown
+  lastAt: string
+  lastDir: 'in' | 'out'
+  lastText: string
+  createdAt: string
+  /** The button flow on this conversation (mig 20261016310000): running = waiting on the customer's answer. */
+  flowState?: 'none' | 'running' | 'done' | 'stopped'
+  flowName?: string | null
+  /** Promotions consent (mig 20261016340000): Meta's rule for a campaign past the 24-hour window. */
+  optIn?: 'none' | 'in' | 'out'
+  optInAt?: string | null
+  /** The ad it came from (mig 20261018110000): Meta's id, and what Ads Manager (or a person) calls it. sourceAd is Meta's headline. */
+  adId?: string | null
+  adName?: string
+  adCampaign?: string
+  adSet?: string
+  adAccount?: string
+  adLink?: string
+  /** Leads v2 (mig 20261022220000): when each step past the hand-over was reached, a closed sale, a loss. Absent until it is applied. */
+  contactedAt?: string | null
+  apptAt?: string | null
+  cameAt?: string | null
+  closedAt?: string | null
+  saleValue?: number | string | null
+  lostAt?: string | null
+  lostReason?: string
+  stageByName?: string
+  /** The CS who handles it (mig 20261027150000): taken by their first reply, or given by Lead View · Manage. */
+  assignedTo?: string | null
+  assignedName?: string
+  assignedAt?: string | null
+  /** The Inbox list only (mig 20261027160000): the customer's messages since the last one that went out to them. */
+  unread?: number
+  /** Meta's receipts (mig 20261027190000): every message out at or before them reached / was read by the customer. */
+  deliveredAt?: string | null
+  readAt?: string | null
+  /** The conversation's Facebook Page and the customer's id there (mig 20261028100000): Messenger's unread count, "seen". */
+  pageId?: string | null
+  psid?: string | null
+  /** Customer Service's labels on this customer (mig 20261027190000). */
+  labels?: LeadLabelChip[]
+  updatedAt?: string
+  /** For the salesperson (Lead View v2, mig 20261102100000): the customer's language and anything special. */
+  language?: LeadLanguage | ''
+  specialRequest?: string
+  /** The phone was typed by CS, kept as typed (mig 20261102100000) — "Phone · added by you". */
+  phoneTyped?: boolean
+  /** The AI Agent answers this chat (mig 20261102170000; on the card since mig 20261102210000). */
+  aiOn?: boolean
+  /** Blocked in Lead View (mig 20261102270000): kept, never answered, out of the Inbox's list but under Blocked. */
+  blockedAt?: string | null
+  blockedBy?: string
+}
+
+export type LeadLanguage = 'Mandarin' | 'English' | 'Malay' | 'Other'
+export const LEAD_LANGUAGES: LeadLanguage[] = ['Mandarin', 'English', 'Malay', 'Other']
+
+export type LabelTone = 'grey' | 'amber' | 'green' | 'red' | 'clay' | 'blue'
+export const LABEL_TONES: LabelTone[] = ['grey', 'amber', 'green', 'red', 'clay', 'blue']
+/** A label on a customer. */
+export interface LeadLabelChip { id: string; name: string; tone: LabelTone }
+/** A label in Customer Service's list, with how many customers carry it. */
+export interface LeadLabel extends LeadLabelChip { used: number }
+
+export interface LeadMessage {
+  id: number
+  direction: 'in' | 'out'
+  /** page = the Page replied outside Lead View — Business Suite, its AI, the phone (mig 20261027130000). */
+  sender: 'customer' | 'cs' | 'ai' | 'flow' | 'campaign' | 'page'
+  byName: string
+  body: string
+  phoneFound: string | null
+  delivery: 'recorded' | 'sent' | 'failed'
+  at: string
+  /** A flow question's buttons, as the customer saw them. */
+  buttons?: string[] | null
+  /** A photo or file CS sent (bucket lead-media, mig 20261027140000), and its type. */
+  mediaPath?: string | null
+  mediaMime?: string | null
+  /** A customer's photo / video / voice note / file: Meta's own address (it expires after a while). */
+  mediaUrl?: string | null
+  /** Meta's id of this message, the id of the message it quotes, and the Page's emoji on it (mig 20261027220000). */
+  mid?: string | null
+  replyToMid?: string | null
+  reaction?: string | null
+}
+
+export interface LeadEvent {
+  what: string
+  by: string
+  at: string
+}
+
+export interface LeadThread {
+  contact: LeadContact
+  messages: LeadMessage[]
+  events: LeadEvent[]
+}
+
+/** The card's fields Customer Service edits (lead_save_card). */
+export interface LeadCardFields {
+  name?: string
+  phone?: string
+  interest?: string
+  budget?: string
+  showroom?: string
+  preferredTime?: string
+  note?: string
+  language?: LeadLanguage | ''
+  specialRequest?: string
+}

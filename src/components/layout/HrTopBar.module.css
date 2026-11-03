@@ -19,24 +19,7 @@
 .view { display: flex; align-items: center; gap: 6px; color: rgb(var(--hvs-top-view)); }
 .dot { width: 5px; height: 5px; border-radius: 50%; background: rgb(var(--hvs-top-dot)); flex: none; }
 .viewLabel { font-size: 13.5px; }
-.select {
-  appearance: none;
-  -webkit-appearance: none;
-  /* As wide as the view it names, not the longest option — "HR view" sits
-     20px from the date, as the prototype's words do. */
-  field-sizing: content;
-  border: 0;
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  font: inherit;
-  font-size: 13.5px;
-  line-height: normal;
-  color: rgb(var(--hvs-top-view));
-  cursor: pointer;
-}
-.select:focus-visible { outline: 2px solid rgb(var(--hvs-nav-bar)); outline-offset: 2px; border-radius: 4px; }
-.select:disabled { opacity: 0.6; }
+/* The view switch, for an account that may switch: ViewSwitch.module.css (every bar's, 2026-10-27). */
 .clock {
   display: flex;
   align-items: baseline;

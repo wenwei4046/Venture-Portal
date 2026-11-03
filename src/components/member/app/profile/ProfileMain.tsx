@@ -1,5 +1,6 @@
 "use client";
 
+import { phoneWhere } from "@/lib/view-switch";
 import { ICON, Svg } from "../icons";
 import { MODULES, type ModuleId } from "../shell/Chrome";
 import InstallRow from "./InstallRow";
@@ -49,14 +50,6 @@ export interface ProfileMainActions {
 }
 
 const NO_ROWS: readonly WorkKey[] = [];
-
-/** Switch view's rows (2026-10-11, one app): where each view opens on a phone, in the HR app's More's order. */
-const VIEWS: { id: ModuleId; where: string }[] = [
-  { id: "principal", where: "The portal" },
-  { id: "finance", where: "The portal" },
-  { id: "hr", where: "The HR app" },
-  { id: "revenue", where: "The Revenue app" },
-];
 
 /**
  * Profile — the peach card, Your workspace, and Settings (lines 1132–1187: Privacy and Sign out, one section since
@@ -121,16 +114,15 @@ export default function ProfileMain({ vm, hidden, actions, closedRows = NO_ROWS,
         {views ? (
           <section className={s.views} aria-label="Switch view">
             <h2 className={s.h2}>Switch view</h2>
-            {VIEWS.map(({ id, where }) => {
-              const m = MODULES.find(x => x.id === id);
-              if (!m) return null;
+            {/* Every view, as the module menu lists them (2026-10-27, lib/view-switch.ts), and where each opens on a phone. */}
+            {MODULES.map(({ id, label, dot }) => {
               const here = id === views.current;
               const face = (
                 <>
-                  <span className={`${s.workIcon} ${s.toneView}`}><span className={`${s.viewDot} ${m.dot}`} /></span>
+                  <span className={`${s.workIcon} ${s.toneView}`}><span className={`${s.viewDot} ${dot}`} /></span>
                   <span className={s.workText}>
-                    <span className={s.workLabel}>{m.label}</span>
-                    <span className={s.workSub}>{here ? "You are here" : where}</span>
+                    <span className={s.workLabel}>{label}</span>
+                    <span className={s.workSub}>{here ? "You are here" : phoneWhere(id, "revenue")}</span>
                   </span>
                   {here ? <span /> : <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />}
                 </>

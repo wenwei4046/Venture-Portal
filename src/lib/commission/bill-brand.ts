@@ -11,10 +11,12 @@
  * shows, and says what happened.
  */
 
-/** A brand the portal has a margin ladder for (`comm_brands`). */
+/** A brand the portal has a margin ladder for (`comm_brands`), and the ERP brandings that are it. */
 export interface BrandOption {
   code: string
   name: string
+  /** Its sub-brands (Akemi's: HAPPI SLEEP) — what an ERP booth may call it. */
+  subBrands?: readonly string[]
 }
 
 export type BillBrandAction =

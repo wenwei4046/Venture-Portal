@@ -185,8 +185,9 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   },
   hr_import_templates: each(['hr_costing.create', 'hr_costing.edit', 'team.create', 'team.edit']),
   hr_monthly_payroll: each(['hr_costing.create', 'hr_costing.edit']),
-  hr_pool_allocation: each(['hr_costing.create', 'hr_costing.edit'], ['INSERT', 'UPDATE']),
+  hr_pool_allocation: each(['hr_costing.create', 'hr_costing.edit']),
   hr_staff_allocation: each(['hr_costing.create', 'hr_costing.edit']),
+  hr_staff_dept_moves: each(['hr_costing.create', 'hr_costing.edit']),
   payroll_payment_requests: {
     INSERT: ['hr_costing.create'],
     // HR edits its request; Finance pays it out or sends it back.
@@ -260,7 +261,6 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   sales_order_erp_changes: each(REVENUE_WORK),
   sales_order_exclusions: each(REVENUE_WORK),
   sales_order_lines: each(REVENUE_WORK),
-  sales_order_open_bill_tags: each(REVENUE_WORK),
   sales_order_reassignments: each(REVENUE_WORK),
   sales_order_shares: each(REVENUE_WORK),
   sales_orders: each(REVENUE_WORK),
@@ -272,8 +272,6 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   comm_kpi_items: each(REVENUE_RULES),
   comm_kpi_thresholds: each(REVENUE_RULES),
   comm_margin_bands: each(REVENUE_RULES),
-  comm_open_bill_months: each(REVENUE_RULES),
-  comm_open_bill_rules: each(REVENUE_RULES),
   comm_promotion_rules: each(REVENUE_RULES),
   comm_rank_defs: each(REVENUE_RULES),
   comm_ranks: each(REVENUE_RULES),
@@ -289,6 +287,9 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   // ── Product List ────────────────────────────────────────────────────────
   catalogue_combo_prices: each(['product_list.edit']),
   catalogue_combos: each(['product_list.edit']),
+  catalogue_fabric_upgrade_series: each(['product_list.edit']),
+  catalogue_fabric_upgrades: each(['product_list.edit']),
+  catalogue_kiv_costs: each(['product_list.edit']),
   catalogue_models: each(['product_list.edit']),
   catalogue_option_prices: each(['product_list.edit']),
   catalogue_skus: each(['product_list.edit']),

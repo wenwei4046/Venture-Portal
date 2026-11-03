@@ -12,12 +12,12 @@ import CommissionWorkbench, { type PayrollBarFacts } from './CommissionWorkbench
 // The salary preview's pay-line editor saves through a server action (its own tests are SalaryCalculation.test).
 vi.mock('../../../pay-line-actions', () => ({ savePayLines: vi.fn() }))
 
-const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, moveOrder, url } = vi.hoisted(() => {
+const { refresh, push, excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, moveOrder, url } = vi.hoisted(() => {
   // Next re-renders `useSearchParams` from the browser's own pushState and
   // replaceState; the stand-in does the same through this subscription.
   const listeners = new Set<() => void>()
   return {
-    saveOpenPicks: vi.fn(), refresh: vi.fn(), push: vi.fn(), excludeOrder: vi.fn(), includeOrder: vi.fn(),
+    refresh: vi.fn(), push: vi.fn(), excludeOrder: vi.fn(), includeOrder: vi.fn(),
     setOrderBrand: vi.fn(), shareOrder: vi.fn(), unshareOrder: vi.fn(), moveOrder: vi.fn(),
     url: {
       subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
@@ -25,7 +25,7 @@ const { saveOpenPicks, refresh, push, excludeOrder, includeOrder, setOrderBrand,
     },
   }
 })
-vi.mock('../../../run-actions', () => ({ saveOpenBillPicks: saveOpenPicks, excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, moveOrder }))
+vi.mock('../../../run-actions', () => ({ excludeOrder, includeOrder, setOrderBrand, shareOrder, unshareOrder, moveOrder }))
 vi.mock('../../../close-actions', () => ({ closeSalespeople: vi.fn(), reopenSalespeople: vi.fn() }))
 vi.mock('next/navigation', async () => {
   const { useMemo, useSyncExternalStore } = await import('react')
@@ -69,8 +69,8 @@ function fixture(): CommissionWorkbenchData {
   const input: EngineInput = {
     periodMonth: '2026-08-01',
     scheme: {
-      openBillBasis: 'uplift_on_commission', overrideIncludesKpi: false,
-      enableProductRevenue: true, enableKpi: true, enableOpenBill: true, enableOverride: true,
+      overrideIncludesKpi: false,
+      enableProductRevenue: true, enableKpi: true, enableOverride: true,
       enableMarginPenalty: true, enableMarginIncentive: true,
       itemGroups: [{ group: 'SOFA', commissionable: true }, { group: 'ACC', commissionable: true }],
       depositThresholdPct: 0.3, defaultRateMode: 'fixed',
@@ -83,14 +83,12 @@ function fixture(): CommissionWorkbenchData {
     orders: [sale('one'), sale('two', 2_000)],
     kpiItems: [{ productCode: 'PILLOW', kpiAmount: 20 }],
     kpiThresholds: [{ minQty: 2, bonusPct: 0.2 }],
-    openBillRules: [{ rank: 1, pct: 0.5 }, { rank: 2, pct: 0.4 }, { rank: 3, pct: 0.3 }],
-    openBillTags: [{ orderId: 'one', rank: 1 }],
     marginBands: [{ brandCode: 'AKEMI', bandKey: 'reward', label: 'Reward', kind: 'incentive', marginPct: 0.36, monthlyIncentive: 1_000, commissionMultiplier: 1 }],
     priorMonths: [],
   }
   return {
     input, currentHierarchy: input.hierarchy,
-    currentRules: { hierarchy: input.hierarchy, kpiItems: input.kpiItems, kpiThresholds: input.kpiThresholds, openBillRules: input.openBillRules },
+    currentRules: { hierarchy: input.hierarchy, kpiItems: input.kpiItems, kpiThresholds: input.kpiThresholds },
     unmatchedOrderNos: [], payRows: [], payUnavailable: true,
     people: [
       { staffId: 'agent', name: 'Anthony', employeeCode: 'HV001' },
@@ -134,14 +132,12 @@ function renderBoard(data = fixture(), runStatus: string | null = null, savedTot
 function choose(name: string) { fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${name}$`) })) }
 function personalTable() { return screen.getByRole('table', { name: 'Personal commission by sales order' }) }
 function salesRow(table: HTMLElement, orderNo: string) { return within(table).getByRole('row', { name: new RegExp(orderNo) }) }
-function openTab() { fireEvent.click(screen.getByRole('tab', { name: /^Open Bill/ })) }
 
 beforeEach(() => {
   sessionStorage.clear()
   vi.clearAllMocks()
-  saveOpenPicks.mockResolvedValue(undefined)
-  excludeOrder.mockResolvedValue({ orderNo: 'SO-one', changed: true, openBillRank: 1 })
-  includeOrder.mockResolvedValue({ orderNo: 'SO-one', changed: true, counts: true, stillOut: null, openBillRank: 1 })
+  excludeOrder.mockResolvedValue({ orderNo: 'SO-one', changed: true })
+  includeOrder.mockResolvedValue({ orderNo: 'SO-one', changed: true, counts: true, stillOut: null })
   originalReplace(null, '', '/revenue/fair/2026-08-01')
   vi.spyOn(window.history, 'pushState').mockImplementation((data, unused, next) => { originalPush(data, unused, next); url.changed() })
   vi.spyOn(window.history, 'replaceState').mockImplementation((data, unused, next) => { originalReplace(data, unused, next); url.changed() })
@@ -192,7 +188,7 @@ describe('CommissionWorkbench', () => {
     expect(card('Commissionable value')).toHaveTextContent('RM 200.00 no commission')
     expect(within(card('Total orders')).getByText('2')).toBeVisible()
     expect(within(card('Salespeople')).getByText('2')).toBeVisible()
-    expect(card('Total commission')).toHaveTextContent('RM 1,309.30')
+    expect(card('Total commission')).toHaveTextContent('RM 1,284.80')
     expect(within(card('Lines without a cost')).getByText('0')).toBeVisible()
     expect(within(summary()).getByText('Unmatched agents')).toHaveTextContent('Unmatched agents 0')
     expect(screen.queryByRole('heading', { name: 'Salespeople' })).toBeNull()
@@ -201,19 +197,16 @@ describe('CommissionWorkbench', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search salesperson' }), { target: { value: 'Anthony' } })
     expect(screen.queryByRole('button', { name: 'Alex' })).toBeNull()
     expect(within(card('Salespeople')).getByText('2')).toBeVisible()
-    expect(card('Total commission')).toHaveTextContent('RM 1,309.30')
+    expect(card('Total commission')).toHaveTextContent('RM 1,284.80')
+  })
 
-    // A draft — an Open Bill pick not yet saved — moves the commission and
-    // nothing the ERP sent: SO-one's bonus drops from 50% to 40% of its 49.00.
-    openTab()
-    fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' }), { target: { value: '2' } })
-    expect(card('Total commission')).toHaveTextContent('RM 1,304.40')
-    expect(card('Total commission')).toHaveTextContent('Draft calculation')
-    expect(card('Total sales value')).toHaveTextContent('RM 3,000.00')
-    expect(within(card('Total orders')).getByText('2')).toBeVisible()
-    expect(within(card('Salespeople')).getByText('2')).toBeVisible()
-    expect(within(card('Lines without a cost')).getByText('0')).toBeVisible()
-    expect(saveOpenPicks).not.toHaveBeenCalled()
+  // Open Bill went (2026-10-31): no tab of its own, no column on a ledger.
+  it('has no Open Bill tab, column or pick', () => {
+    renderBoard()
+    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).not.toContainEqual(expect.stringMatching(/Open Bill/))
+    choose('Anthony')
+    expect(within(personalTable()).queryByText(/Open Bill/)).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: /^Open Bill/ })).toBeNull()
   })
 
   it("shows each salesperson's sales value beside what of it earns, and names what does not (user 2026-09-26)", () => {
@@ -442,12 +435,12 @@ describe('CommissionWorkbench', () => {
     expect(screen.getByRole('tab', { name: /^Total Sales Orders/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('table', { name: 'Salesperson commission summary' })).toBeVisible()
     expect(screen.queryByRole('table', { name: 'Personal commission by sales order' })).toBeNull()
-    expect(screen.getAllByText('RM 1,309.30').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('RM 1,284.80').length).toBeGreaterThan(0)
 
     choose('Anthony')
     const table = personalTable()
     expect(within(table).getAllByRole('row')).toHaveLength(4)
-    expect(within(salesRow(table, 'SO-one')).getByText('RM 428.58')).toBeVisible()
+    expect(within(salesRow(table, 'SO-one')).getByText('RM 404.08')).toBeVisible()
     expect(salesRow(table, 'SO-one')).toHaveTextContent('RM 20.00+ RM 4.00 · 20% bonus')
     expect(salesRow(table, 'SO-one')).toHaveTextContent('Arena')
     expect(salesRow(table, 'SO-one')).toHaveTextContent('Home Fair')
@@ -455,7 +448,7 @@ describe('CommissionWorkbench', () => {
     expect(within(table).getByRole('columnheader', { name: 'Total commission' })).toBeVisible()
     expect(within(table).getByRole('link', { name: 'SO-one' })).toHaveAttribute('href',
       `/revenue/fair/2026-08-01/orders/one?from=${encodeURIComponent('/revenue/fair/2026-08-01?person=agent')}`)
-    expect(screen.getAllByText('RM 1,220.50').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('RM 1,196.00').length).toBeGreaterThan(0)
   })
 
   it('lets an upline with no personal orders inspect each downline order and overriding rate', () => {
@@ -485,15 +478,14 @@ describe('CommissionWorkbench', () => {
     await waitFor(() => expect(excludeOrder).toHaveBeenCalledWith('one', null))
     expect(refresh).toHaveBeenCalledOnce()
     // The same notice, and the same Undo, as the right-click menu's.
-    const notice = await screen.findByText(/SO-one no longer counts in August 2026/)
-    expect(notice).toHaveTextContent('and gave up its 1st Open Bill.')
+    const notice = await screen.findByText(/SO-one no longer counts in August 2026\./)
     // Nothing lives on this screen alone any more: no draft, nothing to reset.
     expect(sessionStorage.getItem('commission-draft:fair:2026-08-01')).not.toContain('excluded')
     const undo = within(notice).getByRole('button', { name: 'Undo' })
     await waitFor(() => expect(undo).toBeEnabled())
     fireEvent.click(undo)
     await waitFor(() => expect(includeOrder).toHaveBeenCalledWith('one'))
-    expect(await screen.findByText(/SO-one counts again, back as the 1st Open Bill/)).toBeVisible()
+    expect(await screen.findByText(/SO-one counts again\./)).toBeVisible()
   })
 
   it('lists the bills taken out by hand on their seller\'s page, to count again', async () => {
@@ -565,7 +557,7 @@ describe('CommissionWorkbench', () => {
     expect(within(salesRow(personalTable(), 'SO-one')).getByText('KL')).toBeVisible()
     expect(within(personalTable()).getByRole('columnheader', { name: 'Sales order' })).toBeVisible()
     expect(within(personalTable()).getByRole('columnheader', { name: 'Total commission' })).toBeVisible()
-    expect(screen.getAllByText('RM 1,220.50').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('RM 1,196.00').length).toBeGreaterThan(0)
   })
 
   it('marks the KPI payout off with a badge, not a notice, while the scheme pays no KPI', () => {
@@ -591,56 +583,13 @@ describe('CommissionWorkbench', () => {
     expect(screen.getByRole('heading', { name: 'Anthony' })).toBeVisible()
   })
 
-  it('reallocates an Open Bill draft across orders, enforces unique day ranks, and saves the changed picks', async () => {
-    renderBoard()
-    openTab()
-    let table = screen.getByRole('table', { name: 'Open Bill orders' })
-    expect(salesRow(table, 'SO-one')).toHaveTextContent('RM 24.50')
-    expect(within(table).queryByText('SO-two')).toBeNull()
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Show all orders to add picks' }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' }), { target: { value: '2' } })
-    expect(salesRow(table, 'SO-one')).toHaveTextContent('RM 19.60')
-    fireEvent.click(screen.getByRole('checkbox', { name: /^Open Bill SO-two$/ }))
-    expect(screen.getByRole('checkbox', { name: /^Open Bill SO-two$/ })).toBeChecked()
-    expect(salesRow(table, 'SO-two')).toHaveTextContent('RM 49.50')
-    fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-two' }), { target: { value: '2' } })
-    expect(screen.getByRole('checkbox', { name: /^Open Bill SO-one$/ })).not.toBeChecked()
-    table = screen.getByRole('table', { name: 'Open Bill orders' })
-    expect(salesRow(table, 'SO-two')).toHaveTextContent('RM 39.60')
-    expect(saveOpenPicks).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Save Open Bill picks' }))
-    await waitFor(() => expect(refresh).toHaveBeenCalledOnce())
-    expect(saveOpenPicks.mock.calls).toEqual([[[{ orderId: 'one', before: 1, after: null }, { orderId: 'two', before: null, after: 2 }]]])
-    expect(screen.getByRole('status')).toHaveTextContent('Open Bill picks saved')
-  })
-
-  it('disables Open Bill edits on an applied run', () => {
-    renderBoard(fixture(), 'applied')
-    openTab()
-    expect(screen.getByRole('checkbox', { name: /^Open Bill SO-one$/ })).toBeDisabled()
-    expect(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' })).toBeDisabled()
-    expect(saveOpenPicks).not.toHaveBeenCalled()
-  })
-
-  it('keeps a failed Open Bill save visible with its draft and does not claim success', async () => {
-    saveOpenPicks.mockRejectedValueOnce(new Error('Run was locked'))
-    renderBoard()
-    openTab()
-    fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' }), { target: { value: '2' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save Open Bill picks' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Run was locked')
-    expect(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' })).toHaveValue('2')
-    expect(await screen.findByRole('button', { name: 'Save Open Bill picks' })).toBeEnabled()
-    expect(refresh).not.toHaveBeenCalled()
-  })
-
   it('sorts the full personal ledger by commission without changing the total', () => {
     renderBoard()
     choose('Anthony')
     fireEvent.change(screen.getByRole('combobox', { name: 'Sort sales orders' }), { target: { value: 'commission_desc' } })
     const rows = within(personalTable()).getAllByRole('row')
     expect(rows[1]).toHaveTextContent('SO-two')
-    expect(personalTable()).toHaveTextContent('RM 1,220.50')
+    expect(personalTable()).toHaveTextContent('RM 1,196.00')
   })
 
   it('ignores an exclusion drafted on this screen before bills were taken out for real', () => {
@@ -648,8 +597,7 @@ describe('CommissionWorkbench', () => {
     renderBoard()
     choose('Anthony')
     expect(personalTable()).toHaveTextContent('SO-one')
-    expect(personalTable()).toHaveTextContent('RM 1,220.50')
-    expect(saveOpenPicks).not.toHaveBeenCalled()
+    expect(personalTable()).toHaveTextContent('RM 1,196.00')
   })
 
   it('requires an explicit current-team preview when the historical month has no effective ranks', () => {
@@ -669,9 +617,8 @@ describe('CommissionWorkbench', () => {
     fireEvent.click(preview)
     expect(screen.getByRole('status')).toHaveTextContent('Current team preview')
     expect(screen.getByRole('status')).toHaveTextContent('Payroll is unchanged')
-    expect(within(summary).getByRole('row', { name: /All salespeople · total commission/ })).toHaveTextContent('RM 1,309.30')
+    expect(within(summary).getByRole('row', { name: /All salespeople · total commission/ })).toHaveTextContent('RM 1,284.80')
     expect(JSON.stringify(data)).toBe(original)
-    expect(saveOpenPicks).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset draft' }))
     expect(preview).not.toBeChecked()
@@ -707,7 +654,7 @@ describe('CommissionWorkbench', () => {
     }))
     renderBoard()
     const card = within(screen.getByRole('region', { name: 'Monthly commission summary' })).getByRole('group', { name: 'Total commission' })
-    expect(card).toHaveTextContent('RM 1,309.30')
+    expect(card).toHaveTextContent('RM 1,284.80')
     expect(card).toHaveTextContent('Live calculation')
     expect(screen.queryByText('Draft', { exact: true })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Reset draft' })).toBeNull()
@@ -719,7 +666,7 @@ describe('CommissionWorkbench', () => {
     expect(screen.queryByRole('link', { name: /salary breakdown/i })).toBeNull()
     fireEvent.click(screen.getByText('Salary calculation · current preview'))
     const salary = screen.getByRole('table', { name: 'Current salary calculation' })
-    expect(salesRow(salary, '^Current commission')).toHaveTextContent('RM 1,220.50')
+    expect(salesRow(salary, '^Current commission')).toHaveTextContent('RM 1,196.00')
     expect(salesRow(salary, '^Other programmes')).toHaveTextContent('RM 100.00')
     expect(salesRow(salary, '^Payroll adjustment')).toHaveTextContent('RM 20.00')
     expect(salesRow(salary, '^Employer contributions')).toHaveTextContent('72.00')
@@ -727,14 +674,13 @@ describe('CommissionWorkbench', () => {
     expect(salesRow(salary, '^Other allowances')).toHaveTextContent('RM 30.00')
     expect(salesRow(salary, '^Overtime')).toHaveTextContent('RM 40.00')
     expect(salesRow(salary, '^Payroll deductions')).toHaveTextContent('11.00')
-    expect(salesRow(salary, '^Gross pay')).toHaveTextContent('RM 1,427.50')
+    expect(salesRow(salary, '^Gross pay')).toHaveTextContent('RM 1,403.00')
     expect(salesRow(salary, '^Employee contributions')).toHaveTextContent('56.00')
     expect(salesRow(salary, '^PCB tax')).toHaveTextContent('15.00')
     expect(salesRow(salary, '^SKBBK')).toHaveTextContent('4.00')
-    expect(salesRow(salary, '^Estimated take-home pay')).toHaveTextContent('RM 1,352.50')
+    expect(salesRow(salary, '^Estimated take-home pay')).toHaveTextContent('RM 1,328.00')
 
-    expect(screen.getByText('Estimated take-home pay', { selector: 'span' }).parentElement).toHaveTextContent('RM 1,352.50')
-    expect(saveOpenPicks).not.toHaveBeenCalled()
+    expect(screen.getByText('Estimated take-home pay', { selector: 'span' }).parentElement).toHaveTextContent('RM 1,328.00')
   })
 
   // The unified Payroll (2026-09-27): the month is open, but a salesperson who
@@ -764,9 +710,9 @@ describe('CommissionWorkbench', () => {
     cleanup()
     visit('')
 
-    renderBoard(salaryFixture(), 'applied', [{ staffId: 'agent', total: 1200 }])
+    renderBoard(salaryFixture(), 'applied', [{ staffId: 'agent', total: 1175.5 }])
     choose('Anthony')
-    expect(screen.getByText('In payroll: RM 1,200.00 · Difference RM 20.50')).toBeVisible()
+    expect(screen.getByText('In payroll: RM 1,175.50 · Difference RM 20.50')).toBeVisible()
     expect(screen.getByRole('link', { name: 'Payroll breakdown ↗' })).toHaveAttribute('href', '/revenue/fair/2026-08-01/pay/agent')
     fireEvent.click(screen.getByRole('button', { name: '← Sales people' }))
     choose('Alex')
@@ -782,40 +728,17 @@ describe('CommissionWorkbench', () => {
     expect(screen.getByText('Salary preview is unavailable for this session. Commission can still be reviewed above.')).toBeVisible()
   })
 
-  // The state, not a sentence (2026-10-12): a badge beside the heading says why
-  // every bonus is RM 0 — the notice that explained it went.
-  it('keeps the Open Bill picks shut while the month pays no Open Bill, and marks the payout off', () => {
-    renderBoard()
-    openTab()
-    expect(screen.queryByText('Payout off this month')).toBeNull()
-    cleanup()
-
-    const data = fixture()
-    data.input.scheme.enableOpenBill = false
-    renderBoard(data)
-    openTab()
-    const badge = screen.getByText('Payout off this month')
-    expect(badge).toBeVisible()
-    expect(badge.parentElement).toHaveTextContent('Open Bill allocationPayout off this month')
-    expect(screen.queryByText(/Open Bill payout is switched off/)).toBeNull()
-    expect(screen.getByRole('checkbox', { name: 'Open Bill SO-one' })).toBeDisabled()
-    expect(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' })).toBeDisabled()
-    expect(salesRow(screen.getByRole('table', { name: 'Open Bill orders' }), 'SO-one')).toHaveTextContent('RM 0.00')
-    expect(screen.queryByRole('button', { name: 'Save Open Bill picks' })).toBeNull()
-    expect(saveOpenPicks).not.toHaveBeenCalled()
-  })
-
-  it('discards persisted Open Bill edits whose source changed, while preserving other draft settings', () => {
+  // A draft saved before Open Bill went (2026-10-31) may still carry its picks: they are gone, the preview stays.
+  it('ignores the Open Bill picks an older draft kept, while keeping its current-team preview', () => {
     sessionStorage.setItem('commission-draft:fair:2026-08-01', JSON.stringify({
       picks: [{ orderId: 'two', rank: 2 }], picksSource: JSON.stringify(['one:3']), excluded: ['two'], currentTeam: true,
     }))
     renderBoard()
-    expect(screen.getByText(/Its Open Bill edits were discarded/)).toBeVisible()
+    expect(screen.queryByText(/Open Bill/)).toBeNull()
     expect(within(screen.getByRole('region', { name: 'Monthly commission summary' })).getByRole('group', { name: 'Total commission' })).toHaveTextContent('Current team preview')
-    expect(screen.queryByRole('button', { name: 'Save Open Bill picks' })).toBeNull()
     choose('Anthony')
     expect(within(personalTable()).getByRole('link', { name: 'SO-two' })).toBeVisible()
-    expect(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' })).toHaveValue('1')
+    expect(sessionStorage.getItem('commission-draft:fair:2026-08-01')).toBe(JSON.stringify({ currentTeam: true }))
   })
 
   describe('the payroll bar (2026-09-27)', () => {
@@ -895,45 +818,31 @@ describe('CommissionWorkbench', () => {
 
     it('reads the month as saved, never what is only drafted on this screen', () => {
       const data = fixture()
-      // Today's team has Anthony a rank up; the month as saved does not.
-      data.currentHierarchy = data.input.hierarchy.map(n => n.staffId === 'agent' ? { ...n, baseRankKey: 'leader' } : n)
-      board(data, 'applied', [{ staffId: 'agent', total: 1_220.5 }, { staffId: 'leader', total: 88.8 }])
+      // Today's team has Anthony on his own; the month as saved has him under Alex.
+      data.currentHierarchy = data.input.hierarchy.map(n => n.staffId === 'agent' ? { ...n, uplineStaffId: null } : n)
+      board(data, 'applied', [{ staffId: 'agent', total: 1_196 }, { staffId: 'leader', total: 88.8 }])
       fireEvent.click(screen.getByText('Review settings', { exact: true }))
       fireEvent.click(screen.getByRole('checkbox', { name: 'Use current team & dated rules for preview' }))
       const card = within(screen.getByRole('region', { name: 'Monthly commission summary' })).getByRole('group', { name: 'Total commission' })
       expect(card).toHaveTextContent('Current team preview')
-      expect(card).not.toHaveTextContent('RM 1,309.30')
+      expect(card).not.toHaveTextContent('RM 1,284.80')
       // Review settings says a draft is open, where its Reset is.
       expect(screen.getByText('Draft', { exact: true })).toBeVisible()
-      // Payroll's RM 1,309.30 still matches the month as saved.
+      // Payroll's RM 1,284.80 still matches the month as saved.
       expect(bar()).toHaveTextContent('The commission above matches it')
       expect(bar()).toHaveTextContent('This screen holds a draft')
     })
 
     it('says a month in payroll has moved since, by how much and for how many', () => {
-      board(fixture(), 'applied', [{ staffId: 'agent', total: 1_220.5 }, { staffId: 'leader', total: 80 }], { ...PAYROLL, sentAt: '2026-09-15T02:30:00Z' })
-      expect(bar()).toHaveTextContent('In payroll · RM 1,300.50')
+      board(fixture(), 'applied', [{ staffId: 'agent', total: 1_196 }, { staffId: 'leader', total: 80 }], { ...PAYROLL, sentAt: '2026-09-15T02:30:00Z' })
+      expect(bar()).toHaveTextContent('In payroll · RM 1,276.00')
       // Malaysia time, whatever the machine's zone.
       expect(bar()).toHaveTextContent(/Sent 15 Sept? 2026, 10:30/)
-      expect(bar()).toHaveTextContent('RM 1,309.30, RM 8.80 more · 1 person changed')
+      expect(bar()).toHaveTextContent('RM 1,284.80, RM 8.80 more · 1 person changed')
       expect(within(bar()).queryByRole('button')).toBeNull()
     })
   })
 
-  it('blocks an open draft if refreshed source picks changed until the draft is reset', () => {
-    const data = fixture()
-    const { rerender } = renderBoard(data)
-    openTab()
-    fireEvent.change(screen.getByRole('combobox', { name: 'Open Bill rank SO-one' }), { target: { value: '2' } })
-    const fresh = { ...data, input: { ...data.input, openBillTags: [{ orderId: 'two', rank: 3 as const }] } }
-    rerender(<CommissionWorkbench data={fresh} sub="fair" period="2026-08-01" runStatus={null} savedTotals={[]} monthStats={monthStats} />)
-    expect(screen.getByRole('alert')).toHaveTextContent('Saved Open Bill picks changed while this draft was open')
-    expect(screen.getByRole('button', { name: 'Save Open Bill picks' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Reset draft' }))
-    expect(screen.queryByRole('button', { name: 'Save Open Bill picks' })).toBeNull()
-    expect(screen.getByRole('combobox', { name: 'Open Bill rank SO-two' })).toHaveValue('3')
-    expect(saveOpenPicks).not.toHaveBeenCalled()
-  })
 })
 
 describe('CommissionWorkbench — where it stands is the URL (user 2026-09-27)', () => {
@@ -1043,7 +952,7 @@ describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () =>
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: "Don't count this bill" }))
     await waitFor(() => expect(excludeOrder).toHaveBeenCalledWith('one', ''))
     expect(refresh).toHaveBeenCalled()
-    const notice = await screen.findByText(/SO-one no longer counts in August 2026 and gave up its 1st Open Bill\./)
+    const notice = await screen.findByText(/SO-one no longer counts in August 2026\./)
     expect(notice).toHaveTextContent('Payroll follows when the salesperson is sent.')
     expect(screen.queryByRole('menu')).toBeNull()
     // Nothing is drafted on the screen: the bill is out for real, and only there.
@@ -1051,7 +960,7 @@ describe("CommissionWorkbench — a ledger's bill menu (user 2026-09-27)", () =>
 
     fireEvent.click(within(notice).getByRole('button', { name: 'Undo' }))
     await waitFor(() => expect(includeOrder).toHaveBeenCalledWith('one'))
-    expect(await screen.findByText(/SO-one counts again, back as the 1st Open Bill\./)).toBeInTheDocument()
+    expect(await screen.findByText(/SO-one counts again\./)).toBeInTheDocument()
   })
 
   it('opens the same menu from the ⋯ beside the order number, and from a downline bill', () => {
@@ -1373,7 +1282,7 @@ describe('CommissionWorkbench — moving a bill to another salesperson', () => {
   const result = (over = {}) => ({
     orderId: 'one', orderNo: 'SO-one', changed: true,
     to: { staffId: 'leader', name: 'Alex' }, from: { staffId: 'agent', name: 'Anthony' }, movedBack: false,
-    openBillRank: 1, openBillBack: null, shareTaken: null, ...over,
+    shareTaken: null, ...over,
   })
 
   it('moves a bill from its right-click, says so above the table, opens the new ledger and undoes', async () => {
@@ -1388,15 +1297,15 @@ describe('CommissionWorkbench — moving a bill to another salesperson', () => {
     fireEvent.change(within(panel).getByLabelText(/Move to/), { target: { value: 'leader' } })
     fireEvent.click(within(panel).getByRole('button', { name: 'Move to Alex' }))
     await waitFor(() => expect(moveOrder).toHaveBeenCalledWith('one', 'leader', ''))
-    const notice = await screen.findByText(/SO-one is Alex’s now — moved from Anthony\. Its Open Bill pick \(1st\) came off/)
+    const notice = await screen.findByText(/SO-one is Alex’s now — moved from Anthony\./)
     expect(screen.queryByRole('menu')).toBeNull()
 
     fireEvent.click(within(notice).getByRole('button', { name: 'Open Alex' }))
     expect(screen.getByRole('heading', { name: 'Alex' })).toBeVisible()
-    moveOrder.mockResolvedValueOnce({ ok: true, result: result({ to: { staffId: 'agent', name: 'Anthony' }, from: { staffId: 'leader', name: 'Alex' }, movedBack: true, openBillRank: null, openBillBack: 1 }) })
+    moveOrder.mockResolvedValueOnce({ ok: true, result: result({ to: { staffId: 'agent', name: 'Anthony' }, from: { staffId: 'leader', name: 'Alex' }, movedBack: true }) })
     fireEvent.click(within(screen.getByText(/SO-one is Alex’s now/)).getByRole('button', { name: 'Undo' }))
     await waitFor(() => expect(moveOrder).toHaveBeenLastCalledWith('one', 'agent'))
-    expect(await screen.findByText(/SO-one is back with Anthony, the salesperson the ERP names\. Its Open Bill pick \(1st\) is back\./)).toBeVisible()
+    expect(await screen.findByText(/SO-one is back with Anthony, the salesperson the ERP names\./)).toBeVisible()
   })
 
   it('says on the row whom a moved bill came from, and offers it back', () => {

@@ -98,7 +98,7 @@ import type { WaitingQueue } from "@/lib/member/waiting-queue";
 import RequestForm, { type FormOptions, type SubmitOutcome } from "./profile/RequestForm";
 import MemosPage, { MemoSheet, type MemoTab } from "./profile/MemosPage";
 import { claimClosedMonth, claimWeeks, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestKindOf, requestRowsVM, teamVM, trackVM, vaGroupsVM, waitingChoices, type RequestEvent } from "./profile/profile-model";
-import { foodOpenTo, transportOpenTo, type ClaimRates } from "@/lib/member/claim-rules";
+import { foodOpenTo, transportPartsFor, type ClaimRates } from "@/lib/member/claim-rules";
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp, { type CrmOpen } from "../crm/CrmApp";
@@ -650,11 +650,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     router.push(productsHref(baseRoute), { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the quote's setters are stable
   }, [onProducts, closeProfileSheets, router, baseRoute]);
-  // The module switcher: the portal's other modules are the Principal's views of it (setViewAs).
+  // The module switcher: the portal's other modules are the Principal's views of it (setViewAs) — every view since
+  // 2026-10-27, as every switcher lists them; a team member is viewed with Profile's View as, not the portal's picker.
   const [, startSwitch] = useTransition();
   const pickModule = useCallback((id: ModuleId) => {
     // The design preview draws the menu and goes nowhere, as the prototype's does.
-    if (id === "revenue" || device !== "live" || !mayLeaveProducts()) return;
+    if (id === "revenue_member" || device !== "live" || !mayLeaveProducts()) return;
     const form = new FormData();
     form.set("role", id);
     startSwitch(async () => { await setViewAs(form); });
@@ -1247,8 +1248,15 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     () => (source.replacementForm ? source.replacementForm() : Promise.resolve({ ok: false as const, error: "Preview data only." })), track,
     () => source.peek?.<MemberWaitingForm>(ask.replacementForm()));
   const replacementForm = replFormRead.value;
+  // What of a transport claim their title may send (2026-10-31): Outstation by road and an Airbnb stay (HR's
+  // *Transport claim* tick), a plane ticket (its *Air ticket claim* tick) — each its own. In View as, the viewed
+  // person's title decides.
+  const transportParts = transportPartsFor(fxp ? fxp.form.rates : claimRates, me.title);
+  const canRoad = transportParts.road;
+  const canPlane = transportParts.plane;
   const formOptions: FormOptions = useMemo(() => {
-    if (fxp) return fxp.form;
+    // The design preview's form on the preview's own day (2026-11-01): a food claim offers last month and this month.
+    if (fxp) return { ...fxp.form, today: fxp.form.today ?? today };
     return {
       subName: membership?.name ?? "",
       weeks: claimWeeks([arena, arenaNow, arenaClosed.snapshot], today),
@@ -1262,14 +1270,19 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       // The food claim (2026-10-13): a fair day still to come cannot be claimed, nor one another of theirs holds.
       today,
       foodClaims: myRequests,
+      // …and a day is claimed in its own month (2026-11-01): a weekend before a month whose fair runs into it comes too.
+      foodWeeks: claimWeeks([arena, arenaNow, arenaClosed.snapshot], today, { spill: true }),
+      transport: { road: canRoad, plane: canPlane },
+      title: me.title ?? null,
     };
-  }, [fxp, membership, arena, arenaNow, arenaClosed.snapshot, today, claimRates, team, data.departments, myRequests, waitingForm, replacementForm]);
+  }, [fxp, membership, arena, arenaNow, arenaClosed.snapshot, today, claimRates, team, data.departments, myRequests, waitingForm, replacementForm, canRoad, canPlane, me.title]);
   // Requests' ways to start one: a food claim only in Fair, for a title HR picked (2026-10-13) — sent under the
   // same Create as a claim. In View as, the viewed person's title decides.
   // The design preview's form carries the refresh handoff's food sample (2026-10-14), so its Requests offer it too.
   const foodOpen = foodOpenTo(fxp ? fxp.form.rates : claimRates, membership?.id, me.title);
-  // …and a transport claim (Outstation, a plane ticket, an Airbnb stay) only for a title HR ticked (2026-10-20).
-  const transportOpen = transportOpenTo(fxp ? fxp.form.rates : claimRates, me.title);
+  // …and a transport claim (Outstation, a plane ticket, an Airbnb stay) only for a title HR ticked for any of it
+  // (2026-10-20; the air ticket alone since 2026-10-31).
+  const transportOpen = canRoad || canPlane;
   const pageKinds = useMemo<RequestKindVM[]>(() => requestKinds.flatMap(k => (k === "claim"
     ? [...(transportOpen ? ["claim"] : []), ...(foodOpen ? ["food"] : [])] as RequestKindVM[]
     : [k])), [requestKinds, foodOpen, transportOpen]);
@@ -1488,7 +1501,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "team") {
       page = <TeamPage vm={teamView} onBack={back} onPerson={setPersonPick} />;
     } else if (pf === "requests") {
-      page = <RequestsPage rows={reqRows} filter={reqFilter} kinds={pageKinds} onFilter={setReqFilter} onBack={back}
+      page = <RequestsPage rows={reqRows} filter={reqFilter} kinds={pageKinds} planeOnly={canPlane && !canRoad} onFilter={setReqFilter} onBack={back}
         onNew={k => { setRevising(null); setReqForm(k); }} onOpen={openRequest} />;
     } else if (pf === "track") {
       // A new one: on Requests, or — Requests closed to them — its form at once; neither when they may not send it.
@@ -1521,7 +1534,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         // The CRM's 4a frame draws this sidebar's rows itself (2026-10-18): the same screens, counts and switcher.
         hidden: hiddenScreens, crmUnread: crmUnread ?? 0,
         products: productList ? { group: productList.group, onOpen: openProducts } : null,
-        modules: principal ? { current: "revenue", onPick: id => pickModule(id as ModuleId) } : null,
+        modules: principal ? { current: "revenue_member", onPick: id => pickModule(id as ModuleId) } : null,
       } : undefined} />;
     } else if (pf === "memos") {
       page = <MemosPage memos={memoVMs} tab={memoTab} onTab={setMemoTab} onBack={back} onOpen={openMemo} />;
@@ -1544,7 +1557,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         changePassword: ownPassword ? () => setPwOpen(true) : undefined,
         changeEmail: ownEmail ? () => setEmailOpen(true) : undefined,
         itSupport: !viewed && !data.demo && !fixture ? () => goScreen("account", { pf: "it" }) : undefined,
-      }} views={live && !desk && principal && !viewed ? { current: "revenue", pick: pickModule } : null} />;
+      }} views={live && !desk && principal && !viewed ? { current: "revenue_member", pick: pickModule } : null} />;
     }
   } else {
     page = <Pending screen={route.screen} />;
@@ -1559,7 +1572,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         onNotif={toggleNotif} onProfile={() => goScreen("account")}
         products={productList ? { group: productList.group, onOpen: openProducts } : null}
         it={itDesk && itDeskOn ? { group: itDesk.group, count: it.newCount, on: route.screen === "account" && route.pf === "itdesk", onOpen: () => goScreen("account", { pf: "itdesk" }) } : null}
-        modules={principal ? { current: "revenue", onPick: pickModule } : null}
+        modules={principal ? { current: "revenue_member", onPick: pickModule } : null}
         crm={crm ? { unread: crmUnread ?? 0, onOpen: openCrm } : null} />
       <DeskHeader greet={fixture?.greeting ?? greeting()} me={me} subName={membership?.name ?? ""} dateLine={`${longDayLabel(today)} · ${quarterLabel(today)}`}
         unread={nfCount > 0 || nf.items.some(n => n.unread)} onSubDept={() => openSheet("sd")} onNotif={toggleNotif}
@@ -1685,7 +1698,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
 
   const frame = device === "ios" ? s.frameIos : device === "android" ? s.frameAndroid : device === "desktop" ? s.frameDesk : "";
   return (
-    <div ref={appRef} className={`${base.root} ${s.app}`} data-revenue-app style={!live ? { width: device === "desktop" ? 1440 : device === "android" ? 410 : 414 } : undefined}>
+    <div ref={appRef} className={`${base.root} ${s.app} ${live ? s.appLive : ""}`} data-revenue-app style={!live ? { width: device === "desktop" ? 1440 : device === "android" ? 410 : 414 } : undefined}>
       {live ? screen : <div className={`${s.frame} ${frame}`}>{screen}</div>}
       {switching?.to === "crm" && (
         <ViewSwitchCurtain from="Revenue" to="CRM" ready={crmReady} screen={screenRef}

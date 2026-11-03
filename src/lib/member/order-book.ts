@@ -43,8 +43,14 @@ export interface MemberBookOrder {
   week: string;
   /** What counts as sales: commissionable lines less KPI items. */
   revenue: number;
-  /** Layer-2 margin, %, or null while a line has no cost. */
+  /** Layer-2 margin, %, or null while a line has no cost — or while the bill has no sales of its own (`noSales`). */
   margin: number | null;
+  /**
+   * The bill has no sales of its own — a gift on a bill of its own at RM 0 — and every goods line is costed
+   * (2026-10-30): no margin to read, and its cost counts against the month (the book's `margins`). Absent from an
+   * answer the server gave before it knew.
+   */
+  noSales?: boolean;
   kpiQty: number;
   /** Deposit met (or released by a close). */
   cleared: boolean;
@@ -102,6 +108,22 @@ export interface MemberOrderBook {
   /** Stored brand-week picks: Friday → brand code. */
   brandWeeks: Record<string, string>;
   orders: MemberBookOrder[];
+  /**
+   * The margin the counted (deposit-cleared) bills make together, %, worked out by the server (2026-10-30): overall
+   * and per brand, a bill with no sales counted at its cost — which no bill here carries, so the app cannot add it up
+   * itself. Null where nothing is costed yet, or nothing sold. Absent from an answer given before.
+   */
+  margins?: BookMargins;
+}
+
+export interface MonthMargins {
+  overall: number | null;
+  brands: Record<string, number | null>;
+}
+
+export interface BookMargins extends MonthMargins {
+  /** Each month's own, `YYYY-MM` — the app cuts one month out of a two-month book (`bookMonth`). */
+  months?: Record<string, MonthMargins>;
 }
 
 export interface MemberInsightRange {
@@ -165,6 +187,7 @@ function readOrder(value: unknown): MemberBookOrder | null {
     fairEnd: day(value.fairEnd),
     organiser: text(value.organiser),
     week, revenue, margin, kpiQty,
+    ...(typeof value.noSales === "boolean" ? { noSales: value.noSales } : {}),
     cleared: value.cleared,
     carried: value.carried,
     manual: value.manual === true,
@@ -206,13 +229,43 @@ export function readOrderBook(value: unknown): MemberOrderBook | null {
       if (DAY.test(friday) && typeof brand === "string" && brand.trim()) brandWeeks[friday] = brand.trim().toUpperCase();
     }
   }
+  const margins = readMargins(value.margins);
   return {
     from, through, asOf,
     paysFrom: paysFrom && MONTH.test(paysFrom) ? paysFrom : null,
     closedMonths,
     brandWeeks,
     orders,
+    ...(margins ? { margins } : {}),
   };
+}
+
+/** One set of margins: percentages only, a number or null each; anything else and the app adds the bills up itself. */
+function readMonthMargins(value: unknown): MonthMargins | null {
+  if (!isObject(value) || !isObject(value.brands)) return null;
+  const overall = value.overall === null ? null : num(value.overall);
+  if (overall === null && value.overall !== null) return null;
+  const brands: Record<string, number | null> = {};
+  for (const [code, pct] of Object.entries(value.brands)) {
+    const read = pct === null ? null : num(pct);
+    if (read === null && pct !== null) return null;
+    brands[code] = read;
+  }
+  return { overall, brands };
+}
+
+/** The book's `margins`, and each month's when it gives them. */
+function readMargins(value: unknown): BookMargins | null {
+  const whole = readMonthMargins(value);
+  if (!whole || !isObject(value)) return null;
+  if (!isObject(value.months)) return whole;
+  const months: Record<string, MonthMargins> = {};
+  for (const [month, set] of Object.entries(value.months)) {
+    const read = readMonthMargins(set);
+    if (!read || !MONTH.test(month)) return null;
+    months[month] = read;
+  }
+  return { ...whole, months };
 }
 
 function readScore(value: unknown): MemberScore | null {

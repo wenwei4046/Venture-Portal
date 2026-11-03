@@ -7,6 +7,9 @@ import {
   rateAt,
   segmentAt,
   segmentRemainingPeriods,
+  segmentedUnpaid,
+  segmentsGovern,
+  principalDueIn,
   termsChanged,
   compoundRoll,
   type PositionTerms,
@@ -191,5 +194,60 @@ describe('compoundRoll', () => {
 
   it('null when the current terms do not compound', () => {
     expect(compoundRoll(buildTermsSegments(ORIGINAL), { principal: 30000, startYM: '2026-04', currentYM: '2026-09', paymentsByMonth: {} })).toBeNull()
+  })
+})
+
+describe('a fixed amount a month (2026-10-27, Repayment type)', () => {
+  // 51,000 at 1,300 a month from January 2026: 39 × 1,300, then 300 in April 2029 — the user's own example.
+  const T: PositionTerms = {
+    principal: 51000,
+    startYM: '2025-12',
+    firstDueYM: '2026-01',
+    current: { rate: 0.00833, months: 40, compounding: false, effectiveFrom: null, principalPerMonth: 1300 },
+    history: [],
+  }
+
+  it('counts its months off what is owed, the last taking the rest', () => {
+    const [s] = buildTermsSegments(T)
+    expect(s).toMatchObject({ fromYM: '2026-01', months: 40, principalPerMonth: 1300, fixedPrincipal: 1300, scheduledEndYM: '2029-04', interestPerMonth: 424.83 })
+    expect(principalDueIn(s, '2026-01')).toBe(1300)
+    expect(principalDueIn(s, '2029-04')).toBe(300)
+    expect(segmentRemainingPeriods(s, 39 * 1300)).toBe(1)
+    expect(segmentsGovern([s])).toBe(true)
+    expect(termsChanged([s])).toBe(false)
+  })
+
+  it('whatever months the record holds — the amount and what is owed decide them', () => {
+    const [s] = buildTermsSegments({ ...T, current: { ...T.current, months: 12 } })
+    expect(s.months).toBe(40)
+  })
+
+  it('equal parts keep their one figure every month, and their segment alone does not govern', () => {
+    const [s] = buildTermsSegments({ ...T, current: { ...T.current, principalPerMonth: null, months: 7 } })
+    expect(principalDueIn(s, s.scheduledEndYM!)).toBe(s.principalPerMonth)
+    expect(segmentsGovern([s])).toBe(false)
+  })
+
+  it('ages its last month at what is left', () => {
+    const unpaid = segmentedUnpaid({ segments: buildTermsSegments(T), asOfYM: '2029-04', totalPaid: 0 })
+    expect(unpaid[0]).toEqual({ ym: '2026-01', unpaid: 1724.83 })
+    expect(unpaid.at(-1)).toEqual({ ym: '2029-04', unpaid: 724.83 })
+    expect(unpaid).toHaveLength(40)
+  })
+
+  it('a later change at a fixed amount re-counts from what is owed then, its history keeping the amount before', () => {
+    const paid = Object.fromEntries(['2026-01', '2026-02', '2026-03'].map((m) => [m, 1300]))
+    const segs = buildTermsSegments(
+      {
+        ...T,
+        current: { rate: 0.01, months: 10, compounding: false, effectiveFrom: '2026-04', principalPerMonth: 5000 },
+        history: [{ validFrom: '2026-01', validTo: '2026-03', rate: 0.00833, months: 40, compounding: false, principalPerMonth: 1300 }],
+      },
+      paid,
+    )
+    expect(segs[0]).toMatchObject({ fixedPrincipal: 1300, principalPerMonth: 1300, toYM: '2026-03' })
+    // 51,000 − 3 × 1,300 = 47,100 at 5,000: 9 × 5,000, then 2,100.
+    expect(segs[1]).toMatchObject({ fromYM: '2026-04', base: 47100, months: 10, principalPerMonth: 5000, scheduledEndYM: '2027-01' })
+    expect(principalDueIn(segs[1], '2027-01')).toBe(2100)
   })
 })

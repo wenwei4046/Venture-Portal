@@ -24,11 +24,9 @@ const RANKS: Rank[] = [
 ]
 
 const PERCENTAGE_SCHEME: CommissionScheme = {
-  openBillBasis: 'uplift_on_commission',
   overrideIncludesKpi: false,
   enableProductRevenue: true,
   enableKpi: false,
-  enableOpenBill: false,
   enableOverride: true,
   enableMarginPenalty: false,
   enableMarginIncentive: false,
@@ -71,8 +69,6 @@ function run(extra: Partial<EngineInput> = {}) {
     orders: [],
     kpiItems: [],
     kpiThresholds: [],
-    openBillRules: [],
-    openBillTags: [],
     marginBands: [],
     hierarchy: [],
     priorMonths: [],

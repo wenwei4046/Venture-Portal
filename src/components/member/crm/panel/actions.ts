@@ -8,7 +8,7 @@ import type { ApptType } from "@/lib/member/crm-data";
 import { crmWrite, fetchMetaAds, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
 import type { MetaAdRow } from "@/lib/member/crm-ad-names-meta";
 import { adToSync } from "@/lib/member/crm-ad-running";
-import type { CrmData, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
+import type { CrmData, CrmReplyItem, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
 import type { SalesActions } from "../sales/actions";
 import { teamOf } from "../shared/people";
 import type { Dispatch, SetStateAction } from "react";
@@ -28,6 +28,12 @@ export interface PanelActions extends SalesActions {
   metaAds(sync: boolean): Promise<MetaAdRow[] | null>;
   /** Settings › General (crm_save_settings, CRM · Manage): the reply lines, the template button, auto-assign. */
   saveSettings(s: CrmSettings): Promise<boolean>;
+  /** Settings › Reply library (crm_save_reply_library, CRM · Manage; 2026-10-29): the whole library, in its order. */
+  saveReplyLibrary(items: CrmReplyItem[]): Promise<boolean>;
+  /** A partner's booking link (mig 20261029190000, CRM · Manage): on / off, or a new address. */
+  setPartnerLink(id: string, on: boolean | null, newCode: boolean): Promise<boolean>;
+  /** Cancel a booking a partner made through its link. */
+  cancelPartnerBooking(id: string): Promise<boolean>;
   /** Save, this ad only; `together`: whether it is still counted with the together ads (saved with anything changed, it leaves them). */
   saveAdRule(ad: string, label: string, rule: { mode: "even" | "split" | null; split: Record<string, number>; pm: "cnt" | "pct"; pp: Record<string, number>; tm?: Record<string, "even" | "pct" | "cnt"> }): Promise<false | { dealt: number; together: boolean }>;
   /** Save and apply to all's window (crm_save_ads, 2026-10-24): this setting on the ads ticked, each counting its own leads
@@ -39,6 +45,9 @@ export interface PanelActions extends SalesActions {
   setFullTime(staffId: string, on: boolean): Promise<boolean>;
   /** Lock a member out of the dealing for now, or back in (crm_set_locked, CRM · Manage). */
   setLocked(staffId: string, on: boolean): Promise<boolean>;
+  /** A member's leave (mig 20261029220000, CRM · Manage): add or change one; remove one. */
+  saveLeave(leave: { id: string | null; staffId: string; from: string; to: string; note: string }): Promise<boolean>;
+  deleteLeave(id: string): Promise<boolean>;
   /** Cold lead templates (rev 1011): save a draft, or save and submit a WhatsApp one for Meta's review. */
   saveTemplate(t: { id: string | null; name: string; ch: CrmTemplate["ch"]; body: string }, submit: boolean): Promise<CrmTemplate | false>;
   templateOn(id: string, on: boolean): Promise<boolean>;
@@ -51,6 +60,10 @@ export interface PanelActions extends SalesActions {
   removeRoom(id: string): Promise<boolean>;
   /** v3 T07: a showroom's staff-only remarks (crm_save_showroom_remarks), as the desktop's frame 07. */
   saveRoomRemarks(id: string, remarks: string): Promise<boolean>;
+  /** A showroom hands the unit's key over, or not (crm_set_showroom_keys, the owner 2026-10-29). */
+  setRoomKeys(id: string, on: boolean): Promise<boolean>;
+  /** The showrooms in this order (crm_set_showroom_order): every list and picker follows it. */
+  orderRooms(ids: string[]): Promise<boolean>;
 }
 
 /** The same keys with the same values — as the database compares two saved settings (jsonb: a key missing ≠ a key at 0). */
@@ -75,6 +88,26 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     async saveSettings(st) {
       if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders, p_team_alerts: st.teamAlerts, p_send_auto: st.sendAutoReply }))) return false;
       setData(d => ({ ...d, settings: st }));
+      return true;
+    },
+    async saveReplyLibrary(items) {
+      const r = await write("crm_save_reply_library", { p_items: items.map(i => ({ id: i.id, title: i.title, category: i.category, body: i.body, keywords: i.keywords })) });
+      if (!r) return false;
+      // The database answers the library as saved (new rows with their ids); the demo keeps what was sent.
+      const saved = Array.isArray(r.data) ? (r.data as CrmReplyItem[]).map(x => ({ ...x, category: x.category ?? "", keywords: x.keywords ?? [] })) : items;
+      setData(d => ({ ...d, replyLibrary: saved }));
+      return true;
+    },
+    async setPartnerLink(id, on, newCode) {
+      const r = await write("crm_partner_link_set", { p_id: id, p_on: on, p_new_code: newCode });
+      if (!r) return false;
+      const l = r.data as { id: string; name: string; code: string; on: boolean } | null;
+      setData(d => ({ ...d, partnerLinks: (d.partnerLinks ?? []).map(x => (x.id === id ? (l ?? { ...x, on: on ?? x.on }) : x)) }));
+      return true;
+    },
+    async cancelPartnerBooking(id) {
+      if (!(await write("crm_partner_booking_cancel", { p_id: id }))) return false;
+      setData(d => ({ ...d, partnerBookings: (d.partnerBookings ?? []).map(b => (b.id === id ? { ...b, state: "cancelled" as const } : b)) }));
       return true;
     },
     async addAd(ad) {
@@ -171,6 +204,18 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       setData(d => ({ ...d, lockedStaff: on ? [...new Set([...(d.lockedStaff ?? []), staffId])] : (d.lockedStaff ?? []).filter(id => id !== staffId) }));
       return true;
     },
+    async saveLeave(l) {
+      const r = await write("crm_save_leave", { p_id: l.id, p_staff: l.staffId, p_from: l.from, p_to: l.to, p_note: l.note });
+      if (!r) return false;
+      const id = typeof r.data === "string" ? r.data : l.id ?? `local-${Date.now()}`;
+      setData(d => ({ ...d, leaves: [...(d.leaves ?? []).filter(x => x.id !== l.id), { id, staffId: l.staffId, from: l.from, to: l.to, note: l.note }].sort((a, b) => a.from.localeCompare(b.from)) }));
+      return true;
+    },
+    async deleteLeave(id) {
+      if (!(await write("crm_delete_leave", { p_id: id }))) return false;
+      setData(d => ({ ...d, leaves: (d.leaves ?? []).filter(x => x.id !== id) }));
+      return true;
+    },
     async setFullTime(staffId, on) {
       if (!(await write("crm_set_full_time", { p_staff: staffId, p_full_time: on }))) return false;
       setData(d => ({
@@ -234,6 +279,19 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       if (!(await write("crm_save_showroom_remarks", { p_id: id, p_remarks: remarks }))) return false;
       setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, remarks } : r)) }));
       return true;
+    },
+    async setRoomKeys(id, on) {
+      if (!(await write("crm_set_showroom_keys", { p_id: id, p_on: on }))) return false;
+      setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, keys: on } : r)) }));
+      return true;
+    },
+    async orderRooms(ids) {
+      // On screen at once; put back if the database refuses.
+      const before = data().rooms, rank = new Map(ids.map((id, i) => [id, i]));
+      setData(d => ({ ...d, rooms: [...d.rooms].sort((a, b) => (rank.get(a.id) ?? 1e6) - (rank.get(b.id) ?? 1e6)) }));
+      if (await write("crm_set_showroom_order", { p_ids: ids })) return true;
+      setData(d => ({ ...d, rooms: before }));
+      return false;
     },
     // Delete = gone from the lists, its past visits keep their showroom; refused while visits are upcoming (crm_delete_showroom,
     // the desktop's rule — v3 T07 links the two).

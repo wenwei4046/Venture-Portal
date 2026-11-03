@@ -325,7 +325,8 @@ export async function fetchInterBillingCashFlow(
       // (rent / utilities / salary…) since the 2026-07-24 by-nature change.
       // Via bridge_mirror_slices RPC (mig 20260820030000), which serves
       // finance/principal every slice (the Dept Manager's own-department slices
-      // went with the kind, 2026-10-17).
+      // went with the kind, 2026-10-17) — and the service role, which Marketing's
+      // pool reads through (mig 20261028120000).
       // (In this batch since 2026-10-08 — it needs nothing from the reads
       // above; awaited after them it was one more round trip in a row.)
       supabase.rpc('bridge_mirror_slices' as never),

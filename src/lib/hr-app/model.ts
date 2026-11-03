@@ -6,6 +6,7 @@
  */
 
 import { formatIntlDate } from '@/lib/utils'
+import { SWITCH_VIEWS, phoneWhere, type SwitchTarget } from '@/lib/view-switch'
 import type { Notice, Notices } from '@/lib/push/notices'
 import type { MyMemo } from '@/lib/memos/model'
 import type { MyDocuments } from '@/lib/documentation/personal'
@@ -262,20 +263,30 @@ export interface HrDocument {
   at: string
 }
 
-/** A view of the one app (setViewAs): the portal as the Principal or Finance, this app, the Revenue app. */
-export type HrAppView = 'principal' | 'finance' | 'hr' | 'revenue_member'
+/**
+ * A row of the one app's switcher (setViewAs): every view, as every switcher lists them (2026-10-27,
+ * lib/view-switch.ts) — or `person`, the portal's View as a person… picker.
+ */
+export type HrAppView = SwitchTarget
 
-/** The switcher's rows: the view, its name (the Revenue app's module menu's), where it opens, its dot. */
-export const HR_APP_VIEWS: ReadonlyArray<readonly [HrAppView, string, string, string]> = [
-  ['principal', 'Principal', 'The portal', 'rgb(128 96 72)'],
-  ['finance', 'Finance', 'The portal', 'rgb(59 104 148)'],
-  ['hr', 'HR', 'This app', 'rgb(46 125 90)'],
-  ['revenue_member', 'Revenue team', 'The Revenue app', 'rgb(233 154 83)'],
-]
+const VIEW_DOT: Readonly<Record<HrAppView, string | null>> = {
+  principal: 'rgb(128 96 72)',
+  finance: 'rgb(59 104 148)',
+  hr: 'rgb(46 125 90)',
+  marketing: 'rgb(176 78 124)',
+  revenue_member: 'rgb(233 154 83)',
+  lead: 'rgb(108 92 160)',
+  person: null,
+}
+
+/** The switcher's rows: the view, its name (the Revenue app's module menu's), where it opens, its dot (none: the eye). */
+export const HR_APP_VIEWS: ReadonlyArray<readonly [HrAppView, string, string, string | null]> = SWITCH_VIEWS.map(
+  v => [v.value, v.short, phoneWhere(v.value, 'hr'), VIEW_DOT[v.value]] as const,
+)
 
 /** Which row of the switcher an account's view is. */
 export function hrAppViewOf(role: string): HrAppView {
-  return role === 'finance' || role === 'hr' || role === 'revenue_member' ? role : 'principal'
+  return role === 'finance' || role === 'hr' || role === 'marketing' || role === 'revenue_member' ? role : 'principal'
 }
 
 export const CHIP: Readonly<Record<ChipTone, [string, string]>> = {
@@ -480,6 +491,8 @@ export function noticeTag(n: Pick<Notice, 'refKind'> & { title?: string }): { ta
   if (n.refKind === 'memo') return { ...MEMO_TAG }
   // An IT request (2026-10-20): the desk's or its sender's — it opens in the Revenue app.
   if (n.refKind === 'it_request') return { tag: 'IT', bg: 'rgb(230 237 241)', fg: 'rgb(78 101 116)' }
+  // A payment request (2026-10-29): sent for one's approval, or one's own decided or paid — it opens the Claim page.
+  if (n.refKind === 'payment_request') return { tag: 'CLAIM', bg: 'rgb(255 244 231)', fg: 'rgb(163 78 37)' }
   // A probation ending (2026-10-23): the person — the amber of the roster's Probation chip; a contract's (2026-10-24,
   // notify_term_ends titles it so), the peach of its.
   if (n.refKind === 'hr_staff') return n.title?.startsWith('Contract ending') ? { ...CONTRACT_TAG } : { ...PROBATION_TAG }

@@ -3,6 +3,7 @@
  * once) and the status chips; a chat opens docked beside the list. Also the team / person pane Insight opens, Customer
  * info, Assign to, and CRM alerts. The rows are the phone's (data.ts › chatRows); writes are the phone's actions.
  */
+import { sourceOf } from "@/lib/member/crm-source";
 import { panelNotifs, type PanelNotif } from "../../panel/vm/notifs";
 import { infoRows } from "../../sales/vm/customer";
 import { CHANNEL, STATUS_LABEL, lastReal, urgencyOf } from "../../sales/vm/common";
@@ -16,7 +17,9 @@ import { DIRECTOR_C, DIRECTOR_TEAM, ST, teamColours } from "./tokens";
 import { avatarTint } from "../../shared/palette";
 import { adHref } from "../../shared/AdLink";
 import { isNewChat } from "../../shared/new-chat";
-import { jobTitle, personOf } from "../../shared/people";
+import { saidInChat, snippetAround } from "../../shared/chat-search";
+import { jobTitle, personOf, teamAssignees } from "../../shared/people";
+import { labelsOn } from "./labels";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
 
@@ -81,12 +84,20 @@ export function inboxVM(ctx: DeskCtx) {
         ["Lost", x => x.key === "Lost", false], ["Cold leads", isCold, false]];
       const cur = T4.find(t => t[0] === ui.inbF) ?? T4[0];
       const q = (ui.ibQ ?? "").trim().toLowerCase();
-      const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q);
-      const rows = [...shown.filter(cur[1]).filter(hit)].sort((a, b) => Number(!!pref(b.id)?.pinned) - Number(!!pref(a.id)?.pinned));
+      const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q) || sourceOf(x.c).label.toLowerCase().includes(q) || !!saidInChat(x.c, q);
+      // Found further back in the chat: the row shows the message that holds the words, not the last one.
+      const preview = (x: ChatRow) => { if (!q || x.msg.toLowerCase().includes(q)) return x.msg; const m = saidInChat(x.c, q); return m ? snippetAround(m.text, q) : x.msg; };
+      // One's own labels (2026-11-02): a filter by one of them, the chats carrying it; the tabs count inside it.
+      const lab = ui.ibLabel && (data.labels ?? []).some(l => l.id === ui.ibLabel) ? ui.ibLabel : null;
+      const hasLab = (x: ChatRow) => !lab || (data.customerLabels?.[x.id] ?? []).includes(lab);
+      const used = (data.labels ?? []).filter(l => shown.some(x => (data.customerLabels?.[x.id] ?? []).includes(l.id)));
+      const rows = [...shown.filter(cur[1]).filter(hasLab).filter(hit)].sort((a, b) => Number(!!pref(b.id)?.pinned) - Number(!!pref(a.id)?.pinned));
       const DAY_MS = 86400000, fmtVisit = (t: Date) => `${t.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, ${t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase()}`;
       return {
         q: ui.ibQ ?? "", setQ: (e: { target: { value: string } }) => patch({ ibQ: e.target.value }),
-        tabs: T4.map(([label, f, hot]) => ({ label, count: shown.filter(f).length, on: label === cur[0], hot, pick: () => patch({ inbF: label }) })),
+        tabs: T4.map(([label, f, hot]) => ({ label, count: shown.filter(f).filter(hasLab).length, on: label === cur[0], hot, pick: () => patch({ inbF: label }) })),
+        labels: used.map(l => ({ id: l.id, name: l.name, color: l.color, on: l.id === lab, count: shown.filter(cur[1]).filter(x => (data.customerLabels?.[x.id] ?? []).includes(l.id)).length,
+          pick: () => patch({ ibLabel: l.id === lab ? null : l.id }) })),
         rows: rows.map(x => {
           const p = pref(x.id), n = x.c.unread, dot = !n && !!p?.markedUnread, [avBg, avFg] = avatarTint(x.name);
           const u = urgencyOf(x.c, now), visit = data.visits.filter(v => v.customerId === x.id && v.state === "booked" && new Date(v.start) >= now).sort((a, b) => a.start.localeCompare(b.start))[0];
@@ -95,8 +106,8 @@ export function inboxVM(ctx: DeskCtx) {
             : visit ? { text: `Visit · ${fmtVisit(new Date(visit.start))}`, kind: "calm" }
               : isCold(x) && lastIn ? { text: `Cold · ${Math.max(1, Math.floor((now.getTime() - lastIn) / DAY_MS))} d`, kind: "mute" } : null;
           const sel = ui.pane === "docked" && ui.chat === x.id;
-          return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: x.ad, msg: x.msg, time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
-            hot: n > 0 || dot, owner: x.owner, pinned: !!p?.pinned, muted: !!p?.muted, sel,
+          return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: [sourceOf(x.c).brandLabel, x.ad].filter(Boolean).join(" · "), msg: preview(x), time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
+            hot: n > 0 || dot, owner: x.owner, pinned: !!p?.pinned, muted: !!p?.muted, sel, tags: labelsOn(data, x.id).map(l => ({ t: l.name, c: l.color })),
             note: note?.text ?? "", noteColor: !note ? "" : note.kind === "hot" ? "var(--crm-oxblood)" : note.kind === "warm" ? "var(--crm-ink)" : note.kind === "calm" ? "var(--crm-ink-soft)" : "var(--crm-faint)",
             noteWeight: note?.kind === "hot" ? 600 : 500, noteIcon: !note ? null : note.kind === "calm" ? "calendar" : note.kind === "hot" && u.level === "overdue" ? "triangle-alert" : "clock",
             open: () => patch({ pane: "docked", kind: "chat", chat: x.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }) };
@@ -157,10 +168,33 @@ export function infoVM(ctx: DeskCtx) {
   };
 }
 
-/** Assign to (C3): people grouped by team in team colours, name + team. Sends through crm_send_to (30 s Undo). */
+/**
+ * Whom a leader's Assign to offers on the desktop — Mine's and the phone Team side's rule (shared/people.ts › teamAssignees;
+ * the owner, 2026-10-27: TL desktop "2 要"): a TL / STL / TA their own people in the customer's team, given at once through
+ * crm_assign_member with no undo. CRM · Manage keeps everybody through crm_send_to.
+ */
+export function leaderAssignees(ctx: DeskCtx, c: DeskCtx["data"]["customers"][number] | undefined) {
+  return c && !ctx.data.can.manage && ["tl", "stl", "ta"].includes(ctx.me.role) ? teamAssignees(ctx.me, ctx.data.people, c) : [];
+}
+
+/** Assign to (C3): people grouped by team in team colours, name + team. Sends through crm_send_to (30 s Undo); a leader's goes to their own people. */
 export function assignVM(ctx: DeskCtx) {
   const { ui, patch, set, teams, data } = ctx;
   const cid = ui.chat;
+  const cust = cid ? data.customers.find(x => x.id === cid) : undefined;
+  const mine = leaderAssignees(ctx, cust);
+  if (!data.can.manage) {
+    const tIdx = teams.findIndex(t => t.id === cust?.teamId), team = teams[tIdx];
+    return {
+      showAssign: mine.length > 0, showMove: false, menuOpen: ui.menu, menuBtnBg: ui.menu ? "var(--crm-tint-attention)" : "#fff",
+      toggleMenu: () => set(u => ({ ...u, menu: !u.menu })), closeMenu: () => patch({ menu: false }),
+      openAssign: () => patch({ menu: false, kind: "assign" }), backToChat: () => patch({ kind: "chat" }),
+      openInfo: () => { if (cid) patch({ menu: false, kind: "info", infoId: cid, visit: null }); },
+      openBook: () => { if (cid) patch({ menu: false, kind: "book" }); },
+      assignGroups: mine.length ? [{ label: (team?.name ?? "Your team").toUpperCase(), color: teamColours(Math.max(0, tIdx))[0], people: mine.map(p => ({ name: p.name, ini: initials(p.name), sub: jobTitle(p),
+        pick: () => { if (!cid || !cust) return; void ctx.act.assignMember(cid, p.id).then(ok => { if (ok) patch({ kind: "chat", toast: `${cust.name} assigned to ${ctx.nameOf(p.id)}` }); }); } })) }] : [],
+    };
+  }
   const groups = [
     ...(ctx.directors.length ? [{ label: DIRECTOR_TEAM.toUpperCase(), color: DIRECTOR_C[0], people: ctx.directors.map(d => ({ id: d.id, name: d.name, sub: DIRECTOR_TEAM })) }] : []),
     ...teams.map((t, k) => ({ label: t.name.toUpperCase(), color: teamColours(k)[0], people: t.people.map(p => ({ id: p.id, name: p.name, sub: t.name })) })),
@@ -211,7 +245,7 @@ export function alertsVM(ctx: DeskCtx) {
       line: n.kind === "overdue" ? `Waiting ${Math.floor(urgencyOf(c ?? ({} as never), now).waitingMinutes / 60) || 9} h for ${n.lead === "a reply" ? "a reply" : `${n.lead}'s reply`}`
         : [n.who, n.text.replace(/ ·$/, ""), n.tail.trim()].filter(Boolean).join(" "),
       extra: n.extra,
-      sub: c ? [CHANNEL[c.channel].name, c.ad, STATUS_LABEL[c.status], c.assignedTo ? ctx.nameOf(c.assignedTo) : "No one yet"].filter(Boolean).join(" · ") : "",
+      sub: c ? [sourceOf(c).label, c.ad, STATUS_LABEL[c.status], c.assignedTo ? ctx.nameOf(c.assignedTo) : "No one yet"].filter(Boolean).join(" · ") : "",
       quote: last ? `${last.from === "me" ? "You: " : ""}${last.text || mediaWord(last)}` : "", hasQuote: !!last,
       canOpen: !!c || !!n.adId, open,
       markRead: unr ? (e?: { stopPropagation(): void }) => { e?.stopPropagation(); act.readNotifs([n.key]); } : null };
@@ -271,7 +305,7 @@ export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(
   const up = personOf(personOf(holder, data.people)?.uplineId, data.people);
   const upTo = up && up.id !== me.id ? up : undefined;
   const items: [string, string, string, () => void, string, boolean][] = [
-    ...(data.can.manage ? [["Assign to", "var(--crm-ink-soft)", "M7 17 3 13l4-4M3 13h14M17 7l4 4-4 4M21 11H7", () => patch({ menu: false, kind: "assign" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
+    ...(data.can.manage || leaderAssignees(ctx, c).length ? [["Assign to", "var(--crm-ink-soft)", "M7 17 3 13l4-4M3 13h14M17 7l4 4-4 4M21 11H7", () => patch({ menu: false, kind: "assign" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
     // Move only when there is somebody to hand over to, as on the phone — the Principal keeps the design's top-level page.
     ...(upTo || top ? [["Move", "var(--crm-rust)", "M12 19V5M5 12l7-7 7 7", () => patch({ menu: false, kind: "move" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
     ["Share", "var(--crm-brown)", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6", () => patch({ menu: false, kind: "share" }), "", false],

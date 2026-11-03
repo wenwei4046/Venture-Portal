@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useTuckOnScroll } from "@/components/pwa/tuck";
 import tuck from "@/components/pwa/tuck.module.css";
+import { REVENUE_APP_VIEWS, type ViewTarget } from "@/lib/view-switch";
 import { ICON, Svg } from "../icons";
 import type { Screen } from "../route";
 import s from "../shell.module.css";
@@ -136,14 +137,17 @@ const DESK_NAV: { id: Screen; label: string; d: string }[] = [
   { id: "account", label: "Profile", d: ICON.user },
 ];
 
-/** The portal's modules, in the switcher's order, and the dot each wears (Profile's Switch view on a phone reads them too). */
-export type ModuleId = "finance" | "principal" | "hr" | "revenue";
-export const MODULES: { id: ModuleId; label: string; dot: string }[] = [
-  { id: "finance", label: "Finance", dot: s.moduleDotFinance },
-  { id: "principal", label: "Principal", dot: s.moduleDotPrincipal },
-  { id: "hr", label: "HR", dot: s.moduleDotHr },
-  { id: "revenue", label: "Revenue team", dot: s.moduleDotRevenue },
-];
+/**
+ * The views a Principal switches to — every view, as every switcher lists them (lib/view-switch.ts, 2026-10-27: the
+ * Principal's order, the apps' names), but View as a person…: here a team member is viewed with Profile's View as —
+ * and the dot each wears (Profile's Switch view on a phone reads them too).
+ */
+export type ModuleId = ViewTarget;
+const DOT: Record<ModuleId, string> = {
+  principal: s.moduleDotPrincipal, finance: s.moduleDotFinance, hr: s.moduleDotHr, marketing: s.moduleDotMarketing,
+  revenue_member: s.moduleDotRevenue, lead: s.moduleDotLead,
+};
+export const MODULES: { id: ModuleId; label: string; dot: string }[] = REVENUE_APP_VIEWS.map(v => ({ id: v.value, label: v.short, dot: DOT[v.value] }));
 
 /**
  * The foot of the sidebar (2026-10-08): which part of the portal this is, and
