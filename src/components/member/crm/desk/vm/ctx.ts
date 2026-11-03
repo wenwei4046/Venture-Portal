@@ -36,6 +36,8 @@ export interface DeskUi {
   fromTeam: boolean;
   fromList: boolean;
   fromInfo: boolean;
+  /** Customer info opened from the chat (its header or ⋮): its back goes to that chat, not to Leads (2026-11-04). */
+  infoFromChat?: boolean;
   infoId: string | null;
   /** A partner's booking open in the pane (mig 20261029190000). */
   partner?: string | null;
