@@ -301,7 +301,10 @@ COMMENT ON TABLE public.hr_pool_allocation IS
 
 -- ─── 3. Each department's inter-billing account ─────────────────────────────
 -- The paying side of an internal invoice is Dr "Inter-billing - <department>" (billing/actions.ts finds it by name);
--- 9051–9056 and Revenue Department's 9001 exist, IT has none. Opened under 9050 at the next free code of 9051–9099.
+-- 9051–9056 and Revenue Department's 9001 exist, IT has none. Opened under 9050 at the lowest free code of 9057–9079:
+-- 9080–9099 are other expenses on production (Staff Salary & Contribution … Printing & Stationery, read 2026-11-03), so
+-- the range's highest code is no guide. It exists when the readers would find it ("Inter-billing % <name>", whatever the
+-- dash); with the block full it opens none and says so, never refusing the department it was called for.
 
 CREATE OR REPLACE FUNCTION public.ensure_inter_billing_account(p_department UUID)
 RETURNS VOID
@@ -315,14 +318,17 @@ DECLARE
 BEGIN
     SELECT name INTO v_name FROM departments
      WHERE id = p_department AND segment_key IS NOT NULL AND NOT is_internal;
-    IF NOT FOUND OR EXISTS (SELECT 1 FROM chart_of_accounts WHERE name = 'Inter-billing - ' || v_name) THEN
+    IF NOT FOUND OR EXISTS (SELECT 1 FROM chart_of_accounts WHERE name ILIKE 'Inter-billing % ' || v_name) THEN
         RETURN;
     END IF;
-    SELECT (coalesce(max(code::int), 9050) + 1)::text INTO v_code
-      FROM chart_of_accounts
-     WHERE code ~ '^[0-9]+$' AND code::int BETWEEN 9051 AND 9099;
-    IF v_code::int > 9099 THEN
-        RAISE EXCEPTION 'The inter-billing accounts 9051–9099 are all taken — open "Inter-billing - %" by hand', v_name;
+    SELECT c::text INTO v_code
+      FROM generate_series(9057, 9079) c
+     WHERE NOT EXISTS (SELECT 1 FROM chart_of_accounts a WHERE a.code = c::text)
+     ORDER BY c
+     LIMIT 1;
+    IF v_code IS NULL THEN
+        RAISE NOTICE 'The inter-billing codes 9057–9079 are all taken — open "Inter-billing - %" by hand', v_name;
+        RETURN;
     END IF;
     INSERT INTO chart_of_accounts (code, name, type, parent_code, is_active, sort_order, cash_flow_category)
     VALUES (v_code, 'Inter-billing - ' || v_name, 'expense', '9050', true, 100, 'operating');

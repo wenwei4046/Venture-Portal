@@ -57,6 +57,7 @@ const REV = id(16)
 const VO = id(17)
 const LEAD = id(18)
 const OPS = id(19)
+const LATE = '0000000f-0000-4000-8000-00000000000f'
 const C2990 = id(31)
 const CAR = id(32)
 const CONTS = id(33)
@@ -187,6 +188,10 @@ try {
       ('9055', 'Inter-billing - Director', 'expense', '9050', 65, 'operating'),
       ('9056', 'Inter-billing - Venture Office', 'expense', '9050', 66, 'operating'),
       ('9001', 'Inter-billing - Revenue Department', 'expense', '9050', 100, 'operating');
+    -- …and 9080–9099, production's other expenses (read off production 2026-11-03: Staff Salary & Contribution …
+    -- Printing & Stationery): the next code of the range must not be read off them.
+    INSERT INTO chart_of_accounts (code, name, type, parent_code, sort_order, cash_flow_category)
+      SELECT c::text, 'Expense ' || c, 'expense', null, 200, 'operating' FROM generate_series(9080, 9099) c;
     INSERT INTO companies VALUES ('${C2990}', '2990 Sdn Bhd', '2990'), ('${CAR}', 'Carres', 'CAR'), ('${CONTS}', 'The Conts', 'CONTS');
     INSERT INTO hr_staff_costs VALUES ('${VIVIAN}', 'VIVIAN', '${DIRO}'), ('${AMIRUL}', 'AMIRUL', '${MKT}'),
       ('${SALLY}', 'SALLY', '${HR}'), ('${NOBODY}', 'NOBODY', '${FIN}'), ('${KEN}', 'KEN', '${IT}');
@@ -289,6 +294,18 @@ try {
     UPDATE departments SET segment_key = 'operations' WHERE id = '${OPS}'`)
   check(await one(`SELECT code FROM chart_of_accounts WHERE name = 'Inter-billing - Operations'`), '9058',
     'a department provisioned later gets its account')
+  // The block 9057–9079 full: the department is still provisioned, with no account (one opened by hand), never refused.
+  await db.exec(`INSERT INTO chart_of_accounts (code, name, type, parent_code, sort_order, cash_flow_category)
+      SELECT c::text, 'Taken ' || c, 'expense', null, 200, 'operating' FROM generate_series(9059, 9079) c;
+    INSERT INTO departments (id, name, segment_key) VALUES ('${LATE}', 'Logistics', 'logistics')`)
+  check(await one(`SELECT segment_key FROM departments WHERE id = '${LATE}'`), 'logistics', 'a full block never refuses a department')
+  check(await one(`SELECT count(*)::int FROM chart_of_accounts WHERE name = 'Inter-billing - Logistics'`), 0, '…it opens no account then')
+  await db.exec(`DELETE FROM chart_of_accounts WHERE name LIKE 'Taken %'; DELETE FROM departments WHERE id = '${LATE}'`)
+  // An account whose name the readers match ("Inter-billing — HR", an em dash) counts: no second one opened.
+  await db.exec(`UPDATE chart_of_accounts SET name = 'Inter-billing — HR' WHERE code = '9053'`)
+  await q(`SELECT public.ensure_inter_billing_account(id) FROM departments WHERE name = 'HR'`)
+  check(await one(`SELECT count(*)::int FROM chart_of_accounts WHERE name ILIKE 'Inter-billing % HR'`), 1, 'the readers’ match decides whether it exists')
+  await db.exec(`UPDATE chart_of_accounts SET name = 'Inter-billing - HR' WHERE code = '9053'`)
 
   // ══ Billing (Task 2): the sender less what moved; cost-center receivers billing on by their Bill to % ══════════
   // The month as HR leaves it before Submit to Finance: Vivian 2990 25% / CAR 25% / RM 3,000 to HR; Sally (HR)
