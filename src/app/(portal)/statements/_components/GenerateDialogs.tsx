@@ -186,9 +186,12 @@ export function PayrollInvoicesDialog({ open, onClose, onDone, period, categorie
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const preview = usePreview(open, month, hubPayrollPreview)
-  const companies = preview.value ?? []
+  const companies = preview.value?.companies ?? []
+  // Payroll moved between departments (2026-11-03): an internal invoice a receiver, then what each keeps.
+  const internal = preview.value?.internal ?? []
+  const staysIn = preview.value?.staysIn ?? []
   const total = r2(companies.reduce((s, c) => s + c.total, 0))
-  const ok = !preview.loading && companies.length > 0 && !!category
+  const ok = !preview.loading && (companies.length > 0 || internal.length > 0) && !!category
 
   const go = async () => {
     if (!ok || busy) return
@@ -197,7 +200,11 @@ export function PayrollInvoicesDialog({ open, onClose, onDone, period, categorie
     try {
       const res = await hubGeneratePayrollInvoices(month, category)
       if (!res.ok) return setError(res.reason)
-      onDone(`${plural(res.value.generated, 'payroll invoice', 'payroll invoices')} generated as drafts`)
+      const made = [
+        plural(res.value.companies.length, 'payroll invoice', 'payroll invoices'),
+        ...(res.value.receivers.length > 0 ? [plural(res.value.receivers.length, 'internal invoice', 'internal invoices')] : []),
+      ]
+      onDone(`${made.join(' and ')} generated as drafts`)
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'It did not go through. Try again.')
@@ -230,8 +237,10 @@ export function PayrollInvoicesDialog({ open, onClose, onDone, period, categorie
           <Hint>Reading HR’s staff billing allocation…</Hint>
         ) : preview.error ? (
           <Hint danger>{preview.error}</Hint>
-        ) : companies.length === 0 ? (
+        ) : companies.length === 0 && internal.length === 0 ? (
           <Hint>No staff billing allocation for {monthWords(month)} — nothing to bill.</Hint>
+        ) : companies.length === 0 ? (
+          <Hint>No company is billed for {monthWords(month)} — only the internal invoices.</Hint>
         ) : (
           <Field label={`${plural(companies.length, 'company', 'companies')} · RM ${money(total)}`}>
             {companies.map((c) => (
@@ -253,6 +262,26 @@ export function PayrollInvoicesDialog({ open, onClose, onDone, period, categorie
             ))}
           </Field>
         )}
+        {!preview.loading && !preview.error && internal.length > 0 ? (
+          <Field label={`${plural(internal.length, 'internal invoice', 'internal invoices')} · payroll moved between departments`}>
+            <div className={fm.summary} role="group" aria-label="Internal invoices">
+              {internal.map((m) => (
+                <div key={`${m.from}→${m.to}`} className={fm.summaryRow}>
+                  <span className={fm.summaryLabel}>{`${m.from} → ${m.to} · RM ${money(m.amount)}`}</span>
+                </div>
+              ))}
+            </div>
+          </Field>
+        ) : null}
+        {!preview.loading && !preview.error && staysIn.length > 0 ? (
+          <div className={fm.summary} role="group" aria-label="Stays in departments">
+            {staysIn.map((s) => (
+              <div key={s.department} className={fm.summaryRow}>
+                <span className={fm.summaryLabel}>{`Stays in ${s.department} · RM ${money(s.amount)}`}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {error ? <Hint danger>{error}</Hint> : <Hint>Drafts — each line posts to its department’s P&amp;L once the invoice is approved.</Hint>}
       </DialogForm>
     </FinDialog>
@@ -489,7 +518,7 @@ export function OwnShareDialog({ open, onClose, onDone, period, categories }: Ge
         {error ? (
           <Hint danger>{error}</Hint>
         ) : (
-          <Hint>A department left unticked keeps its share in its own pool. The ticks are Settings › Departments’; a change here is this run only. It settles by netting.</Hint>
+          <Hint>A department left unticked keeps its share in its own pool. The ticks are Settings › Departments’; a change here is this run only. It settles by netting. Payroll moved to another department is not here — it is billed to that department on its internal invoice.</Hint>
         )}
       </DialogForm>
     </FinDialog>

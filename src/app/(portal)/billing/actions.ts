@@ -1799,19 +1799,43 @@ function groupPayrollAllocation(
   return out
 }
 
+/** The month's payroll invoices as the review modal shows them (2026-11-03):
+ *  the companies', the internal invoices for payroll moved between departments
+ *  (sender → receiver, no names), and what each receiver keeps. */
+export interface PayrollInvoicesPreview {
+  companies: ConsolidatedCompanyPreview[]
+  internal: Array<{ from: string; to: string; amount: number }>
+  staysIn: Array<{ department: string; amount: number }>
+}
+
 /** Preview for the review modal: what one consolidated invoice per subsidiary
- *  will contain for the given period. Reads live HR allocation; no writes. */
+ *  will contain for the given period, the internal invoices beside them, and
+ *  what stays in a receiving department. Reads live HR allocation; no writes. */
 export async function fetchConsolidatedPayrollPreview(
   periodMonth: string,
-): Promise<ConsolidatedCompanyPreview[]> {
+): Promise<PayrollInvoicesPreview> {
   await requirePermission('billing')
   const supabase = await createClient()
   const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
-  const { data, error } = await supabase.rpc('get_staff_billing_allocation', {
-    p_period_month: period,
-  })
+  const [{ data, error }, { data: moves, error: movesErr }, { data: summary, error: summaryErr }] = await Promise.all([
+    supabase.rpc('get_staff_billing_allocation', { p_period_month: period }),
+    supabase.rpc('get_staff_dept_moves_allocation', { p_period_month: period }),
+    supabase.rpc('get_payroll_moves_summary', { p_period_month: period }),
+  ])
   if (error) throw new Error(`Failed to load payroll allocation: ${error.message}`)
-  return groupPayrollAllocation((data ?? []) as unknown as AllocationRpcRow[], await payrollSegmentOf(supabase))
+  if (movesErr) throw new Error(`Failed to load the payroll moved between departments: ${movesErr.message}`)
+  if (summaryErr) throw new Error(`Failed to load what stays in the departments: ${summaryErr.message}`)
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  return {
+    companies: groupPayrollAllocation((data ?? []) as unknown as AllocationRpcRow[], await payrollSegmentOf(supabase)),
+    internal: ((moves ?? []) as unknown as DeptMoveRpcRow[])
+      .map((m) => ({ from: m.from_department_name, to: m.to_department_name, amount: r2(Number(m.amount)) }))
+      .filter((m) => m.amount > 0)
+      .sort((a, b) => a.to.localeCompare(b.to) || a.from.localeCompare(b.from)),
+    staysIn: ((summary ?? []) as Array<{ department_name: string; stays: number | string }>)
+      .map((s) => ({ department: s.department_name, amount: r2(Number(s.stays)) }))
+      .filter((s) => s.amount > 0.005),
+  }
 }
 
 /** Generate one DRAFT consolidated invoice per subsidiary for the period, and

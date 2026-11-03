@@ -145,9 +145,12 @@ describe('Generate payroll invoices', () => {
     },
   ]
 
+  const preview = (companies: typeof PREVIEW, internal: Array<{ from: string; to: string; amount: number }> = [], staysIn: Array<{ department: string; amount: number }> = []) =>
+    ({ ok: true, value: { companies, internal, staysIn } })
+
   it('reads HR’s allocation for the month, a company a card, its departments and their parts; generates on the category', async () => {
-    mocks.payrollPreview.mockResolvedValue({ ok: true, value: PREVIEW })
-    mocks.payroll.mockResolvedValue({ ok: true, value: { generated: 1, companies: ['2990'] } })
+    mocks.payrollPreview.mockResolvedValue(preview(PREVIEW))
+    mocks.payroll.mockResolvedValue({ ok: true, value: { generated: 1, companies: ['2990'], receivers: [] } })
     const onDone = vi.fn()
     render(<PayrollInvoicesDialog open onClose={vi.fn()} onDone={onDone} period="2026-09-01" categories={categories} />)
     await flush()
@@ -163,7 +166,7 @@ describe('Generate payroll invoices', () => {
   })
 
   it('another month is read again; a month with no allocation has nothing to generate', async () => {
-    mocks.payrollPreview.mockResolvedValueOnce({ ok: true, value: PREVIEW }).mockResolvedValueOnce({ ok: true, value: [] })
+    mocks.payrollPreview.mockResolvedValueOnce(preview(PREVIEW)).mockResolvedValueOnce(preview([]))
     render(<PayrollInvoicesDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-09-01" categories={categories} />)
     await flush()
     fireEvent.change(screen.getByLabelText('Period'), { target: { value: '2026-08' } })
@@ -171,6 +174,31 @@ describe('Generate payroll invoices', () => {
     expect(mocks.payrollPreview).toHaveBeenLastCalledWith('2026-08')
     expect(hint()).toContain('No staff billing allocation for August 2026 — nothing to bill.')
     expect(within(dialog()).getByRole('button', { name: 'Generate drafts' })).toHaveAttribute('data-off', 'true')
+  })
+
+  // Payroll moved between departments (2026-11-03, method B): the internal invoices after the companies, then what
+  // each receiver keeps.
+  it('the preview lists the internal invoice and “Stays in HR · RM 600” with HR’s Bill to at 80%', async () => {
+    mocks.payrollPreview.mockResolvedValue(preview(PREVIEW, [{ from: 'Director Office', to: 'HR', amount: 3000 }], [{ department: 'HR', amount: 600 }]))
+    mocks.payroll.mockResolvedValue({ ok: true, value: { generated: 2, companies: ['2990'], receivers: ['HR'] } })
+    const onDone = vi.fn()
+    render(<PayrollInvoicesDialog open onClose={vi.fn()} onDone={onDone} period="2026-11-01" categories={categories} />)
+    await flush()
+    const internal = within(dialog()).getByRole('group', { name: 'Internal invoices' })
+    expect(internal).toHaveTextContent('Director Office → HR · RM 3,000.00')
+    expect(within(dialog()).getByRole('group', { name: 'Stays in departments' })).toHaveTextContent('Stays in HR · RM 600.00')
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Generate drafts' }))
+    await flush()
+    expect(onDone).toHaveBeenCalledWith('1 payroll invoice and 1 internal invoice generated as drafts')
+  })
+
+  it('the empty state still shows an internal invoice when no company is billed', async () => {
+    mocks.payrollPreview.mockResolvedValue(preview([], [{ from: 'Marketing', to: 'Finance', amount: 1000 }]))
+    render(<PayrollInvoicesDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-11-01" categories={categories} />)
+    await flush()
+    expect(hint()).toContain('No company is billed for November 2026 — only the internal invoices.')
+    expect(within(dialog()).getByRole('group', { name: 'Internal invoices' })).toHaveTextContent('Marketing → Finance · RM 1,000.00')
+    expect(within(dialog()).getByRole('button', { name: 'Generate drafts' })).not.toHaveAttribute('data-off', 'true')
   })
 })
 

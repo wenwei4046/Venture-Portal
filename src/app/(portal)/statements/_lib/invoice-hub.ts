@@ -88,7 +88,7 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
         .gte('created_at', periodStart)
         .lte('created_at', periodEnd)
         .order('created_at', { ascending: false }),
-      supabase.from('departments').select('id, name, is_internal').order('name'),
+      supabase.from('departments').select('id, name, is_internal, segment_key').order('name'),
       // Every active account, by code (user 2026-09-28: "这个太乱了，应该顺序").
       supabase.from('chart_of_accounts').select('code, name, type, parent_code').eq('is_active', true).order('code'),
       supabase.from('bank_accounts').select('id, bank_name, account_number, is_primary').eq('status', 'active').order('is_primary', { ascending: false }),
@@ -107,6 +107,8 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
         .select('total_gross, total_payroll_gross, total_invoice, total_saving, director_count, by_company, submitted_at')
         .eq('period_month', period)
         .maybeSingle(),
+      // Payroll moved between departments (2026-11-03): what each receiver took in — part of what it must bill.
+      supabase.rpc('get_payroll_moves_summary', { p_period_month: period }),
     ]),
   )
   // Finance's cost-center / centralized switch, begun with the page's reads. It never throws.
@@ -183,15 +185,17 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
     { data: payrollRun },
     { data: allocRows, error: allocError },
     { data: directorSubmission },
+    { data: movesSummary, error: movesError },
   ] = await firstReads
   if (allocError) console.error('get_staff_billing_allocation failed:', allocError.message)
+  if (movesError) console.error('get_payroll_moves_summary failed:', movesError.message)
   if (marketingError) console.error('mkt_bill_import_preview failed:', marketingError.message)
   const marketing = (marketingError ? null : marketingLinesFromRow(marketingRaw)) ?? NO_MARKETING(period)
 
   // ── The context every invoice is read against ──
   const companyRows = (companies ?? []) as Array<{ id: string; name: string; short_code: string | null; is_active: boolean | null }>
   const companyMap = new Map(companyRows.map((c) => [c.id, { name: c.name, code: c.short_code }]))
-  const departmentRows = (departments ?? []) as Array<{ id: string; name: string; is_internal: boolean | null }>
+  const departmentRows = (departments ?? []) as Array<{ id: string; name: string; is_internal: boolean | null; segment_key?: string | null }>
   const departmentMap = new Map(departmentRows.map((d) => [d.id, d.name]))
   const accountRows = (accounts ?? []) as Array<{ code: string; name: string; type: string; parent_code: string | null }>
   const accountName = new Map(accountRows.map((a) => [a.code, a.name]))
@@ -290,7 +294,15 @@ export async function loadInvoiceHub(supabase: Client, period: string): Promise<
   } | null
   const directorSubmitted = !!submission
   const directorFromPayroll = directorSubmitted ? directorBillingTarget(submission) : payrollSubmitted ? Number(run?.director_salary_total ?? 0) : 0
+  // What moved into each department, by the basis' keys (its segment; Revenue's is 'revenue' there).
+  const segmentOfDept = new Map(departmentRows.map((d) => [d.id, d.segment_key === 'revenue_department' ? 'revenue' : d.segment_key ?? null]))
+  const movedIn: Record<string, number> = {}
+  for (const m of (movesSummary ?? []) as Array<{ department_id: string; moved_in: number | string }>) {
+    const seg = segmentOfDept.get(m.department_id)
+    if (seg) movedIn[seg] = r2((movedIn[seg] ?? 0) + Number(m.moved_in))
+  }
   const basisLines = payrollBillingLines({
+    movedIn,
     fromPayroll: {
       hr: fromRun(run?.hr_opex_total),
       finance: fromRun(run?.finance_opex_total),

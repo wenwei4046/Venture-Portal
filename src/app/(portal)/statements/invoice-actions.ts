@@ -26,7 +26,7 @@ import {
   voidCreditNote,
   voidIssuedInvoices,
   type BillableToKind,
-  type ConsolidatedCompanyPreview,
+  type PayrollInvoicesPreview,
   type CreateInvoiceMode,
   type DirectorCtcRow,
   type InvoiceLineInput,
@@ -344,8 +344,9 @@ export async function hubImportMarketing(month: string): Promise<HubResult<{ mad
   })
 }
 
-/** What the payroll invoices would bill: a company each, its departments, their parts (HR's allocation). */
-export async function hubPayrollPreview(month: string): Promise<HubResult<ConsolidatedCompanyPreview[]>> {
+/** What the payroll invoices would bill: a company each, its departments, their parts (HR's allocation) — and the
+ *  internal invoices for payroll moved between departments, and what stays in a receiver. */
+export async function hubPayrollPreview(month: string): Promise<HubResult<PayrollInvoicesPreview>> {
   await requirePermission('billing')
   return attempt(() => fetchConsolidatedPayrollPreview(`${month}-01`))
 }
