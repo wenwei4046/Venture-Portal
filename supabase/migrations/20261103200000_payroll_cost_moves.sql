@@ -366,7 +366,9 @@ SELECT public.ensure_inter_billing_account(id) FROM public.departments
 -- What each person on the month's Finance-sent payroll moved to another department, in the five invoice items, the
 -- way the billing functions split a cost: a % of every item (a fixed RM as its share of the cost), the salary taking
 -- the rounding. A move into the department a person now sits in is no move. The sender is the person's roster
--- department, as the billing functions read it.
+-- department, as the billing functions read it. Pay that falls after the lines were saved (unpaid leave) can leave
+-- the companies' % and the lines more than the cost: the lines then give way in proportion, so together they move at
+-- most what the companies leave — never more than the payroll.
 CREATE OR REPLACE FUNCTION public.payroll_moved_parts(p_period_month DATE)
 RETURNS TABLE(staff_id UUID, from_department_id UUID, from_department_name TEXT, to_department_id UUID,
               to_department_name TEXT, to_cost_model TEXT, amount NUMERIC, salary_amount NUMERIC,
@@ -405,17 +407,31 @@ AS $fn$
         WHERE hmp.period_month = p_period_month
           AND hmp.status IN ('submitted', 'paid')
     ),
-    moves AS (
+    raw_moves AS (
         SELECT sr.*, m.department_id AS to_id, td.name AS to_name, td.cost_model AS to_model,
-               CASE WHEN m.pct IS NOT NULL THEN ROUND(sr.total_cost * m.pct, 2)
-                    ELSE LEAST(m.amount, sr.total_cost) END AS m_amt,
-               CASE WHEN m.pct IS NOT NULL THEN m.pct
-                    ELSE LEAST(m.amount, sr.total_cost) / sr.total_cost END AS f
+               CASE WHEN m.pct IS NOT NULL THEN sr.total_cost * m.pct
+                    ELSE LEAST(m.amount, sr.total_cost) END AS raw_amt
         FROM staff_rows sr
         JOIN hr_staff_dept_moves m ON m.staff_id = sr.sid AND m.period_month = p_period_month
         JOIN departments td ON td.id = m.department_id
         WHERE sr.total_cost > 0
           AND m.department_id <> sr.dept_id
+    ),
+    -- What the companies' % leave of each person's cost, and the factor their lines give way by.
+    room AS (
+        SELECT rm.sid,
+               CASE WHEN SUM(rm.raw_amt) > GREATEST(MIN(rm.total_cost) - MIN(rm.total_cost) * COALESCE(MIN(co.pct), 0), 0)
+                    THEN GREATEST(MIN(rm.total_cost) - MIN(rm.total_cost) * COALESCE(MIN(co.pct), 0), 0) / SUM(rm.raw_amt)
+                    ELSE 1 END AS k
+        FROM raw_moves rm
+        LEFT JOIN (SELECT a.staff_id, SUM(a.allocation_pct) AS pct FROM hr_staff_allocation a
+                    WHERE a.period_month = p_period_month AND a.allocation_pct > 0 GROUP BY a.staff_id) co ON co.staff_id = rm.sid
+        GROUP BY rm.sid
+    ),
+    moves AS (
+        SELECT rm.*, ROUND(rm.raw_amt * r.k, 2) AS m_amt, rm.raw_amt * r.k / rm.total_cost AS f
+        FROM raw_moves rm
+        JOIN room r ON r.sid = rm.sid
     ),
     parts AS (
         SELECT mv.*,

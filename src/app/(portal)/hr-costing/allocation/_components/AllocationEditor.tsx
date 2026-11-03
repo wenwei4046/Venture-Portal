@@ -486,6 +486,9 @@ function StaffCard({
             </>
           )}
           {error && <span className="text-danger ml-2">{error}</span>}
+          {/* What is on screen breaks a rule — typed, or saved before the pay fell (the billing then lets the
+              department lines give way, so the companies and departments never pass the cost). */}
+          {!error && check && !check.ok && <span className="text-danger ml-2">{check.error}</span>}
           {savedNote && !dirty && <span className="chip ledger ml-2"><span className="dot" />Saved.</span>}
         </div>
         {locked && (

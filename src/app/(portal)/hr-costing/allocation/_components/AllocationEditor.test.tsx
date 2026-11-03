@@ -238,6 +238,11 @@ describe('AllocationEditor — part of the cost to another department', () => {
     )
   })
 
+  it('lines saved before her pay fell say they now pass the cost, before anybody edits them', () => {
+    draw([vivian({ employerCost: 5800, moves: [{ departmentId: 'd-hr', kind: 'amount', value: 3000 }] })])
+    expect(within(card('VIVIAN')).getByText('Companies and departments take 101.72% of the cost — cannot exceed 100%')).toBeInTheDocument()
+  })
+
   it('a centralized person shows + Department only; leftover “Stays in Marketing”', () => {
     draw([
       vivian(),

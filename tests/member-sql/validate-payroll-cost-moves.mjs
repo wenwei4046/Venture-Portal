@@ -378,6 +378,15 @@ try {
   check(rowsOf(await billing(), 'Finance'), {}, 'a move into the person’s own department is no move')
   check(await everything(), cost, 'and every sen still lands in one place')
   await q(`UPDATE hr_staff_costs SET department_id = $1 WHERE id = $2`, [MKT, AMIRUL])
+  // Vivian's pay falls by RM 200 after her lines were saved (unpaid leave): 50% to companies + a fixed RM 3,000 would
+  // pass her RM 5,800. The fixed part gives way — it moves what the companies leave, never more than her cost.
+  await q(`UPDATE hr_monthly_payroll SET gross = gross - 200 WHERE staff_id = $1 AND period_month = '${NOV}'`, [VIVIAN])
+  const shrunk = await q(`SELECT amount::float AS a, (salary_amount + allowance_amount + epf_amount + socso_amount + eis_amount)::float AS parts
+    FROM get_staff_dept_moves_allocation('${NOV}') WHERE from_department_name = 'Director Office'`)
+  check(shrunk, [{ a: 2900, parts: 2900 }], 'a fixed line moves only what the companies leave once pay falls')
+  const lower = await one(`SELECT sum(gross + epf_er + socso_er + eis_er)::float FROM hr_monthly_payroll WHERE period_month = '${NOV}'`)
+  check(await everything(), lower, 'and companies + leftovers + what stays still = the payroll, never more')
+  await q(`UPDATE hr_monthly_payroll SET gross = gross + 200 WHERE staff_id = $1 AND period_month = '${NOV}'`, [VIVIAN])
 
   // Who may ask: Billing or HR Costing · View, as the billing function.
   await db.exec(`SELECT set_config('request.jwt.claim.sub', '${HR_USER}', false), set_config('test.actions', 'claims.view', false)`)
