@@ -209,9 +209,14 @@ export function requestCards(rows: readonly PaymentRequestRow[], departments: re
   ]
 }
 
+/** What waits for Finance: a payroll still to fund, a claim or a request with no voucher yet — the hero's, and the sidebar's count. */
+export function waitingForFinance(rows: readonly PaymentRequestRow[]): PaymentRequestRow[] {
+  return rows.filter((r) => r.stage === 'finance')
+}
+
 /** The total over the cards: what waits for Finance. */
 export function requestHero(rows: readonly PaymentRequestRow[]): { label: string; value: string } {
-  const waiting = rows.filter((r) => r.stage === 'finance')
+  const waiting = waitingForFinance(rows)
   return { label: `Waiting for you · ${plural(waiting.length, 'request', 'requests')}`, value: rm(sum(waiting)) }
 }
 

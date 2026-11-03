@@ -32,6 +32,10 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
     { wants: ['revenue.view:own'], text: 'canAccessRevenue(user) — the sidebar’s Revenue sub-departments (listSubDepartments)' },
   'src/components/layout/BottomTabBar.tsx#BottomTabBar':
     { wants: ['approvals.view', ...APPROVE], text: 'canApprove(viewer) — the phone’s approvals badge' },
+  // 2026-11-03 — the Finance sidebar's count on Payment request: the page's own read (readPaymentRequests), made only
+  // for an account the page opens for. It answers null otherwise rather than redirect: the sidebar draws on every page.
+  'src/app/(portal)/payments/requests/waiting-count.ts#waitingRequestCount':
+    { wants: ['treasury.view'], text: 'canAccessTreasury(user) with Payment request’s tab open — the sidebar’s count on Payment request' },
   // 2026-10-17 — the Principal's own view opens the Finance app with an Approvals tab: its badge is read only
   // where the tab is drawn — the sidebar's Approvals row, `canApprove` and its page's tabs.
   'src/app/(fin-app)/fin-app/layout.tsx#FinAppLayout':
