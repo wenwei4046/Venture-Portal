@@ -320,6 +320,8 @@ export interface DeskActions {
   saveShowroomExtras(roomId: string, x: { photo: File | null; removePhoto: boolean; gmap: string; waze: string }): Promise<boolean>;
   /** v2 frame 07: a showroom's staff-only remarks, and deleting it (refused while visits are upcoming). */
   saveRoomRemarks(roomId: string, remarks: string): Promise<boolean>;
+  /** A showroom's draft kept until Save (crm_save_showroom_draft; room = its id or 'new'); null takes it away. */
+  saveRoomDraft(room: string, draft: Record<string, unknown> | null): Promise<boolean>;
   deleteRoom(roomId: string): Promise<boolean>;
   /** Channels (v2): link / unlink an asset, its default (crm_set_channel); send a tab to Meta (saveCrmChannel). */
   setChannel(kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean): Promise<boolean>;

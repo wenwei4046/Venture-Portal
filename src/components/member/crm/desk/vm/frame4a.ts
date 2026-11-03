@@ -11,7 +11,9 @@ import type { Icon4a } from "../../shared/icons4a";
 export interface F4Item { label: string; icon: Icon4a; on: boolean; pick: () => void; badge: string }
 export interface F4Tab { label: string; on: boolean; pick: () => void }
 export interface F4Menu { open: boolean; close: () => void; items: { tag: string; label: string; bg: string; fg: string; pick: () => void }[] }
-export interface F4Head { title: string; tabs: F4Tab[]; subTabs?: F4Tab[]; sub: string; cta: { label: string; icon: Icon4a | null; act: () => void; menu?: F4Menu } | null }
+export interface F4Head { title: string; tabs: F4Tab[]; subTabs?: F4Tab[]; sub: string; cta: { label: string; icon: Icon4a | null; act: () => void; menu?: F4Menu } | null;
+  /** An outline button left of the primary one (Showrooms' Save as draft). */
+  alt?: { label: string; act: () => void } | null }
 
 const CRM_ICON: Record<DeskTab, Icon4a> = {
   insight: "trending-up", inbox: "inbox", people: "contact", calendar: "calendar", adsperf: "arrow-up-right", assignment: "users",
@@ -65,7 +67,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
     account: { ini: fr.me.ini, name: fr.me.name, sub: fr.me.sub },
     greet: app.greeting, first: ctx.me.role === "boss" ? "Principal" : ctx.me.name.trim().split(/\s+/)[0] ?? "",
     subName: app.subName, openSubDept: app.openSubDept, date: topDate(ctx.now),
-    head: { title: fr.pageTitle, tabs: h?.tabs ?? [], subTabs: h?.subTabs, sub: h?.sub ?? "", cta: h?.cta ?? null } as F4Head,
+    head: { title: fr.pageTitle, tabs: h?.tabs ?? [], subTabs: h?.subTabs, sub: h?.sub ?? "", cta: h?.cta ?? null, alt: h?.alt ?? null } as F4Head,
     alertsN: fr.alertsN, openAlerts: fr.openAlerts,
     // Inbox runs its columns edge to edge under a rule (frame 02); every other page has the 36 px gutter.
     // Calendar's Book a visit (frame 04): pick the customer, then the booking pane every chat's Appointment opens.
@@ -108,7 +110,7 @@ interface HeadBits {
   opItem: string;
   apDl: { v: string; tag: string; label: string; bg: string; fg: string; pick: () => void }[];
   apDlOpen: boolean; apToggleDl: () => void;
-  sr4: { save: () => void; dirty: boolean };
+  sr4: { save: () => void; dirty: boolean; draftable?: boolean; saveDraft: () => void };
   srPage: "rooms" | "types" | "keys"; at: { save: () => void; dirty: boolean };
   cfSave: () => void;
   cfSummary: string;
@@ -143,7 +145,9 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
     // Showrooms and Appointment types (2026-10-24: "在電腦端有個控制面板，可以放在showroom 那邊"), each saved by the head's Save.
     // …and Key log (2026-10-29: "在 showroom 要有一个表单，去记录 member 借还钥匙的情况"), read only, no Save.
     showrooms: { tabs: [], subTabs: ([["rooms", "Showrooms"], ["types", "Appointment types"], ["keys", "Key log"]] as const).map(([k, label]) => ({ label, on: v.srPage === k, pick: () => ctx.patch({ srPage: k }) })),
-      sub: v.srPage === "rooms" ? n(v.showroomCount, "showroom", "showrooms") : "", cta: v.srPage === "keys" ? null : { label: "Save", icon: "check", act: v.srPage === "types" ? v.at.save : v.sr4.save } },
+      sub: v.srPage === "rooms" ? n(v.showroomCount, "showroom", "showrooms") : "", cta: v.srPage === "keys" ? null : { label: "Save", icon: "check", act: v.srPage === "types" ? v.at.save : v.sr4.save },
+      // Save as draft (2026-11-03): the showroom's changes kept, not live until Save.
+      alt: v.srPage === "rooms" && v.sr4.draftable ? { label: "Save as draft", act: v.sr4.saveDraft } : null },
     forms: { tabs: [], sub: v.cfSummary, cta: { label: "Publish", icon: "check", act: v.cfSave } },
     channels: { tabs: [], sub: "", cta: { label: "Add a number", icon: "plus", act: () => window.open("https://business.facebook.com/wa/manage/phone-numbers/", "_blank", "noopener") } },
     settings: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },
