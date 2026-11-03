@@ -399,6 +399,56 @@ export interface GlTxn {
   otherSide: string | null
   /** The source document's number: the voucher (PV / OR), the invoice, the credit note. */
   refNo: string | null
+  /** A reversal's or a void's own words ("Reverse the … accrual of 31 Aug — paid today by HV-PV-…", "VOID JE-…") —
+   *  what the P&L's lines pair it by (foldReversals, 2026-10-26); absent on any other line. */
+  reverses?: string | null
+}
+
+/** A reversal or a void, by its entry's words or its line's, or by what it was posted for. */
+const REVERSAL = /^(reverse|reversal|void)\b/i
+const reversalOf = (l: GlLine): string | null => {
+  const said = [l.entry_description, l.description].find((s) => !!s && REVERSAL.test(s.trim()))
+  if (said) return said.trim()
+  return l.ref_type && /_void$/.test(l.ref_type) ? (l.entry_description ?? l.description ?? 'void') : null
+}
+
+/**
+ * The P&L's lines without a reversal and the line it cancels (2026-10-26, the user: "就PNL 应该显示8月罢了不是？也不需要写
+ * paid 吧? 那个是cash flow part"): a payroll accrual of 31 Aug reversed on 15 Sep when the vouchers paying it were posted
+ * shows the August line alone — September's reversal and payments cancel out and none is listed. A reversal cancels
+ * the opposite line(s) of its month that make up its amount exactly: one its words name (the document — "HV-PV-…-0515 /
+ * 0516" names both — or the entry), else all it names together, else one of the same day, else all of that day
+ * together, else any one. Every month still adds up to its figure; the General Ledger lists all.
+ */
+export function foldReversals(txns: GlTxn[]): GlTxn[] {
+  const gone = new Set<number>()
+  const month = (t: GlTxn) => t.date.slice(0, 7)
+  const cents = (n: number) => Math.round(n * 100)
+  txns.forEach((r, i) => {
+    const words = r.reverses
+    if (!words || gone.has(i)) return
+    // What it cancels: lines on the other side of it, of its month.
+    const want = cents(r.credit - r.debit)
+    const amount = (t: GlTxn) => cents(t.debit - t.credit)
+    const open = txns
+      .map((t, j) => ({ t, j }))
+      .filter(({ t, j }) => j !== i && !gone.has(j) && !t.reverses && month(t) === month(r) && Math.sign(amount(t)) === Math.sign(want))
+    const names = (no: string | null) => {
+      if (!no) return false
+      if (words.includes(no)) return true
+      const tail = no.split('-').pop() ?? ''
+      return tail.length >= 4 && new RegExp(`(^|[^\\d])${tail}(?!\\d)`).test(words)
+    }
+    const named = open.filter(({ t }) => names(t.refNo) || names(t.entryNo))
+    const sameDay = open.filter(({ t }) => t.date === r.date)
+    const one = (xs: typeof open) => xs.filter(({ t }) => amount(t) === want).slice(0, 1)
+    const all = (xs: typeof open) => (xs.length > 1 && xs.reduce((s, { t }) => s + amount(t), 0) === want ? xs : [])
+    const pick = [one(named), all(named), one(sameDay), all(sameDay), one(open)].find((xs) => xs.length > 0)
+    if (!pick) return
+    gone.add(i)
+    for (const { j } of pick) gone.add(j)
+  })
+  return gone.size === 0 ? txns : txns.filter((_, i) => !gone.has(i))
 }
 
 /**
@@ -435,6 +485,7 @@ export function otherSideOf(lines: GlLine[], accounts: ReadonlyMap<string, { nam
 /** A journal line as a drill-down line: what it was and who with (lib/line-words), its debit and credit, its other side, its document. */
 function txnOf(l: GlLine, amount: number, otherSide: (l: GlLine) => string | null): GlTxn {
   const says = lineWords(l)
+  const reverses = reversalOf(l)
   return {
     date: l.date,
     entryNo: says.entryNo,
@@ -446,6 +497,7 @@ function txnOf(l: GlLine, amount: number, otherSide: (l: GlLine) => string | nul
     credit: l.credit,
     otherSide: otherSide(l),
     refNo: l.ref_no ?? null,
+    ...(reverses ? { reverses } : {}),
   }
 }
 
@@ -645,6 +697,8 @@ export function buildPnl(lines: GlLine[], accounts: CoaAccount[], filter: Report
   const one = (t: AccountType, key: string, label: string) => {
     const types = new Set<AccountType>([t])
     const buckets = bucketAccounts(lines, accounts, filter, types, 'movement')
+    // A reversal and the line it cancels in its month are no line of the P&L (foldReversals).
+    for (const b of buckets.values()) b.txns = foldReversals(b.txns)
     return section(key, label, buildTree(accounts, buckets, types))
   }
   const revenue = one('revenue', 'revenue', 'Revenue')

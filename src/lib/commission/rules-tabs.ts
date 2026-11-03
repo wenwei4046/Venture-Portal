@@ -9,7 +9,6 @@
  *
  *   KPI item allowance                 → Item groups, KPI items (the items AND
  *                                        the threshold ladder, one tab)
- *   Open Bill bonus                    → Open Bill rates
  *   Below-margin penalty or            → Brands & margin bands — a brand's ladder
  *   Monthly margin incentive             holds the penalty rungs AND the incentive
  *                                        rungs, so either switch needs the tab
@@ -42,7 +41,6 @@ export type RulesTab =
   | 'scheme'
   | 'ladder'
   | 'groups'
-  | 'open-bill'
   | 'brands'
   | 'promotion'
   | 'ranks'
@@ -73,7 +71,6 @@ export const RULES_TABS: readonly RulesTabItem[] = [
   { key: 'directors', label: 'Directors', group: 'Pay structure' },
   { key: 'groups', label: 'Item groups', group: 'Item rules' },
   { key: 'kpi', label: 'KPI items', group: 'Item rules' },
-  { key: 'open-bill', label: 'Open Bill rates', group: 'Item rules' },
   { key: 'brands', label: 'Brands & margin bands', group: 'Item rules' },
   { key: 'capacity', label: 'Capacity', group: 'Headcount' },
   { key: 'promotion', label: 'Promotion criteria', group: 'Policy' },
@@ -87,7 +84,6 @@ export function groupedRulesTabs(visible: readonly RulesTabItem[]): Array<{ labe
 /** The switches of `comm_schemes` that decide a tab. */
 export interface RulesSwitches {
   enable_kpi: boolean
-  enable_open_bill: boolean
   enable_margin_penalty: boolean
   enable_margin_incentive: boolean
 }
@@ -119,8 +115,6 @@ function tabIsShown(key: RulesTab, scheme: RulesSwitches, recorded: RulesRecorde
       return scheme.enable_kpi || recorded.itemGroups > 0
     case 'kpi':
       return scheme.enable_kpi || (recorded.kpiItems ?? 0) > 0 || (recorded.kpiThresholds ?? 0) > 0
-    case 'open-bill':
-      return scheme.enable_open_bill
     case 'brands':
       return scheme.enable_margin_penalty || scheme.enable_margin_incentive
     case 'promotion':

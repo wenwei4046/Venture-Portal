@@ -26,6 +26,18 @@ describe('a deal’s change in words', () => {
     expect(dealChangeLine(upd('loans', {}, {}, ['updated_at', 'version']))).toBe('Updated')
   })
 
+  it('says minimum pay interest turned on from its month, or off (2026-10-30)', () => {
+    expect(
+      dealChangeLine(upd('fund_sources', { min_pay_interest: false, min_pay_interest_from: null }, { min_pay_interest: true, min_pay_interest_from: '2026-11-01' }, ['min_pay_interest', 'min_pay_interest_from'])),
+    ).toBe('Minimum pay interest on · Minimum pay interest from Nov 2026')
+    expect(
+      dealChangeLine(upd('loans', { min_pay_interest: true, min_pay_interest_from: '2026-11-01' }, { min_pay_interest: true, min_pay_interest_from: null }, ['min_pay_interest_from'])),
+    ).toBe('Minimum pay interest from the first instalment')
+    expect(
+      dealChangeLine(upd('loans', { min_pay_interest: true, min_pay_interest_from: '2026-11-01' }, { min_pay_interest: false, min_pay_interest_from: null }, ['min_pay_interest', 'min_pay_interest_from'])),
+    ).toBe('Minimum pay interest off')
+  })
+
   it('says a repayment recorded, removed or changed', () => {
     const row = { payment_type: 'interest', amount: 2400, payment_date: '2026-09-02' }
     expect(dealChangeLine({ op: 'INSERT', table_name: 'repayments', old_row: null, new_row: row, changed: null })).toBe('Repayment recorded · Interest RM 2,400.00 · 02 Sep 2026')

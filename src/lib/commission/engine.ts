@@ -8,7 +8,7 @@
  *   A  classify lines, apply the DEPOSIT GATE, get each person's own revenue
  *   B  GROUP revenue — own + the whole downline subtree
  *   C  resolve the EFFECTIVE RATE (fixed vs variable, off group revenue)
- *   D  C1 product revenue · C2 KPI items · C3 Open Bill,
+ *   D  C1 product revenue · C2 KPI items,
  *      each bill scaled by its BELOW-MARGIN PENALTY
  *   E  C4 override, on the PENALTY-WEIGHTED revenue of each downline
  *   F  the monthly MARGIN INCENTIVE, which every brand must clear
@@ -31,7 +31,6 @@ import type {
   KpiThreshold,
   MarginBand,
   MarginSource,
-  OpenBillRank,
   PenalisedOrder,
   PriorMonth,
   Rank,
@@ -321,6 +320,22 @@ export function billMargin(order: SalesOrder, base: MarginBase): BillMargin {
 }
 
 /**
+ * What a bill with NO SALES of its own costs the month (2026-10-30) — a gift on a bill of its own at RM 0, or a bill
+ * whose KPI items and option charges take all it sold. It has no margin to read (nothing to divide by), yet its goods
+ * cost what they cost: it counts against the month's margin, as a free pillow on a paid bill counts against that
+ * bill's (user: "consider margin negative as well. make sure in the calculation of monthly").
+ *
+ * Its cost once every goods line is costed; `null` while one still waits for a cost (the month's margin waits with
+ * it); `undefined` for a bill that sells, or that has no goods at all (transport alone), which is no part of any
+ * margin. The SQL twin is `member_order_facts.no_sales_cost`.
+ */
+export function noSalesCost(lines: SalesLine[], base: MarginBase, groupIndex: Map<string, boolean>): number | null | undefined {
+  if (base.revenue > 0) return undefined
+  if (!lines.some(line => inGoodsScope(line, groupIndex))) return undefined
+  return base.complete ? base.cost : null
+}
+
+/**
  * Below-margin penalty for one bill. Penalty bands are read as "margin at or
  * BELOW this threshold", and the MOST SEVERE match wins — so with the user's
  * ladder (27% → x0.5, 25% → x0.25, 24% → x0):
@@ -396,6 +411,9 @@ export function marginIncentiveAcrossBrands(
   if (unbranded) {
     return { ...none, blockedReason: 'some sales carry no brand' }
   }
+  // A brand given away and never sold that month (2026-10-30): a cost and no sales, a margin below nothing — it
+  // clears no tier, and every brand must. Judged, not held: nothing is missing, so nothing to warn about.
+  if (brands.some(b => b.noSales)) return none
   const noMargin = brands.find(b => b.marginPct === null)
   if (noMargin) {
     return { ...none, blockedReason: `no cost data for ${noMargin.brandCode}` }
@@ -748,9 +766,6 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     }
   }
 
-  const openBillPct = new Map<OpenBillRank, number>(input.openBillRules.map(r => [r.rank, r.pct]))
-  const tagByOrder = new Map<string, OpenBillRank>(input.openBillTags.map(t => [t.orderId, t.rank]))
-
   const ordersByStaff = new Map<string, SalesOrder[]>()
   for (const order of input.orders) {
     const list = ordersByStaff.get(order.staffId)
@@ -963,13 +978,13 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     overrideRateOf.set(staffId, comparisonRate)
   }
 
-  // ── Pass D: C1 / C2 / C3, each bill scaled by its margin penalty ───────
+  // ── Pass D: C1 / C2, each bill scaled by its margin penalty ────────────
   let ordersWithoutCost = 0
 
   for (const draft of drafts.values()) {
     // A department head's own bills pay the rate of their title's rung and
-    // NOTHING else — no KPI allowance, Open Bill bonus, margin penalty or
-    // incentive (user 2026-09-27: 如果自己有做 sales，就只拿自己的 rate 罢了).
+    // NOTHING else — no KPI allowance, margin penalty or incentive
+    // (user 2026-09-27: 如果自己有做 sales，就只拿自己的 rate 罢了).
     // Without a rung, no rate: their sales still stand on the statement and
     // the bills still close with the month.
     if (heads.has(draft.staffId)) {
@@ -1011,14 +1026,21 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         )
       }
       const bill = billMargin(order, base)
+      // A bill with no sales of its own still costs the month what its goods cost (2026-10-30) — no sales, so none of
+      // the month's revenue, even where its KPI items and charges take more than it sold; a gift that costs nothing
+      // is no part of it.
+      const giftCost = noSalesCost(order.lines, base, groupIndex)
 
-      if (base.revenue > 0) {
+      if (base.revenue > 0 || giftCost === null || (giftCost ?? 0) > 0) {
         if (base.brandCode === null) draft.missingBrand = true
         else {
           const tally = draft.marginByBrand.get(base.brandCode) ?? { revenue: 0, cost: 0, complete: true }
-          tally.revenue = round2(tally.revenue + base.revenue)
-          tally.cost = round2(tally.cost + bill.cost)
-          if (bill.source === 'none') tally.complete = false
+          tally.revenue = round2(tally.revenue + Math.max(base.revenue, 0))
+          if (giftCost === undefined) {
+            tally.cost = round2(tally.cost + bill.cost)
+            if (bill.source === 'none') tally.complete = false
+          } else if (giftCost === null) tally.complete = false
+          else tally.cost = round2(tally.cost + giftCost)
           draft.marginByBrand.set(base.brandCode, tally)
         }
       }
@@ -1073,41 +1095,6 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           amount: hit.amount,
           note: `${order.orderNo} · ${kpiItemLabel(hit.item)} × ${hit.qty} @ ${hit.item.kpiAmount}`,
         })
-      }
-
-      // C3 — Open Bill: the 1st / 2nd / 3rd bill written on an event day.
-      if (scheme.enableOpenBill) {
-        // An upsale is not a bill written on the day, so it holds no rank.
-        const rank = order.upsale ? undefined : tagByOrder.get(order.id)
-        const pct = rank === undefined ? undefined : openBillPct.get(rank)
-        if (rank !== undefined && pct === undefined) {
-          warnings.push(
-            `Order ${order.orderNo} is tagged Open Bill ${rank}, but no bonus rate is configured for that rank.`,
-          )
-        } else if (rank !== undefined && pct !== undefined) {
-          const full =
-            scheme.openBillBasis === 'pct_of_revenue'
-              ? round2(opr * pct)
-              : round2(opr * rate * pct)
-          const paid = round2(full * multiplier)
-          withheldOnThisBill = round2(withheldOnThisBill + (full - paid))
-          if (paid !== 0) {
-            draft.lines.push({
-              component: 'open_bill',
-              sourceOrderId: order.id,
-              basisAmount: opr,
-              rate: pct,
-              qty: null,
-              amount: paid,
-              note:
-                `${ordinal(rank)} bill · ${order.eventDate} · ${order.orderNo}` +
-                (scheme.openBillBasis === 'pct_of_revenue'
-                  ? ` · ${round2(pct * 100)}% of revenue`
-                  : ` · +${round2(pct * 100)}% on ${round2(rate * 100)}% commission`) +
-                penaltyNote,
-            })
-          }
-        }
       }
 
       if (penaltyBand) {
@@ -1240,6 +1227,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       revenue: t.revenue,
       cost: t.cost,
       marginPct: marginPctOf(t),
+      ...(t.complete && t.revenue <= 0 && t.cost > 0 ? { noSales: true as const } : {}),
     }))
     if (d.missingBrand) {
       brands.push({ brandCode: null, revenue: 0, cost: 0, marginPct: null })
@@ -1247,10 +1235,12 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
     const totalRevenue = sum(brands.map(b => b.revenue))
     const totalCost = sum(brands.map(b => b.cost))
+    // Complete when every cost is known: a brand whose bills had no sales has no margin of its own, yet its cost is
+    // known and in the month's (2026-10-30).
     const overall = marginPctOf({
       revenue: totalRevenue,
       cost: totalCost,
-      complete: brands.every(b => b.marginPct !== null),
+      complete: !d.missingBrand && [...d.marginByBrand.values()].every(t => t.complete),
     })
 
     let bandKey: string | null = null
@@ -1289,14 +1279,13 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
 
     const productCommission = by('product_revenue')
     const kpiCommission = round2(by('kpi_item') + by('kpi_threshold'))
-    const openBillBonus = by('open_bill')
     const overrideCommission = by('override')
     const marginIncentive = by('margin_incentive')
     const groupIncentive = by('group_incentive')
     const directorFixed = by('director_fixed')
     const directorIncentive = by('director_incentive')
     const totalCommission = round2(
-      productCommission + kpiCommission + openBillBonus + overrideCommission + marginIncentive + groupIncentive
+      productCommission + kpiCommission + overrideCommission + marginIncentive + groupIncentive
         + directorFixed + directorIncentive,
     )
 
@@ -1352,7 +1341,6 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       kpiBase: d.kpiBase,
       kpiThresholdPct: d.kpiThresholdPct,
       kpiCommission,
-      openBillBonus,
       overrideCommission,
       marginRevenue: sum((margin?.brands ?? []).map(b => b.revenue)),
       marginCost: sum((margin?.brands ?? []).map(b => b.cost)),
@@ -1381,8 +1369,4 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     penalised,
     warnings,
   }
-}
-
-function ordinal(n: OpenBillRank): string {
-  return n === 1 ? '1st' : n === 2 ? '2nd' : '3rd'
 }

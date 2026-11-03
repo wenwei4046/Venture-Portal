@@ -56,7 +56,7 @@ const MARKETING = {
   typed: [],
 }
 
-function database(tables: Record<string, Row[]> = {}) {
+function database(tables: Record<string, Row[]> = {}, movesSummary: Row[] = []) {
   const data: Record<string, Row[]> = {
     invoices: [...INVOICES, ...OTHER],
     invoice_lines: LINES,
@@ -65,8 +65,8 @@ function database(tables: Record<string, Row[]> = {}) {
       { id: 'co-old', name: 'Hookka', short_code: 'HK', is_active: false },
     ],
     departments: [
-      { id: 'd-fin', name: 'Finance', is_internal: false },
-      { id: 'd-vo', name: 'Venture (Office)', is_internal: true },
+      { id: 'd-fin', name: 'Finance', is_internal: false, segment_key: 'finance' },
+      { id: 'd-vo', name: 'Venture (Office)', is_internal: true, segment_key: null },
     ],
     chart_of_accounts: [
       { code: '5019', name: 'Design Income', type: 'revenue', parent_code: null, is_active: true },
@@ -135,6 +135,10 @@ function database(tables: Record<string, Row[]> = {}) {
     return q
   })
   const rpc = vi.fn((fn?: string) => {
+    if (fn === 'get_payroll_moves_summary') {
+      const summary = { data: movesSummary, error: null }
+      return { then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => Promise.resolve(summary).then(resolve, reject) }
+    }
     if (fn === 'mkt_bill_import_preview') {
       return { then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) => Promise.resolve({ data: MARKETING, error: null }).then(resolve, reject) }
     }
@@ -228,6 +232,14 @@ describe('Invoice’s hub, read', () => {
     expect(hub.basis.allocation).toEqual([
       { department: 'HR', rows: [expect.objectContaining({ code: '2990', amount: 1000 })], billable: 1000, own: expect.objectContaining({ amount: 200 }) },
     ])
+  })
+
+  it('a receiver’s moved-in payroll is part of what it must bill (2026-11-03)', async () => {
+    const { client } = database({ departments: [{ id: 'd-hr', name: 'HR', is_internal: false, segment_key: 'hr' }] }, [
+      { department_id: 'd-hr', department_name: 'HR', cost_model: 'cost_center', moved_in: 3000, billed: 2400, stays: 600 },
+    ])
+    const hub = await loadInvoiceHub(client, PERIOD)
+    expect(hub.basis.lines[0]).toEqual({ key: 'hr', label: 'HR', value: '1,352.45 / 8,797.05' })
   })
 
   it('says "Director salary · pending" while the director submission has not come in', async () => {

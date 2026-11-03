@@ -91,10 +91,12 @@ function Incentive({ person, tiers, readOnly, name }: { person?: ArenaPerson; ti
   // The binding brand is the one furthest from its own next rung: clearing
   // that one is what moves the whole month, because every brand must clear.
   const binding = result.brands.filter(brand => brand.next).sort((a, b) => (b.next!.gap) - (a.next!.gap))[0];
+  const given = result.brands.find(brand => brand.noSales);
   return <section className={s.incentive}>
     <div className={s.tier}>
       {blocked ? <><strong>Held, not lost</strong><small>{reason} The rule is that <em>every</em> brand {subject} sold has to clear a tier, so one unjudgeable brand holds the whole incentive. It pays as soon as that bill is costed.</small></>
         : result.earned.length ? <><strong>{result.earned[0].label}</strong><b>{money(result.amount)}</b><small>Cleared by every brand {subject} sold this month{result.earned.length > 1 ? `, and it stacks: ${result.earned.map(tier => tier.label).join(" + ")}` : ""}.</small></>
+          : given ? <><strong>No tier yet</strong><small>{`${brandLabel(given.brand)} was given away and not sold this month, so it clears no rung, and every brand has to clear it.`}</small></>
           : <><strong>No tier yet</strong><small>{binding ? `${brandLabel(binding.brand)} is ${points(binding.next!.gap)} short of ${binding.next!.label} (${percent(binding.next!.marginPct)}), and every brand has to clear it.` : "No rung is within reach from this month's margin."}</small></>}
     </div>
     <div className={s.sectionHead}><h2>Brand by brand</h2><span>{result.brands.length} brand{result.brands.length === 1 ? "" : "s"}</span></div>
@@ -102,8 +104,9 @@ function Incentive({ person, tiers, readOnly, name }: { person?: ArenaPerson; ti
       const cleared = ladder.filter(tier => tier.brand === brand.brand && brand.cleared.includes(tier.bandKey)).sort((a, b) => b.marginPct - a.marginPct)[0];
       return <div className={s.brandRow} key={brand.brand} data-blocked={brand.marginPct === null || undefined}>
         <strong>{brandLabel(brand.brand)}</strong>
-        <b>{brand.marginPct === null ? `${brand.blindOrders || "Some"} bill${brand.blindOrders === 1 ? "" : "s"} without cost` : percent(brand.marginPct)}</b>
-        <small>{brand.marginPct === null
+        <b>{brand.noSales ? "No sales" : brand.marginPct === null ? `${brand.blindOrders || "Some"} bill${brand.blindOrders === 1 ? "" : "s"} without cost` : percent(brand.marginPct)}</b>
+        <small>{brand.noSales ? "Given away, not sold: below the first rung."
+          : brand.marginPct === null
           ? brand.brand === "UNCLASSIFIED" ? "Give this bill a brand and it joins that brand's ladder." : "Its margin cannot be worked out until every bill of it has a cost."
           : `${cleared ? `Clears ${cleared.label}` : "Below the first rung"}${brand.next ? ` · ${points(brand.next.gap)} to ${brand.next.label} (${percent(brand.next.marginPct)})` : " · top rung"} · ${money(brand.revenue)} of goods`}</small>
       </div>;

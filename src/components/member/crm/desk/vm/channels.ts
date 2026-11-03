@@ -174,6 +174,8 @@ export function channelsVM(ctx: DeskCtx) {
     waNums: live.map(n => ({ name: n.number, region: "MY · Malaysia", bg: n.id === wn?.id ? "var(--crm-sel)" : "#fff", bd: n.id === wn?.id ? "var(--crm-rust)" : "transparent", pick: () => patch({ chWaNum: n.id, chWaTab: "prof" }) })),
     waCount: live.length, waAdd: () => { if (can) { open(WA_MANAGER); toast("Opened WhatsApp Manager — add the number there, then Refresh here"); } },
     wn: { name: wn?.number ?? "—", disp: wn?.verifiedName || "—", id: wn?.id ?? "", cat: WA_VERTICALS.find(v => v[0] === vertical)?.[1] ?? "Other" }, waIni: (wn?.verifiedName || "W").charAt(0).toUpperCase(),
+    // The picture the number's profile has in WhatsApp (read from Meta), else its letter.
+    waPic: prof?.picture ?? "",
     waSubs: ([["insights", "Insights"], ["prof", "Profile"], ["auto", "Automations"], ["links", "Message links"], ["calls", "Call settings"], ["log", "Call log"]] as const)
       .map(([k, label]) => ({ label, on: k === wsub, off: k !== wsub, pick: () => patch({ chWaTab: k }) })),
     waIns: wsub === "insights", waProf: wsub === "prof", waAuto: wsub === "auto", waLinks: wsub === "links", waCalls: wsub === "calls", waLog: wsub === "log",

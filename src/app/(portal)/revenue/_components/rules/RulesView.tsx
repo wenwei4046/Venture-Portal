@@ -9,7 +9,7 @@ import {
   visibleRulesTabs,
   type RulesTab,
 } from '@/lib/commission/rules-tabs'
-import { BrandsAndBands, DirectorPay, ItemGroups, OpenBillRates, TitleLadder } from '../config/RulesTables'
+import { BrandsAndBands, DirectorPay, ItemGroups, TitleLadder } from '../config/RulesTables'
 import KpiItemsSection from '../config/KpiItemsSection'
 import PromotionCriteria from '../config/PromotionCriteria'
 import type { CommissionSettingsData } from '../config/types'
@@ -127,8 +127,6 @@ export default function RulesView({
             titled('directors', <DirectorPay data={data} scheme={scheme} subName={subDept.name} onLadder={() => goTo('ladder')} />)
           ) : tab === 'groups' ? (
             titled('groups', <ItemGroups data={data} scheme={scheme} />)
-          ) : tab === 'open-bill' ? (
-            titled('open-bill', <OpenBillRates data={data} />)
           ) : tab === 'brands' ? (
             titled('brands', <BrandsAndBands data={data} scheme={scheme} />)
           ) : tab === 'capacity' && capacity ? (

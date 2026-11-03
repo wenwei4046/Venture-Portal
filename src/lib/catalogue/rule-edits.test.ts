@@ -105,10 +105,28 @@ describe('validateKpiItems', () => {
     expect(() => validateKpiItems({ adds: [], changes: [{ id: A, amount: '12.345' }], removes: [] })).toThrow(/two decimals/)
   })
 
-  it('takes only a bed frame or a sofa special', () => {
+  it("takes only a bed frame's or a sofa's special or fabric series", () => {
     expect(() =>
       validateKpiItems({ adds: [{ source: 'option', optionPool: 'bedframe_sizes', optionValue: 'Queen', amount: '5' }], changes: [], removes: [] }),
-    ).toThrow(/bed frame or a sofa special/)
+    ).toThrow(/bed frame's or a sofa's special or fabric series/)
+  })
+
+  // 2026-10-29: a fabric series is an option item of its own pool.
+  it('takes a fabric series, a bed frame’s and a sofa’s apart', () => {
+    expect(validateKpiItems({
+      adds: [
+        { source: 'option', optionPool: 'sofa_fabric_series', optionValue: ' PC151 ', amount: '50' },
+        { source: 'option', optionPool: 'bedframe_fabric_series', optionValue: 'PC151', amount: '30' },
+      ],
+      changes: [],
+      removes: [],
+    }).adds).toEqual([
+      { source: 'option', option_pool: 'sofa_fabric_series', option_value: 'PC151', kpi_amount: 50 },
+      { source: 'option', option_pool: 'bedframe_fabric_series', option_value: 'PC151', kpi_amount: 30 },
+    ])
+    expect(() =>
+      validateKpiItems({ adds: [{ source: 'option', optionPool: 'sofa_fabric_series', optionValue: '  ', amount: '5' }], changes: [], removes: [] }),
+    ).toThrow(/fabric series has no name/)
   })
 
   it('refuses the same item twice, however it is spelled', () => {

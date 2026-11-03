@@ -26,6 +26,7 @@ interface HistoryClient {
                   reason: string | null
                   next_interest_on_original?: boolean | null
                   next_interest_keeps_base?: boolean | null
+                  principal_per_month?: number | string | null
                 }[]
               | null
             error: { message: string } | null
@@ -38,6 +39,8 @@ interface HistoryClient {
 
 const ym = (d: string) => d.slice(0, 7)
 const r2 = (n: number) => Math.round(n * 100) / 100
+/** A fixed principal a month as stored (numeric comes back as text) — a positive figure, or none. */
+const amountOrNull = (v: number | string | null | undefined): number | null => (v == null || !(Number(v) > 0) ? null : Number(v))
 
 /** A history row as the terms read it. */
 export function historyRowOf(h: {
@@ -49,6 +52,7 @@ export function historyRowOf(h: {
   reason: string | null
   next_interest_on_original?: boolean | null
   next_interest_keeps_base?: boolean | null
+  principal_per_month?: number | string | null
 }): TermsHistoryRow {
   return {
     validFrom: ym(h.valid_from),
@@ -59,6 +63,7 @@ export function historyRowOf(h: {
     reason: h.reason,
     nextInterestOnOriginal: h.next_interest_on_original === true,
     nextInterestKeepsBase: h.next_interest_keeps_base === true,
+    principalPerMonth: amountOrNull(h.principal_per_month),
   }
 }
 
@@ -74,7 +79,7 @@ export async function fetchTermsHistory(
   const client = supabase as unknown as HistoryClient
   const { data, error } = await client
     .from('treasury_terms_history')
-    .select('record_id, valid_from, valid_to, rate, months, compound_interest, reason, next_interest_on_original, next_interest_keeps_base')
+    .select('record_id, valid_from, valid_to, rate, months, compound_interest, reason, next_interest_on_original, next_interest_keeps_base, principal_per_month')
     .eq('record_kind', kind)
     .in('record_id', ids)
     .order('valid_from', { ascending: true })
@@ -140,6 +145,8 @@ export function termsForLoan(
     /** 未定还款 / 无还款方式 in the text = no fixed term (tenure_months is
      *  NOT NULL on loans, so this is how a loan says "no schedule"). */
     repayment_terms?: string | null
+    /** A fixed principal a month (2026-10-27); read wherever the row is, null = equal parts of the tenure. */
+    principal_per_month?: number | string | null
   },
   history: TermsHistoryRow[] = [],
 ): PositionTerms {
@@ -154,6 +161,8 @@ export function termsForLoan(
       months: unscheduled || l.tenure_months == null || Number(l.tenure_months) <= 0 ? null : Number(l.tenure_months),
       compounding: l.compound_interest === true,
       effectiveFrom: l.terms_effective_from ? ym(l.terms_effective_from) : null,
+      // A loan whose words say no fixed term asks no principal, whatever amount it once had.
+      principalPerMonth: unscheduled ? null : amountOrNull(l.principal_per_month),
     },
     history,
   }
@@ -168,6 +177,8 @@ export function termsForFundSource(
     effective_date: string | null
     repayment_start_month?: string | null
     terms_effective_from?: string | null
+    /** A fixed principal a month (2026-10-27); null = equal parts of the periods. */
+    principal_per_month?: number | string | null
   },
   history: TermsHistoryRow[] = [],
 ): PositionTerms {
@@ -181,6 +192,7 @@ export function termsForFundSource(
       months: s.lock_in_months == null || Number(s.lock_in_months) <= 0 ? null : Number(s.lock_in_months),
       compounding: s.compound_interest === true,
       effectiveFrom: s.terms_effective_from ? ym(s.terms_effective_from) : null,
+      principalPerMonth: s.lock_in_months == null || Number(s.lock_in_months) <= 0 ? null : amountOrNull(s.principal_per_month),
     },
     history,
   }

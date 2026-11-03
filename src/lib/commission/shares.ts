@@ -16,8 +16,6 @@ import type { BillShare, SalesLine, SalesOrder } from './types'
  * holder an ordinary, smaller bill of their own. The deposit ratio and the margin
  * are ratios, so every part passes or fails the gate and lands in the same margin
  * band as the whole bill: a share can never turn a held bill into a paid one.
- * The Open Bill pick is keyed by order id, so each part carries it and each
- * holder's bonus is on their own part.
  *
  * Money is split to the sen, and the OWNER takes the remainder, so the parts
  * always add back to the bill exactly.

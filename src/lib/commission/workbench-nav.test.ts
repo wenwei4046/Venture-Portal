@@ -35,6 +35,12 @@ describe('readWorkbenchLocation', () => {
     expect(parseWorkbenchReturn('/revenue/fair/2026-09-01?view=venue', 'fair')).toMatchObject({ tab: 'exhibition' })
   })
 
+  // Open Bill went (2026-10-31): a link to its old tab opens the month's first view.
+  it('opens Total Sales Orders from a link to the old Open Bill tab', () => {
+    expect(at('view=open')).toEqual(HOME)
+    expect(workbenchSearch('?view=open', HOME)).toBe('')
+  })
+
   // The month's review panels became tabs of the rail (2026-09-30); the months
   // list links straight to Double claims.
   it('reads the review tabs, and writes them back', () => {
@@ -68,7 +74,7 @@ describe('workbenchSearch', () => {
 
   it('replaces its own keys and leaves the rest of the query alone', () => {
     expect(workbenchSearch('?tab=upsales&person=old&q=x', { ...HOME, personId: 'agent' })).toBe('?tab=upsales&person=agent')
-    expect(workbenchSearch(new URLSearchParams('tab=open-bill&view=kpi'), HOME)).toBe('?tab=open-bill')
+    expect(workbenchSearch(new URLSearchParams('tab=payroll&view=kpi'), HOME)).toBe('?tab=payroll')
   })
 
   it('does not write a cut for a ledger — the ledger is the cut', () => {

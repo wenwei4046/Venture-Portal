@@ -3,6 +3,10 @@ import {
   validateAllocationRows,
   hvRemainderPct,
   allocationPreview,
+  billToPreview,
+  movePreview,
+  moveParts,
+  validateDeptMoves,
   periodShortLabel,
   buildAllocationInvoiceLines,
   buildConsolidatedInvoiceLines,
@@ -13,6 +17,7 @@ import {
   splitLock,
   splitLockMessage,
   type AllocationRow,
+  type DeptMoveRow,
   type DeptComponentGroup,
   type SplitLockInput,
   type SplitStanding,
@@ -146,11 +151,11 @@ describe('allocationPreview', () => {
       'HR',
     )
     expect(lines).toEqual([
-      { description: "Salary - May'26 (HR)", amount: 2580.0 },
-      { description: "Allowance - May'26 (HR)", amount: 295.5 },
-      { description: "EPF - May'26 (HR)", amount: 309.6 },
-      { description: "SOCSO - May'26 (HR)", amount: 31.25 },
-      { description: "EIS - May'26 (HR)", amount: 3.57 },
+      { kind: 'Salary', description: "Salary - May'26 (HR)", amount: 2580.0 },
+      { kind: 'Allowance', description: "Allowance - May'26 (HR)", amount: 295.5 },
+      { kind: 'EPF', description: "EPF - May'26 (HR)", amount: 309.6 },
+      { kind: 'SOCSO', description: "SOCSO - May'26 (HR)", amount: 31.25 },
+      { kind: 'EIS', description: "EIS - May'26 (HR)", amount: 3.57 },
     ])
     const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
     expect(total).toBe(3219.92)
@@ -403,9 +408,115 @@ describe('splitCopyNote', () => {
     )
   })
 
+  it('says the department lines and Bill to % it brought (2026-11-03)', () => {
+    expect(splitCopyNote({ copied: 1, locked: 0, notOnPayroll: 0, copiedMoves: 2, copiedBillTo: 1 })).toBe(
+      'Copied splits for 1 staff. Copied department lines for 2 staff. Copied Bill to for 1 department.',
+    )
+    expect(splitCopyNote({ copied: 0, locked: 0, notOnPayroll: 0, copiedMoves: 0, copiedBillTo: 2 })).toBe('Copied Bill to for 2 departments.')
+  })
+
   it('keeps the old line when there was nothing to do', () => {
     expect(splitCopyNote({ copied: 0, locked: 0, notOnPayroll: 0 })).toBe(
       'Nothing to copy — no last-month splits, or everyone already set.',
     )
+  })
+})
+
+// Payroll cost moved to another department (2026-11-03, method B — the user: "我说的意思是example 从director office
+// split 薪水去hr, 也要开一张bill"): a person's cost goes to companies by %, and to other departments by a fixed RM or
+// a % of the whole cost; what is left is HV's. A receiving cost center then bills on what moved in by its Bill to %.
+describe('payroll moved to another department', () => {
+  const COST = 6000
+  const VIVIAN: AllocationRow[] = [
+    { companyId: 'co-2990', pct: 25 },
+    { companyId: 'co-car', pct: 25 },
+  ]
+  const toHr = (kind: DeptMoveRow['kind'], value: number): DeptMoveRow => ({ departmentId: 'd-hr', kind, value })
+
+  it('Vivian RM 3,000 of 6,000 with 2990 25% / CAR 25% leaves HV 0', () => {
+    const moves = [toHr('amount', 3000)]
+    expect(validateDeptMoves(COST, VIVIAN, moves, 'd-do', false)).toEqual({ ok: true })
+    const p = movePreview(COST, VIVIAN, moves)
+    expect(p.companies.map((l) => l.amount)).toEqual([1500, 1500])
+    expect(p.moves).toEqual([{ departmentId: 'd-hr', amount: 3000, pct: 50 }])
+    expect(p).toMatchObject({ billedTotal: 3000, movedTotal: 3000, hvAmount: 0 })
+  })
+
+  it('40% leaves HV 10% = 600', () => {
+    const moves = [toHr('pct', 40)]
+    expect(validateDeptMoves(COST, VIVIAN, moves, 'd-do', false)).toEqual({ ok: true })
+    const p = movePreview(COST, VIVIAN, moves)
+    expect(p.moves).toEqual([{ departmentId: 'd-hr', amount: 2400, pct: 40 }])
+    expect(p.hvAmount).toBe(600)
+  })
+
+  it('a fixed amount over the cost is refused', () => {
+    expect(validateDeptMoves(COST, [], [toHr('amount', 6000.01)], 'd-do', false)).toEqual({ ok: false, error: 'RM 6,000.01 is more than the employer cost RM 6,000.00' })
+    // …and so is a share that, with the companies, passes the whole cost.
+    expect(validateDeptMoves(COST, VIVIAN, [toHr('amount', 3000.01)], 'd-do', false)).toMatchObject({ ok: false })
+    expect(validateDeptMoves(COST, VIVIAN, [toHr('pct', 50.01)], 'd-do', false)).toMatchObject({ ok: false })
+  })
+
+  it('own department refused', () => {
+    expect(validateDeptMoves(COST, [], [{ departmentId: 'd-do', kind: 'amount', value: 100 }], 'd-do', false)).toEqual({ ok: false, error: 'Cost cannot move to the person’s own department' })
+  })
+
+  it('one line a department, a value above nothing, a % up to 100', () => {
+    expect(validateDeptMoves(COST, [], [toHr('amount', 100), toHr('pct', 10)], 'd-do', false)).toEqual({ ok: false, error: 'Duplicate department — merge the lines' })
+    expect(validateDeptMoves(COST, [], [toHr('amount', 0)], 'd-do', false)).toMatchObject({ ok: false })
+    expect(validateDeptMoves(COST, [], [toHr('pct', 100.5)], 'd-do', false)).toMatchObject({ ok: false })
+    expect(validateDeptMoves(COST, [], [{ departmentId: '', kind: 'pct', value: 10 }], 'd-do', false)).toEqual({ ok: false, error: 'Every line needs a department' })
+  })
+
+  it('centralized: companies refused, departments allowed', () => {
+    expect(validateDeptMoves(COST, VIVIAN, [], 'd-mkt', true)).toEqual({ ok: false, error: 'A centralized department bills the companies by invoice — move cost to a department only' })
+    expect(validateDeptMoves(COST, [], [{ departmentId: 'd-fin', kind: 'amount', value: 1000 }], 'd-mkt', true)).toEqual({ ok: true })
+  })
+
+  it('a move’s cost items, as payroll_moved_parts splits them: salary takes the rounding', () => {
+    // Vivian: gross 5,000 of which salary 4,900, EPF 676, SOCSO 104.10, EIS 19.90 → cost 5,800 (not 6,000, so the split shows).
+    const pay = { gross: 5000, salaryComp: 4900, epfEr: 676, socsoEr: 104.1, eisEr: 19.9 }
+    expect(moveParts(pay, 2900)).toEqual({ salary: 2450, allowance: 50, epf: 338, socso: 52.05, eis: 9.95 })
+    const odd = moveParts(pay, 1000)
+    expect(odd).toEqual({ salary: 844.83, allowance: 17.24, epf: 116.55, socso: 17.95, eis: 3.43 })
+    expect(Math.round((odd.salary + odd.allowance + odd.epf + odd.socso + odd.eis) * 100) / 100).toBe(1000)
+  })
+
+  it('rounds half a sen up as the database’s NUMERIC does, not as a float', () => {
+    // 5,000.11 × 50% = 2,500.055 exactly; in floating point it is 2,500.0549… and rounded down.
+    const p = movePreview(5000.11, [{ companyId: 'co-2990', pct: 50 }], [toHr('pct', 30)])
+    expect(p.companies[0].amount).toBe(2500.06)
+    expect(movePreview(5000.11, [], [toHr('pct', 50)]).moves[0].amount).toBe(2500.06)
+    expect(p.hvAmount).toBe(1000.02) // 5,000.11 − 2,500.06 − 1,500.03
+    expect(billToPreview(5000.11, [{ companyId: 'a', pct: 50 }]).lines[0].amount).toBe(2500.06)
+  })
+
+  it('a % line’s items are split by its % as the database splits them, not by the rounded amount', () => {
+    // cost 5,000.11 (gross 4,400.11 of which salary 4,000; EPF 528, SOCSO 59.5, EIS 12.5), 50%: allowance 200.055 → 200.06.
+    const pay = { gross: 4400.11, salaryComp: 4000, epfEr: 528, socsoEr: 59.5, eisEr: 12.5 }
+    expect(moveParts(pay, 2500.06, 50)).toEqual({ salary: 2000, allowance: 200.06, epf: 264, socso: 29.75, eis: 6.25 })
+  })
+
+  it('billToPreview(3,000, 30/30/20) → 900/900/600, stays 600', () => {
+    const p = billToPreview(3000, [
+      { companyId: 'a', pct: 30 },
+      { companyId: 'b', pct: 30 },
+      { companyId: 'c', pct: 20 },
+    ])
+    expect(p.lines.map((l) => l.amount)).toEqual([900, 900, 600])
+    expect(p.stays).toBe(600)
+  })
+
+  it('lines + stays = received to the sen', () => {
+    for (const received of [1000.01, 2333.33, 0.07, 4999.99]) {
+      const p = billToPreview(received, [
+        { companyId: 'a', pct: 33.33 },
+        { companyId: 'b', pct: 33.33 },
+        { companyId: 'c', pct: 33.34 },
+      ])
+      const sum = Math.round((p.lines.reduce((s, l) => s + l.amount, 0) + p.stays) * 100) / 100
+      expect(sum).toBe(received)
+      expect(p.stays).toBeGreaterThanOrEqual(0)
+    }
   })
 })

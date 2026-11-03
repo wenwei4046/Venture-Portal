@@ -194,7 +194,7 @@ describe('parseErpSalesGrid', () => {
   })
 
   it('seeds the event day from the order date, as its own field', () => {
-    // The Open Bill race runs per event day. The ERP has nothing better than
+    // A bill belongs to the day it was written. The ERP has nothing better than
     // the order date, but a roadshow straddling a cut-off needs the two to be
     // separately editable later.
     const so = result.orders.find(o => o.orderNo === 'SO-012579')!
@@ -259,7 +259,7 @@ describe('parseErpSalesGrid', () => {
     ])
   })
 
-  it('numbers each agent-day by running doc number, for Open Bill suggestions', () => {
+  it('numbers each agent-day by running doc number — "#2 of the day" on All bills', () => {
     expect(result.orders.find(o => o.orderNo === 'SO-012579')!.sequenceInDay).toBe(1)
     expect(result.orders.find(o => o.orderNo === 'SO-012596')!.sequenceInDay).toBe(2)
     // Different agent, different day → each is their own 1st bill.

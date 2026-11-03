@@ -296,6 +296,23 @@ export function CellInput({ value, onChange, edited, width, label, disabled, pla
   )
 }
 
+/** A choice in a table cell, drawn as `CellInput` is: amber while edited. */
+export function CellSelect({ value, options, onChange, edited, label, disabled }: {
+  value: string
+  options: readonly (readonly [string, string])[]
+  onChange: (value: string) => void
+  edited: boolean
+  label: string
+  disabled?: boolean
+}) {
+  return (
+    <select className={c.cellSelect} value={value} onChange={e => onChange(e.target.value)} data-edited={edited || undefined}
+      aria-label={label} disabled={disabled}>
+      {options.map(([v, text]) => <option key={v} value={v}>{text}</option>)}
+    </select>
+  )
+}
+
 /** The footer under a table: what is shown, Show more, and a note on the right. */
 export function TableFoot({ shown, more, onMore, note, children }: {
   shown: ReactNode

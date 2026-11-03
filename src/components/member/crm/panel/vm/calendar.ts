@@ -5,7 +5,7 @@
  * (then its outcome: Follow up / Won / Lost) or No show; a past visit nobody
  * marked is To mark. A visit opens that customer's chat.
  */
-import type { CrmVisit } from "@/lib/member/crm-data";
+import { showRateOnce, type CrmVisit } from "@/lib/member/crm-data";
 import { DAY, day0, gb, NO_SEAT, pickGroups, seatOf, stop, type PanelCtx } from "./common";
 
 const f = (t: number) => gb(t, { day: "numeric", month: "short" });
@@ -25,7 +25,7 @@ export function calendarVM(ctx: PanelCtx) {
   });
   const list = all.filter(a => { const d = day0(a.at); return d >= rg.a && d <= rg.b && (ts === "all" || a.seat.id === ts) && (!pp || a.who === pp); }).sort((x, y) => x.at.getTime() - y.at.getTime());
   const isPast = (a: typeof all[number]) => a.at <= now;
-  const came = list.filter(a => a.v.state === "attended").length, no = list.filter(a => a.v.state === "no_show").length, up = list.filter(a => !isPast(a)).length;
+  const came = list.filter(a => a.v.state === "attended").length, up = list.filter(a => !isPast(a)).length;
   const statusOf = (a: typeof all[number]) => {
     if (a.v.state === "attended" && a.v.outcome && a.v.outcome in FIN) { const o = FIN[a.v.outcome as keyof typeof FIN]; return { status: o[0], sBg: o[1], sFg: o[2] }; }
     const s = SS[a.v.state === "booked" && isPast(a) ? "mark" : (a.v.state as "attended" | "no_show" | "booked")];
@@ -72,7 +72,7 @@ export function calendarVM(ctx: PanelCtx) {
     cpSub: ts === "all" ? "All teams" : seatName(ts), cpAll: { bg: pp ? "transparent" : "var(--crm-sel)", sub: `${persons} people`, pick: () => patch({ cPerson: "", cpSheet: false }) },
     cViews: [segv("grid", "Month"), segv("list", "List")], cIsGrid: view === "grid",
     // Leads (was Visits) · Upcoming · Showed up open their lists; Show-up % does not (rev 1011).
-    cStats: ([["Visits", list.length, "#fff"], ["Upcoming", up, "var(--crm-peach)"], ["Showed up", came, "#fff"], ["Show-up", came + no ? `${Math.round((came / (came + no)) * 100)}%` : "—", "#fff"]] as const).map(([label, v, fg]) => ({ label, v, fg,
+    cStats: ([["Visits", list.length, "#fff"], ["Upcoming", up, "var(--crm-peach)"], ["Showed up", came, "#fff"], ["Show-up", showRateOnce(list.map(a => a.v), now), "#fff"]] as const).map(([label, v, fg]) => ({ label, v, fg,
       // Visits shows them as the List; Upcoming and Showed up open their lists; Show-up % opens nothing.
       open: label === "Show-up" ? undefined : label === "Visits" ? () => patch({ cView: "list", cDay: null }) : () => patch({ cLs: label === "Upcoming" ? "up" as const : "came" as const }),
       cur: label === "Show-up" ? "default" : "pointer", deco: label === "Show-up" ? "none" : "underline dotted rgba(255,255,255,.5)" })),

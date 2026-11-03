@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { FinSurface } from '@/components/finv/surface'
 import type { NewLoanOptions } from '../_lib/new-loan-options'
 
 // Create fund out (2026-10-15, the Finance revamp v2 — D12, the prototype's
 // `fund-form`): the design's To, Amount RM, Description, From bank, Date; the
 // system's premium on the quarter's base rate and the account it is booked
 // to; the term, the funding source and the interest switches behind the small
-// buttons. It sends the form page's loan, every name createLoan reads, and
-// says it waits for approval. The hub's head opens it (FundOutHub).
+// buttons — still the Finance phone app's sheet. On a desktop (2026-10-27, the
+// user's mockup fund-forms-desktop-mockup.html — "照这个样稿做"; "只针对 desktop
+// 版的") the window lays the loan out in parts — Borrower, Money out, Interest,
+// Repayment, Booking — with a Repayment type to choose and the summary and
+// schedule beside them. Either sends the form page's loan, every name createLoan
+// reads, and says it waits for approval. The hub's head opens it (FundOutHub).
 
 const mocks = vi.hoisted(() => ({ create: vi.fn(), open: vi.fn(), cancel: vi.fn(), flash: vi.fn(), refresh: vi.fn(), hub: vi.fn() }))
 vi.mock('../actions', () => ({ createLoanFromDialog: mocks.create, openCreateLoan: mocks.open, cancelPendingLoan: mocks.cancel }))
@@ -49,54 +54,58 @@ beforeEach(() => {
   mocks.create.mockResolvedValue({ ok: true, id: 'loan-new' })
 })
 
-describe('Create fund out', () => {
-  const draw = () => {
-    const onClose = vi.fn()
-    const onSaved = vi.fn()
-    render(<CreateFundOutDialog open onClose={onClose} onSaved={onSaved} today="2026-10-15" />)
-    return { onClose, onSaved }
-  }
+const draw = (phone = false) => {
+  const onClose = vi.fn()
+  const onSaved = vi.fn()
+  const form = <CreateFundOutDialog open onClose={onClose} onSaved={onSaved} today="2026-10-15" />
+  render(phone ? <FinSurface.Provider value={{ platform: 'android' }}>{form}</FinSurface.Provider> : form)
+  return { onClose, onSaved }
+}
+const submit = async () => {
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Submit for approval' }))
+  })
+}
 
-  it('says what the design says — its fields in its order, then the rate and the account the system asks', async () => {
+describe('Create fund out on a desktop', () => {
+  it('lays the loan out in parts: the base, the premium and the rate they make; a repayment type and an account to choose', async () => {
     draw()
     await act(async () => undefined)
     expect(within(dialog()).getByText('Create fund out')).toBeInTheDocument()
     expect(within(dialog()).getByText('Needs Principal approval before it is disbursed')).toBeInTheDocument()
-    expect(Array.from(dialog().querySelectorAll('label')).map((l) => l.textContent)).toEqual(['To', 'Amount RM', 'Description', 'From bank', 'Date', 'Custom premium % /mo', 'Account'])
-    expect(screen.getByPlaceholderText('What is this for?')).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: '2990' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: 'Carres (CAR)' })).toBeInTheDocument()
-    expect(screen.getByText('Base 0.850% (2026-Q4) + 0.000% = 0.850% /mo, locked for the loan’s life.')).toBeInTheDocument()
+    expect(Array.from(dialog().querySelectorAll('section')).map((s) => s.querySelector('div > div > div')?.textContent)).toEqual(['Borrower', 'Money out', 'Interest', 'Repayment', 'Booking'])
+    expect(screen.getByText('Base rate · 2026-Q4')).toBeInTheDocument()
+    expect(screen.getByText('To, an amount, an account and a repayment type are needed.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Submit for approval' })).toHaveAttribute('data-off', 'true')
-    expect(screen.getByText('To, an amount and an account are needed.')).toBeInTheDocument()
     // The primary bank first.
     expect((screen.getByLabelText('From bank') as HTMLSelectElement).value).toBe('bk-hl')
   })
 
-  it('sends the form page’s loan and says it waits for approval', async () => {
+  it('a fixed amount a month: the interest it makes, the schedule, and the loan sent', async () => {
     const { onClose, onSaved } = draw()
     await act(async () => undefined)
     fireEvent.change(screen.getByLabelText('To'), { target: { value: 'co-car' } })
-    fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '150000' } })
+    fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '60000' } })
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Working capital' } })
-    fireEvent.change(screen.getByLabelText('Custom premium % /mo'), { target: { value: '1' } })
-    expect(screen.getByText('Base 0.850% (2026-Q4) + 1.000% = 1.850% /mo, locked for the loan’s life.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Premium % /mo'), { target: { value: '1' } })
+    expect(screen.getByText('interest a month on RM 60,000.00.', { exact: false })).toHaveTextContent('RM 1,110.00 interest a month on RM 60,000.00.')
     fireEvent.change(screen.getByLabelText('Account'), { target: { value: '3010' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Term' }))
-    fireEvent.change(screen.getByLabelText('Term · months'), { target: { value: '12' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Funding source' }))
     fireEvent.change(screen.getByLabelText('Funding source'), { target: { value: 'HC-58k' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Interest' }))
-    fireEvent.click(screen.getByLabelText('Compound interest'))
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Submit for approval' }))
-    })
+    fireEvent.click(screen.getByLabelText(/Compound interest/))
+    fireEvent.click(screen.getByRole('radio', { name: /A fixed amount a month/ }))
+    fireEvent.change(screen.getByLabelText('Principal a month (RM)'), { target: { value: '7000' } })
+    expect(screen.getByTestId('repayment-worked')).toHaveTextContent('8 × RM 7,000.00, then RM 4,000.00 in Jul 2027 — 9 months to clear RM 60,000.00.')
+    const summary = within(screen.getByTestId('deal-summary'))
+    expect(summary.getByText('Jul 2027').closest('tr')).toHaveAttribute('data-last', 'true')
+    expect(summary.getByText('HC-58k')).toBeInTheDocument()
+    await submit()
     expect(sent()).toEqual({
       company_id: 'co-car',
-      principal: '150000.00',
+      principal: '60000.00',
       loan_start_date: '2026-10-15',
       custom_rate_percent: '1',
-      tenure_months: '12',
+      tenure_months: '',
+      principal_per_month: '7000',
       repayment_start_date: '',
       funding_source: 'HC-58k',
       disbursement_account_code: '3010',
@@ -108,6 +117,22 @@ describe('Create fund out', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('over a number of months sends the tenure; outside 1–120 it holds', async () => {
+    draw()
+    await act(async () => undefined)
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: 'co-car' } })
+    fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '1000' } })
+    fireEvent.change(screen.getByLabelText('Account'), { target: { value: '1200' } })
+    fireEvent.click(screen.getByRole('radio', { name: /Over a number of months/ }))
+    fireEvent.change(screen.getByLabelText('Number of months'), { target: { value: '121' } })
+    expect(screen.getAllByText('Whole months, from 1 to 120.').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Submit for approval' })).toHaveAttribute('data-off', 'true')
+    fireEvent.change(screen.getByLabelText('Number of months'), { target: { value: '12' } })
+    await submit()
+    expect(sent()).toMatchObject({ tenure_months: '12' })
+    expect(sent()).not.toHaveProperty('principal_per_month')
+  })
+
   it('says the system’s refusal and keeps the form', async () => {
     mocks.create.mockResolvedValueOnce({ ok: false, reason: 'Period 2026-10 is locked' })
     const { onClose } = draw()
@@ -115,23 +140,11 @@ describe('Create fund out', () => {
     fireEvent.change(screen.getByLabelText('To'), { target: { value: 'co-car' } })
     fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '1000' } })
     fireEvent.change(screen.getByLabelText('Account'), { target: { value: '1200' } })
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Submit for approval' }))
-    })
+    fireEvent.click(screen.getByRole('radio', { name: /None — no fixed term/ }))
+    await submit()
+    expect(sent()).toMatchObject({ tenure_months: '' })
     expect(screen.getByRole('alert')).toHaveTextContent('Period 2026-10 is locked')
     expect(onClose).not.toHaveBeenCalled()
-  })
-
-  it('holds a term outside 1–120 months', async () => {
-    draw()
-    await act(async () => undefined)
-    fireEvent.change(screen.getByLabelText('To'), { target: { value: 'co-car' } })
-    fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '1000' } })
-    fireEvent.change(screen.getByLabelText('Account'), { target: { value: '1200' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Term' }))
-    fireEvent.change(screen.getByLabelText('Term · months'), { target: { value: '121' } })
-    expect(screen.getByText('The term is 1 to 120 months — or leave it blank for no fixed term.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Submit for approval' })).toHaveAttribute('data-off', 'true')
   })
 
   it('says so when there is no approved base rate', async () => {
@@ -139,6 +152,26 @@ describe('Create fund out', () => {
     draw()
     await act(async () => undefined)
     expect(screen.getByRole('alert')).toHaveTextContent('No approved base rate yet')
+  })
+})
+
+describe('Create fund out on the phone', () => {
+  it('keeps the sheet’s form: its fields in its order, the term behind its button', async () => {
+    draw(true)
+    await act(async () => undefined)
+    expect(Array.from(dialog().querySelectorAll('label')).map((l) => l.textContent)).toEqual(['To', 'Amount RM', 'Description', 'From bank', 'Date', 'Custom premium % /mo', 'Account'])
+    expect(screen.getByText('Base 0.850% (2026-Q4) + 0.000% = 0.850% /mo, locked for the loan’s life.')).toBeInTheDocument()
+    expect(screen.getByText('To, an amount and an account are needed.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: 'co-car' } })
+    fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '1000' } })
+    fireEvent.change(screen.getByLabelText('Account'), { target: { value: '1200' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Term' }))
+    fireEvent.change(screen.getByLabelText('Term · months'), { target: { value: '121' } })
+    expect(screen.getByText('The term is 1 to 120 months — or leave it blank for no fixed term.')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Term · months'), { target: { value: '12' } })
+    await submit()
+    expect(sent()).toMatchObject({ tenure_months: '12' })
+    expect(sent()).not.toHaveProperty('principal_per_month')
   })
 })
 

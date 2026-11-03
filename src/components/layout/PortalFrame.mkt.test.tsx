@@ -17,6 +17,8 @@ vi.mock('./useViewAsSync', () => ({ useViewAsSync: () => undefined }))
 vi.mock('@/lib/page-view', () => ({ logPageView: () => undefined }))
 vi.mock('@/lib/selection-store', () => ({ dropSelectionsForPath: () => undefined }))
 vi.mock('./FinSwipeBack', () => ({ default: () => null }))
+// Lead View's shell loads its faces through next/font, which only Next's compiler can run.
+vi.mock('./LeadShell', () => ({ default: () => null }))
 vi.mock('./FinScrollMemory', () => ({ default: () => null }))
 vi.mock('./RouteFreshener', () => ({ default: () => null }))
 vi.mock('./HrSidebar', () => ({ default: () => <aside>hr sidebar</aside> }))

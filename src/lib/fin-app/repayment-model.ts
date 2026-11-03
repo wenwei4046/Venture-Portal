@@ -320,5 +320,9 @@ export function repaymentModel(s: RepaymentSchedule): PageModel {
   }
 }
 
-/** The page's Export, as the desktop links it — the month's two due tables as a spreadsheet. */
-export const repaymentFiles = (ym: string) => [{ key: 'xlsx', label: 'Export', href: `/repayment-schedule/export?${joinQuery(`month=${ym}`)}`, format: 'xlsx' as const }]
+/** The page's Export, as the desktop offers it — the month's two due tables as a PDF or a spreadsheet (the PDF since
+ *  2026-11-02, the user: "没有办法export pdf？"), in a report page's words and order. */
+export const repaymentFiles = (ym: string) => [
+  { key: 'pdf', label: 'Export PDF', href: `/repayment-schedule/export?${joinQuery(`month=${ym}`, 'format=pdf')}`, format: 'pdf' as const },
+  { key: 'xlsx', label: 'Export Excel', href: `/repayment-schedule/export?${joinQuery(`month=${ym}`, 'format=xlsx')}`, format: 'xlsx' as const },
+]

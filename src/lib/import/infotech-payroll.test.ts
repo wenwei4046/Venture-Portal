@@ -1,6 +1,26 @@
 import { describe, it, expect } from 'vitest'
 import { utils, write } from 'xlsx'
-import { parseInfotechGrid, parseInfotechPayroll } from './infotech-payroll'
+import { noPayToUnpaidDays, parseInfotechGrid, parseInfotechPayroll } from './infotech-payroll'
+
+// October 2026's four No Pay rows (user: No Pay belongs in the grid's unpaid
+// days — the import had set every row to 0 days).
+describe('noPayToUnpaidDays', () => {
+  it('turns October 2026 No Pay amounts into days at basic ÷ 31', () => {
+    expect(noPayToUnpaidDays(109.68, 3400, '2026-10-01')).toBe(1)
+    expect(noPayToUnpaidDays(183.65, 2800, '2026-10-01')).toBe(2)
+    expect(noPayToUnpaidDays(113.18, 3500, '2026-10-01')).toBe(1)
+    expect(noPayToUnpaidDays(26.67, 800, '2026-10-01')).toBe(1)
+  })
+
+  it('keeps a half day and uses the month’s own length', () => {
+    expect(noPayToUnpaidDays(50, 3000, '2026-09-01')).toBe(0.5)
+  })
+
+  it('is 0 with no No Pay or no basic', () => {
+    expect(noPayToUnpaidDays(0, 3400, '2026-10-01')).toBe(0)
+    expect(noPayToUnpaidDays(100, 0, '2026-10-01')).toBe(0)
+  })
+})
 
 // Golden grid based on the actual Carres Mar 2026 export the user provided.
 // Minimal subset — just enough to exercise every code path.
@@ -127,6 +147,28 @@ describe('parseInfotechGrid', () => {
     // 2026-07-03: the SKBBK value itself now lands in skbbk (net-only
     // employee deduction → skbbk_amount; NettWgs is already after it).
     expect(result.rows[0].skbbk).toBe(10)
+  })
+
+  // Regression for the October 2026 import ("By Individual" report): PCB is no
+  // longer one "PCB" column but a 4th Emplyr | Emp | Total triplet under a
+  // "PCB Contribution" section header. The parser found no "PCB" header and
+  // imported pcb=0 for every row while NettWgs (already after PCB) was right.
+  it('reads PCB from the 4th Emplyr|Emp|Total triplet when there is no PCB column', () => {
+    const grid: (string | number | null)[][] = [
+      [null, null, null, null, null, 'Allow', 'Rest/PH', 'Allowance', 'Deduction', null, null, 'Deduction', 'EPF Contribution', null, null, 'SOCSO Contribution', null, null, 'EIS Contribution', null, null, null, null, null, 'PCB Contribution'],
+      ['No.', 'Code', 'Emp. Name', 'Tot. Sal', 'OT Amt', 'Shift', 'Amount', 'Add', 'No Pay', 'Bonus', 'Gross', 'Ded', 'Emplyr', 'Emp', 'Total', 'Emplyr', 'Emp', 'Total', 'Emplyr', 'Emp', 'Total', 'SKBBK', 'HRDF', 'Zakat', 'Emplyr', 'Emp', 'Total', 'CP38 Amount', 'NettWgs'],
+      ['Company Name : HOUZS VENTURE HOLDING SDN BHD'],
+      [2, 'HV008', 'CHEW WEE HO', 7000, 0, 0, 0, 200, 0, 0, 7200, 0, 840, 770, 1610, 104.15, 29.75, 133.9, 11.9, 11.9, 23.8, 44.65, 0, 0, 0, 276.35, 276.35, 0, 6067.35],
+      [12, 'HV018', 'CHIN YEE RU', 3400, 22.4, 0, 0, 75, 0, 0, 3497.4, 0, 442, 374, 816, 60.35, 17.25, 77.6, 6.9, 6.9, 13.8, 25.85, 0, 0, 0, 0, 0, 0, 3073.4],
+    ]
+    const [chew, chin] = parseInfotechGrid(grid).rows
+    expect(chew.epfEe).toBe(770)
+    expect(chew.eisEe).toBe(11.9)
+    expect(chew.skbbk).toBe(44.65)
+    expect(chew.pcb).toBe(276.35)
+    expect(chew.net).toBe(6067.35)
+    expect(chin.otAmount).toBe(22.4)
+    expect(chin.pcb).toBe(0)
   })
 
   it('skbbk parses as 0 when the file has no SKBBK column (pre-June exports)', () => {

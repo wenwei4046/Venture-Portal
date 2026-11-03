@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="hz-select.js"></script>
+<style>
+body{margin:0;background:rgb(243,240,236);}
+*{box-sizing:border-box;}
+a{color:rgb(176,92,54);text-decoration:none;}
+a:hover{text-decoration:underline;}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid rgb(199,111,70);outline-offset:1px;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-thumb{background:rgb(230,224,217);border-radius:4px;}
+</style>
+</helmet>
+
+<div style="width:1440px;height:900px;display:flex;font-family:'Lora',Georgia,serif;font-size:15px;color:rgb(43,33,28);line-height:1.45;background:rgb(243,240,236);position:relative;overflow:hidden;">
+  <aside style="width:216px;flex:none;display:flex;flex-direction:column;padding:16px 12px;gap:2px;background:rgb(46,33,26);color:rgb(255,255,255);">
+    <div style="display:flex;align-items:center;gap:10px;padding:4px 6px 18px;">
+      <div style="width:34px;height:34px;border-radius:7px;background:rgb(199,111,70);color:rgb(255,255,255);display:flex;align-items:center;justify-content:center;font-family:'Lora',Georgia,serif;font-weight:700;font-size:17px;">H</div>
+      <div style="display:flex;flex-direction:column;gap:1px;"><div style="font-weight:600;font-size:15px;">HOUZS Venture</div><div style="font-size:13px;color:rgba(255,244,235,.55);">Internal ledger</div></div>
+    </div>
+    <a href="Inbox v2.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="inbox" style="width:16px;height:16px;"></i></span>Inbox</a>
+    <a href="Leads.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="users" style="width:16px;height:16px;"></i></span>Leads</a>
+    <a href="Insight.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="chart-column" style="width:16px;height:16px;"></i></span>Insight</a>
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:6px;background:rgba(255,255,255,.08);border:1px solid transparent;box-shadow:inset 3px 0 0 rgb(199,111,70);font-weight:600;color:rgb(255,255,255);"><span style="display:flex;"><i data-lucide="megaphone" style="width:16px;height:16px;"></i></span>Campaigns</div>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:18px 10px 6px;">REPLIES</div>
+    <a href="Auto Reply.dc.html?view=routing" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="split" style="width:16px;height:16px;"></i></span>Reply rules</a>
+    <a href="Auto Reply.dc.html?view=template" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="workflow" style="width:16px;height:16px;"></i></span>Reply templates</a>
+    <a href="Auto Reply.dc.html?view=library" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="blocks" style="width:16px;height:16px;"></i></span>Step library</a>
+    <a href="Auto Reply.dc.html?view=ai" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="sparkles" style="width:16px;height:16px;"></i></span>AI Agent</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;">FILES</div>
+    <a href="Basic Info.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="book-open" style="width:16px;height:16px;"></i></span>General info</a>
+    <a href="Data Center.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="library" style="width:16px;height:16px;"></i></span>Data Center</a>
+    <a href="Auto Reply.dc.html?view=corrections" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="history" style="width:16px;height:16px;"></i></span>AI corrections</a>
+    <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.12em;color:rgba(255,244,235,.45);padding:14px 10px 6px;">ADMIN</div>
+    <a href="Business Hours.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="clock" style="width:16px;height:16px;"></i></span>Business hours</a>
+    <a href="Audit Log.dc.html" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;text-decoration:none;" style-hover="background:rgba(255,244,235,.08);color:rgb(244,212,166);"><span style="display:flex;"><i data-lucide="scroll-text" style="width:16px;height:16px;"></i></span>Audit log</a>
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;padding-top:9px;padding-bottom:9px;color:rgba(255,244,235,.72);border:1px solid transparent;"><span style="display:flex;"><i data-lucide="settings" style="width:16px;height:16px;"></i></span>Settings</div>
+    <div style="flex:1;"></div>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px;border-top:1px solid rgba(255,244,235,.14);">
+      <div style="width:30px;height:30px;border-radius:50%;background:rgb(140,6,16);color:rgb(244,212,166);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;">ML</div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:1px;"><div style="font-weight:500;">Mei Ling</div><div style="font-size:13px;color:rgba(255,244,235,.55);">Customer Service</div></div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgba(255,244,235,.45);">v0.3</div>
+    </div>
+  </aside>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:10px;gap:8px;">
+    <header style="height:56px;flex:none;background:rgb(255,255,255);border:1px solid rgb(230,224,217);border-radius:10px;display:flex;align-items:center;padding:0 16px;gap:18px;box-shadow:0 1px 2px rgba(43,33,28,.05);">
+      <div style="flex:1;max-width:480px;display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-radius:8px;background:rgb(243,240,236);color:rgb(104,92,84);">
+        <span style="display:flex;"><i data-lucide="search" style="width:15px;height:15px;"></i></span>
+        <input placeholder="Search customers, phone numbers or chats" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-family:'Lora',Georgia,serif;font-size:14px;color:rgb(43,33,28);"></input>
+      </div>
+      <div style="flex:1;"></div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgb(88,76,68);background:rgb(242,238,233);padding:4px 10px;border-radius:999px;"><span style="width:6px;height:6px;border-radius:50%;background:rgb(88,76,68);"></span>Test mode</div>
+      <div style="font-family:'Lora',Georgia,serif;font-size:13px;color:rgb(88,76,68);">Mon 19 Oct 2026</div>
+      <button title="Notifications" style="white-space:nowrap;flex-shrink:0;position:relative;cursor:pointer;width:34px;height:34px;border-radius:8px;border:1px solid rgb(230,224,217);background:rgb(255,255,255);color:rgb(88,76,68);display:flex;align-items:center;justify-content:center;"><span style="display:flex;"><i data-lucide="bell" style="width:16px;height:16px;"></i></span><span style="position:absolute;top:6px;right:7px;width:7px;height:7px;border-radius:50%;background:rgb(199,111,70);border:1.5px solid rgb(255,255,255);"></span></button>
+      <a href="#" style="font-size:13px;color:rgb(88,76,68);">Sign out</a>
+    </header>
+
+    <main style="flex:1;min-height:0;background:transparent;border:none;display:flex;flex-direction:column;padding:16px 8px 4px;">
+      <div style="flex:none;display:flex;align-items:flex-end;gap:16px;padding-bottom:14px;">
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+          <div style="font-family:'Lora',Georgia,serif;font-size:11px;letter-spacing:.14em;color:rgb(88,76,68);">LEAD VIEW</div>
+          <h1 style="align-self:flex-start;margin:0;line-height:1.15;letter-spacing:-.01em;font-family:'Cormorant Garamond',Georgia,serif;font-size:32px;font-weight:600;">Campaigns</h1>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;font-size:14px;color:rgb(88,76,68);">
+          <span>Promotions consent</span>
+          <span style="display:flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:rgb(76,110,80);"></span>Agreed <span style="font-family:'Lora',Georgia,serif;color:rgb(0,0,0);">{{ consent.agreed }}</span></span>
+          <span style="display:flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:rgb(218,210,200);"></span>Not asked <span style="font-family:'Lora',Georgia,serif;color:rgb(0,0,0);">{{ consent.notAsked }}</span></span>
+          <span style="display:flex;align-items:center;gap:5px;"><span style="width:7px;height:7px;border-radius:50%;background:rgb(199,111,70);"></span>Unsubscribed <span style="font-family:'Lora',Georgia,serif;color:rgb(0,0,0);">{{ consent.unsub }}</span></span>
+        </div>
+      </div>
+
+      <div style="flex:1;min-height:0;display:grid;grid-template-columns:280px minmax(0,1fr) 340px;border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);overflow:hidden;">
+        <section style="display:flex;flex-direction:column;min-height:0;border-right:1px solid rgb(230,224,217);">
+          <div style="flex:none;padding:12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgb(230,224,217);">
+            <div style="flex:1;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">CAMPAIGNS</div>
+            <button onClick="{{ newCampaign }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:500;padding:5px 10px;border-radius:6px;border:1px solid rgb(43,33,28);background:rgb(255,255,255);color:rgb(43,33,28);" style-hover="background:rgb(240,226,206);">+ New</button>
+          </div>
+          <div style="flex:1;min-height:0;overflow-y:auto;">
+            <sc-for list="{{ list }}" as="c" hint-placeholder-count="4">
+              <div onClick="{{ c.onClick }}" style="cursor:pointer;display:flex;flex-direction:column;gap:4px;padding:11px 12px 11px 10px;border-bottom:1px solid rgb(235,230,224);background:{{ c.bg }};border-left:2px solid {{ c.edge }};">
+                <div style="display:flex;align-items:center;gap:6px;"><span style="flex:1;min-width:0;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ c.name }}</span><span style="font-size:11px;padding:2px 6px;border-radius:3px;background:{{ c.stBg }};color:{{ c.stFg }};">{{ c.stLabel }}</span></div>
+                <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:rgb(104,92,84);"><span style="font-family:'Lora',Georgia,serif;font-size:11px;padding:1px 5px;border-radius:3px;background:{{ c.bBg }};color:{{ c.bFg }};">{{ c.brand }}</span>{{ c.line }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+
+        <section style="min-height:0;overflow-y:auto;padding:18px 22px 24px;display:flex;flex-direction:column;gap:20px;">
+          <sc-if value="{{ isSent }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:18px;">
+              <div style="display:flex;flex-direction:column;gap:4px;">
+                <div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:26px;">{{ c.name }}</div>
+                <div style="font-size:14px;color:rgb(88,76,68);">Sent {{ c.date }} · {{ c.brand }} · {{ c.audienceText }}</div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);">
+                <sc-for list="{{ results }}" as="r" hint-placeholder-count="5">
+                  <div style="padding:12px 14px;border-right:1px solid rgb(235,230,224);display:flex;flex-direction:column;gap:4px;">
+                    <div style="font-size:13px;color:rgb(88,76,68);">{{ r.label }}</div>
+                    <div style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:30px;line-height:1;font-feature-settings:'tnum';">{{ r.n }}</div>
+                    <div style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ r.rate }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="font-size:14px;line-height:1.5;color:rgb(43,33,28);">{{ resultNote }}</div>
+              <div style="display:flex;gap:8px;">
+                <button onClick="{{ duplicate }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:7px 14px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);" style-hover="background:rgb(243,240,236);">Duplicate as new campaign</button>
+                <a href="Leads.dc.html" style="font-size:14px;padding:7px 4px;">See the leads it brought ↗</a>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ isEdit }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;gap:20px;">
+              <input value="{{ c.name }}" onChange="{{ onName }}" style="border:none;border-bottom:1px solid transparent;outline:none;padding:0 0 2px;font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:26px;background:transparent;" style-focus="border-bottom:1px solid rgb(199,111,70);"></input>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">1 · WHO GETS IT</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:14px;">Brand
+                  <select value="{{ c.brand }}" data-v="{{ c.brand }}" onChange="{{ onBrand }}" style="height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"><sc-for list="{{ brands }}" as="b" hint-placeholder-count="3"><option value="{{ b }}">{{ b }}</option></sc-for></select>
+                </div>
+                <div style="display:flex;flex-direction:column;border:1px solid rgb(218,210,200);border-radius:10px;background:rgb(255,255,255);box-shadow:0 1px 2px rgba(43,33,28,.05);">
+                  <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+                    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid rgb(235,230,224);">
+                      <button onClick="{{ f.toggle }}" style="white-space:nowrap;flex-shrink:0;cursor:pointer;width:16px;height:16px;flex:none;border-radius:4px;border:1.5px solid {{ f.ring }};background:{{ f.fill }};color:rgb(255,255,255);font-size:13px;line-height:1;padding:0;">{{ f.tick }}</button>
+                      <span style="flex:1;font-size:14px;">{{ f.label }}</span>
+                      <span style="font-family:'Lora',Georgia,serif;font-size:11px;color:rgb(120,108,100);">{{ f.effect }}</span>
+                    </div>
+                  </sc-for>
+                  <div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgb(248,246,243);border-radius:0 0 8px 8px;">
+                    <span style="width:16px;height:16px;flex:none;border-radius:4px;background:rgb(76,110,80);color:rgb(255,255,255);font-size:13px;display:flex;align-items:center;justify-content:center;">✓</span>
+                    <span style="flex:1;font-size:14px;">Only customers who agreed to promotions</span>
+                    <span style="font-size:13px;color:rgb(104,92,84);">Always on · Meta rule</span>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:baseline;gap:8px;"><span style="font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:28px;font-feature-settings:'tnum';">{{ audience }}</span><span style="font-size:14px;color:rgb(88,76,68);">customers will get this</span></div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">2 · MESSAGE</div>
+                <div style="display:flex;align-items:center;gap:8px;font-size:14px;">Meta template
+                  <select value="{{ c.tpl }}" data-v="{{ c.tpl }}" onChange="{{ onTpl }}" style="flex:1;min-width:0;height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;background:rgb(255,255,255);"><sc-for list="{{ tplOpts }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select>
+                  <span style="font-size:13px;padding:2px 8px;border-radius:3px;white-space:nowrap;background:{{ tplState.bg }};color:{{ tplState.fg }};">{{ tplState.label }}</span>
+                </div>
+                <textarea value="{{ c.body }}" onChange="{{ onBody }}" rows="4" style="border:1px solid rgb(218,210,200);border-radius:6px;padding:9px 11px;font-family:'Lora',Georgia,serif;font-size:15px;line-height:1.5;resize:vertical;"></textarea>
+                <div style="font-size:13px;color:rgb(104,92,84);">{name} becomes the customer’s first name. Changing the text sends the template back to Meta for review, usually within a day.</div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <input type="file" ref="{{ imgRef }}" accept="image/*,video/*" onChange="{{ onImg }}" style="display:none;"></input>
+                  <button onClick="{{ pickImg }}" style="white-space:nowrap;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'Lora',Georgia,serif;font-size:14px;padding:6px 10px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);color:rgb(88,76,68);" style-hover="background:rgb(240,226,206);"><span style="display:flex;"><i data-lucide="image" style="width:14px;height:14px;"></i></span>{{ imgLabel }}</button>
+                  <a href="Data Center.dc.html" style="font-size:14px;">or pick from Data Center</a>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:6px;">
+                  <div style="font-size:13px;color:rgb(88,76,68);">Buttons</div>
+                  <sc-for list="{{ buttons }}" as="b" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <input value="{{ b.label }}" onChange="{{ b.onLabel }}" disabled="{{ b.locked }}" maxlength="20" style="width:220px;height:30px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 10px;font-family:'Lora',Georgia,serif;font-size:14px;background:{{ b.bg }};"></input>
+                      <span style="font-size:13px;color:rgb(104,92,84);">{{ b.hint }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <div style="font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">3 · WHEN</div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <input type="date" value="{{ c.day }}" onChange="{{ onDay }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;"></input>
+                  <input type="time" value="{{ c.time }}" onChange="{{ onTime }}" style="height:32px;border:1px solid rgb(218,210,200);border-radius:6px;padding:0 8px;font-family:'Lora',Georgia,serif;font-size:14px;"></input>
+                  <span style="font-size:13px;color:rgb(104,92,84);">Replies come into the Inbox. Send during working hours so someone can answer.</span>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:8px;padding-top:14px;border-top:1px solid rgb(235,230,224);">
+                <span style="flex:1;font-size:14px;color:{{ statusFg }};">{{ statusText }}</span>
+                <button onClick="{{ sendTest }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:7px 14px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);" style-hover="background:rgb(243,240,236);">Send test to me</button>
+                <sc-if value="{{ canUnschedule }}" hint-placeholder-val="{{ false }}"><button onClick="{{ unschedule }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:14px;padding:7px 14px;border-radius:6px;border:1px solid rgb(218,210,200);background:rgb(255,255,255);color:rgb(199,111,70);">Cancel schedule</button></sc-if>
+                <button onClick="{{ schedule }}" disabled="{{ cantSchedule }}" style="white-space:nowrap;cursor:pointer;font-family:'Lora',Georgia,serif;font-size:15px;font-weight:600;padding:8px 18px;border-radius:6px;border:none;background:rgb(199,111,70);color:rgb(43,33,28);opacity:{{ schedOp }};" style-hover="background:rgb(176,92,54);">{{ schedLabel }}</button>
+              </div>
+            </div>
+          </sc-if>
+        </section>
+
+        <section style="min-height:0;border-left:1px solid rgb(230,224,217);background:rgb(248,246,243);display:flex;flex-direction:column;align-items:center;padding:18px 20px;gap:12px;">
+          <div style="align-self:stretch;font-family:'Lora',Georgia,serif;font-size:14px;font-weight:600;letter-spacing:.04em;color:rgb(43,33,28);">PREVIEW · MESSENGER</div>
+          <div style="width:280px;display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:14px;background:rgb(255,255,255);border:1px solid rgb(235,230,224);">
+            <div style="display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid rgb(235,230,224);"><span style="width:26px;height:26px;border-radius:50%;background:rgb(43,33,28);color:rgb(240,226,206);display:flex;align-items:center;justify-content:center;font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;font-size:15px;">{{ initial }}</span><span style="font-weight:600;font-size:14px;">{{ c.brand }}</span></div>
+            <sc-if value="{{ hasImg }}" hint-placeholder-val="{{ false }}"><div style="height:150px;border-radius:10px;background-size:cover;background-position:center;background-color:rgb(242,238,233);background-image:{{ imgBg }};"></div></sc-if>
+            <div style="padding:9px 11px;border-radius:10px;background:rgb(242,238,233);line-height:1.45;white-space:pre-wrap;font-size:14px;">{{ previewText }}</div>
+            <div style="display:flex;flex-direction:column;gap:5px;">
+              <sc-for list="{{ buttons }}" as="b" hint-placeholder-count="2"><span style="text-align:center;font-size:14px;color:rgb(176,92,54);border:1px solid rgb(176,92,54);border-radius:999px;padding:5px 10px;background:rgb(255,255,255);">{{ b.label }}</span></sc-for>
+            </div>
+          </div>
+          <div style="font-size:13px;line-height:1.5;color:rgb(104,92,84);width:280px;">Meta only allows promotions to customers who agreed to get them. Customers agree by tapping “Yes” on the opt-in question after a chat. Anyone who taps “Stop promotions” is removed at once.</div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:900}}">
+const K = { dark:'rgb(43,33,28)', cream:'rgb(240,226,206)', accent:'rgb(199,111,70)', peach:'rgb(246,243,239)', otext:'rgb(88,76,68)', frame:'rgb(218,210,200)', brown:'rgb(88,76,68)', faint:'rgb(120,108,100)', blue:'rgb(176,92,54)', blueBg:'rgb(242,238,233)', green:'rgb(76,110,80)', greenBg:'rgb(230,240,231)', amber:'rgb(88,76,68)', amberBg:'rgb(242,238,233)', info:'rgb(242,238,233)', white:'rgb(255,255,255)', red:'rgb(199,111,70)' };
+const BRAND = { '2990s':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'}, '2990s mini':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'}, 'Carress':{bg:'rgb(242,238,233)',fg:'rgb(43,33,28)'} };
+const AGREED = { '2990s':124, '2990s mini':38, 'Carress':52 };
+const FILTERS = [['recent','Chatted in the last 60 days',0.78],['notBought','Did not buy yet',0.71],['sofa','Asked about sofas',0.46],['came','Came to the showroom but did not buy',0.24]];
+const TPLS = [{v:'sofa-week',l:'Oct Sofa Week reminder',state:'approved'},{v:'new-arrivals',l:'New arrivals',state:'review'},{v:'mattress-trial',l:'100-night trial',state:'approved'},{v:'custom',l:'New template',state:'draft'}];
+const C = (o) => ({ filters:['recent','notBought'], buttons:['I’m interested'], img:'', day:'2026-10-24', time:'11:00', ...o });
+const SEED = [
+  C({id:'c1', name:'Last days of Sofa Week', brand:'2990s', status:'scheduled', tpl:'sofa-week', filters:['recent','notBought','sofa'], body:'Hi {name}! Sofa Week ends on 31 Oct. Our L-shape sofas are an extra RM 200 off this week. Want our salesperson to send you the options?', day:'2026-10-24', time:'11:00' }),
+  C({id:'c2', name:'Carress trial reminder', brand:'Carress', status:'draft', tpl:'mattress-trial', body:'Hi {name}, still thinking about a new mattress? Try any Carress mattress for 100 nights. Tap below and we’ll arrange a visit to Puchong.' }),
+  C({id:'c3', name:'Raya open house', brand:'2990s', status:'sent', tpl:'sofa-week', date:'2 Apr 2026, 11:00', body:'Selamat Hari Raya, {name}!', res:{ sent:118, read:94, replied:37, phones:19, closed:6 } }),
+  C({id:'c4', name:'Mini bed frames launch', brand:'2990s mini', status:'sent', tpl:'new-arrivals', date:'12 Sep 2026, 14:00', body:'New bed frames are here, {name}!', res:{ sent:34, read:29, replied:9, phones:5, closed:2 } })
+];
+const ST = { draft:['Draft',K.info,K.brown], scheduled:['Scheduled',K.amberBg,K.amber], sent:['Sent',K.greenBg,K.green] };
+
+class Component extends DCLogic {
+  state = { camps: SEED, selId:'c1', note:'' };
+  imgRef = React.createRef();
+  componentDidMount(){ this.icons(); this.sync(); }
+  componentDidUpdate(){ this.icons(); this.sync(); }
+  icons(){ if (window.lucide) window.lucide.createIcons(); else setTimeout(() => this.icons(), 300); }
+  sync(){ requestAnimationFrame(() => document.querySelectorAll('select[data-v]').forEach(s => { if (s.dataset.v && s.value !== s.dataset.v) s.value = s.dataset.v; })); }
+  upd(fn){ const id = this.state.selId; this.setState(s => ({ camps: s.camps.map(c => c.id === id ? fn(c) : c), note:'' })); }
+  renderVals(){
+    const st = this.state, c = st.camps.find(x => x.id === st.selId) || st.camps[0];
+    const audience = Math.round(FILTERS.filter(f => c.filters.includes(f[0])).reduce((n, f) => n * f[2], AGREED[c.brand]));
+    const tpl = TPLS.find(t => t.v === c.tpl) || TPLS[0];
+    const tplState = { approved:{label:'Approved by Meta',bg:K.greenBg,fg:K.green}, review:{label:'In review',bg:K.amberBg,fg:K.amber}, draft:{label:'Not submitted',bg:K.info,fg:K.brown} }[c.edited ? 'review' : tpl.state];
+    const ready = (tpl.state === 'approved' && !c.edited) && audience > 0;
+    const r = c.res || {};
+    return {
+      consent: { agreed: Object.values(AGREED).reduce((a, b) => a + b, 0), notAsked:'1,032', unsub:18 },
+      list: st.camps.map(x => { const s = ST[x.status]; return { ...x, onClick:() => this.setState({selId:x.id, note:''}), bg: x.id === c.id ? 'rgb(252,240,232)' : 'rgb(255,255,255)', edge: x.id === c.id ? K.accent : 'transparent', stLabel:s[0], stBg:s[1], stFg:s[2], bBg:BRAND[x.brand].bg, bFg:BRAND[x.brand].fg,
+        line: x.status === 'sent' ? x.date.split(',')[0] + ' · ' + x.res.closed + ' bought' : x.status === 'scheduled' ? x.day.slice(8) + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(x.day.slice(5,7))-1] + ', ' + x.time : 'Not scheduled' }; }),
+      newCampaign: () => { const id = 'c' + Date.now(); this.setState(s => ({ camps:[C({id, name:'New campaign', brand:'2990s', status:'draft', tpl:'custom', body:'Hi {name}! '}), ...s.camps], selId:id })); },
+      c: { ...c, audienceText: (r.sent || 0) + ' customers who agreed to promotions' },
+      isSent: c.status === 'sent', isEdit: c.status !== 'sent',
+      results: [['Sent','sent',null],['Read','read','sent'],['Replied','replied','read'],['Gave a phone','phones','replied'],['Bought','closed','phones']].map(([label, k, prev]) => ({ label, n: r[k] || 0, rate: prev ? Math.round((r[k] || 0) / Math.max(r[prev], 1) * 100) + '% of previous' : 'agreed customers' })),
+      resultNote: c.res ? c.res.phones + ' customers left a phone and ' + c.res.closed + ' bought. Replies went to the Inbox like any chat and were handed to sales the usual way.' : '',
+      duplicate: () => { const id = 'c' + Date.now(); this.setState(s => ({ camps:[{ ...c, id, name:c.name + ' (copy)', status:'draft', res:null, date:null }, ...s.camps], selId:id })); },
+      brands: Object.keys(BRAND), onName: e => { const v = e.target.value; this.upd(x => ({...x, name:v})); }, onBrand: e => { const v = e.target.value; this.upd(x => ({...x, brand:v})); },
+      filters: FILTERS.map(([k, label, f]) => { const on = c.filters.includes(k); return { label, effect: on ? '× ' + f : '', tick: on ? '✓' : '', ring: on ? K.dark : K.frame, fill: on ? K.dark : K.white, toggle:() => this.upd(x => ({...x, filters: on ? x.filters.filter(y => y !== k) : [...x.filters, k]})) }; }),
+      audience,
+      tplOpts: TPLS.map(t => ({ v:t.v, l:t.l })), tplState, onTpl: e => { const v = e.target.value; this.upd(x => ({...x, tpl:v, edited:false})); },
+      onBody: e => { const v = e.target.value; this.upd(x => ({...x, body:v, edited:true})); },
+      imgRef: this.imgRef, pickImg: () => this.imgRef.current && this.imgRef.current.click(),
+      onImg: e => { const fl = (e.target.files || [])[0]; e.target.value = ''; if (!fl) return; const url = URL.createObjectURL(fl); this.upd(x => ({...x, img:url, imgName:fl.name})); },
+      imgLabel: c.img ? c.imgName : 'Add photo or video', hasImg: !!c.img, imgBg: c.img ? 'url("' + c.img + '")' : 'none',
+      buttons: [...c.buttons.map((b, i) => ({ label:b, locked:false, bg:K.white, hint:'Customer taps it to reply. Goes to the Inbox.', onLabel: e => { const v = e.target.value; this.upd(x => ({...x, buttons:x.buttons.map((y, j) => j === i ? v : y)})); } })), { label:'Stop promotions', locked:true, bg:'rgb(243,240,236)', hint:'Required. Removes the customer from promotions.', onLabel:() => {} }],
+      initial: c.brand[0], previewText: c.body.replace(/\{name\}/g, 'Jason'),
+      onDay: e => { const v = e.target.value; this.upd(x => ({...x, day:v})); }, onTime: e => { const v = e.target.value; this.upd(x => ({...x, time:v})); },
+      statusText: st.note || (c.status === 'scheduled' ? 'Scheduled. It goes out on ' + c.day + ' at ' + c.time + ' to ' + audience + ' customers.' : !ready ? (tpl.state === 'draft' ? 'Submit the template to Meta before you can schedule.' : 'Waiting for Meta to approve the edited text.') : 'Ready to schedule.'),
+      statusFg: st.note ? K.green : c.status === 'scheduled' ? K.amber : ready ? K.green : K.brown,
+      sendTest: () => this.setState({ note:'Test sent to Mei Ling’s Messenger.' }),
+      canUnschedule: c.status === 'scheduled', unschedule: () => this.upd(x => ({...x, status:'draft'})),
+      cantSchedule: !ready && tpl.state !== 'draft', schedOp: (ready || tpl.state === 'draft') ? 1 : .45,
+      schedLabel: tpl.state === 'draft' ? 'Submit to Meta' : c.status === 'scheduled' ? 'Update schedule' : 'Schedule for ' + audience,
+      schedule: () => { if (tpl.state === 'draft') { this.setState({ note:'Submitted to Meta for review. Usually approved within a day.' }); return; } if (!ready) return; this.upd(x => ({...x, status:'scheduled'})); }
+    };
+  }
+}
+</script>
+</body>
+</html>

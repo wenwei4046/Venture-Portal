@@ -93,6 +93,8 @@ export interface CrmCustomer {
   name: string;
   phone: string;
   channel: CrmChannel;
+  /** The WhatsApp number id or Page id the customer wrote to — its source (lib/member/crm-source.ts). */
+  accountId?: string | null;
   adId: string | null;
   ad: string;
   /** What Meta sent as the ad's headline ("Chat with us"); `ad` is the ad's name where it has one (crm_ad_names). */
@@ -119,6 +121,8 @@ export interface CrmCustomer {
   details: CrmDetails;
   /** CRM Desktop rev 1 (B5): answers to the fields the Principal / Director added to the Customer info form. */
   extra?: Record<string, string>;
+  /** A lead form ad's answers (2026-10-30): a Messenger lead ad's or a Facebook Instant Form's, as Meta sent them. */
+  leadForm?: CrmLeadForm;
   /** Book visit's customer form was saved once (then a booking goes straight to the time). */
   detailsSaved: boolean;
   messages: CrmChatMessage[];
@@ -145,7 +149,13 @@ export interface CrmVisit {
   typeId?: string;
   label?: string;
   answers?: Record<string, string>;
+  /** The unit’s key handed over with a photo (the owner, 2026-10-28; mig 20261028130000): collected before the visit, returned
+   * after it — each a file in crm-media under the customer’s folder. A Show up needs the key returned; a No show too once collected. */
+  keyOut?: CrmKeyPhoto;
+  keyBack?: CrmKeyPhoto;
 }
+/** `by`: the staff member who took the photo (crm_appointments.key_*_by). */
+export interface CrmKeyPhoto { path: string; at: string; by?: string | null }
 
 /**
  * A closure from a to b (YYYY-MM-DD). With hours, only those hours each day; without, the whole day. Hours come two
@@ -177,11 +187,25 @@ export interface CrmRoom {
   deleted?: boolean;
   /** Made for one online / elsewhere visit (crmDataFromRows), never a showroom: no list, picker or count shows it. */
   virtual?: boolean;
+  /** The unit's key is handed over here (the owner, 2026-10-29; mig 20261029100000): a visit takes the key photos on the phone
+   * and is marked Show up only with the key returned (No show too once collected). Off, a visit is marked as before. */
+  keys?: boolean;
 }
 
 export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null; /** Marked unread by this person (swipe right › Unread, 2026-10-14); opening the chat takes it off. */ markedUnread?: boolean }
 export interface CrmLabel { id: string; name: string; color: string }
 export interface CrmQuickReply { id: string; shortcut: string; message: string }
+/** A reply in the company's reply library (mig 20261029170000): {name}, {me}, {project} … filled in for the customer on screen. */
+/** A booking a partner made through its link (mig 20261029190000): it takes its slot on the calendar; no CRM customer. */
+export interface CrmPartnerBooking {
+  id: string; ref: string; partner: string; showroomId: string; start: string; minutes: number; state: "booked" | "cancelled";
+  booker: string; bookerPhone: string; customer: string; customerPhone: string; info: Record<string, string>; remarks: string; note: string; createdAt: string;
+}
+/** A member's leave (mig 20261029220000): no new lead goes to them from the first day to the last, both included. */
+export interface CrmLeave { id: string; staffId: string; from: string; to: string; note: string }
+/** A partner's booking link (CRM · Manage only). */
+export interface CrmPartnerLink { id: string; name: string; code: string; on: boolean }
+export interface CrmReplyItem { id: string | null; title: string; category: string; body: string; keywords: string[] }
 
 export interface CrmAutoReply { on: boolean; text: string; img?: string | null; imgName?: string }
 export interface CrmAutoReplySet {
@@ -278,6 +302,15 @@ export interface CrmData {
   labels: CrmLabel[];
   customerLabels: Record<string, string[]>;
   quickReplies: CrmQuickReply[];
+  /** What customers asked and our team answered (crm_reply_examples, 2026-10-29) — the suggested replies' experience; read once, absent until then. */
+  replyExamples?: { q: string; a: string; won?: boolean; appt?: boolean }[];
+  /** The company's reply library, in its order (empty before the migration). */
+  replyLibrary?: CrmReplyItem[];
+  /** Partners' bookings through their links (mig 20261029190000) and the links themselves (CRM · Manage). */
+  partnerBookings?: CrmPartnerBooking[];
+  partnerLinks?: CrmPartnerLink[];
+  /** Members' leave that has not ended (mig 20261029220000). */
+  leaves?: CrmLeave[];
   autoReplies: CrmAutoReplySet;
   /** Other people's auto-replies, for View as (read only) — only for whoever sees everybody's CRM. */
   autoRepliesOf?: Record<string, CrmAutoReplySet>;
@@ -292,6 +325,8 @@ export interface CrmData {
    * An ad's name by its id (mig 20261016120000, crm_ad_names): one the Principal / Director gave it, else Meta's once
    * ads_read is granted. A customer's `ad` already reads it; `adHeadline` keeps what Meta sent.
    */
+  /** A showroom's unsaved draft (mig 20261103100000, CRM · Manage only): by its id, 'new' for one not added yet. */
+  roomDrafts?: Record<string, { draft: unknown; by: string | null; at: string }>;
   adNames?: Record<string, { name: string; source: "manual" | "meta"; status?: string | null; statusAt?: string | null; added?: boolean; startAt?: string | null; endAt?: string | null; pageId?: string | null; pageName?: string | null; /** Taken off Ads performance (crm_hide_ad, 2026-10-24); its leads stay. */ hidden?: boolean }>;
   /** Members locked out of the dealing for now (mig 20261022130000, crm_staff.locked): off Assignment's lists. */
   lockedStaff?: string[];
@@ -304,6 +339,8 @@ export interface CrmData {
   recentEmoji?: string[];
   /** CRM Desktop rev 1 (B5): the Customer info form the Principal / Director set — every salesperson's Customer info follows it. */
   forms?: CrmForm[];
+  /** The booking link's forms (mig 20261030040000, crm_forms.kind = 'booking'), the one in use first — what /b/<code> asks. */
+  bookingForms?: CrmForm[];
   /** CRM Desktop rev 1 (B6): notes on customers, newest first. */
   notes?: CrmNote[];
   /** Settings › General (mig 20261018100000, crm_settings_read): the reply lines, the template button, auto-assign. */
@@ -355,6 +392,8 @@ export interface CrmForm {
   /** `page` / `pageTitle`: the page a section is on (0 = the first) since the paged form (2026-10-16); none — one page. */
   sections: { id: string; title: string; fields: CrmFormField[]; page?: number; pageTitle?: string }[];
 }
+/** A lead form ad's answers on a customer (2026-10-30). */
+export interface CrmLeadForm { kind: "messenger" | "instant"; complete: boolean; at: string | null; answers: { q: string; a: string }[] }
 export interface CrmNote { id: string; customerId: string; by: string | null; text: string; at: string }
 
 /** A cold lead template. `body` writes the customer's first name as {name}; `metaName` is what Meta keeps it by. */
@@ -402,18 +441,40 @@ export interface CrmContactRowX extends CrmContactRow {
   held_reason?: string | null;
   /** CRM Desktop rev 1 (B5): answers to the form's own questions. */
   extra?: Record<string, string> | null;
+  lead_form?: { kind?: string; complete?: boolean; at?: string; answers?: { q?: string; a?: string }[] } | null;
 }
 export interface CrmMessageRowX extends CrmMessageRow {
   reply_to?: string | null;
   my_reaction?: string | null;
   their_reaction?: string | null;
+  /** A customer's document's own file name, beside its caption (mig 20261027100000). */
+  media_name?: string | null;
   card?: CrmCard | null;
 }
+/**
+ * Show-up counts a customer ONCE (the owner, 2026-10-27: "appt rate, show up rate 一个客户只记录一次"): of the visits given
+ * (cancelled ones already left out), the customers with one already due (marked, or past its time), the customers who came
+ * at least once, and the customers marked No show who never came.
+ */
+export function showUpOnce(vs: CrmVisit[], now: Date): { due: Set<string>; came: Set<string>; noshow: Set<string> } {
+  const due = new Set(vs.filter(v => v.state !== "booked" || new Date(v.start) <= now).map(v => v.customerId));
+  const came = new Set(vs.filter(v => v.state === "attended").map(v => v.customerId));
+  const noshow = new Set(vs.filter(v => v.state === "no_show" && !came.has(v.customerId)).map(v => v.customerId));
+  return { due, came, noshow };
+}
+/** A calendar's Show-up %, a customer once: came ÷ came or marked No show (pastAsNo: a past visit not marked counts as not come). */
+export function showRateOnce(vs: CrmVisit[], now: Date, pastAsNo = false): string {
+  const { came, noshow } = showUpOnce(vs, now);
+  const no = pastAsNo ? new Set(vs.filter(v => new Date(v.start) < now && !came.has(v.customerId)).map(v => v.customerId)) : noshow;
+  return came.size + no.size ? `${Math.round((came.size / (came.size + no.size)) * 100)}%` : "—";
+}
+
 export interface CrmVisitRow {
   id: string; contact_id: string; showroom: string; start_at: string; minutes: number; state: CrmVisitState;
   outcome?: CrmVisit["outcome"]; reminded_at?: string | null;
   kind?: string | null; meeting_link?: string | null; place?: string | null; remarks?: string | null;
   type_id?: string | null; answers?: Record<string, string> | null;
+  key_out_path?: string | null; key_out_at?: string | null; key_back_path?: string | null; key_back_at?: string | null; key_out_by?: string | null; key_back_by?: string | null;
 }
 export interface CrmRoomRow {
   id: string; name: string; active: boolean; sort_order: number;
@@ -422,6 +483,8 @@ export interface CrmRoomRow {
   photo_url?: string | null; map_google?: string | null; map_waze?: string | null;
   /** v2 frame 07 (mig 20261024150000): staff-only remarks; a deleted showroom stays for its past visits' names. */
   remarks?: string; deleted?: boolean;
+  /** Hands a unit's key over (mig 20261029100000). */
+  keys?: boolean;
 }
 export interface CrmPrefRow { contact_id: string; pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinned_message_id: string | null; marked_unread?: boolean }
 export interface CrmInviteRow {
@@ -440,6 +503,11 @@ export interface CrmDataRows {
   hides: { message_id: string }[];
   /** One's own starred messages (mig 20261014060000); absent before it. */
   stars?: { message_id: string }[];
+  /** The reply library (mig 20261029170000). */
+  library?: { id: string; title: string; category: string; body: string; keywords: string[] | null; sort_order: number }[];
+  partnerBookings?: { id: string; ref: string; partner: string; showroom: string; start_at: string; minutes: number | null; state: "booked" | "cancelled"; booker_name: string; booker_phone: string | null; customer_name: string; customer_phone: string | null; info: Record<string, string> | null; remarks: string | null; booker_note: string | null; created_at: string }[];
+  partnerLinks?: { id: string; name: string; code: string; on: boolean }[];
+  leaves?: { id: string; staff_id: string; starts_on: string; ends_on: string; note: string | null }[];
   labels: { id: string; name: string; color: string; sort_order: number }[];
   contactLabels: { label_id: string; contact_id: string }[];
   quickReplies: { id: string; shortcut: string; message: string; sort_order: number }[];
@@ -449,7 +517,7 @@ export interface CrmDataRows {
   events: CrmEventRow[];
   staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null; notif_deleted?: string[] | null; recent_emoji?: string[] | null }[];
   /** CRM Desktop rev 1 (B5 / B6): absent where the database has none yet. */
-  forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number }[];
+  forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number; kind?: string | null }[];
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
   adNames?: { ad_source_id: string; name: string; source: string; meta_status?: string | null; status_at?: string | null; added_at?: string | null; starts_at?: string | null; ends_at?: string | null; page_id?: string | null; page_name?: string | null; hidden_at?: string | null }[];
   locked?: string[];
@@ -479,7 +547,11 @@ export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
   // A file to show: WhatsApp's media id, our own copy of what we sent, or Messenger's address — all through our route.
   const shown = row.media_id || row.media_path || row.media_url ? MEDIA_KIND[row.kind] : undefined;
   // A template we sent is its text; media with a file is its caption; media without one is named.
+  // A document with its own name kept (2026-10-27): the name is the file's, the body its caption — WhatsApp's "￼" alone is none.
+  const fileName = row.media_name?.trim() || null;
+  const caption = fileName ? (row.body ?? "").replace(/￼/g, "").trim() : null;
   const text = row.kind === "template" || row.kind === "text" ? row.body ?? ""
+    : fileName ? (caption && caption !== fileName ? caption : "")
     : shown ? row.body ?? "" : label ? (row.body ? `${label} · ${row.body}` : label) : row.body ?? "";
   return {
     id: row.id,
@@ -487,7 +559,7 @@ export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
     kind: row.kind,
     text,
     at: row.sent_at,
-    ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: row.body || "Document", ...(row.media_mime ? { mime: row.media_mime } : {}) } : {}) } } : {}),
+    ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: fileName || row.body || "Document", ...(row.media_mime ? { mime: row.media_mime } : {}) } : {}) } } : {}),
     ...(row.direction === "out" && row.status && row.status !== "received" ? { status: row.status } : {}),
     ...(row.error ? { error: row.error } : {}),
     ...(row.auto ? { auto: true } : {}),
@@ -506,6 +578,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     name: row.name?.trim() || row.phone || "Customer",
     phone: row.phone ?? "",
     channel: row.channel,
+    accountId: row.account_id ?? null,
     adId: row.ad_source_id,
     adUrl: row.ad_source_url ?? null,
     adMedia: row.ad_media === "video" || row.ad_media === "image" ? row.ad_media : null,
@@ -528,6 +601,8 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
       req: row.requirement ?? "", budget: row.budget ?? "",
     },
     ...(row.extra && Object.keys(row.extra).length ? { extra: row.extra } : {}),
+    ...(row.lead_form && Array.isArray(row.lead_form.answers) ? { leadForm: { kind: row.lead_form.kind === "instant" ? "instant" as const : "messenger" as const, complete: row.lead_form.complete !== false,
+      at: row.lead_form.at ?? null, answers: row.lead_form.answers.filter(x => x?.q).map(x => ({ q: String(x.q), a: String(x.a ?? "") })) } } : {}),
     detailsSaved: !!row.details_at,
     messages: messages.filter(m => m.contact_id === row.id).sort((a, b) => a.sent_at.localeCompare(b.sent_at)).map(chatMessage),
   };
@@ -537,7 +612,7 @@ export const roomFromRow = (r: CrmRoomRow): CrmRoom => ({
   id: r.id, name: r.name, active: r.active, address: r.address ?? "",
   slots: r.slots ?? [], cap: r.cap ?? 2, weekly: r.weekly ?? [], blocks: Array.isArray(r.blocks) ? r.blocks : [],
   ...(r.photo_url ? { photo: r.photo_url } : {}), ...(r.map_google ? { mapGoogle: r.map_google } : {}), ...(r.map_waze ? { mapWaze: r.map_waze } : {}),
-  ...(r.remarks ? { remarks: r.remarks } : {}), ...(r.deleted ? { deleted: true } : {}),
+  ...(r.remarks ? { remarks: r.remarks } : {}), ...(r.deleted ? { deleted: true } : {}), ...(r.keys ? { keys: true } : {}),
 });
 
 export const visitFromRow = (a: CrmVisitRow): CrmVisit => {
@@ -547,6 +622,8 @@ export const visitFromRow = (a: CrmVisitRow): CrmVisit => {
     outcome: a.outcome ?? null, remindedAt: a.reminded_at ?? null,
     ...(custom ? { kind: custom, typeId: a.type_id ?? custom, label: a.showroom, ...(a.meeting_link ? { link: a.meeting_link } : {}), ...(a.place ? { place: a.place } : {}), ...(a.answers ? { answers: a.answers } : {}) } : {}),
     ...(a.remarks ? { remarks: a.remarks } : {}),
+    ...(a.key_out_path ? { keyOut: { path: a.key_out_path, at: a.key_out_at ?? "", by: a.key_out_by ?? null } } : {}),
+    ...(a.key_back_path ? { keyBack: { path: a.key_back_path, at: a.key_back_at ?? "", by: a.key_back_by ?? null } } : {}),
   };
 };
 /** The room an online / elsewhere visit is named by. */
@@ -598,6 +675,11 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     prefs: Object.fromEntries(rows.prefs.map(p => [p.contact_id, { pinned: p.pinned, muted: p.muted, hidden: p.hidden, blocked: p.blocked, pinnedMessageId: p.pinned_message_id, markedUnread: !!p.marked_unread }])),
     hiddenMessages: rows.hides.map(h => h.message_id),
     starredMessages: (rows.stars ?? []).map(s => s.message_id),
+    partnerBookings: (rows.partnerBookings ?? []).map(b => ({ id: b.id, ref: b.ref, partner: b.partner, showroomId: b.showroom, start: b.start_at, minutes: b.minutes ?? 60, state: b.state,
+      booker: b.booker_name, bookerPhone: b.booker_phone ?? "", customer: b.customer_name, customerPhone: b.customer_phone ?? "", info: b.info ?? {}, remarks: b.remarks ?? "", note: b.booker_note ?? "", createdAt: b.created_at })),
+    partnerLinks: rows.partnerLinks ?? [],
+    leaves: (rows.leaves ?? []).map(l => ({ id: l.id, staffId: l.staff_id, from: l.starts_on, to: l.ends_on, note: l.note ?? "" })),
+    replyLibrary: (rows.library ?? []).map(r => ({ id: r.id, title: r.title, category: r.category ?? "", body: r.body, keywords: r.keywords ?? [] })),
     labels: [...rows.labels].sort((a, b) => a.sort_order - b.sort_order).map(l => ({ id: l.id, name: l.name, color: l.color })),
     customerLabels,
     quickReplies: [...rows.quickReplies].sort((a, b) => a.sort_order - b.sort_order).map(q => ({ id: q.id, shortcut: q.shortcut, message: q.message })),
@@ -616,7 +698,8 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}), ...(r.together ? { together: true } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
     templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason })),
-    forms: [...(rows.forms ?? [])].sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
+    forms: [...(rows.forms ?? [])].filter(x => x.kind !== "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
+    bookingForms: [...(rows.forms ?? [])].filter(x => x.kind === "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
     notes: (rows.notes ?? []).map(n => ({ id: n.id, customerId: n.contact_id, by: n.author, text: n.body, at: n.created_at })).sort((a, b) => b.at.localeCompare(a.at)),
   };
 }

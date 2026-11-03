@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CostRatioRow, PickSku } from '../load'
+import type { CostRatioRow, KivCostRow, PickSku } from '../load'
 
-const { saveCostSetting, refresh, push } = vi.hoisted(() => ({ saveCostSetting: vi.fn(), refresh: vi.fn(), push: vi.fn() }))
+const { saveCostSetting, saveKivCosts, refresh, push } = vi.hoisted(() => ({ saveCostSetting: vi.fn(), saveKivCosts: vi.fn(), refresh: vi.fn(), push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push }), usePathname: () => '/member/products', useSearchParams: () => new URLSearchParams() }))
-vi.mock('../actions', () => ({ saveCostSetting }))
+vi.mock('../actions', () => ({ saveCostSetting, saveKivCosts }))
 
 import CostSettingTab, { formatRatio } from './CostSettingTab'
 import ProductListTabs from './ProductListTabs'
@@ -44,6 +44,7 @@ function example(): string {
 
 beforeEach(() => {
   saveCostSetting.mockReset().mockResolvedValue({ saved: 1 })
+  saveKivCosts.mockReset().mockResolvedValue({ saved: 1 })
   refresh.mockReset()
   push.mockReset()
 })
@@ -223,5 +224,77 @@ describe('Costing Setting', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Saved.')
     // The notice lands inside the save; the button says Saved only once its transition has ended.
     expect(await screen.findByRole('button', { name: 'Saved' })).toBeDisabled()
+  })
+})
+
+// ── KIV bed frames (2026-10-31): what a frame still to be chosen costs, by size ──
+const KIV: KivCostRow[] = [{ size: 'K', cost: 1000 }, { size: 'Q', cost: 820 }, { size: 'SS', cost: 600 }, { size: 'S', cost: 550 }]
+const kivCard = (size: string) => screen.getByTestId(`kiv-${size}`)
+function renderKiv(kivCosts: KivCostRow[] = KIV, divisor = 0.7) {
+  return render(<CostSettingTab sub={subs[0]} subs={subs} schemeId={SCHEME} divisor={divisor} ratios={[ultK]} skus={skus} kivCosts={kivCosts} />)
+}
+
+describe('Costing Setting › KIV bed frames', () => {
+  it('shows the four sizes, each at its cost and what that is to the Revenue Team', () => {
+    renderKiv()
+    expect(screen.getByRole('heading', { name: 'KIV bed frames' })).toBeInTheDocument()
+    expect(screen.getByText('Every sub-department')).toBeInTheDocument()
+    expect(kivCard('K')).toHaveTextContent('KING1,000.00Team cost 1,428.57')
+    expect(kivCard('Q')).toHaveTextContent('QUEEN820.00Team cost 1,171.43')
+    expect(kivCard('SS')).toHaveTextContent('SUPER SINGLE600.00Team cost 857.14')
+    expect(kivCard('S')).toHaveTextContent('SINGLE550.00Team cost 785.71')
+    // The ratio table is still the tab's only table.
+    expect(screen.getAllByRole('table')).toHaveLength(1)
+  })
+
+  it('says a size not set costs the dearest', () => {
+    renderKiv(KIV.filter(k => k.size !== 'S'))
+    expect(kivCard('S')).toHaveTextContent('SINGLE—Not set · the dearest')
+  })
+
+  it('saves only the sizes changed, and keeps them until the refreshed costs arrive', async () => {
+    const view = renderKiv()
+    click('Edit KIV costs')
+    // Typed back to what is saved: no change.
+    type('King KIV cost', '1,000.00')
+    type('Queen KIV cost', '900')
+    expect(kivCard('Q')).toHaveTextContent('Team cost 1,285.71')
+    click('Save 1 change')
+    await waitFor(() => expect(saveKivCosts).toHaveBeenCalledWith([{ size: 'Q', cost: '900' }]))
+    expect(await screen.findByRole('status')).toHaveTextContent('Saved.')
+    expect(refresh).toHaveBeenCalled()
+    expect(screen.getByRole('textbox', { name: 'Queen KIV cost' })).toBeDisabled()
+    view.rerender(<CostSettingTab sub={subs[0]} subs={subs} schemeId={SCHEME} divisor={0.7} ratios={[ultK]} skus={skus}
+      kivCosts={KIV.map(k => (k.size === 'Q' ? { ...k, cost: 900 } : k))} />)
+    expect(screen.getByRole('button', { name: 'Edit KIV costs' })).toBeEnabled()
+    expect(kivCard('Q')).toHaveTextContent('QUEEN900.00Team cost 1,285.71')
+    expect(saveCostSetting).not.toHaveBeenCalled()
+  })
+
+  it('sends a size left blank to take its cost off', async () => {
+    renderKiv()
+    click('Edit KIV costs')
+    type('Single KIV cost', '')
+    expect(kivCard('S')).toHaveTextContent('Not set · the dearest')
+    click('Save 1 change')
+    await waitFor(() => expect(saveKivCosts).toHaveBeenCalledWith([{ size: 'S', cost: '' }]))
+  })
+
+  it('refuses RM 0 before anything is sent', () => {
+    renderKiv()
+    click('Edit KIV costs')
+    type('Super single KIV cost', '0')
+    click('Save 1 change')
+    expect(screen.getByRole('alert')).toHaveTextContent('Super single: a KIV frame cannot cost RM 0')
+    expect(saveKivCosts).not.toHaveBeenCalled()
+  })
+
+  it('puts every draft back on Cancel', () => {
+    renderKiv()
+    click('Edit KIV costs')
+    type('King KIV cost', '1200')
+    click('Cancel changes')
+    expect(kivCard('K')).toHaveTextContent('KING1,000.00')
+    expect(screen.queryByRole('textbox', { name: 'King KIV cost' })).toBeNull()
   })
 })

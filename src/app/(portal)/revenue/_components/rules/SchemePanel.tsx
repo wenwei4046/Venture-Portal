@@ -10,23 +10,22 @@ import { SectionTop } from './SectionTop'
 import s from './rules.module.css'
 import { Select } from '@/components/hrv/select'
 
-// Rules › Scheme rules (2026-10-10, the HR revamp): the eight components as
-// switches in the prototype's order, a dot on each one changed since the
-// last save, and Save / Saved at the section's top. What a component needs
-// besides its switch — Group incentive's three layer settings (the
-// prototype's), and the ones this scheme also keeps: how Open Bill pays,
-// whether the override base counts KPI revenue, the deposit gate's % — opens
-// under its row while it is on. Defaults: the default rate mode. The Revenue
+// Rules › Scheme rules (2026-10-10, the HR revamp): the components as
+// switches in the prototype's order — seven since Open Bill went (2026-10-31)
+// — a dot on each one changed since the last save, and Save / Saved at the
+// section's top. What a component needs besides its switch — Group
+// incentive's three layer settings (the prototype's), and the ones this scheme
+// also keeps: whether the override base counts KPI revenue, the deposit gate's
+// % — opens under its row while it is on. Defaults: the default rate mode. The Revenue
 // Team cost basis is not here (2026-10-11, the user: one number, one place) —
 // Product List › Costing Setting is the only place it is set, and this Save
 // never writes it.
 
-type SwitchKey = 'product' | 'kpi' | 'open_bill' | 'override' | 'margin_penalty' | 'margin_incentive' | 'group' | 'deposit'
+type SwitchKey = 'product' | 'kpi' | 'override' | 'margin_penalty' | 'margin_incentive' | 'group' | 'deposit'
 
 const SWITCHES: Array<{ k: SwitchKey; label: string; desc: string }> = [
   { k: 'product', label: 'Product revenue commission', desc: "the salesperson's rate × their commissionable revenue" },
   { k: 'kpi', label: 'KPI item allowance', desc: 'flat RM per unit; that item’s revenue leaves the commission base' },
-  { k: 'open_bill', label: 'Open Bill bonus', desc: 'uplift on that bill’s commission' },
   { k: 'override', label: 'Hierarchy override', desc: 'uplines earn on their group’s sales' },
   { k: 'margin_penalty', label: 'Below-margin penalty', desc: 'per bill — also cuts every upline’s override on it' },
   { k: 'margin_incentive', label: 'Monthly margin incentive', desc: 'every brand sold must clear the tier' },
@@ -39,7 +38,6 @@ interface Form {
   groupDepth: string
   overrideDepth: string
   directLimit: string
-  basis: 'uplift_on_commission' | 'pct_of_revenue'
   overrideKpi: boolean
   depositPct: string
   rateMode: 'fixed' | 'variable'
@@ -53,7 +51,6 @@ function formOf(scheme: SchemeRow): Form {
     sw: {
       product: scheme.enable_product_revenue,
       kpi: scheme.enable_kpi,
-      open_bill: scheme.enable_open_bill,
       override: scheme.enable_override,
       margin_penalty: scheme.enable_margin_penalty,
       margin_incentive: scheme.enable_margin_incentive,
@@ -63,7 +60,6 @@ function formOf(scheme: SchemeRow): Form {
     groupDepth: blank(scheme.group_sales_depth),
     overrideDepth: blank(scheme.override_depth),
     directLimit: blank(scheme.direct_line_limit),
-    basis: scheme.open_bill_basis,
     overrideKpi: scheme.override_includes_kpi,
     depositPct: pct(scheme.deposit_threshold_pct),
     rateMode: scheme.default_rate_mode,
@@ -78,7 +74,6 @@ function toFormData(scheme: SchemeRow, f: Form): FormData {
   }
   on('enable_product_revenue', f.sw.product)
   on('enable_kpi', f.sw.kpi)
-  on('enable_open_bill', f.sw.open_bill)
   on('enable_override', f.sw.override)
   on('enable_margin_penalty', f.sw.margin_penalty)
   on('enable_margin_incentive', f.sw.margin_incentive)
@@ -88,7 +83,6 @@ function toFormData(scheme: SchemeRow, f: Form): FormData {
   fd.set('group_sales_depth', f.groupDepth.trim())
   fd.set('override_depth', f.overrideDepth.trim())
   fd.set('direct_line_limit', f.directLimit.trim())
-  fd.set('open_bill_basis', f.basis)
   fd.set('deposit_threshold_pct', f.depositPct.trim())
   fd.set('default_rate_mode', f.rateMode)
   return fd
@@ -181,7 +175,6 @@ export default function SchemePanel({ scheme, canManage }: { scheme: SchemeRow; 
       <div className={s.box} style={{ marginBottom: 22 }}>
         {SWITCHES.map(sw => {
           const on = f.sw[sw.k]
-          const desc = sw.k === 'open_bill' && f.basis === 'pct_of_revenue' ? '% of that bill’s revenue' : sw.desc
           return (
             <div className={s.swRow} key={sw.k}>
               <button
@@ -198,32 +191,13 @@ export default function SchemePanel({ scheme, canManage }: { scheme: SchemeRow; 
                   {sw.label}
                   {on !== saved.sw[sw.k] ? <span className={s.dirtyDot} aria-label="changed" /> : null}
                 </span>
-                <span className={s.swDesc}>{desc}</span>
+                <span className={s.swDesc}>{sw.desc}</span>
               </button>
               {on && sw.k === 'group' ? (
                 <div className={s.params}>
                   {param('Group sales layers', 'directs and their directs', num(f.groupDepth, v => setF(p => ({ ...p, groupDepth: v })), 'Group sales layers'))}
                   {param('Override layers', 'at most two layers', num(f.overrideDepth, v => setF(p => ({ ...p, overrideDepth: v })), 'Override layers'))}
                   {param('Direct-line limit', 'a fourth line with Full Spec', num(f.directLimit, v => setF(p => ({ ...p, directLimit: v })), 'Direct-line limit'))}
-                </div>
-              ) : null}
-              {on && sw.k === 'open_bill' ? (
-                <div className={s.params}>
-                  {param(
-                    'Paid as',
-                    'the Open Bill rates tab sets each rank',
-                    <Select
-                      plain
-                      className={s.paramValue}
-                      value={f.basis}
-                      onChange={e => setF(p => ({ ...p, basis: e.target.value as Form['basis'] }))}
-                      disabled={!canManage}
-                      aria-label="Open Bill basis"
-                    >
-                      <option value="uplift_on_commission">uplift on that bill’s commission</option>
-                      <option value="pct_of_revenue">% of that bill’s revenue</option>
-                    </Select>,
-                  )}
                 </div>
               ) : null}
               {on && sw.k === 'override' ? (

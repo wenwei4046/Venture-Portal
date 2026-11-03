@@ -22,7 +22,7 @@ import {
   currentSegment,
   principalPaidSince,
   segmentRemainingPeriods,
-  termsChanged,
+  segmentsGovern,
   type PositionTerms,
 } from '@/lib/treasury-terms'
 
@@ -46,7 +46,7 @@ export function loanInstallmentCount(args: {
   const { terms, principalPaid, currentYM } = args
   const byMonth = args.principalByMonth ?? {}
   const segments = buildTermsSegments(terms, byMonth)
-  if (termsChanged(segments)) {
+  if (segmentsGovern(segments)) {
     const seg = currentSegment(segments, currentYM)
     if (seg.compounding || !seg.months) return null
     return { total: seg.months, remaining: segmentRemainingPeriods(seg, principalPaidSince(byMonth, seg.fromYM)) }

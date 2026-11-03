@@ -29,6 +29,7 @@ import { useCloseOnOutside } from "./outside";
 import { DOC_ACCEPT, PICKER_AT } from "../shared/attach-sheet";
 import { typePx } from "../shared/type";
 import { InAppCamera } from "../shared/in-app-camera";
+import { KeyPhotoHost } from "../shared/key-photo";
 
 export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: () => void }) {
   const { ui } = ctx;
@@ -63,6 +64,8 @@ export default function SalesScreens({ ctx, onExit }: { ctx: SalesCtx; onExit: (
       <InAppCamera inputId="crm-pick-camera" galleryId="crm-pick-photo" warn={ctx.act.toast} />
     </>)}
     {!chat && <SalesNav v={navVM(ctx)} />}
+    {/* Today’s visits hand the unit’s key over with a photo (2026-10-28): its camera and picker. */}
+    <KeyPhotoHost warn={ctx.act.toast} />
     {/* What happened, wherever the person is (the Inbox and a chat show it in their own place). */}
     {!!ui.toast && ui.tab !== "inbox" && !chat && (
       <div style={{ position: "absolute", left: "20px", right: "20px", bottom: "96px", zIndex: 30, padding: "12px 14px", borderRadius: "14px", background: "var(--crm-ink)", color: "#fff", fontSize: typePx(14), fontWeight: "600", animation: "fadeIn 160ms ease-out" }}>{ui.toast}</div>

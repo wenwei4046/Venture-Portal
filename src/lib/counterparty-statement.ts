@@ -24,6 +24,7 @@ import {
   planTotals,
   principalPaidSince,
   segmentRemainingPeriods,
+  segmentsGovern,
   termsChanged,
   type TermsChangeComparison,
   type TermsSegment,
@@ -70,6 +71,8 @@ export interface PositionInput {
   paymentsByMonth: Record<string, number>
   /** 最低还息单 (2026-09-04) — the deal requires each month's interest paid. */
   minPayInterest?: boolean
+  /** The month it is checked from (`YYYY-MM-DD`, 2026-10-30); none — the first instalment. */
+  minPayFrom?: string | null
   source?: string | null
   /** Terms segments (lib/treasury-terms) when the deal's terms changed
    *  mid-life (2026-09-21). Omitted / single unchanged segment = legacy maths. */
@@ -103,6 +106,8 @@ export interface PositionRow {
   startDate: string | null
   /** 最低还息单 — statement notes "每月最低应还利息 = monthlyInterest". */
   minPayInterest: boolean
+  /** The month minimum pay is checked from (`YYYY-MM-DD`); none — the first instalment. */
+  minPayFrom?: string | null
   source?: string | null
   /** Set when the terms changed mid-life: the month the CURRENT terms took
    *  effect, the base they run on, and every change with its 差价. */
@@ -123,8 +128,9 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
   // Terms changed mid-life (2026-09-21): every figure below reads the segment
   // in force now — base, rate, per-month amounts, remaining count — and the
   // row carries the change comparisons for the statement to show.
+  // A fixed amount a month (2026-10-27) splits the principal its own way, so its segment gives the figures as well.
   const changed = !!p.segments && termsChanged(p.segments)
-  const seg = changed ? currentSegment(p.segments!, currentYM) : null
+  const seg = p.segments && segmentsGovern(p.segments) ? currentSegment(p.segments, currentYM) : null
   const monthlyRate = seg ? seg.rate : p.monthlyRate
   const monthlyInterest = seg ? seg.interestPerMonth : r2(p.principal * p.monthlyRate)
   // The term and Total Interest read the whole plan (2026-10-23 — HC's Conts 60k: 6mo, 2,100 + 5 × 1,800);
@@ -143,8 +149,9 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
     startYM,
     startDate: p.startDate ?? null,
     minPayInterest: p.minPayInterest === true,
+    minPayFrom: p.minPayInterest === true ? (p.minPayFrom ?? null) : null,
     source: p.source ?? null,
-    ...(seg
+    ...(seg && changed
       ? {
           termsFrom: seg.fromYM,
           termsBase: seg.base,

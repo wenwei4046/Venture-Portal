@@ -1,0 +1,74 @@
+/* Create payments (2026-10-29, PR ④): One PV a person, a block a PV — its head (number, payee, Claim / Direct pay,
+   the account, the amount) over the kit's fields, lines and splits — the total, and what the run said. */
+
+.combine { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ds-ink); cursor: pointer; }
+.combine input { width: 15px; height: 15px; margin: 0; accent-color: var(--ds-accent); cursor: pointer; }
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: 12px;
+}
+.head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
+.num {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--ds-ink);
+  color: var(--ds-surface);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.payee { font-size: 14px; font-weight: 600; color: var(--ds-ink); }
+.kind {
+  padding: 1px 7px;
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  background: var(--ds-surface);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgb(var(--hvs-muted));
+  white-space: nowrap;
+}
+.sub { font-size: 12px; color: rgb(var(--hvs-muted)); }
+.amt {
+  margin-left: auto;
+  font-family: var(--font-mono), 'Chivo Mono', monospace;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ds-ink);
+  white-space: nowrap;
+}
+.carried { margin: 0; font-size: 11.5px; color: rgb(var(--hvs-muted)); }
+
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgb(var(--fv-peach));
+  font-size: 13px;
+  color: var(--ds-ink);
+}
+.totalValue { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 14px; font-weight: 600; }
+
+.result { display: flex; flex-direction: column; gap: 6px; }
+.resultLine {
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
+  background: var(--ds-surface);
+  font-size: 13px;
+  color: var(--ds-ink);
+  overflow-wrap: anywhere;
+}
+.resultLine[data-bad='true'] { border-color: var(--ds-danger); color: var(--ds-danger); }

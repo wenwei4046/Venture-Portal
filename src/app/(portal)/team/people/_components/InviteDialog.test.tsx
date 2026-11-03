@@ -19,7 +19,7 @@ const candidates: InviteCandidate[] = [
 const pending: PendingInvite[] = [{ staffId: KAI, name: 'LOKE KAI YEE', email: 'kaiyee@houzs.my', templateId: 'maker' }]
 const templates = [{
   id: 'maker', key: 'fin_maker', name: 'Finance · Maker', description: null, baseRole: 'finance', version: 1, sensitive: [],
-  grants: {}, tabs: null,
+  grants: {}, tabs: null, review: false,
 }]
 const LINK = 'https://venture-portal-chi.vercel.app/welcome?token_hash=abc123abc123abc123&type=invite'
 

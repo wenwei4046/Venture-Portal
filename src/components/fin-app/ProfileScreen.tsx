@@ -6,6 +6,8 @@ import { HrIcon, type HrIconName } from '@/components/hrv/icons'
 import { ChangePasswordDialog, RequestEmailDialog, SignOutDialog } from '@/components/layout/AccountMenu'
 import { EMAIL_WORDS } from '@/lib/account/email-change'
 import { setViewAs } from '@/components/layout/view-as-actions'
+import ViewAsPersonPicker from '@/components/layout/ViewAsPersonPicker'
+import { SWITCH_VIEWS, phoneWhere, type SwitchTarget } from '@/lib/view-switch'
 import { MeCard } from '@/components/me/MeCard'
 import AppScreen from './AppScreen'
 import { pushIntent } from './nav'
@@ -25,16 +27,23 @@ const ROMAN = ['I.', 'II.', 'III.', 'IV.']
 // Finance pages open this app, lib/one-app.ts): the views of the one app, as
 // the HR app's More has them — each opens where it lives.
 
+const VIEW_ICON: Readonly<Record<SwitchTarget, HrIconName>> = {
+  principal: 'home',
+  finance: 'report',
+  hr: 'people',
+  marketing: 'megaphone',
+  revenue_member: 'staff',
+  lead: 'inbox',
+  person: 'eye',
+}
+
 /**
- * The views of the one app: the view, its name, where it opens, its icon. The Principal's own view opens this
- * app too since 2026-10-17 — with its Approvals tab.
+ * The views of the one app — every view, as every switcher lists them (2026-10-27, lib/view-switch.ts): the view, its
+ * name, where it opens, its icon. The Principal's own view opens this app too since 2026-10-17 — with its Approvals tab.
  */
-const VIEWS: ReadonlyArray<readonly [string, string, string, HrIconName]> = [
-  ['principal', 'Principal', 'This app, with Approvals', 'home'],
-  ['finance', 'Finance', 'This app', 'report'],
-  ['hr', 'HR', 'The HR app', 'people'],
-  ['revenue_member', 'Revenue team', 'The Revenue app', 'staff'],
-]
+const VIEWS: ReadonlyArray<readonly [SwitchTarget, string, string, HrIconName]> = SWITCH_VIEWS.map(
+  v => [v.value, v.short, phoneWhere(v.value, 'finance'), VIEW_ICON[v.value]] as const,
+)
 
 export interface ProfileAdminRow {
   key: string
@@ -73,7 +82,10 @@ export default function ProfileScreen({
 }) {
   const [win, setWin] = useState<'password' | 'email' | 'signout' | null>(null)
   const [switching, startSwitch] = useTransition()
-  const switchTo = (view: string) => {
+  // View as a person… (2026-10-27, every switcher's last row): the portal's own picker.
+  const [picking, setPicking] = useState(false)
+  const switchTo = (view: SwitchTarget) => {
+    if (view === 'person') return setPicking(true)
     const form = new FormData()
     form.set('role', view)
     startSwitch(async () => {
@@ -223,6 +235,7 @@ export default function ProfileScreen({
         </>
       ) : null}
       <SignOutDialog open={win === 'signout'} onClose={() => setWin(null)} view={view === 'principal' ? 'the Principal view' : 'the Finance view'} />
+      {canSwitch ? <ViewAsPersonPicker open={picking} onClose={() => setPicking(false)} z={90} /> : null}
     </>
   )
 }

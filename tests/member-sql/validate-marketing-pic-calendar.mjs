@@ -282,10 +282,13 @@ check((await cal(acme)).dates.map(d => [d.field, d.title, d.code]), [['Post day'
   'his calendar of Acme Home: Acme’s alone')
 
 // ── A post's mark, its task done ───────────────────────────────────────────────────────────────────────────
+// Its time is TODAY's, never a day written in: the last check below asks that tomorrow (D1, a date off the PIC's
+// calendar) is nowhere in the page, and a fixed 2026-11-01 WAS tomorrow on 31 Oct (CI red all that day, 2026-10-31).
+const POSTED_AT = `${TODAY}T02:00:00Z`
 await asSystem()
 await q(`UPDATE public.mkt_projects SET posted = $2::jsonb WHERE id = $1`,
-  [T.teaser, JSON.stringify({ '0:Post day': { at: '2026-11-01T02:00:00Z', by: U.ali, name: 'Ali', link: 'https://instagram.com/p/teaser' } })])
-check((await cal(kelvin)).dates[0].posted, { at: '2026-11-01T02:00:00Z', link: 'https://instagram.com/p/teaser' }, 'a post marked posted: when, its link — never who')
+  [T.teaser, JSON.stringify({ '0:Post day': { at: POSTED_AT, by: U.ali, name: 'Ali', link: 'https://instagram.com/p/teaser' } })])
+check((await cal(kelvin)).dates[0].posted, { at: POSTED_AT, link: 'https://instagram.com/p/teaser' }, 'a post marked posted: when, its link — never who')
 
 // ── Approvals: a stage with a PIC level ahead, waiting, both, done ────────────────────────────────────────────
 const appr = async c => (await cal(c)).approvals.map(a => [a.day, a.title, a.product, a.stage, a.code, a.waiting])
@@ -296,7 +299,7 @@ await q(`UPDATE public.mkt_stages SET status = 'review', ver = 1 WHERE project_i
 check((await appr(kelvin)).map(a => a[5]), [true], 'waiting for him now')
 await asSystem()
 await q(`UPDATE public.mkt_stages SET appr = '[{"kind":"pic","all":true}]', pic_ok = $2::jsonb WHERE project_id = $1 AND idx = 1`,
-  [T.teaser, JSON.stringify({ ver: '1', lvl: '0', 1: { name: 'Kelvin Tan', at: '2026-11-02T01:00:00Z' } })])
+  [T.teaser, JSON.stringify({ ver: '1', lvl: '0', 1: { name: 'Kelvin Tan', at: `${TODAY}T01:00:00Z` } })])
 check([await appr(kelvin), (await appr(hana)).map(a => [a[3], a[4], a[5]])], [[], [['Client review', code(501), true]]],
   'both PICs asked: his approval in — off his, still waiting on hers')
 await asSystem()
@@ -331,8 +334,10 @@ check([(await cal(kelvin)).campaigns, (await cal(hana)).campaigns.map(c => c.cod
 check((await cal(kelvin)).holidays, [{ day: await plus(6), name: 'Deepavali' }], 'HR’s holidays, once a day — never another state’s, a deleted one, one past the window')
 
 // ── Never a number, a staff id, or a field's value ─────────────────────────────────────────────────────────
+// The Draft due day is looked for as a value of its own: on the 31st of October it is 2026-11-01, which the posted
+// mark above carries inside its time ("2026-11-01T02:00:00Z") — the bare day matched there and the check went red.
 const words = JSON.stringify(await cal(kelvin))
-check([/345 ?6789|3456789|8765432|1111111/.test(words), Object.values({ ...U, ...S }).some(v => words.includes(v)), /whatsapp/i.test(words), words.includes('Draft due'), words.includes(D1)],
+check([/345 ?6789|3456789|8765432|1111111/.test(words), Object.values({ ...U, ...S }).some(v => words.includes(v)), /whatsapp/i.test(words), words.includes('Draft due'), words.includes(JSON.stringify(D1))],
   [false, false, false, false, false], 'no WhatsApp number, no staff id or name, never a date off the PIC’s calendar')
 
 // ── The PIC changed: the link closes; only its formatting changed, it stays; named again, it opens ────────────

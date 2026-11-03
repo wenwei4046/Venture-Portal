@@ -7,6 +7,14 @@ import { sendAutoReplies } from '@/lib/member/crm-auto-reply'
 import { signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 import { parseMessengerDelivery } from '@/lib/messenger/webhook'
 import { pageToken, profileName } from '@/lib/messenger/send'
+import { messengerLeadRow, readInstantLead } from '@/lib/messenger/lead-forms'
+import { sendLeadOutbox } from '@/lib/leads/messenger-outbox'
+import { answerLeads } from '@/lib/leads/ai-answer'
+import { adAccountName } from '@/lib/leads/ad-account'
+import { parseInstagramDelivery, takeInstagram } from '@/lib/leads/instagram'
+import { leadPageEvents } from '@/lib/leads/page-events'
+import { fillHistory } from '@/lib/leads/meta-sync'
+import { keepMedia } from '@/lib/leads/media-keep'
 
 /**
  * /api/messenger/v1/webhook — the Callback URL for our Facebook Pages'
@@ -20,7 +28,10 @@ import { pageToken, profileName } from '@/lib/messenger/send'
  *   - POST is authenticated by X-Hub-Signature-256 = HMAC of the RAW body with
  *     META_APP_SECRET, in constant time. Unset secret or wrong signature →
  *     refused and logged.
- *   - only our own Pages (META_PAGE_IDS) are taken; anything else is ignored.
+ *   - the CRM's Pages (META_PAGE_IDS) go to the CRM; any other Page's messages go to Lead View
+ *     (`lead_ingest_messenger`, mig 20261026110000), which keeps only a Page a brand names (`lead_brands.fb_page_id`)
+ *     and ignores the rest; after the answer, the templates' messages it wrote are sent (`lead_outbox` /
+ *     `lead_outbox_done`, service role only — lib/leads/messenger-outbox.ts).
  *   - the service-role client is used for ONE thing: the ingest RPC
  *     `crm_ingest_messenger`, which owns every write and the delivery log; a
  *     refused delivery is logged straight to crm_channel_events; after the answer, an ad with no name yet is named
@@ -39,6 +50,8 @@ import { pageToken, profileName } from '@/lib/messenger/send'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// The AI Agent answers after the delivery (`after`, lib/leads/ai-answer.ts): the model can take a while.
+export const maxDuration = 60
 
 function client(): SupabaseClient {
   return adminClient() as unknown as SupabaseClient
@@ -70,25 +83,82 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'invalid JSON' }, { status: 400 })
   }
 
+  // Instagram Direct (object "instagram") is Lead View's alone — the CRM takes no Instagram (lib/leads/instagram.ts).
+  if ((body as { object?: string } | null)?.object === 'instagram') {
+    const taken = await takeInstagram(client(), parseInstagramDelivery(body), process.env.META_SYSTEM_USER_TOKEN?.trim(), job => after(() => job().then(() => undefined)))
+    if (!taken.ok) {
+      console.error('lead_ingest_instagram failed:', taken.error)
+      return NextResponse.json({ ok: false, error: 'ingest failed' }, { status: 500 })
+    }
+    return NextResponse.json({ ok: true, result: taken.data })
+  }
+
   const delivery = parseMessengerDelivery(body)
   // Our Pages only.
   const pages = new Set((process.env.META_PAGE_IDS ?? '').split(',').map(s => s.trim()).filter(Boolean))
   const ours = <T extends { pageId: string }>(rows: T[]) => (pages.size ? rows.filter(r => pages.has(r.pageId)) : rows)
   const messages = ours(delivery.messages)
   const reads = ours(delivery.reads)
-  const ignored = delivery.ignored + (delivery.messages.length - messages.length) + (delivery.reads.length - reads.length)
+  // Every other Page's messages are Lead View's (a brand's Page) — standby ones too, and the Page's own replies sent from
+  // Business Suite (lib/leads/page-events.ts); with no CRM Pages set, the CRM takes them all, as before.
+  const leadEvents = pages.size ? leadPageEvents(body, pages, process.env.META_APP_ID?.trim()) : { messages: [], replies: [], receipts: { delivered: [], reads: [] }, returns: [] }
+  const leadMessages = leadEvents.messages
+  const ignored = delivery.ignored + (delivery.reads.length - reads.length)
 
   // Names: Messenger does not send them. Asked once per customer per delivery, best effort.
   const systemToken = process.env.META_SYSTEM_USER_TOKEN?.trim()
-  if (systemToken && messages.length) {
+  if (systemToken && (messages.length || leadMessages.length)) {
     const tokens = new Map<string, string | null>()
     const names = new Map<string, string | null>()
-    for (const m of messages) {
+    for (const m of [...messages, ...leadMessages]) {
       if (!tokens.has(m.pageId)) tokens.set(m.pageId, await pageToken(m.pageId, systemToken))
       const token = tokens.get(m.pageId)
       if (token && !names.has(m.psid)) names.set(m.psid, await profileName(m.pageId, m.psid, token))
       m.name = names.get(m.psid) ?? null
     }
+  }
+
+  // Lead View's own function and answer. A failure there answers 500 after the CRM's are kept: Meta retries the whole
+  // delivery, and both sides keep a message by Meta's id, so a retry takes nothing twice.
+  let leadsFailed = false
+  // A customer back from an ad (a referral on its own): the ad kept, the reply rules asked again on their next message
+  // (lead_ingest_ad_return, mig 20261029170010) — before the messages, which may come in the same delivery. Only warns.
+  if (leadEvents.returns.length) {
+    const back = await client().rpc('lead_ingest_ad_return', { p_returns: leadEvents.returns })
+    if (back.error) console.warn('lead_ingest_ad_return failed:', back.error.message)
+  }
+  if (leadMessages.length) {
+    // Which brand an ad's customer is: the ad account's name decides 2990s mini (lib/leads/ad-account.ts).
+    const forLeads = await Promise.all(leadMessages.map(async m => m.ad?.sourceId
+      ? { ...m, ad: { ...m.ad, account: await adAccountName(m.ad.sourceId, systemToken) } }
+      : m))
+    const lead = await client().rpc('lead_ingest_messenger', { p_messages: forLeads })
+    if (lead.error) {
+      console.error('lead_ingest_messenger failed:', lead.error.message)
+      leadsFailed = true
+    } else {
+      const contacts = ((lead.data as { contacts?: string[] } | null)?.contacts ?? []).filter(Boolean)
+      // …then the AI Agent answers the conversations in its hands (lib/leads/ai-answer.ts, mig 20261102170000).
+      if (contacts.length) after(() => sendLeadOutbox(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim())
+        .then(() => answerLeads(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim())).then(() => undefined))
+      // A conversation Lead View has never filled in gets its earlier messages from Meta (lib/leads/meta-sync.ts).
+      // …then every photo, video and file still only at Meta's address is copied into lead-media (lib/leads/media-keep.ts).
+      if (contacts.length) after(() => fillHistory(client(), contacts, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => keepMedia(client())).then(() => undefined))
+    }
+  }
+  // The Page's own replies, after its customers' messages (a reply joins a conversation Lead View already has).
+  if (!leadsFailed && leadEvents.replies.length) {
+    const replies = await client().rpc('lead_ingest_page_replies', { p_messages: leadEvents.replies })
+    if (replies.error) {
+      console.error('lead_ingest_page_replies failed:', replies.error.message)
+      leadsFailed = true
+    } else after(() => keepMedia(client()).then(() => undefined))
+  }
+
+  // Delivered / read ticks (mig 20261027190000): worth no retry, so a failure only warns.
+  if (leadEvents.receipts.delivered.length || leadEvents.receipts.reads.length) {
+    const receipts = await client().rpc('lead_ingest_receipts', { p_receipts: leadEvents.receipts })
+    if (receipts.error) console.warn('lead_ingest_receipts failed:', receipts.error.message)
   }
 
   const { data, error } = await client().rpc('crm_ingest_messenger', {
@@ -97,6 +167,36 @@ export async function POST(request: Request) {
   if (error) {
     console.error('crm_ingest_messenger failed:', error.message)
     return NextResponse.json({ ok: false, error: 'ingest failed' }, { status: 500 })
+  }
+  // Lead form ads (2026-10-30): a Messenger lead ad's answers, and Instant Form leads read from Meta with the Page's
+  // token (lib/messenger/lead-forms.ts) — one ingest, crm_ingest_lead (service role only), which logs every delivery.
+  // A failure answers 500: Meta retries, and the ingest keeps an Instant Form lead once.
+  const formLeads = ours(delivery.leads ?? []), instant = ours(delivery.instant ?? [])
+  if (formLeads.length || instant.length) {
+    const tokens = new Map<string, string | null>()
+    const tokenOf = async (pageId: string) => {
+      if (!systemToken) return null
+      if (!tokens.has(pageId)) tokens.set(pageId, await pageToken(pageId, systemToken))
+      return tokens.get(pageId) ?? null
+    }
+    for (const l of formLeads) {
+      const token = await tokenOf(l.pageId)
+      if (token) l.name = await profileName(l.pageId, l.psid, token)
+    }
+    const rows = [...formLeads.map(messengerLeadRow), ...(await Promise.all(instant.map(async ref => readInstantLead(ref, await tokenOf(ref.pageId)))))]
+    const { error: leadError } = await client().rpc('crm_ingest_lead', { p_leads: rows, p_payload: body })
+    if (leadError) {
+      console.error('crm_ingest_lead failed:', leadError.message)
+      return NextResponse.json({ ok: false, error: 'lead form ingest failed' }, { status: 500 })
+    }
+    pushSoon()
+  }
+  if (leadsFailed) return NextResponse.json({ ok: false, error: 'lead ingest failed' }, { status: 500 })
+  // A file's own name beside the message (service role only, mig 20261027100000); a failure only warns.
+  const fileNames = messages.flatMap(m => (m.fileName ? [{ id: m.externalId, name: m.fileName }] : []))
+  if (fileNames.length) {
+    const { error: nmError } = await client().rpc('crm_document_names', { p_names: fileNames })
+    if (nmError) console.error('crm_document_names failed:', nmError.message)
   }
   // Only a delivery with new messages can have told somebody something (a receipt-only one never does).
   if (Number((data as { messages?: unknown } | null)?.messages) > 0) pushSoon()

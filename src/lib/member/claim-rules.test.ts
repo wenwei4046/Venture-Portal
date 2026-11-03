@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairRegion, foodAmount, foodDayState, foodMonthOpensOn,
-  foodMonthOver, foodOpenTo, isOutstation, monthOfWeek, nightsBetween, readClaimRates, readFoodWeeks, shiftDay, stayProblem, stayWindow, tapStayDay,
-  type ClaimRates, type StayPick, transportOpenTo } from "./claim-rules";
+  airbnbCap, airbnbGroup, claimAmount, claimedFoodDays, claimedFoodMonths, fairDays, fairDaysIn, fairRegion, foodAmount, foodClaimMonths, foodDayState,
+  foodMonthOpensOn, foodMonthOver, foodOpenTo, inFoodMonth, isOutstation, monthOfDay, nightsBetween, readClaimRates, readFoodWeeks, shiftDay, shiftMonth,
+  stayProblem, stayWindow, tapStayDay,
+  type ClaimRates, type StayPick, transportOpenTo, transportPartProblem, transportPartsFor } from "./claim-rules";
 
 const rates: ClaimRates = {
   base: "Klang Valley",
@@ -305,13 +306,41 @@ describe("the food claim", () => {
 
 // A food claim is a month (2026-10-13 — "they will submit by total month, for every pax, dont by week submit").
 describe("the food claim's month", () => {
-  it("is the month of each weekend's Friday, claimed from the 1st of the next", () => {
-    expect(monthOfWeek("2026-10-30")).toBe("2026-10");
+  it("is claimed from the 1st of the next", () => {
     expect(foodMonthOpensOn("2026-10")).toBe("2026-11-01");
     expect(foodMonthOpensOn("2026-12")).toBe("2027-01-01");
     expect(foodMonthOver("2026-10", "2026-10-31")).toBe(false);
     expect(foodMonthOver("2026-10", "2026-11-01")).toBe(true);
     expect(foodMonthOver("2026-09", "2026-10-13")).toBe(true);
+    expect([shiftMonth("2026-11", 1), shiftMonth("2026-12", 1), shiftMonth("2027-01", -1), shiftMonth("2026-10", -1)]).toEqual(["2026-12", "2027-01", "2026-12", "2026-09"]);
+  });
+
+  // 2026-11-01 — the user, over a fair of 29 Oct – 1 Nov: "那它 11 月 1 号就是 claim 在 11 月"; asked, "按日期拆".
+  it("claims a day in its own month: a weekend across two months gives each its days", () => {
+    const borneo = { key: "2026-10-30", worked: true, start: "2026-10-29", end: "2026-11-01" };
+    expect(monthOfDay("2026-11-01")).toBe("2026-11");
+    expect(fairDaysIn(borneo, borneo.key, "2026-10")).toEqual(["2026-10-29", "2026-10-30", "2026-10-31"]);
+    expect(fairDaysIn(borneo, borneo.key, "2026-11")).toEqual(["2026-11-01"]);
+    // On October's claim by its Friday, on November's for its 1 Nov; a weekend with no booth only by its Friday.
+    expect([inFoodMonth(borneo, "2026-10"), inFoodMonth(borneo, "2026-11"), inFoodMonth(borneo, "2026-12")]).toEqual([true, true, false]);
+    expect(inFoodMonth({ ...borneo, worked: false }, "2026-11")).toBe(false);
+    // A fair that opens before its Friday's month: 30 Sep is September's.
+    const early = { key: "2026-10-02", worked: true, start: "2026-09-30", end: "2026-10-04" };
+    expect([inFoodMonth(early, "2026-09"), fairDaysIn(early, early.key, "2026-09")]).toEqual([true, ["2026-09-30"]]);
+  });
+
+  it("offers last month and this month, each with a day of a weekend they worked — two months back is not offered", () => {
+    const weeks = [
+      { key: "2026-10-30", worked: true, start: "2026-10-29", end: "2026-11-01" },
+      { key: "2026-10-23", worked: true, start: "2026-10-23", end: "2026-10-25" },
+      { key: "2026-09-25", worked: true, start: "2026-09-24", end: "2026-09-27" },
+      { key: "2026-11-06", worked: false, start: null, end: null },
+    ];
+    // On 1 Nov: October (over) and November (its 1 Nov) — September is two months back.
+    expect(foodClaimMonths(weeks, "2026-11-01")).toEqual(["2026-11", "2026-10"]);
+    // On 31 Oct: September and October — the 1 Nov still to come is next month's.
+    expect(foodClaimMonths(weeks, "2026-10-31")).toEqual(["2026-10", "2026-09"]);
+    expect(foodClaimMonths(weeks, "2026-12-01")).toEqual(["2026-11"]);
   });
 
   it("knows the months a member's live food claims hold, with their numbers", () => {
@@ -328,6 +357,13 @@ describe("the food claim's month", () => {
   it("reads the weekends sent strictly: of the month, each once, real days", () => {
     expect(readFoodWeeks([{ week: "2026-09-18", days: ["2026-09-20", "2026-09-18", "2026-09-18"] }, { week: "2026-09-11", days: ["2026-09-11"] }], "2026-09"))
       .toEqual([{ week: "2026-09-11", days: ["2026-09-11"] }, { week: "2026-09-18", days: ["2026-09-18", "2026-09-20"] }]);
+    // A weekend across two months: its days of the month, whichever month its Friday is in.
+    expect(readFoodWeeks([{ week: "2026-10-30", days: ["2026-11-01"] }, { week: "2026-11-06", days: ["2026-11-06"] }], "2026-11"))
+      .toEqual([{ week: "2026-10-30", days: ["2026-11-01"] }, { week: "2026-11-06", days: ["2026-11-06"] }]);
+    expect(readFoodWeeks([{ week: "2026-10-02", days: ["2026-09-30"] }], "2026-09")).toEqual([{ week: "2026-10-02", days: ["2026-09-30"] }]);
+    // …never a day of another month, nor a weekend two months off.
+    expect(readFoodWeeks([{ week: "2026-10-30", days: ["2026-10-31", "2026-11-01"] }], "2026-11")).toBeNull();
+    expect(readFoodWeeks([{ week: "2026-09-04", days: ["2026-11-01"] }], "2026-11")).toBeNull();
     for (const bad of [null, [], "x", [{ week: "2026-10-02", days: ["2026-10-02"] }], [{ week: "2026-09-11", days: [] }], [{ week: "2026-09-11", days: ["2026-09-31"] }],
       [{ week: "2026-09-11", days: ["11 Sep"] }], [{ week: "2026-09-11", days: ["2026-09-11"] }, { week: "2026-09-11", days: ["2026-09-12"] }],
       Array.from({ length: 7 }, (_, i) => ({ week: `2026-09-0${i + 1}`, days: [`2026-09-0${i + 1}`] }))]) {
@@ -356,5 +392,52 @@ describe("transportOpenTo", () => {
     expect(readClaimRates({ transport: { titles: ["Team Leader", "", 3] } }).transport).toEqual({ titles: ["Team Leader"] });
     expect(readClaimRates({}).transport).toBeUndefined();
     expect(readClaimRates({ transport: "x" }).transport).toBeUndefined();
+  });
+
+  it("is open to a title ticked for the air ticket alone (2026-10-31)", () => {
+    const rates = { transport: { titles: ["Revenue Specialist"], airTicketTitles: ["Team Leader"] } };
+    expect(transportOpenTo(rates, "team leader")).toBe(true);
+    expect(transportOpenTo(rates, "Team Assistant")).toBe(false);
+  });
+});
+
+// The user, 2026-10-31: "我要加多一个 Air ticket claim 的 column … if the venue is accept for air ticket, then these guys
+// with tick can claim，就算他们没有 tick transport claim，但是其他除了 ticket 以外，他就不能给 因为他没有 tick 那个
+// transport claim".
+describe("a transport claim's parts", () => {
+  const rates = { transport: { titles: ["Revenue Specialist", "Senior Revenue Specialist"], airTicketTitles: ["Team Leader", "Revenue Specialist"] } };
+
+  it("by road and an Airbnb stay are the transport tick's, the plane ticket the air ticket's — each its own", () => {
+    expect(transportPartsFor(rates, "Team Leader")).toEqual({ road: false, plane: true });
+    expect(transportPartsFor(rates, " revenue specialist")).toEqual({ road: true, plane: true });
+    expect(transportPartsFor(rates, "Senior Revenue Specialist")).toEqual({ road: true, plane: false });
+    expect(transportPartsFor(rates, "Team Assistant")).toEqual({ road: false, plane: false });
+    expect(transportPartsFor(rates, null)).toEqual({ road: false, plane: false });
+  });
+
+  it("an answer from before the air ticket's tick lets the transport titles claim it, as they did; none read, all of it", () => {
+    expect(transportPartsFor({ transport: { titles: ["Team Leader"] } }, "Team Leader")).toEqual({ road: true, plane: true });
+    expect(transportPartsFor({ transport: { titles: ["Team Leader"] } }, "Team Assistant")).toEqual({ road: false, plane: false });
+    expect(transportPartsFor(null, "Team Assistant")).toEqual({ road: true, plane: true });
+  });
+
+  it("is read from the database's answer", () => {
+    expect(readClaimRates({ transport: { titles: ["Revenue Specialist"], airTicketTitles: ["Team Leader", "", 7] } }).transport)
+      .toEqual({ titles: ["Revenue Specialist"], airTicketTitles: ["Team Leader"] });
+    expect(readClaimRates({ transport: { titles: [], airTicketTitles: "x" } }).transport).toEqual({ titles: [] });
+  });
+
+  it("says why a part is not theirs, in the database's words", () => {
+    const flown = { planeTicket: true }, road = { planeTicket: false };
+    const planeOnly = { road: false, plane: true }, roadOnly = { road: true, plane: false };
+    expect(transportPartProblem(planeOnly, "outstation", flown, "Team Leader")).toBeNull();
+    expect(transportPartProblem(planeOnly, "outstation", road, "Team Leader")).toBe("Team Leader may claim an air ticket only. HR picks the titles that may claim the rest.");
+    expect(transportPartProblem(planeOnly, "airbnb", flown, "Team Leader")).toBe("Team Leader may claim an air ticket only. HR picks the titles that may claim the rest.");
+    expect(transportPartProblem(planeOnly, "outstation", null, "Team Leader")).toBeNull();
+    expect(transportPartProblem(roadOnly, "outstation", flown, "Senior Revenue Specialist")).toBe("An air ticket claim is not open to Senior Revenue Specialist. HR picks the titles that may claim it.");
+    expect(transportPartProblem(roadOnly, "outstation", road, "Senior Revenue Specialist")).toBeNull();
+    expect(transportPartProblem(roadOnly, "airbnb", flown, "Senior Revenue Specialist")).toBeNull();
+    expect(transportPartProblem({ road: false, plane: false }, "airbnb", null, null)).toBe("A transport claim is not open to your title. HR picks the titles that may claim it.");
+    expect(transportPartProblem({ road: true, plane: true }, "outstation", flown)).toBeNull();
   });
 });

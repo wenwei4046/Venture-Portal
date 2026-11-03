@@ -56,11 +56,11 @@ export function dailySeries(keys: string[], days: string[], cs: CrmCustomer[], v
     leads[i]++;
     const vs = live.get(c.id) ?? [];
     if (vs.length) appt[i]++;
-    showup[i] += vs.filter(v => v.state === "attended").length;
+    if (vs.some(v => v.state === "attended")) showup[i]++;
     if (c.status === "won") won[i]++;
   }
   const read = meta.filter((m): m is Record<string, MetaFig> => !!m);
-  const sum = (k: keyof MetaFig) => days.map(d => read.reduce((n, m) => n + (m[d]?.[k] ?? 0), 0));
+  const sum = (k: Exclude<keyof MetaFig, "budget">) => days.map(d => read.reduce((n, m) => n + (m[d]?.[k] ?? 0), 0));
   const spend = sum("spend"), impr = sum("impr"), reach = sum("reach"), clicks = sum("clicks"), allclk = sum("allClicks"), msgconv = sum("msgconv");
   const div = (a: number[], b: number[], x = 1) => a.map((n, i) => (b[i] ? (n / b[i]) * x : null));
   // Each metric as the table builds it over a range (vm/adsperf.ts › metaFigures / crmFigures), one day at a time; a day's

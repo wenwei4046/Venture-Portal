@@ -74,6 +74,16 @@ describe('account-scoped IT support', () => {
     expect(fake.rpc).not.toHaveBeenCalled()
   })
 
+  // 2026-10-27: Closed is its sender's, once IT has marked it Fixed — the database asks both.
+  it('passes a sender’s Close to the database, which asks that it is theirs and Fixed', async () => {
+    fake.rpc.mockResolvedValue({ data: { ...row, status: 'closed' }, error: null })
+    expect(await noteItRequest({ id: ID, body: '', files: [], status: 'closed', current: 'fixed' })).toMatchObject({ ok: true, data: { status: 'closed' } })
+    expect(fake.rpc).toHaveBeenCalledWith('it_request_note', { p_id: ID, p_body: '', p_files: [], p_status: 'closed' })
+    fake.rpc.mockResolvedValue({ data: null, error: { code: '22023', message: 'It can be closed once IT has marked it Fixed.' } })
+    expect(await noteItRequest({ id: ID, body: '', files: [], status: 'closed', current: 'new' }))
+      .toEqual({ ok: false, error: 'It can be closed once IT has marked it Fixed.' })
+  })
+
   it('never queries everyone’s requests for an ordinary account opening another sender’s notice', async () => {
     fake.rpc.mockResolvedValue({ data: null, error: { code: '42501', message: 'That request is not there.' } })
     expect(await fetchItRequest(ID)).toEqual({ ok: false, error: 'That request is not there.' })

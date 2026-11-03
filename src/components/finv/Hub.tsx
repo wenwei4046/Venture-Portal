@@ -416,6 +416,25 @@ export function BulkButton({
   )
 }
 
+/**
+ * What is ticked and what to do with it, in a table's toolbar at its right (2026-10-29, the claim process's PR ④ — the
+ * user: "按钮换去上面", "做在格子的靠右"): a hint, and the buttons greyed, until a row is ticked; the design's dark bar
+ * once one is ("4 selected · RM 2,554.49"). On a narrow screen it takes the toolbar's next line, still at the right.
+ */
+export function TickTools({ ticked, text, idle, children }: { ticked: number; text: string; idle: string; children: ReactNode }) {
+  return (
+    <span className={s.ticks} data-on={ticked > 0 ? 'true' : undefined} role="group" aria-label="Several at once">
+      <span className={s.ticksText}>{ticked > 0 ? text : idle}</span>
+      {children}
+    </span>
+  )
+}
+
+/** A TickTools button: the accent one, the red one, or plain. */
+export function TickButton({ kind, ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type'> & { kind?: 'primary' | 'danger' }) {
+  return <button type="button" {...props} className={s.ticksBtn} data-kind={kind} />
+}
+
 export interface BatchItem {
   key: string
   name: string

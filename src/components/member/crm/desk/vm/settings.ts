@@ -5,7 +5,8 @@
  * Notifications page (Unread | Read, categories, Select, Delete with a 30 s Undo). The read state is the phone's
  * (crm_read_notifs); what the Principal or Director sets here is what everybody's CRM uses.
  */
-import type { CrmTemplate } from "@/lib/member/crm-data";
+import { formFromRow, infoLabel } from "@/lib/crm-partner/model";
+import type { CrmLeave, CrmReplyItem, CrmTemplate } from "@/lib/member/crm-data";
 import { panelNotifs } from "../../panel/vm/notifs";
 import { urgencyOf } from "../../sales/vm/common";
 import { DEFAULT_CRM_SETTINGS, type CrmSettings } from "@/lib/member/crm-data";
@@ -56,7 +57,14 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     ...(ctx.directors.length ? [{ name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: ctx.directors }] : []),
     ...teams.map((t, k) => ({ name: t.name, color: teamColours(k)[0], people: t.people })),
   ], lk, p => jobTitle(p as (typeof teams)[number]["people"][number]), ui.actDraft, d => patch({ actDraft: d }), act.setLocked, msg => patch({ toast: msg }));
-  const actVM = { ...actBase, leads: actLeads };
+  // Members' leave (2026-10-29, the owner: "可以设定 member 的休假，不要派名单给他"): the office's today, each member's leaves
+  // not ended yet, and the writes (CRM · Manage).
+  const today = new Date(ctx.now.getTime() + 8 * 3_600_000).toISOString().slice(0, 10);
+  const leaveOf: Record<string, CrmLeave[]> = {};
+  (data.leaves ?? []).filter(l => l.to >= today).forEach(l => { (leaveOf[l.staffId] ??= []).push(l); });
+  const actVM = { ...actBase, leads: actLeads, leave: { can: !!data.can.manage, today, of: leaveOf,
+    save: (l: { id: string | null; staffId: string; from: string; to: string; note: string }) => act.saveLeave(l).then(okd => { if (okd) patch({ toast: "Saved · Leave" }); return okd; }),
+    remove: (id: string) => act.deleteLeave(id).then(okd => { if (okd) patch({ toast: "Leave removed" }); return okd; }) } };
   const mwtSave = () => { if (!dirty) return; const changed = Object.keys(on).filter(id => !!on[id] !== !!saved[id]);
     void Promise.all(changed.map(id => act.setFullTime(id, !!on[id]))).then(rs => { if (rs.every(Boolean)) patch({ mwt: null, mwtSaved: true, toast: "Saved · Member work type" }); }); };
 
@@ -229,8 +237,31 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     can: !!data.can.manage, cur,
     save: (st: CrmSettings) => act.saveSettings(st).then(okd => { if (okd) patch({ toast: "Saved · Settings" }); return okd; }),
   };
+  // Settings › Reply library (2026-10-29): the company's good replies, kept by CRM · Manage, read by everybody.
+  const replyLib = {
+    can: !!data.can.manage, items: data.replyLibrary ?? [],
+    save: (items: CrmReplyItem[]) => act.saveReplyLibrary(items).then(okd => { if (okd) patch({ toast: "Saved · Reply library" }); return okd; }),
+  };
+  // A partner's booking link (mig 20261029190000): the link, and the booking open in the pane.
+  const pb = (data.partnerBookings ?? []).find(b => b.id === ui.partner);
+  const partnerPane = pb ? {
+    b: pb, room: data.rooms.find(r => r.id === pb.showroomId)?.name ?? "Showroom",
+    partnerName: (data.partnerLinks ?? []).find(l => l.id === pb.partner)?.name ?? (pb.partner === "the_conts" ? "The Conts" : "Partner"),
+    can: !!data.can.manage,
+    // Its answers under the booking form's own words (the one in use; 2026-10-29), else the old six's.
+    infoRows: Object.entries(pb.info ?? {}).filter(([, val]) => val).map(([k, val]) => ({ label: infoLabel(formFromRow(data.bookingForms?.[0]?.sections), k), value: val })),
+    cancel: () => act.cancelPartnerBooking(pb.id).then(okd => { if (okd) patch({ toast: `Cancelled · ${pb.customer}` }); return okd; }),
+  } : null;
+  const partnerLink = {
+    can: !!data.can.manage, links: data.partnerLinks ?? [],
+    upcoming: (data.partnerBookings ?? []).filter(b => b.state === "booked" && new Date(b.start) >= new Date(ctx.now.getTime() - 3_600_000)),
+    roomName: (id: string) => data.rooms.find(r => r.id === id)?.name ?? "Showroom",
+    set: (id: string, on: boolean | null, fresh: boolean) => act.setPartnerLink(id, on, fresh).then(okd => { if (okd) patch({ toast: fresh ? "New link made · the old one stops opening" : on ? "Booking link on" : "Booking link off" }); return okd; }),
+    open: (id: string) => patch({ pane: "docked", kind: "partner", partner: id, visit: null, infoId: null }),
+    toast: (msg: string) => patch({ toast: msg }),
+  };
   return {
-    set4, settings4,
+    set4, settings4, replyLib, partnerPane, partnerLink,
     actVM, mwtTeams, mwtDirty: dirty, mwtClean: !dirty, mwtBtnBg: dirty ? "var(--crm-rust)" : "var(--crm-line)", mwtBtnCur: dirty ? "pointer" : "default", mwtSavedMsg: !dirty && ui.mwtSaved, mwtSave,
     cltOpen: !ui.frmOpen && !!cE && opItem === "Cold lead templates" && sheetOpen, cltE: cE ?? card({ t: { id: "", name: "", ch: "whatsapp", st: "draft", body: "", on: false, metaName: null, language: "en", reason: null }, status: "Draft", ch: "WhatsApp" }),
     cltTaRef: { current: null },

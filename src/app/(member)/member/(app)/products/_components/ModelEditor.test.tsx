@@ -16,7 +16,7 @@ function model(extra: Partial<CatalogueModel> = {}): CatalogueModel {
   return { erpId: 'model-a', code: '2376', name: 'Sofa 2376', erpName: 'Sofa 2376', ownName: null, category: 'SOFA', branding: 'ZANOTTI', active: true, removed: false, isNew: false, allowed: { sizes: [], leg_heights: ['6"'], specials: null }, configured: false, offered: false, enabled: {}, gift: false, giftOverride: null, calcCategory: 'Sofa', calcOverride: null, brand: 'ZANOTTI', brandOverride: null, derivedBrand: 'ZANOTTI', skus: [sku('1S'), sku('2S'), sku('old', { active: false }), sku('gone', { removed: true })], ...extra }
 }
 function option(pool: string, value: string, extra: Partial<MaintenanceOption> = {}): MaintenanceOption {
-  return { pool, value, label: value, sortOrder: 1, active: true, removed: false, isNew: false, price: null, ...extra }
+  return { pool, value, label: value, sortOrder: 1, active: true, removed: false, isNew: false, price: null, byQuantity: false, ...extra }
 }
 const options = [
   option('sofa_sizes', 'DEFAULT', { sortOrder: 3 }), option('sofa_sizes', '27"', { sortOrder: 2 }), option('sofa_sizes', '24', { sortOrder: 1 }),

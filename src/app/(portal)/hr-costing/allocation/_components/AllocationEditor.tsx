@@ -4,12 +4,13 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import {
-  validateAllocationRows,
-  hvRemainderPct,
-  allocationPreview,
+  validateDeptMoves,
+  movePreview,
   type AllocationRow,
+  type DeptMoveRow,
   type SplitLock,
 } from '@/lib/staff-allocation'
+import type { CostModel } from '@/lib/department-mode'
 import { saveStaffAllocation } from '../actions'
 import { Select } from '@/components/hrv/select'
 
@@ -17,16 +18,30 @@ export interface StaffAllocationData {
   staffId: string
   name: string
   dept: string
+  /** Their own department — never a target of their own lines. */
+  departmentId: string
   /** gross + EPF/SOCSO/EIS ER for the period — the billing basis. */
   employerCost: number
   rows: Array<{ companyId: string; pct: number }>
+  /** Part of the cost to other departments (2026-11-03), as saved. */
+  moves: DeptMoveRow[]
   /** Where their pay stands; past draft the split is locked with it. */
   lock: SplitLock
   /**
-   * Their department bills by invoice (2026-09-30). Only listed while a split
-   * is left over from before — frozen, and clearable while their pay is a draft.
+   * Their department bills by invoice (2026-09-30): no company split — one
+   * left over from before is frozen and only cleared — but department lines
+   * (2026-11-03), what they leave staying in their own department.
    */
   centralized: boolean
+}
+
+/** A department a line may name — from the registry (`department_modes()`). */
+export interface MoveTarget {
+  id: string
+  name: string
+  costModel: CostModel
+  isInternal: boolean
+  segmentKey: string | null
 }
 
 interface Company {
@@ -39,6 +54,7 @@ interface Props {
   period: string
   staff: StaffAllocationData[]
   companies: Company[]
+  departments?: MoveTarget[]
   readOnly: boolean
 }
 
@@ -46,6 +62,14 @@ interface EditRow {
   uid: string
   companyId: string
   pct: string // keep as text while typing
+}
+
+interface EditMove {
+  uid: string
+  departmentId: string
+  /** Unpicked until HR chooses Fixed RM or % — the box shows after. */
+  kind: '' | DeptMoveRow['kind']
+  value: string
 }
 
 function toEditRows(rows: Array<{ companyId: string; pct: number }>): EditRow[] {
@@ -56,13 +80,52 @@ function toEditRows(rows: Array<{ companyId: string; pct: number }>): EditRow[] 
   }))
 }
 
+function toEditMoves(moves: DeptMoveRow[]): EditMove[] {
+  return moves.map((m) => ({ uid: crypto.randomUUID(), departmentId: m.departmentId, kind: m.kind, value: String(m.value) }))
+}
+
 function toAllocationRows(rows: EditRow[]): AllocationRow[] {
   return rows
     .filter((r) => r.companyId !== '' || r.pct.trim() !== '')
     .map((r) => ({ companyId: r.companyId, pct: Number(r.pct) }))
 }
 
-export default function AllocationEditor({ period, staff, companies, readOnly }: Props) {
+function toDeptMoves(moves: EditMove[]): Array<DeptMoveRow | null> {
+  return moves
+    .filter((m) => m.departmentId !== '' || m.kind !== '' || m.value.trim() !== '')
+    .map((m) => (m.departmentId && m.kind && m.value.trim() !== '' && Number.isFinite(Number(m.value))
+      ? { departmentId: m.departmentId, kind: m.kind, value: Number(m.value) }
+      : null))
+}
+
+const savedKeyOf = (s: StaffAllocationData) =>
+  [
+    ...s.rows.map((r) => `${r.companyId}=${r.pct}`),
+    ...s.moves.map((m) => `${m.departmentId}:${m.kind}=${m.value}`),
+  ].sort().join('|')
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+export default function AllocationEditor({ period, staff, companies, departments = [], readOnly }: Props) {
+  const costCenter = staff.filter((s) => !s.centralized)
+  // Centralized departments' people, folded by department (2026-11-03): they
+  // bill the companies by invoice, so only + Department is theirs.
+  const bands = new Map<string, StaffAllocationData[]>()
+  for (const s of staff.filter((p) => p.centralized)) bands.set(s.dept, [...(bands.get(s.dept) ?? []), s])
+
+  const cardOf = (s: StaffAllocationData) => (
+    <StaffCard
+      // A card that locks (or opens) starts again from what is saved,
+      // so a refused edit never stays on screen as if it had landed.
+      key={`${s.staffId}:${s.lock.locked ? 'locked' : 'open'}`}
+      period={period}
+      staff={s}
+      companies={companies}
+      departments={departments}
+      readOnly={readOnly}
+    />
+  )
+
   return (
     <section>
       <div className="sect-head">
@@ -73,16 +136,20 @@ export default function AllocationEditor({ period, staff, companies, readOnly }:
         </span>
       </div>
       <div className="space-y-3">
-        {staff.map((s) => (
-          <StaffCard
-            // A card that locks (or opens) starts again from what is saved,
-            // so a refused edit never stays on screen as if it had landed.
-            key={`${s.staffId}:${s.lock.locked ? 'locked' : 'open'}`}
-            period={period}
-            staff={s}
-            companies={companies}
-            readOnly={readOnly}
-          />
+        {costCenter.map(cardOf)}
+        {[...bands].map(([dept, people]) => (
+          <details
+            key={dept}
+            // Open while somebody in it moves cost, or has a split to clear.
+            open={people.some((p) => p.moves.length > 0 || p.rows.length > 0) || undefined}
+            className="border border-hairline rounded-card bg-surface-2"
+          >
+            <summary className="cursor-pointer px-5 py-3 text-sm font-bold flex items-baseline gap-3 flex-wrap">
+              <span>{`${dept} · ${plural(people.length, 'person', 'people')}`}</span>
+              <span className="chip"><span className="dot" />Centralized</span>
+            </summary>
+            <div className="space-y-3 px-3 pb-3">{people.map(cardOf)}</div>
+          </details>
         ))}
       </div>
     </section>
@@ -93,75 +160,107 @@ function StaffCard({
   period,
   staff,
   companies,
+  departments,
   readOnly,
 }: {
   period: string
   staff: StaffAllocationData
   companies: Company[]
+  departments: MoveTarget[]
   readOnly: boolean
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [rows, setRows] = useState<EditRow[]>(() => toEditRows(staff.rows))
+  const [moves, setMoves] = useState<EditMove[]>(() => toEditMoves(staff.moves))
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedNote, setSavedNote] = useState(false)
   // What is saved, in any order. When a refresh brings a different split —
   // Copy from last month, a save in another tab — a card nobody is editing
   // takes it; the form was only ever seeded on the first render.
-  const savedKey = staff.rows.map((r) => `${r.companyId}=${r.pct}`).sort().join('|')
+  const savedKey = savedKeyOf(staff)
   const [shownKey, setShownKey] = useState(savedKey)
   if (savedKey !== shownKey) {
     setShownKey(savedKey)
-    if (!dirty) setRows(toEditRows(staff.rows))
+    if (!dirty) {
+      setRows(toEditRows(staff.rows))
+      setMoves(toEditMoves(staff.moves))
+    }
   }
   // The split follows the payroll row: past draft it stays as it left. A
-  // centralized department's person is only here for a split left over from
-  // before — never edited, only cleared.
+  // centralized department's person has no company split — one left over
+  // from before is only cleared, and until it is the card offers nothing else.
   const locked = staff.lock.locked
-  const frozen = readOnly || locked || staff.centralized
+  const frozen = readOnly || locked
+  const leftover = staff.centralized && staff.rows.length > 0
+  const companiesFrozen = frozen || staff.centralized
+  const movesFrozen = frozen || leftover
 
   const parsed = toAllocationRows(rows)
-  const parseable = parsed.every((r) => r.companyId && Number.isFinite(r.pct))
-  const check = parseable ? validateAllocationRows(parsed) : null
-  const preview = parseable && check?.ok ? allocationPreview(staff.employerCost, parsed) : null
-  const remainder = parseable ? hvRemainderPct(parsed) : null
+  const parsedMoves = toDeptMoves(moves)
+  const parseable = parsed.every((r) => r.companyId && Number.isFinite(r.pct)) && parsedMoves.every((m) => m !== null)
+  const cleanMoves = parsedMoves.filter((m): m is DeptMoveRow => m !== null)
+  const check = parseable
+    ? staff.centralized
+      ? validateDeptMoves(staff.employerCost, [], cleanMoves, staff.departmentId, true)
+      : validateDeptMoves(staff.employerCost, parsed, cleanMoves, staff.departmentId, false)
+    : null
+  const preview = parseable && check?.ok
+    ? movePreview(staff.employerCost, staff.centralized ? [] : parsed, cleanMoves)
+    : null
+  const leftPct = preview && staff.employerCost > 0 ? (preview.hvAmount / staff.employerCost) * 100 : null
 
-  function patchRow(uid: string, patch: Partial<EditRow>) {
-    setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)))
+  // Never the person's own department, nor Venture Office, nor one with no pool.
+  const targets = departments.filter((d) => d.id !== staff.departmentId && !d.isInternal && d.segmentKey)
+
+  function touched() {
     setDirty(true)
     setSavedNote(false)
+  }
+  function patchRow(uid: string, patch: Partial<EditRow>) {
+    setRows((prev) => prev.map((r) => (r.uid === uid ? { ...r, ...patch } : r)))
+    touched()
   }
   function addRow() {
     setRows((prev) => [...prev, { uid: crypto.randomUUID(), companyId: '', pct: '' }])
-    setDirty(true)
-    setSavedNote(false)
+    touched()
   }
   function removeRow(uid: string) {
     setRows((prev) => prev.filter((r) => r.uid !== uid))
-    setDirty(true)
-    setSavedNote(false)
+    touched()
+  }
+  function patchMove(uid: string, patch: Partial<EditMove>) {
+    setMoves((prev) => prev.map((m) => (m.uid === uid ? { ...m, ...patch } : m)))
+    touched()
+  }
+  function addMove() {
+    setMoves((prev) => [...prev, { uid: crypto.randomUUID(), departmentId: '', kind: '', value: '' }])
+    touched()
+  }
+  function removeMove(uid: string) {
+    setMoves((prev) => prev.filter((m) => m.uid !== uid))
+    touched()
   }
 
   function save() {
     setError(null)
     if (!parseable) {
-      setError('Every row needs a company and a numeric %')
+      setError('Every row needs a company and a numeric %; every department line a department, Fixed RM or %, and a number')
       return
     }
-    const v = validateAllocationRows(parsed)
-    if (!v.ok) {
-      setError(v.error)
+    if (check && !check.ok) {
+      setError(check.error)
       return
     }
-    persist(parsed)
+    persist(staff.centralized ? [] : parsed, cleanMoves)
   }
 
-  function persist(next: AllocationRow[]) {
+  function persist(next: AllocationRow[], nextMoves?: DeptMoveRow[]) {
     setError(null)
     startTransition(async () => {
       try {
-        const result = await saveStaffAllocation(staff.staffId, period, next)
+        const result = await saveStaffAllocation(staff.staffId, period, next, ...(nextMoves ? [nextMoves] : []))
         if (!result.ok) {
           // Locked since this page was opened: say why, then show the card
           // as it now stands.
@@ -179,6 +278,8 @@ function StaffCard({
   }
 
   const usedCompanyIds = new Set(rows.map((r) => r.companyId).filter(Boolean))
+  const usedDeptIds = new Set(moves.map((m) => m.departmentId).filter(Boolean))
+  const leftLabel = staff.centralized ? `Stays in ${staff.dept}` : 'HV — HOUZS Venture'
 
   return (
     <div
@@ -205,7 +306,7 @@ function StaffCard({
             // rounding adjustment on a full 100% split); fall back to the
             // naive per-row figure while the form is mid-edit.
             const previewAmt =
-              preview?.lines.find((l) => l.companyId === r.companyId)?.amount ?? null
+              preview?.companies.find((l) => l.companyId === r.companyId)?.amount ?? null
             const amt =
               previewAmt ??
               (r.companyId && Number.isFinite(Number(r.pct)) && Number(r.pct) > 0
@@ -216,7 +317,7 @@ function StaffCard({
                 <Select bare
                   value={r.companyId}
                   onChange={(e) => patchRow(r.uid, { companyId: e.target.value })}
-                  disabled={frozen}
+                  disabled={companiesFrozen}
                   className="px-3 py-1.5 bg-surface border border-hairline rounded-control text-sm text-ink focus:outline-none focus:border-accent min-w-[180px]"
                 >
                   <option value="">Company…</option>
@@ -238,7 +339,7 @@ function StaffCard({
                     max="100"
                     value={r.pct}
                     onChange={(e) => patchRow(r.uid, { pct: e.target.value })}
-                    disabled={frozen}
+                    disabled={companiesFrozen}
                     className="w-24 px-3 py-1.5 bg-surface border border-hairline rounded-control text-sm font-mono text-ink text-right focus:outline-none focus:border-accent"
                     placeholder="0.00"
                   />
@@ -247,7 +348,7 @@ function StaffCard({
                 <span className="num text-sm min-w-[100px]">
                   {amt !== null ? formatMoney(amt) : '—'}
                 </span>
-                {!frozen && (
+                {!companiesFrozen && (
                   <button
                     type="button"
                     onClick={() => removeRow(r.uid)}
@@ -261,16 +362,99 @@ function StaffCard({
             )
           })}
 
-          {/* HOUZS Venture own share — always visible, auto = 100% − subsidiary
-              rows. Not stored, not billed; Finance sees the same figure on the
-              Billing page. */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Part of the cost to another department (2026-11-03): the
+              department first, then Fixed RM or % — the box shows after. */}
+          {moves.map((m) => {
+            const amount = preview?.moves.find((x) => x.departmentId === m.departmentId)
+            const target = departments.find((d) => d.id === m.departmentId)
+            return (
+              <div key={m.uid} role="group" aria-label="Department line" className="flex items-center gap-2 flex-wrap">
+                <Select bare
+                  value={m.departmentId}
+                  onChange={(e) => patchMove(m.uid, { departmentId: e.target.value })}
+                  disabled={movesFrozen}
+                  className="px-3 py-1.5 bg-accent-bg border border-accent-border rounded-control text-sm text-ink focus:outline-none focus:border-accent min-w-[180px]"
+                >
+                  <option value="">Department…</option>
+                  {/* A saved line keeps its department listed even if it is no target now. */}
+                  {target && !targets.includes(target) ? <option value={target.id}>{`→ ${target.name}`}</option> : null}
+                  {targets.map((d) => (
+                    <option key={d.id} value={d.id} disabled={d.id !== m.departmentId && usedDeptIds.has(d.id)}>
+                      {d.name}
+                    </option>
+                  ))}
+                </Select>
+                <div className="inline-flex border border-hairline rounded-control overflow-hidden" role="presentation">
+                  {(['amount', 'pct'] as const).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      aria-pressed={m.kind === k}
+                      disabled={movesFrozen}
+                      onClick={() => patchMove(m.uid, { kind: k })}
+                      className={`text-xs px-2.5 py-1.5 transition-colors ${k === 'pct' ? 'border-l border-hairline' : ''} ${
+                        m.kind === k ? 'bg-accent-bg text-ink font-bold' : 'bg-surface hover:bg-surface-2'
+                      }`}
+                    >
+                      {k === 'amount' ? 'Fixed RM' : '%'}
+                    </button>
+                  ))}
+                </div>
+                {m.kind === '' ? (
+                  <span className="text-[11px]">Pick Fixed RM or %</span>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1">
+                      {m.kind === 'amount' && <span className="text-xs">RM</span>}
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max={m.kind === 'pct' ? 100 : undefined}
+                        aria-label={m.kind === 'pct' ? 'Percentage' : 'Amount (RM)'}
+                        value={m.value}
+                        onChange={(e) => patchMove(m.uid, { value: e.target.value })}
+                        disabled={movesFrozen}
+                        className="w-28 px-3 py-1.5 bg-surface border border-hairline rounded-control text-sm font-mono text-ink text-right focus:outline-none focus:border-accent"
+                        placeholder="0.00"
+                      />
+                      {m.kind === 'pct' && <span className="text-xs">%</span>}
+                    </div>
+                    <span className="num text-sm min-w-[100px]">
+                      {amount
+                        ? m.kind === 'pct'
+                          ? `= ${formatMoney(amount.amount)}`
+                          : `= ${amount.pct.toFixed(2)}% of the cost`
+                        : '—'}
+                    </span>
+                  </>
+                )}
+                {!movesFrozen && (
+                  <button
+                    type="button"
+                    onClick={() => removeMove(m.uid)}
+                    aria-label="Remove line"
+                    className="hover:text-danger text-sm px-1 transition-colors"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )
+          })}
+
+          {/* What is left — always visible, auto = the cost less the
+              companies and the departments. HOUZS Venture's own share (not
+              stored, not billed; Finance sees the same figure on the Billing
+              page), or for a centralized person what stays in their own
+              department's pool. */}
+          <div role="group" aria-label={leftLabel} className="flex items-center gap-2 flex-wrap">
             <div className="px-3 py-1.5 bg-surface-2 border border-dashed border-hairline rounded-control text-sm min-w-[180px]">
-              HV — HOUZS Venture
+              {leftLabel}
             </div>
             <div className="flex items-center gap-1">
               <div className="w-24 px-3 py-1.5 bg-surface-2 border border-dashed border-hairline rounded-control text-sm font-mono text-right">
-                {remainder !== null ? remainder.toFixed(2) : '—'}
+                {leftPct !== null ? leftPct.toFixed(2) : '—'}
               </div>
               <span className="text-xs">%</span>
             </div>
@@ -278,7 +462,7 @@ function StaffCard({
               {preview ? formatMoney(preview.hvAmount) : '—'}
             </span>
             <span className="text-[11px]">
-              auto · own share · not billed
+              {staff.centralized ? `auto · ${staff.dept}'s own pool` : 'auto · own share · not billed'}
             </span>
           </div>
         </div>
@@ -287,11 +471,24 @@ function StaffCard({
         <div className="text-xs">
           {preview && (
             <>
-              Billed to subsidiaries{' '}
-              <span className="num text-ink font-bold">{formatMoney(preview.billedTotal)}</span>
+              {!staff.centralized && (
+                <>
+                  Billed to subsidiaries{' '}
+                  <span className="num text-ink font-bold">{formatMoney(preview.billedTotal)}</span>
+                </>
+              )}
+              {preview.moves.length > 0 && (
+                <span>
+                  {!staff.centralized && ' · '}To departments{' '}
+                  <span className="num text-ink font-bold">{formatMoney(preview.movedTotal)}</span>
+                </span>
+              )}
             </>
           )}
           {error && <span className="text-danger ml-2">{error}</span>}
+          {/* What is on screen breaks a rule — typed, or saved before the pay fell (the billing then lets the
+              department lines give way, so the companies and departments never pass the cost). */}
+          {!error && check && !check.ok && <span className="text-danger ml-2">{check.error}</span>}
           {savedNote && !dirty && <span className="chip ledger ml-2"><span className="dot" />Saved.</span>}
         </div>
         {locked && (
@@ -301,7 +498,7 @@ function StaffCard({
               : 'Payroll for this month is closed for good'}
           </p>
         )}
-        {staff.centralized && !locked && (
+        {leftover && !locked && (
           <div className="flex items-center gap-3 flex-wrap sm:justify-end">
             <p className="text-xs sm:text-right m-0">
               {staff.dept} is centralized — billed by invoice, not split. This split is left from before.
@@ -318,15 +515,26 @@ function StaffCard({
             )}
           </div>
         )}
-        {!frozen && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={addRow}
-              className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-1.5 rounded-control transition-colors"
-            >
-              + Company
-            </button>
+        {!movesFrozen && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {!companiesFrozen && (
+              <button
+                type="button"
+                onClick={addRow}
+                className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-1.5 rounded-control transition-colors"
+              >
+                + Company
+              </button>
+            )}
+            {targets.length > 0 && (
+              <button
+                type="button"
+                onClick={addMove}
+                className="bg-surface hover:bg-surface-2 border border-accent-border text-ink text-sm px-3 py-1.5 rounded-control transition-colors"
+              >
+                + Department
+              </button>
+            )}
             <button
               type="button"
               onClick={save}

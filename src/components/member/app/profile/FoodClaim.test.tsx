@@ -110,6 +110,22 @@ describe("Submit food claim — a month at a time", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("the refusal stands over the button, not at the form's end — in sight wherever the form is scrolled", () => {
+    // 2026-11-01: an October food claim pressed on 31 Oct at 23:25, its weekends open on screen — the refusal sat after
+    // the summary and the notes, out of sight, so the press seemed to do nothing (a video from the Fair).
+    const onSubmit = ok();
+    foodForm(onSubmit, { ...options, today: "2026-10-31" });
+    fireEvent.click(screen.getByRole("button", { name: "Oct 2026" }));
+    fireEvent.click(weekCard(/Akemi week · 2–4 Oct/));
+    const cta = screen.getByRole("button", { name: "Review & submit claim" });
+    fireEvent.click(cta);
+    const refusal = screen.getByRole("alert");
+    expect(refusal).toHaveTextContent("Food for Oct 2026 is claimed once the month is over, from 1 Nov.");
+    expect(refusal.nextElementSibling).toBe(cta);
+    expect(document.querySelector("[data-rq-form-scroll]")).not.toContainElement(refusal);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("a month already claimed is said so, and sends nothing — a month is claimed once", () => {
     const onSubmit = ok();
     const opts: FormOptions = {
@@ -195,6 +211,64 @@ describe("Submit food claim — a month at a time", () => {
     const keys = onSubmit.mock.calls.map(([form]) => (form as FormData).get("idempotencyKey"));
     expect(keys[0]).toBeTruthy();
     expect(keys[1]).not.toBe(keys[0]);
+  });
+});
+
+// 2026-11-01 — a day is claimed in its own month (the user, over a fair of 29 Oct – 1 Nov: "那它 11 月 1 号就是 claim 在
+// 11 月"; asked whether 1 Nov goes with October's food or November's, "按日期拆").
+describe("Submit food claim — a weekend across two months", () => {
+  const borneo = week({ key: "2026-10-30", n: "W5", brandWeek: "Akemi week", brand: "AKEMI", dates: "29 Oct – 1 Nov", venue: "BORNEO CONVENTION CENTRE",
+    fairId: "bcck", start: "2026-10-29", end: "2026-11-01", color: "red", tint: "pink" });
+  const nov6 = week({ key: "2026-11-06", month: "NOV", n: "W1", dates: "6–8 Nov", fairId: "nov-1", start: "2026-11-06", end: "2026-11-08" });
+  const on = (today: string, foodWeeks: ClaimWeek[], more: Partial<FormOptions> = {}): FormOptions => ({ ...options, today, foodWeeks, ...more });
+
+  it("October takes its 29–31 Oct; its 1 Nov is November's, shown faded — and two months back is not offered", async () => {
+    const onSubmit = ok();
+    foodForm(onSubmit, on("2026-11-01", [borneo, ...options.weeks]));
+    expect(months().map(b => `${b.textContent}=${b.getAttribute("aria-pressed")}`)).toEqual(["Nov 2026=false", "Oct 2026=true"]);
+    expect(weekCard(/Akemi week · 29 Oct – 1 Nov/)).toHaveTextContent("3 days");
+    fireEvent.click(weekCard(/Akemi week · 29 Oct – 1 Nov/));
+    expect(day(/^Sat 31 Oct$/)).toHaveAttribute("aria-pressed", "true");
+    expect(day(/^Sun 1 Nov, Nov claim$/)).toBeDisabled();
+    expect(day(/^Sun 1 Nov, Nov claim$/)).toHaveTextContent("Nov claim");
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+    await screen.findByText("Request submitted");
+    expect(sent(onSubmit).month).toBe("2026-10");
+    expect(JSON.parse(String(sent(onSubmit).weeks))).toContainEqual({ week: "2026-10-30", days: ["2026-10-29", "2026-10-30", "2026-10-31"] });
+  });
+
+  it("November takes the 1 Nov, the weekend first as October's W5 — sent once November is over", async () => {
+    const onSubmit = ok();
+    foodForm(onSubmit, on("2026-12-01", [nov6, borneo]));
+    expect(months().map(b => b.textContent)).toEqual(["Nov 2026"]);
+    expect(screen.getAllByRole("button", { name: /week · / }).map(b => b.textContent?.slice(0, 6))).toEqual(["OCTW5A", "NOVW1Z"]);
+    expect(weekCard(/Akemi week · 29 Oct – 1 Nov/)).toHaveTextContent("1 day");
+    fireEvent.click(weekCard(/Akemi week · 29 Oct – 1 Nov/));
+    expect(day(/^Thu 29 Oct, Oct claim$/)).toBeDisabled();
+    expect(sum("Days")).toHaveTextContent("4 days · 1, 6, 7, 8 Nov");
+    fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+    await screen.findByText("Request submitted");
+    expect(sent(onSubmit)).toMatchObject({ month: "2026-11",
+      weeks: JSON.stringify([{ week: "2026-10-30", days: ["2026-11-01"] }, { week: "2026-11-06", days: ["2026-11-06", "2026-11-07", "2026-11-08"] }]) });
+  });
+
+  it("a 1 Nov an October claim already holds (sent before the split) reads Claimed on November's", () => {
+    const held = { id: "x", kind: "claim", status: "submitted", requestNo: "RQ-2611-002",
+      detail: { claimType: "food", month: "2026-10", days: ["2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"] } };
+    foodForm(ok(), on("2026-12-01", [nov6, borneo], { foodClaims: [held] }));
+    expect(weekCard(/Akemi week · 29 Oct – 1 Nov/)).toHaveTextContent("None");
+    fireEvent.click(weekCard(/Akemi week · 29 Oct – 1 Nov/));
+    expect(day(/^Sun 1 Nov, claimed$/)).toHaveTextContent("Claimed");
+  });
+
+  it("an October claim HR sent back with its 1 Nov in it goes back without it", async () => {
+    const onSubmit = ok();
+    const detail = { claimType: "food", month: "2026-10", weeks: [{ week: "2026-10-30", days: ["2026-10-30", "2026-11-01"] }], days: ["2026-10-30", "2026-11-01"] };
+    foodForm(onSubmit, on("2026-11-02", [borneo], { foodClaims: [{ id: "r2", kind: "claim", status: "needs_info", requestNo: "RQ-2611-002", detail }] }), false, { id: "r2", detail });
+    expect(weekCard(/Akemi week · 29 Oct – 1 Nov/)).toHaveTextContent("1 day");
+    fireEvent.click(screen.getByRole("button", { name: "Send the update" }));
+    await screen.findByText("Request submitted");
+    expect(sent(onSubmit)).toMatchObject({ requestId: "r2", month: "2026-10", weeks: JSON.stringify([{ week: "2026-10-30", days: ["2026-10-30"] }]) });
   });
 });
 

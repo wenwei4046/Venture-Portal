@@ -155,12 +155,14 @@ export async function principalParityChecks({ db, q, one, check, reject, migrate
   }
   await scenario('UPDATE comm_sub_departments SET is_active=false WHERE id=$1', [fair], allCalls)
   await scenario("UPDATE departments SET payroll_source='imported' WHERE id=(SELECT department_id FROM comm_sub_departments WHERE id=$1)", [fair], allCalls)
-  for (const update of ['is_active=false', "effective_from=(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date+1",
-    "effective_to=(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date-1"]) {
+  // Ended yesterday: from no later than yesterday, so the window stays valid on the 1st of a month too — the scheme and
+  // the seats start on the month's 1st, and on that day "to = yesterday" alone fell before "from" (effective_window;
+  // CI failed every run on 2026-11-01, KL).
+  const endedYesterday = "effective_from=least(effective_from,(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date-1),effective_to=(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date-1"
+  for (const update of ['is_active=false', "effective_from=(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date+1", endedYesterday]) {
     await scenario(`UPDATE comm_schemes SET ${update} WHERE id=$1`, [scheme], allCalls)
   }
-  for (const update of ["effective_from=(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date+1",
-    "effective_to=(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date-1"]) {
+  for (const update of ["effective_from=(now() AT TIME ZONE 'Asia/Kuala_Lumpur')::date+1", endedYesterday]) {
     await scenario(`UPDATE comm_hierarchy SET ${update} WHERE scheme_id=$1 AND staff_id=$2`, [scheme, staff1])
   }
   await scenario('UPDATE titles SET is_department_head=true WHERE id=(SELECT title_id FROM hr_staff_costs WHERE id=$1)', [staff1])

@@ -61,7 +61,7 @@ describe("what the database told them (2026-10-11, mig 20261011180000)", () => {
 // 2026-10-20: a Revenue fixed salary is paid out of the commission — the settled month's news says so.
 describe("a settled month's commission", () => {
   const settled: MemberIncome = {
-    schemeId: "s", period: "2026-09", status: "locked", personal: 16850.9, override: 0, kpi: 0, openBill: 0, incentive: 0, group: 0,
+    schemeId: "s", period: "2026-09", status: "locked", personal: 16850.9, override: 0, kpi: 0, incentive: 0, group: 0,
     total: 16850.9, sales: 300000, groupSales: 0, deferred: 0, rank: "Rank B", rate: 0.06, kpis: [], brands: [],
   };
   it("pays the fixed salary from it, never beside it", () => {

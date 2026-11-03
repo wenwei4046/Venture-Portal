@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { BulkBar, BulkButton, cardRowFit, HubCards, ItemList, MonthNav, type HubCardItem } from './Hub'
+import { BulkBar, BulkButton, cardRowFit, HubCards, ItemList, MonthNav, TickButton, TickTools, type HubCardItem } from './Hub'
 
 // The hub's parts Invoice added (2026-10-14, the Finance revamp v2 — D10): the
 // month pill (its label opening the year's months — ours, kept from Service
@@ -133,5 +133,28 @@ describe('the bar of what is ticked', () => {
       </BulkBar>,
     )
     expect(screen.getByRole('region', { name: 'What is ticked' })).toHaveAttribute('data-fixed', 'true')
+  })
+})
+
+// What is ticked, in the table's toolbar (2026-10-29, the claim process's PR ④ — "按钮换去上面"): a hint while nothing
+// is, then the count and sum on the dark bar; the buttons are the page's.
+describe('the toolbar’s ticks', () => {
+  it('a hint until a row is ticked, then the count on the dark bar', () => {
+    const { rerender } = render(
+      <TickTools ticked={0} text="0 selected" idle="Tick requests to act on several">
+        <TickButton kind="primary" disabled>Create PV</TickButton>
+      </TickTools>,
+    )
+    const group = screen.getByRole('group', { name: 'Several at once' })
+    expect(group).toHaveTextContent('Tick requests to act on several')
+    expect(group).not.toHaveAttribute('data-on')
+    rerender(
+      <TickTools ticked={2} text="2 selected · RM 703.79" idle="Tick requests to act on several">
+        <TickButton kind="primary">Create PV</TickButton>
+      </TickTools>,
+    )
+    expect(group).toHaveTextContent('2 selected · RM 703.79')
+    expect(group).toHaveAttribute('data-on', 'true')
+    expect(within(group).getByRole('button', { name: 'Create PV' })).toHaveAttribute('data-kind', 'primary')
   })
 })

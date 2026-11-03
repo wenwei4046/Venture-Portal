@@ -27,7 +27,6 @@ import {
 import { officeTime } from '@/lib/office-time'
 import { loadCommissionWorkbench } from '../../_lib/commission-workbench'
 import { loadErpFeedMonth } from '../../_lib/erp-feed-month'
-import { loadOpenBillMonthSetting, resolveOpenBill } from '../../_lib/open-bill-month'
 import { loadDoubleClaimEvidence, loadDoubleClaims } from '../../_lib/double-claims'
 import { carriedFromUnpaidMonths, claimsInMonth } from '@/lib/commission/double-claims'
 import { explainDoubleClaim } from '@/lib/commission/double-claim-reasons'
@@ -36,6 +35,8 @@ import ErpFeedChip from './_components/ErpFeedChip'
 import DoubleClaimPanel from './_components/DoubleClaimPanel'
 import ShareRequestsPanel from './_components/ShareRequestsPanel'
 import { shareRequestsFromRow, type ShareRequest } from '@/lib/member/share-requests'
+import SellerChecksPanel from './_components/SellerChecksPanel'
+import { isWaiting, sellerChecksFromRow, type SellerCheck } from '@/lib/commission/seller-checks'
 import { canDo } from '@/lib/permission-actions'
 import { actionsOnPage } from '@/lib/page-tabs'
 import ErpChangesPanel, { type ChangeBrief, type TrailRowView } from './_components/ErpChangesPanel'
@@ -72,7 +73,6 @@ interface BatchRow {
 }
 
 interface SchemeRow {
-  enable_open_bill: boolean
   enable_kpi: boolean
   enable_margin_penalty: boolean
   enable_margin_incentive: boolean
@@ -97,13 +97,14 @@ interface StatementRow {
  * and the payroll bar under the month's cards says which (2026-09-27). It
  * replaced *Payroll & source tools*, a folded section at the foot of the page
  * that held the saved run, its warnings, the button that sent it (Recompute &
- * sync payroll), the Open Bill cost and the upsales HR typed by hand: the
+ * sync payroll), the Open Bill cost and the upsales HR typed by hand (Open
+ * Bill itself went on 2026-10-31): the
  * live figure read as money already in payroll — September had never been
  * sent — and every drop and upsell now comes from the ERP (user 2026-09-27).
  *
  * ONE RAIL AT THE TOP (2026-09-26): the workbench's tabs — Total Sales
- * Orders, KPI Items, Open Bill, Below deposit and Sales exhibition (Sales by
- * venue until 2026-10-03) — are every cut of the month's bills, in one table
+ * Orders, KPI Items, Below deposit and Sales exhibition (Sales by venue until
+ * 2026-10-03; Open Bill until 2026-10-31) — are every cut of the month's bills, in one table
  * design. Since 2026-09-30 the rail also carries the month's two review
  * panels, which sat stacked above the cards: *Drops & upsells* (what the ERP
  * changed on settled bills) and *Double claims*, where every group says why it
@@ -164,7 +165,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     ? once(
         supabase
           .from('comm_schemes')
-          .select('enable_open_bill, enable_kpi, enable_margin_penalty, enable_margin_incentive')
+          .select('enable_kpi, enable_margin_penalty, enable_margin_incentive')
           .eq('id', subDept.schemeId)
           .maybeSingle(),
       ).then(({ data }) => data as SchemeRow | null)
@@ -189,13 +190,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       .eq('run_id', run.id)
     return (data ?? []) as unknown as StatementRow[]
   })
-
-  // Whether THIS month pays Open Bill: its own setting over Rules (2026-09-26 —
-  // on for August, which the claim form paid; September follows Rules).
-  const openBillMonthRead = Promise.all([
-    schemeRead,
-    subDept.schemeId ? loadOpenBillMonthSetting(supabase, subDept.id, period) : Promise.resolve(null),
-  ]).then(([scheme, month]) => resolveOpenBill(Boolean(scheme?.enable_open_bill), month))
 
   // Can the month's payroll still take commission? Asked of the same guard the
   // send uses, so the bar can say so before anybody clicks. Unanswerable (the
@@ -251,6 +245,13 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       ? { requests: [] as ShareRequest[], unavailable: error.message }
       : { requests: shareRequestsFromRow(data), unavailable: null }))
     .catch((err: unknown) => ({ requests: [] as ShareRequest[], unavailable: err instanceof Error ? err.message : 'The read failed.' }))
+  // Whose sale (2026-10-31): the month's bills the feed held because their paper is on another salesperson's order.
+  // Read softly, as the requests.
+  const sellerChecksRead = once(supabase.rpc('revenue_seller_checks', { p_sub_department: subDept.id, p_period: period }))
+    .then(({ data, error }) => (error
+      ? { checks: [] as SellerCheck[], unavailable: error.message }
+      : { checks: sellerChecksFromRow(data), unavailable: null }))
+    .catch((err: unknown) => ({ checks: [] as SellerCheck[], unavailable: err instanceof Error ? err.message : 'The read failed.' }))
 
   // The drops and upsells the ERP found that somebody paid into this month
   // (Undo sends one back), those still to answer from any month (paid into
@@ -298,7 +299,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
     [paidAdjustments, monthLock],
     workbench,
     [feedMonth, doubleClaims, { data: paidRunRows }, pendingAdjustments],
-    openBillMonth,
     payrollClosed,
     earlierLocks,
     closes,
@@ -342,7 +342,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         pendingAdjustmentsRead,
       ]),
     ),
-    openBillMonthRead,
     payrollClosedRead,
     earlierLocksRead,
     closesRead,
@@ -512,6 +511,14 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
       returnTo={`${revenuePath(subDept.slug, period)}?view=requests`} period={period} />
   )
   const requestsWaiting = shareRequests.requests.filter(q => q.status === 'hr').length
+  // Whose sale: what waits is a held bill nobody answered — Revenue · Edit on this page's tab answers it.
+  const sellerChecks = await sellerChecksRead
+  const sellerChecksPanel = (
+    <SellerChecksPanel key="seller-checks" checks={sellerChecks.checks} unavailable={sellerChecks.unavailable}
+      canDecide={canDo(acting, 'revenue', 'edit')} basePath={revenuePath(subDept.slug)}
+      returnTo={`${revenuePath(subDept.slug, period)}?view=sellers`} period={period} />
+  )
+  const sellersWaiting = sellerChecks.checks.filter(isWaiting).length
 
   const monthHeader = (
       <div key="month-head" className="page-head">
@@ -592,6 +599,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         reviews={{
           changes: { panel: erpChangesPanel, count: changesWaiting },
           claims: doubleClaimPanel ? { panel: doubleClaimPanel, count: claimsWaiting } : undefined,
+          sellers: { panel: sellerChecksPanel, count: sellersWaiting },
           requests: { panel: shareRequestsPanel, count: requestsWaiting },
         }}
         monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: orders.length,
@@ -614,10 +622,6 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
         switches={subDept.schemeId && scheme ? (
           <SchemeSwitches
             schemeId={subDept.schemeId}
-            subDepartmentId={subDept.id}
-            period={period}
-            monthLabel={label(period)}
-            openBill={openBillMonth}
             margin={scheme.enable_margin_penalty || scheme.enable_margin_incentive}
             kpi={scheme.enable_kpi}
           />

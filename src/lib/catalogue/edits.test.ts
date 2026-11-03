@@ -4,11 +4,14 @@ import {
   parseMoney,
   validateComboPrices,
   validateComboRemovals,
+  validateFabricUpgrades,
+  validateKivCosts,
   validateNewCombo,
   validateModelEdit,
   validateOptionPrices,
   validateSkuPrices,
   tidyModelName,
+  tidyUpgradeName,
   type ComboPriceEdit,
   type ModelEdit,
   type SkuPriceEdit,
@@ -373,6 +376,27 @@ describe('validateOptionPrices', () => {
     ])
   })
 
+  // 2026-10-26: a sofa special is charged once per sofa or by quantity — only a sofa special.
+  it('says how a sofa special is charged, and only when told', () => {
+    expect(validateOptionPrices('sofa_specials', [
+      { value: 'Change 8030 Backcushion', price: '200', byQuantity: true },
+      { value: 'Seat Base Fully Cover', price: '300', byQuantity: false },
+      { value: 'Wooden Arm', price: '120' },
+    ]).upserts).toEqual([
+      { pool: 'sofa_specials', value: 'Change 8030 Backcushion', price: 200, by_quantity: true },
+      { pool: 'sofa_specials', value: 'Seat Base Fully Cover', price: 300, by_quantity: false },
+      // Not told (a page from before): the saved choice stands.
+      { pool: 'sofa_specials', value: 'Wooden Arm', price: 120 },
+    ])
+    expect(() => validateOptionPrices('bedframe_specials', [{ value: 'Hydraulic', price: '300', byQuantity: true }]))
+      .toThrow('Hydraulic: only a sofa special is charged by quantity')
+    expect(() => validateOptionPrices('sofa_leg_heights', [{ value: '6"', price: '100', byQuantity: true }]))
+      .toThrow('only a sofa special is charged by quantity')
+    // A leg's "not by quantity" is no choice at all: nothing is written for it.
+    expect(validateOptionPrices('sofa_leg_heights', [{ value: '6"', price: '100', byQuantity: false }]).upserts)
+      .toEqual([{ pool: 'sofa_leg_heights', value: '6"', price: 100 }])
+  })
+
   it.each(['sofa_sizes'])('refuses a price on %s — that list carries no price', pool => {
     expect(() => validateOptionPrices(pool, [{ value: '12"', price: '5' }])).toThrow('That list carries no price')
   })
@@ -536,5 +560,85 @@ describe('validateNewCombo — a piece may be either side (2026-10-08)', () => {
     expect(() => validateNewCombo({ ...base, modules: [['A', 'B', 'C', 'D', 'E'], ['1NA']] })).toThrow('A compartment may be one of four modules at most.')
     expect(() => validateNewCombo({ ...base, modules: [['1A(LHF)', ' 1A(LHF)'], ['1NA']] })).toThrow('A compartment names the same module twice.')
     expect(() => validateNewCombo({ ...base, modules: [['1A(LHF)', 'a "b'], ['1NA']] })).toThrow('is not a compartment code')
+  })
+})
+
+describe('validateFabricUpgrades (Maintenance › Fabrics › upgrades, 2026-10-29)', () => {
+  const A = '6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b'
+  const B = '7a2e3d4c-5b6f-4a71-9b8c-0d1e2f3a4b5c'
+  const none = { adds: [], changes: [], removes: [] }
+
+  it('keeps a name tidy, as the Quote will show it', () => {
+    expect(tidyUpgradeName('  Upgrade \n  fabric ')).toBe('Upgrade fabric')
+    expect(validateFabricUpgrades(' sofa ', { ...none, adds: [{ name: ' Upgrade   fabric ', price: '1,200.50', series: [' PC151 ', 'pc151', 'KS'] }] }))
+      .toEqual({ category: 'SOFA', adds: [{ name: 'Upgrade fabric', price: 1200.5, series: ['PC151', 'KS'] }], changes: [], removes: [] })
+  })
+
+  it("is a sofa's or a bed frame's, named, charged above 0", () => {
+    expect(() => validateFabricUpgrades('MATTRESS', { ...none, adds: [{ name: 'X', price: '1', series: [] }] })).toThrow('a sofa’s or a bed frame’s')
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: '  ', price: '1', series: [] }] })).toThrow('An upgrade has no name')
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'x'.repeat(81), price: '1', series: [] }] })).toThrow('at most 80 characters')
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'Free', price: '0', series: [] }] })).toThrow('Free: a charge above 0')
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'Blank', price: '', series: [] }] })).toThrow('Blank: a charge above 0')
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'Minus', price: '-5', series: [] }] })).toThrow(EditError)
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'X', price: '1', series: [' '] }] })).toThrow('A fabric series is blank')
+    expect(() => validateFabricUpgrades('SOFA', none)).toThrow('Nothing to save')
+  })
+
+  it('names an upgrade once and ticks a series under one upgrade of the Save', () => {
+    expect(() => validateFabricUpgrades('SOFA', { ...none, adds: [{ name: 'Leather', price: '5', series: [] }, { name: 'leather', price: '6', series: [] }] }))
+      .toThrow('Two upgrades are named leather')
+    expect(() => validateFabricUpgrades('SOFA', {
+      adds: [{ name: 'Leather', price: '5', series: ['KS'] }],
+      changes: [{ id: A, label: 'Upgrade fabric', addSeries: ['ks'] }],
+      removes: [],
+    })).toThrow('ks is ticked under Leather and Upgrade fabric')
+  })
+
+  it('sends only what changed, and nothing for an upgrade being taken off', () => {
+    expect(validateFabricUpgrades('BEDFRAME', {
+      adds: [],
+      changes: [
+        { id: A, label: 'Upgrade fabric', price: '250', addSeries: ['ZL', 'KS'], dropSeries: ['KS', 'BN125'] },
+        { id: B, label: 'Old', name: 'Old fabric' },
+        { id: B.replace('7a', '8a'), label: 'Nothing' },
+      ],
+      removes: [B.replace('7a', '9a')],
+    })).toEqual({
+      category: 'BEDFRAME',
+      adds: [],
+      changes: [{ id: A, price: 250, add_series: ['ZL'], drop_series: ['BN125'] }, { id: B, name: 'Old fabric' }],
+      removes: [B.replace('7a', '9a')],
+    })
+    expect(validateFabricUpgrades('SOFA', { adds: [], changes: [{ id: A, label: 'X', price: '9' }], removes: [A] }))
+      .toEqual({ category: 'SOFA', adds: [], changes: [], removes: [A] })
+    expect(() => validateFabricUpgrades('SOFA', { adds: [], changes: [{ id: 'nope', price: '9' }], removes: [] })).toThrow('A changed upgrade is not one')
+    expect(() => validateFabricUpgrades('SOFA', { adds: [], changes: [], removes: ['nope'] })).toThrow('An upgrade to take off is not one')
+    expect(() => validateFabricUpgrades('SOFA', { adds: [], changes: [{ id: A, price: '1' }, { id: A, price: '2' }], removes: [] }))
+      .toThrow('An upgrade is changed twice')
+  })
+})
+
+describe('validateKivCosts (Costing Setting › KIV bed frames, 2026-10-31)', () => {
+  it('takes the four sizes — a cost each, or blank to take the cost off', () => {
+    expect(validateKivCosts([{ size: 'K', cost: '1,000' }, { size: 'q', cost: '820.5' }, { size: 'S', cost: '' }])).toEqual({
+      upserts: [{ size_code: 'K', cost: 1000 }, { size_code: 'Q', cost: 820.5 }],
+      clears: ['S'],
+    })
+    expect(validateKivCosts([{ size: 'SS', cost: null }])).toEqual({ upserts: [], clears: ['SS'] })
+  })
+
+  it('refuses a frame costing RM 0 — its bill would read a margin too high', () => {
+    expect(() => validateKivCosts([{ size: 'Q', cost: '0' }])).toThrow(/Queen: a KIV frame cannot cost RM 0/)
+    expect(() => validateKivCosts([{ size: 'Q', cost: '0.00' }])).toThrow(EditError)
+  })
+
+  it('refuses what the table would: another size, a size twice, no amount, more than RM 100,000', () => {
+    expect(() => validateKivCosts([{ size: 'SK', cost: '1500' }])).toThrow(/Unknown bed frame size SK/)
+    expect(() => validateKivCosts([{ size: 'K', cost: '1000' }, { size: 'k', cost: '900' }])).toThrow(/King appears twice/)
+    expect(() => validateKivCosts([{ size: 'S', cost: 'abc' }])).toThrow(/Single: "abc" is not an amount/)
+    expect(() => validateKivCosts([{ size: 'S', cost: '-5' }])).toThrow(/cannot be negative/)
+    expect(() => validateKivCosts([{ size: 'K', cost: '100000.01' }])).toThrow(/out of range/)
+    expect(() => validateKivCosts([])).toThrow(/Nothing to save/)
   })
 })

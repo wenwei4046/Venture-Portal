@@ -47,6 +47,17 @@ describe("reports", () => {
     expect(r.byOutcome.map(x => x.label)).toEqual(["Upcoming", "Showed up", "Won", "No show", "Cancelled"]);
   });
 
+  it("counts each customer once in the appointments figures (2026-10-27)", () => {
+    const at = new Date(2026, 9, 17, 14);
+    const r = appointmentsReport([
+      { at, room: "KL", rep: "P1", outcome: "Showed up", who: "a" }, { at, room: "KL", rep: "P1", outcome: "Won", who: "a" },
+      { at, room: "KL", rep: "P1", outcome: "No show", who: "b" }, { at, room: "KL", rep: "P1", outcome: "Showed up", who: "b" },
+      { at, room: "KL", rep: "P2", outcome: "No show", who: "c" }, { at, room: "KL", rep: "P2", outcome: "Upcoming", who: "c" },
+    ]);
+    expect(r.figures).toEqual({ booked: 3, upcoming: 1, showed: 2, noShow: 1, toMark: 0, cancelled: 0, showRate: 2 / 3 });
+    expect(r.byRoom[0].n).toBe(6);
+  });
+
   it("splits the period's leads by channel, ad, status and loss reason", () => {
     const cs = [cust("a", "p1", "2026-10-05T02:00:00Z", { adId: "1", ad: "Skyline" }), cust("b", "p1", "2026-10-06T02:00:00Z", { status: "lost", lost: { reason: "too_expensive" } }),
       cust("c", "p1", "2026-10-07T02:00:00Z", { channel: "messenger", adId: "1", ad: "Skyline" })];

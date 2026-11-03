@@ -18,13 +18,16 @@ import { DeskApplyAds } from "./DeskExtras";
 import R from "./desk-root.module.css";
 import { deskVM } from "./vm/app";
 import { titleData, titleName, titleTeams } from "./vm/names";
-import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type DeskUi } from "./vm/ctx";
+import { initialDeskUi, type DeskActions, type DeskApp as DeskAppFrame, type DeskUi, type DeskViewAs } from "./vm/ctx";
 import { historyRows } from "./vm/history";
-import { useDeskPlace, withSavedPlace } from "./nav";
+import { useDeskPlace, withSavedPlace, withSavedPrefs, useDeskPrefs } from "./nav";
+import { ViewAsList, type ViewAsPerson } from "./ViewAsList";
 import { useFollowNewest } from "../shared/stick";
 import { useReadWhenSeen } from "../shared/seen";
 import { MediaViewer } from "../shared/viewer";
 import { MessageMenu } from "../shared/msg-menu";
+import { inBrand } from "./vm/insight";
+import { sourceOf, type SourcePick } from "@/lib/member/crm-source";
 
 export interface DeskScreensProps {
   data: CrmData;
@@ -39,6 +42,10 @@ export interface DeskScreensProps {
   app: DeskAppFrame;
   exit(): void;
   toMine?: () => void;
+  /** View as a team member (the owner, 2026-10-29: "desktop 版本能做 view as team member 吗？"): whose CRM may be opened, and opening it. */
+  viewAs?: DeskViewAs;
+  /** Viewing somebody's desktop (View as, 2026-10-29): whose, and the way back to one's own. */
+  viewing?: { id: string; name: string; exit: () => void; people: ViewAsPerson[]; switchTo: (id: string) => void };
   /** A read that failed (the last one's words), shown as the toast. */
   problem?: string;
   /** What a shared action (send, star, forward …) said — the phone panel's toast — shown here as the desktop's toast. */
@@ -51,8 +58,10 @@ const MIN_W = 1280, MIN_H = 800;
 export default function DeskScreens(p: DeskScreensProps) {
   const { data, live, act, setData } = p;
   // A refresh opens where this tab was; Back steps through the clicks (./nav.ts, user 2026-10-13).
-  const [ui, setUi] = useState<DeskUi>(() => withSavedPlace(initialDeskUi()));
+  const [ui, setUi] = useState<DeskUi>(() => withSavedPrefs(withSavedPlace(initialDeskUi())));
   useDeskPlace(ui, setUi);
+  // Columns, chart tiles and cards set up once stay for the next visit (./nav.ts, the owner 2026-10-29).
+  useDeskPrefs(ui);
   // A chat opens on its newest message and follows the next ones, as on the phone (the owner, 2026-10-14: "電腦版打開聊天時
   // 看的是最新消息，而不是從上面慢慢滑到下面").
   const msgCount = (id: string | null) => (id ? data.customers.find(c => c.id === id)?.messages.length ?? 0 : 0);
@@ -142,14 +151,15 @@ export default function DeskScreens(p: DeskScreensProps) {
         setData(d => ({ ...d, notes: [note, ...(d.notes ?? [])] }));
         return true;
       },
-      async saveForm(form) {
-        const r = await call("crm_save_form", { p_id: form.id, p_name: form.name, p_sections: form.sections });
+      async saveForm(form, kind = "customer") {
+        const r = await call("crm_save_form", { p_id: form.id, p_name: form.name, p_sections: form.sections, p_kind: kind });
         if (!r) return false;
         const id = (r.data as { id?: string } | null)?.id ?? form.id ?? `f${Date.now()}`;
         const saved: CrmForm = { id, name: form.name, sections: form.sections };
+        const key = kind === "booking" ? "bookingForms" : "forms";
         setData(d => {
-          const list = d.forms ?? [];
-          return { ...d, forms: list.some(x => x.id === id) ? list.map(x => (x.id === id ? saved : x)) : [...list, saved] };
+          const list = d[key] ?? [];
+          return { ...d, [key]: list.some(x => x.id === id) ? list.map(x => (x.id === id ? saved : x)) : [...list, saved] };
         });
         return id;
       },
@@ -166,17 +176,27 @@ export default function DeskScreens(p: DeskScreensProps) {
       },
       async setActiveForm(id) {
         if (!(await call("crm_set_active_form", { p_id: id }))) return false;
-        setData(d => { const list = d.forms ?? []; const f = list.find(x => x.id === id); return f ? { ...d, forms: [f, ...list.filter(x => x.id !== id)] } : d; });
+        const first = (list: CrmForm[] | undefined) => { const f = (list ?? []).find(x => x.id === id); return f ? [f, ...(list ?? []).filter(x => x.id !== id)] : list; };
+        setData(d => ({ ...d, forms: first(d.forms), bookingForms: first(d.bookingForms) }));
         return true;
       },
       async deleteForm(id) {
         if (!(await call("crm_delete_form", { p_id: id }))) return false;
-        setData(d => ({ ...d, forms: (d.forms ?? []).filter(x => x.id !== id) }));
+        setData(d => ({ ...d, forms: (d.forms ?? []).filter(x => x.id !== id), bookingForms: (d.bookingForms ?? []).filter(x => x.id !== id) }));
         return true;
       },
       async saveRoomRemarks(roomId, remarks) {
         if (!(await call("crm_save_showroom_remarks", { p_id: roomId, p_remarks: remarks }))) return false;
         setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === roomId ? { ...r, remarks } : r)) }));
+        return true;
+      },
+      async saveRoomDraft(room, draft) {
+        if (!(await call("crm_save_showroom_draft", { p_room: room, p_draft: draft }))) return false;
+        setData(d => {
+          const next = { ...(d.roomDrafts ?? {}) };
+          if (draft) next[room] = { draft, by: me, at: new Date().toISOString() }; else delete next[room];
+          return { ...d, roomDrafts: next };
+        });
         return true;
       },
       async deleteRoom(roomId) {
@@ -240,11 +260,20 @@ export default function DeskScreens(p: DeskScreensProps) {
   const meta = useMemo(() => ({ data: metaData, loading: onChannels && !metaData && !metaErr, error: metaErr, reload: () => setMetaN(n => n + 1), origin }), [metaData, onChannels, metaErr, origin]);
 
   // People and teams in Title Case on the desktop (v2 › note 03) — display only; the writes take ids.
-  const shown = useMemo(() => ({ data: titleData(data), me: { ...p.me, name: titleName(p.me.name) }, teams: titleTeams(p.teams), directors: p.directors.map(d => ({ ...d, name: titleName(d.name) })) }), [data, p.me, p.teams, p.directors]);
+  // One brand at a time, as Lead View (the owner, 2026-10-29: "要分开 DC 和 The Conts 不同的专页，像 lead view 一样"): the
+  // sidebar's All · The Conts · Dream Crafter keeps every page to that brand's customers, their visits and journey (ui.insSrc,
+  // kept on this computer; Insight's own switch is the same choice). Writes still take ids.
+  const shown = useMemo(() => ({ data: inBrand(titleData(data), ui.insSrc as SourcePick | undefined), me: { ...p.me, name: titleName(p.me.name) }, teams: titleTeams(p.teams), directors: p.directors.map(d => ({ ...d, name: titleName(d.name) })) }), [data, p.me, p.teams, p.directors, ui.insSrc]);
   const nameOf = useCallback((id: string | null | undefined) => titleName(p.nameOf(id)), [p]);
+  // The Inbox's brand tabs count what waits in each brand, whichever is picked (as Lead View's).
+  const brandCounts = useMemo(() => {
+    const n = { all: 0, conts: 0, dc: 0 };
+    for (const c of data.customers) { if (!(c.unread > 0)) continue; n.all++; const b = sourceOf(c).brand; if (b) n[b]++; }
+    return n;
+  }, [data.customers]);
   const ctx = {
     data: shown.data, me: shown.me, now: p.now, live, ui, set: setUi, patch, act, deskAct, teams: shown.teams, directors: shown.directors, nameOf,
-    slotCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, exit: p.exit, meta,
+    slotCounts, brandCounts, W: size.W, H: size.H, app: p.app, toMine: p.toMine, viewAs: p.viewAs, exit: p.exit, meta,
   };
   const v = deskVM(ctx);
   // Inbox opens on its first chat, so the page is never an empty "Pick a chat" (the owner, 2026-10-24: "能不能默認打開第一個信息，
@@ -366,11 +395,34 @@ export default function DeskScreens(p: DeskScreensProps) {
   return (
     <div ref={boxRef} className={R.root} data-revenue-app="" style={{ position: "fixed", inset: 0, zIndex: 10, overflow: "auto" }}>
       <DeskApp v={v} />
+      {p.viewing && (
+        <div role="status" style={{ position: "fixed", top: "10px", left: "50%", transform: "translateX(-50%)", zIndex: 30, display: "flex", alignItems: "center", gap: "12px", height: "36px", padding: "0 6px 0 14px", borderRadius: "18px", background: "var(--crm-ink)", color: "#fff", font: "500 13px Inter, sans-serif", boxShadow: "0 8px 24px rgba(42,22,12,.25)", whiteSpace: "nowrap" }}>
+          <span>Viewing {p.viewing.name}&apos;s CRM</span>
+          {p.viewing.people.length > 1 && <ViewingSwitch v={p.viewing} />}
+          <button type="button" onClick={p.viewing.exit} style={{ height: "26px", padding: "0 12px", borderRadius: "13px", border: 0, background: "#fff", color: "var(--crm-ink)", font: "600 12px Inter, sans-serif", cursor: "pointer" }}>Exit</button>
+        </div>
+      )}
       {/* Save and apply to all's window (2026-10-24): over the split editor, drawn as the Add customer window. */}
       {v.applyWin && <DeskApplyAds v={v.applyWin} />}
       {/* The phone's photo / video / document viewer and the message dialogs (Forward, Info, Starred), shared. */}
       <MediaViewer />
       <MessageMenu />
     </div>
+  );
+}
+
+/** The viewing strip's Switch (the owner, 2026-10-29: "要有可以 switch 的功能"): another person's CRM straight away. */
+function ViewingSwitch({ v }: { v: NonNullable<DeskScreensProps["viewing"]> }) {
+  const [on, setOn] = useState(false);
+  return (
+    <span style={{ position: "relative", display: "flex" }}>
+      <button type="button" onClick={() => setOn(o => !o)} aria-expanded={on} style={{ height: "26px", padding: "0 10px", borderRadius: "13px", border: "1px solid rgba(255,255,255,.35)", background: "transparent", color: "#fff", font: "600 12px Inter, sans-serif", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px" }}>
+        Switch <span aria-hidden>▾</span>
+      </button>
+      {on && (<>
+        <span onClick={() => setOn(false)} style={{ position: "fixed", inset: 0, zIndex: 1 }} />
+        <ViewAsList people={v.people} current={v.id} pick={id => { setOn(false); if (id !== v.id) v.switchTo(id); }} style={{ position: "absolute", top: "34px", left: "50%", transform: "translateX(-50%)", zIndex: 2, color: "var(--crm-ink)" }} />
+      </>)}
+    </span>
   );
 }

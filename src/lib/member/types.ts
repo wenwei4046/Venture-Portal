@@ -81,6 +81,11 @@ export interface MemberModelOptions {
 export interface OptionCharge {
   value: string;
   charge: number;
+  /**
+   * A sofa special charged BY QUANTITY (Product List › Maintenance, 2026-10-26): the charge
+   * each, times the quantity the member sets on the Quote. Absent = charged once per sofa.
+   */
+  byQuantity?: boolean;
 }
 /**
  * What a model's options charge the customer (user 2026-10-04; every option
@@ -99,6 +104,12 @@ export interface MemberModelCharges {
   gaps?: OptionCharge[];
   total_heights?: OptionCharge[];
   specials?: OptionCharge[];
+  /**
+   * The fabric upgrades of the model's category (Product List › Maintenance › Fabrics, 2026-10-29):
+   * the Quote names a fabric tier, not a fabric, so the member picks one by its name — Standard,
+   * or "Upgrade fabric +RM 200" — a sofa once per sofa, a bed frame per frame.
+   */
+  fabric_upgrades?: OptionCharge[];
 }
 export interface MemberCatalogueModel {
   id: string;
@@ -173,7 +184,6 @@ export interface MemberIncome {
   personal: number;
   override: number;
   kpi: number;
-  openBill: number;
   incentive: number;
   group: number;
   total: number;
@@ -300,6 +310,8 @@ export interface BedframeBuild {
   total?: string;
   gap?: string;
   specials?: string[];
+  /** Its fabric upgrade, by name (2026-10-29); absent = Standard. */
+  fabricUpgrade?: string;
 }
 /**
  * The build for every sofa module in the cart — one seat height, one fabric
@@ -311,6 +323,13 @@ export interface QuoteBuild {
   tier?: string;
   leg?: string;
   specials?: string[];
+  /**
+   * How many of each special charged by quantity (2026-10-26) — `{ "Change 8030 Backcushion": 3 }`,
+   * for the whole cart; a special absent here counts 1. A special charged once per sofa has none.
+   */
+  specialQty?: Record<string, number>;
+  /** The sofas' fabric upgrade, by name (2026-10-29): charged once per sofa. Absent = Standard. */
+  fabricUpgrade?: string;
   bedframe?: BedframeBuild;
 }
 export interface QuoteInput {

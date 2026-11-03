@@ -39,6 +39,8 @@ export const AUDIT_READ_KEYS = [
   'guest_link',
   // HR › Attendance's settings, days, requests and balances (2026-10-15).
   'attendance',
+  // Lead View's brands, salespeople and customers (2026-10-16).
+  'leads',
 ] as const satisfies readonly Permission[]
 
 /**

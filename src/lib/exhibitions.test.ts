@@ -21,6 +21,14 @@ describe('brandCodeFor', () => {
     expect(brandCodeFor('  ', BRANDS)).toBeNull()
     expect(brandCodeFor(null, BRANDS)).toBeNull()
   })
+
+  // 2026-10-31: HappiSleep is Akemi's sub-brand — one brand, so one exhibition.
+  it('reads a sub-brand’s booth as its brand’s exhibition', () => {
+    const withSub = BRANDS.map(b => (b.code === 'AKEMI' ? { ...b, subBrands: ['HAPPI SLEEP'] } : b))
+    expect(brandCodeFor('HAPPI SLEEP', withSub)).toBe('AKEMI')
+    expect(exhibitionBrandOf({ booth: 'HAPPI SLEEP', brandCode: null }, withSub)).toBe('AKEMI')
+    expect(exhibitionBrandOf({ booth: 'HAPPI SLEEP', brandCode: null }, BRANDS)).toBe('HAPPI SLEEP')
+  })
 })
 
 describe('boothOf', () => {

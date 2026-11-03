@@ -93,6 +93,8 @@ const FRAMES: [string, string, number][] = [["haven", "Haven Divan", 1590], ["li
   ["ivy", "Ivy Low Profile", 1590], ["juno", "Juno Storage Drawers", 2590], ["kensington", "Kensington Royal", 3190]];
 const KPIS: [string, string, number][] = [["protector", "Mattress Protector", 250], ["pillowset", "Pillow Set (2)", 250], ["topper", "Comfort Topper", 390], ["sheet", "Fitted Sheet Set", 180]];
 const ACCS: [string, string, number, boolean][] = [["pillow", "Latex Contour Pillow", 290, false], ["protector", "Waterproof Protector", 260, true], ["bolster", "Bolster", 180, false]];
+/** Not in the prototype: a sofa brand's own accessories (2026-10-26, SKU Master's Sofa Accessory). */
+const SOFA_ACCS: [string, string, number, boolean][] = [["square", "Square Pillow", 30, false], ["long", "Long Pillow", 40, false], ["backcushion", "Back Cushion", 135, false], ["armrest", "Arm Rest", 80, false]];
 const RATIO = { sofa: 0.45, mattress: 0.42, frame: 0.44, acc: 0.3 };
 const DIVISOR = 0.7;
 const sp = (q: number, z: SizeKey) => Math.round((q * SIZE_M[z]) / 10) * 10;
@@ -103,17 +105,21 @@ const sizes = (id: (z: SizeKey) => string) => Object.fromEntries(SIZE_KEYS.map(z
  * The prototype has no bed frame or sofa options; `?charges=1` shows what
  * Modular's ticks and Maintenance's charges would look like (2026-10-05/06).
  */
-const NO_CHARGES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [] };
+const NO_CHARGES: FrameChoices = { divans: [], legs: [], gaps: [], totals: [], specials: [], upgrades: [] };
 const DEMO_CHARGES: FrameChoices = {
   divans: [{ value: '12"', charge: 50 }],
   legs: [{ value: '6"', charge: 100 }, { value: '7"', charge: 120 }],
   gaps: [{ value: '12"', charge: 20 }],
   totals: [],
   specials: [{ value: "Hydraulic", charge: 300 }, { value: "Divan Top Fully Cover", charge: 80 }],
+  // Not in the prototype: a fabric upgrade (2026-10-29).
+  upgrades: [{ value: "Upgrade fabric", charge: 150 }],
 };
 const DEMO_SOFA: QSofaChoices = {
   legs: [{ value: '4"', charge: 80 }, { value: '6"', charge: 100 }],
-  specials: [{ value: "Wooden Arm", charge: 120 }, { value: "Seat Add 1ft", charge: 150 }],
+  // Not in the prototype: one charged by quantity (2026-10-26).
+  specials: [{ value: "Wooden Arm", charge: 120 }, { value: "Seat Add 1ft", charge: 150 }, { value: "Change 8030 Backcushion", charge: 200, byQuantity: true }],
+  upgrades: [{ value: "Upgrade fabric", charge: 200 }],
 };
 
 function catalog(brand: { code: string; name: string; sofa: boolean }, charges = false): QCatalog {
@@ -133,9 +139,9 @@ function catalog(brand: { code: string; name: string; sofa: boolean }, charges =
     sofa: brand.sofa,
     models: [...models].sort((a, b) => a.name.localeCompare(b.name)),
     frames: FRAMES.map(([key, name]) => ({ key, name, sizes: sizes(z => `f:${key}:${z}`), choices: charges ? DEMO_CHARGES : NO_CHARGES })),
-    accs: ACCS.map(([key, name, , sized]) => ({ key, name, any: sized ? null : `a:${key}:`, sizes: sized ? sizes(z => `a:${key}:${z}`) : {} })),
+    accs: (brand.sofa ? SOFA_ACCS : ACCS).map(([key, name, , sized]) => ({ key, name, any: sized ? null : `a:${key}:`, sizes: sized ? sizes(z => `a:${key}:${z}`) : {} })),
     kpis: KPIS.map(([key, name, price]) => ({ key, name, price, productId: `k:${key}` })),
-    accSummary: "Pillow, protector, bolster",
+    accSummary: brand.sofa ? "Pillows, back cushion, arm rest" : "Pillow, protector, bolster",
   };
 }
 
@@ -169,7 +175,7 @@ function priced(productId: string): { list: number; cost: number; name: string; 
   }
   if (kind === "a") {
     const [key, z] = rest;
-    const [, name, p, sized] = ACCS.find(a => a[0] === key)!;
+    const [, name, p, sized] = [...ACCS, ...SOFA_ACCS].find(a => a[0] === key)!;
     const list = sized ? sp(p, (z || "Q") as SizeKey) : p;
     return { list, cost: list * RATIO.acc, name, kpi: false };
   }
@@ -209,7 +215,7 @@ function openSheet(name: string | undefined): SheetState | null {
     fx: name === "mattress-frame" ? { size: "K", frame: "linden", kpi: ["protector"], qty: 1, drop: false, idx: -1 } : null,
   });
   switch (name) {
-    case "sofa": return { mode: "sofa", key: "verona", layout: "R1", mods: { "2A-LHF": 1, CNR: 1, "2A-RHF": 1 }, qty: 1, kpi: ["protector"], height: null, tier: null, leg: null, specials: [] };
+    case "sofa": return { mode: "sofa", key: "verona", layout: "R1", mods: { "2A-LHF": 1, CNR: 1, "2A-RHF": 1 }, qty: 1, kpi: ["protector"], height: null, tier: null, leg: null, specials: [], specialQty: {}, acc: {}, accAll: false };
     case "mattress": return mattress(2);
     case "mattress-frame": return mattress(1);
     case "frame": return { mode: "frame", size: "Q", frame: "linden", kpi: ["protector", "pillowset"], qty: 2, drop: false };

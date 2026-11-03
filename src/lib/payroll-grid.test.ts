@@ -7,6 +7,7 @@ import {
   formatAmount,
   groupByDepartment,
   neighbourId,
+  noPayAmount,
   NO_DEPARTMENT,
   parseAmount,
   payrollRowWrite,
@@ -62,6 +63,50 @@ describe('rowUpdateFromEdit', () => {
     const update = rowUpdateFromEdit(edit, row, { commissionDerived: true })
     expect(update).not.toHaveProperty('commission_amount')
     expect(update).toMatchObject({ socso_er: 60, basic_salary: 3000 })
+  })
+
+  // The Deduct cell shows deduction + No Pay; saving it as typed would take the
+  // No Pay off twice (the unpaid days already do).
+  it('saves the deduction without the No Pay the Deduct cell shows', () => {
+    const shown = { ...row, unpaid_leave_days: 2, deduction_amount: 183.65, no_pay_amount: 183.65 }
+    expect(rowUpdateFromEdit(editFromRow(shown), shown, { commissionDerived: false }).deduction_amount).toBe(0)
+    const typed = editFromRow({ ...shown, deduction_amount: 283.65 })
+    expect(rowUpdateFromEdit(typed, shown, { commissionDerived: false }).deduction_amount).toBe(100)
+  })
+})
+
+// October 2026, imported from InfoTech (user: the Deduct column shows the No
+// Pay the file deducted; the unpaid days stay as well).
+describe('noPayAmount', () => {
+  const imported = {
+    source: 'imported',
+    unpaid_leave_days: 2,
+    basic_salary: 2800,
+    statutory_allowance: 0,
+    non_statutory_allowance: 0,
+    ot_amount: 0,
+    commission_amount: 0,
+    deduction_amount: 0,
+    gross: 2616.35,
+    prorata_days_in_month: 31,
+  }
+
+  it('is the file’s own No Pay on an imported row', () => {
+    expect(noPayAmount(imported)).toBe(183.65)
+    expect(noPayAmount({ ...imported, unpaid_leave_days: 1, basic_salary: 3500, gross: 3386.82 })).toBe(113.18)
+  })
+
+  it('leaves a withheld deduction out of the No Pay', () => {
+    expect(noPayAmount({ ...imported, deduction_amount: 50, gross: 2566.35 })).toBe(183.65)
+  })
+
+  it('is the unpaid days at the trigger’s rate on a row the portal works out', () => {
+    expect(noPayAmount({ ...imported, source: 'manual', gross: 2619.35 })).toBe(180.65)
+  })
+
+  it('is 0 with no unpaid days, and on a Revenue row', () => {
+    expect(noPayAmount({ ...imported, unpaid_leave_days: 0, gross: 2800 })).toBe(0)
+    expect(noPayAmount({ ...imported, source: 'commission' })).toBe(0)
   })
 })
 

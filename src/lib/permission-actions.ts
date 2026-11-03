@@ -27,10 +27,14 @@ export type FunctionKey =
   | 'documentation' | 'hiring' | 'rooms' | 'guest_link'
   // HR › Attendance (mig 20261015030000).
   | 'attendance'
+  // Lead View (mig 20261016300000).
+  | 'leads'
   // IT support's desk (mig 20261021020000).
   | 'it_requests'
   // Marketing's own view (mig 20261023214000).
   | 'marketing'
+  // Marketing's own pool in that view (mig 20261028120000).
+  | 'marketing_pool'
 
 /** Anybody gates can be asked about: their keys, and their actions when they were loaded. */
 export interface ActionHolder extends PermissionHolder {
@@ -116,10 +120,14 @@ export const KEY_ACTIONS: Readonly<Record<string, ReadonlyArray<`${FunctionKey}.
   guest_link: ['guest_link.view', 'guest_link.edit'],
   // HR › Attendance (20261015030000).
   attendance: ['attendance.view', 'attendance.create', 'attendance.edit', 'attendance.approve'],
+  // Lead View (20261016300000).
+  leads: ['leads.view', 'leads.create', 'leads.edit', 'leads.manage'],
   // IT support's desk (20261021020000): read everybody's requests; write notes and set their status.
   it_requests: ['it_requests.view', 'it_requests.edit'],
   // Marketing's own view (20261023214000): its pages, starting projects, working stages, approving, the manager tools.
   marketing: ['marketing.view', 'marketing.create', 'marketing.edit', 'marketing.approve', 'marketing.manage'],
+  // Marketing's own pool (20261028120000): Finance's Marketing P&L and Cash Flow, and their Excel and PDF.
+  marketing_pool: ['marketing_pool.view', 'marketing_pool.export'],
 }
 
 /**
@@ -163,8 +171,10 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'billing.export': 'all',
   'billing.void': 'all',
   'categories.manage': 'all',
-  'claims.approve': 'all',
+  // Claim & approve (2026-10-29, the claim process's PR ③): a department's requests read and approved at Dept.
+  'claims.approve': 'dept',
   'claims.create': 'own',
+  'claims.view': 'dept',
   'crm.edit': 'own',
   'crm.manage': 'all',
   'crm.view': 'own',
@@ -190,6 +200,11 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'hiring.create': 'all',
   'hiring.edit': 'all',
   'hiring.view': 'all',
+  // Lead View (2026-10-16).
+  'leads.create': 'all',
+  'leads.edit': 'all',
+  'leads.manage': 'all',
+  'leads.view': 'all',
   // Marketing's view (2026-10-23): the Tracking Dashboard is the manager's; a task started (Create), worked as its
   // stage's owner (Edit), decided as its approver (Approve) — mig 20261023234000. The formal log's files (④-3b — the
   // user's answer 18: all of Marketing may export a trail) ask View: the matrix's Marketing row has no Export cell.
@@ -198,6 +213,9 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'marketing.edit': 'all',
   'marketing.approve': 'all',
   'marketing.manage': 'all',
+  // Marketing's own pool (2026-10-28): its page and the lines it opens (View), its Excel and PDF (Export).
+  'marketing_pool.export': 'all',
+  'marketing_pool.view': 'all',
   // Sales Groups › Waiting list's "+" (2026-10-11): Member services · Edit.
   'member.manage': 'all',
   'opex.view': 'all',

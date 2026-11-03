@@ -17,7 +17,6 @@
 export const SCHEME_SWITCHES = [
   'enable_product_revenue',
   'enable_kpi',
-  'enable_open_bill',
   'enable_override',
   'enable_margin_penalty',
   'enable_margin_incentive',
@@ -31,7 +30,6 @@ export interface SchemeSettings extends Record<SchemeSwitch, boolean> {
   group_sales_depth?: number | null
   override_depth?: number | null
   direct_line_limit?: number | null
-  open_bill_basis: 'uplift_on_commission' | 'pct_of_revenue'
   override_includes_kpi: boolean
   /** 0–1 share of the order total; null = no deposit gate. */
   deposit_threshold_pct: number | string | null
@@ -45,14 +43,12 @@ export interface SchemeSettings extends Record<SchemeSwitch, boolean> {
 }
 
 /**
- * Every switch off, no deposit gate. The two enums keep the schema's defaults:
- * they only mean anything once their switch is on.
+ * Every switch off, no deposit gate. The rate mode keeps the schema's default.
  */
 export function blankSchemeSettings(): SchemeSettings {
   return {
     enable_product_revenue: false,
     enable_kpi: false,
-    enable_open_bill: false,
     enable_override: false,
     enable_margin_penalty: false,
     enable_margin_incentive: false,
@@ -62,7 +58,6 @@ export function blankSchemeSettings(): SchemeSettings {
     direct_line_limit: null,
     override_includes_kpi: false,
     deposit_threshold_pct: null,
-    open_bill_basis: 'uplift_on_commission',
     default_rate_mode: 'variable',
     revenue_cost_divisor: 1,
   }
@@ -73,7 +68,6 @@ export function copiedSchemeSettings(source: SchemeSettings): SchemeSettings {
   return {
     enable_product_revenue: source.enable_product_revenue,
     enable_kpi: source.enable_kpi,
-    enable_open_bill: source.enable_open_bill,
     enable_override: source.enable_override,
     enable_margin_penalty: source.enable_margin_penalty,
     enable_margin_incentive: source.enable_margin_incentive,
@@ -83,7 +77,6 @@ export function copiedSchemeSettings(source: SchemeSettings): SchemeSettings {
     direct_line_limit: source.direct_line_limit ?? null,
     override_includes_kpi: source.override_includes_kpi,
     deposit_threshold_pct: source.deposit_threshold_pct,
-    open_bill_basis: source.open_bill_basis,
     default_rate_mode: source.default_rate_mode,
     revenue_cost_divisor: source.revenue_cost_divisor ?? 1,
   }

@@ -71,13 +71,13 @@ export async function loadRepaymentBook(supabase: SupabaseClient, today: string,
     loansToo
       ? supabase
           .from('loans')
-          .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, repayment_start_date, terms_effective_from')
+          .select('id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, repayment_start_date, terms_effective_from, principal_per_month')
           .eq('status', 'active')
       : none,
     sourcesToo
       ? supabase
           .from('fund_sources')
-          .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, repayment_date, terms_effective_from, from_company_id, from_department_id, from_director_id, from_freetext_name')
+          .select('id, status, amount, cost_rate, lock_in_months, compound_interest, effective_date, repayment_start_month, repayment_date, terms_effective_from, principal_per_month, from_company_id, from_department_id, from_director_id, from_freetext_name')
           .in('status', ['active', 'matured'])
       : none,
     supabase.from('companies').select('id, name, short_code'),

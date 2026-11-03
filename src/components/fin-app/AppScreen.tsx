@@ -59,6 +59,11 @@ export interface BulkBar {
   off?: boolean
   onClear: () => void
   onGo?: () => void
+  /**
+   * A second step beside it, in Clear's place (2026-10-29 — Payment request's Reject beside Create PV; the select
+   * toggle's Done clears instead).
+   */
+  alt?: { label: string; onClick: () => void } | null
 }
 
 type Anim = Intent | 'in' | 'none'
@@ -255,9 +260,15 @@ export default function AppScreen({
             <span className={s.bulkMain}>{bulk.text}</span>
             <span className={s.bulkSub}>{bulk.sub}</span>
           </span>
-          <button type="button" className={s.bulkClear} onClick={bulk.onClear}>
-            Clear
-          </button>
+          {bulk.alt ? (
+            <button type="button" className={s.bulkClear} onClick={bulk.alt.onClick}>
+              {bulk.alt.label}
+            </button>
+          ) : (
+            <button type="button" className={s.bulkClear} onClick={bulk.onClear}>
+              Clear
+            </button>
+          )}
           {bulk.label && bulk.onGo ? (
             <button type="button" className={s.bulkGo} data-off={bulk.off ? 'true' : undefined} onClick={bulk.onGo}>
               {bulk.label}

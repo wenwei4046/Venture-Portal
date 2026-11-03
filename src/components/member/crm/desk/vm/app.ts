@@ -3,6 +3,7 @@
  * the prototype's own names (CrmFrame.dc.html; vm/proto-logic.ts is its logic, verbatim, for the pixel comparison) —
  * from the CRM's data, the phone's writes and permissions, and the desktop's own (PROPOSALS.md B1–B9).
  */
+import { deskLabelsVM } from "./labels";
 import type { DeskCtx } from "./ctx";
 import { frameVM } from "./frame";
 import { frame4aVM, heads4a } from "./frame4a";
@@ -52,6 +53,7 @@ export function deskVM(ctx: DeskCtx) {
     book: { avatar: "", title: "Appointment", sub: cur ? `${cur.name} · showroom visit` : "", subColor: "var(--crm-muted)", menu: false },
     note: { avatar: "", title: "Notes", sub: cur?.name ?? "", subColor: "var(--crm-muted)", menu: false },
     form: { avatar: "", title: "Edit customer", sub: data.customers.find(c => c.id === (ui.infoId ?? ""))?.name ?? "", subColor: "var(--crm-muted)", menu: false },
+    partner: { avatar: "", title: "Partner booking", sub: "", subColor: "var(--crm-muted)", menu: false },
   };
   const as = assignPageVM(ctx, op);
   const awC = ui.awChat ? data.customers.find(c => c.id === ui.awChat) : undefined;
@@ -73,6 +75,10 @@ export function deskVM(ctx: DeskCtx) {
     ...channelsVM(ctx),
     ...adsPerfVM(ctx),
     ...reportsVM(ctx),
+    // Workspace (2026-10-27): one's own Weekly / Monthly reports (DeskWorkspace.tsx, vm/workspace-report.ts).
+    kWorkspace: ui.tab === "workspace",
+    workspace: { customers: data.customers, visits: data.visits, adNames: data.adNames ?? {}, nameOf: ctx.nameOf, now: ctx.now, live: ctx.live,
+      teams: ctx.teams.map(t => ({ id: t.id, name: t.name, people: t.people.map(p => p.id) })) },
     ...chatProgressVM(ctx, op),
     // 4a's chat head (frame 02): the avatar in the customer's tint and, for a chat, the wait in oxblood ("Attention ·
     // waiting 6 h") or its status in the muted line's colour.
@@ -83,6 +89,7 @@ export function deskVM(ctx: DeskCtx) {
     pinShown: chat.pinShown, pinText: chat.pinText, unpinMsg: chat.unpinMsg, replyOn: chat.replyOn, replyWho: chat.replyWho, replyText: chat.replyText, cancelReply: chat.cancelReply,
     attachOpen: chat.attachOpen, attachToggle: chat.attachToggle, attachClose: chat.attachClose, attachOpts: chat.attachOpts,
     emojiOpen: chat.emojiOpen, emojiToggle: chat.emojiToggle, emojiFg: chat.emojiFg, emoji: chat.emoji,
+    suggest: chat.suggest, suggestKey: chat.suggestKey, pickSuggest: chat.pickSuggest, suggestLogo: chat.suggestLogo, suggestLib: chat.suggestLib,
     // The design's one-message chat bindings, unused live (desk-chat-v2.cjs draws every message): the sample's values.
     sysLines: [] as { text: string; at: string }[], msgShown: false, chatIn: false, chatOut: false, chatText: "", chatTime: "", chatAppt: false,
     ...chatMenuVM(ctx, chat),
@@ -97,6 +104,7 @@ export function deskVM(ctx: DeskCtx) {
     ibBook: () => { if (ui.chat) patch({ menu: false, kind: "book", book: null }); },
     openNote: () => { if (ui.chat) patch({ menu: false, kind: "note" }); },
     editInfo: () => patch({ kind: "form", cform: null }),
+    ibLabels: deskLabelsVM(ctx, cur),
     kBook: ui.kind === "book", kNote: ui.kind === "note", kForm: ui.kind === "form",
     book: bookVM(ctx, cur), note: noteVM(ctx, cur), cform: customerFormVM(ctx, data.customers.find(c => c.id === (ui.infoId ?? ui.chat ?? ""))), history: historyVM(ctx),
     cyclePeriod: () => { const order = ["month", "week", "day"] as const, i = order.indexOf(ui.insPer as (typeof order)[number]); patch({ insPer: order[(i + 1) % order.length], insRange: null }); },

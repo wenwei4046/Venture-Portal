@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { priceGridOf, type PriceCell } from '@/lib/catalogue/pricing'
 import { calcCategoryOf, defaultGift, needsBrandPick, sellsUnderBrand, skuOptionLabel } from '@/lib/catalogue/options'
 import { normaliseComboModules } from '@/lib/catalogue/combos'
+import { isKivSize, type KivSize } from '@/lib/catalogue/edits'
+import { brandCodeFor, type BrandWords } from '@/lib/brand-code'
 
 /**
  * What the Product List reads: the ERP's catalogue as mirrored (`erp_*`, items
@@ -66,40 +68,35 @@ function newness(rows: Row[]): (firstSeen: string | null) => boolean {
 
 // ─── Brands — the margin ladder a model sells under ─────────────────────────
 
-export interface BrandRef {
-  code: string
-  name: string
-}
+/** A brand by its code, its name and its sub-brands (`lib/brand-code.ts`). */
+export type BrandRef = BrandWords
 
 async function loadBrands(sb: SupabaseClient): Promise<BrandRef[]> {
   const data = await all((from, to) => sb
     .from('comm_brands')
-    .select('code, name, is_active, created_at')
+    .select('code, name, sub_brands, is_active, created_at')
     .eq('is_active', true)
     .order('created_at')
     .order('id')
     .range(from, to))
-  const seen = new Set<string>()
-  const out: BrandRef[] = []
+  const byCode = new Map<string, BrandRef>()
   for (const r of (data ?? []) as Row[]) {
     const code = String(r.code)
-    if (seen.has(code)) continue
-    seen.add(code)
-    out.push({ code, name: String(r.name ?? code) })
+    const subBrands = Array.isArray(r.sub_brands) ? r.sub_brands.map(String) : []
+    const seen = byCode.get(code)
+    // One brand per code, as the database names it — and every scheme's sub-brands
+    // of it, as erp_sync_brand_code reads every active row.
+    if (seen) seen.subBrands = [...new Set([...(seen.subBrands ?? []), ...subBrands])]
+    else byCode.set(code, { code, name: String(r.name ?? code), subBrands })
   }
-  return out
-}
-
-/** `erp_sync_brand_code` in TypeScript: a brand by its code or its name. */
-function brandByName(name: string | null, brands: BrandRef[]): string | null {
-  const n = (name ?? '').trim().toUpperCase()
-  if (!n) return null
-  return brands.find(b => b.code.toUpperCase() === n || b.name.toUpperCase() === n)?.code ?? null
+  return [...byCode.values()]
 }
 
 /**
  * `catalogue_brand_of`: only a mattress or a sofa sells under a brand; every
  * other category is a rider (user 2026-09-12), whatever the ERP writes on it.
+ * The brand is the one the ERP's branding names — by its code, its name or a
+ * sub-brand (HAPPI SLEEP is Akemi's, 2026-10-31), `brandCodeFor`.
  */
 export function brandOf(
   category: string | null,
@@ -108,7 +105,7 @@ export function brandOf(
   brands: BrandRef[],
 ): string | null {
   if (!sellsUnderBrand(category)) return null
-  return brandByName(modelBranding, brands) ?? brandByName(skuBranding, brands)
+  return brandCodeFor(modelBranding, brands) ?? brandCodeFor(skuBranding, brands)
 }
 
 // ─── The mirror's pulse ─────────────────────────────────────────────────────
@@ -434,6 +431,8 @@ export interface MaintenanceOption {
   removed: boolean
   isNew: boolean
   price: number | null
+  /** A sofa special charged by the quantity the member sets (2026-10-26); false = once (per sofa, per frame). */
+  byQuantity: boolean
 }
 
 export interface FabricRow {
@@ -450,9 +449,22 @@ export interface FabricRow {
   removed: boolean
 }
 
-export async function loadMaintenance(): Promise<{ options: MaintenanceOption[]; fabrics: FabricRow[] }> {
+/**
+ * A fabric upgrade (2026-10-29, Maintenance › Fabrics › Sofa / Bedframe
+ * upgrades): its name — what the Quote says — its charge, and the fabric series
+ * ticked under it, as the fabric list spells them.
+ */
+export interface FabricUpgradeRow {
+  id: string
+  category: 'SOFA' | 'BEDFRAME'
+  name: string
+  price: number
+  series: string[]
+}
+
+export async function loadMaintenance(): Promise<{ options: MaintenanceOption[]; fabrics: FabricRow[]; upgrades: FabricUpgradeRow[] }> {
   const sb = await untyped()
-  const [options, prices, fabrics] = await Promise.all([
+  const [options, prices, fabrics, upgrades, upgradeSeries] = await Promise.all([
     all((f, t) =>
       sb
         .from('erp_maintenance_options')
@@ -464,7 +476,7 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
         .range(f, t),
     ),
     all((f, t) =>
-      sb.from('catalogue_option_prices').select('pool, value, price').eq('erp_company_id', 1).order('pool').order('value').range(f, t),
+      sb.from('catalogue_option_prices').select('pool, value, price, by_quantity').eq('erp_company_id', 1).order('pool').order('value').range(f, t),
     ),
     all((f, t) =>
       sb
@@ -475,8 +487,23 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
         .order('erp_id')
         .range(f, t),
     ),
+    all((f, t) =>
+      sb.from('catalogue_fabric_upgrades').select('id, category, name, price').eq('erp_company_id', 1).order('name').order('id').range(f, t),
+    ),
+    all((f, t) =>
+      sb
+        .from('catalogue_fabric_upgrade_series')
+        .select('upgrade_id, series')
+        .eq('erp_company_id', 1)
+        .order('series')
+        .order('upgrade_id')
+        .range(f, t),
+    ),
   ])
+  const seriesOf = new Map<string, string[]>()
+  for (const s of upgradeSeries) seriesOf.set(String(s.upgrade_id), [...(seriesOf.get(String(s.upgrade_id)) ?? []), String(s.series)])
   const priceOf = new Map(prices.map(p => [`${p.pool}\u0000${p.value}`, num(p.price)]))
+  const counted = new Set(prices.filter(p => p.by_quantity === true).map(p => `${p.pool}\u0000${p.value}`))
   const isNew = newness(options)
   return {
     options: options.map(o => ({
@@ -488,6 +515,7 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
       removed: o.removed_at !== null && o.removed_at !== undefined,
       isNew: isNew(str(o.first_seen_at)),
       price: priceOf.get(`${o.pool}\u0000${o.value}`) ?? null,
+      byQuantity: counted.has(`${o.pool}\u0000${o.value}`),
     })),
     fabrics: fabrics.map(f => ({
       erpId: String(f.erp_id),
@@ -501,6 +529,11 @@ export async function loadMaintenance(): Promise<{ options: MaintenanceOption[];
       active: f.active !== false,
       removed: f.removed_at !== null && f.removed_at !== undefined,
     })),
+    upgrades: upgrades.flatMap(u => {
+      const category = String(u.category)
+      if (category !== 'SOFA' && category !== 'BEDFRAME') return []
+      return [{ id: String(u.id), category, name: String(u.name), price: num(u.price) ?? 0, series: seriesOf.get(String(u.id)) ?? [] }]
+    }),
   }
 }
 
@@ -719,6 +752,23 @@ export interface CostRatioRow {
   code: string
   ratio: number
   updatedAt: string | null
+}
+
+export interface KivCostRow {
+  size: KivSize
+  cost: number
+}
+
+/** Costing Setting › KIV bed frames (2026-10-31): what a still-to-be-chosen frame of each size costs, every sub-department alike. */
+export async function loadKivCosts(): Promise<KivCostRow[]> {
+  const sb = await untyped()
+  const { data, error } = await sb.from('catalogue_kiv_costs').select('size_code, cost').eq('erp_company_id', 1)
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as Row[]).flatMap(r => {
+    const size = str(r.size_code)
+    const cost = num(r.cost)
+    return isKivSize(size) && cost !== null ? [{ size, cost }] : []
+  })
 }
 
 export async function loadCostRatios(schemeId: string): Promise<CostRatioRow[]> {

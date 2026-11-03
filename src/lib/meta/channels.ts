@@ -13,7 +13,8 @@ export const graph = (path: string) => `https://graph.facebook.com/${GRAPH_VERSI
 export interface PageInfo { id: string; name: string; followers: number | null; about: string; phone: string; website: string; email: string; hours: Record<string, string> | null; picture: string | null }
 export interface MessengerProfile { greeting: string; ice: string[]; menu: { title: string; type: string }[] }
 export interface WaNumber { id: string; number: string; verifiedName: string; quality: string; limit: string; nameStatus: string }
-export interface WaProfile { about: string; address: string; description: string; email: string; websites: string[]; vertical: string }
+/** `picture`: the profile picture Meta shows (its own short-lived link; the owner, 2026-10-29: "我的 WA 已经加 profile pic 了"). */
+export interface WaProfile { about: string; address: string; description: string; email: string; websites: string[]; vertical: string; picture?: string }
 export interface WaAutomation { welcome: boolean; prompts: string[]; commands: { name: string; description: string }[] }
 export interface MetaTemplate { name: string; category: string; language: string; status: string }
 export interface MetaPermission { permission: string; status: string }
@@ -66,7 +67,8 @@ export function parseWaProfile(j: { data?: Record<string, unknown>[] } | null): 
   const d = j?.data?.[0];
   if (!d) return null;
   return { about: String(d.about ?? ""), address: String(d.address ?? ""), description: String(d.description ?? ""), email: String(d.email ?? ""),
-    websites: Array.isArray(d.websites) ? (d.websites as string[]) : [], vertical: String(d.vertical ?? "") };
+    websites: Array.isArray(d.websites) ? (d.websites as string[]) : [], vertical: String(d.vertical ?? ""),
+    ...(typeof d.profile_picture_url === "string" && d.profile_picture_url.startsWith("https://") ? { picture: d.profile_picture_url } : {}) };
 }
 /** WhatsApp's business categories (the profile's `vertical`), as the profile names them. */
 export const WA_VERTICALS: [string, string][] = [
@@ -108,7 +110,7 @@ export const readMessengerProfile = (pageToken: string, f: typeof fetch = fetch)
 export const readWaNumbers = (waba: string, token: string, f: typeof fetch = fetch) =>
   getJson<{ data?: Record<string, unknown>[] }>(graph(`${waba}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,messaging_limit_tier,name_status`), token, f).then(parseWaNumbers);
 export const readWaProfile = (pn: string, token: string, f: typeof fetch = fetch) =>
-  getJson<{ data?: Record<string, unknown>[] }>(graph(`${pn}/whatsapp_business_profile?fields=about,address,description,email,websites,vertical`), token, f).then(parseWaProfile);
+  getJson<{ data?: Record<string, unknown>[] }>(graph(`${pn}/whatsapp_business_profile?fields=about,address,description,email,websites,vertical,profile_picture_url`), token, f).then(parseWaProfile);
 export const readWaAutomation = (pn: string, token: string, f: typeof fetch = fetch) =>
   getJson<{ conversational_automation?: { enable_welcome_message?: boolean; prompts?: string[]; commands?: { command_name: string; command_description: string }[] } }>(graph(`${pn}?fields=conversational_automation`), token, f)
     .then(j => (j ? { welcome: !!j.conversational_automation?.enable_welcome_message, prompts: j.conversational_automation?.prompts ?? [], commands: (j.conversational_automation?.commands ?? []).map(c => ({ name: c.command_name, description: c.command_description })) } : null));

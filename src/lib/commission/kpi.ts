@@ -27,24 +27,62 @@
  * Straight are two add-ons. Hand-typed AutoCount-era text ("HEADBOARD DO
  * STRAIGHT") parses to nothing and is not found.
  *
- * The twin of the SQL in migration 20260927050000 (`comm_kpi_hits`); the run,
- * the month page, the member app and the calculator must find the same items.
+ * A FABRIC SERIES (2026-10-29, user: "kpi item can selected with fabric
+ * series as well. for sofa and bedframe") is the third kind: a bed frame's or
+ * a sofa's, each its own item with its own amount. FOUND by the fabric the
+ * line carries (`parseLineFacts().fabric` — `variants.fabricCode`, else the
+ * first word of `description2`) looked up on the ERP's fabric list
+ * (`erp_fabrics`: code → series), so a fabric keyed TBC on the ERP is found
+ * the day the order comes back with its fabric. A bed frame's counts per bed
+ * frame; a sofa's once per sofa SET (user: "Sofa 每组算一次") — the bill's
+ * pieces of one model (its code before the first '-') in that series, as many
+ * sets as its fewest pieces: two PC151 sofas on one bill are two.
+ *
+ * The twin of the SQL in migrations 20260927050000 and 20261030010000
+ * (`comm_kpi_hits`); the run, the month page, the member app and the
+ * calculator must find the same items. The calculator's cart names no fabric,
+ * so a quote finds no fabric series.
  */
 
 import { valueKey } from '@/lib/catalogue/keys'
 import { parseLineFacts } from '@/lib/catalogue/facts'
 
-export const KPI_OPTION_POOLS = ['bedframe_specials', 'sofa_specials'] as const
+export const KPI_OPTION_POOLS = ['bedframe_specials', 'sofa_specials', 'bedframe_fabric_series', 'sofa_fabric_series'] as const
 export type KpiOptionPool = (typeof KPI_OPTION_POOLS)[number]
 
 export function isKpiOptionPool(pool: string): pool is KpiOptionPool {
   return (KPI_OPTION_POOLS as readonly string[]).includes(pool)
 }
 
-/** The ERP item group a special's pool belongs to. */
+/** The two pools whose value is a fabric series, not a Maintenance special. */
+export const KPI_FABRIC_POOLS = ['bedframe_fabric_series', 'sofa_fabric_series'] as const
+export type KpiFabricPool = (typeof KPI_FABRIC_POOLS)[number]
+
+export function isFabricSeriesPool(pool: string | null | undefined): pool is KpiFabricPool {
+  return (KPI_FABRIC_POOLS as readonly (string | null | undefined)[]).includes(pool)
+}
+
+/** The ERP item group a pool belongs to. */
 const POOL_GROUP: Record<KpiOptionPool, string> = {
   bedframe_specials: 'BEDFRAME',
   sofa_specials: 'SOFA',
+  bedframe_fabric_series: 'BEDFRAME',
+  sofa_fabric_series: 'SOFA',
+}
+
+/**
+ * What a fabric series item is called wherever one is listed — the same series
+ * may be a sofa's item and a bed frame's. `catalogue_save_kpi_items` stores it
+ * as the item's name, so the member app's KPI card reads it too: keep the two
+ * spellings the same.
+ */
+const FABRIC_LABEL: Record<KpiFabricPool, string> = {
+  bedframe_fabric_series: 'Bed frame fabric',
+  sofa_fabric_series: 'Sofa fabric',
+}
+
+export function fabricSeriesLabel(pool: KpiFabricPool, series: string): string {
+  return `${series.trim()} · ${FABRIC_LABEL[pool]}`
 }
 
 export interface KpiItem {
@@ -52,7 +90,7 @@ export interface KpiItem {
   source?: 'sku' | 'option'
   /** SKU items: the ERP Item Code a line carries. */
   productCode?: string | null
-  /** Option items: which Maintenance pool, and the option's own spelling. */
+  /** Option items: which pool — a Maintenance special's or a fabric series' — and its own spelling. */
   optionPool?: KpiOptionPool | null
   optionValue?: string | null
   /** What a person reads: the SKU's name, or the special. */
@@ -79,6 +117,64 @@ export function lineSpecialsOf(
   return specials.length > 0 ? specials : undefined
 }
 
+/** A fabric on the ERP's fabric list, as far as finding its series needs it (`erp_fabrics`). */
+export interface FabricSeriesRow {
+  fabric_code: string
+  series: string | null
+  removed_at?: string | null
+  active?: boolean | null
+  synced_at?: string | null
+}
+
+/** Fabric code (`kpiCodeKey`) → its series. */
+export type FabricSeriesIndex = ReadonlyMap<string, string>
+
+export const EMPTY_FABRIC_SERIES: FabricSeriesIndex = new Map()
+
+/**
+ * The fabric list as `comm_kpi_hits` reads it: a code compared trimmed and in
+ * any case, a fabric with no series left out, and where the ERP lists a code
+ * twice the live row, then the active one, then the latest delivery's.
+ */
+export function indexFabricSeries(rows: readonly FabricSeriesRow[]): FabricSeriesIndex {
+  const rank = (r: FabricSeriesRow) => [r.removed_at ? 0 : 1, r.active === false ? 0 : 1, r.synced_at ?? ''] as const
+  const best = new Map<string, FabricSeriesRow>()
+  for (const row of rows) {
+    const code = kpiCodeKey(row.fabric_code)
+    if (!code || !(row.series ?? '').trim()) continue
+    const held = best.get(code)
+    if (!held) {
+      best.set(code, row)
+      continue
+    }
+    const [a, b] = [rank(row), rank(held)]
+    if (a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] > b[2])))) best.set(code, row)
+  }
+  return new Map([...best].map(([code, row]) => [code, (row.series ?? '').trim()]))
+}
+
+/**
+ * The specials and the fabric series a sales line carries — what a bed frame's
+ * or a sofa's KPI items are found by. The line's facts read once, the way
+ * `catalogue_line_facts` reads them; its fabric's series from the fabric list.
+ */
+export function lineKpiFactsOf(
+  itemGroup: string | null | undefined,
+  description2: string | null | undefined,
+  variants: unknown,
+  fabrics: FabricSeriesIndex = EMPTY_FABRIC_SERIES,
+): { specials?: string[]; fabricSeries?: string } {
+  const group = kpiCodeKey(itemGroup)
+  if (group !== 'BEDFRAME' && group !== 'SOFA') return {}
+  const raw = variants === undefined || variants === null ? undefined : { variants }
+  const { specials, fabric } = parseLineFacts(description2 ?? null, raw)
+  const fabricSeries = fabric && fabrics.size > 0 ? fabrics.get(kpiCodeKey(fabric)) : undefined
+  return {
+    ...(specials.length > 0 ? { specials } : {}),
+    ...(fabricSeries ? { fabricSeries } : {}),
+  }
+}
+
 /** A line as far as finding KPI items needs it. */
 export interface KpiLine {
   id: string
@@ -88,6 +184,8 @@ export interface KpiLine {
   qty: number
   /** The specials the line carries, as printed (`LineFacts.specials`). */
   specials?: readonly string[]
+  /** The series of the fabric the line carries (`lineKpiFactsOf`). */
+  fabricSeries?: string
   upsale?: boolean
 }
 
@@ -119,15 +217,22 @@ export function kpiItemKey(item: Pick<KpiItem, 'source' | 'productCode' | 'optio
 export function kpiItemLabel(item: KpiItem): string {
   const own = (item.label ?? '').trim()
   if (own) return own
-  return kpiSourceOf(item) === 'sku' ? kpiCodeKey(item.productCode) : (item.optionValue ?? '').trim()
+  if (kpiSourceOf(item) === 'sku') return kpiCodeKey(item.productCode)
+  const value = (item.optionValue ?? '').trim()
+  return isFabricSeriesPool(item.optionPool) ? fabricSeriesLabel(item.optionPool, value) : value
+}
+
+const OPTION_KINDS: Record<KpiOptionPool, { kind: string; counted: string }> = {
+  bedframe_specials: { kind: 'Bed frame special', counted: 'Per bed frame' },
+  sofa_specials: { kind: 'Sofa special', counted: 'Once per sofa bill' },
+  bedframe_fabric_series: { kind: 'Bed frame fabric series', counted: 'Per bed frame' },
+  sofa_fabric_series: { kind: 'Sofa fabric series', counted: 'Once per sofa set' },
 }
 
 /** What an item is, and how a bill counts it — the words the tabs print. */
 export function kpiItemKind(item: Pick<KpiItem, 'source' | 'optionPool'>): { kind: string; counted: string } {
   if (kpiSourceOf(item) === 'sku') return { kind: 'SKU', counted: 'Per unit' }
-  return item.optionPool === 'sofa_specials'
-    ? { kind: 'Sofa special', counted: 'Once per sofa bill' }
-    : { kind: 'Bed frame special', counted: 'Per bed frame' }
+  return (item.optionPool && OPTION_KINDS[item.optionPool]) || OPTION_KINDS.bedframe_specials
 }
 
 export function indexKpiItems(items: readonly KpiItem[]): KpiIndex {
@@ -179,12 +284,23 @@ function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100
 }
 
+/**
+ * The sofa a piece belongs to on a bill, as a fabric series counts it: the
+ * model its code names before the first '-' (8030-1A(LHF) → 8030), else the
+ * line on its own — `comm_kpi_hits`' SPLIT_PART.
+ */
+function sofaModelOf(line: KpiLine): string {
+  return kpiCodeKey(line.productCode).split('-')[0] || `line:${line.id}`
+}
+
 /** Every KPI item a bill carries. An upsale HR recorded is never one. */
 export function orderKpiHits(order: { lines: readonly KpiLine[]; upsale?: boolean }, index: KpiIndex): KpiHit[] {
   if (index.size === 0 || order.upsale) return []
   const hits: KpiHit[] = []
   // Once-a-bill specials (a sofa's): item key → the hit being built.
   const perBill = new Map<string, KpiHit>()
+  // A sofa's fabric series, once per sofa set: model + item key → its pieces.
+  const perSet = new Map<string, { item: KpiItem; itemKey: string; lineId: string; sum: number; fewest: number }>()
 
   for (const line of order.lines) {
     if (line.upsale) continue
@@ -192,10 +308,28 @@ export function orderKpiHits(order: { lines: readonly KpiLine[]; upsale?: boolea
     if (sku) {
       hits.push({ item: sku, itemKey: kpiItemKey(sku), lineId: line.id, qty: line.qty, amount: round2(line.qty * sku.kpiAmount) })
     }
-    if (!line.specials?.length) continue
     const group = kpiCodeKey(line.itemGroup)
+    const series = valueKey(line.fabricSeries)
+    if (series) {
+      for (const poolName of KPI_FABRIC_POOLS) {
+        if (POOL_GROUP[poolName] !== group) continue
+        const item = index.byOption.get(poolName)?.get(series)
+        if (!item) continue
+        const key = kpiItemKey(item)
+        if (poolName === 'bedframe_fabric_series') {
+          hits.push({ item, itemKey: key, lineId: line.id, qty: line.qty, amount: round2(line.qty * item.kpiAmount) })
+          continue
+        }
+        const setKey = `${sofaModelOf(line)}\u0000${key}`
+        const set = perSet.get(setKey) ?? { item, itemKey: key, lineId: line.id, sum: 0, fewest: Infinity }
+        set.sum += line.qty
+        set.fewest = Math.min(set.fewest, Math.abs(line.qty))
+        perSet.set(setKey, set)
+      }
+    }
+    if (!line.specials?.length) continue
     for (const [poolName, pool] of index.byOption) {
-      if (POOL_GROUP[poolName] !== group) continue
+      if (POOL_GROUP[poolName] !== group || isFabricSeriesPool(poolName)) continue
       // One line may print a special twice; it is still one add-on.
       const seen = new Set<KpiItem>()
       for (const special of line.specials) {
@@ -221,6 +355,13 @@ export function orderKpiHits(order: { lines: readonly KpiLine[]; upsale?: boolea
     const qty = Math.sign(hit.qty)
     if (qty === 0) continue
     hits.push({ ...hit, qty, amount: round2(qty * hit.item.kpiAmount) })
+  }
+  // As many sets as the sofa's fewest pieces (×2 everywhere = two sofas), its
+  // sign the sofa's: a return takes them back, an exchange of a piece is none.
+  for (const set of perSet.values()) {
+    const qty = Math.sign(set.sum) * Math.max(1, Math.floor(set.fewest))
+    if (qty === 0) continue
+    hits.push({ item: set.item, itemKey: set.itemKey, lineId: set.lineId, qty, amount: round2(qty * set.item.kpiAmount) })
   }
   return hits
 }

@@ -133,7 +133,7 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | customer | `header.debtor_name`, `header.debtor_code` | |
 | branch | `header.sales_location` | the WAREHOUSE the goods ship from (KL / PG / SRW). Stored as `location`; descriptive only |
 | **venue** | `header.venue` | **the fair itself** — "SUNWAY PYRAMID CONVENTION CENTRE", "MIDVALLEY SOUTHKEY JB". Free text the ERP types (`venue_id` is present but never populated). Its own column since 2026-09-16, with sales grouped by it on the month page |
-| brand | `header.branding`, then `vpBrand`, then `fair.brand` | matched to `comm_brands` by code or name, case-insensitive: the ERP's Branding when it names a brand; else the brand the salesperson picked (§3.5); else the brand of the fair booth (not a cancelled one); else from the lines' `branding`; else Item Code prefixes; else none (warning). `erp_sync_order_brand`, mig `20260927080000` |
+| brand | `header.branding`, then `vpBrand`, then `fair.brand` | matched to `comm_brands` by code, name or sub-brand (`sub_brands` — HAPPI SLEEP is Akemi's, mig `20261031200000`), case-insensitive: the ERP's Branding when it names a brand; else the brand the salesperson picked (§3.5); else the brand of the fair booth (not a cancelled one); else from the lines' `branding`; else Item Code prefixes; else none (warning). `erp_sync_order_brand`, mig `20260927080000` |
 | sales value | `header.local_total_sen` / 100 | the list's "Amount" (`subtotal_sen` as fallback) |
 | balance | `header.balance_sen_live` / 100 (else `balance_sen`) | what the deposit gate measures |
 | created at | `header.created_at` | orders the 1st / 2nd / 3rd bill of the day |
@@ -141,6 +141,7 @@ spelling (`IN_PRODUCTION`, `READY_TO_SHIP`, …); the portal normalises.
 | lines | `items[]` where `cancelled = false`, by `line_no` | `item_group`, `item_code`, `description`, `description2`, `qty`, `unit_price_sen`, `total_sen`, `branding` |
 | **line build** | `items[].variants` (since 2026-09-24) | ALLOWLISTED to `fabricCode`, `seatHeight`, `legHeight`, `divanHeight`, `gap`, `totalHeight`, `size`, `specials` (strings) and stored on the line's `raw.variants` — what the cost rule reads a sofa's seat height and a bed frame's options from before it ever parses `description2` (§9.4). The ERP's `variants` also carries money (`extraAddonAmountRM`) and free text; neither is kept, and the ERP's own builder now sends only the allowlist |
 | line cost | `items[].line_cost_sen` / 100 | stored on `raw.cost` only. **Since 2026-09-24 it decides no margin** — every line is priced from the Product List (§9) |
+| **sofa special orders** | `items[].custom_specials` (kept on the ORDER's `raw.items` since 2026-10-26) | `[{ description, surchargeSen }]` — a preset add-on at the ERP's price, *Custom / other*'s extra charge. **Not read since 2026-10-27:** a bill's sofa specials are the line's `variants.specials` at Maintenance's price — once per sofa, or once per compartment when Maintenance charges it by quantity (`catalogue_apply_sofa_charges`, mig `20261027020300`; the user: "只照 Maintenance"). For one day (mig `20261026173700`) they were charged the `surchargeSen` — RM 0 on every sofa bill. Nothing the ERP needs to change |
 | **fair** | `fair` (since 2026-09-27) | the event the salesperson picked — see §3.4. Pinned to the bill; its venue, organiser and days are the fair's everywhere on the portal |
 | **brand pick** | `vpBrand` (since 2026-09-27) | the brand the salesperson said the bill is for when its products name none — see §3.5. Stored on `raw.vpBrand` |
 
@@ -168,7 +169,7 @@ ERP's `branding` is never changed by it.
 
 | Value | Means |
 |---|---|
-| a `project_brands` name (`AKEMI`, `DUNLOPILLO`, …) | the bill is that brand's — matched to `comm_brands` like Branding (`DUNLOPILLO` → `DUNLOP`) |
+| a `project_brands` name (`AKEMI`, `DUNLOPILLO`, …) | the bill is that brand's — matched to `comm_brands` like Branding (`DUNLOPILLO` → `DUNLOP`, `HAPPI SLEEP` → `AKEMI`) |
 | `null` / absent | not asked (the products name a brand), or skipped |
 
 Anything but a string is no pick — never a reason to refuse the sale. The
@@ -266,7 +267,7 @@ Every delivery becomes one row in the portal's `erp_sync_events` and one of:
 
 | Outcome | When | Written? |
 |---|---|---|
-| `applied` | a new order, an update, or an order becoming excluded | yes — header upserted, lines replaced, day re-sequenced, Open Bill suggestions re-derived, batch counters refreshed |
+| `applied` | a new order, an update, or an order becoming excluded | yes — header upserted, lines replaced, day re-sequenced, batch counters refreshed |
 | `duplicate` | same `snapshotAt` as the row already holds | no |
 | `stale` | an older `snapshotAt` than the row already holds (out-of-order retry) | no |
 | `held` | the month's commission run is **applied/locked**, the month is **closed to the feed** (`erp_feed_closed_months`, 2026-09-26 — a delivery that would write into OR out of it), or the month was **file-imported**. Since 2026-10-12 (mig `20261012200000`) a NEW document whose sale month is paid or closed is no longer held: it is `applied` in the first month still open from the month it was keyed in (message *created — keyed late: sold in September 2026, which is paid, so it counts in October 2026*); held only when no month up to the office's own is open | no — payload kept; HR replays after reopening the run or the month |
@@ -846,6 +847,29 @@ whether its commission had already been given. A delivery that changed
 nothing the portal reads (a cost the portal does not use) writes no row. A
 fault in the trail is a `change_trail_failed` warning on the delivery's log,
 never a failed delivery: the ERP still gets its 200.
+
+**Whose sale (2026-10-31, migs `20261031030000` / `20261031030100`).** After the
+trail, a delivery that OPENED a bill (`message` *created …*) asks whose sale it
+is: a bill whose paper number is already on another salesperson's order — a
+bill of the portal's, or an ERP order the portal never had (`erp_order_papers`,
+loaded from the ERP by `scripts/load-erp-order-papers.mjs`) — is held out of
+its month until HR answers on Comm Cal › Whose sale. The delivery itself is
+applied as it was; its log says `whose_sale` when the bill was held and
+`whose_sale_check_failed` when the check faulted — never a failed delivery: the
+ERP still gets its 200. The ERP's *Shared with* (`collaborator_staff_ids`) is
+read as who looks after an order, never a part of its sale.
+
+**A salesperson changed on a bill the portal has (2026-10-31, mig
+`20261031040000`).** An applied delivery whose `salespersonId` differs from the
+one before — from one of the portal's people to somebody else — is stopped: the
+bill stays with whom it was (pinned, as *Move a bill to another salesperson*
+pins it) until HR answers on Comm Cal › Whose sale. The delivery is still
+applied and logged; its log says `whose_sale_moved`, or
+`whose_sale_move_failed` when the check faulted — never a failed delivery.
+Moved again while HR has not answered, the question follows the ERP: given on
+to another of the portal's people, it is asked about them now (`whose_sale_moved`
+again); given back to whom it was kept for, the stop comes off
+(`whose_sale_move_undone`).
 
 **When a change is a drop or an upsell to answer.** While a bill's commission
 has not been given, a change simply counts in its own month. Once it has — a

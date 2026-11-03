@@ -4,13 +4,9 @@ import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
 import { officeMonth } from '@/lib/office-time'
 import { primedRegistryRows } from '@/lib/dept-registry'
-import { statementDepts, statementPath, type StatementView } from '@/lib/dept-statements'
-import { loadMonthlyCashFlow, loadMonthlyPnl } from '@/lib/monthly-statements'
-import { rangeLabel, reportRange, toChoices } from '@/lib/report-range'
-import { segmentFilterFor } from '../../../reports/_components/report-segments'
+import { statementDepts, statementPath, statementPeriod } from '@/lib/dept-statements'
 import { openDeptPoolRow } from '../../../reports/drill-actions'
-import DeptPeriodBar from './_components/DeptPeriodBar'
-import { DeptCashFlowBody, DeptPnlBody } from './_components/DeptStatementBody'
+import { renderDeptStatement } from './_components/DeptStatementScreen'
 
 // A department's own P&L and Cash Flow, under Dept Pool (2026-10-09, the
 // user: 我要把每个 department 的 cash flow, P&L 放过来 — Venture, Marketing,
@@ -27,10 +23,11 @@ import { DeptCashFlowBody, DeptPnlBody } from './_components/DeptStatementBody'
 // names the statement ("Marketing - Cash Flow"), the switch sits in the period
 // row with 6 / 12 months — which may reach back across the year — and the
 // charts stand between the cards and the statement.
+//
+// 2026-10-28: the page itself is drawn by renderDeptStatement, which Marketing's
+// own pool draws too.
 
 export const dynamic = 'force-dynamic'
-
-const YM = /^\d{4}-\d{2}$/
 
 interface Props {
   params: Promise<{ seg: string }>
@@ -47,80 +44,28 @@ export default async function DeptStatementPage({ params, searchParams }: Props)
   const dept = statementDepts(primedRegistryRows()).find((d) => d.slug === seg)
   if (!dept) notFound()
 
-  const sp = await searchParams
   // The Cash Flow first (2026-10-12, user: default 开 cash flow 先); an old
   // ?view=cash-flow link lands there too.
-  const view: StatementView = sp.view === 'pnl' ? 'pnl' : 'cash-flow'
   const nowYM = officeMonth()
-  const period = YM.test(sp.period ?? '') ? (sp.period as string) : nowYM
-  const range = reportRange({ from: sp.from, period }, nowYM, { crossYear: true })
-  const args = {
-    year: range.year,
-    throughMonth: range.throughMonth,
-    segment: segmentFilterFor(dept.segment),
-    consolidated: false,
-    ...(range.buildFrom ? { from: range.buildFrom } : {}),
-  }
-  // What the switch keeps: the period as the address gave it.
-  const kept = { period: YM.test(sp.period ?? '') ? period : undefined, from: range.wholeYear ? undefined : range.from }
-  const exportHref = (format: 'xlsx' | 'pdf') => {
-    const qs = new URLSearchParams({ format, period: range.to })
-    qs.set('segment', dept.segment)
-    if (!range.wholeYear) qs.set('from', range.from)
-    return `/reports/${view === 'pnl' ? 'monthly-pnl' : 'monthly-cash-flow'}/export?${qs.toString()}`
-  }
+  const { view, range, kept } = statementPeriod(await searchParams, nowYM)
 
-  const head = (
-    <>
-      <div className="page-head">
-        <div className="min-w-0">
-          <div className="page-eyebrow">
-            <em>I.</em> DEPARTMENTS · {dept.label.toUpperCase()} · {rangeLabel(range.from, range.to).toUpperCase()}
-          </div>
-          <h1 className="page-title">
-            {dept.label} - {view === 'pnl' ? 'Profit & Loss' : 'Cash Flow'}
-          </h1>
-        </div>
-        {/* The files for whoever may take them out — the route asks Dept reports · Export (2026-10-16). */}
-        {canDo(user, 'dept_reports', 'export') ? (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <a href={exportHref('xlsx')} className="btn-quiet-sheet">
-              Excel
-            </a>
-            <a href={exportHref('pdf')} className="btn-quiet-sheet">
-              PDF
-            </a>
-          </div>
-        ) : null}
-      </div>
-      <DeptPeriodBar
-        view={view}
-        links={{ pnl: statementPath(dept.slug, 'pnl', kept), 'cash-flow': statementPath(dept.slug, 'cash-flow', kept) }}
-        from={range.from}
-        to={range.to}
-        toOptions={toChoices(nowYM)}
-      />
-    </>
-  )
-
-  // An account opens onto its months and lines for this segment (2026-10-24), through this page's own action.
-  const drill = { open: openDeptPoolRow, segment: dept.segment }
-
-  if (view === 'cash-flow') {
-    const cashFlow = await loadMonthlyCashFlow(supabase, args)
-    return (
-      <div className="dept-page">
-        {head}
-        <DeptCashFlowBody cashFlow={cashFlow} range={range} nowYM={nowYM} label={dept.label} drill={drill} />
-      </div>
-    )
-  }
-
-  const pnl = await loadMonthlyPnl(supabase, args)
-  return (
-    <div className="dept-page">
-      {head}
-      <DeptPnlBody pnl={pnl} range={range} nowYM={nowYM} label={dept.label} drill={drill} />
-    </div>
-  )
+  return renderDeptStatement({
+    reader: supabase,
+    label: dept.label,
+    segment: dept.segment,
+    view,
+    range,
+    nowYM,
+    links: { pnl: statementPath(dept.slug, 'pnl', kept), 'cash-flow': statementPath(dept.slug, 'cash-flow', kept) },
+    // The files for whoever may take them out — the route asks Dept reports · Export (2026-10-16).
+    canExport: canDo(user, 'dept_reports', 'export'),
+    exportHref: (format) => {
+      const qs = new URLSearchParams({ format, period: range.to })
+      qs.set('segment', dept.segment)
+      if (!range.wholeYear) qs.set('from', range.from)
+      return `/reports/${view === 'pnl' ? 'monthly-pnl' : 'monthly-cash-flow'}/export?${qs.toString()}`
+    },
+    // An account opens onto its months and lines for this segment (2026-10-24), through this page's own action.
+    drill: { open: openDeptPoolRow, segment: dept.segment },
+  })
 }

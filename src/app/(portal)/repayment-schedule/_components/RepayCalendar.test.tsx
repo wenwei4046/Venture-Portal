@@ -5,7 +5,8 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 // handoff): the month's installments on their days, money we collect (↓,
 // Fund OUT) and money we pay (↑, Fund IN), each tinted by where it stands —
 // paid, due, part paid, overdue; a card on hover, the record on a click, and
-// "+N more" when a day holds more than four.
+// "+N more" when a day holds more than four. (One paid before its month is no
+// entry at all since 2026-11-02 — lib/repayment-calendar.)
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }))

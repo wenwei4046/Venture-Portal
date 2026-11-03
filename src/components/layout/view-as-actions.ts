@@ -31,7 +31,8 @@ export async function setViewAs(formData: FormData) {
   if (!((perms as string[] | null) ?? []).includes('view_switch')) {
     redirect(row.role === 'revenue_member' ? '/member' : '/dashboard')
   }
-  if (target !== 'principal' && !isViewAsRole(target)) redirect('/dashboard')
+  // Lead View (2026-10-16) is pages of its own, not a mask: the account's own view, opened on /leads.
+  if (target !== 'principal' && target !== 'lead' && !isViewAsRole(target)) redirect('/dashboard')
 
   const store = await cookies()
   // Picking a view ends viewing as a person (2026-10-11).
@@ -57,6 +58,7 @@ export async function setViewAs(formData: FormData) {
     secure: process.env.NODE_ENV === 'production',
   })
   if (target === 'revenue_member') redirect('/member')
+  if (target === 'lead') redirect('/leads')
   // Management links leave Revenue View without accepting arbitrary redirects.
   const destination = formData.get('destination')
   if (target === 'principal' && typeof destination === 'string' &&

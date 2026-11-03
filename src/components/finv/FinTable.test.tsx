@@ -198,3 +198,52 @@ describe('the table’s Select', () => {
     expect(onToggleAll).toHaveBeenCalledWith([ROWS[1], ROWS[2]])
   })
 })
+
+// Payment request's list (2026-10-29, PR ④): the boxes always there, only a box ticks — a press elsewhere on the row
+// still opens it; and a tag after a name that the filter does not list.
+describe('the table’s boxes, only the box ticking', () => {
+  it('a box ticks its row; a press on the row still opens it, the open row lit', async () => {
+    const onToggle = vi.fn()
+    const onRowClick = vi.fn()
+    render(
+      <FinTable
+        layoutId="test.table"
+        title="All requests"
+        rows={ROWS}
+        rowKey={(r) => r.id}
+        columns={COLUMNS}
+        amountOf={(r) => r.amount}
+        activeKey="1"
+        onRowClick={onRowClick}
+        emptyText="No requests here."
+        select={{ on: true, boxOnly: true, isSelected: (r) => r.id === '2', canSelect: (r) => r.status === 'pending', onToggle, onToggleAll: vi.fn() }}
+      />,
+    )
+    await act(async () => undefined)
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveAttribute('data-active', 'true')
+    expect(rows[1]).not.toHaveAttribute('data-active')
+    expect(screen.getByRole('button', { name: 'Tick LHDN' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Tick Meta Platforms Ireland' })).toHaveAttribute('data-faint', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Tick KWSP' }))
+    expect(onToggle).toHaveBeenCalledWith(ROWS[2])
+    expect(onRowClick).not.toHaveBeenCalled()
+    fireEvent.click(rows[2])
+    expect(onRowClick).toHaveBeenCalledWith(ROWS[2])
+    expect(onToggle).toHaveBeenCalledTimes(1)
+  })
+
+  it('a tag stays after the name, and the name’s filter lists the name alone', async () => {
+    const tagged: FinColumn<Row>[] = COLUMNS.map((c) => (c.key === 'name' ? { ...c, tag: (r: Row) => (r.id === '2' ? '2 → 1 PV' : null) } : c))
+    render(
+      <FinTable layoutId="test.table" title="All requests" rows={ROWS} rowKey={(r) => r.id} columns={tagged} amountOf={(r) => r.amount} onRowClick={() => undefined} emptyText="—" />,
+    )
+    await act(async () => undefined)
+    const cell = within(screen.getAllByRole('row')[2]).getAllByRole('cell')[0]
+    expect(cell).toHaveAttribute('data-tagged', 'true')
+    expect(cell).toHaveTextContent('LHDN2 → 1 PV')
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Name' }))
+    const pop = screen.getByRole('dialog', { name: 'Filter · Name' })
+    expect(within(pop).getAllByRole('menuitemcheckbox').map((b) => b.textContent)).toEqual(['KWSP1', 'LHDN1', 'Meta Platforms Ireland1'])
+  })
+})

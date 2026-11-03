@@ -29,6 +29,17 @@ describe('brandingOf', () => {
     expect(brandingOf(model('ARIZONA', 'BEDFRAME', 'BEDFRAME'), brands)).toEqual({ key: 'BEDFRAME', label: 'BEDFRAME' })
   })
 
+  // 2026-10-31 (user: "happisleep is the subbrand of akemi … i wnat make them into one").
+  it('sits a sub-brand under its brand — HAPPI SLEEP under AKEMI, beside ZEN COOL', () => {
+    const withSub = brands.map(b => (b.code === 'AKEMI' ? { ...b, subBrands: ['HAPPI SLEEP'] } : b))
+    expect(brandingOf(model('EASE COOL', 'MATTRESS', 'HAPPI SLEEP'), withSub)).toEqual({ key: 'AKEMI', label: 'AKEMI' })
+    expect(brandingOf(model('FRESH COOL', 'MATTRESS', null, { skus: [sku(' happi sleep ')] }), withSub)).toEqual({ key: 'AKEMI', label: 'AKEMI' })
+    expect(brandingOf(model('EASE COOL', 'MATTRESS', 'HAPPI SLEEP'), brands)).toEqual({ key: 'HAPPI SLEEP', label: 'HAPPI SLEEP' })
+    const mattress = modularBoard([model('APEX', 'MATTRESS', 'AKEMI'), model('EASE COOL', 'MATTRESS', 'HAPPI SLEEP'),
+      model('HAPPI SLEEP ZEN COOL', 'MATTRESS', null, { skus: [sku('AKEMI')] })], categories, withSub)[0]
+    expect(mattress.groups.map(g => [g.branding?.label ?? null, codes(g.models)])).toEqual([['AKEMI', ['APEX', 'EASE COOL', 'HAPPI SLEEP ZEN COOL']]])
+  })
+
   it("falls back to the SKUs' branding, as derivedBrand does, and returns null for none", () => {
     expect(brandingOf(model('HAPPI SLEEP ZEN COOL', 'MATTRESS', null, { skus: [sku(null), sku('AKEMI')] }), brands)).toEqual({ key: 'AKEMI', label: 'AKEMI' })
     expect(brandingOf(model('ALAMANDA', 'MATTRESS', '  ', { skus: [sku(null), sku(' ')] }), brands)).toBeNull()

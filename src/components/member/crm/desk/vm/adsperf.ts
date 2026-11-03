@@ -13,10 +13,11 @@ import { INS_CARDS, MON } from "./insight";
 import { columnSizer } from "./columns";
 import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES, SERIES_TINT } from "./adschart";
 import { ST_META } from "./tokens";
+import { adPageInSource, BRAND_LABEL, brandOf, inSource, SOURCE_PICKS, sourceLabel, sourceOf, type SourcePick } from "@/lib/member/crm-source";
 
 type Fmt = "rm" | "rm2" | "n" | "pct" | "x" | "t";
 export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
-  ["Popular", "Meta Ads", [["spend", "Amount spent", "Total charged in the period", "rm"], ["impr", "Impressions", "Times the ad was on screen", "n"], ["reach", "Reach", "People who saw the ad at least once", "n"], ["results", "Results", "Messaging conversations started", "n"], ["cpr", "Cost per result", "Amount spent ÷ results", "rm2"], ["delivery", "Delivery", "Running, paused or in review", "t"]]],
+  ["Popular", "Meta Ads", [["spend", "Amount spent", "Total charged in the period", "rm"], ["dbudget", "Daily budget", "Set in Ads Manager today: the ad set's, else its campaign's (shared by its ad sets)", "rm"], ["impr", "Impressions", "Times the ad was on screen", "n"], ["reach", "Reach", "People who saw the ad at least once", "n"], ["results", "Results", "Messaging conversations started", "n"], ["cpr", "Cost per result", "Amount spent ÷ results", "rm2"], ["delivery", "Delivery", "Running, paused or in review", "t"]]],
   ["Delivery", "Meta Ads", [["freq", "Frequency", "Impressions ÷ reach", "x"], ["cpm", "CPM", "Cost per 1,000 impressions", "rm2"], ["cpp", "Cost per 1,000 reached", "Amount spent ÷ reach × 1,000", "rm2"]]],
   ["Messaging", "Meta Ads", [["msgconv", "Messaging conversations started", "Chats opened from the ad", "n"], ["cpmsg", "Cost per conversation started", "Amount spent ÷ conversations started", "rm2"], ["newmsg", "New messaging contacts", "People who messaged the page for the first time", "n"], ["msgreply", "Conversations replied", "Chats where the page replied", "n"], ["blocks", "Messaging blocks", "People who blocked the page after the ad", "n"]]],
   ["Clicks", "Meta Ads", [["clicks", "Link clicks", "Clicks on the ad link", "n"], ["cpc", "Cost per link click", "Amount spent ÷ link clicks", "rm2"], ["ctr", "CTR (link)", "Link clicks ÷ impressions", "pct"], ["allclk", "Clicks (all)", "Every click on the ad, incl. profile and likes", "n"], ["ctrall", "CTR (all)", "Clicks (all) ÷ impressions", "pct"], ["cpcall", "CPC (all)", "Amount spent ÷ clicks (all)", "rm2"], ["outclk", "Outbound clicks", "Clicks that left Facebook or Instagram", "n"]]],
@@ -25,8 +26,32 @@ export const METRICS: [string, string, [string, string, string, Fmt][]][] = [
   ["From this CRM", "Revenue app", [["leads", "Leads", "Chats that came in from the ad", "n"], ["cpl", "Cost per lead", "Amount spent ÷ leads", "rm2"], ["appt", "Appointments", "Leads who booked a visit", "n"], ["showup", "Showed up", "Visits marked as showed up", "n"], ["won", "Won", "Leads marked won", "n"], ["apptrate", "Appointment rate", "Appointments ÷ leads", "pct"], ["cpappt", "Cost per appointment", "Amount spent ÷ appointments", "rm2"], ["showrate", "Show-up rate", "Showed up ÷ appointments", "pct"], ["winrate", "Win rate", "Won ÷ leads", "pct"], ["cpwon", "Cost per won", "Amount spent ÷ won", "rm2"]]],
 ];
 export const ALL = METRICS.flatMap(g => g[2]);
+
+/** Column order's drag: the row held (`from`, as the state has it now) moved to where the pointer is; null when it is there already. */
+/**
+ * A drag passes a row or chip only once the pointer is past its middle, in the way it is moving (the owner, 2026-10-29: "无法
+ * 拉动/根本不灵敏"): two neighbours of different sizes swapped back and forth under a pointer that sat over both.
+ */
+export function pastMiddle(from: number | null | undefined, to: number, e: { clientX?: number; clientY?: number; currentTarget?: unknown }, axis: "x" | "y"): boolean {
+  if (from == null || from === to) return false;
+  const el = e.currentTarget as { getBoundingClientRect?: () => { left: number; top: number; width: number; height: number } } | undefined;
+  const r = el?.getBoundingClientRect?.(), at = axis === "x" ? e.clientX : e.clientY;
+  if (!r || at == null || (!r.width && !r.height)) return true;
+  const mid = axis === "x" ? r.left + r.width / 2 : r.top + r.height / 2;
+  return to > from ? at >= mid : at <= mid;
+}
+/**
+ * What a drag's start changes on screen waits a moment (2026-10-29): Chrome drops a drag whose element is redrawn inside its
+ * own dragstart, which is why the metrics would not move at all.
+ */
+export const afterDragStart = (run: () => void) => { setTimeout(run, 0); };
+export function moveHeld(list: string[], from: number | null | undefined, to: number): string[] | null {
+  if (from == null || from === to || from < 0 || from >= list.length) return null;
+  const c = [...list]; const [x] = c.splice(from, 1); c.splice(to, 0, x); return c;
+}
 /** The chart's metrics are the table's (2026-10-23, the owner: "他的资料跟下方的 + 是一样的"), less Delivery. */
-const CHART_METRICS = ALL.filter(m => m[3] !== "t").map(m => [m[0], m[1], chartFmtOf(m[3])] as const);
+// The daily budget is today's setting, not a day-by-day figure, so the chart leaves it out.
+const CHART_METRICS = ALL.filter(m => m[3] !== "t" && m[0] !== "dbudget").map(m => [m[0], m[1], chartFmtOf(m[3])] as const);
 // 4a's columns (frame 05): Leads, Appts, Appt rate, Show-up, Won, Won rate, Spend, Per lead — the rest from +. Spend and Per
 // lead say RM in their heads (2026-10-23, the owner: "spend（加RM） & per lead （加RM）").
 export const DEF = ["leads", "appt", "apptrate", "showrate", "won", "winrate", "spend", "cpl"];
@@ -44,13 +69,19 @@ export function crmFigures(cs: CrmCustomer[], ctx: DeskCtx, a: number, b: number
   const inR = (iso: string) => { const t = new Date(iso).getTime(); return t >= a && t < b + DAY; };
   const leads = cs.filter(c => inR(c.createdAt)), ids = new Set(leads.map(c => c.id));
   const vs = ctx.data.visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled");
-  const appt = new Set(vs.map(v => v.customerId)).size, showup = vs.filter(v => v.state === "attended").length, won = leads.filter(c => c.status === "won").length;
+  const appt = new Set(vs.map(v => v.customerId)).size, showup = new Set(vs.filter(v => v.state === "attended").map(v => v.customerId)).size, won = leads.filter(c => c.status === "won").length;
   return { leads: leads.length, appt, showup, won, apptrate: leads.length ? (appt / leads.length) * 100 : null, showrate: appt ? (showup / appt) * 100 : null, winrate: leads.length ? (won / leads.length) * 100 : null };
 }
 /**
  * Meta's figures for a set of ads over a range, summed (null when none of them could be read), and every metric built
  * from them with the CRM's own (2026-10-22, the owner: "做花费和每个名单成本"): cost per lead / appointment / won.
  */
+/** The daily budgets of some ads, a shared (campaign) budget counted once; null when none of them has a daily budget. */
+export function dailyBudget(figs: (MetaFig | null | undefined)[]): number | null {
+  const by = new Map<string, number>();
+  for (const f of figs) if (f?.budget?.daily) by.set(f.budget.key, f.budget.daily);
+  return by.size ? [...by.values()].reduce((a, b) => a + b, 0) : null;
+}
 export function metaFigures(figs: (MetaFig | null | undefined)[], crm: Record<string, number | null>): Record<string, number | null> {
   const got = figs.filter((f): f is MetaFig => !!f);
   if (!got.length) return {};
@@ -60,7 +91,7 @@ export function metaFigures(figs: (MetaFig | null | undefined)[], crm: Record<st
   return { spend: s.spend, impr: s.impr, reach: s.reach, results: s.msgconv, msgconv: s.msgconv, cpr: per(s.msgconv), cpmsg: per(s.msgconv),
     freq: s.reach ? s.impr / s.reach : null, cpm: s.impr ? (s.spend / s.impr) * 1000 : null, cpp: s.reach ? (s.spend / s.reach) * 1000 : null,
     clicks: s.clicks, cpc: per(s.clicks), ctr: s.impr ? (s.clicks / s.impr) * 100 : null, allclk: s.allClicks, ctrall: s.impr ? (s.allClicks / s.impr) * 100 : null, cpcall: per(s.allClicks),
-    cpl: per(crm.leads), cpappt: per(crm.appt), cpwon: per(crm.won) };
+    cpl: per(crm.leads), cpappt: per(crm.appt), cpwon: per(crm.won), dbudget: dailyBudget(got) };
 }
 export const fmt = (v: number | null | undefined, t: Fmt) => (v == null ? "—" : t === "rm" ? Math.round(v).toLocaleString("en-MY") : t === "rm2" ? v.toFixed(2) : t === "pct" ? `${v.toFixed(2)}%` : t === "x" ? v.toFixed(2) : Math.round(v).toLocaleString("en-MY"));
 
@@ -104,8 +135,14 @@ export function adsPerfVM(ctx: DeskCtx) {
   // An ad hidden by a right click on its name (crm_hide_ad, CRM · Manage; the owner, 2026-10-24: "hide ads 的部分只需要在電腦版，
   // 你幫我做右鍵點擊廣告名稱可以選擇hide") is left out — the list and the total — unless *Hidden ads · show* is on.
   const hiddenN = new Set([...data.customers.map(c => c.adId ?? ""), ...added].filter(id => id && data.adNames?.[id]?.hidden)).size;
-  const ads = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].filter(id => ui.apShowHidden || !data.adNames?.[id]?.hidden).map(id => { const cs = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id);
-    return { id, name: cs[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !cs.length || cs.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs }; });
+  // The source picked (the owner, 2026-10-27: DC and The Conts, each WhatsApp · Messenger): an ad's leads from that source, an ad
+  // with none yet by its Page; the list, the chart and the total all follow it.
+  const src = (ui.apSrc ?? "all") as SourcePick;
+  const ads = [...new Set([...data.customers.map(c => c.adId ?? `ch:${c.channel}`), ...added])].filter(id => ui.apShowHidden || !data.adNames?.[id]?.hidden).map(id => { const all = data.customers.filter(c => (c.adId ?? `ch:${c.channel}`) === id), cs = all.filter(c => inSource(c, src));
+    const s0 = all[0] ? sourceOf(all[0]) : null, brand = s0?.brandLabel || (brandOf(data.adNames?.[id]?.pageId) ? BRAND_LABEL[brandOf(data.adNames?.[id]?.pageId)!] : "");
+    return { id, name: all[0]?.ad ?? data.adNames?.[id]?.name ?? id, ch: !all.length || all.some(c => c.channel === "whatsapp") ? "WhatsApp" : "Messenger", cs, brand, // An ad with no lead in the brand picked at the top (Insight's DC / The Conts) is listed only when its Page is that brand's — else
+    // the other brand's ads stood there with 0 leads (the owner, 2026-10-30: "我在msg 跑广告怎么都没显示出来？" — the page was on Dream Crafter).
+    keep: (all.length > 0 || adPageInSource(data.adNames?.[id]?.pageId, ui.insSrc as SourcePick | undefined)) && (src === "all" || cs.length > 0 || (!all.length && adPageInSource(data.adNames?.[id]?.pageId, src))) }; }).filter(a => a.keep);
   const apStF = ui.apStF;
   const AD = ads.filter(a => apStF === "all" || status(a.id) === apStF);
   const val = (cs: CrmCustomer[], ids: string[], k: string, a: number, b: number): number | null => { const crm = crmFigures(cs, ctx, a, b); return crm[k] ?? metaFigures(metaOf(ids, a, b), crm)[k] ?? null; };
@@ -213,9 +250,10 @@ export function adsPerfVM(ctx: DeskCtx) {
         custom: k === "custom", pick: () => { if (k !== "custom") patch({ apRange: k }); } })),
       cols: cols.map(m => ({ id: m[0], label: SHORT[m[0]] ?? m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: srt?.k === m[0] ? (srt.dir === "asc" ? "↑" : "↓") : "", num: m[3] !== "t",
         sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) })),
-      rows: ADs.slice(pg * per, pg * per + per).map(a => ({ name: a.name, headline: a.cs.find(c => c.adHeadline)?.adHeadline ?? "", ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
+      rows: ADs.slice(pg * per, pg * per + per).map(a => ({ name: a.name, headline: [a.brand, a.cs.find(c => c.adHeadline)?.adHeadline ?? ""].filter(Boolean).join(" · "), ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
         // The ad itself (the newest https link Meta sent with its leads, else Ads Manager), and hiding it from this list.
-        url: a.id.startsWith("ch:") ? "" : [...a.cs].sort((x, y) => y.createdAt.localeCompare(x.createdAt)).find(c => c.adUrl?.startsWith("https://"))?.adUrl ?? `https://adsmanager.facebook.com/adsmanager/manage/ads?selected_ad_ids=${a.id}`,
+        // The ad itself, asked of Meta by the server (/member/crm-ad), not one customer's referral link (2026-10-29).
+        url: a.id.startsWith("ch:") ? "" : `/member/crm-ad/${encodeURIComponent(a.id)}`,
         hidden: !!data.adNames?.[a.id]?.hidden,
         hide: data.can.manage && !a.id.startsWith("ch:") ? () => { const on = !data.adNames?.[a.id]?.hidden; void ctx.act.hideAd(a.id, on).then(ok => { if (ok) patch({ toast: on ? `${a.name} hidden from Ads Performance` : `${a.name} shown again` }); }); } : undefined,
         cells: cols.map(m => { const c = cell(a.cs, m, false, a.id, [a.id]), raw = val(a.cs, [a.id], m[0], ra, rb); return { ...c, bar: m[0] === "apptrate" && raw != null ? Math.min(100, Math.round(raw * 2)) : null }; }) })),
@@ -223,6 +261,8 @@ export function adsPerfVM(ctx: DeskCtx) {
       total: { label: `All ${AD.length} ads`, cells: cols.map(m => (m[0] === "delivery" ? { v: "", cv: "", d: "", dc: "", db: "" } : cell(allCs, m, true, "", AD.map(x => x.id)))) },
       cmp,
     },
+    apSrcOpen: !!ui.apSrcOpen, apSrcToggle: () => set(u => ({ ...u, apSrcOpen: !u.apSrcOpen, apStOpen: false })), apSrcCur: { label: sourceLabel(src), n: AD.length },
+    apSrcOpts: SOURCE_PICKS.map(p => { const on = src === p.v; return { label: p.label, sub: p.sub, bg: on ? "var(--crm-tint-attention)" : "transparent", w: on ? 700 : 550, pad: p.sub ? "22px" : "10px", pick: () => patch({ apSrc: p.v, apSrcOpen: false, apPg: 0 } as Partial<typeof ui>) }; }),
     apStOpen: ui.apStOpen, apStToggle: () => set(u => ({ ...u, apStOpen: !u.apStOpen })), apStCur: { label: ST_META[apStF][0], dot: ST_META[apStF][1], n: AD.length },
     apStOpts: (["all", "Running", "Paused", "Pending"] as const).map(k => { const on = apStF === k, n = k === "all" ? ads.length : ads.filter(a => status(a.id) === k).length;
       return { label: ST_META[k][0], dot: ST_META[k][1], n, bg: on ? ST_META[k][3] : "transparent", fg: on ? ST_META[k][4] : "var(--crm-ink)", w: on ? 700 : 550, pick: () => patch({ apStF: k, apStOpen: false }) }; }),
@@ -254,9 +294,9 @@ export function adsPerfVM(ctx: DeskCtx) {
     mq: ui.mq, setMq: (e: { target: { value: string } }) => patch({ mq: e.target.value }), resetMetrics: () => patch({ mDraft: [...(forCards ? INS_CARDS : forChart ? CHART_DEF.filter((k): k is string => !!k) : DEF)] }),
     mFoldAllLabel: METRICS.every(g => ui.mFold[g[0]]) ? "Expand all" : "Collapse all",
     mFoldAll: () => set(u => { const all = METRICS.every(g => u.mFold[g[0]]); return { ...u, mFold: { ...u.mFold, ...Object.fromEntries(METRICS.map(g => [g[0], !all])) } }; }),
-    mGroups: METRICS.map(([label, src, items]) => ({ label, src, open: !!q || !ui.mFold[label], rot: !!q || !ui.mFold[label] ? 0 : -90, nSel: `${items.filter(m => dsel.includes(m[0])).length} of ${items.filter(m => !(forChart && m[3] === "t")).length}`,
+    mGroups: METRICS.map(([label, src, items]) => ({ label, src, open: !!q || !ui.mFold[label], rot: !!q || !ui.mFold[label] ? 0 : -90, nSel: `${items.filter(m => dsel.includes(m[0])).length} of ${items.filter(m => !(forChart && (m[3] === "t" || m[0] === "dbudget"))).length}`,
       fold: () => set(u => ({ ...u, mFold: { ...u.mFold, [label]: !u.mFold[label] } })),
-      items: items.filter(m => (!q || m[1].toLowerCase().includes(q)) && !(forChart && m[3] === "t")).map(m => { const on = dsel.includes(m[0]);
+      items: items.filter(m => (!q || m[1].toLowerCase().includes(q)) && !(forChart && (m[3] === "t" || m[0] === "dbudget"))).map(m => { const on = dsel.includes(m[0]);
         return { label: m[1], hint: m[2], on, bg: on ? "var(--crm-rust)" : "#fff", bd: on ? "var(--crm-rust)" : "var(--crm-faint-2)",
           toggle: () => set(u => { const c = u.mDraft ?? baseOf(u); if (!c.includes(m[0]) && u.mFor === "chart" && c.length >= CHART_MAX) return u; return { ...u, mDraft: c.includes(m[0]) ? c.filter(x => x !== m[0]) : [...c, m[0]] }; }) }; }) })).filter(g => g.items.length),
     mOrder: dcols.map((m, i) => { const mvTo = (j: number) => set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(i, 1); c.splice(j, 0, x); return { ...u, mDraft: c, mDrag: null }; });
@@ -265,8 +305,11 @@ export function adsPerfVM(ctx: DeskCtx) {
         sh: dragging ? "0 6px 18px rgba(42,22,12,.22)" : "none", bd: dragging ? "transparent" : "var(--crm-field)", z: dragging ? 2 : 1,
         up: () => { if (i > 0) mvTo(i - 1); }, down: () => { if (i < dcols.length - 1) mvTo(i + 1); },
         rm: () => set(u => ({ ...u, mDraft: (u.mDraft ?? baseOf(u)).filter(k => k !== m[0]) })),
-        dStart: (e: { dataTransfer: DataTransfer }) => { e.dataTransfer.effectAllowed = "move"; patch({ mDrag: i }); },
-        dOver: (e: { preventDefault(): void }) => { e.preventDefault(); const f = ui.mDrag; if (f == null || f === i) return; set(u => { const c = [...(u.mDraft ?? baseOf(u))].filter(k => ALL.some(x => x[0] === k)); const [x] = c.splice(f, 1); c.splice(i, 0, x); return { ...u, mDraft: c, mDrag: i }; }); },
+        // The row held is read from the state itself, not this render's copy: a drag's dragover events come faster than the
+        // list redraws, and a stale index swapped the row straight back (the owner, 2026-10-27: "拉住无法调整"). setData:
+        // Firefox starts no drag without it.
+        dStart: (e: { dataTransfer: DataTransfer }) => { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(i)); } catch { /* not every browser lets it */ } afterDragStart(() => patch({ mDrag: i })); },
+        dOver: (e: { preventDefault(): void; dataTransfer?: DataTransfer; clientY?: number; currentTarget?: unknown }) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "move"; set(u => { if (!pastMiddle(u.mDrag, i, e, "y")) return u; const c = moveHeld((u.mDraft ?? baseOf(u)).filter(k => ALL.some(x => x[0] === k)), u.mDrag, i); return c ? { ...u, mDraft: c, mDrag: i } : u; }); },
         dDrop: (e: { preventDefault(): void }) => { e.preventDefault(); patch({ mDrag: null }); }, dEnd: () => patch({ mDrag: null }) }; }),
     mOrdOpen: !ui.mFold.__order, mOrdRot: ui.mFold.__order ? -90 : 0, mOrdFold: () => set(u => ({ ...u, mFold: { ...u.mFold, __order: !u.mFold.__order } })),
     syncedNote: "Not connected to Meta Ads yet",

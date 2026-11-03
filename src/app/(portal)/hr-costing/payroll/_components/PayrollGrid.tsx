@@ -55,7 +55,10 @@ export interface PayrollRowData {
   commission_adjustment_reason?: string | null
   commission_adjusted_at?: string | null
   unpaid_leave_days: number
+  /** Staff rows: the deduction with the row's No Pay in it — see no_pay_amount. */
   deduction_amount: number
+  /** The No Pay inside deduction_amount (noPayAmount); a save sends the deduction without it. */
+  no_pay_amount?: number
   skbbk_amount: number
   /** Revenue rows: the pay lines added on Comm Cal (2026-09-27). Read-only here. */
   pay_line_earnings?: number

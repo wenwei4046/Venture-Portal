@@ -44,7 +44,8 @@ interface Props {
   onNotice: (message: string) => void
 }
 
-type Draft = { ticks: Set<string>; sensitive: SensitiveField[] }
+/** Its boxes, its sensitive fields, and By management approve (2026-10-29, the claim process's PR ③). */
+type Draft = { ticks: Set<string>; sensitive: SensitiveField[]; review: boolean }
 
 /** The view a template opens on: the first it has a tab of, else the HR view. */
 function firstView(ticks: ReadonlySet<string>): TabView {
@@ -84,7 +85,10 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
 
   const ticks = draft?.ticks ?? saved
   const sensitive = draft?.sensitive ?? template?.sensitive ?? []
-  const dirty = !!template && !!draft && (!sameTicks(draft.ticks, saved) || !sameSensitive(draft.sensitive, template.sensitive))
+  const savedReview = template?.review ?? false
+  const review = draft?.review ?? savedReview
+  const dirty =
+    !!template && !!draft && (!sameTicks(draft.ticks, saved) || !sameSensitive(draft.sensitive, template.sensitive) || draft.review !== savedReview)
   const warnings = useMemo(() => sodWarnings(grantsOfTicks(ticks), functions), [ticks, functions])
   const held = useMemo(() => (template ? heldTabs(ticks, sensitive, template.baseRole, cellKeys) : new Map<string, string>()), [ticks, sensitive, template, cellKeys])
 
@@ -104,14 +108,21 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
 
   function edit(next: (d: Draft) => Draft) {
     if (!template || !canManage) return
-    setDraft(d => next(d ?? { ticks: saved, sensitive: template.sensitive }))
+    setDraft(d => next(d ?? { ticks: saved, sensitive: template.sensitive, review: savedReview }))
   }
 
   function onSave() {
     if (!template || !draft || !dirty || pending) return
     setError(null)
     startTransition(async () => {
-      const result = await saveTemplateTabs({ templateId: template.id, version: template.version, tabs: [...draft.ticks], sensitive: draft.sensitive })
+      const result = await saveTemplateTabs({
+        templateId: template.id,
+        version: template.version,
+        tabs: [...draft.ticks],
+        sensitive: draft.sensitive,
+        // Only when it moved: an untouched tick costs no second write.
+        ...(draft.review !== savedReview ? { review: draft.review } : {}),
+      })
       if (!result.ok) return setError(result.reason)
       setDraft(null)
       onNotice(`${template.name} saved — applies to ${result.titles} ${result.titles === 1 ? 'title' : 'titles'} at once.`)
@@ -227,6 +238,7 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
         onRow={tabId => edit(d => ({ ...d, ticks: toggleRow(d.ticks, tabId) }))}
         onColumn={action => edit(d => ({ ...d, ticks: toggleColumn(d.ticks, view, action) }))}
         onAll={() => edit(d => ({ ...d, ticks: toggleView(d.ticks, view) }))}
+        review={{ on: review, onToggle: () => edit(d => ({ ...d, review: !d.review })) }}
       />
 
       {canManage ? (

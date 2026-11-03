@@ -5,7 +5,7 @@ import type { PushApp } from './config'
  * `app_notifications`): what it is about, and where a tap on it opens — in
  * the app the phone turned notifications on in.
  */
-export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo' | 'it' | 'share' | 'people'
+export type NoticeKind = 'hiring' | 'rooms' | 'review' | 'memo' | 'it' | 'share' | 'people' | 'claims'
 /**
  * `crm_contact` / `crm_invite` (2026-10-14, mig 20261014030000): the CRM's own notices — a customer's message, a new
  * lead, a visit, a reminder, an invitation. They reach the phone only: the bells never list them (the CRM keeps its own).
@@ -22,6 +22,9 @@ export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo'
   // again 15 days before — to whoever may acknowledge it: the person (their People record's id); the HR app's bell
   // lists it, a tap opens them there.
   | 'hr_staff'
+  // A payment request (2026-10-29, mig 20261029200000): sent for one's approval, or one's own approved, sent back,
+  // rejected by Finance, paid — the Claim page opens it, whichever app the phone signed up in.
+  | 'payment_request'
 
 export interface Notice {
   id: string
@@ -39,8 +42,8 @@ export interface Notices {
   items: Notice[]
 }
 
-const KINDS: readonly NoticeKind[] = ['hiring', 'rooms', 'review', 'memo', 'it', 'share', 'people']
-const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request', 'share_request', 'hr_staff']
+const KINDS: readonly NoticeKind[] = ['hiring', 'rooms', 'review', 'memo', 'it', 'share', 'people', 'claims']
+const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request', 'share_request', 'hr_staff', 'payment_request']
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -89,6 +92,8 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   if (n.refKind === 'share_request') return `/member?share=${id}`
   // Marketing's (2026-10-23): its project's page — Marketing is the computer's; a phone opens the same page.
   if (n.refKind === 'mkt_project') return `/marketing/projects/${id}`
+  // A payment request (2026-10-29): the Claim page, its drawer open — Claim & approve's for its approver.
+  if (n.refKind === 'payment_request') return `/claims?open=${id}`
   // A probation or a contract ending (2026-10-23 / 10-24): the person, in the HR app — HR's acts on it there, whichever
   // app the phone signed up in.
   if (n.refKind === 'hr_staff') return `/hr-app?open=person:${id}`

@@ -413,7 +413,7 @@ describe('a member sends a request', () => {
 
   it('refuses a plane ticket without a price it can read', async () => {
     expect(await submitMemberRequest(form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'outstation', week: '2026-10-02', notes: '', amount: '45.678' })))
-      .toEqual({ ok: false, error: 'Enter the plane ticket\'s price, as its invoice shows.' })
+      .toEqual({ ok: false, error: 'Enter the air ticket\'s price, as its invoice shows.' })
     mocks.rpc.mockReset()
   })
 

@@ -27,8 +27,8 @@ function input(extra: Partial<EngineInput> = {}): EngineInput {
   return {
     periodMonth: '2026-09-01',
     scheme: {
-      openBillBasis: 'uplift_on_commission', overrideIncludesKpi: false,
-      enableProductRevenue: true, enableKpi: false, enableOpenBill: false, enableOverride: true,
+      overrideIncludesKpi: false,
+      enableProductRevenue: true, enableKpi: false, enableOverride: true,
       enableMarginPenalty: false, enableMarginIncentive: false,
       itemGroups: [{ group: 'SOFA', commissionable: true }, { group: 'TRANS', commissionable: false }],
       depositThresholdPct: 0.3, defaultRateMode: 'fixed',
@@ -46,7 +46,7 @@ function input(extra: Partial<EngineInput> = {}): EngineInput {
       // What the customer took off an earlier bill.
       ...upsalesToOrders([{ id: 'drop-1', staff_id: 'agent', amount: -500, sold_on: '2026-09-20', original_ref: 'HC13052', kind: 'drop' }], '2026-09-01'),
     ],
-    kpiItems: [], kpiThresholds: [], openBillRules: [], openBillTags: [], marginBands: [], priorMonths: [],
+    kpiItems: [], kpiThresholds: [], marginBands: [], priorMonths: [],
     ...extra,
   }
 }

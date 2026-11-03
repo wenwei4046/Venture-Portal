@@ -1,0 +1,186 @@
+/* /b/<code> — a partner's showroom booking (2026-10-29). A desktop page in the CRM's warm colours; it still reads on a
+   narrow window (one column under 960px). */
+
+.root {
+  min-height: 100vh;
+  background: rgb(246 242 236);
+  color: rgb(43 31 23);
+  font-family: var(--font-sans), Inter, var(--font-cjk), system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+.root * { box-sizing: border-box; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 32px 24px 64px; display: flex; flex-direction: column; gap: 24px; }
+
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+.kicker { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: rgb(189 74 25); font-weight: 600; }
+.title { margin: 6px 0 0; font: 600 32px/1.15 var(--font-display-rv), 'Inter Tight', Inter, sans-serif; letter-spacing: -.01em; color: rgb(43 31 23); }
+.lookup { display: flex; flex-direction: column; gap: 6px; min-width: 300px; }
+.lookupLabel { font-size: 12px; color: rgb(122 104 92); font-weight: 500; }
+.lookupRow { display: flex; gap: 8px; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.card { background: rgb(255 255 255); border-radius: 18px; padding: 22px 24px; box-shadow: 0 1px 2px rgb(42 22 12 / .06), 0 10px 30px rgb(42 22 12 / .06); display: flex; flex-direction: column; gap: 12px; }
+.h2 { margin: 8px 0 0; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: rgb(43 31 23); }
+
+.rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.room { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.room span { font-size: 12px; color: rgb(122 104 92); }
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.day { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 0; border-radius: 12px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); cursor: pointer; font: inherit; color: inherit; }
+.day span { font-size: 11px; color: rgb(122 104 92); }
+.day b { font-size: 17px; }
+.day:disabled { opacity: .35; cursor: default; text-decoration: line-through; }
+.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.slots .slot { align-items: center; text-align: center; padding: 12px; }
+.pickHead { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.pickHead .h2 { margin: 0; }
+.monthLabel { flex: 1; font-weight: 600; }
+.seg { display: flex; padding: 3px; border-radius: 999px; background: rgb(243 236 228); }
+.segOpt { border: 0; background: transparent; padding: 6px 14px; border-radius: 999px; font: 500 13px inherit; cursor: pointer; color: rgb(122 104 92); }
+.segOn { background: rgb(255 255 255); color: rgb(43 31 23); box-shadow: 0 1px 2px rgb(42 22 12 / .12); }
+.arrow { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); font-size: 18px; line-height: 1; cursor: pointer; color: rgb(43 31 23); }
+.arrow:disabled { opacity: .35; cursor: default; }
+.month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.monthDow { text-align: center; font-size: 11px; color: rgb(122 104 92); padding: 2px 0; }
+.mday { position: relative; height: 40px; border-radius: 10px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); font: 600 14px inherit; color: inherit; cursor: pointer; }
+.mday:disabled { opacity: .35; cursor: default; }
+.mdayOut { visibility: hidden; }
+.todayDot { position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: rgb(189 74 25); }
+.slot { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); cursor: pointer; font: inherit; color: inherit; text-align: left; }
+.slot span { font-size: 11.5px; color: rgb(56 117 87); }
+.slot:disabled { background: rgb(246 242 236); cursor: default; }
+.slot:disabled span { color: rgb(160 140 128); }
+.on, .on:hover { border-color: rgb(189 74 25) !important; background: rgb(189 74 25) !important; color: rgb(255 255 255) !important; }
+.on span { color: rgb(255 255 255 / .85) !important; }
+
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field > span { font-size: 12px; color: rgb(122 104 92); font-weight: 500; letter-spacing: .01em; }
+.input { width: 100%; border: 1px solid rgb(229 218 208); border-radius: 10px; padding: 10px 12px; font: 400 15px/1.35 var(--font-sans), Inter, system-ui, sans-serif; color: rgb(43 31 23); background: rgb(255 255 255); outline: none; resize: vertical; -webkit-appearance: none; }
+.input::placeholder { color: rgb(170 152 140); }
+.input:focus { border-color: rgb(189 74 25); box-shadow: 0 0 0 3px rgb(189 74 25 / .12); }
+
+.summary { margin-top: 6px; padding: 12px 14px; border-radius: 12px; background: rgb(251 246 242); }
+.actions { display: flex; justify-content: flex-end; gap: 10px; }
+.primary, .ghost, .danger { border-radius: 12px; padding: 10px 18px; font: 600 14px/1 inherit; cursor: pointer; border: 1px solid transparent; }
+.primary { background: rgb(189 74 25); color: rgb(255 255 255); }
+.primary:disabled { background: rgb(214 200 190); cursor: default; }
+.ghost { background: rgb(255 255 255); border-color: rgb(229 218 208); color: rgb(43 31 23); }
+.danger { background: rgb(255 255 255); border-color: rgb(196 64 52 / .4); color: rgb(176 52 40); }
+.link { margin-left: 10px; border: 0; background: none; color: rgb(189 74 25); font: inherit; cursor: pointer; text-decoration: underline; }
+.editing { padding: 10px 12px; border-radius: 12px; background: rgb(253 241 230); font-size: 13px; }
+.err { color: rgb(176 52 40); font-size: 13px; }
+.muted { color: rgb(122 104 92); margin: 0; }
+
+.done { align-self: center; width: 100%; max-width: 560px; background: rgb(255 255 255); border-radius: 18px; padding: 28px 30px; box-shadow: 0 10px 30px rgb(42 22 12 / .08); display: flex; flex-direction: column; gap: 10px; }
+.done h2 { margin: 0; font: 600 22px var(--font-display-rv), 'Inter Tight', Inter, sans-serif; }
+.doneBadge { align-self: flex-start; padding: 4px 10px; border-radius: 999px; background: rgb(232 244 237); color: rgb(56 117 87); font-size: 12px; font-weight: 600; }
+.ref { font: 700 28px/1.2 ui-monospace, 'Chivo Mono', monospace; letter-spacing: .06em; color: rgb(189 74 25); }
+.facts { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; margin: 6px 0 10px; }
+.facts dt { color: rgb(122 104 92); }
+.facts dd { margin: 0; }
+
+.listHead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.listHead .h2 { flex: 1; margin: 0; }
+.listSearch { max-width: 320px; }
+.table { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: 170px minmax(0, 1fr) minmax(0, 1fr) 130px minmax(0, 0.9fr) 100px 70px; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid rgb(240 232 224); font-size: 13px; }
+.row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowHead { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: rgb(122 104 92); border-bottom-color: rgb(229 218 208); }
+.refCell { font-family: ui-monospace, 'Chivo Mono', monospace; font-weight: 600; color: rgb(189 74 25); }
+.row .ghost { padding: 6px 12px; font-size: 12px; }
+@media (max-width: 960px) { .row { grid-template-columns: 1fr 1fr; } .rowHead { display: none; } }
+
+.wrapPhone { max-width: 720px; }
+.cards { display: flex; flex-direction: column; gap: 10px; }
+.bookingCard { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.bcWhen { font-weight: 600; font-size: 15px; }
+.bcRoom { font-size: 13px; color: rgb(122 104 92); }
+.bcLine { font-size: 14px; }
+.bcFoot { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 12px; color: rgb(122 104 92); }
+.bcOpen { margin-left: auto; color: rgb(189 74 25); font-weight: 600; }
+.empty { display: flex; flex-direction: column; gap: 4px; padding: 18px; border-radius: 12px; background: rgb(251 246 242); text-align: center; }
+.empty b { font-size: 16px; }
+.bigBtn { width: 100%; padding: 14px 18px; font-size: 15px; }
+.foldHead { display: flex; align-items: center; justify-content: space-between; border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.stepHead { display: flex; align-items: center; gap: 10px; }
+.backBtn { border: 0; background: none; padding: 4px 0; font: 600 14px inherit; color: rgb(189 74 25); cursor: pointer; }
+.stepNo { margin-left: auto; font-size: 12px; color: rgb(122 104 92); font-weight: 600; }
+.progress { height: 4px; border-radius: 2px; background: rgb(243 236 228); overflow: hidden; }
+.progress i { display: block; height: 100%; background: rgb(189 74 25); transition: width .2s; }
+.navRow { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.navRow .primary, .navRow .ghost { min-width: 120px; padding: 12px 18px; }
+.summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+@media (max-width: 560px) {
+  .wrap { padding: 18px 14px 40px; }
+  .title { font-size: 24px; }
+  .h2 { font-size: 14px; }
+  .card { padding: 16px; border-radius: 16px; }
+  /* Two short fields to a row on a phone too (2026-10-29, the owner: Android "那么长"). */
+  .two { gap: 10px; }
+  .rooms { grid-template-columns: minmax(0, 1fr); }
+  .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pickHead { flex-wrap: wrap; }
+  .monthLabel { flex-basis: 100%; }
+  .days { gap: 4px; }
+  .day b { font-size: 15px; }
+  .actions { flex-direction: column-reverse; }
+  .actions button { width: 100%; padding: 13px; }
+}
+
+.searchBox { position: relative; display: flex; align-items: center; }
+.searchInput { width: 100%; height: 44px; box-sizing: border-box; border: 1px solid rgb(229 218 208); border-radius: 12px; padding: 0 46px 0 14px; font: 400 14px var(--font-sans), Inter, system-ui, sans-serif; color: rgb(43 31 23); background: rgb(251 248 245); outline: none; -webkit-appearance: none; }
+.searchInput::placeholder { color: rgb(170 152 140); }
+.searchInput::-webkit-search-cancel-button { display: none; }
+.searchInput:focus { border-color: rgb(189 74 25); background: rgb(255 255 255); box-shadow: 0 0 0 3px rgb(189 74 25 / .12); }
+.searchBtn { position: absolute; right: 4px; width: 36px; height: 36px; border: 0; border-radius: 9px; background: transparent; color: rgb(122 104 92); display: grid; place-items: center; cursor: pointer; }
+.searchBtn:active { background: rgb(243 236 228); }
+
+.closed { max-width: 460px; margin: 18vh auto 0; text-align: center; padding: 0 24px; }
+.closed h1 { font: 600 26px var(--font-display-rv), 'Inter Tight', Inter, sans-serif; }
+
+/* The portal draws every phone field at 16px (globals.css, so iOS does not zoom on focus); this page holds its scale in
+   its viewport (page.tsx), so its fields keep their own, smaller size (the owner, 2026-10-29: "文字小一点，好看一点"). */
+@media (max-width: 767px) {
+  .root .searchBox input.searchInput:not([type="checkbox"]) { font-size: 14px !important; }
+  .root .field input.input:not([type="checkbox"]), .root .field textarea.input:not([type="checkbox"]), .root .lookupRow input.input:not([type="checkbox"]) { font-size: 15px !important; }
+}
+
+/* The portal's h1 rule (globals.css: `h1:not(.sr-only)…`, colour rgb(var(--ink)), which dark mode makes light) outranks a
+   class alone, so on an iPhone in dark mode the title came out washed (the owner, 2026-10-29: "换个颜色"): this page's title
+   is held in its own ink and face. */
+.root h1.title { color: rgb(43 31 23); font-family: var(--font-display-rv), 'Inter Tight', Inter, sans-serif; font-weight: 600; }
+
+/* Week: a strip to swipe — seven days to its width, snapping to a day (2026-10-29). */
+.days { display: flex !important; gap: 6px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; padding-bottom: 2px; }
+.days::-webkit-scrollbar { display: none; }
+.days .day { flex: 0 0 calc((100% - 36px) / 7); min-width: 46px; scroll-snap-align: start; }
+/* Every day says its month under it (the owner, 2026-10-29: "日期下方要放月份"); a month's first day in rust. */
+.dayMon { font-size: 10px !important; color: rgb(122 104 92) !important; font-weight: 500; }
+.dayMonFirst { color: rgb(189 74 25) !important; font-weight: 600; }
+.on .dayMon { color: rgb(255 255 255 / .85) !important; }
+
+/* The slot picked: the showroom on one line, the day and time under it (the owner, 2026-10-29: "下一行吧，好看些"). */
+.sumText { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sumText span { color: rgb(122 104 92); font-size: 13px; }
+
+/* The first page's greeting (2026-10-29), drawn as the CRM's "Hello, Principal". */
+.greet { display: flex; align-items: center; gap: 14px; }
+.root h1.greetTitle { margin: 0; font-size: 28px; line-height: 1.15; }
+.greetSub { margin-top: 3px; font-size: 14px; color: rgb(122 104 92); }
+@media (max-width: 759px) {
+  .root h1.greetTitle { font-size: 24px; }
+  .greetSub { font-size: 13px; }
+}
+
+/* The booking form's long questions and choices take the whole row (2026-10-29). */
+.wide { grid-column: 1 / -1; }
+.choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.choice { padding: 7px 12px; border-radius: 999px; border: 1px solid rgb(229 218 208); background: rgb(255 255 255); font: 500 13px Inter, system-ui, sans-serif; color: rgb(43 31 23); cursor: pointer; }
+.choice.on { background: rgb(189 74 25); border-color: rgb(189 74 25); color: rgb(255 255 255); }
+
+/* Copy for customer on the phone's Booked screen, the whole width above Home / Book another (2026-10-31). */
+.copyWide { width: 100%; margin-bottom: 10px; }

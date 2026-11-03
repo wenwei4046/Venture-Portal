@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MemberMemo, MemberMembership, MemberOrgMap, MemberRequest } from "@/lib/member/types";
 import type { ArenaPerson, MemberArenaSnapshot } from "@/lib/member/arena";
 import {
-  claimClosedMonth, claimWeeks, memoCat, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, requestStatus, teamVM, trackedCount, trackVM, vaGroupsVM, waitingChoices,
+  claimClosedMonth, claimWeeks, memoCat, memoVM, profileMainVM, replaceable, requestCode, requestDetailVM, requestRowsVM, requestStatus, requestSummary, teamVM, trackedCount, trackVM, vaGroupsVM, waitingChoices,
   type RequestEvent,
 } from "./profile-model";
 
@@ -19,6 +19,17 @@ describe("requests", () => {
   it("lists a request by what it is for, its number and its day in Kuala Lumpur", () => {
     const [row] = requestRowsVM([request()], nameOf);
     expect(row).toMatchObject({ title: "Outstation claim · Mid Valley Megamall", sub: "RQ-2610-001 · 5 Oct", status: "Pending review", tone: "pending" });
+  });
+
+  // The user, 2026-11-01: "go with the same name Air ticket claim" — a flown-to claim sent before the rename reads so too.
+  it("calls a flown-to claim an air ticket claim", () => {
+    const flown = request({
+      title: "Plane ticket claim · SABAH INTERNATIONAL CONVENTION CENTRE",
+      detail: { claimType: "outstation", planeTicket: true, location: "SABAH INTERNATIONAL CONVENTION CENTRE", regionName: "Sabah", amount: 990 },
+    });
+    const [row] = requestRowsVM([flown], nameOf);
+    expect(row.title).toBe("Air ticket claim · SABAH INTERNATIONAL CONVENTION CENTRE");
+    expect(requestSummary(flown, nameOf)).toBe("Sabah · air ticket · RM 990.00");
   });
 
   it("names a replacement by the member it replaces, and leaves drafts out", () => {
@@ -148,7 +159,7 @@ describe("teamVM", () => {
   const person = (id: string, sales: number, blindOrders = 0): ArenaPerson => ({
     id, name: id, self: false, sales, held: 0, orders: 1, kpiQty: 0, marginRevenue: sales, marginCost: 0, blindOrders, brands: {},
   });
-  it("draws the directors and the line above, the member, then two levels below", () => {
+  it("draws the directors and the line above, the member, then everybody below", () => {
     const vm = teamVM({ map, departmentId: "fair", subName: "Fair", staffId: "me", people: [person("me", 1000), person("k1", 500, 1)],
       month: "2026-09", kpi: { enabled: false, threshold: null }, capacity: 27, occupied: 26, ranks: new Map([["me", "Rank B"]]) })!;
     expect(vm.ups.map(u => [u.level, u.nodes.map(n => n.name)])).toEqual([["DIRECTOR", ["PETER"]], ["UPLINE", ["MARCUS"]]]);
@@ -171,7 +182,7 @@ describe("teamVM", () => {
       { id: "d:d0", name: "KRIS", title: "Revenue Director", ini: "KR", dot: "up" },
       { id: "d:d1", name: "PETER", title: "Revenue Director", ini: "PE", dot: "up" },
     ] }]);
-    expect(top.count).toBe("2 above · 2 below");
+    expect(top.count).toBe("2 above · 3 below");
     expect(top.sheets["n-top"].reportsTo).toBe("Reports to KRIS · PETER");
     expect(top.sheets["d:d0"]).toMatchObject({ role: "Revenue Director", reportsTo: "Leads Fair" });
   });
@@ -190,10 +201,29 @@ describe("teamVM", () => {
     expect(peter.ups).toEqual([]);
     expect(peter.me).toEqual({ id: "d:d1", name: "PETER", title: "You · Revenue Director", ini: "PE", dot: "up" });
     expect(peter.kids).toMatchObject([{ name: "MARCUS", kids: [{ name: "JIA HUI" }] }]);
-    expect(peter.count).toBe("0 above · 2 below");
     expect(peter.sheets["d:d1"]).toMatchObject({ name: "PETER", role: "Revenue Director", self: true, reportsTo: "Leads Fair" });
     expect(peter.sheets["n-top"].reportsTo).toBe("Reports to you");
     expect(peter.sheets["n-me"].reportsTo).toBe("Reports to MARCUS");
+  });
+  // 2026-10-27 — the user: "let all people can view their own full tree". The chart stopped two levels down, so a
+  // director never saw the people of a team leader's team assistant (PEI FEN and WEI SHUN under SALLY, under SHAWN).
+  it("draws everybody below, every level down, and counts them all", () => {
+    const peter = fairTeam("d1");
+    expect(peter.kids).toMatchObject([{ name: "MARCUS", kids: [{ name: "JIA HUI", kids: [{ name: "DARREN", kids: [{ name: "KELVIN", kids: [] }] }] }] }]);
+    expect(peter.count).toBe("0 above · 4 below");
+    expect(peter.sheets["n-k1"].reportsTo).toBe("Reports to JIA HUI");
+    expect(peter.sheets["n-g1"].reportsTo).toBe("Reports to DARREN");
+  });
+  it("draws a person once, so a line of the map that loops back ends", () => {
+    const loop: MemberOrgMap = { ...map, people: [
+      { id: "n-a", staffId: "a", departmentId: "fair", schemeId: "s", name: "ADA", code: null, title: "Team Leader", parentId: "n-c", self: true, mine: true },
+      { id: "n-b", staffId: "b", departmentId: "fair", schemeId: "s", name: "BEN", code: null, title: "Executive", parentId: "n-a", self: false, mine: true },
+      { id: "n-c", staffId: "c", departmentId: "fair", schemeId: "s", name: "CY", code: null, title: "Executive", parentId: "n-b", self: false, mine: true },
+    ] };
+    const vm = teamVM({ map: loop, departmentId: "fair", subName: "Fair", staffId: "a", people: [], month: "2026-09",
+      kpi: { enabled: false, threshold: null }, capacity: null, occupied: 0, ranks: new Map() })!;
+    expect(vm.kids).toEqual([]);
+    expect(vm.count).toMatch(/· 0 below$/);
   });
   it("a seat whose upline holds none here is one of the director's tops too", () => {
     const stray = { ...twoDirectors, people: [...twoDirectors.people,
@@ -280,6 +310,25 @@ describe("the request forms' choices", () => {
     ]);
     // What the form held before: October alone.
     expect(claimWeeks([oct, null], "2026-10-16").map(w => w.month)).toEqual(["OCT", "OCT", "OCT"]);
+  });
+
+  // 2026-11-01 — a day is claimed in its own month (the user: "那它 11 月 1 号就是 claim 在 11 月"). On 1 Dec, November's
+  // food is sent with November's read alone (still being worked): its read carries October's brand weeks, so the
+  // Borneo weekend of 30 Oct – 1 Nov comes too, for its 1 Nov — as October's W5. The transport claim's list stays as it was.
+  it("brings the food claim the weekend before a month whose fair runs into it", () => {
+    const borneo = { ...brandWeek("2026-10-30", "erp", "AKEMI", "BCCK", "f9"), start: "2026-10-29", end: "2026-11-01" };
+    const nov = { period: "2026-11", selfId: "an", brandWeeks: null,
+      history: { events: [], weeks: [brandWeek("2026-10-23", "erp", "ERGOTEX", "MVEC", "f8"), borneo, brandWeek("2026-11-06", "erp", "AKEMI", "SICC", "f10")] } } as unknown as MemberArenaSnapshot;
+    const food = claimWeeks([nov, null, null], "2026-12-01", { spill: true });
+    expect(food.map(w => [w.key, w.month, w.n, w.dates, w.worked])).toEqual([
+      ["2026-11-27", "NOV", "W4", "27–29 Nov", false], ["2026-11-20", "NOV", "W3", "20–22 Nov", false], ["2026-11-13", "NOV", "W2", "13–15 Nov", false],
+      ["2026-11-06", "NOV", "W1", "6–8 Nov", true],
+      // October's 23 Oct weekend ends in October: not brought.
+      ["2026-10-30", "OCT", "W5", "29 Oct – 1 Nov", true],
+    ]);
+    expect(claimWeeks([nov, null, null], "2026-12-01").map(w => w.key)).not.toContain("2026-10-30");
+    // Read with October's own snapshot too, the weekend is there once.
+    expect(claimWeeks([oct, nov], "2026-12-01", { spill: true }).filter(w => w.key === "2026-10-30")).toHaveLength(1);
   });
 
   it("lets a member replace only somebody in their own team below them", () => {
@@ -410,6 +459,20 @@ describe("waiting list & replacements", () => {
       ["Updated by the member", "Changed: phone number, preferred start date"],
       ["Returned · needs info", "Which IC?"],
       ["Updated and sent again", ""],
+    ]);
+  });
+
+  // Payment request (2026-10-29): Finance's Return to HR — the reason is HR's, the database keeps it from the member.
+  it("says a claim Finance sent back is with HR again", () => {
+    const events: RequestEvent[] = [
+      { at: "2026-10-06T01:00:00Z", status: "submitted", from: "draft", actor: "you", actorName: null, note: null },
+      { at: "2026-10-07T01:00:00Z", status: "approved", from: "submitted", actor: "hr", actorName: "Nadia", note: "Approved" },
+      { at: "2026-10-08T01:00:00Z", status: "submitted", from: "approved", actor: "finance", actorName: "Ong", note: null },
+    ];
+    expect(requestDetailVM(request(), events, { nameOf, readOnly: false, queues }).log.map(e => [e.what, e.who, e.note])).toEqual([
+      ["Submitted", "You", expect.any(String)],
+      ["Approved", "Nadia (HR)", "Approved"],
+      ["Back with HR for review", "Finance", ""],
     ]);
   });
 });

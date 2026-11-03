@@ -161,6 +161,11 @@ export function canAccessAttendance(u: PermissionHolder): boolean {
   return can(u, 'attendance')
 }
 
+/** Lead View (2026-10-16): Customer Service's inbox for the brands' enquiries. */
+export function canAccessLeads(u: PermissionHolder): boolean {
+  return can(u, 'leads')
+}
+
 export function canAccessGuestLink(u: PermissionHolder): boolean {
   return can(u, 'guest_link')
 }
@@ -181,6 +186,15 @@ export function canChangePassword(u: { personalLogin?: boolean; viewingAs?: unkn
  */
 export function canSeeMyDocuments(u: { personalLogin?: boolean; viewingAs?: unknown }): boolean {
   return u.personalLogin === true && !u.viewingAs
+}
+
+/**
+ * Claim in the HR and Finance views (2026-10-29, the claim process): one's own requests to Finance — for whoever sends
+ * their own (Claims), from a login of one's own (a shared one is no person: no People record, no salary account to
+ * pay), never while viewing as somebody. As My documents'.
+ */
+export function canSendOwnClaims(u: PermissionHolder & { personalLogin?: boolean; viewingAs?: unknown }): boolean {
+  return canAccessClaims(u) && u.personalLogin === true && !u.viewingAs
 }
 
 export function canAccessAuditLog(u: PermissionHolder): boolean {

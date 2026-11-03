@@ -11,9 +11,9 @@ import type { ApptType, CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/
 import type { PanelActions } from "../../panel/actions";
 import type { Team } from "../../panel/vm/common";
 
-export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog" | "reports";
+export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog" | "reports" | "workspace";
 export type PaneMode = "closed" | "empty" | "docked" | "overlay" | "wide" | "wideEmpty";
-export type PaneKind = "chat" | "alerts" | "section" | "info" | "clist" | "metrics" | "team" | "assign" | "book" | "note" | "form" | "move" | "share";
+export type PaneKind = "chat" | "alerts" | "section" | "info" | "clist" | "metrics" | "team" | "assign" | "book" | "note" | "form" | "move" | "share" | "partner";
 
 /** The screen's own state. Every key is the prototype's (same name, same meaning) unless it says otherwise. */
 export interface DeskUi {
@@ -37,6 +37,8 @@ export interface DeskUi {
   fromList: boolean;
   fromInfo: boolean;
   infoId: string | null;
+  /** A partner's booking open in the pane (mig 20261029190000). */
+  partner?: string | null;
   visit: string | null;
   clist: string;
   clSort: string;
@@ -52,6 +54,10 @@ export interface DeskUi {
   insTeam: string | null;
   /** Insight's Ads Performance cards: the metrics picked with + Metrics (the owner, 2026-10-13), in order. */
   insCards: string[] | null;
+  /** Insight's brand: all, The Conts or DC (2026-10-29). */
+  insSrc?: string;
+  /** Ads to teams' brand: all, The Conts or Dream Crafter (2026-10-29). */
+  adBrand?: string;
   /** What Customise metrics is picking for: Ads Performance's columns, or Insight's ad cards. */
   mFor: "ads" | "cards" | "chart";
   // Inbox
@@ -60,6 +66,8 @@ export interface DeskUi {
   inbF: string;
   /** 4a's Inbox search (frame 02): a name, a message or an ad. */
   ibQ: string;
+  /** Labels (2026-11-02): the Inbox's label filter (one's own label id), Customer info's new label and its edit mode. */
+  ibLabel?: string | null; labNew?: string; labEdit?: boolean;
   /** 4a Calendar's Book a visit: its customer picker (open, the search). */
   bookPick: boolean; bookQ: string;
   // Assignment
@@ -95,6 +103,8 @@ export interface DeskUi {
   // Ads Performance
   apSel: string[] | null; mDraft: string[] | null; mDrag: number | null; mq: string; mFold: Record<string, boolean>;
   apStF: string;
+  /** Ads Performance's source: All · The Conts / DC, each by WhatsApp · Messenger (lib/member/crm-source.ts, 2026-10-27). */
+  apSrc?: string; apSrcOpen?: boolean;
   /** Ads Performance shows the ads hidden by a right click too, dimmed, to show them again (2026-10-24). */
   apShowHidden?: boolean;
   /** Ads Performance's column widths, dragged at a header's right edge (the owner, 2026-10-13); "name" is the Ad column. */
@@ -109,7 +119,9 @@ export interface DeskUi {
   /** 4a Showrooms: which showroom is on screen (frame 07, one at a time). */
   srAt: number;
   /** Showrooms' two pages: the showrooms, or Appointment types (2026-10-24), and the types' draft until Save. */
-  srPage: "rooms" | "types";
+  srPage: "rooms" | "types" | "keys";
+  /** Showrooms › Key log's showroom and key state (2026-10-29). */
+  klRoom?: string; klState?: string;
   atDraft: ApptType[] | null;
   srDraft: SrDraft | null;
   srTab: "info" | "slots" | "blk";
@@ -206,6 +218,8 @@ export interface DeskUi {
   // Customer form (the page): its draft, the preview's device
   cfDraft: import("./form").FormSectionV2[] | null; cfDev: "phone" | "desktop";
   /** v2 frame 08: which of the saved forms the editor is on (null = the first, the one Customer info asks); Delete asked again. */
+  /** Forms page (2026-10-29): which kind is open — Customer info or the booking link's. */
+  cfKind: "customer" | "booking";
   cfForm: string | null; cfDelAsk: boolean; cfNew: Record<string, string>; cfType: string | null;
   /** The paged Customer form (2026-10-16): the page open in the editor; what is being dragged (a field or a section) and what it is over. */
   cfPage: number; cfDrag: { k: "f" | "s"; si: number; fi?: number } | null; cfOver: string | null;
@@ -260,7 +274,7 @@ export const initialDeskUi = (): DeskUi => ({
   calBy: "room",
   ppF: {}, ppBy: "status", ppQ: "", ppOpen: null, ppVis: null, ppSort: { k: null, dir: 1 }, ppCW: {}, ppAdd: false,
   auCat: "chat", auPer: "7d", auWho: "all", auQ: "", auCols: null, auArea: "all", auOpen: null,
-  cfDraft: null, cfForm: null, cfDelAsk: false, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
+  cfDraft: null, cfKind: "customer", cfForm: null, cfDelAsk: false, cfDev: "phone", cfNew: {}, cfType: null, cfPage: 0, cfDrag: null, cfOver: null,
   chTab: "conn", chProf: null, chDn: null, addCust: null, chWaTab: "prof", chDraft: {}, chDirty: {}, chDlg: null, chNewOpen: false, chNew: null, chWaNum: null,
 });
 
@@ -296,7 +310,8 @@ export interface DeskActions {
   deleteNotifs(keys: string[]): Promise<boolean>;
   restoreNotifs(keys: string[]): Promise<boolean>;
   addNote(customerId: string, text: string): Promise<boolean>;
-  saveForm(form: { id: string | null; name: string; sections: FormSection[] }): Promise<string | false>;
+  /** kind: a new form's — Customer info ("customer", the default) or the booking link's ("booking"). */
+  saveForm(form: { id: string | null; name: string; sections: FormSection[] }, kind?: "customer" | "booking"): Promise<string | false>;
   deleteForm(id: string): Promise<boolean>;
   /** v2 frame 08: the form every Customer info asks (crm_set_active_form puts it first). */
   setActiveForm(id: string): Promise<boolean>;
@@ -305,6 +320,8 @@ export interface DeskActions {
   saveShowroomExtras(roomId: string, x: { photo: File | null; removePhoto: boolean; gmap: string; waze: string }): Promise<boolean>;
   /** v2 frame 07: a showroom's staff-only remarks, and deleting it (refused while visits are upcoming). */
   saveRoomRemarks(roomId: string, remarks: string): Promise<boolean>;
+  /** A showroom's draft kept until Save (crm_save_showroom_draft; room = its id or 'new'); null takes it away. */
+  saveRoomDraft(room: string, draft: Record<string, unknown> | null): Promise<boolean>;
   deleteRoom(roomId: string): Promise<boolean>;
   /** Channels (v2): link / unlink an asset, its default (crm_set_channel); send a tab to Meta (saveCrmChannel). */
   setChannel(kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean): Promise<boolean>;
@@ -331,14 +348,21 @@ export interface DeskCtx {
   nameOf(id: string | null | undefined): string;
   /** Booked visits per slot start (ISO) for the showroom and week Appointment shows. */
   slotCounts: Record<string, number>;
+  /** Chats with unread messages per brand, over every brand (DeskScreens; the Inbox's brand tabs, 2026-10-29). */
+  brandCounts?: Record<"all" | "conts" | "dc", number>;
   /** The viewport the desktop fills. */
   W: number;
   H: number;
   app: DeskApp;
   /** The Director's Mine: their own CRM. */
   toMine?: () => void;
+  /** View as a team member (2026-10-29): read-only, as the phone's View as. */
+  viewAs?: DeskViewAs;
   /** Leave the CRM (the sidebar's other pages). */
   exit(): void;
   /** Channels: what Meta answered (read when Channels opens). */
   meta: import("./channels").MetaState;
 }
+
+/** The people a desktop may view the CRM of (one's line; anybody for View at All), and opening one's — read-only. */
+export interface DeskViewAs { people: { id: string; name: string; title: string }[]; open: (staffId: string) => void }

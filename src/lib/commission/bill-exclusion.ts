@@ -6,7 +6,7 @@ import { formatDate } from '@/lib/utils'
  * The rule is the database's (`sales_order_exclusions`, mig 20260927020000):
  * an excluded bill is `cancelled` with `excluded_reason = 'manual'`, exactly as
  * out as a bill the ERP cancelled — out of the month's sales, own and group
- * sales, override, KPI and Open Bill — and it stays out through every ERP
+ * sales, override and KPI — and it stays out through every ERP
  * re-send until somebody counts it again. This file is the words the Sales
  * orders page uses for it, and what a bill's right-click menu may offer.
  */

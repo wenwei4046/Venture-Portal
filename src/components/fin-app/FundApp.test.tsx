@@ -181,6 +181,7 @@ const LOAN = (over: Partial<LoanPageModel> = {}): LoanPageModel => ({
   termsChanges: [],
   start: { date: '2026-04-15', day: 15, set: false },
   minPayInterest: false,
+  minPayFrom: null,
   late: null,
   monthlyInterest: 2000,
   outstanding: 91666.67,
@@ -221,6 +222,7 @@ const SOURCE = (over: Partial<SourcePageModel> = {}): SourcePageModel => ({
   termsChanges: [],
   start: { date: '2025-07-31', day: 31, set: true },
   minPayInterest: false,
+  minPayFrom: null,
   notes: 'lent to: CMI',
   monthlyInterest: 400,
   monthlyPayment: 1733.33,
@@ -480,16 +482,39 @@ describe('Fund › Fund out on the phone', () => {
     expect(mocks.flash).toHaveBeenCalledWith('Repayment voided — its entry, bank and pool reversed')
   })
 
-  it('Minimum pay interest turns with one press', async () => {
+  it('Minimum pay interest turns on from the month its sheet asks for (2026-10-30)', async () => {
     mocks.setMinPay.mockResolvedValue(undefined)
     await act(async () => {
       draw({ search: 'id=l1', page: { side: 'out', loan: LOAN() } })
     })
+    fireEvent.click(screen.getByRole('button', { name: 'Turn on' }))
+    const sheet = await screen.findByRole('dialog')
+    expect(mocks.setMinPay).not.toHaveBeenCalled()
+    // Nothing chosen: the sheet says what is missing.
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Turn on' }))
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Turn on' }))
     })
-    expect(mocks.setMinPay).toHaveBeenCalledWith('l1', true)
-    expect(mocks.flash).toHaveBeenCalledWith('Minimum pay interest turned on')
+    expect(mocks.setMinPay).not.toHaveBeenCalled()
+    expect(within(sheet).getByText('From which month minimum pay starts is needed before you can save.')).toBeInTheDocument()
+    fireEvent.click(within(sheet).getByRole('radio', { name: /From the first instalment/ }))
+    await act(async () => {
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Turn on' }))
+    })
+    expect(mocks.setMinPay).toHaveBeenCalledWith('l1', true, null)
+    expect(mocks.flash).toHaveBeenCalledWith(expect.stringMatching(/^Minimum pay interest turned on — from the first instalment/))
+  })
+
+  it('Minimum pay interest, on, says its month and turns off with one press', async () => {
+    mocks.setMinPay.mockResolvedValue(undefined)
+    await act(async () => {
+      draw({ search: 'id=l1', page: { side: 'out', loan: LOAN({ minPayInterest: true, minPayFrom: '2026-11-01' }) } })
+    })
+    expect(screen.getByText('from Nov 2026')).toBeInTheDocument()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Turn off' }))
+    })
+    expect(mocks.setMinPay).toHaveBeenCalledWith('l1', false)
+    expect(mocks.flash).toHaveBeenCalledWith('Minimum pay interest turned off')
   })
 
   it('the terms over time: each segment, each change opening onto its months, the latest one revertible', async () => {

@@ -8,10 +8,11 @@ import { actionsOnPage, opensPath } from '@/lib/page-tabs'
 import { canDo } from '@/lib/permission-actions'
 import { MKT_LOOK_COOKIE, MKT_NAV_COOKIE } from '@/lib/marketing-view'
 import { densityOf, lookToCookie, LOOK_SIZES, type Look } from '@/lib/marketing/look'
-import { mktCrumb, mktNavActive, mktNavRows, type MktNavKey } from '@/lib/marketing/nav'
+import { mktCrumb, mktFinancePage, mktNavActive, mktNavRows, mktOwnPage, type MktNavKey } from '@/lib/marketing/nav'
 import { groupTone, toneBg } from '@/lib/marketing/groups'
 import { initialOf } from '@/lib/marketing/shell'
 import { ToastHost } from '@/components/hrv/toast'
+import { FinViewProvider } from '@/components/layout/fin-view'
 import { ChangePasswordDialog, RequestEmailDialog, SignOutDialog } from '@/components/layout/AccountMenu'
 import ViewingAsBanner from '@/components/layout/ViewingAsBanner'
 import RouteFreshener from '@/components/layout/RouteFreshener'
@@ -69,7 +70,10 @@ export default function MktShell({
     return canDo(acting, 'marketing', 'create')
   }, [user, navUser.tabs])
   const active = pending ?? mktNavActive(pathname, search)
-  const own = pathname === '/marketing' || pathname.startsWith('/marketing/')
+  const own = mktOwnPage(pathname)
+  // Finance's own page kept here (the Pool) wears Finance's view as Dept Pool does: `.fin-view` on the frame for the
+  // CSS, FinViewProvider for the shared parts — as PortalFrame sets them on Finance's shell.
+  const finPage = mktFinancePage(pathname)
   const personal = user.personalLogin === true && !user.viewingAs
 
   // The crumb: the row's own, or a subsidiary's when its page or its projects are open.
@@ -138,14 +142,16 @@ export default function MktShell({
             newProject={newProject}
           />
         </div>
-        <div className={s.frame} data-hrv-overlay="">
-          {own ? (
-            <main className={`${s.content} route-surface page-enter print:p-0`} data-mkt-own="">{children}</main>
-          ) : (
-            <main className="sheet-theme sheet hrv-sheet route-surface page-enter print:p-0">{children}</main>
-          )}
-          <ToastHost />
-        </div>
+        <FinViewProvider value={finPage}>
+          <div className={`${s.frame}${finPage ? ' fin-view' : ''}`} data-hrv-overlay="">
+            {own ? (
+              <main className={`${s.content} route-surface page-enter print:p-0`} data-mkt-own="">{children}</main>
+            ) : (
+              <main className={`sheet-theme sheet hrv-sheet${finPage ? ' fin-sheet' : ''} route-surface page-enter print:p-0`}>{children}</main>
+            )}
+            <ToastHost />
+          </div>
+        </FinViewProvider>
       </div>
       {panel === 'menu' ? (
         <>

@@ -56,6 +56,8 @@
 .noteHead time { flex: none; }
 .noteStatus { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--ds-ink-3); font-size: 12px; }
 .composer { border-top: 1px solid var(--ds-border); padding-top: 20px; }
+/* A Fixed request's sender (2026-10-27): Close request under their reply — they tried it; the desk reads it closed. */
+.closeRow { display: flex; }
 /* Files dragged in from the computer (2026-10-24): the text box says where they land. */
 .dropBox { position: relative; display: flex; flex-direction: column; }
 [data-drop] .dropBox > textarea { border-style: dashed; border-color: var(--ds-accent); }
@@ -96,4 +98,5 @@
   .tableFrame td:last-of-type { width: 1%; }
   .noteHead { flex-wrap: wrap; }
   .fileRow, .filedFile { flex-wrap: wrap; }
+  .closeRow > button { flex: 1; }
 }

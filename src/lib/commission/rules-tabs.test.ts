@@ -3,13 +3,11 @@ import { RULES_TABS, groupedRulesTabs, resolveRulesTab, visibleRulesTabs, type R
 
 const off: RulesSwitches = {
   enable_kpi: false,
-  enable_open_bill: false,
   enable_margin_penalty: false,
   enable_margin_incentive: false,
 }
 const on: RulesSwitches = {
   enable_kpi: true,
-  enable_open_bill: true,
   enable_margin_penalty: true,
   enable_margin_incentive: true,
 }
@@ -23,11 +21,11 @@ describe('visibleRulesTabs', () => {
     expect(keys(off)).toEqual(['scheme', 'ladder', 'ranks', 'capacity'])
   })
 
-  it('Fair — every switch on, its policy recorded, two directors: all ten, in the side list’s order', () => {
+  it('Fair — every switch on, its policy recorded, two directors: all nine, in the side list’s order', () => {
     expect(keys(on, { itemGroups: 7, promotionRules: 10, directors: 2, kpiItems: 1, kpiThresholds: 1 }))
       .toEqual(RULES_TABS.map(t => t.key))
     expect(RULES_TABS.map(t => t.key)).toEqual(
-      ['scheme', 'ladder', 'ranks', 'directors', 'groups', 'kpi', 'open-bill', 'brands', 'capacity', 'promotion'],
+      ['scheme', 'ladder', 'ranks', 'directors', 'groups', 'kpi', 'brands', 'capacity', 'promotion'],
     )
   })
 
@@ -46,8 +44,10 @@ describe('visibleRulesTabs', () => {
     expect(keys(off)).not.toContain('kpi')
   })
 
-  it('Open Bill bonus brings Open Bill rates', () => {
-    expect(keys({ ...off, enable_open_bill: true })).toEqual(['scheme', 'ladder', 'ranks', 'open-bill', 'capacity'])
+  // Open Bill went (2026-10-31), its rates tab with it: a link to it opens Scheme rules.
+  it('has no Open Bill rates tab any more', () => {
+    expect(RULES_TABS.map(t => t.key)).not.toContain('open-bill')
+    expect(resolveRulesTab('open-bill', visibleRulesTabs(on, nothing))).toBe('scheme')
   })
 
   it('either margin switch brings Brands & margin bands — one brand ladder holds both kinds of rung', () => {
@@ -101,7 +101,7 @@ describe('groupedRulesTabs (2026-10-10, the HR revamp’s side list)', () => {
     const fair = groupedRulesTabs(visibleRulesTabs(on, { itemGroups: 7, promotionRules: 10, directors: 2, kpiItems: 1, kpiThresholds: 1 }))
     expect(fair.map(g => [g.label, g.items.map(i => i.label)])).toEqual([
       ['Pay structure', ['Scheme rules', 'Title ladder', 'Ranks', 'Directors']],
-      ['Item rules', ['Item groups', 'KPI items', 'Open Bill rates', 'Brands & margin bands']],
+      ['Item rules', ['Item groups', 'KPI items', 'Brands & margin bands']],
       ['Headcount', ['Capacity']],
       ['Policy', ['Promotion criteria']],
     ])

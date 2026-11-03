@@ -44,6 +44,13 @@ export function seededRows(table: 'permission_page_tabs' | 'permission_tab_cells
       found = { file: f, rows: [...new Set([...found.rows, ...rowsOf(insert[1].replace(/ON CONFLICT DO NOTHING\s*$/, ''))])].sort() }
     }
     if (!found) continue
+    // A page that went takes its rows with it, whatever its tabs (2026-10-31, Open Bill's page).
+    if (table === 'permission_page_tabs') {
+      for (const m of sql.matchAll(/DELETE FROM public\.permission_page_tabs\s+WHERE page IN \(([^)]*)\);/g)) {
+        const gone = new Set([...m[1].matchAll(/'([^']*)'/g)].map(v => v[1]))
+        found = { file: f, rows: found.rows.filter(row => !gone.has(row.slice(0, row.lastIndexOf(' ')))) }
+      }
+    }
     for (const m of sql.matchAll(new RegExp(`DELETE FROM public\\.${table}\\s+WHERE tab_id IN \\(([^)]*)\\);`, 'g'))) {
       const gone = new Set([...m[1].matchAll(/'([^']*)'/g)].map(v => v[1]))
       // A page tab's row is `page tab`; a cell's, `tab action cell`.

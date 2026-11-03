@@ -9,6 +9,7 @@
  */
 import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
+import { sourceOf, SOURCE_PICKS } from "@/lib/member/crm-source";
 
 export type RpPeriod = "week" | "month" | "last" | "all";
 export const RP_PERIODS: [RpPeriod, string][] = [["week", "This week"], ["month", "This month"], ["last", "Last month"], ["all", "All time"]];
@@ -45,16 +46,16 @@ export function salespeopleReport(cs: CrmCustomer[], visits: CrmVisit[], range: 
   for (const v of visits) if (v.state !== "cancelled") live.set(v.customerId, [...(live.get(v.customerId) ?? []), v]);
   const leads = cs.filter(c => inRange(c.createdAt, range));
   const figures = (id: string, name: string, team: string, list: CrmCustomer[]): SalesRow => {
-    let replied = 0, mins = 0, timed = 0, appt = 0, showed = 0, apptN = 0;
+    let replied = 0, mins = 0, timed = 0, appt = 0, showed = 0;
     for (const c of list) {
       const firstLead = c.messages.find(m => m.from === "lead"), firstOurs = c.messages.find(m => m.from === "me" && !m.auto && (!firstLead || m.at >= firstLead.at));
       if (firstOurs) { replied++; if (firstLead) { mins += Math.max(0, (new Date(firstOurs.at).getTime() - new Date(firstLead.at).getTime()) / 60000); timed++; } }
       const vs = live.get(c.id) ?? [];
-      if (vs.length) { appt++; apptN += vs.length; showed += vs.filter(v => v.state === "attended").length; }
+      if (vs.length) { appt++; if (vs.some(v => v.state === "attended")) showed++; }
     }
     const won = list.filter(c => c.status === "won").length, lost = list.filter(c => c.status === "lost").length;
     return { id, name, team, leads: list.length, replied, replyRate: rate(replied, list.length), firstReplyMin: timed ? mins / timed : null,
-      appt, apptRate: rate(appt, list.length), showed, showRate: rate(showed, apptN), won, winRate: rate(won, list.length), lost };
+      appt, apptRate: rate(appt, list.length), showed, showRate: rate(showed, appt), won, winRate: rate(won, list.length), lost };
   };
   const by = new Map<string, CrmCustomer[]>();
   for (const c of leads) by.set(c.assignedTo ?? "", [...(by.get(c.assignedTo ?? "") ?? []), c]);
@@ -64,17 +65,24 @@ export function salespeopleReport(cs: CrmCustomer[], visits: CrmVisit[], range: 
 }
 
 /** Appointments & show-ups: visits by their own day — the figures, then by showroom, weekday, time, salesperson and outcome. */
-export interface ApptVisit { at: Date; room: string; rep: string; outcome: string }
+export interface ApptVisit { at: Date; room: string; rep: string; outcome: string; who?: string }
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const OUTCOMES = ["Upcoming", "To mark", "Showed up", "Won", "Follow up", "Lost", "No show", "Cancelled"];
 export function appointmentsReport(vs: ApptVisit[]) {
   const n = (o: string) => vs.filter(v => v.outcome === o).length;
-  const showed = n("Showed up") + n("Won") + n("Follow up") + n("Lost"), marked = showed + n("No show");
+  // The figures count a customer once (2026-10-27, the owner: the rate, then "ok" to the tiles too): booked twice is one
+  // booked, came twice one who came; a No show is a customer marked so who never came. The cards below stay visits.
+  const whoOf = (v: ApptVisit, i: number) => v.who ?? `#${i}`, CAME = ["Showed up", "Won", "Follow up", "Lost"];
+  const custOf = (keep: (v: ApptVisit) => boolean) => new Set(vs.map((v, i) => keep(v) ? whoOf(v, i) : null).filter((x): x is string => !!x));
+  const cameC = custOf(v => CAME.includes(v.outcome));
+  const noC = new Set([...custOf(v => v.outcome === "No show")].filter(w => !cameC.has(w)));
+  const markedC = new Set([...cameC, ...noC]);
   const times = [...new Set(vs.map(v => v.at.getHours() * 60 + v.at.getMinutes()))].sort((a, b) => a - b)
     .map(m => new Date(2000, 0, 1, Math.floor(m / 60), m % 60).toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" }));
   const timeOf = (v: ApptVisit) => v.at.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" });
   return {
-    figures: { booked: vs.length - n("Cancelled"), upcoming: n("Upcoming"), showed, noShow: n("No show"), toMark: n("To mark"), cancelled: n("Cancelled"), showRate: rate(showed, marked) },
+    figures: { booked: custOf(v => v.outcome !== "Cancelled").size, upcoming: custOf(v => v.outcome === "Upcoming").size, showed: cameC.size, noShow: noC.size,
+      toMark: custOf(v => v.outcome === "To mark").size, cancelled: custOf(v => v.outcome === "Cancelled").size, showRate: rate(cameC.size, markedC.size) },
     byRoom: breakdown(vs, v => v.room), byDow: breakdown(vs, v => DOW[(v.at.getDay() + 6) % 7], DOW), byTime: breakdown(vs, timeOf, times),
     byRep: breakdown(vs, v => v.rep), byOutcome: breakdown(vs, v => v.outcome, OUTCOMES),
   };
@@ -87,7 +95,9 @@ export function sourcesReport(cs: CrmCustomer[], range: [number, number], status
   const reason = (c: CrmCustomer) => CRM_LOST_REASONS.find(r => r.value === c.lost?.reason)?.label ?? "Not given";
   return {
     figures: { leads: leads.length, fromAds: leads.filter(c => c.adId).length, won: leads.filter(c => c.status === "won").length, lost: lost.length },
-    byChannel: breakdown(leads, channelName), byAd: breakdown(leads, c => (c.adId ? c.ad || "Ad" : "No ad")),
+    byChannel: breakdown(leads, channelName),
+    // By source (2026-10-27): The Conts / DC, each by WhatsApp · Messenger — a number or Page not listed is its channel alone.
+    bySource: breakdown(leads, c => sourceOf(c).label, SOURCE_PICKS.filter(p => p.sub).map(p => p.label)), byAd: breakdown(leads, c => (c.adId ? c.ad || "Ad" : "No ad")),
     byStatus: breakdown(leads, statusOf, ["New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads"]),
     lostWhy: breakdown(lost, reason, CRM_LOST_REASONS.map(r => r.label).concat("Not given")),
     byType: breakdown(leads, c => c.details.type || "Not filled yet"),

@@ -35,9 +35,6 @@ export default function ReceiptsHubClient({
       ledger={ledger}
       canSetDefault={canSetDefault}
       canExport={canExport}
-      dept={[]}
-      payroll={null}
-      claims={[]}
       actions={
         canCreate ? (
           <>

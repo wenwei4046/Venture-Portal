@@ -107,7 +107,8 @@ export function requestTitle(r: MemberRequest, nameOf: (staffId: string) => stri
     const type = str(d.claimType);
     const where = str(d.location);
     if (type === "food") return `Food claim${foodMonth(d) ? ` · ${foodMonth(d)}` : ""}`;
-    if (type === "outstation" && d.planeTicket === true) return `Plane ticket claim${where ? ` · ${where}` : ""}`;
+    // An air ticket (*Plane ticket* until 2026-11-01 — the user: "go with the same name Air ticket claim").
+    if (type === "outstation" && d.planeTicket === true) return `Air ticket claim${where ? ` · ${where}` : ""}`;
     if (type === "outstation") return `Outstation claim${where ? ` · ${where}` : ""}`;
     if (type === "airbnb") return `Airbnb claim${where ? ` · ${where}` : ""}`;
     return r.title;
@@ -137,7 +138,7 @@ export function requestSummary(r: MemberRequest, nameOf: (staffId: string) => st
       const days = foodDays(d);
       return [days.length ? `${days.length} day${days.length === 1 ? "" : "s"}` : "", foodMonth(d), money].filter(Boolean).join(" · ");
     }
-    if (str(d.claimType) === "outstation" && d.planeTicket === true) return [str(d.regionName), "plane ticket", money].filter(Boolean).join(" · ");
+    if (str(d.claimType) === "outstation" && d.planeTicket === true) return [str(d.regionName), "air ticket", money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "outstation") return [str(d.regionName) || str(d.region), Number.isFinite(num(d.spots)) ? `${num(d.spots)} spots` : "", money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "airbnb") {
       const pax = num(d.pax), nights = num(d.nights);
@@ -216,8 +217,10 @@ export function requestDetailVM(r: MemberRequest, events: readonly RequestEvent[
     // again after HR asked for more is an update too.
     const edited = e.status === "submitted" && !!e.note && e.note.startsWith("Updated by the member");
     const resent = e.status === "submitted" && (e.from === "needs_info" || shown[i - 1]?.status === "needs_info");
+    // An approved claim Finance sent back to HR (2026-10-29): with HR again — the reason is HR's, so none is read here.
+    const returned = r.kind === "claim" && e.status === "submitted" && e.from === "approved";
     const what = edited ? "Updated by the member" : e.status === "allocated" ? `Allocated to ${str(d.department) || "the team"}`
-      : resent ? "Updated and sent again" : WHAT[e.status] ?? e.status;
+      : returned ? "Back with HR for review" : resent ? "Updated and sent again" : WHAT[e.status] ?? e.status;
     const who = e.actor === "you" ? "You" : e.actor === "hr" ? (e.actorName ? `${e.actorName} (HR)` : "HR") : e.actor === "finance" ? "Finance"
       : e.actor === "principal" ? (e.actorName ?? "Principal") : "Revenue system";
     const bad = ["needs_info", "rejected", "withdrawn", "expired", "failed"].includes(e.status);
@@ -403,9 +406,10 @@ export interface TeamInput {
 const CAP_NOTE = "Waiting-list matches use eligibility, start dates and open places. Direct-report capacity is checked separately.";
 
 /**
- * The family chart: everybody above (to the department's directors), the member, two levels below. A Revenue
- * Director (2026-10-14) holds no seat: on the department's rail, they are the top of the chart and the top of every
- * tree reports to them — the other directors are their peers, never drawn above them.
+ * The family chart: everybody above (to the department's directors), the member, and everybody below them, every
+ * level down (2026-10-27 — the user: "let all people can view their own full tree"; two levels until then). A
+ * Revenue Director (2026-10-14) holds no seat: on the department's rail, they are the top of the chart and the top of
+ * every tree reports to them — the other directors are their peers, never drawn above them.
  */
 export function teamVM(input: TeamInput): TeamVM | null {
   const people = input.map.people.filter(p => p.departmentId === input.departmentId);
@@ -450,10 +454,14 @@ export function teamVM(input: TeamInput): TeamVM | null {
     ...[...chain].reverse().map(p => ({ level: "UPLINE", nodes: [{ id: p.id, name: p.name, title: titleOf(p), ini: initials(p.name), dot: "up" as const }] })),
   ];
   const above = directors.length + chain.length;
-  const kids: TeamKidVM[] = childrenOf(me.id).map(k => ({
-    id: k.id, name: k.name, title: k.title, ini: initials(k.name), dot: status(k.staffId)[1],
-    kids: childrenOf(k.id).map(g => ({ id: g.id, name: g.name, title: g.title, ini: initials(g.name), dot: status(g.staffId)[1] })),
-  }));
+  // Everybody below, every level down. A person stands once: a line of the map that loops back ends there.
+  const placed = new Set([me.id, ...chain.map(p => p.id)]);
+  const under = (nodeId: string): TeamKidVM[] => childrenOf(nodeId).filter(k => !placed.has(k.id)).map(k => {
+    placed.add(k.id);
+    return { id: k.id, name: k.name, title: k.title, ini: initials(k.name), dot: status(k.staffId)[1], kids: under(k.id) };
+  });
+  const kids = under(me.id);
+  const everyone = (nodes: TeamKidVM[]): number => nodes.reduce((n, k) => n + 1 + everyone(k.kids), 0);
 
   const sales = (staffId: string) => {
     const p = score.get(staffId);
@@ -482,12 +490,15 @@ export function teamVM(input: TeamInput): TeamVM | null {
   const upline = me.parentId ? byNode.get(me.parentId) : undefined;
   if (lead) sheets[me.id] = directorSheet(lead, true);
   else own(me, upline ? `Reports to ${upline.name}` : directors.length ? `Reports to ${directors.map(d => d.name).join(" · ")}` : "Top of the team", true);
-  for (const k of childrenOf(me.id)) {
-    own(k, "Reports to you");
-    for (const g of childrenOf(k.id)) own(g, `Reports to ${k.name}`);
-  }
+  const sheetsBelow = (nodes: TeamKidVM[], reportsTo: string) => {
+    for (const k of nodes) {
+      const p = byNode.get(k.id);
+      if (p) own(p, reportsTo);
+      sheetsBelow(k.kids, `Reports to ${k.name}`);
+    }
+  };
+  sheetsBelow(kids, "Reports to you");
 
-  const below = kids.length + kids.reduce((a, k) => a + k.kids.length, 0);
   const cap = input.capacity;
   const open = cap !== null ? cap - input.occupied : null;
   const meNode: TeamNodeVM = lead
@@ -502,7 +513,7 @@ export function teamVM(input: TeamInput): TeamVM | null {
       full: open !== null && open <= 0,
       note: CAP_NOTE,
     },
-    count: `${above} above · ${below} below`,
+    count: `${above} above · ${everyone(kids)} below`,
     legend: [input.kpi.enabled ? "KPI hit" : "Selling", "Pending", "Upline"],
     ups,
     me: meNode,
@@ -532,15 +543,31 @@ export function brandWeekTone(brand: string | null): [string, string] {
  * lists them nowhere — the booth they opened the most bills at (the read's
  * `weeks`; `member_claim_brand_week` reads the same two layers). No brand week,
  * or a booth the portal has no fair for yet, = nothing to claim that weekend.
+ *
+ * `spill` — the food claim's (2026-11-01: a day is claimed in its own month): each month also brings the weekend
+ * before it whose fair runs into it, a fair of 29 Oct – 1 Nov on November's claim for its 1 Nov. A month's read
+ * carries the brand weeks of the two months before it, so that booth is there though last month's read may not be.
  */
-export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | undefined)[], today: string): ClaimWeek[] {
+export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | undefined)[], today: string, opts: { spill?: boolean } = {}): ClaimWeek[] {
   const out = new Map<string, ClaimWeek>();
+  type Booth = { brand: string | null; venue: string | null; organizer: string | null; start: string | null; end: string | null; fairId: string | null };
+  const put = (friday: string, month: string, n: number, booth: Booth | null, auto: boolean) => {
+    const brand = booth?.brand ?? null;
+    const [color, tint] = brandWeekTone(brand);
+    out.set(friday, {
+      key: friday, month, n: `W${n}`, brandWeek: brand ? `${WEEK_BRAND[brand] ?? brand} week` : "No brand week", brand,
+      dates: booth?.start && booth.end ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null,
+      fairId: booth?.fairId ?? null, start: booth?.start ?? null, end: booth?.end ?? null,
+      auto, claimable: !!booth?.fairId, worked: !!booth, color, tint,
+    });
+  };
+  const label = (period: string) => (MONTHS_SHORT[Number(period.slice(5, 7)) - 1] ?? "").toUpperCase();
   for (const snap of snapshots) {
     if (!snap) continue;
     const me = snap.selfId;
     const events = snap.history?.events ?? [];
     const weeks = snap.history?.weeks;
-    const month = (MONTHS_SHORT[Number(snap.period.slice(5, 7)) - 1] ?? "").toUpperCase();
+    const month = label(snap.period);
     arenaMonthFridays(snap.period).forEach((friday, i) => {
       if (friday > today || out.has(friday)) return;
       const week = weeks?.find(w => w.week === friday && (!me || w.staffId === me));
@@ -551,14 +578,15 @@ export function claimWeeks(snapshots: readonly (MemberArenaSnapshot | null | und
         : scoring
           ? { brand: scoring.brand ?? null, venue: scoring.venue, organizer: scoring.organizer ?? null, start: scoring.start, end: scoring.end, fairId: scoring.fairId ?? null }
           : null;
-      const brand = booth?.brand ?? null;
-      const [color, tint] = brandWeekTone(brand);
-      out.set(friday, {
-        key: friday, month, n: `W${i + 1}`, brandWeek: brand ? `${WEEK_BRAND[brand] ?? brand} week` : "No brand week", brand,
-        dates: booth?.start && booth.end ? dayRange(booth.start, booth.end) : arenaWeekendLabel(friday), venue: booth?.venue ?? null, org: booth?.organizer ?? null,
-        fairId: booth?.fairId ?? null, start: booth?.start ?? null, end: booth?.end ?? null,
-        auto: week ? week.source === "auto" : !!scoring, claimable: !!booth?.fairId, worked: !!booth, color, tint,
-      });
+      put(friday, month, i + 1, booth, week ? week.source === "auto" : !!scoring);
+    });
+    if (!opts.spill || !weeks) continue;
+    const before = addMonths(snap.period, -1);
+    arenaMonthFridays(before).forEach((friday, i) => {
+      if (friday > today || out.has(friday)) return;
+      const week = weeks.find(w => w.week === friday && (!me || w.staffId === me));
+      if (!week?.end || week.end < `${snap.period}-01`) return;
+      put(friday, label(before), i + 1, week, week.source === "auto");
     });
   }
   return [...out.values()].sort((a, b) => b.key.localeCompare(a.key));

@@ -32,6 +32,10 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
     { wants: ['revenue.view:own'], text: 'canAccessRevenue(user) — the sidebar’s Revenue sub-departments (listSubDepartments)' },
   'src/components/layout/BottomTabBar.tsx#BottomTabBar':
     { wants: ['approvals.view', ...APPROVE], text: 'canApprove(viewer) — the phone’s approvals badge' },
+  // 2026-11-03 — the Finance sidebar's count on Payment request: the page's own read (readPaymentRequests), made only
+  // for an account the page opens for. It answers null otherwise rather than redirect: the sidebar draws on every page.
+  'src/app/(portal)/payments/requests/waiting-count.ts#waitingRequestCount':
+    { wants: ['treasury.view'], text: 'canAccessTreasury(user) with Payment request’s tab open — the sidebar’s count on Payment request' },
   // 2026-10-17 — the Principal's own view opens the Finance app with an Approvals tab: its badge is read only
   // where the tab is drawn — the sidebar's Approvals row, `canApprove` and its page's tabs.
   'src/app/(fin-app)/fin-app/layout.tsx#FinAppLayout':
@@ -44,6 +48,15 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
   // open to them (appAccess(user).parts.people: can(team) || can(team_directory), with People's tab).
   'src/lib/hr-app/server.ts#mobiles':
     { wants: ['team.view:own'], text: 'appAccess(user).parts.people — People (team / team_directory) with its tab open' },
+  // 2026-10-28 — Marketing's own pool: Finance's Marketing P&L and Cash Flow in Marketing's view. The ledger opens to
+  // the treasury only, so the page, the lines it opens and its files read through the service role once their own
+  // View or Export is held, Marketing's segment named in code (lib/marketing/pool.ts).
+  'src/app/(portal)/marketing/pool/page.tsx#MarketingPoolPage':
+    { wants: ['service_role'], text: 'every read goes through adminClient(), once Marketing pool · View is held on its page — Marketing’s segment only' },
+  'src/app/(portal)/marketing/pool/actions.ts#openMarketingPoolRow':
+    { wants: ['service_role'], text: 'every read goes through adminClient(), once Marketing pool · View is held on its page — Marketing’s segment only' },
+  'src/app/(portal)/marketing/pool/export/route.tsx#GET':
+    { wants: ['service_role'], text: 'every read goes through adminClient(), once Marketing pool · Export is held on its page — Marketing’s segment only' },
 }
 
 /**
@@ -96,7 +109,7 @@ export const BRANCHES: Readonly<Record<string, Readonly<Record<Want, readonly st
 export const DYNAMIC_TABLES: Readonly<Record<string, readonly string[]>> = {
   'src/lib/approval-amounts.ts#resolveLiveApprovalAmounts': ['payment_vouchers', 'fund_sources', 'loans'],
   'src/app/(member)/member/(app)/products/load.ts#count': ['erp_products', 'erp_product_models', 'erp_maintenance_options', 'erp_fabrics'],
-  'src/app/(portal)/revenue/config-actions.ts#cloneSchemeChildren': ['comm_item_groups', 'comm_kpi_items', 'comm_cost_ratios', 'comm_kpi_thresholds', 'comm_open_bill_rules', 'comm_promotion_rules'],
+  'src/app/(portal)/revenue/config-actions.ts#cloneSchemeChildren': ['comm_item_groups', 'comm_kpi_items', 'comm_cost_ratios', 'comm_kpi_thresholds', 'comm_promotion_rules'],
   // The work of updatePaymentVoucher and its in-words twin (2026-10-16).
   'src/app/(portal)/payments/actions.ts#updatePaymentVoucherWork': ['payroll_voucher_lines', 'payroll_statutory_voucher_lines'],
   'src/lib/hierarchy-writes.ts#updateChecked': ['comm_hierarchy'],
@@ -137,7 +150,8 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   ar_account_for_invoice: ['chart_of_accounts', 'companies', 'invoices'],
   catalogue_add_combo: ['catalogue_combo_prices', 'catalogue_combos', 'catalogue_live_combos', 'erp_products'],
   catalogue_remove_combos: ['catalogue_combo_prices', 'catalogue_combos'],
-  catalogue_save_kpi_items: ['comm_kpi_items', 'comm_schemes', 'erp_maintenance_options', 'erp_products'],
+  catalogue_save_fabric_upgrades: ['catalogue_fabric_upgrade_series', 'catalogue_fabric_upgrades'],
+  catalogue_save_kpi_items: ['comm_kpi_items', 'comm_schemes', 'erp_fabrics', 'erp_maintenance_options', 'erp_products'],
   comm_clear_first_paid_month: ['comm_cutovers'],
   commission_payroll_closed: [],
   comm_close_salespeople: ['comm_salesperson_closes', 'hr_staff_costs', 'users'],
@@ -145,7 +159,7 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   comm_replace_membership_position: ['comm_hierarchy'],
   comm_set_first_paid_month: ['comm_cutovers', 'comm_runs', 'users'],
   commission_order_period_locked: ['comm_order_releases', 'comm_runs'],
-  commit_sales_import_batch: ['comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_order_open_bill_tags', 'sales_orders'],
+  commit_sales_import_batch: ['comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_orders'],
   // Today's CRM chat button (mig 20261014120000): one's own chats' unread, under crm_contacts' own row policy.
   crm_my_unread: ['crm_contact_prefs', 'crm_contacts'],
   dashboard_summary: [
@@ -172,25 +186,25 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
     'comm_agent_aliases', 'comm_brands', 'comm_cutovers', 'comm_item_groups', 'comm_order_releases', 'comm_organisers',
     'comm_products', 'comm_runs', 'comm_salesperson_closes', 'comm_schemes', 'comm_sub_departments', 'comm_upsales',
     'comm_venue_events', 'comm_venues', 'departments', 'erp_feed_settings', 'erp_sync_events', 'sales_import_batches',
-    'sales_order_erp_changes', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_orders',
+    'sales_order_erp_changes', 'sales_order_lines', 'sales_orders',
   ],
   ladder_delete_level: ['title_levels', 'titles'],
   ladder_insert_level: ['title_levels'],
   lookup_eis: ['eis_act800_schedule'],
   lookup_epf: ['epf_third_schedule'],
   lookup_socso: ['socso_act4_schedule'],
-  match_erp_salesperson: ['comm_agent_aliases', 'comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_orders'],
+  match_erp_salesperson: ['comm_agent_aliases', 'comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   // Transfer from the waiting list (mig 20261010150000): the roster row as the caller; the request through two DEFINER functions.
   member_transfer_waiting: ['hr_staff_costs', 'titles'],
   next_account_code: ['chart_of_accounts'],
   revenue_apply_fair_calendar: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_dismiss_double_claim: ['comm_double_claim_dismissals', 'comm_order_releases', 'comm_runs', 'hr_staff_costs', 'sales_import_batches', 'sales_orders', 'users'],
-  revenue_exclude_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_orders', 'users'],
+  revenue_exclude_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_orders', 'users'],
   revenue_fair_calendar: ['comm_organisers', 'comm_venue_events', 'comm_venues', 'sales_import_batches', 'sales_orders'],
   revenue_fair_calendar_moves: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_orders'],
-  revenue_include_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_orders', 'users'],
-  revenue_move_order: ['comm_agent_aliases', 'comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_order_reassignments', 'sales_order_shares', 'sales_orders', 'users'],
-  revenue_month_orders: ['comm_cost_ratios', 'comm_item_groups', 'comm_kpi_items', 'comm_organisers', 'comm_schemes', 'comm_venue_events', 'comm_venues', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_order_open_bill_tags', 'sales_orders'],
+  revenue_include_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_orders', 'users'],
+  revenue_move_order: ['comm_agent_aliases', 'comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_lines', 'sales_order_reassignments', 'sales_order_shares', 'sales_orders', 'users'],
+  revenue_month_orders: ['comm_cost_ratios', 'comm_item_groups', 'comm_kpi_items', 'comm_organisers', 'comm_schemes', 'comm_venue_events', 'comm_venues', 'erp_fabrics', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_pay_lines_closed: [],
   revenue_possible_double_claims: ['comm_double_claim_dismissals', 'comm_order_releases', 'comm_runs', 'hr_staff_costs', 'sales_import_batches', 'sales_orders'],
   revenue_restore_double_claim: ['comm_double_claim_dismissals'],
@@ -213,18 +227,25 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'amend_loan_from', 'amend_loan_repayment', 'amend_loan_repayment_date', 'amend_voucher_date', 'approve_dept_payment_expense',
   'approve_payroll_run', 'approve_single_voucher', 'approve_voucher_batch', 'approve_voucher_batch_partial', 'audit_changes', 'audit_overview',
   // The CRM (crm-actions.ts): each asks who may first — crm_me / crm_can_reply / crm_sees_all, the IR scope (migs 20261002*–20261009230000).
-  'crm_can_reply', 'crm_my_can', 'crm_people', 'crm_record_out', 'crm_set_reaction',
+  'crm_can_reply', 'crm_my_can', 'crm_people', 'crm_record_out', 'crm_record_unsent', 'crm_set_reaction',
   // Cold lead templates (mig 20261011140000): both ask crm_manages().
   'crm_template_statuses', 'crm_template_submitted',
   // CRM Desktop rev 1 (mig 20261013100000): asks crm_manages().
   'crm_save_showroom_extras',
   // CRM photos, videos and voice notes (mig 20261013240000): asks crm_can_reply().
   'crm_set_out_media',
+  // A document we send keeps its own name (mig 20261027110000): asks crm_can_reply().
+  'crm_name_out_file',
   // CRM Desktop v2's Channels (mig 20261015100000): asks crm_manages().
   'crm_note_channel_save',
   // Settings › General (mig 20261018100000): crm_me() first — anybody in the CRM reads the reply lines and switches.
   'crm_settings_read',
   'crm_appt_types_read',
+  // The chat's suggested replies (mig 20261029150000): crm_me() first — anybody in the CRM reads the team's past answers.
+  'crm_reply_examples',
+  'crm_partner_links_read',
+  // A showroom's draft (mig 20261103100000): CRM · Manage only, [] for anybody else.
+  'crm_showroom_drafts_read',
   // An ad's name from Ads Manager (mig 20261019100000): the webhooks' service role alone — EXECUTE for nobody else.
   'crm_ads_unnamed', 'crm_meta_name_ad', 'crm_ads_to_check', 'crm_meta_ad_status',
   // Auto-replies sent (mig 20261019120000): the webhooks' service role alone — EXECUTE for nobody else.
@@ -235,11 +256,24 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Recost a month from the Product List (mig 20261021240000): Revenue · Edit and the Orders page's box — as the
   // caller, every line's costing asked the permission helpers again (Fair · October, 1,282 lines: 56 s).
   'recost_sales_order_lines',
+  // Payments › Payment request (mig 20261029160000): a member claim's invoice for the treasury once HR approved it for
+  // payment (has_perm('treasury')), and Return to HR (Treasury · Void or Approve, the page's box).
+  'finance_member_claim_invoice', 'finance_return_member_claim',
+  // Staff payment requests (mig 20261029180000): one's own sent, saved, withdrawn and read by Claims · Create / View at
+  // Own; a file's path to its requester or the treasury; Finance's list, Reject and Create PV (each split's Bill back?
+  // answered with it) by Treasury (the page's box asked too).
+  'payment_request_context', 'my_payment_requests', 'payment_request_save', 'payment_request_cancel', 'payment_request_file',
+  'payment_requests_for_finance', 'payment_request_reject', 'payment_requests_for_pv', 'payment_requests_attach_pv',
+  // A department's approval first (mig 20261029200000): its requests read by Claims · View at Dept, the number waiting,
+  // Approve and Reject by Claims · Approve at Dept (the page's box asked too); the By management approve ticks set by
+  // whoever manages permissions.
+  'payment_requests_for_approval', 'payment_requests_waiting_count', 'payment_request_approve', 'payment_request_send_back',
+  'permission_template_flags_set', 'permission_user_flags_set',
   'close_approvals_for_voided_voucher', 'create_loan_with_approval', 'create_payroll_disbursement_vouchers', 'save_director_salary_results',
   'bank_gl_codes', 'bridge_mirror_slices', 'bridge_ref_flags', 'build_hr_cost_submission_payload', 'bump_bank_balance',
-  'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_dept_payment_request', 'cancel_loan_and_approval',
+  'bump_bank_for_paid_credit', 'calculate_dept_np', 'cancel_loan_and_approval',
   'change_account_type', 'claim_create_payment_voucher', 'claim_payment_queue', 'comm_effective_direct_line_limits',
-  'comm_home_sub_department', 'comm_open_bill_on', 'comm_staff_can_recruit', 'create_manual_journal_voucher',
+  'comm_home_sub_department', 'comm_staff_can_recruit', 'create_manual_journal_voucher',
   'create_payroll_statutory_selection', 'current_actions', 'current_permissions', 'current_sensitive_fields', 'current_tabs',
   'delete_manual_journal_voucher', 'delete_voucher_attachment', 'department_modes', 'department_set_cost_model',
   'dept_invoice_settlements', 'dept_request_pv_rejected', 'director_payroll_complete', 'director_payroll_uncomplete',
@@ -247,9 +281,12 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'director_hv_share_of', 'director_hv_share_save',
   'director_private_fields', 'erp_feed_month_closed', 'erp_feed_secret', 'erp_link_drop_secret', 'erp_link_put_secret',
   'execute_fund_source_cancel', 'execute_loan_cancel', 'generate_invoices_from_request', 'generate_monthly_invoices',
-  'generate_pv_for_dept_request', 'get_dept_opex_rows', 'get_director_ctc_by_company', 'get_hr_cost_submissions_list',
+  'get_dept_opex_rows', 'get_director_ctc_by_company', 'get_hr_cost_submissions_list',
   'get_hr_cost_summary', 'get_payroll_accrual_totals', 'get_payroll_accrual_totals_for', 'get_payroll_breakdown_by_pool',
   'get_payroll_funding_paid', 'get_staff_billing_allocation', 'get_staff_own_share_allocation', 'get_submitted_hr_summary',
+  // Payroll cost moved to another department (mig 20261103200000): the moves' lines, and what each receiver bills on —
+  // Billing or HR Costing · View, as the billing allocation.
+  'get_staff_dept_moves_allocation', 'get_payroll_moves_summary',
   'hr_dashboard_summary', 'log_data_access', 'lookup_pcb', 'mark_journal_entry_reversed', 'member_admin_brand_weeks',
   'member_admin_claim_settings', 'member_admin_save_claim_settings',
   // People › Member services › Food claim (mig 20261013150000): member_is_manager, and the save member.manage too.
@@ -347,6 +384,17 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'att_reopen_month', 'att_register',
   // …the user's answers (mig 20261015200000): a file named for its short link asks View, Remind all Edit.
   'att_file', 'att_remind',
+  // Lead View (mig 20261016300200): each asks has_any_action(leads.*).
+  'lead_config', 'lead_inbox', 'lead_thread', 'lead_list', 'lead_reply', 'lead_simulate', 'lead_save_card',
+  'lead_handoff', 'lead_set_outcome', 'lead_leads', 'lead_set_stage', 'lead_info', 'lead_save_info', 'lead_business_hours', 'lead_save_hours', 'lead_save_template', 'lead_reply_rules', 'lead_save_reply_rules', 'lead_library', 'lead_save_library_item', 'lead_remove_library_item', 'lead_data_files', 'lead_ai_more', 'lead_ai_corrections', 'lead_save_ai', 'lead_ai_draft_kept', 'lead_save_data_file', 'lead_remove_data_file', 'lead_data_folders', 'lead_save_data_folder', 'lead_remove_data_folder', 'lead_data_file_until', 'lead_link_checked', 'lead_link_text', 'lead_quick_replies', 'lead_save_quick_replies', 'lead_quick_reply_used', 'lead_pages', 'lead_connect_page', 'lead_set_page', 'lead_disconnect_page', 'lead_leave', 'lead_save_leave', 'lead_ai_dismissed', 'lead_ai_dismiss', 'lead_mark_lost', 'lead_reopen', 'lead_save_brand', 'lead_save_sales', 'lead_remove_sales',
+  'lead_flows', 'lead_save_flow', 'lead_remove_flow', 'lead_auto_categories', 'lead_save_auto_category', 'lead_remove_auto_category',
+  'lead_knowledge', 'lead_save_knowledge', 'lead_remove_knowledge', 'lead_personas', 'lead_save_persona', 'lead_ai_context',
+  'lead_ai_try_context', 'lead_ai_log_draft', 'lead_ai_draft_outcome', 'lead_campaigns', 'lead_campaign_audience', 'lead_consent', 'lead_insight_more',
+  'lead_save_campaign', 'lead_send_campaign', 'lead_remove_campaign', 'lead_set_opt_in',
+  'lead_ads', 'lead_name_ad', 'lead_save_meta_ads', 'lead_test_ad',
+  // Messenger connected (mig 20261026110000): a reply's target and what Meta said ask leads.create; the ingest and the
+  // outbox are the webhook's service role alone — EXECUTE for nobody else.
+  'lead_reply_target', 'lead_reply_sent', 'lead_ingest_messenger', 'lead_ingest_instagram', 'lead_ingest_page_replies', 'lead_handoff_group', 'lead_reply_media', 'lead_agents', 'lead_assign', 'lead_mark_seen', 'lead_reply_to', 'lead_react', 'lead_labels', 'lead_save_labels', 'lead_set_labels', 'lead_ingest_receipts', 'lead_outbox', 'lead_outbox_done', 'lead_history_wanted', 'lead_ingest_history', 'lead_mark_unread', 'lead_my_unread_marks', 'lead_media_to_keep', 'lead_media_kept', 'lead_ingest_ad_return', 'lead_ai_claim', 'lead_ai_answered', 'lead_ai_stop', 'lead_start_over', 'lead_give_to_ai', 'lead_block', 'lead_save_agent_brands', 'lead_agent_brands', 'lead_rule_of', 'lead_ad_posts',
   // Me (mig 20261017100000): each answers for the caller's own People record only — one's month, today, line, team,
   // record and paid payslips — and writes only one's own (the punch notice read, one's photo); one's punch and an MC
   // filed on one's own request ask their own staff record (mig 20261015200000).
@@ -356,6 +404,10 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // five (page, day, book, cancel, hire) are anon's by name and check the link's code instead.
   'guest_link_admin', 'guest_link_set', 'guest_link_new_code', 'guest_link_room', 'guest_link_save_subsidiary',
   'guest_link_remove_subsidiary', 'guest_link_legend', 'guest_link_page', 'guest_link_day', 'guest_link_book', 'guest_link_cancel', 'guest_link_hire',
+  // The partner booking link's page (mig 20261029190000), anon's by name, each asking the link's code.
+  'crm_partner_page', 'crm_partner_day', 'crm_partner_book', 'crm_partner_get', 'crm_partner_cancel', 'crm_partner_list',
+  // The hourly sweep's leave notices (mig 20261029220000), service role.
+  'crm_notify_leave_starts',
   // Notifications and phone push (mig 20261011180000): each asks a sign-in and answers only the caller’s own; the outbox asks the server’s secret.
   'notifications_mine', 'notifications_read', 'notification_topics_sync', 'push_subscribe', 'push_unsubscribe', 'push_outbox_take', 'push_outbox_done',
   // Change password (mig 20261012000000): whether the caller's own login is one a People record names — nothing else.
@@ -489,6 +541,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Principal's member context); Comm Cal's Requests read by Revenue · View / Edit, decided by Revenue · Edit.
   'member_share_order_context', 'member_share_order_send', 'member_share_order_answer', 'member_share_order_cancel',
   'member_share_requests', 'revenue_share_requests', 'revenue_share_request_decide',
+  // Whose sale (mig 20261031030000): Comm Cal's held bills read by Revenue · View / Edit, answered by Revenue · Edit;
+  // a bill the ERP gave to somebody else answered the same way (mig 20261031040000).
+  'revenue_seller_checks', 'revenue_answer_seller_check', 'revenue_answer_seller_move',
   // One's own memos, in every view (mig 20261012210000): the login's own memos and receipt (a sign-in, their People
   // record); a memo's file to its person or to Documentation · View; Publish › Preview asks Documentation · View.
   'my_memos', 'my_memo_mark', 'memo_attachment', 'hr_memo_preview',
@@ -561,9 +616,8 @@ export const TRIGGER_READS: Readonly<Record<string, readonly string[]>> = {
   sales_order_reassignments_apply: ['comm_agent_aliases', 'sales_orders'],
   sales_order_reassignments_guard: ['comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_orders'],
   guard_commission_order_child: ['comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_orders'],
-  sales_order_lines_apply_combos: ['catalogue_combo_prices', 'catalogue_live_combos', 'catalogue_option_prices', 'erp_products', 'sales_order_lines', 'sales_orders'],
-  sales_order_lines_fill_cost: ['catalogue_option_prices', 'catalogue_skus', 'erp_fabrics', 'erp_products', 'sales_orders'],
-  guard_open_bill_scope: ['sales_import_batches', 'sales_orders'],
+  sales_order_lines_apply_combos: ['catalogue_combo_prices', 'catalogue_fabric_upgrade_series', 'catalogue_fabric_upgrades', 'catalogue_live_combos', 'catalogue_option_prices', 'erp_fabrics', 'erp_products', 'sales_order_lines', 'sales_orders'],
+  sales_order_lines_fill_cost: ['catalogue_fabric_upgrade_series', 'catalogue_fabric_upgrades', 'catalogue_kiv_costs', 'catalogue_option_prices', 'catalogue_skus', 'erp_fabrics', 'erp_products', 'sales_orders'],
   sales_order_shares_guard: ['comm_order_releases', 'comm_runs', 'sales_import_batches', 'sales_order_shares', 'sales_orders'],
   guard_commission_order_scope: ['comm_order_releases', 'comm_runs', 'sales_import_batches'],
   sales_orders_resolve_fair: ['comm_venue_events', 'comm_venues'],
@@ -602,8 +656,6 @@ export const TRIGGERS: ReadonlyArray<{ table: string; fn: string; events: readon
   { table: 'sales_order_lines', fn: 'guard_commission_order_child', events: ['INSERT', 'DELETE', 'UPDATE'] },
   { table: 'sales_order_lines', fn: 'sales_order_lines_apply_combos', events: ['INSERT'] },
   { table: 'sales_order_lines', fn: 'sales_order_lines_fill_cost', events: ['INSERT'] },
-  { table: 'sales_order_open_bill_tags', fn: 'guard_commission_order_child', events: ['INSERT', 'DELETE', 'UPDATE'] },
-  { table: 'sales_order_open_bill_tags', fn: 'guard_open_bill_scope', events: ['INSERT', 'UPDATE'] },
   { table: 'sales_order_shares', fn: 'sales_order_shares_guard', events: ['INSERT', 'DELETE', 'UPDATE'] },
   { table: 'sales_orders', fn: 'guard_commission_order_scope', events: ['INSERT', 'DELETE', 'UPDATE'] },
   { table: 'sales_orders', fn: 'sales_orders_resolve_fair', events: ['INSERT', 'UPDATE'] },

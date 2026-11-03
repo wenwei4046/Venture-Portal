@@ -5,7 +5,7 @@
  * out from the customers and visits themselves.
  */
 import type { Dispatch, SetStateAction, SyntheticEvent } from "react";
-import type { CrmCustomer, CrmData, CrmPerson, CrmVisit } from "@/lib/member/crm-data";
+import { showUpOnce, type CrmCustomer, type CrmData, type CrmPerson, type CrmVisit } from "@/lib/member/crm-data";
 import { formatIntlDate } from "@/lib/utils";
 import { downlineOf, isTeamTop, jobTitle, ROLE_ORDER, teamName, titleOf, titleShort } from "../../shared/people";
 import type { PanelActions } from "../actions";
@@ -101,7 +101,8 @@ export function numbersOf(customers: CrmCustomer[], visits: CrmVisit[], r: Range
   const leads = customers.filter(c => inRange(c.createdAt, r));
   const booked = leads.filter(c => visits.some(v => v.customerId === c.id && v.state !== "cancelled")).length;
   const vs = visits.filter(v => ids.has(v.customerId) && v.state !== "cancelled" && inRange(v.start, r));
-  const due = vs.filter(v => v.state !== "booked" || new Date(v.start) <= now);
+  // One customer counts once, however many visits they booked or came to (showUpOnce).
+  const once = showUpOnce(vs, now);
   // Replied within 24 h: each wait the customer started in the range, answered within a day (auto-replies don't count).
   let waits = 0, replied24 = 0;
   for (const c of customers) {
@@ -112,7 +113,7 @@ export function numbersOf(customers: CrmCustomer[], visits: CrmVisit[], r: Range
       if (m.from === "me" && !m.auto && wait != null) { if (inRange(new Date(wait).toISOString(), r) && t - wait <= DAY) replied24++; wait = null; }
     }
   }
-  return { leads: leads.length, won: leads.filter(c => c.status === "won").length, booked, came: vs.filter(v => v.state === "attended").length, due: due.length, noshow: vs.filter(v => v.state === "no_show").length, replied24, waits };
+  return { leads: leads.length, won: leads.filter(c => c.status === "won").length, booked, came: once.came.size, due: once.due.size, noshow: once.noshow.size, replied24, waits };
 }
 
 /* ── The date sheet: Period and Compare to (Overview, Ads Performance) ──── */

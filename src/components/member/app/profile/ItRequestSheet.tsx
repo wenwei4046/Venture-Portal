@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ItNoteInput } from "@/app/(member)/member/it-actions";
 import ImageAnnotator from "@/components/it-requests/ImageAnnotator";
 import {
-  CATEGORY_LABEL, IT_LIMITS, IT_STATUSES, STATUS_LABEL, STATUS_TONE, fileSize, fileTag, isImage, itWhen, noteProblem,
+  CATEGORY_LABEL, IT_DESK_STATUSES, IT_LIMITS, STATUS_LABEL, STATUS_TONE, fileSize, fileTag, isImage, itWhen, noteProblem, senderMayClose,
   type ItFile, type ItRequest, type ItStatus,
 } from "@/lib/it-requests/model";
 import Sheet, { SheetHandle } from "../Sheet";
@@ -19,8 +19,9 @@ type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
  * One IT request, read in full (2026-10-20 — the user: "我们也可以帮做 annotation，这样就能看到他 submit 的 case 被
  * annotate，他也能看到自己 submit 的 case status。如果我们给它 fix 了，他那边就可以收到 fix 的通知"): what was sent, its
  * pictures and files, and its thread — IT's notes on the peach, the sender's replies on white, every status IT set. Its
- * sender replies; IT requests · Edit writes a note and sets the status (New · In progress · Fixed · Closed), and the
- * sender is told. View as reads it and writes nothing.
+ * sender replies; IT requests · Edit writes a note and sets the status (New · In progress · Fixed), and the sender is
+ * told. Once it is Fixed, its sender tries it and closes it — **Close request** — and the desk reads it closed (2026-10-27
+ * — the user: "这个 close 其实应该是由提出这个 request / support 的人去操作"). View as reads it and writes nothing.
  */
 export default function ItRequestSheet({ open, request, canEdit, readOnly, onNote, sign, openFile, onClose, upload }: {
   open: boolean;
@@ -85,6 +86,7 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
   }, [discard]);
   const writes = !readOnly && (r.mine || canEdit);
   const setsStatus = canEdit && !readOnly;
+  const closes = !readOnly && senderMayClose(r);
   // A link made at the press: the preview's may have run out (ten minutes) while the sheet stayed open.
   const mark = async (f: ItFile) => {
     const fresh = sign ? await sign([f.id]).catch(() => null) : null;
@@ -93,10 +95,11 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
   };
   const annotate = writes && !busy && !files.full ? (f: ItFile) => void mark(f) : undefined;
 
-  const send = async () => {
+  // IT's note with the status it picked; or, closing, the sender's words (if any) with Closed.
+  const send = async (close = false) => {
     if (sending.current) return;
     setError(null);
-    const next = setsStatus && status !== r.status ? status : null;
+    const next: ItStatus | null = close ? "closed" : setsStatus && status !== r.status ? status : null;
     const problem = noteProblem({ body, files: files.items.length, status: next, current: r.status });
     if (problem) return setError(problem);
     if (files.busy) return setError("Wait for the files to finish uploading.");
@@ -174,7 +177,7 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
             <div className={s.field} role="group" aria-label="Status">
               <span className={s.fieldLabel}>Status</span>
               <div className={s.pills}>
-                {IT_STATUSES.map(x => (
+                {IT_DESK_STATUSES.map(x => (
                   <button key={x.id} type="button" className={`${s.pill} ${status === x.id ? s.pillOn : ""}`} aria-pressed={status === x.id} onClick={() => setStatus(x.id)}>{x.label}</button>
                 ))}
               </div>
@@ -183,7 +186,10 @@ function Body({ request: r, canEdit, readOnly, onNote, sign, openFile, onClose, 
           {error && <p className={s.formError} role="alert">{error}</p>}
           <div className={t.composeRow}>
             <span className={t.hint}>{setsStatus && !r.mine ? `${r.senderName} is told.` : r.mine && !canEdit ? "IT is told." : ""}</span>
-            <button className={t.send} onClick={() => void send()} disabled={busy}>{busy ? "Sending…" : "Send"}</button>
+            <div className={t.composeActions}>
+              {closes && <button className={t.closeRequest} onClick={() => void send(true)} disabled={busy}>Close request</button>}
+              <button className={t.send} onClick={() => void send()} disabled={busy}>{busy ? "Sending…" : "Send"}</button>
+            </div>
           </div>
         </div>
       )}

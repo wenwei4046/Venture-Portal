@@ -93,6 +93,8 @@ export interface SourceEditColumns {
   amount?: number
   cost_rate?: number
   lock_in_months?: number | null
+  /** Cleared when the periods are edited — they then split the amount in equal parts (2026-10-27). */
+  principal_per_month?: number | null
   effective_date?: string
   repayment_date?: string
   repayment_start_month?: string
@@ -140,6 +142,8 @@ export function sourceEditPatch(row: SourceEditRow, fd: FormData, today: string,
     const months = raw === '' ? null : parseInt(raw, 10)
     if (months !== null && (isNaN(months) || months < 1)) return { ok: false, reason: 'Repayment period must be at least 1 month' }
     patch.lock_in_months = months
+    // Periods typed in are equal parts: a fixed amount a month the source was filed with gives way to them.
+    patch.principal_per_month = null
   }
   const effectiveDate = sent('effective_date') ? s('effective_date') : row.effective_date
   if (sent('effective_date')) {

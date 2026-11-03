@@ -54,7 +54,6 @@ vi.mock('../invoice-actions', () => ({
   hubVoidCreditNote: mocks.cnVoid,
   hubDeleteCreditNote: mocks.cnDelete,
 }))
-vi.mock('./CreateInvoiceDialog', () => ({ default: marker('single') }))
 vi.mock('./InvoiceLinesDialog', () => ({ default: marker('lines') }))
 vi.mock('./CreditNoteDialog', () => ({ default: marker('credit_note') }))
 vi.mock('./ChangeAccountDialog', () => ({ default: marker('reassign') }))
@@ -207,16 +206,15 @@ describe('the head and the cards', () => {
     expect(within(dialog()).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Payroll basisPending · HR pending · Director salary pending · 2 Marketing lines'])
   })
 
-  it('Create invoice ▾ opens the invoice dialogs on the page’s month', () => {
+  // 2026-10-30: one window for one line or several, where Single invoice and Multi-line invoice were two.
+  it('Create invoice ▾ opens the one invoice window on the page’s month', () => {
     draw()
     fireEvent.click(screen.getByRole('button', { name: 'Create invoice ▾' }))
     expect(within(dialog()).getByText('1 line to import · RM 500.00')).toBeInTheDocument()
-    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /Single invoice/ }))
-    expect(screen.getByTestId('dialog-single')).toBeInTheDocument()
-    expect(mocks.dialog).toHaveBeenLastCalledWith('single', expect.objectContaining({ period: '2026-10-01', open: true, today: '2026-10-14' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Create invoice ▾' }))
-    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /Multi-line invoice/ }))
-    expect(mocks.dialog).toHaveBeenLastCalledWith('lines', expect.objectContaining({ period: '2026-10-01', open: true }))
+    expect(within(dialog()).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['New invoiceOne line or several', 'Import Marketing billing1 line to import · RM 500.00'])
+    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /New invoice/ }))
+    expect(screen.getByTestId('dialog-lines')).toBeInTheDocument()
+    expect(mocks.dialog).toHaveBeenLastCalledWith('lines', expect.objectContaining({ period: '2026-10-01', open: true, today: '2026-10-14' }))
     expect(mocks.dialog.mock.lastCall?.[1].editing).toBeUndefined()
   })
 
@@ -553,7 +551,7 @@ describe('arriving', () => {
   it('?new=1 (the Overview’s Create invoice) opens Create invoice', () => {
     window.history.replaceState(null, '', '/statements?new=1')
     draw({ openNew: true })
-    expect(screen.getByTestId('dialog-single')).toBeInTheDocument()
+    expect(screen.getByTestId('dialog-lines')).toBeInTheDocument()
     expect(window.location.search).toBe('')
   })
 

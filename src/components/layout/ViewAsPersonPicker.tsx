@@ -9,9 +9,10 @@ import s from './view-as-person.module.css'
  * View as a person — the picker (2026-10-11, the user: "can set a function is
  * view as a user, same like in revenue app, i can view as a member"). Everybody
  * who signs in to the portal, by department; picking one draws the portal as
- * they see it, read-only, until Stop viewing.
+ * they see it, read-only, until Stop viewing. `z`: the scrim's layer — above
+ * the phone apps' own layers where they open it (2026-10-27: every switcher).
  */
-export default function ViewAsPersonPicker({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function ViewAsPersonPicker({ open, onClose, z = 40 }: { open: boolean; onClose: () => void; z?: number }) {
   const [people, setPeople] = useState<ViewablePerson[] | null>(null)
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -53,7 +54,7 @@ export default function ViewAsPersonPicker({ open, onClose }: { open: boolean; o
   }
 
   return (
-    <Window open={open} onClose={onClose} width={480} scrim={0.22} z={40} label="View as a person" style={{ padding: 22, borderRadius: 14 }}>
+    <Window open={open} onClose={onClose} width={480} scrim={0.22} z={z} label="View as a person" style={{ padding: 22, borderRadius: 14 }}>
       <div className={s.picker}>
         <h2 className={s.title}>View as a person</h2>
         <p className={s.lede}>See the portal exactly as they do — their pages, menus and buttons. Read-only: nothing you press is saved.</p>

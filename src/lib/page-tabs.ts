@@ -68,7 +68,6 @@ export const PAGE_TABS = {
   '/revenue/[sub]': COMM_CAL,
   '/revenue/[sub]/[period]': COMM_CAL,
   '/revenue/[sub]/[period]/import': COMM_CAL,
-  '/revenue/[sub]/[period]/open-bill': COMM_CAL,
   '/revenue/[sub]/[period]/orders': COMM_CAL,
   '/revenue/[sub]/[period]/orders/[orderId]': COMM_CAL,
   '/revenue/[sub]/[period]/pay': COMM_CAL,
@@ -103,6 +102,21 @@ export const PAGE_TABS = {
   '/attendance/close': ['hr.att_close'],
   '/attendance/settings': ['hr.att_settings'],
   '/attendance/readiness': ['hr.att_ready'],
+  // Lead View (2026-10-16): one tab a page.
+  '/leads': ['lead.inbox'],
+  '/leads/list': ['lead.leads'],
+  '/leads/insight': ['lead.insight'],
+  '/leads/campaigns': ['lead.campaigns'],
+  '/leads/flows': ['lead.flows'],
+  '/leads/rules': ['lead.rules'],
+  '/leads/library': ['lead.library'],
+  '/leads/ai': ['lead.ai'],
+  '/leads/knowledge': ['lead.knowledge'],
+  '/leads/corrections': ['lead.corrections'],
+  '/leads/info': ['lead.info'],
+  '/leads/hours': ['lead.hours'],
+  '/leads/audit': ['lead.audit'],
+  '/leads/settings': ['lead.settings'],
   // Changes: what it shows follows the reader's other boxes (each view's Audit Log).
   '/audit-log': ['hr.audit_log', 'fin.audit_log', 'pri.audit_log'],
   // Admin › Meeting Rooms (2026-10-11): every view books a room.
@@ -122,6 +136,8 @@ export const PAGE_TABS = {
   '/payments/claim-requests': PAYMENTS,
   '/payments/dept-requests': PAYMENTS,
   '/payments/payroll-requests': PAYMENTS,
+  // Payment request (2026-10-29): what waits for Finance to pay — Payments' own tab, as its old request pages.
+  '/payments/requests': PAYMENTS,
   '/invoice-pool': PAYMENTS,
   '/receipts': ['fin.receipt'],
   '/statements': INVOICE,
@@ -173,7 +189,8 @@ export const PAGE_TABS = {
   '/reconciliation/journal-entries/[id]': JOURNAL,
   '/reconciliation/journal-entries/[id]/edit': JOURNAL,
   '/reconciliation/journal-entries/new': JOURNAL,
-  '/claims': ['pri.claims', 'dept.my_claims', 'mkt.my_claims'],
+  '/claims': ['pri.claims', 'dept.my_claims', 'mkt.my_claims', 'hr.my_claims', 'fin.my_claims',
+    'dept.claims_approve', 'mkt.claims_approve', 'hr.claims_approve', 'fin.claims_approve'],
   '/dept-pool': DEPT_POOL,
   '/dept-pool/[slug]': DEPT_POOL,
   '/dept-pool/marketing': DEPT_POOL,
@@ -204,6 +221,8 @@ export const PAGE_TABS = {
   '/marketing/minutes': ['mkt.tracking'],
   '/marketing/replace': ['mkt.tracking'],
   '/marketing/billing': ['mkt.tracking'],
+  // Marketing's own P&L and Cash Flow (2026-10-28): a box of its own, beside the manager tools.
+  '/marketing/pool': ['mkt.pool'],
 } as const satisfies Record<string, readonly string[]>
 
 export type PageRoute = keyof typeof PAGE_TABS

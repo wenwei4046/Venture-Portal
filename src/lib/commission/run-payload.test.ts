@@ -18,14 +18,12 @@ import {
 const SCHEME: RunSourceRows['scheme'] = {
   id: 'scheme-1',
   sub_department_id: 'sub-1',
-  open_bill_basis: 'uplift_on_commission',
   override_includes_kpi: false,
   // Deliberately a string: PostgREST returns DECIMAL as text.
   deposit_threshold_pct: '0.500000',
   default_rate_mode: 'variable',
   enable_product_revenue: true,
   enable_kpi: true,
-  enable_open_bill: true,
   enable_override: true,
   enable_margin_penalty: true,
   enable_margin_incentive: true,
@@ -69,8 +67,6 @@ function baseRows(overrides: Partial<RunSourceRows> = {}): RunSourceRows {
     ],
     kpiItems: [{ product_code: 'PIL-01', kpi_amount: '50.00' }],
     kpiThresholds: [{ min_qty: 10, bonus_pct: '0.200000' }],
-    openBillRules: [{ bill_rank: 1, pct: '0.500000' }],
-    openBillTags: [],
     marginBands: [],
     hierarchy: [
       {
@@ -125,7 +121,6 @@ describe('toEngineInput', () => {
     expect(input.ranks[1].groupSalesThreshold).toBe(100000)
     expect(input.kpiItems[0].kpiAmount).toBe(50)
     expect(input.kpiThresholds[0].bonusPct).toBe(0.2)
-    expect(input.openBillRules[0].pct).toBe(0.5)
     expect(input.orders[0].orderTotal).toBe(10000)
     expect(input.orders[0].lines[0].costAmount).toBe(6000)
   })
@@ -502,7 +497,6 @@ function irRows(fullSpec = false): RunSourceRows {
     scheme: {
       ...SCHEME,
       enable_kpi: false,
-      enable_open_bill: false,
       enable_margin_penalty: false,
       enable_margin_incentive: false,
       deposit_threshold_pct: null,
@@ -578,7 +572,7 @@ describe('IR package database mapping', () => {
     ])
     for (const s of payload.p_statements) {
       expect(s.lines.reduce((sum, line) => sum + line.amount, 0)).toBe(s.total_commission)
-      expect(s.product_commission + s.kpi_commission + s.open_bill_bonus + s.override_commission + s.margin_incentive + s.group_incentive).toBe(s.total_commission)
+      expect(s.product_commission + s.kpi_commission + s.override_commission + s.margin_incentive + s.group_incentive).toBe(s.total_commission)
     }
     expect(payload.p_statements.reduce((sum, s) => sum + s.total_commission, 0)).toBe(payload.p_total_commission)
     expect(payload.p_released_orders.reduce((sum, o) => sum + o.product_revenue, 0)).toBe(1_800_000)

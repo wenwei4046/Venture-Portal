@@ -1,7 +1,23 @@
 import type { createClient } from '@/lib/supabase/server'
 import { round2 } from '@/lib/payroll-funding'
 import { topupSummary } from '@/lib/payroll-lifecycle'
-import type { StatutoryPeriod } from '../_components/StatutorySection'
+
+/**
+ * A payroll run's statutory payments (HR's vouchers: KWSP · SOCSO · EIS · LHDN · SKBBK) — read-only for Finance. Shown
+ * since PR ⑥ as Payment request's Statutory card (the old Payroll Requests page's section, 2026-10-29).
+ */
+export interface StatutoryPeriod {
+  period_month: string
+  /** Existing non-voided statutory PVs for this period's run. */
+  pvs: {
+    id: string
+    voucher_no: string | null
+    payee_name: string | null
+    amount: number
+    status: string
+    payment_date: string | null
+  }[]
+}
 
 // What Payments › Payroll Requests reads (2026-10-16, lifted out of its page
 // word for word so the Finance phone app reads the very same): the open

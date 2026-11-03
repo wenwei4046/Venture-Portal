@@ -99,7 +99,8 @@ module.exports = function desk4a(body) {
   body = once(body, '<div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "10px", padding: "8px 16px", background: "#fff", borderTop: "1px solid var(--crm-rule)" }}>\n                      <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px", paddingLeft: "10px", borderLeft: "3px solid var(--crm-rust)" }}>',
     '<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "82px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "12px", boxShadow: "0 6px 20px rgba(42,22,12,.08)" }}>\n                      <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px", paddingLeft: "10px", borderLeft: "3px solid var(--crm-rust)" }}>', "reply bar");
   body = swap(body, '<div style={{ flex: "0 0 auto", background: "#fff", padding: "12px 16px", borderTop: "1px solid var(--crm-rule)", display: "flex", alignItems: "center", gap: "6px" }}>\n                    <span style={{ position: "relative", flex: "0 0 auto" }}>', "div",
-    `<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
+    // The suggested replies' floating logo over the reply box, as the phone's (the owner, 2026-10-29: "电脑版也加漂浮 logo").
+    `{v.suggest && <SuggestFloat key={v.suggestKey} list={v.suggest} pick={v.pickSuggest} library={v.suggestLib} showLogo={v.suggestLogo && !!v.suggest.length && !v.draft} desk />}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
                     <div style={{ flex: "1", minWidth: "0", height: "50px", borderRadius: "25px", display: "flex", alignItems: "center", gap: "16px", padding: "0 18px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-line)", boxShadow: "0 6px 20px rgba(42,22,12,.08)", color: "var(--crm-muted)" }}>
                       <span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" x2="9.01" y1="9" y2="9"></line><line x1="15" x2="15.01" y1="9" y2="9"></line></svg>{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}
@@ -177,6 +178,10 @@ module.exports = function desk4a(body) {
                   <span style={{ position: "relative" }}>
                     <button type="button" onClick={v.apStToggle} style={{ ${OUT} }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.apStOpen) && (<><div onClick={v.apStToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ ${POP}, left: "0" }}>{(v.apStOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.dot }}></span><span style={{ flex: "1" }}>{o.label}</span><span style={{ color: "var(--crm-faint)" }}>{o.n}</span></button>))}</div></>)}
+                  </span>
+                  <span style={{ position: "relative" }}>
+                    <button type="button" onClick={v.apSrcToggle} style={{ ${OUT} }} className="crm4a-outline">{v.apSrcCur.label}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    {!!(v.apSrcOpen) && (<><div onClick={v.apSrcToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ ${POP}, left: "0" }}>{(v.apSrcOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", flex: "none", whiteSpace: "nowrap", height: "34px", padding: "0 10px", paddingLeft: o.pad, border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", fontWeight: o.w, color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}>{o.label}</button>))}</div></>)}
                   </span>
                   <span style={{ position: "relative" }}>
                     <button type="button" onClick={v.dpOpen} style={{ ${OUT} }} className="crm4a-outline">{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
@@ -266,7 +271,10 @@ module.exports = function desk4a(body) {
   }
   // Frame 10 · Settings: a General tab first, the frame's two-column groups (Desk4a.tsx › DeskSettings4a); Cold lead
   // templates and Notifications, production's, stay as the head's other two tabs.
-  body = once(body, '{!!(v.isNtfOp) && (<>', '{!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isNtfOp) && (<>', "settings general");
+  body = once(body, '{!!(v.isNtfOp) && (<>', '{!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLibOp) && (<DeskReplyLibrary4a v={v.replyLib} />)}{!!(v.isLinkOp) && (<DeskBookingLink4a v={v.partnerLink} />)}{!!(v.isNtfOp) && (<>', "settings general");
+  // A partner's booking open in the pane (mig 20261029190000): its own card, beside Customer info.
+  body = once(body, '{!!(v.kInfo) && (<>', '{!!(v.kPartner) && (<DeskPartnerPane4a v={v.partnerPane} close={v.closePane} />)}{!!(v.kInfo) && (<>', "partner pane");
+  // Settings › Reply library (2026-10-29, the owner: good replies kept for the salespeople, names filled in for the customer).
   // Frame 11 · Audit log: a search, three menus and the five-column table (Desk4a.tsx › DeskAudit4a). Production's three
   // tabs are the Area menu's areas; its stats band went into the head's count.
   {
@@ -281,13 +289,15 @@ module.exports = function desk4a(body) {
   body = once(body, '<p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.chatOwner}</p>', "", "v2 chat owner line");
   // v2 (2026-10-23, note 06 › Inbox and Audit log colours): the chat wall is #F7F3EF, no longer cream.
   body = every(body, 'padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>', 'padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>', "v2 chat wall");
-  body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kAdsPerf) && (<>", "reports page");
+  body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>", "reports page");
+  // Workspace (2026-10-27, the owner: "workspace 可以放在左边report的下方（独立）"): one's own Weekly / Monthly reports, DeskWorkspace.tsx.
   // Frame 08 · Customer form: pages · sections and fields · live preview (Desk4a.tsx › DeskForm4a), on formpage.ts as before.
   {
     const start = '{!!(v.cfOn) && (<>', a = body.indexOf(start);
     const end = '{!!(v.isFrmOp) && (<>', b = body.indexOf(end, a);
     if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: customer form");
-    body = body.slice(0, a) + "{!!(v.cfOn) && (<DeskForm4a v={v} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} />)} " + body.slice(b);
+    // …with the booking link's bar over it (2026-10-29, the owner: "contact form 加上这个的控制 panel，同时附上这个链接让人可以复制").
+    body = body.slice(0, a) + "{!!(v.cfOn) && (<DeskForm4a v={v} share={<DeskBookingBar4a v={v.partnerLink} />} preview={<DeskPhoneForm v={v.cfReal} scale={v.cfRealScale} />} />)} " + body.slice(b);
   }
   // v2 frame 06 (2026-10-23, note 04 / 06 / 08): Split, Ad performance and Audit log are ONE panel with three tabs
   // (DeskAdTabs4a), one shown at a time (v.paneOn) — the two strips they folded to are gone; › folds the whole panel to

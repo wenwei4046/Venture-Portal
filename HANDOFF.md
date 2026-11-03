@@ -1,5 +1,284 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-03 b (#927 SHIPPED · payroll cost → another department DESIGNED, method B, not built)
+
+Session e73c0205.
+
+- **#927 MERGED:** squash `48a76291` (2026-11-03 12:03Z), every check green on `377573e5`, on the user's "全绿就 merge". No migration.
+  - Finance's sidebar *Payment request* row shows the page's own *Waiting for you* as a soft count. The user picked sample B; it sits at the row's end ("放最后"), which cuts the name to *Payment requ…*. Folded, the count sits on the tile's corner.
+  - The count comes from `payments/requests/waiting-count.ts` › `waitingRequestCount`, asked after the sidebar is drawn and again on each page. It answers null (never redirects) unless the account has `canAccessTreasury` and the page's tab. It is registered as a hand-written gate in `src/test/read-paths.ts` › GUARDS.
+  - DESIGN.md v4.227.
+- **Payroll cost → another department, designed, not built.** Branch `feat/payroll-cost-to-department` (not pushed): spec `docs/superpowers/specs/2026-11-03-payroll-cost-to-department-design.md`, plan `docs/superpowers/plans/2026-11-03-payroll-cost-to-department.md`, latest commit a63506d1.
+  - The user's example: Director Office's Vivian, RM 3,000 borne by HR, then HR bills it to the companies by a monthly %.
+  - **Method B** ("对，我决定还是要方法b"): payroll funding and accrual are unchanged. When Finance generates the month's payroll invoices, an automatic internal invoice per receiving department is made (Director Office → HR), issued and settled by netting like the own-share invoice to Venture Office.
+  - Department lines follow the company split's lock, so a Resubmit reopens them.
+  - A cost-center receiver's Bill to % is set by HR monthly (`hr_pool_allocation`, reused). The billed amounts merge into its five lines; what isn't billed stays with it.
+  - A centralized receiver bears it all. A centralized person may move cost to departments, never by % to companies.
+  - IT has no *Inter-billing - IT* account; the plan adds it.
+  - **Next:** the user approves the rewritten spec and plan, picks how to build (B · I build / A · subagents; recommended B), then Task 1.
+- **Later, to settle with the user:**
+  - "关于那个ISS 显示的我也确定了": IIS, see memory `iis-method-decided`. Still built only on the user's go.
+  - A new rule: "minimun pay 后如果不还本金还是要算compound interest". After a minimum payment, unpaid principal keeps compounding. "这个可以过后确定": not designed yet.
+
+## CHECKPOINT 2026-11-03 a (SHIPPED, #921) — the date field's calendar is never cut off
+
+Session e73c0205. The user said "全绿就 merge", then "现在看并 merge" twice; the first was only far enough to re-run a flaky job.
+
+- **MERGED:** squash `8d6325aa` (2026-11-03 03:43Z). Every check was green on `0a542a81` after one re-run of
+  "Cloudflare worker build + PDF smoke". That job hit the known `next/font/google` flake; the same run's Next.js build
+  check had passed. No migration. DESIGN.md v4.226.
+- **The bug:** the user, on *Settle 1 invoice*, saw the calendar's month and first weeks hidden under the window's
+  head: "显示bug".
+  - `components/finv/DateField.tsx` drew the calendar `absolute` inside DialogForm's scroll (`overflow-y: auto`). It
+    opened up when the form had less than 390px below the field.
+  - Settle's form has 84px below the field and 187px above it, so the scroll cut off the calendar's top.
+- **The fix:**
+  - `.pop` is `position: fixed`, placed like hrv/select's soft menu: under the field when it fits in the window, else
+    over it when there is more room above, and 8px inside the edges.
+  - Positions count from a zero-size fixed probe (`[data-cal-origin]`), because the desktop dialog's
+    `transform: scale(1)` holds fixed children.
+  - The side holds while the months are walked. It follows scroll, resize and transitionend (a rising phone sheet),
+    and closes once the field has left `[data-cal-scope]`.
+  - On phone sheets the card is the field's width, via `--date-field-w`; `right: 0` would now be the window's edge.
+  - Every DateField gets the fix (17 files).
+- **Checked** with the real SettleDialog in headless Chrome, on a throwaway Vite page since deleted:
+  - before: the user's picture;
+  - after: 1280×800 opens over the field, whole; 1280×1000 opens under it; the 500×900 phone sheet opens over it at
+    the field's width.
+  - Headless Chrome's virtual clock freezes CSS transitions at their first frame, so the shots were taken with
+    transitions off.
+  - Not yet seen logged in on the live site.
+
+## CHECKPOINT 2026-11-02 c (SHIPPED, #914) — the calendar: paid stays, paid ahead does not (corrects #911)
+
+Session e73c0205, on "全绿就 merge" → "现在看并 merge".
+
+- **MERGED:** squash `65465ef6` (2026-11-02 06:18Z), every check green on `749d034a`. #911 had left every paid
+  instalment off the calendar; the user, on October's: "这个不对，还了要显示，只是像那种提早settle 了就不要显示，先确定，别做"
+  → asked A (only a deal settled in full) or B (an instalment paid ahead too) → **"b"**.
+- **The rule now:** a paid instalment shows, green *Paid*, when paid in its own month or after; it is left out only when
+  paid in full in an EARLIER month (`PlanRow.paidOn`: the reach date oldest first; settled early, the payoff day). So
+  HC's 300,000 shows August as paid and nothing from September to Nov 2027; CONTS's 300,000 nothing from August (July's
+  lump), October included; a payment on 19 Sep for 5 Oct leaves October without it — the user chose B knowing so.
+  The legend's Paid, the `.paid` CSS and the phone's chip are back. DESIGN.md v4.225 corrects v4.223. No migration.
+- Auto-merge: the repo refuses it ("Auto merge is not allowed for this repository"); the user may turn on *Allow
+  auto-merge* in GitHub's settings — a repo-wide choice, theirs.
+
+## CHECKPOINT 2026-11-02 b (SHIPPED, #912) — Repayment Schedule's tabs' row, merged
+
+Session e73c0205, on "现在看并 merge". Checkpoint a below has #911 (shipped) and #912 (open then); this closes #912.
+
+- **MERGED:** squash `b2cab00d` (2026-11-02 04:41Z), every check green on `b7ef5dcc` (SQL 27m32s). The month and one
+  Export ▾ (Excel / PDF) at the right of Calendar / We collect / We pay; the five cards small, in one row; the phone's
+  bar Export PDF · Export Excel. DESIGN.md v4.224 over #911's v4.223. No migration.
+
+## CHECKPOINT 2026-11-02 a (#911 SHIPPED · #912 OPEN, merge once green: "全绿就 merge") — Repayment Schedule
+
+Session e73c0205.
+
+- **#911 SHIPPED** — squash `1568da13` (2026-11-02 04:11Z), deployed. The user, on November's calendar: "已经settle
+  了就别出现哦". CONTS's 300,000 (LO#19, all 36 repaid by 26 Oct) and HC's 300,000 fund source (35 of 36 paid ahead
+  on 5 Aug) stood green on the 1st, 10,000.13 each. `lib/repayment-calendar` `monthEvents` now drops a row with nothing
+  left on it (paid, paid ahead, settled early); the legend has no Paid; the phone's Calendar card follows. DESIGN.md
+  **v4.223** (#910's Lead View v2 took v4.215–v4.222 the same morning).
+- **#912 OPEN** — `feat/schedule-tab-row`, head `b7ef5dcc` (main merged in; DESIGN.md / rules conflicts with #911, both
+  kept). The user: "帮我把日期选择器和export 做在这一排 · card 可以做小，就一排就好 · export 的字体优化？ 没有办法export
+  pdf？" → a sample (scratchpad `sched-row/sched-row-sample.html`) → "一个export 就行". The month and one Export ▾ (Excel
+  / PDF: `?format=pdf`, A4 landscape) at the right of the tabs; the five cards small in one row (`StatCards
+  size="small"`; a Fragment had counted as one card, so they stood 3 + 2); the phone's bar Export PDF · Export Excel.
+  DESIGN.md **v4.224**. **Next:** `gh pr checks 912`; all green → squash-merge #912 (the user's word is given), read
+  the deploy once. No migration in either.
+- Local false failures (not ours): `erp-sync/catalogue` and `crm/palette` (`sales/wall.ts:7`, a comment) — CRLF;
+  `permission-actions` and `design-system-tokens` time out under the full run and pass alone.
+
+## CHECKPOINT 2026-10-31 z (SHIPPED, #884) — Minimum pay interest from a month, merged
+
+Session e73c0205, on "继续" / "现在看并 merge". Checkpoint y below is the build (OPEN then); this closes it.
+
+- **MERGED:** squash `983132b1` (2026-10-30 16:59Z = 31 Oct 00:59 MYT). The migration
+  `20261030080000_min_pay_interest_from.sql` has been on production since 30 Oct ~12:35Z.
+- Overnight main gained #885 (which took DESIGN.md **v4.204**), #886 and #887: #884's entry became **v4.205** (dated
+  2026-10-31), main merged into the branch (`fb3a2528`).
+- That run's *SQL checks* failed only in `tests/member-sql/validate-marketing-pic-calendar.mjs:335` (`words.includes(D1)`,
+  "never a date off the PIC's calendar") — a clock window: it fails between 00:00 and 08:00 MYT (UTC still the day
+  before); another branch (`feat-kiv-bedframe-cost`, 00:31 MYT) failed the same line; #884's previous head passed the
+  whole chain at 20:30 MYT. Merged under the user's standing rule for Marketing's tests ("只做我的part": ours green —
+  units, build, Cloudflare, Vercel). Marketing's test is not ours to fix.
+
+## CHECKPOINT 2026-10-30 y (OPEN, #884 — merge on the user's next word) — Minimum pay interest from a month
+
+Session e73c0205. The user: "minimn pay interest 可以set 几时开始吗？" → it could not (an undated on/off: on, every
+month from the first instalment was checked) → a sample (scratchpad `minpay/minpay-start-sample.html`), the user picked
+**A** (Amend terms' two choices) → "照这个做" → branch `feat/min-pay-from-month`.
+
+- **Migration `20261030080000_min_pay_interest_from.sql` — on production FIRST** (dry-run twice, then COMMIT +
+  schema_migrations row, 2026-10-30 ~12:35Z, on "上数据库，全绿就 merge"): `min_pay_interest_from date` on fund_sources
+  and loans (NULL = the first instalment — HC's 220,000 fund in, the only deal on, stays so); a CHECK (a month's first
+  day, only while on); `set_fund_source_min_pay_interest` / `set_loan_min_pay_interest` take `p_from date DEFAULT NULL`
+  (the old two-argument calls still resolve), re-registered with `pg_temp.tab_guard` (a DROP FUNCTION un-registers a
+  guard in the tab-write-guards scan).
+- **Choice A** (`DealMinPayFrom`, `lib/min-pay`): *From the first instalment* (its month) / *From a later month* →
+  *Starts from* (a month; *Earliest for this deal: …*), none chosen at first. In Record fund in / Create fund out
+  (desktop + phone; the summary's *Minimum pay*), the old /fund-in/new and /fund-out/new forms (hidden field), a deal's
+  page (`MinPayInterestField`: Save; *On — from …*; unticked = off at once — the choice sits OUTSIDE `.fin-field`,
+  whose page rule draws every input as a text box), the phone Fund app (*Turn on* → `MinPaySheet`; *Turn off* one
+  press).
+- Reads: the Repayment Schedule checks from the later of the first instalment and the month set (`minPayStartYM`);
+  the Company Statement and its export say *· from Nov 2026*; the audit log *Minimum pay interest from Nov 2026*.
+- **NOT MERGED.** At 20:46 (12:46Z) 6 of 7 checks were green, and the SQL job (started 12:30Z, ~23 min) was still running. The user
+  had to leave: "下次再 merge". **Next session:** read `gh pr checks 884`; all green → squash-merge #884; then a short
+  SHIPPED checkpoint and the deploy status. If a check failed, show it to the user first. Production is safe meanwhile:
+  the migration is backward compatible with the live code. Local: 104 files / 787 tests. Not seen live by me (no login).
+
+## CHECKPOINT 2026-10-30 x (SHIPPED, #883) — a past month's invoice starts at its last day
+
+Session e73c0205. The user: "帮我检查如果是payroll bill back 回会有问题吗？只是检查" → one problem found: the director
+CTC bill back is keyed the month after and was always dated the payroll month's last day (30 Jun · 31 Jul · 31 Aug ·
+30 Sep, keyed 8 Jul · 4 Aug · 2 Sep · 6 Oct), but the one window (#879) started at today — the invoice would print, and
+post at Issue (the issue entry takes the invoice date), in the next month. Asked, the user: "Yes, fix it". **No
+migration.**
+
+- `newInvoiceDate(month, today)` (`statements/_lib/invoice-form.ts`): today in this month or one ahead; a month gone
+  by's last day. The window starts at it for the hub's month; until a date is picked it moves with *Period* (and back
+  when Period is put away); a picked date stays; Edit keeps its own date.
+- Fine as they were (checked, nothing changed): *Generate payroll invoices* and the own-share invoice (always month
+  end); Several companies' director CTC itemising (total_ctc = the six parts to the sen, Jun–Sep); payroll PVs never ask
+  Bill back (only claim / direct-pay shares do).
+- MERGED on "全绿就 merge": squash `ace24f42`. The first run's *Next.js build check* failed on a Turbopack
+  next/font/google error unrelated to the change (the code commit's own run passed it); re-run once the SQL job ended
+  (`gh run rerun` refuses while a job still runs), then 7 of 7.
+- Next in this session: Minimum pay interest gets a start month (the user picked sample A, then "照这个做") — branch
+  `feat/min-pay-from-month`, migration `20261030080000_min_pay_interest_from.sql` (goes to production before its merge,
+  on the user's word).
+
+## CHECKPOINT 2026-10-30 w (SHIPPED, #879) — one Create invoice window (Single + Multi-line merged)
+
+Session e73c0205. The user: "single-invoice 和 multi-invoice 的功能能不能做在一起？" → three samples (scratchpad
+`inv-merge`; radios + CSS, the file view runs no script) → "可以，但是往后 director 的我也要 split category" → "开没有" →
+branch `feat/one-invoice-window`. **No migration** — lines already carry their account (`invoice_lines.category_code`).
+
+- *Create invoice ▾* › *New invoice · One line or several* opens `InvoiceLinesDialog`, the one window (Edit invoice
+  too; `?new=1` opens it). `CreateInvoiceDialog` and its test are deleted.
+- The window: Bill to | Invoice date (today; the select 40px beside the date, `.pair select.select.tall`), Description
+  (now required — production had none blank), Billing mode (none until picked), lines *Account* ▾ | words | amount on
+  one row (`acct-item`; every line's account needed; a lone line's blank words take the Description), Due date (none
+  until picked: "due date default 不用"). More: Several companies · Period · Reference no. Split billing modes dropped
+  ("拿掉先" — never used).
+- HR's staff cost and a director's CTC fill a company's lines (`rechargeParts`), each account still picked. Several
+  companies: an invoice each (`planCompanyInvoices`) — HR's figure itemised on *Account for each line* (one account
+  per kind: Salary / KPI / Allowance / EPF / SOCSO / EIS), a changed amount one line on Salary's, typed amounts one line
+  on the one *Account*. Every invoice is now written with lines (`hubCreateLinesInvoice`); `hubCreateInvoice` is kept
+  but no window calls it.
+- My calls the user may still overrule: Billing mode blank; HR-filled lines' accounts blank (all 123 past HR lines were
+  5050); the menu word *New invoice*; a changed several-companies amount on Salary's account.
+- MERGED on "全绿就 merge" once CI was green (7 of 7; SQL 22m55s): squash `3af22e3e`. Not seen live by me (no login).
+
+## CHECKPOINT 2026-10-30 v (SHIPPED, #877) — the two invoice windows 680px wide
+
+Session e73c0205. The user, on Multi-line invoice: "这个可以帮我做宽有点，因为我key line 时key description看到不是很清楚",
+then "普通invoice 也是一样" → a width sample (now 520 / 680 / 840; the app's file view runs no script, so its switch is
+radios + CSS), the user: "用 680px" → branch `feat/invoice-dialogs-wide`. **No migration.**
+
+- `CreateInvoiceDialog` and `InvoiceLinesDialog` (so Edit invoice too) take `FinDialog`'s `wide`: 680px on a desktop,
+  as Create payment; the phone's sheet ignores it. A line shows about 65 characters of its description instead of 40.
+- Production's 738 invoice lines: a quarter longer than 44 characters, the longest 86. A line over about 65 still scrolls
+  inside its box — the user picked 680 over 840 knowing it.
+- MERGED on "全绿就 merge" once CI was green (7 of 7; the SQL job 24m48s): squash `adfc9446`.
+
+## CHECKPOINT 2026-10-29 u (SHIPPED, #858) — the phone's Payment request, the old pages retired
+
+Session e73c0205. "可以，先把pr6 的代码写好" → the phone sample (`mockups/pr6-phone-payment-request.html`), the user:
+"b, 手机也能勾" → branch `feat/payment-requests-rest` (rebased on main after #852, opened for review on "可以，merge
+#852，然后把 ⑥ 开成 PR"; plan: `docs/module-spec-payment-requests.md` §4e).
+
+- **Phone:** Payment's bar *Requests · N* → `/fin-app/page/payment-requests` (`PaymentRequestsApp`): the cards, a list
+  with Select (dark bar: Reject · Create PV →), a request's screen = the drawer's `useRequestView`; Create PV's windows
+  `useRequestPvs` (shared with the desktop).
+- **Statutory card** (the old Payroll Requests page's section) on Payment request, desktop and phone.
+- **Old pages redirect** (desktop's after `requirePage`; phone's three); their bodies, the Dept requests code, the old
+  phone request apps and `/claims`' pool-claims code are gone.
+- **Mig `20261029250000_dept_payment_requests_read_only`**: REVOKE client writes on `dept_payment_requests`, DROP
+  `generate_pv_for_dept_request` / `cancel_dept_payment_request` (no caller anywhere, checked in production). APPLIED
+  to production first ("可以，先 dry-run 再把 ⑥ 的 migration 上到 production"; schema_migrations `20261029250000 ·
+  dept_payment_requests_read_only · claude-payment-requests`) after a dry run of the final text: as a Principal's
+  session, insert / update / delete refused, read fine, `dept_request_pv_rejected` still ran (as its owner), anon
+  refused; rolled back and checked unchanged. After COMMIT the same: clients keep only REFERENCES / SELECT / TRIGGER,
+  service_role still writes, the six kept functions there, 0 rows. MERGED on "再看一次 CI，全绿就 merge #858" once CI
+  was green (7 of 7; the SQL job 23m40s): squash `feecf10d`. SQL validator 8 checks.
+- Next: the claim process's PRs are all in but ⑤ (the supplier invoice's auto-read), shelved ("不要开key 先").
+
+## CHECKPOINT 2026-10-29 t (SHIPPED, #852) — several at once for Finance
+
+Session e73c0205. "可以，开始做 PR ④" → branch `feat/payment-requests-bulk` (plan: `docs/module-spec-payment-requests.md`
+§4d; design: the mockup's ③ 多选 → 一次开几张 PV). **No migration.**
+
+- **Payment request's list:** a box on each staff request waiting for its PV, always there, a press elsewhere on the row
+  still opening its drawer (`FinTable` `select.boxOnly`); payroll and Revenue claims faint, saying why. The toolbar's
+  group at its right — "N selected · RM", **Reject**, **Create PV** — greyed until a tick, dark once ("按钮换去上面",
+  "做在格子的靠右"). A payee's open requests tagged **2 → 1 PV** (`FinColumn` `tag`).
+- **Create PV for the ticked:** one payee → today's Create PV window; several → **Create payments**
+  (`CreatePaymentsDialog`, `_lib/bulk-pv`): bank / date / method once, One PV a person, a block a PV (lines, Bill back?,
+  receipts), Save N drafts / Submit N for approval — each voucher `createPaymentForRequests` in turn, then
+  `submitPaymentsTogether` (one `approval_requests.group_id` → Approvals' combined card, approve whole or split).
+- **Reject the ticked:** one reason (`rejectPaymentRequests`, each `payment_request_reject`).
+- **Claim & approve the same** ("统一吧"): boxes always there (To approve, All {department}; none on Mine), Reject /
+  Approve in the toolbar (the kit's `TickTools` / `TickButton`, shared with Payment request); PR ③'s Select and bottom
+  bar gone.
+- My calls: Revenue claims are not ticked (their voucher goes straight to the Principal, no draft; their reject is Return
+  to HR); payroll one by one (the mockup). PR ③'s test fixtures gained the fields `tsc` named (type-only).
+- MERGED on "可以，merge #852" once CI was green (7 of 7): squash `8aed9c56`. No migration.
+- Next: PR ⑥ (the rest: the phone's Payment request, the old request pages retired) — opened for review; its
+  migration waits for the user's go. PR ⑤ stays shelved ("不要开key 先").
+
+## CHECKPOINT 2026-10-29 s (SHIPPED, #850) — a department's approval before Finance
+
+Session e73c0205. "可以，开始做 PR ③" → branch `feat/payment-requests-approval` (plan:
+`docs/module-spec-payment-requests.md` §4c; design: the mockup's ②):
+
+- **By management approve** — not a cell: `permission_template_flags` / `user_permission_flags` (flag `claims_review`,
+  the person wins), a pill under each Claim row in the permission windows (template + person), saved only when it moved.
+- **Claim & approve** — tab `claims_approve` in HR / Finance / Marketing / Department views at Dept; `/claims` becomes
+  Claim & approve for a holder (To approve · All {dept} · Mine, Select → Approve / Reject…, drawer buttons). Approvers
+  are read from cells (`payment_request_approvers`); writes ask claims.approve:dept, no page guard (`narrows()`).
+- **Routing at Submit**: ticked + not an approver + somebody else approves → pending_approval, else Finance. An approver's
+  own and a department with nobody to approve go straight to Finance.
+- **Notices** (kind `claims`, ref `payment_request` → `/claims?open=<id>`): to approvers on send; to the sender on
+  approve, send back, Finance reject, paid. Marketing's bell (`mkt_notices`) and sidebar number (`mkt_shell` → `claims`)
+  swapped in place (swap_check). HR / Finance rows read *Claim & approve*; the Department view's stays *Claim*.
+- **Seeded**: Marketing · Staff ticked; Marketing · Manager holds Claim & approve (SIA JOSIAH today).
+- **Mig `20261029200000_payment_request_approval`**: APPLIED to production first ("可以，先 dry-run 再把 PR ③ 的
+  migration 上到 production"; schema_migrations `20261029200000 · payment_request_approval · claude-payment-requests`)
+  after a dry run of the final text (LI SEAN ticked; two of LI's requests posed as Marketing's pending; SIA JOSIAH
+  approved one and sent one back; ONG MEI SHUANG refused; rolled back). md5 of all 17 function bodies = the file; the
+  notice CHECKs kept every old value (+ `claims` / `payment_request`). MERGED on "可以" once the SQL checks were green:
+  squash `279a8c87`. SQL validator 61 checks.
+- Next: PR ④ (several at once), ⑥ (the rest) — each on the user's go. PR ⑤ stays shelved ("不要开key 先").
+
+## CHECKPOINT 2026-10-29 r (SHIPPED, #847) — the claim process: the staff's own requests to Finance
+
+Session e73c0205. The user settled the claim process with the boss (2026-10-29; the design is
+`OneDrive\Desktop\Claude\Venture\mockups\claims-flow-mockup.html`, the plan `docs/module-spec-payment-requests.md`,
+PR ① to ⑥). PR ① shipped as #840 (Payments › Payment voucher / Payment request; Return to HR; mig 20261029160000).
+"可以，开始做 PR ②" → branch `feat/payment-requests-staff`:
+
+- **Claim** (`/claims`, rebuilt — the old pool-claims code stays until PR ⑥): one's own claims and direct payments in
+  Payment voucher's hub; the drawer's Edit / Submit / Cancel request; **New request** pop-out (what it is · what it was
+  for, receipts straight to R2 · which pool pays or Split it). Rows: Department / Marketing say Claim; HR › Admin ›
+  Claim; Finance's account menu › Account › Claim (personal logins only, never while viewing as).
+- **Payments › Payment request**: the requests under their department's card; Reject…; Create PV = today's Create
+  payment window filled in (`createPaymentForRequests`), every open request of the same payee combined, **Bill back?
+  Yes / No for each split asked in that window** (the user: "我开pv 时就要确定是不是要开单了" — the drawer only says
+  where it stands), receipts copied onto the voucher (`.copyTo`), Yes splits drafted as DRAFT invoices in the same
+  database step that ties the requests (`payment_requests_attach_pv(ids, pv, bill)`; `payment_request_bill_back` gone).
+- **Mig `20261029180000_payment_requests`**: APPLIED to production first ("可以，先 dry-run 再把 PR ② 的 migration 上到
+  production"; schema_migrations `20261029180000 · payment_requests · claude-payment-requests`) after a dry run of the
+  final text (LI SEAN sent two; ONG MEI SHUANG — Invoice · Create and the Bank tick — tied them Yes / Yes / No → two
+  DRAFT invoices; rolled back). md5 of all 18 function bodies = the file, before and after COMMIT. MERGED on "CI 全绿就
+  merge PR ②": squash `043b74df`. SQL validator 77 checks. No Anthropic key, no invoice reading (PR ⑤ shelved:
+  "不要开key 先").
+- Next: PR ③ (By management approve, Claim & approve, the notices), ④ (several at once), ⑥ (the rest) — each on the
+  user's go.
+
 ## CHECKPOINT 2026-10-26 q (SHIPPED, #779) — an opened account's lines as rows of the sheet, under their months; L4; clearer words
 
 Session e73c0205 (the #754 session). The user, showing #754's drill: "我点开了还是这样" — the fifth-round design

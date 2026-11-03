@@ -152,9 +152,7 @@ const draw = (search = '', canExport = true) =>
         canExport={canExport}
         create={{ prefix: 'HV-PV-202610', today: '2026-10-15', open: false, initial: null }}
         today="2026-10-15"
-        dept={[]}
-        payroll={[]}
-        claims={[]}
+        requests={3}
       />
     </FinAppFrame>,
   )
@@ -333,16 +331,24 @@ describe('Daily › Payment on the phone', () => {
     expect(screen.getByRole('button', { name: /Marketing 2 vouchers 6,200\.00/ })).toBeDisabled()
   })
 
-  it('the ⋯ keeps Export to whoever may export (Treasury · Export, 2026-10-16)', () => {
+  it('the ⋯ is Export, for whoever may export (Treasury · Export, 2026-10-16)', () => {
     draw()
     fireEvent.click(screen.getByRole('button', { name: 'More' }))
-    expect(screen.getByRole('menuitem', { name: /^Export/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^Excel/ })).toBeInTheDocument()
     cleanup()
     resetNav()
     draw('', false)
-    fireEvent.click(screen.getByRole('button', { name: 'More' }))
-    expect(screen.getByRole('menuitem', { name: /^Claims/ })).toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: /^Export/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull()
+  })
+
+  // PR ⑥ (2026-10-29 — the user picked B, a button on Payment's bar): Requests · N opens Payment request, in place of
+  // the old Dept, Payroll and ⋯ › Claims.
+  it('Requests · N opens Payment request; Dept, Payroll and Claims are gone', () => {
+    draw()
+    expect(screen.queryByRole('button', { name: /^Dept/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Payroll ·/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Requests · 3' }))
+    expect(mocks.push).toHaveBeenCalledWith('/fin-app/page/payment-requests')
   })
 
   it('Payment opens the desktop’s own window — Create payment, as a sheet', () => {

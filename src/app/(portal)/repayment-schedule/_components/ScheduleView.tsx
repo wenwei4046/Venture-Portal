@@ -114,6 +114,7 @@ export default function ScheduleView({
   repayNoTermInterest,
   repayCompound,
   repayCompoundTotals,
+  tools = null,
 }: {
   monthLabel: string
   /** YYYY-MM — the month on screen. */
@@ -143,6 +144,8 @@ export default function ScheduleView({
   repayNoTermInterest: number
   repayCompound: CompoundRow[]
   repayCompoundTotals: CompoundTotals
+  /** The month and Export, at the right of the tabs' row (2026-11-02, the user: "帮我把日期选择器和export 做在这一排"). */
+  tools?: ReactNode
 }) {
   const [mode, setMode] = useState<Mode>('all')
   const [tab, setTab] = useState<Tab>('cal')
@@ -156,16 +159,19 @@ export default function ScheduleView({
     <div>
       {cards?.[tab] ?? null}
 
-      <SlidingTabs
-        items={[
-          { key: 'cal', label: 'Calendar' },
-          { key: 'collect', label: 'We collect', count: collectCount },
-          { key: 'pay', label: 'We pay', count: payCount },
-        ]}
-        active={tab}
-        onTabChange={(key) => setTab(key as Tab)}
-        variant="control"
-      />
+      <div className="sch-tabrow">
+        <SlidingTabs
+          items={[
+            { key: 'cal', label: 'Calendar' },
+            { key: 'collect', label: 'We collect', count: collectCount },
+            { key: 'pay', label: 'We pay', count: payCount },
+          ]}
+          active={tab}
+          onTabChange={(key) => setTab(key as Tab)}
+          variant="control"
+        />
+        {tools ? <div className="sch-tabrow-tools">{tools}</div> : null}
+      </div>
 
       {tab === 'cal' ? (
         <RepayCalendar month={month} today={today} events={events} />

@@ -35,7 +35,7 @@ import {
   orderProductRevenue,
   round2,
 } from './engine'
-import { isKpiOptionPool, lineSpecialsOf } from './kpi'
+import { EMPTY_FABRIC_SERIES, indexFabricSeries, isKpiOptionPool, lineKpiFactsOf, type FabricSeriesRow } from './kpi'
 import type {
   DirectorTerms,
   EngineInput,
@@ -45,9 +45,6 @@ import type {
   KpiThreshold,
   MarginBand,
   MarginBandKind,
-  OpenBillRank,
-  OpenBillRule,
-  OpenBillTag,
   PriorMonth,
   Rank,
   RateMode,
@@ -67,13 +64,11 @@ type Num = number | string | null | undefined
 export interface SchemeRow {
   id: string
   sub_department_id: string
-  open_bill_basis: 'uplift_on_commission' | 'pct_of_revenue'
   override_includes_kpi: boolean
   deposit_threshold_pct: Num
   default_rate_mode: RateMode
   enable_product_revenue: boolean
   enable_kpi: boolean
-  enable_open_bill: boolean
   enable_override: boolean
   enable_margin_penalty: boolean
   enable_margin_incentive: boolean
@@ -116,7 +111,7 @@ export interface ItemGroupRow {
 }
 
 /**
- * A KPI item: a SKU (`product_code`) or a Maintenance special
+ * A KPI item: a SKU (`product_code`), a Maintenance special or a fabric series
  * (`option_pool` + `option_value`) — Rules › KPI items (the Product List's
  * Add-on / KPI Items until 2026-10-08).
  * Rows written before 2026-09-27 carry no `source` and are SKUs.
@@ -139,16 +134,6 @@ export interface CostRatioRow {
 export interface KpiThresholdRow {
   min_qty: number
   bonus_pct: Num
-}
-
-export interface OpenBillRuleRow {
-  bill_rank: number
-  pct: Num
-}
-
-export interface OpenBillTagRow {
-  order_id: string
-  bill_rank: number
 }
 
 export interface MarginBandRow {
@@ -212,8 +197,6 @@ export interface RunSourceRows {
   itemGroups: ItemGroupRow[]
   kpiItems: KpiItemRow[]
   kpiThresholds: KpiThresholdRow[]
-  openBillRules: OpenBillRuleRow[]
-  openBillTags: OpenBillTagRow[]
   marginBands: MarginBandRow[]
   hierarchy: HierarchyRow[]
   orders: SalesOrderRow[]
@@ -233,6 +216,11 @@ export interface RunSourceRows {
   upsaleShares?: OrderShareRow[]
   /** `comm_cost_ratios` of this scheme. Absent = every SKU at the default. */
   costRatios?: CostRatioRow[]
+  /**
+   * The ERP's fabric list (`erp_fabrics`), read only while a KPI item is a
+   * fabric series (2026-10-29). Absent = no line's fabric has a series.
+   */
+  fabrics?: FabricSeriesRow[]
   /**
    * Who among the sellers holds a title that heads the department
    * (`titles.is_department_head`). Absent = nobody.
@@ -278,10 +266,6 @@ function one<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v
 }
 
-function isBillRank(n: number): n is OpenBillRank {
-  return n === 1 || n === 2 || n === 3
-}
-
 // ─── rows → EngineInput ─────────────────────────────────────────────────────
 
 /**
@@ -301,14 +285,11 @@ export function toKpiItems(rows: readonly KpiItemRow[]): KpiItem[] {
   })
 }
 
-/** A bed frame's or a sofa's specials — how an option KPI item is found. */
-function lineSpecials(l: SalesLineRow): { specials?: string[] } {
-  const specials = lineSpecialsOf(l.item_group, l.description2, l.variants)
-  return specials ? { specials } : {}
-}
-
 export function toEngineInput(rows: RunSourceRows): EngineInput {
   const released = new Set(rows.releasedOrderNos)
+  // A bed frame's or a sofa's specials and fabric series — how an option KPI item is found.
+  const fabrics = rows.fabrics?.length ? indexFabricSeries(rows.fabrics) : EMPTY_FABRIC_SERIES
+  const lineFacts = (l: SalesLineRow) => lineKpiFactsOf(l.item_group, l.description2, l.variants, fabrics)
 
   const ranks: Rank[] = rows.ranks.map(r => ({
     rankKey: r.rank_key,
@@ -346,14 +327,6 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     minQty: t.min_qty,
     bonusPct: num(t.bonus_pct),
   }))
-
-  const openBillRules: OpenBillRule[] = rows.openBillRules
-    .filter(r => isBillRank(r.bill_rank))
-    .map(r => ({ rank: r.bill_rank as OpenBillRank, pct: num(r.pct) }))
-
-  const openBillTags: OpenBillTag[] = rows.openBillTags
-    .filter(t => isBillRank(t.bill_rank))
-    .map(t => ({ orderId: t.order_id, rank: t.bill_rank as OpenBillRank }))
 
   // A band with no brand is unusable — the whole ladder is keyed by brand —
   // so it is dropped rather than applied to everybody.
@@ -415,7 +388,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         costAmount: numOrNull(l.cost_amount) ?? undefined,
         // Only when there is one: a line without a charge reads exactly as it always has.
         ...(numOrNull(l.option_charge_amount) ? { optionCharge: numOrNull(l.option_charge_amount)! } : {}),
-        ...lineSpecials(l),
+        ...lineFacts(l),
       })),
     }))
 
@@ -434,11 +407,9 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
   return {
     periodMonth: rows.periodMonth,
     scheme: {
-      openBillBasis: rows.scheme.open_bill_basis,
       overrideIncludesKpi: rows.scheme.override_includes_kpi,
       enableProductRevenue: rows.scheme.enable_product_revenue,
       enableKpi: rows.scheme.enable_kpi,
-      enableOpenBill: rows.scheme.enable_open_bill,
       enableOverride: rows.scheme.enable_override,
       enableMarginPenalty: rows.scheme.enable_margin_penalty,
       enableMarginIncentive: rows.scheme.enable_margin_incentive,
@@ -458,8 +429,6 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     orders,
     kpiItems,
     kpiThresholds,
-    openBillRules,
-    openBillTags,
     marginBands,
     hierarchy,
     priorMonths,
@@ -511,7 +480,6 @@ export interface StatementDto {
   kpi_base: number
   kpi_threshold_pct: number
   kpi_commission: number
-  open_bill_bonus: number
   override_commission: number
   margin_revenue: number
   margin_cost: number
@@ -613,7 +581,6 @@ function toStatementDto(s: Statement, upsaleIds: ReadonlySet<string>): Statement
     kpi_base: s.kpiBase,
     kpi_threshold_pct: s.kpiThresholdPct,
     kpi_commission: s.kpiCommission,
-    open_bill_bonus: s.openBillBonus,
     override_commission: s.overrideCommission,
     margin_revenue: s.marginRevenue,
     margin_cost: s.marginCost,
