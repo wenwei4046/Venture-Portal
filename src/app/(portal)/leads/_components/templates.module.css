@@ -75,6 +75,7 @@
 }
 .addMenu[data-up] { left: 50%; transform: translateX(-50%); bottom: 40px; }
 .addMenu[data-down] { left: 0; top: 40px; }
+.addMenu[data-under] { left: 50%; transform: translateX(-50%); top: 40px; }
 .addItem {
   cursor: pointer; display: flex; align-items: center; gap: 10px; min-height: 34px; padding: 0 10px; border: none; border-radius: 8px; background: transparent;
   font-family: inherit; font-size: 13px; line-height: normal; color: rgb(var(--lv-fg)); text-align: left;

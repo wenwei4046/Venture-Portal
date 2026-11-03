@@ -70,6 +70,21 @@ export function mapPlaced(steps: TemplateStep[]): TemplateStep[] {
   return steps.map(s => ({ ...s, pos: at[s.id] }))
 }
 
+/**
+ * Every step with a place, the kept ones untouched (2026-11-03 — a new template's Welcome had none, and Flow map read
+ * `pos.x` of nothing: "This page didn't load"). A step without one goes under everything drawn, in the first column.
+ */
+export function placeMissing(steps: TemplateStep[]): TemplateStep[] {
+  if (steps.every(s => s.pos)) return steps
+  let y = Math.max(NODE.start - NODE.gap, ...steps.filter(s => s.pos).map(s => s.pos!.y + nodeHeight(s))) + NODE.gap
+  return steps.map(s => {
+    if (s.pos) return s
+    const at = { x: NODE.start, y }
+    y += nodeHeight(s) + NODE.gap
+    return { ...s, pos: at }
+  })
+}
+
 /** Where a row's line leaves its node (its right edge, the row's middle) and where it reaches a node (its left, 20 down). */
 export const rowPort = (s: TemplateStep, i: number) => ({ x: s.pos!.x + NODE.w, y: s.pos!.y + 1 + NODE.head + NODE.text + i * NODE.row + NODE.row / 2 })
 export const inPort = (s: TemplateStep) => ({ x: s.pos!.x - 1, y: s.pos!.y + 20 })

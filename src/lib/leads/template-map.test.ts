@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TemplateStep } from './template'
-import { NODE, edgePath, extOf, layoutColumns, mapPlaced, mapRows, nodeHeight, placesHold, rowPort, sizeLabel, typeOf } from './template-map'
+import { NODE, edgePath, extOf, layoutColumns, mapPlaced, mapRows, nodeHeight, placeMissing, placesHold, rowPort, sizeLabel, typeOf } from './template-map'
 
 const q = (id: string, nexts: string[]): TemplateStep => ({ id, kind: 'question', text: 'Pick', buttons: nexts.map((n, i) => ({ label: `O${i}`, next: n })) })
 const m = (id: string, next = '', kind: TemplateStep['kind'] = 'message'): TemplateStep => ({ id, kind, text: 'Hi', next })
@@ -44,6 +44,26 @@ describe('the map’s columns', () => {
   it('leaves a row from the node’s right, at the row’s middle', () => {
     const [w] = mapPlaced(steps)
     expect(rowPort(w, 1)).toEqual({ x: 40 + NODE.w, y: 40 + 1 + 40 + 62 + 30 + 15 })
+  })
+})
+
+describe('a step with no place (2026-11-03 — New template, then Flow map: “This page didn’t load”)', () => {
+  const welcome: TemplateStep = { id: 's1', kind: 'question', name: 'Welcome', text: 'Hi', buttons: [{ label: 'Option 1', next: '' }] }
+  it('a new template’s only step gets a place', () => {
+    const [w] = placeMissing([welcome])
+    expect(w.pos).toEqual({ x: NODE.start, y: NODE.start })
+  })
+  it('kept places stay; one without goes under everything drawn, in the first column', () => {
+    const a: TemplateStep = { ...welcome, pos: { x: 400, y: 100 } }
+    const b: TemplateStep = { id: 's2', kind: 'message', text: 'x', next: '' }
+    const out = placeMissing([a, b])
+    expect(out[0]).toBe(a)
+    expect(out[1].pos).toEqual({ x: NODE.start, y: 100 + nodeHeight(a) + NODE.gap })
+    expect(placesHold(out)).toBe(true)
+  })
+  it('every step placed: the same array back', () => {
+    const steps = mapPlaced([welcome])
+    expect(placeMissing(steps)).toBe(steps)
   })
 })
 

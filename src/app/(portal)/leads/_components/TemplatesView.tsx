@@ -12,7 +12,7 @@ import {
   ALSO_MAX, BACK_LABEL, OPTION_MAX, RETRY_PHONE, SAVE_AS, doneOf, freshId, fromLibrary, templateProblem, toLibrary, updateFromLibrary, usedBy, walkAnswer, walkFrom,
   type LibraryItem, type ReplyRules, type ReplyTemplate, type StepFile, type StepKind, type TemplateStep, type Walk,
 } from '@/lib/leads/template'
-import { ATTACH_ACCEPT, NODE, STEP_TYPES, edgePath, extOf, inPort, isImage, mapPlaced, mapRows, nodeHeight, rowPort, sizeLabel, typeOf } from '@/lib/leads/template-map'
+import { ATTACH_ACCEPT, NODE, STEP_TYPES, edgePath, extOf, inPort, isImage, mapPlaced, mapRows, placeMissing, nodeHeight, rowPort, sizeLabel, typeOf } from '@/lib/leads/template-map'
 import Modal from './ui/Modal'
 import RichText from './RichText'
 import s from './templates.module.css'
@@ -32,7 +32,7 @@ import s from './templates.module.css'
 type Draft = Pick<ReplyTemplate, 'id' | 'name' | 'description' | 'endMsg' | 'steps'>
 const blank = (): Draft => ({
   id: `new-${Date.now().toString(36)}`, name: 'New template', description: '', endMsg: '',
-  steps: [{ id: 's1', kind: 'question', name: 'Welcome', text: 'Hi {name}! What are you looking for today?', buttons: [{ label: 'Option 1', next: '' }] }],
+  steps: mapPlaced([{ id: 's1', kind: 'question', name: 'Welcome', text: 'Hi {name}! What are you looking for today?', buttons: [{ label: 'Option 1', next: '' }] }]),
 })
 const draftOf = (t: ReplyTemplate): Draft => ({ id: t.id, name: t.name, description: t.description ?? '', endMsg: t.endMsg ?? '', steps: mapPlaced(t.steps) })
 const tileStyle = (k: StepKind) => { const t = typeOf(k); return { ['--tint' as string]: `var(${t.tint})`, ['--fg' as string]: `var(${t.fg})` } as CSSProperties }
@@ -258,7 +258,7 @@ export default function TemplatesView({ templates, rules, ads, brands, library, 
             onBlank={() => { setEditing(null); setSel(null) }}
             onAdd={(k, item) => addStep(k, item, null)} editor={id => <StepEditor key={id} step={draft.steps.find(x => x.id === id)!} {...editProps} />} />
         ) : (
-          <FlowMap steps={draft.steps} sel={sel} setSel={setSel} editing={editing} setEditing={setEditing} canEdit={canEdit} library={library} libIds={libIds}
+          <FlowMap steps={placeMissing(draft.steps)}sel={sel} setSel={setSel} editing={editing} setEditing={setEditing} canEdit={canEdit} library={library} libIds={libIds}
             setStep={setStep} change={change} onCtx={(id, x, y) => setCtx({ id, x, y })} onDelete={removeStep} onAdd={(k, item, at) => addStep(k, item, at)}
             editor={id => <StepEditor key={id} step={draft.steps.find(x => x.id === id)!} {...editProps} />} />
         )}
@@ -376,16 +376,27 @@ function FileChip({ file, url }: { file: StepFile; url: string }) {
 }
 
 /** "+ Add step": the six types, then FROM LIBRARY. Opens up in List view, down on the map; a click outside closes it. */
+/** Room the Add step menu needs above its button to open upward: its six types, the library heading, a library row or two, the header. */
+const ADD_MENU_ROOM = 420
+
 function AddStep({ up, library, onAdd }: { up?: boolean; library: LibraryItem[]; onAdd: (k: StepKind | null, item: LibraryItem | null) => void }) {
   const [open, setOpen] = useState(false)
+  // The List view's menu opens upward, unless the page has too little room above the button (a short list: the
+  // menu ran under the header — 2026-11-03); then it opens below, still centred.
+  const [below, setBelow] = useState(false)
+  const btn = useRef<HTMLButtonElement>(null)
   const steps = library.filter(l => l.kind === 'step')
+  const toggle = () => {
+    if (!open && up && btn.current) setBelow(btn.current.getBoundingClientRect().top < ADD_MENU_ROOM)
+    setOpen(o => !o)
+  }
   return (
     <div className={up ? s.addWrap : undefined} style={up ? undefined : { position: 'relative' }}>
-      <button type="button" className={s.addBtn} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)}><LeadIcon name="plus" size={14} />Add step</button>
+      <button ref={btn} type="button" className={s.addBtn} aria-haspopup="menu" aria-expanded={open} onClick={toggle}><LeadIcon name="plus" size={14} />Add step</button>
       {open ? (
         <>
           <div className={s.catcher} onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className={s.addMenu} data-up={up || undefined} data-down={up ? undefined : ''} role="menu">
+          <div className={s.addMenu} data-up={(up && !below) || undefined} data-under={(up && below) || undefined} data-down={up ? undefined : ''} role="menu">
             {STEP_TYPES.map(t => (
               <button key={t.kind} type="button" role="menuitem" className={s.addItem} onClick={() => { setOpen(false); onAdd(t.kind, null) }}><LeadIcon name={t.icon} size={14} />{t.label}</button>
             ))}
