@@ -50,10 +50,11 @@ describe("an Instant Form lead", () => {
     expect(row).toMatchObject({ kind: "instant", name: "Joe Example", phone: "+60 12-345 6789", waAccount: "1438056256053876",
       ad: { sourceId: "52621329088064" }, answers: [{ q: "Full name", a: "Joe Example" }, { q: "Phone number", a: "+60 12-345 6789" }, { q: "Unit location", a: "Mont Kiara" }] });
   });
-  it("leaves a Messenger lead ad's lead (inbox_url) to its chat, and finds a phone asked in a whole sentence", () => {
+  it("takes a form carrying inbox_url (every new Instant Form) without it, and finds a phone asked in a whole sentence", () => {
     const ref = parseMessengerDelivery(notice).instant![0];
-    expect(instantLeadRow(ref, { field_data: [{ name: "inbox_url", values: ["https://business.facebook.com/x"] }, { name: "full_name", values: ["A"] }] }))
-      .toMatchObject({ error: "from a Messenger lead ad — taken by its chat" });
+    expect(instantLeadRow(ref, { field_data: [{ name: "full_name", values: ["A"] }, { name: "whatsapp_number", values: ["+60123456789"] },
+      { name: "inbox_url", values: ["<test lead: dummy data for inbox_url>"] }] }))
+      .toMatchObject({ kind: "instant", name: "A", phone: "+60123456789", answers: [{ q: "Full name", a: "A" }, { q: "Whatsapp number", a: "+60123456789" }] });
     expect(instantLeadRow(ref, { field_data: [{ name: "sounds_good,_{{user_first_name}}._what_is_the_best_phone_number_to_reach_you_on?", values: ["0123456789"] }] }))
       .toMatchObject({ phone: "0123456789" });
   });

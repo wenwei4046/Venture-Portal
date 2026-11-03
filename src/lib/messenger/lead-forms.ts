@@ -27,10 +27,10 @@ const FIRST = /^first_name$/i, LAST = /^last_name$/i;
 
 /** An Instant Form lead's answers (Meta's field_data) → the row: its questions and answers, phone, name. */
 export function instantLeadRow(ref: InstantLeadRef, lead: { field_data?: { name?: string; values?: unknown[] }[]; ad_id?: string; form_id?: string; created_time?: string }): LeadRow {
-  const fields = (lead.field_data ?? []).filter(f => f?.name).map(f => ({ key: String(f.name), value: (f.values ?? []).map(v => String(v)).join(", ").trim() }));
-  // A Messenger lead ad's lead is in Leads Center too (its form carries inbox_url): its chat brings it (the referral or
-  // the summary), so it is not made a second customer on WhatsApp (found 2026-10-30 on The Conts' only form).
-  if (fields.some(f => f.key === "inbox_url")) return { kind: "instant", pageId: ref.pageId, leadId: ref.leadId, error: "from a Messenger lead ad — taken by its chat" };
+  // inbox_url is Meta's link to the Messenger chat it opens for the lead, not the customer's answer. Every new Instant
+  // Form carries it (2026-11-03, The Conts' "testing ky": skipped as a Messenger lead ad's, and no chat came), so it no
+  // longer means "taken by its chat" — the lead is taken here; a Messenger lead ad run beside it may make the customer twice.
+  const fields = (lead.field_data ?? []).filter(f => f?.name && f.name !== "inbox_url").map(f => ({ key: String(f.name), value: (f.values ?? []).map(v => String(v)).join(", ").trim() }));
   const pick = (re: RegExp) => fields.find(f => re.test(f.key) && f.value)?.value ?? null;
   const name = pick(NAME) ?? ([pick(FIRST), pick(LAST)].filter(Boolean).join(" ") || null);
   const brand = brandOf(ref.pageId);
