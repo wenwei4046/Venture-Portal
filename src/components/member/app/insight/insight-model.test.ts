@@ -211,3 +211,37 @@ describe("Insight › the whole sub-department", () => {
     expect(orderSheet(whole(), "1")).toMatchObject({ cust: "LUCAS TAN · Mdm Lee" });
   });
 });
+
+// Insight › My team › a person (2026-11-03 — the user, over STANLEY's Team members: "i need them can press their team
+// member than can view their order as well like this").
+describe("Insight › My team › a person", () => {
+  const row = (staffId: string, name: string, sales: number, depth = 1) =>
+    ({ staffId, name, title: "Revenue Specialist", uplineId: null, depth, sales, held: 0, orders: 1, kpiQty: 0, marginRevenue: sales, marginCost: sales * 0.6, blindOrders: 0, lastOrder: null });
+  const me = { staffId: "stanley", sales: 900, held: 0, orders: 1, kpiQty: 0, marginRevenue: 900, marginCost: 600, blindOrders: 0, lastOrder: null };
+
+  it("a member's My team opens everybody it lists — never the member's own row", () => {
+    const vm = insightMain(input({ me, name: "STANLEY", downline: [row("lucas", "LUCAS", 2000), row("james", "JAMES SEOW", 1500, 2)],
+      canView: new Set(["lucas", "james"]) }));
+    expect(vm.team.rows.map(r => [r.name, r.open ?? false])).toEqual([["LUCAS", true], ["JAMES SEOW", true], ["STANLEY (you)", false]]);
+    // Without the set (the preview, or before a tap can open anybody) nobody opens.
+    expect(insightMain(input({ me, downline: [row("lucas", "LUCAS", 2000)] })).team.rows.some(r => r.open)).toBe(false);
+  });
+
+  it("their book reads as theirs: KPI, the brand's next tier and a shared bill name them, never \"you\"", () => {
+    const withKpi = ORDERS.map(o => o.id === "1" ? { ...o, kpiQty: 3, lines: [...o.lines, { name: "PILLOW", code: "P", qty: 3, amount: 0, goods: true, kpiQty: 3 }] } : o);
+    const kpi = { schemeId: "s", period: "2026-09", asOf: "x", enabled: true, items: [], total: 3, threshold: 10, hit: false };
+    expect(kpiView(input({ book: book(withKpi), kpi, of: "JAMES" }), "Fair").how?.title).toBe("How JAMES reached 3");
+    expect(kpiView(input({ book: book(withKpi), kpi }), "Fair").how?.title).toBe("How you reached 3");
+
+    const top = brandPage(input({ book: book([order({ id: "9", brand: "ZANOTTI", booth: "ZANOTTI", revenue: 2000, margin: 37 })]), of: "JAMES" }), "ZANOTTI")!;
+    expect(top.nextSub).toBe("JAMES is 1.0% above Incentive Tier 2. Keep new orders at 36% or more to hold it.");
+
+    const holders = [{ id: "lucas", name: "LUCAS", pct: 0.5, owner: true }, { id: "james", name: "JAMES SEOW", pct: 0.5, owner: false }];
+    const shared = input({ of: "JAMES", book: book([
+      order({ id: "7", total: 4300, revenue: 2150, share: { part: 0.5, holders } }),
+      order({ id: "8", total: 4300, revenue: 2150, own: false, share: { part: 0.5, holders } }),
+    ]) });
+    expect(orderSheet(shared, "7")?.share?.sub).toBe("JAMES’s part 50% · RM 2,150 in JAMES’s sales");
+    expect(orderSheet(shared, "8")?.share?.sub).toBe("LUCAS’s bill · JAMES’s part 50% · RM 2,150 in JAMES’s sales");
+  });
+});

@@ -10,11 +10,11 @@ import type { DepartmentInsight, MemberInsightRange, MemberOrderBook } from "@/l
 import {
   acknowledgeMemberMemo, calculateMemberQuote, cancelMemberRequest, fetchMemberMemoSignature, fetchMemberReplacementFormLink, fetchMemberWaitingFormLink, openMemberMemoFile, submitMemberRequest,
   type fetchDepartmentIncome, type fetchDepartmentInsight, type fetchDepartmentOrderBook, type fetchMemberCatalogue, type fetchMemberClaimRates, type fetchMemberReplacementForm, type fetchMemberWaitingForm, type fetchMemberWaitingQueue, type fetchMemberHonours, type fetchMemberIncome, type fetchMemberInsight,
-  type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
+  type fetchMemberInsightRange, type fetchMemberOrderBook, type fetchMemberTeamOrderBook, type fetchMemberOrgMap, type fetchMemberRequestHistory, type fetchPrincipalMemoReceipts,
   type refreshMemberData,
 } from "@/app/(member)/member/actions";
 import type { fetchDepartmentArena, fetchMemberArena } from "@/app/(member)/member/arena-actions";
-import type { fetchMemberKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
+import type { fetchMemberKpiSummary, fetchMemberTeamKpiSummary } from "@/app/(member)/member/kpi-summary-actions";
 import { readMemberBatch, type MemberRead } from "@/app/(member)/member/batch-actions";
 import { bookMemberRoom, cancelMemberBooking, type MemberBookInput, type fetchMemberRooms } from "@/app/(member)/member/rooms-actions";
 import type { MemberRoomsData } from "./profile/rooms-model";
@@ -64,6 +64,8 @@ export const ask = {
     ({ kind: "orderBook", subDepartmentId, from, until, context }),
   insightRange: (subDepartmentId: string, from: string, until: string, context?: MemberReadContext): MemberRead =>
     ({ kind: "insightRange", subDepartmentId, from, until, context }),
+  teamBook: (subDepartmentId: string, staffId: string, from: string, until: string): MemberRead => ({ kind: "teamBook", subDepartmentId, staffId, from, until }),
+  teamKpi: (schemeId: string, staffId: string, period?: string): MemberRead => ({ kind: "teamKpi", schemeId, staffId, period }),
   income: (subDepartmentId: string, period: string, context?: MemberReadContext): MemberRead => ({ kind: "income", subDepartmentId, period, context }),
   departmentIncome: (subDepartmentId: string, period: string): MemberRead => ({ kind: "departmentIncome", subDepartmentId, period }),
   departmentInsight: (subDepartmentId: string, from: string, until: string): MemberRead => ({ kind: "departmentInsight", subDepartmentId, from, until }),
@@ -106,6 +108,13 @@ export interface RevenueSource {
   orderBook(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberOrderBook>>;
   /** The member and their team over a quarter or a year. */
   insightRange(subDepartmentId: string, from: string, until: string, context?: MemberReadContext): Promise<Outcome<MemberInsightRange>>;
+  /**
+   * Insight › My team › a person (2026-11-03): somebody their My team lists — their bills from one month to another, as
+   * their own Insight reads them. A member's own session; the Principal reads a person through View as's context instead.
+   */
+  teamBook?(subDepartmentId: string, staffId: string, from: string, until: string): Promise<Outcome<MemberOrderBook>>;
+  /** …and their KPI items of a month ('YYYY-MM'; absent = the current one). */
+  teamKpi?(schemeId: string, staffId: string, period?: string): Promise<Outcome<MemberKpiSummary>>;
   /** A cart's margin at a price — priced on the server; no cost ever comes back. */
   quote(input: QuoteInput): Promise<Outcome<QuoteResult>>;
   /** Mark a memo read (`ack` false) or acknowledge it — the member's own receipt. */
@@ -256,6 +265,8 @@ export function createLiveSource(account?: string, store: ReadStore | null = idb
     orderBook: (subDepartmentId, from, until, context) => go<Answer<typeof fetchMemberOrderBook>>(ask.orderBook(subDepartmentId, from, until, context)),
     insightRange: (subDepartmentId, from, until, context) =>
       go<Answer<typeof fetchMemberInsightRange>>(ask.insightRange(subDepartmentId, from, until, context)),
+    teamBook: (subDepartmentId, staffId, from, until) => go<Answer<typeof fetchMemberTeamOrderBook>>(ask.teamBook(subDepartmentId, staffId, from, until)),
+    teamKpi: (schemeId, staffId, period) => go<Answer<typeof fetchMemberTeamKpiSummary>>(ask.teamKpi(schemeId, staffId, period)),
     quote: input => calculateMemberQuote(input),
     async memo(id, ack, signature) {
       const result = await acknowledgeMemberMemo(id, ack, signature);

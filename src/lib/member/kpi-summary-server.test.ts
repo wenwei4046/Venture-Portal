@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { loadMemberKpiSummary } from "./kpi-summary-server";
+import { loadMemberKpiSummary, loadMemberTeamKpiSummary } from "./kpi-summary-server";
 import { readKpiSummary, type MemberKpiSummary } from "./kpi-summary";
 
 const mocks = vi.hoisted(() => ({ getUser: vi.fn(), createClient: vi.fn(), rpc: vi.fn() }));
@@ -18,6 +18,35 @@ beforeEach(() => {
   mocks.getUser.mockResolvedValue({ id: "signed-in-user", is_active: true, permissions: ["member_portal"] });
   mocks.createClient.mockResolvedValue({ rpc: mocks.rpc });
   mocks.rpc.mockResolvedValue({ data: summary, error: null });
+});
+
+// Insight › My team › a person (2026-11-03): a member reads the KPI items of somebody their My team lists — the
+// database asks whether that person is under them (member_team_kpi_summary); the Principal goes through View as.
+describe("a person under the member: their KPI items", () => {
+  const staffId = "10000000-0000-4000-8000-000000000002";
+  it("asks member_team_kpi_summary with the person, the scheme and the month — and projects as a member's own", async () => {
+    mocks.getUser.mockResolvedValue({ id: "stanley", is_active: true, permissions: ["member_portal", "member_insight"] });
+    mocks.rpc.mockResolvedValue({ data: { ...summary, teamView: true, viewedStaffId: staffId, salary: 777 }, error: null });
+    expect(await loadMemberTeamKpiSummary(schemeId, staffId, "2026-09")).toEqual({ ok: true, data: summary });
+    expect(mocks.rpc).toHaveBeenCalledWith("member_team_kpi_summary", { p_staff: staffId, p_scheme: schemeId, p_period: "2026-09" });
+    await loadMemberTeamKpiSummary(schemeId, staffId);
+    expect(mocks.rpc).toHaveBeenLastCalledWith("member_team_kpi_summary", { p_staff: staffId, p_scheme: schemeId, p_period: null });
+  });
+  it("asks nothing for an account without Insight, a Principal, or an id it cannot read", async () => {
+    for (const user of [null, { is_active: true, permissions: ["member_portal"] }, { role: "principal", is_active: true, permissions: ["member_insight"] }]) {
+      mocks.getUser.mockResolvedValue(user);
+      expect((await loadMemberTeamKpiSummary(schemeId, staffId)).ok).toBe(false);
+    }
+    mocks.getUser.mockResolvedValue({ id: "stanley", is_active: true, permissions: ["member_portal", "member_insight"] });
+    expect((await loadMemberTeamKpiSummary(schemeId, "james")).ok).toBe(false);
+    expect((await loadMemberTeamKpiSummary(schemeId, staffId, "2026-9")).ok).toBe(false);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("a refusal (not under them) answers as a failed read", async () => {
+    mocks.getUser.mockResolvedValue({ id: "stanley", is_active: true, permissions: ["member_portal", "member_insight"] });
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: "This person is not in your team" } });
+    expect((await loadMemberTeamKpiSummary(schemeId, staffId)).ok).toBe(false);
+  });
 });
 
 describe("authenticated KPI summary boundary", () => {

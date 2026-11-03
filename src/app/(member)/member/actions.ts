@@ -13,6 +13,7 @@ import {
   loadMemberInsight,
   loadMemberInsightRange,
   loadMemberOrderBook,
+  loadMemberTeamOrderBook,
   loadMemberOrgMap,
   calculateMemberQuote as calculate,
   submitMemberRequest as submit,
@@ -54,6 +55,10 @@ export async function fetchMemberInsight(period?: string, context?: MemberReadCo
 }
 export async function fetchMemberOrderBook(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
   return loadMemberOrderBook(subDepartmentId, from, until, context);
+}
+/** Insight › My team › a person (2026-11-03): their bills, for a member whose My team lists them. */
+export async function fetchMemberTeamOrderBook(subDepartmentId: string, staffId: string, from: string, until: string) {
+  return loadMemberTeamOrderBook(subDepartmentId, staffId, from, until);
 }
 export async function fetchMemberInsightRange(subDepartmentId: string, from: string, until: string, context?: MemberReadContext) {
   return loadMemberInsightRange(subDepartmentId, from, until, context);

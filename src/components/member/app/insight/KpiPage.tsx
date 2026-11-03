@@ -5,17 +5,19 @@ import { SubHead } from "./parts";
 import s from "./insight.module.css";
 
 /** KPI items — how many, how they got there, week by week, bill by bill (456–518). */
-export default function KpiPage({ vm, dateLabel, onBill, onBack, onDate }: {
+export default function KpiPage({ vm, dateLabel, onBill, onBack, onDate, who }: {
   vm: KpiVM | null;
   dateLabel: string;
   onBill: (id: string) => void;
   onBack: () => void;
   onDate: () => void;
+  /** Insight › My team › a person (2026-11-03): their KPI items, by their first name. */
+  who?: string;
 }) {
   return (
     <div className={s.subPage}>
-      <SubHead title="KPI items" dateLabel={dateLabel} onBack={onBack} onDate={onDate} />
-      {!vm ? <p className={s.empty}>Loading your KPI items…</p> : (
+      <SubHead title={who ? `${who}’s KPI items` : "KPI items"} dateLabel={dateLabel} onBack={onBack} onDate={onDate} backLabel={who} />
+      {!vm ? <p className={s.empty}>{who ? "Loading the KPI items…" : "Loading your KPI items…"}</p> : (
         <>
           <section className={`${s.kpiHero} ${vm.enabled ? "" : s.kpiHeroOff}`}>
             <div className={s.kpiHeroTop}>

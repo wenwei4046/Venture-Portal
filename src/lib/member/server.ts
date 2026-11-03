@@ -435,6 +435,34 @@ export async function loadMemberOrderBook(
   });
 }
 
+/**
+ * Insight › My team › a person (2026-11-03 — the user, over STANLEY's *Team members*: "i need them can press their team
+ * member than can view their order as well"): that person's bills over a month, a quarter or a year, as their own
+ * Insight reads them — for a member whose My team lists them (every level down; a Revenue Director, everybody). The
+ * member's own session; the database asks again (`member_team_order_book`: a seat or a directorship there, then the
+ * person under them today). The Principal reads a person with View as's own context instead (`loadMemberOrderBook`).
+ */
+export async function loadMemberTeamOrderBook(
+  subDepartmentId: string,
+  staffId: string,
+  from: string,
+  until: string,
+): Promise<MemberOutcome<MemberOrderBook>> {
+  return outcome(async () => {
+    const user = await getMemberUser();
+    if (!user?.is_active) throw new Error("Sign in with an active work account.");
+    if (isPrincipalAccount(user)) throw new Error("Choose a member to view this feature.");
+    uuid(staffId, "member");
+    insightWindow(subDepartmentId, from, until);
+    const client = await session("member_insight");
+    const book = readOrderBook(await rpc<unknown>(client, "member_team_order_book", {
+      p_staff: staffId, p_sub_department: subDepartmentId, p_from: from, p_until: until,
+    }));
+    if (!book) throw new Error("These bills are temporarily unavailable.");
+    return relabelBook(book);
+  });
+}
+
 /** Insight › Quarter / Year: the member and their team, `me` and `downline` over the range. */
 export async function loadMemberInsightRange(
   subDepartmentId: string,

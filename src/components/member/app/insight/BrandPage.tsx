@@ -7,7 +7,7 @@ import { SubHead } from "./parts";
 import s from "./insight.module.css";
 
 /** One brand's margin: the bar, the next tier, the three tiers around you, its bills (`tierStyle="c"`, 383–455). */
-export default function BrandPage({ vm, dateLabel, onBrand, onTiers, onBill, onBack, onDate }: {
+export default function BrandPage({ vm, dateLabel, onBrand, onTiers, onBill, onBack, onDate, who }: {
   vm: BrandPageVM | null;
   dateLabel: string;
   onBrand: (code: string) => void;
@@ -15,19 +15,23 @@ export default function BrandPage({ vm, dateLabel, onBrand, onTiers, onBill, onB
   onBill: (id: string) => void;
   onBack: () => void;
   onDate: () => void;
+  /** Insight › My team › a person (2026-11-03): their margin — where *You* marks the reader, their first name marks them. */
+  who?: string;
 }) {
   if (!vm) {
     return (
       <div className={s.subPage}>
-        <SubHead title="Margin" dateLabel={dateLabel} onBack={onBack} onDate={onDate} />
+        <SubHead title="Margin" dateLabel={dateLabel} onBack={onBack} onDate={onDate} backLabel={who} />
         <p className={s.empty}>No counted sales in this period.</p>
       </div>
     );
   }
   const tone = TONES[vm.tone];
+  // The bar's and the tier's small marks take one word.
+  const mark = who ? who.split(/\s+/)[0] : "You";
   return (
     <div className={s.subPage}>
-      <SubHead title={vm.title} titleClass={s.brandTitle} dateLabel={dateLabel} onBack={onBack} onDate={onDate}>
+      <SubHead title={vm.title} titleClass={s.brandTitle} dateLabel={dateLabel} onBack={onBack} onDate={onDate} backLabel={who}>
         <div className={s.brandTabs}>
           {vm.tabs.map(t => (
             <button key={t.code} className={`${s.brandTab} ${t.code === vm.code ? s.brandTabOn : ""}`} onClick={() => onBrand(t.code)} aria-pressed={t.code === vm.code}>
@@ -54,7 +58,7 @@ export default function BrandPage({ vm, dateLabel, onBrand, onTiers, onBill, onB
               </span>
             ))}
             <span className={s.mbarYou} style={{ left: vm.bar.pos }} />
-            <span className={s.mbarYouLabel} style={{ left: vm.bar.pos }}>You</span>
+            <span className={s.mbarYouLabel} style={{ left: vm.bar.pos }}>{mark}</span>
           </div>
         )}
         <div className={s.nextCard}>
@@ -68,7 +72,7 @@ export default function BrandPage({ vm, dateLabel, onBrand, onTiers, onBill, onB
           <div className={s.trio}>
             {vm.trio.map((t, i) => (
               <div key={i} className={s.trioCard} style={{ borderWidth: t.wide ? "1.5px" : "1px", borderColor: t.border, background: t.bg, opacity: t.op }}>
-                {t.isCur && <span className={s.trioYou} style={{ background: t.border }}>You</span>}
+                {t.isCur && <span className={s.trioYou} style={{ background: t.border }}>{mark}</span>}
                 <span className={s.trioName}>{t.name}</span>
                 <span className={s.trioRange} style={{ color: t.capInk }}>{t.range}</span>
               </div>

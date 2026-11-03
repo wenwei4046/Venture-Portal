@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { readRoute, visitPath } from "./route";
+import { readRoute, visitPath, writeRoute } from "./route";
+
+// Insight › My team › a person (2026-11-03): whose Insight pages are open rides the address (`of`), so Back, a reload and
+// the phone's back gesture land on them — Insight's only, a staff id only.
+describe("a person's Insight pages in the address", () => {
+  const JAMES = "b45ba010-06a8-41b1-9b92-649a84dd8c00";
+  it("reads and writes `of` on Insight, and nowhere else", () => {
+    expect(readRoute(`?page=insight&of=${JAMES}`)).toMatchObject({ screen: "insight", ins: "main", of: JAMES });
+    expect(readRoute(`?page=insight&view=bills&of=${JAMES}`)).toMatchObject({ ins: "bills", of: JAMES });
+    expect(readRoute(`?page=arena&of=${JAMES}`).of).toBeUndefined();
+    expect(readRoute("?page=insight&of=james").of).toBeUndefined();
+    const href = writeRoute({ ...readRoute("?page=insight"), ins: "kpi", of: JAMES }, "https://x.test/member");
+    expect(new URL(href).search).toBe(`?page=insight&view=kpi&of=${JAMES}`);
+    expect(new URL(writeRoute({ ...readRoute("?page=insight"), screen: "today", of: JAMES }, "https://x.test/member")).search).toBe("");
+  });
+  it("files the visit without whom", () => {
+    expect(visitPath(readRoute(`?page=insight&view=bills&of=${JAMES}`))).toBe("/member?page=insight&view=bills");
+  });
+});
 
 // The app's visits reach People's Last seen and Activity (2026-10-22): each is filed under its screen and the page inside
 // it — never whom the app is viewed as, nor the sub-department.
