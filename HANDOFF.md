@@ -1,5 +1,22 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-04 c (#929 + #930 SHIPPED, migrations applied first · #782 / #783 brought up to date)
+
+Session d7ac866f.
+
+- **#929 MERGED** — payroll cost moved to another department, method B (squash `27b1605e`, 2026-11-03 15:41Z, on the user's "你不能帮我merge 吗？"). Migration `20261103200000_payroll_cost_moves` applied to production FIRST (recorded as version 20261103153935), after a BEGIN … ROLLBACK dry run:
+  - October unchanged to the sen: billing 8 rows RM 38,255.13, own share 2 rows RM 61,161.67; moves summary empty.
+  - *Inter-billing - IT* opened at **9057** (production's 9080–9099 are other expenses; the first draft's max()+1 would have aborted on 9100 — caught by the final review).
+  - All 9 function bodies' md5 equal the PR file's.
+  - What it does: Allocation's *+ Department* lines (Fixed RM / %), centralized bands, *Moved into <dept>* cards with a monthly Bill to %; an internal invoice per receiver (`DPM-YYYYMM`) generated with the payroll invoices; Reconcile payroll covers the companies, the receivers' internal invoices AND HV's own share (the user: "做b"); Generate no longer re-drafts a payer already billed. DESIGN v4.228; `.claude/rules/hr/payroll.md`, `.claude/rules/finance/finance-view.md`.
+  - Deferred minors (in the PR): the payroll basis shows a receiver short by its *Stays in*; `saveStaffAllocation` delete-then-insert without a transaction; a pool-less sender stops Generate after the company drafts; the *Moved into* card counts draft rows; retire the uncalled `generate_monthly_invoices` (reads `hr_pool_allocation`); a sen over at exactly 100%.
+- **#930 MERGED** — Bill back salary asks the cell (squash `f296910e`, 2026-11-03 15:43Z). Migration `20261103230000_departments_billback_asks_the_cell` applied first (version 20261103153650) after a dry run as finance@ (ticks: 1 row) and hr@ (0 rows; a rename refused).
+  - Found: production's old `departments_principal_update` was `has_scope(ARRAY['admin'])`, not the migration file's `current_user_role() = 'principal'` — drifted; replaced now.
+  - The merge went in at once (main requires no checks); main's CI on `f296910e` then passed every job.
+- **CHOW WAI MAN** (Director Office, Personal Assistant, Ultimate full access): can already send payment requests — account menu › Account › Claim. Nothing changed.
+- **#782 / #783 (LO#7 cards, approved 2026-10-26 "照样稿做") brought up to date, NOT merged:** #782 merged main cleanly (pushed `790f768d`); #783 took #782 and one conflict with main's `paidOn` (#914) — its oldest-first rows now carry `paidOn` (test) (pushed `26396417`). CI running. Merge #782, then #783, on the user's word.
+- **IIS + compound under minimum pay — confirmed, NOT built** (memory `iis-and-compound-min-pay-decisions`): no BI# linking (plain method; LO#19/BI#19 excepted); catch-up B (month by month from each deal's own start, carefully, dry-run per deal); terms-change adjustment B (in the original months); per-deal "compound even under minimum pay"; four cards on every deal both sides; month-end recognition probably a button, to settle later.
+
 ## CHECKPOINT 2026-11-03 b (#927 SHIPPED · payroll cost → another department DESIGNED, method B, not built)
 
 Session e73c0205.
