@@ -33,6 +33,7 @@ export default function ViewSidebar({
   footerSub,
   footerMenu,
   wide = false,
+  counts,
 }: {
   user: User
   /** The sections this viewer sees, numbered (visibleHrNav). */
@@ -46,6 +47,11 @@ export default function ViewSidebar({
   footerMenu?: (menu: { open: boolean; close: () => void; collapsed: boolean }) => ReactNode
   /** 248px open, as the HR Attendance handoff (2026-10-15) draws HR's sidebar; Finance's stays 212. */
   wide?: boolean
+  /**
+   * A number after a row's name, by the row's key — none at nought (2026-11-03: Finance's Payment request, what waits for
+   * the voucher). Soft, in its section's tile colours; on the folded rail it sits on the tile's corner.
+   */
+  counts?: Readonly<Record<string, number>>
 }) {
   const pathname = usePathname() ?? ''
   const search = useSearchParams()
@@ -182,6 +188,12 @@ export default function ViewSidebar({
                         <HrIcon name={item.icon} size={item.group ? 14 : 16} />
                       </span>
                       <span className={s.itemLabel}>{item.label}</span>
+                      {counts?.[item.key] ? (
+                        <span className={s.count}>
+                          {counts[item.key]}
+                          <span className="sr-only"> waiting</span>
+                        </span>
+                      ) : null}
                     </Link>
                   </div>
                   </Fragment>

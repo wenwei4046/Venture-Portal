@@ -162,6 +162,34 @@
 }
 .item[data-on='true'] .itemLabel { transform: translateX(2px); }
 
+/* A row's count (2026-11-03 — Finance's Payment request: what waits for the voucher, the user's sample B "soft
+   count"): a pill after the name in its section's own tile colours; folded, a smaller one on the tile's corner. */
+.count {
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(var(--tile-light));
+  color: rgb(var(--tile-deep));
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.aside[data-collapsed='true'] .count {
+  position: absolute;
+  left: 23px;
+  top: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  box-shadow: 0 0 0 2px rgb(var(--hvs-nav));
+}
+
 /* A group's heading and its rows (2026-10-29 — Payments over Payment voucher and Payment request): the heading reads
    as a row but is no link; its rows sit indented under it, their tiles a size down, each as tall as any row (the
    pill's 38px). Folded, the heading goes and the rows keep their tiles where every row's tile stands. */

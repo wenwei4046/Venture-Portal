@@ -1,5 +1,25 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-03 b (#927 SHIPPED · payroll cost → another department DESIGNED, method B, not built)
+
+Session e73c0205.
+
+- **#927 MERGED:** squash `48a76291` (2026-11-03 12:03Z), every check green on `377573e5`, on the user's "全绿就 merge". No migration.
+  - Finance's sidebar *Payment request* row shows the page's own *Waiting for you* as a soft count. The user picked sample B; it sits at the row's end ("放最后"), which cuts the name to *Payment requ…*. Folded, the count sits on the tile's corner.
+  - The count comes from `payments/requests/waiting-count.ts` › `waitingRequestCount`, asked after the sidebar is drawn and again on each page. It answers null (never redirects) unless the account has `canAccessTreasury` and the page's tab. It is registered as a hand-written gate in `src/test/read-paths.ts` › GUARDS.
+  - DESIGN.md v4.227.
+- **Payroll cost → another department, designed, not built.** Branch `feat/payroll-cost-to-department` (not pushed): spec `docs/superpowers/specs/2026-11-03-payroll-cost-to-department-design.md`, plan `docs/superpowers/plans/2026-11-03-payroll-cost-to-department.md`, latest commit a63506d1.
+  - The user's example: Director Office's Vivian, RM 3,000 borne by HR, then HR bills it to the companies by a monthly %.
+  - **Method B** ("对，我决定还是要方法b"): payroll funding and accrual are unchanged. When Finance generates the month's payroll invoices, an automatic internal invoice per receiving department is made (Director Office → HR), issued and settled by netting like the own-share invoice to Venture Office.
+  - Department lines follow the company split's lock, so a Resubmit reopens them.
+  - A cost-center receiver's Bill to % is set by HR monthly (`hr_pool_allocation`, reused). The billed amounts merge into its five lines; what isn't billed stays with it.
+  - A centralized receiver bears it all. A centralized person may move cost to departments, never by % to companies.
+  - IT has no *Inter-billing - IT* account; the plan adds it.
+  - **Next:** the user approves the rewritten spec and plan, picks how to build (B · I build / A · subagents; recommended B), then Task 1.
+- **Later, to settle with the user:**
+  - "关于那个ISS 显示的我也确定了": IIS, see memory `iis-method-decided`. Still built only on the user's go.
+  - A new rule: "minimun pay 后如果不还本金还是要算compound interest". After a minimum payment, unpaid principal keeps compounding. "这个可以过后确定": not designed yet.
+
 ## CHECKPOINT 2026-11-03 a (SHIPPED, #921) — the date field's calendar is never cut off
 
 Session e73c0205. The user said "全绿就 merge", then "现在看并 merge" twice; the first was only far enough to re-run a flaky job.
