@@ -35,3 +35,30 @@ export async function loadMemberKpiSummary(schemeId: string, context?: MemberRea
     return { ok: false, error: "KPI progress is temporarily unavailable. Please try again." };
   }
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Insight › My team › a person (2026-11-03): that person's KPI items of a month, as their own Insight reads them — for a
+ * member whose My team lists them. The member's own session; the database asks again (`member_team_kpi_summary`).
+ * The Principal reads a person with View as's own context instead (`loadMemberKpiSummary`).
+ */
+export async function loadMemberTeamKpiSummary(schemeId: string, staffId: string, period?: string): Promise<MemberKpiSummaryOutcome> {
+  try {
+    const user = await getMemberUser();
+    if (!user?.is_active || isPrincipalAccount(user) || !user.permissions.includes("member_insight")) {
+      return { ok: false, error: "Insight is not enabled for this account." };
+    }
+    if (!UUID.test(schemeId) || !UUID.test(staffId)) return { ok: false, error: "Choose a member of your team." };
+    if (period !== undefined && !/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+      return { ok: false, error: "Choose a valid month." };
+    }
+    const client = await createClient() as unknown as SupabaseClient;
+    const result = await client.rpc("member_team_kpi_summary", { p_staff: staffId, p_scheme: schemeId, p_period: period ?? null });
+    if (result.error) return { ok: false, error: "KPI progress is temporarily unavailable. Please try again." };
+    const data = readKpiSummary(result.data, schemeId);
+    return data ? { ok: true, data } : { ok: false, error: "KPI progress is temporarily unavailable. Please try again." };
+  } catch {
+    return { ok: false, error: "KPI progress is temporarily unavailable. Please try again." };
+  }
+}

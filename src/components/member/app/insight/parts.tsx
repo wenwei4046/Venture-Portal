@@ -15,19 +15,23 @@ export function DateChip({ label, small, onClick }: { label: string; small?: boo
   );
 }
 
-/** ‹ Insight · the date chip, then the page's title (and whatever sits between). */
-export function SubHead({ title, dateLabel, onBack, onDate, children, titleClass }: {
+/**
+ * ‹ Insight · the date chip, then the page's title (and whatever sits between). `backLabel`: where ‹ goes when it is
+ * not Insight — a person's page (Insight › My team › a person, 2026-11-03), by their first name.
+ */
+export function SubHead({ title, dateLabel, onBack, onDate, children, titleClass, backLabel }: {
   title: string;
   dateLabel: string;
   onBack: () => void;
   onDate: () => void;
   children?: ReactNode;
   titleClass?: string;
+  backLabel?: string;
 }) {
   return (
     <div className={s.subHead}>
       <div className={s.subTop}>
-        <button className={s.back} onClick={onBack}><Svg d={ICON.back} size={20} sw={1.9} />Insight</button>
+        <button className={s.back} onClick={onBack}><Svg d={ICON.back} size={20} sw={1.9} />{backLabel || "Insight"}</button>
         <DateChip label={dateLabel} small onClick={onDate} />
       </div>
       {children}

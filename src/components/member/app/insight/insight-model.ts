@@ -53,8 +53,16 @@ export interface InsightInput {
    * person's threshold or tier.
    */
   whole?: string;
-  /** …and whom a tap on the team opens (View as, read-only): everybody the Principal may view there. */
+  /**
+   * …and whom a tap on the team opens: everybody the Principal may view there (View as, read-only) — or, for a member
+   * (2026-11-03), everybody their My team lists, whose own Insight a tap opens (Insight › My team › a person).
+   */
   canView?: ReadonlySet<string>;
+  /**
+   * Insight › My team › a person (2026-11-03): the book is THEIRS, named by their first name — what a page says of
+   * "you" it says of them (`How JAMES reached 12`, `JAMES’s part 50%`).
+   */
+  of?: string;
 }
 
 // ── shared derivations ─────────────────────────────────────────────────────
@@ -531,8 +539,9 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
     own: o.own,
     share: o.share ? {
       line: holdersLine(o.share.holders),
-      // A whole sub-department's bill is whole: nobody's part is the reader's.
+      // A whole sub-department's bill is whole: nobody's part is the reader's. A person's (2026-11-03) part is theirs.
       sub: input.whole ? `${rm(o.revenue)} in ${input.whole}’s sales`
+        : input.of ? `${o.own ? `${input.of}’s` : `${o.share.holders.find(h => h.owner)?.name ?? "Another salesperson"}’s bill · ${input.of}’s`} part ${pctLabel(o.share.part)} · ${rm(o.revenue)} in ${input.of}’s sales`
         : `${o.own ? "Your" : `${o.share.holders.find(h => h.owner)?.name ?? "Another salesperson"}’s bill · your`} part ${pctLabel(o.share.part)} · ${rm(o.revenue)} in your sales`,
     } : null,
   };
@@ -578,7 +587,7 @@ export function kpiView(input: InsightInput, subName: string): KpiVM {
       : threshold === null ? "No threshold this month" : `${threshold} needed for the threshold`,
     above: !enabled || threshold === null ? "" : total >= threshold ? `${total - threshold} above` : `${threshold - total} to go`,
     how: enabled && items.length ? {
-      title: `How ${input.whole ?? "you"} reached ${total}`,
+      title: `How ${input.whole ?? input.of ?? "you"} reached ${total}`,
       threshold: threshold === null ? "" : `Threshold ${threshold}`,
       thLeft: threshold === null || total <= 0 ? null : `${Math.min(100, (threshold / Math.max(total, threshold)) * 100).toFixed(1)}%`,
       items,
@@ -644,7 +653,7 @@ export function brandPage(input: InsightInput, code: string): BrandPageVM | null
     nextSub = `${brandName(b.code)} has no incentive tier in this sub-department's rules.`;
   } else if (b.margin + 1e-9 >= top.threshold) {
     nextTitle = "Top tier reached";
-    nextSub = `${input.whole ? `${input.whole} is` : "You are"} ${(b.margin - top.threshold).toFixed(1)}% above ${top.label}. Keep new orders at ${pctText(top.threshold)}% or more to hold it.`;
+    nextSub = `${input.whole ? `${input.whole} is` : input.of ? `${input.of} is` : "You are"} ${(b.margin - top.threshold).toFixed(1)}% above ${top.label}. Keep new orders at ${pctText(top.threshold)}% or more to hold it.`;
   } else {
     const next = b.ladder.incentives.find(i => i.threshold > b.margin! + 1e-9)!;
     const gap = next.threshold - b.margin;

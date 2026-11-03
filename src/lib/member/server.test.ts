@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '@/types'
 import type { MemberBand, MemberData, QuoteInput } from './types'
-import { acknowledgeMemberMemo, adminMemberAction, calculateMemberQuote, cancelMemberRequest, loadDepartmentInsight, loadDepartmentOrderBook, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberReplacementForm, loadMemberReplacementFormLink, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
+import { acknowledgeMemberMemo, adminMemberAction, calculateMemberQuote, cancelMemberRequest, loadDepartmentInsight, loadDepartmentOrderBook, loadMemberCatalogue, loadMemberClaimRates, loadMemberData, loadMemberInsight, loadMemberOrgMap, loadMemberReplacementForm, loadMemberReplacementFormLink, loadMemberTeamOrderBook, loadMemberWaitingForm, loadMemberWaitingFormLink, loadMemberWaitingQueue, submitMemberRequest } from './server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), createClient: vi.fn(), adminClient: vi.fn(), rpc: vi.fn(), adminRpc: vi.fn(),
@@ -98,6 +98,31 @@ describe('Principal Revenue View server boundary', () => {
     mocks.getUser.mockResolvedValue(user())
     expect((await loadDepartmentInsight('fair', '2026-10', '2026-10')).ok).toBe(false)
     expect((await loadDepartmentOrderBook(schemeId, '2026-10', '2026-09')).ok).toBe(false)
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
+  // Insight › My team › a person (2026-11-03 — "i need them can press their team member than can view their order as
+  // well"): a member reads somebody their My team lists under their OWN session — the database asks whether that person
+  // is under them (member_team_order_book); a Principal reads a person through View as's context, never this way.
+  it('reads a person under a member with the member’s own session, and asks nothing for a Principal or a bad id', async () => {
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal', 'member_insight'] }))
+    const bill = { id: 'o1', number: 'HC-SO-2611-033', date: '2026-11-01', week: '2026-11-06', revenue: 10380, kpiQty: 0, total: 10380, paid: 10380,
+      sourceMonth: '2026-11', recognitionMonth: '2026-11', cleared: true, carried: false, margin: 29.5, lines: [], own: true, brand: '未分类' }
+    mocks.rpc.mockResolvedValueOnce({ data: { from: '2026-11', through: '2026-11', asOf: 'x', orders: [bill], teamView: true, viewedStaffId: productId }, error: null })
+    const book = await loadMemberTeamOrderBook(schemeId, productId, '2026-11', '2026-11')
+    expect(mocks.rpc).toHaveBeenLastCalledWith('member_team_order_book', { p_staff: productId, p_sub_department: schemeId, p_from: '2026-11', p_until: '2026-11' })
+    expect(book.ok && book.data.orders.map(o => [o.number, o.revenue, o.brand])).toEqual([['HC-SO-2611-033', 10380, 'Uncategorised']])
+    // What the answer says beyond a book's own shape stays on the server.
+    expect(book.ok && Object.keys(book.data)).not.toContain('teamView')
+    expect(mocks.adminClient).not.toHaveBeenCalled()
+
+    mocks.rpc.mockClear()
+    expect((await loadMemberTeamOrderBook(schemeId, 'james', '2026-11', '2026-11')).ok).toBe(false)
+    expect((await loadMemberTeamOrderBook(schemeId, productId, '2026-11', '2026-10')).ok).toBe(false)
+    mocks.getUser.mockResolvedValue(user({ role: 'revenue_member', permissions: ['member_portal'] }))
+    expect((await loadMemberTeamOrderBook(schemeId, productId, '2026-11', '2026-11')).ok).toBe(false)
+    mocks.getUser.mockResolvedValue(user())
+    expect((await loadMemberTeamOrderBook(schemeId, productId, '2026-11', '2026-11')).ok).toBe(false)
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
