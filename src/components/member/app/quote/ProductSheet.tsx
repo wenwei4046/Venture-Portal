@@ -8,7 +8,7 @@ import { valueKey } from "@/lib/catalogue/keys";
 import { ICON, Svg } from "../icons";
 import { rm } from "../format";
 import {
-  MAX_QTY, SIZES, accAt, accOnlyTitle, accOrder, accVariants, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, mattressVariants, quickCounts,
+  MAX_QTY, SIZES, accAt, accOnlyTitle, accOrder, accVariantMatches, accVariants, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, mattressVariants, quickCounts,
   sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText, variantMatches,
   type BfPick, type CartLine, type QAcc, type QCatalog, type QuickTab, type QuoteMemory, type RecentFrame, type SheetState, type SizeKey, type SofaBuild,
 } from "./quote-model";
@@ -599,14 +599,17 @@ function AccSection({ title, catalog, memory, picked, size, onSet, ...fold }: {
   const rows = whole ? variantRows(accOrder(catalog, memory, {}))
     : variantRows(accOrder(catalog, memory, grouped)).sort((a, b) => Number((picked[b.key] ?? 0) > 0) - Number((picked[a.key] ?? 0) > 0));
   if (!rows.length) return null;
-  const shown = q ? rows.filter(({ acc }) => acc.name.toLowerCase().includes(q))
+  // The name and the size, every word — what the row says can be typed (`aero queen`).
+  const shown = q ? rows.filter(({ acc, at }) => accVariantMatches(acc, at.size, q))
     : fold.whole || fold.all ? rows : rows.slice(0, Math.max(ACC_FIRST, rows.filter(r => (picked[r.key] ?? 0) > 0).length));
+  // A list of SKUs in several sizes says the size can be searched; a mattress's own list is in its size alone.
+  const sizes = !size && rows.some(r => r.at.size);
   return (
     <div>
       <div className={s.rowHead}><p className={s.rowHeadTitle}>{title}</p><span className={s.rowHeadCap}>Optional</span></div>
       <div className={`${s.search} ${s.accSearch}`}>
         <Svg d={SEARCH} size={18} sw={1.8} stroke="var(--rv-sub)" />
-        <input className={s.searchInput} type="search" aria-label="Search accessories" placeholder="Search accessories by name"
+        <input className={s.searchInput} type="search" aria-label="Search accessories" placeholder={sizes ? "Search by name or size" : "Search accessories by name"}
           value={query} onChange={e => setQuery(e.target.value)} />
         {query && <button className={s.accSearchClear} aria-label="Clear accessory search" onClick={() => setQuery("")}><Svg d={X} size={16} sw={2} /></button>}
       </div>

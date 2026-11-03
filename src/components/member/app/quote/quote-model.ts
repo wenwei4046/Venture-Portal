@@ -465,8 +465,21 @@ export function mattressVariants(model: QModel): { size: SizeKey; productId: str
  * `apex q`, `queen apex` and `super single` each find what they say. `q` comes trimmed and in small letters.
  */
 export function variantMatches(model: QModel, size: SizeKey, q: string): boolean {
+  return everyWordIn([model.name, model.desc, sizeLabel(size)], q);
+}
+
+/**
+ * An accessory list's search, the same way: every word typed is in the accessory's name or its size's name — the size
+ * stands beside the name on the row (2026-11-04), so `aero queen` and `AERO-MP Super Single` find what the row says.
+ * A one-size SKU has only its name. `q` comes trimmed and in small letters.
+ */
+export function accVariantMatches(acc: Pick<QAcc, "name">, size: SizeKey | null, q: string): boolean {
+  return everyWordIn([acc.name, size ? sizeLabel(size) : ""], q);
+}
+
+function everyWordIn(parts: string[], q: string): boolean {
   if (!q) return true;
-  const hay = [model.name, model.desc, sizeLabel(size)].join(" ").toLowerCase();
+  const hay = parts.join(" ").toLowerCase();
   return q.split(/\s+/).every(word => hay.includes(word));
 }
 

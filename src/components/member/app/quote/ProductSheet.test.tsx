@@ -192,6 +192,21 @@ describe("the quick sheet", () => {
     expect(name("AERO-MP · Super King", "Super King")).toHaveTextContent(/^AERO-MP Super King$/);
   });
 
+  // The size reads as part of the name now, so it is typed as one: the accessories are searched as the mattresses are.
+  it("searches the accessories by every word of the name and the size, as the row reads", () => {
+    quick("acc");
+    const box = screen.getByRole("searchbox", { name: "Search accessories" });
+    expect(box).toHaveAttribute("placeholder", "Search by name or size");
+    search("AERO-MP Super King");
+    expect(rows()).toEqual(["AERO-MP · Super King"]);
+    search("aero  queen");
+    expect(rows()).toEqual(["AERO-MP · Queen"]);
+    search("king");
+    expect(rows()).toEqual(["AERO-MP · King", "AERO-MP · Super King"]);
+    search("pillow queen");
+    expect(screen.getByRole("status")).toHaveTextContent("No accessories match your search.");
+  });
+
   it("opens on either list, and searches the mattresses by name and size", () => {
     quick("acc");
     expect(screen.getByRole("tab", { name: /^Accessories/ })).toHaveAttribute("aria-selected", "true");
