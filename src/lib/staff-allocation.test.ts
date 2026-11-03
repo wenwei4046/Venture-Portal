@@ -3,6 +3,9 @@ import {
   validateAllocationRows,
   hvRemainderPct,
   allocationPreview,
+  billToPreview,
+  movePreview,
+  validateDeptMoves,
   periodShortLabel,
   buildAllocationInvoiceLines,
   buildConsolidatedInvoiceLines,
@@ -13,6 +16,7 @@ import {
   splitLock,
   splitLockMessage,
   type AllocationRow,
+  type DeptMoveRow,
   type DeptComponentGroup,
   type SplitLockInput,
   type SplitStanding,
@@ -407,5 +411,80 @@ describe('splitCopyNote', () => {
     expect(splitCopyNote({ copied: 0, locked: 0, notOnPayroll: 0 })).toBe(
       'Nothing to copy — no last-month splits, or everyone already set.',
     )
+  })
+})
+
+// Payroll cost moved to another department (2026-11-03, method B — the user: "我说的意思是example 从director office
+// split 薪水去hr, 也要开一张bill"): a person's cost goes to companies by %, and to other departments by a fixed RM or
+// a % of the whole cost; what is left is HV's. A receiving cost center then bills on what moved in by its Bill to %.
+describe('payroll moved to another department', () => {
+  const COST = 6000
+  const VIVIAN: AllocationRow[] = [
+    { companyId: 'co-2990', pct: 25 },
+    { companyId: 'co-car', pct: 25 },
+  ]
+  const toHr = (kind: DeptMoveRow['kind'], value: number): DeptMoveRow => ({ departmentId: 'd-hr', kind, value })
+
+  it('Vivian RM 3,000 of 6,000 with 2990 25% / CAR 25% leaves HV 0', () => {
+    const moves = [toHr('amount', 3000)]
+    expect(validateDeptMoves(COST, VIVIAN, moves, 'd-do', false)).toEqual({ ok: true })
+    const p = movePreview(COST, VIVIAN, moves)
+    expect(p.companies.map((l) => l.amount)).toEqual([1500, 1500])
+    expect(p.moves).toEqual([{ departmentId: 'd-hr', amount: 3000, pct: 50 }])
+    expect(p).toMatchObject({ billedTotal: 3000, movedTotal: 3000, hvAmount: 0 })
+  })
+
+  it('40% leaves HV 10% = 600', () => {
+    const moves = [toHr('pct', 40)]
+    expect(validateDeptMoves(COST, VIVIAN, moves, 'd-do', false)).toEqual({ ok: true })
+    const p = movePreview(COST, VIVIAN, moves)
+    expect(p.moves).toEqual([{ departmentId: 'd-hr', amount: 2400, pct: 40 }])
+    expect(p.hvAmount).toBe(600)
+  })
+
+  it('a fixed amount over the cost is refused', () => {
+    expect(validateDeptMoves(COST, [], [toHr('amount', 6000.01)], 'd-do', false)).toEqual({ ok: false, error: 'RM 6,000.01 is more than the employer cost RM 6,000.00' })
+    // …and so is a share that, with the companies, passes the whole cost.
+    expect(validateDeptMoves(COST, VIVIAN, [toHr('amount', 3000.01)], 'd-do', false)).toMatchObject({ ok: false })
+    expect(validateDeptMoves(COST, VIVIAN, [toHr('pct', 50.01)], 'd-do', false)).toMatchObject({ ok: false })
+  })
+
+  it('own department refused', () => {
+    expect(validateDeptMoves(COST, [], [{ departmentId: 'd-do', kind: 'amount', value: 100 }], 'd-do', false)).toEqual({ ok: false, error: 'Cost cannot move to the person’s own department' })
+  })
+
+  it('one line a department, a value above nothing, a % up to 100', () => {
+    expect(validateDeptMoves(COST, [], [toHr('amount', 100), toHr('pct', 10)], 'd-do', false)).toEqual({ ok: false, error: 'Duplicate department — merge the lines' })
+    expect(validateDeptMoves(COST, [], [toHr('amount', 0)], 'd-do', false)).toMatchObject({ ok: false })
+    expect(validateDeptMoves(COST, [], [toHr('pct', 100.5)], 'd-do', false)).toMatchObject({ ok: false })
+    expect(validateDeptMoves(COST, [], [{ departmentId: '', kind: 'pct', value: 10 }], 'd-do', false)).toEqual({ ok: false, error: 'Every line needs a department' })
+  })
+
+  it('centralized: companies refused, departments allowed', () => {
+    expect(validateDeptMoves(COST, VIVIAN, [], 'd-mkt', true)).toEqual({ ok: false, error: 'A centralized department bills the companies by invoice — move cost to a department only' })
+    expect(validateDeptMoves(COST, [], [{ departmentId: 'd-fin', kind: 'amount', value: 1000 }], 'd-mkt', true)).toEqual({ ok: true })
+  })
+
+  it('billToPreview(3,000, 30/30/20) → 900/900/600, stays 600', () => {
+    const p = billToPreview(3000, [
+      { companyId: 'a', pct: 30 },
+      { companyId: 'b', pct: 30 },
+      { companyId: 'c', pct: 20 },
+    ])
+    expect(p.lines.map((l) => l.amount)).toEqual([900, 900, 600])
+    expect(p.stays).toBe(600)
+  })
+
+  it('lines + stays = received to the sen', () => {
+    for (const received of [1000.01, 2333.33, 0.07, 4999.99]) {
+      const p = billToPreview(received, [
+        { companyId: 'a', pct: 33.33 },
+        { companyId: 'b', pct: 33.33 },
+        { companyId: 'c', pct: 33.34 },
+      ])
+      const sum = Math.round((p.lines.reduce((s, l) => s + l.amount, 0) + p.stays) * 100) / 100
+      expect(sum).toBe(received)
+      expect(p.stays).toBeGreaterThanOrEqual(0)
+    }
   })
 })
