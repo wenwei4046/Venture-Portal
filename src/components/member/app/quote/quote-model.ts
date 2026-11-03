@@ -440,17 +440,19 @@ export type SheetState =
   /** Standalone accessories are picked by SKU so several fitted sizes can be bought together. */
   | { mode: "acc"; acc: Record<string, number>; accAll: boolean }
   /**
-   * A mattress brand's *All models* and *Accessories only* (2026-11-03 — the user: "直接出它的 variant … 直接按加号 …
-   * 可以在 mode 那边切换，分成 mattress 和 accessory"): every mattress in every size it comes in, and every accessory,
-   * each with − / +; *Mattress | Accessories* switches the list, and one *Add to cart* adds both. Picked by SKU.
+   * A mattress brand's *All models* (2026-11-03 — the user: "直接出它的 variant … 直接按加号 … 可以在 mode 那边切换，
+   * 分成 mattress 和 accessory"): every mattress in every size it comes in, and every accessory, each with − / +;
+   * *Mattress | Accessories* switches the list, and one *Add to cart* adds both. Picked by SKU. Its Accessories list is
+   * the brand's accessories on their own — step 1 has no *Accessories only* for a mattress brand (2026-11-04) — and
+   * is never folded, so it has no *Show all* to remember.
    */
-  | { mode: "quick"; tab: QuickTab; picks: Record<string, number>; acc: Record<string, number>; accAll: boolean; query: string };
+  | { mode: "quick"; tab: QuickTab; picks: Record<string, number>; acc: Record<string, number>; query: string };
 
 export type QuickTab = "mattress" | "acc";
 
 /** A mattress brand's quick sheet, empty, on one of its two lists. */
 export function quickSheet(tab: QuickTab): Extract<SheetState, { mode: "quick" }> {
-  return { mode: "quick", tab, picks: {}, acc: {}, accAll: false, query: "" };
+  return { mode: "quick", tab, picks: {}, acc: {}, query: "" };
 }
 
 /** Every size a mattress model comes in, as a SKU each — Single, Super Single, Queen, King, then Super King. */

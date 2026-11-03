@@ -156,15 +156,16 @@ export function useQuote(args: UseQuoteArgs) {
     if (!catalog) return;
     setSheet({ mode: "frame", size: "Q", frame: firstFrame(catalog, "Q"), kpi: [], qty: 1, drop: false });
   }, [catalog]);
-  // A mattress brand's *All models* and *Accessories only* are one quick sheet, on its own list (2026-11-03): every size
-  // of every mattress and every accessory with − / +, one *Add to cart*. A sofa is built in its own sheet: its *All
-  // models* stays the list of models, its *Sofa accessories only* the accessories' sheet. Bed frames keep theirs.
+  // A mattress brand's *All models* is the quick sheet (2026-11-03): every size of every mattress and every accessory
+  // with − / +, one *Add to cart* — its accessories' only door since step 1 dropped *Accessories only* for a mattress
+  // brand (2026-11-04). A sofa is built in its own sheet: its *All models* stays the list of models, its *Sofa
+  // accessories only* the accessories' sheet. Bed frames keep theirs.
   const openAll = useCallback(() => {
     if (!catalog) return;
     if (catalog.sofa) { setQuery(""); setAllOpen(true); return; }
     setSheet(quickSheet("mattress"));
   }, [catalog]);
-  const openAccOnly = useCallback(() => setSheet(catalog && !catalog.sofa ? quickSheet("acc") : { mode: "acc", acc: {}, accAll: false }), [catalog]);
+  const openAccOnly = useCallback(() => setSheet({ mode: "acc", acc: {}, accAll: false }), []);
   const closeSheet = useCallback(() => setSheet(null), []);
   const patch = useCallback((p: Partial<SheetState>) => setSheet(s => (s ? ({ ...s, ...p } as SheetState) : s)), []);
 

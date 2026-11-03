@@ -41,6 +41,9 @@ export default function QuoteProducts({ catalog, memory, onBrand, onSet, onAll, 
   const n = catalog.models.length;
   const kpi = catalog.kpis.length ? " · KPI items" : "";
   const frames = !catalog.sofa && catalog.frames.length > 0;
+  // A mattress brand's accessories are on All models' Accessories tab (2026-11-04 — the user: "可以把 Accessory Only
+  // 删掉，因为上面已经可以 switch 了"); a sofa brand's sofa accessories keep their row.
+  const accs = catalog.sofa && catalog.accs.length > 0;
   return (
     <div className={s.page}>
       <div>
@@ -85,7 +88,7 @@ export default function QuoteProducts({ catalog, memory, onBrand, onSet, onAll, 
         </button>
       </section>
       {/* A sofa brand sells its sofa accessories on their own (2026-10-26); bed frames are a mattress's. */}
-      {(frames || catalog.accs.length > 0) && (
+      {(frames || accs) && (
         <section>
           <div className={s.sepHead}><h2 className={s.secTitle}>Buy separately</h2></div>
           {frames && (
@@ -97,7 +100,7 @@ export default function QuoteProducts({ catalog, memory, onBrand, onSet, onAll, 
               <Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
             </button>
           )}
-          {catalog.accs.length > 0 && (
+          {accs && (
             <button className={s.sepRow} onClick={onAccOnly}>
               <span>
                 <span className={s.sepName}>{accOnlyTitle(catalog)}</span>

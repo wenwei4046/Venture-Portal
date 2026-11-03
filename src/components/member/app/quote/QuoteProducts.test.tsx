@@ -33,9 +33,18 @@ describe("step 1's Buy separately", () => {
     expect(screen.queryByRole("heading", { name: "Buy separately" })).not.toBeInTheDocument();
   });
 
-  it("keeps a mattress brand's bed frames and accessories", () => {
+  // 2026-11-04, the user: "下面的 Buy Separately，你可以把 Accessory Only 删掉，因为上面已经可以 switch 了" — a mattress
+  // brand's accessories are All models' Accessories tab.
+  it("keeps a mattress brand's bed frames, and no Accessories only", () => {
     draw({ ...sofa([{ key: "PIL", name: "PIL", any: "p", sizes: {} }]), brand: "AKEMI", name: "Akemi", sofa: false });
     expect(screen.getByText("Bed frame only")).toBeInTheDocument();
-    expect(screen.getByText("Accessories only")).toBeInTheDocument();
+    expect(screen.queryByText("Accessories only")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button").map(b => b.textContent)).not.toContainEqual(expect.stringMatching(/Accessories only/));
+  });
+
+  it("has nothing to buy separately for a mattress brand with accessories and no bed frame", () => {
+    draw({ ...sofa([{ key: "PIL", name: "PIL", any: "p", sizes: {} }]), brand: "AKEMI", name: "Akemi", sofa: false, frames: [] });
+    expect(screen.queryByRole("heading", { name: "Buy separately" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /All Akemi models/ })).toBeInTheDocument();
   });
 });
