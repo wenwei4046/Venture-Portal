@@ -1528,7 +1528,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       : <div className={qs.page}><p className={qs.recentEmpty}>No brands are set up for quotes in {membership?.name ?? "this sub-department"} yet.</p></div>;
   } else if (route.screen === "quote" && quote.catalog) {
     page = <QuoteProducts catalog={quote.catalog} memory={quote.memory} onBrand={() => openSheet("brand")} onSet={quote.applySet}
-      onAll={() => { quote.setQuery(""); quote.setAllOpen(true); }} onFrameOnly={quote.openFrameOnly} onAccOnly={quote.openAccOnly} />;
+      onAll={quote.openAll} onFrameOnly={quote.openFrameOnly} onAccOnly={quote.openAccOnly} />;
   } else if (route.screen === "calc" && quote.catalog) {
     page = <QuoteCalc {...calcProps} />;
   } else if (route.screen === "account") {

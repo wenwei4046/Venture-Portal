@@ -173,6 +173,8 @@
    running on under it: a transparent border of `--sheet-safe` (shell.module.css .screen), taken
    out of the height so the sheet covers as much of the screen as it was drawn to. */
 .psPanel { position: relative; width: auto; height: auto; background: var(--rv-white); border-radius: 28px 28px 0 0; border-bottom: var(--sheet-safe, 0px) solid transparent; max-height: calc(88% - var(--sheet-safe, 0px)); display: flex; flex-direction: column; box-shadow: 0 -10px 40px var(--rv-ink-15); }
+/* The quick sheet (2026-11-03) keeps its height while a search shortens its list or its other list is switched to. */
+.psPanelFull { height: calc(88% - var(--sheet-safe, 0px)); }
 @container rv (min-width: 1024px) {
   .psLayer { padding-left: 240px; padding-top: 60px; align-items: flex-end; }
   .psDim { background: transparent; }
@@ -305,6 +307,15 @@
 .accBtn { height: 38px; border: 0; background: transparent; color: var(--rv-accent); font-size: calc(20px * var(--rv-type)); padding: 1px 6px; }
 .accQty { text-align: center; font-size: calc(15px * var(--rv-type)); font-weight: 650; color: var(--rv-ink); font-variant-numeric: tabular-nums; }
 .accStepOn .accQty { color: var(--rv-accent); }
+
+/* A mattress brand's quick sheet (2026-11-03): *Mattress | Accessories* under the head — Insight's Personal | My team,
+   in the sheet's padding — each list's picks counted beside its name; a variant the cart holds says so in green. */
+.quickBar { padding: 12px 20px 0; }
+.quickSeg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 13px; background: var(--rv-sand); }
+.quickSegBtn { display: flex; align-items: center; justify-content: center; gap: 6px; height: 38px; border: 0; border-radius: 10px; background: transparent; box-shadow: none; color: var(--rv-sub); font-size: calc(14px * var(--rv-type)); font-weight: 500; }
+.quickSegOn { background: var(--rv-white); box-shadow: 0 1px 3px var(--rv-ink-14); color: var(--rv-ink); font-weight: 650; }
+.quickSegCount { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--rv-accent); color: var(--rv-white); font-size: calc(11.5px * var(--rv-type)); font-weight: 650; font-variant-numeric: tabular-nums; box-sizing: border-box; }
+.quickHeld { color: var(--rv-green); font-weight: 600; }
 .more { margin-top: 6px; width: 100%; display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--rv-accent); font-size: calc(14px * var(--rv-type)); font-weight: 650; }
 
 /* the sofa */
