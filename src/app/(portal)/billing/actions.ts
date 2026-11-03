@@ -1877,12 +1877,27 @@ export async function generateConsolidatedPayrollInvoices(
     await supabase.from('invoices').delete().in('id', existingIds).eq('status', 'draft')
   }
 
+  // A company already billed this month (issued, paid, netted — a top-up aside) gets no second draft: Generate run
+  // again, as the reconciliation's "void and generate again" asks, re-drafts only what has no live invoice — Approve
+  // all would otherwise bill it twice (the review, 2026-11-03). A gap on a billed one is the reconciliation's.
+  const { data: billedRows, error: billedErr } = await supabase
+    .from('invoices')
+    .select('company_id')
+    .eq('period_month', period)
+    .eq('billing_mode', 'payroll_consolidated')
+    .eq('billable_to_type', 'subsidiary')
+    .not('description', 'like', `%${ADJUSTMENT_MARKER}%`)
+    .in('status', [...BILLED_STATUSES])
+  if (billedErr) throw new Error(`Failed to read the month's payroll invoices: ${billedErr.message}`)
+  const billedCompanies = new Set((billedRows ?? []).map((r) => r.company_id as string))
+
   const periodShort = periodShortLabel(period)
   const invoiceDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
   const category = categoryCode && categoryCode.trim() ? categoryCode.trim() : null
 
   const generatedCompanies: string[] = []
   for (const c of companies) {
+    if (billedCompanies.has(c.companyId)) continue
     const lines = buildConsolidatedInvoiceLines(c.groups, periodShort)
     if (lines.length === 0) continue
     const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100
@@ -2002,6 +2017,20 @@ async function makeDeptMoveInvoices(
   }
   if (moves.length === 0) return { receivers: [] }
 
+  // A receiver already billed this month (its internal invoice issued, paid or netted) gets no second draft — as the
+  // companies' Generate: after "void the internal invoice and generate again" only the voided one is drafted again.
+  const { data: billedRows, error: billedErr } = await supabase
+    .from('invoices')
+    .select('billable_to_department_id')
+    .eq('period_month', period)
+    .eq('billing_mode', 'payroll_consolidated')
+    .eq('billable_to_type', 'dept_pool')
+    .eq('reference_no', marker)
+    .not('description', 'like', `%${ADJUSTMENT_MARKER}%`)
+    .in('status', [...BILLED_STATUSES])
+  if (billedErr) throw new Error(`Failed to read the month's internal invoices: ${billedErr.message}`)
+  const billedReceivers = new Set((billedRows ?? []).map((r) => r.billable_to_department_id as string))
+
   // Each sender bills on its own segment, read off the department itself — IT
   // and any department added later included (HR's line needs one to save).
   const { data: senders, error: sendersErr } = await supabase
@@ -2036,6 +2065,7 @@ async function makeDeptMoveInvoices(
   const invoiceDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
   const receivers: string[] = []
   for (const [departmentId, receiver] of byReceiver) {
+    if (billedReceivers.has(departmentId)) continue
     const lines = buildConsolidatedInvoiceLines(receiver.groups, periodShort)
     if (lines.length === 0) continue
     const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100

@@ -171,6 +171,25 @@ describe('Generate drafts the internal invoices with the payroll invoices', () =
     expect(deletedInvoices(db).sort()).toEqual(['co-draft', 'dpm-draft'])
   })
 
+  // The reconciliation's way back for an over-billed receiver is "void the internal invoice and generate again": that
+  // Generate must re-draft only what has no live invoice, or Approve all would bill the rest twice.
+  it('a payer already billed this month gets no second draft: 2990’s and HR’s issued invoices stand alone', async () => {
+    const live = (id: string, over: Row): Row => ({ ...draft(id, over), status: 'issued' })
+    const db = database({
+      invoices: [
+        live('co-2990-issued', { billable_to_type: 'subsidiary', company_id: 'co-2990', description: 'Payroll cost share — Nov\'26' }),
+        live('dpm-hr-paid', { billable_to_type: 'dept_pool', billable_to_department_id: 'd-hr', reference_no: 'DPM-202611', description: 'Payroll cost moved in — Nov\'26', status: 'paid_via_netting' }),
+        live('dpm-fin-adjust', { billable_to_type: 'dept_pool', billable_to_department_id: 'd-fin', reference_no: 'DPM-202611', description: 'Payroll cost moved in — Nov\'26 · adjustment' }),
+        { ...draft('dpm-mkt-voided', { billable_to_type: 'dept_pool', billable_to_department_id: 'd-mkt', reference_no: 'DPM-202611', description: 'Payroll cost moved in — Nov\'26' }), status: 'voided' },
+      ],
+    })
+    const res = await generateConsolidatedPayrollInvoices(PERIOD, '5050')
+    expect(inserted(db, 'invoices').filter((v) => v.billable_to_type === 'subsidiary').map((v) => v.company_id)).toEqual(['co-car'])
+    // HR's is paid; Finance holds only a top-up (no original yet), Marketing's was voided: both drafted again.
+    expect(internalDrafts(db).map((d) => d.billable_to_department_id)).toEqual(['d-fin', 'd-mkt'])
+    expect(res).toMatchObject({ companies: ['CAR'], receivers: ['Finance', 'Marketing'] })
+  })
+
   it('the companies’ Generate no longer deletes the own-share draft (nor a top-up)', async () => {
     const db = database({ moves: [] })
     await generateConsolidatedPayrollInvoices(PERIOD, '5050')
