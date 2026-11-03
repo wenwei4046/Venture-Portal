@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Department to department · sample</title>
+<style>
+  :root {
+    --bg: #f6f2ec; --surface: #ffffff; --surface-2: #f7f3ee; --line: #e7ded3; --ink: #2b1f17;
+    --muted: #8a7d70; --accent: #e99a53; --accent-soft: #fdf1e4; --ledger: #1e7a52; --ledger-soft: #e3f3ea;
+    --note: #6b5b4c; --note-bg: #fffaf2; --note-line: #f0dcc0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 Inter, system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  .sr { position: absolute; opacity: 0; pointer-events: none; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 20px 16px 48px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 2px 0 0; font-size: 22px; font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+  .seg label { padding: 6px 14px; font-size: 13px; cursor: pointer; color: var(--muted); }
+  #v-now:checked ~ .wrap label[for=v-now], #v-new:checked ~ .wrap label[for=v-new] { background: var(--ink); color: #fff; }
+  #v-now:checked ~ .wrap .new, #v-new:checked ~ .wrap .now { display: none; }
+  .sect { margin: 22px 0 10px; display: flex; align-items: baseline; gap: 10px; }
+  .sect h2 { margin: 0; font-size: 15px; font-weight: 600; }
+  .sect .rule { flex: 1; border-top: 1px solid var(--line); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; margin-bottom: 12px; }
+  .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .who { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .who b { font-size: 14px; }
+  .who small { font-size: 11px; color: var(--muted); }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
+  .chip.dept { background: var(--accent-soft); color: #9a5a1c; }
+  .cost { font-size: 12px; color: var(--muted); }
+  .cost b { color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; margin-left: 4px; }
+  .rows { margin-top: 12px; display: grid; gap: 8px; }
+  .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .box { min-width: 190px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
+  .box::after { content: '▾'; color: var(--muted); }
+  .box.auto { background: var(--surface-2); border-style: dashed; }
+  .box.auto::after { content: ''; }
+  .box.to-dept { border-color: var(--accent); background: var(--accent-soft); }
+  .num-in { width: 96px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; font: 13px ui-monospace, 'Chivo Mono', monospace; text-align: right; color: var(--ink); background: var(--surface); }
+  .num-in.auto { background: var(--surface-2); border-style: dashed; }
+  .unit { font-size: 12px; color: var(--muted); }
+  .amt { min-width: 104px; font-variant-numeric: tabular-nums; font-size: 13px; }
+  .x { color: var(--muted); font-size: 13px; }
+  .hint { font-size: 11px; color: var(--muted); }
+  .how { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .how label { padding: 5px 10px; font-size: 12px; cursor: pointer; color: var(--muted); background: var(--surface); }
+  .how label + label { border-left: 1px solid var(--line); }
+  #m-fx:checked ~ * label[for=m-fx], #m-pc:checked ~ * label[for=m-pc] { background: var(--ink); color: #fff; }
+  .when-fx, .when-pc { display: none; }
+  #m-fx:checked ~ * .when-fx, #m-pc:checked ~ * .when-pc { display: inline-flex; }
+  #m-fx:checked ~ * .when-fx.b, #m-pc:checked ~ * .when-pc.b { display: block; }
+  #m-fx:checked ~ * .when-none, #m-pc:checked ~ * .when-none { display: none; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .foot .sum { font-size: 12px; color: var(--muted); }
+  .foot .sum b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font-size: 13px; color: var(--ink); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); }
+  .btn.new-btn { border-color: var(--accent); color: #9a5a1c; }
+  .note { margin: 8px 0 0; padding: 8px 12px; border: 1px solid var(--note-line); background: var(--note-bg); border-radius: 10px; font-size: 12.5px; color: var(--note); }
+  .note b { color: var(--ink); }
+  .incoming { margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .incoming .line { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; font-size: 13px; }
+  .incoming .line + .line { border-top: 1px solid var(--line); }
+  .incoming .parts { font-size: 11px; color: var(--muted); padding: 0 12px 8px; }
+  .label-cap { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 12px 0 0; }
+  table.inv { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  table.inv td { padding: 5px 8px; border-top: 1px solid var(--line); }
+  table.inv td.r { text-align: right; font-variant-numeric: tabular-nums; }
+  table.inv tr.sub td { font-weight: 600; }
+  table.inv tr.added td { background: var(--accent-soft); }
+  .tag { font-size: 10.5px; padding: 1px 6px; border-radius: 999px; background: var(--accent); color: var(--ink); margin-left: 6px; }
+  .pick-first { font-size: 12px; color: #9a5a1c; }
+  .added-row { display: none; }
+  #add-dept:checked ~ * .added-row { display: flex; }
+  label.btn, label.x { cursor: pointer; }
+  .box-sel { min-width: 190px; padding: 6px 10px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent-soft); font: inherit; font-size: 13px; color: var(--ink); }
+  .after-pick { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .row:has(option[value=""]:checked) .after-pick { display: none; }
+  .when2-fx, .when2-pc { display: none; }
+  #m2-fx:checked ~ * .when2-fx, #m2-pc:checked ~ * .when2-pc { display: inline-flex; align-items: center; gap: 6px; }
+  #m2-fx:checked ~ * .when2-none, #m2-pc:checked ~ * .when2-none { display: none; }
+  #m2-fx:checked ~ * label[for=m2-fx], #m2-pc:checked ~ * label[for=m2-pc] { background: var(--ink); color: #fff; }
+  .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 8px; margin: 6px 0 2px; }
+  .flow .stop { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; text-align: center; }
+  .flow .arrow { color: var(--accent); font-weight: 700; }
+  @media (max-width: 600px) { .flow { grid-template-columns: 1fr; } .flow .arrow { text-align: center; transform: rotate(90deg); } .box { min-width: 150px; } }
+</style>
+</head>
+<body>
+<input type="radio" name="view" id="v-now" class="sr" />
+<input type="radio" name="view" id="v-new" class="sr" checked />
+<div class="wrap">
+
+  <div class="top">
+    <div>
+      <div class="eyebrow">HR Costing · Allocation · sample</div>
+      <h1>November 2026</h1>
+    </div>
+    <div class="seg"><label for="v-now">Now</label><label for="v-new">New</label></div>
+  </div>
+  <div class="note">样本：数字都是假的（Vivian 的成本假设 RM 6,000）。<b>Now</b> 是现在的画面，<b>New</b> 是改了以后。能点的只有 <b>Now / New</b>、<b>Fixed RM / %</b> 和 <b>+ Department</b>；改了数字不会自动重算（真的系统会）。画面上的字照系统用英文，说明用华语。</div>
+
+  <!-- ══════════════ NOW ══════════════ -->
+  <div class="now">
+    <div class="sect"><h2>Staff</h2><span class="rule"></span></div>
+    <div class="card">
+      <div class="card-head">
+        <div class="who"><b>VIVIAN</b><small>Director Office</small><span class="chip">● Draft</span></div>
+        <div class="cost">Employer cost<b>RM 6,000.00</b></div>
+      </div>
+      <div class="rows">
+        <div class="row"><span class="box">2990 — 2990 Sdn Bhd</span><input class="num-in" value="25.00" /><span class="unit">%</span><span class="amt">RM 1,500.00</span><span class="x">✕</span></div>
+        <div class="row"><span class="box">CAR — Carres</span><input class="num-in" value="25.00" /><span class="unit">%</span><span class="amt">RM 1,500.00</span><span class="x">✕</span></div>
+        <div class="row"><span class="box auto">HV — HOUZS Venture</span><span class="num-in auto">50.00</span><span class="unit">%</span><span class="amt">RM 3,000.00</span><span class="hint">auto · own share · not billed</span></div>
+      </div>
+      <div class="foot">
+        <div class="sum">Billed to subsidiaries <b>RM 3,000.00</b></div>
+        <div class="btns"><span class="btn">+ Company</span><span class="btn primary">Save</span></div>
+      </div>
+    </div>
+    <div class="note">现在：一个人只能分给<b>公司</b>，剩下的就是 HV 自己的份。Marketing、Revenue Department、Director 的同事不会出现在这里（Centralized）。</div>
+  </div>
+
+  <!-- ══════════════ NEW ══════════════ -->
+  <div class="new">
+    <input type="radio" name="m" id="m-fx" class="sr" />
+    <input type="radio" name="m" id="m-pc" class="sr" />
+    <input type="checkbox" id="add-dept" class="sr" />
+    <input type="radio" name="m2" id="m2-fx" class="sr" />
+    <input type="radio" name="m2" id="m2-pc" class="sr" />
+
+    <div class="sect"><h2>① A person: part of the cost to another department</h2><span class="rule"></span></div>
+    <div class="card">
+      <div class="card-head">
+        <div class="who"><b>VIVIAN</b><small>Director Office</small><span class="chip">● Draft</span></div>
+        <div class="cost">Employer cost<b>RM 6,000.00</b></div>
+      </div>
+      <div class="rows">
+        <div class="row"><span class="box">2990 — 2990 Sdn Bhd</span><input class="num-in" value="25.00" /><span class="unit">%</span><span class="amt">RM 1,500.00</span><span class="x">✕</span></div>
+        <div class="row"><span class="box">CAR — Carres</span><input class="num-in" value="25.00" /><span class="unit">%</span><span class="amt">RM 1,500.00</span><span class="x">✕</span></div>
+        <div class="row">
+          <span class="box to-dept">→ HR</span>
+          <span class="how"><label for="m-fx">Fixed RM</label><label for="m-pc">%</label></span>
+          <span class="pick-first when-none">Pick Fixed RM or %</span>
+          <span class="when-fx"><input class="num-in" value="3,000.00" /></span><span class="unit when-fx">RM</span><span class="hint when-fx">= 50.00% of the cost</span>
+          <span class="when-pc"><input class="num-in" value="40.00" /></span><span class="unit when-pc">%</span><span class="hint when-pc">= RM 2,400.00</span>
+          <span class="x">✕</span>
+        </div>
+        <div class="row added-row">
+          <select class="box-sel" aria-label="Department">
+            <option value="" selected>Department…</option>
+            <option>Finance</option>
+            <option>IT</option>
+            <option>Marketing</option>
+            <option>Revenue Department</option>
+            <option>Director</option>
+          </select>
+          <span class="after-pick">
+            <span class="how"><label for="m2-fx">Fixed RM</label><label for="m2-pc">%</label></span>
+            <span class="pick-first when2-none">Pick Fixed RM or %</span>
+            <span class="when2-fx"><input class="num-in" placeholder="0.00" /><span class="unit">RM</span></span>
+            <span class="when2-pc"><input class="num-in" placeholder="0.00" /><span class="unit">%</span></span>
+          </span>
+          <label for="add-dept" class="x" title="Remove row">✕</label>
+        </div>
+        <div class="row"><span class="box auto">HV — HOUZS Venture</span>
+          <span class="num-in auto"><span class="when-none">—</span><span class="when-fx">0.00</span><span class="when-pc">10.00</span></span><span class="unit">%</span>
+          <span class="amt"><span class="when-none">—</span><span class="when-fx">RM 0.00</span><span class="when-pc">RM 600.00</span></span>
+          <span class="hint">auto · own share</span></div>
+      </div>
+      <div class="foot">
+        <div class="sum">Billed to subsidiaries <b>RM 3,000.00</b> · To departments <b><span class="when-none">—</span><span class="when-fx">RM 3,000.00</span><span class="when-pc">RM 2,400.00</span></b></div>
+        <div class="btns"><span class="btn">+ Company</span><label for="add-dept" class="btn new-btn">+ Department</label><span class="btn primary">Save</span></div>
+      </div>
+    </div>
+    <div class="note">新的 <b>+ Department</b>：点了多一行，先选部门，再选 <b>Fixed RM</b> 或 <b>%</b>，框才出现（试点一下）。% 都是按她的<b>总成本</b>算；转过去的包括薪水、allowance、EPF、SOCSO、EIS，各项按比例拆。</div>
+
+    <div class="sect"><h2>② What HR received this month — HR decides the companies</h2><span class="rule"></span></div>
+    <div class="card">
+      <div class="card-head">
+        <div class="who"><b>Moved into HR</b><span class="chip dept">HR pool</span></div>
+        <div class="cost">Received<b><span class="when-none">—</span><span class="when-fx">RM 3,000.00</span><span class="when-pc">RM 2,400.00</span></b></div>
+      </div>
+      <div class="incoming">
+        <div class="line"><span>VIVIAN · Director Office</span><span class="amt" style="text-align:right"><span class="when-none">—</span><span class="when-fx">RM 3,000.00</span><span class="when-pc">RM 2,400.00</span></span></div>
+        <div class="parts"><span class="when-none">Pick Fixed RM or % in ① first</span>
+          <span class="when-fx">Salary 2,450.00 · Allowance 150.00 · EPF 338.00 · SOCSO 52.05 · EIS 9.95</span>
+          <span class="when-pc">Salary 1,960.00 · Allowance 120.00 · EPF 270.40 · SOCSO 41.64 · EIS 7.96</span></div>
+      </div>
+      <div class="label-cap">Bill to</div>
+      <div class="rows">
+        <div class="row"><span class="box">2990 — 2990 Sdn Bhd</span><input class="num-in" value="30.00" /><span class="unit">%</span><span class="amt"><span class="when-none">—</span><span class="when-fx">RM 900.00</span><span class="when-pc">RM 720.00</span></span><span class="x">✕</span></div>
+        <div class="row"><span class="box">CAR — Carres</span><input class="num-in" value="30.00" /><span class="unit">%</span><span class="amt"><span class="when-none">—</span><span class="when-fx">RM 900.00</span><span class="when-pc">RM 720.00</span></span><span class="x">✕</span></div>
+        <div class="row"><span class="box">CONTS — The Conts</span><input class="num-in" value="20.00" /><span class="unit">%</span><span class="amt"><span class="when-none">—</span><span class="when-fx">RM 600.00</span><span class="when-pc">RM 480.00</span></span><span class="x">✕</span></div>
+        <div class="row"><span class="box auto">Stays in HR</span><span class="num-in auto">20.00</span><span class="unit">%</span><span class="amt"><span class="when-none">—</span><span class="when-fx">RM 600.00</span><span class="when-pc">RM 480.00</span></span><span class="hint">auto · HR bears it</span></div>
+      </div>
+      <div class="foot">
+        <div class="sum">Billed to subsidiaries <b><span class="when-none">—</span><span class="when-fx">RM 2,400.00</span><span class="when-pc">RM 1,920.00</span></b></div>
+        <div class="btns"><span class="btn">+ Company</span><span class="btn">Copy last month's %</span><span class="btn primary">Save</span></div>
+      </div>
+    </div>
+    <div class="note">每个收到钱的部门一张这样的卡，HR <b>每个月</b>设分给哪几家公司、各多少 %（可以复制上个月）。没分出去的留在那个部门的 pool。<br /><b>几时看到：</b>同一个月份的 Allocation 页面，只要有人的 split 转钱给 HR 并按了 Save，这张卡就会出现。HR 要在月底 Finance 开当月 payroll invoice 之前设好 %；开了单之后就锁住，跟个人的 split 一样。<br /><b>没设也可以：</b>没分出去的就留在 HR、由 HR 承担，不挡开单，开单预览会写出“Stays in HR”。<b>收钱的部门是 Centralized</b>（如 Marketing）：没有这张 % 的卡，整笔由它自己承担。</div>
+
+    <div class="sect"><h2>③ A centralized department's person</h2><span class="rule"></span></div>
+    <div class="card">
+      <div class="card-head">
+        <div class="who"><b>AMIRUL</b><small>Marketing</small><span class="chip">● Draft</span><span class="chip">Centralized</span></div>
+        <div class="cost">Employer cost<b>RM 4,000.00</b></div>
+      </div>
+      <div class="rows">
+        <div class="row"><span class="box to-dept">→ Finance</span><span class="how"><label>Fixed RM</label><label style="background:var(--ink);color:#fff">%</label></span><input class="num-in" value="25.00" /><span class="unit">%</span><span class="hint">= RM 1,000.00</span><span class="x">✕</span></div>
+        <div class="row"><span class="box auto">Stays in Marketing</span><span class="num-in auto">75.00</span><span class="unit">%</span><span class="amt">RM 3,000.00</span><span class="hint">auto · Marketing's own pool</span></div>
+      </div>
+      <div class="foot">
+        <div class="sum">To departments <b>RM 1,000.00</b></div>
+        <div class="btns"><span class="btn new-btn">+ Department</span><span class="btn primary">Save</span></div>
+      </div>
+    </div>
+    <div class="note">Marketing、Revenue Department、Director 的同事现在也会列出来，但只有 <b>+ Department</b>（没有 + Company），因为这三个部门自己开单向公司收钱。剩下的留在自己部门的 pool。</div>
+
+    <div class="sect"><h2>④ At month end — what gets billed</h2><span class="rule"></span></div>
+    <div class="card">
+      <div class="flow">
+        <div class="stop">Vivian's pay<br /><small class="hint">Director Office keeps the rest</small></div>
+        <div class="arrow">→</div>
+        <div class="stop">HR's own cost<br /><small class="hint"><span class="when-none">—</span><span class="when-fx">RM 3,000.00</span><span class="when-pc">RM 2,400.00</span> · booked under HR, funded from HR's pool</small></div>
+        <div class="arrow">→</div>
+        <div class="stop">2990 · CAR · CONTS<br /><small class="hint">by HR's %</small></div>
+      </div>
+      <div class="label-cap">No internal invoice</div>
+      <table class="inv">
+        <tr><td>Director Office's figures leave out this part; HR's include it — accrual and funding</td><td class="r"><span class="when-none">—</span><span class="when-fx">3,000.00</span><span class="when-pc">2,400.00</span></td></tr>
+      </table>
+      <div class="label-cap">CAR's payroll invoice · November 2026 · HR section — each line grows by</div>
+      <table class="inv">
+        <tr class="added"><td>Salary</td><td class="r"><span class="when-none">—</span><span class="when-fx">735.00</span><span class="when-pc">588.00</span></td></tr>
+        <tr class="added"><td>Allowance</td><td class="r"><span class="when-none">—</span><span class="when-fx">45.00</span><span class="when-pc">36.00</span></td></tr>
+        <tr class="added"><td>EPF</td><td class="r"><span class="when-none">—</span><span class="when-fx">101.40</span><span class="when-pc">81.12</span></td></tr>
+        <tr class="added"><td>SOCSO</td><td class="r"><span class="when-none">—</span><span class="when-fx">15.62</span><span class="when-pc">12.49</span></td></tr>
+        <tr class="added"><td>EIS</td><td class="r"><span class="when-none">—</span><span class="when-fx">2.98</span><span class="when-pc">2.39</span></td></tr>
+        <tr class="sub"><td>Added to HR's section</td><td class="r"><span class="when-none">—</span><span class="when-fx">900.00</span><span class="when-pc">720.00</span></td></tr>
+      </table>
+    </div>
+    <div class="note">不开内部单：转给 HR 的部分<b>一开始就是 HR 的成本</b>——记账记在 HR、funding 从 HR pool 扣，Director Office 只剩她其余的部分。月底每家公司的 payroll invoice，<b>直接并进 HR 原本的五行</b>（Salary / Allowance / EPF / SOCSO / EIS 各自变大，橙色是各行多出来的金额），不另外列、不写来源；公司的单上不写名字，跟现在一样。</div>
+  </div>
+</div>
+</body>
+</html>

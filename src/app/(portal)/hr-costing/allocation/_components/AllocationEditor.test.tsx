@@ -18,8 +18,10 @@ function person(name: string, lock: Partial<SplitLockInput>): StaffAllocationDat
     staffId: name,
     name,
     dept: 'IT',
+    departmentId: 'd-it',
     employerCost: 5171.75,
     rows: [{ companyId: 'hc', pct: 50 }],
+    moves: [],
     lock: splitLock({
       status: 'draft', revenue: false, completedAt: null, topupOpenedAt: null, topupKind: null, monthClosed: false,
       ...lock,
@@ -101,7 +103,7 @@ describe('AllocationEditor — the split follows the payroll row', () => {
     fireEvent.change(c.getByRole('spinbutton'), { target: { value: '60' } })
     fireEvent.click(c.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(c.getByText(reason)).toBeInTheDocument())
-    expect(actions.saveStaffAllocation).toHaveBeenCalledWith('TAN YONG HONG', '2026-09-01', [{ companyId: 'hc', pct: 60 }])
+    expect(actions.saveStaffAllocation).toHaveBeenCalledWith('TAN YONG HONG', '2026-09-01', [{ companyId: 'hc', pct: 60 }], [])
     expect(refresh).toHaveBeenCalled()
     expect(c.queryByText('Saved.')).toBeNull()
   })
@@ -166,5 +168,110 @@ describe('AllocationEditor — the split follows the payroll row', () => {
     const c = within(card('SITI AISYAH'))
     expect(c.getByText('Resubmit · editing')).toBeInTheDocument()
     expect(c.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+  })
+})
+
+// Payroll cost moved to another department (2026-11-03, method B — the user: "我说的意思是example 从director office
+// split 薪水去hr, 也要开一张bill"): + Department beside + Company; HV is what companies and departments leave.
+describe('AllocationEditor — part of the cost to another department', () => {
+  const departments = [
+    { id: 'd-do', name: 'Director Office', costModel: 'cost_center' as const, isInternal: false, segmentKey: 'director_office' },
+    { id: 'd-hr', name: 'HR', costModel: 'cost_center' as const, isInternal: false, segmentKey: 'hr' },
+    { id: 'd-fin', name: 'Finance', costModel: 'cost_center' as const, isInternal: false, segmentKey: 'finance' },
+    { id: 'd-mkt', name: 'Marketing', costModel: 'centralized' as const, isInternal: false, segmentKey: 'marketing' },
+    { id: 'd-vo', name: 'Venture Office', costModel: 'cost_center' as const, isInternal: true, segmentKey: null },
+    { id: 'd-lead', name: 'Lead Department', costModel: 'cost_center' as const, isInternal: false, segmentKey: null },
+  ]
+  const vivian = (over: Partial<StaffAllocationData> = {}, lock: Partial<SplitLockInput> = {}): StaffAllocationData => ({
+    ...person('VIVIAN', lock),
+    dept: 'Director Office',
+    departmentId: 'd-do',
+    employerCost: 6000,
+    rows: [{ companyId: 'hc', pct: 25 }, { companyId: 'car', pct: 25 }],
+    ...over,
+  })
+  const draw = (staff: StaffAllocationData[]) =>
+    render(<AllocationEditor period="2026-11-01" companies={companies} departments={departments} readOnly={false} staff={staff} />)
+
+  it('+ Department adds a row whose box shows only after Fixed RM or % is picked', () => {
+    draw([vivian()])
+    const c = within(card('VIVIAN'))
+    fireEvent.click(c.getByRole('button', { name: '+ Department' }))
+    const line = within(c.getByRole('group', { name: 'Department line' }))
+    expect(line.queryByRole('spinbutton')).toBeNull()
+    expect(line.getByText('Pick Fixed RM or %')).toBeInTheDocument()
+    fireEvent.click(line.getByRole('button', { name: 'Fixed RM' }))
+    expect(line.getByRole('button', { name: 'Fixed RM' })).toHaveAttribute('aria-pressed', 'true')
+    expect(line.getByRole('spinbutton', { name: 'Amount (RM)' })).toBeInTheDocument()
+    fireEvent.click(line.getByRole('button', { name: '%' }))
+    expect(line.getByRole('spinbutton', { name: 'Percentage' })).toBeInTheDocument()
+  })
+
+  it('the department list leaves out the person’s own department, Venture Office and pool-less departments', () => {
+    draw([vivian()])
+    const c = within(card('VIVIAN'))
+    fireEvent.click(c.getByRole('button', { name: '+ Department' }))
+    const select = within(c.getByRole('group', { name: 'Department line' })).getByRole('combobox')
+    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['Department…', 'HR', 'Finance', 'Marketing'])
+  })
+
+  it('HV reads 0.00% for Vivian 25/25 + RM 3,000', async () => {
+    actions.saveStaffAllocation.mockResolvedValue({ ok: true })
+    draw([vivian({ moves: [{ departmentId: 'd-hr', kind: 'amount', value: 3000 }] })])
+    const c = within(card('VIVIAN'))
+    const hv = within(c.getByRole('group', { name: 'HV — HOUZS Venture' }))
+    expect(hv.getByText('0.00')).toBeInTheDocument()
+    expect(hv.getByText('RM 0.00')).toBeInTheDocument()
+    expect(within(c.getByRole('group', { name: 'Department line' })).getByText('= 50.00% of the cost')).toBeInTheDocument()
+    expect(c.getByText(/To departments/)).toHaveTextContent('To departments RM 3,000.00')
+    // Made 40%: HV keeps 10%.
+    const line = within(c.getByRole('group', { name: 'Department line' }))
+    fireEvent.click(line.getByRole('button', { name: '%' }))
+    fireEvent.change(line.getByRole('spinbutton', { name: 'Percentage' }), { target: { value: '40' } })
+    expect(hv.getByText('10.00')).toBeInTheDocument()
+    expect(hv.getByText('RM 600.00')).toBeInTheDocument()
+    fireEvent.click(c.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(actions.saveStaffAllocation).toHaveBeenCalledWith('VIVIAN', '2026-11-01', [{ companyId: 'hc', pct: 25 }, { companyId: 'car', pct: 25 }], [
+        { departmentId: 'd-hr', kind: 'pct', value: 40 },
+      ]),
+    )
+  })
+
+  it('lines saved before her pay fell say they now pass the cost, before anybody edits them', () => {
+    draw([vivian({ employerCost: 5800, moves: [{ departmentId: 'd-hr', kind: 'amount', value: 3000 }] })])
+    expect(within(card('VIVIAN')).getByText('Companies and departments take 101.72% of the cost — cannot exceed 100%')).toBeInTheDocument()
+  })
+
+  it('a centralized person shows + Department only; leftover “Stays in Marketing”', () => {
+    draw([
+      vivian(),
+      { ...person('AMIRUL', {}), dept: 'Marketing', departmentId: 'd-mkt', centralized: true, employerCost: 4000, rows: [], moves: [{ departmentId: 'd-fin', kind: 'pct', value: 25 }] },
+    ])
+    expect(screen.getByText('Marketing · 1 person')).toBeInTheDocument()
+    const c = within(card('AMIRUL'))
+    expect(c.queryByRole('button', { name: '+ Company' })).toBeNull()
+    expect(c.getByRole('button', { name: '+ Department' })).toBeInTheDocument()
+    const stays = within(c.getByRole('group', { name: 'Stays in Marketing' }))
+    expect(stays.getByText('75.00')).toBeInTheDocument()
+    expect(stays.getByText('RM 3,000.00')).toBeInTheDocument()
+  })
+
+  it('a submitted person’s lines are locked with the split’s words; after Resubmit they open', () => {
+    const moves = [{ departmentId: 'd-hr', kind: 'amount' as const, value: 3000 }]
+    const { unmount } = draw([vivian({ moves }, { status: 'submitted' })])
+    const c = within(card('VIVIAN'))
+    expect(c.getByText('Locked with their pay · Resubmit them on HR › Payroll to change it')).toBeInTheDocument()
+    expect(c.queryByRole('button', { name: '+ Department' })).toBeNull()
+    const line = within(c.getByRole('group', { name: 'Department line' }))
+    expect(line.getByRole('combobox')).toBeDisabled()
+    expect(line.getByRole('spinbutton', { name: 'Amount (RM)' })).toBeDisabled()
+    expect(line.queryByRole('button', { name: 'Remove line' })).toBeNull()
+    unmount()
+
+    draw([vivian({ moves }, { topupOpenedAt: '2026-11-20T02:00:00Z', topupKind: 'resubmit' })])
+    const open = within(card('VIVIAN'))
+    expect(open.getByRole('button', { name: '+ Department' })).toBeInTheDocument()
+    expect(within(open.getByRole('group', { name: 'Department line' })).getByRole('spinbutton', { name: 'Amount (RM)' })).toBeEnabled()
   })
 })

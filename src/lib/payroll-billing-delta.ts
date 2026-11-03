@@ -80,6 +80,19 @@ export interface CompanyBillingDelta {
   negatives: SegmentDelta[]
 }
 
+/** The month's reconciliation: the companies against their payroll invoices,
+ *  and (2026-11-03) the departments payroll was moved to against their
+ *  internal invoices — a department's row carries its id in `companyId` and its
+ *  name in `shortCode` / `name`, its segments the SENDERS'. */
+export interface PayrollBillingDeltas {
+  companies: CompanyBillingDelta[]
+  departments: CompanyBillingDelta[]
+  /** HV's own share against its issued own-share invoice(s) to Venture Office
+   *  (2026-11-03, the user: "做b") — one row keyed by Venture Office's id, or
+   *  none while nothing was issued; only the segments that invoice billed back. */
+  ownShare: CompanyBillingDelta[]
+}
+
 interface Cell {
   should: number
   billed: number

@@ -185,8 +185,9 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   },
   hr_import_templates: each(['hr_costing.create', 'hr_costing.edit', 'team.create', 'team.edit']),
   hr_monthly_payroll: each(['hr_costing.create', 'hr_costing.edit']),
-  hr_pool_allocation: each(['hr_costing.create', 'hr_costing.edit'], ['INSERT', 'UPDATE']),
+  hr_pool_allocation: each(['hr_costing.create', 'hr_costing.edit']),
   hr_staff_allocation: each(['hr_costing.create', 'hr_costing.edit']),
+  hr_staff_dept_moves: each(['hr_costing.create', 'hr_costing.edit']),
   payroll_payment_requests: {
     INSERT: ['hr_costing.create'],
     // HR edits its request; Finance pays it out or sends it back.

@@ -92,6 +92,149 @@ export function allocationPreview(
   return { lines, billedTotal, hvAmount }
 }
 
+// ─── Payroll moved to another department (2026-11-03, method B) ─────────────
+//
+// The user: "我说的意思是example 从director office split 薪水去hr, 也要开一张bill".
+// Beside the company split, part of a person's employer cost may go to another
+// department — a fixed RM or a % of the WHOLE cost — billed by an internal
+// invoice; what is left is HV's. A receiving cost center bills what moved in on
+// to the companies by its Bill to %, and the rest stays in its pool. The SQL
+// (hr_staff_dept_moves, get_staff_dept_moves_allocation) rounds the same way:
+// a % move is ROUND(cost × pct, 2), a fixed one LEAST(amount, cost), a Bill to
+// line ROUND(received × pct, 2).
+
+export interface DeptMoveRow {
+  departmentId: string
+  kind: 'amount' | 'pct'
+  /** RM for 'amount'; 0–100 as typed for 'pct' (the table keeps 0–1). */
+  value: number
+}
+
+/** To the sen, half away from zero, as NUMERIC's ROUND(x, 2): the float's noise
+ *  (2,500.055 held as 2,500.0549…) is cut off at 15 digits before rounding. */
+const r2 = (n: number) => {
+  const sen = Number((Math.abs(n) * 100).toPrecision(15))
+  return (Math.sign(n) * Math.round(sen)) / 100
+}
+const rm = (n: number) =>
+  `RM ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+/** What one department line moves, to the sen. */
+function moveAmount(employerCost: number, m: DeptMoveRow): number {
+  return m.kind === 'pct' ? r2((employerCost * m.value) / 100) : r2(Math.min(m.value, employerCost))
+}
+
+/**
+ * Validate one person's department lines beside their company split.
+ * Rules: a department each line, once; never the person's own; a value above
+ * 0, a % up to 100, a fixed amount up to the cost; companies and departments
+ * together at most the whole cost. A centralized person bills the companies
+ * by invoice, so has department lines only (the user 2026-09-30, DEPARTMENT MODE).
+ */
+export function validateDeptMoves(
+  employerCost: number,
+  companies: AllocationRow[],
+  moves: DeptMoveRow[],
+  ownDepartmentId: string,
+  centralized: boolean,
+): AllocationValidation {
+  if (centralized && companies.length > 0) {
+    return { ok: false, error: 'A centralized department bills the companies by invoice — move cost to a department only' }
+  }
+  const companyCheck = validateAllocationRows(companies)
+  if (!companyCheck.ok) return companyCheck
+  const seen = new Set<string>()
+  for (const m of moves) {
+    if (!m.departmentId) return { ok: false, error: 'Every line needs a department' }
+    if (m.departmentId === ownDepartmentId) return { ok: false, error: 'Cost cannot move to the person’s own department' }
+    if (seen.has(m.departmentId)) return { ok: false, error: 'Duplicate department — merge the lines' }
+    seen.add(m.departmentId)
+    if (!Number.isFinite(m.value) || m.value <= 0) {
+      return { ok: false, error: m.kind === 'pct' ? 'Percentage must be greater than 0' : 'Amount must be greater than 0' }
+    }
+    if (m.kind === 'pct' && m.value > 100) return { ok: false, error: 'Percentage cannot exceed 100' }
+    if (m.kind === 'amount' && m.value > employerCost + EPSILON) {
+      return { ok: false, error: `${rm(m.value)} is more than the employer cost ${rm(employerCost)}` }
+    }
+  }
+  // Counted in RM, as typed: a sen over the cost is over, however small a % of it.
+  const companyRm = companies.reduce((s, r) => s + (employerCost * r.pct) / 100, 0)
+  const movedRm = moves.reduce((s, m) => s + (m.kind === 'pct' ? (employerCost * m.value) / 100 : m.value), 0)
+  if (companyRm + movedRm > employerCost + EPSILON) {
+    const pct = employerCost > 0 ? ((companyRm + movedRm) / employerCost) * 100 : 0
+    return { ok: false, error: `Companies and departments take ${pct.toFixed(2)}% of the cost — cannot exceed 100%` }
+  }
+  return { ok: true }
+}
+
+export interface MovePreview {
+  companies: AllocationPreviewLine[]
+  /** What each department line moves, and that as a % of the cost. */
+  moves: Array<{ departmentId: string; amount: number; pct: number }>
+  /** cost − companies − moves: HV's own share, absorbing the rounding. */
+  hvAmount: number
+  billedTotal: number
+  movedTotal: number
+}
+
+/** RM preview of one person's split: the companies as allocationPreview, the
+ *  department lines after them, HV the exact remainder (never below 0 — an
+ *  overshoot of a sen comes off the last line). */
+export function movePreview(employerCost: number, companies: AllocationRow[], moves: DeptMoveRow[]): MovePreview {
+  const lines = companies.map((r) => ({ companyId: r.companyId, pct: r.pct, amount: r2((employerCost * r.pct) / 100) }))
+  const moved = moves.map((m) => {
+    const amount = moveAmount(employerCost, m)
+    return { departmentId: m.departmentId, amount, pct: m.kind === 'pct' ? m.value : employerCost > 0 ? r2((amount / employerCost) * 100) : 0 }
+  })
+  const sum = (xs: Array<{ amount: number }>) => r2(xs.reduce((s, x) => s + x.amount, 0))
+  let hvAmount = r2(employerCost - sum(lines) - sum(moved))
+  if (hvAmount < 0) {
+    const last = moved[moved.length - 1] ?? lines[lines.length - 1]
+    if (last) {
+      last.amount = r2(last.amount + hvAmount)
+      hvAmount = 0
+    }
+  }
+  return { companies: lines, moves: moved, hvAmount, billedTotal: sum(lines), movedTotal: sum(moved) }
+}
+
+/** A person's pay as a move is split by it: gross, the salary part of it
+ *  (get_staff_billing_allocation's salary rule) and the employer statutory. */
+export interface MovePay {
+  gross: number
+  salaryComp: number
+  epfEr: number
+  socsoEr: number
+  eisEr: number
+}
+
+/** What one move carries of each cost item — payroll_moved_parts' split: each
+ *  item in proportion, rounded to the sen, salary taking the rounding. A %
+ *  line splits by its % (0–100), as the database does, not by its rounded amount. */
+export function moveParts(pay: MovePay, amount: number, pct?: number): AllocationComponents {
+  const cost = pay.gross + pay.epfEr + pay.socsoEr + pay.eisEr
+  if (cost <= 0) return { salary: 0, allowance: 0, epf: 0, socso: 0, eis: 0 }
+  const f = pct !== undefined ? pct / 100 : amount / cost
+  const allowance = r2((pay.gross - pay.salaryComp) * f)
+  const epf = r2(pay.epfEr * f)
+  const socso = r2(pay.socsoEr * f)
+  const eis = r2(pay.eisEr * f)
+  return { salary: r2(amount - allowance - epf - socso - eis), allowance, epf, socso, eis }
+}
+
+/** A receiving cost center's Bill to %: what moved in, to each company, and
+ *  what stays in its pool — lines + stays = received to the sen. */
+export function billToPreview(received: number, rows: AllocationRow[]): { lines: AllocationPreviewLine[]; stays: number } {
+  const lines = rows.map((r) => ({ companyId: r.companyId, pct: r.pct, amount: r2((received * r.pct) / 100) }))
+  let stays = r2(received - lines.reduce((s, l) => s + l.amount, 0))
+  if (stays < 0 && lines.length > 0) {
+    const last = lines[lines.length - 1]
+    last.amount = r2(last.amount + stays)
+    stays = 0
+  }
+  return { lines, stays }
+}
+
 // ─── The split follows the payroll row (2026-09-30) ──────────────────────────
 //
 // User 2026-09-30: once somebody's payroll is Completed their billing split
@@ -224,13 +367,23 @@ export function planSplitCopy<T extends { staff_id: string }>(
 
 /** What a copy did, including who it left alone and why. */
 export function splitCopyNote(
-  counts: Pick<SplitCopyPlan<unknown>, 'copied' | 'locked' | 'notOnPayroll'> & { centralized?: number },
+  counts: Pick<SplitCopyPlan<unknown>, 'copied' | 'locked' | 'notOnPayroll'> & {
+    centralized?: number
+    /** Payroll moved to another department (2026-11-03): people whose department lines came along. */
+    copiedMoves?: number
+    /** Receiving departments whose Bill to % came along. */
+    copiedBillTo?: number
+  },
 ): string {
   const { copied, locked, notOnPayroll } = counts
   const centralized = counts.centralized ?? 0
+  const copiedMoves = counts.copiedMoves ?? 0
+  const copiedBillTo = counts.copiedBillTo ?? 0
   const were = (n: number) => (n === 1 ? 'was' : 'were')
   const parts: string[] = []
   if (copied > 0) parts.push(`Copied splits for ${copied} staff.`)
+  if (copiedMoves > 0) parts.push(`Copied department lines for ${copiedMoves} staff.`)
+  if (copiedBillTo > 0) parts.push(`Copied Bill to for ${copiedBillTo} ${copiedBillTo === 1 ? 'department' : 'departments'}.`)
   if (locked > 0) parts.push(`${locked} locked with their payroll ${were(locked)} left alone.`)
   if (centralized > 0) {
     parts.push(`${centralized} in a centralized department ${were(centralized)} skipped.`)

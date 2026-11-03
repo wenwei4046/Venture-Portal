@@ -98,13 +98,17 @@ const SEGMENTS: Array<{ key: string; label: string; mode: string }> = [
 
 export function payrollBillingLines(args: {
   fromPayroll: Record<string, number>
+  /** Payroll moved INTO each department from another's (2026-11-03, method
+   *  B), by segment: the receiver must bill it too. The sender's side needs
+   *  nothing — its internal invoice's lines are on its segment, so billed. */
+  movedIn?: Record<string, number>
   invoices: SheetInvoice[]
   lines: Array<{ invoice_id: string; amount: number | string; segment: string | null }>
 }): PayrollBillingLine[] {
   const live = new Map(args.invoices.filter((i) => i.status !== 'voided').map((i) => [i.id, i]))
   const out: PayrollBillingLine[] = []
   for (const seg of SEGMENTS) {
-    const required = r2(args.fromPayroll[seg.key] ?? 0)
+    const required = r2((args.fromPayroll[seg.key] ?? 0) + (args.movedIn?.[seg.key] ?? 0))
     let billed = 0
     const ids = new Set<string>()
     for (const l of args.lines) {
