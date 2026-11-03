@@ -1973,9 +1973,12 @@ await db.exec(`
   check((await inboxIds()).includes(bl), false, 'another brand’s chat is out of their Inbox')
   check((await q(`select public.lead_thread($1) t`, [bl]))[0].t, null, 'and cannot be opened')
   check((await q(`select public.lead_leads(null, null) j`))[0].j.some(x => x.id === bl), false, 'nor listed on Leads')
+  await db.exec(await f('20261103100010_lead_brands_for_managers.sql'))
+  await db.exec(await f('20261103100010_lead_brands_for_managers.sql'))
   await as(OTHER, ALL)
-  check((await inboxIds()).includes(bl), true, 'with Lead View · Manage: every brand')
+  check((await inboxIds()).includes(bl), false, 'with Lead View · Manage, their ticks still narrow them (mig 20261103100000)')
   await as(CS_USER, ALL)
+  check((await inboxIds()).includes(bl), true, 'Manage with no ticks: every brand')
   await q(`select public.lead_save_agent_brands($1, '{}'::uuid[])`, [OTHER])
   check((await q(`select count(*)::int n from public.lead_agent_brands where user_id = $1`, [OTHER]))[0].n, 0, 'untick all: back to every brand')
   for (const sig of ['lead_block(uuid,boolean)', 'lead_save_agent_brands(uuid,uuid[])', 'lead_agent_brands()']) {
