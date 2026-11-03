@@ -4,7 +4,6 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import {
-  validateAllocationRows,
   validateDeptMoves,
   movePreview,
   type AllocationRow,
