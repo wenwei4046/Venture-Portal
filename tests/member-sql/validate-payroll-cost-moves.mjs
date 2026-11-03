@@ -65,6 +65,7 @@ const VIVIAN = id(41)
 const AMIRUL = id(42)
 const SALLY = id(43)
 const NOBODY = id(44)
+const LENA = id(46)
 const NOV = '2026-11-01'
 
 const MOVE = `INSERT INTO hr_staff_dept_moves (staff_id, period_month, department_id, amount, pct, created_by)
@@ -240,6 +241,13 @@ try {
   await reject(MOVE, [SALLY, NOV, HR, 100, null], /SALLY is in HR — move the cost to another department/, 'not to the person’s own department')
   await reject(MOVE, [SALLY, NOV, VO, 100, null], /Venture Office does not take moved payroll/, 'not to Venture Office')
   await reject(MOVE, [SALLY, NOV, LEAD, 100, null], /Lead Department has no pool of its own/, 'not to a department with no pool')
+  // …nor from one: a person whose own department has no pool has no P&L for the move to be recovered in.
+  await db.exec(`INSERT INTO hr_staff_costs VALUES ('${LENA}', 'LENA', '${LEAD}');
+    INSERT INTO hr_monthly_payroll (staff_id, period_month, basic_salary, gross, epf_er, socso_er, eis_er)
+      VALUES ('${LENA}', '${NOV}', 2000, 2000, 260, 35, 4)`)
+  await reject(MOVE, [LENA, NOV, HR, 100, null], /LENA is in Lead Department, which has no pool of its own — their cost cannot move/,
+    'nor from a department with no pool')
+  await db.exec(`DELETE FROM hr_monthly_payroll WHERE staff_id = '${LENA}'`)
 
   // ── The receivers' monthly Bill to % ────────────────────────────────────────
   check((await q(`SELECT policyname FROM pg_policies WHERE tablename = 'hr_pool_allocation' AND cmd = 'DELETE' ORDER BY 1`)).map(r => r.policyname),

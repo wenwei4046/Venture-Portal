@@ -350,8 +350,9 @@ export async function hubPayrollPreview(month: string): Promise<HubResult<Consol
   return attempt(() => fetchConsolidatedPayrollPreview(`${month}-01`))
 }
 
-/** One consolidated payroll invoice a company, drafts, on one category. */
-export async function hubGeneratePayrollInvoices(month: string, category: string): Promise<HubResult<{ generated: number; companies: string[] }>> {
+/** One consolidated payroll invoice a company, drafts, on one category — and one internal invoice a department that
+ *  payroll was moved into (2026-11-03). */
+export async function hubGeneratePayrollInvoices(month: string, category: string): Promise<HubResult<{ generated: number; companies: string[]; receivers: string[] }>> {
   await requireActionOn('/invoices/[id]', 'billing', 'create')
   return attempt(() => generateConsolidatedPayrollInvoices(`${month}-01`, category.trim() || null))
 }

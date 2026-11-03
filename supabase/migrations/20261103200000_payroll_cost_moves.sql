@@ -79,6 +79,7 @@ DECLARE
     v_month       TEXT;
     v_dept_id     UUID;
     v_dept        TEXT;
+    v_dept_seg    TEXT;
     v_to_name     TEXT;
     v_to_internal BOOLEAN;
     v_to_segment  TEXT;
@@ -102,8 +103,8 @@ BEGIN
 
         SELECT mp.status::TEXT,
                (mp.source::TEXT = 'commission' OR coalesce(d.payroll_source::TEXT = 'commission', false)),
-               s.employee_name, s.department_id, d.name
-          INTO v_status, v_revenue, v_name, v_dept_id, v_dept
+               s.employee_name, s.department_id, d.name, d.segment_key
+          INTO v_status, v_revenue, v_name, v_dept_id, v_dept, v_dept_seg
           FROM hr_monthly_payroll mp
           JOIN hr_staff_costs s ON s.id = mp.staff_id
           LEFT JOIN departments d ON d.id = s.department_id
@@ -145,6 +146,11 @@ BEGIN
             IF v_to = v_dept_id THEN
                 RAISE EXCEPTION '% is in % — move the cost to another department',
                     coalesce(v_name, 'This person'), v_dept USING ERRCODE = '23PAY';
+            END IF;
+            -- The sender recovers the move in its own pool's P&L, so it needs one too.
+            IF v_dept_seg IS NULL THEN
+                RAISE EXCEPTION '% is in %, which has no pool of its own — their cost cannot move to another department',
+                    coalesce(v_name, 'This person'), coalesce(v_dept, 'no department') USING ERRCODE = '23PAY';
             END IF;
             IF v_to_internal THEN
                 RAISE EXCEPTION '% does not take moved payroll — HOUZS Venture''s own share reaches it by the bill-back',
