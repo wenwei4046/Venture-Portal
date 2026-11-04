@@ -6,6 +6,7 @@ import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { canDo } from '@/lib/permission-actions'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { buildRepaymentPlan, type RepaymentPlan } from '@/lib/repayment-plan'
+import { minPayPlanFrom } from '@/lib/min-pay'
 import { loanStart, type RepaymentStart } from '@/lib/repayment-start'
 import { overdueOf, type OverdueSummary } from '@/lib/repayment-calendar'
 import { dealChangeLine, type DealChange } from '@/lib/deal-audit'
@@ -167,6 +168,7 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     today,
     dueDay: start.day,
     status: loan.status,
+    minPayFromYM: minPayPlanFrom(loan as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
   })
   // Overdue (2026-10-12): an instalment past its day unpaid, on this plan.
   const late = isActive ? overdueOf(plan, today) : null

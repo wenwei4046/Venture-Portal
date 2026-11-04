@@ -438,3 +438,66 @@ describe('the live book’s rounding', () => {
     expect(plan.compound!.interestFirst).toBe(false)
   })
 })
+
+// 2026-11-04 — compound on a deal WITH a fixed term, the user's rules (60,000 · 4% · 12 instalments): each
+// instalment asks its principal (5,000) and the flat interest on the principal it started from (2,400), "无论换到怎样
+// 都是用60000*4%"; whatever falls due and is left unpaid compounds at the deal's rate the next month ("叠加利息");
+// past the last instalment, the rate runs on everything still owed. Minimum pay (both switches ticked): a month
+// whose flat interest is paid is not late, but its principal still shows owed and still compounds. A payment
+// counts as the type it was recorded as.
+describe('a fixed-term plan that compounds', () => {
+  const terms = (): PositionTerms => ({
+    principal: 60000,
+    startYM: '2026-01',
+    firstDueYM: '2026-02',
+    current: { rate: 0.04, months: 12, compounding: true, effectiveFrom: null },
+    history: [],
+  })
+  const interestOnly = [pay('2026-02-05', 'interest', 2400), pay('2026-03-05', 'interest', 2400), pay('2026-04-05', 'interest', 1000)]
+
+  it('asks every instalment its principal and the flat interest, and compounds what was left unpaid', () => {
+    const plan = buildRepaymentPlan({ terms: terms(), payments: interestOnly, isPrincipal, today: '2026-07-20', dueDay: 5, status: 'active' })
+    expect(plan.rows).toHaveLength(12)
+    expect(plan.months).toBe(12)
+    expect(plan.rows.map((r) => r.principal)).toEqual(Array(12).fill(5000))
+    // Feb: nothing owed before it. Mar: 4% on Feb's 5,000. Apr: 4% on 10,000 (Mar's 200 paid by its 2,400 first).
+    expect(plan.rows.slice(0, 6).map((r) => r.interest)).toEqual([2400, 2600, 2800, 3080, 3403.2, 3739.33])
+    // Owed today: the principal (none of it repaid) and the interest still unpaid.
+    expect(plan.compound!.owedNow).toBe(72222.53)
+    expect(plan.rows[11]).toMatchObject({ ym: '2027-01', installment: 7400, tone: '' })
+    // Without minimum pay every month short of its instalment is late.
+    expect(plan.rows[0].late).toBe(true)
+    expect(plan.overdue).toBe(r2(5000 + 5000 + 5000 + 5000 + 5000 + 5000 + 2400 * 6 + 200 + 400 + 680 + 1003.2 + 1339.33 - 5800))
+  })
+
+  it('a principal repayment does not lower the flat interest', () => {
+    const plan = buildRepaymentPlan({
+      terms: terms(),
+      payments: [pay('2026-02-05', 'principal', 5000), pay('2026-02-05', 'interest', 2400), pay('2026-03-05', 'principal', 5000), pay('2026-03-05', 'interest', 2400)],
+      isPrincipal, today: '2026-03-20', dueDay: 5, status: 'active',
+    })
+    expect(plan.rows.slice(0, 3).map((r) => r.interest)).toEqual([2400, 2400, 2400])
+    expect(plan.rows.slice(0, 2).map((r) => r.remark)).toEqual(['Paid 5 Feb 2026', 'Paid 5 Mar 2026'])
+    expect(plan.overdue).toBe(0)
+    expect(plan.compound!.owedNow).toBe(50000)
+  })
+
+  it('with minimum pay, a month whose interest is paid is not late — its principal still owed and compounding', () => {
+    const plan = buildRepaymentPlan({ terms: terms(), payments: interestOnly, isPrincipal, today: '2026-04-20', dueDay: 5, status: 'active', minPayFromYM: '2026-02' })
+    expect(plan.rows.slice(0, 3).map((r) => r.interest)).toEqual([2400, 2600, 2800])
+    expect(plan.rows[0]).toMatchObject({ outstanding: 0, remark: 'Interest paid · principal 5,000.00 owed' })
+    expect(plan.rows[0].late).toBeUndefined()
+    expect(plan.rows[1]).toMatchObject({ outstanding: 0, remark: 'Interest paid · principal 10,000.00 owed' })
+    // April's 1,000 is short of the 2,400: late, by what is unpaid of the month's interest.
+    expect(plan.rows[2].late).toBe(true)
+    expect(plan.overdue).toBe(1400)
+  })
+
+  it('past the last instalment, interest runs on everything still owed', () => {
+    const one: PositionTerms = { principal: 35000, startYM: '2026-01', firstDueYM: '2026-02', current: { rate: 0.02, months: 1, compounding: true, effectiveFrom: null }, history: [] }
+    const plan = buildRepaymentPlan({ terms: one, payments: [], isPrincipal, today: '2026-04-20', dueDay: 2, status: 'active' })
+    expect(plan.rows.map((r) => [r.ym, r.interest])).toEqual([['2026-02', 700], ['2026-03', 714], ['2026-04', 728.28]])
+    expect(plan.compound!.owedNow).toBe(37142.28)
+  })
+})
+const r2 = (n: number) => Math.round(n * 100) / 100

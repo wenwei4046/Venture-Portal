@@ -11,7 +11,7 @@ import { monthEvents, type CalendarEntry } from '@/lib/repayment-calendar'
 import { fromCalendar } from '@/lib/deal-return'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../../fund-in/actions'
-import { minPayStartYM } from '@/lib/min-pay'
+import { minPayPlanFrom, minPayStartYM } from '@/lib/min-pay'
 import type { SchedRow, NoTermRow, CompoundRow, MinInterestRow } from '../_components/ScheduleView'
 
 // The Repayment Schedule's month (2026-10-10, lifted out of its page so the
@@ -453,6 +453,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       // Each instalment on the repayment start's day (2026-10-12).
       dueDay: loanStart(l).day,
       status: l.status as string,
+      minPayFromYM: minPayPlanFrom(l as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
     })
     events.push(
       ...monthEvents(plan, { kind: 'collect', name: (co?.short_code ?? co?.name ?? '—') as string, href: fromCalendar(`/fund-out/${l.id}`, month), rate: Number(l.effective_rate), principal: Number(l.principal) }, currentYM, today),
@@ -491,6 +492,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       today,
       dueDay: fundSourceStart(m).day,
       status: m.status as string,
+      minPayFromYM: minPayPlanFrom(m as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
     })
     events.push(...monthEvents(plan, { kind: 'pay', name, href: fromCalendar(`/fund-in/${id}`, month), rate: Number(m.cost_rate), principal: Number(m.amount) }, currentYM, today))
   }

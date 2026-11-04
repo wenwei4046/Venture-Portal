@@ -66,3 +66,10 @@ export function minPayChoiceWords(v: MinPayFrom, firstDueYM: string | null, late
   if (minPayFromMissing(v, laterMonths)) return null
   return v.choice === 'later' ? `From ${monthShort(v.month)}` : `From the first instalment${firstDueYM ? ` — ${monthShort(firstDueYM)}` : ''}`
 }
+
+/** The month a repayment plan checks minimum pay from (`PlanInput.minPayFromYM`): its set month, or every month from
+ *  the first instalment ('0000-00'); null when it is off. */
+export function minPayPlanFrom(row: { min_pay_interest?: boolean | null; min_pay_interest_from?: string | null }): string | null {
+  if (row.min_pay_interest !== true) return null
+  return row.min_pay_interest_from ? row.min_pay_interest_from.slice(0, 7) : '0000-00'
+}
