@@ -8,6 +8,8 @@ import type { CompanyBillingDelta } from '@/lib/payroll-billing-delta'
 import type { DeptComponentGroup } from '@/lib/staff-allocation'
 import type { InvoiceCategory } from '../_lib/invoice-form'
 import {
+  hubDirectorPreview,
+  hubGenerateDirectorInvoices,
   hubGenerateOwnShare,
   hubGeneratePayrollInvoices,
   hubImportMarketing,
@@ -18,6 +20,7 @@ import {
   hubTopUpPayroll,
   type HubResult,
 } from '../invoice-actions'
+import { directorInvoicePlan } from '@/lib/director-invoice-plan'
 import { importWords, mktLineState, mktParties, mktSummary } from '../_lib/marketing-lines'
 import { CategorySelect, PeriodSelect } from './InvoiceFormParts'
 
@@ -530,6 +533,130 @@ export function OwnShareDialog({ open, onClose, onDone, period, categories }: Ge
         ) : (
           <Hint>A department left unticked keeps its share in its own pool. The ticks are Settings › Departments’; a change here is this run only. It settles by netting. Payroll moved to another department is not here — it is billed to that department on its internal invoice.</Hint>
         )}
+      </DialogForm>
+    </FinDialog>
+  )
+}
+
+// ── Generate director payroll invoices (2026-11-04) ──
+// The user: "做进去payroll 按， 但分开按generate director payroll invoice 可以吗？". HR's director CTC a company, each
+// ticked by default; Generate writes one Director OPEX draft a company ticked, itemised as HR keyed it, on the one
+// account — the month's own drafts replaced, a company already billed for its directors left out.
+
+const CTC_PARTS: Array<[string, 'basic' | 'kpi' | 'allowance' | 'epf' | 'socso' | 'eis']> = [
+  ['Salary', 'basic'],
+  ['KPI', 'kpi'],
+  ['Allowance', 'allowance'],
+  ['EPF', 'epf'],
+  ['SOCSO', 'socso'],
+  ['EIS', 'eis'],
+]
+
+export function DirectorInvoicesDialog({ open, onClose, onDone, period, categories }: GeneratorProps & { categories: InvoiceCategory[] }) {
+  const hubMonth = period.slice(0, 7)
+  const [month, setMonth] = useState(hubMonth)
+  const [category, setCategory] = useState('')
+  const [ticked, setTicked] = useState<Set<string>>(new Set())
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const preview = usePreview(open, month, hubDirectorPreview)
+  // Every company with a CTC ticked, and last month's account, each time the month is read.
+  const [seeded, setSeeded] = useState('')
+  if (preview.value && !preview.loading && seeded !== preview.month) {
+    setSeeded(preview.month)
+    const done = new Set(preview.value.billed)
+    setTicked(new Set(preview.value.rows.filter((r) => r.totalCtc > 0 && !done.has(r.companyId)).map((r) => r.companyId)))
+    if (!category && preview.value.account) setCategory(preview.value.account)
+  }
+  const rows = (preview.value?.rows ?? []).filter((r) => r.totalCtc > 0)
+  const billed = new Set(preview.value?.billed ?? [])
+  const plan = directorInvoicePlan({ rows, month, picked: ticked, billed, account: category })
+  const ok = !preview.loading && plan.invoices.length > 0 && !!category
+
+  const go = async () => {
+    if (!ok || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await hubGenerateDirectorInvoices(month, category, [...ticked])
+      if (!res.ok) return setError(res.reason)
+      onDone(`${plural(res.value.generated.length, 'director invoice', 'director invoices')} generated as drafts · RM ${money(res.value.total)}`)
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'It did not go through. Try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <FinDialog open={open} onClose={() => !busy && onClose()} title="Generate director payroll invoices" sub="Director OPEX · one draft a company" locked={busy}>
+      <DialogForm
+        buttons={
+          <>
+            <DialogButton disabled={busy} onClick={onClose}>
+              Cancel
+            </DialogButton>
+            <DialogButton kind="primary" off={!ok} disabled={busy} onClick={go}>
+              {busy ? 'Generating…' : plan.invoices.length > 0 ? `Generate ${plural(plan.invoices.length, 'draft', 'drafts')}` : 'Generate drafts'}
+            </DialogButton>
+          </>
+        }
+      >
+        <Field label="Period" htmlFor="dir-period">
+          <PeriodSelect id="dir-period" value={month} onChange={setMonth} around={hubMonth} />
+        </Field>
+        <Field label="Category" htmlFor="dir-category">
+          <CategorySelect id="dir-category" value={category} onChange={setCategory} categories={categories} />
+        </Field>
+        {preview.loading ? (
+          <Hint>Reading the directors’ CTC…</Hint>
+        ) : preview.error ? (
+          <Hint danger>{preview.error}</Hint>
+        ) : rows.length === 0 ? (
+          <Hint>No director CTC for {monthWords(month)} yet — HR keys it on Director Salary.</Hint>
+        ) : (
+          <Field label={`Bill the companies · RM ${money(plan.total)}`}>
+            <div className={fm.checks} role="group" aria-label="Companies">
+              {rows.map((r) => {
+                const done = billed.has(r.companyId)
+                return (
+                  <div key={r.companyId}>
+                    <label className={fm.check}>
+                      <input
+                        type="checkbox"
+                        checked={!done && ticked.has(r.companyId)}
+                        disabled={done}
+                        onChange={() =>
+                          setTicked((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(r.companyId)) next.delete(r.companyId)
+                            else next.add(r.companyId)
+                            return next
+                          })
+                        }
+                      />
+                      <span className={fm.checkName}>{`${r.name} (${r.shortCode})`}</span>
+                      <span className={fm.checkValue}>{money(r.totalCtc)}</span>
+                    </label>
+                    <div className={fm.summaryParts}>
+                      {done
+                        ? 'Already billed this month'
+                        : CTC_PARTS.filter(([, k]) => r[k] > 0)
+                            .map(([label, k]) => `${label} ${money(r[k])}`)
+                            .join(' · ')}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Field>
+        )}
+        {error ? (
+          <Hint danger>{error}</Hint>
+        ) : preview.value && preview.value.drafts > 0 ? (
+          <Hint>{`This month’s ${plural(preview.value.drafts, 'director draft', 'director drafts')} will be replaced.`}</Hint>
+        ) : null}
       </DialogForm>
     </FinDialog>
   )

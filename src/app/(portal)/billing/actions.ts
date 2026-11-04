@@ -1,5 +1,6 @@
 'use server'
 
+import { directorInvoiceDescription, directorInvoicePlan } from '@/lib/director-invoice-plan'
 import { revalidatePath } from 'next/cache'
 import { AR_PARENT, resolveArGlCode } from '@/lib/ar-accounts'
 import { headerAccounts } from '@/lib/postable-accounts'
@@ -2776,6 +2777,105 @@ export async function generateOwnShareInvoice(
   revalidatePath('/billing')
   revalidatePath('/statements')
   return { generated: 1, total }
+}
+
+// ─── Payroll ▾ › Generate director payroll invoices (2026-11-04) ─────────────
+//
+// The user: "做进去payroll 按， 但分开按generate director payroll invoice 可以吗？". One Director OPEX draft a company
+// from HR's director CTC (get_director_ctc_by_company), itemised as HR keyed it — what Create invoice › Director OPEX ›
+// Several companies wrote in August and September, now one press beside the staff's payroll invoices. Idempotent: the
+// month's drafts this made (its own description) are replaced; a company with any other live director invoice this
+// month — issued, paid, or a draft typed by hand — is left out and said.
+
+export interface DirectorInvoicesPreview {
+  rows: DirectorCtcRow[]
+  /** Companies with a live director invoice this month that Generate does not replace. */
+  billed: string[]
+  /** Drafts this generator made for the month, which Generate replaces. */
+  drafts: number
+  /** The account last month's director invoices were on, the dialog's default. */
+  account: string | null
+}
+
+async function directorInvoicesThisMonth(supabase: Awaited<ReturnType<typeof createClient>>, period: string) {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('id, company_id, status, description')
+    .eq('period_month', period)
+    .eq('billing_mode', 'director_attribution')
+    .eq('billable_to_type', 'subsidiary')
+    .neq('status', 'voided')
+  if (error) throw new Error(`Failed to read this month's director invoices: ${error.message}`)
+  const ours = directorInvoiceDescription(period.slice(0, 7))
+  const rows = (data ?? []) as Array<{ id: string; company_id: string | null; status: string; description: string | null }>
+  const drafts = rows.filter((r) => r.status === 'draft' && (r.description ?? '').trim() === ours)
+  const billed = rows.filter((r) => !drafts.includes(r) && r.company_id).map((r) => r.company_id as string)
+  return { drafts: drafts.map((r) => r.id), billed: [...new Set(billed)] }
+}
+
+export async function fetchDirectorInvoicesPreview(periodMonth: string): Promise<DirectorInvoicesPreview> {
+  await requirePermission('billing')
+  const supabase = await createClient()
+  const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+  const prev = dayjs(period).subtract(1, 'month').format('YYYY-MM-DD')
+  const [rows, mine, { data: last }] = await Promise.all([
+    fetchDirectorCtcByCompany(period),
+    directorInvoicesThisMonth(supabase, period),
+    supabase
+      .from('invoices')
+      .select('invoice_lines(category_code)')
+      .eq('period_month', prev)
+      .eq('billing_mode', 'director_attribution')
+      .neq('status', 'voided')
+      .limit(1),
+  ])
+  const lastLines = ((last ?? [])[0] as { invoice_lines?: Array<{ category_code: string | null }> } | undefined)?.invoice_lines ?? []
+  return { rows, billed: mine.billed, drafts: mine.drafts.length, account: lastLines.find((l) => l.category_code)?.category_code ?? null }
+}
+
+export async function generateDirectorPayrollInvoices(
+  periodMonth: string,
+  categoryCode: string,
+  /** The companies ticked; empty — none. */
+  companyIds: string[],
+): Promise<{ generated: string[]; skipped: string[]; total: number }> {
+  await requireActionOn('/invoices/[id]', 'billing', 'create')
+  const supabase = await createClient()
+  const period = dayjs(periodMonth).startOf('month').format('YYYY-MM-DD')
+  const month = period.slice(0, 7)
+  await assertPeriodOpen(supabase, period)
+  const account = categoryCode.trim()
+  if (!account) throw new Error('Pick the account the director invoices are booked to')
+
+  const [rows, mine] = await Promise.all([fetchDirectorCtcByCompany(period), directorInvoicesThisMonth(supabase, period)])
+  const plan = directorInvoicePlan({ rows, month, picked: new Set(companyIds), billed: new Set(mine.billed), account })
+
+  if (mine.drafts.length > 0) {
+    await supabase.from('invoice_lines').delete().in('invoice_id', mine.drafts)
+    await supabase.from('invoices').delete().in('id', mine.drafts).eq('status', 'draft')
+  }
+
+  const invoiceDate = dayjs(period).endOf('month').format('YYYY-MM-DD')
+  const dueDate = dayjs(invoiceDate).add(30, 'day').format('YYYY-MM-DD')
+  const generated: string[] = []
+  for (const inv of plan.invoices) {
+    const created = await createMultiLineInvoice({
+      billableType: 'subsidiary',
+      companyId: inv.companyId,
+      billingMode: 'director_attribution',
+      period: month,
+      invoiceDate,
+      dueDate,
+      referenceNo: '',
+      headerDescription: plan.description,
+      lines: inv.lines,
+    })
+    generated.push(`${created.invoice_no} · ${inv.shortCode}`)
+  }
+
+  revalidatePath('/billing')
+  revalidatePath('/statements')
+  return { generated, skipped: plan.skipped.map((s) => s.name), total: plan.total }
 }
 
 export async function approveInvoice(formData: FormData) {

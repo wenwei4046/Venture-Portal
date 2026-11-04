@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   topUp: vi.fn(),
   ownPreview: vi.fn(),
   own: vi.fn(),
+  directorPreview: vi.fn(),
+  director: vi.fn(),
 }))
 vi.mock('../invoice-actions', () => ({
   hubImportMarketing: mocks.marketing,
@@ -26,10 +28,12 @@ vi.mock('../invoice-actions', () => ({
   hubTopUpPayroll: mocks.topUp,
   hubOwnSharePreview: mocks.ownPreview,
   hubGenerateOwnShare: mocks.own,
+  hubDirectorPreview: mocks.directorPreview,
+  hubGenerateDirectorInvoices: mocks.director,
   hubHrFigures: vi.fn(),
 }))
 
-import { MarketingDialog, OwnShareDialog, PayrollInvoicesDialog, ReconcileDialog } from './GenerateDialogs'
+import { DirectorInvoicesDialog, MarketingDialog, OwnShareDialog, PayrollInvoicesDialog, ReconcileDialog } from './GenerateDialogs'
 
 const categories = [{ code: '5050', label: 'Salary Income', type: 'revenue' as const, parent_code: null }]
 const flush = () => act(async () => {
@@ -318,5 +322,46 @@ describe('Own-share → Venture (Office)', () => {
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Generate draft' }))
     expect(within(dialog()).getByRole('button', { name: 'Generate draft' })).toHaveAttribute('data-off', 'true')
     expect(mocks.own).not.toHaveBeenCalled()
+  })
+})
+
+// 2026-11-04 — the user: "做进去payroll 按， 但分开按generate director payroll invoice 可以吗？": Payroll ▾ › Generate
+// director payroll invoices, a Director OPEX draft a company from HR's director CTC.
+describe('Generate director payroll invoices', () => {
+  const ctc = (companyId: string, shortCode: string, name: string, basic: number, allowance: number, epf: number, socso: number, eis: number) => ({
+    companyId, shortCode, name, basic, kpi: 0, allowance, epf, socso, eis, totalCtc: Math.round((basic + allowance + epf + socso + eis) * 100) / 100,
+  })
+  const PREVIEW = {
+    rows: [ctc('co-2990', '2990', '2990', 2500, 4533.13, 325, 42.85, 4.9), ctc('co-hk', 'HK', 'Hookka', 10000, 0, 1200, 104.15, 11.9), ctc('co-dc', 'DC', 'Dream Crafter', 12800, 10074.17, 1536, 104.15, 11.9)],
+    billed: ['co-dc'],
+    drafts: 0,
+    account: '5050',
+  }
+
+  it('lists each company’s CTC, ticked unless already billed; generates the ticked on last month’s account', async () => {
+    mocks.directorPreview.mockResolvedValue({ ok: true, value: PREVIEW })
+    mocks.director.mockResolvedValue({ ok: true, value: { generated: ['HV-INV-202610-0060 · 2990'], skipped: [], total: 7405.88 } })
+    const onDone = vi.fn()
+    render(<DirectorInvoicesDialog open onClose={vi.fn()} onDone={onDone} period="2026-10-01" categories={categories} />)
+    await flush()
+    const boxes = within(screen.getByRole('group', { name: 'Companies' })).getAllByRole('checkbox') as HTMLInputElement[]
+    expect(boxes.map((b) => [b.checked, b.disabled])).toEqual([[true, false], [true, false], [false, true]])
+    expect(dialog()).toHaveTextContent('Bill the companies · RM 18,721.93')
+    expect(dialog()).toHaveTextContent('Salary 2,500.00 · Allowance 4,533.13 · EPF 325.00 · SOCSO 42.85 · EIS 4.90')
+    expect(dialog()).toHaveTextContent('Already billed this month')
+    fireEvent.click(boxes[1])
+    expect(dialog()).toHaveTextContent('Bill the companies · RM 7,405.88')
+    fireEvent.click(within(dialog()).getByRole('button', { name: 'Generate 1 draft' }))
+    await flush()
+    expect(mocks.director).toHaveBeenCalledWith('2026-10', '5050', ['co-2990'])
+    expect(onDone).toHaveBeenCalledWith('1 director invoice generated as drafts · RM 7,405.88')
+  })
+
+  it('a month with no CTC has nothing to generate', async () => {
+    mocks.directorPreview.mockResolvedValue({ ok: true, value: { rows: [], billed: [], drafts: 0, account: null } })
+    render(<DirectorInvoicesDialog open onClose={vi.fn()} onDone={vi.fn()} period="2026-10-01" categories={categories} />)
+    await flush()
+    expect(dialog()).toHaveTextContent('No director CTC for October 2026 yet')
+    expect(within(dialog()).getByRole('button', { name: 'Generate drafts' })).toHaveAttribute('data-off', 'true')
   })
 })
