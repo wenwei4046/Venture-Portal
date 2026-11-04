@@ -547,6 +547,9 @@
 .rowAmt[data-tone='ledger'] { color: rgb(var(--fv-chip-ledger-ink)); }
 .rowAmt[data-tone='out'] { color: var(--ds-danger); }
 .rowAmt[data-tone='void'] { color: var(--ds-ink-4); }
+.rowAmts { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.rowAmtUnder { font-family: var(--font-mono), 'Chivo Mono', monospace; font-size: 12px; color: var(--ds-ink-3); white-space: nowrap; }
+.rowAmtUnder[data-tone='out'] { color: var(--ds-danger); }
 .chev { flex: none; font-size: 18px; color: rgb(var(--hvs-quiet)); }
 
 /* ── Payroll batches: a row each, its vouchers under it ── */
