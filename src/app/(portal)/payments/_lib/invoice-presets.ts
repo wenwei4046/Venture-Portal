@@ -1,5 +1,7 @@
 import type { createClient } from '@/lib/supabase/server'
 import { invoicePoolForBillingMode } from '@/lib/cfo-reports'
+import { lineAttributions } from '@/lib/invoice-settlement'
+import { extraBillingModeToSegment, extraSegmentToPool, primeDeptRegistryFromDb } from '@/lib/dept-registry'
 
 // What the voucher page fills in from an invoice (2026-10-16 — lifted out of
 // `/payments/new` word for word, so the Finance phone app's sheets read the
@@ -22,6 +24,12 @@ export interface InvoicePreset {
    *  to a subsidiary (real bank involved) vs an internal dept pool / director
    *  (inter-billing, no real money moves — settle via netting). */
   billable_to_type: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
+  /** A payroll invoice: the pools its lines land in, a department each (the receipt splits so —
+   *  payments/actions.ts). Absent for any other invoice: it lands in `target_pool`. */
+  receiving?: Array<{ pool: string; amount: number }>
+  /** Billed to a department: who pays, and the Inter-billing account its side is booked to (null — none in the COA;
+   *  the receipt refuses then). */
+  paying?: { department: string; account: { code: string; name: string } | null }
 }
 
 export interface RefundPreset {
@@ -35,11 +43,20 @@ export interface RefundPreset {
 export async function readInvoicePreset(supabase: Client, invoiceId: string): Promise<InvoicePreset | null> {
   const { data: inv } = await supabase
     .from('invoices')
-    .select('id, invoice_no, company_id, total_amount, period_month, billing_mode, status, billable_to_type, companies(name)')
+    .select('id, invoice_no, company_id, total_amount, period_month, billing_mode, status, billable_to_type, billable_to_department_id, companies(name)')
     .eq('id', invoiceId)
     .single()
 
   if (!inv || inv.status === 'paid' || inv.status === 'paid_via_netting') return null
+  // What the receipt will post (2026-11-04, HV-INV-202610-0061 read "Venture Pool · Dr 9050" while its receipt credits
+  // Director Office's pool and debits Revenue's own account): a payroll invoice's lines by department, and a
+  // department payer's Inter-billing account, found as the receipt finds them.
+  const [receiving, paying] = await Promise.all([
+    inv.billing_mode === 'payroll_consolidated' ? settleReceiving(supabase, inv.id as string, inv.billing_mode as string) : Promise.resolve(undefined),
+    inv.billable_to_type === 'dept_pool' && inv.billable_to_department_id
+      ? settlePayer(supabase, inv.billable_to_department_id as string)
+      : Promise.resolve(undefined),
+  ])
   const company = (inv.companies as { name: string } | null) ?? null
   // Prefill the OUTSTANDING balance, not the printed total — partial
   // receipts and approved credit notes (CN v2, 2026-08-19) both reduce
@@ -69,7 +86,38 @@ export async function readInvoicePreset(supabase: Client, invoiceId: string): Pr
     // the income statement.
     target_pool: invoicePoolForBillingMode(inv.billing_mode),
     billable_to_type: (inv.billable_to_type as InvoicePreset['billable_to_type']) ?? null,
+    ...(receiving ? { receiving } : {}),
+    ...(paying ? { paying } : {}),
   }
+}
+
+/** A payroll invoice's lines summed by the pool each department's segment lands in — `lineAttributions`, as the
+ *  receipt splits it. */
+async function settleReceiving(supabase: Client, invoiceId: string, billingMode: string): Promise<InvoicePreset['receiving']> {
+  const [{ data: lines }, registry] = await Promise.all([
+    supabase.from('invoice_lines').select('amount, segment').eq('invoice_id', invoiceId),
+    primeDeptRegistryFromDb(supabase).catch(() => []),
+  ])
+  return lineAttributions(
+    ((lines ?? []) as Array<{ amount: number | string; segment: string | null }>).map((l) => ({ amount: Number(l.amount), segment: l.segment ?? null })),
+    billingMode,
+    { modeToSegment: extraBillingModeToSegment(registry), segmentToPool: extraSegmentToPool(registry) },
+  ).map((g) => ({ pool: g.pool, amount: g.amount }))
+}
+
+/** The department billed, and its "Inter-billing - <name>" expense account — the receipt's own lookup. */
+async function settlePayer(supabase: Client, departmentId: string): Promise<InvoicePreset['paying']> {
+  const { data: dept } = await supabase.from('departments').select('name').eq('id', departmentId).maybeSingle()
+  const name = (dept as { name?: string } | null)?.name
+  if (!name) return undefined
+  const { data: acct } = await supabase
+    .from('chart_of_accounts')
+    .select('code, name')
+    .eq('type', 'expense')
+    .ilike('name', `Inter-billing % ${name}`)
+    .maybeSingle()
+  const a = acct as { code?: string; name?: string } | null
+  return { department: name, account: a?.code ? { code: a.code, name: a.name ?? '' } : null }
 }
 
 /**

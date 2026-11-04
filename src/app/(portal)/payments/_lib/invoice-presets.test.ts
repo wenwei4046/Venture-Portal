@@ -18,6 +18,9 @@ function client(rows: Rows) {
         select: () => q,
         eq: (k: string, v: unknown) => (filters.push((r) => r[k] === v), q),
         neq: (k: string, v: unknown) => (filters.push((r) => r[k] !== v), q),
+        ilike: (k: string, v: string) => (filters.push((r) => new RegExp(`^${v.split('%').join('.*')}$`, 'i').test(String(r[k] ?? ''))), q),
+        order: () => q,
+        maybeSingle: async () => ({ data: (rows[table] ?? []).filter((r) => filters.every((f) => f(r)))[0] ?? null }),
         single: async () => ({ data: (rows[table] ?? []).filter((r) => filters.every((f) => f(r)))[0] ?? null }),
         then: (done: (v: { data: unknown[] }) => unknown) => Promise.resolve({ data: (rows[table] ?? []).filter((r) => filters.every((f) => f(r))) }).then(done),
       }
@@ -62,5 +65,30 @@ describe('the voucher page’s presets for an invoice', () => {
       'i1',
     )
     expect(preset).toMatchObject({ id: 'i1', company_name: '—', total_amount: 2000, target_pool: 'dept_pool_hr', billable_to_type: 'dept_pool' })
+  })
+
+  // 2026-11-04 — the user, settling HV-INV-202610-0061 (Director Office → Revenue, payroll moved): the form said
+  // "Venture Pool" and "Dr 9050", though the receipt credits Director Office's pool and debits Revenue's own
+  // Inter-billing account. The preset now names what the receipt will post.
+  it('a payroll invoice moved between departments names the pools its lines land in and the payer’s own account', async () => {
+    const preset = await readInvoicePreset(
+      client({
+        invoices: [{ ...INV, status: 'issued', billing_mode: 'payroll_consolidated', billable_to_type: 'dept_pool', billable_to_department_id: 'd-rev', company_id: null, companies: null, total_amount: 3810.03 }],
+        invoice_lines: [
+          { invoice_id: 'i1', amount: 3350, segment: 'director_office' },
+          { invoice_id: 'i1', amount: 460.03, segment: 'director_office' },
+        ],
+        departments: [{ id: 'd-rev', name: 'Revenue Department' }],
+        chart_of_accounts: [
+          { code: '9050', name: 'Inter-billing Expense', type: 'expense' },
+          { code: '9001', name: 'Inter-billing - Revenue Department', type: 'expense' },
+        ],
+        payment_vouchers: [],
+        credit_notes: [],
+      }),
+      'i1',
+    )
+    expect(preset?.receiving).toEqual([{ pool: 'dept_pool_director_office', amount: 3810.03 }])
+    expect(preset?.paying).toEqual({ department: 'Revenue Department', account: { code: '9001', name: 'Inter-billing - Revenue Department' } })
   })
 })
