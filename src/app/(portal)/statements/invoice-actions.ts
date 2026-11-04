@@ -13,10 +13,12 @@ import {
   deleteDraftInvoice,
   fetchConsolidatedPayrollPreview,
   fetchDirectorCtcByCompany,
+  fetchDirectorInvoicesPreview,
   fetchOwnShareInvoicePreview,
   fetchPayrollBillingDelta,
   fetchStaffAllocationByCompany,
   generateConsolidatedPayrollInvoices,
+  generateDirectorPayrollInvoices,
   generateOwnShareInvoice,
   generatePayrollAdjustmentInvoices,
   reassignInvoiceGlAccount,
@@ -29,6 +31,7 @@ import {
   type PayrollInvoicesPreview,
   type CreateInvoiceMode,
   type DirectorCtcRow,
+  type DirectorInvoicesPreview,
   type InvoiceLineInput,
   type OwnShareInvoicePreview,
   type StaffAllocationCompanyRow,
@@ -380,6 +383,22 @@ export async function hubOwnSharePreview(month: string): Promise<HubResult<OwnSh
 export async function hubGenerateOwnShare(month: string, category: string, segments: string[]): Promise<HubResult<{ generated: number; total: number }>> {
   await requireActionOn('/invoices/[id]', 'billing', 'create')
   return attempt(() => generateOwnShareInvoice(`${month}-01`, category.trim() || null, segments))
+}
+
+/** The month's director CTC a company, the companies already billed for their directors, and last month's account. */
+export async function hubDirectorPreview(month: string): Promise<HubResult<DirectorInvoicesPreview>> {
+  await requirePermission('billing')
+  return attempt(() => fetchDirectorInvoicesPreview(`${month}-01`))
+}
+
+/** One Director OPEX draft a company ticked (2026-11-04) — the month's own drafts replaced. */
+export async function hubGenerateDirectorInvoices(
+  month: string,
+  category: string,
+  companyIds: string[],
+): Promise<HubResult<{ generated: string[]; skipped: string[]; total: number }>> {
+  await requireActionOn('/invoices/[id]', 'billing', 'create')
+  return attempt(() => generateDirectorPayrollInvoices(`${month}-01`, category, companyIds))
 }
 
 /** HR's figures a recharge bills, per company: a shared-services department's staff, or the directors' CTC. */

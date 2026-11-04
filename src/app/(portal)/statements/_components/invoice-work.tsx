@@ -10,7 +10,7 @@ import SettleDialog from './SettleDialog'
 import InvoiceLinesDialog from './InvoiceLinesDialog'
 import CreditNoteDialog from './CreditNoteDialog'
 import ChangeAccountDialog from './ChangeAccountDialog'
-import { MarketingDialog, OwnShareDialog, PayrollInvoicesDialog, ReconcileDialog } from './GenerateDialogs'
+import { DirectorInvoicesDialog, MarketingDialog, OwnShareDialog, PayrollInvoicesDialog, ReconcileDialog } from './GenerateDialogs'
 import {
   hubApproveCreditNote,
   hubApproveInvoice,
@@ -40,7 +40,7 @@ const rm = (n: number) => `RM ${f2(n)}`
 const r2 = (n: number) => Math.round(n * 100) / 100
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
-export type InvoiceDialogKind = 'new' | 'marketing' | 'consolidated' | 'reconcile' | 'own-share' | 'edit' | 'credit_note' | 'reassign'
+export type InvoiceDialogKind = 'new' | 'marketing' | 'consolidated' | 'director' | 'reconcile' | 'own-share' | 'edit' | 'credit_note' | 'reassign'
 export type InvoiceMenu = 'create' | 'payroll' | 'export' | 'bulk'
 type Ask =
   | { kind: 'void'; ids: string[] }
@@ -266,7 +266,8 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
   const payrollItems: DialogMenuItem[] = [
     ...(can.create
       ? [
-          menuItem('consolidated', 'Generate payroll invoices', openDialog('consolidated'), `HR and Director salary basis for ${monthLong}`),
+          menuItem('consolidated', 'Generate payroll invoices', openDialog('consolidated'), `Staff salary for ${monthLong}`),
+          menuItem('director', 'Generate director payroll invoices', openDialog('director'), `Director OPEX for ${monthLong}`),
           menuItem('reconcile', 'Reconcile payroll', openDialog('reconcile')),
           menuItem('own-share', 'Own-share → Venture (Office)', openDialog('own-share')),
         ]
@@ -469,6 +470,8 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
         <MarketingDialog key={dialog.nonce} open={dialog.open} onClose={closeDialog} onDone={dialogDone} period={hub.period} />
       ) : dialog?.kind === 'consolidated' ? (
         <PayrollInvoicesDialog key={dialog.nonce} open={dialog.open} onClose={closeDialog} onDone={dialogDone} period={hub.period} categories={hub.categories} />
+      ) : dialog?.kind === 'director' ? (
+        <DirectorInvoicesDialog key={dialog.nonce} open={dialog.open} onClose={closeDialog} onDone={dialogDone} period={hub.period} categories={hub.categories} />
       ) : dialog?.kind === 'reconcile' ? (
         <ReconcileDialog key={dialog.nonce} open={dialog.open} onClose={closeDialog} onDone={dialogDone} period={hub.period} />
       ) : dialog?.kind === 'own-share' ? (
