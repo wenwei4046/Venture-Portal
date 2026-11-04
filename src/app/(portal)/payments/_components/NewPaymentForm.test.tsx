@@ -202,3 +202,28 @@ describe('Create receipt', () => {
     expect(screen.queryByRole('checkbox', { name: /这是还贷款/ })).toBeNull()
   })
 })
+
+// 2026-11-04 — the user, settling HV-INV-202610-0061 (Director Office → Revenue Department, payroll moved): the form
+// read "Venture Pool · Dr 9050 Inter-billing Expense" though the receipt credits Director Office's pool and debits
+// Revenue's own Inter-billing account. It now says what the receipt posts.
+describe('settling a payroll invoice billed to a department', () => {
+  it('names the pool its lines land in, the payer and the payer’s own account', () => {
+    render(
+      <NewPaymentForm
+        companies={companies}
+        bankAccounts={banks}
+        accounts={accounts}
+        invoicePreset={{
+          id: 'i1', invoice_no: 'HV-INV-202610-0061', company_id: null, company_name: '—', total_amount: 3810.03, period_month: '2026-10-01',
+          billing_mode: 'payroll_consolidated', target_pool: 'venture_pool', billable_to_type: 'dept_pool',
+          receiving: [{ pool: 'dept_pool_director_office', amount: 3810.03 }],
+          paying: { department: 'Revenue Department', account: { code: '9001', name: 'Inter-billing - Revenue Department' } },
+        }}
+      />,
+    )
+    expect(screen.getByText('from invoice lines')).toBeInTheDocument()
+    expect(screen.queryByText('Venture Pool')).toBeNull()
+    expect(screen.getByText(/Dr 9001 Inter-billing - Revenue Department \/ Cr 应收/)).toBeInTheDocument()
+    expect(screen.getByText('收自 Revenue Department')).toBeInTheDocument()
+  })
+})

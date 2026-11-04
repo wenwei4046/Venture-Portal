@@ -51,6 +51,10 @@ interface InvoicePreset {
    *  (subsidiary) or through netting against the paying party's internal
    *  pool ledger (dept_pool / director / freetext). */
   billable_to_type: 'subsidiary' | 'director' | 'dept_pool' | 'freetext' | null
+  /** A payroll invoice: the pools its lines land in (2026-11-04, `_lib/invoice-presets`). */
+  receiving?: Array<{ pool: string; amount: number }>
+  /** Billed to a department: who pays, and its Inter-billing account. */
+  paying?: { department: string; account: { code: string; name: string } | null }
 }
 
 interface PayableFundSource {
@@ -412,7 +416,13 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       })
     }
   } else {
-    previewRows.push({ label: '进池', value: poolName(targetPool) })
+    // A payroll invoice lands a department each, as its lines say (2026-11-04: it read "Venture Pool").
+    const receiving = isInvoicePay ? invoicePreset!.receiving : undefined
+    if (receiving && receiving.length > 0) {
+      for (const g of receiving) previewRows.push({ label: '进池', value: poolName(g.pool), sub: `RM ${dealMoney(g.amount)}` })
+    } else {
+      previewRows.push({ label: '进池', value: poolName(targetPool) })
+    }
     if (!isInvoicePay) {
       previewRows.push({
         label: '科目',
@@ -424,7 +434,9 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
 
   const previewGl = isInvoicePay ? (
     <>
-      {isInterBilling ? 'Dr 9050 Inter-billing Expense / Cr 应收' : 'Dr 银行 / Cr 应收'}
+      {isInterBilling
+        ? `Dr ${invoicePreset!.paying?.account ? `${invoicePreset!.paying.account.code} ${invoicePreset!.paying.account.name}` : 'Inter-billing (付款部门)'} / Cr 应收`
+        : 'Dr 银行 / Cr 应收'}
       <br />
       {isInterBilling ? '部门间冲账,不动银行。' : '收入在开票时已经确认,这里只冲应收。'}
     </>
@@ -1025,12 +1037,25 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
               <label className="block text-sm font-sans font-medium text-graphite mb-1.5">
                 Receive into pool
               </label>
-              <div className="px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-ink font-serif italic flex items-center gap-2">
-                <span>{poolOptions.find((p) => p.value === targetPool)?.label ?? targetPool}</span>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5 not-italic">
-                  from invoice
-                </span>
-              </div>
+              {(invoicePreset!.receiving?.length ?? 0) > 0 ? (
+                // A payroll invoice: a department's pool each, as its lines say — what the receipt splits into.
+                invoicePreset!.receiving!.map((g) => (
+                  <div key={g.pool} className="px-3 py-2 mb-1 bg-surface border border-hairline rounded-md text-sm text-ink font-serif italic flex items-center gap-2">
+                    <span>{poolName(g.pool)}</span>
+                    <span className="num not-italic ml-auto">RM {dealMoney(g.amount)}</span>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5 not-italic">
+                      from invoice lines
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="px-3 py-2 bg-surface border border-hairline rounded-md text-sm text-ink font-serif italic flex items-center gap-2">
+                  <span>{poolOptions.find((p) => p.value === targetPool)?.label ?? targetPool}</span>
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-graphite border border-hairline rounded px-1.5 py-0.5 not-italic">
+                    from invoice
+                  </span>
+                </div>
+              )}
               <p className="font-serif italic text-muted text-xs mt-1.5">
                 Auto-set from the invoice&apos;s billing mode. To land the
                 payment in a different pool, void this voucher and re-issue the
@@ -1169,7 +1194,15 @@ export default function NewPaymentForm({ companies, bankAccounts, accounts, invo
       </DealCards>
 
       <DealPreview
-        who={payeeName ? `${isDebit ? '付给' : '收自'} ${payeeName}` : isDebit ? '未填收款人' : '未填付款人'}
+        who={
+          isInvoicePay && invoicePreset!.paying && (!payeeName || payeeName === '—')
+            ? `收自 ${invoicePreset!.paying.department}`
+            : payeeName
+              ? `${isDebit ? '付给' : '收自'} ${payeeName}`
+              : isDebit
+                ? '未填收款人'
+                : '未填付款人'
+        }
         rows={previewRows}
         gl={previewGl}
         note={
