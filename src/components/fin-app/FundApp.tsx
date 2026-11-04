@@ -421,8 +421,11 @@ export default function FundApp({
               key={r.id}
               title={r.party}
               desc={fundLine(r)}
-              amount={`${out ? '−' : '+'}${f2(r.amount)}`}
-              tone={r.status === 'cancelled' ? 'void' : out ? 'out' : 'ledger'}
+              // Fund OUT: the amount lent plain, what is still owed red under it (2026-11-04, the user: outstanding
+              // 应该是红色，不需要 -的符号). Fund IN keeps its +amount in green.
+              amount={out ? f2(r.amount) : `+${f2(r.amount)}`}
+              tone={r.status === 'cancelled' ? 'void' : out ? null : 'ledger'}
+              under={out && r.status !== 'cancelled' && (r.outstanding ?? 0) > 0 ? { text: `${f2(r.outstanding ?? 0)} outstanding`, tone: 'out' } : null}
               onClick={() => go({ kind: 'record', id: r.id, from: card })}
             />
           ))}

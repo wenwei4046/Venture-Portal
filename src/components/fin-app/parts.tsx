@@ -140,6 +140,7 @@ export function Row({
   desc,
   amount,
   tone = null,
+  under,
   onClick,
   tick,
 }: {
@@ -147,6 +148,8 @@ export function Row({
   desc: string
   amount: string
   tone?: AmountTone
+  /** A second figure under the amount (Fund OUT's outstanding). */
+  under?: { text: string; tone?: AmountTone } | null
   onClick: () => void
   /** While selecting: ticked, and whether it can be. */
   tick?: { on: boolean; can: boolean } | null
@@ -162,9 +165,20 @@ export function Row({
         <span className={s.rowTitle}>{title}</span>
         <span className={s.rowDesc}>{desc || '—'}</span>
       </span>
-      <span className={s.rowAmt} data-tone={tone ?? undefined}>
-        {amount}
-      </span>
+      {under ? (
+        <span className={s.rowAmts}>
+          <span className={s.rowAmt} data-tone={tone ?? undefined}>
+            {amount}
+          </span>
+          <span className={s.rowAmtUnder} data-tone={under.tone ?? undefined}>
+            {under.text}
+          </span>
+        </span>
+      ) : (
+        <span className={s.rowAmt} data-tone={tone ?? undefined}>
+          {amount}
+        </span>
+      )}
       <span className={s.chev} aria-hidden="true">
         ›
       </span>

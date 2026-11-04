@@ -5,7 +5,7 @@ import type { FundRecord } from '@/lib/fund-hub'
 
 // Fund OUT's and Fund IN's hub (2026-10-15, the Finance revamp v2 — D12): the
 // head, *Fund out · {Month YYYY}*, the user's cards in the design's colours,
-// the list each opens (−RM red out, +RM green in, a cancelled one faint), a
+// the list each opens (RM plain out with its outstanding red, +RM green in, a cancelled one faint), a
 // deal's drawer — the dark hero, its three groups, the trail — and the steps
 // the deal's own page takes from the list: Open in Approvals for whoever
 // decides it, Cancel / Withdraw one still waiting (asked first), Edit a
@@ -129,10 +129,18 @@ describe('the hub', () => {
     expect(list()).toHaveLength(5)
     expect(screen.getByText('5 · RM 200,000.00')).toBeInTheDocument()
     const carres = list().find((r) => r.textContent?.includes('Carres'))!
-    expect(within(carres).getByText('−RM 100,000.00')).toHaveAttribute('data-tone', 'danger')
+    // 2026-11-04 — the user: "outstanding 应该是红色，不需要 -的符号": what is still owed is the red figure; the amount
+    // lent reads plain, no minus.
+    expect(within(carres).getByText('RM 100,000.00')).not.toHaveAttribute('data-tone')
+    expect(within(carres).queryByText('−RM 100,000.00')).toBeNull()
     expect(within(carres).getByText('2.000% /mo · 12 months')).toBeInTheDocument()
     const cancelled = list().find((r) => r.textContent?.includes('HOUZS Kitchen'))!
-    expect(within(cancelled).getByText('−RM 15,000.00')).toHaveAttribute('data-faint', 'true')
+    expect(within(cancelled).getByText('RM 15,000.00')).toHaveAttribute('data-faint', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Columns' }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Outstanding/ }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    const carresNow = list().find((r) => r.textContent?.includes('Carres'))!
+    expect(within(carresNow).getByText('RM 80,000.00')).toHaveAttribute('data-tone', 'danger')
 
     fireEvent.click(cardBtn(/^Overdue/))
     expect(list()).toHaveLength(1)

@@ -127,7 +127,17 @@ export default function FundHub({
     { key: 'date', label: 'Date', kind: 'date', width: 112, value: (r) => r.date ?? '', text: (r) => fd(r.date) },
     { key: 'type', label: 'Type', kind: 'text', width: 130, value: (r) => r.typeLabel, text: (r) => r.typeLabel },
     { key: 'status', label: 'Status', kind: 'chip', width: 130, value: (r) => status(r).text, text: (r) => status(r).text, chip: (r) => status(r) },
-    { key: 'outstanding', label: 'Outstanding', kind: 'amount', width: 140, value: (r) => r.outstanding ?? -1, text: (r) => (r.outstanding == null ? '—' : rm(r.outstanding)) },
+    // Fund OUT: what is still owed is the red figure and the amount lent reads plain, no minus (2026-11-04, the user:
+    // outstanding 应该是红色，不需要 -的符号). Fund IN keeps its +RM in green.
+    {
+      key: 'outstanding',
+      label: 'Outstanding',
+      kind: 'amount',
+      width: 140,
+      value: (r) => r.outstanding ?? -1,
+      text: (r) => (r.outstanding == null ? '—' : rm(r.outstanding)),
+      tone: (r) => (out && r.status !== 'cancelled' && (r.outstanding ?? 0) > 0 ? 'danger' : null),
+    },
     { key: 'rate', label: 'Rate', kind: 'no', width: 110, value: (r) => r.rate, text: (r) => `${ratePct(r.rate)} /mo` },
     {
       key: 'amount',
@@ -136,8 +146,8 @@ export default function FundHub({
       fixed: true,
       width: 140,
       value: (r) => r.amount,
-      text: (r) => `${out ? '−' : '+'}${rm(r.amount)}`,
-      tone: (r) => (r.status === 'cancelled' ? null : out ? 'danger' : 'ledger'),
+      text: (r) => (out ? rm(r.amount) : `+${rm(r.amount)}`),
+      tone: (r) => (r.status === 'cancelled' || out ? null : 'ledger'),
     },
   ]
 

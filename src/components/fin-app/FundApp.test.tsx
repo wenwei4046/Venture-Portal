@@ -304,7 +304,11 @@ describe('Fund › Fund out on the phone', () => {
     expect(window.location.search).toBe('?f=active')
     expect(screen.getByRole('heading', { name: 'Active' })).toBeInTheDocument()
     expect(screen.getByText('2 · RM 140,000.00')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Carres \(CAR\) 2\.000% \/mo · 12 months · SC King −100,000\.00/ })).toBeInTheDocument()
+    // 2026-11-04 — the user: "outstanding 应该是红色，不需要 -的符号" (desktop and phone): the amount lent plain, what is
+    // still owed red under it.
+    const carres = screen.getByRole('button', { name: /Carres \(CAR\) 2\.000% \/mo · 12 months · SC King 100,000\.00 91,666\.67 outstanding/ })
+    expect(within(carres).getByText('100,000.00')).not.toHaveAttribute('data-tone')
+    expect(within(carres).getByText('91,666.67 outstanding')).toHaveAttribute('data-tone', 'out')
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '2990' } })
     expect(screen.queryByRole('button', { name: /^Carres/ })).not.toBeInTheDocument()
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } })
