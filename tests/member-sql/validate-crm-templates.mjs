@@ -39,6 +39,8 @@ const dir = new URL('../../supabase/migrations/', import.meta.url)
 for (const file of (await readdir(dir)).filter(f => /^20261(00[2-9]|01\d)\d+_crm_.*\.sql$/.test(f)).sort()) {
   await db.exec((await readFile(new URL(file, dir), 'utf8')).replace(/\r\n/g, '\n'))
 }
+// A template says its language (2026-11-04): the five-argument save, run VERBATIM after the October ones.
+await db.exec((await readFile(new URL('20261104090000_crm_template_language.sql', dir), 'utf8')).replace(/\r\n/g, '\n'))
 
 const id = (prefix, who) => {
   const hex = Buffer.from(`${prefix}-${who}`).toString('hex').padEnd(32, '0').slice(0, 32)
@@ -111,5 +113,28 @@ await refused('boss', `insert into crm_templates (name, body) values ('x', 'y')`
 await refused('ann', `select public.crm_delete_template($1)`, [a.id], /may not/, 'a salesperson may not delete')
 await as('boss', `select public.crm_delete_template($1)`, [a.id])
 check(await seen('boss'), ['Draft one'], 'deleted')
+
+// A template says its language (2026-11-04, the owner: "在crm 没得选中英").
+const zh = await tpl('hod', `select * from public.crm_save_template(null, '开场', 'whatsapp', 'Hi {name} 您好', 'zh_CN', 'MARKETING')`)
+check([zh.language, zh.status], ['zh_CN', 'draft'], 'saved in Chinese, a draft')
+await refused('boss', `select public.crm_save_template(null, 'X', 'whatsapp', 'x', 'fr', 'MARKETING')`, [], /English or Chinese/, 'English or Chinese only')
+await refused('ann', `select public.crm_save_template(null, 'X', 'whatsapp', 'x', 'en', 'MARKETING')`, [], /may not/, 'a salesperson may not write one in any language')
+await as('boss', `select public.crm_template_submitted($1, 'crm_kai_chang_zh', 'm9', 'approved')`, [zh.id])
+const keep = await tpl('boss', `select * from public.crm_save_template($1, '开场 (new name)', 'whatsapp', 'Hi {name} 您好', 'zh_CN', 'MARKETING')`, [zh.id])
+check([keep.status, keep.meta_name], ['approved', 'crm_kai_chang_zh'], 'the same words and language: still Approved')
+const moved = await tpl('boss', `select * from public.crm_save_template($1, '开场', 'whatsapp', 'Hi {name} 您好', 'en', 'MARKETING')`, [zh.id])
+check([moved.status, moved.meta_name, moved.language], ['draft', null, 'en'], "another language: a new draft — Meta never changes a reviewed template's language")
+const four = await tpl('boss', `select * from public.crm_save_template($1, '开场', 'whatsapp', 'Hi {name} 您好')`, [zh.id])
+check(four.language, 'en', 'the four-argument save (a page opened before) keeps the language')
+// …and its kind: Marketing or Utility, a change of kind a new draft too.
+await refused('boss', `select public.crm_save_template(null, 'X', 'whatsapp', 'x', 'en', 'SERVICE')`, [], /Marketing or Utility/, 'Marketing or Utility only')
+const util = await tpl('boss', `select * from public.crm_save_template(null, '收到表格', 'whatsapp', '我们已收到您的表格', 'zh_CN', 'UTILITY')`)
+check([util.category, util.language], ['UTILITY', 'zh_CN'], 'saved as a Chinese utility template')
+await as('boss', `select public.crm_template_submitted($1, 'crm_shou_dao', 'm10', 'approved')`, [util.id])
+const kind = await tpl('boss', `select * from public.crm_save_template($1, '收到表格', 'whatsapp', '我们已收到您的表格', 'zh_CN', 'MARKETING')`, [util.id])
+check([kind.status, kind.category, kind.meta_name], ['draft', 'MARKETING', null], 'another kind: a new draft')
+const fourK = await tpl('boss', `select * from public.crm_save_template($1, '收到表格 2', 'whatsapp', '我们已收到您的表格')`, [util.id])
+check([fourK.category, fourK.language], ['MARKETING', 'zh_CN'], 'the four-argument save keeps both')
+check((await q(`select count(*)::int n from information_schema.routine_privileges where routine_name = 'crm_save_template' and grantee in ('anon', 'PUBLIC')`))[0].n, 0, "neither save is the publishable key's")
 
 console.log(`crm templates: ${checks} checks passed`)

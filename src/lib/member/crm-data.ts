@@ -333,6 +333,8 @@ export interface CrmData {
   ftRules: CrmFtRule[];
   /** Cold lead templates (rev 1011, mig 20261011140000): every one for the Control panel, Approved + On for everybody else. */
   templates?: CrmTemplate[];
+  /** CRM · Manage: Meta's WhatsApp Manager list of the templates, to follow their review (2026-11-04). */
+  templatesUrl?: string | null;
   /** CRM Desktop rev 1 (B3): notifications this person deleted (their own; keys as notifRead's). */
   notifDeleted?: string[];
   /** The chat composer's Recents (mig 20261014251500): this person's recent emoji, most recent first. */
@@ -400,6 +402,8 @@ export interface CrmNote { id: string; customerId: string; by: string | null; te
 export interface CrmTemplate {
   id: string; name: string; ch: "whatsapp" | "messenger"; st: "draft" | "review" | "approved" | "rejected"; body: string; on: boolean;
   metaName: string | null; language: string; reason: string | null;
+  /** Meta's category: MARKETING or UTILITY (2026-11-04; a row read before has none → MARKETING). */
+  category?: string;
 }
 
 /* ── Defaults the design starts with ───────────────────────────────────── */
@@ -527,7 +531,7 @@ export interface CrmDataRows {
   settings?: unknown;
   adRules: { ad_source_id: string; ad_label: string | null; mode: CrmAdRule["mode"]; team_split: Record<string, number> | null; people_mode: "cnt" | "pct"; people: Record<string, number> | null; started_at: string; team_modes?: Record<string, "even" | "pct" | "cnt"> | null; together?: boolean | null }[];
   ftRules: { tl_id: string; mode: CrmFtRule["mode"]; days: number[] | null; vals: Record<string, Record<string, number>> | null }[];
-  templates?: { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null }[];
+  templates?: { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null; category?: string }[];
   /** crm_my_can()'s answer; null when the database did not give one. */
   can?: unknown;
 }
@@ -697,7 +701,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     apptTypes: apptTypesFrom(rows.apptTypes),
     adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}), ...(r.together ? { together: true } : {}) })),
     ftRules: rows.ftRules.map(r => ({ tlId: r.tl_id, mode: r.mode, days: r.days ?? [], vals: r.vals ?? {} })),
-    templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason })),
+    templates: (rows.templates ?? []).map(t => ({ id: t.id, name: t.name, ch: t.channel, st: t.status, body: t.body, on: t.is_on, metaName: t.meta_name, language: t.language, reason: t.reject_reason, category: t.category ?? "MARKETING" })),
     forms: [...(rows.forms ?? [])].filter(x => x.kind !== "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
     bookingForms: [...(rows.forms ?? [])].filter(x => x.kind === "booking").sort((a, b) => a.sort_order - b.sort_order).map(x => ({ id: x.id, name: x.name, sections: Array.isArray(x.sections) ? x.sections : [] })),
     notes: (rows.notes ?? []).map(n => ({ id: n.id, customerId: n.contact_id, by: n.author, text: n.body, at: n.created_at })).sort((a, b) => b.at.localeCompare(a.at)),

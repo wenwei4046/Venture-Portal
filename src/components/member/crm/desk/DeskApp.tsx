@@ -13,6 +13,7 @@ import { InfoValue } from "../shared/AdLink";
 import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
 import { SuggestFloat } from "../shared/suggest-float";
+import { DeskTemplateKind, DeskTemplateReview } from "./DeskTemplateMeta";
 import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
@@ -484,7 +485,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </span>
                   <span style={{ flex: "1" }}>
                   </span>
-                  <button type="button" onClick={v.cltNewT} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "34px", padding: "0 14px", boxSizing: "border-box", borderRadius: "17px", font: "inherit", fontSize: "13.5px", fontWeight: "650", cursor: "pointer", whiteSpace: "nowrap", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-rust)" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <DeskTemplateReview url={v.cltReviewUrl} /><button type="button" onClick={v.cltNewT} style={{ display: "inline-flex", alignItems: "center", gap: "6px", height: "34px", padding: "0 14px", boxSizing: "border-box", borderRadius: "17px", font: "inherit", fontSize: "13.5px", fontWeight: "650", cursor: "pointer", whiteSpace: "nowrap", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-rust)" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M12 5v14M5 12h14">
                       </path>
                     </svg>New template</button>
@@ -1177,7 +1178,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         <button type="button" onClick={c.pick} style={{ height: "38px", border: "0", borderRadius: "10px", background: c.bg, boxShadow: c.sh, font: "inherit", fontSize: "14px", fontWeight: c.fw, color: c.fg, cursor: "pointer" }}>{c.label}</button>
                       </Fragment>))}
                     </div>
-                  </div>
+                  </div>{!!(v.cltE.kind) && (<DeskTemplateKind v={v.cltE.kind} />)}
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     <span style={{ fontSize: "11.5px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>MESSAGE</span>
                     <textarea ref={v.cltTaRef} value={v.cltE.draft} onChange={v.cltE.setDraft} placeholder="Hi {name}, …" rows={6} style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", border: "1.5px solid var(--crm-rust)", borderRadius: "12px", background: "#fff", font: "inherit", fontSize: "14.5px", lineHeight: "1.6", color: "var(--crm-ink)", resize: "vertical", outline: "none" }}>

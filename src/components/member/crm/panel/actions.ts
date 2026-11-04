@@ -49,7 +49,7 @@ export interface PanelActions extends SalesActions {
   saveLeave(leave: { id: string | null; staffId: string; from: string; to: string; note: string }): Promise<boolean>;
   deleteLeave(id: string): Promise<boolean>;
   /** Cold lead templates (rev 1011): save a draft, or save and submit a WhatsApp one for Meta's review. */
-  saveTemplate(t: { id: string | null; name: string; ch: CrmTemplate["ch"]; body: string }, submit: boolean): Promise<CrmTemplate | false>;
+  saveTemplate(t: { id: string | null; name: string; ch: CrmTemplate["ch"]; body: string; language?: string; category?: string }, submit: boolean): Promise<CrmTemplate | false>;
   templateOn(id: string, on: boolean): Promise<boolean>;
   deleteTemplate(id: string): Promise<boolean>;
   /** Meta's review brought in (on opening the page); the changes arrive with the next read. */
@@ -231,14 +231,17 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       if (submit && t.ch !== "whatsapp") { base.toast("Messenger templates are not connected yet — save it as a draft."); return false; }
       if (!live) {
         const was = (data().templates ?? []).find(y => y.id === t.id);
-        const x: CrmTemplate = { id: t.id ?? `t${Date.now()}`, name: t.name.trim(), ch: t.ch, body: t.body.trim(), st: submit ? "review" : "draft", on: false, metaName: was?.metaName ?? null, language: "en", reason: null };
+        const x: CrmTemplate = { id: t.id ?? `t${Date.now()}`, name: t.name.trim(), ch: t.ch, body: t.body.trim(), st: submit ? "review" : "draft", on: false, metaName: was?.metaName ?? null, language: t.language ?? was?.language ?? "en", category: t.category ?? was?.category ?? "MARKETING", reason: null };
         putT(x);
         return x;
       }
-      const r = await write("crm_save_template", { p_id: t.id, p_name: t.name, p_channel: t.ch, p_body: t.body });
+      // Its language and category too (2026-11-04): the six-argument save; one opened before keeps both (four arguments).
+      const was = (data().templates ?? []).find(y => y.id === t.id);
+      const r = await write("crm_save_template", { p_id: t.id, p_name: t.name, p_channel: t.ch, p_body: t.body,
+        p_language: t.language ?? was?.language ?? "en", p_category: t.category ?? was?.category ?? "MARKETING" });
       if (!r) return false;
-      const row = r.data as { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null };
-      let x: CrmTemplate = { id: row.id, name: row.name, ch: row.channel, body: row.body, st: row.status, on: row.is_on, metaName: row.meta_name, language: row.language, reason: row.reject_reason };
+      const row = r.data as { id: string; name: string; channel: CrmTemplate["ch"]; body: string; status: CrmTemplate["st"]; is_on: boolean; meta_name: string | null; language: string; reject_reason: string | null; category: string };
+      let x: CrmTemplate = { id: row.id, name: row.name, ch: row.channel, body: row.body, st: row.status, on: row.is_on, metaName: row.meta_name, language: row.language, category: row.category, reason: row.reject_reason };
       putT(x);
       // Unchanged and already with Meta (In review / Approved): nothing to submit again.
       if (!submit || (x.st !== "draft" && x.st !== "rejected")) return x;

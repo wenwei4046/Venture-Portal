@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { getAccountUser, getMemberUser } from "@/lib/auth";
 import { canDo } from "@/lib/permission-actions";
 import { createClient } from "@/lib/supabase/server";
-import { cleanText, fetchWhatsAppTemplateStatuses, fillTemplate, mediaMessage, metaTemplateBody, metaTemplateName, reactionMessage, sendWhatsApp, submitWhatsAppTemplate, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
+import { cleanText, fetchWhatsAppTemplateStatuses, fillTemplate, mediaMessage, metaTemplateBody, metaTemplateName, templatesReviewUrl, reactionMessage, sendWhatsApp, submitWhatsAppTemplate, templateMessage, textMessage, uploadWhatsAppMedia, windowOpen, type WaTemplate } from "@/lib/whatsapp/send";
 import { HUMAN_AGENT_APPROVED, messengerWindow, pageToken, sendMessengerAttachment, sendMessengerText } from "@/lib/messenger/send";
 import { cardHasWay, messengerCardText, messengerVisitMessage, whatsappCardText, whatsappVisitMessage } from "@/lib/member/crm-maps";
 import { chatMessage, crmDataFromRows, type CrmCard, type CrmChatMessage, type CrmData, type CrmDataRows } from "@/lib/member/crm-data";
@@ -194,13 +194,13 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       read<CrmDataRows["adRules"]>(db.from("crm_ad_assign").select("ad_source_id, ad_label, mode, team_split, people_mode, people, started_at, team_modes, together")),
       read<CrmDataRows["ftRules"]>(db.from("crm_fulltime_rules").select("tl_id, mode, days, vals")),
       // Every template for the Control panel; Approved + On for everybody else (the row policy decides).
-      read<NonNullable<CrmDataRows["templates"]>>(db.from("crm_templates").select("id, name, channel, body, status, is_on, meta_name, language, reject_reason").order("created_at")),
+      read<NonNullable<CrmDataRows["templates"]>>(db.from("crm_templates").select("id, name, channel, body, status, is_on, meta_name, language, reject_reason, category").order("created_at")),
     ]);
     const more = await desktopRows(db, !!opts.journey);
     const extra = new Map(more.extras.map(x => [x.id, x.extra]));
     const leadForm = new Map(more.leadForms.map(x => [x.id, x.lead_form]));
     const roomX = new Map(more.rooms.map(r => [r.id, r]));
-    return { ok: true, data: withRoomDrafts(more.roomDrafts, crmDataFromRows({
+    const data = withRoomDrafts(more.roomDrafts, crmDataFromRows({
       people, can, messages, visits, prefs, hides, labels, contactLabels, quickReplies, autoReplies, invites, shares, adRules, ftRules, templates,
       contacts: extra.size || leadForm.size ? contacts.map(c => ({ ...c, ...(extra.has(c.id) ? { extra: extra.get(c.id) } : {}), ...(leadForm.has(c.id) ? { lead_form: leadForm.get(c.id) } : {}) })) : contacts,
       rooms: rooms.map(r => {
@@ -212,7 +212,10 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
       forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
-    })) };
+    }));
+    // Where Meta shows every template's review (2026-11-04) — for whoever writes templates; the account's id, never a token.
+    const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim();
+    return { ok: true, data: { ...data, templatesUrl: data.can.manage && wabaId ? templatesReviewUrl(wabaId) : null } };
   } catch (error) {
     const message = error instanceof Error ? error.message : "The CRM could not be loaded. Please try again.";
     return { ok: false, error: /schema cache|does not exist|could not find|permission denied for/i.test(message)
