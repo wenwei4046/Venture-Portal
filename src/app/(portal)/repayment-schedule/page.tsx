@@ -9,6 +9,8 @@ import ScheduleView, { type SchedRow, type CompoundRow, type MinInterestRow } fr
 import MonthNav from './_components/MonthNav'
 import ExportMenu from './_components/ExportMenu'
 import { loadRepaymentSchedule } from './_lib/schedule-data'
+import { listTotals, scheduleList, type ListDeal } from '@/lib/schedule-list'
+import type { NoTermRow } from './_components/ScheduleView'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +41,7 @@ export default async function RepaymentSchedulePage({
     repayCompound,
     repayNoTerm,
     events,
+    arrears,
   } = await loadRepaymentSchedule(supabase, month)
   const monthLabel = dayjs(`${currentYM}-01`).format('MMM YYYY')
 
@@ -68,10 +71,6 @@ export default async function RepaymentSchedulePage({
   const netMonth = r2(toCollect - toPay)
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
   const monShort = dayjs(`${currentYM}-01`).format('MMM')
-  const minOf = (rows: MinInterestRow[]) => ({
-    got: r2(rows.reduce((t, r) => t + r.paid, 0)),
-    short: r2(rows.reduce((t, r) => t + r.shortfall, 0)),
-  })
 
   // The cards (2026-10-09, the handoff): the calendar's read the month's
   // instalments; a list tab's (2026-10-10) read that side's minimum interest
@@ -84,13 +83,50 @@ export default async function RepaymentSchedulePage({
     <StatCard key="pay" tone="danger" label="To pay" value={formatMoney(toPay)} icon="send" note={payNote} />,
     <StatCard key="net" tone="primary" label="Net this month" value={formatMoney(netMonth)} icon="swap" note={netMonth >= 0 ? 'Collect more than we pay' : 'Pay more than we collect'} />,
   ]
-  const sideCards = (word: 'Received' | 'Paid', min: { got: number; short: number }) => (
-    <StatCards label="Repayment Schedule" size="small">
-      {headCards('From borrowers', 'To fund sources')}
-      <StatCard tone="ledger" label={`${word} so far`} value={formatMoney(min.got)} icon="check" note={`Min interest · ${monShort}`} />
-      <StatCard tone={min.short > 0 ? 'danger' : 'default'} label="Short" value={formatMoney(min.short)} icon="alert" note="Min interest not yet in" />
-    </StatCards>
-  )
+  // We collect / We pay a month at a time (2026-11-04): one row an instalment, read off the calendar's entries; a
+  // compounding or no-fixed-term deal whose plan has no row this month stands on the month's last day.
+  const listOf = (
+    kind: 'collect' | 'pay',
+    rowsBy: { rows: SchedRow[]; min: MinInterestRow[]; compound: CompoundRow[]; noTerm: NoTermRow[] },
+  ) => {
+    const deals = new Map<string, ListDeal>()
+    for (const r of [...rowsBy.min, ...rowsBy.compound, ...rowsBy.noTerm]) deals.set(r.key, { counterparty: r.counterparty, detail: r.detail, source: 'source' in r ? r.source : null })
+    for (const r of rowsBy.rows) deals.set(r.key, { counterparty: r.counterparty, detail: r.detail, source: r.source ?? null, pending: r.pending })
+    return scheduleList({
+      entries: [...arrears, ...events].filter((e) => e.kind === kind),
+      deals,
+      compounding: new Set(rowsBy.compound.map((r) => r.key)),
+      extras: [
+        ...rowsBy.compound.map((r) => ({ id: r.key, interest: r.thisMonthInterest, received: r.received ?? 0 })),
+        ...rowsBy.noTerm.map((r) => ({ id: r.key, interest: r.monthlyInterest, received: r.received ?? 0 })),
+      ],
+      month: currentYM,
+      today,
+    })
+  }
+  const collectList = listOf('collect', { rows: collectRows, min: collectMin, compound: collectCompound, noTerm: collectNoTerm })
+  const payList = listOf('pay', { rows: repayRows, min: repayMin, compound: repayCompound, noTerm: repayNoTerm })
+
+  // A list tab's cards (2026-11-04, the mockup): what the month's rows ask in cash, what came in, what is still owed,
+  // and what of it is overdue — each the list's own foot, so the cards and the table agree.
+  const sideCards = (side: 'collect' | 'pay') => {
+    const list = side === 'collect' ? collectList : payList
+    const t = listTotals(list, today)
+    const word = side === 'collect' ? 'Received' : 'Paid'
+    // What of it is still owed from months before this one (the office's month lists them, overdue).
+    const earlier = r2(list.filter((r) => r.date < `${currentYM}-01`).reduce((s, r) => s + (r.owed ?? 0), 0))
+    const dueNote = [earlier >= 0.005 ? `incl. ${formatMoney(earlier)} from earlier months` : null, t.rolled >= 0.005 ? `${formatMoney(t.rolled)} rolls in` : null].filter(Boolean).join(' · ')
+    return (
+      <StatCards label="Repayment Schedule" size="small">
+        {[
+          <StatCard key="due" tone="ledger" label={side === 'collect' ? `To collect · ${monShort}` : `To pay · ${monShort}`} value={formatMoney(t.due)} icon={side === 'collect' ? 'inbox' : 'send'} note={dueNote ? dueNote[0].toUpperCase() + dueNote.slice(1) : 'Cash due this month'} />,
+          <StatCard key="got" tone="ledger" label={`${word} so far`} value={formatMoney(t.received)} icon="check" note="On the instalments listed" />,
+          <StatCard key="owed" label="Still owed" value={formatMoney(t.owed)} icon="clock" note={side === 'collect' ? 'Not yet received' : 'Not yet paid'} />,
+          <StatCard key="late" tone={t.overdue >= 0.005 ? 'danger' : 'default'} label={`Overdue · ${t.overdueCount}`} value={formatMoney(t.overdue)} icon="alert" note="Past its day, still owed" />,
+        ]}
+      </StatCards>
+    )
+  }
   const cards = {
     cal: (
       <StatCards label="Repayment Schedule" size="small">
@@ -105,8 +141,8 @@ export default async function RepaymentSchedulePage({
         />
       </StatCards>
     ),
-    collect: sideCards('Received', minOf(collectMin)),
-    pay: sideCards('Paid', minOf(repayMin)),
+    collect: sideCards('collect'),
+    pay: sideCards('pay'),
   }
 
   return (
@@ -154,6 +190,8 @@ export default async function RepaymentSchedulePage({
         repayNoTermInterest={repayNoTermInterest}
         repayCompound={repayCompound}
         repayCompoundTotals={repayCompoundTotals}
+        collectList={collectList}
+        payList={payList}
       />
     </div>
   )

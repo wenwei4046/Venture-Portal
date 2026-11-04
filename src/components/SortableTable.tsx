@@ -173,6 +173,9 @@ interface Props<T> {
    *  a phone, where there is no right-click, the opened row offers 更多 ⋯ for
    *  it unless the table already ends in a pinned menu column. */
   onRowContextMenu?: (row: T, event: MouseEvent<HTMLElement>) => void
+  /** Right-click on the header row — for a table menu (Print listing, a filter); the caller owns the menu and is
+   *  handed the rows on show, filtered and sorted as the reader sees them (2026-11-04, the Repayment Schedule). */
+  onHeaderContextMenu?: (visibleRows: T[], event: MouseEvent<HTMLElement>) => void
   /**
    * Opening a row: a double-click on desktop, a 打开 → button in the row's
    * detail panel on a phone. Replaces a View link at the end of every row
@@ -269,6 +272,7 @@ export default function SortableTable<T>({
   layoutTitle,
   canSetDefault = false,
   onRowContextMenu: onAnyRowContextMenu,
+  onHeaderContextMenu,
   onRowOpen: onAnyRowOpen,
   rowOpens,
   openLabel,
@@ -757,7 +761,16 @@ export default function SortableTable<T>({
           </colgroup>
         ) : null}
         <thead>
-          <tr>
+          <tr
+            onContextMenu={
+              onHeaderContextMenu
+                ? (e) => {
+                    e.preventDefault()
+                    onHeaderContextMenu(visible, e)
+                  }
+                : undefined
+            }
+          >
             {shownColumns.map((c) => {
               const isActive = c.key === sortKey
               const sortable = c.sortable !== false

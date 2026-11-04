@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { monthEvents, overdueOf } from './repayment-calendar'
+import { arrearsBefore, monthEvents, overdueOf } from './repayment-calendar'
 import { buildRepaymentPlan, type PlanPayment, type RepaymentPlan } from './repayment-plan'
 import { isFundSourcePrincipal, isLoanPrincipal, termsForFundSource, termsForLoan } from './treasury-terms-data'
 
@@ -58,6 +58,26 @@ describe('monthEvents', () => {
   it('leaves out a month with nothing to pay', () => {
     const p = plan([row(1, '2026-10-26', 0, 0), row(2, '2026-10-30', 100, 100)], null)
     expect(monthEvents(p, deal, '2026-10', '2026-10-09').map((e) => [e.date, e.amount])).toEqual([['2026-10-30', 100]])
+  })
+
+  it('carries the split, what came in and the day it was paid (the monthly list, 2026-11-04)', () => {
+    const [e] = monthEvents(plan([row(5, '2026-10-02', 12400, 2400)]), deal, '2026-10', '2026-10-09')
+    expect(e).toMatchObject({ instPrincipal: 12000, instInterest: 400, paid: 10000, paidOn: null, rolled: 0 })
+    const [paid] = monthEvents(plan([row(5, '2026-10-02', 12400, 0, '2026-10-02')]), deal, '2026-10', '2026-10-09')
+    expect(paid).toMatchObject({ paid: 12400, paidOn: '2026-10-02' })
+  })
+})
+
+// 2026-11-04 — the monthly list: a payment clears the oldest instalment first, so CAR's 30,000 of November went to
+// October's, and November's own row read unpaid with "Overdue · 0" over it. The office's month lists the earlier
+// instalments still owed in cash; a compounding month's interest that rolled into the balance is no arrear.
+describe('arrearsBefore', () => {
+  it('lists earlier instalments still owed, overdue or part paid — never one paid, nor one rolled into the balance', () => {
+    const rolled = { ...row(3, '2026-08-15', 2000, 0), toBalance: 2000 }
+    const p = plan([rolled, row(4, '2026-09-15', 31000, 0), row(5, '2026-10-15', 31000, 1000), row(6, '2026-11-15', 31000, 31000)])
+    expect(arrearsBefore(p, deal, '2026-11', '2026-11-04').map((e) => [e.no, e.date, e.status, e.outstanding, e.paid])).toEqual([
+      [5, '2026-10-15', 'partial', 1000, 30000],
+    ])
   })
 })
 
