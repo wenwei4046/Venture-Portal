@@ -493,6 +493,19 @@ describe('a fixed-term plan that compounds', () => {
     expect(plan.overdue).toBe(1400)
   })
 
+  // The user: "就让他先clear 之前的installment" — money paid after a day clears the oldest instalment still unpaid, and
+  // that row says so, not the next one whose day it came before.
+  it('a late payment clears the oldest instalment still unpaid', () => {
+    const plan = buildRepaymentPlan({
+      terms: terms(),
+      payments: [pay('2026-02-05', 'principal', 5000), pay('2026-02-05', 'interest', 2400), pay('2026-03-08', 'principal', 5000), pay('2026-03-08', 'interest', 2400)],
+      isPrincipal, today: '2026-03-20', dueDay: 5, status: 'active',
+    })
+    expect(plan.rows[1]).toMatchObject({ paid: 7400, outstanding: 0, remark: 'Paid 8 Mar 2026' })
+    expect(plan.rows[2]).toMatchObject({ paid: 0, outstanding: 7400 })
+    expect(plan.overdue).toBe(0)
+  })
+
   it('past the last instalment, interest runs on everything still owed', () => {
     const one: PositionTerms = { principal: 35000, startYM: '2026-01', firstDueYM: '2026-02', current: { rate: 0.02, months: 1, compounding: true, effectiveFrom: null }, history: [] }
     const plan = buildRepaymentPlan({ terms: one, payments: [], isPrincipal, today: '2026-04-20', dueDay: 2, status: 'active' })

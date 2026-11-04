@@ -737,8 +737,11 @@ function termCompoundPlan(
     const minPay = !!minPayFromYM && ym >= minPayFromYM && flat > EPS
     const interest = r2(flat + compound)
     if (!past) {
-      // Not due yet: nothing is owed on it; money already in goes off the principal. Its balance is what is left
+      // Not due yet: nothing is owed on it. Money already in clears what is still owed from before (the oldest
+      // instalment first, "先clear 之前的installment"), the rest goes off the principal. Its balance is what is left
       // after it, paid as the terms ask.
+      ;[pDue, cashI] = take(pDue, cashI)
+      ;[iOwed, cashP] = take(iOwed, cashP)
       ;[pLater, cashP] = take(pLater, r2(cashP + cashI))
       ahead = r2(Math.max(0, (ahead ?? pDue + iOwed + pLater) - principal))
       askedAhead = r2(askedAhead + principal)
@@ -774,6 +777,8 @@ function termCompoundPlan(
     const got = Math.min(pool, c.amount)
     pool = r2(pool - got)
     const unpaid = r2(c.amount - got)
+    // What the money paid of this instalment — the oldest still unpaid first, whatever day it came.
+    r.paid = r2(got)
     if (unpaid <= slack(c.amount)) {
       r.outstanding = 0
       r.tone = 'ledger'
@@ -800,10 +805,14 @@ function termCompoundPlan(
     }
   })
   const termRows = rows.slice(runFrom).filter((r) => r.principal != null || r.interest > 0)
-  const lastPast = [...rows].reverse().find((r) => r.due <= today) ?? null
+  // Owed today: money that came after the last day read still clears what is owed, oldest first.
+  let rest = r2(pays.slice(k).filter((p) => p.date <= today).reduce((s, p) => s + p.amount, 0))
+  ;[iOwed, rest] = take(iOwed, rest)
+  ;[pDue, rest] = take(pDue, rest)
+  ;[pLater, rest] = take(pLater, rest)
   const plan = summary('fixed', rows, termRows.length > 0 ? rows.length : null, paidCount, terms.principal, principalPaid, interestPaid, {
     breaks,
-    owedNow: lastPast ? lastPast.balance : from.base,
+    owedNow: r2(pDue + iOwed + pLater),
     paidToDate: r2(principalPaid + interestPaid),
     addedToBalance: charged,
     addedFrom: null,
