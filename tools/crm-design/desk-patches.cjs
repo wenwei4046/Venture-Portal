@@ -80,5 +80,11 @@ module.exports = [
     "A template's language (English · 中文) and category (Marketing · Utility), sent to Meta with it — every one went as English marketing (the owner, 2026-11-04: \"在crm 没得选中英\", \"是不是能选它是营销还是实用性\")."],
   [`<button type="button" onClick={v.cltNewT} `, `<DeskTemplateReview url={v.cltReviewUrl} /><button type="button" onClick={v.cltNewT} `,
     "Beside New template: Meta's WhatsApp Manager, where every template's review stands, and a Copy link (the owner, 2026-11-04: \"做一个按钮是可以导入到看审核状态，或也可以是复制链接的功能\")."],
+  [/(ref=\{v\.cltTaRef\}[^\n]*\n\s*<\/textarea>)/, "$1<DeskTemplateFormat draft={v.cltE.draft} setDraft={v.cltE.setDraft} />",
+    "Under the message: Bold · Italic · Strikethrough · Monospace in WhatsApp's own marks (the owner, 2026-11-04: \"我能放粗体，斜体，底线等吗？\" — WhatsApp has no underline)."],
+  [/(\{\(v\.cltE\.dsegs\)\.map\(\(g, g_i\) => \(<Fragment key=\{g_i\}>[\s\S]*?)\{!!\(g\.txt\) && \(<>\{g\.t\}<\/>\)\}/, "$1{!!(g.txt) && (<WaText t={g.t} />)}",
+    "The editor's preview draws WhatsApp's formatting as the customer will see it (2026-11-04)."],
+  [/(\{\(t\.segs\)\.map\(\(g, g_i\) => \(<Fragment key=\{g_i\}>[\s\S]*?)\{!!\(g\.txt\) && \(<>\{g\.t\}<\/>\)\}/, "$1{!!(g.txt) && (<WaText t={g.t} />)}",
+    "A template card draws WhatsApp's formatting too (2026-11-04)."],
 ];
 

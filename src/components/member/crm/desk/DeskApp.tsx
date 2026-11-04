@@ -13,7 +13,7 @@ import { InfoValue } from "../shared/AdLink";
 import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
 import { SuggestFloat } from "../shared/suggest-float";
-import { DeskTemplateKind, DeskTemplateReview } from "./DeskTemplateMeta";
+import { DeskTemplateFormat, DeskTemplateKind, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
 import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
@@ -536,7 +536,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                                 {!!(g.tag) && (<>
                                   <span style={{ padding: "1px 7px", borderRadius: "6px", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontWeight: "650", fontSize: "13.5px" }}>{g.t}</span>
                                 </>)}
-                                {!!(g.txt) && (<>{g.t}</>)}
+                                {!!(g.txt) && (<WaText t={g.t} />)}
                               </Fragment>))}
                             </div>
                             <span style={{ position: "absolute", top: "12px", right: "14px", display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1182,7 +1182,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     <span style={{ fontSize: "11.5px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>MESSAGE</span>
                     <textarea ref={v.cltTaRef} value={v.cltE.draft} onChange={v.cltE.setDraft} placeholder="Hi {name}, …" rows={6} style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", border: "1.5px solid var(--crm-rust)", borderRadius: "12px", background: "#fff", font: "inherit", fontSize: "14.5px", lineHeight: "1.6", color: "var(--crm-ink)", resize: "vertical", outline: "none" }}>
-                    </textarea>
+                    </textarea><DeskTemplateFormat draft={v.cltE.draft} setDraft={v.cltE.setDraft} />
                     <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                       <span style={{ fontSize: "11.5px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)", marginRight: "4px" }}>INSERT</span>
                       {(v.cltE.vars).map((vi, vi_i) => (<Fragment key={vi_i}>
@@ -1216,7 +1216,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           {!!(g.tag) && (<>
                             <span style={{ padding: "1px 7px", borderRadius: "6px", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontWeight: "650", fontSize: "13.5px" }}>{g.t}</span>
                           </>)}
-                          {!!(g.txt) && (<>{g.t}</>)}
+                          {!!(g.txt) && (<WaText t={g.t} />)}
                         </Fragment>))}
                       </div>
                     </div>

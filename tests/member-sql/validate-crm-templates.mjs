@@ -39,8 +39,11 @@ const dir = new URL('../../supabase/migrations/', import.meta.url)
 for (const file of (await readdir(dir)).filter(f => /^20261(00[2-9]|01\d)\d+_crm_.*\.sql$/.test(f)).sort()) {
   await db.exec((await readFile(new URL(file, dir), 'utf8')).replace(/\r\n/g, '\n'))
 }
-// A template says its language (2026-11-04): the five-argument save, run VERBATIM after the October ones.
-await db.exec((await readFile(new URL('20261104090000_crm_template_language.sql', dir), 'utf8')).replace(/\r\n/g, '\n'))
+// A template says its language and category (2026-11-04): the six-argument save, and Meta's verdict by webhook — run
+// VERBATIM after the October ones.
+for (const file of ['20261104090000_crm_template_language.sql', '20261104110000_crm_template_status_hook.sql']) {
+  await db.exec((await readFile(new URL(file, dir), 'utf8')).replace(/\r\n/g, '\n'))
+}
 
 const id = (prefix, who) => {
   const hex = Buffer.from(`${prefix}-${who}`).toString('hex').padEnd(32, '0').slice(0, 32)
@@ -136,5 +139,14 @@ check([kind.status, kind.category, kind.meta_name], ['draft', 'MARKETING', null]
 const fourK = await tpl('boss', `select * from public.crm_save_template($1, '收到表格 2', 'whatsapp', '我们已收到您的表格')`, [util.id])
 check([fourK.category, fourK.language], ['MARKETING', 'zh_CN'], 'the four-argument save keeps both')
 check((await q(`select count(*)::int n from information_schema.routine_privileges where routine_name = 'crm_save_template' and grantee in ('anon', 'PUBLIC')`))[0].n, 0, "neither save is the publishable key's")
+
+// Meta's verdict by webhook (2026-11-04, the owner: "如果meta 审核成功，这边就要马上更新"): the service role's alone.
+const hook = await tpl('boss', `select * from public.crm_save_template(null, 'Hook', 'whatsapp', 'Hi {name}', 'en', 'MARKETING')`)
+await as('boss', `select public.crm_template_submitted($1, 'crm_hook_t1', 'm11', 'review')`, [hook.id])
+await refused('boss', `select public.crm_template_status_hook($1)`, [JSON.stringify([{ name: 'crm_hook_t1', status: 'APPROVED' }])], /permission denied/, "not a signed-in session's to call, not even the Principal's")
+await db.exec(`set role service_role`)
+check((await q(`select public.crm_template_status_hook($1) as n`, [JSON.stringify([{ name: 'crm_hook_t1', status: 'APPROVED', reason: '' }])]))[0].n, 1, 'Meta approved it: the webhook brings it in')
+await db.exec(`reset role`)
+check((await q(`select status, is_on from crm_templates where id = $1`, [hook.id]))[0], { status: 'approved', is_on: false }, 'Approved, still Off until somebody switches it on')
 
 console.log(`crm templates: ${checks} checks passed`)

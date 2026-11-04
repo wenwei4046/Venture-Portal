@@ -92,6 +92,12 @@ export async function POST(request: Request) {
     const { error: nmError } = await client().rpc('crm_document_names', { p_names: delivery.names })
     if (nmError) console.error('crm_document_names failed:', nmError.message)
   }
+  // Meta's verdict on a template, the moment it is decided (service role only, mig 20261104110000); a failure only warns —
+  // the templates page asks Meta again whenever it opens.
+  if (delivery.templates?.length) {
+    const { error: tplError } = await client().rpc('crm_template_status_hook', { p_rows: delivery.templates })
+    if (tplError) console.error('crm_template_status_hook failed:', tplError.message)
+  }
   // Only a delivery with new messages can have told somebody something (a receipt-only one never does).
   if (Number((data as { messages?: unknown } | null)?.messages) > 0) pushSoon()
   // An ad with no name yet: Ads Manager's, asked once Meta has its answer (lib/member/crm-ad-names-meta.ts).

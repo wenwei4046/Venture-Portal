@@ -70,6 +70,10 @@ interface WaValue {
   contacts?: { wa_id?: string; user_id?: string; profile?: { name?: string; username?: string } }[];
   messages?: WaMessage[];
   statuses?: WaStatus[];
+  /** field message_template_status_update (2026-11-04): Meta's verdict on a template. */
+  event?: string;
+  message_template_name?: string;
+  reason?: string;
 }
 
 /* ── What the ingest RPC receives ──────────────────────────────────────── */
@@ -104,6 +108,9 @@ export interface WaDelivery {
   /** A customer's document's own file name (2026-10-27): kept beside its caption (crm_document_names). */
   names: { id: string; name: string }[];
   statuses: WaStatusUpdate[];
+  /** Meta's verdict on a template (2026-11-04, the owner: "如果meta 审核成功，这边就要马上更新"): its name, the status as
+   *  crm_template_statuses reads it, Meta's reason — handed to crm_template_status_hook. */
+  templates?: { name: string; status: string; reason: string }[];
   /** Changes that were not WhatsApp messages/statuses (other fields Meta may send) — logged, not applied. */
   ignored: number;
 }
@@ -152,6 +159,13 @@ export function parseDelivery(body: unknown): WaDelivery {
   for (const entry of entries) {
     for (const change of entry?.changes ?? []) {
       const v = change?.value;
+      // A template's review, decided: APPROVED / REJECTED / DISABLED / PAUSED / FLAGGED / REINSTATED … (a reinstated one is approved again).
+      if (change?.field === "message_template_status_update" && v?.message_template_name && v.event) {
+        const ev = v.event.toUpperCase();
+        (out.templates ??= []).push({ name: v.message_template_name, status: ev === "REINSTATED" ? "APPROVED" : ev === "PAUSED" ? "DISABLED" : ev,
+          reason: v.reason && v.reason.toUpperCase() !== "NONE" ? v.reason : "" });
+        continue;
+      }
       if (change?.field !== "messages" || v?.messaging_product !== "whatsapp" || !v.metadata?.phone_number_id) { out.ignored++; continue; }
       const phoneNumberId = v.metadata.phone_number_id;
       // Each contact's name under every id it carries — its number and its BSUID — so either finds it.
