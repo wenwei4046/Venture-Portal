@@ -15,7 +15,6 @@ const PAYMENT_TYPES: { value: PaymentType; label: string }[] = [
   { value: 'interest', label: 'Interest' },
   { value: 'principal', label: 'Principal' },
   { value: 'penalty', label: 'Penalty' },
-  { value: 'netting', label: 'Netting' },
 ]
 
 export default function RepaymentForm({ loanId, outstanding }: Props) {

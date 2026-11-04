@@ -1,0 +1,24 @@
+/* Fund contra's lines (2026-11-04): a deal, its principal, its interest, ×. A phone takes the deal on its own row. */
+.row { grid-template-columns: minmax(0, 1fr) 112px 112px 28px; }
+@media (max-width: 560px) {
+  .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 28px; }
+  .row > :first-child { grid-column: 1 / -1; }
+}
+.heads {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px 112px 28px;
+  gap: 6px;
+  padding: 0 10px 4px 12px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(var(--hvs-muted));
+}
+.heads > :nth-child(2),
+.heads > :nth-child(3) { text-align: right; }
+@media (max-width: 560px) { .heads { display: none; } }
+.owes { font-size: 11.5px; color: rgb(var(--hvs-muted)); padding: 0 12px 8px; }
+.side { display: flex; flex-direction: column; gap: 6px; }
+.sideHead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sideName { font-size: 13px; font-weight: 600; color: var(--ds-ink); }
+.sideNote { font-size: 11.5px; color: rgb(var(--hvs-muted)); }

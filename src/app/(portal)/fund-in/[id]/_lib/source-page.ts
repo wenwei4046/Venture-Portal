@@ -40,6 +40,8 @@ export interface SourceRepaymentRow {
   /** The voucher it came in on. */
   voucherNo: string | null
   notes: string | null
+  /** The fund contra that wrote it (2026-11-04): undone whole, never on its own. */
+  contraId?: string | null
 }
 
 /** Record repayment's voucher (2026-10-02): what Create payment files in loan-repayment mode, the source already known. */
@@ -328,6 +330,7 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
       amount: Number(r.amount),
       voucherNo: (r.payment_voucher_id && voucherNo.get(r.payment_voucher_id)) || null,
       notes: (r.notes as string | null) ?? null,
+      contraId: (r as { fund_contra_id?: string | null }).fund_contra_id ?? null,
     })),
     termsSegments,
     termsChanges,

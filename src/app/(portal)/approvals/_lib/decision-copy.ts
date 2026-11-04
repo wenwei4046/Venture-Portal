@@ -25,6 +25,7 @@ export const APPROVE_LEAD: Record<ApprovalRequestType, string> = {
   dept_payment_request: 'Approving debits the dept pool and routes the request to Finance to generate the PV',
   loan_cancel: 'Approving reverses the booked loan — bank, Venture Pool and GL — and marks it cancelled',
   terms_change: 'Approving applies the new terms from the month asked — the months before keep theirs',
+  fund_contra: 'Approving posts the contra — both sides repaid by it, one journal entry, no bank',
 }
 
 export const REJECT_LEAD: Record<ApprovalRequestType, string> = {
@@ -45,6 +46,7 @@ export const REJECT_LEAD: Record<ApprovalRequestType, string> = {
   dept_payment_request: 'Rejecting cancels the request — pool is unchanged, Finance is not notified',
   loan_cancel: 'Rejecting keeps the loan active',
   terms_change: 'Rejecting keeps the terms as they are',
+  fund_contra: 'Rejecting leaves both deals as they are',
 }
 
 /** The lead clause for any request type (one added since reads generically). */

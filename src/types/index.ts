@@ -108,6 +108,7 @@ export type ApprovalRequestType =
   | 'dept_payment_request'
   | 'loan_cancel'
   | 'terms_change'
+  | 'fund_contra'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 

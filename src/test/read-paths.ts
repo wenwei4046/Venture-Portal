@@ -576,6 +576,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // A deal's terms change filed for the Principal (mig 20261025110000): filed and withdrawn on the deal's page
   // (Treasury · Edit; withdrawn by whoever filed it or the queue's Approve), decided in Approvals (Approve).
   'approve_terms_change', 'file_terms_change', 'reject_terms_change', 'withdraw_terms_change',
+  // A fund contra (mig 20261104230000): filed / withdrawn / undone on Fund OUT or Fund IN, decided in Approvals.
+  'approve_fund_contra', 'file_fund_contra', 'reject_fund_contra', 'undo_fund_contra',
 ])
 
 /**

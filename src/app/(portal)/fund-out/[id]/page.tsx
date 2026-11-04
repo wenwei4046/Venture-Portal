@@ -9,6 +9,7 @@ import FundingSourceEditor from './_components/FundingSourceEditor'
 import RepaymentStartEditor from './_components/RepaymentStartEditor'
 import MinPayInterestToggle from './_components/MinPayInterestToggle'
 import VoidRepaymentButton from './_components/VoidRepaymentButton'
+import UndoContraButton from '@/components/treasury/UndoContraButton'
 import TermsTimeline from '@/components/treasury/TermsTimeline'
 import RepaymentScheduleSection, { scheduleCount } from '@/components/treasury/RepaymentScheduleSection'
 import PrintSchedule from '@/components/treasury/PrintSchedule'
@@ -157,7 +158,11 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
                                   <td className="m-hide text-muted">{r.notes ?? '—'}</td>
                                   {can.void ? (
                                     <td className="text-right m-hide">
-                                      <VoidRepaymentButton repaymentId={r.id} loanId={loan.id} label={`${r.type} RM ${formatMoney(r.amount)} · ${fullDay(r.date)}`} />
+                                      {r.contraId ? (
+                                        <UndoContraButton contraId={r.contraId} label={`${r.type} RM ${formatMoney(r.amount)} · ${fullDay(r.date)}`} />
+                                      ) : (
+                                        <VoidRepaymentButton repaymentId={r.id} loanId={loan.id} label={`${r.type} RM ${formatMoney(r.amount)} · ${fullDay(r.date)}`} />
+                                      )}
                                     </td>
                                   ) : null}
                                 </tr>

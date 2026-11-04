@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import { HeadButton } from '@/components/finv/Hub'
 import FundHub, { type FundCan } from '@/components/treasury/FundHub'
+import FundContraDialog from '@/components/treasury/FundContraDialog'
 import type { FundCardKey, FundRecord } from '@/lib/fund-hub'
 import { cancelPendingLoan } from '../actions'
 import CreateFundOutDialog from './CreateFundOutDialog'
@@ -41,6 +42,7 @@ export default function FundOutHub({
 }) {
   const router = useRouter()
   const [creating, setCreating] = useState(false)
+  const [contra, setContra] = useState(false)
   return (
     <>
       <FundHub
@@ -59,6 +61,7 @@ export default function FundOutHub({
                 Create fund out
               </HeadButton>
             ) : null}
+            {canCreate ? <HeadButton onClick={() => setContra(true)}>Contra</HeadButton> : null}
             {canLoanAging ? <HeadButton href="/reports/loan-aging">Loan aging</HeadButton> : null}
             {canExport ? <ExportCSVButton /> : null}
           </>
@@ -68,6 +71,17 @@ export default function FundOutHub({
         <CreateFundOutDialog
           open={creating}
           onClose={() => setCreating(false)}
+          onSaved={(message) => {
+            flash(message)
+            router.refresh()
+          }}
+          today={today}
+        />
+      ) : null}
+      {canCreate ? (
+        <FundContraDialog
+          open={contra}
+          onClose={() => setContra(false)}
           onSaved={(message) => {
             flash(message)
             router.refresh()

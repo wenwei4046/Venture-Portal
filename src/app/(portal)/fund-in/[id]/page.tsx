@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import UndoContraButton from '@/components/treasury/UndoContraButton'
 import { officeToday } from '@/lib/office-time'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -149,7 +150,17 @@ export default async function FundSourceDetailPage({ params, searchParams }: Pro
                                   <td className="whitespace-nowrap">{fullDay(r.date)}</td>
                                   <td className="text-graphite">{r.type}</td>
                                   <td className="num">{formatMoney(r.amount)}</td>
-                                  <td className="m-hide whitespace-nowrap">{r.voucherNo || <span className="text-muted">—</span>}</td>
+                                  <td className="m-hide whitespace-nowrap">
+                                    {r.contraId ? (
+                                      can.void ? (
+                                        <UndoContraButton contraId={r.contraId} label={`${r.type} RM ${formatMoney(r.amount)} · ${fullDay(r.date)}`} />
+                                      ) : (
+                                        <span className="text-muted">Contra</span>
+                                      )
+                                    ) : (
+                                      r.voucherNo || <span className="text-muted">—</span>
+                                    )}
+                                  </td>
                                   <td className="m-hide text-muted">{r.notes ?? '—'}</td>
                                 </tr>
                               ))}

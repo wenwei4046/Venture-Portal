@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import { HeadButton } from '@/components/finv/Hub'
 import FundHub, { type FundCan } from '@/components/treasury/FundHub'
+import FundContraDialog from '@/components/treasury/FundContraDialog'
 import type { FundCardKey, FundRecord } from '@/lib/fund-hub'
 import { withdrawFundSource } from '../actions'
 import RecordFundInDialog from './RecordFundInDialog'
@@ -33,6 +34,7 @@ export default function FundInHub({
 }) {
   const router = useRouter()
   const [creating, setCreating] = useState(false)
+  const [contra, setContra] = useState(false)
   return (
     <>
       <FundHub
@@ -46,9 +48,12 @@ export default function FundInHub({
         onWithdraw={withdrawFundSource}
         head={
           canCreate ? (
-            <HeadButton primary onClick={() => setCreating(true)}>
-              Record fund in
-            </HeadButton>
+            <>
+              <HeadButton primary onClick={() => setCreating(true)}>
+                Record fund in
+              </HeadButton>
+              <HeadButton onClick={() => setContra(true)}>Contra</HeadButton>
+            </>
           ) : null
         }
       />
@@ -56,6 +61,17 @@ export default function FundInHub({
         <RecordFundInDialog
           open={creating}
           onClose={() => setCreating(false)}
+          onSaved={(message) => {
+            flash(message)
+            router.refresh()
+          }}
+          today={today}
+        />
+      ) : null}
+      {canCreate ? (
+        <FundContraDialog
+          open={contra}
+          onClose={() => setContra(false)}
           onSaved={(message) => {
             flash(message)
             router.refresh()

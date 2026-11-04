@@ -289,7 +289,10 @@ export async function recordRepayment(formData: FormData) {
   const notes = (formData.get('notes') as string) || null
 
   if (!loanId) throw new Error('Loan id is required')
-  if (!['principal', 'interest', 'penalty', 'netting'].includes(paymentType)) {
+  // Netting left Record repayment (2026-11-04): it posted Dr bank / Cr interest income and moved no principal — a
+  // loan knocked off against a deposit is a Fund contra now (Contra on Fund OUT / Fund IN, mig 20261104230000).
+  if (paymentType === 'netting') throw new Error('Netting is not recorded here — use Contra on Fund OUT or Fund IN')
+  if (!['principal', 'interest', 'penalty'].includes(paymentType)) {
     throw new Error('Invalid payment type')
   }
   if (isNaN(amount) || amount <= 0) {

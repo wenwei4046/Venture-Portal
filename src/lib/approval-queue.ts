@@ -106,6 +106,7 @@ const TYPE_LABELS: Record<string, string> = {
   dept_payment_request: 'Dept request payment',
   loan_cancel: 'Loan cancel',
   terms_change: 'Terms change',
+  fund_contra: 'Fund contra',
   hr_costing: 'HR costing',
   payroll_run: 'Payroll run',
 }

@@ -25,6 +25,8 @@ export const APPROVAL_DOMAIN: Readonly<Record<ApprovalRequestType, Domain | null
   loan_cancel: 'treasury',
   // A deal's terms change filed by Finance (mig 20261025110000): no domain, so only the queue's own Approve — the Principal — decides it.
   terms_change: null,
+  // A fund contra (mig 20261104230000): the Principal decides it, as a terms change (the user: 先给 Principal 批).
+  fund_contra: null,
   new_fund_source: 'treasury',
   tier_change: 'treasury',
   base_rate: 'treasury',
