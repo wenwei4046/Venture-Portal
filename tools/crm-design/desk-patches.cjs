@@ -70,5 +70,7 @@ module.exports = [
   ['<strong style={{ fontSize: "15px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</strong>',
     '{v.ad.canName ? (<input aria-label="Ad name" value={v.ad.nameDraft} onChange={v.ad.onName} onBlur={v.ad.saveName} onKeyDown={v.ad.nameKey} placeholder={v.ad.headline} maxLength={120} style={{ width: "100%", boxSizing: "border-box", margin: "0", padding: "1px 0 3px", border: "0", borderBottom: "1px dashed #D9C7BA", borderRadius: "0", background: "transparent", font: "inherit", fontSize: "15px", fontWeight: "650", color: "#3F2B22", outline: "none" }} />) : (<strong style={{ fontSize: "15px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</strong>)}',
     "Ads to teams' editor: the ad's name typed in place (CRM · Manage), saved on blur / Enter through crm_name_ad; the harness keeps the title."],
+  [/(textWrap: "pretty") (\}\}>\s*\{\(v\.cltE\.dsegs\))/, "$1, whiteSpace: \"pre-wrap\" $2",
+    "A cold lead template's preview keeps its line breaks, as the customer's WhatsApp will (the owner, 2026-11-04: \"为什么不能空格\")."],
 ];
 

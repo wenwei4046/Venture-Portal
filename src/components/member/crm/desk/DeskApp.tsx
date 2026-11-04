@@ -1210,7 +1210,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     <span style={{ fontSize: "11.5px", fontWeight: "700", letterSpacing: ".08em", color: "var(--crm-muted)" }}>PREVIEW</span>
                     <div style={{ padding: "16px", borderRadius: "14px", background: "var(--crm-cream-nav)" }}>
-                      <div style={{ padding: "10px 14px", borderRadius: "4px 14px 14px 14px", background: "#fff", border: "1px solid var(--crm-field)", fontSize: "14.5px", lineHeight: "1.6", color: "var(--crm-ink)", textWrap: "pretty" }}>
+                      <div style={{ padding: "10px 14px", borderRadius: "4px 14px 14px 14px", background: "#fff", border: "1px solid var(--crm-field)", fontSize: "14.5px", lineHeight: "1.6", color: "var(--crm-ink)", textWrap: "pretty", whiteSpace: "pre-wrap" }}>
                         {(v.cltE.dsegs).map((g, g_i) => (<Fragment key={g_i}>
                           {!!(g.tag) && (<>
                             <span style={{ padding: "1px 7px", borderRadius: "6px", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontWeight: "650", fontSize: "13.5px" }}>{g.t}</span>
