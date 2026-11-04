@@ -5,8 +5,8 @@ import type { ContraOptions } from '@/lib/fund-contra'
 // Fund contra (2026-11-04, mig 20261104230000): Fund OUT loans against Fund IN fund sources, each line a principal and
 // an interest, the sides equal — sent to the Principal; the dialog says what still stops it.
 
-const mocks = vi.hoisted(() => ({ open: vi.fn(), file: vi.fn() }))
-vi.mock('@/app/(portal)/fund-out/contra-actions', () => ({ openFundContra: mocks.open, fileFundContra: mocks.file }))
+const mocks = vi.hoisted(() => ({ open: vi.fn(), file: vi.fn(), withdraw: vi.fn() }))
+vi.mock('@/app/(portal)/fund-out/contra-actions', () => ({ openFundContra: mocks.open, fileFundContra: mocks.file, withdrawFundContra: mocks.withdraw }))
 
 import FundContraDialog from './FundContraDialog'
 
@@ -16,6 +16,7 @@ const OPTIONS: ContraOptions = {
     { id: 'L2', label: 'CAR [LO#2] · RM 100,000.00', outstanding: 91_666.67 },
   ],
   sources: [{ id: 'S1', label: 'HC · RM 220,000.00', outstanding: 220_000 }],
+  waiting: [],
 }
 
 const draw = () => {
@@ -30,6 +31,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.open.mockResolvedValue({ ok: true, options: OPTIONS })
   mocks.file.mockResolvedValue({ ok: true, message: 'Contra submitted — waiting for the Principal' })
+  mocks.withdraw.mockResolvedValue({ ok: true })
 })
 
 describe('Fund contra', () => {
@@ -89,5 +91,33 @@ describe('Fund contra', () => {
     })
     expect(screen.getByText('HC is already in a contra waiting for the Principal')).toBeInTheDocument()
     expect(onSaved).not.toHaveBeenCalled()
+  })
+
+  // 2026-11-05 (the user: 这个可以先做吗？): a contra still waiting is withdrawn from the same window — whoever filed it,
+  // or the Principal — after a second press; one the reader may not withdraw shows no button.
+  it('lists the contras waiting for the Principal and withdraws one after a second press', async () => {
+    mocks.open.mockResolvedValue({
+      ok: true,
+      options: {
+        ...OPTIONS,
+        waiting: [
+          { id: 'C1', words: 'Contra · CAR [LO#1] (P 100.00) ↔ HC (P 100.00) · RM 100.00', date: '2026-11-04', filedBy: 'Finance Manager', canWithdraw: true },
+          { id: 'C2', words: 'Contra · CAR [LO#2] (I 50.00) ↔ HC (I 50.00) · RM 50.00', date: '2026-11-03', filedBy: 'Carrie', canWithdraw: false },
+        ],
+      },
+    })
+    const { onSaved } = draw()
+    await act(async () => undefined)
+    expect(screen.getByText('Waiting for the Principal · 2')).toBeInTheDocument()
+    expect(screen.getByText('Finance Manager · dated 2026-11-04')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Withdraw' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }))
+    expect(mocks.withdraw).not.toHaveBeenCalled()
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Withdraw it' }))
+    })
+    expect(mocks.withdraw).toHaveBeenCalledWith('C1')
+    expect(onSaved).toHaveBeenCalledWith('Contra withdrawn')
+    expect(screen.getByText('Waiting for the Principal · 1')).toBeInTheDocument()
   })
 })

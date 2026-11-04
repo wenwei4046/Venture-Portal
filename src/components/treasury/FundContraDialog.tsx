@@ -6,7 +6,7 @@ import { DialogButton, DialogForm, Field, FinDialog, Hint, TextArea } from '@/co
 import fm from '@/components/finv/form.module.css'
 import { Select } from '@/components/hrv/select'
 import { contraLines, contraProblem, money, sideTotal, type ContraDeal, type ContraLineDraft, type ContraOptions, type ContraSide } from '@/lib/fund-contra'
-import { fileFundContra, openFundContra } from '@/app/(portal)/fund-out/contra-actions'
+import { fileFundContra, openFundContra, withdrawFundContra } from '@/app/(portal)/fund-out/contra-actions'
 import c from './contra.module.css'
 
 // Fund contra (2026-11-04 — the user: "我想要这个contra 功能"; mig 20261104230000): Fund OUT loans on one side, Fund IN
@@ -37,6 +37,10 @@ export default function FundContraDialog({
   const [sources, setSources] = useState<ContraLineDraft[]>(() => [blank()])
   const [busy, setBusy] = useState(false)
   const [refused, setRefused] = useState<string | null>(null)
+  // A contra still waiting (2026-11-05): withdrawn after a second press, its refusal said beside it.
+  const [asking, setAsking] = useState<string | null>(null)
+  const [withdrawing, setWithdrawing] = useState<string | null>(null)
+  const [withdrawError, setWithdrawError] = useState<{ id: string; reason: string } | null>(null)
 
   useEffect(() => {
     if (!open || opts) return
@@ -142,6 +146,60 @@ export default function FundContraDialog({
     )
   }
 
+  const withdraw = async (id: string) => {
+    if (withdrawing) return
+    setWithdrawing(id)
+    setWithdrawError(null)
+    const r = await withdrawFundContra(id)
+    setWithdrawing(null)
+    setAsking(null)
+    if (!r.ok) {
+      setWithdrawError({ id, reason: r.reason })
+      return
+    }
+    setOpts((o) => (o ? { ...o, waiting: o.waiting.filter((w) => w.id !== id) } : o))
+    onSaved('Contra withdrawn')
+  }
+
+  const waitingBlock =
+    opts && opts.waiting.length > 0 ? (
+      <div className={c.side}>
+        <div className={c.sideHead}>
+          <span className={c.sideName}>{`Waiting for the Principal · ${opts.waiting.length}`}</span>
+          <span className={c.sideNote}>Withdraw one to change it, then file it again</span>
+        </div>
+        <div className={fm.lines}>
+          {opts.waiting.map((w) => (
+            <div key={w.id} className={fm.lineWrap}>
+              <div className={c.waiting}>
+                <div className={c.waitingText}>
+                  <div className={c.waitingWords}>{w.words}</div>
+                  <div className={c.owes}>{`${w.filedBy} · dated ${w.date}`}</div>
+                  {withdrawError?.id === w.id ? <div className={c.waitingError}>{withdrawError.reason}</div> : null}
+                </div>
+                {w.canWithdraw ? (
+                  asking === w.id ? (
+                    <span className={c.waitingAsk}>
+                      <button type="button" className={fm.addLine} onClick={() => setAsking(null)} disabled={withdrawing === w.id}>
+                        Keep
+                      </button>
+                      <button type="button" className={`${fm.addLine} ${c.danger}`} onClick={() => void withdraw(w.id)} disabled={withdrawing === w.id}>
+                        {withdrawing === w.id ? 'Withdrawing…' : 'Withdraw it'}
+                      </button>
+                    </span>
+                  ) : (
+                    <button type="button" className={fm.addLine} onClick={() => setAsking(w.id)}>
+                      Withdraw
+                    </button>
+                  )
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ) : null
+
   const buttons = (
     <>
       <DialogButton disabled={busy} onClick={close}>
@@ -156,6 +214,7 @@ export default function FundContraDialog({
   return (
     <FinDialog open={open} onClose={close} title="Fund contra" sub="Loans and fund sources knocked off against each other · no bank · needs Principal approval" locked={busy} wide tall>
       <DialogForm buttons={buttons} onSubmit={save}>
+        {waitingBlock}
         <Field label="Date">
           <DateField value={date} onChange={setDate} today={today} label="Date" />
         </Field>
