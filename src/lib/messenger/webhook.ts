@@ -68,7 +68,19 @@ export interface MsgDelivery {
 }
 
 export interface Referral { source?: string; type?: string; ref?: string; ad_id?: string; ads_context_data?: { ad_title?: string; post_id?: string; photo_url?: string; video_url?: string } }
-interface Attachment { type?: string; title?: string; payload?: { url?: string; sticker_id?: number; coordinates?: { lat?: number; long?: number } } }
+interface Attachment { type?: string; title?: string; payload?: { url?: string; title?: string; sticker_id?: number; coordinates?: { lat?: number; long?: number } } }
+
+/** What a shared post / reel / link is called in the chat (2026-11-04: a customer's shared reel came in with no words — a blank bubble). */
+const SHARED: Record<string, string> = { reel: "Shared a reel", ig_reel: "Shared a reel", share: "Shared a post", ig_post: "Shared a post",
+  story_mention: "Mentioned you in a story", template: "Shared a link", fallback: "Shared a link" };
+
+/** A shared post, reel or link has no text of its own: the chat says what it is, its title and its address. */
+export function sharedBody(a: Attachment | undefined): string | null {
+  if (!a?.type || !(a.type in SHARED)) return null;
+  const url = a.payload?.url && /^https:\/\//.test(a.payload.url) ? a.payload.url : null;
+  const title = (a.payload?.title ?? a.title)?.trim() || null;
+  return [SHARED[a.type] + (title ? `: ${title}` : ""), url].filter(Boolean).join("\n");
+}
 interface Event {
   sender?: { id?: string };
   recipient?: { id?: string };
@@ -161,7 +173,7 @@ export function parseMessengerDelivery(body: unknown): MsgDelivery {
       if (e.message) {
         if (e.message.is_echo || !e.message.mid) { out.ignored++; continue; }
         const first = e.message.attachments?.[0];
-        const body = e.message.text ?? first?.title
+        const body = e.message.text ?? sharedBody(first) ?? first?.title
           ?? (first?.payload?.coordinates ? `${first.payload.coordinates.lat},${first.payload.coordinates.long}` : null);
         out.messages.push({
           externalId: e.message.mid, pageId, psid, name: null, kind: e.message.text ? "text" : kindOf(first), body: body ?? null,
