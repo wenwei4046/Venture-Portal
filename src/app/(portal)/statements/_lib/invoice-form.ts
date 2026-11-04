@@ -113,6 +113,25 @@ export function periodChoices(month: string, keep?: string | null): Array<{ valu
 /** The kinds of line HR's figures are itemised into, in the order an invoice lists them. */
 export const PART_KINDS: readonly string[] = ['Salary', 'KPI', 'Allowance', 'EPF', 'SOCSO', 'EIS']
 
+/**
+ * The account each kind of HR's line was on in last month's invoices of the same mode (2026-11-04 — the user: "director
+ * 开invoice 时account我要自己选"): a line's kind is its words before " - " ("Salary - Sep'26", "EPF - Sep'26 (HR)"), and
+ * the account most of that kind's lines used is where the new one starts. A kind with no account left out.
+ */
+export function lastKindAccounts(lines: ReadonlyArray<{ description: string | null; category_code: string | null }>): Record<string, string> {
+  const counts = new Map<string, Map<string, number>>()
+  for (const l of lines) {
+    const kind = (l.description ?? '').split(' - ')[0].trim()
+    if (!l.category_code || !PART_KINDS.includes(kind)) continue
+    const byCode = counts.get(kind) ?? new Map<string, number>()
+    byCode.set(l.category_code, (byCode.get(l.category_code) ?? 0) + 1)
+    counts.set(kind, byCode)
+  }
+  const out: Record<string, string> = {}
+  for (const [kind, byCode] of counts) out[kind] = [...byCode.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  return out
+}
+
 export interface RechargePart {
   /** Salary, KPI, Allowance, EPF, SOCSO or EIS. */
   kind: string

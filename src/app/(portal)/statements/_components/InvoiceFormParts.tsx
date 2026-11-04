@@ -272,9 +272,12 @@ export interface HrFigures {
   byCompany: ReadonlyMap<string, HrFigure>
   /** HR / Finance / Director Office, or "director" — what the figures are. */
   source: 'staff' | 'director' | null
+  /** Each kind of line (Salary, EPF …), the account last month's invoices of this mode put it on (2026-11-04). */
+  kindAccounts: Readonly<Record<string, string>>
 }
 
 const NONE: ReadonlyMap<string, HrFigure> = new Map()
+const NO_ACCOUNTS: Readonly<Record<string, string>> = {}
 
 /**
  * HR's figures for a recharge — a shared-services department's staff cost per
@@ -284,7 +287,7 @@ const NONE: ReadonlyMap<string, HrFigure> = new Map()
 export function useHrFigures(enabled: boolean, mode: string, month: string): HrFigures {
   const source = hrSource(mode)
   const key = enabled && source ? `${mode}|${month}` : ''
-  const cache = useRef(new Map<string, { status: 'loading' | 'ready' | 'error'; byCompany: ReadonlyMap<string, HrFigure> }>())
+  const cache = useRef(new Map<string, { status: 'loading' | 'ready' | 'error'; byCompany: ReadonlyMap<string, HrFigure>; kindAccounts?: Readonly<Record<string, string>> }>())
   const [, bump] = useState(0)
 
   useEffect(() => {
@@ -298,7 +301,7 @@ export function useHrFigures(enabled: boolean, mode: string, month: string): HrF
           const byCompany = new Map<string, HrFigure>()
           for (const r of res.value.staff) byCompany.set(r.companyId, { amount: r.amount, staff: { salary: r.salary, allowance: r.allowance, epf: r.epf, socso: r.socso, eis: r.eis } })
           for (const r of res.value.directors) byCompany.set(r.companyId, { amount: r.totalCtc, ctc: { basic: r.basic, kpi: r.kpi, allowance: r.allowance, epf: r.epf, socso: r.socso, eis: r.eis } })
-          cache.current.set(key, { status: 'ready', byCompany })
+          cache.current.set(key, { status: 'ready', byCompany, kindAccounts: res.value.kindAccounts ?? NO_ACCOUNTS })
         }
         bump((n) => n + 1)
       },
@@ -310,5 +313,5 @@ export function useHrFigures(enabled: boolean, mode: string, month: string): HrF
   }, [key, mode, month])
 
   const hit = key ? cache.current.get(key) : undefined
-  return { key, status: hit?.status ?? (key ? 'loading' : 'idle'), byCompany: hit?.byCompany ?? NONE, source }
+  return { key, status: hit?.status ?? (key ? 'loading' : 'idle'), byCompany: hit?.byCompany ?? NONE, source, kindAccounts: hit?.kindAccounts ?? NO_ACCOUNTS }
 }

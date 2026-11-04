@@ -225,7 +225,8 @@ export default function InvoiceLinesDialog({
     }
     // A kind's account, picked on the lines HR wrote before, stays with the kind.
     const picked = new Map(lines.filter((l) => l.kind && l.account).map((l) => [l.kind, l.account]))
-    const next = parts.map((p) => ({ key: nextKey(), account: picked.get(p.kind) ?? '', desc: p.description, amount: p.amount.toFixed(2), kind: p.kind }))
+    // A kind with none picked starts on last month's account for it (2026-11-04).
+    const next = parts.map((p) => ({ key: nextKey(), account: picked.get(p.kind) ?? hr.kindAccounts[p.kind] ?? '', desc: p.description, amount: p.amount.toFixed(2), kind: p.kind }))
     setLines(next)
     autoLines.current = linesKey(next)
     fillDesc(hrDescription(mode, month))
@@ -241,6 +242,8 @@ export default function InvoiceLinesDialog({
     const order = new Map(companies.map((c, i) => [c.id, i]))
     const ids = [...hr.byCompany.keys()].sort((a, b) => (order.get(a) ?? 999) - (order.get(b) ?? 999))
     setRows(ids.map((id) => ({ key: nextKey(), companyId: id, amount: (hr.byCompany.get(id)?.amount ?? 0).toFixed(2) })))
+    // Each kind not picked yet starts on last month's account for it (2026-11-04 — "account我要自己选").
+    setKindAccounts((prev) => ({ ...hr.kindAccounts, ...Object.fromEntries(Object.entries(prev).filter(([, v]) => v)) }))
     fillDesc(hrDescription(mode, month))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [several, hr.status, hr.key])
