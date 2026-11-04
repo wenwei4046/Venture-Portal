@@ -9,6 +9,7 @@
 // figures are tested without a database.
 
 import type { HrIconName } from '@/components/hrv/icons'
+import { rateWords, type RateBasis } from './rate-basis'
 import type { CardTone, HubCardItem } from '@/components/finv/Hub'
 
 export type FundSide = 'out' | 'in'
@@ -29,6 +30,8 @@ export interface FundRecord {
   outstanding: number | null
   /** The monthly rate, a decimal (a loan's effective rate, a source's cost). */
   rate: number
+  /** How the rate was agreed (2026-11-04): per month, or per year — shown that way; `rate` is still the month's. */
+  rateBasis?: RateBasis
   status: FundStatus
   /** An active loan with an instalment past its day unpaid (OVERDUE IS READ LIVE, 2026-10-12). */
   overdue: { amount: number; since: string; days: number } | null
@@ -189,7 +192,7 @@ export const ratePct = (rate: number) => `${(rate * 100).toFixed(3)}%`
  *  list has no Source column of its own (the Finance phone app; the desktop hub's is beside it, 2026-10-23). */
 export function fundLine(r: FundRecord, withSource = true): string {
   const term = r.months == null ? 'no fixed term' : `${r.months} ${r.months === 1 ? 'month' : 'months'}`
-  const parts = [r.side === 'in' ? r.typeLabel : null, `${ratePct(r.rate)} /mo`, term, withSource && r.fundingSource ? `SC ${r.fundingSource}` : null]
+  const parts = [r.side === 'in' ? r.typeLabel : null, rateWords(r.rate, r.rateBasis ?? 'month'), term, withSource && r.fundingSource ? `SC ${r.fundingSource}` : null]
   return parts.filter(Boolean).join(' · ')
 }
 

@@ -1,5 +1,6 @@
 import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
+import { rateBasisOf, rateInBasis } from '@/lib/rate-basis'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { notFound, redirect } from 'next/navigation'
 import { requireActionOn, requireAnyActionOn, requirePage } from '@/lib/auth'
@@ -57,7 +58,8 @@ export default async function LoanEditPage({ params }: Props) {
 
       <LoanAmendForm
         loanId={loan.id}
-        ratePct={(Number(loan.effective_rate) * 100).toString()}
+        ratePct={rateInBasis(Number(loan.effective_rate), rateBasisOf((loan as { rate_basis?: string | null }).rate_basis)).toString()}
+        rateBasis={rateBasisOf((loan as { rate_basis?: string | null }).rate_basis)}
         tenureMonths={(loan.tenure_months ?? '').toString()}
         principalPerMonth={loan.principal_per_month == null ? '' : String(loan.principal_per_month)}
         disbursementDate={(loan.disbursement_date as string | null) ?? ''}

@@ -95,7 +95,7 @@ describe('Amend terms, for Finance', () => {
     fireEvent.change(screen.getByLabelText('Rate (% a month)'), { target: { value: '0.833' } })
     fireEvent.submit(document.querySelector('form')!)
     await waitFor(() => expect(mocks.amendFundSourceFrom).toHaveBeenCalled())
-    expect(sent(mocks.amendFundSourceFrom)).toEqual({ fund_source_id: 'fs-bi7', cost_rate_percent: '0.833', effective_from: '2026-01' })
+    expect(sent(mocks.amendFundSourceFrom)).toEqual({ fund_source_id: 'fs-bi7', cost_rate_percent: '0.833', rate_basis: 'month', effective_from: '2026-01' })
   })
 
   it('BI#7 as one change: 1,000 a month from January, no fixed term from October', async () => {
@@ -117,6 +117,7 @@ describe('Amend terms, for Finance', () => {
     expect(sent(mocks.amendFundSourceFrom)).toEqual({
       fund_source_id: 'fs-bi7',
       cost_rate_percent: '0.833',
+      rate_basis: 'month',
       effective_from: '2026-01',
       principal_per_month: '1000',
       open_from: '2026-10',
@@ -144,7 +145,7 @@ describe('Amend terms, for Finance', () => {
     fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'agreed from the start' } })
     fireEvent.submit(document.querySelector('form')!)
     await waitFor(() => expect(mocks.amendFundSource).toHaveBeenCalled())
-    expect(sent(mocks.amendFundSource)).toEqual({ fund_source_id: 'fs-mk', cost_rate_percent: '0.833', reason: 'agreed from the start' })
+    expect(sent(mocks.amendFundSource)).toEqual({ fund_source_id: 'fs-mk', cost_rate_percent: '0.833', rate_basis: 'month', reason: 'agreed from the start' })
     expect(mocks.amendFundSourceFrom).not.toHaveBeenCalled()
   })
 

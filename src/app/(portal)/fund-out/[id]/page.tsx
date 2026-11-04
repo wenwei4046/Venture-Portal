@@ -99,7 +99,7 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
               name={loan.companyName}
               plan={plan}
               printed={printedLine(today, (user as { name?: string | null }).name)}
-              meta={scheduleMeta({ label: 'Borrower', value: loan.borrower }, loan.principal, `${pct(loan.rate.effective)} /mo`, plan)}
+              meta={scheduleMeta({ label: 'Borrower', value: loan.borrower }, loan.principal, loan.rate.words ?? `${pct(loan.rate.effective)} /mo`, plan)}
             />
           ) : null}
         </div>
@@ -224,7 +224,7 @@ export default async function LoanDetailPage({ params, searchParams }: Props) {
           <FullPanelRow label="Maturity" value={loan.maturity ? fullDay(loan.maturity) : 'No fixed term'} mono={!!loan.maturity} />
 
           <div className={s.pGroup}>Booking</div>
-          <FullPanelRow label="Rate" value={`${pct(loan.rate.effective)} /mo`} sub={`${pct(loan.rate.base)} base + ${pct(loan.rate.premium)}`} mono />
+          <FullPanelRow label="Rate" value={loan.rate.words ?? `${pct(loan.rate.effective)} /mo`} sub={loan.rate.basis === 'year' ? 'a year, ÷ 12 a month' : `${pct(loan.rate.base)} base + ${pct(loan.rate.premium)}`} mono />
           {isActive ? <FullPanelRow label="Monthly interest" value={rm(loan.monthlyInterest)} mono /> : null}
           <FullPanelRow label="Outstanding" value={isActive ? rm(loan.outstanding) : '—'} sub={loan.totalPrincipalPaid > 0 ? `${rm(loan.totalPrincipalPaid)} repaid` : null} mono={isActive} />
           {late ? <FullPanelRow label="Overdue" value={rm(late.outstanding)} sub={`since ${fullDay(late.oldestDue)} · ${plural(late.daysPast, 'day', 'days')}`} mono /> : null}

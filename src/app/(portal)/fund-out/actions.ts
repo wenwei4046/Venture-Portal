@@ -1,5 +1,6 @@
 'use server'
 
+import { monthlyRateOf, rateBasisOf, ratePctCap } from '@/lib/rate-basis'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
@@ -165,6 +166,11 @@ async function createLoanInner(formData: FormData): Promise<{ error: string } | 
   )
   if (acctErrMsg) return { error: acctErrMsg }
 
+  // Per year (2026-11-04, the user's method 1): the year's rate typed directly — no base rate plus premium; kept as the
+  // month's, ten decimals, with base 0 and the whole rate the premium, so an amend is never refused for going under
+  // a base rate the deal never had.
+  const rateBasis = rateBasisOf(formData.get('rate_basis'))
+
   // ─── Look up active base rate ───
   const { data: baseRate, error: brError } = await supabase
     .from('base_rate_history')
@@ -176,7 +182,7 @@ async function createLoanInner(formData: FormData): Promise<{ error: string } | 
     .maybeSingle()
 
   if (brError) return { error: `Base rate lookup failed: ${brError.message}` }
-  if (!baseRate) {
+  if (!baseRate && rateBasis === 'month') {
     return {
       error:
         'No approved base rate found. Principal must approve a base rate before loans can be created.',
@@ -195,14 +201,14 @@ async function createLoanInner(formData: FormData): Promise<{ error: string } | 
 
   // Custom interest rate from form (% per month → decimal)
   const customRatePercent = parseFloat((formData.get('custom_rate_percent') as string) ?? '0')
-  if (isNaN(customRatePercent) || customRatePercent < 0 || customRatePercent >= 100) {
-    return { error: 'Custom interest rate must be between 0 and 100%' }
+  if (isNaN(customRatePercent) || customRatePercent < 0 || customRatePercent >= ratePctCap(formData)) {
+    return { error: rateBasis === 'year' ? 'The rate a year must be from 0 to 1,200%' : 'Custom interest rate must be between 0 and 100%' }
   }
-  const customRate = customRatePercent / 100
+  const customRate = monthlyRateOf(customRatePercent, rateBasis)
 
-  const base = Number(baseRate.base_rate)
+  const base = rateBasis === 'year' ? 0 : Number(baseRate!.base_rate)
   const premium = customRate
-  const effective = base + premium
+  const effective = rateBasis === 'year' ? customRate : base + premium
 
   // Bank balance check moved to approval/disbursement time. At creation the
   // loan is only pending_approval — no money moves — so blocking Finance
@@ -245,7 +251,9 @@ async function createLoanInner(formData: FormData): Promise<{ error: string } | 
     min_pay_interest_from?: string
     repayment_start_month?: string
     principal_per_month?: number
+    rate_basis?: string
   } = {}
+  if (rateBasis === 'year') creationFlags.rate_basis = 'year'
   if (formData.get('compound_interest') === 'on') creationFlags.compound_interest = true
   if (formData.get('min_pay_interest') === 'on') {
     creationFlags.min_pay_interest = true
@@ -262,7 +270,7 @@ async function createLoanInner(formData: FormData): Promise<{ error: string } | 
       .update(creationFlags)
       .eq('id', loanId as string)
       .eq('status', 'pending_approval')
-    if (cErr) return { error: `The loan was filed, but its compound interest / minimum pay / first repayment / amount a month were not set: ${cErr.message} — set them on its page.` }
+    if (cErr) return { error: `The loan was filed, but its compound interest / minimum pay / first repayment / amount a month or its rate per year were not set: ${cErr.message} — set them on its page.` }
   }
 
   return { id: loanId as string }
@@ -739,8 +747,8 @@ async function fileWholeLoan(formData: FormData): Promise<{ error: string } | un
   let rate: number | null = null
   if (ratePctRaw !== '') {
     const ratePct = parseFloat(ratePctRaw)
-    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: 'The rate must be from 0 to 100%.' }
-    rate = Math.round((ratePct / 100) * 1e6) / 1e6
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= ratePctCap(formData)) return { error: 'The rate must be from 0 to 100% a month.' }
+    rate = monthlyRateOf(ratePct, rateBasisOf(formData.get('rate_basis')))
   }
   const tenureRaw = ((formData.get('tenure_months') as string) ?? '').trim()
   let tenure: number | null = null
@@ -800,8 +808,8 @@ async function amendLoanWork(formData: FormData): Promise<{ error: string } | un
 
   if (ratePctRaw.trim() !== '') {
     const ratePct = parseFloat(ratePctRaw)
-    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: 'The rate must be from 0 to 100%.' }
-    payload.effective_rate = Math.round((ratePct / 100) * 1e6) / 1e6
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= ratePctCap(formData)) return { error: 'The rate must be from 0 to 100% a month.' }
+    payload.effective_rate = monthlyRateOf(ratePct, rateBasisOf(formData.get('rate_basis')))
   }
   if (tenureRaw.trim() !== '') {
     const tenure = parseInt(tenureRaw, 10)
@@ -868,8 +876,8 @@ async function amendLoanFromWork(formData: FormData, direct = true): Promise<{ e
   let rate: number | null = null
   if (ratePctRaw !== '') {
     const ratePct = parseFloat(ratePctRaw)
-    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: 'The rate must be from 0 to 100%.' }
-    rate = Math.round((ratePct / 100) * 1e6) / 1e6
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= ratePctCap(formData)) return { error: 'The rate must be from 0 to 100% a month.' }
+    rate = monthlyRateOf(ratePct, rateBasisOf(formData.get('rate_basis')))
   }
   const remainingRaw = ((formData.get('remaining_months') as string) ?? '').trim()
   let remaining: number | null = null

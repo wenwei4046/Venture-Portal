@@ -1,5 +1,6 @@
 'use server'
 
+import { monthlyRateOf, rateBasisOf, ratePctCap } from '@/lib/rate-basis'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import dayjs from 'dayjs'
@@ -44,8 +45,8 @@ async function fileWholeFundSource(formData: FormData): Promise<{ error: string 
   let rate: number | null = null
   if (ratePctRaw !== '') {
     const ratePct = parseFloat(ratePctRaw)
-    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: 'The rate must be from 0 to 100%.' }
-    rate = Math.round((ratePct / 100) * 1e6) / 1e6
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= ratePctCap(formData)) return { error: 'The rate must be from 0 to 100% a month.' }
+    rate = monthlyRateOf(ratePct, rateBasisOf(formData.get('rate_basis')))
   }
   let periods: number | null = null
   let noFixedTerm = false
@@ -110,8 +111,8 @@ async function amendFundSourceWork(formData: FormData): Promise<{ error: string 
 
   if (ratePctRaw.trim() !== '') {
     const ratePct = parseFloat(ratePctRaw)
-    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: 'The rate must be from 0 to 100%.' }
-    payload.cost_rate = Math.round((ratePct / 100) * 1e6) / 1e6
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= ratePctCap(formData)) return { error: 'The rate must be from 0 to 100% a month.' }
+    payload.cost_rate = monthlyRateOf(ratePct, rateBasisOf(formData.get('rate_basis')))
   }
   // lock_in_months: sent empty => no fixed term (null); not sent => as it is.
   if (formData.has('lock_in_months')) {
@@ -186,8 +187,8 @@ async function amendFundSourceFromWork(formData: FormData, direct = true): Promi
   let rate: number | null = null
   if (ratePctRaw !== '') {
     const ratePct = parseFloat(ratePctRaw)
-    if (isNaN(ratePct) || ratePct < 0 || ratePct >= 100) return { error: 'The rate must be from 0 to 100%.' }
-    rate = Math.round((ratePct / 100) * 1e6) / 1e6
+    if (isNaN(ratePct) || ratePct < 0 || ratePct >= ratePctCap(formData)) return { error: 'The rate must be from 0 to 100% a month.' }
+    rate = monthlyRateOf(ratePct, rateBasisOf(formData.get('rate_basis')))
   }
   const remainingRaw = ((formData.get('remaining_months') as string) ?? '').trim()
   let remaining: number | null = null
@@ -426,8 +427,12 @@ async function createFundSourceInner(formData: FormData, userId: string): Promis
   if (isNaN(raw.amount) || raw.amount <= 0) {
     throw new Error('Amount must be greater than 0')
   }
-  if (isNaN(raw.cost_rate_percent) || raw.cost_rate_percent < 0 || raw.cost_rate_percent >= 100) {
-    throw new Error('Interest rate must be between 0 and 100%')
+  // Per month or per year (2026-11-04): a year's rate is kept as the month's, ten decimals — 10% a year bears
+  // 1,000.00 a month on 120,000.
+  const rateBasis = rateBasisOf(formData.get('rate_basis'))
+  const ratePctMax = rateBasis === 'year' ? 1200 : 100
+  if (isNaN(raw.cost_rate_percent) || raw.cost_rate_percent < 0 || raw.cost_rate_percent >= ratePctMax) {
+    throw new Error('Interest rate must be between 0 and 100% a month')
   }
   // Repayment type "A fixed amount a month" (2026-10-27): its periods are what clears the amount at it, the last
   // month taking what is left — no more than the 120 a number of months may be.
@@ -489,7 +494,7 @@ async function createFundSourceInner(formData: FormData, userId: string): Promis
     }
   }
 
-  const cost_rate = raw.cost_rate_percent / 100
+  const cost_rate = monthlyRateOf(raw.cost_rate_percent, rateBasis)
   // 利滚利 — compound interest, settable at creation (2026-06-12; was edit-only).
   const compound = formData.get('compound_interest') === 'on'
   // 最低还息 — minimum-pay-interest flag, settable at creation (2026-09-04), and the month it is checked from
@@ -501,6 +506,7 @@ async function createFundSourceInner(formData: FormData, userId: string): Promis
     capital_type: 'paid' as const,
     amount: raw.amount,
     cost_rate,
+    rate_basis: rateBasis,
     compound_interest: compound,
     min_pay_interest: minPayInterest,
     min_pay_interest_from: minPayInterest ? minPayFromDate(formData.get('min_pay_interest_from')) : null,
@@ -584,7 +590,7 @@ async function createFundSourceInner(formData: FormData, userId: string): Promis
       reference_id: data.id,
       reference_table: 'fund_sources',
       submitted_by: userId,
-      description: `New fund source: ${typeLabel} — RM ${raw.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${raw.cost_rate_percent}%/mo`,
+      description: `New fund source: ${typeLabel} — RM ${raw.amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${raw.cost_rate_percent}%/${rateBasis === 'year' ? 'yr' : 'mo'}`,
       amount: raw.amount,
       status: 'pending' as const,
       workflow_state: 'submitted' as const,

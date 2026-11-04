@@ -135,6 +135,7 @@ describe('Record fund in on a desktop', () => {
       from_freetext_name: '',
       amount: '300000.00',
       cost_rate_percent: '2',
+      rate_basis: 'month',
       lock_in_months: '6',
       effective_date: '2026-10-15',
       repayment_date: '',
@@ -178,7 +179,7 @@ describe('Record fund in on the phone', () => {
   it('keeps the sheet’s form: its fields in its order, the term behind its button', async () => {
     const { onSaved } = draw(true)
     await act(async () => undefined)
-    expect(Array.from(dialog().querySelectorAll('label')).map((l) => l.textContent)).toEqual(['From', 'Type', 'Amount RM', 'Description', 'Into bank', 'Date', 'Rate % /mo'])
+    expect(Array.from(dialog().querySelectorAll('label')).map((l) => l.textContent)).toEqual(['From', 'Type', 'Amount RM', 'Description', 'Into bank', 'Date', 'Rate per', 'Rate % /mo'])
     expect(Array.from((screen.getByLabelText('Type') as HTMLSelectElement).options).map((o) => o.textContent)).toEqual(['Subsidiary', 'Director loan', 'Dept pool', 'Outsource'])
     expect(screen.getByText('From, an amount and a rate are needed.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('From'), { target: { value: 'co-hc' } })
@@ -206,5 +207,17 @@ describe('Fund IN’s head', () => {
   it('has no Record fund in for whoever may not record one', () => {
     render(<FundInHub records={[]} month="2026-10" today="2026-10-15" initialCard="all" can={{ edit: false, void: false, amend: false }} canSetDefault={false} canCreate={false} />)
     expect(screen.getByTestId('head')).toBeEmptyDOMElement()
+  })
+})
+
+// 2026-11-04 — a rate a year, kept as the month's (÷ 12): 10% a year on 120,000 is 1,000.00 a month.
+describe('Record fund in with a rate a year', () => {
+  it('works the month’s interest out of the year’s rate and sends it per year', async () => {
+    draw()
+    await act(async () => undefined)
+    fireEvent.change(screen.getByLabelText('Rate per'), { target: { value: 'year' } })
+    fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '120000' } })
+    fireEvent.change(screen.getByLabelText('Rate % /yr'), { target: { value: '10' } })
+    expect(within(screen.getByTestId('deal-summary')).getByText(/10\.000% \/yr · 0\.833% \/mo/)).toBeInTheDocument()
   })
 })

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchByKeys } from '@/lib/paginate'
+import { rateBasisOf } from '@/lib/rate-basis'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { loadRepaymentBook } from '@/lib/repayment-book'
@@ -18,6 +19,7 @@ type LoanRow = {
   company_id: string
   principal: number | string
   effective_rate: number | string
+  rate_basis?: string | null
   tenure_months: number | null
   disbursement_date: string | null
   repayment_start_month: string | null
@@ -38,7 +40,7 @@ export async function loadLoanHub(supabase: SupabaseClient, today: string): Prom
   const [{ data: loans, error }, { data: companies }, { data: outstandingRows }, book, { data: pendingRequests }] = await Promise.all([
     supabase
       .from('loans')
-      .select('id, company_id, principal, effective_rate, tenure_months, disbursement_date, repayment_start_month, terms_effective_from, repayment_terms, status, compound_interest, min_pay_interest, created_by, created_at, approved_by, approved_at')
+      .select('id, company_id, principal, effective_rate, rate_basis, tenure_months, disbursement_date, repayment_start_month, terms_effective_from, repayment_terms, status, compound_interest, min_pay_interest, created_by, created_at, approved_by, approved_at')
       .order('created_at', { ascending: false }),
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
@@ -82,6 +84,7 @@ export async function loadLoanHub(supabase: SupabaseClient, today: string): Prom
       amount: Number(l.principal),
       outstanding: status === 'active' ? Number(o?.outstanding ?? l.principal) : null,
       rate: Number(l.effective_rate),
+      rateBasis: rateBasisOf(l.rate_basis),
       status,
       overdue: status === 'active' ? (lateBy.get(l.id) ?? null) : null,
       date: l.disbursement_date,

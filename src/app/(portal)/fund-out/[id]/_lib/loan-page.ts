@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { createClient } from '@/lib/supabase/server'
+import { rateBasisOf, rateInBasis, rateWords, type RateBasis } from '@/lib/rate-basis'
 import type { User } from '@/types'
 import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
@@ -68,7 +69,7 @@ export interface LoanPageModel {
   monthlyInterest: number
   outstanding: number
   totalPrincipalPaid: number
-  rate: { effective: number; base: number; premium: number }
+  rate: { effective: number; base: number; premium: number; basis?: RateBasis; words?: string }
   tone: string
   chip: string
   trail: FullStep[]
@@ -248,7 +249,11 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     monthlyInterest,
     outstanding: outstandingAmount,
     totalPrincipalPaid,
-    rate: { effective: Number(loan.effective_rate), base: Number(loan.base_rate), premium: Number(loan.risk_premium) },
+    rate: {
+      effective: Number(loan.effective_rate), base: Number(loan.base_rate), premium: Number(loan.risk_premium),
+      basis: rateBasisOf((loan as { rate_basis?: string | null }).rate_basis),
+      words: rateWords(Number(loan.effective_rate), rateBasisOf((loan as { rate_basis?: string | null }).rate_basis)),
+    },
     tone,
     chip,
     trail,
@@ -258,7 +263,8 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
     amend:
       isActive && (approvesTerms || fileTerms)
         ? {
-            ratePct: (Number(loan.effective_rate) * 100).toString(),
+            ratePct: rateInBasis(Number(loan.effective_rate), rateBasisOf((loan as { rate_basis?: string | null }).rate_basis)).toString(),
+            rateBasis: rateBasisOf((loan as { rate_basis?: string | null }).rate_basis),
             months: (loan.tenure_months ?? '').toString(),
             start: (loan.disbursement_date as string | null) ?? '',
             compound: (loan as { compound_interest?: boolean }).compound_interest === true,

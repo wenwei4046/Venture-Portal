@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { createClient } from '@/lib/supabase/server'
+import { rateBasisOf, rateInBasis, rateWords } from '@/lib/rate-basis'
 import type { User } from '@/types'
 import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { canDo } from '@/lib/permission-actions'
@@ -318,7 +319,7 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
     compound: !!source.compound_interest,
     lockInMonths: termMonths,
     fullyRepaid,
-    rate: `${(Number(source.cost_rate) * 100).toFixed(3)}% /mo`,
+    rate: rateWords(Number(source.cost_rate), rateBasisOf((source as { rate_basis?: string | null }).rate_basis)),
     plan,
     repayments: repaymentsList.map((r) => ({
       id: r.id as string,
@@ -374,7 +375,8 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
     amend:
       isActive && (approvesTerms || fileTerms)
         ? {
-            ratePct: (Number(source.cost_rate) * 100).toString(),
+            ratePct: rateInBasis(Number(source.cost_rate), rateBasisOf((source as { rate_basis?: string | null }).rate_basis)).toString(),
+            rateBasis: rateBasisOf((source as { rate_basis?: string | null }).rate_basis),
             months: (source.lock_in_months ?? '').toString(),
             start: (source.repayment_date as string | null) ?? (source.effective_date as string),
             compound: (source as { compound_interest?: boolean }).compound_interest === true,

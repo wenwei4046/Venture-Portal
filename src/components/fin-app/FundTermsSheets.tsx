@@ -158,13 +158,13 @@ export function AmendTermsSheet({
             <Field label="Effective from" htmlFor="am-from">
               <Input id="am-from" type="month" mono value={d.effectiveFrom} onChange={(e) => set({ effectiveFrom: e.target.value })} />
             </Field>
-            <Field label="Rate % /mo" htmlFor="am-rate">
+            <Field label={terms.rateBasis === 'year' ? 'Rate % /yr' : 'Rate % /mo'} htmlFor="am-rate">
               <Input id="am-rate" mono align="right" inputMode="decimal" value={d.ratePct} onChange={(e) => set({ ratePct: e.target.value })} placeholder="0.000" />
             </Field>
           </div>
         ) : (
           <div className={fm.duo}>
-            <Field label="Rate % /mo" htmlFor="am-rate">
+            <Field label={terms.rateBasis === 'year' ? 'Rate % /yr' : 'Rate % /mo'} htmlFor="am-rate">
               <Input id="am-rate" mono align="right" inputMode="decimal" value={d.ratePct} onChange={(e) => set({ ratePct: e.target.value })} placeholder="0.000" />
             </Field>
             <Field label="Term · months" htmlFor="am-months">
