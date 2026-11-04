@@ -65,6 +65,8 @@ export interface AmendTermsFormProps {
   side: DealSide
   id: string
   ratePct: string
+  /** How the deal's rate was agreed (2026-11-04): its rate is asked and sent that way. */
+  rateBasis?: 'month' | 'year'
   /** The periods / tenure the deal holds ('' = no fixed term). */
   months: string
   /** The deal's fixed principal a month ('' = equal parts). */
@@ -104,7 +106,7 @@ export default function AmendTermsForm(p: AmendTermsFormProps) {
   const [openFrom, setOpenFrom] = useState('')
 
   // What the form opened with: only what is changed from it is sent (lib/fund-amend, 2026-10-16).
-  const was: AmendTerms = { ratePct: p.ratePct, months: p.months, start: p.start, compound: p.compound, text: p.text, termsFrom: w.changed ? w.termsFromYM : null, nextMonth: p.nextMonth }
+  const was: AmendTerms = { ratePct: p.ratePct, rateBasis: p.rateBasis ?? 'month', months: p.months, start: p.start, compound: p.compound, text: p.text, termsFrom: w.changed ? w.termsFromYM : null, nextMonth: p.nextMonth }
 
   const switchMode = (m: AmendMode) => {
     // The months box counts differently each way (months left from the month, or the terms' own months): it starts again.
@@ -222,7 +224,7 @@ export default function AmendTermsForm(p: AmendTermsFormProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-start">
             <div>
               <label htmlFor={cfg.rateName} className={AMEND_LABEL}>
-                Rate (% a month)
+                {p.rateBasis === 'year' ? 'Rate (% a year)' : 'Rate (% a month)'}
               </label>
               <input id={cfg.rateName} name={cfg.rateName} type="number" step="0.001" min="0" value={rate} onChange={(e) => setRate(e.target.value)} className={AMEND_FIELD} />
             </div>

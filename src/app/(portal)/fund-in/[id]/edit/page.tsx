@@ -1,5 +1,6 @@
 import { officeTime } from '@/lib/office-time'
 import Link from 'next/link'
+import { rateBasisOf, rateInBasis } from '@/lib/rate-basis'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { notFound, redirect } from 'next/navigation'
 import { requireActionOn, requireAnyActionOn, requirePage } from '@/lib/auth'
@@ -90,7 +91,8 @@ export default async function EditFundSourcePage({ params }: Props) {
         </div>
         <AmendFundSourceForm
           id={source.id}
-          ratePct={(Number(source.cost_rate) * 100).toString()}
+          ratePct={rateInBasis(Number(source.cost_rate), rateBasisOf((source as { rate_basis?: string | null }).rate_basis)).toString()}
+          rateBasis={rateBasisOf((source as { rate_basis?: string | null }).rate_basis)}
           lockInMonths={(source.lock_in_months ?? '').toString()}
           principalPerMonth={source.principal_per_month == null ? '' : String(source.principal_per_month)}
           repaymentDate={(source.repayment_date as string | null) ?? (source.effective_date as string)}

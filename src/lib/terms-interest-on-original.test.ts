@@ -145,7 +145,7 @@ describe('Amend terms sends it', () => {
   const SOURCE: AmendTerms = { ratePct: '3.5', months: '6', start: '2026-05-02', compound: false, text: 'Conts - 60k', termsFrom: null, nextMonth: '2026-06' }
   it('from a month on, ticked: interest_on_original', () => {
     const d = { ...amendDraftOf(SOURCE), ratePct: '3', interestOnOriginal: true }
-    expect(Object.fromEntries(amendFormData('in', 's1', SOURCE, d).entries())).toEqual({ fund_source_id: 's1', cost_rate_percent: '3', effective_from: '2026-06', interest_on_original: 'on' })
+    expect(Object.fromEntries(amendFormData('in', 's1', SOURCE, d).entries())).toEqual({ fund_source_id: 's1', cost_rate_percent: '3', rate_basis: 'month', effective_from: '2026-06', interest_on_original: 'on' })
   })
   it('not ticked, or the whole deal: not sent', () => {
     expect(amendFormData('in', 's1', SOURCE, { ...amendDraftOf(SOURCE), ratePct: '3' }).has('interest_on_original')).toBe(false)

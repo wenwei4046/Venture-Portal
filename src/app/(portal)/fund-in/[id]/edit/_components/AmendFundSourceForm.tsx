@@ -1,12 +1,15 @@
 'use client'
 
 import { amendFundSource, amendFundSourceFrom } from '../../../actions'
+import type { RateBasis } from '@/lib/rate-basis'
 import AmendTermsForm from '@/components/treasury/AmendTermsForm'
 import type { AmendFacts } from '@/lib/fund-amend'
 
 interface Props {
   id: string
   ratePct: string
+  /** How the source's rate was agreed (2026-11-04). */
+  rateBasis?: RateBasis
   lockInMonths: string
   /** A fixed principal a month the source has ('' = equal parts). */
   principalPerMonth?: string
@@ -22,12 +25,13 @@ interface Props {
 
 // An active fund source's Amend terms — the form both deals share (components/treasury/AmendTermsForm, 2026-10-27):
 // From the first instalment / From a later month, the parts in cards, the Repayment type, the schedule beside it.
-export default function AmendFundSourceForm({ id, ratePct, lockInMonths, principalPerMonth = '', repaymentDate, compound, notes, nextMonth, facts, direct = true }: Props) {
+export default function AmendFundSourceForm({ id, ratePct, rateBasis = 'month', lockInMonths, principalPerMonth = '', repaymentDate, compound, notes, nextMonth, facts, direct = true }: Props) {
   return (
     <AmendTermsForm
       side="in"
       id={id}
       ratePct={ratePct}
+      rateBasis={rateBasis}
       months={lockInMonths}
       principalPerMonth={principalPerMonth}
       start={repaymentDate}

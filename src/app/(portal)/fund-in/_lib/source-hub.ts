@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchByKeys } from '@/lib/paginate'
+import { rateBasisOf } from '@/lib/rate-basis'
 import { SOURCE_TYPE_LABELS, withCode, type FundRecord, type FundStatus } from '@/lib/fund-hub'
 import { installmentsInAll, resolveFirstDueYM } from '@/lib/treasury-terms'
 
@@ -18,6 +19,7 @@ type SourceRow = {
   from_freetext_name: string | null
   amount: number | string
   cost_rate: number | string
+  rate_basis?: string | null
   lock_in_months: number | null
   effective_date: string | null
   repayment_start_month: string | null
@@ -39,7 +41,7 @@ export async function loadSourceHub(supabase: SupabaseClient): Promise<FundRecor
   const [{ data: sources, error }, { data: companies }, { data: directors }, { data: departments }, { data: outstandingRows }, { data: banks }, { data: accounts }, { data: requests }] = await Promise.all([
     supabase
       .from('fund_sources')
-      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, repayment_start_month, terms_effective_from, maturity_date, status, notes, compound_interest, min_pay_interest, bank_account_id, account_code, created_by, created_at, repaid_at, repaid_by')
+      .select('id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, rate_basis, lock_in_months, effective_date, repayment_start_month, terms_effective_from, maturity_date, status, notes, compound_interest, min_pay_interest, bank_account_id, account_code, created_by, created_at, repaid_at, repaid_by')
       .order('effective_date', { ascending: false }),
     supabase.from('companies').select('id, name, short_code'),
     supabase.from('directors').select('id, name, code'),
@@ -102,6 +104,7 @@ export async function loadSourceHub(supabase: SupabaseClient): Promise<FundRecor
       amount: Number(s.amount),
       outstanding: s.status === 'active' || s.status === 'matured' ? (owed.get(s.id) ?? Number(s.amount)) : null,
       rate: Number(s.cost_rate),
+      rateBasis: rateBasisOf(s.rate_basis),
       status: s.status,
       overdue: null,
       date: s.effective_date,

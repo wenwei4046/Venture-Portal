@@ -358,7 +358,7 @@ describe('Fund › Fund out on the phone', () => {
     const [mode, fd] = mocks.amendLoan.mock.calls[0] as [string, FormData]
     expect(mode).toBe('from')
     // The compound switch, untouched, is not sent — the RPC keeps it.
-    expect(Object.fromEntries(fd.entries())).toEqual({ loan_id: 'l1', effective_rate_percent: '2.5', effective_from: '2026-11' })
+    expect(Object.fromEntries(fd.entries())).toEqual({ loan_id: 'l1', effective_rate_percent: '2.5', rate_basis: 'month', effective_from: '2026-11' })
     expect(await within(sheet).findByText('修改失败: 生效月要晚过现行条件的生效月')).toBeInTheDocument()
     await act(async () => {
       fireEvent.click(within(sheet).getByRole('button', { name: 'Apply from Nov 2026' }))

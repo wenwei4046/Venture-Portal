@@ -13,6 +13,7 @@ import { typeLabel, type AccountType } from '@/lib/coa'
 import { withCode } from '@/lib/fund-hub'
 import { NO_MIN_PAY_FROM, minPayChoiceWords, minPayFromField, minPayFromMissing, minPayLaterMonths, type MinPayFrom } from '@/lib/min-pay'
 import { addYM, money, previewRows, readRepayment, repaymentSummary, repaymentWords, type RepaymentChoice } from '@/lib/repayment-type'
+import { monthlyRateOf, rateWords } from '@/lib/rate-basis'
 import { createFundSourceFromDialog, openRecordFundIn } from '../actions'
 import type { NewSourceOptions } from '../_lib/new-source-options'
 
@@ -59,6 +60,8 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
   const [bankId, setBankId] = useState('')
   const [date, setDate] = useState(today)
   const [rate, setRate] = useState('')
+  // Per year (2026-11-04): the year's rate, kept as the month's to ten decimals.
+  const [perYear, setPerYear] = useState(false)
   const [showAccount, setShowAccount] = useState(false)
   const [showTerm, setShowTerm] = useState(false)
   const [showInterest, setShowInterest] = useState(false)
@@ -102,6 +105,7 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
     setBankId(opts?.banks[0]?.id ?? '')
     setDate(today)
     setRate('')
+    setPerYear(false)
     setShowAccount(false)
     setShowTerm(false)
     setShowInterest(false)
@@ -136,6 +140,8 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
   const monthsAsked = desktop ? repay === 'months' : true
   const term = !monthsAsked || months.trim() === '' ? null : Number(months)
   const rateN = rate.trim() === '' ? NaN : Number(rate)
+  /** The month's rate as a fraction, whichever way it was typed. */
+  const monthly = Number.isFinite(rateN) ? monthlyRateOf(rateN, perYear ? 'year' : 'month') : NaN
   const amountN = num(amount)
   // What the Repayment type's box works out to on the amount.
   const read = desktop && (repay === 'amount' || repay === 'months') ? readRepayment(repay, repay === 'amount' ? perMonth : months, amountN) : null
@@ -151,7 +157,7 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
   if (desktop && !repay) need.push('a repayment type')
   const problem =
     neededSentence(need, true) ??
-    (rateN < 0 || rateN >= 100
+    (rateN < 0 || monthly >= 1
       ? 'The rate is from 0 to under 100% a month.'
       : date > today
         ? 'The date cannot be in the future — interest runs from the day it came in.'
@@ -182,6 +188,7 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
     fd.set('from_freetext_name', named ? fromName.trim() : '')
     fd.set('amount', num(amount).toFixed(2))
     fd.set('cost_rate_percent', String(rateN))
+    fd.set('rate_basis', perYear ? 'year' : 'month')
     // A desktop's Repayment type: the months, a fixed amount a month (its months worked out from it), or none.
     fd.set('lock_in_months', monthsAsked ? months.trim() : '')
     if (desktop && repay === 'amount') fd.set('principal_per_month', perMonth.replace(/[,\s]/g, ''))
@@ -285,7 +292,7 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
   if (desktop) {
     // What the terms make: from the first repayment's month (the month after the money came in, unset).
     const startYM = firstDueYM
-    const interest = !compound && Number.isFinite(rateN) && amountN > 0 ? r2((amountN * rateN) / 100) : null
+    const interest = !compound && Number.isFinite(monthly) && amountN > 0 ? r2(amountN * monthly) : null
     const plan = read?.ok ? read.plan : null
     const schedule =
       repay && amountN > 0 && (repay === 'none' || plan)
@@ -328,8 +335,14 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
               </DealPart>
 
               <DealPart no={3} title="Interest">
-                <div className={df.pair}>
-                  <Field label="Rate % /mo" htmlFor="fi-rate">
+                <div className={df.trio}>
+                  <Field label="Rate per" htmlFor="fi-per">
+                    <Select id="fi-per" value={perYear ? 'year' : 'month'} onChange={(e) => setPerYear(e.target.value === 'year')}>
+                      <option value="month">Month</option>
+                      <option value="year">Year</option>
+                    </Select>
+                  </Field>
+                  <Field label={perYear ? 'Rate % /yr' : 'Rate % /mo'} htmlFor="fi-rate">
                     <Input id="fi-rate" mono align="right" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="0.000" />
                   </Field>
                   <Field label="Interest a month">
@@ -395,7 +408,7 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
                 { key: 'Amount', value: amountN > 0 ? `RM ${money(amountN)}` : '—', mono: true },
                 { key: 'Into', value: bank ? `${bank.bank_name} — ${bank.account_number}` : '—' },
                 { key: 'Date', value: dayLabel(date) },
-                { key: 'Rate', value: Number.isFinite(rateN) ? `${rateN.toFixed(3)}% a month${interest != null ? ` · RM ${money(interest)}` : ''}` : '—' },
+                { key: 'Rate', value: Number.isFinite(monthly) ? `${rateWords(monthly, perYear ? 'year' : 'month')}${interest != null ? ` · RM ${money(interest)}` : ''}` : '—' },
                 {
                   key: 'Repayment',
                   value: !repay ? 'Not chosen yet' : repay === 'none' || plan ? repaymentSummary(repay, plan, startYM) : 'Not filled in yet',
@@ -438,7 +451,13 @@ export default function RecordFundInDialog({ open, onClose, onSaved, today }: { 
         <Field label="Date">
           <DateField value={date} onChange={setDate} today={today} label="Date" />
         </Field>
-        <Field label="Rate % /mo" htmlFor="fi-rate">
+        <Field label="Rate per" htmlFor="fi-per">
+                    <Select id="fi-per" value={perYear ? 'year' : 'month'} onChange={(e) => setPerYear(e.target.value === 'year')}>
+                      <option value="month">Month</option>
+                      <option value="year">Year</option>
+                    </Select>
+                  </Field>
+        <Field label={perYear ? 'Rate % /yr' : 'Rate % /mo'} htmlFor="fi-rate">
           <Input id="fi-rate" mono align="right" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="0.000" />
         </Field>
 

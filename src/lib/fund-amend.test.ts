@@ -31,6 +31,7 @@ describe('Amend terms — what is sent', () => {
     expect(entries(amendFormData('out', 'l1', LOAN, { ...d, ratePct: '2.5', remaining: '24', reason: ' renegotiated ' }))).toEqual({
       loan_id: 'l1',
       effective_rate_percent: '2.5',
+      rate_basis: 'month',
       effective_from: '2026-11',
       remaining_months: '24',
       reason: 'renegotiated',
@@ -128,7 +129,7 @@ describe('Amend terms — the whole terms filed by Finance', () => {
     const d = draftOfForm('in', fd, 'whole', SOURCE)
     expect(d.start).toBe(SOURCE.start)
     expect(d.text).toBe(SOURCE.text)
-    expect(entries(amendFormData('in', 's1', SOURCE, d))).toEqual({ fund_source_id: 's1', cost_rate_percent: '0.833', reason: 'agreed from the start' })
+    expect(entries(amendFormData('in', 's1', SOURCE, d))).toEqual({ fund_source_id: 's1', cost_rate_percent: '0.833', rate_basis: 'month', reason: 'agreed from the start' })
   })
 })
 
@@ -173,5 +174,14 @@ describe('Repayment type — what the desktop form sends (2026-10-27)', () => {
     expect(principalPerMonthSent(form([['principal_per_month', '-5']]))).toEqual({ ok: false, error: 'The principal a month is an amount above 0.' })
     expect(openFromSent(form([['open_from', '2026-10']]))).toBe('2026-10')
     expect(openFromSent(form([['open_from', 'October']]))).toBeNull()
+  })
+})
+
+// 2026-11-04 — a deal agreed per year is amended per year: its rate typed so, sent with its basis.
+describe('Amend terms — a rate per year', () => {
+  it('sends the year’s rate with its basis', () => {
+    const was = { ...LOAN, rateBasis: 'year' as const, ratePct: '10' }
+    const sent = entries(amendFormData('out', 'l1', was, { ...amendDraftOf(was), ratePct: '9' }))
+    expect(sent).toMatchObject({ effective_rate_percent: '9', rate_basis: 'year' })
   })
 })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { rateWords } from '@/lib/rate-basis'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
@@ -24,7 +25,6 @@ import {
   fundTrail,
   movedInMonth,
   onFundCard,
-  ratePct,
   type FundCardKey,
   type FundRecord,
   type FundSide,
@@ -138,7 +138,7 @@ export default function FundHub({
       text: (r) => (r.outstanding == null ? '—' : rm(r.outstanding)),
       tone: (r) => (out && r.status !== 'cancelled' && (r.outstanding ?? 0) > 0 ? 'danger' : null),
     },
-    { key: 'rate', label: 'Rate', kind: 'no', width: 110, value: (r) => r.rate, text: (r) => `${ratePct(r.rate)} /mo` },
+    { key: 'rate', label: 'Rate', kind: 'no', width: 110, value: (r) => r.rate, text: (r) => rateWords(r.rate, r.rateBasis ?? 'month') },
     {
       key: 'amount',
       label: 'Amount',
@@ -410,7 +410,7 @@ export function FundDetailBody({
       <Group n="III." title="Booking">
         {r.account ? <Line label="Account" value={r.account.name} sub={r.account.code} /> : null}
         <Line label="Amount" value={rm(r.amount)} mono />
-        <Line label="Rate" value={`${ratePct(r.rate)} /mo`} sub={r.months == null ? 'no fixed term' : plural(r.months, 'month', 'months')} mono />
+        <Line label="Rate" value={rateWords(r.rate, r.rateBasis ?? 'month')} sub={r.months == null ? 'no fixed term' : plural(r.months, 'month', 'months')} mono />
         {interest ? <Line label="Interest" value={interest} /> : null}
         {r.outstanding != null ? <Line label="Outstanding" value={rm(r.outstanding)} sub={r.repaid > 0 ? `${rm(r.repaid)} repaid` : undefined} mono /> : null}
         {r.overdue ? <Line label="Overdue" value={rm(r.overdue.amount)} sub={`since ${fd(r.overdue.since)} · ${plural(r.overdue.days, 'day', 'days')}`} mono /> : null}

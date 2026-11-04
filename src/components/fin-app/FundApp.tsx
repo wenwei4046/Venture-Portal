@@ -593,7 +593,7 @@ export default function FundApp({
           name={loanOn.companyName}
           plan={loanOn.plan}
           printed={printedLine(today, printedBy)}
-          meta={scheduleMeta({ label: 'Borrower', value: loanOn.borrower }, loanOn.principal, `${pct(loanOn.rate.effective)} /mo`, loanOn.plan)}
+          meta={scheduleMeta({ label: 'Borrower', value: loanOn.borrower }, loanOn.principal, loanOn.rate.words ?? `${pct(loanOn.rate.effective)} /mo`, loanOn.plan)}
         />
       ) : sourceOn ? (
         <PrintSchedule

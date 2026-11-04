@@ -22,8 +22,10 @@ export type RepaymentChoice = 'amount' | 'months' | 'none'
 
 /** A deal's terms as its edit page starts the form. */
 export interface AmendTerms {
-  /** %/month as the form shows it, e.g. "1.25". */
+  /** % as the form shows it, in the deal's basis (a month's, or a year's — `rateBasis`), e.g. "1.25". */
   ratePct: string
+  /** How the deal's rate was agreed (2026-11-04): the form asks and sends it that way; absent — per month. */
+  rateBasis?: 'month' | 'year'
   /** A loan's tenure, a fund source's periods ('' = no fixed term), in months. */
   months: string
   /** A loan's disbursement date, a fund source's repayment start — `YYYY-MM-DD`. */
@@ -104,7 +106,11 @@ export function amendFormData(side: DealSide, id: string, was: AmendTerms, d: Am
   const n = NAMES[side]
   const fd = new FormData()
   fd.set(n.id, id)
-  if (!sameRate(d.ratePct, was.ratePct)) fd.set(n.rate, d.ratePct.trim())
+  if (!sameRate(d.ratePct, was.ratePct)) {
+    fd.set(n.rate, d.ratePct.trim())
+    // The rate is typed in the deal's own basis; the action keeps it as the month's (2026-11-04).
+    fd.set('rate_basis', was.rateBasis ?? 'month')
+  }
   if (d.compound !== was.compound) fd.set('compound_interest', d.compound ? 'on' : 'off')
   if (d.mode === 'from') {
     fd.set('effective_from', d.effectiveFrom)

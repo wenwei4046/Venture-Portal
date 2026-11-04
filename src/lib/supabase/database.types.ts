@@ -3822,6 +3822,7 @@ export type Database = {
       }
       fund_sources: {
         Row: {
+          rate_basis: string
           account_code: string | null
           amount: number
           bank_account_id: string | null
@@ -3855,6 +3856,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          rate_basis?: string
           account_code?: string | null
           amount: number
           bank_account_id?: string | null
@@ -3888,6 +3890,7 @@ export type Database = {
           version?: number
         }
         Update: {
+          rate_basis?: string
           account_code?: string | null
           amount?: number
           bank_account_id?: string | null
@@ -5120,6 +5123,7 @@ export type Database = {
       }
       loans: {
         Row: {
+          rate_basis: string
           approved_at: string | null
           approved_by: string | null
           base_rate: number
@@ -5145,6 +5149,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          rate_basis?: string
           approved_at?: string | null
           approved_by?: string | null
           base_rate: number
@@ -5170,6 +5175,7 @@ export type Database = {
           version?: number
         }
         Update: {
+          rate_basis?: string
           approved_at?: string | null
           approved_by?: string | null
           base_rate?: number

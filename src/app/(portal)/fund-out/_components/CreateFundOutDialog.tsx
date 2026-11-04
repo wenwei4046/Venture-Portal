@@ -13,6 +13,7 @@ import { typeLabel, type AccountType } from '@/lib/coa'
 import { withCode } from '@/lib/fund-hub'
 import { NO_MIN_PAY_FROM, minPayChoiceWords, minPayFromField, minPayFromMissing, minPayLaterMonths, type MinPayFrom } from '@/lib/min-pay'
 import { addYM, money, previewRows, readRepayment, repaymentSummary, repaymentWords, type RepaymentChoice } from '@/lib/repayment-type'
+import { monthlyRateOf, rateWords } from '@/lib/rate-basis'
 import { createLoanFromDialog, openCreateLoan } from '../actions'
 import type { NewLoanOptions } from '../_lib/new-loan-options'
 
@@ -48,6 +49,8 @@ export default function CreateFundOutDialog({ open, onClose, onSaved, today }: {
   const [bankId, setBankId] = useState('')
   const [date, setDate] = useState(today)
   const [premium, setPremium] = useState('')
+  // Per year (2026-11-04, method 1): the year's rate typed directly, no base rate — kept as the month's.
+  const [perYear, setPerYear] = useState(false)
   const [account, setAccount] = useState('')
   const [showTerm, setShowTerm] = useState(false)
   const [showSource, setShowSource] = useState(false)
@@ -92,6 +95,7 @@ export default function CreateFundOutDialog({ open, onClose, onSaved, today }: {
     setBankId(opts?.banks[0]?.id ?? '')
     setDate(today)
     setPremium('')
+    setPerYear(false)
     setAccount('')
     setShowTerm(false)
     setShowSource(false)
@@ -118,7 +122,9 @@ export default function CreateFundOutDialog({ open, onClose, onSaved, today }: {
   }
 
   const base = opts?.baseRate?.rate ?? 0
-  const effective = base + num(premium) / 100
+  const effective = perYear ? monthlyRateOf(num(premium), 'year') : base + num(premium) / 100
+  /** The rate is known: per year it needs no base rate; per month the quarter's approved one. */
+  const rateKnown = perYear || !!opts?.baseRate
   // The months box is the term on the phone, the Repayment type's months on a desktop.
   const monthsAsked = desktop ? repay === 'months' : true
   const term = !monthsAsked || months.trim() === '' ? null : Number(months)
@@ -156,6 +162,7 @@ export default function CreateFundOutDialog({ open, onClose, onSaved, today }: {
     fd.set('principal', num(amount).toFixed(2))
     fd.set('loan_start_date', date)
     fd.set('custom_rate_percent', String(num(premium)))
+    fd.set('rate_basis', perYear ? 'year' : 'month')
     // A desktop's Repayment type: the months, a fixed amount a month (its months worked out from it), or none.
     fd.set('tenure_months', monthsAsked ? months.trim() : '')
     if (desktop && repay === 'amount') fd.set('principal_per_month', perMonth.replace(/[,\s]/g, ''))
@@ -231,8 +238,16 @@ export default function CreateFundOutDialog({ open, onClose, onSaved, today }: {
     </Field>
   )
   const premiumField = (
-    <Field label={desktop ? 'Premium % /mo' : 'Custom premium % /mo'} htmlFor="fo-premium">
+    <Field label={perYear ? 'Rate % /yr' : desktop ? 'Premium % /mo' : 'Custom premium % /mo'} htmlFor="fo-premium">
       <Input id="fo-premium" mono align="right" inputMode="decimal" value={premium} onChange={(e) => setPremium(e.target.value)} placeholder="0.000" />
+    </Field>
+  )
+  const perField = (
+    <Field label="Rate per" htmlFor="fo-per">
+      <Select id="fo-per" value={perYear ? 'year' : 'month'} onChange={(e) => setPerYear(e.target.value === 'year')}>
+        <option value="month">Month — base rate + premium</option>
+        <option value="year">Year — type the rate</option>
+      </Select>
     </Field>
   )
   const sourceField = (
@@ -259,7 +274,7 @@ export default function CreateFundOutDialog({ open, onClose, onSaved, today }: {
   if (desktop) {
     // What the terms make: from the first repayment's month (the month after the loan starts, unset).
     const startYM = firstDueYM
-    const interest = !compound && opts?.baseRate && amountN > 0 ? r2(amountN * effective) : null
+    const interest = !compound && rateKnown && amountN > 0 ? r2(amountN * effective) : null
     const plan = read?.ok ? read.plan : null
     const schedule =
       repay && amountN > 0 && (repay === 'none' || plan)
@@ -294,16 +309,27 @@ export default function CreateFundOutDialog({ open, onClose, onSaved, today }: {
                 </div>
               </DealPart>
 
-              <DealPart no={3} title="Interest" note="The quarter’s base rate plus a premium, locked for the loan’s life.">
+              <DealPart no={3} title="Interest" note={perYear ? 'The rate a year, charged monthly (÷ 12), locked for the loan’s life.' : 'The quarter’s base rate plus a premium, locked for the loan’s life.'}>
                 <div className={df.trio}>
-                  <Field label={`Base rate${opts?.baseRate ? ` · ${opts.baseRate.quarter}` : ''}`}>
-                    <div className={df.fixed}>{opts?.baseRate ? (base * 100).toFixed(3) : '—'}</div>
-                  </Field>
-                  {premiumField}
-                  <Field label="Rate % /mo">
-                    <div className={df.fixed}>{opts?.baseRate ? (effective * 100).toFixed(3) : '—'}</div>
-                  </Field>
+                  {perField}
+                  {perYear ? (
+                    premiumField
+                  ) : (
+                    <Field label={`Base rate${opts?.baseRate ? ` · ${opts.baseRate.quarter}` : ''}`}>
+                      <div className={df.fixed}>{opts?.baseRate ? (base * 100).toFixed(3) : '—'}</div>
+                    </Field>
+                  )}
+                  {perYear ? (
+                    <Field label="Rate % /mo">
+                      <div className={df.fixed}>{(effective * 100).toFixed(3)}</div>
+                    </Field>
+                  ) : (
+                    premiumField
+                  )}
                 </div>
+                {!perYear ? (
+                  <p className={df.calc}>{`Rate ${opts?.baseRate ? (effective * 100).toFixed(3) : '—'}% /mo`}</p>
+                ) : null}
                 {interest != null ? (
                   <p className={df.calc}>
                     <b>RM {money(interest)}</b> interest a month on RM {money(amountN)}.
@@ -362,7 +388,7 @@ export default function CreateFundOutDialog({ open, onClose, onSaved, today }: {
                 { key: 'Amount', value: amountN > 0 ? `RM ${money(amountN)}` : '—', mono: true },
                 { key: 'From bank', value: bank ? `${bank.bank_name} — ${bank.account_number}` : '—' },
                 { key: 'Date', value: dayLabel(date) },
-                { key: 'Rate', value: opts?.baseRate ? `${(effective * 100).toFixed(3)}% a month${interest != null ? ` · RM ${money(interest)}` : ''}` : '—' },
+                { key: 'Rate', value: rateKnown ? `${rateWords(effective, perYear ? 'year' : 'month')}${interest != null ? ` · RM ${money(interest)}` : ''}` : '—' },
                 {
                   key: 'Repayment',
                   value: !repay ? 'Not chosen yet' : repay === 'none' || plan ? repaymentSummary(repay, plan, startYM) : 'Not filled in yet',
@@ -397,8 +423,11 @@ export default function CreateFundOutDialog({ open, onClose, onSaved, today }: {
         <Field label="Date">
           <DateField value={date} onChange={setDate} today={today} label="Date" />
         </Field>
+        {perField}
         {premiumField}
-        {opts?.baseRate ? (
+        {perYear ? (
+          <Hint>{`${num(premium).toFixed(3)}% a year = ${(effective * 100).toFixed(3)}% /mo, locked for the loan’s life.`}</Hint>
+        ) : opts?.baseRate ? (
           <Hint>
             {`Base ${(base * 100).toFixed(3)}% (${opts.baseRate.quarter}) + ${num(premium).toFixed(3)}% = ${(effective * 100).toFixed(3)}% /mo, locked for the loan’s life.`}
           </Hint>

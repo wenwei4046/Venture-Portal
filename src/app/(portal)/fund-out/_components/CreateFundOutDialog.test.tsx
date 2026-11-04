@@ -104,6 +104,7 @@ describe('Create fund out on a desktop', () => {
       principal: '60000.00',
       loan_start_date: '2026-10-15',
       custom_rate_percent: '1',
+      rate_basis: 'month',
       tenure_months: '',
       principal_per_month: '7000',
       repayment_start_date: '',
@@ -159,7 +160,7 @@ describe('Create fund out on the phone', () => {
   it('keeps the sheet’s form: its fields in its order, the term behind its button', async () => {
     draw(true)
     await act(async () => undefined)
-    expect(Array.from(dialog().querySelectorAll('label')).map((l) => l.textContent)).toEqual(['To', 'Amount RM', 'Description', 'From bank', 'Date', 'Custom premium % /mo', 'Account'])
+    expect(Array.from(dialog().querySelectorAll('label')).map((l) => l.textContent)).toEqual(['To', 'Amount RM', 'Description', 'From bank', 'Date', 'Rate per', 'Custom premium % /mo', 'Account'])
     expect(screen.getByText('Base 0.850% (2026-Q4) + 0.000% = 0.850% /mo, locked for the loan’s life.')).toBeInTheDocument()
     expect(screen.getByText('To, an amount and an account are needed.')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('To'), { target: { value: 'co-car' } })
@@ -208,5 +209,22 @@ describe('Fund OUT’s head', () => {
   it('leaves out what the reader may not use', () => {
     head({ canCreate: false, canLoanAging: false, canExport: false })
     expect(screen.getByTestId('head')).toBeEmptyDOMElement()
+  })
+})
+
+// 2026-11-04 — the user: "有没有办法我也可以set annual的？" → method 1 for Fund OUT: the rate a year typed directly, no
+// base rate plus premium; sent with its basis, kept as the month's.
+describe('Create fund out with a rate a year', () => {
+  it('types the year’s rate, says the month’s, and sends it per year', async () => {
+    draw(true)
+    await act(async () => undefined)
+    fireEvent.change(screen.getByLabelText('To'), { target: { value: 'co-car' } })
+    fireEvent.change(screen.getByLabelText('Amount RM'), { target: { value: '120000' } })
+    fireEvent.change(screen.getByLabelText('Account'), { target: { value: '1200' } })
+    fireEvent.change(screen.getByLabelText('Rate per'), { target: { value: 'year' } })
+    fireEvent.change(screen.getByLabelText('Rate % /yr'), { target: { value: '10' } })
+    expect(screen.getByText('10.000% a year = 0.833% /mo, locked for the loan’s life.')).toBeInTheDocument()
+    await submit()
+    expect(sent()).toMatchObject({ custom_rate_percent: '10', rate_basis: 'year' })
   })
 })
