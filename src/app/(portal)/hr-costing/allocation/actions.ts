@@ -8,6 +8,7 @@ import { assertPeriodOpen } from '@/lib/period-lock'
 import { isTopupKind, type RowStatus } from '@/lib/payroll-lifecycle'
 import { centralizedSplitMessage, costModelOf } from '@/lib/department-mode'
 import {
+  HV_BILL_TO,
   planSplitCopy,
   splitLock,
   splitLockMessage,
@@ -217,7 +218,8 @@ export async function saveDeptBillTo(
     const { error: insErr } = await supabase.from('hr_pool_allocation').insert(
       rows.map((r) => ({
         department_id: departmentId,
-        company_id: r.companyId,
+        // HOUZS Venture's share of what moved in has no company (2026-11-04).
+        company_id: r.companyId === HV_BILL_TO ? null : r.companyId,
         period_month: period,
         split_pct: Math.round(r.pct * 10000) / 1000000, // % → 6dp fraction
         created_by: user.id,

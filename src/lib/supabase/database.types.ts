@@ -4252,7 +4252,7 @@ export type Database = {
       }
       hr_pool_allocation: {
         Row: {
-          company_id: string
+          company_id: string | null
           created_at: string
           created_by: string
           department_id: string
@@ -4261,7 +4261,7 @@ export type Database = {
           split_pct: number
         }
         Insert: {
-          company_id: string
+          company_id?: string | null
           created_at?: string
           created_by: string
           department_id: string
@@ -4270,7 +4270,7 @@ export type Database = {
           split_pct: number
         }
         Update: {
-          company_id?: string
+          company_id?: string | null
           created_at?: string
           created_by?: string
           department_id?: string
