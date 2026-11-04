@@ -64,6 +64,7 @@ const compound: RepaymentPlan = {
     addedFrom: '2026-01',
     addedTo: '2026-01',
   },
+  next: { due: '2026-03-05', amount: 2152.38, principal: 0, interest: 2152.38 },
 }
 const head = () => screen.getByRole('heading', { name: 'Repayment schedule' }).closest('.sect-head') as HTMLElement
 
@@ -86,6 +87,26 @@ describe('the Repayment schedule', () => {
     expect(foot).toHaveTextContent('33,600.00')
     expect(foot).toHaveTextContent('11,800.00')
     expect(screen.queryByText(/^Installment = principal ÷ 3/)).toBeNull()
+  })
+
+  // 2026-10-26 — the user: fund in "也需要卡片，和fund out 一样", every schedule "是", the fourth "改成 next installment".
+  it('puts the four figures over every schedule: overdue, owed now, paid to date, the next installment', () => {
+    const { unmount } = render(
+      <RepaymentScheduleSection plan={{ ...plan, overdue: 11800, overdueSince: '2026-03-15', overdueDays: 36, next: { due: '2026-05-15', amount: 11200, principal: 10000, interest: 1200 } }} />,
+    )
+    const facts = () => Array.from(document.querySelectorAll('.sched-fact')).map((f) => f.textContent)
+    // Owed now: the principal still owed and the interest already due but not paid (Feb–Apr's 3,600 less the 1,800 in).
+    expect(facts()).toEqual([
+      'Overdue nowRM 11,800.00since 15 Mar 2026 · 36 days',
+      'Owed nowRM 11,800.00principal 10,000.00 + interest 1,800.00',
+      'Paid to dateRM 21,800.00principal 20,000.00 + interest 1,800.00',
+      'Next installmentRM 11,200.0015 May 2026 · principal 10,000.00 + interest 1,200.00',
+    ])
+    expect(document.querySelector('.sched-fact[data-bad="true"]')).toHaveTextContent('Overdue now')
+    unmount()
+    render(<RepaymentScheduleSection plan={{ ...plan, kind: 'open', months: null, next: null }} />)
+    expect(facts()[1]).toBe('Owed nowRM 11,800.00principal 10,000.00 + interest 1,800.00')
+    expect(facts()[3]).toBe('Next installment—nothing more falls due')
   })
 
   it('folds the payments themselves away under the schedule', () => {
@@ -114,7 +135,7 @@ describe('the Repayment schedule', () => {
       'Overdue nowRM 2,069.60since 5 Feb 2026 · 19 days',
       'Owed nowRM 53,809.60balance after Feb 2026',
       'Paid to dateRM 2,600.00principal 2,000.00 + interest 600.00',
-      'Added to the balanceRM 740.00Jan 2026 · unpaid interest',
+      'Next installmentRM 2,152.385 Mar 2026 · interest',
     ])
     const table = head().parentElement!.querySelector('table') as HTMLTableElement
     expect(Array.from(table.querySelectorAll('thead th')).map((th) => th.textContent)).toEqual([
