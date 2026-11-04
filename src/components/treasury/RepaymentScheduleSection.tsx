@@ -38,7 +38,10 @@ function ScheduleFacts({ plan }: { plan: RepaymentPlan }) {
   const r2 = (n: number) => Math.round(n * 100) / 100
   // Owed now: a 利滚利 deal's whole balance (rolled into); else — and a 利滚利 deal paid along the way, its money on the
   // oldest interest first — the principal still owed and the interest already due but unpaid.
-  const unpaidInterest = r2(Math.max(0, plan.rows.filter((r) => !plan.next || r.due < plan.next.due).reduce((s, r) => s + r.interest, 0) - plan.interestPaid))
+  // Every instalment paid (2026-11-04, HC's 300,000 paid at 1,666.67 where the stored rate asks 1,666.80): nothing is
+  // owed — what the rate's rounding leaves over is not a debt, as the header's Outstanding RM 0.00 already says.
+  const paidUp = plan.rows.length > 0 && plan.rows.every((r) => r.outstanding <= 0.005) && plan.principalOwed <= 0.005
+  const unpaidInterest = paidUp ? 0 : r2(Math.max(0, plan.rows.filter((r) => !plan.next || r.due < plan.next.due).reduce((s, r) => s + r.interest, 0) - plan.interestPaid))
   const next = plan.next ?? null
   const facts: Array<{ key: string; label: string; value: string; sub: string; bad?: boolean }> = [
     {

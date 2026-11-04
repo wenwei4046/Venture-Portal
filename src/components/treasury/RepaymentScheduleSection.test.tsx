@@ -143,6 +143,16 @@ describe('the Repayment schedule', () => {
     expect(facts()[3]).toBe('Next installment—nothing more falls due')
   })
 
+  // 2026-11-04 — HC's 300,000 (BI#19), every instalment paid at 1,666.67 where the stored rate asks 1,666.80: its
+  // header read Paid 36 of 36 · Outstanding RM 0.00 while Owed now said RM 4.63 of interest. A plan whose every
+  // instalment is paid owes nothing — the rate's rounding is not a debt.
+  it('a plan whose every instalment is paid owes nothing now', () => {
+    const paid = plan.rows.map((r) => ({ ...r, outstanding: 0, remark: 'Paid', tone: 'ledger' as const }))
+    render(<RepaymentScheduleSection plan={{ ...plan, rows: paid, paidCount: 3, outstandingDue: 0, principalPaid: 30000, principalOwed: 0, interestPaid: 3595.37, next: null }} />)
+    const facts = Array.from(document.querySelectorAll('.sched-fact')).map((f) => f.textContent)
+    expect(facts[1]).toBe('Owed nowRM 0.00principal 0.00 + interest 0.00')
+  })
+
   it('folds the payments themselves away under the schedule', () => {
     render(
       <RepaymentScheduleSection plan={plan} recorded={{ count: 4, content: <p>the payments</p> }} />,
