@@ -70,6 +70,8 @@ export const TILES = [
   ["Suggest reply", "M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z", "var(--crm-rust)"],
 ] as const;
 export type TileLabel = (typeof TILES)[number][0];
+/** Cold template's tile: the envelope the ⋮ menu's Send template message wears. */
+export const COLD_ICON = "M4 6h16v12H4zM4 7l8 6 8-6";
 
 /** How many emoji Recents holds — one category's worth, three rows of eight. */
 export const RECENT_MAX = 24;
@@ -191,6 +193,9 @@ export interface ComposerIn {
   openTpl: () => void;
   /** Settings › Suggest a template (on unless Settings turned it off). */
   tplOn?: boolean;
+  /** A WhatsApp chat past its window (2026-11-04, the owner: "我在crm 没找到可以send cold template 的地方，帮我suggest reply 改成cold"):
+   *  Attach's Suggest reply — nothing to suggest past the window — is Cold template, opening the templates (openTpl). */
+  coldTile?: boolean;
   /** The cold card's line (common.ts › coldLine). */
   coldSub?: string;
   reply: { who: string; text: string } | null;
@@ -276,7 +281,9 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
       const a = s.ecat === id && !(s.searching && s.q.trim());
       return { label, icon: ICON[ic], fg: a ? RUST : MUTED, sw: a ? 2 : 1.7, line: a ? RUST : "transparent", pick: () => set(x => pickCat(x, id)) };
     }),
-    tiles: TILES.map(([label, icon, color]) => ({ label, icon, color, go: () => { set(x => ({ ...x, panel: null, kb: false })); v.tile(label); } })),
+    tiles: TILES.map(([label, icon, color]) => label === "Suggest reply" && v.coldTile
+      ? { label: "Cold template", icon: COLD_ICON, color, go: () => { set(x => ({ ...x, panel: null, kb: false })); v.openTpl(); } }
+      : { label, icon, color, go: () => { set(x => ({ ...x, panel: null, kb: false })); v.tile(label); } }),
     homeBg: homeBg(shown), toast: s.toast,
     replyText: v.reply?.text ?? "", replyWho: v.reply?.who ?? "", cancelReply: () => v.cancelReply(),
     slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: v.qrEdit ? () => v.qrEdit?.() : undefined,
