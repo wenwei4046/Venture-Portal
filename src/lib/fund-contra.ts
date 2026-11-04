@@ -13,9 +13,20 @@ export interface ContraDeal {
   outstanding: number
 }
 
+/** A contra still waiting for the Principal (2026-11-05): withdrawn by whoever filed it, or the Principal. */
+export interface ContraWaiting {
+  id: string
+  /** The approval's words: each deal with its P / I, the total. */
+  words: string
+  date: string
+  filedBy: string
+  canWithdraw: boolean
+}
+
 export interface ContraOptions {
   loans: ContraDeal[]
   sources: ContraDeal[]
+  waiting: ContraWaiting[]
 }
 
 /** A line as typed: the deal picked and two amounts as text. */
