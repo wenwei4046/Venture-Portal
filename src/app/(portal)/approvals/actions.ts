@@ -62,6 +62,13 @@ function revalidateTermsDeal(approval: Pick<ApprovalRecord, 'reference_table' | 
   revalidatePath('/reports/loan-aging')
 }
 
+/** A fund contra decided: both hubs and every reading of the deals' balances (its deals are many, so the lists). */
+function revalidateContraDeals() {
+  for (const p of ['/fund-out', '/fund-in', '/repayment-schedule', '/reports/company-statement', '/reports/loan-aging', '/venture-pool']) revalidatePath(p)
+  revalidatePath('/fund-out/[id]', 'page')
+  revalidatePath('/fund-in/[id]', 'page')
+}
+
 async function performApproval(
   supabase: Awaited<ReturnType<typeof createClient>>,
   user: User,
@@ -104,6 +111,16 @@ async function performApproval(
     const { error: rpcErr } = await supabase.rpc('approve_terms_change' as never, { p_approval_id: id, p_notes: notes } as never)
     if (rpcErr) throw new Error(`The terms were not changed: ${rpcErr.message}`)
     revalidateTermsDeal(approval, true)
+    notifyApprovalDecision(approval.request_type, 'approved', approval.description ?? '', user.name).catch(() => {})
+    return
+  }
+
+  // A fund contra (mig 20261104230000): one RPC posts its journal entry, writes both sides' repayments and the Venture
+  // Pool, and marks it approved — a refusal anywhere leaves it pending, nothing written.
+  if (approval.request_type === 'fund_contra') {
+    const { error: rpcErr } = await supabase.rpc('approve_fund_contra' as never, { p_approval_id: id, p_notes: notes } as never)
+    if (rpcErr) throw new Error(`The contra was not posted: ${rpcErr.message}`)
+    revalidateContraDeals()
     notifyApprovalDecision(approval.request_type, 'approved', approval.description ?? '', user.name).catch(() => {})
     return
   }
@@ -597,6 +614,13 @@ async function performRejection(
     const { error: rpcErr } = await supabase.rpc('reject_terms_change' as never, { p_approval_id: id, p_notes: notes } as never)
     if (rpcErr) throw new Error(`Failed to reject: ${rpcErr.message}`)
     revalidateTermsDeal(approval, false)
+    return
+  }
+  // A fund contra (mig 20261104230000): its own RPC closes the approval and the contra together.
+  if (approval.request_type === 'fund_contra') {
+    const { error: rpcErr } = await supabase.rpc('reject_fund_contra' as never, { p_approval_id: id, p_notes: notes } as never)
+    if (rpcErr) throw new Error(`Failed to reject: ${rpcErr.message}`)
+    revalidateContraDeals()
     return
   }
 

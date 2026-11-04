@@ -43,7 +43,6 @@ const PAYMENT_TYPES = [
   { value: 'interest', label: 'Interest' },
   { value: 'principal', label: 'Principal' },
   { value: 'penalty', label: 'Penalty' },
-  { value: 'netting', label: 'Netting' },
 ] as const
 
 /** A sheet's busy flag, its refusal, and a write answered `{ error }` (or thrown). */

@@ -3760,6 +3760,7 @@ export type Database = {
           amount: number
           created_at: string
           created_by: string
+          fund_contra_id: string | null
           fund_source_id: string
           id: string
           notes: string | null
@@ -3771,6 +3772,7 @@ export type Database = {
           amount: number
           created_at?: string
           created_by: string
+          fund_contra_id?: string | null
           fund_source_id: string
           id?: string
           notes?: string | null
@@ -3782,6 +3784,7 @@ export type Database = {
           amount?: number
           created_at?: string
           created_by?: string
+          fund_contra_id?: string | null
           fund_source_id?: string
           id?: string
           notes?: string | null
@@ -6486,6 +6489,7 @@ export type Database = {
           amount: number
           created_at: string
           created_by: string
+          fund_contra_id: string | null
           id: string
           journal_entry_id: string | null
           loan_id: string
@@ -6498,6 +6502,7 @@ export type Database = {
           amount: number
           created_at?: string
           created_by: string
+          fund_contra_id?: string | null
           id?: string
           journal_entry_id?: string | null
           loan_id: string
@@ -6510,6 +6515,7 @@ export type Database = {
           amount?: number
           created_at?: string
           created_by?: string
+          fund_contra_id?: string | null
           id?: string
           journal_entry_id?: string | null
           loan_id?: string
@@ -8596,6 +8602,7 @@ export type Database = {
         | "dept_payment_request"
         | "loan_cancel"
         | "terms_change"
+        | "fund_contra"
       approval_status: "pending" | "approved" | "rejected"
       approval_workflow_state:
         | "submitted"
@@ -8900,6 +8907,7 @@ export const Constants = {
         "dept_payment_request",
         "loan_cancel",
         "terms_change",
+        "fund_contra",
       ],
       approval_status: ["pending", "approved", "rejected"],
       approval_workflow_state: [

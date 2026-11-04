@@ -38,6 +38,8 @@ export interface LoanRepaymentRow {
   type: string
   amount: number
   notes: string | null
+  /** The fund contra that wrote it (2026-11-04): undone whole, never voided alone. */
+  contraId?: string | null
 }
 
 export interface LoanPageModel {
@@ -239,6 +241,7 @@ export async function loadLoanPage(supabase: Client, user: User, id: string): Pr
       type: r.payment_type as string,
       amount: Number(r.amount),
       notes: (r.notes as string | null) ?? null,
+      contraId: (r as { fund_contra_id?: string | null }).fund_contra_id ?? null,
     })),
     termsSegments,
     termsChanges,
