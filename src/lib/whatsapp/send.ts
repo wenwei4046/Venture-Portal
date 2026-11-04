@@ -204,6 +204,9 @@ export const fillTemplate = (text: string, params: string[]) => text.replace(/\{
 /* ── Cold lead templates (rev 1011): the CRM writes them, Meta reviews them ── */
 
 /** A CRM template's words for Meta: the customer's first name, written {name}, is the body's one variable {{1}}. */
+/** Meta's WhatsApp Manager list of the account's templates, where each one's review stands (2026-11-04). */
+export const templatesReviewUrl = (wabaId: string) => `https://business.facebook.com/wa/manage/message-templates/?waba_id=${encodeURIComponent(wabaId)}`;
+
 export const metaTemplateBody = (body: string) => body.trim().replace(/\{name\}/g, "{{1}}");
 
 /**

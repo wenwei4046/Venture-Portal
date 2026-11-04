@@ -77,10 +77,15 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   const segs = (s: string) => s.split(/(\{[a-z_]+\})/).filter(Boolean).map(x => ({ t: x, tag: /^\{[a-z_]+\}$/.test(x), txt: !/^\{[a-z_]+\}$/.test(x) }));
   const card = (x: (typeof tpls)[number]) => { const ok = x.status === "Approved", o = ok && x.t.on, editing = ed === x.t.id, draft = editing ? ui.cltDraft ?? x.t.body : x.t.body;
     const ch = editing ? ui.cltDC ?? x.ch : x.ch;
+    // Its language and category (2026-11-04), as Meta names them; the editor's picks until saved.
+    const lang = editing ? ui.cltDL ?? x.t.language ?? "en" : x.t.language ?? "en", cat = editing ? ui.cltDK ?? x.t.category ?? "MARKETING" : x.t.category ?? "MARKETING";
     return { name: x.t.name, status: x.status, channel: x.ch, stBg: SC[x.status][0], stFg: SC[x.status][1], chFg: x.ch === "WhatsApp" ? CHANNEL_COLOUR.whatsapp : CHANNEL_COLOUR.messenger, chBg: x.ch === "WhatsApp" ? CHANNEL_TINT.whatsapp : CHANNEL_TINT.messenger,
       bd: editing ? "var(--crm-rust)" : "var(--crm-rule)", onLabel: o ? "On" : "Off", onFg: !ok ? "var(--crm-faint)" : o ? "var(--crm-brown)" : "var(--crm-muted)", segs: segs(x.t.body), view: true, editing, draft, dsegs: segs(String(draft)),
-      edit: () => patch({ cltEdit: x.t.id, cltDraft: x.t.body, cltDN: x.t.name, cltDC: x.ch as "WhatsApp" | "Messenger", cltIsNew: false, frmOpen: false }),
-      cancel: () => patch({ cltEdit: null, cltDraft: null, cltIsNew: false }),
+      edit: () => patch({ cltEdit: x.t.id, cltDraft: x.t.body, cltDN: x.t.name, cltDC: x.ch as "WhatsApp" | "Messenger", cltDL: null, cltDK: null, cltIsNew: false, frmOpen: false }),
+      kind: { langOpts: ([["en", "English"], ["zh_CN", "中文"]] as const).map(([k, l]) => ({ label: l, on: lang === k, pick: () => patch({ cltDL: k }) })),
+        catOpts: ([["MARKETING", "Marketing"], ["UTILITY", "Utility"]] as const).map(([k, l]) => ({ label: l, on: cat === k, pick: () => patch({ cltDK: k }) })),
+        catHint: cat === "UTILITY" ? "Utility: a plain update about their enquiry, no offer or promotion — cheaper. Meta moves it to Marketing if it reads as one." : "Marketing: an offer, an introduction, an invitation — anything that sells." },
+      cancel: () => patch({ cltEdit: null, cltDraft: null, cltDL: null, cltDK: null, cltIsNew: false }),
       empty: !String(draft).trim(), subBg: String(draft).trim() ? "var(--crm-rust)" : "var(--crm-line)", subCur: String(draft).trim() ? "pointer" : "not-allowed",
       mode: ui.cltIsNew && editing ? "New template" : "", hasMode: ui.cltIsNew && editing, dname: x.t.name, dn: editing ? ui.cltDN ?? x.t.name : x.t.name,
       setDN: (e: { target: { value: string } }) => patch({ cltDN: e.target.value }),
@@ -109,7 +114,8 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     const t = tpls.find(x => x.t.id === id)?.t, name = (ui.cltDN ?? t?.name ?? "").trim() || "Untitled template", body = ui.cltDraft ?? t?.body ?? "";
     const ch = (ui.cltDC ?? (t?.ch === "messenger" ? "Messenger" : "WhatsApp")) === "Messenger" ? "messenger" : "whatsapp";
     if (!body.trim()) return;
-    void act.saveTemplate({ id: ui.cltIsNew ? null : id, name, ch, body }, submit).then(r => { if (r) patch({ cltEdit: null, cltDraft: null, cltIsNew: false, toast: submit ? `Sent to Meta for ${ch === "whatsapp" ? "WhatsApp" : "Messenger"} review` : `Saved · ${name}` }); });
+    const language = ui.cltDL ?? t?.language ?? "en", category = ui.cltDK ?? t?.category ?? "MARKETING";
+    void act.saveTemplate({ id: ui.cltIsNew ? null : id, name, ch, body, language, category }, submit).then(r => { if (r) patch({ cltEdit: null, cltDraft: null, cltDL: null, cltDK: null, cltIsNew: false, toast: submit ? `Sent to Meta for ${ch === "whatsapp" ? "WhatsApp" : "Messenger"} review` : `Saved · ${name}` }); });
   };
   const all = tpls.map(card);
   const newCard = ui.cltIsNew && ui.cltEdit === "new" ? card({ t: { id: "new", name: "", ch: "whatsapp", st: "draft", body: "", on: false, metaName: null, language: "en", reason: null }, status: "Draft", ch: ui.cltDC ?? "WhatsApp" }) : null;
@@ -265,7 +271,8 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     actVM, mwtTeams, mwtDirty: dirty, mwtClean: !dirty, mwtBtnBg: dirty ? "var(--crm-rust)" : "var(--crm-line)", mwtBtnCur: dirty ? "pointer" : "default", mwtSavedMsg: !dirty && ui.mwtSaved, mwtSave,
     cltOpen: !ui.frmOpen && !!cE && opItem === "Cold lead templates" && sheetOpen, cltE: cE ?? card({ t: { id: "", name: "", ch: "whatsapp", st: "draft", body: "", on: false, metaName: null, language: "en", reason: null }, status: "Draft", ch: "WhatsApp" }),
     cltTaRef: { current: null },
-    cltNewT: () => patch({ frmOpen: false, frmDraft: null, cltF: "all", cltEdit: "new", cltDraft: "", cltDN: "", cltDC: "WhatsApp", cltIsNew: true }),
+    cltNewT: () => patch({ frmOpen: false, frmDraft: null, cltF: "all", cltEdit: "new", cltDraft: "", cltDN: "", cltDC: "WhatsApp", cltDL: null, cltDK: null, cltIsNew: true }),
+    cltReviewUrl: data.templatesUrl ?? null,
     cltCards: cards, cltEmpty: !cards.length, cltFOpen: ui.cltFOpen, cltToggleF: () => set(u => ({ ...u, cltFOpen: !u.cltFOpen })),
     cltFLabel: f === "all" ? "All statuses" : f, cltFDot: DOT[f] ?? "var(--crm-muted)",
     cltFOpts: [["all", "All statuses"], ["Approved", "Approved"], ["In review", "In review"], ["Draft", "Draft"], ["Rejected", "Rejected"]].map(([k, label]) => ({ label, dot: DOT[k], n: String(tpls.filter(t => k === "all" || t.status === k).length),

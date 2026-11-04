@@ -70,5 +70,15 @@ module.exports = [
   ['<strong style={{ fontSize: "15px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</strong>',
     '{v.ad.canName ? (<input aria-label="Ad name" value={v.ad.nameDraft} onChange={v.ad.onName} onBlur={v.ad.saveName} onKeyDown={v.ad.nameKey} placeholder={v.ad.headline} maxLength={120} style={{ width: "100%", boxSizing: "border-box", margin: "0", padding: "1px 0 3px", border: "0", borderBottom: "1px dashed #D9C7BA", borderRadius: "0", background: "transparent", font: "inherit", fontSize: "15px", fontWeight: "650", color: "#3F2B22", outline: "none" }} />) : (<strong style={{ fontSize: "15px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ad.name}</strong>)}',
     "Ads to teams' editor: the ad's name typed in place (CRM · Manage), saved on blur / Enter through crm_name_ad; the harness keeps the title."],
+  [/(textWrap: "pretty") (\}\}>\s*\{\(v\.cltE\.dsegs\))/, "$1, whiteSpace: \"pre-wrap\" $2",
+    "A cold lead template's preview keeps its line breaks, as the customer's WhatsApp will (the owner, 2026-11-04: \"为什么不能空格\")."],
+  [/(title="Click to edit" style=\{\{ position: "relative", padding: )"16px 18px"/, `$1"38px 18px 16px"`,
+    "A template card leaves the top for its Edit, which sat over a long message's first line (the owner, 2026-11-04: \"overlap\")."],
+  [/(textWrap: "pretty") (\}\}>\s*\{\(t\.segs\))/, "$1, whiteSpace: \"pre-wrap\" $2",
+    "A template card's message keeps its line breaks, as the customer's WhatsApp will (2026-11-04)."],
+  [/(\{\(v\.cltE\.chOpts\)\.map\(\(c, c_i\) => \(<Fragment key=\{c_i\}>[\s\S]*?<\/Fragment>\)\)\}\s*<\/div>\s*<\/div>)/, "$1{!!(v.cltE.kind) && (<DeskTemplateKind v={v.cltE.kind} />)}",
+    "A template's language (English · 中文) and category (Marketing · Utility), sent to Meta with it — every one went as English marketing (the owner, 2026-11-04: \"在crm 没得选中英\", \"是不是能选它是营销还是实用性\")."],
+  [`<button type="button" onClick={v.cltNewT} `, `<DeskTemplateReview url={v.cltReviewUrl} /><button type="button" onClick={v.cltNewT} `,
+    "Beside New template: Meta's WhatsApp Manager, where every template's review stands, and a Copy link (the owner, 2026-11-04: \"做一个按钮是可以导入到看审核状态，或也可以是复制链接的功能\")."],
 ];
 
