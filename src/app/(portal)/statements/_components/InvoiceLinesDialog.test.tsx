@@ -552,3 +552,28 @@ describe('Edit', () => {
     expect(within(dialog()).getByRole('button', { name: /^Due date/ })).toHaveTextContent('No due date')
   })
 })
+
+// 2026-11-04 — the user: "director 开invoice 时account我要自己选": each kind of HR's line starts on the account last
+// month's invoices of the mode put it on; still changeable, still asked where last month had none.
+describe('each kind’s account from last month', () => {
+  const LAST = { Salary: '5050', Allowance: '5050', EPF: '5018', SOCSO: '5018' }
+  beforeEach(() => {
+    mocks.hr.mockImplementation(async () => ({ ok: true, value: { staff: [], directors: DIRECTORS, kindAccounts: LAST } }))
+  })
+
+  it('one company: HR’s lines start on last month’s accounts', async () => {
+    draw()
+    set('Billing mode', 'director_attribution')
+    set('Bill to', 'co:co-hc')
+    await flush()
+    expect([1, 2, 3, 4].map((n) => (screen.getByLabelText(`Line ${n} account`) as HTMLSelectElement).value)).toEqual(['5050', '5018', '5018', ''])
+  })
+
+  it('several companies: each kind starts on last month’s account; one with none is still asked', async () => {
+    draw()
+    set('Billing mode', 'director_attribution')
+    press('Several companies')
+    await flush()
+    expect(['Salary', 'Allowance', 'EPF', 'SOCSO', 'EIS'].map((k) => (screen.getByLabelText(`${k} account`) as HTMLSelectElement).value)).toEqual(['5050', '5050', '5018', '5018', ''])
+  })
+})

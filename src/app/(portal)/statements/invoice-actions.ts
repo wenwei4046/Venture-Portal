@@ -41,6 +41,7 @@ import type { Address } from '@/lib/address/address'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { importResultOf, marketingLinesFromRow, type MarketingLines } from './_lib/marketing-lines'
+import { lastKindAccounts } from './_lib/invoice-form'
 
 // Invoice's hub steps, in words (2026-10-14, the Finance revamp v2 — D10). The
 // hub's drawer, its bulk bar and its credit notes call Service Billing's own
@@ -405,11 +406,42 @@ export async function hubGenerateDirectorInvoices(
 export async function hubHrFigures(
   month: string,
   mode: string,
-): Promise<HubResult<{ staff: StaffAllocationCompanyRow[]; directors: DirectorCtcRow[] }>> {
+): Promise<HubResult<{ staff: StaffAllocationCompanyRow[]; directors: DirectorCtcRow[]; kindAccounts: Record<string, string> }>> {
   await requirePermission('billing', 'hr_costing')
   return attempt(async () => {
     const period = `${month}-01`
-    if (mode === 'director_attribution') return { staff: [], directors: await fetchDirectorCtcByCompany(period) }
-    return { staff: await fetchStaffAllocationByCompany(period, mode as CreateInvoiceMode), directors: [] }
+    const [figures, kindAccounts] = await Promise.all([
+      mode === 'director_attribution'
+        ? fetchDirectorCtcByCompany(period).then((directors) => ({ staff: [] as StaffAllocationCompanyRow[], directors }))
+        : fetchStaffAllocationByCompany(period, mode as CreateInvoiceMode).then((staff) => ({ staff, directors: [] as DirectorCtcRow[] })),
+      lastMonthKindAccounts(month, mode),
+    ])
+    return { ...figures, kindAccounts }
   })
+}
+
+/** Each kind of HR's line, the account last month's invoices of this mode put it on (2026-11-04 — the user: "director
+ *  开invoice 时account我要自己选"). Nothing read — nothing filled in; the dialog still asks. */
+async function lastMonthKindAccounts(month: string, mode: string): Promise<Record<string, string>> {
+  try {
+    return await readLastMonthKindAccounts(month, mode)
+  } catch {
+    return {}
+  }
+}
+
+async function readLastMonthKindAccounts(month: string, mode: string): Promise<Record<string, string>> {
+  // Invoices are Billing's to read: an HR Costing reader with no Billing gets no defaults (the throw is caught above).
+  await requirePermission('billing')
+  const supabase = await createClient()
+  const prev = new Date(`${month}-01T00:00:00Z`)
+  prev.setUTCMonth(prev.getUTCMonth() - 1)
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('invoice_lines(description, category_code)')
+    .eq('period_month', prev.toISOString().slice(0, 10))
+    .eq('billing_mode', mode as CreateInvoiceMode)
+    .neq('status', 'voided')
+  if (error) return {}
+  return lastKindAccounts(((data ?? []) as Array<{ invoice_lines?: Array<{ description: string | null; category_code: string | null }> }>).flatMap((i) => i.invoice_lines ?? []))
 }

@@ -4,6 +4,7 @@ import {
   categoryGroups,
   hrDescription,
   hrSource,
+  lastKindAccounts,
   modeOptions,
   newInvoiceDate,
   parseBillTo,
@@ -211,5 +212,23 @@ describe('a batch', () => {
     expect(partialSentence(2, [{ label: 'HOUZS Sofa (HS) · HR attribution', reason: 'Period 2026-09 is closed' }])).toBe(
       'Created 2 of 3 — HOUZS Sofa (HS) · HR attribution: Period 2026-09 is closed',
     )
+  })
+})
+
+// 2026-11-04 — the user: "director 开invoice 时account我要自己选" — each kind of HR's line starts on the account last
+// month's invoices of the same mode put it on (September's director invoices: every line on 5050).
+describe('each kind’s account from last month', () => {
+  it('reads the account each kind of line was on — the most used, a kind with none left out', () => {
+    expect(
+      lastKindAccounts([
+        { description: "Salary - Sep'26", category_code: '5050' },
+        { description: "Salary - Sep'26", category_code: '5050' },
+        { description: "Salary - Sep'26", category_code: '5011' },
+        { description: "EPF - Sep'26", category_code: '5050' },
+        { description: "Allowance - Sep'26 (HR)", category_code: '5051' },
+        { description: "SOCSO - Sep'26", category_code: null },
+        { description: 'Director salary CTC — September 2026', category_code: '5011' },
+      ]),
+    ).toEqual({ Salary: '5050', EPF: '5050', Allowance: '5051' })
   })
 })

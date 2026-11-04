@@ -217,10 +217,10 @@ describe('the invoice dialogs', () => {
   it('HR’s figures: Billing or HR Costing may read them; a director recharge reads the CTC, a staff one the allocation', async () => {
     mocks.fetchDirectorCtcByCompany.mockResolvedValue([{ companyId: 'co-hc', totalCtc: 1 }])
     mocks.fetchStaffAllocationByCompany.mockResolvedValue([{ companyId: 'co-conts', amount: 2 }])
-    expect(await hubHrFigures('2026-09', 'director_attribution')).toEqual({ ok: true, value: { staff: [], directors: [{ companyId: 'co-hc', totalCtc: 1 }] } })
+    expect(await hubHrFigures('2026-09', 'director_attribution')).toEqual({ ok: true, value: { staff: [], directors: [{ companyId: 'co-hc', totalCtc: 1 }], kindAccounts: {} } })
     expect(mocks.requirePermission).toHaveBeenCalledWith('billing', 'hr_costing')
     expect(mocks.fetchDirectorCtcByCompany).toHaveBeenCalledWith('2026-09-01')
-    expect(await hubHrFigures('2026-09', 'finance_attribution')).toEqual({ ok: true, value: { staff: [{ companyId: 'co-conts', amount: 2 }], directors: [] } })
+    expect(await hubHrFigures('2026-09', 'finance_attribution')).toEqual({ ok: true, value: { staff: [{ companyId: 'co-conts', amount: 2 }], directors: [], kindAccounts: {} } })
     expect(mocks.fetchStaffAllocationByCompany).toHaveBeenCalledWith('2026-09-01', 'finance_attribution')
   })
 
