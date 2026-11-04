@@ -137,79 +137,9 @@ describe('the Repayment Schedule’s cards', () => {
     expect(screen.getByRole('group', { name: 'Overdue / short' })).toBeInTheDocument()
   })
 
-  it('reads the minimum interest on a list tab: received so far, and what is short', async () => {
-    await page()
-    fireEvent.click(tab(/^We collect/))
-    expect(card('To collect')).toHaveTextContent('From borrowers')
-    expect(card('To pay')).toHaveTextContent('To fund sources')
-    expect(card('Received so far')).toHaveAttribute('data-tone', 'ledger')
-    expect(card('Received so far')).toHaveTextContent('RM 5,000.00')
-    expect(card('Received so far')).toHaveTextContent('Min interest · Oct')
-    expect(card('Short')).toHaveAttribute('data-tone', 'danger')
-    expect(card('Short')).toHaveTextContent('RM 1,000.00')
-    expect(card('Short')).toHaveTextContent('Min interest not yet in')
-    expect(screen.queryByRole('group', { name: 'Done so far' })).toBeNull()
-
-    fireEvent.click(tab(/^We pay/))
-    expect(card('Paid so far')).toHaveTextContent('RM 0.00')
-    expect(card('Short')).not.toHaveAttribute('data-tone')
-  })
 })
 
 describe('Due to collect', () => {
-  it('is one table of everything due, counted for the month', async () => {
-    await page()
-    fireEvent.click(tab(/^We collect/))
-    const due = section('Due to collect')
-    // HD's minimum interest is inside its instalment: one row, not two (2026-10-10).
-    expect(within(due).getByText('5 ITEMS · OCTOBER 2026')).toBeInTheDocument()
-    expect(Array.from(due.querySelectorAll('thead th[data-col]')).map((th) => th.textContent?.replace(/[↕▲▼]/g, '').trim())).toEqual([
-      'Counterparty', 'Type', 'Principal', 'Interest', 'Total due', 'Received · Oct', 'Short', '',
-    ])
-    // No note under the table (2026-10-12, the user: descriptions clutter the view).
-    expect(due).not.toHaveTextContent('Min interest = interest must be paid in full each month')
-    expect(due.querySelector('tfoot')).toHaveTextContent('Total')
-  })
-
-  it('reads each row: its terms, type, what came in, and what is short', async () => {
-    await page()
-    fireEvent.click(tab(/^We collect/))
-    const due = section('Due to collect')
-
-    const [hk] = rowsOf(due, 'HK')
-    expect(hk).toHaveTextContent('RM 120,000.00 @ 1.000%/mo · 12mo · 8 left')
-    expect(within(hk).getByText('SC HC').closest('.chip')).toBeInTheDocument()
-    expect(within(hk).getByText('principal + interest').closest('.chip')).toHaveClass('accent')
-    expect(hk).toHaveTextContent('10,000.00')
-    expect(hk).toHaveTextContent('11,200.00')
-    expect(within(hk).getByText('(11,200.00)')).toHaveClass('text-danger')
-    expect(within(hk).getByRole('link', { name: 'Record receipt' })).toHaveAttribute('href', '/fund-out/l1?from=calendar#repayment-form')
-
-    // HC paid October in full: clear, nothing to record.
-    const [hc] = rowsOf(due, 'HC')
-    expect(within(hc).getByText('clear').closest('.chip')).toHaveClass('ledger')
-    expect(within(hc).queryByRole('link', { name: 'Record receipt' })).toBeNull()
-
-    // HD paid only 5,000 of its interest: short on its instalment — listed once,
-    // its minimum interest being part of it (the check stays in Full plans).
-    const hdRows = rowsOf(due, 'HD')
-    expect(hdRows).toHaveLength(1)
-    const [hdScheduled] = hdRows
-    expect(hdScheduled).toHaveTextContent('5,000.00')
-    expect(hdScheduled).toHaveTextContent('(26,000.00)')
-    expect(within(hdScheduled).queryByText('min interest')).toBeNull()
-    expect(within(hdScheduled).getByRole('link', { name: 'Record receipt' })).toBeInTheDocument()
-
-    // Rolled interest and open-ended deals are not in the month's cash: nothing short.
-    const [hm] = rowsOf(due, 'HM')
-    expect(within(hm).getByText('rolled interest').closest('.chip')).toHaveClass('alert')
-    expect(within(hm).queryByRole('link')).toBeNull()
-    const [hb] = rowsOf(due, 'HB')
-    expect(within(hb).getByText('open-ended').closest('.chip')).toBeInTheDocument()
-    expect(hb).toHaveTextContent('500.00')
-    expect(within(hb).queryByRole('link')).toBeNull()
-  })
-
   it('keeps the four old tables and the toggle, folded under it, in English', async () => {
     await page()
     fireEvent.click(tab(/^We collect/))
@@ -225,15 +155,124 @@ describe('Due to collect', () => {
   })
 })
 
-describe('Due to pay', () => {
-  it('offers Record payment on a short row, and shows a repayment PV in flight instead', async () => {
+describe('We collect / We pay, a month at a time (2026-11-04)', () => {
+  const paidUp = () =>
+    database({
+      repayments: [
+        { loan_id: 'l1', amount: 10000, payment_date: '2026-09-09', payment_type: 'principal' },
+        { loan_id: 'l2', amount: 40000, payment_date: '2026-10-05', payment_type: 'principal' },
+        { loan_id: 'l2', amount: 4800, payment_date: '2026-10-05', payment_type: 'interest' },
+        { loan_id: 'l3', amount: 125000, payment_date: '2026-09-20', payment_type: 'principal' },
+        { loan_id: 'l3', amount: 35000, payment_date: '2026-10-03', payment_type: 'interest' },
+      ],
+    })
+  const heads = (sec: HTMLElement) => Array.from(sec.querySelectorAll('thead th[data-col]')).map((th) => th.textContent?.replace(/[↕▲▼]/g, '').trim())
+
+  it('reads the list tab’s cards off the list: to collect, received, still owed, overdue', async () => {
+    await page()
+    fireEvent.click(tab(/^We collect/))
+    expect(card('To collect · Oct')).toBeInTheDocument()
+    expect(card('Received so far')).toHaveAttribute('data-tone', 'ledger')
+    expect(card('Still owed')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /^Overdue · \d+$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Done so far' })).toBeNull()
+    const side = screen.getByRole('region', { name: 'Repayment Schedule' })
+    expect((side.querySelector('.stat-cards-grid') as HTMLElement).style.getPropertyValue('--stat-cols')).toBe('4')
+  })
+
+  it('is one row an instalment, sorted by its day, with its status and the day it was paid', async () => {
+    paidUp()
+    await page()
+    fireEvent.click(tab(/^We collect/))
+    const due = section('Due to collect')
+    expect(heads(due)).toEqual(['Due', 'Company', '#', 'To collect', 'Received', 'Still owed', 'Status', 'Received on', ''])
+    expect(due.querySelector('tfoot')).toHaveTextContent('Total')
+
+    // HC paid October in full on the 5th: Paid, its day, nothing to record.
+    const [hc] = rowsOf(due, 'HC')
+    expect(within(hc).getByText('Paid').closest('.chip')).toHaveClass('ledger')
+    expect(hc).toHaveTextContent('5 Oct')
+    expect(within(hc).queryByRole('link', { name: 'Record receipt' })).toBeNull()
+
+    // HK: its instalment, its split and number, its source; still owed in full, Record receipt.
+    const [hk] = rowsOf(due, 'HK')
+    expect(hk).toHaveTextContent('P 10,000.00 · I 1,200.00')
+    expect(hk).toHaveTextContent('/12')
+    expect(within(hk).getByText('SC HC').closest('.chip')).toBeInTheDocument()
+    expect(within(hk).getByRole('link', { name: 'Record receipt' })).toHaveAttribute('href', '/fund-out/l1?from=calendar#repayment-form')
+
+    // HD paid 5,000 of it: part paid, still owed, Record receipt — listed once.
+    const hd = rowsOf(due, 'HD')
+    expect(hd).toHaveLength(1)
+    expect(within(hd[0]).getByText(/^Part paid/).closest('.chip')).toHaveClass('alert')
+    expect(hd[0]).toHaveTextContent('5,000.00')
+    expect(within(hd[0]).getByRole('link', { name: 'Record receipt' })).toBeInTheDocument()
+
+    // HM compounds: its interest rolls into the balance — nothing owed in cash, nothing to record.
+    const [hm] = rowsOf(due, 'HM')
+    expect(within(hm).getByText('Rolls in')).toBeInTheDocument()
+    expect(within(hm).queryByRole('link')).toBeNull()
+
+    // By day: every row's date in order.
+    const days = Array.from(due.querySelectorAll('tbody tr')).map((tr) => tr.querySelector('td')?.textContent ?? '')
+    const asDate = (s: string) => Date.parse(`${s} 2026`)
+    expect(days.map(asDate)).toEqual([...days.map(asDate)].sort((a, b) => a - b))
+  })
+
+  it('filters by status from the chips over it', async () => {
+    paidUp()
+    await page()
+    fireEvent.click(tab(/^We collect/))
+    const due = section('Due to collect')
+    fireEvent.click(within(due).getByRole('button', { name: /^Paid · 1$/ }))
+    expect(within(due).getAllByRole('row').filter((r) => r.closest('tbody'))).toHaveLength(1)
+    expect(rowsOf(due, 'HC')).toHaveLength(1)
+    expect(within(due).queryByText('HK')).toBeNull()
+    fireEvent.click(within(due).getByRole('button', { name: /^All · / }))
+    expect(rowsOf(due, 'HK').length).toBeGreaterThan(0)
+  })
+
+  // A payment clears the oldest instalment first: HK paid only September's principal, so its June to September
+  // instalments are still owed — this month's list shows them, overdue, before October's, and the card counts them.
+  it('lists the earlier instalments still owed, overdue, in the office’s month', async () => {
+    paidUp()
+    await page()
+    fireEvent.click(tab(/^We collect/))
+    const due = section('Due to collect')
+    const hk = rowsOf(due, 'HK')
+    expect(hk.length).toBeGreaterThan(1)
+    expect(within(hk[0]).getByText(/^(Overdue|Part paid)/)).toBeInTheDocument()
+    expect(hk[hk.length - 1]).toHaveTextContent('9 Oct')
+    expect(screen.getByRole('group', { name: /^Overdue · [1-9][0-9]*$/ })).toHaveAttribute('data-tone', 'danger')
+  })
+
+  it('prints the rows on show from a right-click on the header', async () => {
+    const doc = { open: vi.fn(), write: vi.fn(), close: vi.fn() }
+    const win = { document: doc, focus: vi.fn(), print: vi.fn(), setTimeout: (f: () => void) => f() }
+    const open = vi.spyOn(window, 'open').mockReturnValue(win as unknown as Window)
+    paidUp()
+    await page()
+    fireEvent.click(tab(/^We collect/))
+    const due = section('Due to collect')
+    fireEvent.click(within(due).getByRole('button', { name: /^Paid · 1$/ }))
+    fireEvent.contextMenu(due.querySelector('thead tr') as HTMLElement)
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Print listing/ }))
+    expect(open).toHaveBeenCalled()
+    const html = doc.write.mock.calls[0][0] as string
+    expect(html).toContain('Repayment Schedule · We collect')
+    expect(html).toContain('October 2026 · Paid only')
+    expect(html).toContain('HC')
+    expect(html).not.toContain('>HK')
+    expect(win.print).toHaveBeenCalled()
+    open.mockRestore()
+  })
+
+  it('We pay: Record payment on what is owed, a repayment PV in flight instead', async () => {
     await page()
     fireEvent.click(tab(/^We pay/))
     const due = section('Due to pay')
-    expect(within(due).getByText('2 ITEMS · OCTOBER 2026')).toBeInTheDocument()
-    expect(due.querySelector('thead th[data-col="received"]')).toHaveTextContent('Paid · Oct')
+    expect(heads(due)).toContain('Paid on')
     const [tan] = rowsOf(due, 'Tan S.H.')
-    expect(tan).toHaveTextContent('4,120.00')
     expect(within(tan).getByRole('link', { name: 'Record payment' })).toHaveAttribute('href', '/fund-in/f1?from=calendar#repay_principal')
     const [conts] = rowsOf(due, 'CONTS')
     expect(within(conts).getByText('pending PV').closest('.chip')).toHaveClass('wait')
@@ -290,8 +329,5 @@ describe('the Repayment Schedule’s tabs’ row', () => {
     const cards = screen.getByRole('region', { name: 'Repayment Schedule' })
     expect(cards).toHaveAttribute('data-size', 'small')
     expect((cards.querySelector('.stat-cards-grid') as HTMLElement).style.getPropertyValue('--stat-cols')).toBe('5')
-    fireEvent.click(tab(/^We collect/))
-    const side = screen.getByRole('region', { name: 'Repayment Schedule' })
-    expect((side.querySelector('.stat-cards-grid') as HTMLElement).style.getPropertyValue('--stat-cols')).toBe('5')
   })
 })

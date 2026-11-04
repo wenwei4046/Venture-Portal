@@ -5,8 +5,8 @@ import dayjs from 'dayjs'
 import { formatMoney } from '@/lib/utils'
 import { SlidingTabs } from '@/components/motion/SlidingTabs'
 import RepayCalendar, { type CalendarEvent } from './RepayCalendar'
-import DueTable from './DueTable'
-import { dueRows } from './due-rows'
+import MonthList from './MonthList'
+import type { ListRow } from '@/lib/schedule-list'
 
 export interface SchedRow {
   key: string
@@ -114,8 +114,13 @@ export default function ScheduleView({
   repayNoTermInterest,
   repayCompound,
   repayCompoundTotals,
+  collectList,
+  payList,
   tools = null,
 }: {
+  /** We collect / We pay a month at a time, one row an instalment (2026-11-04, lib/schedule-list). */
+  collectList: ListRow[]
+  payList: ListRow[]
   monthLabel: string
   /** YYYY-MM — the month on screen. */
   month: string
@@ -151,8 +156,8 @@ export default function ScheduleView({
   const [tab, setTab] = useState<Tab>('cal')
 
   const visible = (rows: SchedRow[]) => (mode === 'all' ? rows : rows.filter((r) => !r.done))
-  const collectCount = collectRows.length + collectMin.length + collectCompound.length + collectNoTerm.length
-  const payCount = repayRows.length + repayMin.length + repayCompound.length + repayNoTerm.length
+  const collectCount = collectList.length
+  const payCount = payList.length
   const first = dayjs(`${month}-01`)
 
   return (
@@ -177,16 +182,12 @@ export default function ScheduleView({
         <RepayCalendar month={month} today={today} events={events} />
       ) : (
         <>
-          <DueTable
+          <MonthList
             key={tab}
             side={tab}
-            rows={
-              tab === 'collect'
-                ? dueRows({ rows: collectRows, min: collectMin, compound: collectCompound, noTerm: collectNoTerm })
-                : dueRows({ rows: repayRows, min: repayMin, compound: repayCompound, noTerm: repayNoTerm })
-            }
+            rows={tab === 'collect' ? collectList : payList}
+            today={today}
             monthLong={first.format('MMMM YYYY')}
-            monthShort={first.format('MMM')}
             linkMonth={linkMonth}
             canRecord={canRecord}
             canSetDefault={canSetDefault}

@@ -18,6 +18,11 @@ const ev = (over: Partial<RepaymentSchedule['events'][number]>): RepaymentSchedu
   status: 'due',
   no: 1,
   months: 12,
+  instPrincipal: 0,
+  instInterest: 0,
+  paid: 0,
+  paidOn: null,
+  rolled: 0,
   ...over,
 })
 
@@ -36,6 +41,7 @@ const SCHEDULE: RepaymentSchedule = {
   repayMin: [],
   repayCompound: [],
   repayNoTerm: [],
+  arrears: [],
   events: [
     ev({ name: 'HC', amount: 1100, outstanding: 1100, status: 'overdue', no: 3 }),
     ev({ kind: 'pay', name: 'PETER', href: '/fund-in/fs-f?from=calendar&month=2026-10', amount: 300, outstanding: 0, status: 'paid', no: 1, months: 6 }),
