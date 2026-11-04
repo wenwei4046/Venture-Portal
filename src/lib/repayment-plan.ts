@@ -610,7 +610,7 @@ function compoundPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, 
   }
   let balance = k > 0 ? segments[k].base : terms.principal
   // A one-off (一次还清, one instalment) keeps rolling as before: only instalments change how it reads.
-  if (latest.months && latest.months > 1 && !pending) return termCompoundPlan(input, segments, pools, dueDay, { rows, breaks, paidCount, ym, base: balance, runPays })
+  if (compoundsByInstalment(segments) && !pending) return termCompoundPlan(input, segments, pools, dueDay, { rows, breaks, paidCount, ym, base: balance, runPays })
   const runFrom = rows.length
   while (ym <= endYM && rows.length < 600) {
     const seg = segmentFor(segments, ym)
@@ -684,6 +684,13 @@ function compoundPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, 
  * principal not yet due. Minimum pay (`minPayFromYM`): a month whose flat interest came in is not late — its principal
  * still shows owed, and still compounds; a month short of it is late by what its flat interest is short.
  */
+/** A deal that compounds by instalment — its latest terms compound over a fixed term of more than one (2026-11-04):
+ *  its plan, not a rolled balance, gives its figures everywhere (the Repayment Schedule, the Company Statement). */
+export function compoundsByInstalment(segments: readonly TermsSegment[]): boolean {
+  const latest = segments[segments.length - 1]
+  return !!latest && latest.compounding && (latest.months ?? 0) > 1
+}
+
 function termCompoundPlan(
   input: PlanInput,
   segments: TermsSegment[],
@@ -696,7 +703,7 @@ function termCompoundPlan(
   const { rows, breaks } = from
   let { paidCount, ym } = from
   const endYM = endMonth(input, from.runPays)
-  const pays = [...from.runPays].sort((a, b) => a.date.localeCompare(b.date))
+  const pays = from.runPays.filter((p) => p.date <= today).sort((a, b) => a.date.localeCompare(b.date))
   const take = (owed: number, cash: number): [number, number] => {
     const t = Math.min(owed, cash)
     return [r2(owed - t), r2(cash - t)]

@@ -81,6 +81,9 @@ export interface PositionInput {
   principalByMonth?: Record<string, number>
   /** Principal + interest repaid per month — the 已付 side of a change comparison. */
   paidByMonth?: Record<string, { principal: number; interest: number }>
+  /** A deal that compounds by instalment (lib/repayment-plan `compoundsByInstalment`, 2026-11-04): what its repayment
+   *  plan says is owed now, principal and interest — its accrued interest is read off it, not off a rolled balance. */
+  planOwed?: number | null
 }
 
 export interface PositionRow {
@@ -168,6 +171,9 @@ export function buildPositionRow(p: PositionInput, currentYM: string): PositionR
     // A deal whose terms changed rolls per lib/treasury-terms compoundRoll
     // (a flat deal turned compounding starts at X on what was still owed).
     const accrualStart = (p.startDate ?? '').slice(0, 7) || currentYM
+    if (p.planOwed != null) {
+      return { ...base, kind: 'compound', interestOutstanding: r2(Math.max(0, p.planOwed - p.outstanding)), remainingPeriods: null, finishYM: null }
+    }
     const cs = changed
       ? compoundRoll(p.segments!, { principal: p.principal, startYM: accrualStart, currentYM, paymentsByMonth: p.paymentsByMonth })!
       : compoundInterestState({
