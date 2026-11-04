@@ -510,6 +510,7 @@ export function chatVM(ctx: SalesCtx) {
     placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
     warm: true, // past the window too: the reply is kept in the chat, marked not sent (crm-actions › keptUnsent, 2026-10-30)
     openTpl: () => void openTpl(), tplOn: data.settings?.suggestTemplate !== false, coldSub: coldLine(c, now),
+    coldTile: shut && c.channel === "whatsapp" && data.settings?.suggestTemplate !== false,
     suggest: shut ? undefined : suggestReplies(c, data.replyExamples ?? [], data.quickReplies, 3, { library: data.replyLibrary, ...fillWithFor(data, c, owner.name, now) }), suggestLogo: !!waitingWords(c),
     suggestLibrary: shut ? undefined : libraryFor(c, data.replyLibrary, fillWithFor(data, c, owner.name, now)),
     reply: ui.reply ? { who: ui.reply.from === "me" ? "You" : c.name, text: plain(ui.reply.text) } : null,

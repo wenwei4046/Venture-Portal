@@ -240,6 +240,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     key: cid, state: composerOf(ui.pCmp, cid) ?? initialComposer(), set: setCmp,
     placeholder: c ? `Reply to ${first(c.name)}…` : "", draft, setDraft, canSend: has, send: () => void send(),
     warm: true, openTpl: () => void openTpl(), tplOn: ctx.data.settings?.suggestTemplate !== false, coldSub: c ? coldLine(c, now) : "",
+    coldTile: !!c && shut && c.channel === "whatsapp" && ctx.data.settings?.suggestTemplate !== false,
     suggest: c && !shut ? suggestReplies(c, ctx.data.replyExamples ?? [], ctx.data.quickReplies, 3, { library: ctx.data.replyLibrary, ...fillWithFor(ctx.data, c, ctx.me.name, now) }) : undefined, suggestLogo: !!c && !!waitingWords(c),
     suggestLibrary: c && !shut ? libraryFor(c, ctx.data.replyLibrary, fillWithFor(ctx.data, c, ctx.me.name, now)) : undefined,
     reply: reply ? { who: reply.who, text: reply.text } : null, cancelReply: () => patch({ pReply: null }),
