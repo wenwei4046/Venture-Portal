@@ -16,4 +16,9 @@ describe("a cold lead template's line breaks", () => {
     const desk = readFileSync(join(__dirname, "DeskApp.tsx"), "utf8");
     expect(desk).toMatch(/textWrap: "pretty", whiteSpace: "pre-wrap" \}\}>\s*\{\(v\.cltE\.dsegs\)/);
   });
+  it("show on the template's card, under its Edit (the owner, 2026-11-04: \"overlap\")", () => {
+    const desk = readFileSync(join(__dirname, "DeskApp.tsx"), "utf8");
+    expect(desk).toMatch(/textWrap: "pretty", whiteSpace: "pre-wrap" \}\}>\s*\{\(t\.segs\)/);
+    expect(desk).toContain('title="Click to edit" style={{ position: "relative", padding: "38px 18px 16px"');
+  });
 });

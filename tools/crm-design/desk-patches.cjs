@@ -72,5 +72,9 @@ module.exports = [
     "Ads to teams' editor: the ad's name typed in place (CRM · Manage), saved on blur / Enter through crm_name_ad; the harness keeps the title."],
   [/(textWrap: "pretty") (\}\}>\s*\{\(v\.cltE\.dsegs\))/, "$1, whiteSpace: \"pre-wrap\" $2",
     "A cold lead template's preview keeps its line breaks, as the customer's WhatsApp will (the owner, 2026-11-04: \"为什么不能空格\")."],
+  [/(title="Click to edit" style=\{\{ position: "relative", padding: )"16px 18px"/, `$1"38px 18px 16px"`,
+    "A template card leaves the top for its Edit, which sat over a long message's first line (the owner, 2026-11-04: \"overlap\")."],
+  [/(textWrap: "pretty") (\}\}>\s*\{\(t\.segs\))/, "$1, whiteSpace: \"pre-wrap\" $2",
+    "A template card's message keeps its line breaks, as the customer's WhatsApp will (2026-11-04)."],
 ];
 

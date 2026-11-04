@@ -529,8 +529,8 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                           </div>
                         </>)}
                         {!!(t.view) && (<>
-                          <div onClick={t.edit} title="Click to edit" style={{ position: "relative", padding: "16px 18px", borderRadius: "14px", background: "var(--crm-cream-nav)", cursor: "pointer" }} className={DH.h22}>
-                            <div style={{ maxWidth: "520px", padding: "10px 14px", borderRadius: "4px 14px 14px 14px", background: "#fff", border: "1px solid var(--crm-field)", fontSize: "14.5px", lineHeight: "1.6", color: "var(--crm-ink)", textWrap: "pretty" }}>
+                          <div onClick={t.edit} title="Click to edit" style={{ position: "relative", padding: "38px 18px 16px", borderRadius: "14px", background: "var(--crm-cream-nav)", cursor: "pointer" }} className={DH.h22}>
+                            <div style={{ maxWidth: "520px", padding: "10px 14px", borderRadius: "4px 14px 14px 14px", background: "#fff", border: "1px solid var(--crm-field)", fontSize: "14.5px", lineHeight: "1.6", color: "var(--crm-ink)", textWrap: "pretty", whiteSpace: "pre-wrap" }}>
                               {(t.segs).map((g, g_i) => (<Fragment key={g_i}>
                                 {!!(g.tag) && (<>
                                   <span style={{ padding: "1px 7px", borderRadius: "6px", background: "var(--crm-tint-attention)", color: "var(--crm-rust)", fontWeight: "650", fontSize: "13.5px" }}>{g.t}</span>
