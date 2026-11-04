@@ -61,3 +61,42 @@ export function DeskTemplateReview({ url }: { url: string | null | undefined }) 
     </button>
   </>);
 }
+
+/** WhatsApp's own formatting, drawn as the customer will see it: *bold*, _italic_, ~strikethrough~, ```monospace``` (it has no underline). */
+export function WaText({ t }: { t: string }) {
+  const parts = t.split(/(```[\s\S]+?```|\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~)/);
+  return (<>{parts.map((s, i) =>
+    s.startsWith("```") && s.endsWith("```") && s.length > 6 ? <code key={i} style={{ fontFamily: "ui-monospace, Menlo, Consolas, monospace", fontSize: ".92em" }}>{s.slice(3, -3)}</code>
+      : /^\*[^*\n]+\*$/.test(s) ? <strong key={i}>{s.slice(1, -1)}</strong>
+        : /^_[^_\n]+_$/.test(s) ? <em key={i}>{s.slice(1, -1)}</em>
+          : /^~[^~\n]+~$/.test(s) ? <s key={i}>{s.slice(1, -1)}</s>
+            : s)}</>);
+}
+
+const FORMATS = [["*", "B", "Bold", { fontWeight: 800 }], ["_", "I", "Italic", { fontStyle: "italic" }], ["~", "S", "Strikethrough", { textDecoration: "line-through" }], ["```", "</>", "Monospace", { fontFamily: "ui-monospace, Menlo, Consolas, monospace", fontSize: "12px" }]] as const;
+
+/**
+ * Bold · Italic · Strikethrough · Monospace for the template's message (2026-11-04, the owner: "我能放粗体，斜体，底线等吗？" —
+ * WhatsApp has no underline). Wraps what is selected in the message box in WhatsApp's marks (or puts the pair at the cursor);
+ * a press keeps the box's focus and selection.
+ */
+export function DeskTemplateFormat({ draft, setDraft }: { draft: string; setDraft: (e: { target: { value: string } }) => void }) {
+  const wrap = (m: string) => {
+    const el = typeof document !== "undefined" ? document.activeElement as HTMLTextAreaElement | null : null;
+    const inBox = el?.tagName === "TEXTAREA";
+    const a = inBox ? el!.selectionStart : draft.length, b = inBox ? el!.selectionEnd : draft.length;
+    const next = draft.slice(0, a) + m + draft.slice(a, b) + m + draft.slice(b);
+    setDraft({ target: { value: next } });
+    if (inBox) requestAnimationFrame(() => { el!.focus(); el!.setSelectionRange(a + m.length, b + m.length); });
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+      <span style={{ ...LABEL, marginRight: "4px" }}>FORMAT</span>
+      {FORMATS.map(([m, label, title, look]) => (
+        <button key={m} type="button" title={`${title} — ${m}text${m}`} aria-label={title} onMouseDown={e => e.preventDefault()} onClick={() => wrap(m)}
+          style={{ minWidth: "34px", height: "30px", padding: "0 10px", borderRadius: "15px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "13.5px", color: "var(--crm-ink)", cursor: "pointer", ...look }}>{label}</button>
+      ))}
+      <span style={{ fontSize: "12px", color: "var(--crm-muted)" }}>WhatsApp has no underline.</span>
+    </div>
+  );
+}

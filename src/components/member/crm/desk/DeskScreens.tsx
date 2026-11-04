@@ -315,6 +315,11 @@ export default function DeskScreens(p: DeskScreensProps) {
     void act.metaAds(true).then(rows => { if (rows) patch({ addAdList: rows }); });
   }, [ui.tab, live, data.can.manage, act, patch]);
 
+  // Cold lead templates asks Meta how each review stands every time it opens, as the phone's does (2026-11-04, the owner:
+  // "为什么还是review in crm?" — both were Approved in Meta, the desktop never asked); the 5 s re-read then shows it.
+  const cltOn = live && data.can.manage && v.opTitle === "Cold lead templates";
+  useEffect(() => { if (cltOn) void act.refreshTemplates(); }, [cltOn, act]);
+
   // Ads Performance reads Ads Manager's figures for the range on screen (and the compare range) — spend, cost per lead …
   // (2026-10-22, the owner: "做花费和每个名单成本"); each range and ad once (ui.apMeta), CRM · Manage, the server's token.
   // …and Assignment's Ad performance tab, for the ad open there (2026-10-23).
