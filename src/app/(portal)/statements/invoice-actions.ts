@@ -431,6 +431,8 @@ async function lastMonthKindAccounts(month: string, mode: string): Promise<Recor
 }
 
 async function readLastMonthKindAccounts(month: string, mode: string): Promise<Record<string, string>> {
+  // Invoices are Billing's to read: an HR Costing reader with no Billing gets no defaults (the throw is caught above).
+  await requirePermission('billing')
   const supabase = await createClient()
   const prev = new Date(`${month}-01T00:00:00Z`)
   prev.setUTCMonth(prev.getUTCMonth() - 1)
