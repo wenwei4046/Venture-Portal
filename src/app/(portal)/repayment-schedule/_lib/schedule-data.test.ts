@@ -84,3 +84,27 @@ describe('minimum pay interest', () => {
     expect(oct.collectMin.map((r) => r.key)).toEqual(['l2'])
   })
 })
+
+describe('a deal that compounds by instalment', () => {
+  // 2026-11-04 — 60,000 to Carres at 4% over 12 instalments from Feb, compounding, minimum pay on; only the interest came
+  // in Feb and Mar. Its month is read off its own repayment plan: the instalment's principal, the flat interest and what
+  // compounded (4% on April's 10,200 still owed: 10,000 principal and March's 200) — not the rolled balance — and minimum
+  // pay asks the flat interest alone.
+  const loan = {
+    id: 'l3', company_id: 'co-car', principal: 60000, effective_rate: 0.04, tenure_months: 12, status: 'active', repayment_terms: 'EMI 分期 · 12期',
+    compound_interest: true, disbursement_date: '2026-01-05', min_pay_interest: true, min_pay_interest_from: null, repayment_start_month: '2026-02-01',
+    repayment_start_date: '2026-02-05', terms_effective_from: null, principal_per_month: null,
+  }
+  const reps = [
+    { loan_id: 'l3', amount: 2400, payment_date: '2026-02-05', payment_type: 'interest' },
+    { loan_id: 'l3', amount: 2400, payment_date: '2026-03-05', payment_type: 'interest' },
+  ]
+
+  it('lists the month’s instalment off its plan, and minimum pay asks the flat interest', async () => {
+    const tables = { ...TABLES, loans: [loan], repayments: reps, fund_sources: [] }
+    const apr = await loadRepaymentSchedule(client(tables) as never, '2026-04')
+    expect(apr.collectCompound).toEqual([])
+    expect(apr.collectRows.map((r) => [r.key, r.principalDue, r.interestDue])).toEqual([['l3', 5000, 2808]])
+    expect(apr.collectMin.map((r) => [r.key, r.due])).toEqual([['l3', 2400]])
+  })
+})

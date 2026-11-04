@@ -76,6 +76,14 @@ describe('buildPositionRow — compound / no-term / settled', () => {
     expect(r.finishYM).toBeNull()
   })
 
+  // 2026-11-04 — a deal that compounds by instalment reads its accrued interest off its repayment plan (what it
+  // says is owed now, less the principal still owed), not off a rolled balance.
+  it('利滚利 by instalment: interest outstanding = the plan’s owed now − principal outstanding', () => {
+    const r = buildPositionRow({ ...base, principal: 60000, outstanding: 60000, compounding: true, startDate: '2026-01-05', planOwed: 72222.53 }, '2026-07')!
+    expect(r.kind).toBe('compound')
+    expect(r.interestOutstanding).toBe(12222.53)
+  })
+
   it('no-term rows carry zero interest in totals and no payoff month', () => {
     const r = buildPositionRow({ ...base, tenureMonths: null, unscheduled: true }, '2026-08')!
     expect(r.kind).toBe('no_term')

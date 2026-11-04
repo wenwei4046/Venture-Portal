@@ -3,11 +3,13 @@
 // screen and file can't drift apart. Query set + counterparty resolution
 // mirror lib/loan-monitor; maths live in lib/counterparty-statement.
 
-import { officeMonth } from '@/lib/office-time'
+import { officeMonth, officeToday } from '@/lib/office-time'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRows } from '@/lib/paginate'
 import { isLoanUnscheduled } from '@/lib/treasury-schedule'
-import { buildTermsSegments } from '@/lib/treasury-terms'
+import { buildTermsSegments, type PositionTerms, type TermsSegment } from '@/lib/treasury-terms'
+import { buildRepaymentPlan, compoundsByInstalment } from '@/lib/repayment-plan'
+import { fundSourceStart, loanStart } from '@/lib/repayment-start'
 import {
   fetchTermsHistory,
   isFundSourcePrincipal,
@@ -18,6 +20,7 @@ import {
   termsForLoan,
 } from '@/lib/treasury-terms-data'
 import { fundingSourceFromTerms, lentToFromNotes } from '@/lib/utils'
+import { minPayPlanFrom } from '@/lib/min-pay'
 import {
   buildPositionRow,
   groupStatement,
@@ -52,7 +55,7 @@ export async function fetchCounterpartyStatement(
     supabase
       .from('loans')
       .select(
-        'id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, min_pay_interest, min_pay_interest_from, terms_effective_from, principal_per_month',
+        'id, company_id, principal, effective_rate, tenure_months, status, repayment_terms, compound_interest, disbursement_date, repayment_start_month, repayment_start_date, min_pay_interest, min_pay_interest_from, terms_effective_from, principal_per_month',
       )
       .eq('status', 'active'),
     supabase.from('loan_outstanding').select('loan_id, outstanding, total_principal_paid'),
@@ -67,7 +70,7 @@ export async function fetchCounterpartyStatement(
     supabase
       .from('fund_sources')
       .select(
-        'id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, notes, min_pay_interest, min_pay_interest_from, terms_effective_from, principal_per_month',
+        'id, source_type, from_company_id, from_director_id, from_department_id, from_freetext_name, amount, cost_rate, lock_in_months, effective_date, status, compound_interest, repayment_start_month, repayment_date, notes, min_pay_interest, min_pay_interest_from, terms_effective_from, principal_per_month',
       )
       .in('status', ['active', 'matured']),
     supabase.from('fund_source_outstanding').select('fund_source_id, outstanding, total_principal_paid'),
@@ -129,10 +132,36 @@ export async function fetchCounterpartyStatement(
     return co ? ((co.short_code as string | null) ?? (co.name as string)) : null
   }
 
+  // A deal that compounds by instalment (2026-11-04): what its repayment plan — the deal page's own — says is owed now.
+  const today = officeToday()
+  const planOwed = (
+    terms: PositionTerms,
+    segments: TermsSegment[],
+    reps: Array<{ id: string; amount: number; payment_date: string; payment_type: string }>,
+    isPrincipal: (t: string) => boolean,
+    dueDay: number,
+    status: string,
+    minPay: { min_pay_interest?: boolean; min_pay_interest_from?: string | null },
+  ): number | null => {
+    if (!compoundsByInstalment(segments)) return null
+    const plan = buildRepaymentPlan({
+      terms,
+      payments: reps.map(rp => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type, amount: rp.amount, ref: null })),
+      isPrincipal,
+      today,
+      dueDay,
+      status,
+      minPayFromYM: minPayPlanFrom(minPay),
+    })
+    return plan.compound?.owedNow ?? null
+  }
+
   const inputs: PositionInput[] = []
 
   for (const l of loans ?? []) {
     const out = loanOutBy.get(l.id as string)
+    const terms = termsForLoan(l, loanHist.get(l.id as string) ?? [])
+    const segments = buildTermsSegments(terms, loanPrincipalByMonth.get(l.id as string) ?? {})
     inputs.push({
       id: l.id as string,
       side: 'collect',
@@ -150,9 +179,10 @@ export async function fetchCounterpartyStatement(
       minPayInterest: (l as { min_pay_interest?: boolean }).min_pay_interest === true,
       minPayFrom: (l as { min_pay_interest_from?: string | null }).min_pay_interest_from ?? null,
       source: fundingSourceFromTerms(l.repayment_terms as string | null),
-      segments: buildTermsSegments(termsForLoan(l, loanHist.get(l.id as string) ?? []), loanPrincipalByMonth.get(l.id as string) ?? {}),
+      segments,
       principalByMonth: loanPrincipalByMonth.get(l.id as string) ?? {},
       paidByMonth: loanPaidByType.get(l.id as string) ?? {},
+      planOwed: planOwed(terms, segments, loanRepRows.filter(rp => rp.id === l.id), isLoanPrincipal, loanStart(l).day, l.status as string, l as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
     })
   }
 
@@ -166,6 +196,8 @@ export async function fetchCounterpartyStatement(
       (s.from_freetext_name as string | null) ??
       (s.from_director_id ? (dirById.get(s.from_director_id as string)?.name as string | undefined) : undefined) ??
       '—'
+    const terms = termsForFundSource(s, fsHist.get(s.id as string) ?? [])
+    const segments = buildTermsSegments(terms, fsPrincipalByMonth.get(s.id as string) ?? {})
     inputs.push({
       id: s.id as string,
       side: 'repay',
@@ -188,9 +220,10 @@ export async function fetchCounterpartyStatement(
       source:
         lentToFromNotes(s.notes as string | null) ??
         (((s.notes as string | null) ?? '').trim().slice(0, 60) || null),
-      segments: buildTermsSegments(termsForFundSource(s, fsHist.get(s.id as string) ?? []), fsPrincipalByMonth.get(s.id as string) ?? {}),
+      segments,
       principalByMonth: fsPrincipalByMonth.get(s.id as string) ?? {},
       paidByMonth: fsPaidByType.get(s.id as string) ?? {},
+      planOwed: planOwed(terms, segments, fsRepRows.filter(rp => rp.id === s.id), isFundSourcePrincipal, fundSourceStart(s).day, s.status as string, s as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
     })
   }
 

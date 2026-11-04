@@ -5,6 +5,7 @@ import { officeMonth, officeTime, officeToday } from '@/lib/office-time'
 import { canDo } from '@/lib/permission-actions'
 import { expectedFullRepaymentDate } from '@/lib/fund-source-dates'
 import { buildRepaymentPlan, type RepaymentPlan } from '@/lib/repayment-plan'
+import { minPayPlanFrom } from '@/lib/min-pay'
 import { fundSourceStart, type RepaymentStart } from '@/lib/repayment-start'
 import { dealChangeLine, type DealChange } from '@/lib/deal-audit'
 import { SOURCE_TYPE_LABELS, fundStatus, withCode, type FundStatus, type FundTone } from '@/lib/fund-hub'
@@ -251,6 +252,7 @@ export async function loadSourcePage(supabase: Client, user: User, id: string): 
     today,
     dueDay: start.day,
     status: source.status,
+    minPayFromYM: minPayPlanFrom(source as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
   })
 
   // Record repayment (2026-10-02): the voucher Create payment files in loan-repayment mode — its banks, pools and accounts.

@@ -5,13 +5,13 @@ import { loanMonthlyInstallment, isLoanUnscheduled, isBeforeFirstInstallment, co
 import { resolveFirstDueYM } from '@/lib/loan-monitor'
 import { buildTermsSegments, compoundRoll, currentSegment, principalDueIn, principalPaidSince, segmentRemainingPeriods, segmentsGovern, termsChanged, type TermsSegment } from '@/lib/treasury-terms'
 import { fetchTermsHistory, isFundSourcePrincipal, isLoanPrincipal, principalPaidByMonth, termsForFundSource, termsForLoan } from '@/lib/treasury-terms-data'
-import { buildRepaymentPlan } from '@/lib/repayment-plan'
+import { buildRepaymentPlan, compoundsByInstalment, type RepaymentPlan } from '@/lib/repayment-plan'
 import { fundSourceStart, loanStart } from '@/lib/repayment-start'
 import { monthEvents, type CalendarEntry } from '@/lib/repayment-calendar'
 import { fromCalendar } from '@/lib/deal-return'
 import { fundingSourceFromTerms } from '@/lib/utils'
 import { listPayableFundSources } from '../../fund-in/actions'
-import { minPayStartYM } from '@/lib/min-pay'
+import { minPayPlanFrom, minPayStartYM } from '@/lib/min-pay'
 import type { SchedRow, NoTermRow, CompoundRow, MinInterestRow } from '../_components/ScheduleView'
 
 // The Repayment Schedule's month (2026-10-10, lifted out of its page so the
@@ -134,6 +134,18 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     // due 按这笔单自己的算法(flat 原额×月息 / compound 余额×月息),paid = 当月
     // interest 类还款(含 penalty/netting,同 已收行 的口径)。首期未到的月份不追。
     // 设了起始月 (2026-10-30) 的,起始月之前也不追。
+    // 利滚利 by instalment (2026-11-04): this month's instalment off the deal's own repayment plan.
+    const termPlan = compoundsByInstalment(segments)
+      ? buildRepaymentPlan({
+          terms: termsForLoan(l, loanHist.get(l.id as string) ?? []),
+          payments: (loanReps ?? []).filter((rp) => rp.loan_id === l.id).map((rp) => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type as string, amount: Number(rp.amount), ref: null })),
+          isPrincipal: isLoanPrincipal,
+          today: officeToday(),
+          dueDay: loanStart(l).day,
+          status: l.status as string,
+          minPayFromYM: minPayPlanFrom(l as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
+        })
+      : null
     if ((l as { min_pay_interest?: boolean }).min_pay_interest === true && rate > 0) {
       const firstDueYM = minPayStartYM(
         resolveFirstDueYM(((l as { repayment_start_month?: string | null }).repayment_start_month ?? null), l.disbursement_date as string | null),
@@ -141,7 +153,10 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       )
       if (!firstDueYM || firstDueYM <= currentYM) {
         const isCompound = (l as { compound_interest?: boolean }).compound_interest === true
-        const due = isCompound
+        // By instalment, minimum pay asks the flat interest only (2026-11-04).
+        const due = termPlan
+          ? currentSegment(segments, currentYM).interestPerMonth
+          : isCompound
           ? (seg
               ? compoundRoll(segments, { principal, startYM: ((l.disbursement_date as string | null) ?? '').slice(0, 7) || null, currentYM, paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {} })!
               : compoundInterestState({
@@ -167,7 +182,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     // 利滚利挂账: 本金不计入本月应收(未定还款),只逐月把利息滚进余额。
     // 单独成区,显示当前余额 / 累计已滚利息 / 本月利息。不论有没有期数都走这里。
     const compounding = (l as { compound_interest?: boolean }).compound_interest === true && rate > 0
-    if (compounding) {
+    if (compounding && !termPlan) {
       const startYM = ((l.disbursement_date as string | null) ?? '').slice(0, 7) || currentYM
       const cs = seg
         ? compoundRoll(segments, { principal, startYM, currentYM, paymentsByMonth: loanPayByMonth.get(l.id as string) ?? {} })!
@@ -183,6 +198,22 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
         received: loanReceived(l.id as string),
         source,
       })
+      continue
+    }
+    if (termPlan) {
+      const inst = instalmentFromPlan(termPlan, currentYM)
+      if (inst)
+        collectRows.push({
+          key: l.id as string,
+          counterparty,
+          detail: `RM ${principal.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(rate * 100).toFixed(3)}%/mo · ${termPlan.months ?? ''}mo · compound · ${inst.remainingPeriods} left${termsTag}`,
+          principalDue: inst.principalDue,
+          interestDue: inst.interestDue,
+          totalDue: r2(inst.principalDue + inst.interestDue),
+          done: loanDoneThisMonth.has(l.id as string),
+          received: loanReceived(l.id as string),
+          source,
+        })
       continue
     }
     if (isLoanUnscheduled(l.repayment_terms as string | null)) {
@@ -316,13 +347,32 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     const cp = p.label.split(' · ')[0] ?? '—'
     // 利滚利挂账 (应付侧): 本金未定还款,只滚利息,单独成区。
     const fsm = fsMeta.get(p.id)
+    const fsTerms = fsm
+      ? termsForFundSource({ amount: fsm.amount ?? 0, cost_rate: fsm.cost_rate ?? 0, lock_in_months: fsm.lock_in_months ?? null, compound_interest: fsm.compound_interest, effective_date: fsm.effective_date ?? null, repayment_start_month: fsm.repayment_start_month, terms_effective_from: fsm.terms_effective_from, principal_per_month: fsm.principal_per_month }, fsHist.get(p.id) ?? [])
+      : null
+    const fsSegs = fsTerms ? buildTermsSegments(fsTerms, fsPrincipalByMonth.get(p.id) ?? {}) : null
+    // 利滚利 by instalment (2026-11-04): this month's instalment off the source's own repayment plan.
+    const termPlan =
+      fsTerms && fsSegs && fsm && compoundsByInstalment(fsSegs)
+        ? buildRepaymentPlan({
+            terms: fsTerms,
+            payments: (fsReps ?? []).filter((rp) => rp.fund_source_id === p.id).map((rp) => ({ date: String(rp.payment_date).slice(0, 10), type: rp.payment_type as string, amount: Number(rp.amount), ref: null })),
+            isPrincipal: isFundSourcePrincipal,
+            today: officeToday(),
+            dueDay: fundSourceStart(fsm as Parameters<typeof fundSourceStart>[0]).day,
+            status: (fsMetaRows ?? []).find((m) => m.id === p.id)?.status as string,
+            minPayFromYM: minPayPlanFrom(fsm),
+          })
+        : null
     // 最低还息单 (应付侧, 2026-09-04): 当月最低要付的利息 vs 已付。口径同应收侧;
     // settled(本金已清)的不再追。
     if (fsm?.min_pay_interest === true && p.cost_rate > 0 && !p.settled_in_month) {
       const firstDueYM = minPayStartYM(resolveFirstDueYM(fsm.repayment_start_month ?? null, fsm.effective_date ?? null), fsm.min_pay_interest_from)
       if (!firstDueYM || firstDueYM <= currentYM) {
         const isCompound = fsm.compound_interest === true
-        const due = isCompound
+        const due = termPlan
+          ? currentSegment(fsSegs!, currentYM).interestPerMonth
+          : isCompound
           ? fsCompound(p.id, p.original_amount, p.cost_rate, (fsm.effective_date ?? '').slice(0, 7) || currentYM).thisMonthInterest
           : p.terms_from
             ? p.monthly_interest
@@ -335,6 +385,22 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
           ...st,
         })
       }
+    }
+    if (termPlan && !p.settled_in_month) {
+      const inst = instalmentFromPlan(termPlan, currentYM)
+      if (inst)
+        repayRows.push({
+          key: p.id,
+          counterparty: cp,
+          detail: `RM ${p.original_amount.toLocaleString('en-MY', { minimumFractionDigits: 2 })} @ ${(p.cost_rate * 100).toFixed(3)}%/mo · ${termPlan.months ?? ''}mo · compound · ${inst.remainingPeriods} left${p.terms_from ? ` · terms from ${p.terms_from}` : ''}`,
+          principalDue: inst.principalDue,
+          interestDue: inst.interestDue,
+          totalDue: r2(inst.principalDue + inst.interestDue),
+          done: fsDoneThisMonth.has(p.id),
+          received: fsPaid(p.id),
+          compound: true,
+        })
+      continue
     }
     if (!p.settled_in_month && fsm?.compound_interest === true && p.cost_rate > 0) {
       const startYM = (fsm?.effective_date ?? '').slice(0, 7) || currentYM
@@ -453,6 +519,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       // Each instalment on the repayment start's day (2026-10-12).
       dueDay: loanStart(l).day,
       status: l.status as string,
+      minPayFromYM: minPayPlanFrom(l as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
     })
     events.push(
       ...monthEvents(plan, { kind: 'collect', name: (co?.short_code ?? co?.name ?? '—') as string, href: fromCalendar(`/fund-out/${l.id}`, month), rate: Number(l.effective_rate), principal: Number(l.principal) }, currentYM, today),
@@ -491,6 +558,7 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
       today,
       dueDay: fundSourceStart(m).day,
       status: m.status as string,
+      minPayFromYM: minPayPlanFrom(m as { min_pay_interest?: boolean; min_pay_interest_from?: string | null }),
     })
     events.push(...monthEvents(plan, { kind: 'pay', name, href: fromCalendar(`/fund-in/${id}`, month), rate: Number(m.cost_rate), principal: Number(m.amount) }, currentYM, today))
   }
@@ -509,4 +577,13 @@ export async function loadRepaymentSchedule(supabase: SupabaseClient, month: str
     repayNoTerm,
     events,
   }
+}
+
+/** A deal that compounds by instalment (2026-11-04): the month's instalment off its repayment plan — its principal and
+ *  its interest (the flat interest and what compounded) — and the instalments left from it; none in a month it has no
+ *  instalment. */
+function instalmentFromPlan(plan: RepaymentPlan, ym: string): { principalDue: number; interestDue: number; remainingPeriods: number } | null {
+  const row = plan.rows.find((r) => r.ym === ym)
+  if (!row) return null
+  return { principalDue: row.principal ?? 0, interestDue: row.interest, remainingPeriods: plan.rows.filter((r) => r.ym >= ym && r.principal != null).length }
 }

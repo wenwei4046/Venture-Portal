@@ -153,6 +153,8 @@ export interface PlanInput {
   dueDay?: number
   /** The record's status: cancelled has no schedule; pending shows the plan untouched. */
   status: string
+  /** Minimum pay interest: the first month it is checked (`YYYY-MM`); absent — off. */
+  minPayFromYM?: string | null
 }
 
 function dueOn(ym: string, dueDay: number): string {
@@ -607,6 +609,8 @@ function compoundPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, 
     }
   }
   let balance = k > 0 ? segments[k].base : terms.principal
+  // A one-off (一次还清, one instalment) keeps rolling as before: only instalments change how it reads.
+  if (compoundsByInstalment(segments) && !pending) return termCompoundPlan(input, segments, pools, dueDay, { rows, breaks, paidCount, ym, base: balance, runPays })
   const runFrom = rows.length
   while (ym <= endYM && rows.length < 600) {
     const seg = segmentFor(segments, ym)
@@ -670,3 +674,158 @@ function compoundPlan(input: PlanInput, segments: TermsSegment[], pools: Pools, 
     interestFirst,
   })
 }
+
+/**
+ * 利滚利 on a deal WITH a fixed term (2026-11-04, the user — 60,000 · 4% · 12 instalments): each instalment asks its
+ * principal and the flat interest on what its terms started from ("无论换到怎样都是用60000*4%" — a principal repaid
+ * never lowers it); whatever fell due and is still unpaid compounds at the rate the next month ("叠加利息"); past the
+ * last instalment the rate runs on everything still owed. A payment counts as the type it was recorded as: interest
+ * pays interest owed (the oldest first), principal pays principal; what is left of either pays the other, then the
+ * principal not yet due. Minimum pay (`minPayFromYM`): a month whose flat interest came in is not late — its principal
+ * still shows owed, and still compounds; a month short of it is late by what its flat interest is short.
+ */
+/** A deal that compounds by instalment — its latest terms compound over a fixed term of more than one (2026-11-04):
+ *  its plan, not a rolled balance, gives its figures everywhere (the Repayment Schedule, the Company Statement). */
+export function compoundsByInstalment(segments: readonly TermsSegment[]): boolean {
+  const latest = segments[segments.length - 1]
+  return !!latest && latest.compounding && (latest.months ?? 0) > 1
+}
+
+function termCompoundPlan(
+  input: PlanInput,
+  segments: TermsSegment[],
+  pools: Pools,
+  dueDay: number,
+  from: { rows: PlanRow[]; breaks: CompoundFacts['breaks']; paidCount: number; ym: string; base: number; runPays: PlanPayment[] },
+): RepaymentPlan {
+  const { terms, today, isPrincipal, minPayFromYM } = input
+  const { principalPaid, interestPaid } = pools
+  const { rows, breaks } = from
+  let { paidCount, ym } = from
+  const endYM = endMonth(input, from.runPays)
+  const pays = from.runPays.filter((p) => p.date <= today).sort((a, b) => a.date.localeCompare(b.date))
+  const take = (owed: number, cash: number): [number, number] => {
+    const t = Math.min(owed, cash)
+    return [r2(owed - t), r2(cash - t)]
+  }
+  let pDue = 0
+  let iOwed = 0
+  let pLater = from.base
+  let charged = 0
+  let ahead: number | null = null
+  let askedAhead = 0
+  let k = 0
+  const runFrom = rows.length
+  // Each run row's own charges, for setting the money against them oldest first afterwards.
+  const charges: Array<{ due: string; amount: number; flat: number; window: number; met: boolean | null; pOwed: number }> = []
+  while (rows.length < 600) {
+    const seg = segmentFor(segments, ym)
+    const inTerm = !!seg.months && !!seg.scheduledEndYM && ym <= seg.scheduledEndYM
+    const due = dueOn(ym, dueDay)
+    if (!inTerm && (ym > endYM || r2(pDue + iOwed + pLater) <= PAID_UP)) break
+    if (segments.length > 1 && ym === seg.fromYM) breaks.push({ no: rows.length + 1, ...termsBreak(seg, seg.scheduledEndYM ?? ym, null) })
+    let cashI = 0
+    let cashP = 0
+    while (k < pays.length && pays[k].date <= due) {
+      if (isPrincipal(pays[k].type)) cashP = r2(cashP + pays[k].amount)
+      else cashI = r2(cashI + pays[k].amount)
+      k++
+    }
+    const window = r2(cashI + cashP)
+    const windowInterest = cashI
+    ;[iOwed, cashI] = take(iOwed, cashI)
+    ;[pDue, cashP] = take(pDue, cashP)
+    const past = due <= today
+    // What fell due before and is still unpaid compounds; past the term, everything still owed.
+    const compound = past ? r2(seg.rate * (inTerm ? pDue + iOwed : pDue + iOwed + pLater)) : 0
+    const flat = inTerm ? seg.interestPerMonth : 0
+    const last = inTerm && ym === seg.scheduledEndYM && seg === segments[segments.length - 1]
+    const principal = inTerm ? (last ? r2(pLater - askedAhead) : Math.min(r2(pLater - askedAhead), principalDueIn(seg, ym))) : 0
+    const minPay = !!minPayFromYM && ym >= minPayFromYM && flat > EPS
+    const interest = r2(flat + compound)
+    if (!past) {
+      // Not due yet: nothing is owed on it. Money already in clears what is still owed from before (the oldest
+      // instalment first, "先clear 之前的installment"), the rest goes off the principal. Its balance is what is left
+      // after it, paid as the terms ask.
+      ;[pDue, cashI] = take(pDue, cashI)
+      ;[iOwed, cashP] = take(iOwed, cashP)
+      ;[pLater, cashP] = take(pLater, r2(cashP + cashI))
+      ahead = r2(Math.max(0, (ahead ?? pDue + iOwed + pLater) - principal))
+      askedAhead = r2(askedAhead + principal)
+      charges.push({ due, amount: r2(principal + interest), flat, window: windowInterest, met: null, pOwed: pDue })
+      rows.push({ no: rows.length + 1, ym, due, installment: r2(principal + interest), principal: principal > EPS ? principal : null, interest, balance: ahead, outstanding: 0, remark: '', tone: '', paid: window, toBalance: 0 })
+      if (!inTerm) break
+      ym = addMonthsYM(ym, 1)
+      continue
+    }
+    if (!inTerm) {
+      pDue = r2(pDue + pLater)
+      pLater = 0
+    }
+    iOwed = r2(iOwed + flat + compound)
+    charged = r2(charged + compound)
+    ;[iOwed, cashI] = take(iOwed, cashI)
+    pLater = r2(pLater - principal)
+    pDue = r2(pDue + principal)
+    ;[pDue, cashP] = take(pDue, cashP)
+    ;[pLater, cashP] = take(pLater, cashP)
+    ;[pDue, cashI] = take(pDue, cashI)
+    ;[pLater, cashI] = take(pLater, cashI)
+    ;[iOwed, cashP] = take(iOwed, cashP)
+    charges.push({ due, amount: r2(principal + interest), flat, window: windowInterest, met: minPay && past ? windowInterest >= flat - slack(flat) : null, pOwed: pDue })
+    rows.push({ no: rows.length + 1, ym, due, installment: r2(principal + interest), principal: principal > EPS ? principal : null, interest, balance: r2(pDue + iOwed + pLater), outstanding: 0, remark: '', tone: '', paid: window, toBalance: 0 })
+    if (!inTerm && r2(pDue + iOwed + pLater) <= PAID_UP) break
+    ym = addMonthsYM(ym, 1)
+  }
+  // The money set against the rows oldest first: what is unpaid on each, Paid, Part paid, Overdue.
+  let pool = r2(pays.reduce((s, p) => s + p.amount, 0))
+  charges.forEach((c, i) => {
+    const r = rows[runFrom + i]
+    const got = Math.min(pool, c.amount)
+    pool = r2(pool - got)
+    const unpaid = r2(c.amount - got)
+    // What the money paid of this instalment — the oldest still unpaid first, whatever day it came.
+    r.paid = r2(got)
+    if (unpaid <= slack(c.amount)) {
+      r.outstanding = 0
+      r.tone = 'ledger'
+      paidCount++
+      const at = reach(pays, r2(charges.slice(0, i + 1).reduce((s, x) => s + x.amount, 0)))
+      r.remark = paidRemark(at)
+      if (at) r.paidOn = at.date
+      return
+    }
+    if (c.met === true) {
+      // Minimum pay: the month's interest came in — not late; its principal shows owed.
+      r.outstanding = 0
+      r.tone = 'info'
+      r.remark = `Interest paid · principal ${figure(c.pOwed)} owed`
+      return
+    }
+    r.outstanding = c.met === false ? r2(Math.max(0, c.flat - c.window)) : unpaid
+    if (c.due < today) {
+      r.tone = 'danger'
+      r.remark = got > EPS ? `Part paid ${figure(got)} · short ${figure(unpaid)} · ${dayjs(today).diff(dayjs(c.due), 'day')} days` : overdue(today, c.due)
+    } else if (got > EPS) {
+      r.tone = 'alert'
+      r.remark = `Part paid ${figure(got)} · short ${figure(unpaid)}`
+    }
+  })
+  const termRows = rows.slice(runFrom).filter((r) => r.principal != null || r.interest > 0)
+  // Owed today: money that came after the last day read still clears what is owed, oldest first.
+  let rest = r2(pays.slice(k).filter((p) => p.date <= today).reduce((s, p) => s + p.amount, 0))
+  ;[iOwed, rest] = take(iOwed, rest)
+  ;[pDue, rest] = take(pDue, rest)
+  ;[pLater, rest] = take(pLater, rest)
+  const plan = summary('fixed', rows, termRows.length > 0 ? rows.length : null, paidCount, terms.principal, principalPaid, interestPaid, {
+    breaks,
+    owedNow: r2(pDue + iOwed + pLater),
+    paidToDate: r2(principalPaid + interestPaid),
+    addedToBalance: charged,
+    addedFrom: null,
+    addedTo: null,
+    interestFirst: false,
+  })
+  return plan
+}
+
