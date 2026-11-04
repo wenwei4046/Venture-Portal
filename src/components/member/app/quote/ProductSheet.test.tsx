@@ -2,7 +2,7 @@ import { useState } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ProductSheet from "./ProductSheet";
-import { EMPTY_MEMORY, NO_SOFA_BUILD, NO_SOFA_CHOICES, sheetLines, type QCatalog, type SheetState } from "./quote-model";
+import { EMPTY_MEMORY, NO_SOFA_BUILD, NO_SOFA_CHOICES, quickSheet, sheetLines, type CartLine, type QCatalog, type QuickTab, type SheetState } from "./quote-model";
 
 const catalog: QCatalog = {
   brand: "AKEMI", name: "Akemi", sofa: false, frames: [], kpis: [], accSummary: "8 items",
@@ -105,6 +105,127 @@ describe("accessory search in product sheets", () => {
       expect.objectContaining({ productId: "m-k", qty: 1 }),
       expect.objectContaining({ productId: "a-k", qty: 1 }),
     ]);
+  });
+});
+
+// A mattress brand's quick sheet (2026-11-03 — the user: "这一个我要它直接出它的 variant … 它可以直接加 quantity（加一、加二、
+// 加三）… 交互形式就跟现在的 accessory 一样 … 可以在 mode 那边切换，分成 mattress 和 accessory … 选好之后按加加加，然后再按下面的
+// Add to Cart"): every size of every mattress with − / +, Mattress | Accessories, one Add to cart for both.
+describe("the quick sheet", () => {
+  // A–Z, as catalogFromProducts hands it.
+  const two: QCatalog = { ...catalog, models: [
+    { key: "apex", name: "APEX", desc: "", sizes: { S: "x-s", SS: "x-ss", Q: "x-q" }, modules: [], choices: NO_SOFA_CHOICES }, ...catalog.models] };
+  function quick(tab: QuickTab, { cart = [] as CartLine[], readOnly = false, cat = two } = {}) {
+    const add = vi.fn();
+    function Harness() {
+      const [sheet, setSheet] = useState<SheetState>(quickSheet(tab));
+      return <ProductSheet sheet={sheet} catalog={cat} memory={EMPTY_MEMORY} cart={cart} build={NO_SOFA_BUILD} readOnly={readOnly}
+        actions={{
+          close: vi.fn(), patch: patch => setSheet(current => ({ ...current, ...patch } as SheetState)),
+          patchFrame: vi.fn(), openBf: vi.fn(), editBf: vi.fn(), removeBf: vi.fn(), backToMattress: vi.fn(), applyFrame: vi.fn(),
+          add: () => add(sheetLines(sheet, cat)),
+        }} />;
+    }
+    render(<Harness />);
+    return add;
+  }
+  const rows = () => screen.getAllByRole("group").map(g => g.getAttribute("aria-label"));
+  const tab = (name: RegExp) => fireEvent.click(screen.getByRole("tab", { name }));
+
+  it("lists every size of every mattress as its own row, A–Z, a plus adding one", () => {
+    const add = quick("mattress");
+    expect(screen.getByRole("dialog", { name: "All Akemi models" })).toBeInTheDocument();
+    expect(screen.getByText("AKEMI · MATTRESS")).toBeInTheDocument();
+    expect(rows()).toEqual(["APEX · Single", "APEX · Super Single", "APEX · Queen", "BASTION · Queen", "BASTION · King"]);
+    expect(screen.getByRole("button", { name: "Choose something to add" })).toHaveAttribute("aria-disabled", "true");
+    addOne("APEX · Queen");
+    addOne("APEX · Queen");
+    addOne("BASTION · King");
+    expect(within(screen.getByRole("group", { name: "APEX · Queen" })).getByText("2")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add 3 items to cart" }));
+    expect(add).toHaveBeenCalledWith([
+      expect.objectContaining({ id: "m-apex-Q", productId: "x-q", qty: 2 }),
+      expect.objectContaining({ id: "m-bastion-K", productId: "m-k", qty: 1 }),
+    ]);
+  });
+
+  it("switches to the accessories and back keeping both lists' picks — and adds both at once", () => {
+    const add = quick("mattress");
+    addOne("BASTION · Queen");
+    tab(/^Accessories/);
+    expect(screen.getByRole("dialog", { name: "Accessories" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Mattress/ })).toHaveTextContent("Mattress1");
+    expect(screen.getByRole("searchbox", { name: "Search accessories" })).toBeInTheDocument();
+    addOne("Pillow 1");
+    addOne("Pillow 1");
+    tab(/^Mattress/);
+    expect(within(screen.getByRole("group", { name: "BASTION · Queen" })).getByText("1")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Accessories/ })).toHaveTextContent("Accessories2");
+    fireEvent.click(screen.getByRole("button", { name: "Add 3 items to cart" }));
+    expect(add).toHaveBeenCalledWith([
+      expect.objectContaining({ kind: "mattress", productId: "m-q", qty: 1 }),
+      expect.objectContaining({ kind: "acc", productId: "p-1", qty: 2 }),
+    ]);
+  });
+
+  // 2026-11-04, the user: "不需要它下面再显示 Show all 84 accessories，直接 show 出来就好，因为现在它是 scroll 下来的".
+  it("lists every accessory at once on its tab — no Show all — and a row picked keeps its place", () => {
+    quick("acc");
+    const all = ["AERO-MP · Queen", "AERO-MP · King", "AERO-MP · Super King", ...Array.from({ length: 6 }, (_, i) => `Pillow ${i + 1}`), "Z Bolster"];
+    expect(rows()).toEqual(all);
+    expect(screen.queryByRole("button", { name: /Show all|Show fewer/ })).not.toBeInTheDocument();
+    addOne("Z Bolster");
+    addOne("Pillow 4");
+    expect(rows()).toEqual(all);
+    expect(screen.getByRole("tab", { name: /^Accessories/ })).toHaveTextContent("Accessories2");
+  });
+
+  // 2026-11-04, the user: "我要它显示在右边，不要在下面，因为在下面有点难看到".
+  it("writes each row's size beside its name, on the name's line", () => {
+    quick("mattress", { cart: [{ id: "m-bastion-Q", kind: "mattress", key: "bastion", name: "BASTION", size: "Queen", qty: 2, productId: "m-q" }] });
+    const name = (row: string, size: string) => within(screen.getByRole("group", { name: row })).getByText(size).parentElement;
+    expect(name("APEX · Super Single", "Super Single")).toHaveTextContent(/^APEX Super Single$/);
+    expect(name("BASTION · Queen", "Queen")).toHaveTextContent(/^BASTION Queen$/);
+    // What the cart holds stays a line of its own, under the name.
+    expect(within(screen.getByRole("group", { name: "BASTION · Queen" })).getByText("2 in cart").parentElement).toHaveTextContent(/^BASTION Queen2 in cart$/);
+    tab(/^Accessories/);
+    expect(name("AERO-MP · Super King", "Super King")).toHaveTextContent(/^AERO-MP Super King$/);
+  });
+
+  // The size reads as part of the name now, so it is typed as one: the accessories are searched as the mattresses are.
+  it("searches the accessories by every word of the name and the size, as the row reads", () => {
+    quick("acc");
+    const box = screen.getByRole("searchbox", { name: "Search accessories" });
+    expect(box).toHaveAttribute("placeholder", "Search by name or size");
+    search("AERO-MP Super King");
+    expect(rows()).toEqual(["AERO-MP · Super King"]);
+    search("aero  queen");
+    expect(rows()).toEqual(["AERO-MP · Queen"]);
+    search("king");
+    expect(rows()).toEqual(["AERO-MP · King", "AERO-MP · Super King"]);
+    search("pillow queen");
+    expect(screen.getByRole("status")).toHaveTextContent("No accessories match your search.");
+  });
+
+  it("opens on either list, and searches the mattresses by name and size", () => {
+    quick("acc");
+    expect(screen.getByRole("tab", { name: /^Accessories/ })).toHaveAttribute("aria-selected", "true");
+    tab(/^Mattress/);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search mattresses" }), { target: { value: "apex  s" } });
+    expect(rows()).toEqual(["APEX · Single", "APEX · Super Single"]);
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search mattresses" }), { target: { value: "zzz" } });
+    expect(screen.getByRole("status")).toHaveTextContent("No Akemi mattress matches “zzz”.");
+  });
+
+  it("says what the cart already holds, sends nothing while read-only, and has no switch without accessories", () => {
+    quick("mattress", { cart: [{ id: "m-bastion-Q", kind: "mattress", key: "bastion", name: "BASTION", size: "Queen", qty: 2, productId: "m-q" }], readOnly: true });
+    expect(within(screen.getByRole("group", { name: "BASTION · Queen" })).getByText(/2 in cart/)).toBeInTheDocument();
+    addOne("BASTION · Queen");
+    expect(screen.getByRole("button", { name: "Read-only while viewing as" })).toHaveAttribute("aria-disabled", "true");
+    cleanup();
+    quick("mattress", { cat: { ...two, accs: [] } });
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(rows()).toHaveLength(5);
   });
 });
 

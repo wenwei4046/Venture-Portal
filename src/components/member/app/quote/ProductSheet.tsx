@@ -8,8 +8,9 @@ import { valueKey } from "@/lib/catalogue/keys";
 import { ICON, Svg } from "../icons";
 import { rm } from "../format";
 import {
-  MAX_QTY, SIZES, accAt, accOnlyTitle, accOrder, accVariants, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText,
-  type BfPick, type CartLine, type QCatalog, type QuoteMemory, type RecentFrame, type SheetState, type SizeKey, type SofaBuild,
+  MAX_QTY, SIZES, accAt, accOnlyTitle, accOrder, accVariantMatches, accVariants, firstFrame, frameBuildFor, frameBuildMeta, frameMeta, layoutFits, layoutKey, liveFrames, mattressVariants, quickCounts,
+  sheetLines, sizeLabel, sofaPick, sofaSeats, sofaText, variantMatches,
+  type BfPick, type CartLine, type QAcc, type QCatalog, type QuickTab, type QuoteMemory, type RecentFrame, type SheetState, type SizeKey, type SofaBuild,
 } from "./quote-model";
 import s from "./quote.module.css";
 
@@ -56,12 +57,15 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
   const pick = sheet.mode === "sofa" ? sofaPick(sheet, catalog, cart, build) : null;
   const brandUp = catalog.name.toUpperCase();
   const accWord = catalog.sofa ? "SOFA ACCESSORIES" : "ACCESSORIES";
-  const eyebrow = `${brandUp} · ${inF ? "BED FRAME FOR THIS MATTRESS" : sheet.mode === "sofa" ? "SOFA" : sheet.mode === "model" ? "MATTRESS" : sheet.mode === "frame" ? "BED FRAME" : accWord}`;
-  const title = inF ? "Add bed frame" : model ? model.name : sheet.mode === "frame" ? "Bed frame only" : accOnlyTitle(catalog);
+  // A mattress brand's quick sheet (2026-11-03): its two lists, named by the one on screen.
+  const quick = sheet.mode === "quick" ? sheet : null;
+  const eyebrow = `${brandUp} · ${inF ? "BED FRAME FOR THIS MATTRESS" : sheet.mode === "sofa" ? "SOFA" : sheet.mode === "model" || quick?.tab === "mattress" ? "MATTRESS" : sheet.mode === "frame" ? "BED FRAME" : accWord}`;
+  const title = inF ? "Add bed frame" : model ? model.name : sheet.mode === "frame" ? "Bed frame only"
+    : quick ? (quick.tab === "mattress" ? `All ${catalog.name} models` : "Accessories") : accOnlyTitle(catalog);
   const hasKpi = catalog.kpis.length > 0;
 
   // ── the footer ──
-  const qty = fv && inF ? fv.qty : sheet.mode === "acc" ? 1 : sheet.qty;
+  const qty = fv && inF ? fv.qty : sheet.mode === "acc" || sheet.mode === "quick" ? 1 : sheet.qty;
   const setQty = (n: number) => (inF ? a.patchFrame({ qty: n }) : a.patch({ qty: n }));
   let addText: string;
   let addOn: boolean;
@@ -71,6 +75,11 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
     addText = !sheet.fx.frame ? "No bed frame in this size" : sheet.fx.idx >= 0 ? "Save bed frame" : qty > 1 ? `Add ${qty} bed frames` : "Add bed frame";
   } else if (pick?.clash) { addText = "No seat height fits these modules"; addOn = false; }
   else if (!lines.length) { addText = "Choose something to add"; addOn = false; }
+  else if (quick) {
+    // Everything picked on both lists goes at once, the count said on the button.
+    const items = lines.reduce((n, l) => n + l.qty, 0);
+    addText = items > 1 ? `Add ${items} items to cart` : "Add to cart"; addOn = true;
+  }
   else { addText = qty > 1 ? `Add ${qty} sets to cart` : "Add to cart"; addOn = true; }
   const showPkg = !inF && (sheet.mode === "model" || sheet.mode === "sofa") && (sheet.qty > 1 || (sheet.mode === "model" && sheet.bfs.length > 0));
   const sets = sheet.mode === "model" || sheet.mode === "sofa" ? sheet.qty : 1;
@@ -81,7 +90,7 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
     <div className={s.psLayer}>
       <div className={s.psDim} onClick={a.close} />
       {fv && <FramePicker fv={fv} catalog={catalog} onPick={key => a.patchFrame({ frame: key, drop: false })} onClose={() => a.patchFrame({ drop: false })} />}
-      <div className={s.psPanel} role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`${s.psPanel} ${quick ? s.psPanelFull : ""}`} role="dialog" aria-modal="true" aria-label={title}>
         <div className={s.psHandle} />
         <div className={s.psHead}>
           <div className={s.psHeadText}>
@@ -92,6 +101,7 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
           </div>
           <button className={s.psClose} aria-label="Close" onClick={a.close}><Svg d={CLOSE} size={18} sw={1.9} /></button>
         </div>
+        {quick && catalog.accs.length > 0 && <QuickSwitch tab={quick.tab} counts={quickCounts(quick)} onTab={tab => a.patch({ tab })} />}
         <div className={s.psBody} data-sheet-body>
           {sheet.mode === "sofa" && model && pick && <SofaSections sheet={sheet} catalog={catalog} memory={memory} pick={pick} hasKpi={hasKpi} onPatch={a.patch} />}
           {fv && <FrameSections fv={fv} catalog={catalog} memory={memory} brandName={catalog.name} onPatch={a.patchFrame} onRecent={a.applyFrame} hasKpi={hasKpi} />}
@@ -110,11 +120,18 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
             <AccSection title={catalog.sofa ? "Sofa accessories" : "Accessories"} catalog={catalog} memory={memory} picked={sheet.acc} all={sheet.accAll}
               onAll={() => a.patch({ accAll: !sheet.accAll })} onSet={acc => a.patch({ acc })} />
           )}
+          {quick?.tab === "mattress" && (
+            <MattressVariants catalog={catalog} cart={cart} picks={quick.picks} query={quick.query}
+              onQuery={query => a.patch({ query })} onSet={picks => a.patch({ picks })} />
+          )}
+          {quick?.tab === "acc" && (
+            <AccSection title="Accessories" catalog={catalog} memory={memory} picked={quick.acc} whole onSet={acc => a.patch({ acc })} />
+          )}
         </div>
         <div className={s.psFoot}>
           {showPkg && <p className={s.pkg}><strong className={s.pkgHead}>{sets > 1 ? `${sets} sets =` : "This set:"}</strong> {pkgParts.join(" · ")}</p>}
           <div className={s.footRow}>
-            {sheet.mode !== "acc" && (
+            {sheet.mode !== "acc" && sheet.mode !== "quick" && (
               <div className={s.qtyBig}>
                 <button className={s.qtyBigBtn} aria-label="Less" onClick={() => setQty(Math.max(1, qty - 1))}>−</button>
                 <span className={s.qtyBigNum}>{qty}</span>
@@ -125,6 +142,75 @@ export default function ProductSheet({ sheet, catalog, memory, cart, build, read
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The quick sheet's *Mattress | Accessories* (2026-11-03 — the user: "可以在 mode 那边切换，分成 mattress 和 accessory 两个
+ * 东西可以去 switch"): which list is on screen; what each holds so far beside its name. Switching keeps both.
+ */
+function QuickSwitch({ tab, counts, onTab }: { tab: QuickTab; counts: Record<QuickTab, number>; onTab: (tab: QuickTab) => void }) {
+  return (
+    <div className={s.quickBar}>
+      <div className={s.quickSeg} role="tablist" aria-label="Add from">
+        {(["mattress", "acc"] as const).map(id => (
+          <button key={id} role="tab" aria-selected={tab === id} className={`${s.quickSegBtn} ${tab === id ? s.quickSegOn : ""}`} onClick={() => onTab(id)}>
+            {id === "mattress" ? "Mattress" : "Accessories"}
+            {counts[id] > 0 && <span className={s.quickSegCount} aria-label={`${counts[id]} picked`}>{counts[id]}</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The quick sheet's mattresses (2026-11-03 — the user: "直接出它的 variant，比如说 Apex Single、Apex Super Single …
+ * 直接按加号 … 交互形式就跟现在的 accessory 一样"): every model in every size it comes in, A–Z, each a row with − / + as
+ * an accessory's; what is picked waits for *Add to cart*, and what the cart already holds is said under it. The size
+ * stands to the right of the name (2026-11-04 — the user: "我要它显示在右边，不要在下面，因为在下面有点难看到"). The
+ * search reads the name and the size, every word.
+ */
+function MattressVariants({ catalog, cart, picks, query, onQuery, onSet }: {
+  catalog: QCatalog;
+  cart: CartLine[];
+  picks: Record<string, number>;
+  query: string;
+  onQuery: (query: string) => void;
+  onSet: (picks: Record<string, number>) => void;
+}) {
+  const q = query.trim().toLowerCase();
+  const rows = catalog.models.flatMap(m => mattressVariants(m).map(v => ({ m, ...v }))).filter(r => variantMatches(r.m, r.size, q));
+  const held = new Map(cart.filter(l => l.kind === "mattress").map(l => [l.productId, l.qty]));
+  const n = catalog.models.length;
+  return (
+    <div>
+      <div className={s.rowHead}><p className={s.rowHeadTitle}>Mattresses</p><span className={s.rowHeadCap}>{`${n} model${n === 1 ? "" : "s"} · A–Z`}</span></div>
+      <div className={`${s.search} ${s.accSearch}`}>
+        <Svg d={SEARCH} size={18} sw={1.8} stroke="var(--rv-sub)" />
+        <input className={s.searchInput} type="search" aria-label="Search mattresses" placeholder="Search by name or size"
+          value={query} onChange={e => onQuery(e.target.value)} />
+        {query && <button className={s.accSearchClear} aria-label="Clear mattress search" onClick={() => onQuery("")}><Svg d={X} size={16} sw={2} /></button>}
+      </div>
+      {!rows.length && <p className={s.noMatch} role="status">{`No ${catalog.name} mattress matches “${query.trim()}”.`}</p>}
+      {rows.map(({ m, size, productId }) => {
+        const k = picks[productId] ?? 0;
+        const inCart = held.get(productId) ?? 0;
+        return (
+          <div key={productId} className={s.accRow} role="group" aria-label={`${m.name} · ${sizeLabel(size)}`}>
+            <div className={s.accText}>
+              <span className={s.accName}>{m.name} <span className={s.accSizeBeside}>{sizeLabel(size)}</span></span>
+              {inCart > 0 && <span className={`${s.accSize} ${s.quickHeld}`}>{`${inCart} in cart`}</span>}
+            </div>
+            <div className={`${s.accStep} ${k ? s.accStepOn : ""}`}>
+              <button className={s.accBtn} aria-label="Remove one" onClick={() => k && onSet({ ...picks, [productId]: k - 1 })}>−</button>
+              <span className={s.accQty}>{k}</span>
+              <button className={s.accBtn} aria-label="Add one" onClick={() => onSet({ ...picks, [productId]: Math.min(MAX_QTY, k + 1) })}>+</button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -478,36 +564,52 @@ function BedFrames({ bfs, catalog, onAdd, onEdit, onRemove }: {
   );
 }
 
-function AccSection({ title, catalog, memory, picked, size, all, onAll, onSet }: {
+/**
+ * The accessories, each with − / +. Folded to the first few behind *Show all N accessories* — except where the list
+ * is the whole sheet (`whole`: the quick sheet's Accessories tab, 2026-11-04 — the user: "不需要它下面再显示 Show all
+ * 84 accessories，直接 show 出来就好，因为现在它是 scroll 下来的"), where every row is there and keeps its place while
+ * it is picked. A fitted size stands to the right of the name (2026-11-04 — "我要它显示在右边，不要在下面").
+ */
+function AccSection({ title, catalog, memory, picked, size, onSet, ...fold }: {
   title: string;
   catalog: QCatalog;
   memory: QuoteMemory;
   picked: Record<string, number>;
   size?: SizeKey;
-  all: boolean;
-  onAll: () => void;
   onSet: (acc: Record<string, number>) => void;
-}) {
+} & (
+  /** The whole list at once, in a fixed order (recent first, then A–Z) — nothing moves when a row is picked. */
+  | { whole: true }
+  /** Folded to the first few, *Show all* unfolding it. */
+  | { whole?: false; all: boolean; onAll: () => void }
+)) {
+  const whole = fold.whole === true;
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   // Standalone accessories have independent SKU quantities; mattress accessories follow its size.
   const grouped = size ? picked : Object.fromEntries(catalog.accs.map(acc => [
     acc.key, accVariants(acc).reduce((sum, at) => sum + (picked[at.productId] ?? 0), 0),
   ]));
-  const rows = accOrder(catalog, memory, grouped).flatMap(acc => {
+  const variantRows = (accs: QAcc[]) => accs.flatMap(acc => {
     const fitted = size ? accAt(acc, size) : null;
     const variants = size ? (fitted ? [fitted] : []) : accVariants(acc);
     return variants.map(at => ({ acc, at, key: size ? acc.key : at.productId }));
-  }).sort((a, b) => Number((picked[b.key] ?? 0) > 0) - Number((picked[a.key] ?? 0) > 0));
+  });
+  // Folded, what is picked comes first so it stays in sight; whole, a row picked stays where it was tapped.
+  const rows = whole ? variantRows(accOrder(catalog, memory, {}))
+    : variantRows(accOrder(catalog, memory, grouped)).sort((a, b) => Number((picked[b.key] ?? 0) > 0) - Number((picked[a.key] ?? 0) > 0));
   if (!rows.length) return null;
-  const shown = q ? rows.filter(({ acc }) => acc.name.toLowerCase().includes(q))
-    : all ? rows : rows.slice(0, Math.max(ACC_FIRST, rows.filter(r => (picked[r.key] ?? 0) > 0).length));
+  // The name and the size, every word — what the row says can be typed (`aero queen`).
+  const shown = q ? rows.filter(({ acc, at }) => accVariantMatches(acc, at.size, q))
+    : fold.whole || fold.all ? rows : rows.slice(0, Math.max(ACC_FIRST, rows.filter(r => (picked[r.key] ?? 0) > 0).length));
+  // A list of SKUs in several sizes says the size can be searched; a mattress's own list is in its size alone.
+  const sizes = !size && rows.some(r => r.at.size);
   return (
     <div>
       <div className={s.rowHead}><p className={s.rowHeadTitle}>{title}</p><span className={s.rowHeadCap}>Optional</span></div>
       <div className={`${s.search} ${s.accSearch}`}>
         <Svg d={SEARCH} size={18} sw={1.8} stroke="var(--rv-sub)" />
-        <input className={s.searchInput} type="search" aria-label="Search accessories" placeholder="Search accessories by name"
+        <input className={s.searchInput} type="search" aria-label="Search accessories" placeholder={sizes ? "Search by name or size" : "Search accessories by name"}
           value={query} onChange={e => setQuery(e.target.value)} />
         {query && <button className={s.accSearchClear} aria-label="Clear accessory search" onClick={() => setQuery("")}><Svg d={X} size={16} sw={2} /></button>}
       </div>
@@ -517,8 +619,7 @@ function AccSection({ title, catalog, memory, picked, size, all, onAll, onSet }:
         return (
           <div key={key} className={s.accRow} role="group" aria-label={[acc.name, at.size ? sizeLabel(at.size) : ""].filter(Boolean).join(" · ")}>
             <div className={s.accText}>
-              <span className={s.accName}>{acc.name}</span>
-              {at.size && <span className={s.accSize}>{sizeLabel(at.size)}</span>}
+              <span className={s.accName}>{acc.name}{at.size && <> <span className={s.accSizeBeside}>{sizeLabel(at.size)}</span></>}</span>
             </div>
             <div className={`${s.accStep} ${n ? s.accStepOn : ""}`}>
               <button className={s.accBtn} aria-label="Remove one" onClick={() => n && onSet({ ...picked, [key]: n - 1 })}>−</button>
@@ -528,10 +629,10 @@ function AccSection({ title, catalog, memory, picked, size, all, onAll, onSet }:
           </div>
         );
       })}
-      {!q && (rows.length > shown.length || all) ? (
-        <button className={s.more} onClick={onAll}>
-          {all ? "Show fewer" : `Show all ${rows.length} accessories`}
-          <Svg d={ICON.chevronDown} size={18} sw={2} className={`${s.dropChev} ${all ? s.dropChevOpen : ""}`} />
+      {!q && !fold.whole && (rows.length > shown.length || fold.all) ? (
+        <button className={s.more} onClick={fold.onAll}>
+          {fold.all ? "Show fewer" : `Show all ${rows.length} accessories`}
+          <Svg d={ICON.chevronDown} size={18} sw={2} className={`${s.dropChev} ${fold.all ? s.dropChevOpen : ""}`} />
         </button>
       ) : null}
     </div>

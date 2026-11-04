@@ -15,7 +15,7 @@ import { arenaRankings, type MemberArenaSnapshot } from "@/lib/member/arena";
 import { championshipMonth, championshipStandings } from "@/lib/member/championship";
 import base from "./base.module.css";
 import s from "./shell.module.css";
-import { greeting, initials, klToday, longDayLabel, monthName, quarterLabel } from "./format";
+import { firstName, greeting, initials, klToday, longDayLabel, monthName, quarterLabel } from "./format";
 import { greetingName } from "@/lib/person-name";
 import { PRODUCTS_PATH, appHref, productsHref, useRoute, visitPath, type Board, type InsightView, type Route, type Screen } from "./route";
 import { useVisits } from "./shell/useVisits";
@@ -23,6 +23,8 @@ import { departmentSource } from "./department-source";
 import { ProductShellContext, type ProductShell } from "./product-shell";
 import { addMonths, isLiveMonth, monthPeriod, periodOf, periodOptions, workingMonth, type MonthState, type PeriodKind } from "./insight/period";
 import { useInsightData } from "./insight/useInsightData";
+import { usePersonData } from "./insight/usePersonData";
+import PersonPage from "./insight/PersonPage";
 import { billsView, brandPage, insightMain, kpiView, orderSheet, type InsightInput } from "./insight/insight-model";
 import InsightMain, { type InsightTab } from "./insight/InsightMain";
 import BillsPage, { type BillsStatus } from "./insight/BillsPage";
@@ -629,7 +631,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     closeProfileSheets();
     if (screen !== "quote" && screen !== "calc") { quote.closeSheet(); quote.setCartOpen(false); quote.setAllOpen(false); }
     quote.setPreviewOpen(false);
-    const next: Partial<Route> = { screen, pf: null, ins: "main", arena: "hub", ...extra };
+    const next: Partial<Route> = { screen, pf: null, ins: "main", arena: "hub", of: "", ...extra };
     if (onProducts) {
       // From the Product List's page back to the app's own: the router changes the page, the app its screen.
       go(next, false, false);
@@ -660,9 +662,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     form.set("role", id);
     startSwitch(async () => { await setViewAs(form); });
   }, [mayLeaveProducts, device]);
-  const toInsight = useCallback((view: InsightView, status: BillsStatus = "counted") => {
+  /** `of`: a person's pages (Insight › My team › a person, 2026-11-03); empty = the reader's own. */
+  const toInsight = useCallback((view: InsightView, status: BillsStatus = "counted", of = "") => {
     if (view === "bills") setBillStatus(status);
-    goScreen("insight", { ins: view });
+    goScreen("insight", { ins: view, of });
   }, [goScreen]);
   // A board from Today or the bell opens on its month, as the prototype's `go('arena', { period: 'monthly', sub: 'total' })`:
   // the bell's results on the settled month they are about, anything else on the current month.
@@ -823,19 +826,26 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // The whole sub-department (2026-10-25): everybody's bills, and a tap on a member views them — anybody View as lists.
   const whole = deptSource ? membership?.name ?? "the department" : undefined;
   const canView = useMemo(() => (deptSource ? new Set((membership?.people ?? []).map(p => p.id)) : undefined), [deptSource, membership?.people]);
+  const insDownline = useMemo(() => (insMonthly ? ins.block?.downline : ins.range?.downline) ?? [], [insMonthly, ins.block, ins.range]);
+  // Insight › My team › a person (2026-11-03 — the user, over STANLEY's *Team members*: "i need them can press their team
+  // member than can view their order as well like this"): a row of a member's My team opens that person's own Insight,
+  // read-only — everybody it lists, every level down; the Principal viewing somebody, through View as's context. The
+  // whole sub-department keeps its own tap (View as them, above); the preview's fixtures open nobody.
+  const teamOpens = !deptSource && !fixture && !data.demo && (principal ? !!context : !!source.teamBook);
+  const teamOpenIds = useMemo(() => (teamOpens ? new Set(insDownline.map(d => d.staffId).filter(Boolean)) : undefined), [teamOpens, insDownline]);
   const insightInput = useMemo<InsightInput>(() => ({
     period: insPeriod,
     book: ins.book,
     me: (insMonthly ? ins.block?.me : ins.range?.me) ?? null,
-    downline: (insMonthly ? ins.block?.downline : ins.range?.downline) ?? [],
+    downline: insDownline,
     target: insMonthly ? ins.block?.target ?? null : null,
     kpi: insMonthly ? ins.kpi : null,
     kpiEnabled: now.kpi?.enabled,
     bands: data.bands,
     name: me.name,
     title: me.title,
-    ...(whole ? { whole, canView } : {}),
-  }), [insPeriod, ins, insMonthly, now.kpi?.enabled, data.bands, me.name, me.title, whole, canView]);
+    ...(whole ? { whole, canView } : teamOpenIds ? { canView: teamOpenIds } : {}),
+  }), [insPeriod, ins, insMonthly, insDownline, now.kpi?.enabled, data.bands, me.name, me.title, whole, canView, teamOpenIds]);
   const insMain = useMemo(() => fixture?.insight?.main ?? (ins.book ? insightMain(insightInput) : null), [fixture, ins.book, insightInput]);
   const insBills = useMemo(() => fixture?.insight?.bills ?? (ins.book ? billsView(insightInput) : null), [fixture, ins.book, insightInput]);
   const insKpi = useMemo(() => fixture?.insight?.kpi ?? (ins.book ? kpiView(insightInput, membership?.name ?? "this sub-department") : null), [fixture, ins.book, insightInput, membership?.name]);
@@ -843,14 +853,41 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     if (fixture?.insight) return fixture.insight.brands[insBrand] ?? Object.values(fixture.insight.brands)[0] ?? null;
     return ins.book ? brandPage(insightInput, insBrand) : null;
   }, [fixture, ins.book, insightInput, insBrand]);
+  // …the person open (`?of=`): their bills and KPI items, the period Insight shows; their name and title as My team
+  // lists them — kept while another period's team is read.
+  const personId = route.screen === "insight" && teamOpens ? route.of ?? "" : "";
+  const personRow = useMemo(() => (personId ? insDownline.find(d => d.staffId === personId) ?? null : null), [personId, insDownline]);
+  const [personSeen, setPersonSeen] = useState<{ id: string; name: string; title: string } | null>(null);
+  useEffect(() => { if (personRow) setPersonSeen({ id: personRow.staffId, name: personRow.name, title: personRow.title }); }, [personRow]);
+  const personName = personRow?.name ?? (personSeen?.id === personId ? personSeen.name : "");
+  const personTitle = personRow?.title ?? (personSeen?.id === personId ? personSeen.title : "");
+  const personWho = personName ? firstName(personName) : "";
+  // Only somebody My team lists is read — known from the team on screen, or kept from it while another period's is read.
+  // An address naming anybody else opens nothing (the database would refuse a member anyway; the Principal viewing
+  // somebody may read anybody).
+  const teamRead = insMonthly ? !!ins.block : !!ins.range;
+  const personOff = !!personId && teamRead && !personName;
+  const person = usePersonData({ source, membershipId, schemeId, staffId: personName ? personId : "", period: personId ? insPeriod : null,
+    viewAs: principal && !!context, gen, track });
+  const personInput = useMemo<InsightInput | null>(() => (personId && personWho ? {
+    period: insPeriod, book: person.book, me: null, downline: [], target: null,
+    kpi: insMonthly ? person.kpi : null, kpiEnabled: now.kpi?.enabled, bands: data.bands,
+    name: personName, title: personTitle, of: personWho,
+  } : null), [personId, personWho, insPeriod, person.book, insMonthly, person.kpi, now.kpi?.enabled, data.bands, personName, personTitle]);
+  const personMain = useMemo(() => (personInput?.book ? insightMain(personInput).personal : null), [personInput]);
+  const personBills = useMemo(() => (personInput?.book ? billsView(personInput) : null), [personInput]);
+  const personKpi = useMemo(() => (personInput?.book ? kpiView(personInput, membership?.name ?? "this sub-department") : null), [personInput, membership?.name]);
+  const personBrand = useMemo(() => (personInput?.book ? brandPage(personInput, insBrand) : null), [personInput, insBrand]);
   const soVM = useMemo(() => {
     if (!soPick) return null;
     if (fixture?.insight) return fixture.insight.orders[soPick] ?? null;
+    // A person's bill reads as theirs, and shares nothing (below).
+    if (personId) return personInput ? orderSheet(personInput, soPick) : null;
     return orderSheet(insightInput, soPick);
-  }, [fixture, soPick, insightInput]);
+  }, [fixture, soPick, insightInput, personId, personInput]);
   // Share order (2026-10-21): the bill's open request, the share sheet's reads and writes — each answer replaces the
-  // request in the list at once.
-  const soRequest = soPick ? shares.onBill(soPick) : null;
+  // request in the list at once. A person's bill is never the reader's to share.
+  const soRequest = soPick && !personId ? shares.onBill(soPick) : null;
   const sharePickVM = sharePick ? shares.find(sharePick) : null;
   const sharePut = shares.put;
   const loadShare = useCallback((orderId: string) => (source.shareContext
@@ -1429,16 +1466,28 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       openBoard: arenaOpen ? board => arenaThisMonth(board) : undefined,
     }} />;
   } else if (route.screen === "insight") {
-    const back = () => toInsight("main");
+    // A person's pages (Insight › My team › a person, 2026-11-03) go back to their page; the reader's own to Insight.
+    const of = personId;
+    const who = of ? personWho || undefined : undefined;
+    const back = () => toInsight("main", "counted", of);
     const openDate = () => setDateOpen(true);
     if (route.ins === "bills") {
-      page = <BillsPage vm={insBills} dateLabel={insDateLabel} status={billStatus} week={billWeek} onStatus={setBillStatus} onWeek={setBillWeek}
-        onBill={setSoPick} onBack={back} onDate={openDate} whole={whole} />;
+      page = <BillsPage vm={of ? personBills : insBills} dateLabel={insDateLabel} status={billStatus} week={billWeek} onStatus={setBillStatus} onWeek={setBillWeek}
+        onBill={setSoPick} onBack={back} onDate={openDate} whole={of ? undefined : whole} who={who} />;
     } else if (route.ins === "kpi") {
-      page = <KpiPage vm={insKpi} dateLabel={insDateLabel} onBill={setSoPick} onBack={back} onDate={openDate} />;
+      page = <KpiPage vm={of ? personKpi : insKpi} dateLabel={insDateLabel} onBill={setSoPick} onBack={back} onDate={openDate} who={who} />;
     } else if (route.ins === "brand") {
-      page = <BrandPage vm={insBrandVM} dateLabel={insDateLabel} onBrand={code => { setInsBrand(code); setTiersOpen(false); }}
-        onTiers={() => setTiersOpen(true)} onBill={setSoPick} onBack={back} onDate={openDate} />;
+      page = <BrandPage vm={of ? personBrand : insBrandVM} dateLabel={insDateLabel} onBrand={code => { setInsBrand(code); setTiersOpen(false); }}
+        onTiers={() => setTiersOpen(true)} onBill={setSoPick} onBack={back} onDate={openDate} who={who} />;
+    } else if (of) {
+      page = <PersonPage vm={personMain} name={personName} title={personTitle} dateLabel={insDateLabel} failed={person.failed || personOff}
+        onBack={() => { setInsTab("team"); toInsight("main"); }} actions={{
+          openDate,
+          toBills: () => toInsight("bills", "counted", of),
+          toKpi: () => toInsight("kpi", "counted", of),
+          toWaiting: () => toInsight("bills", "waiting", of),
+          openBrand: code => { setInsBrand(code); toInsight("brand", "counted", of); },
+        }} />;
     } else {
       page = <InsightMain vm={insMain} tab={insTab} dateLabel={insDateLabel} whole={whole} actions={{
         openDate, setTab: setInsTab,
@@ -1447,8 +1496,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
         toWaiting: () => toInsight("bills", "waiting"),
         openBrand: code => { setInsBrand(code); toInsight("brand"); },
         // The whole sub-department (2026-10-25 — "点按过去看全部人的"): a member's row views them on Insight — their own
-        // bills of the same period, read-only, as Profile's View as.
-        openPerson: deptSource ? staffId => { setInsTab("personal"); goScreen("insight", { staff: staffId, department: membershipId }); } : undefined,
+        // bills of the same period, read-only, as Profile's View as. A member's My team (2026-11-03): that person's own
+        // Insight, read-only, under ‹ My team.
+        openPerson: deptSource ? staffId => { setInsTab("personal"); goScreen("insight", { staff: staffId, department: membershipId }); }
+          : teamOpens ? staffId => toInsight("main", "counted", staffId) : undefined,
       }} />;
     }
   } else if (route.screen === "arena") {
@@ -1477,7 +1528,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       : <div className={qs.page}><p className={qs.recentEmpty}>No brands are set up for quotes in {membership?.name ?? "this sub-department"} yet.</p></div>;
   } else if (route.screen === "quote" && quote.catalog) {
     page = <QuoteProducts catalog={quote.catalog} memory={quote.memory} onBrand={() => openSheet("brand")} onSet={quote.applySet}
-      onAll={() => { quote.setQuery(""); quote.setAllOpen(true); }} onFrameOnly={quote.openFrameOnly} onAccOnly={quote.openAccOnly} />;
+      onAll={quote.openAll} onFrameOnly={quote.openFrameOnly} onAccOnly={quote.openAccOnly} />;
   } else if (route.screen === "calc" && quote.catalog) {
     page = <QuoteCalc {...calcProps} />;
   } else if (route.screen === "account") {
@@ -1624,7 +1675,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
             onPick={o => { setInsFrom(o.period.from); setBillWeek(null); setDateOpen(false); }} onClose={() => setDateOpen(false)} />
           {route.ins === "brand" && <TiersSheet open={tiersOpen} vm={insBrandVM} onClose={() => setTiersOpen(false)} />}
           {route.ins !== "main" && <OrderSheet open={soPick !== null} vm={soVM} onClose={() => setSoPick(null)}
-            canShare={!fixture && !data.demo && !!source.shareSend && !closed.sends.includes("requests")}
+            canShare={!personId && !fixture && !data.demo && !!source.shareSend && !closed.sends.includes("requests")}
             request={soRequest ? { id: soRequest.id, status: shareStatus(soRequest).text } : null}
             // The share sheets take the bill sheet's place: it is a peek, and a tap in a sheet above it would close it anyway.
             onShare={() => { setShareOrder(soPick); setSoPick(null); }} onRequest={id => { setSharePick(id); setSoPick(null); }} />}

@@ -16,13 +16,14 @@ import {
   fetchMemberInsight,
   fetchMemberInsightRange,
   fetchMemberOrderBook,
+  fetchMemberTeamOrderBook,
   fetchMemberOrgMap,
   fetchMemberRequestHistory,
   fetchPrincipalMemoReceipts,
   refreshMemberData,
 } from "./actions";
 import { fetchDepartmentArena, fetchMemberArena } from "./arena-actions";
-import { fetchMemberKpiSummary } from "./kpi-summary-actions";
+import { fetchMemberKpiSummary, fetchMemberTeamKpiSummary } from "./kpi-summary-actions";
 import { fetchMemberRooms } from "./rooms-actions";
 import { fetchMemberDocuments, fetchMemberPersonal } from "./docs-actions";
 import { fetchMemberCrmUnread } from "./chat-badge-actions";
@@ -40,6 +41,9 @@ export type MemberRead =
   | { kind: "orgMap"; context?: Pick<MemberReadContext, "subDepartmentId"> }
   | { kind: "orderBook"; subDepartmentId: string; from: string; until: string; context?: MemberReadContext }
   | { kind: "insightRange"; subDepartmentId: string; from: string; until: string; context?: MemberReadContext }
+  // Insight › My team › a person (2026-11-03): their bills and KPI items, for a member whose My team lists them.
+  | { kind: "teamBook"; subDepartmentId: string; staffId: string; from: string; until: string }
+  | { kind: "teamKpi"; schemeId: string; staffId: string; period?: string }
   | { kind: "income"; subDepartmentId: string; period: string; context?: MemberReadContext }
   | { kind: "departmentIncome"; subDepartmentId: string; period: string }
   // The Principal viewing nobody (2026-10-25): the whole sub-department's Insight, bills and boards.
@@ -96,6 +100,8 @@ function readOne(read: MemberRead): Promise<unknown> {
     case "orgMap": return fetchMemberOrgMap(read.context);
     case "orderBook": return fetchMemberOrderBook(read.subDepartmentId, read.from, read.until, read.context);
     case "insightRange": return fetchMemberInsightRange(read.subDepartmentId, read.from, read.until, read.context);
+    case "teamBook": return fetchMemberTeamOrderBook(read.subDepartmentId, read.staffId, read.from, read.until);
+    case "teamKpi": return fetchMemberTeamKpiSummary(read.schemeId, read.staffId, read.period);
     case "income": return fetchMemberIncome(read.subDepartmentId, read.period, read.context);
     case "departmentIncome": return fetchDepartmentIncome(read.subDepartmentId, read.period);
     case "departmentInsight": return fetchDepartmentInsight(read.subDepartmentId, read.from, read.until);

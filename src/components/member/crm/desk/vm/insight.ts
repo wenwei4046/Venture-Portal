@@ -272,11 +272,14 @@ export function clistVM(ctx: DeskCtx) {
     clSorts: ["Last chat", "Oldest chat", "Status", "Salesperson", "Name A–Z"].map(s => ({ label: s, bg: s === k ? "var(--crm-tint-attention)" : "transparent", fg: s === k ? "var(--crm-rust)" : "var(--crm-ink)", w: s === k ? 700 : 500, pick: () => patch({ clSort: s, clSortOpen: false }) })),
     clistRows: sorted.map(x => { const c = ST[x.status.split(" · ")[0]] ?? ST["Follow up"];
       return { name: x.name, ini: x.ini, sub: x.sub, status: x.status, stBg: c[0], stFg: c[1],
-        open: () => key.startsWith("st:") ? patch({ kind: "chat", chat: x.id, fromList: true }) : patch({ kind: "info", infoId: x.id }) }; }),
+        open: () => key.startsWith("st:") ? patch({ kind: "chat", chat: x.id, fromList: true }) : patch({ kind: "info", infoId: x.id, infoFromChat: false }) }; }),
     clistHead: { title: stLabel[key] ?? key, sub: stLabel[key] ? "Leads by status · tap to open the chat" : `${name} · tap a customer for their info` },
     backStatusLabel: `${stLabel[key] ?? ""} · all chats`, backToStatus: () => patch({ kind: "clist", fromList: false }),
     chatFromList: ui.kind === "chat" && ui.pane === "overlay" && ui.fromList && key.startsWith("st:"),
-    infoBack: !!ui.infoId && ui.kind === "info" && !ui.visit, infoBackLabel: `${key} · all customers`, backToList: () => patch({ kind: "clist", infoId: null }),
+    // Opened from the chat, back is that chat (the owner, 2026-11-04: "点击后返回到聊天室"); from Leads, back is Leads.
+    infoBack: !!ui.infoId && ui.kind === "info" && !ui.visit,
+    infoBackLabel: ui.infoFromChat && ui.chat ? "Back to chat" : `${key} · all customers`,
+    backToList: () => patch(ui.infoFromChat && ui.chat ? { kind: "chat", infoFromChat: false } : { kind: "clist", infoId: null, infoFromChat: false }),
     teamNameOf: (id: string | null) => teamNameOf(ctx, id),
     isCold: (c: CrmCustomer) => isCold(c, now), urgency: (c: CrmCustomer) => urgencyOf(c, now),
   };

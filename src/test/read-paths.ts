@@ -346,6 +346,9 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Insight and bills — each asks member_principal_department (an active Principal account) first.
   'member_principal_department_arena', 'member_principal_department_booth_history', 'member_principal_department_insight',
   'member_principal_department_order_book',
+  // Insight › My team › a person (mig 20261103231500): somebody the member's My team lists — each asks
+  // member_insight_scheme (member_insight, a seat or a directorship there) and then member_team_has.
+  'member_team_order_book', 'member_team_kpi_summary',
   // People › Permissions by view and tab (migs 20261011010000, 20261011020000): each asks has_perm('permissions_manage').
   'permission_template_tabs_save', 'permission_user_tabs_set', 'permission_template_delete', 'permission_title_move',
   // "+ New template"'s window (mig 20261011233200): has_any_action(accounts.manage), then the two above ask permissions_manage.

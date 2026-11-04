@@ -33,7 +33,14 @@ export interface Route {
   department: string;
   /** Principal only: whom the app is viewed as. */
   staff: string;
+  /**
+   * Insight › My team › a person (2026-11-03): whose Insight pages are open — somebody the member's My team lists
+   * (`?of=<staff id>`); absent = the member's own. Insight's only.
+   */
+  of?: string;
 }
+
+const STAFF_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** The app's screens an address can name, and Profile's pages — every one has a box in People › Permissions or a reason not to (permission-tabs-coverage.test). */
 export const SCREENS: Screen[] = ["today", "quote", "calc", "insight", "arena", "account"];
@@ -59,6 +66,7 @@ export function readRoute(search: string): Route {
   if (LEGACY[page]) return { ...base, ...LEGACY[page] };
   const screen = (SCREENS as string[]).includes(page) ? (page as Screen) : "today";
   const board = (BOARDS as string[]).includes(q.get("board") ?? "") ? (q.get("board") as Board) : "sales";
+  const of = screen === "insight" ? q.get("of") ?? "" : "";
   return {
     ...base,
     screen,
@@ -66,6 +74,7 @@ export function readRoute(search: string): Route {
     ins: screen === "insight" && (INS as string[]).includes(view) ? (view as InsightView) : "main",
     arena: screen === "arena" && (view === "board" || view === "record") ? view : "hub",
     board,
+    ...(STAFF_ID.test(of) ? { of } : {}),
   };
 }
 
@@ -78,6 +87,7 @@ export function writeRoute(route: Route, base: string): string {
     : route.screen === "arena" && route.arena !== "hub" ? route.arena : null;
   if (view) q.set("view", view);
   if (route.screen === "arena" && route.arena === "board") q.set("board", route.board);
+  if (route.screen === "insight" && route.of) q.set("of", route.of);
   if (route.department) q.set("department", route.department);
   if (route.staff) q.set("staff", route.staff);
   const keep = new URL(base).searchParams;

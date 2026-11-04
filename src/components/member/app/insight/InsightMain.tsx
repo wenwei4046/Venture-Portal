@@ -15,7 +15,10 @@ export interface InsightMainActions {
   toKpi: () => void;
   toWaiting: () => void;
   openBrand: (code: string) => void;
-  /** The Principal's whole sub-department (2026-10-25): a member's row views them — their own bills, read-only. */
+  /**
+   * A row of the team opens that person: the Principal's whole sub-department (2026-10-25) views them — their own
+   * bills, read-only — and a member's My team (2026-11-03) opens their Insight, read-only too.
+   */
   openPerson?: (staffId: string) => void;
 }
 
@@ -50,12 +53,21 @@ export default function InsightMain({ vm, tab, dateLabel, actions, whole }: {
   );
 }
 
-function Personal({ vm, actions, whole }: { vm: InsightMainVM["personal"]; actions: InsightMainActions; whole?: string }) {
+/**
+ * The Personal tab's cards and Margin by brand. `person` (2026-11-03, Insight › My team › a person): the same of somebody
+ * under the reader — their name heads the page, so the sales card is just *Sales*.
+ */
+export function Personal({ vm, actions, whole, person = false }: {
+  vm: InsightMainVM["personal"];
+  actions: Pick<InsightMainActions, "toBills" | "toKpi" | "toWaiting" | "openBrand">;
+  whole?: string;
+  person?: boolean;
+}) {
   return (
     <div className={s.col20}>
       <button className={s.salesCard} onClick={actions.toBills}>
         <div className={s.cardTop}>
-          <span className={s.cardLabel}>{whole ? `${whole} sales` : "My sales"}</span>
+          <span className={s.cardLabel}>{whole ? `${whole} sales` : person ? "Sales" : "My sales"}</span>
           <span className={`${s.cardRight} ${vm.sales.rightAccent ? s.cardRightAccent : ""}`}>{vm.sales.right}</span>
         </div>
         <div className={s.cardAmount}>{vm.sales.amount}</div>
@@ -129,9 +141,13 @@ function Team({ vm, whole, onPerson }: { vm: InsightMainVM["team"]; whole?: stri
               <span className={s.teamRight}><span className={s.teamSales}>{t.sales}</span><span className={s.teamMeta}>{t.meta}</span></span>
             </>
           );
-          // A tap views them — their own bills, read-only (2026-10-25: "点按过去看全部人的").
+          // A tap views them — their own bills, read-only (2026-10-25: "点按过去看全部人的"; a member's team, 2026-11-03).
           return t.open && onPerson
-            ? <button key={t.id} className={`${s.teamRow} ${s.teamRowTap}`} onClick={() => onPerson(t.id)} aria-label={`View ${t.name}`}>{body}</button>
+            ? (
+              <button key={t.id} className={`${s.teamRow} ${s.teamRowTap}`} onClick={() => onPerson(t.id)} aria-label={`View ${t.name}`}>
+                {body}<Svg d={ICON.chevronRight} size={16} sw={1.8} stroke="var(--rv-sub)" />
+              </button>
+            )
             : <div key={t.id} className={s.teamRow}>{body}</div>;
         })}
       </section>

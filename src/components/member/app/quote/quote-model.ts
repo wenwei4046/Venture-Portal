@@ -438,7 +438,56 @@ export type SheetState =
     }
   | { mode: "frame"; size: SizeKey; frame: string; kpi: string[]; qty: number; drop: boolean; build?: BedframeBuild }
   /** Standalone accessories are picked by SKU so several fitted sizes can be bought together. */
-  | { mode: "acc"; acc: Record<string, number>; accAll: boolean };
+  | { mode: "acc"; acc: Record<string, number>; accAll: boolean }
+  /**
+   * A mattress brand's *All models* (2026-11-03 — the user: "直接出它的 variant … 直接按加号 … 可以在 mode 那边切换，
+   * 分成 mattress 和 accessory"): every mattress in every size it comes in, and every accessory, each with − / +;
+   * *Mattress | Accessories* switches the list, and one *Add to cart* adds both. Picked by SKU. Its Accessories list is
+   * the brand's accessories on their own — step 1 has no *Accessories only* for a mattress brand (2026-11-04) — and
+   * is never folded, so it has no *Show all* to remember.
+   */
+  | { mode: "quick"; tab: QuickTab; picks: Record<string, number>; acc: Record<string, number>; query: string };
+
+export type QuickTab = "mattress" | "acc";
+
+/** A mattress brand's quick sheet, empty, on one of its two lists. */
+export function quickSheet(tab: QuickTab): Extract<SheetState, { mode: "quick" }> {
+  return { mode: "quick", tab, picks: {}, acc: {}, query: "" };
+}
+
+/** Every size a mattress model comes in, as a SKU each — Single, Super Single, Queen, King, then Super King. */
+export function mattressVariants(model: QModel): { size: SizeKey; productId: string }[] {
+  return (["S", "SS", "Q", "K", "SK"] as const).flatMap(size => (model.sizes[size] ? [{ size, productId: model.sizes[size]! }] : []));
+}
+
+/**
+ * The quick sheet's mattress search: every word typed is in the model's name, its `desc` or the size's name — so
+ * `apex q`, `queen apex` and `super single` each find what they say. `q` comes trimmed and in small letters.
+ */
+export function variantMatches(model: QModel, size: SizeKey, q: string): boolean {
+  return everyWordIn([model.name, model.desc, sizeLabel(size)], q);
+}
+
+/**
+ * An accessory list's search, the same way: every word typed is in the accessory's name or its size's name — the size
+ * stands beside the name on the row (2026-11-04), so `aero queen` and `AERO-MP Super Single` find what the row says.
+ * A one-size SKU has only its name. `q` comes trimmed and in small letters.
+ */
+export function accVariantMatches(acc: Pick<QAcc, "name">, size: SizeKey | null, q: string): boolean {
+  return everyWordIn([acc.name, size ? sizeLabel(size) : ""], q);
+}
+
+function everyWordIn(parts: string[], q: string): boolean {
+  if (!q) return true;
+  const hay = parts.join(" ").toLowerCase();
+  return q.split(/\s+/).every(word => hay.includes(word));
+}
+
+/** How many of each list a quick sheet holds — the switch's two counts. */
+export function quickCounts(sh: Extract<SheetState, { mode: "quick" }>): { mattress: number; acc: number } {
+  const sum = (picked: Record<string, number>) => Object.values(picked).reduce((n, q) => n + (q > 0 ? q : 0), 0);
+  return { mattress: sum(sh.picks), acc: sum(sh.acc) };
+}
 
 /** The first bed frame that comes in a size, A–Z; empty when none does. */
 export function firstFrame(catalog: QCatalog, size: SizeKey): string {
@@ -462,6 +511,18 @@ export function sheetLines(sh: SheetState, catalog: QCatalog): CartLine[] {
     const model = catalog.models.find(m => m.key === sh.key);
     const pid = model?.sizes[sh.size];
     if (model && pid) push(out, { id: `m-${model.key}-${sh.size}`, kind: "mattress", key: model.key, name: model.name, size: sizeLabel(sh.size), qty: sh.qty, productId: pid });
+  }
+  // The quick sheet: each mattress picked, in the catalogue's order (A–Z, then by size), then each accessory — the
+  // same lines, and so the same cart ids, as a mattress's sheet and *Accessories only* add.
+  if (sh.mode === "quick") {
+    for (const model of catalog.models) {
+      for (const { size, productId } of mattressVariants(model)) {
+        const n = sh.picks[productId] ?? 0;
+        if (n > 0) push(out, { id: `m-${model.key}-${size}`, kind: "mattress", key: model.key, name: model.name, size: sizeLabel(size), qty: n, productId });
+      }
+    }
+    accLines(out, catalog, sh.acc, 1);
+    return out;
   }
   if (sh.mode === "sofa") {
     const model = catalog.models.find(m => m.key === sh.key);
@@ -638,7 +699,17 @@ export function remember(memory: QuoteMemory, sh: SheetState, catalog: QCatalog)
     const f: RecentFrame = { size: sh.size, frame: sh.frame, kpi: [...sh.kpi], ...(sh.build ? { build: { ...sh.build } } : {}) };
     next.frames = [f, ...memory.frames.filter(r => !sameFrame(r, f))].slice(0, 3);
   }
-  if (sh.mode === "model" || sh.mode === "acc" || sh.mode === "sofa") {
+  // The quick sheet's mattresses are last used sets with no bed frame, as a mattress's sheet adds one — in the
+  // catalogue's order, three at most, as ever.
+  if (sh.mode === "quick") {
+    const picked = catalog.models.flatMap(m => mattressVariants(m).filter(v => (sh.picks[v.productId] ?? 0) > 0)
+      .map(v => ({ kind: "mattress" as const, key: m.key, size: v.size, bfs: [] as BfPick[] })));
+    if (picked.length) {
+      next.sets[brand] = [...picked, ...sets.filter(r => !(r.kind === "mattress" && r.bfs.length === 0
+        && picked.some(p => p.key === r.key && p.size === r.size)))].slice(0, 3);
+    }
+  }
+  if (sh.mode === "model" || sh.mode === "acc" || sh.mode === "sofa" || sh.mode === "quick") {
     const used = sh.mode === "model"
       ? Object.entries(sh.acc).filter(([, n]) => n > 0).map(([k]) => k)
       : catalog.accs.filter(acc => accVariants(acc).some(at => (sh.acc[at.productId] ?? 0) > 0)).map(acc => acc.key);

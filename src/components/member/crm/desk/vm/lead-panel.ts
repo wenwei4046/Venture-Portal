@@ -32,6 +32,6 @@ export function panelLeads(ctx: DeskCtx, ids: string[], openId: string | null, s
           ["First contact", `${when(c.createdAt)}, ${new Date(c.createdAt).toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" })}`],
         ],
         openChat: () => patch({ tab: "inbox", ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null, pane: "docked", kind: "chat", chat: c.id, fromTeam: false, inbF: "All", whoSel: [] }),
-        openInfo: () => patch({ pane: "overlay", kind: "info", infoId: c.id, visit: null }) };
+        openInfo: () => patch({ pane: "overlay", kind: "info", infoId: c.id, visit: null, infoFromChat: false }) };
     });
 }

@@ -137,3 +137,40 @@ describe("step 2's margin", () => {
     expect(result.current.vm).toMatchObject({ tierLabel: "Cost pending", note: "Product cost is pending a Principal update. Margin cannot be confirmed yet." });
   });
 });
+
+// A mattress brand's All models (2026-11-03): the quick sheet, its accessories on its second tab — step 1 has no
+// Accessories only for it (2026-11-04); a sofa keeps its own.
+describe("step 1's entries", () => {
+  const SOFA: QCatalog = { ...CATALOG, brand: "ZANOTTI", name: "Zanotti", sofa: true, models: [] };
+  const calc = () => vi.fn(async (): Promise<Outcome<QuoteResult>> => ({ ok: false, error: "not asked" }));
+
+  it("a mattress brand: All models opens the quick sheet on its mattresses; Add to cart adds to the cart's lines", () => {
+    const { result } = renderHook(() => useQuote(args(calc(), { pricing: false })));
+    act(() => result.current.openAll());
+    expect(result.current.sheet).toMatchObject({ mode: "quick", tab: "mattress", picks: {}, acc: {} });
+    expect(result.current.allOpen).toBe(false);
+    act(() => result.current.patch({ picks: { "ak-q": 2 } }));
+    act(() => result.current.addSheet());
+    expect(result.current.sheet).toBeNull();
+    expect(result.current.cart).toEqual([{ ...LINE, qty: 3 }]);
+    expect(result.current.memory.sets.AKEMI).toEqual([{ kind: "mattress", key: "serene", size: "Q", bfs: [] }]);
+  });
+
+  it("a sofa brand: All models is the list of models, Sofa accessories only its own sheet", () => {
+    const { result } = renderHook(() => useQuote(args(calc(), { pricing: false, catalogs: { ZANOTTI: SOFA }, fallbackBrand: "ZANOTTI",
+      initial: { brand: "ZANOTTI", cart: [], price: "", memory: EMPTY_MEMORY, sheet: null } })));
+    act(() => result.current.openAll());
+    expect(result.current.allOpen).toBe(true);
+    expect(result.current.sheet).toBeNull();
+    act(() => result.current.openAccOnly());
+    expect(result.current.sheet).toEqual({ mode: "acc", acc: {}, accAll: false });
+  });
+
+  it("asks nothing while View as fills it, and adds nothing", () => {
+    const { result } = renderHook(() => useQuote(args(calc(), { pricing: false, readOnly: true })));
+    act(() => result.current.openAll());
+    act(() => result.current.patch({ picks: { "ak-q": 1 } }));
+    act(() => result.current.addSheet());
+    expect(result.current.cart).toEqual([LINE]);
+  });
+});

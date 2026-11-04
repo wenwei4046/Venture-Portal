@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { BedframeBuild, MemberProduct } from "@/lib/member/types";
 import {
-  EMPTY_MEMORY, NO_SOFA_BUILD, accOnlyTitle, accOrder, accVariants, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
-  modelMatches, moduleCushions, moduleInfo, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
-  type CartLine, type QCatalog, type QModule, type SheetState,
+  EMPTY_MEMORY, NO_SOFA_BUILD, NO_SOFA_CHOICES, accOnlyTitle, accOrder, accVariantMatches, accVariants, addLines, bump, cartMeta, catalogFromProducts, customerLines, defaultSize, frameMeta, itemsText, layoutFits, liveSets,
+  mattressVariants, modelMatches, moduleCushions, moduleInfo, quickCounts, quickSheet, remember, setMeta, sheetLines, sizeKeyOf, sofaBuildOf, sofaBuildToSend, sofaCartCharge, sofaPick, sofaSeats, sofaText,
+  variantMatches,
+  type CartLine, type QCatalog, type QModel, type QModule, type SheetState,
 } from "./quote-model";
 
 const product = (p: Partial<MemberProduct> & Pick<MemberProduct, "id" | "name">): MemberProduct => ({
@@ -248,6 +249,70 @@ describe("the cart", () => {
   it("counts items", () => {
     expect(itemsText([line("a", 1), line("b", 3)], "Akemi")).toBe("4 items · Akemi");
     expect(itemsText([], "Akemi")).toBe("Your cart is empty");
+  });
+});
+
+// A mattress brand's quick sheet (2026-11-03 — the user: "这一个我要它直接出它的 variant，比如说 Apex Single、Apex Super
+// Single … 直接按加号 … 可以在 mode 那边切换，分成 mattress 和 accessory"): every size of every mattress, and every accessory.
+describe("the quick sheet", () => {
+  it("lists a model's sizes smallest first, Super King last", () => {
+    const model: QModel = { key: "x", name: "X", desc: "", sizes: { K: "k", SK: "sk", S: "s", Q: "q", SS: "ss" }, modules: [], choices: NO_SOFA_CHOICES };
+    expect(mattressVariants(model)).toEqual([
+      { size: "S", productId: "s" }, { size: "SS", productId: "ss" }, { size: "Q", productId: "q" }, { size: "K", productId: "k" }, { size: "SK", productId: "sk" },
+    ]);
+  });
+
+  it("finds a variant by every word of its name and size, in any order", () => {
+    const apex = akemi().models.find(m => m.key === "m-apex")!;
+    expect(variantMatches(apex, "Q", "apex q")).toBe(true);
+    expect(variantMatches(apex, "Q", "queen apex")).toBe(true);
+    expect(variantMatches(apex, "K", "apex q")).toBe(false);
+    expect(variantMatches(apex, "SS", "super single")).toBe(true);
+    expect(variantMatches(apex, "S", "super single")).toBe(false);
+    expect(variantMatches(apex, "S", "")).toBe(true);
+  });
+
+  // 2026-11-04: the size stands beside an accessory's name, so what the row says can be typed.
+  it("finds an accessory by every word of its name and size; a one-size SKU by its name", () => {
+    const mp = { name: "AERO-MP" };
+    expect(accVariantMatches(mp, "Q", "aero queen")).toBe(true);
+    expect(accVariantMatches(mp, "SS", "aero-mp super single")).toBe(true);
+    expect(accVariantMatches(mp, "SK", "king aero")).toBe(true);
+    expect(accVariantMatches(mp, "Q", "aero king")).toBe(false);
+    expect(accVariantMatches({ name: "AK-CS AIRLOFT COMFY PIL" }, null, "airloft pil")).toBe(true);
+    expect(accVariantMatches({ name: "AK-CS AIRLOFT COMFY PIL" }, null, "airloft queen")).toBe(false);
+    expect(accVariantMatches(mp, null, "")).toBe(true);
+  });
+
+  it("adds each mattress picked, A–Z and by size, then each accessory — the ids a mattress's sheet and Accessories only add", () => {
+    const sh: SheetState = { ...quickSheet("acc"), picks: { "apex-k": 2, "aristoi-s": 1, "apex-q": 1, "amira-q": 4, "gone": 1 }, acc: { "mp-k": 1, pil: 2 } };
+    const lines = sheetLines(sh, akemi());
+    expect(lines.map(l => [l.id, l.kind, l.productId, l.size, l.qty])).toEqual([
+      ["m-m-apex-Q", "mattress", "apex-q", "Queen", 1],
+      ["m-m-apex-K", "mattress", "apex-k", "King", 2],
+      ["m-m-aristoi-S", "mattress", "aristoi-s", "Single", 1],
+      ["a-AERO-MP-K", "acc", "mp-k", "King", 1],
+      ["a-AK- LTX CLS PIL-", "acc", "pil", "", 2],
+    ]);
+    // …so they land on the lines a mattress's sheet already put in the cart.
+    const cart = sheetLines({ mode: "model", key: "m-apex", size: "Q", qty: 1, bfs: [], fx: null, accAll: false, acc: {} }, akemi());
+    expect(addLines(cart, lines).find(l => l.id === "m-m-apex-Q")?.qty).toBe(2);
+    expect(sheetLines(quickSheet("mattress"), akemi())).toEqual([]);
+    expect(quickCounts({ ...quickSheet("mattress"), picks: { "apex-k": 2, "apex-q": 0 }, acc: { pil: 2, "mp-k": 1 } })).toEqual({ mattress: 2, acc: 3 });
+  });
+
+  it("remembers its mattresses as last used sets with no bed frame, and its accessories as recents", () => {
+    const before = { ...EMPTY_MEMORY, sets: { AKEMI: [{ kind: "mattress" as const, key: "m-apex", size: "K" as const, bfs: [] },
+      { kind: "mattress" as const, key: "m-apex", size: "Q" as const, bfs: [{ size: "Q" as const, frame: "m-pebble", kpi: [], qty: 1 }] }] } };
+    const m = remember(before, { ...quickSheet("mattress"), picks: { "apex-k": 1, "aristoi-s": 2, "apex-q": 0 }, acc: { pil: 1 } }, akemi());
+    expect(m.sets.AKEMI).toEqual([
+      { kind: "mattress", key: "m-apex", size: "K", bfs: [] },
+      { kind: "mattress", key: "m-aristoi", size: "S", bfs: [] },
+      // The set with a bed frame is a set of its own: it stays.
+      { kind: "mattress", key: "m-apex", size: "Q", bfs: [{ size: "Q", frame: "m-pebble", kpi: [], qty: 1 }] },
+    ]);
+    expect(m.accs.AKEMI).toEqual(["AK- LTX CLS PIL"]);
+    expect(remember(EMPTY_MEMORY, quickSheet("acc"), akemi()).sets).toEqual({});
   });
 });
 
