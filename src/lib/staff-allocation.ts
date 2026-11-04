@@ -19,6 +19,10 @@ export type AllocationValidation = { ok: true } | { ok: false; error: string }
 
 const EPSILON = 0.005 // 2dp form inputs; tolerate float noise
 
+/** A receiving department's Bill to row that is HOUZS Venture's share of what moved in (2026-11-04) — stored with no
+ *  company (`hr_pool_allocation.company_id` NULL). */
+export const HV_BILL_TO = 'hv'
+
 /**
  * Validate one staff member's allocation rows.
  * Rules: no duplicate company, each pct in (0, 100], sum ≤ 100.

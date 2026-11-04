@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney, formatMoneyBare } from '@/lib/utils'
 import {
+  HV_BILL_TO,
   billToPreview,
   validateAllocationRows,
   type AllocationComponents,
@@ -14,7 +15,8 @@ import { Select } from '@/components/hrv/select'
 
 // What moved into a cost-center department this month (2026-11-03, method B),
 // and its Bill to %: the companies it bills that money on to. What it does not
-// bill stays in its own pool (the user: "也有可能是 hr pool 要承担"). One card
+// bill stays in its own pool (the user: "也有可能是 hr pool 要承担") — unless HOUZS Venture takes a share of it, a
+// row of its own (2026-11-04, the user: "分进来的无法由hv 承担一部分？" → method 2). One card
 // per receiving cost center with something moved in; editable until the
 // payroll month is closed for good — the month's invoices take the % as it
 // stands when Finance generates them, a later change goes through the
@@ -60,13 +62,20 @@ const PART_LABEL: Array<[keyof AllocationComponents, string]> = [
   ['eis', 'EIS'],
 ]
 
+/** HOUZS Venture's % in a Bill to, or blank. */
+const hvOf = (list: AllocationRow[]) => {
+  const hv = list.find((r) => r.companyId === HV_BILL_TO)
+  return hv ? String(hv.pct) : ''
+}
+
 const toEditRows = (rows: AllocationRow[]): EditRow[] =>
-  rows.map((r) => ({ uid: crypto.randomUUID(), companyId: r.companyId, pct: String(r.pct) }))
+  rows.filter((r) => r.companyId !== HV_BILL_TO).map((r) => ({ uid: crypto.randomUUID(), companyId: r.companyId, pct: String(r.pct) }))
 
 export default function MovedIntoCard({ period, department, incoming, billTo, lastMonthBillTo, companies, readOnly, locked }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [rows, setRows] = useState<EditRow[]>(() => toEditRows(billTo))
+  const [hvPct, setHvPct] = useState(() => hvOf(billTo))
   const [dirty, setDirty] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedNote, setSavedNote] = useState(false)
@@ -74,7 +83,10 @@ export default function MovedIntoCard({ period, department, incoming, billTo, la
   const [shownKey, setShownKey] = useState(savedKey)
   if (savedKey !== shownKey) {
     setShownKey(savedKey)
-    if (!dirty) setRows(toEditRows(billTo))
+    if (!dirty) {
+      setRows(toEditRows(billTo))
+      setHvPct(hvOf(billTo))
+    }
   }
   const frozen = readOnly || locked
 
@@ -82,11 +94,13 @@ export default function MovedIntoCard({ period, department, incoming, billTo, la
   const parsed = rows
     .filter((r) => r.companyId !== '' || r.pct.trim() !== '')
     .map((r) => ({ companyId: r.companyId, pct: Number(r.pct) }))
+  if (hvPct.trim() !== '' && Number(hvPct) !== 0) parsed.push({ companyId: HV_BILL_TO, pct: Number(hvPct) })
   const parseable = parsed.every((r) => r.companyId && Number.isFinite(r.pct))
   const check = parseable ? validateAllocationRows(parsed) : null
   const preview = parseable && check?.ok ? billToPreview(received, parsed) : null
   const staysPct = preview && received > 0 ? (preview.stays / received) * 100 : null
-  const billed = preview ? Math.round(preview.lines.reduce((s, l) => s + l.amount, 0) * 100) / 100 : null
+  const billed = preview ? Math.round(preview.lines.filter((l) => l.companyId !== HV_BILL_TO).reduce((s, l) => s + l.amount, 0) * 100) / 100 : null
+  const hvAmount = preview?.lines.find((l) => l.companyId === HV_BILL_TO)?.amount ?? null
   const staysLabel = `Stays in ${department.name}`
 
   function edit(next: (prev: EditRow[]) => EditRow[]) {
@@ -193,6 +207,32 @@ export default function MovedIntoCard({ period, department, incoming, billTo, la
           )
         })}
 
+        {/* HOUZS Venture's share — its own-share row, never a company (2026-11-04). */}
+        <div role="group" aria-label="HOUZS Venture" className="flex items-center gap-2 flex-wrap">
+          <div className="px-3 py-1.5 bg-surface border border-hairline rounded-control text-sm min-w-[180px]">HV — HOUZS Venture</div>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={hvPct}
+              onChange={(e) => {
+                setHvPct(e.target.value)
+                setDirty(true)
+                setSavedNote(false)
+              }}
+              disabled={frozen}
+              aria-label="HOUZS Venture %"
+              className="w-24 px-3 py-1.5 bg-surface border border-hairline rounded-control text-sm font-mono text-ink text-right focus:outline-none focus:border-accent"
+              placeholder="0.00"
+            />
+            <span className="text-xs">%</span>
+          </div>
+          <span className="num text-sm min-w-[100px]">{hvAmount !== null ? formatMoney(hvAmount) : '—'}</span>
+          <span className="text-[11px]">own share</span>
+        </div>
+
         {/* What it does not bill on stays its own cost — auto, never stored. */}
         <div role="group" aria-label={staysLabel} className="flex items-center gap-2 flex-wrap">
           <div className="px-3 py-1.5 bg-surface-2 border border-dashed border-hairline rounded-control text-sm min-w-[180px]">
@@ -232,7 +272,10 @@ export default function MovedIntoCard({ period, department, incoming, billTo, la
             {lastMonthBillTo.length > 0 && (
               <button
                 type="button"
-                onClick={() => edit(() => toEditRows(lastMonthBillTo))}
+                onClick={() => {
+                  edit(() => toEditRows(lastMonthBillTo))
+                  setHvPct(hvOf(lastMonthBillTo))
+                }}
                 className="bg-surface hover:bg-surface-2 border border-hairline text-ink text-sm px-3 py-1.5 rounded-control transition-colors"
               >
                 Copy last month’s %

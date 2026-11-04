@@ -44,7 +44,7 @@ describe('MovedIntoCard', () => {
     expect(c.getByText('Received')).toHaveTextContent('Received')
     expect(c.getByTestId('received')).toHaveTextContent('RM 3,000.00')
     expect(c.getByRole('listitem')).toHaveTextContent('VIVIAN · Director OfficeRM 3,000.00Salary 2,450.00 · Allowance 150.00 · EPF 338.00 · SOCSO 52.05 · EIS 9.95')
-    expect(c.getAllByRole('spinbutton').map((i) => (i as HTMLInputElement).value)).toEqual(['30', '30', '20'])
+    expect(c.getAllByRole('spinbutton').map((i) => (i as HTMLInputElement).value)).toEqual(['30', '30', '20', ''])
     expect(c.getAllByText('RM 900.00')).toHaveLength(2)
     const stays = within(c.getByRole('group', { name: 'Stays in HR' }))
     expect(stays.getByText('20.00')).toBeInTheDocument()
@@ -72,9 +72,33 @@ describe('MovedIntoCard', () => {
     const c = within(screen.getByRole('region', { name: 'Moved into HR' }))
     expect(within(c.getByRole('group', { name: 'Stays in HR' })).getByText('100.00')).toBeInTheDocument()
     fireEvent.click(c.getByRole('button', { name: 'Copy last month’s %' }))
-    expect(c.getAllByRole('spinbutton').map((i) => (i as HTMLInputElement).value)).toEqual(['50'])
+    expect(c.getAllByRole('spinbutton').map((i) => (i as HTMLInputElement).value)).toEqual(['50', ''])
     fireEvent.click(c.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(c.getByText('Payroll for November 2026 is closed for good — its billing splits cannot change')).toBeInTheDocument())
+  })
+
+  // 2026-11-04 — the user: "分进来的无法由hv 承担一部分？" → method 2, a row of its own: HOUZS Venture takes a % of what
+  // moved in (its own-share row); what neither the companies nor HV take still stays with HR.
+  it('takes a share for HOUZS Venture, apart from the subsidiaries and what stays', async () => {
+    actions.saveDeptBillTo.mockResolvedValue({ ok: true })
+    draw({ billTo: [{ companyId: 'co-2990', pct: 30 }, { companyId: 'co-car', pct: 30 }, { companyId: 'co-conts', pct: 20 }, { companyId: 'hv', pct: 10 }] })
+    const c = within(screen.getByRole('region', { name: 'Moved into HR' }))
+    const hv = within(c.getByRole('group', { name: 'HOUZS Venture' }))
+    expect((hv.getByRole('spinbutton') as HTMLInputElement).value).toBe('10')
+    expect(hv.getByText('RM 300.00')).toBeInTheDocument()
+    const stays = within(c.getByRole('group', { name: 'Stays in HR' }))
+    expect(stays.getByText('10.00')).toBeInTheDocument()
+    expect(stays.getByText('RM 300.00')).toBeInTheDocument()
+    expect(c.getByText(/Billed to subsidiaries/)).toHaveTextContent('Billed to subsidiaries RM 2,400.00')
+    // The company rows never offer it; it saves as its own row.
+    expect(c.getAllByRole('spinbutton')).toHaveLength(4)
+    fireEvent.change(hv.getByRole('spinbutton'), { target: { value: '15' } })
+    fireEvent.click(c.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(actions.saveDeptBillTo).toHaveBeenCalledWith('d-hr', '2026-11-01', [
+        { companyId: 'co-2990', pct: 30 }, { companyId: 'co-car', pct: 30 }, { companyId: 'co-conts', pct: 20 }, { companyId: 'hv', pct: 15 },
+      ]),
+    )
   })
 
   it('a month closed for good reads only', () => {

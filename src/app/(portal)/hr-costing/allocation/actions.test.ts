@@ -130,6 +130,16 @@ describe('saveDeptBillTo', () => {
     ])
   })
 
+  // 2026-11-04 — HOUZS Venture's share of what moved in is a row with no company.
+  it('saveDeptBillTo keeps HOUZS Venture’s share as a row with no company', async () => {
+    const db = database()
+    expect(await saveDeptBillTo('d-hr', PERIOD, [{ companyId: 'co-2990', pct: 30 }, { companyId: 'hv', pct: 10 }])).toEqual({ ok: true })
+    expect(inserted(db, 'hr_pool_allocation')).toEqual([
+      { department_id: 'd-hr', company_id: 'co-2990', period_month: PERIOD, split_pct: 0.3, created_by: 'hr-user' },
+      { department_id: 'd-hr', company_id: null, period_month: PERIOD, split_pct: 0.1, created_by: 'hr-user' },
+    ])
+  })
+
   it('saveDeptBillTo refuses a centralized department', async () => {
     const db = database()
     expect(await saveDeptBillTo('d-mkt', PERIOD, [{ companyId: 'co-2990', pct: 30 }])).toEqual({

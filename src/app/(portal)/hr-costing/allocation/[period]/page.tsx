@@ -6,7 +6,7 @@ import { canDo } from '@/lib/permission-actions'
 import { formatMoney } from '@/lib/utils'
 import { comparePayrollOrder } from '@/lib/payroll-grid'
 import { isTopupKind, type RowStatus } from '@/lib/payroll-lifecycle'
-import { allocationRoster, moveParts, movePreview, splitLock, type DeptMoveRow } from '@/lib/staff-allocation'
+import { HV_BILL_TO, allocationRoster, moveParts, movePreview, splitLock, type DeptMoveRow } from '@/lib/staff-allocation'
 import { costModelOf } from '@/lib/department-mode'
 import { loadDepartmentModes } from '@/lib/department-mode-server'
 import PeriodPicker from '../../payroll/_components/PeriodPicker'
@@ -104,7 +104,7 @@ export default async function AllocationPage({ params }: PageProps) {
   const billToOf = (deptId: string, month: string) =>
     (billToRows ?? [])
       .filter((r) => r.department_id === deptId && r.period_month === month)
-      .map((r) => ({ companyId: r.company_id as string, pct: asPct(r.split_pct) }))
+      .map((r) => ({ companyId: (r.company_id as string | null) ?? HV_BILL_TO, pct: asPct(r.split_pct) }))
 
   const allocByStaff = new Map<string, Array<{ companyId: string; pct: number }>>()
   for (const r of allocRows ?? []) {

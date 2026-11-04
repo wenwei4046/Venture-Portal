@@ -47,6 +47,8 @@ async function productionFunction(migration, name) {
 }
 
 const MIGRATION = '20261103200000_payroll_cost_moves.sql'
+// 2026-11-04 — a receiver's Bill to row with no company: HOUZS Venture's share of what moved in.
+const HV_SHARE = '20261104150000_moved_in_hv_share.sql'
 const HR_USER = id(1)
 const HR = id(11)
 const FIN = id(12)
@@ -204,6 +206,7 @@ try {
   `)
 
   await load(MIGRATION)
+  await load(HV_SHARE)
 
   // ── A line takes an amount or a percentage ──────────────────────────────────
   await reject(MOVE, [VIVIAN, NOV, HR, 3000, 0.5], /check/i, 'an amount AND a percentage is refused')
@@ -362,6 +365,19 @@ try {
   ], 'billed by each Bill to %; the rest stays')
   check(await ownShare(), { HR: 1384.6, IT: 189.7, Marketing: 3000 },
     'own share: each sender’s leftover less what it moved; nothing moved in counts')
+
+  // 2026-11-04 — the user: "分进来的无法由hv 承担一部分？" → a row of its own. HR's Bill to takes HOUZS Venture 10% of
+  // the 3,000 moved in: 300 joins HR's HV row and its own share; 300 still stays with HR.
+  await q(`INSERT INTO hr_pool_allocation (department_id, company_id, period_month, split_pct, created_by) VALUES ($1, NULL, '${NOV}', 0.1, $2)`, [HR, HR_USER])
+  rows = await billing()
+  check(rowsOf(rows, 'HR'), { 2990: 1971.8, CAR: 1971.8, CONTS: 1671.8, HV: 1684.6 }, 'HV’s share joins HR’s HV row; its companies as before')
+  check(rows.filter(r => Math.round((r.s + r.al + r.e + r.so + r.ei) * 100) !== Math.round(r.a * 100)), [], '…its five items still add up')
+  check((await q(`SELECT moved_in::float AS moved, billed::float AS billed, stays::float AS stays, hv::float AS hv
+    FROM get_payroll_moves_summary('${NOV}') WHERE department_name = 'HR'`)), [{ moved: 3000, billed: 2400, stays: 300, hv: 300 }],
+    'what stays is less HV’s share, HV’s share beside it')
+  check(await ownShare(), { HR: 1684.6, IT: 189.7, Marketing: 3000 }, 'HR’s own-share invoice takes HV’s share')
+  await reject(`INSERT INTO hr_pool_allocation (department_id, company_id, period_month, split_pct, created_by) VALUES ($1, NULL, '${NOV}', 0.05, $2)`,
+    [HR, HR_USER], /uq_pool_alloc_dept_period_hv|duplicate/, 'one HV share a department a month')
 
   // Every sen lands in one place: the companies, the leftovers, and what stays with a receiver add up to the payroll.
   const cost = await one(`SELECT sum(gross + epf_er + socso_er + eis_er)::float FROM hr_monthly_payroll WHERE period_month = '${NOV}'`)
