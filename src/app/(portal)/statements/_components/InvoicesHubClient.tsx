@@ -95,6 +95,8 @@ export default function InvoicesHubClient({
   // No drawer (2026-11-05 — the user, on the Invoice hub's side panel: "invoice 我不需要旁边这个"): an invoice opens its full
   // page, which carries the same steps (invoiceSteps).
   const openInvoice = (id: string) => router.push(`/invoices/${id}`)
+  // A click marks the row; a double-click (or Enter) opens it (2026-11-05 — the user: 可以做成double click 打开吗？).
+  const [marked, setMarked] = useState<string | null>(null)
   const [basisOpen, setBasisOpen] = useState(false)
   const [rowMenu, setRowMenu] = useState<{ inv: HubInvoice; anchor: RowMenuAnchor } | null>(null)
 
@@ -360,7 +362,9 @@ export default function InvoicesHubClient({
             countLabel={(n) => `${n} · ${monthShort}${withOthers ? ' + other months' : ''}`}
             tools={tools}
             select={{ on: selecting, isSelected: (r) => selected.has(r.id), canSelect: canTick, onToggle: toggle, onToggleAll: toggleAll }}
-            onRowClick={(r) => openInvoice(r.id)}
+            activeKey={marked}
+            onRowClick={(r) => setMarked(r.id)}
+            onRowDoubleClick={(r) => openInvoice(r.id)}
             onRowContextMenu={onRowContextMenu}
             emptyText={hub.invoices.length === 0 && !withOthers ? `No invoices for ${monthLong} yet.` : 'No invoices here.'}
             canSetDefault={canSetDefault}

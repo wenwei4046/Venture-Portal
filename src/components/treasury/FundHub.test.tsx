@@ -24,7 +24,7 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
-import FundHub, { type FundCan } from './FundHub'
+import FundHub, { FundDetailBody, type FundCan } from './FundHub'
 
 const deal = (over: Partial<FundRecord>): FundRecord => ({
   id: 'x',
@@ -89,7 +89,6 @@ function hub(over: Partial<Parameters<typeof FundHub>[0]> = {}) {
 
 const cardBtn = (name: RegExp) => screen.getByRole('button', { name })
 const list = () => screen.getAllByRole('row').filter((r) => r.getAttribute('tabindex') === '0')
-const drawer = () => screen.getByRole('dialog', { name: /^Fund (out|in) · / })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -212,69 +211,31 @@ describe('the hub', () => {
   })
 })
 
-describe('the drawer', () => {
-  it('shows a live loan: the hero, its groups, the trail, Amend terms', () => {
-    hub()
-    fireEvent.click(list().find((r) => r.textContent?.includes('Carres'))!)
-    const d = drawer()
-    expect(d).toHaveTextContent('Fund out · Loan out')
-    expect(d).toHaveTextContent('−RM 100,000.00')
-    expect(d).toHaveTextContent('To Carres (CAR)')
-    expect(d).toHaveTextContent('Disbursed — bank and loan ledger are updated.')
-    expect(within(d).getByText('Transfer to')).toBeInTheDocument()
-    expect(within(d).getByText('SC HC')).toBeInTheDocument()
-    expect(within(d).getByText('EMI 分期 · 月息2% · 12期')).toBeInTheDocument()
-    expect(within(d).getByText('When & where')).toBeInTheDocument()
-    expect(within(d).getByText('Booking')).toBeInTheDocument()
-    expect(within(d).getByText('RM 80,000.00')).toBeInTheDocument()
-    expect(within(d).getByText('RM 20,000.00 repaid')).toBeInTheDocument()
-    expect(within(d).getByText('Created')).toBeInTheDocument()
-    // The trail's step, by the approver.
-    expect(within(d).getByText('Disbursed')).toBeInTheDocument()
-    expect(within(d).getByText(/^Principal 05 Oct 2026/)).toBeInTheDocument()
-    // Its switches only when on (both off here).
-    expect(within(d).queryByText('Interest')).toBeNull()
-    expect(within(d).getByRole('link', { name: 'View full page ↗' })).toHaveAttribute('href', '/fund-out/a')
-    expect(within(d).getByRole('link', { name: 'Print' })).toHaveAttribute('href', '/fund-out/a?print=1')
-    expect(within(d).getByRole('link', { name: 'Amend terms' })).toHaveAttribute('href', '/fund-out/a/edit')
-    expect(within(d).queryByRole('button', { name: 'Cancel loan' })).toBeNull()
-  })
+// 2026-11-05 (the user: "fund in 和 fund out 旁边的这个也不需要，双击打开"): no drawer — a click marks a deal, a double-click
+// opens its page; the right-click menu keeps the drawer's steps. The deal's details are the phone app's record still
+// (FundDetailBody), checked on their own.
+const menuOf = (party: string) => {
+  fireEvent.contextMenu(list().find((r) => r.textContent?.includes(party))!)
+  return screen.getByRole('menu')
+}
 
-  it('says how much is overdue on a late loan', () => {
+describe('opening a deal, and its steps from the row menu', () => {
+  it('a click marks the deal; a double-click opens its page — no side panel', () => {
     hub()
-    fireEvent.click(list().find((r) => r.textContent?.includes('Hookka'))!)
-    expect(drawer()).toHaveTextContent('Overdue — RM 12,333.34 past its day since 20 Aug 2026.')
-    expect(within(drawer()).getByText('since 20 Aug 2026 · 50 days')).toBeInTheDocument()
-  })
-
-  it('says a fund source’s bank, its account and its switches', () => {
-    const sources = [
-      deal({
-        id: 's1', side: 'in', type: 'subsidiary', typeLabel: 'Subsidiary', party: 'HOUZS Century (HC)', amount: 150000, compound: true, minPayInterest: true,
-        bank: { name: 'Hong Leong Bank', number: '23600599248' }, account: { code: '4052', name: 'Amount Due to - HOUZS Century' }, notes: '[BI#3] Conts - 58k',
-      }),
-    ]
-    hub({ side: 'in', records: sources, head: null })
-    fireEvent.click(list()[0])
-    const d = drawer()
-    expect(within(d).getByText('Received from')).toBeInTheDocument()
-    expect(within(d).getByText('[BI#3] Conts - 58k')).toBeInTheDocument()
-    expect(within(d).getByText('Hong Leong Bank')).toBeInTheDocument()
-    expect(within(d).getByText('23600599248')).toBeInTheDocument()
-    expect(within(d).getByText('Amount Due to - HOUZS Century')).toBeInTheDocument()
-    expect(within(d).getByText('4052')).toBeInTheDocument()
-    expect(within(d).getByText('Compound · Minimum pay')).toBeInTheDocument()
-    expect(within(d).getByText('Received')).toBeInTheDocument()
+    const row = list().find((r) => r.textContent?.includes('Carres'))!
+    fireEvent.click(row)
+    expect(mocks.push).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: /^Fund (out|in) · / })).toBeNull()
+    fireEvent.doubleClick(row)
+    expect(mocks.push).toHaveBeenCalledWith('/fund-out/a')
   })
 
   it('sends whoever decides a pending loan to Approvals, and cancels it only when asked', async () => {
     withdraw.mockResolvedValueOnce(undefined)
     hub()
-    fireEvent.click(list().find((r) => r.textContent?.includes('The Conts'))!)
-    const d = drawer()
-    expect(d).toHaveTextContent('Waiting for Principal approval before the money leaves.')
-    expect(within(d).getByRole('link', { name: 'Open in Approvals' })).toHaveAttribute('href', '/approvals/req-1')
-    fireEvent.click(within(d).getByRole('button', { name: 'Cancel loan' }))
+    fireEvent.click(within(menuOf('The Conts')).getByRole('menuitem', { name: /Open in Approvals/ }))
+    expect(mocks.push).toHaveBeenCalledWith('/approvals/req-1')
+    fireEvent.click(within(menuOf('The Conts')).getByRole('menuitem', { name: /Cancel loan/ }))
     const ask = screen.getByRole('dialog', { name: 'Cancel the loan to The Conts (CONTS)?' })
     expect(ask).toHaveTextContent('It never went out — the RM 30,000.00 loan is cancelled and its approval request closes.')
     expect(withdraw).not.toHaveBeenCalled()
@@ -289,8 +250,7 @@ describe('the drawer', () => {
   it('says a refusal in the confirm, and keeps it open', async () => {
     withdraw.mockResolvedValueOnce({ error: 'The loan was not cancelled: it is already approved' })
     hub()
-    fireEvent.click(list().find((r) => r.textContent?.includes('The Conts'))!)
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'Cancel loan' }))
+    fireEvent.click(within(menuOf('The Conts')).getByRole('menuitem', { name: /Cancel loan/ }))
     const ask = screen.getByRole('dialog', { name: 'Cancel the loan to The Conts (CONTS)?' })
     await act(async () => {
       fireEvent.click(within(ask).getByRole('button', { name: 'Cancel loan' }))
@@ -302,25 +262,20 @@ describe('the drawer', () => {
   it('offers no step a reader may not take', () => {
     const notMine = LOANS.map((r) => (r.id === 'c' ? { ...r, decidable: false } : r))
     hub({ records: notMine, can: { edit: false, void: false, amend: false } })
-    fireEvent.click(list().find((r) => r.textContent?.includes('The Conts'))!)
-    expect(within(drawer()).queryByRole('link', { name: 'Open in Approvals' })).toBeNull()
-    expect(within(drawer()).queryByRole('button', { name: 'Cancel loan' })).toBeNull()
-    fireEvent.click(list().find((r) => r.textContent?.includes('Carres'))!)
-    expect(within(drawer()).queryByRole('link', { name: 'Amend terms' })).toBeNull()
+    const pending = menuOf('The Conts')
+    expect(within(pending).queryByRole('menuitem', { name: /Open in Approvals/ })).toBeNull()
+    expect(within(pending).queryByRole('menuitem', { name: /Cancel loan/ })).toBeNull()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(within(menuOf('Carres')).queryByRole('menuitem', { name: /Amend terms/ })).toBeNull()
   })
 
   it('gives a pending fund source Edit and Withdraw', async () => {
     withdraw.mockResolvedValueOnce(undefined)
     const sources = [deal({ id: 's9', side: 'in', type: 'outsource', typeLabel: 'Outsource', party: 'Kingsley', amount: 8000, status: 'pending_approval', approvedAt: null, approvedBy: null })]
     hub({ side: 'in', records: sources, head: null })
-    fireEvent.click(list()[0])
-    const d = drawer()
-    expect(d).toHaveTextContent('Fund in · Outsource')
-    expect(d).toHaveTextContent('+RM 8,000.00')
-    expect(d).toHaveTextContent('From Kingsley')
-    expect(d).toHaveTextContent('Waiting for Principal approval before it is booked.')
-    expect(within(d).getByRole('link', { name: 'Edit' })).toHaveAttribute('href', '/fund-in/s9/edit')
-    fireEvent.click(within(d).getByRole('button', { name: 'Withdraw' }))
+    fireEvent.click(within(menuOf('Kingsley')).getByRole('menuitem', { name: /^Edit/ }))
+    expect(mocks.push).toHaveBeenCalledWith('/fund-in/s9/edit')
+    fireEvent.click(within(menuOf('Kingsley')).getByRole('menuitem', { name: /Withdraw/ }))
     const ask = screen.getByRole('dialog', { name: 'Withdraw the fund source from Kingsley?' })
     await act(async () => {
       fireEvent.click(within(ask).getByRole('button', { name: 'Withdraw' }))
@@ -329,12 +284,67 @@ describe('the drawer', () => {
     expect(mocks.flash).toHaveBeenCalledWith('Fund source from Kingsley withdrawn')
   })
 
-  it('opens from the right-click menu, which keeps Print schedule and Amend terms', () => {
+  it('the right-click menu opens the page and keeps Print schedule and Amend terms', () => {
     hub()
-    fireEvent.contextMenu(list().find((r) => r.textContent?.includes('Carres'))!)
-    const menu = screen.getByRole('menu')
+    const menu = menuOf('Carres')
     expect(within(menu).getByRole('menuitem', { name: /Print schedule/ })).toBeInTheDocument()
     fireEvent.click(within(menu).getByRole('menuitem', { name: /Amend terms/ }))
     expect(mocks.push).toHaveBeenCalledWith('/fund-out/a/edit')
+    fireEvent.click(within(menuOf('Carres')).getByRole('menuitem', { name: /^Open$/ }))
+    expect(mocks.push).toHaveBeenLastCalledWith('/fund-out/a')
+  })
+})
+
+describe('a deal’s details (the phone app’s record — FundDetailBody)', () => {
+  const body = (r: FundRecord) => render(<FundDetailBody r={r} today="2026-10-15" />).container
+
+  it('shows a live loan: the hero, its groups, the trail', () => {
+    const d = body(LOANS[0])
+    expect(d).toHaveTextContent('Fund out · Loan out')
+    expect(d).toHaveTextContent('−RM 100,000.00')
+    expect(d).toHaveTextContent('To Carres (CAR)')
+    expect(d).toHaveTextContent('Disbursed — bank and loan ledger are updated.')
+    expect(within(d).getByText('Transfer to')).toBeInTheDocument()
+    expect(within(d).getByText('SC HC')).toBeInTheDocument()
+    expect(within(d).getByText('EMI 分期 · 月息2% · 12期')).toBeInTheDocument()
+    expect(within(d).getByText('When & where')).toBeInTheDocument()
+    expect(within(d).getByText('Booking')).toBeInTheDocument()
+    expect(within(d).getByText('RM 80,000.00')).toBeInTheDocument()
+    expect(within(d).getByText('RM 20,000.00 repaid')).toBeInTheDocument()
+    expect(within(d).getByText('Created')).toBeInTheDocument()
+    expect(within(d).getByText('Disbursed')).toBeInTheDocument()
+    expect(within(d).getByText(/^Principal 05 Oct 2026/)).toBeInTheDocument()
+    expect(within(d).queryByText('Interest')).toBeNull()
+  })
+
+  it('says how much is overdue on a late loan', () => {
+    const d = body(LOANS[1])
+    expect(d).toHaveTextContent('Overdue — RM 12,333.34 past its day since 20 Aug 2026.')
+    expect(within(d).getByText('since 20 Aug 2026 · 50 days')).toBeInTheDocument()
+  })
+
+  it('says a fund source’s bank, its account and its switches', () => {
+    const d = body(
+      deal({
+        id: 's1', side: 'in', type: 'subsidiary', typeLabel: 'Subsidiary', party: 'HOUZS Century (HC)', amount: 150000, compound: true, minPayInterest: true,
+        bank: { name: 'Hong Leong Bank', number: '23600599248' }, account: { code: '4052', name: 'Amount Due to - HOUZS Century' }, notes: '[BI#3] Conts - 58k',
+      }),
+    )
+    expect(within(d).getByText('Received from')).toBeInTheDocument()
+    expect(within(d).getByText('[BI#3] Conts - 58k')).toBeInTheDocument()
+    expect(within(d).getByText('Hong Leong Bank')).toBeInTheDocument()
+    expect(within(d).getByText('23600599248')).toBeInTheDocument()
+    expect(within(d).getByText('Amount Due to - HOUZS Century')).toBeInTheDocument()
+    expect(within(d).getByText('4052')).toBeInTheDocument()
+    expect(within(d).getByText('Compound · Minimum pay')).toBeInTheDocument()
+    expect(within(d).getByText('Received')).toBeInTheDocument()
+  })
+
+  it('a pending fund source: where it stands', () => {
+    const d = body(deal({ id: 's9', side: 'in', type: 'outsource', typeLabel: 'Outsource', party: 'Kingsley', amount: 8000, status: 'pending_approval', approvedAt: null, approvedBy: null }))
+    expect(d).toHaveTextContent('Fund in · Outsource')
+    expect(d).toHaveTextContent('+RM 8,000.00')
+    expect(d).toHaveTextContent('From Kingsley')
+    expect(d).toHaveTextContent('Waiting for Principal approval before it is booked.')
   })
 })
