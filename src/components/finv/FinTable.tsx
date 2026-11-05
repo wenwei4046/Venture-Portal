@@ -111,6 +111,7 @@ export function FinTable<R>({
   search,
   activeKey,
   onRowClick,
+  onRowDoubleClick,
   onRowContextMenu,
   emptyText,
   canSetDefault = false,
@@ -137,6 +138,8 @@ export function FinTable<R>({
   /** The row open in the drawer, in peach. */
   activeKey?: string | null
   onRowClick: (r: R) => void
+  /** Opening a row by a double-click (2026-11-05 — the user: 双击打开); Enter opens it too. With it, a click only marks the row. */
+  onRowDoubleClick?: (r: R) => void
   onRowContextMenu?: (r: R, e: MouseEvent<HTMLElement>) => void
   emptyText: string
   canSetDefault?: boolean
@@ -322,6 +325,7 @@ export function FinTable<R>({
   const onRowKey = (r: R, e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'Enter' || e.target !== e.currentTarget) return
     if (ticksOnPress) select!.onToggle(r)
+    else if (onRowDoubleClick) onRowDoubleClick(r)
     else onRowClick(r)
   }
 
@@ -552,6 +556,7 @@ export function FinTable<R>({
                     data-active={ticksOnPress ? (on ? 'true' : undefined) : activeKey === key ? 'true' : undefined}
                     aria-selected={selecting ? on : undefined}
                     onClick={() => (ticksOnPress ? select!.onToggle(r) : onRowClick(r))}
+                    onDoubleClick={onRowDoubleClick && !ticksOnPress ? () => onRowDoubleClick(r) : undefined}
                     onKeyDown={(e) => onRowKey(r, e)}
                     onContextMenu={onRowContextMenu ? (e) => onRowContextMenu(r, e) : undefined}
                   >

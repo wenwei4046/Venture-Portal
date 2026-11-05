@@ -2,14 +2,13 @@
 
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
 import { rateWords } from '@/lib/rate-basis'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
 import { HubCards, HubHead, hubStyles as hs, type HubCardItem } from '@/components/finv/Hub'
 import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { DialogConfirm, FinDialog } from '@/components/finv/Dialog'
-import { FinDrawer, drawerStyles as d } from '@/components/finv/Drawer'
+import { drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
 import { officeTime } from '@/lib/office-time'
 import {
@@ -89,7 +88,10 @@ export default function FundHub({
   const keys = out ? OUT_CARDS : IN_CARDS
   const [card, setCard] = useState<FundCardKey>(keys.includes(initialCard) ? initialCard : 'all')
   const [query, setQuery] = useState('')
-  const [drawerId, setDrawerId] = useState<string | null>(null)
+  // No drawer (2026-11-05 — the user: "fund in 和 fund out 旁边的这个也不需要，双击打开"): a click marks a deal, a
+  // double-click (or Enter) opens its page, which carries every step; the right-click menu keeps the drawer's.
+  const [marked, setMarked] = useState<string | null>(null)
+  const openDeal = (id: string) => router.push(`${base}/${id}`)
   const [rowMenu, setRowMenu] = useState<{ r: FundRecord; anchor: RowMenuAnchor } | null>(null)
   const [ask, setAsk] = useState<FundRecord | null>(null)
   const [busy, setBusy] = useState(false)
@@ -177,14 +179,29 @@ export default function FundHub({
     }
   }
   const printable = (r: FundRecord) => r.status !== 'cancelled'
-  const amendable = (r: FundRecord) => can.amend && r.status === 'active'
   const rowMenuItems = (r: FundRecord): RowMenuItem[] => {
     const items: RowMenuItem[] = [
-      { key: 'open', label: 'Open', onSelect: () => setDrawerId(r.id) },
+      { key: 'open', label: 'Open', onSelect: () => openDeal(r.id) },
       { key: 'new-tab', label: 'Open in new tab', onSelect: () => window.open(`${base}/${r.id}`, '_blank', 'noopener,noreferrer') },
     ]
     if (printable(r)) items.push({ key: 'print', label: 'Print schedule', onSelect: () => window.open(`${base}/${r.id}?print=1`, '_blank', 'noopener,noreferrer') })
-    if (amendable(r)) items.push({ key: 'amend', label: 'Amend terms', onSelect: () => router.push(`${base}/${r.id}/edit`) })
+    // What the drawer's bar offered: Open in Approvals, a fund source's Edit, Cancel loan / Withdraw, Amend terms.
+    const steps = fundSteps(r, can)
+    if (steps.length > 0) items.push('sep')
+    for (const st of steps) {
+      items.push({
+        key: st.key,
+        label: st.label,
+        danger: st.kind === 'danger',
+        onSelect: () => {
+          if (st.href) router.push(st.href)
+          else {
+            setError(null)
+            setAsk(r)
+          }
+        },
+      })
+    }
     return items
   }
   const onRowContextMenu = (r: FundRecord, e: MouseEvent<HTMLElement>) => {
@@ -192,7 +209,6 @@ export default function FundHub({
     setRowMenu({ r, anchor: { x: e.clientX, y: e.clientY } })
   }
 
-  const drawn = drawerId ? (records.find((r) => r.id === drawerId) ?? null) : null
   const listTitle = cardLabel(side, card)
   return (
     <div className={hs.root} data-fin-kit="">
@@ -215,27 +231,14 @@ export default function FundHub({
           amountOf={cardAmountOf(card)}
           faint={(r) => r.status === 'cancelled'}
           search={{ value: query, onChange: setQuery, placeholder: 'Search company, description…' }}
-          activeKey={drawerId}
-          onRowClick={(r) => setDrawerId(r.id)}
+          activeKey={marked}
+          onRowClick={(r) => setMarked(r.id)}
+          onRowDoubleClick={(r) => openDeal(r.id)}
           onRowContextMenu={onRowContextMenu}
           emptyText={records.length === 0 ? (out ? 'No loans yet.' : 'No fund sources yet.') : 'Nothing here yet.'}
           canSetDefault={canSetDefault}
         />
       </div>
-
-      <FundDrawer
-        r={drawn}
-        open={!!drawerId}
-        onClose={() => setDrawerId(null)}
-        today={today}
-        base={base}
-        can={can}
-        busy={busy}
-        onWithdraw={(r) => {
-          setError(null)
-          setAsk(r)
-        }}
-      />
 
       <FinDialog open={!!ask} onClose={closeAsk} title={ask ? (out ? `Cancel the loan to ${ask.party}?` : `Withdraw the fund source from ${ask.party}?`) : ''} locked={busy}>
         <DialogConfirm
@@ -259,70 +262,6 @@ export default function FundHub({
         <RowMenu title={`${rowMenu.r.party} · ${status(rowMenu.r).text}`} anchor={rowMenu.anchor} items={rowMenuItems(rowMenu.r)} onClose={() => setRowMenu(null)} />
       ) : null}
     </div>
-  )
-}
-
-/**
- * A deal in the drawer (the prototype's `detailFund`): the dark hero — *Fund out · Loan out*, the amount, to or
- * from whom, where it stands — then I Transfer to / Received from, II When & where, III Booking, the trail, and
- * at its foot the steps this reader may take in the state it is in.
- */
-function FundDrawer({
-  r,
-  open,
-  onClose,
-  today,
-  base,
-  can,
-  busy,
-  onWithdraw,
-}: {
-  r: FundRecord | null
-  open: boolean
-  onClose: () => void
-  today: string
-  base: string
-  can: FundCan
-  busy: boolean
-  onWithdraw: (r: FundRecord) => void
-}) {
-  const out = r?.side === 'out'
-  const bar: ReactNode[] = (r ? fundSteps(r, can) : []).map((st) =>
-    st.href ? (
-      <Link key={st.key} href={st.href} className={d.barBtn} data-kind={st.kind === 'secondary' ? undefined : st.kind}>
-        {st.label}
-      </Link>
-    ) : (
-      <button key={st.key} type="button" className={d.barBtn} data-kind={st.kind === 'secondary' ? undefined : st.kind} disabled={busy} onClick={() => r && onWithdraw(r)}>
-        {st.label}
-      </button>
-    ),
-  )
-
-  return (
-    <FinDrawer
-      open={open}
-      onClose={onClose}
-      label={r ? `${out ? 'Fund out' : 'Fund in'} · ${r.party}` : 'Fund'}
-      title={r?.party ?? ''}
-      headActions={
-        r ? (
-          <>
-            <Link href={`${base}/${r.id}`} className={d.headBtn}>
-              View full page ↗
-            </Link>
-            {r.status !== 'cancelled' ? (
-              <a href={`${base}/${r.id}?print=1`} target="_blank" rel="noopener noreferrer" className={d.headBtn}>
-                Print
-              </a>
-            ) : null}
-          </>
-        ) : null
-      }
-      bar={bar.length > 0 ? bar : null}
-    >
-      {!r ? <div className={d.loading}>This is not on the list any more.</div> : <FundDetailBody r={r} today={today} />}
-    </FinDrawer>
   )
 }
 
