@@ -50,6 +50,8 @@ export interface PanelCtx {
   /** The Director: Control panel ⇄ My CRM — on `tab` (the phone's round button: Mine's first page), else the same page. */
   toMyCrm?: (tab?: SalesTab, sub?: "notif" | "auto" | "quick") => void;
   exitApp: () => void;
+  /** IR Quote (2026-11-05): Profile › Quotation settings, below Ads Performance — handed in only to whoever may edit them, on a phone. */
+  openQuoteSettings?: () => void;
   slotCounts: Record<string, number>;
   /** One's recent emoji, shared with Mine's chat (sales/vm/composer.ts › SharedRecents). */
   recents?: import("../../sales/vm/composer").SharedRecents;

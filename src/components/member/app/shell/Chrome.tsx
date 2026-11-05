@@ -191,7 +191,7 @@ function ModuleSwitcher({ current, onPick }: { current: ModuleId; onPick: (id: M
 }
 
 /** Desktop: the 240px sidebar. */
-export function DeskAside({ active, count, notifOpen, me, products, it, modules, crm, hidden = NONE, home = "today", onGo, onQuote, onNotif, onProfile }: {
+export function DeskAside({ active, count, notifOpen, me, products, quoteSettings, it, modules, crm, hidden = NONE, home = "today", onGo, onQuote, onNotif, onProfile }: {
   active: Screen;
   /** Screens their ticks close: not listed (2026-10-11). */
   hidden?: readonly Screen[];
@@ -203,6 +203,11 @@ export function DeskAside({ active, count, notifOpen, me, products, it, modules,
   me?: Me;
   /** The Product List row under its group label — only for an account holding `product_list`. */
   products?: { group: string; onOpen: () => void } | null;
+  /**
+   * IR Quote's Quotation settings (2026-11-05, the handoff's sidebar: PRINCIPAL › Product List, Quote settings) — for
+   * whoever may edit the Product List, under its group label.
+   */
+  quoteSettings?: { on: boolean; onOpen: () => void } | null;
   /**
    * IT requests (2026-10-20 — the user: "log in 进去的时候，左边这里 category 就会多一个 IT request" … "just principal or
    * ulitmate full access"): everybody's, for IT requests · View — under the Product List's group label, its New ones
@@ -254,6 +259,11 @@ export function DeskAside({ active, count, notifOpen, me, products, it, modules,
           <button className={`${s.asideNav} ${productsOn ? s.asideNavOn : ""}`} onClick={products.onOpen} aria-current={productsOn ? "page" : undefined}>
             <Svg d={ICON.cube} size={20} sw={1.8} />Product List
           </button>
+          {quoteSettings && (
+            <button className={`${s.asideNav} ${quoteSettings.on ? s.asideNavOn : ""}`} onClick={quoteSettings.onOpen} aria-current={quoteSettings.on ? "page" : undefined}>
+              <Svg d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8ZM14 3v5h5M9 13h6M9 17h4" size={20} sw={1.8} />Quote settings
+            </button>
+          )}
         </>
       )}
       {it && (

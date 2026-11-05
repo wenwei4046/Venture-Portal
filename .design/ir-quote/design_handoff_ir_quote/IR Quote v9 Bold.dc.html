@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+html,html,body{color-scheme:light}body{margin:0;padding:0;height:100%;background:#F2F2EF;color:#1F1F1C;-webkit-font-smoothing:antialiased}
+button,select,textarea{font-family:inherit;cursor:pointer}
+input{font-family:inherit}
+input::placeholder{color:#A3A39C}
+a{color:#111111;text-decoration:none}
+a:hover{text-decoration:underline}
+@keyframes rvSheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes rvPanelIn{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes rvFade{from{opacity:0}to{opacity:1}}
+</style>
+</helmet>
+<sc-if value="{{ isPreview }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;z-index:60;left:50%;top:10px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;height:34px;padding:0 6px 0 14px;border-radius:8px;background:#1F1F1C;color:#FFFFFF;font-family:Manrope,sans-serif;font-size:12.5px;box-shadow:0 6px 20px rgba(20,20,18,0.18);white-space:nowrap">
+    <span style="width:7px;height:7px;border-radius:50%;background:#F5871F"></span>
+    <span><strong>Preview</strong> · unpublished settings, updates live</span>
+    <button onClick="{{ closePreview }}" style="height:24px;padding:0 10px;border-radius:12px;border:0;background:rgba(20,20,18,.05);color:#FFFFFF;font-size:12px;font-weight:600">Close</button>
+  </div>
+</sc-if>
+<div ref="{{ rootRef }}" style="position:relative;height:100vh;width:100%;max-width:{{ frameMax }};margin:0 auto;display:flex;overflow:hidden;background:#F7F7F5;font-family:Manrope,'Noto Sans SC',system-ui,sans-serif;color:#1F1F1C;font-size:15px">
+
+  <sc-if value="{{ desk }}" hint-placeholder-val="{{ false }}">
+    <aside style="flex:0 0 240px;width:240px;display:flex;flex-direction:column;gap:6px;padding:24px 16px 20px;background:#111111;border-right:0;box-sizing:border-box">
+      <div style="padding:0 10px 18px">
+        <span style="display:block;font-size:16px;font-weight:700;letter-spacing:.16em;color:#FFFFFF;line-height:1.2">HOUZS VENTURE</span>
+        <span style="display:block;font-size:12.5px;font-weight:600;color:#F5871F;margin-top:3px">Revenue</span>
+      </div>
+      <sc-for list="{{ deskNav }}" as="n" hint-placeholder-count="5">
+        <button onClick="{{ n.go }}" style="display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:10px;border:0;background:{{ n.bg }};color:{{ n.color }};font-size:15px;font-weight:{{ n.weight }};text-align:left">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="{{ n.d }}"></path></svg>{{ n.label }}
+        </button>
+      </sc-for>
+      <button style="display:flex;align-items:center;gap:12px;height:44px;padding:0 12px;border-radius:12px;border:0;background:transparent;color:#A3A3A3;font-size:15px;font-weight:550;text-align:left">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"></path></svg>
+        <span style="flex:1">Notifications</span>
+        <span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#F5871F;color:#111111;font-size:11px;font-weight:700;line-height:20px;text-align:center">2</span>
+      </button>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;border:1px solid #262626;background:#1A1A1A">
+        <span style="flex:0 0 38px;width:38px;height:38px;border-radius:50%;background:#F5871F;color:#111111;font-size:12.5px;font-weight:700;display:grid;place-items:center">{{ userInitials }}</span>
+        <span style="min-width:0">
+          <span style="display:block;font-size:14px;font-weight:650;color:#FFFFFF">{{ userName }}</span>
+          <span style="display:block;font-size:12px;color:#8A8A8A">IR · Senior Executive</span>
+        </span>
+      </div>
+    </aside>
+  </sc-if>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+
+    <sc-if value="{{ desk }}" hint-placeholder-val="{{ false }}">
+      <header style="flex:0 0 60px;height:60px;display:flex;align-items:center;gap:16px;padding:0 28px;background:#FFFFFF;border-bottom:1px solid #E7E7E2;box-sizing:border-box">
+        <span style="flex:1"></span>
+        <a href="Quote Settings v3 Bold.dc.html" title="Quote settings" aria-label="Quote settings" style="display:grid;place-items:center;width:38px;height:38px;border-radius:10px;color:#1F1F1C" style-hover="background:#F2F2EF;text-decoration:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"></path></svg></a>
+        <div style="position:relative">
+          <button onClick="{{ toggleAcct }}" style="display:flex;align-items:center;gap:8px;height:36px;padding:0 10px 0 4px;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;color:#34342F;font-size:14px;font-weight:650;white-space:nowrap">
+            <span style="display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#F5871F;color:#1F1F1C;font-size:12px;font-weight:700">{{ userInitials }}</span>{{ userName }}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6B6B66" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+          </button>
+          <sc-if value="{{ acctOpen }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ closeAcct }}" style="position:fixed;inset:0;z-index:90"></div>
+            <div role="menu" style="position:absolute;right:0;top:44px;z-index:91;width:250px;padding:6px;border-radius:10px;background:#FFFFFF;border:1px solid #E7E7E2;box-shadow:0 14px 36px rgba(20,20,18,.16);display:flex;flex-direction:column;gap:1px">
+              <span style="padding:8px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.1em;color:#97978F">SWITCH ACCOUNT</span>
+              <sc-for list="{{ acctList }}" as="ac" hint-placeholder-count="3">
+                <button role="menuitem" onClick="{{ ac.pick }}" style="display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;border:0;border-radius:9px;background:{{ ac.bg }};color:#1F1F1C;font-size:13.5px;font-weight:600;text-align:left" style-hover="background:#F2F2EF">
+                  <span style="display:grid;place-items:center;width:26px;height:26px;border-radius:7px;background:{{ ac.avBg }};color:#1F1F1C;font-size:11.5px;font-weight:700">{{ ac.initials }}</span>
+                  <span style="flex:1">{{ ac.name }}</span>
+                  <sc-if value="{{ ac.on }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if>
+                </button>
+              </sc-for>
+              <span style="height:1px;margin:4px 6px;background:#EEEEEA"></span>
+              <form onSubmit="{{ addAcct }}" style="display:flex;gap:6px;padding:4px">
+                <input name="nm" placeholder="+ Account name" style="flex:1;min-width:0;height:34px;padding:0 10px;border-radius:8px;border:1px solid #DEDED8;font-size:13px;color:#1F1F1C;outline:none" style-focus="border-color:#111111">
+                <button type="submit" style="height:34px;padding:0 12px;border-radius:8px;border:0;background:#111111;color:#FFFFFF;font-size:12.5px;font-weight:650">Add</button>
+              </form>
+              
+            </div>
+          </sc-if>
+        </div>
+        
+        <button aria-label="Notifications" style="position:relative;width:38px;height:38px;border-radius:10px;border:0;background:transparent;color:#34342F;display:grid;place-items:center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"></path></svg>
+          <span style="position:absolute;top:5px;right:4px;width:8px;height:8px;border-radius:50%;background:#111111;box-shadow:0 0 0 2px #F2F2EF"></span>
+        </button>
+        
+      </header>
+    </sc-if>
+
+    <sc-if value="{{ phone }}" hint-placeholder-val="{{ true }}">
+      <header style="position:relative;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px 12px;background:#FFFFFF;box-shadow:inset 0 -1px 0 #E7E7E2">
+        <sc-if value="{{ phoneStep }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;left:64px;right:64px;top:0;bottom:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+            <span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:17px;font-weight:700;letter-spacing:-.01em;color:#1F1F1C">{{ stepNow.label }}</span>
+            <span style="font-size:11px;font-weight:650;color:#97978F">{{ stepNow.n }}</span>
+          </div>
+          <div style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:2px"><sc-for list="{{ steps }}" as="sb" hint-placeholder-count="5"><span style="flex:1;height:3px;background:{{ sb.bar }}"></span></sc-for></div>
+        </sc-if>
+        <sc-if value="{{ phoneBack }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ goBack }}" style="display:flex;align-items:center;gap:6px;height:44px;padding:0;border:0;background:transparent;color:#111111;font-size:14px;font-weight:600">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5m6-6-6 6 6 6"></path></svg>
+          </button>
+        </sc-if>
+        <sc-if value="{{ phoneLogo }}" hint-placeholder-val="{{ true }}">
+          <div style="min-width:0">
+            <span style="display:block;font-size:14px;font-weight:700;letter-spacing:.14em;color:#34342F;line-height:1.2;white-space:nowrap">HOUZS VENTURE</span>
+            <span style="display:block;font-size:11px;font-weight:600;color:#111111;margin-top:2px">Revenue</span>
+          </div>
+        </sc-if>
+        
+        <div style="display:flex;align-items:center;height:46px;padding:0 4px 0 0;border-radius:23px;border:1px solid #E7E7E2;background:#FFFFFF;box-sizing:border-box;box-shadow:0 2px 8px rgba(20,20,18,0.04)">
+          
+          
+          
+          <div style="position:relative;display:flex">
+            <button onClick="{{ toggleAcct }}" aria-label="Switch account" style="flex:0 0 36px;width:36px;height:36px;border-radius:50%;border:0;padding:0;background:#F5871F;color:#1F1F1C;font-size:11px;font-weight:700">{{ userInitials }}</button>
+            <sc-if value="{{ acctOpen }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ closeAcct }}" style="position:fixed;inset:0;z-index:90"></div>
+            <div role="menu" style="position:absolute;right:0;top:52px;z-index:91;width:250px;padding:6px;border-radius:10px;background:#FFFFFF;border:1px solid #E7E7E2;box-shadow:0 14px 36px rgba(20,20,18,.16);display:flex;flex-direction:column;gap:1px">
+              <span style="padding:8px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.1em;color:#97978F">SWITCH ACCOUNT</span>
+              <sc-for list="{{ acctList }}" as="ac" hint-placeholder-count="3">
+                <button role="menuitem" onClick="{{ ac.pick }}" style="display:flex;align-items:center;gap:10px;height:40px;padding:0 8px;border:0;border-radius:9px;background:{{ ac.bg }};color:#1F1F1C;font-size:13.5px;font-weight:600;text-align:left" style-hover="background:#F2F2EF">
+                  <span style="display:grid;place-items:center;width:26px;height:26px;border-radius:7px;background:{{ ac.avBg }};color:#1F1F1C;font-size:11.5px;font-weight:700">{{ ac.initials }}</span>
+                  <span style="flex:1">{{ ac.name }}</span>
+                  <sc-if value="{{ ac.on }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if>
+                </button>
+              </sc-for>
+              <span style="height:1px;margin:4px 6px;background:#EEEEEA"></span>
+              <form onSubmit="{{ addAcct }}" style="display:flex;gap:6px;padding:4px">
+                <input name="nm" placeholder="+ Account name" style="flex:1;min-width:0;height:34px;padding:0 10px;border-radius:8px;border:1px solid #DEDED8;font-size:13px;color:#1F1F1C;outline:none" style-focus="border-color:#111111">
+                <button type="submit" style="height:34px;padding:0 12px;border-radius:8px;border:0;background:#111111;color:#FFFFFF;font-size:12.5px;font-weight:650">Add</button>
+              </form>
+              
+            </div>
+          </sc-if>
+          </div>
+        </div>
+      </header>
+    </sc-if>
+
+    <div style="flex:1;min-height:0;display:flex;position:relative">
+      <sc-if value="{{ phoneHome }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;z-index:25;overflow-y:auto;background:#F7F7F5;padding:22px 20px 32px;box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:13px;color:#6B6B66">{{ homeHello }}</span>
+            <span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:28px;font-weight:700;letter-spacing:-.03em">Quote</span>
+          </div>
+          <button onClick="{{ homeNew }}" style="position:relative;overflow:hidden;flex-shrink:0;min-height:140px;display:flex;flex-direction:column;align-items:flex-start;gap:14px;padding:20px;border-radius:20px;border:0;background:#111111;color:#FFFFFF;text-align:left">
+            <span style="position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:#F5871F;opacity:.9"></span>
+            <span style="position:relative;display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:#FFFFFF;color:#111111"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
+            <span style="position:relative;display:flex;flex-direction:column;gap:4px"><span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:21px;font-weight:700;letter-spacing:-.02em">New quote</span><span style="font-size:12.5px;color:#BDBDB5">Customer · Room · Style · Customize</span></span>
+          </button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <button onClick="{{ openWs }}" style="display:flex;flex-direction:column;align-items:flex-start;gap:16px;padding:16px;border-radius:16px;border:0;background:#FFFFFF;color:#1F1F1C;text-align:left;box-shadow:0 1px 2px rgba(20,20,18,.05)">
+              <span style="display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#F2F2EF"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15 9h.01"></path></svg></span>
+              <span style="display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">Drive</span><span style="font-size:12px;color:#6B6B66">Style photos</span></span>
+            </button>
+            <div style="display:flex;flex-direction:column;align-items:flex-start;gap:16px;padding:16px;border-radius:16px;background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,18,.05)">
+              <span style="display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#FFEBD9;color:#D96E0B"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h4"></path></svg></span>
+              <span style="display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">{{ homeDraftN }}</span><span style="font-size:12px;color:#6B6B66">In progress</span></span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 2px 0"><span style="font-size:11.5px;font-weight:700;letter-spacing:.12em;color:#6B6B66">CONTINUE</span><sc-if value="{{ homeMore }}" hint-placeholder-val="{{ false }}"><button onClick="{{ homeMore.toggle }}" style="height:26px;padding:0 4px;border:0;background:transparent;color:#111111;font-size:12.5px;font-weight:650">{{ homeMore.label }}</button></sc-if></div>
+          <div style="flex-shrink:0;border-radius:16px;background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,18,.05);overflow:hidden">
+            <sc-for list="{{ homeList }}" as="dr" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:10px;padding:0 6px 0 14px;border-bottom:1px solid #F2F2EF">
+                <button onClick="{{ dr.open }}" style="flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:60px;padding:0;border:0;background:transparent;text-align:left;color:#1F1F1C">
+                  <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ dr.name }}</span><span style="font-size:12px;color:#97978F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ dr.meta }}</span></span>
+                  <span style="font-size:14px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums">{{ dr.total }}</span>
+                </button>
+                <button onClick="{{ dr.remove }}" aria-label="Delete draft" style="flex:0 0 auto;min-width:30px;height:30px;padding:0 6px;border:0;border-radius:8px;background:transparent;color:#B5B5AE;font-size:12px;font-weight:650">{{ dr.delIcon }}</button>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{ noDrafts }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:20px;border-radius:16px;border:1px dashed #DEDED8;font-size:13.5px;color:#6B6B66;text-align:center">No drafts yet</p></sc-if>
+        </div>
+      </sc-if>
+      <sc-if value="{{ wsOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;inset:0;z-index:30;background:#F7F7F5;display:block">
+          <dc-import name="Workspace" board-key="{{ wsKey }}" quote-label="{{ wsLabel }}" items="{{ wsItems }}" pkg-style="{{ wsStyle }}" styles="{{ wsStyles }}" active-style="{{ wsStyleId }}" furniture="{{ wsFurniture }}" on-close="{{ closeWs }}" hint-size="100%,100%" style="display:block;width:100%;height:100%"></dc-import>
+        </div>
+      </sc-if>
+      <main style="flex:1;min-width:0;overflow-y:auto;overflow-x:hidden;background:#F7F7F5">
+        <div style="max-width:1200px;margin:0 auto;padding:{{ mainPad }};display:flex;flex-direction:column;gap:14px;box-sizing:border-box">
+
+          <div style="display:{{ deskOnlyFlex }};flex-direction:column">
+            
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px">
+              <span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.15;display:{{ deskOnlyFlex }}">Renovation package</span>
+              <span style="flex:1"></span>
+              <div style="display:{{ deskOnlyFlex }};align-items:center;gap:8px;flex-wrap:wrap"><sc-if value="{{ draftBadge }}" hint-placeholder-val="{{ false }}"><span style="height:26px;padding:0 10px;border-radius:13px;background:#FFEBD9;color:#B35A00;font-size:12px;font-weight:650;line-height:26px;white-space:nowrap">{{ draftBadge }}</span></sc-if>
+              <div style="position:relative">
+                <button onClick="{{ toggleDrafts }}" style="display:flex;align-items:center;gap:6px;position:relative;height:36px;padding:0 12px;border-radius:10px;border:0;background:transparent;color:#111111;font-size:13.5px;font-weight:650" style-hover="background:#EEEEEA"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h4"></path></svg>Drafts<sc-if value="{{ draftCount }}" hint-placeholder-val="{{ false }}"><span style="min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:9px;background:#F5871F;color:#1F1F1C;font-size:10.5px;font-weight:700;line-height:18px;text-align:center">{{ draftCount }}</span></sc-if></button>
+                <sc-if value="{{ draftsOpen }}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{ toggleDrafts }}" style="position:fixed;inset:0;z-index:60"></div>
+                  <div style="position:absolute;right:0;top:46px;z-index:61;width:340px;max-width:calc(100vw - 32px);max-height:420px;overflow-y:auto;padding:6px;border-radius:10px;background:#FFFFFF;border:1px solid #E7E7E2;box-shadow:0 14px 36px rgba(20,20,18,.16);display:flex;flex-direction:column;gap:1px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px 6px"><span style="font-size:11px;font-weight:700;letter-spacing:.1em;color:#97978F">DRAFTS</span><button onClick="{{ newQuote }}" style="height:28px;padding:0 10px;border-radius:8px;border:0;background:#EEEEEA;color:#111111;font-size:12px;font-weight:650">+ New</button></div>
+                    <sc-for list="{{ draftList }}" as="dr" hint-placeholder-count="2">
+                      <div style="display:flex;align-items:center;gap:6px;border-radius:10px;background:{{ dr.bg }}">
+                        <button onClick="{{ dr.open }}" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;padding:9px 10px;border:0;background:transparent;text-align:left;color:#1F1F1C;border-radius:10px" style-hover="background:#F2F2EF">
+                          <span style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:14px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ dr.name }}</span><span style="font-size:13px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap">{{ dr.total }}</span></span>
+                          <span style="font-size:12px;color:#6B6B66">{{ dr.sub }}</span>
+                        </button>
+                        <button onClick="{{ dr.remove }}" aria-label="Delete draft" style="flex:0 0 auto;height:30px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:#8A2E1C;font-size:12px;font-weight:650">{{ dr.delLabel }}</button>
+                      </div>
+                    </sc-for>
+                    <sc-if value="{{ noDrafts }}" hint-placeholder-val="{{ false }}"><span style="padding:12px 10px 14px;font-size:13px;color:#6B6B66">No drafts</span></sc-if>
+                  </div>
+                </sc-if>
+              </div>
+              
+              <button onClick="{{ openWs }}" style="display:flex;align-items:center;gap:6px;position:relative;height:36px;padding:0 12px;border-radius:10px;border:0;background:transparent;color:#111111;font-size:13.5px;font-weight:650" style-hover="background:#EEEEEA"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15 9h.01"></path></svg>Drive</button></div>
+            </div>
+          </div>
+
+          
+          <div style="display:{{ stepBarD }};align-items:center;gap:8px;font-size:13px;padding:10px 16px;border-radius:12px;border:1px solid rgba(20,20,18,.05);box-shadow:0 1px 2px rgba(20,20,18,.04);background:#FFFFFF;flex-wrap:wrap;row-gap:8px">
+            <sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+              <sc-if value="{{ s.rule }}" hint-placeholder-val="{{ false }}"><span style="flex:1;height:1px;background:#E7E7E2;min-width:12px"></span></sc-if>
+              <sc-if value="{{ s.on }}" hint-placeholder-val="{{ false }}">
+                <span style="display:flex;align-items:center;gap:7px;font-weight:650;color:#111111;white-space:nowrap"><span style="width:22px;height:22px;border-radius:50%;background:#F5871F;color:#1F1F1C;font-size:12px;display:grid;place-items:center">{{ s.n }}</span>{{ s.label }}</span>
+              </sc-if>
+              <sc-if value="{{ s.done }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ s.go }}" style="display:flex;align-items:center;gap:7px;padding:0;border:0;background:transparent;color:#2F6B47;font-size:13px;font-weight:550;white-space:nowrap"><span style="width:22px;height:22px;border-radius:50%;background:#E8F3ED;display:grid;place-items:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6"></path></svg></span>{{ s.label }}</button>
+              </sc-if>
+              <sc-if value="{{ s.off }}" hint-placeholder-val="{{ true }}">
+                <span style="display:flex;align-items:center;gap:7px;color:#6B6B66;white-space:nowrap"><span style="width:22px;height:22px;border-radius:50%;border:1px solid #E7E7E2;box-sizing:border-box;font-size:12px;display:grid;place-items:center">{{ s.n }}</span>{{ s.label }}</span>
+              </sc-if>
+            </sc-for>
+          </div>
+
+          <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+            <p style="margin:0;padding:16px;border-radius:12px;border:1px dashed #DEDED8;font-size:13.5px;color:#6B6B66;text-align:center">Loading the price list…</p>
+          </sc-if>
+
+          <sc-if value="{{ stepRoom }}" hint-placeholder-val="{{ false }}">
+            <section style="display:flex;flex-direction:column;gap:14px;padding:{{ secPad }};border-radius:14px;border:{{ secBorder }};background:{{ secBg }};box-shadow:{{ secShadow }}">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:14px;font-weight:650;color:#1F1F1C">Property type</span>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <sc-for list="{{ propTypes }}" as="pt" hint-placeholder-count="3">
+                    <button onClick="{{ pt.pick }}" title="{{ pt.tip }}" style="height:36px;padding:0 14px;border-radius:14px;border:1px solid {{ pt.border }};background:{{ pt.bg }};color:{{ pt.ink }};font-size:13.5px;font-weight:600;opacity:{{ pt.op }}">{{ pt.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <span style="font-size:14px;font-weight:650;color:#1F1F1C">Unit size</span>
+                <sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-direction:column;gap:10px">
+                    <sc-for list="{{ sizeCards }}" as="us" hint-placeholder-count="4">
+                      <button onClick="{{ us.pick }}" style="display:flex;align-items:center;gap:14px;padding:10px;border-radius:16px;border:0;background:#FFFFFF;text-align:left;color:#1F1F1C;box-shadow:{{ us.rowRing }}">
+                        <span style="position:relative;flex:0 0 92px;width:92px;height:92px;border-radius:12px;overflow:hidden;background:#EEEEEA url('{{ us.img }}') center/cover no-repeat">
+                          <sc-if value="{{ us.noImg }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;inset:0;display:grid;place-items:center;font-family:'Space Grotesk',Manrope,sans-serif;font-size:18px;font-weight:700;color:#C9C9C2">{{ us.label }}</span></sc-if>
+                        </span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+                          <span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:18px;font-weight:700;letter-spacing:-.01em">{{ us.title }}</span>
+                          <span style="font-size:12.5px;color:#6B6B66">{{ us.eyebrow }}</span>
+                          <span style="font-size:12.5px;color:#97978F">{{ us.sqft }}</span>
+                          <span style="font-size:14px;margin-top:2px">From <strong style="font-weight:700">{{ us.price }}</strong></span>
+                        </span>
+                        <span style="flex:0 0 26px;width:26px;height:26px;border-radius:50%;border:2px solid {{ us.radioBorder }};background:{{ us.radioBg }};display:grid;place-items:center;box-sizing:border-box;color:#111111"><sc-if value="{{ us.on }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+                <div style="display:{{ stGridD }};grid-template-columns:{{ sizeWrap.tc }};grid-auto-flow:{{ sizeWrap.flow }};grid-auto-columns:{{ sizeWrap.col }};overflow-x:{{ sizeWrap.ox }};scroll-snap-type:x mandatory;scrollbar-width:none;margin:0 {{ sizeWrap.m }};padding:0 {{ sizeWrap.p }};gap:24px 14px">
+                  <sc-for list="{{ sizeCards }}" as="us" hint-placeholder-count="3">
+                    <div role="button" tabIndex="0" onClick="{{ us.pick }}" style="display:flex;flex-direction:column;gap:10px;text-align:left;color:#1F1F1C;cursor:pointer">
+                      <span onTouchStart="{{ us.tStart }}" onTouchEnd="{{ us.tEnd }}" onMouseEnter="{{ us.hoverOn }}" onMouseLeave="{{ us.hoverOff }}" style="position:relative;display:block;aspect-ratio:20/19;border-radius:12px;overflow:hidden;background:#EEEEEA url('{{ us.img }}') center/cover no-repeat;box-shadow:{{ us.cShadow }};transition:box-shadow .15s,background-image .3s;touch-action:pan-y">
+                        <sc-if value="{{ us.noImg }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;inset:0;display:grid;place-items:center;font-family:'Space Grotesk',Manrope,sans-serif;font-size:40px;font-weight:700;letter-spacing:-.03em;color:#FFC999">{{ us.label }}</span></sc-if>
+                        <sc-if value="{{ us.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:12px;right:12px;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#F5871F;color:#1F1F1C"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg></span></sc-if>
+                        <sc-if value="{{ us.multi }}" hint-placeholder-val="{{ false }}">
+                          <button onClick="{{ us.prev }}" aria-label="Previous photo" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#1F1F1C;display:grid;place-items:center;padding:0;box-shadow:0 1px 4px rgba(20,20,18,.2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"></path></svg></button>
+                          <button onClick="{{ us.next }}" aria-label="Next photo" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;border:0;background:rgba(255,255,255,.92);color:#1F1F1C;display:grid;place-items:center;padding:0;box-shadow:0 1px 4px rgba(20,20,18,.2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+                          <span style="position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:center;gap:5px">
+                            <sc-for list="{{ us.dots }}" as="d" hint-placeholder-count="3"><span style="width:6px;height:6px;border-radius:50%;background:#FFFFFF;opacity:{{ d.op }}"></span></sc-for>
+                          </span>
+                        </sc-if>
+                      </span>
+                      <span style="display:flex;flex-direction:column;gap:2px;padding:0 2px">
+                        <span style="display:flex;align-items:baseline;justify-content:space-between;gap:10px"><span style="font-size:15.5px;font-weight:650">{{ us.title }}</span><span style="font-size:12.5px;color:#6B6B66;white-space:nowrap">{{ us.sqft }}</span></span>
+                        <span style="font-size:13.5px;color:#6B6B66">{{ us.eyebrow }}</span>
+                        <span style="font-size:13.5px;color:#1F1F1C;margin-top:2px">From <strong style="font-weight:650">{{ us.price }}</strong></span>
+                      </span>
+                    </div>
+                  </sc-for>
+                </div>
+                
+              </div>
+            </section>
+
+
+            </sc-if>
+          <sc-if value="{{ stepCust }}" hint-placeholder-val="{{ true }}">
+            <section style="padding:18px;border-radius:14px;border:1px solid rgba(20,20,18,.05);background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)">
+              <div style="margin-bottom:10px">
+                <h2 style="margin:0;font-family:'Space Grotesk',Manrope,sans-serif;font-size:19px;font-weight:700;letter-spacing:-.02em">Customer</h2>
+              </div>
+              <sc-if value="{{ crmPicked }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:14px;border-radius:10px;background:#EEEEEA">
+                  <span style="flex:0 0 40px;display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:#111111;color:#FFFFFF;font-size:13px;font-weight:700">{{ crmPicked.initials }}</span>
+                  <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:15px;font-weight:650">{{ crmPicked.name }}</span><span style="font-size:12.5px;color:#55554F">{{ crmPicked.sub }}</span></span>
+                  
+                  <button onClick="{{ crmClear }}" style="height:36px;padding:0 12px;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;color:#111111;font-size:13px;font-weight:650">Change</button>
+                </div>
+              </sc-if>
+              <sc-if value="{{ crmSearch }}" hint-placeholder-val="{{ true }}">
+                <div style="position:relative;margin-bottom:14px">
+                  <label style="display:flex;align-items:center;gap:10px;height:46px;padding:0 14px;border-radius:12px;border:1px solid #DEDED8;background:#F7F7F5">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3"></path></svg>
+                    <input value="{{ crmQ }}" onChange="{{ onCrmQ }}" onFocus="{{ crmFocus }}" placeholder="Search CRM · name / phone" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:15px;color:#1F1F1C">
+                  </label>
+                  <sc-if value="{{ crmOpen }}" hint-placeholder-val="{{ false }}">
+                    <div onClick="{{ crmBlur }}" style="position:fixed;inset:0;z-index:20"></div>
+                    <div style="position:absolute;left:0;right:0;top:52px;z-index:21;padding:6px;border-radius:10px;background:#FFFFFF;border:1px solid #E7E7E2;box-shadow:0 14px 36px rgba(20,20,18,.14);display:flex;flex-direction:column;gap:1px">
+                      <sc-for list="{{ crmResults }}" as="cr" hint-placeholder-count="3">
+                        <button onClick="{{ cr.pick }}" style="display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 10px;border:0;border-radius:10px;background:transparent;text-align:left;color:#1F1F1C" style-hover="background:#F2F2EF">
+                          <span style="flex:0 0 32px;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#EEEEEA;font-size:11.5px;font-weight:700">{{ cr.initials }}</span>
+                          <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-size:14px;font-weight:600">{{ cr.name }}</span><span style="font-size:12px;color:#6B6B66">{{ cr.sub }}</span></span>
+                        </button>
+                      </sc-for>
+                      <sc-if value="{{ crmNone }}" hint-placeholder-val="{{ false }}"><span style="padding:10px 12px;font-size:13px;color:#6B6B66">No match</span></sc-if>
+                    </div>
+                  </sc-if>
+                  
+                </div>
+              </sc-if>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px">
+                <sc-for list="{{ custFields }}" as="f" hint-placeholder-count="6">
+                  <label style="display:flex;flex-direction:column;gap:5px">
+                    <span style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#34342F">{{ f.label }}<sc-if value="{{ f.req }}" hint-placeholder-val="{{ false }}"><span style="color:#B3261E">*</span></sc-if></span>
+                    <input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.ph }}" type="{{ f.type }}" style="height:42px;padding:0 12px;border-radius:10px;border:1px solid rgba(20,20,18,.12);background:#FFFFFF;font-size:15px;color:#1F1F1C;outline:none;box-sizing:border-box;width:100%" style-focus="border-color:#111111;box-shadow:0 0 0 3px rgba(17,17,17,.12)">
+                  </label>
+                </sc-for>
+              </div>
+            </section>
+
+            <sc-if value="{{ hasExtra }}" hint-placeholder-val="{{ false }}">
+              <section style="padding:18px;border-radius:14px;border:1px solid rgba(20,20,18,.05);background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)">
+                <div style="margin-bottom:10px">
+                  <h2 style="margin:0;font-family:'Space Grotesk',Manrope,sans-serif;font-size:19px;font-weight:700;letter-spacing:-.02em">Quotation details</h2>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px">
+                  <sc-for list="{{ extraFields }}" as="xf" hint-placeholder-count="2"><div style="display:flex;flex-direction:column;gap:5px;min-width:0;grid-column:{{ xf.span }}">
+  <span style="font-size:12.5px;font-weight:700;color:#34342F">{{ xf.label }}<sc-if value="{{ xf.required }}" hint-placeholder-val="{{ false }}"><span style="color:#111111"> *</span></sc-if></span>
+  <sc-if value="{{ xf.isInput }}" hint-placeholder-val="{{ true }}">
+    <input type="{{ xf.inputType }}" value="{{ xf.value }}" onChange="{{ xf.onChange }}" placeholder="{{ xf.ph }}" style="height:42px;padding:0 12px;border-radius:10px;border:1px solid rgba(20,20,18,.12);background:#FFFFFF;font-size:15px;color:#1F1F1C;outline:none;box-sizing:border-box;width:100%" style-focus="border-color:#111111;box-shadow:0 0 0 3px rgba(17,17,17,.12)">
+  </sc-if>
+  <sc-if value="{{ xf.isLong }}" hint-placeholder-val="{{ false }}">
+    <textarea value="{{ xf.value }}" onChange="{{ xf.onChange }}" rows="3" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;font-size:15px;line-height:1.5;color:#1F1F1C;resize:vertical;outline:none;font-family:inherit"></textarea>
+  </sc-if>
+  <sc-if value="{{ xf.isImage }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div role="img" aria-label="{{ xf.label }}" style="flex:0 0 72px;width:72px;height:72px;border-radius:10px;border:1px dashed #DEDED8;background:#FFFFFF url('{{ xf.img }}') center/contain no-repeat;display:grid;place-items:center;font-size:11px;color:#97978F">{{ xf.imgEmpty }}</div>
+      <label style="display:flex;align-items:center;height:36px;padding:0 14px;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;font-size:13px;font-weight:650;color:#1F1F1C;cursor:pointer">Upload image<input type="file" accept="image/*" onChange="{{ xf.onUpload }}" style="display:none"></label>
+      <sc-if value="{{ xf.hasImg }}" hint-placeholder-val="{{ false }}"><button onClick="{{ xf.clear }}" style="height:36px;padding:0 10px;border:0;background:transparent;color:#8A2E1C;font-size:13px;font-weight:650">Remove</button></sc-if>
+    </div>
+  </sc-if>
+  <sc-if value="{{ xf.isTable }}" hint-placeholder-val="{{ false }}">
+    <div style="overflow-x:auto;border:1px solid #DEDED8;border-radius:10px;background:#FFFFFF">
+      <div style="min-width:{{ xf.minW }}">
+        <div style="display:grid;grid-template-columns:{{ xf.grid }};background:#F0F0ED;border-bottom:1px solid #E7E7E2;font-size:11.5px;font-weight:700;letter-spacing:.05em;color:#6B6B66">
+          <sc-for list="{{ xf.cols }}" as="xvh" hint-placeholder-count="3"><span style="padding:8px 10px;text-align:{{ xvh.align }}">{{ xvh.label }}</span></sc-for><span></span>
+        </div>
+        <sc-for list="{{ xf.rows }}" as="xvr" hint-placeholder-count="1">
+          <div style="display:grid;grid-template-columns:{{ xf.grid }};align-items:center;border-bottom:1px solid rgba(20,20,18,.06)">
+            <sc-for list="{{ xvr.cells }}" as="xvc" hint-placeholder-count="3">
+              <span style="padding:3px 4px;min-width:0">
+                <sc-if value="{{ xvc.isInput }}" hint-placeholder-val="{{ true }}"><input type="{{ xvc.type }}" value="{{ xvc.value }}" onChange="{{ xvc.onChange }}" placeholder="{{ xvc.ph }}" style="width:100%;box-sizing:border-box;height:34px;padding:0 8px;border:0;border-radius:6px;outline:none;background:transparent;font-size:13.5px;color:#1F1F1C;text-align:{{ xvc.align }}" style-focus="background:#F2F2EF"></sc-if>
+                <sc-if value="{{ xvc.isImg }}" hint-placeholder-val="{{ false }}"><label title="Upload image" style="display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed #DEDED8;background:#FFFFFF url('{{ xvc.img }}') center/cover no-repeat;color:#111111;font-size:16px;cursor:pointer">{{ xvc.imgEmpty }}<input type="file" accept="image/*" onChange="{{ xvc.onUpload }}" style="display:none"></label></sc-if>
+              </span>
+            </sc-for>
+            <button aria-label="Remove row" onClick="{{ xvr.remove }}" style="width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:#6B6B66;padding:0;font-size:15px">×</button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <button onClick="{{ xf.addRow }}" style="align-self:flex-start;height:30px;padding:0;border:0;background:transparent;color:#111111;font-size:13px;font-weight:650">+ Add row</button>
+  </sc-if>
+</div></sc-for>
+                </div>
+              </section>
+            </sc-if>
+
+
+            </sc-if>
+          <sc-if value="{{ stepStyle }}" hint-placeholder-val="{{ false }}">
+            <section style="display:flex;flex-direction:column;gap:14px">
+              <div style="display:{{ deskOnlyFlex }};align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                <div>
+                  <span style="display:block;font-size:11.5px;font-weight:700;letter-spacing:.1em;color:#6B6B66">STYLE</span>
+                  
+                </div>
+                <button onClick="{{ openWs }}" title="Drive" aria-label="Drive" style="display:grid;place-items:center;position:relative;width:40px;height:40px;padding:0;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;color:#111111;width:36px;height:36px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+              </div>
+              <sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:0 20px">
+                  <sc-for list="{{ styleCards }}" as="sc" hint-placeholder-count="3">
+                    <button onClick="{{ sc.pick }}" style="flex:0 0 auto;height:40px;padding:0 18px;border-radius:20px;border:1px solid {{ sc.chipBorder }};background:{{ sc.chipBg }};color:{{ sc.chipInk }};font-size:14px;font-weight:650;white-space:nowrap">{{ sc.name }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <div style="display:{{ stGridD }};grid-template-columns:{{ stWrap.tc }};grid-auto-flow:{{ stWrap.flow }};grid-auto-columns:{{ stWrap.col }};overflow-x:{{ stWrap.ox }};scrollbar-width:none;scroll-snap-type:x mandatory;margin:0 {{ stWrap.m }};padding:0 {{ stWrap.p }};gap:10px">
+                <sc-for list="{{ styleCards }}" as="sc" hint-placeholder-count="3">
+                  <button onClick="{{ sc.pick }}" style="display:flex;flex-direction:column;padding:6px;border-radius:12px;border:1px solid {{ sc.border }};box-shadow:{{ sc.ring }};background:#FFFFFF;text-align:left;color:#1F1F1C">
+                    <span style="position:relative;display:block;aspect-ratio:4/3;border-radius:11px;background:#EEEEEA url('{{ sc.cover }}') center/cover no-repeat">
+                      <sc-if value="{{ sc.noCover }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;inset:0;display:grid;place-items:center;font-family:'Space Grotesk',Manrope,sans-serif;font-size:26px;font-weight:700;letter-spacing:-.02em;color:#D2D2CB">{{ sc.name }}</span></sc-if>
+                      <sc-if value="{{ sc.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:8px;right:8px;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:#F5871F;color:#1F1F1C"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg></span></sc-if>
+                    </span>
+                    <span style="display:flex;flex-direction:column;gap:2px;padding:10px 6px 6px">
+                      <span style="display:flex;align-items:baseline;justify-content:space-between;gap:8px"><span style="font-size:15px;font-weight:650">{{ sc.name }}</span><span style="font-size:12px;color:#97978F">{{ sc.count }}</span></span>
+                      <span style="display:{{ stWrap.desc }};font-size:12.5px;line-height:1.4;color:#6B6B66;text-wrap:pretty">{{ sc.desc }}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ sv }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;border-radius:{{ svCard.r }};border:{{ svCard.b }};background:{{ svCard.bg }};overflow:hidden;margin:0 {{ svCard.m }}">
+                  <sc-if value="{{ sv.hasImg }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:relative;aspect-ratio:{{ svCard.ar }};background:#1F1F1C;border-radius:{{ svCard.ir }};overflow:hidden">
+                      <div role="img" onClick="{{ sv.enlarge }}" style="position:absolute;inset:0;width:100%;height:100%;display:block;background:url('{{ sv.src }}') center/cover no-repeat;cursor:zoom-in"></div>
+                      <sc-if value="{{ sv.multi }}" hint-placeholder-val="{{ false }}">
+                        <button onClick="{{ sv.prev }}" aria-label="Previous" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:30px;height:30px;padding:0;border-radius:50%;border:0;background:rgba(255,255,255,.85);color:#1F1F1C;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.15)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"></path></svg></button>
+                        <button onClick="{{ sv.next }}" aria-label="Next" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:30px;height:30px;padding:0;border-radius:50%;border:0;background:rgba(255,255,255,.85);color:#1F1F1C;display:grid;place-items:center;box-shadow:0 1px 4px rgba(0,0,0,.15)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"></path></svg></button>
+                        <span style="position:absolute;right:12px;top:12px;height:26px;padding:0 10px;border-radius:13px;background:rgba(0,0,0,.55);color:#FFFFFF;font-size:12px;font-weight:600;line-height:26px;font-variant-numeric:tabular-nums">{{ sv.counter }}</span>
+                      </sc-if>
+                      <span style="position:absolute;left:0;right:0;bottom:0;padding:28px 16px 12px;background:linear-gradient(transparent,rgba(0,0,0,.66));color:#FFFFFF"><span style="display:block;font-size:14px;font-weight:650">{{ sv.title }}</span><sc-if value="{{ sv.note }}" hint-placeholder-val="{{ false }}"><span style="display:block;font-size:12.5px;line-height:1.4;margin-top:2px;opacity:.92;text-wrap:pretty">{{ sv.note }}</span></sc-if></span>
+                    </div>
+                    <sc-if value="{{ sv.hasSecs }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;gap:6px;overflow-x:auto;padding:12px 12px 0;scrollbar-width:none">
+                        <sc-for list="{{ sv.secs }}" as="se" hint-placeholder-count="3">
+                          <button onClick="{{ se.pick }}" style="flex:0 0 auto;height:32px;padding:0 14px;border-radius:8px;border:1px solid {{ se.border }};background:{{ se.bg }};color:{{ se.ink }};font-size:13px;font-weight:650;white-space:nowrap">{{ se.label }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ sv.multi }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:{{ svCard.thumbs }};gap:6px;overflow-x:auto;padding:10px 12px;border-bottom:1px solid rgba(20,20,18,.06);scrollbar-width:none">
+                        <sc-for list="{{ sv.thumbs }}" as="th" hint-placeholder-count="4">
+                          <button onClick="{{ th.pick }}" aria-label="Show image" style="flex:0 0 72px;width:72px;height:50px;border-radius:8px;border:0;padding:0;background:#EEEEEA url('{{ th.src }}') center/cover no-repeat;box-shadow:{{ th.ring }};opacity:{{ th.op }}"></button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </sc-if>
+                  <sc-if value="{{ sv.noImg }}" hint-placeholder-val="{{ true }}">
+                    <button onClick="{{ openWs }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;aspect-ratio:16/7;border:0;border-bottom:1px solid rgba(20,20,18,.06);background:#F7F7F5;color:#6B6B66;font-size:13.5px">
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#D96E0B" strokeWidth="1.7" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path></svg>
+                      <span style="font-weight:650;color:#1F1F1C">No style images yet</span>
+                      <span>Add {{ sv.name }} images in Drive, or a cover in Quote Settings</span>
+                    </button>
+                  </sc-if>
+                  <div style="padding:16px 18px 18px;display:flex;flex-direction:column;gap:12px">
+                    <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                      <div style="min-width:0">
+                        <span style="display:block;font-size:17px;font-weight:650">{{ sv.name }}</span>
+                        <span style="display:block;font-size:12.5px;color:#6B6B66;margin-top:2px">{{ sv.count }} · base price</span>
+                      </div>
+                      <span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums">{{ sv.price }}</span>
+                    </div>
+                    <sc-if value="{{ sv.hasPkgTabs }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                        <span style="display:{{ svCard.bedLbl }};font-size:12.5px;font-weight:700;color:#34342F">Bedroom</span>
+                        <div style="flex:{{ svCard.segFlex }};display:flex;gap:2px;padding:3px;border-radius:11px;background:#EEEEEA">
+                          <sc-for list="{{ styleTabs }}" as="tb" hint-placeholder-count="2">
+                            <button onClick="{{ tb.pick }}" style="flex:1;height:34px;padding:0 12px;border-radius:8px;border:0;background:{{ tb.bg }};color:{{ tb.ink }};font-size:12.5px;font-weight:650;box-shadow:{{ tb.shadow }};white-space:nowrap">{{ tb.label }} · {{ tb.price }}</button>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ sv.inPhoto }}" hint-placeholder-val="{{ false }}">
+                      <span style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:#FFEBD9;color:#34342F;font-size:12.5px;line-height:1.4"><span style="flex:0 0 7px;width:7px;height:7px;border-radius:50%;background:#F5871F"></span>{{ sv.inPhoto }}</span>
+                    </sc-if>
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                      <div style="border-radius:12px;border:1px solid #E7E7E2;overflow:hidden">
+                        <button onClick="{{ sv.furnToggle }}" style="width:100%;display:flex;align-items:center;gap:8px;height:44px;padding:0 14px;border:0;background:#FFFFFF;text-align:left;color:#1F1F1C">
+                          <span style="flex:1;min-width:0;font-size:14px;font-weight:700;white-space:nowrap">Furniture</span>
+                          <span style="font-size:12.5px;color:#6B6B66;white-space:nowrap">{{ sv.furnCount }}</span>
+                          <span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap">{{ sv.furnSum }}</span>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6B66" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style="transform:{{ sv.furnRot }};transition:transform .2s"><path d="m6 9 6 6 6-6"></path></svg>
+                        </button>
+                        <sc-if value="{{ sv.furnOpen }}" hint-placeholder-val="{{ true }}">
+                        <div style="display:flex;flex-direction:column;padding:2px 14px 6px;border-top:1px solid #EEEEEA">
+                          <sc-for list="{{ sv.furn }}" as="fu" hint-placeholder-count="6">
+                            <div onClick="{{ fu.view }}" style="display:flex;align-items:center;gap:10px;min-height:30px;font-size:13px;border-bottom:1px solid #F2F2EF;cursor:{{ fu.cur }}">
+                              <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ fu.name }}</span>
+                              <span style="font-size:12px;color:#97978F">{{ fu.qty }}</span>
+                              <span style="min-width:76px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">{{ fu.price }}</span>
+                            </div>
+                          </sc-for>
+                        </div>
+                        </sc-if>
+                      </div>
+                      <sc-if value="{{ sv.serv }}" hint-placeholder-val="{{ false }}">
+                        <div style="border-radius:12px;border:1px solid #E7E7E2;overflow:hidden">
+                          <button onClick="{{ sv.serv.toggle }}" style="width:100%;display:flex;align-items:center;gap:8px;height:44px;padding:0 14px;border:0;background:#FFFFFF;text-align:left;color:#1F1F1C">
+                            <span style="flex:1;min-width:0;font-size:14px;font-weight:700;white-space:nowrap">Services</span>
+                            <span style="font-size:12.5px;color:#6B6B66;white-space:nowrap">{{ sv.serv.count }}</span>
+                            <span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:14px;font-weight:700;font-variant-numeric:tabular-nums">{{ sv.serv.sum }}</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6B66" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style="transform:{{ sv.serv.rot }};transition:transform .2s"><path d="m6 9 6 6 6-6"></path></svg>
+                          </button>
+                          <sc-if value="{{ sv.serv.open }}" hint-placeholder-val="{{ false }}">
+                            <div style="display:flex;flex-direction:column;gap:10px;padding:4px 14px 12px;border-top:1px solid #EEEEEA">
+                              <sc-for list="{{ sv.serv.cats }}" as="sc" hint-placeholder-count="2">
+                                <div style="display:flex;flex-direction:column">
+                                  <span style="font-size:11px;font-weight:700;letter-spacing:.1em;color:#97978F;padding:8px 0 2px">{{ sc.name }}</span>
+                                  <sc-for list="{{ sc.rows }}" as="r" hint-placeholder-count="3">
+                                    <div style="display:flex;align-items:center;gap:10px;min-height:28px;font-size:12.5px">
+                                      <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+                                      <span style="font-size:12px;color:#97978F">{{ r.qty }}</span>
+                                      <span style="min-width:76px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">{{ r.price }}</span>
+                                    </div>
+                                  </sc-for>
+                                </div>
+                              </sc-for>
+                            </div>
+                          </sc-if>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+            </section>
+          </sc-if>
+
+          <sc-if value="{{ step2 }}" hint-placeholder-val="{{ false }}">
+            <div style="display:{{ deskOnlyFlex }};align-items:center;gap:12px;padding:16px 20px;border-radius:14px;background:#FFFFFF;border:1px solid rgba(20,20,18,.05);box-shadow:0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)">
+              <div style="flex:1;min-width:0">
+                <span style="display:block;font-size:12.5px;color:#6B6B66">{{ unitText }}</span>
+                <span style="display:block;font-size:16px;font-weight:650;margin-top:2px">{{ pkgName }}</span>
+              </div>
+              <div style="text-align:right">
+                <span style="display:block;font-size:12px;color:#6B6B66">Total</span>
+                <span style="display:block;font-family:'Space Grotesk',Manrope,sans-serif;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums">RM {{ totalBare }}</span>
+                <span style="display:block;font-size:11.5px;color:#6B6B66;margin-top:1px;font-variant-numeric:tabular-nums">Package {{ pkgPriceText }} · Changes {{ changesText }}</span>
+              </div>
+            </div>
+
+            <sc-if value="{{ czTabs }}" hint-placeholder-val="{{ false }}">
+              <div style="position:sticky;top:0;z-index:5;display:flex;gap:2px;padding:2px;border-radius:10px;background:#EEEEEA;margin:0 0 2px;box-shadow:0 0 0 6px #F7F7F5">
+                <sc-for list="{{ czTabs }}" as="zt" hint-placeholder-count="2">
+                  <button onClick="{{ zt.pick }}" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 6px;border-radius:8px;border:0;background:{{ zt.bg }};color:{{ zt.ink }};box-shadow:{{ zt.shadow }};white-space:nowrap"><span style="font-size:13px;font-weight:700">{{ zt.label }}</span><span style="font-size:11.5px;font-weight:600;color:{{ zt.sub }};font-variant-numeric:tabular-nums">{{ zt.sum }}</span></button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-for list="{{ catGroupsShown }}" as="cg" hint-placeholder-count="2">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:{{ cgPad }}">
+              <span style="font-size:11.5px;font-weight:700;letter-spacing:.12em;color:#6B6B66">{{ cg.label }}</span>
+              <span style="font-size:12.5px;color:#6B6B66;font-variant-numeric:tabular-nums">{{ cg.sum }}</span>
+            </div>
+            <sc-for list="{{ cg.cats }}" as="c" hint-placeholder-count="3">
+              <section style="padding:{{ cz.pad }};border-radius:{{ cz.r }};border:{{ cz.b }};background:{{ cz.bg }};box-shadow:{{ cz.sh }}">
+                <div style="display:flex;align-items:center;gap:10px;margin:{{ cz.hMargin }};padding:{{ cz.hPad }};border-radius:{{ cz.hR }};position:{{ cz.hPos }};top:40px;z-index:3;background:{{ cz.hBg }}">
+                  <h2 style="margin:0;font-family:'Space Grotesk',Manrope,sans-serif;font-size:{{ cz.h }};font-weight:700;letter-spacing:-.02em">{{ c.label }}</h2>
+                  <span style="margin-left:auto;min-width:{{ cz.cntW }};height:{{ cz.cntH }};padding:0 {{ cz.cntP }};border-radius:11px;background:{{ cz.cntBg }};box-sizing:border-box;display:grid;place-items:center;font-size:12px;font-weight:700;color:#55554F;font-variant-numeric:tabular-nums">{{ c.countOrSum }}</span>
+                  <sc-if value="{{ cz.plus }}" hint-placeholder-val="{{ false }}"><sc-if value="{{ c.canAdd }}" hint-placeholder-val="{{ false }}"><button onClick="{{ c.add }}" aria-label="Add item" style="width:24px;height:24px;border-radius:50%;border:0;background:#FFEBD9;color:#D96E0B;display:grid;place-items:center;padding:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></sc-if></sc-if>
+                </div>
+                <sc-for list="{{ c.lines }}" as="l" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px 12px;padding:{{ cz.rowPad }};border-bottom:1px solid rgba(20,20,18,.06)">
+                    <span onClick="{{ l.lView }}" style="display:{{ thumbD }};flex:0 0 52px;width:52px;height:52px;border-radius:10px;background:#F4F4F1 url('{{ l.lImg }}') center/contain no-repeat;box-shadow:inset 0 0 0 1px rgba(20,20,18,.05);cursor:{{ l.lCursor }}"></span>
+                    <div onClick="{{ l.lView }}" style="flex:1 1 {{ nameBasis }};min-width:0;cursor:{{ l.lCursor }}">
+                      <span style="display:block;font-size:14.5px;font-weight:600;letter-spacing:-.005em;text-decoration:{{ l.strike }};color:{{ l.nameColor }}">{{ l.title }}</span>
+                      <span style="display:{{ priceIn }};margin-top:2px;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:{{ l.nameColor }}"><sc-if value="{{ l.locked }}" hint-placeholder-val="{{ false }}"><svg aria-label="Fixed price" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#97978F" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style="margin-right:4px;vertical-align:-1px"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"></path></svg></sc-if>{{ l.sumText }}<span style="font-weight:500;color:#97978F"> {{ l.eachText }}</span></span>
+                      <sc-if value="{{ l.meta }}" hint-placeholder-val="{{ true }}"><span style="display:{{ cz.meta }};font-size:12px;color:#6B6B66;margin-top:1px">{{ l.meta }}</span></sc-if>
+                      <sc-if value="{{ l.tag }}" hint-placeholder-val="{{ false }}">
+                        <span style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap">
+                          <span style="font-size:10.5px;font-weight:700;letter-spacing:.04em;border-radius:6px;padding:3px 6px;color:{{ l.tagInk }};background:{{ l.tagBg }}">{{ l.tag }}</span>
+                          <span style="font-size:12.5px;font-weight:650;font-variant-numeric:tabular-nums;color:{{ l.tagInk }}">{{ l.delta }}</span>
+                          <button onClick="{{ l.undo }}" style="height:24px;padding:0 4px;border:0;background:transparent;color:#111111;font-size:12.5px;font-weight:600">Undo</button>
+                        </span>
+                      </sc-if>
+                    </div>
+                    <sc-if value="{{ l.canSwap }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ l.swap }}" style="flex:0 0 auto;margin-left:auto;height:{{ cz.stepH }};padding:0 {{ chgPad }};border-radius:8px;border:0;background:{{ cz.swapBg }};color:#111111;font-size:12.5px;font-weight:650" title="Change" aria-label="Change" style-hover="background:#E6E6E1"><span style="display:{{ chgTxt }}">Change</span><svg style="display:{{ chgIco }}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"></path></svg></button>
+                    </sc-if>
+                    <div style="flex:0 0 auto;margin-left:auto;display:grid;grid-template-columns:{{ cz.stepCols }};align-items:center;height:{{ cz.stepH }};border-radius:8px;border:1px solid rgba(20,20,18,.1);background:#FFFFFF">
+                      <button aria-label="Remove one" onClick="{{ l.minus }}" style="height:{{ cz.stepH }};border:0;background:transparent;color:#111111;font-size:18px;font-weight:600;padding:0">−</button>
+                      <input inputMode="numeric" aria-label="Quantity" value="{{ l.qty }}" onChange="{{ l.onQty }}" onFocus="{{ selAll }}" style="width:100%;min-width:0;padding:0;border:0;outline:none;background:transparent;text-align:center;font-size:14px;font-weight:700;color:#1F1F1C;font-family:inherit;font-variant-numeric:tabular-nums">
+                      <button aria-label="Add one" onClick="{{ l.plus }}" style="height:{{ cz.stepH }};border:0;background:transparent;color:#111111;font-size:18px;font-weight:600;padding:0">+</button>
+                    </div>
+                    <sc-if value="{{ l.adj }}" hint-placeholder-val="{{ false }}"><label title="Adjustable price" style="flex:0 0 auto;display:flex;align-items:center;gap:4px;height:34px;padding:0 8px;border-radius:8px;border:1px solid #FFC999;background:#FFF5EC"><span style="font-size:11.5px;font-weight:700;color:#B35A00">RM</span><input inputMode="decimal" value="{{ l.costV }}" onChange="{{ l.onCost }}" style="width:64px;border:0;outline:0;background:transparent;text-align:right;font-size:13.5px;font-weight:700;color:#1F1F1C;font-variant-numeric:tabular-nums"></label></sc-if>
+                    <span style="flex:0 0 auto;min-width:72px;display:{{ thumbD }};flex-direction:column;align-items:flex-end;gap:1px;text-align:right;font-variant-numeric:tabular-nums">
+                      <span style="display:flex;align-items:center;font-size:14px;font-weight:650;color:{{ l.nameColor }};text-decoration:{{ l.strike }}"><sc-if value="{{ l.locked }}" hint-placeholder-val="{{ false }}"><svg aria-label="Fixed price" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#97978F" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style="margin-right:4px;vertical-align:-1px"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"></path></svg></sc-if>{{ l.sumText }}</span>
+                      <span style="font-size:11.5px;color:#6B6B66">{{ l.eachText }}</span>
+                    </span>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ cz.addRow }}" hint-placeholder-val="{{ true }}"><sc-if value="{{ c.canAdd }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ c.add }}" style="margin-top:4px;width:100%;display:flex;align-items:center;gap:8px;height:{{ cz.add }};padding:0 4px;border:0;background:transparent;color:#111111;font-size:14px;font-weight:650;text-align:left">
+                    <span style="width:28px;height:28px;border-radius:50%;background:#FFEBD9;display:grid;place-items:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>Add item
+                  </button>
+                </sc-if></sc-if>
+              </section>
+            </sc-for>
+            </sc-for>
+
+            
+          </sc-if>
+
+          <sc-if value="{{ step3 }}" hint-placeholder-val="{{ false }}">
+            <sc-if value="{{ hasSigs }}" hint-placeholder-val="{{ false }}">
+              <section style="display:flex;flex-direction:column;gap:10px;padding:18px;border-radius:14px;border:1px solid rgba(20,20,18,.05);background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)">
+                <h2 style="margin:0;font-family:'Space Grotesk',Manrope,sans-serif;font-size:19px;font-weight:700;letter-spacing:-.02em">Signatures</h2>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px">
+                  <sc-for list="{{ sigSlots }}" as="sg" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid #E7E7E2;background:#FFFFFF">
+                      <div role="img" aria-label="{{ sg.label }}" style="flex:0 0 96px;width:96px;height:52px;border-radius:10px;border:1px dashed #DEDED8;background:#FFFFFF url('{{ sg.img }}') center/contain no-repeat;display:grid;place-items:center;font-size:11.5px;color:#97978F">{{ sg.empty }}</div>
+                      <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14.5px;font-weight:600">{{ sg.label }}</span><span style="font-size:12.5px;color:#6B6B66">{{ sg.status }}</span></span>
+                      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+                        <button onClick="{{ sg.open }}" style="height:36px;padding:0 14px;border-radius:10px;border:0;background:#111111;color:#FFFFFF;font-size:13.5px;font-weight:650">{{ sg.cta }}</button>
+                        <sc-if value="{{ sg.signed }}" hint-placeholder-val="{{ false }}"><button onClick="{{ sg.clear }}" style="height:24px;padding:0;border:0;background:transparent;color:#6B6B66;font-size:12.5px;font-weight:600">Clear</button></sc-if>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+            </sc-if>
+            <sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <div style="padding:18px;border-radius:16px;background:#111111;color:#FFFFFF">
+                  <span style="font-size:12.5px;color:#BDBDB5">{{ cust.att }}</span>
+                  <div style="display:flex;align-items:baseline;gap:4px;margin-top:4px"><span style="font-size:15px;font-weight:600;color:#BDBDB5">RM</span><span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:34px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums">{{ totalBare }}</span></div>
+                  <span style="display:block;margin-top:4px;font-size:12.5px;color:#BDBDB5">{{ pkgName }}</span>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:16px;background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,18,.05)">
+                  <div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:#6B6B66">Package</span><span style="font-weight:650;font-variant-numeric:tabular-nums">{{ pkgPriceText }}</span></div>
+                  <div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:#6B6B66">Changes · {{ changeCount }}</span><span style="font-weight:650;font-variant-numeric:tabular-nums">{{ changesText }}</span></div>
+                  <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px"><span style="color:#6B6B66">Discount</span><span style="display:flex;align-items:center;gap:6px;width:140px;height:38px;padding:0 10px;border-radius:10px;border:1px solid #DEDED8;box-sizing:border-box"><span style="font-size:12.5px;font-weight:700">RM</span><input inputMode="decimal" placeholder="0.00" value="{{ discount }}" onChange="{{ onDiscount }}" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:15px;font-weight:650;text-align:right;color:#1F1F1C"></span></label>
+                </div>
+                
+              </div>
+            </sc-if>
+            <div style="display:{{ docBoxD }};position:{{ docBox.pos }};inset:0;z-index:{{ docBox.z }};flex-direction:column;border:{{ docBox.b }};border-radius:{{ docBox.r }};background:#FFFFFF;box-shadow:0 4px 14px rgba(20,20,18,0.04);overflow:hidden">
+              <sc-if value="{{ docBox.full }}" hint-placeholder-val="{{ false }}"><div style="flex:0 0 auto;display:flex;align-items:center;gap:6px;height:52px;padding:0 12px 0 6px;border-bottom:1px solid #E7E7E2"><button onClick="{{ closeDoc }}" aria-label="Back" style="width:40px;height:40px;border-radius:50%;border:0;background:transparent;display:grid;place-items:center;padding:0;color:#1F1F1C"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5m6-6-6 6 6 6"></path></svg></button><span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:17px;font-weight:700">Quotation</span></div></sc-if>
+              <div style="position:relative;flex:1;min-height:400px;overflow-y:auto;overflow-x:hidden;background:#F2F2EF">
+                <iframe title="Quotation preview" srcDoc="{{ docSrc }}" ref="{{ docRef }}" style="color-scheme:light;display:block;width:100%;min-height:400px;border:0;background:#F2F2EF"></iframe>
+              </div>
+              <sc-if value="{{ docBox.full }}" hint-placeholder-val="{{ false }}">
+                <div style="flex:0 0 auto;display:grid;grid-template-columns:46px 46px 1fr;gap:8px;padding:10px 12px 14px;border-top:1px solid #E7E7E2;background:#FFFFFF">
+                  <button onClick="{{ saveDraftC }}" aria-label="Save draft" title="Save draft" style="height:46px;display:grid;place-items:center;padding:0;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;color:#1F1F1C"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3h11l3 3v15H5zM8 3v5h7V3M8 21v-7h8v7"></path></svg></button>
+                  <button onClick="{{ openShare }}" aria-label="Share" title="Share" style="height:46px;display:grid;place-items:center;padding:0;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;color:#1F1F1C"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"></path></svg></button>
+                  
+                  <button onClick="{{ doPdfC }}" style="height:46px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:12px;border:0;background:#111111;color:#FFFFFF;font-size:13.5px;font-weight:700"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v12m-5-5 5 5 5-5M5 20h14"></path></svg>Download PDF</button>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+
+        </div>
+      </main>
+
+      <sc-if value="{{ desk }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:0 0 400px;width:400px;background:#FFFFFF;border-left:1px solid #E7E7E2;display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:16px 20px 4px">
+            <h2 style="margin:0;font-family:'Space Grotesk',Manrope,sans-serif;font-size:18px;font-weight:700;letter-spacing:-.02em">Summary</h2>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:12px 20px 20px;display:flex;flex-direction:column;gap:16px">
+            
+            <sc-if value="{{ showPrice }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid rgba(20,20,18,.05);border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)">
+              <div style="padding:16px 16px 14px">
+                <span style="display:block;font-size:12.5px;color:#6B6B66">Total</span>
+                <div style="display:flex;align-items:baseline;gap:4px;margin-top:6px"><span style="font-size:15px;font-weight:600;color:#6B6B66">RM</span><span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:32px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.1">{{ totalBare }}</span></div>
+                
+              </div>
+              <div style="border-top:1px solid #E7E7E2;padding:12px 16px;display:flex;flex-direction:column;gap:7px;background:#F2F2EF">
+                <div style="display:flex;justify-content:space-between;gap:10px;font-size:13.5px"><span>Package price</span><span style="font-weight:650;font-variant-numeric:tabular-nums">{{ pkgPriceText }}</span></div>
+                <div style="display:flex;justify-content:space-between;gap:10px;font-size:13.5px"><span>Changes · {{ changeCount }}</span><span style="font-weight:650;font-variant-numeric:tabular-nums">{{ changesText }}</span></div>
+                <label style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13.5px"><span>Discount</span>
+                  <span style="display:flex;align-items:center;gap:6px;width:150px;height:38px;padding:0 10px;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;box-sizing:border-box"><span style="font-size:12.5px;font-weight:700;color:#34342F">RM</span><input inputMode="decimal" placeholder="0.00" value="{{ discount }}" onChange="{{ onDiscount }}" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:14.5px;font-weight:650;text-align:right;color:#1F1F1C;font-variant-numeric:tabular-nums"></span>
+                </label>
+              </div>
+            </div>
+            </sc-if>
+            <sc-if value="{{ noPrice }}" hint-placeholder-val="{{ true }}">
+              <p style="margin:0;padding:16px;border-radius:12px;background:#F2F2EF;font-size:13.5px;line-height:1.5;color:#6B6B66">Price shows after room type.</p>
+            </sc-if>
+            <sc-if value="{{ hasChanges }}" hint-placeholder-val="{{ false }}">
+              <section style="padding:18px;border-radius:14px;border:1px solid rgba(20,20,18,.05);background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)">
+                <h3 style="margin:0 0 4px;font-size:15px;font-weight:650">Changes</h3>
+                <sc-for list="{{ changeList }}" as="ch" hint-placeholder-count="2">
+                  <div onClick="{{ ch.view }}" title="{{ ch.tip }}" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(20,20,18,.06);font-size:13.5px;cursor:{{ ch.cursor }}">
+                    <span style="flex:0 0 40px;width:40px;height:38px;border-radius:9px;background:#EEEEEA url('{{ ch.img }}') center/cover no-repeat"></span>
+                    <span style="flex:1;min-width:0"><span style="display:block;font-weight:600">{{ ch.title }}</span><span style="display:block;font-size:12px;color:#6B6B66">{{ ch.note }}</span></span>
+                    <span style="flex:0 0 auto;font-weight:650;font-variant-numeric:tabular-nums;color:{{ ch.ink }}">{{ ch.delta }}</span>
+                  </div>
+                </sc-for>
+              </section>
+            </sc-if>
+            <sc-if value="{{ step3 }}" hint-placeholder-val="{{ false }}">
+              <section style="display:flex;flex-direction:column;gap:8px;padding:18px;border-radius:14px;border:1px solid rgba(20,20,18,.05);background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)">
+                <h3 style="margin:0 0 2px;font-size:15px;font-weight:650">Export</h3>
+                <sc-for list="{{ exportsDesk }}" as="ex" hint-placeholder-count="4">
+                  <button onClick="{{ ex.run }}" style="display:flex;align-items:center;gap:12px;min-height:46px;padding:6px 14px;border-radius:12px;border:1px solid #E7E7E2;background:#FFFFFF;text-align:left;color:#1F1F1C">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="{{ ex.d }}"></path></svg>
+                    <span style="flex:1;min-width:0;font-size:14.5px;font-weight:650">{{ ex.label }}</span>
+                  </button>
+                </sc-for>
+              </section>
+            </sc-if>
+          </div>
+          <div style="padding:12px 20px 20px;border-top:1px solid #E7E7E2;display:flex;gap:8px">
+            <button onClick="{{ saveDraft }}" title="Save draft" aria-label="Save draft" style="flex:0 0 50px;width:50px;height:50px;display:grid;place-items:center;padding:0;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;color:#111111"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3h11l3 3v15H5zM8 3v5h7V3M8 21v-7h8v7"></path></svg></button>
+            <sc-if value="{{ phoneBack }}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{ goBack }}" title="Back to {{ backLabel }}" style="flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:6px;height:50px;padding:0 16px;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;color:#1F1F1C;font-size:15px;font-weight:600">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5m6-6-6 6 6 6"></path></svg>Back
+              </button>
+            </sc-if>
+            <button onClick="{{ primary.run }}" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:8px;height:50px;border-radius:10px;border:0;background:#111111;color:#FFFFFF;font-size:15.5px;font-weight:600;box-shadow:0 3px 9px rgba(0,0,0,.16)">{{ primary.label }}
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="{{ primary.d }}"></path></svg>
+            </button>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ phone }}" hint-placeholder-val="{{ true }}">
+      <div style="display:{{ phoneFooterD }};flex:0 0 auto;background:#FFFFFF;border-top:1px solid #E7E7E2;padding:12px 20px">
+        <sc-if value="{{ stepEarly }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;gap:8px">
+          <button onClick="{{ saveDraft }}" title="Save draft" aria-label="Save draft" style="flex:0 0 50px;width:50px;height:50px;display:grid;place-items:center;padding:0;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;color:#111111"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3h11l3 3v15H5zM8 3v5h7V3M8 21v-7h8v7"></path></svg></button>
+          <button onClick="{{ primary.run }}" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:8px;height:50px;border-radius:10px;border:0;background:#111111;color:#FFFFFF;font-size:14.5px;font-weight:600;box-shadow:0 3px 9px rgba(0,0,0,.16)">{{ primary.label }}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg>
+          </button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ step2 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="min-width:0">
+              <span style="display:block;font-size:12px;color:#6B6B66">Customer pays · {{ changeCount }}</span>
+              <span style="display:block;font-family:'Space Grotesk',Manrope,sans-serif;font-size:20px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums">{{ totalText }}</span>
+            </div>
+            <button onClick="{{ primary.run }}" style="flex:0 0 auto;display:flex;align-items:center;gap:6px;height:48px;padding:0 18px;border-radius:10px;border:0;background:#111111;color:#FFFFFF;font-size:14px;font-weight:600;box-shadow:0 3px 9px rgba(0,0,0,.16)">Preview quotation
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg>
+            </button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ step3 }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:8px">
+            <button onClick="{{ saveDraftC }}" aria-label="Save draft" style="flex:0 0 50px;width:50px;height:50px;display:grid;place-items:center;padding:0;border-radius:14px;border:1px solid #DEDED8;background:#FFFFFF;color:#111111"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3h11l3 3v15H5zM8 3v5h7V3M8 21v-7h8v7"></path></svg></button>
+            <button onClick="{{ openDoc }}" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:8px;height:50px;border-radius:14px;border:0;background:#111111;color:#FFFFFF;font-size:15px;font-weight:600">View quotation<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg></button>
+          </div>
+        </sc-if>
+      </div>
+      <nav style="flex:0 0 auto;display:{{ appNavD }};background:#FFFFFF;border-top:1px solid #E7E7E2;padding-bottom:env(safe-area-inset-bottom,0px)">
+        <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:end;height:62px;padding:0 4px">
+          <sc-for list="{{ navLeft }}" as="n" hint-placeholder-count="2">
+            <button style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0 8px;border:0;background:transparent;color:#6B6B66">
+              <span style="width:56px;height:30px;display:grid;place-items:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d="{{ n.d }}"></path></svg></span>
+              <span style="font-size:10.5px;font-weight:500">{{ n.label }}</span>
+            </button>
+          </sc-for>
+          <button aria-label="Quote" style="position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;height:100%;padding:0 0 8px;border:0;background:transparent;color:#111111">
+            <span style="position:absolute;left:50%;top:-30px;transform:translateX(-50%);width:62px;height:62px;border-radius:50%;background:#F5871F;border:4px solid #FFFFFF;box-sizing:border-box;box-shadow:0 6px 16px rgba(245,135,31,.32);color:#FFFFFF;display:grid;place-items:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 3h14v18H5V3Zm3 4h8M8 11h1m3 0h1m3 0h.1M8 15h1m3 0h1m3 0h.1M8 18h1m3 0h1m3 0h.1"></path></svg></span>
+            <span style="font-size:10.5px;font-weight:700;color:#111111">Quote</span>
+          </button>
+          <sc-for list="{{ navRight }}" as="n" hint-placeholder-count="2">
+            <button style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0 8px;border:0;background:transparent;color:#6B6B66">
+              <span style="width:56px;height:30px;display:grid;place-items:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d="{{ n.d }}"></path></svg></span>
+              <span style="font-size:10.5px;font-weight:500">{{ n.label }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </nav>
+    </sc-if>
+
+    <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:flex-end;align-items:{{ sheetAlign }};padding-top:{{ sheetTop }};pointer-events:{{ sheetPass }}">
+        <div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:{{ sheetDim }};animation:rvFade .24s cubic-bezier(.2,.8,.2,1)"></div>
+        <div style="position:relative;pointer-events:auto;width:{{ sheetW }};height:{{ sheetH }};max-height:{{ sheetMax }};background:#FFFFFF;border-radius:{{ sheetRadius }};border-left:1px solid #E7E7E2;box-shadow:0 -10px 40px rgba(20,20,18,0.11);display:flex;flex-direction:column;animation:{{ sheetAnim }}">
+          <sc-if value="{{ phone }}" hint-placeholder-val="{{ true }}"><div style="width:38px;height:5px;border-radius:3px;background:#E7E7E2;margin:8px auto 4px"></div></sc-if>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 20px 14px;border-bottom:1px solid #E7E7E2">
+            <div style="min-width:0">
+              <p style="margin:0;font-size:11.5px;font-weight:650;letter-spacing:.08em;color:#111111">{{ sheet.eyebrow }}</p>
+              <h2 style="margin:3px 0 0;font-family:'Space Grotesk',Manrope,sans-serif;font-size:20px;font-weight:700;letter-spacing:-.02em">{{ sheet.title }}</h2>
+              <p style="margin:2px 0 0;font-size:13px;color:#6B6B66">{{ sheet.sub }}</p>
+              <sc-if value="{{ staleText }}" hint-placeholder-val="{{ false }}"><p style="display:inline-flex;margin:8px 0 0;padding:4px 10px;border-radius:8px;background:#FFEBD9;color:#B35A00;font-size:12.5px;font-weight:600">{{ staleText }}</p></sc-if>
+            </div>
+            <button aria-label="Close" onClick="{{ closeSheet }}" style="flex:0 0 36px;width:36px;height:36px;border-radius:50%;border:0;background:#F0F0ED;color:#1F1F1C;display:grid;place-items:center;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="m6 6 12 12M6 18 18 6"></path></svg></button>
+          </div>
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:14px 20px 24px;display:block">
+            <div style="display:flex;align-items:center;gap:10px;height:46px;padding:0 14px;border-radius:12px;background:#F0F0ED;margin-bottom:14px">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6B6B66" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3"></path></svg>
+              <input value="{{ q }}" onChange="{{ onQuery }}" placeholder="Search by name or code" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:15px;color:#1F1F1C">
+            </div>
+            <div style="display:flex;flex-direction:column">
+              <sc-if value="{{ hasCols }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:2px;padding:3px;margin:10px 0 4px;border-radius:12px;background:#EEEEEA">
+                  <sc-for list="{{ sheetTabs }}" as="stb" hint-placeholder-count="2">
+                    <button onClick="{{ stb.pick }}" style="flex:1;height:36px;padding:0 10px;border-radius:9px;border:0;background:{{ stb.bg }};color:{{ stb.ink }};font-size:13px;font-weight:650;box-shadow:{{ stb.shadow }};white-space:nowrap">{{ stb.label }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ colBack }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 0 2px">
+                  <button onClick="{{ colBack.run }}" style="display:flex;align-items:center;gap:4px;height:34px;padding:0 10px 0 4px;border:0;border-radius:8px;background:transparent;color:#111111;font-size:13px;font-weight:650"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"></path></svg>All collections</button>
+                  <span style="font-size:14px;font-weight:700;letter-spacing:.04em">{{ colBack.name }}</span>
+                  <span style="font-size:12.5px;color:#6B6B66">{{ colBack.count }}</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{ colListOn }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;flex-direction:column;padding-top:4px">
+                  <sc-for list="{{ colList }}" as="cl" hint-placeholder-count="6">
+                    <button onClick="{{ cl.pick }}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border:0;border-bottom:1px solid rgba(20,20,18,.06);background:transparent;text-align:left;color:#1F1F1C;width:100%">
+                      <span style="flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:#EEEEEA url('{{ cl.img }}') center/cover no-repeat"></span>
+                      <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+                        <span style="display:flex;align-items:center;gap:8px"><span style="font-size:14.5px;font-weight:650;letter-spacing:.03em">{{ cl.name }}</span><sc-if value="{{ cl.cur }}" hint-placeholder-val="{{ false }}"><span style="height:20px;padding:0 7px;border-radius:10px;background:#FFEBD9;color:#B35A00;font-size:10.5px;font-weight:700;line-height:20px">Current</span></sc-if></span>
+                        <span style="font-size:12.5px;color:#6B6B66">{{ cl.sub }}</span>
+                      </span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#97978F" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"></path></svg>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ hasClrs }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;gap:6px;overflow-x:auto;padding:6px 0 4px;scrollbar-width:none">
+                  <span style="flex:0 0 auto;align-self:center;font-size:11px;font-weight:700;letter-spacing:.08em;color:#97978F;padding-right:2px">COLOUR</span>
+                  <sc-for list="{{ clrChips }}" as="cc" hint-placeholder-count="4">
+                    <button onClick="{{ cc.pick }}" style="flex:0 0 auto;height:32px;padding:0 12px;border-radius:12px;border:1px solid {{ cc.border }};background:{{ cc.bg }};color:{{ cc.ink }};font-size:12.5px;font-weight:600;white-space:nowrap">{{ cc.label }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ colAll }}" hint-placeholder-val="{{ false }}">
+                <button onClick="{{ colAll.run }}" style="display:flex;align-items:center;gap:10px;margin:8px 0 4px;padding:10px 12px;border-radius:12px;border:1px solid #FFC999;background:#FFF5EC;text-align:left;color:#1F1F1C">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D96E0B" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"></path></svg>
+                  <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span style="font-size:13.5px;font-weight:650">{{ colAll.label }}</span><span style="font-size:12px;color:#6B6B66">{{ colAll.sub }}</span></span>
+                </button>
+              </sc-if>
+              <sc-for list="{{ options }}" as="o" hint-placeholder-count="5">
+                <button onClick="{{ o.pick }}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border:0;border-bottom:1px solid rgba(20,20,18,.06);background:transparent;text-align:left;color:#1F1F1C;width:100%">
+                  <span onClick="{{ o.zoom }}" title="{{ o.zoomTitle }}" style="position:relative;flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:#EEEEEA url('{{ o.img }}') center/cover no-repeat;display:grid;place-items:center;font-size:10.5px;font-weight:700;color:#34342F;letter-spacing:.04em;cursor:{{ o.zoomCursor }}">{{ o.initials }}
+                    <sc-if value="{{ o.img }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;right:3px;bottom:3px;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.92);display:grid;place-items:center;box-shadow:0 1px 3px rgba(20,20,18,0.15)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#34342F" strokeWidth="2.4" strokeLinecap="round"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3M11 8v6M8 11h6"></path></svg></span></sc-if>
+                  </span>
+                  <span style="flex:1;min-width:0">
+                    <span style="display:block;font-size:14.5px;font-weight:600;line-height:1.3">{{ o.name }}</span>
+                    <sc-if value="{{ o.hasVars }}" hint-placeholder-val="{{ false }}">
+                      <span style="display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 2px">
+                        <sc-for list="{{ o.vars }}" as="ov" hint-placeholder-count="2">
+                          <span role="button" onClick="{{ ov.pick }}" style="display:inline-flex;align-items:center;height:26px;padding:0 9px;border-radius:13px;border:1px solid {{ ov.border }};background:{{ ov.bg }};color:{{ ov.ink }};font-size:11.5px;font-weight:600;cursor:pointer">{{ ov.label }}</span>
+                        </sc-for>
+                      </span>
+                    </sc-if>
+                    <span style="display:flex;gap:6px;align-items:center;margin-top:2px;flex-wrap:wrap"><span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6B6B66">{{ o.code }}</span>
+                      <sc-if value="{{ o.collection }}" hint-placeholder-val="{{ false }}"><span style="font-size:11px;font-weight:600;border-radius:6px;padding:2px 6px;color:#55554F;background:#F0F0ED">{{ o.collection }}</span></sc-if>
+                      <sc-if value="{{ o.sample }}" hint-placeholder-val="{{ false }}"><span style="font-size:10.5px;font-weight:700;letter-spacing:.04em;border-radius:6px;padding:2px 6px;color:#B35A00;background:#FFEBD9">SAMPLE PRICE</span></sc-if>
+                    </span>
+                  </span>
+                  <span style="flex:0 0 auto;font-size:13.5px;font-weight:650;font-variant-numeric:tabular-nums;color:{{ o.ink }}">{{ o.delta }}</span>
+                </button>
+              </sc-for>
+              <sc-if value="{{ noOptions }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:14px 0;font-size:13.5px;color:#6B6B66">No match</p></sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;padding:14px;margin-top:14px;border-radius:12px;background:#F2F2EF;border:1px solid #E7E7E2">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+                <h3 style="margin:0;font-size:15px;font-weight:650">Not listed?</h3>
+                <sc-if value="{{ sheet.url }}" hint-placeholder-val="{{ false }}"><a href="{{ sheet.url }}" target="_blank" rel="noopener" style="font-size:13px;font-weight:600">b2b ↗</a></sc-if>
+              </div>
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px">
+                <input value="{{ custom.code }}" onChange="{{ onCustomCode }}" placeholder="Code" style="height:44px;padding:0 12px;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;font-size:14.5px;color:#1F1F1C;outline:none;min-width:0;box-sizing:border-box">
+                <input value="{{ custom.name }}" onChange="{{ onCustomName }}" placeholder="Item name" style="height:44px;padding:0 12px;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;font-size:14.5px;color:#1F1F1C;outline:none;min-width:0;box-sizing:border-box">
+              </div>
+              <div style="display:flex;gap:8px">
+                <span style="flex:1;display:flex;align-items:center;gap:6px;height:44px;padding:0 12px;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;box-sizing:border-box;min-width:0"><span style="font-size:12.5px;font-weight:700;color:#34342F;white-space:nowrap">RM</span><input inputMode="decimal" value="{{ custom.cost }}" onChange="{{ onCustomCost }}" placeholder="0" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:14.5px;font-weight:650;text-align:right;color:#1F1F1C"></span>
+                <button onClick="{{ useCustom }}" style="flex:0 0 auto;height:44px;padding:0 16px;border-radius:12px;border:0;background:#111111;color:#FFFFFF;font-size:14px;font-weight:650;opacity:{{ customOpacity }}">Use</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ pad }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;z-index:45;background:rgba(20,20,18,0.18);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box">
+        <div style="width:min(100%,600px);background:#FFFFFF;border-radius:14px;padding:18px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <h3 style="margin:0;font-size:17px;font-weight:650">{{ pad.title }}</h3>
+            <button onClick="{{ padCancel }}" style="height:36px;padding:0 6px;border:0;background:transparent;color:#6B6B66;font-size:14px;font-weight:600">Cancel</button>
+          </div>
+          <div style="position:relative">
+            <canvas ref="{{ padRef }}" onPointerDown="{{ padDown }}" onPointerMove="{{ padMove }}" onPointerUp="{{ padUp }}" onPointerLeave="{{ padUp }}" style="display:block;width:100%;height:240px;border-radius:10px;border:1.5px dashed #DEDED8;background:#FFFFFF;touch-action:none;cursor:crosshair"></canvas>
+            <span style="position:absolute;left:18px;right:18px;bottom:52px;border-top:1px solid #DEDED8;pointer-events:none"></span>
+            <span style="position:absolute;left:18px;bottom:28px;font-size:12.5px;color:#97978F;pointer-events:none">Sign above the line</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onClick="{{ padClear }}" style="height:46px;padding:0 18px;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;color:#1F1F1C;font-size:14.5px;font-weight:600">Clear</button>
+            <button onClick="{{ padSave }}" style="flex:1;height:46px;border-radius:12px;border:0;background:#111111;color:#FFFFFF;font-size:15px;font-weight:650">Use this signature</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ plan }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ closePlan }}" style="position:absolute;inset:0;z-index:40;background:rgba(20,20,18,0.22);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;box-sizing:border-box;cursor:zoom-out">
+        <div role="img" aria-label="{{ plan.name }} floor plan" style="width:min(100%,820px);flex:1;max-height:calc(100% - 90px);border-radius:12px;background:#FFFFFF url('{{ plan.img }}') center/contain no-repeat"></div>
+        <div style="text-align:center;color:#FFFFFF"><span style="display:block;font-size:17px;font-weight:650">{{ plan.name }}</span><span style="display:block;font-size:13.5px;opacity:.9;margin-top:2px">{{ plan.spec }}</span></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ phoneDrafts }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ toggleDrafts }}" style="position:fixed;inset:0;z-index:150;background:rgba(20,20,18,.35);display:flex;align-items:flex-end">
+        <div onClick="{{ stopProp }}" style="width:100%;max-height:75%;overflow-y:auto;padding:8px 14px 28px;border-radius:24px 24px 0 0;background:#FFFFFF;box-sizing:border-box">
+          <div style="width:38px;height:5px;border-radius:3px;background:#E7E7E2;margin:4px auto 12px"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px 10px"><span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:20px;font-weight:700">Drafts</span><button onClick="{{ newQuote }}" style="height:34px;padding:0 12px;border-radius:9px;border:0;background:#111111;color:#FFFFFF;font-size:13px;font-weight:650">+ New</button></div>
+          <sc-for list="{{ draftList }}" as="dr" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:6px;border-bottom:1px solid #EEEEEA">
+              <button onClick="{{ dr.open }}" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding:12px 4px;border:0;background:transparent;text-align:left;color:#1F1F1C">
+                <span style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:15px;font-weight:650">{{ dr.name }}</span><span style="font-size:14px;font-weight:700">{{ dr.total }}</span></span>
+                <span style="font-size:12.5px;color:#6B6B66">{{ dr.sub }}</span>
+              </button>
+              <button onClick="{{ dr.remove }}" style="height:34px;padding:0 8px;border:0;background:transparent;color:#8A2E1C;font-size:12.5px;font-weight:650">{{ dr.delLabel }}</button>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noDrafts }}" hint-placeholder-val="{{ false }}"><p style="margin:12px 4px;font-size:14px;color:#6B6B66">No drafts</p></sc-if>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ confirmBox }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ confirmBox.close }}" style="position:fixed;inset:0;z-index:220;background:rgba(20,20,18,.4);display:grid;place-items:center;padding:24px;animation:rvFade .15s ease">
+        <div onClick="{{ stopProp }}" style="width:min(100%,320px);padding:24px 20px 18px;border-radius:20px;background:#FFFFFF;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+          <span style="display:grid;place-items:center;width:52px;height:52px;border-radius:50%;background:#FFEBD9;color:#D96E0B"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg></span>
+          <span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:19px;font-weight:700">{{ confirmBox.title }}</span>
+          <span style="font-size:13.5px;line-height:1.45;color:#6B6B66">{{ confirmBox.sub }}</span>
+          <button onClick="{{ confirmBox.close }}" style="width:100%;height:46px;margin-top:6px;border-radius:12px;border:0;background:#111111;color:#FFFFFF;font-size:15px;font-weight:700">OK</button>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ shareSheet }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ shareSheet.close }}" style="position:fixed;inset:0;z-index:220;background:rgba(20,20,18,.4);display:flex;align-items:flex-end;animation:rvFade .15s ease">
+        <div onClick="{{ stopProp }}" style="width:100%;padding:8px 16px 28px;border-radius:24px 24px 0 0;background:#FFFFFF;box-sizing:border-box">
+          <div style="width:38px;height:5px;border-radius:3px;background:#E7E7E2;margin:4px auto 14px"></div>
+          <span style="display:block;font-family:'Space Grotesk',Manrope,sans-serif;font-size:18px;font-weight:700;margin:0 4px 14px">Share quotation</span>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            <sc-for list="{{ shareSheet.apps }}" as="sa" hint-placeholder-count="4">
+              <button onClick="{{ sa.run }}" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 0;border:0;background:transparent;color:#1F1F1C">
+                <span style="display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:{{ sa.bg }};color:{{ sa.ink }}"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="{{ sa.d }}"></path></svg></span>
+                <span style="font-size:12px;font-weight:600">{{ sa.label }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ zoom }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ closeZoom }}" style="position:fixed;inset:0;z-index:200;background:rgba(20,20,18,0.72);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;box-sizing:border-box;animation:rvFade .2s ease;cursor:zoom-out">
+        <div style="position:relative;width:min(100%,720px);aspect-ratio:11/10;max-height:calc(100% - 120px)">
+          <div role="img" aria-label="{{ zoom.name }}" style="position:absolute;inset:0;border-radius:12px;background:#FFFFFF url('{{ zoom.img }}') center/contain no-repeat;box-shadow:0 20px 60px rgba(20,20,18,0.10)"></div>
+          <sc-if value="{{ zoom.multi }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ zoom.prev }}" aria-label="Previous" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;border:0;background:rgba(255,255,255,.9);color:#1F1F1C;display:grid;place-items:center;padding:0;box-shadow:0 1px 4px rgba(20,20,18,.18);cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m15 6-6 6 6 6"></path></svg></button>
+            <button onClick="{{ zoom.next }}" aria-label="Next" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;border:0;background:rgba(255,255,255,.9);color:#1F1F1C;display:grid;place-items:center;padding:0;box-shadow:0 1px 4px rgba(20,20,18,.18);cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+            <span style="position:absolute;top:12px;right:12px;height:26px;padding:0 10px;border-radius:13px;background:rgba(20,20,18,.72);color:#FFFFFF;font-size:12px;font-weight:650;line-height:26px;font-variant-numeric:tabular-nums">{{ zoom.counter }}</span>
+          </sc-if>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;max-width:min(100%,720px);width:100%;box-sizing:border-box;padding:10px 10px 10px 16px;border-radius:10px;background:#FFFFFF">
+          <span style="flex:1;min-width:0;color:#1F1F1C">
+            <span style="display:block;font-size:15px;font-weight:650">{{ zoom.name }}</span>
+            <span style="display:block;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#6B6B66;margin-top:2px">{{ zoom.code }} · {{ zoom.delta }}</span>
+          </span>
+          <sc-if value="{{ zoom.canPick }}" hint-placeholder-val="{{ false }}"><button onClick="{{ zoom.pick }}" style="flex:0 0 auto;height:44px;padding:0 18px;border-radius:12px;border:0;background:#111111;color:#FFFFFF;font-size:14px;font-weight:650;white-space:nowrap">Use this item</button></sc-if>
+          <button aria-label="Close" onClick="{{ closeZoom }}" style="flex:0 0 44px;width:44px;height:44px;border-radius:50%;border:0;background:#F0F0ED;color:#1F1F1C;display:grid;place-items:center;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><path d="m6 6 12 12M6 18 18 6"></path></svg></button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:50%;bottom:{{ toastBottom }};transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;background:#34342F;color:#FFFFFF;font-size:13px;font-weight:550;white-space:nowrap;box-shadow:0 4px 14px rgba(20,20,18,0.14);animation:rvFade .2s ease">{{ toast }}</div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showItemPrices&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Quotation&quot;},&quot;markup&quot;:{&quot;editor&quot;:&quot;float&quot;,&quot;default&quot;:1.3,&quot;min&quot;:1,&quot;max&quot;:2,&quot;step&quot;:0.05,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Pricing&quot;},&quot;viewport&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;auto&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;phone&quot;,&quot;desktop&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Preview&quot;}}">
+const ICON = {
+  home: "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9",
+  chart: "M4 20V10m5 10V4m5 16v-7m5 7V8M3 20h18",
+  trophy: "M7 3h10v5a5 5 0 0 1-10 0V3Zm0 2H3v3a4 4 0 0 0 4 4m10-7h4v3a4 4 0 0 1-4 4M12 13v5m-5 3h10M9 18h6v3",
+  user: "M20 21a8 8 0 0 0-16 0M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
+  quoteDesk: "M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM9 7h6M9 11h1M12 11h1M15 11h0M9 15h1M12 15h1M9 18h1M12 18h1M15 15v3",
+  arrowRight: "M5 12h14m-6-6 6 6-6 6",
+  download: "M12 4v11m-5-5 5 5 5-5M5 20h14",
+  doc: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8ZM14 3v5h5M9 13h6M9 17h4",
+  chat: "M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z",
+  copy: "M9 9h11v11H9zM5 15H4V4h11v1"
+};
+const BEDROOM = /BEDROOM/;
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const money = n => (n < 0 ? "−" : "") + Math.abs(n).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const rm = n => (n < 0 ? "−RM " : "RM ") + Math.abs(n).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const rm0 = n => "RM " + Math.round(n).toLocaleString("en-MY");
+const signed = n => (n > 0 ? "+RM " : n < 0 ? "−RM " : "RM ") + Math.abs(Math.round(n)).toLocaleString("en-MY");
+const title = s => s.toLowerCase().replace(/(^|[\s/(+])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bTv\b/g, "TV").replace(/\bAirbnb\b/g, "Airbnb").replace(/(\d)Seater/i, "$1 Seater");
+const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const imgFor = code => /^(\d{6}|K\d{5})$/.test(code || "") ? `https://mm.hinlim.com/cache/b2bfs/product/${code}/${code}-550x500.jpg` : "";
+const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const longDate = iso => { const d = new Date(iso + "T00:00:00"); return isNaN(d) ? iso : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
+
+class Component extends DCLogic {
+  state = {
+    data: null, catalog: null, width: 1440, step: 1, pid: "p0", filter: "all",
+    cust: { att: "", bill: "", building: "", unit: "", date: todayIso(), by: "William Lim" },
+    home: true, lines: [], extra: {}, sigs: {}, pad: null, discount: "", sheet: null, q: "", custom: { code: "", name: "", cost: "" }, toast: ""
+  };
+  draftKey() { return "irq.drafts." + (this.wsMod ? this.wsMod.currentUser().id : "william"); }
+  drafts() { try { return JSON.parse(localStorage.getItem(this.draftKey())) || []; } catch (_) { return []; } }
+  saveDraft() {
+    const st = this.state, { total } = this.calc(), p = st.data && st.data.packages.find(x => x.id === st.pid);
+    const id = st.draftId || "d" + Date.now().toString(36);
+    const d = { id, at: Date.now(), name: st.cust.att || "Unnamed customer", room: p ? (p.groupLabel || p.name) + (p.style === "build" ? " · Build in" : " · Classic") : "", total,
+      s: { step: st.step, pid: st.pid, cust: st.cust, crm: st.crm || {}, crmId: st.crmId || null, extra: st.extra, sigs: st.sigs, lines: st.lines, discount: st.discount, styleId: st.styleId || null, room: st.room || null } };
+    const list = [d, ...this.drafts().filter(x => x.id !== id)];
+    try { localStorage.setItem(this.draftKey(), JSON.stringify(list)); this.setState({ draftId: id, draftAt: d.at }); this.flash("Draft saved"); } catch (e) { this.flash("Couldn't save: storage is full"); }
+  }
+  openDraft(d) { this.setState({ ...d.s, home: false, draftId: d.id, draftAt: d.at, draftsOpen: false, sheet: null }); this.flash("Draft opened"); }
+  rootRef = React.createRef();
+  padRef = React.createRef();
+  padPt(e) { const c = this.padRef.current, r = c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  padDown = e => {
+    const c = this.padRef.current; if (!c) return;
+    const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(r.height * d); }
+    const x = c.getContext("2d"); x.setTransform(d, 0, 0, d, 0, 0); x.lineWidth = 2.6; x.lineCap = "round"; x.lineJoin = "round"; x.strokeStyle = "#16224F";
+    const [px, py] = this.padPt(e); x.beginPath(); x.moveTo(px, py); x.lineTo(px + .1, py + .1); x.stroke();
+    this._draw = true; this._inked = true; try { c.setPointerCapture(e.pointerId); } catch (er) {}
+  };
+  padMove = e => { if (!this._draw) return; const x = this.padRef.current.getContext("2d"), [px, py] = this.padPt(e); x.lineTo(px, py); x.stroke(); };
+  padUp = () => { this._draw = false; };
+  padClear = () => { const c = this.padRef.current; if (c) c.getContext("2d").clearRect(0, 0, c.width, c.height); this._inked = false; };
+  padSave = () => {
+    const c = this.padRef.current, p = this.state.pad; if (!c || !p) return;
+    let url = "";
+    if (this._inked) {
+      const x = c.getContext("2d"), { data, width: w, height: hh } = x.getImageData(0, 0, c.width, c.height);
+      let x0 = w, y0 = hh, x1 = 0, y1 = 0;
+      for (let y = 0; y < hh; y += 2) for (let i = 0; i < w; i += 2) if (data[(y * w + i) * 4 + 3] > 20) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      if (x1 > x0) { const pad = 8, o = document.createElement("canvas"); o.width = x1 - x0 + pad * 2; o.height = y1 - y0 + pad * 2; o.getContext("2d").drawImage(c, x0 - pad, y0 - pad, o.width, o.height, 0, 0, o.width, o.height); url = o.toDataURL("image/png"); }
+    }
+    this._inked = false;
+    this.setState(s => ({ pad: null, sigs: { ...s.sigs, [p.id]: { ...(s.sigs[p.id] || {}), [p.side]: url } } }));
+  };
+
+  componentDidMount() {
+    setTimeout(() => this.loadDrive(), 400);
+    this.onZoomKey = e => { if (!this.state.zoomList) return; if (e.key === "ArrowRight") this.stepZoom(1); else if (e.key === "ArrowLeft") this.stepZoom(-1); else if (e.key === "Escape") this.setState({ zoomList: null }); };
+    window.addEventListener("keydown", this.onZoomKey);
+    import("./workspace-store.js").then(ws => { this.wsMod = ws; const nm = ws.currentUser().name; this.setState(s => ({ cust: { ...s.cust, by: s.cust.by === "William Lim" && nm !== "William" ? nm : s.cust.by } })); });
+    this.onUser = () => { const nm = this.wsMod ? this.wsMod.currentUser().name : ""; this.setState(s => ({ drive: {}, draftId: null, draftAt: null, cust: { ...s.cust, by: nm || s.cust.by } })); this.loadDrive(); this.flash("Switched to " + (this.wsMod ? this.wsMod.currentUser().name : "account")); };
+    window.addEventListener("irq-user", this.onUser);
+    this._slideT = setInterval(() => { const sl = (this._slides || []).filter(x => x.k !== this._hover && x.k !== this._held); if (!sl.length || document.hidden) return; this.setState(s => { const ci = { ...(s.ci || {}) }; sl.forEach(x => { ci[x.k] = ((ci[x.k] || 0) + 1) % x.n; }); return { ci }; }); }, 3500);
+    Promise.all([import("./quote-doc.js"), fetch("data/packages.json").then(r => r.json()), fetch("data/catalog.json").then(r => r.json())])
+      .then(([lib, pj, cj]) => {
+        // Quote settings publishes to the same store; without it this is the Excel price list.
+        this.preview = /[?&]preview=1/.test(location.search);
+        const key = this.preview ? lib.PREVIEW : lib.STORE;
+        const cfg = lib.load(pj, cj, key);
+        const mk = cfg => ({ company: cfg.company, markup: +cfg.markup || 1.3, building: cfg.buildings[0]?.name || "", buildings: cfg.buildings, packages: cfg.packages, groups: lib.deriveGroups(cfg.packages) });
+        const data = mk(cfg);
+        this.lib = lib; this.cfg = cfg;
+        this.onStore = e => { if (e.key !== key) return; const c2 = lib.load(pj, cj, key); this.cfg = c2; const d2 = mk(c2); this.setState({ data: d2, catalog: c2.catalog, liveAt: Date.now() }); if (this.state.pid && !c2.packages.some(p => p.id === this.state.pid)) this.load((d2.groups[0] || {}).classic, d2); this.flash(this.preview ? "Preview updated from Quote Settings" : "Settings updated"); };
+        window.addEventListener("storage", this.onStore);
+        const first = data.groups.find(g => g.building === this.state.cust.building) || data.groups[0];
+        this.setState({ data, catalog: cfg.catalog });
+        this.load(first.classic || first.build, data);
+      })
+      .catch(() => this.flash("Could not load the price list"));
+    this.setState({ width: window.innerWidth });
+    this.onWinResize = () => { if (!this.ro) this.setState({ width: window.innerWidth }); };
+    window.addEventListener("resize", this.onWinResize);
+    this.attachRo();
+  }
+  attachRo() { const el = this.rootRef.current; if (this.ro || !el || !window.ResizeObserver) return; this.ro = new ResizeObserver(e => { const w = e[0].contentRect.width; if (Math.abs(w - this.state.width) > 1) this.setState({ width: w }); }); this.ro.observe(el); }
+  componentDidUpdate() { if (!this.ro) this.attachRo(); }
+  componentWillUnmount() { window.removeEventListener("resize", this.onWinResize); clearInterval(this._slideT); window.removeEventListener("keydown", this.onZoomKey); window.removeEventListener("irq-user", this.onUser); this.ro && this.ro.disconnect(); clearTimeout(this.tt); this.onStore && window.removeEventListener("storage", this.onStore); }
+
+  load(pid, data = this.state.data, keep = false) {
+    const p = data.packages.find(x => x.id === pid);
+    const lines = [];
+    p.cats.forEach((c, ci) => c.items.forEach((it, ii) => lines.push({ id: `${pid}-${ci}-${ii}`, ci, ...it, orig: { ...it } })));
+    if (keep && this.state.lines.length) {
+      // Switching Classic ↔ Build in: carry every edit outside the bedrooms onto the new package.
+      const old = data.packages.find(x => x.id === this.state.pid);
+      const okey = o => [o.name, o.desc, o.code, o.cost, o.qty].join("|");
+      this.state.lines.forEach(l => {
+        const cname = old.cats[l.ci].name;
+        if (BEDROOM.test(cname)) return;
+        const ci = p.cats.findIndex(c => c.name === cname);
+        if (ci < 0) return;
+        if (!l.orig) { lines.push({ ...l, ci }); return; }
+        const changed = l.cost !== l.orig.cost || l.qty !== l.orig.qty || l.code !== l.orig.code || l.name !== l.orig.name;
+        if (!changed) return;
+        const t = lines.find(x => x.ci === ci && x.orig && okey(x.orig) === okey(l.orig));
+        if (t) Object.assign(t, { name: l.name, desc: l.desc, code: l.code, cost: l.cost, qty: l.qty });
+      });
+    }
+    this.setState({ pid, lines });
+  }
+  flash(msg) { clearTimeout(this.tt); this.setState({ toast: msg }); this.tt = setTimeout(() => this.setState({ toast: "" }), 2200); }
+  setLine(id, fn) { this.setState(s => ({ lines: s.lines.map(l => (l.id === id ? fn(l) : l)) })); }
+  bump(id, d) { this.setLine(id, l => ({ ...l, qty: Math.max(0, l.qty + d) })); }
+  undo(l) {
+    if (!l.orig) this.setState(s => ({ lines: s.lines.filter(x => x.id !== l.id) }));
+    else this.setLine(l.id, x => ({ ...x, ...x.orig, orig: x.orig }));
+  }
+  openSheet(sheet) {
+    let col = "";
+    if (sheet && sheet.mode === "swap") { const l = this.state.lines.find(x => x.id === sheet.id), it = l && (this.state.catalog?.items || []).find(c => (c.code && c.code === l.code) || c.name === l.name); if (it && it.collection) col = it.collection; }
+    col = "";
+    this.setState({ sheet, sheetView: "cat", q: "", col, clr: "", vsel: {}, custom: { code: "", name: "", cost: "" } });
+  }
+  collectionPlan(col) {
+    const st = this.state, kinds = st.catalog?.kinds || {}, live = it => !it.paused && !(kinds[it.kind] || {}).paused && it.cost != null && !it.noPrice;
+    const pool = (st.catalog?.items || []).filter(it => it.collection === col && live(it));
+    return st.lines.filter(l => l.kind && l.qty > 0).map(l => { const c = pool.filter(it => it.kind === l.kind); if (!c.length) return null; const best = c.reduce((a, b) => Math.abs(b.cost - l.cost) < Math.abs(a.cost - l.cost) ? b : a); return best.name === l.name && best.code === l.code ? null : { id: l.id, item: best }; }).filter(Boolean);
+  }
+  applyCollection(col) {
+    const plan = this.collectionPlan(col); if (!plan.length) { this.flash("Nothing to change for this collection"); return; }
+    this.setState(s => ({ lines: s.lines.map(l => { const p = plan.find(x => x.id === l.id); return p ? { ...l, name: p.item.name, code: p.item.code || "", desc: p.item.desc || l.desc, cost: +p.item.cost || 0 } : l; }), sheet: null }));
+    this.flash(`${plan.length} item${plan.length === 1 ? "" : "s"} switched to ${col.replace(/^.* · /, "")}`);
+  }
+  openZoom(list, idx) { this.setState({ zoomList: list, zoomIdx: Math.max(0, idx) }); }
+  stepZoom(d) { const n = (this.state.zoomList || []).length; if (n > 1) this.setState(s => ({ zoomIdx: (s.zoomIdx + d + n) % n })); }
+  // data: URLs contain ";" which breaks inline style parsing; serve them as blob: URLs instead.
+  u(src) { const s = String(src || ""); if (!s.startsWith("data:")) return s; this._blobs = this._blobs || new Map(); if (this._blobs.has(s)) return this._blobs.get(s);
+    try { const [h, b64] = s.split(","), mime = (h.match(/data:([^;]+)/) || [])[1] || "image/jpeg", bin = atob(b64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([arr], { type: mime })); this._blobs.set(s, url); return url; } catch (e) { return ""; } }
+  imgFor(l) { const its = (this.state.catalog && this.state.catalog.items) || []; const it = its.find(c => l.code && c.code === l.code) || its.find(c => String(c.name).toUpperCase() === String(l.name).toUpperCase()); return (it && it.img) || ""; }
+  apply(item) {
+    const sh = this.state.sheet;
+    if (!sh) return;
+    if (sh.mode === "swap") this.setLine(sh.id, l => ({ ...l, name: item.name, code: item.code || "", desc: item.desc || l.desc, cost: +item.cost || 0, kind: l.kind }));
+    else this.setState(s => ({ lines: [...s.lines, { id: "n" + Date.now(), ci: sh.ci, name: item.name, desc: item.desc || "", code: item.code || "", cost: +item.cost || 0, qty: 1, kind: item.kind || null, orig: null }] }));
+    if (!this._desk) this.setState({ sheet: null });
+    this.flash(sh.mode === "swap" ? `Changed to ${title(item.name)}` : `Added ${title(item.name)}`);
+  }
+
+  calc() {
+    const { data, lines, discount, pid } = this.state;
+    const m = 1; // total = sum of items at listed price
+    const pkg = data ? data.packages.find(p => p.id === pid) : null;
+    let diff = 0;
+    const changes = [];
+    lines.forEach(l => {
+      const now = l.cost * l.qty, was = l.orig ? l.orig.cost * l.orig.qty : 0;
+      const changed = !l.orig || l.cost !== l.orig.cost || l.qty !== l.orig.qty || l.code !== l.orig.code || l.name !== l.orig.name;
+      if (changed) {
+        const d = Math.round((now - was) * m);
+        diff += now - was;
+        const tag = !l.orig ? "Added" : l.qty === 0 ? "Removed" : (l.code !== l.orig.code || l.name !== l.orig.name || l.cost !== l.orig.cost) ? "Changed" : "Quantity";
+        changes.push({ l, d, tag });
+      }
+    });
+    const changeSell = Math.round(diff * m);
+    const disc = parseFloat(discount) || 0;
+    const blocks = this.cfg?.doc.blocks || [];
+    const tb = blocks.find(b => b.type === "table" && !b.hidden), tt = blocks.find(b => b.type === "totals" && !b.hidden);
+    const xrows = (tb?.extraRows || []).filter(r => r.item);
+    const xsum = xrows.reduce((a, r) => a + (+r.price || 0) * (+r.qty || 1), 0);
+    const base = pkg ? pkg.price + changeSell + xsum - disc : 0;
+    let total = base;
+    const adjust = (tt?.extras || []).filter(e => e.label).map(e => {
+      const v = e.mode === "percent" ? Math.round(base * (+e.value || 0)) / 100 : (+e.value || 0);
+      const amount = e.sign === "less" ? -v : v; total += amount;
+      return { label: e.label + (e.mode === "percent" ? ` (${e.value || 0}%)` : ""), amount };
+    });
+    return { m, pkg, changes, changeSell, disc, total, xrows, xsum, adjust, xTitle: tb?.extraTitle || "OTHERS" };
+  }
+
+  docRows(pkg, m) {
+    let n = 0;
+    return pkg.cats.map((c, ci) => {
+      const rows = this.state.lines.filter(l => l.ci === ci && l.qty > 0).map(l => {
+        const unit = Math.round(l.cost * m);
+        const ci2 = (this.state.catalog?.items || []).find(x => (l.code && x.code === l.code) || x.name === l.name) || {}; return { no: ++n, item: l.name, desc: l.desc || "", code: l.code || "", qty: l.qty, unit, sum: unit * l.qty, kind: ((this.state.catalog?.kinds || {})[l.kind] || {}).label || "", collection: ci2.collection || "", color: ci2.color || "", remark: "" };
+      });
+      return { name: c.name, rows };
+    }).filter(c => c.rows.length).concat((() => {
+      const { xrows, xTitle } = this.calc();
+      return xrows.length ? [{ name: xTitle, rows: xrows.map(r => { const unit = +r.price || 0, qty = +r.qty || 1; return { no: ++n, item: r.item, desc: r.desc || "", code: "", qty, unit, sum: unit * qty }; }) }] : [];
+    })());
+  }
+
+  unitFact(pkg) { const s = this.lib?.specText(pkg.spec); return s ? `${pkg.layout} · ${s}` : pkg.layout; }
+  facts(pkg) {
+    const c = this.state.cust;
+    return [
+      { k: "ATTENTION :", v: c.att || "-" }, { k: "Prepared By", v: c.by || "-" },
+      { k: "BILLING ADDRESS:", v: c.bill || "-" }, { k: "Building", v: c.building || "-" },
+      { k: "ADDRESS :", v: [c.unit, c.building].filter(Boolean).join(", ") || "-" }, { k: "Unit", v: this.unitFact(pkg) },
+      { k: "LAYOUT", v: pkg.name }, { k: "Date", v: longDate(c.date) }
+    ];
+  }
+
+  docHtml(forExcel) {
+    if (this.lib) {
+      const { m, pkg, total, disc, adjust } = this.calc();
+      const adjSum = adjust.reduce((a, x) => a + x.amount, 0);
+      const cfg = JSON.parse(JSON.stringify(this.cfg));
+      const tb = cfg.doc.blocks.find(b => b.type === "table");
+      if (tb && this.props.showItemPrices) tb.columns.forEach(c => { if (c.key === "price" || c.key === "sum") c.show = true; });
+      const priced = tb && tb.columns.some(c => c.show && (c.key === "price" || c.key === "sum"));
+      const cats = this.docRows(pkg, m);
+      const list = cats.reduce((a, c) => a + c.rows.reduce((x, r) => x + r.sum, 0), 0);
+      const c = this.state.cust;
+      const facts = { att: c.att, by: c.by, bill: c.bill, building: c.building, address: [c.unit, c.building, cfg.buildings?.find(b => b.name === c.building)?.address].filter(Boolean).join(", "), unit: this.unitFact(pkg), layout: pkg.name, date: longDate(c.date) };
+      (cfg.doc.blocks.find(b => b.type === "facts")?.labels || []).filter(f => f.custom).forEach(f => { facts[f.key] = this.state.extra[f.key] || ""; });
+      const ci = cfg.custInfo || {}, custRows = [...(this.lib.CRM_FIELDS || []).filter(f => f.id !== "name" && (ci.crm || {})[f.id] && ci.crm[f.id].show && ci.crm[f.id].print).map(f => ({ label: f.label, value: (this.state.crm || {})[f.id] })), ...(ci.own || []).filter(f => !["unit", "bill", "building", "date", "by"].includes(f.id) && f.print).map(f => ({ label: f.label, value: this.state.extra["ci_" + f.id] }))];
+      return this.lib.renderDoc(cfg, { facts, adjust, custRows, extra: this.state.extra, sigs: this.state.sigs, building: cfg.buildings?.find(b => b.name === c.building), cats, discount: disc, saving: priced ? Math.max(0, list - (total - adjSum) - disc) : 0, total }, { excel: forExcel, title: this.fileBase() });
+    }
+    return this.docHtmlLegacy(forExcel);
+  }
+  docHtmlLegacy(forExcel) {
+    const { data } = this.state;
+    const { m, pkg, total, disc } = this.calc();
+    const co = data.company, show = !!this.props.showItemPrices;
+    const cats = this.docRows(pkg, m);
+    const list = cats.reduce((a, c) => a + c.rows.reduce((x, r) => x + r.sum, 0), 0);
+    const cols = show ? 7 : 5;
+    const facts = this.facts(pkg);
+    const td = (v, st = "") => `<td style="padding:4px 6px;border-bottom:1px solid #ddd;${st}">${esc(v)}</td>`;
+    let body = "";
+    cats.forEach(c => {
+      body += `<tr><td colspan="${cols}" style="padding:10px 6px 3px;font-weight:bold;letter-spacing:.05em">${esc(c.name)}</td></tr>`;
+      c.rows.forEach(r => { body += `<tr>${td(r.no)}${td(r.item)}${td(r.desc)}${td(r.code)}${td(r.qty, "text-align:right")}${show ? td(money(r.unit), "text-align:right") + td(money(r.sum), "text-align:right") : ""}</tr>`; });
+    });
+    const sums = [];
+    if (show && list - (total + disc) > 0) sums.push(["Package saving", money(-(list - total - disc))]);
+    if (disc) sums.push(["Discount", money(-disc)]);
+    const sumRows = sums.map(([k, v]) => `<tr><td colspan="${cols - 1}" style="text-align:right;padding:3px 6px">${k}</td><td style="text-align:right;padding:3px 6px">${v}</td></tr>`).join("");
+    const factRows = [0, 2, 4, 6].map(i => `<tr><td style="font-weight:bold;padding:2px 6px">${esc(facts[i].k)}</td><td colspan="${cols > 5 ? 3 : 2}" style="padding:2px 6px">${esc(facts[i].v)}</td><td style="font-weight:bold;padding:2px 6px">${esc(facts[i + 1].k)}</td><td colspan="${cols > 5 ? 2 : 1}" style="padding:2px 6px">${esc(facts[i + 1].v)}</td></tr>`).join("");
+    const head = ["NO", "ITEM", "DESCRIPTION", "CODE/COLOUR", "QTY"].concat(show ? ["PRICE", "SUM"] : []);
+    const table = `<table style="width:100%;border-collapse:collapse;font-family:Georgia,serif;font-size:12px;color:#17201D">
+<tr><td colspan="${cols}" style="text-align:center;font-weight:bold;font-size:15px">${esc(co.name)} ${esc(co.reg)}</td></tr>
+${co.addr.map(a => `<tr><td colspan="${cols}" style="text-align:center">${esc(a)}</td></tr>`).join("")}
+<tr><td colspan="${cols}" style="text-align:center">PHONE : ${esc(co.phone)} // EMAIL : ${esc(co.email)}</td></tr>
+<tr><td colspan="${cols}" style="text-align:center;font-weight:bold;font-size:14px;letter-spacing:.16em;padding:14px 0 10px">QUOTATION</td></tr>
+${factRows}
+<tr><td colspan="${cols}" style="padding:12px 6px 8px">We refer to our meeting with regards the above captioned matter and we are pleased to submit our quotain as follow : -</td></tr>
+<tr style="background:#1F1F1C;font-weight:bold">${head.map((h, i) => `<td style="padding:6px;border-top:1px solid #bbb;border-bottom:1px solid #bbb;${i >= 4 ? "text-align:right" : ""}">${h}</td>`).join("")}</tr>
+${body}${sumRows}
+<tr><td colspan="${cols - 1}" style="text-align:right;padding:8px 6px;font-weight:bold;font-size:14px;border-top:1px solid #000">TOTAL (RM)</td><td style="text-align:right;padding:8px 6px;font-weight:bold;font-size:14px;border-top:1px solid #000">${money(total)}</td></tr>
+<tr><td colspan="${cols}" style="height:14px"></td></tr>
+${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:11px">${esc(t)}</td></tr>`).join("")}
+</table>`;
+    if (forExcel) return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>${table}</body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(this.fileBase())}</title><style>@page{size:A4;margin:14mm}body{margin:0}</style></head><body>${table}</body></html>`;
+  }
+  fileBase() {
+    const { cust } = this.state; const { pkg } = this.calc();
+    return `Quotation ${cust.building} ${cust.unit || pkg.layout} ${cust.date}`.replace(/[\\/:*?"<>|]+/g, "-");
+  }
+  custView(setCust) {
+    const st = this.state, lib = this.lib, ci = (this.cfg && this.cfg.custInfo) || (lib ? lib.defaultCustInfo() : { crm: {}, own: [] }), CF = lib ? lib.CRM_FIELDS : [];
+    const ini = n => String(n || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase();
+    const crmVal = id => id === "name" ? st.cust.att : (st.crm || {})[id] || "";
+    const setCrm = id => e => { const val = e.target.value; if (id === "name") this.setState(s => ({ cust: { ...s.cust, att: val } })); else this.setState(s => ({ crm: { ...(s.crm || {}), [id]: val } })); };
+    const fields = [
+      ...CF.filter(f => f.core || (ci.crm[f.id] || {}).show).map(f => ({ label: f.label, value: crmVal(f.id), ph: f.id === "name" ? "Customer name" : "", type: "text", onChange: setCrm(f.id), crm: true, req: !!f.core || !!(ci.crm[f.id] || {}).required })),
+      ...(ci.own || []).map(f => { const core = ["unit", "bill", "building", "date", "by"].includes(f.id), key = "ci_" + f.id;
+        return { label: f.label, value: core ? st.cust[f.id] : st.extra[key] || "", ph: f.ph || "", type: f.type === "date" ? "date" : f.type === "number" ? "number" : "text", crm: false, req: !!f.required,
+          onChange: core ? setCust(f.id) : e => { const val = e.target.value; this.setState(s => ({ extra: { ...s.extra, [key]: val } })); } }; }),
+      ...((this.cfg?.doc.blocks.find(b => b.type === "facts" && !b.hidden)?.labels) || []).filter(f => f.custom && !f.hidden).map(f => ({ label: f.label, value: st.extra[f.key] || "", ph: "", type: "text", crm: false, req: false, onChange: e => { const val = e.target.value; this.setState(s => ({ extra: { ...s.extra, [f.key]: val } })); } }))
+    ];
+    const q = (st.crmQ || "").trim().toLowerCase(), digits = q.replace(/\D/g, "");
+    const list = (lib ? lib.CRM_CUSTOMERS : []).filter(c => !q || c.name.toLowerCase().includes(q) || (digits && c.phone.replace(/\D/g, "").includes(digits))).slice(0, 6);
+    const picked = st.crmId && lib ? lib.CRM_CUSTOMERS.find(c => c.id === st.crmId) : null;
+    return {
+      custFields: fields,
+      crmPicked: picked ? { name: st.cust.att || picked.name, initials: ini(st.cust.att || picked.name), sub: [picked.phone, picked.usize, picked.uloc].filter(Boolean).join(" · ") } : false,
+      crmSearch: !picked, crmQ: st.crmQ || "", crmOpen: !picked && !!st.crmOpen, crmNone: !list.length,
+      onCrmQ: e => this.setState({ crmQ: e.target.value, crmOpen: true }), crmFocus: () => this.setState({ crmOpen: true }), crmBlur: () => this.setState({ crmOpen: false }),
+      crmClear: () => this.setState({ crmId: null, crmQ: "", crm: {}, crmOpen: true }),
+      crmResults: list.map(c => ({ name: c.name, initials: ini(c.name), sub: [c.phone, c.usize, c.uloc].filter(Boolean).join(" · "), pick: () => this.pickCrm(c) }))
+    };
+  }
+  pickCrm(c) {
+    const crm = {}; (this.lib.CRM_FIELDS || []).forEach(f => { if (f.id !== "name") crm[f.id] = c[f.id] || ""; });
+    this.setState(s => ({ crmId: c.id, crmOpen: false, crmQ: "", crm, cust: { ...s.cust, att: c.name, ptype: c.ptype || s.cust.ptype } }));
+    const m = String(c.usize || "").match(/(\d+)\s*R\s*(\d+)/i), data = this.state.data;
+    if (m && data) { const k = m[1] + "-" + m[2]; const p = data.packages.find(p => { const sp = p.spec || {}; return parseInt(sp.beds) + "-" + parseInt(sp.baths) === k && p.style !== "build"; }) || data.packages.find(p => { const sp = p.spec || {}; return parseInt(sp.beds) + "-" + parseInt(sp.baths) === k; });
+      if (p) { this.setState({ room: (p.spec.beds || "?") + "-" + (p.spec.baths || "?") }); this.load(p.id); this.flash(`${c.name} added · ${c.usize} selected in step 2`); return; } }
+    this.flash(c.name + " added from CRM");
+  }
+  checkReq() {
+    const own = ((this.cfg && this.cfg.custInfo && this.cfg.custInfo.own) || []).filter(f => f.required && !(["unit", "bill", "building", "date", "by"].includes(f.id) ? this.state.cust[f.id] : this.state.extra["ci_" + f.id]));
+    const crmMiss = ((this.lib && this.lib.CRM_FIELDS) || []).filter(f => f.id !== "name" && ((this.cfg?.custInfo?.crm || {})[f.id] || {}).show && ((this.cfg?.custInfo?.crm || {})[f.id] || {}).required && !(this.state.crm || {})[f.id]); own.unshift(...crmMiss);
+    if (!this.state.cust.att || own.length) { this.flash(`Fill in ${[...(!this.state.cust.att ? ["Name"] : []), ...own.map(f => f.label)].join(", ")} first`); this.setState({ step: 1 }); return false; }
+    const miss = (this.cfg?.doc.blocks || []).filter(b => b.type === "field" && !b.hidden && b.required && this.lib.isEmpty(b, this.state.extra[b.id] ?? b.value));
+    if (!miss.length) return true;
+    this.flash(`Fill in ${miss.map(b => b.label).join(", ")} first`);
+    this.setState({ step: 1 });
+    return false;
+  }
+  styleStep(group, byId, style) {
+    const st = this.state, styles = (this.cfg && this.cfg.styles) || [], drive = st.drive || {};
+    const sid = st.styleId && styles.some(x => x.id === st.styleId) ? st.styleId : (styles[0] || {}).id;
+    const styleCards = styles.map(x => { const imgs = drive[x.id] || [], cover = x.cover || (imgs[0] && imgs[0].src) || "", on = x.id === sid;
+      return { name: x.name, desc: x.desc || "", count: imgs.length ? imgs.length + " photo" + (imgs.length === 1 ? "" : "s") : "", cover: this.u(cover), noCover: !cover, on, border: on ? "#111111" : "#E7E7E2", ring: on ? "0 0 0 1px #111111, 0 10px 24px rgba(17,17,17,.12)" : "0 1px 2px rgba(20,20,18,.04)", pick: () => this.setState({ styleId: x.id, gi: 0 }), chipBg: on ? "#111111" : "#FFFFFF", chipInk: on ? "#FFFFFF" : "#1F1F1C", chipBorder: on ? "#111111" : "#DEDED8" }; });
+    if (!group) return { styleCards, styleTabs: [], sv: false };
+    const opts = [["classic", "Classic"], ["build", "Build in"]].filter(([k]) => group[k]);
+    const styleTabs = opts.map(([k, label]) => { const p = byId(group[k]), on = style === k; return { label, price: rm0(p.price), bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", shadow: on ? "0 1px 3px rgba(20,20,18,.14)" : "none", pick: () => { if (!on) this.load(group[k], st.data, true); } }; });
+    const p = byId(group[style]) || byId(group.classic || group.build); if (!p) return { styleCards, styleTabs, sv: false };
+    const sx = styles.find(x => x.id === sid) || {};
+    const okSrc = s => /^(data:image|https?:|blob:)/.test(String(s || "")); const imgs = [...((sx.photos && sx.photos.length ? sx.photos : (sx.cover ? [sx.cover] : [])).map((src, k) => ({ src, title: sx.name + (k ? " · " + (k + 1) : ""), sectionName: "Overview", items: [] }))), ...(drive[sid] || []).filter(x => okSrc(x.src))];
+    const gi = Math.min(st.gi || 0, Math.max(0, imgs.length - 1)), im = imgs[gi];
+    const inIm = () => false;
+    const live = c => c.items.filter(i => (i.qty ?? 1) > 0), isF = c => c.items.some(i => i.kind);
+    const fItems = p.cats.filter(isF).flatMap(live), zl = fItems.map(i => { const im = this.imgFor(i); return im ? { img: im, name: title(i.name), code: i.code || "", delta: rm0((i.cost || 0) * (i.qty ?? 1)), item: null } : null; }).filter(Boolean), furn = fItems.map(i => { const im = this.imgFor(i); return { name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0((i.cost || 0) * (i.qty ?? 1)), cur: im ? "zoom-in" : "default", view: () => { if (im) this.openZoom(zl, zl.findIndex(z => z.img === im)); } }; });
+    const sCats = p.cats.filter(c => !isF(c) && live(c).length), sItems = sCats.flatMap(live), sSum = sItems.reduce((a, i) => a + (i.cost || 0) * (i.qty ?? 1), 0);
+    const serv = sCats.length ? { count: sItems.length + " items", sum: rm0(sSum), open: !!st.servOpen, rot: st.servOpen ? "rotate(180deg)" : "none", toggle: () => this.setState(s => ({ servOpen: !s.servOpen })),
+      cats: sCats.map(c => ({ name: String(c.name).toUpperCase(), rows: live(c).map(i => ({ name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0((i.cost || 0) * (i.qty ?? 1)) })) })) } : false;
+    const cats = p.cats.map(c => ({ name: String(c.name).toUpperCase(), rows: c.items.filter(i => (i.qty ?? 1) > 0).map(i => ({ name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0((i.cost || 0) * (i.qty ?? 1)), hl: inIm(i.name) ? "#FFEBD9" : "transparent" })) })).filter(c => c.rows.length);
+    const n = imgs.length, set = k => this.setState({ gi: (k + n) % n });
+    return { styleCards, styleTabs, sv: {
+      furn, furnOpen: st.furnOpen ?? !this._phone, furnRot: (st.furnOpen ?? !this._phone) ? "rotate(180deg)" : "none", furnToggle: () => this.setState(s => ({ furnOpen: !(s.furnOpen ?? !this._phone) })), furnCount: fItems.length + " items", furnSum: rm0(fItems.reduce((a, i) => a + (i.cost || 0) * (i.qty ?? 1), 0)), serv, name: sx.name || "Style", pkgName: p.groupLabel || title(p.name), hasPkgTabs: opts.length > 1, price: rm0(p.price), count: `${cats.reduce((a, c) => a + c.rows.length, 0)} items`,
+      hasImg: !!im, noImg: !im, src: im ? this.u(im.src) : "", title: im ? im.title || "" : "", note: im ? im.note || "" : "", multi: n > 1, counter: `${gi + 1} / ${n}`,
+      prev: () => set(gi - 1), next: () => set(gi + 1), enlarge: () => this.openZoom(imgs.map(t => ({ img: this.u(t.src), name: t.title || sx.name || "", code: t.sectionName && !/^images$/i.test(t.sectionName) ? t.sectionName : (sx.name || ""), delta: (imgs.indexOf(t) + 1) + " / " + n, item: null })), gi),
+      ...(() => { const secOf = t => (t.sectionName && !/^images$/i.test(t.sectionName)) ? t.sectionName : (t === imgs[0] && sx.cover && t.src === sx.cover ? "Overview" : ""); const names = [...new Set(imgs.map(secOf).filter(Boolean))], cur = im ? secOf(im) : "";
+        return { hasSecs: names.length > 1, secs: names.map(nm => { const on = nm === cur; return { label: nm, bg: on ? "#111111" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#111111" : "#DEDED8", pick: () => set(imgs.findIndex(t => secOf(t) === nm)) }; }), secLabel: cur }; })(),
+      thumbs: imgs.map((t, k) => ({ src: this.u(t.src), ring: k === gi ? "0 0 0 2px #F5871F" : "none", op: k === gi ? 1 : .6, pick: () => set(k) })),
+      inPhoto: "", cats } };
+  }
+  loadDrive() { import("./workspace-store.js").then(ws => ws.byStyle()).then(drive => this.setState({ drive })).catch(() => {}); }
+  wsKey() { const c = this.state.cust || {}; return [c.building, c.unit, c.att].map(x => (x || "").trim()).join("|") || "draft"; }
+  wsLabel() { const c = this.state.cust || {}; return [c.att || "New customer", [c.building, c.unit].filter(Boolean).join(" ")].filter(Boolean).join(" · "); }
+  refreshWsCount() { import("./workspace-store.js").then(ws => ws.countFor(this.wsKey())).then(n => { if (n !== this.state.wsCount) this.setState({ wsCount: n }); }).catch(() => {}); }
+  async exportPdf() {
+    if (!this.checkReq()) return;
+    let html = this.docHtml(false);
+    try { const ws = await import("./workspace-store.js"); const sx = ((this.cfg && this.cfg.styles) || []).find(x => x.id === this.state.styleId) || ((this.cfg && this.cfg.styles) || [])[0] || {}; const extra = await ws.pdfHtml(sx.id, sx.name); if (extra) html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, extra + "</body>") : html + extra; } catch (e) {}
+    const f = document.createElement("iframe");
+    f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+    document.body.appendChild(f);
+    const d = f.contentWindow.document; d.open(); d.write(html); d.close();
+    setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 1500); }, 250);
+  }
+  exportExcel() {
+    if (!this.checkReq()) return;
+    const blob = new Blob(["\ufeff" + this.docHtml(true)], { type: "application/vnd.ms-excel" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = this.fileBase() + ".xls";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    this.flash("Excel file downloaded");
+  }
+  shareText() {
+    const { pkg, total, changes, disc, adjust } = this.calc(); const c = this.state.cust;
+    const lines = [`Quotation · ${c.building}${c.unit ? " " + c.unit : ""}`, `${pkg.name}`, c.att ? `Attention: ${c.att}` : "", "",
+      ...changes.map(x => `${x.tag}: ${title(x.l.name)}${x.l.qty !== 1 ? " × " + x.l.qty : ""}`),
+      disc ? `Discount: ${rm(-disc)}` : "", ...adjust.map(a => `${a.label}: ${rm(a.amount)}`), `Total: ${rm(total)}`, "", `Prepared by ${c.by} · ${longDate(c.date)}`];
+    return lines.filter((l, i, a) => l !== "" || (a[i - 1] !== "" && i > 0)).join("\n");
+  }
+  async share() {
+    if (!this.checkReq()) return;
+    const text = this.shareText();
+    try {
+      if (navigator.share) { await navigator.share({ text }); return; }
+      await navigator.clipboard.writeText(text); this.flash("Quote copied — paste it to the customer");
+    } catch (e) { /* closed */ }
+  }
+  async copy() { if (!this.checkReq()) return; try { await navigator.clipboard.writeText(this.shareText()); this.flash("Copied"); } catch (e) { this.flash("Could not copy"); } }
+
+  renderVals() {
+    const st = this.state;
+    const vp = this.props.viewport ?? "auto";
+    const desk = vp === "desktop" ? true : vp === "phone" ? false : st.width >= 1024; this._desk = desk;
+    const phone = !desk; this._phone = phone;
+    const { m, pkg, changes, changeSell, disc, total } = this.calc();
+    const data = st.data, co = data?.company;
+    const step = st.step;
+    const setCust = k => e => { const v = e.target.value; this.setState(s => ({ cust: { ...s.cust, [k]: v } })); };
+    const go = n => () => { if (!pkg) return; this.setState({ step: n }); const el = this.rootRef.current?.querySelector("main"); if (el) el.scrollTop = 0; };
+    const stepNames = ["Customer", "Room type", "Style", "Customize", "Quotation"];
+    const steps = stepNames.map((label, i) => ({ n: i + 1, label, rule: i > 0, on: step === i + 1, done: step > i + 1, off: step < i + 1, go: go(i + 1), bar: step >= i + 1 ? "#F5871F" : "#E7E7E2" }));
+    const stepNow = { label: stepNames[step - 1] || "", n: step + " / " + stepNames.length };
+    const d = new Date();
+    const byId = id => data.packages.find(p => p.id === id);
+    const style = pkg ? pkg.style : "classic";
+    const group = pkg && data.groups ? data.groups.find(g => g.id === pkg.group) : null;
+    const bedItems = p => [...new Set(p.cats.filter(c => BEDROOM.test(c.name)).flatMap(c => c.items.map(i => title(i.name).replace(/ - .*$/, ""))))].join(" · ");
+    const kinds = st.catalog?.kinds || {};
+    const catViews = pkg ? pkg.cats.map((c, ci) => {
+      const ls = st.lines.filter(l => l.ci === ci);
+      return {
+        _ci: ci, countOrSum: phone ? String(ls.filter(l => l.qty > 0).length) : `${ls.filter(l => l.qty > 0).length} item${ls.filter(l => l.qty > 0).length === 1 ? "" : "s"}`, label: c.label, count: `${ls.filter(l => l.qty > 0).length} item${ls.filter(l => l.qty > 0).length === 1 ? "" : "s"}`,
+        canAdd: c.items.some(i => i.kind),
+        add: () => this.openSheet({ mode: "add", ci }),
+        lines: ls.map(l => {
+          const ch = changes.find(x => x.l.id === l.id);
+          const tone = !ch ? null : ch.tag === "Removed" ? ["#8A2E1C", "#F6E1DA"] : ch.tag === "Added" ? ["#2F6B47", "#E8F3ED"] : ["#B35A00", "#FFEBD9"];
+          return {
+            title: title(l.name), meta: [l.desc, l.code].filter(Boolean).join(" · "), qty: l.qty,
+            adj: !!(l.adjust || (l.orig && l.orig.adjust)), locked: !(l.adjust || (l.orig && l.orig.adjust)) && !!(l.fixed || (l.orig && l.orig.fixed)), costV: String(l.cost ?? ""), onCost: e => { const n = parseFloat(e.target.value.replace(/[^\d.]/g, "")); this.setLine(l.id, x => ({ ...x, cost: isNaN(n) ? 0 : n })); },
+            sumText: rm0((+l.cost || 0) * Math.max(l.qty, 0)), eachText: l.qty === 1 ? "" : `${rm0(+l.cost || 0)} each`,
+            strike: l.qty === 0 ? "line-through" : "none", nameColor: l.qty === 0 ? "#6B6B66" : "#1F1F1C",
+            tag: ch ? ch.tag.toUpperCase() : "", delta: ch ? signed(ch.d) : "", tagInk: tone ? tone[0] : "", tagBg: tone ? tone[1] : "",
+            ...((im) => ({ lImg: im, lCursor: im ? "zoom-in" : "default", lView: () => { if (!im) return; const zl = st.lines.filter(x => x.qty > 0).map(x => { const i2 = this.imgFor(x); const c2 = changes.find(y => y.l.id === x.id); return i2 ? { img: i2, name: title(x.name), code: x.code || "", delta: c2 ? signed(c2.d) : "In package", item: null } : null; }).filter(Boolean); this.openZoom(zl, zl.findIndex(z => z.img === im)); } }))(this.imgFor(l)),
+            canSwap: !!l.kind, swap: () => this.openSheet({ mode: "swap", id: l.id }),
+            minus: () => this.bump(l.id, -1), plus: () => this.bump(l.id, 1), onQty: e => { const n = Math.max(0, Math.min(999, parseInt(e.target.value.replace(/\D/g, "")) || 0)); this.setLine(l.id, x => ({ ...x, qty: n })); }, undo: e => { if (e) e.stopPropagation(); this.undo(l); }
+          };
+        })
+      };
+    }) : [];
+    const isFurn = ci => pkg && pkg.cats[ci].items.some(i => i.kind);
+    const grpSum = vs => rm0(vs.reduce((a, cv) => a + st.lines.filter(l => l.ci === cv._ci).reduce((b, l) => b + (+l.cost || 0) * Math.max(l.qty, 0), 0), 0));
+    const furnV = catViews.filter(cv => isFurn(cv._ci)), servV = catViews.filter(cv => !isFurn(cv._ci));
+    const catGroups = [{ key: "furn", short: "Furniture", label: "FURNITURE & APPLIANCES", cats: furnV }, { key: "serv", short: "Services", label: "SERVICES & FITTINGS", cats: servV }].filter(g => g.cats.length).map(g => ({ ...g, sum: grpSum(g.cats) }));
+    const czKey = catGroups.some(g => g.key === st.czTab) ? st.czTab : (catGroups[0] || {}).key;
+    const czTabs = phone && catGroups.length > 1 ? catGroups.map(g => { const on = g.key === czKey; return { label: g.short, sum: g.sum, bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", sub: on ? "#D96E0B" : "#97978F", shadow: on ? "0 1px 3px rgba(20,20,18,.12)" : "none", pick: () => { this.setState({ czTab: g.key }); const el = this.rootRef.current && this.rootRef.current.querySelector("main"); if (el) el.scrollTop = 0; } }; }) : false;
+    const catGroupsShown = phone && catGroups.length > 1 ? catGroups.filter(g => g.key === czKey).map(g => ({ ...g, label: "", sum: "" })) : catGroups;
+
+    // sheet
+    let sheet = { eyebrow: "", title: "", sub: "", url: "" }, options = [];
+    const hideOpts = !!st.sheet && st.sheetView === "col" && !st.col && !(st.q || "").trim();
+    if (st.sheet && pkg && st.catalog) {
+      const q = st.q.trim().toLowerCase();
+      const colView = st.sheetView === "col", col = colView ? st.col || "" : "", clr = st.clr || "", colorsOf = it => String(it.color || "").split(/\s*,\s*/).filter(Boolean);
+      const live = it => !it.paused && !(kinds[it.kind] || {}).paused;
+      const match = it => live(it) && (!q || (it.name + " " + it.code + " " + (it.collection || "")).toLowerCase().includes(q)) && (!col || it.collection === col) && (!clr || colorsOf(it).includes(clr));
+      if (st.sheet.mode === "swap") {
+        const l = st.lines.find(x => x.id === st.sheet.id);
+        const base = l.orig || l, k = kinds[l.kind] || {};
+        sheet = { eyebrow: "CHANGE ITEM", title: title(l.orig ? l.orig.name : l.name), sub: `${k.label || "Item"} · ${rm0(base.cost * m)}`, url: k.url || "" };
+        options = st.catalog.items.filter(it => it.kind === l.kind && it.cost != null && !it.noPrice && match(it)).map(it => {
+          const dd = Math.round((it.cost - base.cost) * m) * (l.qty || 1);
+          const cur = it.code === l.code && it.name === l.name;
+          return { ...it, item: it, cur, delta: cur ? "Selected" : dd === 0 ? "Same price" : signed(dd), ink: cur ? "#2F6B47" : dd > 0 ? "#1F1F1C" : "#2F6B47" };
+        });
+      } else {
+        const c = pkg.cats[st.sheet.ci];
+        const ks = [...new Set(c.items.map(i => i.kind).filter(Boolean))];
+        sheet = { eyebrow: "ADD ITEM", title: c.label, sub: "Priced at cost × " + m, url: (kinds[ks[0]] || {}).url || "https://www.b2bfurnituresupply.com" };
+        options = st.catalog.items.filter(it => ks.includes(it.kind) && it.cost != null && !it.noPrice && match(it)).map(it => ({ ...it, item: it, delta: signed(Math.round(it.cost * m)), ink: "#1F1F1C" }));
+      }
+      const VAR = /\s*\(#\)|\s+\d{2,4}\/\d{2,5}(?:\/\d{1,5})*$|\b(?:LEFT|RIGHT|LHF|RHF|LHS|RHS|LH|RH|REVERSIBLE)(?:\s+(?:FACING|HAND|ARM|CHAISE|SIDE))?\b/gi;
+      const lead = /^[\d\/\s-]{6,}(?=[A-Z])/i;
+      const gk = n => String(n || "").toUpperCase().replace(lead, "").replace(VAR, " ").replace(/\s+/g, " ").trim();
+      const vl = n => { const u = String(n || "").toUpperCase().replace(lead, ""); const p = []; let m; const re = new RegExp(VAR.source, "gi"); while ((m = re.exec(u))) { const t = m[0].replace(/[()#]/g, "").trim(); if (t) p.push(t); } return p.join(" · ") || "Standard"; };
+      const groups = []; const gi = {};
+      options.forEach(o => { const k = gk(o.name); if (gi[k] == null) { gi[k] = groups.length; groups.push({ k, list: [] }); } groups[gi[k]].list.push(o); });
+      options = groups.map(g => { const vs = g.list; const selId = (st.vsel || {})[g.k]; const o = vs.find(v => v.id === selId) || vs.find(v => v.cur) || vs[0];
+        const vars = vs.length > 1 ? vs.map(v => { const on = v === o; return { label: vl(v.name), bg: on ? "#1F1F1C" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#1F1F1C" : "#DEDED8", pick: e => { e.stopPropagation(); this.setState(s => ({ vsel: { ...(s.vsel || {}), [g.k]: v.id } })); } }; }) : [];
+        return { ...o, vars, hasVars: vars.length > 1, varCount: vars.length > 1 ? vars.length + " options" : "", gname: vs.length > 1 ? g.k : o.name }; });
+      const zl = options.map(o => { const im = o.img || o.item?.img || imgFor(o.code); return im ? { img: im, name: title(o.name), code: o.code, delta: o.delta, item: o.item } : null; }).filter(Boolean);
+      options = options.map(o => { const im = o.img || o.item?.img || imgFor(o.code); return {
+        name: title(o.gname), code: o.code || "—", img: im, initials: im ? "" : (o.name.match(/\b[A-Z]/g) || []).slice(0, 2).join(""),
+        collection: o.collection || "", vars: o.vars, hasVars: o.hasVars, varCount: o.varCount,
+        sample: !!o.sample, delta: o.delta, ink: o.ink, pick: () => this.apply(o.item),
+        zoomTitle: im ? "View larger" : "", zoomCursor: im ? "zoom-in" : "inherit",
+        zoom: e => { if (!im) return; e.stopPropagation(); this.openZoom(zl, zl.findIndex(z => z.img === im)); }
+      }; });
+    }
+    const cu = st.custom, cuOk = cu.name.trim() && +cu.cost > 0;
+    const kindForCustom = st.sheet?.mode === "swap" ? st.lines.find(x => x.id === st.sheet.id)?.kind : null;
+
+    const docCats = pkg ? this.docRows(pkg, m).map(c => ({ name: c.name, rows: c.rows.map(r => ({ ...r, price: money(r.unit), sum: money(r.sum) })) })) : [];
+    const listTotal = docCats.length ? this.docRows(pkg, m).reduce((a, c) => a + c.rows.reduce((x, r) => x + r.sum, 0), 0) : 0;
+    const show = !!this.props.showItemPrices;
+    const docSums = [];
+    if (show && listTotal - (total + disc) > 0) docSums.push({ k: "Package saving", v: money(-(listTotal - total - disc)) });
+    if (disc) docSums.push({ k: "Discount", v: money(-disc) });
+
+    const primary = step === 1 ? { label: "Room type", d: ICON.arrowRight, run: go(2) }
+      : step === 2 ? { label: "Style", d: ICON.arrowRight, run: go(3) }
+      : step === 3 ? { label: "Customize", d: ICON.arrowRight, run: go(4) }
+      : step === 4 ? { label: "Preview quotation", d: ICON.arrowRight, run: go(5) }
+      : { label: "Download PDF", d: ICON.download, run: () => this.exportPdf() };
+    const nChanges = changes.length;
+
+    return {
+      rootRef: this.rootRef, desk, phone, stepBarD: phone ? "none" : "flex", deskOnlyFlex: phone ? "none" : "flex",
+      saveDraftC: () => { this.saveDraft(); this.setState({ confirm: { title: "Draft saved", sub: "Find it anytime under Quote · Drafts." } }); },
+      doPdfC: () => { this.exportPdf(); this.setState({ confirm: { title: "PDF ready", sub: "Choose “Save as PDF” in the next screen to keep it on this device." } }); },
+      confirmBox: st.confirm ? { ...st.confirm, close: () => this.setState({ confirm: null }) } : false,
+      openShare: () => { if (this.checkReq()) this.setState({ shareOpen: true }); },
+      shareSheet: st.shareOpen ? { close: () => this.setState({ shareOpen: false }), apps: (() => { const t = () => encodeURIComponent(this.shareText()), done = () => this.setState({ shareOpen: false });
+        return [
+          { label: "WhatsApp", bg: "#E5F7EC", ink: "#1E9E55", d: "M3 21l1.6-4.7A8.5 8.5 0 1 1 7.8 19.6ZM9 8.5c0 3.5 2.5 6.5 6.5 6.5l1-1.5-2-1-1 1c-1.2-.5-2.2-1.5-2.7-2.7l1-1-1-2Z", run: () => { window.open("https://wa.me/?text=" + t(), "_blank"); done(); } },
+          { label: "Email", bg: "#EAF0FB", ink: "#2D5788", d: "M3 5h18v14H3zM3 6l9 7 9-7", run: () => { window.location.href = "mailto:?subject=" + encodeURIComponent("Quotation") + "&body=" + t(); done(); } },
+          { label: "Telegram", bg: "#E6F3FA", ink: "#2A8BC7", d: "M21 4 3 11l6 2 2 6 3-4 5 4Z", run: () => { window.open("https://t.me/share/url?text=" + t(), "_blank"); done(); } },
+          { label: "Copy", bg: "#F2F2EF", ink: "#1F1F1C", d: "M9 9h11v11H9zM5 15H4V4h11v1", run: () => { done(); this.copy(); } },
+          { label: "More", bg: "#F2F2EF", ink: "#1F1F1C", d: "M5 12h.01M12 12h.01M19 12h.01", run: () => { done(); this.share(); } }
+        ]; })() } : false, selAll: e => e.target.select(), docBoxD: !phone || st.docFull ? "flex" : "none", docBox: phone ? (() => { return { pos: "fixed", z: 160, b: "0", r: "0", full: true }; })() : { pos: "relative", z: "auto", b: "1px solid #E7E7E2", r: "14px", full: false }, openDoc: () => this.setState({ docFull: true }, () => { setTimeout(() => { const f = this.rootRef.current && this.rootRef.current.querySelector("iframe[title=\"Quotation preview\"]"); if (f && this._fitDoc) this._fitDoc({ currentTarget: f }); }, 60); }), closeDoc: () => this.setState({ docFull: false }), phoneStep: phone && !st.home, cgPad: phone ? "2px 4px 0" : "10px 4px 0", cz: phone ? { pad: "0", h: "14.5px", meta: "none", add: "38px", r: "0", b: "0", bg: "transparent", sh: "none", plus: true, addRow: false, stepCols: "26px 24px 26px", stepH: "30px", cntW: "22px", cntH: "22px", cntP: "6px", cntBg: "#FFFFFF", rowPad: "12px 4px 12px 10px", hPad: "4px 4px 4px 10px", hPos: "sticky", hBg: "#EEEEEA", hR: "8px", hMargin: "10px 0 2px", swapBg: "transparent" } : { pad: "18px", h: "19px", meta: "block", add: "44px", r: "14px", b: "1px solid rgba(20,20,18,.05)", bg: "#FFFFFF", sh: "0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)", plus: false, addRow: true, stepCols: "32px 28px 32px", stepH: "34px", cntW: "0", cntH: "auto", cntP: "0", cntBg: "transparent", rowPad: "12px 0", hPad: "0", hPos: "static", hBg: "transparent", hR: "0", hMargin: "0 0 2px", swapBg: "#F0F0ED" }, svCard: phone ? { r: "0", b: "0", bg: "transparent", m: "-20px", ar: "4/3", ir: "0", thumbs: "none", bedLbl: "none", segFlex: "1 1 100%" } : { r: "14px", b: "1px solid #E7E7E2", bg: "#FFFFFF", m: "0", ar: "16/10", ir: "0", thumbs: "flex", bedLbl: "inline", segFlex: "0 0 auto" }, mainPad: phone ? "8px 20px 28px" : "20px 28px 36px", appNavD: (phone && !st.home) || /embed=1/.test(location.search) ? "none" : "block", phoneHome: phone && !!st.home, phoneFooterD: phone && st.home ? "none" : "block", homeNew: () => { this.setState({ home: false }); if (this._newQuote) this._newQuote(); }, chgTxt: phone ? "none" : "inline", chgIco: phone ? "block" : "none", chgPad: phone ? "4px" : "14px", thumbD: phone ? "none" : "flex", priceIn: phone ? "block" : "none", nameBasis: phone ? "140px" : "160px", stGridD: phone ? "none" : "grid", stWrap: phone ? { tc: "none", flow: "column", col: "38%", ox: "auto", m: "-20px", p: "20px", desc: "none" } : { tc: "repeat(auto-fill,minmax(min(100%,190px),1fr))", flow: "row", col: "auto", ox: "visible", m: "0", p: "0", desc: "block" }, inH: phone ? "50px" : "42px", phoneDrafts: phone && !!st.draftsOpen, stopProp: e => e.stopPropagation(), secPad: phone ? "0" : "18px", secBorder: phone ? "0" : "1px solid rgba(20,20,18,.05)", secBg: phone ? "transparent" : "#FFFFFF", secShadow: phone ? "none" : "0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)",
+      sizeWrap: phone ? { tc: "none", d: "grid", flow: "column", col: "62%", ox: "auto", m: "-20px", p: "20px" } : { tc: "repeat(auto-fill,minmax(min(100%,220px),1fr))", d: "grid", flow: "row", col: "auto", ox: "visible", m: "0", p: "0" }, frameMax: vp === "phone" ? "430px" : "none",
+      ...(() => { const ws = this.wsMod, me = ws ? ws.currentUser() : { id: "", name: "William" }, ini = n => String(n || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase();
+        return { userName: me.name, userInitials: ini(me.name), acctOpen: !!this.state.acctOpen,
+          toggleAcct: () => this.setState(s => ({ acctOpen: !s.acctOpen })), closeAcct: () => this.setState({ acctOpen: false }),
+          acctList: ws ? ws.users().map(u => ({ name: u.name, initials: ini(u.name), on: u.id === me.id, bg: u.id === me.id ? "#F2F2EF" : "transparent", avBg: u.id === me.id ? "#F5871F" : "#EEEEEA", pick: () => { this.setState({ acctOpen: false }); ws.setUser(u.id); } })) : [],
+          addAcct: e => { e.preventDefault(); const n = e.target.nm.value; if (ws && ws.addUser(n)) this.setState({ acctOpen: false }); } }; })(),
+      dateLine: `${DAYS[d.getDay()].toUpperCase()} ${d.getDate()} ${MONTHS[d.getMonth()].toUpperCase()} ${d.getFullYear()}`,
+      deskNav: [["Today", ICON.home], ["Insight", ICON.chart], ["Quote", ICON.quoteDesk], ["Workspace", "M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15 9h.01"], ["Arena", ICON.trophy], ["Profile", ICON.user]].map(([label, dd]) => { const on = label === "Workspace" ? !!this.state.wsOpen : label === "Quote" && !this.state.wsOpen; return { label, d: dd, bg: on ? "#F5871F" : "transparent", color: on ? "#111111" : "#A3A3A3", weight: on ? 650 : 550, go: label === "Workspace" ? () => this.setState({ wsOpen: true }) : label === "Quote" ? () => this.setState({ wsOpen: false }) : undefined }; }),
+      wsOpen: !!this.state.wsOpen, openWs: () => this.setState({ wsOpen: true }), closeWs: () => { this.setState({ wsOpen: false }); this.loadDrive(); },
+      wsStyles: ((this.cfg && this.cfg.styles) || []).map(x => ({ id: x.id, label: x.name })), wsStyleId: this.state.styleId || (((this.cfg && this.cfg.styles) || [])[0] || {}).id || "",
+      wsFurniture: [...new Set(((this.state.data && this.state.data.packages) || []).flatMap(p => p.cats.flatMap(c => c.items.map(i => i.name))))].sort().map(nm => ({ id: nm, name: nm })),
+      wsKey: this.wsKey(), wsLabel: this.wsLabel(), wsCount: String(this.state.wsCount || 0),
+      wsStyle: (((this.state.data && this.state.data.packages) || []).find(p => p.id === this.state.pid) || {}).name || "",
+      wsItems: (this.state.lines || []).map(l => ({ id: String(l.id), name: String(l.name || "") })),
+      navLeft: [{ label: "Today", d: ICON.home }, { label: "Insight", d: ICON.chart }],
+      navRight: [{ label: "Arena", d: ICON.trophy }, { label: "Profile", d: ICON.user }],
+      phoneBack: phone ? !st.home : step > 1, phoneLogo: phone ? !!st.home : step === 1, backLabel: stepNames[step - 2] || "", goBack: step === 1 ? () => this.setState({ home: true }) : go(step - 1),
+      steps, stepNow, showPrice: step > 1 && !!pkg, noPrice: step === 1, stepCust: step === 1 && !!pkg, stepRoom: step === 2 && !!pkg, stepStyle: step === 3 && !!pkg, stepEarly: step <= 3 && !!pkg, step1: false, step2: step === 4 && !!pkg, step3: step === 5 && !!pkg, loading: !pkg,
+      ...(() => { const fl = this.lib ? (this.cfg?.doc.blocks || []).filter(b => b.type === "field" && !b.hidden) : []; return { hasExtra: fl.length > 0, extraFields: fl.map(f => this.lib.fieldEditor(f, st.extra[f.id] ?? f.value, v => this.setState(s => ({ extra: { ...s.extra, [f.id]: v } })))) }; })(),
+      ...(() => {
+        const sb = this.lib ? (this.cfg?.doc.blocks || []).filter(b => b.type === "signature" && !b.hidden) : [];
+        const slots = [];
+        sb.forEach(b => {
+          [["left", "signIr", b.text || "Prepared by"], ["right", "signCust", b.text2 || "Customer acknowledgement"]].forEach(([side, flag, label]) => {
+            if (!b[flag]) return;
+            const img = (st.sigs[b.id] || {})[side] || "";
+            slots.push({ label, img, signed: !!img, empty: img ? "" : "Not signed", status: img ? "Signed" : side === "left" && b.img ? "Using company signature" : "Not signed yet", cta: img ? "Sign again" : "Sign",
+              open: () => this.setState({ pad: { id: b.id, side, title: label } }),
+              clear: () => this.setState(s => ({ sigs: { ...s.sigs, [b.id]: { ...(s.sigs[b.id] || {}), [side]: "" } } })) });
+          });
+        });
+        return { hasSigs: slots.length > 0, sigSlots: slots };
+      })(),
+      pad: st.pad, padRef: this.padRef, padDown: this.padDown, padMove: this.padMove, padUp: this.padUp, padClear: this.padClear, padSave: this.padSave, padCancel: () => { this._inked = false; this.setState({ pad: null }); },
+      cust: st.cust, unitText: st.cust.unit || "Unit not set",
+      ...this.custView(setCust),
+      ...(() => {
+        if (!data?.groups) return { roomTypes: [], unitSizes: [], sizeCards: [], missingSizes: "", propTypes: [], pkgCountText: "" };
+        const gp = g => byId(g.classic || g.build) || {}, rk = g => { const s = gp(g).spec || {}; return s.beds || s.baths ? `${s.beds || "?"}-${s.baths || "?"}` : "other"; };
+        const curKey = st.room || (group ? rk(group) : "");
+        const keys = [...new Set(data.groups.map(rk))].sort((a, b) => a === "other" ? 1 : b === "other" ? -1 : a.localeCompare(b, undefined, { numeric: true }));
+        const roomTypes = keys.map(k => { const gs = data.groups.filter(g => rk(g) === k), on = k === curKey, [b, t] = k.split("-"), min = Math.min(...gs.map(g => gp(g).price || Infinity));
+          return { beds: k === "other" ? "—" : b, bedWord: k === "other" ? "Other" : b === "1" ? "Bedroom" : "Bedrooms", baths: k === "other" ? "Layouts without a room count" : `${t} Bathroom${t === "1" ? "" : "s"}`, meta: `${gs.length} layout${gs.length === 1 ? "" : "s"}${isFinite(min) ? " · from " + rm0(min) : ""}`,
+            border: on ? "#111111" : "#E7E7E2", ring: on ? "inset 0 0 0 1px #111111" : "none", bg: on ? "#FFEBD9" : "#FFFFFF",
+            pick: () => { this.setState({ room: k }); if (!group || rk(group) !== k) { const g = gs[0]; this.load(g.classic || g.build); } } }; });
+        const shown = data.groups.filter(g => rk(g) === curKey);
+        const multiB = new Set(data.groups.map(g => g.building)).size > 1;
+        this._multiB = multiB;
+        const SIZES = ["2-1", "2-2", "3-2", "3-3", "4-2", "4-3", "4-4"];
+        const chip = (on, avail = true) => ({ border: on ? "#1F1F1C" : "#DEDED8", bg: on ? "#1F1F1C" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", op: avail ? "1" : ".45" });
+        const numK = k => k.split("-").map(n => parseInt(n) || 0); const unitSizes = [...new Set([...SIZES, ...keys.filter(k => k !== "other")])].sort((a, b) => { const [a1, a2] = numK(a), [b1, b2] = numK(b); return a1 - b1 || a2 - b2; }).map(k => { const gs = data.groups.filter(g => rk(g) === k), [b, t] = k.split("-"), min = Math.min(...gs.map(g => gp(g).price || Infinity));
+          return { _k: k, _gs: gs, _from: gs.length ? rm0(min) : "", label: `${b}R ${t}R`, tip: gs.length ? `${b} bedroom ${t} bathroom · from ${rm0(min)}` : "No package for this size yet", ...chip(k === curKey, gs.length > 0),
+            pick: () => { if (this._swiped && Date.now() - this._swiped < 400) return; if (!gs.length) { this.flash(`No package for ${b}R ${t}R yet. Add one in Quote Settings.`); return; } this.setState({ room: k }); if (!group || rk(group) !== k) { const g = gs[0]; this.load(g.classic || g.build); } } }; });
+        const propTypes = ["Condo", "Landed"].map(l => ({ label: l, tip: "", ...chip((st.cust.ptype || "") === l), pick: () => this.setState(s => ({ cust: { ...s.cust, ptype: s.cust.ptype === l ? "" : l } })) }));
+        const NOSHOW = /SERVICE|PAINT|CLEAN|ELECTRIC|PLUMB|INSTALL|TRANSPORT|DELIVER/i;
+        const slides = []; this._slides = slides;
+        const sizeCards = unitSizes.filter(u => u._gs.length).map(u => { const p = gp(u._gs[0]), sp = p.spec || {}, on = u._k === curKey;
+          const names = [...new Set((p.cats || []).filter(c => !NOSHOW.test(c.name)).flatMap(c => c.items.map(i => title(i.name).replace(/ - .*$/, "").replace(/\s*\(.*\)$/, ""))))];
+          const hl = names.slice(0, 3).map((t, i) => ({ t, line: i ? "1px solid #DEDED8" : "0" })); if (hl.length) hl[0].line = "0";
+          if (names.length > 3) hl.push({ t: "+" + (names.length - 3) + " more", line: "1px solid #DEDED8" });
+          const [b, t] = u._k.split("-");
+          const ph = sp.photos || [], n = ph.length, ci = Math.min((st.ci || {})[u._k] || 0, Math.max(0, n - 1)), step = d => this.setState(s => ({ ci: { ...(s.ci || {}), [u._k]: (ci + d + n) % n } })), go = d => e => { e.stopPropagation(); this._held = u._k; step(d); };
+          if (n > 1 && (sp.photoMode || "slide") === "slide") slides.push({ k: u._k, n });
+          return { ...u, on, img: this.u(ph[ci] || ""), noImg: !n, multi: n > 1, prev: go(-1), next: go(1),
+            tStart: e => { this._tx = e.touches[0].clientX; }, tEnd: e => { const dx = e.changedTouches[0].clientX - (this._tx ?? 0); this._tx = null; if (n > 1 && Math.abs(dx) > 35) { this._held = u._k; this._swiped = Date.now(); step(dx < 0 ? 1 : -1); } },
+            hoverOn: () => { this._hover = u._k; }, hoverOff: () => { if (this._hover === u._k) this._hover = null; }, dots: ph.map((_, k) => ({ op: k === ci ? 1 : .55 })),
+            eyebrow: `${b} bedroom${b > 1 ? "s" : ""} · ${t} bathroom${t > 1 ? "s" : ""}`, sqft: sp.sqft ? sp.sqft + " sq.ft." : "", title: u.label, price: u._from,
+            cShadow: on ? "inset 0 0 0 3px #F5871F" : "none", rowRing: on ? "inset 0 0 0 2px #F5871F" : "0 1px 2px rgba(20,20,18,.05)", radioBorder: on ? "#F5871F" : "#DEDED8", radioBg: on ? "#F5871F" : "#FFFFFF" }; });
+        const missingSizes = unitSizes.filter(u => !u._gs.length).map(u => u.label).join(", ");
+        return { unitSizes, sizeCards, missingSizes, propTypes, roomTypes, pkgCountText: `${shown.length} layout${shown.length === 1 ? "" : "s"} for this room type`, _shown: shown };
+      })(),
+      pkgRows: data?.groups ? data.groups.filter(g => { const p = byId(g.classic || g.build) || {}, s = p.spec || {}, k = s.beds || s.baths ? `${s.beds || "?"}-${s.baths || "?"}` : "other"; const ck = st.room || (group ? (() => { const s2 = (byId(group.classic || group.build) || {}).spec || {}; return s2.beds || s2.baths ? `${s2.beds || "?"}-${s2.baths || "?"}` : "other"; })() : k); return k === ck; }).map(g => {
+        const on = group && g.id === group.id, cur = byId(g[style]) || byId(g.classic || g.build), other = byId(g[cur.style === "build" ? "classic" : "build"]);
+        const items = cur.cats.reduce((a, c) => a + c.items.length, 0), sp = cur.spec || {};
+        return { name: g.label, spec: this.lib.specText(sp, true), meta: `${items} items · ${cur.style === "build" ? "Build in" : "Classic"}${this._multiB && g.building ? " · " + title(g.building) : ""}`, hasPlan: !!sp.plan, plan: sp.plan || "", openPlan: e => { e.stopPropagation(); this.setState({ plan: { img: sp.plan, name: g.label, spec: this.lib.specText(sp) } }); }, price: rm0(cur.price), styleNote: other ? `${other.style === "build" ? "Build in" : "Classic"} ${rm0(other.price)}` : "", border: on ? "#111111" : "#E7E7E2", ring: on ? "inset 0 0 0 1px #111111" : "none", bg: on ? "#FFEBD9" : "#FFFFFF", radio: on ? "2px solid #111111" : "1.5px solid #D2D2CB", dot: on ? "#111111" : "transparent", pick: () => { if (!on) this.load(cur.id); } };
+      }) : [],
+      styleSub: "Pick the look to show the client. Furniture and price follow the room type.",
+      docSrc: step === 5 && pkg ? this.docHtml(false).replace("</head>", `<style>@media screen{html{background:#F2F2EF;color-scheme:light}body{width:210mm!important;min-height:297mm;box-sizing:border-box;padding:14mm!important;margin:24px auto!important;background:#fff;box-shadow:0 2px 12px rgba(30,43,39,.14)}}</style></head>`) : "",
+      docRef: this._docRef || (this._docRef = el => { if (el && !el._fit) { el._fit = true; el.addEventListener("load", () => this._fitDoc({ currentTarget: el })); } }),
+      _fitDocSet: (this._fitDoc = e => { try { const f = e.currentTarget, de = f.contentDocument.documentElement; de.style.zoom = 1; const h = de.scrollHeight; const s = Math.min(1, f.clientWidth / (de.scrollWidth + 8)); de.style.zoom = s; f.style.height = Math.ceil(h * s + 4) + "px"; } catch (x) {} }),
+      ...this.styleStep(group, byId, style),
+      styleOpts: group ? [["classic", "Classic"], ["build", "Build in"]].filter(([k]) => group[k]).map(([k, label]) => {
+        const p = byId(group[k]), on = style === k;
+        return { label, price: rm0(p.price), items: bedItems(p), border: on ? "#111111" : "#E7E7E2", ring: on ? "inset 0 0 0 1px #111111" : "none", bg: on ? "#FFEBD9" : "#FFFFFF", ink: on ? "#111111" : "#1F1F1C", pick: () => { if (!on) { this.load(group[k], data, true); this.flash(`${label} bedrooms · other changes kept`); } } };
+      }) : [],
+      pkgName: pkg ? (pkg.groupLabel ? `${pkg.groupLabel} · ${pkg.style === "build" ? "Build in" : "Classic"}` : title(pkg.name)) : "", pkgPriceText: pkg ? rm(pkg.price) : "",
+      catViews, catGroups, catGroupsShown, czTabs,
+      discount: st.discount, onDiscount: e => this.setState({ discount: e.target.value.replace(/[^\d.]/g, "") }),
+      totalText: rm(total), totalBare: money(total), changesText: signed(changeSell), changeCount: nChanges === 0 ? "no changes" : `${nChanges} change${nChanges === 1 ? "" : "s"}`,
+      hasChanges: nChanges > 0,
+      changeList: changes.map(x => { const im = this.imgFor(x.l); return { img: im, cursor: im ? "zoom-in" : "default", tip: im ? "View picture" : "", view: () => { if (!im) return; const zl = changes.map(y => { const i2 = this.imgFor(y.l); return i2 ? { img: i2, name: title(y.l.name), code: y.l.code || "", delta: signed(y.d), item: null } : null; }).filter(Boolean); this.openZoom(zl, zl.findIndex(z => z.img === im)); }, title: title(x.l.name), note: x.tag + (x.l.qty > 0 ? ` · qty ${x.l.qty}` : ""), delta: signed(x.d), ink: x.d > 0 ? "#1F1F1C" : "#2F6B47" }; }),
+      primary,
+      draftsOpen: !!st.draftsOpen, toggleDrafts: () => this.setState(s => ({ draftsOpen: !s.draftsOpen, armDraft: null })), saveDraft: () => this.saveDraft(),
+      draftBadge: st.draftId ? "Draft · saved " + new Date(st.draftAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "",
+      ...(() => { const ds = this.drafts(); return { draftCount: ds.length || false, noDrafts: !ds.length,
+        newQuote: this._newQuote = () => { this.setState({ draftId: null, draftAt: null, draftsOpen: false, step: 1, cust: { att: "", bill: "", building: "", unit: "", date: todayIso(), by: st.cust.by }, crm: {}, crmId: null, extra: {}, sigs: {}, discount: "" }); const g = st.data && st.data.groups[0]; if (g) this.load(g.classic || g.build);  },
+        homeList: (st.homeAll ? ds : ds.slice(0, 4)).map(d => ({ name: d.name, total: rm0(d.total || 0), meta: [d.room, "Step " + (d.s.step || 1) + "/5", new Date(d.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })].filter(Boolean).join(" · "), open: () => this.openDraft(d), delIcon: st.armDraft === d.id ? "Delete?" : "✕", remove: () => { if (st.armDraft !== d.id) { this.setState({ armDraft: d.id }); return; } localStorage.setItem(this.draftKey(), JSON.stringify(this.drafts().filter(x => x.id !== d.id))); this.setState({ armDraft: null }); } })), homeMore: ds.length > 4 ? { label: st.homeAll ? "Show less" : "See all " + ds.length, toggle: () => this.setState(z => ({ homeAll: !z.homeAll })) } : false, homeDraftN: ds.length + (ds.length === 1 ? " draft" : " drafts"), homeHello: "Hi, " + ((this.wsMod && this.wsMod.currentUser().name) || "there"), draftList: ds.map(d => ({ ini: String(d.name || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase(), room: d.room || "", when: new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }), bars: [1, 2, 3, 4, 5].map(k => ({ bg: k <= (d.s.step || 1) ? "#F5871F" : "#E7E7E2" })), delIcon: st.armDraft === d.id ? "Delete?" : "✕", name: d.name, total: rm0(d.total || 0), sub: [d.room, "Step " + (d.s.step || 1), new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · "), bg: d.id === st.draftId ? "#FFEBD9" : "transparent",
+          open: () => this.openDraft(d), delLabel: st.armDraft === d.id ? "Delete?" : "Delete",
+          remove: () => { if (st.armDraft !== d.id) { this.setState({ armDraft: d.id }); return; } localStorage.setItem(this.draftKey(), JSON.stringify(this.drafts().filter(x => x.id !== d.id))); this.setState(s => ({ armDraft: null, ...(s.draftId === d.id ? { draftId: null, draftAt: null } : {}) })); } })) }; })(),
+      exportsDesk: [
+        { label: "Save draft", sub: "", d: ICON.doc, run: () => this.saveDraft() },
+        { label: "Download PDF", sub: "A4 · company letterhead", d: ICON.doc, run: () => this.exportPdf() },
+        { label: "Excel", sub: "", d: ICON.download, run: () => this.exportExcel() },
+        { label: "Share", sub: "WhatsApp or email summary", d: ICON.chat, run: () => this.share() },
+        { label: "Copy text", sub: "", d: ICON.copy, run: () => this.copy() }
+      ],
+      doPdf: () => this.exportPdf(), doExcel: () => this.exportExcel(), doShare: () => this.share(),
+      co: co || { name: "", reg: "", addr: [], phone: "", email: "", terms: [] },
+      docFacts: pkg ? this.facts(pkg) : [], docCats, docSums, showPrices: show,
+      docCols: show ? "28px minmax(120px,2fr) minmax(70px,1fr) minmax(70px,1fr) 36px 80px 90px" : "28px minmax(140px,2.4fr) minmax(80px,1fr) minmax(80px,1fr) 40px",
+      sheetOpen: !!st.sheet && !!pkg, ...((() => { const o = !!st.sheet && !!pkg; setTimeout(() => { this._sheetWasOpen = o; }, 400); return {}; })()), closeSheet: () => this.setState({ sheet: null }), sheet, options: hideOpts ? [] : options, noOptions: !!st.sheet && !hideOpts && options.length === 0,
+      sheetAlign: desk ? "flex-end" : "stretch", sheetTop: desk ? "60px" : "0", sheetDim: desk ? "transparent" : "rgba(20,20,18,0.18)", sheetPass: desk ? "none" : "auto",
+      sheetW: desk ? "400px" : "auto", sheetH: desk ? "100%" : "auto", sheetMax: desk ? "none" : "86%", sheetRadius: desk ? "0" : "28px 28px 0 0",
+      sheetAnim: desk ? (this._sheetWasOpen ? "none" : "rvPanelIn .34s cubic-bezier(.2,.8,.2,1)") : "rvSheetUp .32s cubic-bezier(.2,.8,.2,1)",
+      staleText: (() => { const t = st.catalog?.syncedAt; if (!st.catalog) return ""; const d = t ? Math.floor((Date.now() - t) / 86400000) : null; return d == null ? "⚠ Prices may be outdated" : d >= 7 ? `⚠ Checked ${d}d ago` : ""; })(),
+      isPreview: !!this.preview, closePreview: () => { try { window.close(); } catch (e) {} location.href = "IR Quote.dc.html"; },
+      q: st.q, onQuery: e => this.setState({ q: e.target.value }),
+      ...(() => { if (!st.sheet || !st.catalog || !pkg) return { sheetTabs: [], colListOn: false, colList: [], colBack: false, hasCols: false, colSel: false, colChips: [], hasClrs: false, clrChips: [], colAll: false };
+        let ks; if (st.sheet.mode === "swap") { const l = st.lines.find(x => x.id === st.sheet.id); ks = l ? [l.kind] : []; } else { const c = pkg.cats[st.sheet.ci]; ks = c ? c.items.map(i => i.kind) : []; }
+        const cs = [...new Set(st.catalog.items.filter(it => ks.includes(it.kind) && it.collection && it.cost != null && !it.noPrice && !it.paused && !(kinds[it.kind] || {}).paused).map(it => it.collection))].sort();
+        const chip = (v, label) => { const on = (st.col || "") === v; return { label, bg: on ? "#1F1F1C" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#1F1F1C" : "#DEDED8", pick: () => this.setState({ col: v }) }; };
+        const pool = st.catalog.items.filter(it => ks.includes(it.kind) && it.cost != null && !it.noPrice && !it.paused && !(kinds[it.kind] || {}).paused && (!(st.sheetView === "col" && st.col) || it.collection === st.col));
+        const clrs = [...new Set(pool.flatMap(it => String(it.color || "").split(/\s*,\s*/).filter(Boolean)))].sort();
+        const cchip = (v, label) => { const on = (st.clr || "") === v; return { label, bg: on ? "#1F1F1C" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#1F1F1C" : "#DEDED8", pick: () => this.setState({ clr: v }) }; };
+        const plan = st.col ? this.collectionPlan(st.col) : [];
+        const base = st.catalog.items.filter(it => ks.includes(it.kind) && it.collection && it.cost != null && !it.noPrice && !it.paused && !(kinds[it.kind] || {}).paused), cnt = {}; base.forEach(it => { cnt[it.collection] = (cnt[it.collection] || 0) + 1; });
+        const curL = st.sheet.mode === "swap" ? st.lines.find(x => x.id === st.sheet.id) : null, curIt = curL && st.catalog.items.find(c => (c.code && c.code === curL.code) || c.name === curL.name), curCol = curIt && curIt.collection;
+        const short = c => c.replace(/^.* · /, "");
+        const colSel = { value: st.col || "", on: !!st.col, border: st.col ? "#1F1F1C" : "#DEDED8", bg: st.col ? "#F2F2EF" : "#FFFFFF",
+          opts: [{ v: "", l: `All collections (${cs.length})` }, ...cs.map(c => ({ v: c, l: `${short(c)} · ${cnt[c]} item${cnt[c] === 1 ? "" : "s"}` }))],
+          onChange: e => this.setState({ col: e.target.value, clr: "" }), clear: () => this.setState({ col: "", clr: "" }),
+          same: curCol && st.col !== curCol && cs.includes(curCol) ? { label: "Same as current · " + short(curCol), pick: () => this.setState({ col: curCol, clr: "" }) } : false };
+        const colView = st.sheetView === "col", ecol = colView ? st.col || "" : "";
+        const kl = st.sheet.mode === "swap" ? ((kinds[ks[0]] || {}).label || "items") : "items", plural = /s$/i.test(kl) ? kl : kl + "s";
+        const lc = s => /^[A-Z]{2}/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1);
+        const tab = (k, label) => { const on = (st.sheetView || "cat") === k; return { label, bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", shadow: on ? "0 1px 3px rgba(20,20,18,.14)" : "none", pick: () => this.setState({ sheetView: k, col: "", clr: "", q: "" }) }; };
+        const mins = {}, imgs = {}; base.forEach(it => { const c = it.collection; if (mins[c] == null || it.cost < mins[c]) mins[c] = it.cost; if (!imgs[c] && it.img) imgs[c] = it.img; });
+        const colOrder = [...cs].sort((a, b) => (b === curCol) - (a === curCol) || a.localeCompare(b));
+        const extra = { sheetTabs: [tab("cat", "All " + lc(plural)), tab("col", "By collection")],
+          colListOn: colView && !st.col, colList: colOrder.map(c => ({ name: short(c), img: imgs[c] || "", cur: c === curCol, sub: `${cnt[c]} ${cnt[c] === 1 ? lc(kl) : lc(plural)} · from ${rm0(mins[c] * m)}`, pick: () => this.setState({ col: c, clr: "" }) })),
+          colBack: colView && st.col ? { name: short(st.col), count: cnt[st.col] ? `${cnt[st.col]} item${cnt[st.col] === 1 ? "" : "s"}` : "", run: () => this.setState({ col: "", clr: "" }) } : false };
+        return { ...extra, hasCols: cs.length > 0, colSel, colChips: [chip("", "All"), ...cs.map(c => chip(c, short(c)))], hasClrs: clrs.length > 0 && !(st.sheetView === "col" && !st.col), clrChips: [cchip("", "All"), ...clrs.map(c => cchip(c, c))],
+          colAll: plan.length && st.sheetView === "col" ? { label: `Use ${st.col.replace(/^.* · /, "")} for the whole home`, sub: `Switches ${plan.length} matching item${plan.length === 1 ? "" : "s"} to this collection · price updates`, run: () => this.applyCollection(st.col) } : false }; })(),
+      custom: cu,
+      onCustomCode: e => { const v = e.target.value; this.setState(s => ({ custom: { ...s.custom, code: v } })); },
+      onCustomName: e => { const v = e.target.value; this.setState(s => ({ custom: { ...s.custom, name: v } })); },
+      onCustomCost: e => { const v = e.target.value.replace(/[^\d.]/g, ""); this.setState(s => ({ custom: { ...s.custom, cost: v } })); },
+      customOpacity: cuOk ? 1 : 0.4,
+      customHint: "",
+      useCustom: () => { if (cuOk) this.apply({ name: cu.name.trim().toUpperCase(), code: cu.code.trim(), cost: +cu.cost, kind: kindForCustom }); },
+      zoom: (() => { const zl = st.zoomList || [], z = zl[st.zoomIdx]; if (!z) return null; const n = zl.length;
+        return { ...z, canPick: !!z.item, multi: n > 1, counter: `${st.zoomIdx + 1} / ${n}`, prev: e => { e.stopPropagation(); this.stepZoom(-1); }, next: e => { e.stopPropagation(); this.stepZoom(1); }, stop: e => e.stopPropagation(),
+          pick: e => { e.stopPropagation(); const it = z.item; this.setState({ zoomList: null }); this.apply(it); } }; })(),
+      plan: st.plan || null, closePlan: () => this.setState({ plan: null }),
+      closeZoom: e => { if (e) e.stopPropagation(); this.setState({ zoomList: null }); },
+      toast: st.toast, toastBottom: phone ? "96px" : "28px"
+    };
+  }
+}
+</script>
+</body>
+</html>

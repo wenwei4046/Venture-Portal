@@ -551,3 +551,17 @@
 
 /* The Product List page scrolls inside itself: the column is its frame. */
 .mainProducts { position: relative; overflow: hidden; padding-left: 0; padding-right: 0; }
+
+/* IR Quote (2026-11-05): on a computer it fills the column (the main is `.mainProducts`, so it scrolls inside itself);
+   on a phone it is the whole screen over the app — the handoff draws its own header and bottom bar there — standing
+   under the phone's status bar. */
+.irqColumn { position: absolute; inset: 0; }
+.irqLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--rv-white);
+  padding-top: env(safe-area-inset-top, 0px);
+  box-sizing: border-box;
+  overflow: hidden;
+}
