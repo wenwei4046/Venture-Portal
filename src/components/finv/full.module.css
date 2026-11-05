@@ -166,6 +166,12 @@
 .tFoot .tCol { font-weight: 500; }
 .tFoot .tNum { font-weight: 600; }
 .tWide { flex: 1.4; }
+/* An invoice's lines (2026-11-05, the user: 要整齐): the amount one width on every row, so the columns before it line up;
+   a department's name over its lines, its subtotal under them. */
+.tAmount { width: 140px; min-width: 140px; }
+.tGroup { box-sizing: content-box; display: flex; align-items: center; min-height: 34px; padding: 0 14px; border-top: 1px solid var(--ds-border); background: rgb(var(--fv-strip-head) / 0.45); font-size: 12px; font-weight: 600; letter-spacing: 0.03em; color: var(--ds-ink); }
+.tSubtotal { font-weight: 600; }
+.tSubtotal .tCol { color: rgb(var(--hvs-graphite)); font-weight: 500; }
 
 /* Files: a row each, a dashed way to add one. */
 .files { display: flex; flex-direction: column; gap: 8px; }
