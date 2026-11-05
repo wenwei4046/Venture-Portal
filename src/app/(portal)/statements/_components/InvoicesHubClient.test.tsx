@@ -34,7 +34,7 @@ const { marker } = vi.hoisted(() => ({
     },
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }) }))
-vi.mock('@/components/hrv/toast', () => ({ flash: mocks.flash }))
+vi.mock('@/components/hrv/toast', () => ({ flash: mocks.flash, FLASH_LONG: 8000 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     from: () => {
@@ -164,7 +164,6 @@ const dialog = () => {
   const all = document.querySelectorAll<HTMLElement>('[data-fin-dialog] [role="dialog"]')
   return all[all.length - 1] ?? null
 }
-const drawer = () => document.querySelector('[data-fin-drawer] [role="dialog"]') as HTMLElement
 const flush = () => act(async () => {})
 
 beforeEach(() => {
@@ -282,26 +281,27 @@ describe('the list', () => {
   })
 })
 
-describe('the drawer', () => {
-  it('an issued invoice: the hero, Balance · Billing · Line items · Receipts, and Settle · Edit · ⋯', () => {
+// 2026-11-05 (the user, on the side panel: "invoice 我不需要旁边这个"): no drawer — a row opens the invoice's full page,
+// which carries the same steps; the right-click menu keeps them on the list.
+const step = (name: string, amount: string, item: RegExp | string) => {
+  fireEvent.contextMenu(rowOf(name, amount))
+  fireEvent.click(screen.getByRole('menuitem', { name: item }))
+}
+
+describe('opening an invoice, and its steps from the row menu', () => {
+  it('a click opens the invoice’s full page — no side panel', () => {
     draw()
     fireEvent.click(rowOf('HOUZS Century', '2,204.00'))
-    const d = drawer()
-    expect(d).toHaveTextContent('Invoice · HR attribution')
-    expect(d).toHaveTextContent('issued')
-    expect(d).toHaveTextContent('Settle collects the remaining RM 2,204.00. Same-company invoices can be settled together on one receipt.')
-    for (const g of ['Balance', 'Billing', 'Line items', 'Receipts']) expect(within(d).getByText(g)).toBeInTheDocument()
-    expect(d).toHaveTextContent('Due06 Nov 202623 days left')
-    expect(d).toHaveTextContent('No money received against this invoice yet.')
-    expect(within(d).getByRole('link', { name: 'View full page ↗' })).toHaveAttribute('href', '/invoices/hc1')
-    expect(within(d).getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/billing/invoice-doc?id=hc1')
-    expect(within(d).getAllByRole('button').map((b) => b.textContent)).toEqual(['×', 'Settle', 'Edit', '⋯'])
+    expect(mocks.push).toHaveBeenCalledWith('/invoices/hc1')
+    expect(document.querySelector('[data-fin-drawer]')).toBeNull()
+    fireEvent.contextMenu(rowOf('HOUZS Century', '2,204.00'))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open' }))
+    expect(mocks.push).toHaveBeenLastCalledWith('/invoices/hc1')
   })
 
   it('Edit opens the invoice in the lines dialog — its fields, its lines, whether money came in', () => {
     draw()
-    fireEvent.click(rowOf('HOUZS Century', '2,204.00'))
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'Edit' }))
+    step('HOUZS Century', '2,204.00', 'Edit')
     expect(mocks.dialog).toHaveBeenLastCalledWith(
       'lines',
       expect.objectContaining({
@@ -309,53 +309,42 @@ describe('the drawer', () => {
         editing: expect.objectContaining({ id: 'hc1', status: 'issued', settled: false, initial: expect.objectContaining({ billing_mode: 'hr_attribution' }) }),
       }),
     )
-    // Saved: the hub's toast says so and reads the list again.
-    const { onDone, onClose } = mocks.dialog.mock.lastCall?.[1] as { onDone: (m: string) => void; onClose: () => void }
+    const { onDone } = mocks.dialog.mock.lastCall?.[1] as { onDone: (m: string) => void }
     act(() => onDone('HV-INV-202610-0001 changed — JE-202610-0901 corrected'))
     expect(mocks.flash).toHaveBeenCalledWith('HV-INV-202610-0001 changed — JE-202610-0901 corrected')
     expect(mocks.refresh).toHaveBeenCalled()
-    act(() => onClose())
-    expect(mocks.dialog).toHaveBeenLastCalledWith('lines', expect.objectContaining({ open: false }))
   })
 
   it('Settle opens the settle dialog for it; a department pool’s settles on the voucher page', () => {
     draw()
-    fireEvent.click(rowOf('HOUZS Century', '2,204.00'))
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'Settle' }))
+    step('HOUZS Century', '2,204.00', 'Settle')
     expect(dialog()).toHaveTextContent('Settle 1 invoice')
     expect(dialog()).toHaveTextContent('HOUZS Century (HC) · one receipt')
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Cancel' }))
-    fireEvent.click(rowOf('Marketing', '780.25'))
-    expect(drawer()).toHaveTextContent('by netting, on the voucher page')
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'Settle' }))
+    step('Marketing', '780.25', /Settle/)
     expect(mocks.push).toHaveBeenCalledWith('/payments/new?invoice_id=dp1&return_to=/statements')
   })
 
   it('a draft: Approve & issue posts it and says so', async () => {
     draw()
-    fireEvent.click(rowOf('HOUZS Century', '500.00'))
-    expect(within(drawer()).getAllByRole('button').map((b) => b.textContent)).toEqual(['×', 'Approve & issue', 'Edit', '⋯'])
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'Approve & issue' }))
+    step('HOUZS Century', '500.00', 'Approve & issue')
     await flush()
     expect(mocks.approve).toHaveBeenCalledWith('dr1')
     expect(mocks.flash).toHaveBeenCalledWith('Approved & issued — posted to the GL')
     expect(mocks.refresh).toHaveBeenCalled()
   })
 
-  it('a refusal is said in the drawer, in words', async () => {
+  it('a refusal is said on screen, in words, held long enough to read', async () => {
     mocks.approve.mockResolvedValue({ ok: false, reason: 'The period 2026-10 is closed.' })
     draw()
-    fireEvent.click(rowOf('HOUZS Century', '500.00'))
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'Approve & issue' }))
+    step('HOUZS Century', '500.00', 'Approve & issue')
     await flush()
-    expect(within(drawer()).getByRole('alert')).toHaveTextContent('The period 2026-10 is closed.')
+    expect(mocks.flash).toHaveBeenCalledWith('The period 2026-10 is closed.', 8000)
   })
 
-  it('⋯ on a draft deletes it after asking', async () => {
+  it('Delete draft asks first', async () => {
     draw()
-    fireEvent.click(rowOf('HOUZS Century', '500.00'))
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'More' }))
-    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /Delete draft/ }))
+    step('HOUZS Century', '500.00', /Delete draft/)
     expect(dialog()).toHaveTextContent('Delete this draft?')
     expect(dialog()).toHaveTextContent('HV-INV-202610-0017 has not been issued. Deleting removes it.')
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Delete' }))
@@ -364,20 +353,18 @@ describe('the drawer', () => {
     expect(mocks.flash).toHaveBeenCalledWith('Draft deleted')
   })
 
-  it('a paid invoice: Refund through a voucher, + Credit note, ⋯ (Change account, Edit, Copy)', () => {
+  it('a paid invoice: Refund through a voucher; + Credit note shut, with why', () => {
     draw()
-    fireEvent.click(rowOf('HOUZS Century', '1,250.00'))
-    expect(within(drawer()).getAllByRole('button').map((b) => b.textContent)).toEqual(['×', 'Refund', '+ Credit note', '⋯'])
-    expect(drawer()).toHaveTextContent('Paid. Refund it if something was billed wrong.')
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'Refund' }))
+    step('HOUZS Century', '1,250.00', 'Refund')
     expect(mocks.push).toHaveBeenCalledWith('/payments/new?mode=refund&invoice_id=pd1&return_to=/statements')
+    const inv = toHubInvoice(row({ id: 'pc1', invoice_no: 'HV-INV-202610-0020', billing_mode: 'payroll_consolidated' }), ctx)
+    const { more } = invoiceSteps(inv, ALL)
+    expect(more.find((s) => s.key === 'credit_note')?.off).toBe('A consolidated payroll invoice settles in full — no credit note')
   })
 
-  it('⋯ › + Credit note and Change account open their dialogs on the invoice — what it owes, what it posted to', () => {
+  it('+ Credit note and Change account open their dialogs on the invoice — what it owes, what it posted to', () => {
     draw({ data: hub({ invoices: [toHubInvoice(row({ id: 'hc1', invoice_no: 'HV-INV-202610-0013', total_amount: 2204 }), { ...ctx, creditNotes: new Map([['hc1', [{ id: 'c1', no: 'HV-CN-202610-0002', amount: 220.4, reason: 'Overbilled', status: 'draft' }]]]) })] }) })
-    fireEvent.click(rowOf('HOUZS Century', '2,204.00'))
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'More' }))
-    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /\+ Credit note/ }))
+    step('HOUZS Century', '2,204.00', /\+ Credit note/)
     expect(mocks.dialog).toHaveBeenLastCalledWith(
       'credit_note',
       expect.objectContaining({
@@ -385,29 +372,13 @@ describe('the drawer', () => {
         invoice: { id: 'hc1', no: 'HV-INV-202610-0013', party: 'HOUZS Century (HC)', total: 2204, received: 0, credited: 220.4, mode: 'hr_attribution', category: '5020' },
       }),
     )
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'More' }))
-    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /Change account/ }))
+    step('HOUZS Century', '2,204.00', /Change account/)
     expect(mocks.dialog).toHaveBeenLastCalledWith('reassign', expect.objectContaining({ open: true, invoice: expect.objectContaining({ id: 'hc1', category: '5020' }) }))
-  })
-
-  // CN v2 (2026-08-19): a credit note nets what an ISSUED invoice still owes — the system refuses one on a
-  // paid invoice (refund it) and on a consolidated payroll invoice; the design's button stays, shut, saying why.
-  it('a credit note the system would refuse is drawn shut, with why', () => {
-    draw()
-    fireEvent.click(rowOf('HOUZS Century', '1,250.00'))
-    const cn = within(drawer()).getByRole('button', { name: '+ Credit note' })
-    expect(cn).toBeDisabled()
-    expect(cn).toHaveAttribute('title', 'A credit note nets what is still owed — a paid invoice is refunded instead')
-    const inv = toHubInvoice(row({ id: 'pc1', invoice_no: 'HV-INV-202610-0020', billing_mode: 'payroll_consolidated' }), ctx)
-    const { more } = invoiceSteps(inv, ALL)
-    expect(more.find((s) => s.key === 'credit_note')?.off).toBe('A consolidated payroll invoice settles in full — no credit note')
   })
 
   it('Void asks for a reason before it voids', async () => {
     draw()
-    fireEvent.click(rowOf('HOUZS Century', '2,204.00'))
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'More' }))
-    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /Void invoice/ }))
+    step('HOUZS Century', '2,204.00', /Void invoice/)
     expect(dialog()).toHaveTextContent('Void HV-INV-202610-0013?')
     expect(dialog()).toHaveTextContent('The invoice and its GL entry are reversed. HOUZS Century (HC) will no longer owe RM 2,204.00.')
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Void invoice' }))
@@ -423,9 +394,7 @@ describe('the drawer', () => {
 
   it('Copy lands a new draft in this month and says so', async () => {
     draw({ data: hub({ period: '2026-09-01' }) })
-    fireEvent.click(rowOf('HOUZS Century', '1,250.00'))
-    fireEvent.click(within(drawer()).getByRole('button', { name: 'More' }))
-    fireEvent.click(within(dialog()).getByRole('menuitem', { name: /Copy as new draft/ }))
+    step('HOUZS Century', '1,250.00', /Copy as new draft/)
     expect(dialog()).toHaveTextContent('A new draft in October 2026, with the same lines')
     fireEvent.click(within(dialog()).getByRole('button', { name: 'Copy as new draft' }))
     await flush()
@@ -513,7 +482,7 @@ describe('the lists that are not the table’s', () => {
     fireEvent.click(screen.getByText('HV-CN-202610-0002'))
     expect(within(dialog()).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Open HV-INV-202610-0013', 'PDF', 'Approve', 'Delete draft'])
     fireEvent.click(within(dialog()).getByRole('menuitem', { name: 'Open HV-INV-202610-0013' }))
-    expect(drawer()).toHaveTextContent('HV-INV-202610-0013')
+    expect(mocks.push).toHaveBeenLastCalledWith(expect.stringMatching(/^\/invoices\//))
   })
 
   it('Marketing billing: each confirmed line — Invoice opens the one it is on; Import while some are on none', () => {
@@ -524,7 +493,7 @@ describe('the lists that are not the table’s', () => {
     const [onIt, notYet] = screen.getAllByRole('button', { name: 'Invoice' })
     expect(notYet).toBeDisabled()
     fireEvent.click(onIt)
-    expect(drawer()).toHaveTextContent('HV-INV-202610-0009')
+    expect(mocks.push).toHaveBeenLastCalledWith(expect.stringMatching(/^\/invoices\//))
     fireEvent.click(screen.getByRole('button', { name: 'Import · 1' }))
     expect(mocks.dialog).toHaveBeenLastCalledWith('marketing', expect.objectContaining({ period: '2026-10-01', open: true }))
   })

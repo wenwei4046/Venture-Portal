@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState, type MouseEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { flash } from '@/components/hrv/toast'
+import { FLASH_LONG, flash } from '@/components/hrv/toast'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
 import { BulkBar, BulkButton, HeadButton, HubCards, HubHead, ItemList, MonthNav, hubStyles as hs, type ItemRow } from '@/components/finv/Hub'
 import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { fd } from '@/components/finv/DrawerParts'
 import { officeTime } from '@/lib/office-time'
-import { InvoiceDrawer, invoiceSteps, statusText, statusTone, type InvoiceCan, type InvoiceStep, type InvoiceStepKey } from './InvoiceDrawer'
+import { invoiceSteps, statusText, statusTone, type InvoiceCan, type InvoiceStep, type InvoiceStepKey } from './InvoiceDrawer'
 import PayrollBasisDrawer from './PayrollBasisDrawer'
 import { useInvoiceWork } from './invoice-work'
 import { INVOICE_CARD, invoiceCards, isStatusCard } from '../_lib/invoice-cards'
@@ -92,17 +92,18 @@ export default function InvoicesHubClient({
   const [others, setOthers] = useState(false)
   const [selecting, setSelecting] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [drawerId, setDrawerId] = useState<string | null>(null)
+  // No drawer (2026-11-05 — the user, on the Invoice hub's side panel: "invoice 我不需要旁边这个"): an invoice opens its full
+  // page, which carries the same steps (invoiceSteps).
+  const openInvoice = (id: string) => router.push(`/invoices/${id}`)
   const [basisOpen, setBasisOpen] = useState(false)
   const [rowMenu, setRowMenu] = useState<{ inv: HubInvoice; anchor: RowMenuAnchor } | null>(null)
 
-  // The selection, the drawer and Select belong to the month on show.
+  // The selection and Select belong to the month on show.
   const [shownPeriod, setShownPeriod] = useState(hub.period)
   if (shownPeriod !== hub.period) {
     setShownPeriod(hub.period)
     setSelected(new Set())
     setSelecting(false)
-    setDrawerId(null)
   }
 
   // The card in the URL, so a refresh or a link lands on it (no navigation: the lists are here).
@@ -137,12 +138,9 @@ export default function InvoicesHubClient({
     thisMonth,
     all,
     here: '/statements',
-    onOpen: setDrawerId,
-    onGone: () => setDrawerId(null),
+    onOpen: openInvoice,
+    onGone: () => {},
     goMonth: go,
-    onRefused: (id) => {
-      if (!drawerId) setDrawerId(id)
-    },
     ticked,
     onDoneWith: (ids, settled) => {
       if (settled) {
@@ -212,6 +210,12 @@ export default function InvoicesHubClient({
       }
       return next
     })
+  // A step taken from the row menu (Approve, Delete …) that the server refused: said on screen, as the drawer said it.
+  const refused = work.shownError
+  useEffect(() => {
+    if (refused) flash(refused, FLASH_LONG)
+  }, [refused])
+
   const settleTicked = () => {
     if (sel.payees > 1) return flash('One receipt can only settle one company’s invoices')
     if (sel.settleable.length === 0) return flash('Only issued invoices can be settled')
@@ -224,7 +228,7 @@ export default function InvoicesHubClient({
     const steps = [...bar, ...more]
     const item = (s: InvoiceStep): RowMenuItem => ({ key: s.key, label: s.label, hint: s.off ?? s.sub, danger: s.kind === 'danger', disabled: !!s.off, onSelect: () => onStep(s.key, inv) })
     const items: RowMenuItem[] = [
-      { key: 'open', label: 'Open', onSelect: () => setDrawerId(inv.id) },
+      { key: 'open', label: 'Open', onSelect: () => openInvoice(inv.id) },
       { key: 'new-tab', label: 'Open in new tab', onSelect: () => window.open(`/invoices/${inv.id}`, '_blank', 'noopener,noreferrer') },
     ]
     if (can.docExport) items.push({ key: 'pdf', label: 'PDF', onSelect: () => window.open(`/billing/invoice-doc?id=${inv.id}`, '_blank', 'noopener,noreferrer') })
@@ -264,7 +268,7 @@ export default function InvoicesHubClient({
     sub: [l.party.name, l.track, l.account ? l.account.code : 'no account', mktLineState(l)].join(' · '),
     value: f2(l.amount),
     action: l.invoice
-      ? { label: 'Invoice', onClick: () => setDrawerId(l.invoice!.id), title: l.invoice.no ?? undefined }
+      ? { label: 'Invoice', onClick: () => openInvoice(l.invoice!.id), title: l.invoice.no ?? undefined }
       : { label: 'Invoice', disabled: true, title: 'Not on an invoice yet — Create invoice ▾ › Import Marketing billing puts it on its draft.' },
   }))
   const nbItems: ItemRow[] = hub.nonBillable.map((t) => ({
@@ -314,7 +318,6 @@ export default function InvoicesHubClient({
       </>
     ) : null
 
-  const drawerInvoice = drawerId ? (all.get(drawerId) ?? null) : null
   const listTitle = INVOICE_CARD[card].label
   return (
     <div className={hs.root} data-fin-kit="">
@@ -357,8 +360,7 @@ export default function InvoicesHubClient({
             countLabel={(n) => `${n} · ${monthShort}${withOthers ? ' + other months' : ''}`}
             tools={tools}
             select={{ on: selecting, isSelected: (r) => selected.has(r.id), canSelect: canTick, onToggle: toggle, onToggleAll: toggleAll }}
-            activeKey={drawerId}
-            onRowClick={(r) => setDrawerId(r.id)}
+            onRowClick={(r) => openInvoice(r.id)}
             onRowContextMenu={onRowContextMenu}
             emptyText={hub.invoices.length === 0 && !withOthers ? `No invoices for ${monthLong} yet.` : 'No invoices here.'}
             canSetDefault={canSetDefault}
@@ -416,20 +418,6 @@ export default function InvoicesHubClient({
         </BulkBar>
       ) : null}
 
-      <InvoiceDrawer
-        invoice={drawerInvoice}
-        open={!!drawerId}
-        onClose={() => {
-          setDrawerId(null)
-          work.setError(null)
-        }}
-        can={can}
-        today={today}
-        busy={work.busy}
-        error={work.shownError}
-        onStep={onStep}
-        onMore={work.openMore}
-      />
       <PayrollBasisDrawer open={basisOpen} onClose={() => setBasisOpen(false)} month={monthLong} basis={hub.basis} department={hub.department} />
 
       {work.dialogs}
