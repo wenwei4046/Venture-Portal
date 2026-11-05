@@ -97,11 +97,13 @@ export default function Employment({
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function run(fn: (id: string) => Promise<void>) {
+  function run(fn: (id: string) => Promise<string | void>) {
     setError(null)
     startTransition(async () => {
       try {
-        await fn(personId)
+        // A word back (Deactivate whose login stayed on) is said here; the step itself went through.
+        const note = await fn(personId)
+        if (note) setError(note)
         setConfirming(false)
         onDone()
       } catch (err) {

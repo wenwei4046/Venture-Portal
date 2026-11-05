@@ -254,6 +254,17 @@ export default async function StaffDetailPage({ params, searchParams }: PageProp
             ? `/team/people?invite=${staff.id}`
             : null
         }
+        // Disable / Enable login (2026-11-05): People · Edit or Permissions · Edit, never one's own; a full-access login
+        // shows why it stays with whoever manages permissions (the database asks the same — account_set_login).
+        loginSwitch={
+          account && account.id !== viewer.id && (canDo(viewer, 'team', 'edit') || canDo(viewer, 'accounts', 'manage'))
+            ? {
+                userId: account.id,
+                enabled: account.is_active,
+                held: fullAccess ? 'A full-access login: only whoever manages permissions turns it off or on.' : null,
+              }
+            : null
+        }
         startEditing={edit === '1'}
       />
 

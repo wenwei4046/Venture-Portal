@@ -426,12 +426,13 @@ async function saveLoginEmail(supabase: Awaited<ReturnType<typeof createClient>>
  * active staff only, so a person deactivated without it stays on the chart
  * until the next hard reload.
  */
-async function setEmployment(id: string, status: 'active' | 'inactive') {
+/** Answers their login's id, when they have one (Deactivate turns it off). */
+async function setEmployment(id: string, status: 'active' | 'inactive'): Promise<string | null> {
   // Its buttons are on the person's full page (PersonChanges › Employment).
   await requireActionOn('/team/people/[id]', 'team', 'edit')
   const supabase = await createClient()
 
-  const { error } = await supabase.from('hr_staff_costs').update({ status }).eq('id', id)
+  const { data, error } = await supabase.from('hr_staff_costs').update({ status }).eq('id', id).select('user_id').maybeSingle()
 
   if (error) {
     throw new Error(
@@ -442,12 +443,22 @@ async function setEmployment(id: string, status: 'active' | 'inactive') {
   revalidatePath('/hr-costing', 'layout')
   revalidatePath('/team', 'layout')
   revalidatePath('/revenue', 'layout')
+  return (data as { user_id: string | null } | null)?.user_id ?? null
 }
 
-export async function deactivateStaff(id: string) {
-  await setEmployment(id, 'inactive')
+/**
+ * Deactivate turns their login off too (2026-11-05 — the user: 要，自动停用): a person who left must not sign in. The
+ * deactivation stands whatever happens to the login; a login this viewer may not turn off (a full-access one, for HR)
+ * is said in words, and stays on. Reactivate never turns it back on — that is the person page's Enable login.
+ */
+export async function deactivateStaff(id: string): Promise<string | void> {
+  const userId = await setEmployment(id, 'inactive')
+  if (!userId) return
+  const supabase = await createClient()
+  const { error } = await (supabase as unknown as SupabaseClient).rpc('account_set_login', { p_user: userId, p_enabled: false })
+  if (error) return `Deactivated — but their login is still on: ${error.message}`
 }
 
-export async function reactivateStaff(id: string) {
+export async function reactivateStaff(id: string): Promise<void> {
   await setEmployment(id, 'active')
 }
