@@ -289,11 +289,13 @@ const step = (name: string, amount: string, item: RegExp | string) => {
 }
 
 describe('opening an invoice, and its steps from the row menu', () => {
-  it('a click opens the invoice’s full page — no side panel', () => {
+  it('a click marks the invoice; a double-click opens its full page — no side panel', () => {
     draw()
     fireEvent.click(rowOf('HOUZS Century', '2,204.00'))
-    expect(mocks.push).toHaveBeenCalledWith('/invoices/hc1')
+    expect(mocks.push).not.toHaveBeenCalled()
     expect(document.querySelector('[data-fin-drawer]')).toBeNull()
+    fireEvent.doubleClick(rowOf('HOUZS Century', '2,204.00'))
+    expect(mocks.push).toHaveBeenCalledWith('/invoices/hc1')
     fireEvent.contextMenu(rowOf('HOUZS Century', '2,204.00'))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Open' }))
     expect(mocks.push).toHaveBeenLastCalledWith('/invoices/hc1')
