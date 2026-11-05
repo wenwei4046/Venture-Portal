@@ -16,6 +16,7 @@ import {
   type ReactNode,
 } from 'react'
 import { btn, Chip } from '@/components/hrv/kit'
+import LoginSwitch from './LoginSwitch'
 import { NavIcon, type HrIconName } from '@/components/hrv/icons'
 import { Select } from '@/components/hrv/select'
 import { FLASH_LONG, flash } from '@/components/hrv/toast'
@@ -156,12 +157,15 @@ export default function PersonRecord({
   view,
   editor,
   inviteHref,
+  loginSwitch = null,
   startEditing = false,
 }: {
   view: PersonRecordView
   editor: PersonEditor | null
   /** Invite user, while they have no login and the viewer may make one. */
   inviteHref: string | null
+  /** Disable / Enable login (2026-11-05): their login, for whoever may turn it off or on — never one's own. */
+  loginSwitch?: { userId: string; enabled: boolean; held: string | null } | null
   /** Opened from the old Edit address. */
   startEditing?: boolean
 }) {
@@ -429,7 +433,7 @@ export default function PersonRecord({
           </span>
         ) : null}
       </div>
-      {!editing && (editor || inviteHref) ? (
+      {!editing && (editor || inviteHref || loginSwitch) ? (
         <div className={s.actions}>
           {editor ? (
             <button ref={editButton} type="button" onClick={enter} className={`${btn('primary')} ${s.action}`}>
@@ -443,6 +447,7 @@ export default function PersonRecord({
               Invite
             </Link>
           ) : null}
+          {loginSwitch ? <LoginSwitch {...loginSwitch} className={s.action} /> : null}
         </div>
       ) : null}
       <dl className={s.sideFacts}>

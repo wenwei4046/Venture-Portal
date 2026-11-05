@@ -578,6 +578,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'approve_terms_change', 'file_terms_change', 'reject_terms_change', 'withdraw_terms_change',
   // A fund contra (mig 20261104230000): filed / withdrawn / undone on Fund OUT or Fund IN, decided in Approvals.
   'approve_fund_contra', 'file_fund_contra', 'reject_fund_contra', 'undo_fund_contra', 'withdraw_fund_contra',
+  // A login turned off or on from the person's page (mig 20261105010000): People · Edit or Permissions · Edit.
+  'account_set_login',
 ])
 
 /**
