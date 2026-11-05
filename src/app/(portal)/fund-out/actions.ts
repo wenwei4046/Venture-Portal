@@ -22,6 +22,7 @@ import type { Json } from '@/lib/supabase/database.types'
 import { amendMonthWords, compoundSent, explainAmendRefusal, openFromSent, principalPerMonthSent } from '@/lib/fund-amend'
 import { loadNewLoanOptions, type NewLoanOptions } from './_lib/new-loan-options'
 import { minPayFromDate } from '@/lib/min-pay'
+import { loanTagOf } from '@/lib/gl-reports'
 
 // ─── Create new loan (Finance) ────────────────────────────────────────────────
 //
@@ -310,11 +311,16 @@ export async function recordRepayment(formData: FormData) {
   // Check loan is active and amount doesn't exceed outstanding for principal payments
   const { data: loan, error: loanError } = await supabase
     .from('loans')
-    .select('status, principal')
+    .select('status, principal, repayment_terms, companies(short_code, name)')
     .eq('id', loanId)
     .single()
 
   if (loanError || !loan) throw new Error('Loan not found')
+  // Who and which loan, in the entry's words (2026-11-05 — the user, on the P&L's "interest repayment offset" rows):
+  // "Loan interest repayment — CAR [LO#16]", where it said the loan's id.
+  const loanCo = (Array.isArray(loan.companies) ? loan.companies[0] : loan.companies) as { short_code: string | null; name: string | null } | null
+  const loanTag = loanTagOf(loan.repayment_terms as string | null)
+  const loanName = [loanCo?.short_code || loanCo?.name, loanTag ? `[${loanTag}]` : null].filter(Boolean).join(' ') || loanId
   if (loan.status !== 'active') {
     throw new Error(`Cannot record repayment on ${loan.status} loan`)
   }
@@ -401,13 +407,13 @@ export async function recordRepayment(formData: FormData) {
   try {
     journalEntryId = await postJournalEntry(supabase, {
       transactionDate: paymentDate,
-      description: `Loan ${paymentType} repayment — ${loanId}`,
+      description: `Loan ${paymentType} repayment — ${loanName}`,
       referenceType: 'repayment',
       referenceId: loanId,
       createdBy: user.id,
       lines: [
-        { accountCode: bankGl, debit: amount, description: `Bank — ${paymentType} received` },
-        { accountCode: creditAccount, credit: amount, description: `${paymentType} repayment offset` },
+        { accountCode: bankGl, debit: amount, description: `Loan ${paymentType} received — ${loanName}` },
+        { accountCode: creditAccount, credit: amount, description: `Loan ${paymentType} received — ${loanName}` },
       ],
     })
   } catch (jeErr) {
@@ -436,7 +442,7 @@ export async function recordRepayment(formData: FormData) {
     const { error: vpError } = await supabase.from('venture_pool').insert({
       transaction_type: 'loan_repayment_in',
       amount,
-      description: `Loan principal repayment — ${loanId}`,
+      description: `Loan principal repayment — ${loanName}`,
       reference_id: loanId,
       reference_table: 'loans',
       created_by: user.id,

@@ -7,7 +7,7 @@
 
 /** The system's own wording, which says nothing about the line. */
 const GENERIC =
-  /^(expense - .+ \(([a-z_]+|\d{4})\)\s*$|AR — invoice\b|AR cleared — |Payment received —|Service billing revenue recognised|Inter-billing\b|Reclass \d{4}-\d{2}-\d{2})/i
+  /^(expense - .+ \(([a-z_]+|\d{4})\)\s*$|AR — invoice\b|AR cleared — |Payment received —|Service billing revenue recognised|Inter-billing\b|Reclass \d{4}-\d{2}-\d{2}|(Reversal — )?(principal|interest|netting|penalty) repayment offset\s*$|(Reversal — )?Bank — (principal|interest|netting|penalty) received\s*$)/i
 /** An entry from before the system: "PV-000020 — KHO WEI JIE", "JV-000011 [marketing] — SALARY - MAR'26". */
 const OLD = /^((?:PV|JV|I|OR)-\d+)(?:\s*\[[^\]]*\])?\s*—\s*(.+)$/
 

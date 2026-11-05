@@ -8,7 +8,7 @@ import {
   buildPnl,
   fetchAllJournalLines,
   fetchCoaAccounts,
-  fetchGlRefs,
+  fetchGlRefs, fetchLoanRefs,
   monthPeriod,
 } from '@/lib/gl-reports'
 import { eliminateInterBilling, fetchInterBillingElimination } from '@/lib/consolidation'
@@ -47,7 +47,7 @@ export async function readPnlStatement(supabase: Client, user: User, ask: Statem
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     // Salary lines by department for whoever reads payroll that way (2026-10-13).
-    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
+    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user), loans: fetchLoanRefs(supabase, user) }),
     consolidated ? fetchInterBillingElimination(supabase) : Promise.resolve(null),
   ])
   let lines = applyGlRefs(rawLines, glRefs)
@@ -86,7 +86,7 @@ export async function readCashFlowStatement(supabase: Client, user: User, ask: S
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     // Salary lines by department for whoever reads payroll that way (2026-10-13).
-    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
+    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user), loans: fetchLoanRefs(supabase, user) }),
     bankCodesRead,
     // Fold inter-billing settles (dept_pools-only, no GL) in as synthetic
     // transfer lines so each segment's closing cash ties to its Dept Pool.
@@ -122,7 +122,7 @@ export async function readBalanceSheet(supabase: Client, user: User, ask: Statem
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
     // Salary lines by department for whoever reads payroll that way (2026-10-13).
-    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
+    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user), loans: fetchLoanRefs(supabase, user) }),
   ])
   const lines = applyGlRefs(rawLines, glRefs)
 
