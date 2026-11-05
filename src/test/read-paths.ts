@@ -51,6 +51,10 @@ export const GUARDS: Readonly<Record<string, Gate>> = {
   // 2026-10-28 — Marketing's own pool: Finance's Marketing P&L and Cash Flow in Marketing's view. The ledger opens to
   // the treasury only, so the page, the lines it opens and its files read through the service role once their own
   // View or Export is held, Marketing's segment named in code (lib/marketing/pool.ts).
+  // 2026-11-05 — a loan repayment's lines in the reports name the borrower and the loan: the loans are read only for
+  // a company-wide reader (Reports · View); a department's reader of the same reports gets none.
+  'src/lib/gl-reports.ts#fetchLoanRefs':
+    { wants: ['reports.view'], text: 'reportsCompanyWide(user) — Reports · View, the loans behind a repayment’s lines' },
   'src/app/(portal)/marketing/pool/page.tsx#MarketingPoolPage':
     { wants: ['service_role'], text: 'every read goes through adminClient(), once Marketing pool · View is held on its page — Marketing’s segment only' },
   'src/app/(portal)/marketing/pool/actions.ts#openMarketingPoolRow':

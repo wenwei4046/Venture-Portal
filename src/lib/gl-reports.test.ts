@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   applyGlRefs,
+  loanTagOf,
   foldPayrollGlLines,
   buildPnl,
   buildBalanceSheet,
@@ -313,6 +314,33 @@ describe('applyGlRefs', () => {
       ref_id: 'x',
     }
     expect(applyGlRefs([line], refs)[0].party).toBeUndefined()
+  })
+
+  // 2026-11-05 — the user, on the P&L's rows of "interest repayment offset": 有没有别的可以显示？
+  it('says a loan repayment’s borrower, kind and loan tag instead of “interest repayment offset”', () => {
+    const withLoans = { ...refs, loans: new Map([['loan-1', { party: 'CAR', tag: 'LO#16' }]]) }
+    const paid = entry('2026-06-05', [['3000', 1200, 0], ['5000', 0, 1200]]).map((l, i) => ({
+      ...l,
+      ref_type: 'repayment',
+      ref_id: 'loan-1',
+      description: i === 0 ? 'Bank — interest received' : 'interest repayment offset',
+    }))
+    const undone = entry('2026-06-06', [['5000', 1200, 0], ['3000', 0, 1200]]).map((l, i) => ({
+      ...l,
+      ref_type: 'repayment_void',
+      ref_id: 'loan-1',
+      description: i === 0 ? 'Reversal — interest repayment offset' : 'Reversal — Bank — interest received',
+    }))
+    const lines = applyGlRefs([...paid, ...undone], withLoans)
+    expect(lines[1]).toMatchObject({ party: 'CAR', ref_no: 'LO#16', doc_text: 'Loan interest received · LO#16' })
+    expect(lines[2].doc_text).toBe('Loan interest received · reversed · LO#16')
+    // The P&L folds a reversal and what it cancels; the payment alone stands there.
+    const revenue = buildPnl(lines.slice(0, 2), ACCOUNTS, FILTER).revenue.nodes.find((n) => n.code === '5000')!.txns
+    expect(revenue.find((t) => t.date === '2026-06-05')).toMatchObject({ description: 'Loan interest received · LO#16', party: 'CAR', refNo: 'LO#16' })
+    // A loan the reader cannot read still says what it was.
+    expect(applyGlRefs([paid[1]], refs)[0].doc_text).toBe('Loan interest received')
+    expect(loanTagOf('EMI 分期 · 月息4% · 6期 · [LO#3] · 资金来源: HC-58k')).toBe('LO#3')
+    expect(loanTagOf(null)).toBeNull()
   })
 
   // 2026-10-24 — the drill-down's Ref. 2: the source document's number; an invoice's words stand without it.

@@ -11,6 +11,8 @@ import { ACCOUNT_TYPES, type AccountType, type CashFlowCategory, defaultCashFlow
 import { fetchAllRows, fetchAllRowsParallel } from './paginate'
 import { payrollFoldOf, type PayrollVoucherText } from './payroll-vouchers'
 import { lineWords } from './line-words'
+import { reportsCompanyWide } from '@/lib/surfaces'
+import type { ActionHolder } from '@/lib/permission-actions'
 
 function r2(n: number): number {
   return Math.round(n * 100) / 100
@@ -133,6 +135,22 @@ export interface GlRefs {
    *  fetchGlRefs `payrollByPerson: false`): salary voucher id → the batch and
    *  department its lines fold into (applyGlRefs). */
   payrollByDepartment?: Map<string, { label: string; department: string }>
+  /** loan id → its borrower (short code) and its tag ("LO#16"), for a loan repayment's lines (2026-11-05). */
+  loans?: Map<string, { party: string | null; tag: string | null }>
+}
+
+/** A loan's tag as Finance writes it in its terms ("… · [LO#16] · …") — the first bracket, without the brackets. */
+export function loanTagOf(terms: string | null | undefined): string | null {
+  const m = /\[([^\]]{1,24})\]/.exec(terms ?? '')
+  return m?.[1]?.trim() || null
+}
+
+/** What a loan repayment's line was (2026-11-05 — the user, on the P&L's rows of "interest repayment offset": 有没有别的可以显示？):
+ *  "Loan interest received", "Loan principal received · reversed" — the kind read off the line's own words. */
+export function repaymentLineText(description: string | null, reversed: boolean): string | null {
+  const m = /\b(principal|interest|netting|penalty)\b/i.exec(description ?? '')
+  if (!m) return null
+  return `Loan ${m[1].toLowerCase()} received${reversed ? ' · reversed' : ''}`
 }
 
 /** Reference lookups for enriching drill-down rows: invoice number /
@@ -147,9 +165,32 @@ export interface GlRefs {
  *  `payrollByPerson: false` (lib/roles.ts listsPayrollByPerson, 2026-10-13):
  *  the refs carry `payrollByDepartment`, and applyGlRefs folds each salary
  *  voucher's lines by batch and department — no name reaches a drill-down. */
-export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPerson?: boolean } = {}): Promise<GlRefs> {
+/** The loans, for a repayment's borrower and tag (2026-11-05). Read only for a reader the reports open company-wide
+ *  (Reports · View, `reportsCompanyWide`): a department's reader does not open the loans, and its lines keep their
+ *  kind alone. A reader the loans are still closed to gets none. */
+export async function fetchLoanRefs(supabase: SupabaseClient, user: ActionHolder): Promise<NonNullable<GlRefs['loans']>> {
+  if (!reportsCompanyWide(user)) return new Map()
+  const [loans, { data: companies }] = await Promise.all([
+    fetchAllRows((from, to) =>
+      supabase.from('loans').select('id, company_id, repayment_terms').order('id', { ascending: true }).range(from, to),
+    ).catch(() => [] as Array<{ id: string; company_id: string | null; repayment_terms: string | null }>),
+    supabase.from('companies').select('id, name, short_code'),
+  ])
+  const coById = new Map((companies ?? []).map((c) => [c.id as string, (c.short_code as string | null) ?? (c.name as string)]))
+  return new Map(
+    (loans as Array<{ id: string; company_id: string | null; repayment_terms: string | null }>).map((l) => [
+      l.id,
+      { party: l.company_id ? (coById.get(l.company_id) ?? null) : null, tag: loanTagOf(l.repayment_terms) },
+    ]),
+  )
+}
+
+export async function fetchGlRefs(
+  supabase: SupabaseClient,
+  opts: { payrollByPerson?: boolean; loans?: Promise<GlRefs['loans']> } = {},
+): Promise<GlRefs> {
   const foldPayroll = opts.payrollByPerson === false
-  const [invoices, { data: companies }, { data: departments }, vouchers, creditNotes, salaryVouchers] =
+  const [invoices, { data: companies }, { data: departments }, vouchers, creditNotes, salaryVouchers, loans] =
     await Promise.all([
       fetchAllRows(
         (from, to) =>
@@ -194,6 +235,7 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
             'fetchGlRefs salary vouchers',
           )
         : Promise.resolve([]),
+      opts.loans ?? Promise.resolve(undefined),
     ])
 
   const coById = new Map((companies ?? []).map((c) => [c.id as string, (c.short_code as string | null) ?? (c.name as string)]))
@@ -223,6 +265,7 @@ export async function fetchGlRefs(supabase: SupabaseClient, opts: { payrollByPer
   )
 
   return {
+    ...(loans ? { loans } : {}),
     invoices: new Map(
       (invoices ?? []).map((i) => [
         i.id as string,
@@ -361,6 +404,17 @@ export function applyGlRefs(lines: GlLine[], refs: GlRefs): GlLine[] {
       const text = refs.creditNoteTexts?.get(l.ref_id) ?? null
       if (!party && !no && !text) return l
       return { ...l, ...(party ? { party } : {}), ...(no ? { ref_no: no } : {}), ...(text ? { doc_text: text } : {}) }
+    }
+    if (l.ref_type === 'repayment' || l.ref_type === 'repayment_void') {
+      const loan = refs.loans?.get(l.ref_id)
+      const text = repaymentLineText(l.description, l.ref_type === 'repayment_void')
+      if (!loan && !text) return l
+      return {
+        ...l,
+        ...(loan?.party ? { party: loan.party } : {}),
+        ...(loan?.tag ? { ref_no: loan.tag } : {}),
+        ...(text ? { doc_text: loan?.tag ? `${text} · ${loan.tag}` : text } : {}),
+      }
     }
     return l
   })

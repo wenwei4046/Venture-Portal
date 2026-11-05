@@ -40,6 +40,7 @@ vi.mock('@/lib/gl-reports', async (orig) => ({
   ...(await orig<object>()),
   fetchAllJournalLines: mocks.journal,
   fetchCoaAccounts: async () => fx.ACCOUNTS,
+  fetchLoanRefs: async () => new Map(),
   fetchGlRefs: async () => ({ invoices: new Map(), voucherPayees: new Map() }),
 }))
 vi.mock('@/lib/consolidation', async (orig) => ({ ...(await orig<object>()), fetchInterBillingElimination: mocks.elim }))
