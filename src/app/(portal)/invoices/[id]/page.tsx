@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { linesByDepartment } from '@/lib/invoice-departments'
 import { requirePermission, requirePage } from '@/lib/auth'
 import { canDo } from '@/lib/permission-actions'
 import { createClient } from '@/lib/supabase/server'
@@ -58,6 +59,7 @@ export default async function InvoicePage({ params }: Props) {
     docExport: canDo(user, 'billing', 'export'),
   }
   let n = 0
+  const groups = linesByDepartment(h.lines)
 
   return (
     <div className={s.root} data-fin-kit="">
@@ -101,22 +103,35 @@ export default async function InvoicePage({ params }: Props) {
               <div className={s.tHead}>
                 <span className={`${s.tCol} ${s.tWide}`}>Item</span>
                 <span className={s.tCol}>Account</span>
-                <span className={s.tNum}>Amount</span>
+                <span className={`${s.tNum} ${s.tAmount}`}>Amount</span>
               </div>
-              {h.lines.map((l, i) => (
-                <div key={i} className={s.tRow}>
-                  <span className={`${s.tCol} ${s.tWide}`} title={l.description || undefined}>
-                    {l.description || `Line ${i + 1}`}
-                  </span>
-                  <span className={s.tCol} data-sub="true" title={l.account && l.code ? `${l.account} · ${l.code}` : undefined}>
-                    {l.code ? `${l.code} · ${l.account ?? l.code}` : '—'}
-                  </span>
-                  <span className={s.tNum}>{rm(l.amount)}</span>
+              {/* By department (2026-11-05): a consolidated payroll invoice's lines under each department, its subtotal
+                  after — as its PDF prints them; an invoice whose lines carry no department reads as one list. */}
+              {(groups ?? [{ segment: '', label: '', lines: h.lines, subtotal: h.total }]).map((g) => (
+                <div key={g.segment || 'all'}>
+                  {groups ? <div className={s.tGroup}>{g.label}</div> : null}
+                  {g.lines.map((l, i) => (
+                    <div key={i} className={s.tRow}>
+                      <span className={`${s.tCol} ${s.tWide}`} title={l.description || undefined}>
+                        {l.description || `Line ${i + 1}`}
+                      </span>
+                      <span className={s.tCol} data-sub="true" title={l.account && l.code ? `${l.account} · ${l.code}` : undefined}>
+                        {l.code ? `${l.code} · ${l.account ?? l.code}` : '—'}
+                      </span>
+                      <span className={`${s.tNum} ${s.tAmount}`}>{rm(l.amount)}</span>
+                    </div>
+                  ))}
+                  {groups ? (
+                    <div className={`${s.tRow} ${s.tSubtotal}`}>
+                      <span className={s.tCol}>{g.label} subtotal</span>
+                      <span className={`${s.tNum} ${s.tAmount}`}>{rm(g.subtotal)}</span>
+                    </div>
+                  ) : null}
                 </div>
               ))}
               <div className={s.tFoot}>
                 <span className={s.tCol}>Total</span>
-                <span className={s.tNum}>{rm(h.total)}</span>
+                <span className={`${s.tNum} ${s.tAmount}`}>{rm(h.total)}</span>
               </div>
             </div>
           </FullCard>

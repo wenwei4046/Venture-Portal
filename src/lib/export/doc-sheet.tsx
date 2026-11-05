@@ -126,6 +126,9 @@ const s = StyleSheet.create({
     lineHeight: 1.45,
     color: FAINT,
   },
+  // A continued page's line beside the title: what it is, small and grey.
+  // Placed on the page as the page count is — a per-page text inside the flow was measured empty and never drew.
+  running: { position: 'absolute', left: px(56), right: px(56 + 36 + 16), top: px(52) + px(10), fontSize: 8, lineHeight: 1.45, color: FAINT, textAlign: 'right' },
   // Room on the right for *Page N of M*.
   footerLeft: { flex: 1, marginRight: 64 },
   pageCount: {
@@ -196,7 +199,20 @@ export function docOfficeDay(at: string | null | undefined): string | null {
  * every page it runs to. A `head` repeats on every page with the title — a
  * detail appendix's meta and column heads over its long list.
  */
-export function DocPage({ title, footer, head, children }: { title: string; footer: string; head?: React.ReactNode; children: React.ReactNode }) {
+export function DocPage({
+  title,
+  footer,
+  head,
+  running,
+  children,
+}: {
+  title: string
+  footer: string
+  head?: React.ReactNode
+  /** On every page after the first, beside the title (2026-11-05, the user: export 出来的 pdf 要有 header): what it is. */
+  running?: string
+  children: React.ReactNode
+}) {
   const top = (
     <View style={s.top}>
       <T style={s.title}>{title}</T>
@@ -207,19 +223,17 @@ export function DocPage({ title, footer, head, children }: { title: string; foot
   )
   return (
     <Page size="A4" style={s.page}>
-      {head ? (
-        <View fixed>
-          {top}
-          {head}
-        </View>
-      ) : (
-        top
-      )}
+      {/* The title and the H head every page (2026-11-05 — a second page began with bare rows). */}
+      <View fixed>
+        {top}
+        {head ?? null}
+      </View>
       {children}
       <View style={s.footer} fixed>
         <T style={s.footerLeft}>{footer}</T>
       </View>
       <T style={s.pageCount} fixed render={({ subPageNumber, subPageTotalPages }) => `Page ${subPageNumber} of ${subPageTotalPages}`} />
+      {running ? <T style={s.running} fixed render={({ subPageNumber }) => (subPageNumber > 1 ? `${running} · continued` : '')} /> : null}
     </Page>
   )
 }
@@ -303,9 +317,9 @@ export interface DocRow {
 const cellStyle = (c: DocColumn, i: number) => [i === 0 ? s.grow : { width: px(c.width ?? 0) }, i > 0 ? s.col : {}, c.align === 'right' ? s.right : {}]
 
 /** The items' header: 8pt grey over a 1pt black rule. */
-export function DocItemsHead({ columns, first = true }: { columns: DocColumn[]; first?: boolean }) {
+export function DocItemsHead({ columns, first = true, repeat = false }: { columns: DocColumn[]; first?: boolean; repeat?: boolean }) {
   return (
-    <View style={[s.itemsHead, first ? s.items : {}]}>
+    <View style={[s.itemsHead, first ? s.items : {}]} fixed={repeat}>
       {columns.map((c, i) => (
         <T key={i} style={cellStyle(c, i)}>
           {c.label}
@@ -339,7 +353,8 @@ export function DocItemRow({ columns, row, strong = false }: { columns: DocColum
 export function DocItems({ columns, rows, groups }: { columns: DocColumn[]; rows?: DocRow[]; groups?: Array<{ label: string; rows: DocRow[]; subtotal: DocRow }> }) {
   return (
     <View>
-      <DocItemsHead columns={columns} />
+      {/* The column heads repeat over the items on every page they run to (2026-11-05). */}
+      <DocItemsHead columns={columns} repeat />
       {rows?.map((r, i) => (
         <DocItemRow key={i} columns={columns} row={r} />
       ))}

@@ -1,4 +1,5 @@
 import React from 'react'
+import { linesByDepartment } from '@/lib/invoice-departments'
 import { Document } from '@react-pdf/renderer'
 import {
   DocBlock,
@@ -65,15 +66,6 @@ export interface InvoiceDocData {
   paid_on: string | null
 }
 
-// gl_segment → a department's group on a consolidated payroll invoice.
-const SEGMENT_LABEL: Record<string, string> = {
-  hr: 'HR',
-  finance: 'Finance',
-  director_office: 'Director Office',
-  director: 'Director',
-  marketing: 'Marketing',
-  it: 'IT',
-}
 
 const r2 = (n: number) => Math.round(n * 100) / 100
 const firstLine = (s: string | null | undefined) => (s ?? '').split(/\r?\n/)[0].trim()
@@ -110,14 +102,12 @@ function InvoicePage({ inv }: { inv: InvoiceDocData }) {
     cells: [l.description?.trim() || '—', '1', docMoney(l.amount), docMoney(l.amount)],
     second: period,
   })
-  const segmented = lines.some((l) => l.segment)
-  const groups = segmented
-    ? [...new Set(lines.map((l) => l.segment ?? ''))].map((seg) => {
-        const its = lines.filter((l) => (l.segment ?? '') === seg)
-        const label = SEGMENT_LABEL[seg] ?? (seg || 'Other')
-        return { label, rows: its.map(row), subtotal: { cells: [`${label} subtotal`, '', '', docMoney(r2(its.reduce((s, l) => s + l.amount, 0)))] } }
-      })
-    : undefined
+  // By department (lib/invoice-departments — the invoice's page reads the same groups, 2026-11-05).
+  const groups = linesByDepartment(lines)?.map((g) => ({
+    label: g.label,
+    rows: g.lines.map(row),
+    subtotal: { cells: [`${g.label} subtotal`, '', '', docMoney(g.subtotal)] },
+  }))
   const subtotal = r2(lines.reduce((s, l) => s + l.amount, 0))
 
   const totals = [
@@ -129,7 +119,7 @@ function InvoicePage({ inv }: { inv: InvoiceDocData }) {
   totals.push({ label: 'Amount due', value: docMoney(inv.status === 'issued' || inv.status === 'draft' ? inv.remaining : 0) })
 
   return (
-    <DocPage title="Invoice" footer={`${no} · ${headline}`}>
+    <DocPage title="Invoice" footer={`${no} · ${headline}`} running={`${no} · ${inv.bill_to.name}`}>
       <DocMeta lines={meta} />
       <DocParties full counter={{ heading: 'Bill to', lines: [inv.bill_to.name, inv.bill_to.kind, inv.billing_mode_label, ...inv.bill_to.contact] }} />
       <DocHeadline headline={headline} summary={inv.description?.trim() || null} />

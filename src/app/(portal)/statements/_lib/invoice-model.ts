@@ -20,6 +20,8 @@ export interface HubInvoiceLine {
   account: string | null
   code: string | null
   amount: number
+  /** Its department's P&L segment — a consolidated payroll invoice's lines group by it (2026-11-05). */
+  segment?: string | null
 }
 
 export interface HubInvoiceReceipt {
@@ -222,7 +224,7 @@ export interface InvoiceContext {
   /** code → name, every account. */
   accounts: ReadonlyMap<string, string>
   extraModes: ReadonlyArray<{ value: string; label: string }>
-  lines: ReadonlyMap<string, Array<{ description: string | null; amount: number; category_code: string | null }>>
+  lines: ReadonlyMap<string, Array<{ description: string | null; amount: number; category_code: string | null; segment?: string | null }>>
   /** Receipts made against an invoice (credit vouchers naming it, not voided), in payment-date order. */
   receipts: ReadonlyMap<string, Array<{ voucher_no: string | null; payment_date: string | null; amount: number }>>
   /** The consolidated receipt an invoice points at (settlement_voucher_id). */
@@ -254,7 +256,7 @@ export function toHubInvoice(inv: InvoiceRowIn, ctx: InvoiceContext, other = fal
   const accountOf = (code: string | null) => (code ? (ctx.accounts.get(code) ?? code) : null)
   const lines: HubInvoiceLine[] =
     stored.length > 0
-      ? stored.map((l) => ({ description: (l.description ?? '').trim(), account: accountOf(l.category_code), code: l.category_code, amount: r2(Number(l.amount)) }))
+      ? stored.map((l) => ({ description: (l.description ?? '').trim(), account: accountOf(l.category_code), code: l.category_code, amount: r2(Number(l.amount)), ...(l.segment ? { segment: l.segment } : {}) }))
       : [{ description: firstLine(description) || 'Invoice amount', account: accountOf(inv.category_code), code: inv.category_code, amount: total }]
   const lineCodes = [...new Set(stored.map((l) => l.category_code).filter((c): c is string => !!c))]
   const category = lineCodes.length > 0 ? lineCodes.map((c) => accountOf(c)!).join(' + ') : accountOf(inv.category_code)

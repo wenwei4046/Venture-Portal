@@ -135,4 +135,36 @@ describe('the headline', () => {
     expect(invoiceHeadline({ status: 'paid_via_netting', total: 100, remaining: 0, due_date: '2026-11-06', paid_on: null })).toBe('RM 100.00 paid')
     expect(invoiceHeadline({ status: 'voided', total: 100, remaining: 0, due_date: '2026-11-06', paid_on: null })).toBe('RM 100.00 voided')
   })
+
+  // 2026-11-05 (the user, on HV-INV-202610-0058's second page: export 出来的 pdf 要有 header): a long consolidated
+  // invoice's later pages carry the title and the H, what it is and *continued*, and the column heads over its rows.
+  it('repeats the header on every page a long invoice runs to', async () => {
+    const items = ['Salary', 'Allowance', 'EPF', 'SOCSO', 'EIS']
+    const long = await parse(
+      await renderPdfBuffer(
+        <InvoiceDocPdf
+          invoices={[
+            {
+              ...ISSUED,
+              id: 'i58',
+              invoice_no: 'HV-INV-202610-0058',
+              billing_mode_label: 'Payroll (consolidated)',
+              total: 1500,
+              remaining: 1500,
+              bill_to: { name: 'HOUZS Century', kind: 'Subsidiary · HC', contact: [] },
+              lines: ['hr', 'finance', 'director_office'].flatMap((seg) => items.map((d) => ({ description: `${d} - Oct 2026`, amount: 100, segment: seg }))),
+            },
+          ]}
+        />,
+      ),
+    )
+    expect(long.Pages.length).toBeGreaterThan(1)
+    const second = text(long.Pages[1])
+    expect(text(long.Pages[0])).not.toContain('continued')
+    expect(second).toContain('Invoice')
+    expect(second).toContain('HV-INV-202610-0058 · HOUZS Century · continued')
+    expect(second).toContain('Description')
+    expect(second).toContain('Unit price')
+    expect(text(long.Pages[long.Pages.length - 1])).toContain('Director Office subtotal')
+  }, 30000)
 })

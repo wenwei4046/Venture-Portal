@@ -65,7 +65,7 @@ export async function loadInvoicePage(supabase: Client, id: string): Promise<Inv
     { data: creator },
     ownAudit,
   ] = await Promise.all([
-    supabase.from('invoice_lines').select('description, amount, category_code').eq('invoice_id', id).order('line_no'),
+    supabase.from('invoice_lines').select('description, amount, category_code, segment').eq('invoice_id', id).order('line_no'),
     // Receipts recorded against it (a part payment, a single settle).
     supabase
       .from('payment_vouchers')
@@ -106,7 +106,7 @@ export async function loadInvoicePage(supabase: Client, id: string): Promise<Inv
     departments: new Map(departmentRows.map((d) => [d.id, d.name])),
     accounts: new Map(accountRows.map((a) => [a.code, a.name])),
     extraModes,
-    lines: new Map([[id, ((lineRows ?? []) as Array<{ description: string | null; amount: number; category_code: string | null }>).map((l) => ({ ...l, amount: Number(l.amount) }))]]),
+    lines: new Map([[id, ((lineRows ?? []) as Array<{ description: string | null; amount: number; category_code: string | null; segment?: string | null }>).map((l) => ({ ...l, amount: Number(l.amount) }))]]),
     receipts: new Map([[id, (receiptRows ?? []) as Array<{ voucher_no: string | null; payment_date: string | null; amount: number }>]]),
     settlements: new Map(batchVoucher && inv.settlement_voucher_id ? [[inv.settlement_voucher_id, { ...batchVoucher, amount: Number(batchVoucher.amount) }]] : []),
     creditNotes: new Map([[id, creditNoteRows]]),
