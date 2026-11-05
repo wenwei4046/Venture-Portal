@@ -2,8 +2,9 @@
 // IR Quote (2026-11-05 — `.design/ir-quote/design_handoff_ir_quote`): the screens. Each is a prototype template
 // (tpl/, generated) run by its ported logic (logic/) through `DcHost`, inside `[data-irq]`, which carries the
 // prototype's colours, keyframes and faces (ir-quote.css, irq-fonts.ts).
-import "./ir-quote.css";
-import { useCallback, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { IRQ_CSS_QUOTE, IRQ_CSS_SETTINGS, IRQ_CSS_SETTINGS_MOBILE } from "./irq-css";
 import { DcHost, type DcComponents, type DcVals } from "./dc";
 import { manrope, spaceGrotesk } from "./irq-fonts";
 import { useIrqBoot } from "./useIrqBoot";
@@ -31,10 +32,29 @@ function asCustomer(c: IrqCrmCustomer) {
   return { ...v, id: c.id, name: v.name ?? "", phone: v.phone ?? "", ptype: v.type ?? "", usize: v.size ?? "", uloc: v.loc ?? "" };
 }
 
-function Frame({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+/**
+ * Each screen draws in a shadow root, as the prototype drew on a page of its own: none of the app's CSS (Tailwind's
+ * preflight, the Revenue app's globals) reaches it, only its prototype's own page CSS (`css`) and the browser's
+ * defaults. The two faces' variables are set on the host and inherit through.
+ */
+function Frame({ children, css }: { children: ReactNode; css: string }) {
+  const host = useRef<HTMLDivElement>(null);
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    const shadow = el.shadowRoot ?? el.attachShadow({ mode: "open" });
+    shadow.replaceChildren();
+    const style = document.createElement("style");
+    style.textContent = css;
+    const inner = document.createElement("div");
+    inner.className = "irq-root";
+    shadow.append(style, inner);
+    setRoot(inner);
+  }, [css]);
   return (
-    <div data-irq="" className={`${manrope.variable} ${spaceGrotesk.variable}`} style={style}>
-      {children}
+    <div ref={host} data-irq="" className={`${manrope.variable} ${spaceGrotesk.variable}`} style={{ height: "100%" }}>
+      {root ? createPortal(children, root) : null}
     </div>
   );
 }
@@ -90,8 +110,8 @@ export function IrQuoteScreen(p: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boot.status]);
   return (
-    <Frame>
-      {props ? <DcHost logic={QuoteLogic} render={renderQuote} props={props} components={COMPONENTS} />
+    <Frame css={IRQ_CSS_QUOTE}>
+      {props ? <DcHost logic={QuoteLogic} render={renderQuote} props={props} components={COMPONENTS} hostStyle={{ height: "100%" }} />
         : <Waiting rootH={p.rootH} error={boot.status === "error" ? boot.error : undefined} />}
       {toast && <Toast text={toast} onClose={clear} />}
     </Frame>
@@ -113,11 +133,11 @@ export function IrQuoteSettingsScreen(p: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boot.status]);
   return (
-    <Frame>
+    <Frame css={p.phone ? IRQ_CSS_SETTINGS_MOBILE : IRQ_CSS_SETTINGS}>
       {props
         ? p.phone
-          ? <DcHost logic={SettingsMobileLogic} render={renderSettingsMobile} props={props} />
-          : <DcHost logic={SettingsLogic} render={renderSettings} props={props} />
+          ? <DcHost logic={SettingsMobileLogic} render={renderSettingsMobile} props={props} hostStyle={{ height: "100%" }} />
+          : <DcHost logic={SettingsLogic} render={renderSettings} props={props} hostStyle={{ height: "100%" }} />
         : <Waiting rootH={p.rootH} error={boot.status === "error" ? boot.error : undefined} />}
       {toast && <Toast text={toast} onClose={clear} />}
     </Frame>

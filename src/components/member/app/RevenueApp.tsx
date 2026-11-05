@@ -1476,14 +1476,14 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   if (irqOn && irqSettings) {
     page = (
       <div className={desk ? s.irqColumn : s.irqLayer}>
-        <IrQuoteSettingsScreen phone={!desk} inApp={desk} rootH={desk ? "100%" : "100dvh"} readOnly={!!viewed} offline={data.demo || fixture ? { name: me.name } : undefined}
+        <IrQuoteSettingsScreen phone={!desk} inApp={desk} rootH="100%" readOnly={!!viewed} offline={data.demo || fixture ? { name: me.name } : undefined}
           onNav={irqNav} onBack={() => setIrqSettings(false)} onPreview={irqPreviewOpen} />
       </div>
     );
   } else if (irqOn) {
     page = (
       <div className={desk ? s.irqColumn : s.irqLayer}>
-        <IrQuoteScreen inApp={desk} rootH={desk ? "100%" : "100dvh"} readOnly={irqReadOnly} preview={irqPreview} offline={data.demo || fixture ? { name: me.name } : undefined}
+        <IrQuoteScreen inApp={desk} rootH="100%" readOnly={irqReadOnly} preview={irqPreview} offline={data.demo || fixture ? { name: me.name } : undefined}
           onNav={irqNav} onSettings={productList ? openIrqSettings : undefined} onClosePreview={() => goScreen("quote")} />
       </div>
     );
