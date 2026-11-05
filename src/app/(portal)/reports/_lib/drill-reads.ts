@@ -7,7 +7,7 @@ import {
   buildPnl,
   fetchAllJournalLines,
   fetchCoaAccounts,
-  fetchGlRefs,
+  fetchGlRefs, fetchLoanRefs,
   monthPeriod,
   type AccountNode,
   type ReportSection,
@@ -104,7 +104,7 @@ export async function readMonthlyDrill(supabase: Client, user: User, ask: Monthl
       fetchAllJournalLines(supabase),
       fetchCoaAccounts(supabase),
       // Salary lines by department for whoever reads payroll that way (2026-10-13).
-      fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
+      fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user), loans: fetchLoanRefs(supabase, user) }),
       consolidated ? fetchInterBillingElimination(supabase) : Promise.resolve(null),
     ])
     let lines = applyGlRefs(rawLines, glRefs)
@@ -127,7 +127,7 @@ export async function readMonthlyDrill(supabase: Client, user: User, ask: Monthl
   const [rawLines, accounts, glRefs, bankCodes, ib] = await Promise.all([
     fetchAllJournalLines(supabase),
     fetchCoaAccounts(supabase),
-    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user) }),
+    fetchGlRefs(supabase, { payrollByPerson: listsPayrollByPerson(user), loans: fetchLoanRefs(supabase, user) }),
     bankCodesRead,
     // The internal-transfer bridge: one segment only — it cancels across segments (the statement's rule).
     consolidated ? null : fetchInterBillingCashFlow(supabase, bankCodesRead),

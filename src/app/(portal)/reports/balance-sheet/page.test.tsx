@@ -35,6 +35,7 @@ vi.mock('@/lib/gl-reports', () => ({
   buildBalanceSheet: mocks.buildBalanceSheet,
   fetchAllJournalLines: async () => [],
   fetchCoaAccounts: async () => [],
+  fetchLoanRefs: async () => new Map(),
   fetchGlRefs: async () => new Map(),
   monthPeriod: (ym: string) => ({ from: `${ym}-01`, to: `${ym}-31` }),
 }))
