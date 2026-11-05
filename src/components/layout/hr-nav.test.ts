@@ -35,15 +35,18 @@ describe("HR's sidebar", () => {
     expect(items({ ...own, viewingAs: { id: 'other', name: 'Other' } }).map(i => i.key)).not.toContain('it-support')
   })
 
-  // 2026-10-29 (the claim process): one's own requests to Finance, above the rooms — a person's own login only.
-  it('lists Claim in Admin for a login of one’s own that sends claims — never a shared one, nor while viewing as', () => {
+  // 2026-10-29 (the claim process): one's own requests to Finance — a person's own login only. At the top under Overview
+  // since 2026-11-05 (the user: "可以做在显眼一点的位置吗？"); it was in Admin.
+  it('lists Claim under Overview for a login of one’s own that sends claims — never a shared one, nor while viewing as', () => {
     const li = withActions({ id: 'l', role: 'hr', permissions: ['claims', 'meeting_rooms', 'audit_log'] }) as unknown as NavViewer
+    const top = (viewer: NavViewer) => visibleHrNav(hrNavSections(null), viewer)[0].items.map(i => i.label)
     const admin = (viewer: NavViewer) => visibleHrNav(hrNavSections(null), viewer).find(s => s.label === 'Admin')?.items.map(i => i.label) ?? []
-    expect(admin({ ...li, personalLogin: true }).slice(0, 2)).toEqual(['Claim', 'Room schedule'])
-    expect(admin({ ...li, personalLogin: false })).not.toContain('Claim')
-    expect(admin({ ...li, personalLogin: true, viewingAs: { id: 'x', name: 'X' } })).not.toContain('Claim')
+    expect(top({ ...li, personalLogin: true })).toEqual(['Overview', 'Claim'])
+    expect(admin({ ...li, personalLogin: true })).not.toContain('Claim')
+    expect(top({ ...li, personalLogin: false })).toEqual(['Overview'])
+    expect(top({ ...li, personalLogin: true, viewingAs: { id: 'x', name: 'X' } })).toEqual(['Overview'])
     // PR ③: for whoever holds the HR view's Claim & approve, the same row says so.
-    expect(admin({ ...li, personalLogin: true, tabs: ['hr.my_claims.view', 'hr.claims_approve.view', 'hr.meeting_rooms.view'] })[0]).toBe('Claim & approve')
+    expect(top({ ...li, personalLogin: true, tabs: ['hr.my_claims.view', 'hr.claims_approve.view', 'hr.meeting_rooms.view'] })[1]).toBe('Claim & approve')
   })
 
   it('opens Revenue on the sub-department it is handed, each Sales Groups tab its own row', () => {

@@ -50,12 +50,14 @@ describe("Marketing's shell", () => {
 
   it('lists the rows the viewer’s tabs open, the manager’s tools for a manager only', () => {
     const staff = ['mkt.overview.view', 'mkt.calendar.view', 'mkt.projects.view', 'mkt.my_claims.view', 'mkt.meeting_rooms.view']
-    expect(mktNavRows(staff).map(r => r.key)).toEqual(['myspace', 'calendar', 'subs', 'projects', 'library', 'claims', 'rooms'])
-    expect(mktNavRows([...staff, 'mkt.tracking.view']).map(r => r.key)).toEqual(['myspace', 'calendar', 'subs', 'projects', 'library', 'tracking', 'workflow', 'product', 'minutes', 'replace', 'billing', 'claims', 'rooms'])
+    // Claim under Calendar since 2026-11-05 (the user: "可以做在显眼一点的位置吗？"); it stood at the foot.
+    expect(mktNavRows(staff).map(r => r.key)).toEqual(['myspace', 'calendar', 'claims', 'subs', 'projects', 'library', 'rooms'])
+    expect(mktNavRows([...staff, 'mkt.tracking.view']).map(r => r.key)).toEqual(['myspace', 'calendar', 'claims', 'subs', 'projects', 'library', 'tracking', 'workflow', 'product', 'minutes', 'replace', 'billing', 'rooms'])
     expect(mktNavRows(undefined).length).toBe(14)
-    // PR ③ (2026-10-29, the mockup's ②): Claim & approve under the manager's tools, with the number waiting for them.
+    // PR ③ (2026-10-29, the mockup's ②): Claim & approve, with the number waiting for them — in its place at the top
+    // since 2026-11-05, no longer under the manager's tools.
     const claims = mktNavRows([...staff, 'mkt.claims_approve.view']).find(r => r.key === 'claims')!
-    expect([claims.label, claims.count, claims.manager, claims.foot]).toEqual(['Claim & approve', 'claims', true, false])
+    expect([claims.label, claims.count, !!claims.manager, !!claims.foot]).toEqual(['Claim & approve', 'claims', false, false])
     expect(mktNavRows(staff).find(r => r.key === 'claims')!.label).toBe('Claim')
   })
 
@@ -64,7 +66,7 @@ describe("Marketing's shell", () => {
     const manager = ['mkt.overview.view', 'mkt.calendar.view', 'mkt.projects.view', 'mkt.tracking.view', 'mkt.my_claims.view', 'mkt.meeting_rooms.view']
     expect(mktNavRows(manager).some(r => r.key === 'pool')).toBe(false)
     const rows = mktNavRows([...manager, 'mkt.pool.view'])
-    expect(rows.map(r => r.key).slice(-4)).toEqual(['billing', 'pool', 'claims', 'rooms'])
+    expect(rows.map(r => r.key).slice(-3)).toEqual(['billing', 'pool', 'rooms'])
     expect(rows.find(r => r.key === 'pool')).toMatchObject({ emoji: '🏦', label: 'Pool', href: '/marketing/pool', manager: true })
     expect([mktNavActive('/marketing/pool', new URLSearchParams('view=pnl')), mktCrumb('/marketing/pool')]).toEqual(['pool', { emoji: '🏦', label: 'Pool' }])
   })

@@ -17,7 +17,10 @@ import type { User } from '@/types'
 
 export function finAppSections(user: User): Array<HrNavSection & { roman: string | null }> {
   const data: NavData = readsDeptStatements(user) ? { ...emptyNavData, deptPoolDepts: statementDepts(primedRegistryRows()) } : emptyNavData
+  // Claim is the desktop's (2026-11-05): the app has no screen of its own for it.
   return visibleHrNav(finNavSections(data), user)
+    .map((sec) => ({ ...sec, items: sec.items.filter((i) => i.key !== 'claim') }))
+    .filter((sec) => sec.items.length > 0)
 }
 
 /** The sidebar rows this reader sees (fin-nav keys). */

@@ -135,7 +135,12 @@ export function hrNavSections(revenueSub: string | null | HrRevenueSubs): HrNavS
     {
       label: null,
       tone: 'walnut',
-      items: [{ key: 'overview', label: 'Overview', icon: 'home', href: '/dashboard', match: p => under(p, '/dashboard'), visible: () => true }],
+      items: [
+        { key: 'overview', label: 'Overview', icon: 'home', href: '/dashboard', match: p => under(p, '/dashboard'), visible: () => true },
+        // Claim (2026-11-05 — the user: "可以做在显眼一点的位置吗？" → at the top, under Overview): one's own claims and
+        // direct payments to Finance, a login of one's own only; Claim & approve for whoever holds it. It was in Admin.
+        { key: 'claim', label: 'Claim', labelFor: v => (v.tabs?.includes('hr.claims_approve.view') ? 'Claim & approve' : 'Claim'), icon: 'receipt', href: '/claims', match: p => under(p, '/claims'), visible: canSendOwnClaims },
+      ],
     },
     {
       label: 'Hiring',
@@ -229,9 +234,6 @@ export function hrNavSections(revenueSub: string | null | HrRevenueSubs): HrNavS
       label: 'Admin',
       tone: 'walnut',
       items: [
-        // One's own claims and direct payments to Finance (2026-10-29, the claim process: Claim above the rooms in every view).
-        // Claim & approve for whoever holds it in this view (PR ③): the same page, their department's requests beside their own.
-        { key: 'claim', label: 'Claim', labelFor: v => (v.tabs?.includes('hr.claims_approve.view') ? 'Claim & approve' : 'Claim'), icon: 'receipt', href: '/claims', match: p => under(p, '/claims'), visible: canSendOwnClaims },
         // Every view books a room (2026-10-11); its two tabs are rows here.
         { key: 'roomSched', label: 'Room schedule', icon: 'room', href: '/admin/rooms', match: roomOn('schedule'), visible: canAccessMeetingRooms },
         { key: 'roomRooms', label: 'Rooms', icon: 'room', href: '/admin/rooms?tab=rooms', match: roomOn('rooms'), visible: canAccessMeetingRooms },
