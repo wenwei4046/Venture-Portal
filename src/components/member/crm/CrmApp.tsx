@@ -63,7 +63,7 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  * computer, the phone's on a phone). The Control panel then opens as panel/desk/PanelDesk — the same data, writes and
  * view models, laid out wide; the salesperson CRM stays the phone's until its desktop is built on the same frame.
  */
-export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void }) {
+export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
   // Settings › Reply targets: the urgency lines every screen below draws by (lib/member/crm.ts › replyUrgency).
   setUrgencyThresholds(data?.settings);
@@ -326,7 +326,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       // same page (the desktop).
       toMyCrm: panelFor.id !== me.id ? (tab?: SalesTab, sub?: "notif" | "auto" | "quick") => { setTeamAs(null); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], chat: null, profSub: sub ?? null })); }
         : sells ? (tab?: SalesTab, sub?: "notif" | "auto" | "quick") => { openCrmOf(me.id); setUi(u => ({ ...u, tab: tab ?? MINE_TAB[panelUi.tab], profSub: sub ?? null })); } : undefined,
-      exitApp: onExit, slotCounts, recents,
+      exitApp: onExit, openQuoteSettings: onQuoteSettings, slotCounts, recents,
       // A chat's ⋮ Assign to, by what the SIGNED-IN account may do (2026-10-23, Mine's rule): CRM · Manage gives anyone,
       // whoever's Team is on screen; a TL / STL / TA on their own Team side, their own people; else none.
       assign: data.can.manage ? "any" : panelFor.id === me.id && ["tl", "stl", "ta"].includes(me.role) ? "team" : undefined,

@@ -57,6 +57,8 @@ function profile6(ctx: PanelCtx, house: boolean) {
       { label: "Showrooms", icon: "map-pin" as const, open: () => patch({ roomsOpen: true }), n: n(data.rooms.filter(r => r.active).length), badge: false },
       { label: "Cold lead templates", icon: "message-square-text" as const, open: () => { patch({ tplOpen: true }); void ctx.act.refreshTemplates(); }, n: n((data.templates ?? []).length), badge: false },
       { label: "Ads Performance", icon: "arrow-up-right" as const, open: () => patch({ tab: "ads", lead: null }), n: "", badge: false },
+      // IR Quote's settings (the handoff: "CRM → Profile → below Ads performance → Quotation settings").
+      ...(ctx.openQuoteSettings ? [{ label: "Quotation settings", icon: "file-text" as const, open: ctx.openQuoteSettings, n: "", badge: false }] : []),
     ] : [] }],
   };
 }

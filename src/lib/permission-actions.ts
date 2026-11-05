@@ -228,6 +228,7 @@ export const GATED_ACTIONS: Readonly<Record<string, Scope>> = {
   'revenue.create': 'all',
   'revenue.edit': 'all',
   'revenue.manage': 'all',
+  'revenue_app.create': 'own', // IR Quote's server actions (ir-quote-actions.ts): quoting, the member's own
   'rooms.create': 'all',
   'rooms.edit': 'all',
   // The HR phone app reads the rooms only for an account whose cell opens them (2026-10-11).

@@ -136,6 +136,11 @@ describe('the faces', () => {
     'src/app/print/director-pool/page.tsx',
     'src/lib/commission/waiting-form.ts',
     'src/components/member/design-preview/ArenaDesignPreview.module.css',
+    // IR Quote's quotation (2026-11-05, the handoff: "Quotation doc: Georgia") — the A4 document, its preview and the
+    // settings' Fonts choice of it.
+    'src/components/member/app/irq/lib/quote-doc.ts',
+    'src/components/member/app/irq/logic/QuoteLogic.ts',
+    'src/components/member/app/irq/tpl/SettingsTpl.tsx',
   ])
 
   it('keeps Georgia to paper — on screen it only stands behind the display face', () => {

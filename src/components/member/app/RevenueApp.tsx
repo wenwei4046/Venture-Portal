@@ -104,6 +104,7 @@ import { foodOpenTo, transportPartsFor, type ClaimRates } from "@/lib/member/cla
 import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profile-vm";
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp, { type CrmOpen } from "../crm/CrmApp";
+import { IrQuoteScreen, IrQuoteSettingsScreen, type IrQuoteNav } from "./irq/IrQuoteScreens";
 import { crmOpenTarget, type Notices } from "@/lib/push/notices";
 import { readNotices } from "@/lib/push/actions";
 
@@ -360,6 +361,12 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const principal = data.principalView === true;
   const membership: MemberMembership | undefined = data.memberships.find(m => m.id === route.department) ?? data.memberships[0];
   const membershipId = membership?.id ?? "";
+  // IR's Quote is the renovation package (2026-11-05, the IR Quote handoff — .claude/rules/revenue/revenue-app.md › IR QUOTE):
+  // a membership whose code is IR opens Quote on it, never the brand list.
+  const irQuote = membership?.code === "IR";
+  const [irqSettings, setIrqSettings] = useState(false);
+  // Quote settings' Preview opens the quote in another tab on the unpublished settings (`irqPreview`).
+  const irqPreview = useMemo(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("irqPreview"), []);
   // Keyed on the ids, never the membership object: a refresh hands back a new `data`, and a new context would
   // start every read below over — View as went back to "Loading…" every minute until 2026-10-05.
   const context = useMemo<MemberReadContext | undefined>(() => (principal && route.staff && membershipId
@@ -551,7 +558,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // background when the phone has none yet, so the first tap on Quote is not a wait. A server render of
   // the app (a Product List save) asks again: its key carries the snapshot's time.
   const [catalogueWarm, setCatalogueWarm] = useState(false);
-  const catalogueNeed = live && !data.demo && !fixture && !onProducts && memoryReady && !!source.catalogue
+  const catalogueNeed = live && !data.demo && !fixture && !onProducts && memoryReady && !!source.catalogue && !irQuote
     && (route.screen === "quote" || route.screen === "calc" || sheet === "brand" || catalogueWarm);
   const catalogueRead = useKeyedRead<MemberCatalogue>(`catalogue|${initialData.refreshedAt}`, catalogueNeed, gen,
     () => source.catalogue!(), track, () => source.peek?.<MemberCatalogue>(ask.catalogue()));
@@ -629,6 +636,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     setCompact(false);
     setVaOpen(false);
     closeProfileSheets();
+    setIrqSettings(false);
     if (screen !== "quote" && screen !== "calc") { quote.closeSheet(); quote.setCartOpen(false); quote.setAllOpen(false); }
     quote.setPreviewOpen(false);
     const next: Partial<Route> = { screen, pf: null, ins: "main", arena: "hub", of: "", ...extra };
@@ -652,6 +660,21 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     router.push(productsHref(baseRoute), { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the quote's setters are stable
   }, [onProducts, closeProfileSheets, router, baseRoute]);
+  // IR Quote's settings: the computer's sidebar row and, on a phone, CRM › Profile › Quotation settings open them.
+  const openIrqSettings = useCallback(() => {
+    setSheet(null); setNfOpen(false); setVaOpen(false); closeProfileSheets();
+    if (onProducts) router.push(appHref({ ...baseRoute, screen: "quote" }, window.location.origin), { scroll: false });
+    setIrqSettings(true);
+  }, [onProducts, closeProfileSheets, router, baseRoute]);
+  const irqNav = useCallback((to: IrQuoteNav | "Quote") => {
+    setIrqSettings(false);
+    goScreen(to === "Today" ? "today" : to === "Insight" ? "insight" : to === "Arena" ? "arena" : to === "Profile" ? "account" : "quote");
+  }, [goScreen]);
+  const irqPreviewOpen = useCallback(() => {
+    const url = new URL(appHref({ ...baseRoute, screen: "quote", pf: null }, window.location.origin), window.location.origin);
+    url.searchParams.set("irqPreview", "1");
+    window.open(url.toString(), "irq-preview");
+  }, [baseRoute]);
   // The module switcher: the portal's other modules are the Principal's views of it (setViewAs) — every view since
   // 2026-10-27, as every switcher lists them; a team member is viewed with Profile's View as, not the portal's picker.
   const [, startSwitch] = useTransition();
@@ -1409,7 +1432,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   reloadable.current = pullable;
   // View as takes the page column's place too (the prototype's `vaPE` opens the rail). The Product List
   // keeps the whole column and makes room inside itself instead (`shift`).
-  const rail = desk && !onProducts && (nfOpen || anyPanel || (route.screen === "quote" && quoteSends) || vaOpen);
+  const rail = desk && !onProducts && (nfOpen || anyPanel || (route.screen === "quote" && quoteSends && !irQuote) || vaOpen);
   const productShell = useMemo<ProductShell>(() => ({
     shift: desk && (nfOpen || sheet !== null || vaOpen),
     closePanels: () => { setSheet(null); setNfOpen(false); setVaOpen(false); },
@@ -1446,7 +1469,25 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const onQuote = route.screen === "quote" || route.screen === "calc";
 
   let page: ReactNode;
-  if (onProducts) {
+  // IR Quote (2026-11-05): on a computer it fills the app's column under the app's own sidebar and top bar; on a phone it
+  // is the whole screen, with the handoff's own header and bottom bar (`irqLayer`).
+  const irqReadOnly = (principal && !!route.staff) || !quoteSends;
+  const irqOn = !onProducts && (irqSettings || (route.screen === "quote" && irQuote));
+  if (irqOn && irqSettings) {
+    page = (
+      <div className={desk ? s.irqColumn : s.irqLayer}>
+        <IrQuoteSettingsScreen phone={!desk} inApp={desk} rootH="100%" readOnly={!!viewed} offline={data.demo || fixture ? { name: me.name } : undefined}
+          onNav={irqNav} onBack={() => setIrqSettings(false)} onPreview={irqPreviewOpen} />
+      </div>
+    );
+  } else if (irqOn) {
+    page = (
+      <div className={desk ? s.irqColumn : s.irqLayer}>
+        <IrQuoteScreen inApp={desk} rootH="100%" readOnly={irqReadOnly} preview={irqPreview} offline={data.demo || fixture ? { name: me.name } : undefined}
+          onNav={irqNav} onSettings={productList ? openIrqSettings : undefined} onClosePreview={() => goScreen("quote")} />
+      </div>
+    );
+  } else if (onProducts) {
     page = <ProductShellContext.Provider value={productShell}>{children}</ProductShellContext.Provider>;
   } else if (route.screen === "today") {
     // Today's figures are this month's: a tap opens Insight and the Arena on this month too.
@@ -1578,7 +1619,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
       page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen} onReady={() => setCrmReady(true)}
-        onExit={exitCrm} deskApp={desk ? {
+        onExit={exitCrm} onQuoteSettings={!desk && productList ? openIrqSettings : undefined} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
         go: screen => goScreen(screen), openNotifications: openNotif, openBell: toggleNotif, openSubDept: () => openSheet("sd"), signOut,
@@ -1619,9 +1660,10 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const screen = (
     <div ref={screenRef} className={`${s.screen} ${live ? s.screenLive : s.screenFramed} ${rail ? s.rail : ""}`} style={screenVars} data-platform={android ? "android" : "ios"}>
       {!live && device !== "desktop" && <StatusBar android={android} />}
-      <DeskAside active={route.screen} count={nfCount} notifOpen={nfOpen} me={me} hidden={hiddenScreens} home={home} onGo={goScreen} onQuote={() => openSheet("brand")}
+      <DeskAside active={route.screen} count={nfCount} notifOpen={nfOpen} me={me} hidden={hiddenScreens} home={home} onGo={goScreen} onQuote={() => (irQuote ? goScreen("quote") : openSheet("brand"))}
         onNotif={toggleNotif} onProfile={() => goScreen("account")}
         products={productList ? { group: productList.group, onOpen: openProducts } : null}
+        quoteSettings={productList ? { on: irqSettings, onOpen: openIrqSettings } : null}
         it={itDesk && itDeskOn ? { group: itDesk.group, count: it.newCount, on: route.screen === "account" && route.pf === "itdesk", onOpen: () => goScreen("account", { pf: "itdesk" }) } : null}
         modules={principal ? { current: "revenue_member", onPick: pickModule } : null}
         crm={crm ? { unread: crmUnread ?? 0, onOpen: openCrm } : null} />
@@ -1638,21 +1680,21 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
           onProfile={() => goScreen("account")} />
       )}
       <PullRefresh target={mainRef} enabled={pullable} refreshing={refreshing || bootOverKept} failed={refreshFailed} onRefresh={pullRefresh} />
-      <main ref={mainRef} className={`${s.main} ${onProducts ? s.mainProducts : ""} ${deskCrm ? s.mainCrm : ""} ${onCrm ? s.mainHeld : ""}`} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
+      <main ref={mainRef} className={`${s.main} ${onProducts || irqOn ? s.mainProducts : ""} ${deskCrm ? s.mainCrm : ""} ${onCrm ? s.mainHeld : ""}`} onScroll={e => { const t = e.currentTarget.scrollTop; const v = t > 4, c = t > 110; if (v !== scrolled) setScrolled(v); if (c !== compact) setCompact(c); }}>
         {page}
       </main>
-      {route.screen === "quote" && quote.catalog && quoteSends && (
+      {route.screen === "quote" && quote.catalog && quoteSends && !irQuote && (
         <ProductsDock items={quote.items} itemsText={itemsText(quote.cart, quote.catalog.name)} open={quote.cartOpen} onBag={quote.toggleCart} onSetPrice={toCalc} />
       )}
       {route.screen === "calc" && quote.catalog && <CalcDock ready={!!customer} onPreview={() => { if (customer) quote.setPreviewOpen(true); }} />}
-      <BottomNav active={route.screen} page={`${route.screen}/${route.pf ?? ""}/${route.ins}/${route.arena}/${route.board}`} android={android} live={live} hidden={hiddenScreens} onGo={goScreen} onQuote={() => openSheet("brand")} />
+      <BottomNav active={route.screen} page={`${route.screen}/${route.pf ?? ""}/${route.ins}/${route.arena}/${route.board}`} android={android} live={live} hidden={hiddenScreens} onGo={goScreen} onQuote={() => (irQuote ? goScreen("quote") : openSheet("brand"))} />
       <SubDeptSheet open={sheet === "sd"} options={subOptions} current={membership?.id ?? ""} onClose={() => setSheet(null)}
         onPick={id => { setSheet(null); go({ department: id, staff: principal ? route.staff : "" }); }} />
       <Notifications open={nfOpen} summary={nfSummaryVM} tab={nfTab} groups={nfGroupsVM}
         onTab={setNfTab} onClose={() => setNfOpen(false)} onReadAll={() => setReadAll(true)} onOpen={openNotifItem} />
       <BrandPicker open={sheet === "brand"} brands={brandList} current={quote.brand} onQuote={onQuote} cartItems={quote.items}
         onClose={() => setSheet(null)} onPick={code => { quote.setBrand(code); goScreen("quote"); }} />
-      {onQuote && quote.catalog && (
+      {onQuote && quote.catalog && !irQuote && (
         <>
           <DeskCalc show={desk && route.screen === "quote" && !anyPanel && !nfOpen && quoteSends} {...calcProps} />
           <AllModelsSheet open={quote.allOpen} catalog={quote.catalog} cart={quote.cart} query={quote.query} onQuery={quote.setQuery}

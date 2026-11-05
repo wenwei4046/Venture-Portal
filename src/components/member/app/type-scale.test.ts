@@ -60,8 +60,10 @@ describe("Revenue app type scale", () => {
     expect(needless).toEqual([]);
   });
 
+  // IR Quote (irq/, 2026-11-05) is the one exception, on purpose: it is drawn at its Claude Design prototype's own sizes,
+  // in a shadow root, never scaled — the user: "确保它跟 prototype 的东西是长得一模一样的" (revenue-app.md › IR QUOTE).
   it("gives inline styles no number of their own either", () => {
-    const inline = files(APP_DIR, ".tsx").flatMap(path => read(path).split(/\r?\n/).flatMap((line, i) =>
+    const inline = files(APP_DIR, ".tsx").filter(path => !where(path).startsWith("irq/")).flatMap(path => read(path).split(/\r?\n/).flatMap((line, i) =>
       /fontSize:\s*\d/.test(line) ? [`${where(path)}:${i + 1}`] : []));
     expect(inline).toEqual([]);
   });
