@@ -39,10 +39,17 @@ describe("Finance's sidebar", () => {
     expect(all.map((i) => i.href)).not.toContain('/overdue')
   })
 
-  it('has no Claims — the user took it out on 2026-10-15 (its page stays)', () => {
-    const all = finNavSections(data).flatMap((s) => s.items)
-    expect(all.map((i) => i.label)).not.toContain('Claims')
-    expect(all.map((i) => i.href)).not.toContain('/claims')
+  // The old pool Claims went on 2026-10-15; one's own Claim stands under Approvals since 2026-11-05 (the user: "可以做在显眼一点
+  // 的位置吗？") — a login of one's own only, never a shared one nor while viewing as.
+  it('lists one’s own Claim under Approvals in Daily, for a login of one’s own', () => {
+    const principal = login('principal@venture.my')
+    const daily = (v: NavViewer) => visibleHrNav(finNavSections(data), v).find((s) => s.label === 'Daily')!.items.map((i) => i.label)
+    expect(daily({ ...principal, personalLogin: true } as NavViewer).slice(0, 2)).toEqual(['Approvals', 'Claim'])
+    expect(daily(principal)).not.toContain('Claim')
+    expect(daily({ ...principal, personalLogin: true, viewingAs: { id: 'x', name: 'X' } } as NavViewer)).not.toContain('Claim')
+    expect(daily({ ...carrie, tabs: [...(carrie.tabs ?? []), 'fin.my_claims.view', 'fin.claims_approve.view'] } as NavViewer)).toContain('Claim & approve')
+    expect(finNavSections(data).flatMap((s) => s.items).map((i) => i.label)).not.toContain('Claims')
+    expect(activeHrNavKey(finNavSections(data), '/claims', null)).toBe('claim')
   })
 
   it('puts Approvals first in Daily for whoever may decide (the Principal’s Finance lens)', () => {
@@ -128,18 +135,11 @@ describe("Finance's account menu", () => {
   it('opens Account and Admin for Carrie', () => {
     const groups = visibleAccountMenu(finAccountMenu(), carrie)
     expect(groups.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([
-      // No Edit profile (2026-10-17): one's record changes through Me › Profile, which HR approves. Claim (2026-10-29):
-      // her own requests to Finance.
-      ['Account', ['Change password', 'IT support', 'Claim']],
+      // No Edit profile (2026-10-17): one's record changes through Me › Profile, which HR approves. Claim left for the
+      // sidebar's Daily on 2026-11-05.
+      ['Account', ['Change password', 'IT support']],
       ['Admin', ['Audit Log', 'Meeting Rooms']],
     ])
-    expect(accountMenuActive(finAccountMenu(), '/claims', null)).toBe('claim')
-  })
-
-  // PR ③ (2026-10-29): for whoever holds the Finance view's Claim & approve, the same row says so.
-  it('says Claim & approve to its holder', () => {
-    const groups = visibleAccountMenu(finAccountMenu(), { ...carrie, tabs: [...(carrie.tabs ?? []), 'fin.my_claims.view', 'fin.claims_approve.view'] })
-    expect(groups.find((g) => g.title === 'Account')?.items.map((i) => i.label)).toContain('Claim & approve')
   })
 
   it('lets a shared login ask IT for help, with no password control', () => {

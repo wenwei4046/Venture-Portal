@@ -37,6 +37,9 @@ export interface MktNavRow {
 export const MKT_NAV: readonly MktNavRow[] = [
   { key: 'myspace', emoji: '🏠', label: 'My Space', tone: 'sand', href: '/marketing', count: 'myspace' },
   { key: 'calendar', emoji: '📅', label: 'Calendar', tone: 'mist', href: '/marketing/calendar', count: 'calendar' },
+  // One's own claims and direct payments to Finance — Claim since 2026-10-29 (the staff's word, the claim process); at
+  // the top under Calendar since 2026-11-05 (the user: "可以做在显眼一点的位置吗？"), where it was at the foot.
+  { key: 'claims', emoji: '🧾', label: 'Claim', tone: 'cream', href: '/claims' },
   { key: 'subs', emoji: '🏢', label: 'Subsidiaries', tone: 'peach' },
   { key: 'projects', emoji: '📁', label: 'Projects', tone: 'sand', href: '/marketing/projects', count: 'projects' },
   { key: 'library', emoji: '📚', label: 'Library', tone: 'mist', href: '/marketing/library' },
@@ -50,16 +53,15 @@ export const MKT_NAV: readonly MktNavRow[] = [
   // Not in the handoff (2026-10-28 — the user: "Marketing view 加一行，打开就是 Finance 那页 Marketing 的 P&L / Cash
   // Flow"): Marketing's own pool, a box of its own (Marketing view › Pool).
   { key: 'pool', emoji: '🏦', label: 'Pool', tone: 'sand', href: '/marketing/pool', manager: true },
-  // One's own claims and direct payments to Finance — Claim since 2026-10-29 (the staff's word, the claim process).
-  { key: 'claims', emoji: '🧾', label: 'Claim', tone: 'cream', href: '/claims', foot: true },
   { key: 'rooms', emoji: '🚪', label: 'Meeting Rooms', tone: 'mist', href: '/admin/rooms', foot: true },
 ]
 
 /**
  * Claim & approve (2026-10-29, the claim process's PR ③ — the mockup's ②): for whoever holds it, the Claim row is
- * Claim & approve under MANAGER TOOLS, carrying the number waiting for them.
+ * Claim & approve, carrying the number waiting for them — in its place at the top since 2026-11-05 (it stood under
+ * MANAGER TOOLS).
  */
-const CLAIM_AND_APPROVE: Partial<MktNavRow> = { label: 'Claim & approve', count: 'claims', manager: true, foot: false }
+const CLAIM_AND_APPROVE: Partial<MktNavRow> = { label: 'Claim & approve', count: 'claims' }
 
 /** The rows a viewer's tabs open (an account with no tabs worked out is not asked — opensPath). */
 export function mktNavRows(tabs: readonly string[] | undefined): MktNavRow[] {

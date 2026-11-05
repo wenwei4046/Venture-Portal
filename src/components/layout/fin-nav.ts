@@ -94,6 +94,11 @@ export function finNavSections(data: NavData, opts: FinNavOptions = {}): HrNavSe
       tone: 'clay',
       items: [
         link('approvals', 'Approvals', 'approve', '/approvals', canApprove),
+        // Claim (2026-11-05 — the user: "可以做在显眼一点的位置吗？" → under Approvals): one's own claims and direct
+        // payments to Finance, a login of one's own only; Claim & approve for whoever holds it. It was in the account menu.
+        link('claim', 'Claim', 'receipt', '/claims', canSendOwnClaims, undefined, {
+          labelFor: (v) => (v.tabs?.includes('fin.claims_approve.view') ? 'Claim & approve' : 'Claim'),
+        }),
         // Payments (2026-10-29 — the user: "payment side bar 会有两个子account，一个是pv，一个是Payment request";
         // "pv 改成payment voucher"): the vouchers and the requests waiting for one. A receipt's form is Receipt's; a
         // receipt's own page names Receipt itself (NavOwner).
@@ -199,9 +204,6 @@ export function finAccountMenu(opts: FinNavOptions = {}): AccountMenuGroup[] {
       items: [
         { key: 'password', label: 'Change password', icon: 'lock', window: 'password', visible: canChangePassword },
         { key: 'it-support', label: 'IT support', icon: 'buoy', href: '/it-support', visible: viewer => !viewer.viewingAs },
-        // One's own claims and direct payments to Finance (2026-10-29, the claim process — every view's own Claim row).
-        // Claim & approve for whoever holds it in this view (PR ③).
-        { key: 'claim', label: 'Claim', labelFor: (v) => (v.tabs?.includes('fin.claims_approve.view') ? 'Claim & approve' : 'Claim'), icon: 'receipt', href: '/claims', visible: canSendOwnClaims },
       ],
     },
     {
