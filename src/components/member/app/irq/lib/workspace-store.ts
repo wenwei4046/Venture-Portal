@@ -1,5 +1,5 @@
-// @ts-nocheck — ported from the prototype; kept as it is so the documents and prices come out the same.
 /* eslint-disable */
+// @ts-nocheck — ported from the prototype; kept as it is so the documents and prices come out the same.
 // Design workspace storage. Boards: "q:<quoteKey>" per quote, "lib:<id>" personal library.
 // IR Quote in the app (2026-11-05): the prototype kept each account's boards in IndexedDB on the device; here they are
 // the signed-in salesperson's own rows (ir_drive_boards, through ../env), read once when the screen opens and kept in

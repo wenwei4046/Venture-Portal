@@ -37,6 +37,10 @@ function asCustomer(c: IrqCrmCustomer) {
  * preflight, the Revenue app's globals) reaches it, only its prototype's own page CSS (`css`) and the browser's
  * defaults. The two faces' variables are set on the host and inherit through.
  */
+/** The face's own name alone — next/font adds a made-up "… Fallback" face after it, which the prototype never had. */
+const faceOnly = (family: string | undefined) => (family ? family.split(",")[0].trim() : undefined);
+const FACES = { "--font-manrope": faceOnly(manrope.style?.fontFamily), "--font-space-grotesk": faceOnly(spaceGrotesk.style?.fontFamily) } as CSSProperties;
+
 function Frame({ children, css }: { children: ReactNode; css: string }) {
   const host = useRef<HTMLDivElement>(null);
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
@@ -53,7 +57,7 @@ function Frame({ children, css }: { children: ReactNode; css: string }) {
     setRoot(inner);
   }, [css]);
   return (
-    <div ref={host} data-irq="" className={`${manrope.variable} ${spaceGrotesk.variable}`} style={{ height: "100%" }}>
+    <div ref={host} data-irq="" className={`${manrope.variable} ${spaceGrotesk.variable}`} style={{ height: "100%", ...FACES }}>
       {root ? createPortal(children, root) : null}
     </div>
   );

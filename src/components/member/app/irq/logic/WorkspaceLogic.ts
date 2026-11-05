@@ -1,5 +1,5 @@
-// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/Workspace.dc.html), kept line for line so the screens behave as it does.
 /* eslint-disable */
+// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/Workspace.dc.html), kept line for line so the screens behave as it does.
 import { DcLogic } from "../dc";
 import React from "react";
 import * as wsStore from "../lib/workspace-store";
@@ -215,11 +215,11 @@ export class WorkspaceLogic extends DcLogic {
     const libs = this.libs();
     const nav = x => { const on = st.boardId === x.id; return { name: x.name || "Untitled", sub: String(x.images.length), bg: on ? "#FFFFFF" : "transparent", border: on ? "#DEDED8" : "transparent", ink: on ? P : "#34342F", weight: on ? 650 : 550, fill: on ? "#FFEBD9" : "none", match: x.kind === "library" && this.matches(x), pick: () => this.setState({ boardId: x.id, sel: null, picker: null, pen: false, tagDraft: "" }) }; };
     const newBoard = () => { if (!this.ws) return; const nb = this.ws.blankBoard("library", null, "New folder"); this.setState(s => ({ boards: { ...s.boards, [nb.id]: nb }, boardId: nb.id, sel: null })); this.ws.put(nb); };
-    const saveText = st.pending ? "Saving…" : st.savedAt ? "All changes saved" : "Saved on this device";
+    const saveText = st.pending ? "Saving…" : st.savedAt ? "All changes saved" : "Saved to your account"; // the prototype: "Saved on this device" — the app keeps the Drive on the server
     const base = {
       rootRef: this.rootRef, wide: !narrow, narrow, narrowBack: narrow && !!this.props.onClose, hasBack: !!this.props.onClose, back: () => this.props.onClose && this.props.onClose(), toast: st.toast, newBoard, stop: e => e.stopPropagation(),
       saveText, saveDot: st.pending ? "#F5871F" : "#2F6B47",
-      usageText: `${mb(st.usage)} used on this device. Back up to keep a copy or move to another tablet.`,
+      usageText: "Kept in your account, on every device you sign in on. Back up to keep a copy of your own.", // the prototype counted its IndexedDB here
       doBackup: () => this.doBackup(), doRestore: e => this.doRestore(e),
       saveNow: () => this.flush(), saveBtn: st.pending ? "Save" : "Saved"
     };

@@ -1,5 +1,5 @@
-// @ts-nocheck — ported from the prototype; kept as it is so the documents and prices come out the same.
 /* eslint-disable */
+// @ts-nocheck — ported from the prototype; kept as it is so the documents and prices come out the same.
 import { irqStorage } from "../storage";
 // Shared by IR Quote and Quote Settings: the saved configuration and the quotation document.
 export const STORE = "irq.config.v1";

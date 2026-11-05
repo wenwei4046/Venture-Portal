@@ -67,7 +67,10 @@ export class DcLogic<P extends DcVals = DcVals> {
     this.__host?.forceUpdate();
   }
   componentDidMount() {}
-  componentDidUpdate(_prevProps: P, _prevState: DcVals) {}
+  componentDidUpdate(prevProps: P, prevState: DcVals) {
+    void prevProps;
+    void prevState;
+  }
   componentWillUnmount() {}
   renderVals(): DcVals {
     return {};
@@ -90,6 +93,10 @@ export class DcHost<P extends DcVals> extends Component<HostProps<P>, { logic: D
     super(p);
     this.inst = new p.logic(p.props);
     this.state = { logic: this.inst.state };
+    this.attach();
+  }
+  /** Wires the logic to this host — again on every mount: React's StrictMode mounts, unmounts and mounts again. */
+  attach() {
     this.inst.__host = {
       setLogic: (u, cb) =>
         this.setState(
@@ -102,8 +109,20 @@ export class DcHost<P extends DcVals> extends Component<HostProps<P>, { logic: D
       forceUpdate: () => this.forceUpdate(),
     };
   }
+  // The prototype's logic mounts once: its timers and first edits are not written to run twice. React's StrictMode
+  // (development) unmounts and mounts a component again at once — that pair is absorbed here, so the logic sees one
+  // mount, as on the prototype's page; a real unmount still reaches it (a microtask later).
+  mounted = false;
+  leaving = false;
   componentDidMount() {
+    this.attach();
     this.inst.state = this.state.logic;
+    if (this.leaving) {
+      this.leaving = false;
+      return;
+    }
+    if (this.mounted) return;
+    this.mounted = true;
     this.inst.componentDidMount();
   }
   componentDidUpdate(prev: HostProps<P>, prevState: { logic: DcVals }) {
@@ -111,8 +130,14 @@ export class DcHost<P extends DcVals> extends Component<HostProps<P>, { logic: D
     if (prev.props !== this.props.props || prevState.logic !== this.state.logic) this.inst.componentDidUpdate(prev.props, prevState.logic);
   }
   componentWillUnmount() {
-    this.inst.componentWillUnmount();
-    this.inst.__host = null;
+    this.leaving = true;
+    queueMicrotask(() => {
+      if (!this.leaving) return;
+      this.leaving = false;
+      this.mounted = false;
+      this.inst.componentWillUnmount();
+      this.inst.__host = null;
+    });
   }
   render() {
     this.inst.props = this.props.props;

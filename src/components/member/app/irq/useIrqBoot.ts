@@ -13,6 +13,17 @@ const draftsKey = (uid: string) => `irq.drafts.${uid}`;
 
 type Draft = { id: string };
 
+/**
+ * The prototype keeps a salesperson's drafts as one list; the server keeps each draft. What changed between the list
+ * the server last had (`kept`, id → JSON) and the list now: the drafts to send (new or changed) and the ids to delete.
+ */
+export function draftDiff(kept: ReadonlyMap<string, string>, list: Draft[]) {
+  const next = new Map(list.filter(d => d?.id).map(d => [d.id, JSON.stringify(d)]));
+  const put = [...next].filter(([id, json]) => kept.get(id) !== json).map(([id, json]) => ({ id, draft: JSON.parse(json) as Draft }));
+  const drop = [...kept.keys()].filter(id => !next.has(id));
+  return { next, put, drop };
+}
+
 function wire(boot: IrqBoot, readOnly: boolean, onError: (m: string) => void) {
   irqEnv.user = boot.user;
   irqEnv.readOnly = readOnly;
@@ -41,15 +52,12 @@ function wire(boot: IrqBoot, readOnly: boolean, onError: (m: string) => void) {
       }
       if (key === dKey) {
         // The prototype keeps a list; the server keeps each draft — send what changed, take away what went.
-        const list: Draft[] = value ? JSON.parse(value) : [];
-        const next = new Map(list.filter(d => d?.id).map(d => [d.id, JSON.stringify(d)]));
-        for (const [id, json] of next) {
-          if (kept.get(id) === json) continue;
-          const r = await saveIrQuoteDraft(id, await uploadPictures(JSON.parse(json), "drive"));
+        const { next, put, drop } = draftDiff(kept, value ? JSON.parse(value) : []);
+        for (const { id, draft } of put) {
+          const r = await saveIrQuoteDraft(id, await uploadPictures(draft, "drive"));
           if (!r.ok) throw new Error(r.error);
         }
-        for (const id of kept.keys()) {
-          if (next.has(id)) continue;
+        for (const id of drop) {
           const r = await saveIrQuoteDraft(id, null);
           if (!r.ok) throw new Error(r.error);
         }

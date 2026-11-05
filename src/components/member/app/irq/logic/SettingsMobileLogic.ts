@@ -1,8 +1,9 @@
-// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/Quote Settings Mobile.dc.html), kept line for line so the screens behave as it does.
 /* eslint-disable */
+// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/Quote Settings Mobile.dc.html), kept line for line so the screens behave as it does.
 import { DcLogic } from "../dc";
 import React from "react";
 import * as quoteDocLib from "../lib/quote-doc";
+import { irqStorage } from "../storage";
 import seedPackages from "../data/packages.json";
 import seedCatalog from "../data/catalog.json";
 export class SettingsMobileLogic extends DcLogic {
@@ -10,7 +11,7 @@ export class SettingsMobileLogic extends DcLogic {
   componentDidUpdate(pp, ps) { if (!this.props.readOnly && this.lib && this.state.cfg && ps.cfg && ps.cfg !== this.state.cfg) this.lib.savePreview(this.state.cfg); }
   componentDidMount() {
     Promise.all([Promise.resolve({ ...quoteDocLib, CRM_FIELDS: this.props.crmFields || quoteDocLib.CRM_FIELDS }), Promise.resolve(seedPackages), Promise.resolve(seedCatalog)])
-      .then(([lib, pj, cj]) => { this.lib = lib; const cfg = lib.load(pj, cj, lib.PREVIEW); this.setState({ cfg, saved: JSON.stringify(lib.load(pj, cj, lib.STORE)) }); });
+      .then(([lib, pj, cj]) => { this.lib = lib; const cfg = lib.load(pj, cj, lib.PREVIEW); this.setState({ cfg, saved: JSON.stringify(irqStorage.getItem(lib.PREVIEW) ? lib.load(pj, cj, lib.STORE) : cfg) }); });
   }
   u(src) { const s = String(src || ""); if (!s.startsWith("data:")) return s; this._b = this._b || new Map(); if (this._b.has(s)) return this._b.get(s);
     try { const [h, b] = s.split(","), mime = (h.match(/data:([^;]+)/) || [])[1] || "image/jpeg", bin = atob(b), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([a], { type: mime })); this._b.set(s, url); return url; } catch (e) { return ""; } }

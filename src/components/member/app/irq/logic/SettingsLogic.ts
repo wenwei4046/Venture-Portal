@@ -1,8 +1,9 @@
-// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/Quote Settings v3 Bold.dc.html), kept line for line so the screens behave as it does.
 /* eslint-disable */
+// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/Quote Settings v3 Bold.dc.html), kept line for line so the screens behave as it does.
 import { DcLogic } from "../dc";
 import React from "react";
 import * as quoteDocLib from "../lib/quote-doc";
+import { irqStorage } from "../storage";
 import seedPackages from "../data/packages.json";
 import seedCatalog from "../data/catalog.json";
 import * as catalogImport from "../lib/catalog-import";
@@ -139,7 +140,7 @@ export class SettingsLogic extends DcLogic {
     Promise.resolve(catalogImport).then(ci => { this.ci = ci; if (this._bm) this._bm.setAttribute("href", ci.BOOKMARKLET); this.forceUpdate(); });
     Promise.all([Promise.resolve({ ...quoteDocLib, CRM_FIELDS: this.props.crmFields || quoteDocLib.CRM_FIELDS }), Promise.resolve(seedPackages), Promise.resolve(seedCatalog)])
       .then(([lib, pj, cj]) => {
-        const cfg = lib.load(pj, cj, lib.PREVIEW), live = lib.load(pj, cj, lib.STORE);
+        const cfg = lib.load(pj, cj, lib.PREVIEW), live = irqStorage.getItem(lib.PREVIEW) ? lib.load(pj, cj, lib.STORE) : cfg;
         this.setState({ lib, base: { pj, cj }, cfg, savedJson: JSON.stringify(live), pid: cfg.packages[0]?.id });
         const gsz = {}; lib.deriveGroups(cfg.packages).forEach(g => { const k = sizeKey((cfg.packages.find(x => x.id === (g.classic || g.build)) || {}).spec); if (k) (gsz[k] = gsz[k] || []).push(g.id); });
         const solo = Object.values(gsz).filter(a => a.length === 1).map(a => a[0]).filter(id => cfg.packages.some(p => p.group === id && !/^\dR \dR/.test(p.groupLabel || "")));

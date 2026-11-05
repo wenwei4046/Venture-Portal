@@ -32,7 +32,7 @@ async function session(need: "read" | "quote" | "settings"): Promise<{ db: Supab
   const closed = appClosed(user.closed);
   if (need === "quote") {
     if (closed.sends.includes("quote")) throw new Error(SEND_REFUSED.quote);
-    if (!canDo(user, "revenue_app", "create") && !(await editsSettings(user))) throw new Error("Quotes are made by the IR team.");
+    if (!canDo(user, "revenue_app", "create", "own") && !(await editsSettings(user))) throw new Error("Quotes are made by the IR team.");
   }
   if (need === "settings" && !(await editsSettings(user))) throw new Error("Only somebody who may edit the Product List may change the quotation settings.");
   return { db: (await createClient()) as unknown as SupabaseClient, user };

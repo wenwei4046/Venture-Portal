@@ -1,5 +1,5 @@
-// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/IR Quote v9 Bold.dc.html), kept line for line so the screens behave as it does.
 /* eslint-disable */
+// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/IR Quote v9 Bold.dc.html), kept line for line so the screens behave as it does.
 import { DcLogic } from "../dc";
 import React from "react";
 import * as quoteDocLib from "../lib/quote-doc";
@@ -100,7 +100,7 @@ export class QuoteLogic extends DcLogic {
         this.setState({ data, catalog: cfg.catalog });
         this.load(first.classic || first.build, data);
       })
-      .catch(() => this.flash("Could not load the price list"));
+      .catch(e => { console.error("[irq] price list", e); this.flash("Could not load the price list"); });
     this.setState({ width: window.innerWidth });
     this.onWinResize = () => { if (!this.ro) this.setState({ width: window.innerWidth }); };
     window.addEventListener("resize", this.onWinResize);

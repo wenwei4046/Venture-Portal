@@ -1,5 +1,5 @@
-// @ts-nocheck — ported from the prototype; kept as it is so the documents and prices come out the same.
 /* eslint-disable */
+// @ts-nocheck — ported from the prototype; kept as it is so the documents and prices come out the same.
 // Catalogue import: website scraper (also used as the bookmarklet), clipboard/CSV/Excel parsing, and diffing.
 
 // Self-contained: runs in our page (on fetched HTML) and on the b2b site as a bookmarklet.

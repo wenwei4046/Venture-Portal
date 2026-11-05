@@ -57,7 +57,7 @@ security definer
 set search_path to 'public'
 as $function$
 declare
-  v_quote boolean := has_any_action(array['revenue_app.create']);
+  v_quote boolean := has_any_action(array['revenue_app.create:own']);
   v_edit boolean := has_any_action(array['product_list.edit']);
 begin
   if auth.uid() is null or not (v_quote or v_edit) then
@@ -83,7 +83,7 @@ security definer
 set search_path to 'public'
 as $function$
 begin
-  if auth.uid() is null or not has_any_action(array['revenue_app.create', 'product_list.edit']) then return '[]'::jsonb; end if;
+  if auth.uid() is null or not has_any_action(array['revenue_app.create:own', 'product_list.edit']) then return '[]'::jsonb; end if;
   return coalesce((select jsonb_agg(board order by updated_at) from ir_drive_boards where owner = auth.uid()), '[]'::jsonb);
 end $function$;
 revoke execute on function public.ir_drive_read() from public, anon;
@@ -134,7 +134,7 @@ security definer
 set search_path to 'public'
 as $function$
 begin
-  if auth.uid() is null or not has_any_action(array['revenue_app.create', 'product_list.edit']) then
+  if auth.uid() is null or not has_any_action(array['revenue_app.create:own', 'product_list.edit']) then
     raise exception 'Quotes are made by the IR team.' using errcode = '42501';
   end if;
   if p_draft is null then
@@ -158,7 +158,7 @@ security definer
 set search_path to 'public'
 as $function$
 begin
-  if auth.uid() is null or not has_any_action(array['revenue_app.create', 'product_list.edit']) then
+  if auth.uid() is null or not has_any_action(array['revenue_app.create:own', 'product_list.edit']) then
     raise exception 'The Drive is the IR team''s.' using errcode = '42501';
   end if;
   if p_board is null then
@@ -184,19 +184,19 @@ create policy "ir quote photos: in" on public.file_objects for insert to authent
   with check (bucket_id = 'ir-quote'
     and (storage.foldername(name))[2] = (select auth.uid())::text
     and (((storage.foldername(name))[1] = 'config' and (select has_any_action(array['product_list.edit'])))
-      or ((storage.foldername(name))[1] = 'drive' and (select has_any_action(array['revenue_app.create', 'product_list.edit'])))));
+      or ((storage.foldername(name))[1] = 'drive' and (select has_any_action(array['revenue_app.create:own', 'product_list.edit'])))));
 -- Read: the settings' photos by everybody who quotes or edits; a Drive's by its owner.
 create policy "ir quote photos: read" on public.file_objects for select to authenticated
   using (bucket_id = 'ir-quote'
-    and (((storage.foldername(name))[1] = 'config' and (select has_any_action(array['revenue_app.create', 'product_list.edit'])))
+    and (((storage.foldername(name))[1] = 'config' and (select has_any_action(array['revenue_app.create:own', 'product_list.edit'])))
       or ((storage.foldername(name))[1] = 'drive' and (storage.foldername(name))[2] = (select auth.uid())::text)));
 -- Out: one's own files.
 create policy "ir quote photos: out" on public.file_objects for delete to authenticated
   using (bucket_id = 'ir-quote' and (storage.foldername(name))[2] = (select auth.uid())::text);
 
-select public.audit_register('ir_quote_config', 'IR quotation settings', 'Revenue app', '{}', 'none',
+select public.audit_register('ir_quote_config', 'IR quotation settings', 'Revenue', '{}', 'none',
   p_reason => 'One document rewritten whole on every save; when and by whom is on the row (updated_by, published_at).');
-select public.audit_register('ir_quote_drafts', 'IR quote drafts', 'Revenue app', '{}', 'none',
+select public.audit_register('ir_quote_drafts', 'IR quote drafts', 'Revenue', '{}', 'none',
   p_reason => 'A salesperson''s unfinished quotes, their own only — working copies, not records.');
-select public.audit_register('ir_drive_boards', 'IR Drive folders', 'Revenue app', '{}', 'none',
+select public.audit_register('ir_drive_boards', 'IR Drive folders', 'Revenue', '{}', 'none',
   p_reason => 'A salesperson''s own style photos — working material, not records.');
