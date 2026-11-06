@@ -9,11 +9,12 @@ import f from './form.module.css'
 // *Received from*): typed freely, with the companies it matches under it in the
 // soft menu's look — picking one links the voucher to that company, as the
 // form page's Company select did. Typed past the linked name, it is a party of
-// its own again.
+// its own again. With `browse` (2026-11-06, a claim's Pay to) the list is there to pick from before anything is typed.
 
 export interface PartyCompany {
   id: string
   name: string
+  /** Beside the name, and searched with it (a company's code; with `browse`, a person's department). */
   short_code: string
 }
 
@@ -24,6 +25,7 @@ export function PartyInput({
   readOnly = false,
   companies,
   companyId,
+  browse = false,
   onChange,
 }: {
   id: string
@@ -32,14 +34,16 @@ export function PartyInput({
   readOnly?: boolean
   companies: PartyCompany[]
   companyId: string
+  browse?: boolean
   onChange: (name: string, companyId: string) => void
 }) {
   const [focused, setFocused] = useState(false)
   const [keyAt, setKeyAt] = useState(-1)
   const q = value.trim().toLowerCase()
   const linked = companies.find((co) => co.id === companyId) ?? null
-  const matches = q && !readOnly ? companies.filter((co) => co.name.toLowerCase().includes(q) || co.short_code.toLowerCase().includes(q)).slice(0, 6) : []
-  const listOpen = focused && matches.length > 0 && !(linked && linked.name === value)
+  const browsing = browse && !readOnly && (!q || (linked && linked.name === value))
+  const matches = browsing ? companies : q && !readOnly ? companies.filter((co) => co.name.toLowerCase().includes(q) || co.short_code.toLowerCase().includes(q)).slice(0, 6) : []
+  const listOpen = focused && matches.length > 0 && (browse || !(linked && linked.name === value))
   useEscape(listOpen, () => setFocused(false))
   const listId = `${id}-list`
 
@@ -61,7 +65,19 @@ export function PartyInput({
         aria-expanded={listOpen}
         aria-controls={listId}
         aria-autocomplete="list"
-        onFocus={() => setFocused(true)}
+        onFocus={(e) => {
+          setFocused(true)
+          if (browse) e.target.select()
+        }}
+        onClick={
+          browse
+            ? (e) => {
+                setFocused(true)
+                // The press undid the focus's selection: a name picked is replaced by what is typed next.
+                if (linked && linked.name === value) e.currentTarget.select()
+              }
+            : undefined
+        }
         onBlur={() => setFocused(false)}
         onChange={(e) => {
           const name = e.target.value
@@ -83,7 +99,7 @@ export function PartyInput({
         }}
       />
       {listOpen ? (
-        <div id={listId} className={f.suggest} role="listbox">
+        <div id={listId} className={f.suggest} data-browse={browse ? 'true' : undefined} role="listbox">
           {matches.map((co, i) => (
             <button
               key={co.id}

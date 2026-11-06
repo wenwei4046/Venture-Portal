@@ -216,7 +216,7 @@ describe('a staff request', () => {
     expect(names().map((cells) => cells.find((c) => c === 'KHO WEI JIE'))).toEqual(['KHO WEI JIE'])
     fireEvent.click(screen.getByText('KHO WEI JIE'))
     const drawer = screen.getByRole('dialog', { name: /KHO WEI JIE/ })
-    expect(drawer).toHaveTextContent('Claim · I paid')
+    expect(drawer).toHaveTextContent('Pay to KHO WEI JIE')
     expect(drawer).toHaveTextContent('Receipt-2932.pdf')
     expect(drawer).toHaveTextContent('Salary account · Hong Leong Bank •••• 4821')
     expect(within(drawer).getByRole('button', { name: 'Create PV' })).toBeEnabled()

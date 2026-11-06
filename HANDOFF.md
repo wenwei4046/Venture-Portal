@@ -1,5 +1,20 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-06 a (#959 SHIPPED, migration applied first) — a claim's Pay to
+
+Session 171188af.
+
+- **MERGED:** squash `ebca092d` (2026-11-06 05:14Z), every check green on `e3eecaf6`, on the user's "上 migration，全绿就 merge" → "现在看并 merge". Unit tests (1/2) failed once in Revenue's `MembersGrid` ("+ Add director" menu, not this PR's code); it passed on a re-run of that job and three times locally.
+- **Migration `20261106100000_claim_pay_to` on production FIRST**, after a dry run as CHOW WAI MAN (rolled back and checked): schema_migrations row, created_by `claude-claim-pay-to`; the 3 function bodies' md5 equal the file's. The bodies replaced equalled the previous migration's (no drift).
+- **The user:** "这个payment request pay to 的人default 是自己，但要可以选或自己打". Sample `mockups/claim-pay-to-mockup.html` (OneDrive cwd), picked A and A, "照这个做".
+  - New request: *Claim — pay it back*, then *Pay to*: the sender by default, People on a press (oneself first), or any name typed.
+  - A person: their salary account or another account. A typed name: Bank and Account number, always.
+  - Finance's column: `Claim · name` / `Supplier · name`. Create PV's payee, One PV a person and the drawers follow the payee (`payeeOf`, never `requesterName`). From, the approval, notices and the pool stay with the sender.
+  - `payment_requests.payee_staff_id`. A colleague's salary account is hidden from the sender without the Bank tick; `people` says only `hasSalary`. DESIGN v4.234; `.claude/rules/finance/finance-view.md`.
+- **Told the user, unchanged:** a Claim & approve holder still reads a colleague's salary account as bank + last four. Only the one who picked them is refused it. The user has not asked to change this.
+- **Not checked:** logged in on the live site (no login here). The real dialog was checked on a throwaway Vite page.
+- **Also since checkpoint 2026-11-04 c:** #782 and #783 are merged (read on GitHub 2026-11-05). The user set aside IIS + compound under minimum pay: "先不做".
+
 ## CHECKPOINT 2026-11-04 c (#929 + #930 SHIPPED, migrations applied first · #782 / #783 brought up to date)
 
 Session d7ac866f.

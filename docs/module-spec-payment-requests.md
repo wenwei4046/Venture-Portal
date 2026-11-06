@@ -145,6 +145,7 @@ the bells' kinds and taps are one change. The Claim page shows a rejected reques
    - Readers: `payment_request_context()` (the New request window: who, department and its pool, the salary account
      from HR's record as bank + last four, the departments and companies a share may name); `my_payment_requests()`;
      `payment_requests_for_finance()` (Treasury: submitted, in a PV); `payment_request_file(file)` (the path to sign).
+   - Since mig `20261106100000` a claim's pay-to names who is paid: `payTo.staffId` (People), `payTo.name` (typed, always its own account), or neither (the sender).
    - Writers: `payment_request_save(id, data, submit)` (a draft or a rejected request of one's own: kind, pay-to,
      items, shares, files; Submit checks it whole — items, a receipt, the pay-to, shares under the total — then takes a
      number, snapshots the salary account and goes to Finance); `payment_request_cancel(id)`;
