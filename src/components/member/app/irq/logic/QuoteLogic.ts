@@ -349,7 +349,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     const okSrc = s => /^(data:image|https?:|blob:)/.test(String(s || "")); const imgs = [...((sx.photos && sx.photos.length ? sx.photos : (sx.cover ? [sx.cover] : [])).map((src, k) => ({ src, title: sx.name + (k ? " · " + (k + 1) : ""), sectionName: "Overview", items: [] }))), ...(drive[sid] || []).filter(x => okSrc(x.src))];
     const gi = Math.min(st.gi || 0, Math.max(0, imgs.length - 1)), im = imgs[gi];
     const inIm = () => false;
-    const live = c => c.items.filter(i => (i.qty ?? 1) > 0), isF = c => c.items.some(i => i.kind);
+    const live = c => c.items.filter(i => (i.qty ?? 1) > 0), isF = c => c.section ? c.section === "furn" : c.items.some(i => i.kind);
     const fItems = p.cats.filter(isF).flatMap(live), zl = fItems.map(i => { const im = this.imgFor(i); return im ? { img: im, name: title(i.name), code: i.code || "", delta: rm0((i.cost || 0) * (i.qty ?? 1)), item: null } : null; }).filter(Boolean), furn = fItems.map(i => { const im = this.imgFor(i); return { name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0((i.cost || 0) * (i.qty ?? 1)), cur: im ? "zoom-in" : "default", view: () => { if (im) this.openZoom(zl, zl.findIndex(z => z.img === im)); } }; });
     const sCats = p.cats.filter(c => !isF(c) && live(c).length), sItems = sCats.flatMap(live), sSum = sItems.reduce((a, i) => a + (i.cost || 0) * (i.qty ?? 1), 0);
     const serv = sCats.length ? { count: sItems.length + " items", sum: rm0(sSum), open: !!st.servOpen, rot: st.servOpen ? "rotate(180deg)" : "none", toggle: () => this.setState(s => ({ servOpen: !s.servOpen })),
@@ -444,7 +444,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
         })
       };
     }) : [];
-    const isFurn = ci => pkg && pkg.cats[ci].items.some(i => i.kind);
+    const isFurn = ci => pkg && (pkg.cats[ci].section ? pkg.cats[ci].section === "furn" : pkg.cats[ci].items.some(i => i.kind));
     const grpSum = vs => rm0(vs.reduce((a, cv) => a + st.lines.filter(l => l.ci === cv._ci).reduce((b, l) => b + (+l.cost || 0) * Math.max(l.qty, 0), 0), 0));
     const furnV = catViews.filter(cv => isFurn(cv._ci)), servV = catViews.filter(cv => !isFurn(cv._ci));
     const catGroups = [{ key: "furn", short: "Furniture", label: "FURNITURE & APPLIANCES", cats: furnV }, { key: "serv", short: "Services", label: "SERVICES & FITTINGS", cats: servV }].filter(g => g.cats.length).map(g => ({ ...g, sum: grpSum(g.cats) }));

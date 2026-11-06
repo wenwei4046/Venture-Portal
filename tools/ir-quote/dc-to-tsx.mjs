@@ -63,13 +63,25 @@ const PATCHES = {
     // The app's own top bar stands where the prototype drew a stand-in with its sample Principal's initials.
     ['<header style="flex:0 0 60px;height:60px;display:flex;align-items:center;gap:16px;padding:0 28px;background:#FFFFFF', '<header style="flex:0 0 60px;height:60px;display:{{ hdrDisplay }};align-items:center;gap:16px;padding:0 28px;background:#FFFFFF'],
     ['font-size:12px;font-weight:700">TS</span>\n    </header>', 'font-size:12px;font-weight:700">{{ userInitials }}</span>\n    </header>'],
+    // A catalogue item's photo can be the Principal's own: an item b2b does not have, has none (the user, 2026-11-06).
+    ['<span style="padding:6px 6px 6px 0"><span style="display:grid;place-items:center;width:44px;height:40px;border-radius:9px;background:#EEEEEA url(\'{{ r.img }}\') center/cover no-repeat;font-size:10px;font-weight:700;color:#111111">{{ r.initials }}</span></span>', '<label title="Add or change the photo" style="padding:6px 6px 6px 0;cursor:pointer"><span style="display:grid;place-items:center;width:44px;height:40px;border-radius:9px;background:#EEEEEA url(\'{{ r.img }}\') center/cover no-repeat;font-size:10px;font-weight:700;color:#111111">{{ r.initials }}</span><input type="file" accept="image/*" onChange="{{ r.onImg }}" style="display:none"></label>'],
+    // A room type's category says which side of the quote it stands on (the user, 2026-11-06).
+    ['<span style="font-size:12px;color:#6B6B66">{{ c.count }}</span>', '<span style="font-size:12px;color:#6B6B66">{{ c.count }}</span><select value="{{ c.section }}" onChange="{{ c.onSection }}" aria-label="Furniture or services" style="height:28px;padding:0 6px;border-radius:8px;border:1px solid #DEDED8;background:#FFFFFF;font-size:12px;font-weight:600;color:#1F1F1C"><option value="furn">Furniture</option><option value="serv">Services</option></select>'],
     // The Catalogue's column heads sort it (the user, 2026-11-06).
     ['<span style="padding:0 8px">CODE</span><span style="padding:0 8px">NAME</span><span style="padding:0 8px">CATEGORY</span><span style="padding:0 8px;text-align:right">PRICE (RM)</span><span style="padding:0 8px"></span><span style="padding:0 8px">SHOW</span>', '<span onClick="{{ catSortH.code.go }}" title="Sort by code" style="padding:0 8px;cursor:pointer;user-select:none">CODE{{ catSortH.code.mark }}</span><span onClick="{{ catSortH.name.go }}" title="Sort by name" style="padding:0 8px;cursor:pointer;user-select:none">NAME{{ catSortH.name.mark }}</span><span onClick="{{ catSortH.kind.go }}" title="Sort by category" style="padding:0 8px;cursor:pointer;user-select:none">CATEGORY{{ catSortH.kind.mark }}</span><span onClick="{{ catSortH.cost.go }}" title="Sort by price" style="padding:0 8px;text-align:right;cursor:pointer;user-select:none">PRICE (RM){{ catSortH.cost.mark }}</span><span style="padding:0 8px"></span><span onClick="{{ catSortH.show.go }}" title="Sort by show" style="padding:0 8px;cursor:pointer;user-select:none">SHOW{{ catSortH.show.mark }}</span>'],
   ],
   "Quote Settings Mobile.dc.html": [
     ['<a href="#" aria-label="Back to Profile"', '<a href="#" onClick="{{ back }}" aria-label="Back to Profile"'],
   ],
-  "Workspace.dc.html": [],
+  "Workspace.dc.html": [
+    // Fills the space the quote gives it. At a whole screen's height, under the app's header, its foot ran off the screen (the user, 2026-11-06).
+    ['height:100%;min-height:100vh;display:flex;overflow:hidden;background:#F7F7F5', 'height:100%;min-height:0;display:flex;overflow:hidden;background:#F7F7F5'],
+    // A phone's viewer: the rooms take a row of their own; among the buttons, many rooms ran under them (the user, 2026-11-06).
+    ['<div style="flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:14px 18px 10px 24px">', '<div data-ws-bar="" style="flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:14px 18px 10px 24px">'],
+    ['<div style="flex:1;min-width:0;display:flex;gap:4px;justify-content:center;overflow-x:auto">', '<div data-ws-chapters="" style="flex:1;min-width:0;display:flex;gap:4px;justify-content:center;overflow-x:auto">'],
+    // The pin: this photo comes first (the user, 2026-11-06).
+    ['<button onClick="{{ im.remove }}" title="Delete photo"', '<button onClick="{{ im.pin }}" title="{{ im.pinTitle }}" aria-label="{{ im.pinTitle }}" style="position:absolute;left:8px;bottom:8px;width:28px;height:28px;padding:0;border-radius:14px;border:0;background:{{ im.pinBg }};color:{{ im.pinInk }};display:grid;place-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5M5 3h14l-2 7 3 4H4l3-4z"></path></svg></button><button onClick="{{ im.remove }}" title="Delete photo"'],
+  ],
 };
 
 // ── the runtime's encoding (support.js › encode.ts) ──
@@ -325,6 +337,8 @@ const base = [
   "/* The quote header's Quote settings link shows only to those who may edit them (a patch in this script). */",
   '[data-irq-settings="false"] { display: none !important; }',
   '[data-irq-tabs="0"] { display: none !important; }',
+  "[data-ws-chapters] { justify-content: safe center !important; }",
+  "@media (max-width: 767px) { [data-ws-bar] { flex-wrap: wrap; gap: 8px !important; padding: 10px 12px 6px 16px !important; } [data-ws-bar] > span:first-child { flex: 1 1 0 !important; } [data-ws-chapters] { order: 9; flex: 1 1 100% !important; justify-content: flex-start !important; } }",
   "/* iOS Safari zooms the page on a focused control under 16px and leaves it zoomed. globals.css holds this floor for the app, but it cannot reach into a shadow root. */",
   "@media (max-width: 767px) { input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea { font-size: 16px !important; } }",
   "/* iOS draws a date field at its own width, past its card; the prototype's fields fill the card. */",

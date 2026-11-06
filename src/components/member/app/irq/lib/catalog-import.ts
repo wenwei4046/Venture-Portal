@@ -303,7 +303,7 @@ export function diff(items, incoming) {
     if (cur) {
       if (inc.price != null && +inc.price !== +cur.cost) what.push("price");
       if (inc.name && !inc.truncated && inc.name !== cur.name) what.push("name");
-      if (inc.img && inc.img !== cur.img) what.push("picture");
+      if (inc.img && inc.img !== cur.img && !cur.imgOwn) what.push("picture");
       if (inc.specs && inc.specs !== (cur.specs || "")) what.push("specs");
       if (inc.color && inc.color !== (cur.color || "")) what.push("colour");
       status = what.length ? "changed" : "same";

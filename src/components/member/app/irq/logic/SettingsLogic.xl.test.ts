@@ -31,6 +31,15 @@ describe("Import from Excel", () => {
     expect(kinds).toEqual(["media", null, null, null]);
   });
 
+  it("takes a category's side from an optional TYPE column", async () => {
+    const x = await read([[...HEAD, "TYPE"],
+      ["MASTER BEDROOM", "WARDROBE", "", "", 1, 650, "Furniture"],
+      ["PAINTING", "WALL", "", "", 1, 500, "Services"],
+      ["OTHERS", "BELL", "", "", 1, 130, ""],
+    ]);
+    expect(x.cats.map(c => (c as unknown as { section?: string }).section)).toEqual(["furn", "serv", undefined]);
+  });
+
   it("reads the template's CATEGORY, left of ITEM", async () => {
     const x = await read([HEAD,
       ["LIVING", "TV CABINET", "", "336103", 1, 519],
