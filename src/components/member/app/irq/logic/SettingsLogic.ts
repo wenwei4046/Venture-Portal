@@ -181,7 +181,8 @@ export class SettingsLogic extends DcLogic {
     const hi = rows.findIndex(r => low(r).some(c => /^(item|name|description of item|product)/.test(c)));
     if (hi < 0) { this.setState({ xl: { pid, cats: [], err: "Couldn't find a header row with an ITEM column.", mode: "replace", name: file.name } }); return; }
     const h = low(rows[hi]), itemCols = h.map((c, k) => /^(item|name|product)/.test(c) ? k : -1).filter(k => k >= 0);
-    const starts = itemCols.map(k => (k > 0 && /^(no|#|bil)$/.test(h[k - 1])) ? k - 1 : k);
+    // A list's columns start at its NO and CATEGORY, left of its ITEM (the template's own CATEGORY stands there).
+    const starts = itemCols.map(k => { while (k > 0 && /^(no|#|bil)$|^(categ|area|room)/.test(h[k - 1])) k--; return k; });
     const num = v => { const n = parseFloat(String(v).replace(/[^\d.]/g, "")); return isNaN(n) ? null : n; };
     const kinds = this.state.cfg.catalog.kinds, cats = [];
     starts.forEach((st0, bi) => {
@@ -192,7 +193,7 @@ export class SettingsLogic extends DcLogic {
         const name = String(r[cI] ?? "").trim().replace(/^[-–•\s]+/, ""); if (!name && !(cK >= 0 && String(r[cK]).trim())) return;
         if (/^(total|sub ?total|grand total|discount)/i.test(name)) return;
         const catName = cK >= 0 ? String(r[cK]).trim() : "", qty = cQ >= 0 ? num(r[cQ]) : null, price = cP >= 0 ? num(r[cP]) : null;
-        if (catName && (!cur || cur.name !== catName.toUpperCase())) { cur = { name: catName.toUpperCase(), label: catName, items: [] }; cats.push(cur); }
+        if (catName && (!cur || cur.name !== catName.toUpperCase())) { const N = catName.toUpperCase(); cur = cats.find(x => x.name === N) || null; if (!cur) { cur = { name: N, label: /[a-z]/.test(catName) ? catName : catName.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase()), items: [] }; cats.push(cur); } }
         if (cK < 0 && name && qty == null && price == null && !(cC >= 0 && String(r[cC]).trim())) { cur = { name: name.toUpperCase(), label: name, items: [] }; cats.push(cur); return; }
         if (!name) return; if (!cur) { cur = { name: "ITEMS", label: "Items", items: [] }; cats.push(cur); }
         cur.items.push({ name: name.toUpperCase(), desc: cD >= 0 ? String(r[cD]).trim() : "", code: cC >= 0 ? String(r[cC]).trim() : "", qty: qty == null ? 1 : qty, cost: price == null ? 0 : price, kind: this.guessKind(name, kinds) || null });
