@@ -50,20 +50,23 @@ export function fieldRows(f, v, n, b) {
   if (isEmpty(f, v)) return "";
   const size = b?.size || 12.5, al = b?.align || "left", bold = b?.bold ? "font-weight:bold;" : "";
   const td = (inner, extra = "") => `<tr><td colspan="${n}" style="text-align:${al};font-size:${size}px;${bold}padding:3px 6px;${extra}">${inner}</td></tr>`;
-  const lab = `<b>${esc(f.label)}</b>`;
+  // A name still the type's own ("Short text") is no name: only the answer prints (the user, 2026-11-06).
+  const named = f.label && !FIELD_KINDS.some(k => k.label === f.label);
+  const lab = named ? `<b>${esc(f.label)}</b>` : "";
+  const labRow = named ? td(lab, "padding-top:8px") : "";
   if (["short", "number", "date", "link"].includes(f.kind)) {
     const val = f.kind === "date" ? esc(fmtDate(v)) : f.kind === "link" ? `<a href="${esc(v)}" style="color:#1C1714">${esc(v)}</a>` : esc(v);
-    return td(`${lab}&nbsp;&nbsp;${val}`);
+    return td(named ? `${lab}&nbsp;&nbsp;${val}` : val);
   }
-  if (f.kind === "long") return td(lab, "padding-top:8px") + td(esc(v), "white-space:pre-wrap;line-height:1.45");
-  if (f.kind === "image") return td(lab, "padding-top:8px") + td(`<img src="${esc(v)}" style="max-width:100%;max-height:110mm">`);
+  if (f.kind === "long") return labRow + td(esc(v), "white-space:pre-wrap;line-height:1.45");
+  if (f.kind === "image") return labRow + td(`<img src="${esc(v)}" style="max-width:100%;max-height:110mm">`);
   if (f.kind === "table") {
     const cols = f.columns || [];
     const cv = (c, x) => x == null || x === "" ? "" : c.kind === "image" ? `<img src="${esc(x)}" style="height:48px">` : c.kind === "money" ? "RM " + money(+x || 0) : c.kind === "date" ? esc(fmtDate(x)) : esc(x);
     const num = c => c.kind === "number" || c.kind === "money";
     const head = cols.map(c => `<td style="padding:5px 6px;background:#E7E5DE;border-top:1px solid #bbb;border-bottom:1px solid #bbb;font-weight:bold;font-size:${size - 1}px;${num(c) ? "text-align:right" : ""}">${esc(c.label)}</td>`).join("");
     const body = v.map(r => `<tr>${cols.map(c => `<td style="padding:4px 6px;border-bottom:1px solid #ddd;font-size:${size}px;${num(c) ? "text-align:right" : ""}">${cv(c, r[c.id])}</td>`).join("")}</tr>`).join("");
-    return td(lab, "padding-top:8px") + `<tr><td colspan="${n}" style="padding:2px 6px 6px"><table style="width:100%;border-collapse:collapse">${head ? `<tr>${head}</tr>` : ""}${body}</table></td></tr>`;
+    return labRow + `<tr><td colspan="${n}" style="padding:2px 6px 6px"><table style="width:100%;border-collapse:collapse">${head ? `<tr>${head}</tr>` : ""}${body}</table></td></tr>`;
   }
   return "";
 }

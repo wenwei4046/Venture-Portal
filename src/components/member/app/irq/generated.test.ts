@@ -34,6 +34,20 @@ describe("the generated IR Quote templates", () => {
     for (const name of ["rvSheetUp", "rvPanelIn", "rvFade", "wsIn", "wsFade"]) expect(ALL.includes(`@keyframes ${name}`), name).toBe(true);
   });
 
+  // globals.css's 16px floor stops at the shadow root, so each screen's sheet carries its own: under 16px, a tap on
+  // the search box zooms an iPhone's page and leaves it zoomed (2026-11-06).
+  it("keep a phone's form controls at 16px, so iOS does not zoom on focus", () => {
+    for (const css of [IRQ_CSS_QUOTE, IRQ_CSS_SETTINGS, IRQ_CSS_SETTINGS_MOBILE]) {
+      expect(css).toContain("@media (max-width: 767px) { input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea { font-size: 16px !important; } }");
+    }
+  });
+
+  it("show the item being replaced in the Change item sheet's header", () => {
+    const quote = tpls.find(([f]) => f === "QuoteTpl.tsx")![1];
+    expect(quote).toContain('v["sheet"]?.["img"]');
+    expect(quote).toContain('v["sheet"]?.["zoom"]');
+  });
+
   it("read the app's own faces, never a font the page did not load", () => {
     for (const [f, src] of tpls) expect(/font-family:[^;"]*\b(Manrope|Space Grotesk)\b/.test(src.replace(/var\(--font-[a-z-]+\)/g, "")), f).toBe(false);
   });

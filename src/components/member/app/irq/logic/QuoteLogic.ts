@@ -4,6 +4,7 @@ import { DcLogic } from "../dc";
 import React from "react";
 import * as quoteDocLib from "../lib/quote-doc";
 import * as wsStore from "../lib/workspace-store";
+import { productSlug } from "../lib/catalog-import";
 import { irqStorage } from "../storage";
 import seedPackages from "../data/packages.json";
 import seedCatalog from "../data/catalog.json";
@@ -137,7 +138,7 @@ export class QuoteLogic extends DcLogic {
   bump(id, d) { this.setLine(id, l => ({ ...l, qty: Math.max(0, l.qty + d) })); }
   undo(l) {
     if (!l.orig) this.setState(s => ({ lines: s.lines.filter(x => x.id !== l.id) }));
-    else this.setLine(l.id, x => ({ ...x, ...x.orig, orig: x.orig }));
+    else this.setLine(l.id, x => ({ ...x, img: "", color: null, ...x.orig, orig: x.orig }));
   }
   openSheet(sheet) {
     let col = "";
@@ -152,7 +153,7 @@ export class QuoteLogic extends DcLogic {
   }
   applyCollection(col) {
     const plan = this.collectionPlan(col); if (!plan.length) { this.flash("Nothing to change for this collection"); return; }
-    this.setState(s => ({ lines: s.lines.map(l => { const p = plan.find(x => x.id === l.id); return p ? { ...l, name: p.item.name, code: p.item.code || "", desc: p.item.desc || l.desc, cost: +p.item.cost || 0 } : l; }), sheet: null }));
+    this.setState(s => ({ lines: s.lines.map(l => { const p = plan.find(x => x.id === l.id); return p ? { ...l, name: p.item.name, code: p.item.code || "", desc: p.item.desc || l.desc, cost: +p.item.cost || 0, img: p.item.img || "", color: p.item.color || "" } : l; }), sheet: null }));
     this.flash(`${plan.length} item${plan.length === 1 ? "" : "s"} switched to ${col.replace(/^.* · /, "")}`);
   }
   openZoom(list, idx) { this.setState({ zoomList: list, zoomIdx: Math.max(0, idx) }); }
@@ -160,12 +161,14 @@ export class QuoteLogic extends DcLogic {
   // data: URLs contain ";" which breaks inline style parsing; serve them as blob: URLs instead.
   u(src) { const s = String(src || ""); if (!s.startsWith("data:")) return s; this._blobs = this._blobs || new Map(); if (this._blobs.has(s)) return this._blobs.get(s);
     try { const [h, b64] = s.split(","), mime = (h.match(/data:([^;]+)/) || [])[1] || "image/jpeg", bin = atob(b64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([arr], { type: mime })); this._blobs.set(s, url); return url; } catch (e) { return ""; } }
-  imgFor(l) { const its = (this.state.catalog && this.state.catalog.items) || []; const it = its.find(c => l.code && c.code === l.code) || its.find(c => String(c.name).toUpperCase() === String(l.name).toUpperCase()); return (it && it.img) || ""; }
+  itemFor(l) { const its = (this.state.catalog && this.state.catalog.items) || []; return its.find(c => l.code && c.code === l.code) || its.find(c => String(c.name).toUpperCase() === String(l.name).toUpperCase()); }
+  imgFor(l) { if (l.img) return l.img; const it = this.itemFor(l); return (it && it.img) || ""; }
+  colorFor(l) { if (l.color != null) return l.color; const it = this.itemFor(l); return (it && it.color) || ""; }
   apply(item) {
     const sh = this.state.sheet;
     if (!sh) return;
-    if (sh.mode === "swap") this.setLine(sh.id, l => ({ ...l, name: item.name, code: item.code || "", desc: item.desc || l.desc, cost: +item.cost || 0, kind: l.kind }));
-    else this.setState(s => ({ lines: [...s.lines, { id: "n" + Date.now(), ci: sh.ci, name: item.name, desc: item.desc || "", code: item.code || "", cost: +item.cost || 0, qty: 1, kind: item.kind || null, orig: null }] }));
+    if (sh.mode === "swap") this.setLine(sh.id, l => ({ ...l, name: item.name, code: item.code || "", desc: item.desc || l.desc, cost: +item.cost || 0, kind: l.kind, img: item.img || "", color: item.color || "" }));
+    else this.setState(s => ({ lines: [...s.lines, { id: "n" + Date.now(), ci: sh.ci, name: item.name, desc: item.desc || "", code: item.code || "", cost: +item.cost || 0, qty: 1, kind: item.kind || null, orig: null, img: item.img || "", color: item.color || "" }] }));
     if (!this._desk) this.setState({ sheet: null });
     this.flash(sh.mode === "swap" ? `Changed to ${title(item.name)}` : `Added ${title(item.name)}`);
   }
@@ -207,7 +210,7 @@ export class QuoteLogic extends DcLogic {
     return pkg.cats.map((c, ci) => {
       const rows = this.state.lines.filter(l => l.ci === ci && l.qty > 0).map(l => {
         const unit = Math.round(l.cost * m);
-        const ci2 = (this.state.catalog?.items || []).find(x => (l.code && x.code === l.code) || x.name === l.name) || {}; return { no: ++n, item: l.name, desc: l.desc || "", code: l.code || "", qty: l.qty, unit, sum: unit * l.qty, kind: ((this.state.catalog?.kinds || {})[l.kind] || {}).label || "", collection: ci2.collection || "", color: ci2.color || "", remark: "" };
+        const ci2 = (this.state.catalog?.items || []).find(x => (l.code && x.code === l.code) || x.name === l.name) || {}; const clr = this.colorFor(l); return { no: ++n, item: l.name, desc: l.desc || "", code: [l.code, clr].filter(Boolean).join(" / "), qty: l.qty, unit, sum: unit * l.qty, kind: ((this.state.catalog?.kinds || {})[l.kind] || {}).label || "", collection: ci2.collection || "", color: clr, remark: "" };
       });
       return { name: c.name, rows };
     }).filter(c => c.rows.length).concat((() => {
@@ -429,7 +432,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
           const ch = changes.find(x => x.l.id === l.id);
           const tone = !ch ? null : ch.tag === "Removed" ? ["#8A2E1C", "#F6E1DA"] : ch.tag === "Added" ? ["#2F6B47", "#E8F3ED"] : ["#B35A00", "#FFEBD9"];
           return {
-            title: title(l.name), meta: [l.desc, l.code].filter(Boolean).join(" · "), qty: l.qty,
+            title: title(l.name), meta: [l.desc, l.code, this.colorFor(l)].filter(Boolean).join(" · "), qty: l.qty,
             adj: !!(l.adjust || (l.orig && l.orig.adjust)), locked: !(l.adjust || (l.orig && l.orig.adjust)) && !!(l.fixed || (l.orig && l.orig.fixed)), costV: String(l.cost ?? ""), onCost: e => { const n = parseFloat(e.target.value.replace(/[^\d.]/g, "")); this.setLine(l.id, x => ({ ...x, cost: isNaN(n) ? 0 : n })); },
             sumText: rm0((+l.cost || 0) * Math.max(l.qty, 0)), eachText: l.qty === 1 ? "" : `${rm0(+l.cost || 0)} each`,
             strike: l.qty === 0 ? "line-through" : "none", nameColor: l.qty === 0 ? "#6B6B66" : "#1F1F1C",
@@ -460,7 +463,8 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       if (st.sheet.mode === "swap") {
         const l = st.lines.find(x => x.id === st.sheet.id);
         const base = l.orig || l, k = kinds[l.kind] || {};
-        sheet = { eyebrow: "CHANGE ITEM", title: title(l.orig ? l.orig.name : l.name), sub: `${k.label || "Item"} · ${rm0(base.cost * m)}`, url: k.url || "" };
+        const baseImg = this.imgFor(base) || imgFor(base.code);
+        sheet = { eyebrow: "CHANGE ITEM", title: title(l.orig ? l.orig.name : l.name), sub: `${k.label || "Item"} · ${rm0(base.cost * m)}`, url: k.url || "", img: baseImg, zoom: e => { e.stopPropagation(); this.openZoom([{ img: baseImg, name: title(base.name), code: base.code || "", delta: rm0(base.cost * m), item: null }], 0); } };
         options = st.catalog.items.filter(it => it.kind === l.kind && it.cost != null && !it.noPrice && match(it)).map(it => {
           const dd = Math.round((it.cost - base.cost) * m) * (l.qty || 1);
           const cur = it.code === l.code && it.name === l.name;
@@ -475,15 +479,19 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       const VAR = /\s*\(#\)|\s+\d{2,4}\/\d{2,5}(?:\/\d{1,5})*$|\b(?:LEFT|RIGHT|LHF|RHF|LHS|RHS|LH|RH|REVERSIBLE)(?:\s+(?:FACING|HAND|ARM|CHAISE|SIDE))?\b/gi;
       const lead = /^[\d\/\s-]{6,}(?=[A-Z])/i;
       const gk = n => String(n || "").toUpperCase().replace(lead, "").replace(VAR, " ").replace(/\s+/g, " ").trim();
-      const vl = n => { const u = String(n || "").toUpperCase().replace(lead, ""); const p = []; let m; const re = new RegExp(VAR.source, "gi"); while ((m = re.exec(u))) { const t = m[0].replace(/[()#]/g, "").trim(); if (t) p.push(t); } return p.join(" · ") || "Standard"; };
+      const vl = n => { const u = String(n || "").toUpperCase().replace(lead, ""); const p = []; let m; const re = new RegExp(VAR.source, "gi"); while ((m = re.exec(u))) { const t = m[0].replace(/[()#]/g, "").trim(); if (t) p.push(t); } return p.join(" · "); };
       const groups = []; const gi = {};
-      options.forEach(o => { const k = gk(o.name); if (gi[k] == null) { gi[k] = groups.length; groups.push({ k, list: [] }); } groups[gi[k]].list.push(o); });
-      options = groups.map(g => { const vs = g.list; const selId = (st.vsel || {})[g.k]; const o = vs.find(v => v.id === selId) || vs.find(v => v.cur) || vs[0];
-        const vars = vs.length > 1 ? vs.map(v => { const on = v === o; return { label: vl(v.name), bg: on ? "#1F1F1C" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#1F1F1C" : "#DEDED8", pick: e => { e.stopPropagation(); this.setState(s => ({ vsel: { ...(s.vsel || {}), [g.k]: v.id } })); } }; }) : [];
-        return { ...o, vars, hasVars: vars.length > 1, varCount: vars.length > 1 ? vars.length + " options" : "", gname: vs.length > 1 ? g.k : o.name }; });
-      const zl = options.map(o => { const im = o.img || o.item?.img || imgFor(o.code); return im ? { img: im, name: title(o.name), code: o.code, delta: o.delta, item: o.item } : null; }).filter(Boolean);
+      // b2b's own grouping (its product page's OPTION list, `group`) where the import read it, else by the name. One product is one option: b2b lists it under a category and every collection, and two products may share a code.
+      const pid = o => productSlug(o.url) || o.code;
+      options.forEach(o => { const k = o.group ? "g:" + o.group : gk(o.name); if (gi[k] == null) { gi[k] = groups.length; groups.push({ k, list: [] }); } const list = groups[gi[k]].list, same = list.findIndex(x => pid(x) && pid(x) === pid(o)); if (same < 0) list.push(o); else if (o.cur) list[same] = o; });
+      const words = n => String(n || "").toUpperCase().replace(lead, "").trim().split(/\s+/);
+      const shared = vs => { const a = words(vs[0].name); let i = 0; while (i < a.length && vs.every(v => words(v.name)[i] === a[i])) i++; return i; };
+      options = groups.map(g => { const vs = g.list; const selId = (st.vsel || {})[g.k]; const o = vs.find(v => v.id === selId) || vs.find(v => v.cur) || vs[0]; const same = shared(vs);
+        const vars = vs.length > 1 ? vs.map(v => { const on = v === o; return { label: (v.group ? title(words(v.name).slice(same).join(" ")) : vl(v.name)) || v.code || "—", bg: on ? "#1F1F1C" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C", border: on ? "#1F1F1C" : "#DEDED8", pick: e => { e.stopPropagation(); this.setState(s => ({ vsel: { ...(s.vsel || {}), [g.k]: v.id } })); } }; }) : [];
+        return { ...o, vars, hasVars: vars.length > 1, varCount: vars.length > 1 ? vars.length + " options" : "", gname: vs.length > 1 ? (o.group ? words(o.name).slice(0, same).join(" ") || o.name : g.k) : o.name }; });
+      const zl = options.map(o => { const im = o.img || o.item?.img || imgFor(o.code); return im ? { img: im, name: title(o.name), code: [o.code, o.color].filter(Boolean).join(" · "), delta: o.delta, item: o.item } : null; }).filter(Boolean);
       options = options.map(o => { const im = o.img || o.item?.img || imgFor(o.code); return {
-        name: title(o.gname), code: o.code || "—", img: im, initials: im ? "" : (o.name.match(/\b[A-Z]/g) || []).slice(0, 2).join(""),
+        name: title(o.gname), code: [o.code || "—", o.color].filter(Boolean).join(" · "), img: im, initials: im ? "" : (o.name.match(/\b[A-Z]/g) || []).slice(0, 2).join(""),
         collection: o.collection || "", vars: o.vars, hasVars: o.hasVars, varCount: o.varCount,
         sample: !!o.sample, delta: o.delta, ink: o.ink, pick: () => this.apply(o.item),
         zoomTitle: im ? "View larger" : "", zoomCursor: im ? "zoom-in" : "inherit",
@@ -613,7 +621,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       discount: st.discount, onDiscount: e => this.setState({ discount: e.target.value.replace(/[^\d.]/g, "") }),
       totalText: rm(total), totalBare: money(total), changesText: signed(changeSell), changeCount: nChanges === 0 ? "no changes" : `${nChanges} change${nChanges === 1 ? "" : "s"}`,
       hasChanges: nChanges > 0,
-      changeList: changes.map(x => { const im = this.imgFor(x.l); return { img: im, cursor: im ? "zoom-in" : "default", tip: im ? "View picture" : "", view: () => { if (!im) return; const zl = changes.map(y => { const i2 = this.imgFor(y.l); return i2 ? { img: i2, name: title(y.l.name), code: y.l.code || "", delta: signed(y.d), item: null } : null; }).filter(Boolean); this.openZoom(zl, zl.findIndex(z => z.img === im)); }, title: title(x.l.name), note: x.tag + (x.l.qty > 0 ? ` · qty ${x.l.qty}` : ""), delta: signed(x.d), ink: x.d > 0 ? "#1F1F1C" : "#2F6B47" }; }),
+      changeList: changes.map(x => { const im = this.imgFor(x.l); return { img: im, cursor: im ? "zoom-in" : "default", tip: im ? "View picture" : "", view: () => { if (!im) return; const zl = changes.map(y => { const i2 = this.imgFor(y.l); return i2 ? { img: i2, name: title(y.l.name), code: y.l.code || "", delta: signed(y.d), item: null } : null; }).filter(Boolean); this.openZoom(zl, zl.findIndex(z => z.img === im)); }, title: title(x.l.name), note: x.tag + (x.l.code ? ` · ${x.l.code}` : "") + (x.l.qty > 0 ? ` · qty ${x.l.qty}` : ""), delta: signed(x.d), ink: x.d > 0 ? "#1F1F1C" : "#2F6B47" }; }),
       primary,
       draftsOpen: !!st.draftsOpen, toggleDrafts: () => this.setState(s => ({ draftsOpen: !s.draftsOpen, armDraft: null })), saveDraft: () => this.saveDraft(),
       draftBadge: st.draftId ? "Draft · saved " + new Date(st.draftAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "",
