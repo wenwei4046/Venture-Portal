@@ -47,6 +47,9 @@ const PATCHES = {
     ["padding-bottom:env(safe-area-inset-bottom,0px)", "padding-bottom:var(--safe-bottom)"],
     // …and the app's own top bar on a computer (greeting, bell, account), where the prototype drew a stand-in.
     ['<sc-if value="{{ desk }}" hint-placeholder-val="{{ false }}">\n      <header', '<sc-if value="{{ deskHeader }}" hint-placeholder-val="{{ false }}">\n      <header'],
+    // A long option or code wraps inside its row; it ran over the price on a phone (the user, 2026-11-06: "overlap").
+    ['<span role="button" onClick="{{ ov.pick }}" style="display:inline-flex;align-items:center;height:26px;padding:0 9px;', '<span role="button" onClick="{{ ov.pick }}" style="display:inline-flex;align-items:center;box-sizing:border-box;max-width:100%;min-width:0;min-height:26px;overflow-wrap:anywhere;padding:3px 9px;'],
+    ['<span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6B6B66">{{ o.code }}</span>', '<span style="min-width:0;overflow-wrap:anywhere;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#6B6B66">{{ o.code }}</span>'],
     // A room type with one version has no Classic / Build in switch (the user, 2026-11-06).
     ['<div style="flex:{{ svCard.segFlex }};display:flex;gap:2px;padding:3px;border-radius:11px;background:#EEEEEA">', '<div data-irq-tabs="{{ styleTabs.length }}" style="flex:{{ svCard.segFlex }};display:flex;gap:2px;padding:3px;border-radius:11px;background:#EEEEEA">'],
     // The Change item sheet's header shows the item being replaced (the user, 2026-11-06), drawn as the list's own photos.
@@ -324,6 +327,9 @@ const base = [
   '[data-irq-tabs="0"] { display: none !important; }',
   "/* iOS Safari zooms the page on a focused control under 16px and leaves it zoomed. globals.css holds this floor for the app, but it cannot reach into a shadow root. */",
   "@media (max-width: 767px) { input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea { font-size: 16px !important; } }",
+  "/* iOS draws a date field at its own width, past its card; the prototype's fields fill the card. */",
+  "input[type='date'] { -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; display: block; text-align: left; }",
+  "input[type='date']::-webkit-date-and-time-value { text-align: left; }",
   rules,
 ].join("\n");
 const sheets = {

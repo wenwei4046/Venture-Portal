@@ -2413,7 +2413,7 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                               {dcList(L_o_11?.["vars"]).map((L_ov_12, L_ov_12_i) => (
                                 <Fragment key={L_ov_12_i}>
                                   {"\n                          "}
-                                  <span role={"button"} onClick={L_ov_12?.["pick"]} style={dcCss(`display:inline-flex;align-items:center;height:26px;padding:0 9px;border-radius:13px;border:1px solid ${dcS(L_ov_12?.["border"])};background:${dcS(L_ov_12?.["bg"])};color:${dcS(L_ov_12?.["ink"])};font-size:11.5px;font-weight:600;cursor:pointer`)}>
+                                  <span role={"button"} onClick={L_ov_12?.["pick"]} style={dcCss(`display:inline-flex;align-items:center;box-sizing:border-box;max-width:100%;min-width:0;min-height:26px;overflow-wrap:anywhere;padding:3px 9px;border-radius:13px;border:1px solid ${dcS(L_ov_12?.["border"])};background:${dcS(L_ov_12?.["bg"])};color:${dcS(L_ov_12?.["ink"])};font-size:11.5px;font-weight:600;cursor:pointer`)}>
                                     {dcText(L_ov_12?.["label"])}
                                   </span>
                                   {"\n                        "}
@@ -2425,7 +2425,7 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                           </>) : null}
                           {"\n                    "}
                           <span style={{"display":"flex","gap":"6px","alignItems":"center","marginTop":"2px","flexWrap":"wrap"}}>
-                            <span style={{"fontFamily":"ui-monospace,Menlo,monospace","fontSize":"11.5px","color":"var(--irq-c-6b6b66)"}}>
+                            <span style={{"minWidth":"0","overflowWrap":"anywhere","fontFamily":"ui-monospace,Menlo,monospace","fontSize":"11.5px","color":"var(--irq-c-6b6b66)"}}>
                               {dcText(L_o_11?.["code"])}
                             </span>
                             {"\n                      "}
