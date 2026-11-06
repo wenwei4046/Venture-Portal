@@ -43,6 +43,7 @@ select.lineSelect { border: 1px solid var(--ds-border); color: var(--ds-ink); }
   border-radius: 14px;
   box-shadow: var(--ds-shadow-menu);
 }
+.suggest[data-browse='true'] { max-height: 244px; overflow-y: auto; }
 .suggestItem {
   display: flex;
   align-items: center;

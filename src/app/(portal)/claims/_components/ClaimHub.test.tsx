@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { parseApproval, parseRequest, type ApprovalRead, type PaymentRequest, type RequestContext } from '@/lib/payment-requests/model'
 
 // Claim (2026-10-29, PR ② — the agreed design's staff page): one's own requests in Payment voucher's hub; the drawer's
@@ -29,7 +29,13 @@ vi.mock('@/lib/payment-requests/upload', () => ({ uploadRequestFile: mocks.uploa
 import ClaimHub from './ClaimHub'
 
 const CTX: RequestContext = {
-  name: 'KHO WEI JIE', departmentId: 'mk', departmentName: 'Marketing', pool: 'dept_pool_marketing',
+  name: 'KHO WEI JIE', staffId: 'kho',
+  people: [
+    { id: 'chin', name: 'CHIN YEE RU', department: 'Marketing', hasSalary: true },
+    { id: 'kho', name: 'KHO WEI JIE', department: 'Marketing', hasSalary: true },
+    { id: 'li', name: 'LI SEAN', department: 'HR', hasSalary: false },
+  ],
+  departmentId: 'mk', departmentName: 'Marketing', pool: 'dept_pool_marketing',
   salaryAccount: { bank: 'Hong Leong Bank', last4: '4821' },
   departments: [{ id: 'hr', name: 'HR' }], companies: [{ id: 'dc', name: 'Dream Crafter' }], reviewers: null,
 }
@@ -134,11 +140,11 @@ describe('New request', () => {
   it('pops out with nothing chosen: what it is first — the rest opens once it is picked', async () => {
     const w = await open()
     expect(w).toHaveTextContent('KHO WEI JIE · Marketing')
-    expect(within(w).getByRole('radio', { name: /I paid — pay me back/ })).not.toBeChecked()
+    expect(within(w).getByRole('radio', { name: /Claim — pay it back/ })).not.toBeChecked()
     expect(within(w).getByRole('radio', { name: /Pay a supplier directly/ })).not.toBeChecked()
     expect(within(w).queryByText('2 · What was it for?')).toBeNull()
     expect(within(w).getByRole('button', { name: 'Submit' })).toHaveAttribute('data-off', 'true')
-    fireEvent.click(within(w).getByRole('radio', { name: /I paid — pay me back/ }))
+    fireEvent.click(within(w).getByRole('radio', { name: /Claim — pay it back/ }))
     expect(within(w).getByRole('radio', { name: /My salary account/ })).toHaveAccessibleName(/Hong Leong Bank •••• 4821/)
     expect(within(w).getByText('2 · What was it for?')).toBeInTheDocument()
     expect(within(w).getByText('3 · Which pool pays?')).toBeInTheDocument()
@@ -148,11 +154,47 @@ describe('New request', () => {
     expect(within(w).getByLabelText('Item 1 description')).toHaveAttribute('placeholder', 'e.g. Canva team plan · Oct')
   })
 
+  it('Pay to: oneself by default; a person from People, or a name typed with its account', async () => {
+    mocks.save.mockResolvedValue({ ok: true, data: req({ id: '44444444-4444-4444-8444-444444444444', status: 'draft', requestNo: null }) })
+    const w = await open()
+    fireEvent.click(within(w).getByRole('radio', { name: /Claim — pay it back/ }))
+    const payTo = within(w).getByLabelText('Pay to')
+    expect(payTo).toHaveValue('KHO WEI JIE')
+    expect(w).toHaveTextContent('You, unless you change it.')
+
+    // The list is there before anything is typed, oneself first.
+    fireEvent.focus(payTo)
+    expect(within(w).getAllByRole('option').map((o) => o.textContent)).toEqual(['KHO WEI JIEYou', 'CHIN YEE RUMarketing', 'LI SEANHR'])
+    fireEvent.mouseDown(within(w).getByRole('option', { name: /CHIN YEE RU/ }))
+    const theirs = within(w).getByRole('radio', { name: /CHIN YEE RU’s salary account/ })
+    expect(theirs).not.toBeChecked()
+    expect(theirs).toHaveAccessibleName(/shown to Finance only/)
+    fireEvent.click(theirs)
+    fireEvent.click(within(w).getByRole('button', { name: 'Save as draft' }))
+    await waitFor(() => expect(mocks.save).toHaveBeenCalled())
+    expect(mocks.save.mock.calls.at(-1)?.[1]).toMatchObject({ payTo: { staffId: 'chin', salary: true } })
+  })
+
+  it('Pay to: someone HR has no account for cannot be paid into one; a typed name asks for its account', async () => {
+    const w = await open()
+    fireEvent.click(within(w).getByRole('radio', { name: /Claim — pay it back/ }))
+    const payTo = within(w).getByLabelText('Pay to')
+    fireEvent.focus(payTo)
+    fireEvent.mouseDown(within(w).getByRole('option', { name: /LI SEAN/ }))
+    expect(within(w).getByRole('radio', { name: /LI SEAN’s salary account/ })).toBeDisabled()
+
+    fireEvent.change(payTo, { target: { value: 'Ahmad Bin Ali' } })
+    expect(w).toHaveTextContent('Not in People — type where to pay them.')
+    expect(within(w).queryByRole('radiogroup', { name: 'Pay into' })).toBeNull()
+    expect(within(w).getByLabelText('Bank')).toBeInTheDocument()
+    expect(within(w).getByLabelText('Account number')).toBeInTheDocument()
+  })
+
   it('a claim, whole: its items, a receipt gone up, the department’s pool — Submit sends it', async () => {
     mocks.upload.mockResolvedValue({ ok: true, file: { path: 'u1/k/Receipt.pdf', name: 'Receipt.pdf', contentType: 'application/pdf', size: 900 } })
     mocks.save.mockResolvedValue({ ok: true, data: req({ id: '44444444-4444-4444-8444-444444444444', requestNo: 'PRQ-2610-0004' }) })
     const w = await open()
-    fireEvent.click(within(w).getByRole('radio', { name: /I paid — pay me back/ }))
+    fireEvent.click(within(w).getByRole('radio', { name: /Claim — pay it back/ }))
     fireEvent.click(within(w).getByRole('radio', { name: /My salary account/ }))
     fireEvent.change(within(w).getByLabelText('Item 1 description'), { target: { value: 'Claude · Oct' } })
     fireEvent.change(within(w).getByLabelText('Item 1 amount'), { target: { value: '453.79' } })
@@ -189,7 +231,7 @@ describe('New request', () => {
   it('Save as draft keeps what was typed', async () => {
     mocks.save.mockResolvedValue({ ok: true, data: DRAFT })
     const w = await open()
-    fireEvent.click(within(w).getByRole('radio', { name: /I paid — pay me back/ }))
+    fireEvent.click(within(w).getByRole('radio', { name: /Claim — pay it back/ }))
     fireEvent.change(within(w).getByLabelText('Item 1 description'), { target: { value: 'Jian Ying' } })
     await act(async () => {
       fireEvent.click(within(w).getByRole('button', { name: 'Save as draft' }))

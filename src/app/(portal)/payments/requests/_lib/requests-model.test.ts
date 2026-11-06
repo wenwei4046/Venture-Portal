@@ -60,7 +60,7 @@ describe('the departments', () => {
 describe('a row', () => {
   it('a member’s claim sits under its department, sent the day HR approved it (the office’s day)', () => {
     const r = claimRow(claim({ approvedAt: '2026-10-25T17:30:00Z' }), DEPTS)
-    expect(r).toMatchObject({ key: 'claim:c1', card: 'dept:rev', from: 'LUCAS', sent: '2026-10-26', ref: 'RQ-2610-008', payTo: 'Claim', whoPays: 'Venture pool', stage: 'finance' })
+    expect(r).toMatchObject({ key: 'claim:c1', card: 'dept:rev', from: 'LUCAS', sent: '2026-10-26', ref: 'RQ-2610-008', payTo: 'Claim · LUCAS', whoPays: 'Venture pool', stage: 'finance' })
     expect(r.fromSub).toBe('Revenue Department · approved by HR (LI SEAN)')
   })
 

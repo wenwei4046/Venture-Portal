@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { DialogButton, DialogForm, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
 import { fileSize, money } from '@/components/finv/form-words'
+import { PartyInput } from '@/components/finv/PartyInput'
 import fm from '@/components/finv/form.module.css'
 import df from '@/components/finv/dealform.module.css'
 import { Select } from '@/components/hrv/select'
@@ -17,6 +18,8 @@ import {
   emptyDraft,
   emptyItem,
   emptyShare,
+  payeePatch,
+  payeePerson,
   routeWords,
   saveProblem,
   submitProblem,
@@ -28,8 +31,8 @@ import { useRequestUploads } from './useRequestUploads'
 import c from './claim.module.css'
 
 // New request (2026-10-29, PR ② — the mockup's window, "他们的new request 要pop out 哦"): a pop-out window in three
-// parts, nothing chosen until it is picked (the user, 2026-10-27) — What is it? (I paid — pay me back, into the salary
-// account HR holds or another this time · Pay a supplier directly, its name, bank and account typed: no reading of
+// parts, nothing chosen until it is picked (the user, 2026-10-27) — What is it? (A claim — Pay to oneself unless changed,
+// a person from People or a name typed, into the salary account HR holds or another this time · Pay a supplier directly, its name, bank and account typed: no reading of
 // invoices for now, "不要开key 先 … 暂时就让他们填"), What was it for? (items and their total; the receipts, required —
 // each up the moment it is picked), Which pool pays? (the department's, or split with other departments and
 // companies, the amounts typed by the requester). Save as draft keeps what was typed; Submit sends it to Finance. The
@@ -133,6 +136,14 @@ export default function NewRequestDialog({
   }
 
   const salary = ctx?.salaryAccount ?? null
+  // Pay to ("default 是自己，但要可以选或自己打"): oneself until changed, the list with oneself first.
+  const isMe = draft.payToName === null || (!!ctx && draft.payToStaffId === ctx.staffId)
+  const person = payeePerson(draft, ctx)
+  const payToName = draft.payToName ?? ctx?.name ?? ''
+  const typedName = !isMe && !draft.payToStaffId
+  const payToOptions = (ctx?.people ?? [])
+    .map((p) => ({ id: p.id, name: p.name, short_code: p.id === ctx?.staffId ? 'You' : p.department }))
+    .sort((a, b) => Number(b.short_code === 'You') - Number(a.short_code === 'You'))
   const title = !request ? 'New request' : request.status === 'rejected' ? 'Fix and send again' : 'Edit request'
   const sub = ctx ? `${ctx.name} · ${ctx.departmentName}` : request?.requestNo ?? ' '
   const partyOptions = (party: string) => (party === 'company' ? ctx?.companies ?? [] : party === 'department' ? ctx?.departments ?? [] : [])
@@ -170,26 +181,58 @@ export default function NewRequestDialog({
             <label className={df.typeHead}>
               <input type="radio" name="pr-kind" checked={draft.kind === 'claim'} onChange={() => set({ kind: 'claim', supplier: '' })} />
               <span>
-                I paid — pay me back
-                <span className={df.typeNote}>A claim: Finance pays it into your account.</span>
+                Claim — pay it back
+                <span className={df.typeNote}>Someone paid out of their own pocket; Finance pays it back.</span>
               </span>
             </label>
             {draft.kind === 'claim' ? (
               <div className={df.typeBody}>
-                <div role="radiogroup" aria-label="Pay into">
-                  <label className={c.option} data-off={!salary ? 'true' : undefined}>
-                    <input type="radio" name="pr-into" checked={draft.salary === true} disabled={!salary} onChange={() => set({ salary: true, bank: '', accountNo: '' })} />
-                    <span>
-                      My salary account
-                      <span className={df.typeNote}>{salary ? `${salary.bank} •••• ${salary.last4} — as HR has it` : ctx ? 'HR has no salary account for you' : '…'}</span>
-                    </span>
-                  </label>
-                  <label className={c.option}>
-                    <input type="radio" name="pr-into" checked={draft.salary === false} onChange={() => set({ salary: false })} />
-                    <span>Another account this time</span>
-                  </label>
-                </div>
-                {draft.salary === false ? (
+                <Field label="Pay to" htmlFor="pr-payto">
+                  <PartyInput
+                    id="pr-payto"
+                    browse
+                    value={payToName}
+                    placeholder="Pick a person or type a name"
+                    companies={payToOptions}
+                    companyId={draft.payToStaffId ?? (draft.payToName === null ? ctx?.staffId ?? '' : '')}
+                    onChange={(name, id) => set(payeePatch(draft, name, id, ctx))}
+                  />
+                  <span className={df.typeNote}>
+                    {isMe
+                      ? 'You, unless you change it.'
+                      : person
+                        ? `${person.department} · from People`
+                        : payToName.trim()
+                          ? 'Not in People — type where to pay them.'
+                          : 'Pick a person or type a name.'}
+                  </span>
+                </Field>
+                {typedName ? null : (
+                  <div role="radiogroup" aria-label="Pay into">
+                    {isMe ? (
+                      <label className={c.option} data-off={!salary ? 'true' : undefined}>
+                        <input type="radio" name="pr-into" checked={draft.salary === true} disabled={!salary} onChange={() => set({ salary: true, bank: '', accountNo: '' })} />
+                        <span>
+                          My salary account
+                          <span className={df.typeNote}>{salary ? `${salary.bank} •••• ${salary.last4} — as HR has it` : ctx ? 'HR has no salary account for you' : '…'}</span>
+                        </span>
+                      </label>
+                    ) : (
+                      <label className={c.option} data-off={!person?.hasSalary ? 'true' : undefined}>
+                        <input type="radio" name="pr-into" checked={draft.salary === true} disabled={!person?.hasSalary} onChange={() => set({ salary: true, bank: '', accountNo: '' })} />
+                        <span>
+                          {payToName}’s salary account
+                          <span className={df.typeNote}>{person?.hasSalary ? 'As HR has it — the number is shown to Finance only' : 'HR has no salary account for them'}</span>
+                        </span>
+                      </label>
+                    )}
+                    <label className={c.option}>
+                      <input type="radio" name="pr-into" checked={draft.salary === false} onChange={() => set({ salary: false })} />
+                      <span>Another account this time</span>
+                    </label>
+                  </div>
+                )}
+                {draft.salary === false && payToName.trim() ? (
                   <div className={fm.pair}>
                     <Field label="Bank" htmlFor="pr-bank">
                       <Input id="pr-bank" value={draft.bank} onChange={(e) => set({ bank: e.target.value })} placeholder="e.g. Maybank" maxLength={120} />
