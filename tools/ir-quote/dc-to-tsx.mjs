@@ -47,6 +47,9 @@ const PATCHES = {
     ["padding-bottom:env(safe-area-inset-bottom,0px)", "padding-bottom:var(--safe-bottom)"],
     // …and the app's own top bar on a computer (greeting, bell, account), where the prototype drew a stand-in.
     ['<sc-if value="{{ desk }}" hint-placeholder-val="{{ false }}">\n      <header', '<sc-if value="{{ deskHeader }}" hint-placeholder-val="{{ false }}">\n      <header'],
+    // The Change item sheet's header shows the item being replaced (the user, 2026-11-06), drawn as the list's own photos.
+    ['<div style="min-width:0">\n              <p style="margin:0;font-size:11.5px;font-weight:650;letter-spacing:.08em;color:#111111">{{ sheet.eyebrow }}', '<div style="min-width:0;display:flex;align-items:flex-start;gap:12px"><sc-if value="{{ sheet.img }}" hint-placeholder-val="{{ false }}"><span onClick="{{ sheet.zoom }}" title="View larger" style="position:relative;flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:#EEEEEA url(\'{{ sheet.img }}\') center/cover no-repeat;cursor:zoom-in"><span style="position:absolute;right:3px;bottom:3px;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.92);display:grid;place-items:center;box-shadow:0 1px 3px rgba(20,20,18,0.15)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#34342F" strokeWidth="2.4" strokeLinecap="round"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3M11 8v6M8 11h6"></path></svg></span></span></sc-if><div style="min-width:0">\n              <p style="margin:0;font-size:11.5px;font-weight:650;letter-spacing:.08em;color:#111111">{{ sheet.eyebrow }}'],
+    ['{{ staleText }}</p></sc-if>\n            </div>\n            <button aria-label="Close" onClick="{{ closeSheet }}"', '{{ staleText }}</p></sc-if>\n            </div></div>\n            <button aria-label="Close" onClick="{{ closeSheet }}"'],
   ],
   "Quote Settings v3 Bold.dc.html": [
     ["position:relative;height:100vh;width:100%;display:flex", "position:relative;height:{{ rootH }};width:100%;display:flex"],
@@ -55,6 +58,8 @@ const PATCHES = {
     // The app's own top bar stands where the prototype drew a stand-in with its sample Principal's initials.
     ['<header style="flex:0 0 60px;height:60px;display:flex;align-items:center;gap:16px;padding:0 28px;background:#FFFFFF', '<header style="flex:0 0 60px;height:60px;display:{{ hdrDisplay }};align-items:center;gap:16px;padding:0 28px;background:#FFFFFF'],
     ['font-size:12px;font-weight:700">TS</span>\n    </header>', 'font-size:12px;font-weight:700">{{ userInitials }}</span>\n    </header>'],
+    // The Catalogue's column heads sort it (the user, 2026-11-06).
+    ['<span style="padding:0 8px">CODE</span><span style="padding:0 8px">NAME</span><span style="padding:0 8px">CATEGORY</span><span style="padding:0 8px;text-align:right">PRICE (RM)</span><span style="padding:0 8px"></span><span style="padding:0 8px">SHOW</span>', '<span onClick="{{ catSortH.code.go }}" title="Sort by code" style="padding:0 8px;cursor:pointer;user-select:none">CODE{{ catSortH.code.mark }}</span><span onClick="{{ catSortH.name.go }}" title="Sort by name" style="padding:0 8px;cursor:pointer;user-select:none">NAME{{ catSortH.name.mark }}</span><span onClick="{{ catSortH.kind.go }}" title="Sort by category" style="padding:0 8px;cursor:pointer;user-select:none">CATEGORY{{ catSortH.kind.mark }}</span><span onClick="{{ catSortH.cost.go }}" title="Sort by price" style="padding:0 8px;text-align:right;cursor:pointer;user-select:none">PRICE (RM){{ catSortH.cost.mark }}</span><span style="padding:0 8px"></span><span onClick="{{ catSortH.show.go }}" title="Sort by show" style="padding:0 8px;cursor:pointer;user-select:none">SHOW{{ catSortH.show.mark }}</span>'],
   ],
   "Quote Settings Mobile.dc.html": [
     ['<a href="#" aria-label="Back to Profile"', '<a href="#" onClick="{{ back }}" aria-label="Back to Profile"'],
@@ -314,6 +319,8 @@ const base = [
   ".sc-host { display: block; }",
   "/* The quote header's Quote settings link shows only to those who may edit them (a patch in this script). */",
   '[data-irq-settings="false"] { display: none !important; }',
+  "/* iOS Safari zooms the page on a focused control under 16px and leaves it zoomed. globals.css holds this floor for the app, but it cannot reach into a shadow root. */",
+  "@media (max-width: 767px) { input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea { font-size: 16px !important; } }",
   rules,
 ].join("\n");
 const sheets = {

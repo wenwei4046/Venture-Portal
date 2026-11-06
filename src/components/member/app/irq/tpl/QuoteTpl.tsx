@@ -2201,26 +2201,37 @@ export function renderQuote(v: DcVals, C: DcComponents) {
               {"\n          "}
               <div style={{"display":"flex","alignItems":"flex-start","justifyContent":"space-between","gap":"12px","padding":"10px 20px 14px","borderBottom":"1px solid var(--irq-c-e7e7e2)"}}>
                 {"\n            "}
-                <div style={{"minWidth":"0"}}>
-                  {"\n              "}
-                  <p style={{"margin":"0","fontSize":"11.5px","fontWeight":"650","letterSpacing":".08em","color":"var(--irq-c-111111)"}}>
-                    {dcText(v["sheet"]?.["eyebrow"])}
-                  </p>
-                  {"\n              "}
-                  <h2 style={{"margin":"3px 0 0","fontFamily":"var(--font-space-grotesk),var(--font-manrope),sans-serif","fontSize":"20px","fontWeight":"700","letterSpacing":"-.02em"}}>
-                    {dcText(v["sheet"]?.["title"])}
-                  </h2>
-                  {"\n              "}
-                  <p style={{"margin":"2px 0 0","fontSize":"13px","color":"var(--irq-c-6b6b66)"}}>
-                    {dcText(v["sheet"]?.["sub"])}
-                  </p>
-                  {"\n              "}
-                  {(v["staleText"]) ? (<>
-                    <p style={{"display":"inline-flex","margin":"8px 0 0","padding":"4px 10px","borderRadius":"8px","background":"var(--irq-c-ffebd9)","color":"var(--irq-c-b35a00)","fontSize":"12.5px","fontWeight":"600"}}>
-                      {dcText(v["staleText"])}
-                    </p>
+                <div style={{"minWidth":"0","display":"flex","alignItems":"flex-start","gap":"12px"}}>
+                  {(v["sheet"]?.["img"]) ? (<>
+                    <span onClick={v["sheet"]?.["zoom"]} title={"View larger"} style={dcCss(`position:relative;flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:var(--irq-c-eeeeea) url('${dcS(v["sheet"]?.["img"])}') center/cover no-repeat;cursor:zoom-in`)}>
+                      <span style={{"position":"absolute","right":"3px","bottom":"3px","width":"18px","height":"18px","borderRadius":"50%","background":"rgba(255,255,255,.92)","display":"grid","placeItems":"center","boxShadow":"0 1px 3px rgba(20,20,18,0.15)"}}>
+                        <svg width={"11"} height={"11"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"2.4"} strokeLinecap={"round"} style={{"stroke":"var(--irq-c-34342f)"}}>
+                          <path d={"M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3M11 8v6M8 11h6"} />
+                        </svg>
+                      </span>
+                    </span>
                   </>) : null}
-                  {"\n            "}
+                  <div style={{"minWidth":"0"}}>
+                    {"\n              "}
+                    <p style={{"margin":"0","fontSize":"11.5px","fontWeight":"650","letterSpacing":".08em","color":"var(--irq-c-111111)"}}>
+                      {dcText(v["sheet"]?.["eyebrow"])}
+                    </p>
+                    {"\n              "}
+                    <h2 style={{"margin":"3px 0 0","fontFamily":"var(--font-space-grotesk),var(--font-manrope),sans-serif","fontSize":"20px","fontWeight":"700","letterSpacing":"-.02em"}}>
+                      {dcText(v["sheet"]?.["title"])}
+                    </h2>
+                    {"\n              "}
+                    <p style={{"margin":"2px 0 0","fontSize":"13px","color":"var(--irq-c-6b6b66)"}}>
+                      {dcText(v["sheet"]?.["sub"])}
+                    </p>
+                    {"\n              "}
+                    {(v["staleText"]) ? (<>
+                      <p style={{"display":"inline-flex","margin":"8px 0 0","padding":"4px 10px","borderRadius":"8px","background":"var(--irq-c-ffebd9)","color":"var(--irq-c-b35a00)","fontSize":"12.5px","fontWeight":"600"}}>
+                        {dcText(v["staleText"])}
+                      </p>
+                    </>) : null}
+                    {"\n            "}
+                  </div>
                 </div>
                 {"\n            "}
                 <button aria-label={"Close"} onClick={v["closeSheet"]} style={{"flex":"0 0 36px","width":"36px","height":"36px","borderRadius":"50%","border":"0","background":"var(--irq-c-f0f0ed)","color":"var(--irq-c-1f1f1c)","display":"grid","placeItems":"center","padding":"0"}}>

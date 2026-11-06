@@ -2781,21 +2781,21 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                         <input type={"checkbox"} aria-label={"Select all shown"} checked={dcChecked(v["allSel"])} onChange={v["toggleAll"]} style={{"width":"17px","height":"17px","margin":"0","accentColor":"var(--irq-c-111111)","cursor":"pointer"}} />
                       </span>
                       <span />
-                      <span style={{"padding":"0 8px"}}>
-                        {"CODE"}
+                      <span onClick={v["catSortH"]?.["code"]?.["go"]} title={"Sort by code"} style={{"padding":"0 8px","cursor":"pointer","userSelect":"none"}}>
+                        {"CODE"}{dcText(v["catSortH"]?.["code"]?.["mark"])}
                       </span>
-                      <span style={{"padding":"0 8px"}}>
-                        {"NAME"}
+                      <span onClick={v["catSortH"]?.["name"]?.["go"]} title={"Sort by name"} style={{"padding":"0 8px","cursor":"pointer","userSelect":"none"}}>
+                        {"NAME"}{dcText(v["catSortH"]?.["name"]?.["mark"])}
                       </span>
-                      <span style={{"padding":"0 8px"}}>
-                        {"CATEGORY"}
+                      <span onClick={v["catSortH"]?.["kind"]?.["go"]} title={"Sort by category"} style={{"padding":"0 8px","cursor":"pointer","userSelect":"none"}}>
+                        {"CATEGORY"}{dcText(v["catSortH"]?.["kind"]?.["mark"])}
                       </span>
-                      <span style={{"padding":"0 8px","textAlign":"right"}}>
-                        {"PRICE (RM)"}
+                      <span onClick={v["catSortH"]?.["cost"]?.["go"]} title={"Sort by price"} style={{"padding":"0 8px","textAlign":"right","cursor":"pointer","userSelect":"none"}}>
+                        {"PRICE (RM)"}{dcText(v["catSortH"]?.["cost"]?.["mark"])}
                       </span>
                       <span style={{"padding":"0 8px"}} />
-                      <span style={{"padding":"0 8px"}}>
-                        {"SHOW"}
+                      <span onClick={v["catSortH"]?.["show"]?.["go"]} title={"Sort by show"} style={{"padding":"0 8px","cursor":"pointer","userSelect":"none"}}>
+                        {"SHOW"}{dcText(v["catSortH"]?.["show"]?.["mark"])}
                       </span>
                       <span />
                       {"\n              "}

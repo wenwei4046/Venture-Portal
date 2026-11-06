@@ -125,7 +125,7 @@ export function IrQuoteScreen(p: {
 /** Quotation settings — the computer's six tabs, or the phone's three. */
 export function IrQuoteSettingsScreen(p: {
   phone: boolean; inApp: boolean; rootH: string; readOnly: boolean;
-  onNav: (to: IrQuoteNav | "Quote") => void; onBack?: () => void; onPreview: () => void;
+  onNav: (to: IrQuoteNav | "Quote") => void; onBack?: () => void; onPreview: () => boolean | void;
   offline?: { name: string };
 }) {
   const { toast, show, clear } = useToast();

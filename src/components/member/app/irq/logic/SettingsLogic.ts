@@ -7,6 +7,7 @@ import { irqStorage } from "../storage";
 import seedPackages from "../data/packages.json";
 import seedCatalog from "../data/catalog.json";
 import * as catalogImport from "../lib/catalog-import";
+import { sortCatalog, nextCatalogSort } from "../lib/catalog-import";
 const ICON = {
   home: "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9",
   chart: "M4 20V10m5 10V4m5 16v-7m5 7V8M3 20h18",
@@ -83,7 +84,7 @@ export class SettingsLogic extends DcLogic {
     this.upd(c => {
       rv.rows.forEach(r => {
         const now = Date.now(); c.catalog.syncedAt = now;
-        if (r.cur) { const y = c.catalog.items.find(z => z.id === r.cur.id); if (y) { const i0 = r.inc; if (i0.cat) { y.webCat = i0.cat; if (i0.room) y.room = i0.room; } if (i0.col) y.collection = i0.col; if (i0.stock != null) y.stock = i0.stock; y.checkedAt = now; } }
+        if (r.cur) { const y = c.catalog.items.find(z => z.id === r.cur.id); if (y) { const i0 = r.inc; if (i0.cat) { y.webCat = i0.cat; if (i0.room) y.room = i0.room; } if (i0.col) y.collection = i0.col; if (i0.stock != null) y.stock = i0.stock; if (i0.group) { y.group = i0.group; y.color = i0.color || ""; } y.checkedAt = now; } }
         if (!rv.sel[r.key] || r.status === "same") return;
         const inc = r.inc; n++;
         if (r.cur) {
@@ -101,7 +102,7 @@ export class SettingsLogic extends DcLogic {
         } else {
           const map = inc.cat ? rv.catKind[inc.cat] : rv.kind; if (inc.cat && !map) { n--; return; }
           const kd = map === "+web" ? this.kindForCat(c, inc.cat, inc.room) : map || this.guessKind(inc.name, c.catalog.kinds); if (!kd) { n--; return; }
-          c.catalog.items.push({ id: lib.newId("c"), kind: kd, code: inc.code || "", name: inc.name || "Untitled", cost: inc.price ?? null, sample: false, noPrice: inc.price == null, img: inc.img || "", specs: inc.specs || "", url: inc.url || "", collection: inc.col || "", color: inc.color || "", webCat: inc.cat || "", room: inc.room || "", stock: inc.stock ?? null, updatedAt: Date.now(), checkedAt: Date.now() });
+          c.catalog.items.push({ id: lib.newId("c"), kind: kd, code: inc.code || "", name: inc.name || "Untitled", cost: inc.price ?? null, sample: false, noPrice: inc.price == null, img: inc.img || "", specs: inc.specs || "", url: inc.url || "", collection: inc.col || "", color: inc.color || "", group: inc.group || "", webCat: inc.cat || "", room: inc.room || "", stock: inc.stock ?? null, updatedAt: Date.now(), checkedAt: Date.now() });
         }
       });
     });
@@ -307,7 +308,7 @@ export class SettingsLogic extends DcLogic {
       userInitials: String((this.props.user && this.props.user.name) || "?").split(/s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase(),
       deskNav: [["Today", ICON.home], ["Insight", ICON.chart], ["Quote", ICON.quoteDesk], ["Arena", ICON.trophy], ["Profile", ICON.user]].map(([label, dd]) => ({ label, d: dd, href: "#", go: e => { e && e.preventDefault && e.preventDefault(); this.props.onNav && this.props.onNav(label); }, bg: "transparent", color: "#A3A3A3", weight: 550 })),
       loading: !cfg,
-      onPreview: () => { if (!cfg || !lib) return; lib.savePreview(cfg); this._pv = true; this.props.onPreview && this.props.onPreview(); }
+      onPreview: () => { if (!cfg || !lib) return; lib.savePreview(cfg); this._pv = true; if (this.props.onPreview && this.props.onPreview() === false) this.setState({ notice: "Your browser blocked the preview tab. Allow pop-ups for this site, then press Preview again." }); }
     };
     if (!cfg) return { ...base, tabs: [], tabDoc: false, savedText: "", statusText: "", dirtyDot: "#D5D2C8", dirtyCount: "", dirtyRest: "", dirtyOpacity: .5, saveBg: "#EEEEEA", saveInk: "#97978F" };
     const saved = JSON.parse(st.savedJson);
@@ -334,7 +335,7 @@ export class SettingsLogic extends DcLogic {
 
     const fieldPreview = f => {
       const k = f.kind, v = f.value, has = !lib.isEmpty(f, v), ink = has ? "#5A5048" : "#97978F";
-      const o = { label: f.label, ink, inline: ["short", "number", "date", "link"].includes(k), block: k === "long", image: k === "image", table: k === "table",
+      const o = { label: lib.FIELD_KINDS.some(x => x.label === f.label) ? "" : f.label, ink, inline: ["short", "number", "date", "link"].includes(k), block: k === "long", image: k === "image", table: k === "table",
         sample: has ? (k === "date" ? lib.fmtDate(v) : String(v)) : "Filled in by IR" + (f.required ? " · required" : " · left out if empty"),
         img: k === "image" && has ? v : "", imgBorder: has ? "transparent" : "#DEDED8", imgEmpty: has ? "" : "Image · filled in by IR", grid: "1fr", cols: [], rows: [] };
       if (k === "table") {
@@ -601,7 +602,7 @@ export class SettingsLogic extends DcLogic {
     const items = cfg.catalog.items;
     const q = st.catQ.trim().toLowerCase();
     const kinds = cfg.catalog.kinds;
-    const catRows = items.filter(it => (st.kindFilter === "all" || it.kind === st.kindFilter) && (!q || (it.code + " " + it.name).toLowerCase().includes(q))).map(it => {
+    const catRows = sortCatalog(items.filter(it => (st.kindFilter === "all" || it.kind === st.kindFilter) && (!q || (it.code + " " + it.name).toLowerCase().includes(q))), st.catSort, kinds).map(it => {
       const setC = fn => this.upd(c => { const x = c.catalog.items.find(y => y.id === it.id); if (x) fn(x); });
       return {
         id: it.id, selected: !!(st.sel || {})[it.id], onSel: () => this.setState(s => { const m = { ...(s.sel || {}) }; if (m[it.id]) delete m[it.id]; else m[it.id] = true; return { sel: m }; }),
@@ -870,6 +871,7 @@ export class SettingsLogic extends DcLogic {
         return [{ room: rooms.some(r => r.room) ? " " : "", chips: [chip("all", "All", items.length)] }, ...rooms.map(r => ({ ...r, room: r.room || (rooms.some(x => x.room) ? "OTHER" : "") }))]; })(),
       ...(() => { const mv = items.filter(it => it.webCat && (kinds[it.kind] || {}).webCat !== it.webCat);
         return { useWebLabel: mv.length ? `Use website categories (${mv.length})` : "Use website categories", useWeb: () => { if (!mv.length) { this.setState({ catMsg: items.some(i => i.webCat) ? "Every item already follows the website categories." : "Items don't know their website category yet. On b2b: bookmark › Everything › Copy, then Paste from website › Update (this also fills Stock).", catErr: !items.some(i => i.webCat) }); return; } this.upd(c => { c.catalog.items.forEach(x => { if (x.webCat) x.kind = this.kindForCat(c, x.webCat, x.room); }); }); this.setState({ kindFilter: "all", catMsg: `Moved ${mv.length} items to their website categories. Check, then Save and publish.`, catErr: false }); } }; })(),
+      catSortH: Object.fromEntries(["code", "name", "kind", "cost", "show"].map(k => { const on = st.catSort && st.catSort.key === k; return [k, { mark: on ? (st.catSort.dir > 0 ? " ▲" : " ▼") : "", go: () => this.setState(s => ({ page: 0, catSort: nextCatalogSort(s.catSort, k) })) }]; })),
       kindFilter: st.kindFilter, onKindFilter: e => this.setState({ kindFilter: e.target.value, sel: {}, page: 0 }),
       kindSelOpts: [{ v: "all", l: "All categories (" + items.length + ")" }, ...Object.entries(kinds).map(([k, v]) => ({ v: k, l: v.label + " (" + items.filter(i => i.kind === k).length + ")" }))],
       sync: (() => { const t = cfg.catalog.syncedAt, d = t ? Math.floor((Date.now() - t) / 86400000) : null, old = d == null || d >= 7;

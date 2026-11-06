@@ -105,6 +105,7 @@ import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profi
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp, { type CrmOpen } from "../crm/CrmApp";
 import { IrQuoteScreen, IrQuoteSettingsScreen, type IrQuoteNav } from "./irq/IrQuoteScreens";
+import { openIrqPreview } from "./irq/open-preview";
 import { crmOpenTarget, type Notices } from "@/lib/push/notices";
 import { readNotices } from "@/lib/push/actions";
 
@@ -673,7 +674,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const irqPreviewOpen = useCallback(() => {
     const url = new URL(appHref({ ...baseRoute, screen: "quote", pf: null }, window.location.origin), window.location.origin);
     url.searchParams.set("irqPreview", "1");
-    window.open(url.toString(), "irq-preview");
+    return openIrqPreview(url.toString());
   }, [baseRoute]);
   // The module switcher: the portal's other modules are the Principal's views of it (setViewAs) — every view since
   // 2026-10-27, as every switcher lists them; a team member is viewed with Profile's View as, not the portal's picker.

@@ -69,7 +69,7 @@ export function scrape(doc, base) {
       var sq = t.match(/\b(?:Qty|Stock|Today's Stock|Available)\s*[:.]?\s*(\d+)/i);
       var prices = ms ? ms.map(function (x) { return parseFloat(x.replace(/[^\d.]/g, "")); }) : [];
       var it = { name: name.slice(0, 140), code: code, price: prices.length ? Math.min.apply(null, prices) : null, img: src, url: a ? abs(a.getAttribute("href")) : base, specs: specOf(t), stock: sq ? +sq[1] : null, truncated: !full.length && /(\.\.\.|…)/.test(cands[0] || "") };
-      var key = (it.code || it.name).toLowerCase();
+      var key = String(a ? it.url : it.code || it.name).toLowerCase();
       if (it.name && !keys[key]) { keys[key] = 1; out.push(it); }
       break;
     }
@@ -141,7 +141,34 @@ function grab() {
     btn(np ? "Copy instead" : "Copy", copy, !np);
     btn("Cancel", close);
   };
-  var thisPage = function () { var it = SCRAPE(document, location.href); if (!it.length) { say("<b>IR price grabber</b><br>No products found on this page."); btn("Close", close); return; } finish(it, 0); };
+  var details = function (items, cb) {
+    var slugOf = function (u) { return String(u || "").split(/[?#]/)[0].replace(/\/+$/, "").split("/").pop().toLowerCase(); };
+    var rows = {}, slugs = [], par = {}, at = 0, busy = 0, seen = 0, halt = false, over = false;
+    items.forEach(function (x) { var s = x.slug = slugOf(x.url); if (!s) return; if (!rows[s]) { rows[s] = []; slugs.push(s); } rows[s].push(x); });
+    var find = function (a) { while (par[a] && par[a] !== a) a = par[a]; return a; };
+    var link = function (a, b) { par[a] = par[a] || a; par[b] = par[b] || b; a = find(a); b = find(b); if (a < b) par[b] = a; else if (b < a) par[a] = b; };
+    say("<b>Reading each product's name, colours and options…</b>"); var st = document.createElement("div"); ui.appendChild(st); btn("Stop", function () { halt = true; });
+    var end = function () { if (over) return; over = true; items.forEach(function (x) { if (x.read) x.group = find(x.slug); delete x.read; }); cb(); };
+    var read = function (s, h) {
+      var d = new DOMParser().parseFromString(h, "text/html"), t = d.querySelector("h1.product-name"); if (!t) return;
+      var nm = [].slice.call(t.childNodes).filter(function (n) { return n.nodeType === 3; }).map(function (n) { return n.nodeValue; }).join(" ").replace(/\s+/g, " ").trim();
+      var lead = nm.match(/^((?:[A-Z]{0,3}\d{5,}\/)*[A-Z]{0,3}\d{5,})\s+(.+)$/); if (lead) nm = lead[2];
+      var cs = []; [].slice.call(t.querySelectorAll("img")).forEach(function (i) { var c = (i.getAttribute("title") || i.getAttribute("alt") || "").replace(/\s+/g, " ").trim(); if (c && cs.indexOf(c) < 0) cs.push(c); });
+      par[s] = par[s] || s;
+      [].slice.call(d.querySelectorAll(".product_variants a[href]")).forEach(function (a) { var o = slugOf(a.getAttribute("href")); if (o) link(s, o); });
+      rows[s].forEach(function (x) { if (nm) { x.name = nm.slice(0, 140); x.truncated = false; } x.color = cs.join(", "); x.read = 1; });
+    };
+    var pump = function () {
+      if (over) return;
+      if (halt || at >= slugs.length) { if (!busy) end(); return; }
+      while (busy < 6 && at < slugs.length && !halt) (function (s) {
+        busy++;
+        fetch(rows[s][0].url, { credentials: "include" }).then(function (r) { return r.text(); }).then(function (h) { read(s, h); }).catch(function () {}).then(function () { busy--; seen++; st.textContent = seen + " of " + slugs.length + " products"; pump(); });
+      })(slugs[at++]);
+    };
+    pump();
+  };
+  var thisPage = function () { var it = SCRAPE(document, location.href); if (!it.length) { say("<b>IR price grabber</b><br>No products found on this page."); btn("Close", close); return; } details(it, function () { finish(it, 0); }); };
   var all = function () {
     var items = [], keys = {}, clrSeen = {}, done = 0, pages = 0, stop = false, queue = cats.map(function (c) { c.t = "cat"; return c; }).concat(cols.map(function (c) { c.t = "col"; return c; }));
     var add = function (list, c) { list.forEach(function (x) { var k = x.url || x.code || x.name, ex = keys[k];
@@ -150,7 +177,7 @@ function grab() {
       if (ex) return; x.cat = c.name; if (c.room && c.room !== c.name) x.room = c.room; keys[k] = x; items.push(x); }); };
     say("<b>Reading all categories…</b>"); var st = document.createElement("div"); ui.appendChild(st); btn("Stop", function () { stop = true; });
     var next = function () {
-      if (stop || !queue.length) { finish(items, pages); return; }
+      if (stop || !queue.length) { details(items, function () { finish(items, pages); }); return; }
       var c = queue.shift(), visited = {}, pq = [c.url];
       var page = function () {
         if (stop || !pq.length || pages > 400) { done++; next(); return; }
@@ -242,10 +269,34 @@ export async function readFile(file) {
 }
 
 const norm = s => String(s || "").toUpperCase().replace(/\s+/g, "");
+/** The product's own part of a b2b address: a category's and a collection's address for one product end alike. */
+export const productSlug = u => String(u || "").split(/[?#]/)[0].replace(/\/+$/, "").split("/").pop().toLowerCase();
+
+/** A column head's press: A to Z, Z to A, then the catalogue's own order. */
+export const nextCatalogSort = (cur, key) => !cur || cur.key !== key ? { key, dir: 1 } : cur.dir > 0 ? { key, dir: -1 } : null;
+
+/** The Catalogue's rows by a column head. An item with no price stays last either way; ties keep the catalogue's order. */
+export function sortCatalog(rows, sort, kinds) {
+  if (!sort) return rows;
+  const text = { sensitivity: "base", numeric: true };
+  const by = {
+    code: (a, b) => String(a.code || "").localeCompare(String(b.code || ""), "en", text),
+    name: (a, b) => String(a.name || "").localeCompare(String(b.name || ""), "en", text),
+    kind: (a, b) => String(kinds?.[a.kind]?.label || "").localeCompare(String(kinds?.[b.kind]?.label || ""), "en", text),
+    cost: (a, b) => +a.cost - +b.cost,
+    show: (a, b) => Number(!!a.paused || !!kinds?.[a.kind]?.paused) - Number(!!b.paused || !!kinds?.[b.kind]?.paused),
+  }[sort.key];
+  if (!by) return rows;
+  const noPrice = it => sort.key === "cost" && (it.cost == null || it.cost === "");
+  return [...rows].sort((a, b) => Number(noPrice(a)) - Number(noPrice(b)) || (noPrice(a) ? 0 : by(a, b) * sort.dir));
+}
+
 export function diff(items, incoming) {
   return incoming.map((inc, i) => {
     const parts = String(inc.code || "").split("/").map(norm).filter(Boolean);
-    const cur = items.find(x => inc.code && norm(x.code) === norm(inc.code)) || items.find(x => parts.length > 1 && parts.includes(norm(x.code)))
+    // b2b's own product (its address) first: a set's code can be two products' (K23002, K23005) or hold a part's code.
+    const cur = inc.slug ? (items.find(x => x.url && x.url === inc.url) || items.find(x => productSlug(x.url) === inc.slug) || items.find(x => !x.url && inc.code && norm(x.code) === norm(inc.code)) || items.find(x => !x.url && inc.name && String(x.name).toLowerCase() === String(inc.name).toLowerCase()) || null)
+      : items.find(x => inc.code && norm(x.code) === norm(inc.code)) || items.find(x => parts.length > 1 && parts.includes(norm(x.code)))
       || items.find(x => inc.name && String(x.name).toLowerCase() === String(inc.name).toLowerCase())
       || (inc.truncated ? items.find(x => inc.name && String(x.name).toLowerCase().startsWith(String(inc.name).toLowerCase())) : null);
     let status = "new", what = [];
@@ -254,6 +305,7 @@ export function diff(items, incoming) {
       if (inc.name && !inc.truncated && inc.name !== cur.name) what.push("name");
       if (inc.img && inc.img !== cur.img) what.push("picture");
       if (inc.specs && inc.specs !== (cur.specs || "")) what.push("specs");
+      if (inc.color && inc.color !== (cur.color || "")) what.push("colour");
       status = what.length ? "changed" : "same";
     }
     return { key: "r" + i, inc, cur: cur || null, status, what };
