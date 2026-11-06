@@ -2136,6 +2136,14 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                 <span style={{"fontSize":"12px","color":"var(--irq-c-6b6b66)"}}>
                                   {dcText(L_c_1c?.["count"])}
                                 </span>
+                                <select value={dcValue(L_c_1c?.["section"])} onChange={L_c_1c?.["onSection"]} aria-label={"Furniture or services"} style={{"height":"28px","padding":"0 6px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"12px","fontWeight":"600","color":"var(--irq-c-1f1f1c)"}}>
+                                  <option value={"furn"}>
+                                    {"Furniture"}
+                                  </option>
+                                  <option value={"serv"}>
+                                    {"Services"}
+                                  </option>
+                                </select>
                                 {"\n                          "}
                                 <span style={{"flex":"1"}} />
                                 {"\n                          "}
@@ -2810,11 +2818,12 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                             <input type={"checkbox"} aria-label={"Select item"} checked={dcChecked(L_r_1p?.["selected"])} onChange={L_r_1p?.["onSel"]} style={{"width":"17px","height":"17px","margin":"0","accentColor":"var(--irq-c-111111)","cursor":"pointer"}} className={"irq-pg irq-ph"} />
                           </span>
                           {"\n                  "}
-                          <span style={{"padding":"6px 6px 6px 0"}}>
+                          <label title={"Add or change the photo"} style={{"padding":"6px 6px 6px 0","cursor":"pointer"}}>
                             <span style={dcCss(`display:grid;place-items:center;width:44px;height:40px;border-radius:9px;background:var(--irq-c-eeeeea) url('${dcS(L_r_1p?.["img"])}') center/cover no-repeat;font-size:10px;font-weight:700;color:var(--irq-c-111111)`)}>
                               {dcText(L_r_1p?.["initials"])}
                             </span>
-                          </span>
+                            <input type={"file"} accept={"image/*"} onChange={L_r_1p?.["onImg"]} style={{"display":"none"}} />
+                          </label>
                           {"\n                  "}
                           <span style={{"padding":"6px 4px"}}>
                             <input value={dcValue(L_r_1p?.["code"])} onChange={L_r_1p?.["onCode"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontFamily":"var(--font-mono),Menlo,monospace","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pg irq-ph"} />

@@ -7,7 +7,7 @@ import { dcCss, dcList, dcS, dcText, dcValue, dcChecked, type DcVals, type DcCom
 export function renderWorkspace(v: DcVals, C: DcComponents) {
   return (
     <>
-      <div ref={v["rootRef"]} style={{"position":"relative","width":"100%","height":"100%","minHeight":"100vh","display":"flex","overflow":"hidden","background":"var(--irq-c-f7f7f5)","fontFamily":"var(--font-manrope),'Noto Sans SC',system-ui,sans-serif","color":"var(--irq-c-1f1f1c)","fontSize":"14px"}}>
+      <div ref={v["rootRef"]} style={{"position":"relative","width":"100%","height":"100%","minHeight":"0","display":"flex","overflow":"hidden","background":"var(--irq-c-f7f7f5)","fontFamily":"var(--font-manrope),'Noto Sans SC',system-ui,sans-serif","color":"var(--irq-c-1f1f1c)","fontSize":"14px"}}>
       {"\n\n  "}
       {(v["wide"]) ? (<>
         {"\n    "}
@@ -386,6 +386,11 @@ export function renderWorkspace(v: DcVals, C: DcComponents) {
                                 {"\n                      "}
                               </>) : null}
                               {"\n                      "}
+                              <button onClick={L_im_5?.["pin"]} title={L_im_5?.["pinTitle"]} aria-label={L_im_5?.["pinTitle"]} style={dcCss(`position:absolute;left:8px;bottom:8px;width:28px;height:28px;padding:0;border-radius:14px;border:0;background:${dcS(L_im_5?.["pinBg"])};color:${dcS(L_im_5?.["pinInk"])};display:grid;place-items:center`)}>
+                                <svg width={"14"} height={"14"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"2"} strokeLinecap={"round"} strokeLinejoin={"round"}>
+                                  <path d={"M12 17v5M5 3h14l-2 7 3 4H4l3-4z"} />
+                                </svg>
+                              </button>
                               <button onClick={L_im_5?.["remove"]} title={"Delete photo"} aria-label={"Delete photo"} style={dcCss(`position:absolute;right:8px;top:8px;height:28px;min-width:28px;padding:0 ${dcS(L_im_5?.["delPad"])};border-radius:14px;border:0;background:${dcS(L_im_5?.["delBg"])};color:${dcS(L_im_5?.["delInk"])};display:flex;align-items:center;justify-content:center;gap:4px;font-size:11.5px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.15)`)}>
                                 <svg width={"13"} height={"13"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"2.2"} strokeLinecap={"round"} strokeLinejoin={"round"}>
                                   <path d={"M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"} />
@@ -939,13 +944,13 @@ export function renderWorkspace(v: DcVals, C: DcComponents) {
         {"\n    "}
         <div style={{"position":"absolute","inset":"0","zIndex":"50","display":"flex","flexDirection":"column","background":"var(--irq-c-171311)","color":"var(--irq-c-ffffff)","animation":"wsFade .2s"}}>
           {"\n      "}
-          <div style={{"flex":"0 0 auto","display":"flex","alignItems":"center","gap":"12px","padding":"14px 18px 10px 24px"}}>
+          <div data-ws-bar={""} style={{"flex":"0 0 auto","display":"flex","alignItems":"center","gap":"12px","padding":"14px 18px 10px 24px"}}>
             {"\n        "}
             <span style={{"flex":"0 1 auto","minWidth":"0","fontSize":"12px","fontWeight":"700","letterSpacing":".14em","color":"var(--irq-c-f5871f)","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis","maxWidth":"260px"}}>
               {dcText(v["pv"]?.["board"])}
             </span>
             {"\n        "}
-            <div style={{"flex":"1","minWidth":"0","display":"flex","gap":"4px","justifyContent":"center","overflowX":"auto"}}>
+            <div data-ws-chapters={""} style={{"flex":"1","minWidth":"0","display":"flex","gap":"4px","justifyContent":"center","overflowX":"auto"}}>
               {"\n          "}
               {dcList(v["pv"]?.["chapters"]).map((L_ch_f, L_ch_f_i) => (
                 <Fragment key={L_ch_f_i}>

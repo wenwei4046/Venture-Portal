@@ -92,7 +92,7 @@ export class SettingsLogic extends DcLogic {
           if (inc.price != null) { if (+inc.price !== +x.cost) x.prevCost = x.cost; x.cost = +inc.price; x.sample = false; x.noPrice = false; }
           x.updatedAt = Date.now();
           if (inc.name && !inc.truncated) x.name = inc.name;
-          if (inc.img) x.img = inc.img;
+          if (inc.img && !x.imgOwn) x.img = inc.img;
           if (inc.specs) x.specs = inc.specs;
           if (inc.url) x.url = inc.url;
           if (inc.code && !x.code) x.code = inc.code;
@@ -159,8 +159,9 @@ export class SettingsLogic extends DcLogic {
     try { const [h, b64] = x.split(","), mime = (h.match(/data:([^;]+)/) || [])[1] || "image/jpeg", bin = atob(b64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([arr], { type: mime })); this._blobs.set(x, url); return url; } catch (e) { return ""; } }
   loadXlsx() { if (window.XLSX) return Promise.resolve(window.XLSX); return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"; sc.onload = () => res(window.XLSX); sc.onerror = rej; document.head.appendChild(sc); }); }
   async dlTemplate(ep) {
-    const rows = [["CATEGORY", "ITEM", "DESCRIPTION", "CODE/COLOUR", "QTY", "PRICE"]];
-    (ep.cats || []).forEach(c => { if (!c.items.length) rows.push([c.name, "", "", "", "", ""]); c.items.forEach(i => rows.push([c.name, i.name, i.desc || "", i.code || "", i.qty ?? 1, i.cost ?? ""])); });
+    const typeOf = c => (c.section || (c.items.some(i => i.kind) ? "furn" : "serv")) === "furn" ? "Furniture" : "Services";
+    const rows = [["CATEGORY", "ITEM", "DESCRIPTION", "CODE/COLOUR", "QTY", "PRICE", "TYPE"]];
+    (ep.cats || []).forEach(c => { if (!c.items.length) rows.push([c.name, "", "", "", "", "", typeOf(c)]); c.items.forEach(i => rows.push([c.name, i.name, i.desc || "", i.code || "", i.qty ?? 1, i.cost ?? "", typeOf(c)])); });
     if (rows.length === 1) rows.push(["LIVING", "TV CABINET", "", "336103", 1, 519]);
     const fname = [ep.groupLabel || "Room type", this.state.lib?.versionWord(this.state.cfg?.packages, ep)].filter(Boolean).join(" ").replace(/[\\/:*?"<>|]+/g, "-");
     try {
@@ -189,7 +190,7 @@ export class SettingsLogic extends DcLogic {
     const cats = [], catalogItems = this.state.cfg.catalog.items || [], kindOfCode = v => { const k = String(v ?? "").trim().toUpperCase(); if (!k) return null; const found = [...new Set(catalogItems.filter(c => String(c.code || "").trim().toUpperCase() === k).map(c => c.kind).filter(Boolean))]; return found.length === 1 ? found[0] : null; };
     starts.forEach((st0, bi) => {
       const end = bi + 1 < starts.length ? starts[bi + 1] : h.length, col = re => { for (let k = st0; k < end; k++) if (re.test(h[k])) return k; return -1; };
-      const cI = itemCols[bi], cD = col(/^desc/), cC = col(/code|colou?r/), cQ = col(/^qty|quantity/), cP = col(/price|cost|unit/), cK = col(/^categ|^area|^room/);
+      const cI = itemCols[bi], cD = col(/^desc/), cC = col(/code|colou?r/), cQ = col(/^qty|quantity/), cP = col(/price|cost|unit/), cK = col(/^categ|^area|^room/), cT = col(/^(type|section)$/);
       let cur = null;
       rows.slice(hi + 1).forEach(r => {
         const name = String(r[cI] ?? "").trim().replace(/^[-–•\s]+/, ""); if (!name && !(cK >= 0 && String(r[cK]).trim())) return;
@@ -197,6 +198,7 @@ export class SettingsLogic extends DcLogic {
         const catName = cK >= 0 ? String(r[cK]).trim() : "", qty = cQ >= 0 ? num(r[cQ]) : null, price = cP >= 0 ? num(r[cP]) : null;
         if (catName && (!cur || cur.name !== catName.toUpperCase())) { const N = catName.toUpperCase(); cur = cats.find(x => x.name === N) || null; if (!cur) { cur = { name: N, label: /[a-z]/.test(catName) ? catName : catName.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase()), items: [] }; cats.push(cur); } }
         if (cK < 0 && name && qty == null && price == null && !(cC >= 0 && String(r[cC]).trim())) { cur = { name: name.toUpperCase(), label: name, items: [] }; cats.push(cur); return; }
+        const typ = cT >= 0 ? String(r[cT]).trim() : ""; if (cur && /^furn/i.test(typ)) cur.section = "furn"; else if (cur && /^serv/i.test(typ)) cur.section = "serv";
         if (!name) return; if (!cur) { cur = { name: "ITEMS", label: "Items", items: [] }; cats.push(cur); }
         cur.items.push({ name: name.toUpperCase(), desc: cD >= 0 ? String(r[cD]).trim() : "", code: cC >= 0 ? String(r[cC]).trim() : "", qty: qty == null ? 1 : qty, cost: price == null ? 0 : price, kind: kindOfCode(cC >= 0 ? r[cC] : "") });
       });
@@ -553,6 +555,7 @@ export class SettingsLogic extends DcLogic {
         remove: () => this.arm(armKey, () => { this.upd(c => { c.packages = c.packages.filter(p => p.id !== ep.id); }); this.setState({ pid: cfg.packages.find(p => p.id !== ep.id)?.id }); }),
         addCat: () => setP(p => { p.cats.push({ name: "NEW CATEGORY", label: "New category", items: [] }); }),
         cats: ep.cats.map((c, ci) => ({
+          section: c.section || (c.items.some(i => i.kind) ? "furn" : "serv"), onSection: e => { const v = e.target.value; setP(p => { p.cats[ci].section = v; }); },
           name: c.name, open: !(st.catShut || {})[ep.id + ":" + ci], rot: (st.catShut || {})[ep.id + ":" + ci] ? "rotate(-90deg)" : "none", toggle: () => this.setState(z => ({ catShut: { ...(z.catShut || {}), [ep.id + ":" + ci]: !(z.catShut || {})[ep.id + ":" + ci] } })), count: `${c.items.length} item${c.items.length === 1 ? "" : "s"}`, sum: money(c.items.reduce((a, i) => a + (+i.cost || 0) * (+i.qty || 0), 0)),
           onName: e => { const v = e.target.value.toUpperCase(); setP(p => { p.cats[ci].name = v; p.cats[ci].label = v.charAt(0) + v.slice(1).toLowerCase(); }); },
           remove: () => setP(p => { p.cats.splice(ci, 1); }),
@@ -608,6 +611,7 @@ export class SettingsLogic extends DcLogic {
     const catRows = sortCatalog(items.filter(it => (st.kindFilter === "all" || it.kind === st.kindFilter) && (!q || (it.code + " " + it.name).toLowerCase().includes(q))), st.catSort, kinds).map(it => {
       const setC = fn => this.upd(c => { const x = c.catalog.items.find(y => y.id === it.id); if (x) fn(x); });
       return {
+        onImg: e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) lib.fileToDataUrl(f, 1000).then(d => this.upd(c => { c.catalog.items.filter(y => y.id === it.id || (it.code && y.code === it.code)).forEach(y => { y.img = d; y.imgOwn = true; }); })); },
         id: it.id, selected: !!(st.sel || {})[it.id], onSel: () => this.setState(s => { const m = { ...(s.sel || {}) }; if (m[it.id]) delete m[it.id]; else m[it.id] = true; return { sel: m }; }),
         img: it.img || imgFor(it.code), specs: it.specs || "", initials: "",
         code: it.code || "", name: it.name, kind: it.kind, cost: it.noPrice || it.cost == null ? "" : String(it.cost),
