@@ -44,7 +44,7 @@ export class QuoteLogic extends DcLogic {
   saveDraft() {
     const st = this.state, { total } = this.calc(), p = st.data && st.data.packages.find(x => x.id === st.pid);
     const id = st.draftId || "d" + Date.now().toString(36);
-    const d = { id, at: Date.now(), name: st.cust.att || "Unnamed customer", room: p ? (p.groupLabel || p.name) + (p.style === "build" ? " · Build in" : " · Classic") : "", total,
+    const d = { id, at: Date.now(), name: st.cust.att || "Unnamed customer", room: p ? [p.groupLabel || p.name, this.lib.versionWord(st.data?.packages, p)].filter(Boolean).join(" · ") : "", total,
       s: { step: st.step, pid: st.pid, cust: st.cust, crm: st.crm || {}, crmId: st.crmId || null, crmPick: st.crmPick || null, extra: st.extra, sigs: st.sigs, lines: st.lines, discount: st.discount, styleId: st.styleId || null, room: st.room || null } };
     const list = [d, ...this.drafts().filter(x => x.id !== id)];
     if (this.props.readOnly) { this.flash("Read-only while viewing as"); return; }
@@ -241,7 +241,7 @@ export class QuoteLogic extends DcLogic {
       const cats = this.docRows(pkg, m);
       const list = cats.reduce((a, c) => a + c.rows.reduce((x, r) => x + r.sum, 0), 0);
       const c = this.state.cust;
-      const facts = { att: c.att, by: c.by, bill: c.bill, building: c.building, address: [c.unit, c.building, cfg.buildings?.find(b => b.name === c.building)?.address].filter(Boolean).join(", "), unit: this.unitFact(pkg), layout: pkg.name, date: longDate(c.date) };
+      const facts = { att: c.att, by: c.by, bill: c.bill, building: c.building, address: [c.unit, c.building, cfg.buildings?.find(b => b.name === c.building)?.address].filter(Boolean).join(", "), unit: this.unitFact(pkg), layout: this.lib.packageName(this.state.data?.packages, pkg), date: longDate(c.date) };
       (cfg.doc.blocks.find(b => b.type === "facts")?.labels || []).filter(f => f.custom).forEach(f => { facts[f.key] = this.state.extra[f.key] || ""; });
       const ci = cfg.custInfo || {}, custRows = [...(this.lib.CRM_FIELDS || []).filter(f => f.id !== "name" && (ci.crm || {})[f.id] && ci.crm[f.id].show && ci.crm[f.id].print).map(f => ({ label: f.label, value: (this.state.crm || {})[f.id] })), ...(ci.own || []).filter(f => !["unit", "bill", "building", "date", "by"].includes(f.id) && f.print).map(f => ({ label: f.label, value: this.state.extra["ci_" + f.id] }))];
       return this.lib.renderDoc(cfg, { facts, adjust, custRows, extra: this.state.extra, sigs: this.state.sigs, building: cfg.buildings?.find(b => b.name === c.building), cats, discount: disc, saving: priced ? Math.max(0, list - (total - adjSum) - disc) : 0, total }, { excel: forExcel, title: this.fileBase() });
@@ -343,7 +343,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       return { name: x.name, desc: x.desc || "", count: imgs.length ? imgs.length + " photo" + (imgs.length === 1 ? "" : "s") : "", cover: this.u(cover), noCover: !cover, on, border: on ? "#111111" : "#E7E7E2", ring: on ? "0 0 0 1px #111111, 0 10px 24px rgba(17,17,17,.12)" : "0 1px 2px rgba(20,20,18,.04)", pick: () => this.setState({ styleId: x.id, gi: 0 }), chipBg: on ? "#111111" : "#FFFFFF", chipInk: on ? "#FFFFFF" : "#1F1F1C", chipBorder: on ? "#111111" : "#DEDED8" }; });
     if (!group) return { styleCards, styleTabs: [], sv: false };
     const opts = [["classic", "Classic"], ["build", "Build in"]].filter(([k]) => group[k]);
-    const styleTabs = opts.map(([k, label]) => { const p = byId(group[k]), on = style === k; return { label, price: rm0(p.price), bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", shadow: on ? "0 1px 3px rgba(20,20,18,.14)" : "none", pick: () => { if (!on) this.load(group[k], st.data, true); } }; });
+    const styleTabs = opts.length < 2 ? [] : opts.map(([k, label]) => { const p = byId(group[k]), on = style === k; return { label, price: rm0(p.price), bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", shadow: on ? "0 1px 3px rgba(20,20,18,.14)" : "none", pick: () => { if (!on) this.load(group[k], st.data, true); } }; });
     const p = byId(group[style]) || byId(group.classic || group.build); if (!p) return { styleCards, styleTabs, sv: false };
     const sx = styles.find(x => x.id === sid) || {};
     const okSrc = s => /^(data:image|https?:|blob:)/.test(String(s || "")); const imgs = [...((sx.photos && sx.photos.length ? sx.photos : (sx.cover ? [sx.cover] : [])).map((src, k) => ({ src, title: sx.name + (k ? " · " + (k + 1) : ""), sectionName: "Overview", items: [] }))), ...(drive[sid] || []).filter(x => okSrc(x.src))];
@@ -605,7 +605,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       pkgRows: data?.groups ? data.groups.filter(g => { const p = byId(g.classic || g.build) || {}, s = p.spec || {}, k = s.beds || s.baths ? `${s.beds || "?"}-${s.baths || "?"}` : "other"; const ck = st.room || (group ? (() => { const s2 = (byId(group.classic || group.build) || {}).spec || {}; return s2.beds || s2.baths ? `${s2.beds || "?"}-${s2.baths || "?"}` : "other"; })() : k); return k === ck; }).map(g => {
         const on = group && g.id === group.id, cur = byId(g[style]) || byId(g.classic || g.build), other = byId(g[cur.style === "build" ? "classic" : "build"]);
         const items = cur.cats.reduce((a, c) => a + c.items.length, 0), sp = cur.spec || {};
-        return { name: g.label, spec: this.lib.specText(sp, true), meta: `${items} items · ${cur.style === "build" ? "Build in" : "Classic"}${this._multiB && g.building ? " · " + title(g.building) : ""}`, hasPlan: !!sp.plan, plan: sp.plan || "", openPlan: e => { e.stopPropagation(); this.setState({ plan: { img: sp.plan, name: g.label, spec: this.lib.specText(sp) } }); }, price: rm0(cur.price), styleNote: other ? `${other.style === "build" ? "Build in" : "Classic"} ${rm0(other.price)}` : "", border: on ? "#111111" : "#E7E7E2", ring: on ? "inset 0 0 0 1px #111111" : "none", bg: on ? "#FFEBD9" : "#FFFFFF", radio: on ? "2px solid #111111" : "1.5px solid #D2D2CB", dot: on ? "#111111" : "transparent", pick: () => { if (!on) this.load(cur.id); } };
+        return { name: g.label, spec: this.lib.specText(sp, true), meta: `${[items + " items", this.lib.versionWord(data.packages, cur)].filter(Boolean).join(" · ")}${this._multiB && g.building ? " · " + title(g.building) : ""}`, hasPlan: !!sp.plan, plan: sp.plan || "", openPlan: e => { e.stopPropagation(); this.setState({ plan: { img: sp.plan, name: g.label, spec: this.lib.specText(sp) } }); }, price: rm0(cur.price), styleNote: other ? `${other.style === "build" ? "Build in" : "Classic"} ${rm0(other.price)}` : "", border: on ? "#111111" : "#E7E7E2", ring: on ? "inset 0 0 0 1px #111111" : "none", bg: on ? "#FFEBD9" : "#FFFFFF", radio: on ? "2px solid #111111" : "1.5px solid #D2D2CB", dot: on ? "#111111" : "transparent", pick: () => { if (!on) this.load(cur.id); } };
       }) : [],
       styleSub: "Pick the look to show the client. Furniture and price follow the room type.",
       docSrc: step === 5 && pkg ? this.docHtml(false).replace("</head>", `<style>@media screen{html{background:#F2F2EF;color-scheme:light}body{width:210mm!important;min-height:297mm;box-sizing:border-box;padding:14mm!important;margin:24px auto!important;background:#fff;box-shadow:0 2px 12px rgba(30,43,39,.14)}}</style></head>`) : "",
@@ -616,7 +616,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
         const p = byId(group[k]), on = style === k;
         return { label, price: rm0(p.price), items: bedItems(p), border: on ? "#111111" : "#E7E7E2", ring: on ? "inset 0 0 0 1px #111111" : "none", bg: on ? "#FFEBD9" : "#FFFFFF", ink: on ? "#111111" : "#1F1F1C", pick: () => { if (!on) { this.load(group[k], data, true); this.flash(`${label} bedrooms · other changes kept`); } } };
       }) : [],
-      pkgName: pkg ? (pkg.groupLabel ? `${pkg.groupLabel} · ${pkg.style === "build" ? "Build in" : "Classic"}` : title(pkg.name)) : "", pkgPriceText: pkg ? rm(pkg.price) : "",
+      pkgName: pkg ? (pkg.groupLabel ? [pkg.groupLabel, this.lib.versionWord(data?.packages, pkg)].filter(Boolean).join(" · ") : title(pkg.name)) : "", pkgPriceText: pkg ? rm(pkg.price) : "",
       catViews, catGroups, catGroupsShown, czTabs,
       discount: st.discount, onDiscount: e => this.setState({ discount: e.target.value.replace(/[^\d.]/g, "") }),
       totalText: rm(total), totalBare: money(total), changesText: signed(changeSell), changeCount: nChanges === 0 ? "no changes" : `${nChanges} change${nChanges === 1 ? "" : "s"}`,

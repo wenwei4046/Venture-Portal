@@ -47,6 +47,8 @@ const PATCHES = {
     ["padding-bottom:env(safe-area-inset-bottom,0px)", "padding-bottom:var(--safe-bottom)"],
     // …and the app's own top bar on a computer (greeting, bell, account), where the prototype drew a stand-in.
     ['<sc-if value="{{ desk }}" hint-placeholder-val="{{ false }}">\n      <header', '<sc-if value="{{ deskHeader }}" hint-placeholder-val="{{ false }}">\n      <header'],
+    // A room type with one version has no Classic / Build in switch (the user, 2026-11-06).
+    ['<div style="flex:{{ svCard.segFlex }};display:flex;gap:2px;padding:3px;border-radius:11px;background:#EEEEEA">', '<div data-irq-tabs="{{ styleTabs.length }}" style="flex:{{ svCard.segFlex }};display:flex;gap:2px;padding:3px;border-radius:11px;background:#EEEEEA">'],
     // The Change item sheet's header shows the item being replaced (the user, 2026-11-06), drawn as the list's own photos.
     ['<div style="min-width:0">\n              <p style="margin:0;font-size:11.5px;font-weight:650;letter-spacing:.08em;color:#111111">{{ sheet.eyebrow }}', '<div style="min-width:0;display:flex;align-items:flex-start;gap:12px"><sc-if value="{{ sheet.img }}" hint-placeholder-val="{{ false }}"><span onClick="{{ sheet.zoom }}" title="View larger" style="position:relative;flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:#EEEEEA url(\'{{ sheet.img }}\') center/cover no-repeat;cursor:zoom-in"><span style="position:absolute;right:3px;bottom:3px;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.92);display:grid;place-items:center;box-shadow:0 1px 3px rgba(20,20,18,0.15)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#34342F" strokeWidth="2.4" strokeLinecap="round"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3M11 8v6M8 11h6"></path></svg></span></span></sc-if><div style="min-width:0">\n              <p style="margin:0;font-size:11.5px;font-weight:650;letter-spacing:.08em;color:#111111">{{ sheet.eyebrow }}'],
     ['{{ staleText }}</p></sc-if>\n            </div>\n            <button aria-label="Close" onClick="{{ closeSheet }}"', '{{ staleText }}</p></sc-if>\n            </div></div>\n            <button aria-label="Close" onClick="{{ closeSheet }}"'],
@@ -319,6 +321,7 @@ const base = [
   ".sc-host { display: block; }",
   "/* The quote header's Quote settings link shows only to those who may edit them (a patch in this script). */",
   '[data-irq-settings="false"] { display: none !important; }',
+  '[data-irq-tabs="0"] { display: none !important; }',
   "/* iOS Safari zooms the page on a focused control under 16px and leaves it zoomed. globals.css holds this floor for the app, but it cannot reach into a shadow root. */",
   "@media (max-width: 767px) { input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea { font-size: 16px !important; } }",
   rules,

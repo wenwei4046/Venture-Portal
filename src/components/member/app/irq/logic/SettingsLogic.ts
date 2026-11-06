@@ -162,7 +162,7 @@ export class SettingsLogic extends DcLogic {
     const rows = [["CATEGORY", "ITEM", "DESCRIPTION", "CODE/COLOUR", "QTY", "PRICE"]];
     (ep.cats || []).forEach(c => { if (!c.items.length) rows.push([c.name, "", "", "", "", ""]); c.items.forEach(i => rows.push([c.name, i.name, i.desc || "", i.code || "", i.qty ?? 1, i.cost ?? ""])); });
     if (rows.length === 1) rows.push(["LIVING", "TV CABINET", "", "336103", 1, 519]);
-    const fname = ((ep.groupLabel || "Room type") + " " + (ep.style === "build" ? "Build in" : "Classic")).replace(/[\\/:*?"<>|]+/g, "-");
+    const fname = [ep.groupLabel || "Room type", this.state.lib?.versionWord(this.state.cfg?.packages, ep)].filter(Boolean).join(" ").replace(/[\\/:*?"<>|]+/g, "-");
     try {
       const X = await this.loadXlsx(); const ws = X.utils.aoa_to_sheet(rows); ws["!cols"] = [{ wch: 16 }, { wch: 34 }, { wch: 20 }, { wch: 16 }, { wch: 6 }, { wch: 10 }];
       const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, "Items"); X.writeFile(wb, fname + ".xlsx");
@@ -331,7 +331,7 @@ export class SettingsLogic extends DcLogic {
       if (sampleCats.length >= 2) return;
       sampleCats.push({ name: c.name, rows: c.items.map(it => { n++; shown++; const unit = Math.round((+it.cost || 0) * m); const r = { no: n, item: it.name, desc: it.desc, code: it.code, qty: it.qty, price: money(unit), sum: money(unit * it.qty) }; return { cells: cols.map(cl => ({ v: r[cl.key], align: cl.num ? "right" : "left" })) }; }) });
     });
-    const sampleFacts = { att: "MR HANDSOME", by: "WILLIAM", bill: "-", building: p0?.building || "", address: p0?.building || "", unit: p0 ? [p0.layout, lib.specText(p0.spec)].filter(Boolean).join(" · ") : "", layout: p0?.name || "", date: `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` };
+    const sampleFacts = { att: "MR HANDSOME", by: "WILLIAM", bill: "-", building: p0?.building || "", address: p0?.building || "", unit: p0 ? [p0.layout, lib.specText(p0.spec)].filter(Boolean).join(" · ") : "", layout: lib.packageName(cfg.packages, p0), date: `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` };
     const edit = (fn) => e => { const v = e.currentTarget.innerText.replace(/\n+$/, ""); fn(v); };
 
     const fieldPreview = f => {
@@ -515,7 +515,7 @@ export class SettingsLogic extends DcLogic {
       const pc = cost(ep), armKey = "delpkg-" + ep.id;
       const setP = fn => this.upd(c => { const p = this.pkgOf(c, ep.id); if (p) fn(p, c); });
       ed = {
-        title: `${sizeKey(ep.spec) ? sizeLabel(sizeKey(ep.spec)) : (ep.groupLabel || ep.name)} · ${ep.style === "build" ? "Build in" : "Classic"}`, sub: sizeKey(ep.spec) ? "" : "Set bedrooms & bathrooms",
+        title: [sizeKey(ep.spec) ? sizeLabel(sizeKey(ep.spec)) : (ep.groupLabel || ep.name), lib.versionWord(cfg.packages, ep)].filter(Boolean).join(" · "), sub: sizeKey(ep.spec) ? "" : "Set bedrooms & bathrooms",
         groupLabel: ep.groupLabel || "", layout: ep.layout || "", building: ep.building || "", price: String(ep.price ?? ""),
         onGroupLabel: e => { const v = e.target.value; this.upd(c => c.packages.filter(p => p.group === ep.group).forEach(p => { p.groupLabel = v; })); },
         onLayout: e => { const v = e.target.value; setP(p => { p.layout = v; }); },
@@ -584,7 +584,7 @@ export class SettingsLogic extends DcLogic {
       onFrom: e => { const v = e.target.value; this.setState(s => ({ newUnit: { ...s.newUnit, from: v } })); },
       sizes: SIZES.map(k => ({ label: sizeLabel(k), ...((on) => ({ border: on ? "#1F1F1C" : "#DEDED8", bg: on ? "#1F1F1C" : "#FFFFFF", ink: on ? "#FFFFFF" : "#1F1F1C" }))(nu.size === k), pick: () => this.setState(s => ({ newUnit: { ...s.newUnit, size: k } })) })),
       styles: [["classic", "Classic"], ["build", "Build in"]].map(([k, label]) => ({ label, bg: nu.style === k ? "#FFFFFF" : "transparent", shadow: nu.style === k ? "0 1px 2px rgba(20,20,18,.14)" : "none", color: nu.style === k ? "#111111" : "#6B6B66", pick: () => this.setState(s => ({ newUnit: { ...s.newUnit, style: k } })) })),
-      fromOpts: [{ v: "", l: "Blank" }, ...cfg.packages.map(p => ({ v: p.id, l: `${p.groupLabel || p.name} · ${p.style === "build" ? "Build in" : "Classic"}` }))],
+      fromOpts: [{ v: "", l: "Blank" }, ...cfg.packages.map(p => ({ v: p.id, l: [p.groupLabel || p.name, lib.versionWord(cfg.packages, p)].filter(Boolean).join(" · ") }))],
       hint: !nu.size ? "Pick a unit size" : nuDup ? `${sizeLabel(nu.size)} ${nu.style === "build" ? "Build in" : "Classic"} already exists` : "", hasHint: !nu.size || nuDup,
       btnBg: nuOk ? "#111111" : "#EEEEEA", btnInk: nuOk ? "#FFFFFF" : "#97978F",
       create: () => {
@@ -819,7 +819,7 @@ export class SettingsLogic extends DcLogic {
           const g = groups.find(x => x.classic === p.id || x.build === p.id) || {}, other = p.style === "build" ? "classic" : "build", otherLabel = other === "build" ? "Build in" : "Classic";
           const clone = (extra) => { const id = lib.newId("p"); const cp = { ...JSON.parse(JSON.stringify(p)), id, ...extra(id) }; this.upd(c => { const k = c.packages.findIndex(x => x.id === p.id); c.packages.splice(k + 1, 0, cp); }); this.setState({ pid: id }); };
           const armK = "pdel-" + p.id, last = cfg.packages.length < 2;
-          return { x: cx.x + "px", y: cx.y + "px", name: (p.groupLabel || p.name || "").toUpperCase() + " · " + (p.style === "build" ? "BUILD IN" : "CLASSIC"), close, items: [
+          return { x: cx.x + "px", y: cx.y + "px", name: [p.groupLabel || p.name || "", lib.versionWord(cfg.packages, p)].filter(Boolean).join(" · ").toUpperCase(), close, items: [
             it("Open", go(() => this.setState({ pid: p.id }))),
             it("Duplicate", go(() => clone(() => { const gl = (p.groupLabel || p.layout || "Package") + " copy"; return { group: lib.newId("g"), groupLabel: gl, layout: gl.toUpperCase(), spec: { ...p.spec, beds: "", baths: "" }, name: `${gl.toUpperCase()} ${p.style === "build" ? "BUILD IN" : "CLASSIC"}` }; }))),
             it(`Add ${otherLabel} version`, go(() => clone(() => ({ style: other, name: `${(p.groupLabel || p.layout || "").toUpperCase()} ${other === "build" ? "BUILD IN" : "CLASSIC"}` }))), { off: !!g[other] }),
@@ -926,7 +926,7 @@ export class SettingsLogic extends DcLogic {
       priceSub: "Package price ÷ cost. Build in packages sit lower than Classic in the Excel.",
       priceRows: cfg.packages.map((p, i) => {
         const pc = cost(p), eff = pc ? p.price / pc : 0;
-        return { name: p.groupLabel || p.name, style: p.style === "build" ? "Build in" : "Classic", cost: rm0(pc), price: String(p.price), effective: pc ? "×" + eff.toFixed(2) : "—", effInk: eff && eff < 1.15 ? "#D96E0B" : "#1F1F1C", suggested: rm0(pc * m), bg: i % 2 ? "#F8F8F6" : "#FFFFFF", onPrice: e => { const v = num(e.target.value); this.upd(c => { c.packages[i].price = v; }); } };
+        return { name: p.groupLabel || p.name, style: lib.versionWord(cfg.packages, p), cost: rm0(pc), price: String(p.price), effective: pc ? "×" + eff.toFixed(2) : "—", effInk: eff && eff < 1.15 ? "#D96E0B" : "#1F1F1C", suggested: rm0(pc * m), bg: i % 2 ? "#F8F8F6" : "#FFFFFF", onPrice: e => { const v = num(e.target.value); this.upd(c => { c.packages[i].price = v; }); } };
       }),
       restoreLabel: st.arm === "restore" ? "Confirm: restore the Excel price list" : "Restore the Excel price list", restoreBg: st.arm === "restore" ? "#EEEEEA" : "#FFFFFF",
       onRestore: () => this.arm("restore", () => { this.setState({ cfg: lib.defaults(st.base.pj, st.base.cj) }); })
