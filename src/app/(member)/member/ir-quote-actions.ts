@@ -74,13 +74,38 @@ async function crmFields(db: SupabaseClient): Promise<IrqCrmField[]> {
   return out;
 }
 
-/** Everything a quote or the settings opens on, in one request. */
-export async function loadIrQuote(): Promise<Outcome<IrqBoot>> {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Everything a quote or the settings opens on, in one request. `view`: the Principal viewing a member reads that member's
+ * name, drafts and Drive (mig 20261106140000, which asks again) on the published settings, and may edit nothing here.
+ */
+export async function loadIrQuote(view?: { staffId: string; subDepartmentId: string }): Promise<Outcome<IrqBoot>> {
   try {
     const { db, user } = await session("read");
-    const [main, drive, fields] = await Promise.all([db.rpc("ir_quote_read"), db.rpc("ir_drive_read"), crmFields(db)]);
+    if (view && !(isPrincipalAccount(user) && UUID.test(view.staffId) && UUID.test(view.subDepartmentId))) {
+      return { ok: false, error: "Only the Principal may view a member's quotes." };
+    }
+    const [main, drive, fields, member] = await Promise.all([
+      db.rpc("ir_quote_read"),
+      view ? Promise.resolve({ data: null, error: null }) : db.rpc("ir_drive_read"),
+      crmFields(db),
+      view ? db.rpc("ir_quote_member_view", { p_staff: view.staffId, p_sub_department: view.subDepartmentId }) : Promise.resolve({ data: null, error: null }),
+    ]);
     if (main.error) return { ok: false, error: words(main.error, "The quotation settings could not be read.") };
+    if (member.error) return { ok: false, error: words(member.error, "That member's quotes could not be read.") };
     const m = (main.data ?? {}) as Partial<IrqBoot> & { liveAt?: string | null };
+    if (view) {
+      const v = (member.data ?? {}) as { user?: { id: string; name: string }; drafts?: unknown[]; boards?: unknown[] };
+      return {
+        ok: true,
+        data: {
+          quote: true, edit: false, live: m.live ?? null, liveAt: m.liveAt ?? null, draft: null,
+          drafts: Array.isArray(v.drafts) ? v.drafts : [], boards: Array.isArray(v.boards) ? v.boards : [],
+          crmFields: fields, user: v.user ?? { id: view.staffId, name: "" },
+        },
+      };
+    }
     return {
       ok: true,
       data: {

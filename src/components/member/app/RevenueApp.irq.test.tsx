@@ -51,6 +51,18 @@ describe("IR's Quote", () => {
     expect(screen.queryByText(/Loading the catalogue/)).toBeNull();
   });
 
+  // View as (2026-11-06): the Principal viewing a member stays told so, inside the quote's own layer too.
+  it("shows the viewing bar over the quote while viewing a member", () => {
+    const data = protoData({ principal: true });
+    const ir = data.memberships.find(m => m.id === "ir")!;
+    const person = ir.people[0];
+    const search = `?department=ir&page=quote&staff=${person.id}`;
+    window.history.replaceState(null, "", `/member/preview${search}`);
+    render(<RevenueApp initialData={data} initialSearch={search} today="2026-10-03" fixture={protoFixture()} />);
+    expect(screen.getByTestId("irq-quote")).toBeTruthy();
+    expect(screen.getByText(`Viewing as ${person.name}`)).toBeTruthy();
+  });
+
   it("leaves Fair's Quote as it was", () => {
     open("?department=fair&page=quote");
     expect(screen.queryByTestId("irq-quote")).toBeNull();

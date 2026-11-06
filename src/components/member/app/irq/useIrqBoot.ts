@@ -83,7 +83,7 @@ const OFFLINE_BOOT: IrqBoot = {
 export type IrqBootState = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; boot: IrqBoot };
 
 /** The screen's data; `readOnly` (View as) keeps every write in the browser. */
-export function useIrqBoot(readOnly: boolean, onError: (m: string) => void, offline?: { name: string }): IrqBootState {
+export function useIrqBoot(readOnly: boolean, onError: (m: string) => void, offline?: { name: string }, view?: { staffId: string; subDepartmentId: string }): IrqBootState {
   const [state, setState] = useState<IrqBootState>({ status: "loading" });
   useEffect(() => {
     let live = true;
@@ -95,7 +95,7 @@ export function useIrqBoot(readOnly: boolean, onError: (m: string) => void, offl
       setState({ status: "ready", boot });
       return () => { live = false; };
     }
-    loadIrQuote().then(r => {
+    loadIrQuote(view).then(r => {
       if (!live) return;
       if (!r.ok) return setState({ status: "error", error: r.error });
       wire(r.data, readOnly, onError);
@@ -109,7 +109,7 @@ export function useIrqBoot(readOnly: boolean, onError: (m: string) => void, offl
       irqStorage.flush();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readOnly]);
+  }, [readOnly, view?.staffId, view?.subDepartmentId]);
   return state;
 }
 

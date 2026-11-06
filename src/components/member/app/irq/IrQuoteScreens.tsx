@@ -97,9 +97,11 @@ export function IrQuoteScreen(p: {
   onNav: (to: IrQuoteNav) => void; onSettings?: () => void; onClosePreview?: () => void;
   /** The design preview and the demo: the handoff's price list, nothing read or sent. */
   offline?: { name: string };
+  /** The Principal viewing a member: that member's name, drafts and Drive, read only. */
+  view?: { staffId: string; subDepartmentId: string };
 }) {
   const { toast, show, clear } = useToast();
-  const boot = useIrqBoot(p.readOnly, show, p.offline);
+  const boot = useIrqBoot(p.readOnly, show, p.offline, p.view);
   const props = useMemo(() => {
     if (boot.status !== "ready") return null;
     return {
