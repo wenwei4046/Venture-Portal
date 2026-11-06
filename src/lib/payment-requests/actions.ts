@@ -41,7 +41,12 @@ function cleanPayload(raw: unknown): SavePayload | null {
   return {
     kind: o.kind,
     ...(o.kind === 'claim'
-      ? { payTo: payTo?.salary === false ? { salary: false as const, bank: text(payTo.bank, 120), accountNo: text(payTo.accountNo, 40) } : { salary: true as const } }
+      ? {
+          payTo: {
+            ...(isId(payTo?.staffId) ? { staffId: payTo.staffId } : typeof payTo?.name === 'string' ? { name: text(payTo.name, 200) } : {}),
+            ...(payTo?.salary === false ? { salary: false as const, bank: text(payTo.bank, 120), accountNo: text(payTo.accountNo, 40) } : { salary: true as const }),
+          },
+        }
       : { supplier: { name: text(supplier?.name, 200), bank: text(supplier?.bank, 120), accountNo: text(supplier?.accountNo, 40) } }),
     items: rows(o.items, PR_LIMITS.items + 1).map((i) => ({ description: text(i.description, 200), amount: text(i.amount, 20) })),
     shares: rows(o.shares, PR_LIMITS.shares + 1).map((s) => ({

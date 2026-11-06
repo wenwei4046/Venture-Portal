@@ -28,7 +28,7 @@ export const COLUMNS: FinColumn<PaymentRequestRow>[] = [
   { key: 'name', label: 'From', kind: 'name', fixed: true, width: 170, min: 120, value: (r) => r.from.toLowerCase(), text: (r) => r.from },
   { key: 'desc', label: 'What', kind: 'desc', fixed: true, width: 220, min: 120, value: (r) => r.what.toLowerCase(), text: (r) => r.what },
   { key: 'dept', label: 'Department', kind: 'text', width: 140, value: (r) => r.department.toLowerCase(), text: (r) => r.department },
-  { key: 'payTo', label: 'Pay to', kind: 'text', width: 110, value: (r) => r.payTo, text: (r) => r.payTo },
+  { key: 'payTo', label: 'Pay to', kind: 'text', width: 220, value: (r) => r.payTo, text: (r) => r.payTo },
   { key: 'whoPays', label: 'Who pays', kind: 'text', width: 160, value: (r) => r.whoPays.toLowerCase(), text: (r) => r.whoPays },
   { key: 'ref', label: 'Ref #', kind: 'no', width: 150, value: (r) => r.ref, text: (r) => r.ref || '—' },
   { key: 'status', label: 'Status', kind: 'chip', width: 150, value: (r) => stageChip(r).text, text: (r) => stageChip(r).text, chip: (r) => stageChip(r) },

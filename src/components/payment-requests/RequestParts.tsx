@@ -5,7 +5,7 @@ import { drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
 import { fileSize } from '@/components/finv/form-words'
 import { officeDay } from '@/lib/office-time'
-import { billBackWords, ownPart, payToWords, requestDay, rmOf, type PaymentRequest } from '@/lib/payment-requests/model'
+import { billBackWords, intoWords, ownPart, payeeOf, requestDay, rmOf, type PaymentRequest } from '@/lib/payment-requests/model'
 
 // A payment request in a hub's drawer (2026-10-29, PR ② of docs/module-spec-payment-requests.md): the dark hero as a
 // voucher's, then the request's numbered groups — what it was for, the receipts, who is paid, which pool pays. The
@@ -53,7 +53,7 @@ export function OpenRow({ icon, name, meta, onOpen, disabled = false }: { icon: 
   )
 }
 
-const KIND_WORDS = { claim: 'Claim · I paid', direct_pay: 'Direct payment to a supplier' } as const
+const KIND_WORDS = { claim: 'Claim', direct_pay: 'Direct payment to a supplier' } as const
 
 /** The request's own groups, I. to IV. */
 export function RequestGroups({
@@ -108,8 +108,8 @@ export function RequestGroups({
 
       <Group n="III." title="Who is paid">
         <Line label="It is" value={KIND_WORDS[r.kind]} />
-        <Line label="Pay to" value={r.kind === 'claim' ? r.requesterName : r.payeeName ?? '—'} />
-        <Line label="Into" value={payToWords(r)} mono={!r.payToSalary || r.kind === 'direct_pay'} />
+        <Line label="Pay to" value={payeeOf(r) ?? '—'} />
+        <Line label="Into" value={intoWords(r)} mono={!r.payToSalary || r.kind === 'direct_pay'} />
       </Group>
 
       <Group n="IV." title="Which pool pays" foot={r.shares.length > 0 ? { l: `${r.departmentName} pays`, v: rmOf(ownPart(r)) } : undefined}>

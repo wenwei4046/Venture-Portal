@@ -19,7 +19,7 @@
 .itemsHead > :nth-child(2) { text-align: right; padding-right: 8px; }
 .itemsHead + div { border-top: 0; }
 
-/* A place to pay into, under "I paid — pay me back": the choice card's own radio row, smaller. */
+/* A place to pay into, under a claim's Pay to: the choice card's own radio row, smaller. */
 .option {
   display: flex;
   gap: 10px;

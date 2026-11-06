@@ -10,7 +10,7 @@ import type { PayrollRequestLine } from '@/lib/fin-app/payroll-requests-model'
 import type { StatutoryPeriod } from '../../payroll-requests/_lib/payroll-read'
 import { officeDay } from '@/lib/office-time'
 import { plural, rm } from '@/lib/fin-app/page-model'
-import { whatOf, whoPaysWords, type PaymentRequest } from '@/lib/payment-requests/model'
+import { payeeOf, whatOf, whoPaysWords, type PaymentRequest } from '@/lib/payment-requests/model'
 
 // Since PR ② (2026-10-29): the staff's own requests too — a claim or a direct payment from the Claim page, under the
 // requester's department, worked here (Bill back?, Reject…, Create PV). Since PR ⑥: the statutory payments HR made for a
@@ -106,7 +106,7 @@ export function claimRow(c: ClaimQueueRow, departments: readonly RequestDepartme
     sent: day(c.approvedAt),
     ref: claimReference(c),
     department: c.department ?? '—',
-    payTo: 'Claim',
+    payTo: `Claim · ${c.claimantName}`,
     whoPays: POOL_WORDS[c.sourcePool ?? ''] ?? (c.sourcePool ? c.sourcePool.replace(/_/g, ' ') : 'Venture pool'),
     amount: c.amount,
     stage: c.voucherId ? 'principal' : 'finance',
@@ -132,7 +132,7 @@ export function staffRequestRow(r: PaymentRequest, departments: readonly Request
     sent: r.submittedAt ? day(r.submittedAt) : '',
     ref: r.requestNo ?? '',
     department: r.departmentName,
-    payTo: r.kind === 'claim' ? 'Claim' : 'Supplier',
+    payTo: [r.kind === 'claim' ? 'Claim' : 'Supplier', payeeOf(r)].filter(Boolean).join(' · '),
     whoPays: whoPaysWords(r),
     amount: r.total,
     stage: r.pvId ? 'principal' : 'finance',

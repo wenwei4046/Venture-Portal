@@ -1,5 +1,5 @@
 // Staff payment requests (2026-10-29, PR ② of docs/module-spec-payment-requests.md — the claim process the user settled
-// with the boss): a claim ("I paid — pay me back") or a direct pay to a supplier, what it was for, its receipts, who is
+// with the boss): a claim (pay it back — oneself by default, or who the sender says) or a direct pay to a supplier, what it was for, its receipts, who is
 // paid and which pool pays — as the database hands it (`payment_requests_json`), as the Claim page lists it, as the New
 // request window builds it, and as Finance's Create PV starts from it. Pure.
 
@@ -63,6 +63,8 @@ export interface PaymentRequest {
   /** A claim paid into the salary account on the People record. */
   payToSalary: boolean
   payeeName: string | null
+  /** A claim's payee on People; none for a name typed, or a supplier. */
+  payeeStaffId: string | null
   payeeBank: string | null
   /** Whole for the requester and a reader with the Bank tick, else `•••• 4821`. */
   payeeAccount: string | null
@@ -90,8 +92,19 @@ export interface PaymentRequest {
 }
 
 /** What the New request window offers (`payment_request_context`). */
+/** One on People, as Pay to lists them: whether HR holds their account, never the account. */
+export interface RequestPerson {
+  id: string
+  name: string
+  department: string
+  hasSalary: boolean
+}
+
 export interface RequestContext {
   name: string
+  /** The sender's People record — Pay to's default. */
+  staffId: string
+  people: RequestPerson[]
   departmentId: string
   departmentName: string
   pool: string | null
@@ -135,6 +148,7 @@ export function parseRequest(raw: unknown): PaymentRequest | null {
     billingMode: str(r.billingMode),
     payToSalary: r.payToSalary !== false,
     payeeName: str(r.payeeName),
+    payeeStaffId: str(r.payeeStaffId),
     payeeBank: str(r.payeeBank),
     payeeAccount: str(r.payeeAccount),
     description: str(r.description) ?? '',
@@ -189,6 +203,10 @@ export function parseContext(raw: unknown): RequestContext | null {
   const named = (v: unknown) => list(v).map((x) => ({ id: str(x.id) ?? '', name: str(x.name) ?? '' })).filter((x) => x.id && x.name)
   return {
     name: str(c.name) ?? '',
+    staffId: str(c.staffId) ?? '',
+    people: list(c.people)
+      .map((p) => ({ id: str(p.id) ?? '', name: str(p.name) ?? '', department: str(p.department) ?? '', hasSalary: p.hasSalary === true }))
+      .filter((p) => p.id && p.name),
     departmentId,
     departmentName: str(c.departmentName) ?? '',
     pool: str(c.pool),
@@ -213,11 +231,20 @@ export const requestDay = (r: PaymentRequest): string => {
 /** What it was for, in a line: its items' words (the request's description), else the kind. */
 export const whatOf = (r: PaymentRequest): string => r.description || (r.kind === 'claim' ? 'Claim' : 'Direct payment')
 
-/** Who is paid, and where: "Salary account · Hong Leong Bank •••• 4821", "Public Bank 3187450210", a supplier's. */
-export function payToWords(r: PaymentRequest): string {
+/** Who is paid: the name on a request, a claim's sender when it names nobody (saved before Pay to was asked). */
+export const payeeOf = (r: PaymentRequest): string | null => r.payeeName ?? (r.kind === 'claim' ? r.requesterName : null)
+
+/** Where it is paid: "Salary account · Hong Leong Bank •••• 4821", "Public Bank 3187450210", a supplier's. */
+export function intoWords(r: PaymentRequest): string {
   const where = [r.payeeBank, r.payeeAccount].filter(Boolean).join(' ')
   if (r.kind === 'claim') return r.payToSalary ? (where ? `Salary account · ${where}` : 'Salary account') : where || 'Another account'
   return [r.payeeName, where].filter(Boolean).join(' · ') || 'Supplier'
+}
+
+/** Who is paid, and where — a claim names its payee only when it is not the one who sent it. */
+export function payToWords(r: PaymentRequest): string {
+  const into = intoWords(r)
+  return r.kind === 'claim' && r.payeeName && r.payeeName !== r.requesterName ? `${r.payeeName} · ${into}` : into
 }
 
 /** Which pool pays: the department's, and any split ("Marketing · Dream Crafter RM 100.00"). */
@@ -402,6 +429,10 @@ export interface DraftShare {
 /** What the window holds. Nothing is chosen until it is picked (the user, 2026-10-27: pre-choose nothing). */
 export interface RequestDraft {
   kind: RequestKind | null
+  /** A claim's Pay to as it reads: null until changed — the one sending it. */
+  payToName: string | null
+  /** The person on People that name is; none for a name typed. */
+  payToStaffId: string | null
   /** A claim: into the salary account HR holds (true), or another this time (false). */
   salary: boolean | null
   /** Another account's, or the supplier's. */
@@ -418,7 +449,7 @@ export const emptyItem = (): DraftItem => ({ description: '', amount: '' })
 export const emptyShare = (): DraftShare => ({ party: '', partyId: '', amount: '' })
 
 export function emptyDraft(): RequestDraft {
-  return { kind: null, salary: null, bank: '', accountNo: '', supplier: '', items: [emptyItem()], split: null, shares: [] }
+  return { kind: null, payToName: null, payToStaffId: null, salary: null, bank: '', accountNo: '', supplier: '', items: [emptyItem()], split: null, shares: [] }
 }
 
 const amountText = (v: number) => (v > 0 ? v.toFixed(2) : '')
@@ -426,8 +457,11 @@ const amountText = (v: number) => (v > 0 ? v.toFixed(2) : '')
 /** A saved request, back in the window to be changed (a draft, or a rejected one being fixed). */
 export function draftOf(r: PaymentRequest): RequestDraft {
   const other = r.kind === 'direct_pay' || !r.payToSalary
+  const someoneElse = r.kind === 'claim' && r.payeeName !== r.requesterName
   return {
     kind: r.kind,
+    payToName: someoneElse ? r.payeeName ?? '' : null,
+    payToStaffId: someoneElse ? r.payeeStaffId : null,
     salary: r.kind === 'claim' ? r.payToSalary : null,
     bank: other ? r.payeeBank ?? '' : '',
     accountNo: other ? r.payeeAccount ?? '' : '',
@@ -462,7 +496,8 @@ export interface UploadedFile {
 /** What payment_request_save takes. */
 export interface SavePayload {
   kind: RequestKind
-  payTo?: { salary: true } | { salary: false; bank: string; accountNo: string }
+  /** Neither staffId nor name: the one sending it. */
+  payTo?: { staffId?: string; name?: string } & ({ salary: true } | { salary: false; bank: string; accountNo: string })
   supplier?: { name: string; bank: string; accountNo: string }
   items: Array<{ description: string; amount: string }>
   shares: Array<{ party: 'department' | 'company'; departmentId?: string; companyId?: string; amount: string }>
@@ -477,7 +512,12 @@ export function draftPayload(d: RequestDraft, files: UploadedFile[], removeFiles
   return {
     kind: d.kind,
     ...(d.kind === 'claim'
-      ? { payTo: d.salary === false ? { salary: false as const, bank: d.bank.trim(), accountNo: digits(d.accountNo) } : { salary: true as const } }
+      ? {
+          payTo: {
+            ...(d.payToStaffId ? { staffId: d.payToStaffId } : d.payToName !== null ? { name: d.payToName.trim() } : {}),
+            ...(d.salary === false ? { salary: false as const, bank: d.bank.trim(), accountNo: digits(d.accountNo) } : { salary: true as const }),
+          },
+        }
       : { supplier: { name: d.supplier.trim(), bank: d.bank.trim(), accountNo: digits(d.accountNo) } }),
     items: d.items
       .filter((i) => i.description.trim() || i.amount.trim())
@@ -496,6 +536,24 @@ export function draftPayload(d: RequestDraft, files: UploadedFile[], removeFiles
   }
 }
 
+/** The person Pay to names on People; the sender until it is changed. */
+export function payeePerson(d: RequestDraft, ctx: RequestContext | null): RequestPerson | null {
+  const id = d.payToName === null ? ctx?.staffId : d.payToStaffId
+  return id ? ctx?.people.find((p) => p.id === id) ?? null : null
+}
+
+/**
+ * Pay to changed: its name, and the person picked (or a typed name that is exactly someone on People). A person starts
+ * again at where to pay them; a typed name has only an account typed, kept while the name is still being typed.
+ */
+export function payeePatch(d: RequestDraft, name: string, staffId: string, ctx: RequestContext | null): Partial<RequestDraft> {
+  const typed = name.trim().toLowerCase()
+  const person = ctx?.people.find((p) => p.id === staffId) ?? (typed ? ctx?.people.find((p) => p.name.toLowerCase() === typed) : null) ?? null
+  if (person) return { payToName: person.name, payToStaffId: person.id, salary: null, bank: '', accountNo: '' }
+  const stillTyping = d.payToName !== null && !d.payToStaffId
+  return { payToName: name, payToStaffId: null, salary: false, bank: stillTyping ? d.bank : '', accountNo: stillTyping ? d.accountNo : '' }
+}
+
 /** What stops Save as draft — or null. A draft keeps what was typed; only what it is must be picked. */
 export function saveProblem(d: RequestDraft): string | null {
   if (!d.kind) return 'Pick what it is first.'
@@ -511,8 +569,12 @@ export function submitProblem(d: RequestDraft, files: number, ctx: RequestContex
   if (saving) return saving
   const need: string[] = []
   if (d.kind === 'claim') {
-    if (d.salary === null) need.push('where to pay you')
-    else if (d.salary && !ctx?.salaryAccount) return 'HR has no salary account for you — pick “Another account”, or ask HR to add yours.'
+    const person = payeePerson(d, ctx)
+    const me = d.payToName === null || (!!ctx?.staffId && d.payToStaffId === ctx.staffId)
+    if (d.payToName !== null && !d.payToName.trim()) need.push('who to pay')
+    else if (d.salary === null) need.push(me ? 'where to pay you' : 'where to pay them')
+    else if (d.salary && me && !ctx?.salaryAccount) return 'HR has no salary account for you — pick “Another account”, or ask HR to add yours.'
+    else if (d.salary && !me && !person?.hasSalary) return `HR has no salary account for ${d.payToName} — pick “Another account”, or ask HR to add it.`
   } else if (!d.supplier.trim()) need.push('the supplier’s name')
   const other = d.kind === 'direct_pay' || d.salary === false
   if (other && !d.bank.trim()) need.push('the bank')
@@ -623,9 +685,9 @@ export function voucherStart(requests: readonly PaymentRequest[]): RequestVouche
   const where = first ? [first.payeeBank, first.payeeAccount].filter(Boolean).join(' ') : ''
   return {
     requestIds: rs.map((r) => r.id),
-    payee: first ? (first.kind === 'claim' ? first.requesterName : first.payeeName ?? '') : '',
+    payee: first ? payeeOf(first) ?? '' : '',
     payInto: where ? `Pay into ${where}${first?.kind === 'claim' && first.payToSalary ? ' · salary account' : ''}` : '',
-    description: rs.length === 1 ? `${first.kind === 'claim' ? 'Claim' : 'Payment'} · ${whatOf(first)}`.slice(0, 200) : `${rs.length} requests · ${first?.requesterName ?? ''}`.slice(0, 200),
+    description: rs.length === 1 ? `${first.kind === 'claim' ? 'Claim' : 'Payment'} · ${whatOf(first)}`.slice(0, 200) : `${rs.length} requests · ${(first?.kind === 'claim' ? payeeOf(first) : first?.requesterName) ?? ''}`.slice(0, 200),
     lines: rs.flatMap((r) =>
       r.items.map((i) => ({ requestId: r.id, description: i.description, pool: r.pool ?? '', amount: i.amount })),
     ),

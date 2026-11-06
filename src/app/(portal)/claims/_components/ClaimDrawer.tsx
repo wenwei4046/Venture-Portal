@@ -6,13 +6,13 @@ import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/
 import { RequestGroups, RequestHero } from '@/components/payment-requests/RequestParts'
 import { officeDay } from '@/lib/office-time'
 import { openRequestFile } from '@/lib/payment-requests/actions'
-import { canCancel, canEdit, orWords, waitsForMe, whereItIs, type PaymentRequest } from '@/lib/payment-requests/model'
+import { canCancel, canEdit, orWords, payeeOf, waitsForMe, whereItIs, type PaymentRequest } from '@/lib/payment-requests/model'
 
 // One of one's own requests in the Claim page's drawer (2026-10-29, PR ②): where it is, what it holds, why it was sent
 // back — and, while it is still the requester's, Edit (or Fix and send again), Submit and Cancel request. Since PR ③ a
 // Claim & approve holder opens their department's here too: Approve — send to Finance, or Reject… with what to fix.
 
-const KICKER = { claim: 'Claim · I paid', direct_pay: 'Direct payment' } as const
+const KICKER = { claim: 'Claim', direct_pay: 'Direct payment' } as const
 
 function noteOf(r: PaymentRequest): string {
   switch (r.status) {
@@ -130,7 +130,7 @@ export function ClaimDrawer({
             chip={whereItIs(r)}
             no={r.requestNo ?? 'Draft'}
             amount={r.total}
-            to={`Pay to ${r.kind === 'claim' ? r.requesterName : r.payeeName ?? 'the supplier'}`}
+            to={`Pay to ${payeeOf(r) ?? 'the supplier'}`}
             note={noteOf(r)}
           />
           {r.status === 'rejected' && r.rejectReason ? (

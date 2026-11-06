@@ -6,6 +6,7 @@ import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/
 import { OpenRow, RequestGroups, RequestHero } from '@/components/payment-requests/RequestParts'
 import { f2, rm } from '@/lib/fin-app/page-model'
 import { openRequestFile } from '@/lib/payment-requests/actions'
+import { payeeOf } from '@/lib/payment-requests/model'
 import { openMemberClaimInvoice } from '../actions'
 import { stageChip, type PaymentRequestRow } from '../_lib/requests-model'
 
@@ -189,11 +190,11 @@ export function useRequestView(
     body = (
       <>
         <RequestHero
-          kicker={q.kind === 'claim' ? 'Claim · I paid' : 'Direct payment'}
+          kicker={q.kind === 'claim' ? 'Claim' : 'Direct payment'}
           chip={stageChip(r)}
           no={q.requestNo ?? r.ref}
           amount={q.total}
-          to={`Pay to ${q.kind === 'claim' ? q.requesterName : q.payeeName ?? 'the supplier'}`}
+          to={`Pay to ${payeeOf(q) ?? 'the supplier'}`}
           note={
             !waiting
               ? `In ${q.pvNo ?? 'its payment voucher'}.`

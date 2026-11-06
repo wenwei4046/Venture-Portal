@@ -23,6 +23,8 @@ import {
   parseRequest,
   parseRequests,
   payToWords,
+  payeeOf,
+  payeePatch,
   prContentType,
   prFileRefusal,
   prObjectPath,
@@ -104,6 +106,9 @@ describe('the Claim page', () => {
 
   it('names who is paid and who pays', () => {
     expect(payToWords(req())).toBe('Salary account · Hong Leong Bank •••• 4821')
+    // Someone else's: named, and the requester reads no account of theirs.
+    expect(payToWords(req({ payeeName: 'CHIN YEE RU', payeeBank: null, payeeAccount: null }))).toBe('CHIN YEE RU · Salary account')
+    expect(payeeOf(req({ payeeName: null }))).toBe('KHO WEI JIE')
     expect(payToWords(req({ kind: 'direct_pay', payToSalary: false, payeeName: 'Canva', payeeBank: 'CIMB', payeeAccount: '8001234' }))).toBe('Canva · CIMB 8001234')
     expect(whoPaysWords(req({ shares: [{ id: 's', party: 'company', companyName: 'Dream Crafter', amount: 100, billBack: null }] }))).toBe('Marketing · Dream Crafter RM 100.00')
   })
@@ -293,5 +298,56 @@ describe('a department’s approval first', () => {
     expect(approveLede({ ...read, approvers: [{ id: 'u1', name: 'SIA JOSIAH' }] }, 'SIA JOSIAH')).toBe(
       'Marketing’s requests. Your team’s wait here for you. Yours go straight to Finance.',
     )
+  })
+})
+
+describe('a claim’s Pay to', () => {
+  const ctx = {
+    name: 'KHO WEI JIE', staffId: 'kho', departmentId: 'mk', departmentName: 'Marketing', pool: null, salaryAccount: null,
+    departments: [], companies: [], reviewers: null,
+    people: [
+      { id: 'kho', name: 'KHO WEI JIE', department: 'Marketing', hasSalary: false },
+      { id: 'chin', name: 'CHIN YEE RU', department: 'Marketing', hasSalary: true },
+      { id: 'li', name: 'LI SEAN', department: 'HR', hasSalary: false },
+    ],
+  } as RequestContext
+  const claim = (over: Partial<RequestDraft> = {}): RequestDraft => ({ ...emptyDraft(), kind: 'claim', split: false, items: [{ description: 'Grab', amount: '10' }], ...over })
+
+  it('oneself until changed: the payload names nobody, as the code before it did', () => {
+    expect(draftPayload(claim({ salary: true }), [], [])?.payTo).toEqual({ salary: true })
+    expect(draftOf(req()).payToName).toBeNull()
+  })
+
+  it('a person is sent by id, a typed name by name', () => {
+    expect(draftPayload(claim({ payToName: 'CHIN YEE RU', payToStaffId: 'chin', salary: true }), [], [])?.payTo).toEqual({ staffId: 'chin', salary: true })
+    expect(draftPayload(claim({ payToName: ' Ahmad ', salary: false, bank: 'CIMB', accountNo: '123-456' }), [], [])?.payTo).toEqual({ name: 'Ahmad', salary: false, bank: 'CIMB', accountNo: '123456' })
+  })
+
+  it('a saved request comes back with who it pays', () => {
+    const d = draftOf(req({ payeeName: 'CHIN YEE RU', payeeStaffId: 'chin' }))
+    expect([d.payToName, d.payToStaffId, d.salary]).toEqual(['CHIN YEE RU', 'chin', true])
+    const typed = draftOf(req({ payeeName: 'Ahmad', payeeStaffId: null, payToSalary: false, payeeBank: 'CIMB', payeeAccount: '123456' }))
+    expect([typed.payToName, typed.payToStaffId, typed.bank, typed.accountNo]).toEqual(['Ahmad', null, 'CIMB', '123456'])
+  })
+
+  it('a person starts again at where to pay them; a typed name keeps its account while it is typed; its exact name is the person', () => {
+    const typed = claim({ payToName: 'Ah', salary: false, bank: 'CIMB', accountNo: '123456' })
+    expect(payeePatch(typed, 'Ahm', '', ctx)).toMatchObject({ payToName: 'Ahm', payToStaffId: null, salary: false, bank: 'CIMB', accountNo: '123456' })
+    expect(payeePatch(typed, 'li sean', '', ctx)).toMatchObject({ payToName: 'LI SEAN', payToStaffId: 'li', salary: null, bank: '', accountNo: '' })
+    expect(payeePatch(claim({ payToName: 'LI SEAN', payToStaffId: 'li', salary: true }), 'LI SEA', '', ctx)).toMatchObject({ payToStaffId: null, salary: false, bank: '' })
+  })
+
+  it('Submit waits for who and where, in words', () => {
+    expect(submitProblem(claim({ payToName: '  ', salary: false }), 1, ctx)).toContain('who to pay')
+    expect(submitProblem(claim({ payToName: 'CHIN YEE RU', payToStaffId: 'chin' }), 1, ctx)).toContain('where to pay them')
+    expect(submitProblem(claim({ payToName: 'LI SEAN', payToStaffId: 'li', salary: true }), 1, ctx)).toContain('HR has no salary account for LI SEAN')
+    expect(submitProblem(claim({ salary: true }), 1, ctx)).toContain('HR has no salary account for you')
+    expect(submitProblem(claim({ payToName: 'Ahmad', salary: false }), 1, ctx)).toBe('Add the bank and the account number.')
+    expect(submitProblem(claim({ payToName: 'CHIN YEE RU', payToStaffId: 'chin', salary: true }), 1, ctx)).toBeNull()
+  })
+
+  it('Create PV starts from the payee, not the sender', () => {
+    const start = voucherStart([req({ mine: false, payeeName: 'CHIN YEE RU', payeeStaffId: 'chin' })])
+    expect(start.payee).toBe('CHIN YEE RU')
   })
 })
