@@ -161,7 +161,7 @@ export class QuoteLogic extends DcLogic {
   // data: URLs contain ";" which breaks inline style parsing; serve them as blob: URLs instead.
   u(src) { const s = String(src || ""); if (!s.startsWith("data:")) return s; this._blobs = this._blobs || new Map(); if (this._blobs.has(s)) return this._blobs.get(s);
     try { const [h, b64] = s.split(","), mime = (h.match(/data:([^;]+)/) || [])[1] || "image/jpeg", bin = atob(b64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([arr], { type: mime })); this._blobs.set(s, url); return url; } catch (e) { return ""; } }
-  itemFor(l) { const its = (this.state.catalog && this.state.catalog.items) || []; return its.find(c => l.code && c.code === l.code) || its.find(c => String(c.name).toUpperCase() === String(l.name).toUpperCase()); }
+  itemFor(l) { const its = (this.state.catalog && this.state.catalog.items) || []; return l.code ? its.find(c => c.code === l.code) : undefined; }
   imgFor(l) { if (l.img) return l.img; const it = this.itemFor(l); return (it && it.img) || ""; }
   colorFor(l) { if (l.color != null) return l.color; const it = this.itemFor(l); return (it && it.color) || ""; }
   apply(item) {
@@ -210,7 +210,7 @@ export class QuoteLogic extends DcLogic {
     return pkg.cats.map((c, ci) => {
       const rows = this.state.lines.filter(l => l.ci === ci && l.qty > 0).map(l => {
         const unit = Math.round(l.cost * m);
-        const ci2 = (this.state.catalog?.items || []).find(x => (l.code && x.code === l.code) || x.name === l.name) || {}; const clr = this.colorFor(l); return { no: ++n, item: l.name, desc: l.desc || "", code: [l.code, clr].filter(Boolean).join(" / "), qty: l.qty, unit, sum: unit * l.qty, kind: ((this.state.catalog?.kinds || {})[l.kind] || {}).label || "", collection: ci2.collection || "", color: clr, remark: "" };
+        const ci2 = (l.code && (this.state.catalog?.items || []).find(x => x.code === l.code)) || {}; const clr = this.colorFor(l); return { no: ++n, item: l.name, desc: l.desc || "", code: [l.code, clr].filter(Boolean).join(" / "), qty: l.qty, unit, sum: unit * l.qty, kind: ((this.state.catalog?.kinds || {})[l.kind] || {}).label || "", collection: ci2.collection || "", color: clr, remark: "" };
       });
       return { name: c.name, rows };
     }).filter(c => c.rows.length).concat((() => {

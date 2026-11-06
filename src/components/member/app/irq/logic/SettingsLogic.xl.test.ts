@@ -6,12 +6,12 @@ import { SettingsLogic } from "./SettingsLogic";
 // under one "Items".
 const HEAD = ["CATEGORY", "ITEM", "DESCRIPTION", "CODE/COLOUR", "QTY", "PRICE"];
 
-async function read(rows: unknown[][]) {
+async function read(rows: unknown[][], items: { code: string; kind: string }[] = []) {
   let xl: { cats: { name: string; label: string; items: { name: string; desc: string; code: string; qty: number; cost: number }[] }[]; err: string } | null = null;
   const self = {
-    state: { cfg: { catalog: { kinds: {} } } },
+    state: { cfg: { catalog: { kinds: {}, items } } },
     setState: (s: { xl: typeof xl }) => { xl = s.xl; },
-    guessKind: () => null,
+    guessKind: () => "sofa",
     loadXlsx: async () => ({ read: () => ({ SheetNames: ["a"], Sheets: { a: {} } }), utils: { sheet_to_json: () => rows } }),
   };
   const file = { name: "room.xlsx", arrayBuffer: async () => new ArrayBuffer(0) };
@@ -20,6 +20,17 @@ async function read(rows: unknown[][]) {
 }
 
 describe("Import from Excel", () => {
+  it("goes by a row's code, never its name: the name is what the customer reads", async () => {
+    const x = await read([HEAD,
+      ["LIVING", "ANY NAME AT ALL", "", 336103, 1, 519],
+      ["PAINTING", "LIVING SOFA", "", "", 1, 500],
+      ["OTHERS", "LIVING SOFA", "", "NOT-IN-CATALOGUE", 1, 500],
+      ["BEDROOM SET", "BEDFRAME JAGER", "", "PC151-01", 2, 455],
+    ], [{ code: "336103", kind: "media" }, { code: "PC151-01", kind: "sofa" }, { code: "PC151-01", kind: "bed" }]);
+    const kinds = x.cats.map(c => (c.items[0] as unknown as { kind: string | null }).kind);
+    expect(kinds).toEqual(["media", null, null, null]);
+  });
+
   it("reads the template's CATEGORY, left of ITEM", async () => {
     const x = await read([HEAD,
       ["LIVING", "TV CABINET", "", "336103", 1, 519],

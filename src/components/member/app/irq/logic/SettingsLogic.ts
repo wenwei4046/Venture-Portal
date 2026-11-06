@@ -184,7 +184,9 @@ export class SettingsLogic extends DcLogic {
     // A list's columns start at its NO and CATEGORY, left of its ITEM (the template's own CATEGORY stands there).
     const starts = itemCols.map(k => { while (k > 0 && /^(no|#|bil)$|^(categ|area|room)/.test(h[k - 1])) k--; return k; });
     const num = v => { const n = parseFloat(String(v).replace(/[^\d.]/g, "")); return isNaN(n) ? null : n; };
-    const kinds = this.state.cfg.catalog.kinds, cats = [];
+    // A row's name is what the customer reads, and may look like another product's: only its code says which catalogue
+    // item it is (the user, 2026-11-06). A code two kinds share says nothing; the row can be set by hand in the table.
+    const cats = [], catalogItems = this.state.cfg.catalog.items || [], kindOfCode = v => { const k = String(v ?? "").trim().toUpperCase(); if (!k) return null; const found = [...new Set(catalogItems.filter(c => String(c.code || "").trim().toUpperCase() === k).map(c => c.kind).filter(Boolean))]; return found.length === 1 ? found[0] : null; };
     starts.forEach((st0, bi) => {
       const end = bi + 1 < starts.length ? starts[bi + 1] : h.length, col = re => { for (let k = st0; k < end; k++) if (re.test(h[k])) return k; return -1; };
       const cI = itemCols[bi], cD = col(/^desc/), cC = col(/code|colou?r/), cQ = col(/^qty|quantity/), cP = col(/price|cost|unit/), cK = col(/^categ|^area|^room/);
@@ -196,7 +198,7 @@ export class SettingsLogic extends DcLogic {
         if (catName && (!cur || cur.name !== catName.toUpperCase())) { const N = catName.toUpperCase(); cur = cats.find(x => x.name === N) || null; if (!cur) { cur = { name: N, label: /[a-z]/.test(catName) ? catName : catName.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase()), items: [] }; cats.push(cur); } }
         if (cK < 0 && name && qty == null && price == null && !(cC >= 0 && String(r[cC]).trim())) { cur = { name: name.toUpperCase(), label: name, items: [] }; cats.push(cur); return; }
         if (!name) return; if (!cur) { cur = { name: "ITEMS", label: "Items", items: [] }; cats.push(cur); }
-        cur.items.push({ name: name.toUpperCase(), desc: cD >= 0 ? String(r[cD]).trim() : "", code: cC >= 0 ? String(r[cC]).trim() : "", qty: qty == null ? 1 : qty, cost: price == null ? 0 : price, kind: this.guessKind(name, kinds) || null });
+        cur.items.push({ name: name.toUpperCase(), desc: cD >= 0 ? String(r[cD]).trim() : "", code: cC >= 0 ? String(r[cC]).trim() : "", qty: qty == null ? 1 : qty, cost: price == null ? 0 : price, kind: kindOfCode(cC >= 0 ? r[cC] : "") });
       });
     });
     this.setState({ xl: { pid, cats: cats.filter(c => c.items.length), err: cats.length ? "" : "No items found.", mode: "replace", name: file.name } });
