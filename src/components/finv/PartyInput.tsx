@@ -69,7 +69,15 @@ export function PartyInput({
           setFocused(true)
           if (browse) e.target.select()
         }}
-        onClick={browse ? () => setFocused(true) : undefined}
+        onClick={
+          browse
+            ? (e) => {
+                setFocused(true)
+                // The press undid the focus's selection: a name picked is replaced by what is typed next.
+                if (linked && linked.name === value) e.currentTarget.select()
+              }
+            : undefined
+        }
         onBlur={() => setFocused(false)}
         onChange={(e) => {
           const name = e.target.value

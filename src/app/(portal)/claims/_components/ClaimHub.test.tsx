@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within, waitFor } from '@testing-library/react'
 import { parseApproval, parseRequest, type ApprovalRead, type PaymentRequest, type RequestContext } from '@/lib/payment-requests/model'
 
 // Claim (2026-10-29, PR ② — the agreed design's staff page): one's own requests in Payment voucher's hub; the drawer's

@@ -57,6 +57,8 @@ const raw = (over: Record<string, unknown> = {}) => ({
 })
 const req = (over: Record<string, unknown> = {}) => parseRequest(raw(over)) as PaymentRequest
 const CTX: RequestContext = {
+  staffId: 'kho',
+  people: [],
   name: 'KHO WEI JIE', departmentId: 'mk', departmentName: 'Marketing', pool: 'dept_pool_marketing',
   salaryAccount: { bank: 'Hong Leong Bank', last4: '4821' },
   departments: [{ id: 'hr', name: 'HR' }], companies: [{ id: 'dc', name: 'Dream Crafter' }], reviewers: null,

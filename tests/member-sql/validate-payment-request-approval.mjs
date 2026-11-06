@@ -401,14 +401,14 @@ try {
     'every claim so far pays the one who sent it')
   await q(`UPDATE hr_staff_costs SET bank_name = 'Maybank', bank_account_no = '5140-1234 0009' WHERE user_id = $1`, [JOEY])
   const staffOf = async user => one(`SELECT id FROM hr_staff_costs WHERE user_id = $1`, [user])
-  const joey = await staffOf(JOEY)
+  const joeyStaff = await staffOf(JOEY)
   const liStaff = await staffOf(LI)
   const chinStaff = await staffOf(CHIN)
 
   await as(LI)
   const liCtx = await one('SELECT payment_request_context()')
   check(liCtx.staffId, liStaff, 'the window knows who is sending')
-  check(liCtx.people.find(p => p.id === joey), { id: joey, name: 'WONG JOEY', department: 'Marketing', hasSalary: true }, 'Pay to lists People, with whether HR holds an account')
+  check(liCtx.people.find(p => p.id === joeyStaff), { id: joeyStaff, name: 'WONG JOEY', department: 'Marketing', hasSalary: true }, 'Pay to lists People, with whether HR holds an account')
   check(liCtx.people.find(p => p.id === chinStaff).hasSalary, false, '…and says so when HR does not')
   check(JSON.stringify(liCtx.people).includes('5140'), false, 'the list never carries an account number')
 
@@ -424,9 +424,9 @@ try {
   check([paid.payeeName, paid.payeeStaffId, paid.requesterName], ['LI SEAN', liStaff, 'LI SEAN'], 'neither staffId nor name: the one sending it')
 
   // A person, into their salary account: kept on the request, and out of the sender's reach.
-  paid = await saveLi({ staffId: joey, salary: true })
+  paid = await saveLi({ staffId: joeyStaff, salary: true })
   check([paid.payeeName, paid.payeeStaffId, paid.payToSalary, paid.requesterName, paid.payeeBank, paid.payeeAccount],
-    ['WONG JOEY', joey, true, 'LI SEAN', null, null], 'a colleague’s salary account is theirs to be paid into, never shown to whoever picked them')
+    ['WONG JOEY', joeyStaff, true, 'LI SEAN', null, null], 'a colleague’s salary account is theirs to be paid into, never shown to whoever picked them')
   const joeysId = paid.id
   await as(null, null)
   check(await q('SELECT payee_bank, payee_account_no FROM payment_requests WHERE id = $1', [joeysId]), [{ payee_bank: 'Maybank', payee_account_no: '514012340009' }],
@@ -439,8 +439,8 @@ try {
 
   // A person, into another account the sender typed: theirs to read.
   await as(LI)
-  paid = await saveLi({ staffId: joey, salary: false, bank: 'CIMB', accountNo: '7000111' })
-  check([paid.payeeName, paid.payeeStaffId, paid.payeeBank, paid.payeeAccount], ['WONG JOEY', joey, 'CIMB', '7000111'], 'a person, another account: as typed')
+  paid = await saveLi({ staffId: joeyStaff, salary: false, bank: 'CIMB', accountNo: '7000111' })
+  check([paid.payeeName, paid.payeeStaffId, paid.payeeBank, paid.payeeAccount], ['WONG JOEY', joeyStaff, 'CIMB', '7000111'], 'a person, another account: as typed')
 
   // A name typed: not on People, so no salary account, whatever is said.
   paid = await saveLi({ name: ' Ahmad Bin Ali ', salary: false, bank: 'CIMB', accountNo: '7000222' })
@@ -456,11 +456,11 @@ try {
   await reject('SELECT payment_request_save(NULL, $1::jsonb, false)', [await payToSave({ staffId: id(999), salary: true })],
     /no longer in People/, 'nobody on People by that id')
   await as(null, null)
-  await q(`UPDATE hr_staff_costs SET status = 'resigned' WHERE id = $1`, [joey])
-  await reject('SELECT payment_request_save(NULL, $1::jsonb, false)', [await payToSave({ staffId: joey, salary: true })],
+  await q(`UPDATE hr_staff_costs SET status = 'resigned' WHERE id = $1`, [joeyStaff])
+  await reject('SELECT payment_request_save(NULL, $1::jsonb, false)', [await payToSave({ staffId: joeyStaff, salary: true })],
     /no longer in People/, 'someone who has left')
   await as(null, null)
-  await q(`UPDATE hr_staff_costs SET status = 'active' WHERE id = $1`, [joey])
+  await q(`UPDATE hr_staff_costs SET status = 'active' WHERE id = $1`, [joeyStaff])
 
   console.log(`Payment request approval checks passed: ${checks}`)
 } finally {
