@@ -141,6 +141,18 @@ export function deriveGroups(packages) {
   return [...map.values()];
 }
 
+/** "Classic" / "Build in" only while the room type has both: with one version there is nothing to tell apart (the user, 2026-11-06). */
+export function versionWord(packages, p) {
+  if (!p) return "";
+  const g = p.group || p.id, both = (packages || []).some(x => x.id !== p.id && (x.group || x.id) === g);
+  return both ? (p.style === "build" ? "Build in" : "Classic") : "";
+}
+/** A package's name as printed: without its version's word when it is the only version. */
+export function packageName(packages, p) {
+  if (!p) return "";
+  return versionWord(packages, p) ? p.name : String(p.name || "").replace(/\s+(BUILD IN|CLASSIC)$/i, "");
+}
+
 export function defaults(packagesJson, catalogJson) {
   const building = packagesJson.building || "SKYLINE EMBASSY";
   const packages = packagesJson.packages.map(p => ({ ...p, building: p.building || building }));

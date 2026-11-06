@@ -41,7 +41,7 @@ export class SettingsMobileLogic extends DcLogic {
         toggle: () => setItem(it.id, x => { x.paused = !x.paused; }) }, room: false, style: false }; } }
     const groups = {}; cfg.packages.forEach(p => { (groups[p.group] = groups[p.group] || []).push(p); });
     const gList = Object.values(groups).sort((a, b) => { const k = p => [parseInt(p.spec?.beds) || 0, parseInt(p.spec?.baths) || 0]; const [a1, a2] = k(a[0]), [b1, b2] = k(b[0]); return a1 - b1 || a2 - b2; });
-    const priceText = ps => ps.map(p => (p.style === "build" ? "Build in " : "Classic ") + rm(p.price || 0)).join(" · ");
+    const priceText = ps => ps.map(p => (ps.length < 2 ? "" : p.style === "build" ? "Build in " : "Classic ") + rm(p.price || 0)).join(" · ");
     if (st.sheet && st.sheet.type === "room") { const ps = groups[st.sheet.id]; if (ps) { const photos = (ps[0].spec || {}).photos || [];
       const setPh = arr => this.upd(c => c.packages.filter(p => p.group === st.sheet.id).forEach(p => { p.spec = { ...(p.spec || {}), photos: arr }; }));
       const sp = ps[0].spec || {}, bN = parseInt(sp.beds) || 0, xN = parseInt((String(sp.beds || "").match(/\+\s*(\d+)/) || [])[1]) || 0, plus = xN > 0, bedsStr = (b, x) => b + (x ? "+" + x : ""), tN = parseInt(sp.baths) || 0, rtab = st.rtab || "specs";
@@ -57,7 +57,7 @@ export class SettingsMobileLogic extends DcLogic {
         bedDn: () => setSpec(bedsStr(Math.max(1, bN - 1), xN), sp.baths), bedUp: () => setSpec(bedsStr(Math.min(9, bN + 1), xN), sp.baths),
         bathDn: () => setSpec(sp.beds, String(Math.max(1, tN - 1))), bathUp: () => setSpec(sp.beds, String(Math.min(9, tN + 1))),
         onSqft: e => setS("sqft", e.target.value.replace(/[^\d,]/g, "")), onNote: e => setS("note", e.target.value),
-        vers: ps.map(p => { const on = p.id === ver.id; return { label: (p.style === "build" ? "Build in" : "Classic") + " · " + rm(p.price || 0), bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", pick: () => this.setState({ rver: p.id }) }; }),
+        vers: ps.map(p => { const on = p.id === ver.id; return { label: (ps.length < 2 ? "" : (p.style === "build" ? "Build in" : "Classic") + " · ") + rm(p.price || 0), bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", pick: () => this.setState({ rver: p.id }) }; }),
         cats: ver.cats.map((c, ci) => ({ c, ci })).filter(x => x.c.items.length || x.c.items.some(i => i.kind) || true).map(({ c, ci }) => ({ name: String(c.name).toUpperCase(), sum: rm(c.items.reduce((a, i) => a + (+i.cost || 0) * (+i.qty || 0), 0)),
           add: () => this.setState({ pick: { pid: ver.id, ci, q: "" } }),
           rows: c.items.map((i, ii) => ({ ...this.swipe(ver.id + ":" + ci + ":" + ii, () => { const removed = JSON.parse(JSON.stringify(i)); this.upd(z => { const p = z.packages.find(x => x.id === ver.id); p.cats[ci].items.splice(ii, 1); }); this.flash("Removed " + i.name); }), name: String(i.name).toLowerCase().replace(/\b\w/g, m => m.toUpperCase()), qty: (+i.qty || 0) > 1 ? "× " + i.qty : "", price: rm((+i.cost || 0) * (+i.qty || 0)) })) })),

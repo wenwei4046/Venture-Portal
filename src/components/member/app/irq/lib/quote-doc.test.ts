@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { fieldRows } from "./quote-doc";
+import { fieldRows, packageName, versionWord } from "./quote-doc";
+
+describe("a room type's versions", () => {
+  const classic = { id: "a", group: "g1", style: "classic", name: "1R 1R CLASSIC" };
+  const build = { id: "b", group: "g1", style: "build", name: "1R 1R BUILD IN" };
+  const other = { id: "c", group: "g2", style: "classic", name: "2R 1R CLASSIC" };
+  it("names the version only while the room type has two", () => {
+    expect(versionWord([classic, build, other], build)).toBe("Build in");
+    expect(versionWord([classic, build, other], classic)).toBe("Classic");
+    expect(versionWord([classic, other], classic)).toBe("");
+    expect(versionWord([build, other], build)).toBe("");
+  });
+  it("prints the name without the word when it is the only version", () => {
+    expect(packageName([classic, build], build)).toBe("1R 1R BUILD IN");
+    expect(packageName([build], build)).toBe("1R 1R");
+    expect(packageName([classic], classic)).toBe("1R 1R");
+  });
+});
 
 describe("a section on the quotation", () => {
   it("prints only the answer while its name is still the type's own", () => {

@@ -1281,7 +1281,7 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                               {"Bedroom"}
                             </span>
                             {"\n                        "}
-                            <div style={dcCss(`flex:${dcS(v["svCard"]?.["segFlex"])};display:flex;gap:2px;padding:3px;border-radius:11px;background:var(--irq-c-eeeeea)`)}>
+                            <div data-irq-tabs={v["styleTabs"]?.["length"]} style={dcCss(`flex:${dcS(v["svCard"]?.["segFlex"])};display:flex;gap:2px;padding:3px;border-radius:11px;background:var(--irq-c-eeeeea)`)}>
                               {"\n                          "}
                               {dcList(v["styleTabs"]).map((L_tb_l, L_tb_l_i) => (
                                 <Fragment key={L_tb_l_i}>
