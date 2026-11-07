@@ -66,10 +66,12 @@ export interface CommissionOrderRow {
   categories: string[]
   upsale: boolean
   /**
-   * An old bill topped up (2026-11-07): it pays its holder the rate and is no
-   * sale of theirs — out of every sales, margin, KPI and override figure.
+   * An old bill topped up (2026-11-07): it pays its holder the rate — cut by
+   * its own margin as any bill's — and is no sale of theirs: out of every
+   * sales, monthly margin, KPI and override figure. The builder always says;
+   * absent reads as an ordinary bill.
    */
-  commissionOnly: boolean
+  commissionOnly?: boolean
   /** Everything on the bill — transport, disposal and every other charge included. */
   orderTotal: number
   /**
@@ -321,10 +323,11 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       : order.alreadyReleased ? 'already_released'
         : !order.upsale && !isDepositMet(order, input.scheme.depositThresholdPct) ? 'deposit_pending' : 'eligible'
     const eligible = status === 'eligible'
-    // An old bill topped up (2026-11-07): the rate on it and nothing else — no
-    // margin scales it, no upline is paid on it.
+    // An old bill topped up (2026-11-07): the rate on it, scaled by its margin
+    // as any bill's ("need follow the margin as well") — and no upline is paid
+    // on it, nor is it in any margin of the month's.
     const commissionOnly = !!order.commissionOnly
-    const penalty = input.scheme.enableMarginPenalty && margin.pct !== null && !commissionOnly
+    const penalty = input.scheme.enableMarginPenalty && margin.pct !== null
       ? penaltyBandFor(margin.pct, base.brandCode, input.marginBands) : null
     const multiplier = penalty?.commissionMultiplier ?? 1
     const sourceLines = eligible ? statement?.lines.filter(line => line.sourceOrderId === order.id) ?? [] : []

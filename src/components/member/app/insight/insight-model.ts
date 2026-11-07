@@ -549,7 +549,8 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
   const group = billGroups(input).find(g => g.orders.some(x => x.id === o.id));
   const due = stillDue(o);
   const qty = (q: number) => (Number.isInteger(q) ? String(q) : String(Math.round(q * 100) / 100));
-  // An old bill topped up (2026-11-07): no margin, tier or KPI is read on it — it pays commission only.
+  // An old bill topped up (2026-11-07): commission only — no KPI is read on it; its margin is, as it cuts its
+  // commission as any bill's does ("need follow the margin as well").
   const old = !sold(o);
   return {
     no: o.number,
@@ -560,9 +561,9 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
     status: old && o.cleared ? OLD_BILL_PILL : o.cleared ? "Deposit cleared" : due > 0 ? `Deposit due ${rm(due)}` : "Deposit due",
     statusTone: old && o.cleared ? "neutral" : o.cleared ? "good" : "warn",
     amt: rm(o.total),
-    margin: old || o.margin === null ? "—" : `${o.margin.toFixed(1)}%`,
-    marginInk: old ? TONES.neutral.ink : noSalesBill(o) ? TONES[band?.tone ?? "bad"].ink : o.margin === null ? TONES.warn.ink : TONES[band?.tone ?? "neutral"].ink,
-    tier: old ? "Not counted" : noSalesBill(o) ? "No sales" : o.margin === null ? "Cost pending" : band?.label ?? "No ladder",
+    margin: o.margin === null ? "—" : `${o.margin.toFixed(1)}%`,
+    marginInk: noSalesBill(o) ? TONES[band?.tone ?? "bad"].ink : o.margin === null ? TONES.warn.ink : TONES[band?.tone ?? "neutral"].ink,
+    tier: noSalesBill(o) ? "No sales" : o.margin === null ? "Cost pending" : band?.label ?? "No ladder",
     kpi: old ? "—" : kpiOn(input) ? String(o.kpiQty) : "—",
     oldBill: old ? {
       // The month it was SOLD in: its date's — the bill sits in the month its top-up came in (`sourceMonth`).

@@ -6,7 +6,7 @@ import { incomeOrdersVM, incomeVM, OLD_BILL_NOTE } from "./income-model";
 
 const bill = (over: Partial<IncomeBill> = {}): IncomeBill => ({
   orderId: "o1", no: "SO-1", status: "eligible", upsale: false, commissionable: 10000, orderTotal: 10500, personal: 500,
-  kpi: 0, kpiQty: 0, pay: 500, marginPct: 0.41, sharePct: null, brand: "AKEMI", ...over,
+  kpi: 0, kpiQty: 0, pay: 500, marginPct: 41, sharePct: null, brand: "AKEMI", ...over,
 });
 const month = (over: Partial<IncomeMonth> = {}): IncomeMonth => ({
   period: "2026-09", state: "live", asOf: "2026-10-05T02:00:00Z", closedAt: null, payrollStatus: null, paidOn: null,
@@ -156,6 +156,17 @@ describe("an old bill topped up in My income", () => {
     expect(row).toMatchObject({ pay: "RM 240.00", sub: "Not in sales", held: false });
     expect(vm.sheets[row.id]).toMatchObject({ tag: "Commission only", tone: "neutral", note: expect.stringContaining(OLD_BILL_NOTE) });
     expect(OLD_BILL_NOTE).toMatch(/not counted in your sales, your target or the Arena/);
+  });
+
+  it("says its margin beside it, read on its brand's ladder, as it cuts its commission like any bill's", () => {
+    const bands = [
+      { brand: "AKEMI", key: "Below margin Tier 1", kind: "penalty" as const, threshold: 27, multiplier: 0.5, amount: 0 },
+      { brand: "AKEMI", key: "Standard margin", kind: "reference" as const, threshold: 33, multiplier: 1, amount: 0 },
+    ];
+    const vm = incomeOrdersVM(data(month({ bills: [bill({ orderId: "old", no: "ZNT4813", commissionOnly: true, marginPct: 26, personal: 250, pay: 250 })] })), null, bands, false);
+    const sheet = vm.sheets[vm.mine.rows[0].id];
+    expect(sheet.tag).toBe("Commission only · 26.0% margin");
+    expect(sheet.tone).toBe("bad");
   });
 
   it("names no week of the month: it was sold at a fair months before", () => {

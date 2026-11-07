@@ -37,6 +37,13 @@ describe("liveIncome — Comm Cal's live row for the member", () => {
     expect(m.brands).toEqual([{ code: "AKEMI", marginPct: 0.41 }]);
   });
 
+  // 2026-11-07: the engine's margin is a fraction (0.41); the app's ladders and labels read a percentage.
+  it("carries a bill's margin as a percentage", () => {
+    expect(liveIncome(person, extra).bills.map(b => b.marginPct)).toEqual([41, 41, 41]);
+    const uncosted = { ...person, personalRows: [orderRow({ marginPct: null })] } as unknown as WorkbenchPerson;
+    expect(liveIncome(uncosted, extra).bills[0].marginPct).toBeNull();
+  });
+
   it("pays a bill its commission and KPI, and names the member's part of a shared one", () => {
     const shared = liveIncome(person, extra).bills.find(b => b.no === "SO-4")!;
     expect(shared).toMatchObject({ personal: 300, kpi: 10, kpiQty: 1, pay: 310, sharePct: 0.5, brand: "AKEMI" });

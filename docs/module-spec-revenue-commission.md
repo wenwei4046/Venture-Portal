@@ -1634,12 +1634,14 @@ with comm, they will right click"*.
   such a bill counts in, the user: *"is go with b, not a"*; of the Revenue app:
   *"i want can view, then mention no count in sales target (arena)"*). The
   holder is paid their rate on everything on it that earns, KPI items included,
-  no margin multiplier — one line, *… · old bill, commission only*; it waits on
-  its deposit like any bill and is released once paid (`SalesOrder.commissionOnly`,
-  set by `toEngineInput` for an ERP bill dated before the feed window in a month
-  from it on). It is none of the revenue anything else is measured on: no rung,
-  no group sales, no override to the upline, no margin or margin incentive, no
-  KPI item or threshold, not the directors' threshold. It is LISTED — the
+  cut by its own margin's penalty band as any bill is (*"need follow the margin
+  as well"*; a director's, like their own bills, uncut) — one line, *… · old
+  bill, commission only*; it waits on its deposit like any bill and is released
+  once paid (`SalesOrder.commissionOnly`, set by `toEngineInput` for an ERP bill
+  dated before the feed window in a month from it on). It is none of the revenue
+  anything else is measured on: no rung, no group sales, no override to the
+  upline, not the month's margin or its incentive, no KPI item or threshold, not
+  the directors' threshold. It is LISTED — the
   ledger, All bills (*Top up deposit · Mar 2026 bill · Junie · commission
   only*), My income, the Revenue app's bills (*Commission only · Not in sales ·
   target · Arena*) — and left out of every sales figure: the month's cards and

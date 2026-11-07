@@ -44,6 +44,11 @@ export interface IncomeBill {
   kpiQty: number;
   /** personal + KPI: what the bill pays the member this month. */
   pay: number;
+  /**
+   * The bill's layer-2 margin as a PERCENTAGE (41.2 for 41.2%) — the unit the app's ladders and the order book's
+   * `margin` read in; null while it has none. (Until 2026-11-07 the live month carried the engine's fraction, 0.412,
+   * which My income printed as "0.4% margin", every bill at the foot of its ladder.)
+   */
   marginPct: number | null;
   /** The member's part of a shared bill (0.5); null when it is theirs alone. */
   sharePct: number | null;
@@ -151,7 +156,8 @@ function bill(row: CommissionOrderRow): IncomeBill {
     kpi,
     kpiQty: row.kpiQty,
     pay: round2(row.productCommission + kpi),
-    marginPct: row.marginPct,
+    // The engine's margin is a fraction; the app reads percentages.
+    marginPct: row.marginPct === null ? null : round2(row.marginPct * 100),
     sharePct: row.share && part ? part.pct : null,
     brand: row.brands[0] ?? null,
     ...(row.commissionOnly ? { commissionOnly: true as const } : {}),

@@ -270,9 +270,9 @@ describe("Insight › an old bill topped up", () => {
     expect(vm.weeks.earlier.stats).toMatch(/ · 1 old bill$/);
   });
 
-  it("opens on whose bill it was, and that it pays commission only", () => {
+  it("opens on whose bill it was, that it pays commission only, and its margin — which cuts that commission as any bill's", () => {
     expect(orderSheet(withOld, "9")).toMatchObject({
-      status: "Commission only", statusTone: "neutral", margin: "—", tier: "Not counted", kpi: "—",
+      status: "Commission only", statusTone: "neutral", margin: "10.0%", tier: "Below margin Tier 3", kpi: "—",
       oldBill: { line: "JUNIE TAN’s bill · Mar 2026", sub: "Pays you commission only. Not counted in your sales, your target or the Arena." },
     });
     expect(orderSheet(input({ book: book([old]), of: "SHAWN" }), "9")?.oldBill?.sub)

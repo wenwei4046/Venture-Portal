@@ -124,6 +124,19 @@ describe('commission workbench ledger', () => {
     reconcile(board)
   })
 
+  // 2026-11-07: an old bill topped up pays commission only, cut by its margin as any bill is ("need follow the margin as well").
+  it('shows an old bill topped up cut by its own margin, in no margin of the month and no override', () => {
+    const old = sale('old', 1_000, { orderDate: '2026-03-12', manualMarginPct: 0.2, commissionOnly: true })
+    const board = buildCommissionWorkbench(input({ orders: [sale('one'), old] }))
+    // 5% of the 1,000 that earns — its pillow is no KPI on an old bill — halved by Penalty (20% < 25%).
+    expect(board.personalRows.find(row => row.orderId === 'old')).toMatchObject({
+      commissionOnly: true, productCommission: 25, penaltyMultiplier: 0.5, penaltyWithheld: 25,
+      kpiBase: 0, kpiThresholdPct: 0, marginIncentive: 0, totalCommission: 25,
+    })
+    expect(board.overridingRows.map(row => row.orderId)).toEqual(['one'])
+    reconcile(board)
+  })
+
   // 2026-10-30: a gift on a bill of its own at RM 0 has no margin, and its cost counts against the month's.
   it('reads a bill with no sales as No sales at its cost, and lets that cost pull the month under its tier', () => {
     const gift: SalesOrder = {
