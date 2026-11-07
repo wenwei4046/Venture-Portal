@@ -41,8 +41,11 @@ export function SubHead({ title, dateLabel, onBack, onDate, children, titleClass
 }
 
 /** A bill on a list: number and line, amount and its margin · KPI. */
-export function BillButton({ no, sub, amt, amtMuted, pill, pillInk, kpiText, onClick }: {
-  no: string; sub: string; amt: string; amtMuted: boolean; pill: string; pillInk: string; kpiText: string | null; onClick: () => void;
+export function BillButton({ no, sub, amt, amtMuted, pill, pillInk, kpiText, arena, onClick }: {
+  no: string; sub: string; amt: string; amtMuted: boolean; pill: string; pillInk: string; kpiText: string | null;
+  /** What of the bill counts for the reader when it is less than the whole (2026-11-07): "Arena RM 5,000". */
+  arena?: string | null;
+  onClick: () => void;
 }) {
   return (
     <button className={s.bill} onClick={onClick}>
@@ -53,6 +56,7 @@ export function BillButton({ no, sub, amt, amtMuted, pill, pillInk, kpiText, onC
           <span className={s.billPill} style={{ color: pillInk }}>{pill}</span>
           {kpiText && <span className={s.billKpi}> · {kpiText}</span>}
         </span>
+        {arena && <span className={s.billArena}>{arena}</span>}
       </span>
     </button>
   );

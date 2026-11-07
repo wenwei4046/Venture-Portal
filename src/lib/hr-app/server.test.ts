@@ -76,6 +76,15 @@ describe('the app follows the account’s tabs, page by page (the review’s M2)
     }
   })
 
+  // A share that took effect on its colleague's Accept (2026-11-07): HR approves none any more, so whoever may Cancel
+  // share on Comm Cal's month is told of it.
+  it('Revenue · Edit on Comm Cal’s month: revenue.shares — never without it, nor while viewing as somebody', () => {
+    const revenue = hrUser({ actions: { ...HR_ACTIONS, 'revenue.view': 'all', 'revenue.edit': 'all' }, permissions: [...HR_KEYS, 'revenue'] })
+    expect(hrTopics(revenue)).toContain('revenue.shares')
+    expect(hrTopics(hrUser({ actions: { ...HR_ACTIONS, 'revenue.view': 'all' }, permissions: [...HR_KEYS, 'revenue'] }))).not.toContain('revenue.shares')
+    expect(hrTopics({ ...revenue, viewingAs: { id: 'x', name: 'Somebody' } })).not.toContain('revenue.shares')
+  })
+
   // The step after the reminder (2026-10-24): Confirm as permanent and Extend by People · Edit; their letters and Renew's
   // new contract by Documentation · Create on the person's page, as People's own forms ask.
   it('Documentation · Create on a person’s page files a step’s letter — never without People open, nor while viewing as somebody', () => {

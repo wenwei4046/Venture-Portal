@@ -13,8 +13,8 @@ type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
 /**
  * Share order (2026-10-21 — the user, on My sales orders: "我可以把这个 order allocation 分在不同的 sales 之间"; then "only
  * can share one pax, then percentage for them request is fix with 50% 50%"): pick the ONE colleague who sold the bill with
- * you and send it — half each. They accept it in their own app, then HR approves it on Comm Cal; the bill's sales, KPI items
- * and commission are split from then on. The sheet asks the database first: whom the bill may go to, and why it cannot be
+ * you and send it — half each. Their Accept in their own app shares it (since 2026-11-07 no HR step; HR is told); the
+ * bill's sales, KPI items and commission are split from then on. The sheet asks the database first: whom the bill may go to, and why it cannot be
  * shared now (a paid month, a bill HR shares already, a request already open).
  */
 export default function ShareOrderSheet({ open, orderId, ownerName, readOnly, load, onSend, onOpenRequest, onClose }: {

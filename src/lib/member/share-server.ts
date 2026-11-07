@@ -12,8 +12,8 @@ import type { MemberReadContext } from "./types";
 
 /**
  * Share order in the Revenue app (2026-10-21; mig 20261021150100): the bill's sheet reads whom it may be shared with, its
- * salesperson sends a request, the colleagues it names answer it, and the salesperson may withdraw it before HR decides
- * on Comm Cal › Requests. Every rule is the database's, under the caller's own session; this checks the shape of what the
+ * salesperson sends a request, the colleagues it names answer it — since 2026-11-07 the Accept shares it, with no HR step
+ * (HR is told) — and the salesperson may withdraw it until then. Every rule is the database's, under the caller's own session; this checks the shape of what the
  * phone sent, the Principal's View as (read only) and the Requests page's Create box, and answers a refusal in words —
  * production hands the phone only a digest of what an action throws.
  */
@@ -74,7 +74,7 @@ export async function loadShareRequests(context?: MemberReadContext): Promise<Me
 }
 
 /**
- * Send a share request: it goes to the colleague named first, and to HR once they accepted. One colleague, half each
+ * Send a share request: it goes to the colleague named, whose Accept shares the bill (2026-11-07). One colleague, half each
  * (2026-10-21 — the user: "only can share one pax … fix with 50% 50%"; the database refuses anything else too).
  */
 export async function sendShareRequest(input: ShareSendInput): Promise<MemberOutcome<ShareRequest>> {
@@ -119,7 +119,7 @@ export async function answerShareRequest(id: string, accept: boolean, note: stri
   }
 }
 
-/** The salesperson withdraws their request — any time before HR decides. */
+/** The salesperson withdraws their request — any time before it is accepted (or, one from before 2026-11-07, HR decides). */
 export async function cancelShareRequest(id: string): Promise<MemberOutcome<ShareRequest>> {
   try {
     if (!isId(id)) return { ok: false, error: "That share request is not there." };
