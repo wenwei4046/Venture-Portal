@@ -777,6 +777,50 @@ export interface KivCostRow {
   cost: number
 }
 
+/** One SKU of a gift with purchase: its SKU Master id and the code it was saved under. */
+export interface GwpSkuRef {
+  erpId: string
+  code: string
+}
+
+/** A gift with purchase as Product List › GWP lists it (2026-11-08). No dates (the user). */
+export interface GwpEntry {
+  id: string
+  perUnit: number
+  buy: GwpSkuRef[]
+  gift: GwpSkuRef[]
+  updatedAt: string
+}
+
+/** Product List › GWP (2026-11-08): every gift with purchase, the oldest first — every sub-department alike. */
+export async function loadGwp(): Promise<GwpEntry[]> {
+  const sb = await untyped()
+  const { data, error } = await sb
+    .from('catalogue_gwp')
+    .select('id, qty_per_unit, updated_at, created_at, catalogue_gwp_items (role, erp_product_id, product_code)')
+    .order('created_at')
+    .order('id')
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as Row[]).flatMap(r => {
+    const id = str(r.id)
+    const perUnit = num(r.qty_per_unit)
+    if (!id || perUnit === null) return []
+    const items = Array.isArray(r.catalogue_gwp_items) ? (r.catalogue_gwp_items as Row[]) : []
+    const side = (role: string): GwpSkuRef[] =>
+      items
+        .filter(i => i.role === role && str(i.erp_product_id))
+        .map(i => ({ erpId: str(i.erp_product_id)!, code: str(i.product_code) ?? str(i.erp_product_id)! }))
+        .sort((a, b) => a.code.localeCompare(b.code))
+    return [{
+      id,
+      perUnit,
+      buy: side('buy'),
+      gift: side('gift'),
+      updatedAt: str(r.updated_at) ?? '',
+    }]
+  })
+}
+
 /** Costing Setting › KIV bed frames (2026-10-31): what a still-to-be-chosen frame of each size costs, every sub-department alike. */
 export async function loadKivCosts(): Promise<KivCostRow[]> {
   const sb = await untyped()

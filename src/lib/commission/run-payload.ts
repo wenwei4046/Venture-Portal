@@ -37,6 +37,7 @@ import {
 } from './engine'
 import { EMPTY_FABRIC_SERIES, indexFabricSeries, isKpiOptionPool, lineKpiFactsOf, type FabricSeriesRow } from './kpi'
 import { isOldBillDate } from './row-origin'
+import { gwpFreeParts, type GwpRule } from '@/lib/catalogue/gwp'
 import type {
   DirectorTerms,
   EngineInput,
@@ -149,6 +150,40 @@ export function toCostRatiosByBrand(rows: readonly CostRatioBrandRow[] | undefin
   })
 }
 
+/**
+ * A gift with purchase (Product List › GWP, 2026-11-08), as the loader reads it: the codes of its buy and
+ * gift SKUs (`catalogue_gwp_items.product_code`) and its gift units per unit bought. No dates (the user).
+ */
+export interface GwpRow {
+  id: string
+  qty_per_unit: Num
+  catalogue_gwp_items: { role: string; product_code: string }[] | null
+}
+
+/** The rows as the costing reads them; a GWP with no buy or no gift SKU, or no units, is left out. */
+export function toGwpRules(rows: readonly GwpRow[] | undefined): GwpRule[] {
+  return (rows ?? []).flatMap(r => {
+    const items = r.catalogue_gwp_items ?? []
+    const buy = items.filter(i => i.role === 'buy').map(i => i.product_code)
+    const gift = items.filter(i => i.role === 'gift').map(i => i.product_code)
+    const perUnit = numOrNull(r.qty_per_unit)
+    return perUnit !== null && perUnit > 0 && buy.length && gift.length
+      ? [{ id: r.id, buy, gift, perUnit }]
+      : []
+  })
+}
+
+/** A bill's lines with each one's part given with a purchase, worked out on the whole bill. */
+export function withGwp(order: SalesOrder, rules: readonly GwpRule[]): SalesOrder {
+  if (!rules.length) return order
+  const parts = gwpFreeParts(
+    order.lines.map(l => ({ id: l.id, productCode: l.productCode, qty: l.qty, costAmount: l.costAmount ?? null })),
+    rules,
+  )
+  if (!parts.size) return order
+  return { ...order, lines: order.lines.map(l => (parts.has(l.id) ? { ...l, gwpFree: parts.get(l.id)! } : l)) }
+}
+
 export interface KpiThresholdRow {
   min_qty: number
   bonus_pct: Num
@@ -244,6 +279,8 @@ export interface RunSourceRows {
   costRatios?: CostRatioRow[]
   /** `comm_cost_ratio_brands` of this scheme (2026-11-07). Absent = no SKU has a ratio by brand. */
   costRatiosByBrand?: CostRatioBrandRow[]
+  /** Product List › GWP (2026-11-08): every gift with purchase. Absent = none. */
+  gwp?: GwpRow[]
   /**
    * The ERP's fabric list (`erp_fabrics`), read only while a KPI item is a
    * fabric series (2026-10-29). Absent = no line's fabric has a series.
@@ -389,6 +426,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
     ]
   })
 
+  const gwpRules = toGwpRules(rows.gwp)
+
   // An unmatched agent has no staff_id, so the order pays nobody. It is dropped
   // here rather than passed through as a phantom salesperson — the period page
   // and the import wizard are where that gets resolved, loudly.
@@ -423,6 +462,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         ...lineFacts(l),
       })),
     }))
+    // A gift with purchase (Product List › GWP, 2026-11-08), worked out on the whole bill before it is shared.
+    .map(o => withGwp(o, gwpRules))
 
   // A shared bill becomes one part per holder, each paid at its holder's rate
   // and climbing its holder's line (`lib/commission/shares.ts`). An upsale HR

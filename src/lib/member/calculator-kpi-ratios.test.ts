@@ -114,6 +114,63 @@ describe("a rider SKU's ratio by brand", () => {
   });
 });
 
+// 2026-11-08 (Product List › GWP — the user: "dullop mattress ecobliss, set a gwp 2 micorfibre pillow. so the
+// margin calculator and margin leader will not calculate the cost in for those 2 pillow"): with the mattress in
+// the cart, up to two pillows a mattress leave the cost — found by themselves, the Quote unchanged, as the run
+// reads the bill (lib/catalogue/gwp.ts).
+describe("a gift with purchase leaves the cost", () => {
+  const mattress: MemberProduct = {
+    id: "eco-q", code: "ECOBLISS (Q)", name: "ECOBLISS", brand: "ZANOTTI", category: "Mattress", size: "Queen",
+    color: "", available: true, gift: false, modelId: "eco", kind: "MATTRESS", cost: 1400, version: "v1",
+  };
+  const pillow = (id: string, code: string, cost: number | null): MemberProduct => ({
+    id, code, name: code, brand: null, category: "Pillow", size: "Standard",
+    color: "", available: true, gift: true, modelId: id, kind: "ACCESSORY", cost, version: "v1",
+  });
+  const cart = [mattress, pillow("mf", "MF PILLOW", 35), pillow("latex", "LATEX PILLOW", 70), pillow("nocost", "NEW PILLOW", null)];
+  const gift = (id: string, quantity: number) => ({ productId: id, quantity, gift: true });
+  const ECO = { id: "eco", buy: ["ECOBLISS (Q)"], gift: ["MF PILLOW", "LATEX PILLOW", "NEW PILLOW"], perUnit: 2 };
+  const rules: QuoteRules = { costDivisor: 0.7, gwp: [ECO] };
+
+  it("leaves the two pillows out of the cost: the mattress's alone", () => {
+    const r = calculateQuote(quote([one("eco-q"), gift("mf", 2)], undefined, "3000"), cart, bands, rules);
+    expect(r.valid).toBe(true);
+    expect(r.margin).toBeCloseTo(((3000 - 2000) / 3000) * 100, 10); // 1,400 ÷ 0.7; the pillows 0
+    const without = calculateQuote(quote([one("eco-q"), gift("mf", 2)], undefined, "3000"), cart, bands, { costDivisor: 0.7 });
+    expect(without.margin).toBeCloseTo(((3000 - 2000 - 100) / 3000) * 100, 10); // 2 × 35 ÷ 0.7
+  });
+
+  it("counts a pillow past the allowance, the dearest of them", () => {
+    // Two units free of a microfibre (35) and two latex (70): the microfibre and one latex go, one latex stays.
+    const r = calculateQuote(quote([one("eco-q"), gift("mf", 1), gift("latex", 2)], undefined, "3000"), cart, bands, rules);
+    expect(r.margin).toBeCloseTo(((3000 - 2000 - 100) / 3000) * 100, 10); // 70 ÷ 0.7
+  });
+
+  it("gives two a mattress: two mattresses, four pillows", () => {
+    const r = calculateQuote(quote([one("eco-q", 2), gift("mf", 4)], undefined, "6000"), cart, bands, rules);
+    expect(r.margin).toBeCloseTo(((6000 - 4000) / 6000) * 100, 10);
+  });
+
+  it("finds a pillow the member did not add as a free gift too", () => {
+    const r = calculateQuote(quote([one("eco-q"), one("mf", 2)], undefined, "3000"), cart, bands, rules);
+    expect(r.margin).toBeCloseTo(((3000 - 2000) / 3000) * 100, 10);
+  });
+
+  it("needs no price for a pillow wholly given, and still does for one that is not", () => {
+    const free = calculateQuote(quote([one("eco-q"), gift("nocost", 1)], undefined, "3000"), cart, bands, rules);
+    expect(free.valid).toBe(true);
+    expect(free.margin).toBeCloseTo(((3000 - 2000) / 3000) * 100, 10);
+    const past = calculateQuote(quote([one("eco-q"), gift("nocost", 3)], undefined, "3000"), cart, bands, rules);
+    expect(past.valid).toBe(false);
+    expect(past.error).toMatch(/Product cost is pending/);
+  });
+
+  it("gives nothing without the mattress", () => {
+    const r = calculateQuote(quote([one("y04-q"), gift("mf", 2)], undefined, "3000"), [...cart, frame], bands, rules);
+    expect(r.margin).toBeCloseTo(((3000 - 1142.86 - 100) / 3000) * 100, 10); // 800 ÷ 0.7 + 70 ÷ 0.7
+  });
+});
+
 // 2026-10-05: the price keyed is the SELLING price (the prototype's keypad).
 // A KPI item the customer buys rides on top of it, out of the margin, paid flat
 // as KPI; one given free comes off it. The run reads the bill the same way:
@@ -231,9 +288,14 @@ describe("the quote context's rules, read defensively", () => {
   // 2026-10-05: the cost rules arrive from member_quote_cost_rules (service role only).
   it("reads the cost rules, and refuses an answer with no usable ratio", () => {
     expect(quoteCostRules({ costDivisor: "0.7000", costRatios: { "Y04-(Q)": 0.6, bad: -1 } })).toEqual({
-      costDivisor: 0.7, costRatios: [{ productCode: "Y04-(Q)", ratio: 0.6 }], costRatiosByBrand: [],
+      costDivisor: 0.7, costRatios: [{ productCode: "Y04-(Q)", ratio: 0.6 }], costRatiosByBrand: [], gwp: [],
     });
-    expect(quoteCostRules({ costDivisor: 1 })).toEqual({ costDivisor: 1, costRatios: [], costRatiosByBrand: [] });
+    expect(quoteCostRules({ costDivisor: 1 })).toEqual({ costDivisor: 1, costRatios: [], costRatiosByBrand: [], gwp: [] });
+    // 2026-11-08: the gifts with purchase, as member_quote_cost_rules hands them.
+    expect(quoteCostRules({
+      costDivisor: 0.7,
+      gwp: [{ id: "g1", buy: ["ECOBLISS (Q)"], gift: ["MF PILLOW"], perUnit: 2 }, { buy: [] }],
+    })?.gwp).toEqual([{ id: "g1", buy: ["ECOBLISS (Q)"], gift: ["MF PILLOW"], perUnit: 2 }]);
     // 2026-11-07: a rider SKU's ratio for each brand — anything not a positive number is left out.
     expect(quoteCostRules({
       costDivisor: 0.7,

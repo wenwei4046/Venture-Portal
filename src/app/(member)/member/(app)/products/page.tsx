@@ -11,6 +11,7 @@ import {
   loadCostRatioBrands,
   loadCostRatios,
   loadCostingGaps,
+  loadGwp,
   loadKivCosts,
   loadMaintenance,
   loadMirrorStatus,
@@ -28,6 +29,7 @@ import MaintenanceTab from './_components/MaintenanceTab'
 import ComboPricingTab from './_components/ComboPricingTab'
 import CostingGapsSection from './_components/CostingGapsSection'
 import CostSettingTab from './_components/CostSettingTab'
+import GwpTab from './_components/GwpTab'
 import ProductWorkspace from './_components/ProductWorkspace'
 import { Notice } from './_components/ui'
 import { layoutsFromCookies } from './_components/column-layout'
@@ -53,7 +55,7 @@ export const metadata = { title: 'Product List · HOUZS Venture' }
  * the ERP has not: a sofa combo added on Combo Pricing (2026-10-08), costed
  * exactly as the ERP's are.
  *
- * Six tabs — the ERP's own four, the work list, and a setting:
+ * Seven tabs — the ERP's own four, the work list, and two settings:
  *
  *   SKU Master          every SKU, and its price (a sofa module's per seat
  *                       height and fabric tier)
@@ -67,6 +69,9 @@ export const metadata = { title: 'Product List · HOUZS Venture' }
  *                       what a bed frame still to be chosen (KIV) costs by
  *                       size, and the SKUs divided by a ratio of their own —
  *                       a rider's by the brand it is sold under (2026-11-07)
+ *   GWP                 gifts with purchase: what a purchase earns free, its
+ *                       cost out of every margin (2026-11-08) — every
+ *                       sub-department alike, no dates
  *
  * The seventh, Add-on / KPI Items, moved to Rules › KPI items on 2026-10-08
  * (user: "rules 这里是用来算薪水的 … product list 是拿来 set costing 的"): which
@@ -85,7 +90,7 @@ export const metadata = { title: 'Product List · HOUZS Venture' }
 // so a gap older than that is not one anybody can act on.
 const GAP_WINDOW_FROM = '2026-08-01'
 
-const TABS: readonly ProductTab[] = ['sku', 'modular', 'maintenance', 'combos', 'gaps', 'costing']
+const TABS: readonly ProductTab[] = ['sku', 'modular', 'maintenance', 'combos', 'gaps', 'costing', 'gwp']
 
 /** 2026-08-01 → "1 Aug 2026", the prototype's way of writing the window. */
 const dayLabel = (iso: string) => formatIntlDate(new Date(`${iso}T00:00:00Z`), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }, 'en-GB')
@@ -162,6 +167,9 @@ export default async function ProductListPage({
         />
       )
     }
+  } else if (tab === 'gwp') {
+    const [entries, skus] = await Promise.all([loadGwp(), loadSkus()])
+    body = <GwpTab entries={entries} skus={skus.map(toPickSku)} />
   } else {
     body = (
       <CostingGapsSection

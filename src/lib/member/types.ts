@@ -1,5 +1,6 @@
 import type { QuotePricing } from "./calculator";
 import type { KpiItem } from "@/lib/commission/kpi";
+import type { GwpRule } from "@/lib/catalogue/gwp";
 import type { ClaimPayout } from "./claim-payout";
 export type MemberPage =
   | "today"
@@ -358,6 +359,13 @@ export interface QuoteRules {
    * divisor. Server-only, as every ratio. Absent = none.
    */
   costRatiosByBrand?: { productCode: string; brand: string; ratio: number }[];
+  /**
+   * The gifts with purchase (Product List › GWP, 2026-11-08; no dates):
+   * a cart with one of a GWP's buy SKUs leaves up to its units of the gift
+   * SKUs out of the cost, cheapest first, as the run reads the bill. Nothing
+   * on screen says so. Server-only, as every cost rule. Absent = none.
+   */
+  gwp?: GwpRule[];
   /**
    * The department's KPI items while its KPI pay is on (Rules › KPI items;
    * 2026-09-27, on Rules since 2026-10-08): a cart carrying one has that amount off

@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import { splitOrdersByShares } from './shares'
+import { toGwpRules, withGwp } from './run-payload'
+import type { GwpRule } from '@/lib/catalogue/gwp'
 import {
   classifyLine,
   computeCommissionRun,
@@ -1974,5 +1977,61 @@ describe('a bill cut for its margin counts the sales its commission is (2026-11-
     expect(find(run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]])] }).statements, 'rs').productRevenue).toBe(10_000)
     const head = run({ orders: [{ ...thin('1', 10_000), staffId: 'director' }], departmentHeadIds: ['director'] })
     expect(find(head.statements, 'director').productRevenue).toBe(10_000)
+  })
+})
+
+// 2026-11-08 (Product List › GWP — the user: "dullop mattress ecobliss, set a gwp 2 micorfibre pillow. so the margin
+// calculator and margin leader will not calculate the cost in for those 2 pillow. is jsut calculate the mattress cost
+// only"): a line's part given with a purchase leaves the margin's cost, worked out on the whole bill.
+describe('a gift with purchase leaves the margin (2026-11-08)', () => {
+  const groupIndex = indexItemGroups(ITEM_GROUPS)
+  const ECO: GwpRule = { id: 'eco', buy: ['ECOBLISS (Q)'], gift: ['MF PILLOW'], perUnit: 2 }
+  const bill = (pillows: number, pillowCost: number | undefined) =>
+    withGwp(order('g1', 'rs', [
+      ['MATTRESS', 'ECOBLISS (Q)', 1, 3_000, 1_400, 'AKEMI'],
+      ['ACC', 'MF PILLOW', pillows, 0, pillowCost, 'AKEMI'],
+    ]), [ECO])
+
+  it('costs the mattress alone while the pillows are within the allowance', () => {
+    const base = marginBase(bill(2, 70).lines, indexKpiItems([]), groupIndex, 0.7, 'AKEMI')
+    expect(base.cost).toBe(2_000) // 1,400 ÷ 0.7; the two pillows 0
+    expect(base.complete).toBe(true)
+    const plain = marginBase(order('g0', 'rs', [
+      ['MATTRESS', 'ECOBLISS (Q)', 1, 3_000, 1_400, 'AKEMI'],
+      ['ACC', 'MF PILLOW', 2, 0, 70, 'AKEMI'],
+    ]).lines, indexKpiItems([]), groupIndex, 0.7, 'AKEMI')
+    expect(plain.cost).toBe(2_100)
+  })
+
+  it('counts the pillows past it, and holds the bill only for a part not given', () => {
+    // Three pillows at 35 each: one counts, 35 ÷ 0.7 = 50.
+    expect(marginBase(bill(3, 105).lines, indexKpiItems([]), groupIndex, 0.7, 'AKEMI').cost).toBe(2_050)
+    // Two with no cost yet are wholly given: the margin is known.
+    expect(marginBase(bill(2, undefined).lines, indexKpiItems([]), groupIndex, 0.7, 'AKEMI').complete).toBe(true)
+    // Three with no cost: one is not given, so the bill waits for it.
+    expect(marginBase(bill(3, undefined).lines, indexKpiItems([]), groupIndex, 0.7, 'AKEMI').complete).toBe(false)
+  })
+
+  it('marks the given part on the bill, every month alike (a GWP has no dates)', () => {
+    expect(bill(2, 70).lines.find(l => l.productCode === 'MF PILLOW')?.gwpFree).toBe(1)
+    expect(bill(2, 70).lines.find(l => l.productCode === 'ECOBLISS (Q)')?.gwpFree).toBeUndefined()
+    expect(withGwp(bill(2, 70), []).lines.find(l => l.productCode === 'MF PILLOW')?.gwpFree).toBe(1)
+  })
+
+  it('keeps each holder of a shared bill on the same part', () => {
+    const [owner, other] = splitOrdersByShares([bill(3, 105)], [{ orderId: 'g1', staffId: 'rs2', pct: 0.5 }])
+    for (const part of [owner, other]) {
+      expect(part.lines.find(l => l.productCode === 'MF PILLOW')?.gwpFree).toBeCloseTo(2 / 3, 10)
+    }
+    const costOf = (o: SalesOrder) => marginBase(o.lines, indexKpiItems([]), groupIndex, 0.7, 'AKEMI').cost
+    expect(costOf(owner) + costOf(other)).toBeCloseTo(2_050, 2)
+  })
+
+  it('reads the rows as the loader hands them', () => {
+    expect(toGwpRules([
+      { id: 'g', qty_per_unit: '2',
+        catalogue_gwp_items: [{ role: 'buy', product_code: 'ECOBLISS (Q)' }, { role: 'gift', product_code: 'MF PILLOW' }] },
+      { id: 'h', qty_per_unit: 2, catalogue_gwp_items: [{ role: 'buy', product_code: 'X' }] },
+    ])).toEqual([{ id: 'g', buy: ['ECOBLISS (Q)'], gift: ['MF PILLOW'], perUnit: 2 }])
   })
 })

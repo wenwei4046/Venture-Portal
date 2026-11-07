@@ -1,6 +1,7 @@
 import { toKpiItems, type KpiItemRow } from "@/lib/commission/run-payload";
 import type { KpiItem } from "@/lib/commission/kpi";
 import type { QuoteRules } from "./types";
+import { gwpRulesOf } from "@/lib/catalogue/gwp";
 
 /**
  * The department rules a quote is judged by beyond its bands — read
@@ -20,7 +21,7 @@ import type { QuoteRules } from "./types";
  */
 export function quoteCostRules(
   raw: unknown,
-): Pick<QuoteRules, "costDivisor" | "costRatios" | "costRatiosByBrand"> | null {
+): Pick<QuoteRules, "costDivisor" | "costRatios" | "costRatiosByBrand" | "gwp"> | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const value = raw as Record<string, unknown>;
   if (typeof value.costDivisor !== "number" && typeof value.costDivisor !== "string") return null;
@@ -30,6 +31,8 @@ export function quoteCostRules(
     costDivisor,
     costRatios: quoteCostRatios(value.costRatios),
     costRatiosByBrand: quoteCostRatiosByBrand(value.costRatioBrands),
+    // Product List › GWP (2026-11-08): every one, as member_quote_cost_rules hands them.
+    gwp: gwpRulesOf(value.gwp),
   };
 }
 

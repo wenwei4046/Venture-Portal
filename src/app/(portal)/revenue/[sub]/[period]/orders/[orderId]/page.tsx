@@ -19,7 +19,8 @@ import {
   type SalesLine,
 } from '@/lib/commission/engine'
 import { EMPTY_FABRIC_SERIES, indexFabricSeries, kpiItemLabel, lineKpiFactsOf } from '@/lib/commission/kpi'
-import { toCostRatiosByBrand, toKpiItems, type CostRatioBrandRow, type CostRatioRow, type KpiItemRow } from '@/lib/commission/run-payload'
+import { toCostRatiosByBrand, toGwpRules, toKpiItems, type CostRatioBrandRow, type CostRatioRow, type GwpRow, type KpiItemRow } from '@/lib/commission/run-payload'
+import { gwpFreeParts } from '@/lib/catalogue/gwp'
 import { chargeText, costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
 import ReturnLink from '@/components/layout/ReturnLink'
@@ -214,7 +215,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }, { data: gwpData }] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -289,6 +290,8 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       subDept.schemeId
         ? supabase.from('comm_cost_ratio_brands').select('product_code, brand_code, ratio').eq('scheme_id', subDept.schemeId)
         : Promise.resolve({ data: null }),
+      // What a purchase earns free, its cost out of the margin (Product List › GWP, 2026-11-08).
+      supabase.from('catalogue_gwp').select('id, qty_per_unit, catalogue_gwp_items (role, product_code)'),
     ])
   const byHand = exclusions?.get(orderId) ?? null
   const moved = moves[orderId] ?? null
@@ -335,6 +338,12 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     toCostRatiosByBrand((brandRatioData ?? []) as CostRatioBrandRow[]),
   )
 
+  // The part of each line a purchase earned free (Product List › GWP, 2026-11-08), on the whole bill, as the run reads it.
+  const gwpParts = gwpFreeParts(
+    lines.map(l => ({ id: l.id, productCode: l.product_code, qty: Number(l.qty), costAmount: l.cost_amount === null ? null : Number(l.cost_amount) })),
+    toGwpRules((gwpData ?? []) as GwpRow[]),
+  )
+
   // The lines as the engine reads them.
   const salesLines: SalesLine[] = lines.map(l => ({
     id: l.id,
@@ -347,6 +356,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     costAmount: l.cost_amount === null ? undefined : Number(l.cost_amount),
     optionCharge: Number(l.option_charge_amount ?? 0) || undefined,
     ...lineKpiFactsOf(l.item_group, l.description2, l.raw?.variants, fabrics),
+    ...(gwpParts.has(l.id) ? { gwpFree: gwpParts.get(l.id)! } : {}),
   }))
   const classed = lines.map((l, i) => ({ line: l, cls: classifyLine(salesLines[i], groupIndex) }))
   // What its bed frames' divan, leg, gap and total height were charged (2026-10-05): in the
@@ -374,7 +384,8 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // part-costed bill is not a high-margin bill.
   const goodsLines = classed.filter(c => c.cls === 'commissionable')
   const base = marginBaseOf(salesLines, kpiIndex, groupIndex, costBasis, order.brand_code ?? null)
-  const baseMissing = goodsLines.filter(c => c.line.cost_amount === null).length
+  // A line wholly given with a purchase never holds the bill: its cost is not the margin's.
+  const baseMissing = goodsLines.filter(c => c.line.cost_amount === null && (gwpParts.get(c.line.id) ?? 0) < 1).length
   const cost = base.cost
   const manualMargin = order.manual_margin_pct === null ? null : Number(order.manual_margin_pct)
   const margin =
@@ -705,6 +716,14 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                           KPI · {kpiItemLabel(hit.item)} {formatMoney(hit.amount)}{split.uncovered ? ' · not paid' : ''}
                         </span>
                       ))}
+                      {gwpParts.has(l.id) ? (
+                        <span className="chip info ml-1" title="A gift with purchase (Product List › GWP): its cost is not in the margin">
+                          <span className="dot" />
+                          GWP{(gwpParts.get(l.id) ?? 0) < 1
+                            ? ` · ${(Math.round((gwpParts.get(l.id) ?? 0) * Number(l.qty) * 1000) / 1000).toLocaleString()} of ${Number(l.qty).toLocaleString()}`
+                            : ''}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="num m-hide" data-label="Qty">{Number(l.qty).toLocaleString()}</td>
                     <td className="num m-hide" data-label="Unit">{formatMoney(Number(l.unit_price))}</td>

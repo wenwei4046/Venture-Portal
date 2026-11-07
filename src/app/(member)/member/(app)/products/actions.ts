@@ -24,6 +24,7 @@ import {
   type SkuPriceEdit,
 } from '@/lib/catalogue/edits'
 import { validateCostSetting, type CostSettingEdit } from '@/lib/catalogue/rule-edits'
+import { cleanGwpChanges } from '@/lib/catalogue/gwp-edits'
 
 /**
  * Revenue → Product List: the portal's OWN decisions about the ERP's catalogue
@@ -375,4 +376,46 @@ export async function removeCombos(sets: ComboSetRef[]): Promise<RemoveCombosRes
   }
   refresh()
   return { ok: true, removed: Number(data ?? rows.length) }
+}
+
+// ─── GWP (2026-11-08) ────────────────────────────────────────────────────────
+
+export type SaveGwpResult = { ok: true; id: string } | { ok: false; reason: string }
+
+/**
+ * Product List › GWP (2026-11-08 — the user: "dullop mattress ecobliss, set a gwp 2 micorfibre pillow. so the
+ * margin calculator and margin leader will not calculate the cost in for those 2 pillow"): makes a gift with
+ * purchase, changes one — only the fields the page changed — or takes one away, in one transaction
+ * (`catalogue_save_gwp`, under the caller's own session: the tables' policies decide, Product List · Edit).
+ * Every margin reads it at once — the Quote, Comm Cal's month, Insight and the Arena; a run already computed
+ * moves when it is computed again. A refusal the Principal can act on comes back as `reason`.
+ */
+export async function saveGwp(id: string | null, changes: unknown): Promise<SaveGwpResult> {
+  await requireProductListEdit()
+  let clean
+  try {
+    clean = cleanGwpChanges(changes, id === null)
+  } catch (e) {
+    if (e instanceof EditError) return { ok: false, reason: e.message }
+    throw e
+  }
+  return gwpRpc(id, clean)
+}
+
+export async function removeGwp(id: string): Promise<SaveGwpResult> {
+  await requireProductListEdit()
+  if (typeof id !== 'string' || !id) return { ok: false, reason: 'Which GWP?' }
+  return gwpRpc(id, { remove: true })
+}
+
+async function gwpRpc(id: string | null, changes: object): Promise<SaveGwpResult> {
+  const sb = await client()
+  const { data, error } = await sb.rpc('catalogue_save_gwp', { p_id: id, p_changes: changes })
+  if (error) {
+    // A check only the database can make, in its own words: the shape, a SKU gone, a GWP gone, Product List · Edit.
+    if (['22023', '23503', 'P0002', '42501'].includes(error.code ?? '')) return { ok: false, reason: error.message }
+    fail('the GWP', error)
+  }
+  refresh()
+  return { ok: true, id: String(data ?? id ?? '') }
 }
