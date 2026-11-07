@@ -1324,3 +1324,41 @@ BEGIN
 END
 $function$
 ;
+
+-- member_share_order_cancel() md5 427e1e2ff8bc4da8a03dcb692ec86917
+CREATE OR REPLACE FUNCTION public.member_share_order_cancel(p_request uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_me    uuid := auth.uid();
+  v_staff uuid := public.member_staff_id();
+  v_r     public.sales_order_share_requests%ROWTYPE;
+BEGIN
+  SELECT * INTO v_r FROM public.sales_order_share_requests WHERE id = p_request FOR UPDATE;
+  IF v_r.id IS NULL OR v_r.owner_staff_id <> v_staff THEN
+    RAISE EXCEPTION 'Only the salesperson who sent it can withdraw a share request.' USING ERRCODE = '42501';
+  END IF;
+  IF v_r.status NOT IN ('partner', 'hr') THEN
+    RAISE EXCEPTION 'This share request is % already, so there is nothing to withdraw.',
+      CASE v_r.status WHEN 'approved' THEN 'approved' WHEN 'rejected' THEN 'rejected' WHEN 'declined' THEN 'declined'
+                      ELSE 'withdrawn' END USING ERRCODE = '22023';
+  END IF;
+  UPDATE public.sales_order_share_requests SET status = 'cancelled', updated_at = now() WHERE id = p_request;
+  INSERT INTO public.sales_order_share_request_events (request_id, step, actor_id, actor_staff_id, actor_name)
+  VALUES (p_request, 'cancelled', v_me, v_staff, v_r.owner_name);
+  BEGIN
+    PERFORM public.notify_people(ARRAY(SELECT s.user_id FROM public.sales_order_share_request_parts y
+                                         JOIN public.hr_staff_costs s ON s.id = y.staff_id
+                                        WHERE y.request_id = p_request AND y.answer <> 'declined'),
+      'share', v_r.order_no || ' · share request withdrawn', v_r.owner_name || ' withdrew the request to share ' || v_r.order_no || '.',
+      'share_request', p_request::text);
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'member_share_order_cancel: nobody was told of % (%)', v_r.order_no, SQLERRM;
+  END;
+  RETURN public.share_requests_json(ARRAY[p_request], v_staff) -> 0;
+END
+$function$
+;

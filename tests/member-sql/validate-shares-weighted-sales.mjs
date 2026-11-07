@@ -8,7 +8,8 @@
 // migration then runs VERBATIM, twice. Under test — A: the one with HR that passes its checks takes effect (owner,
 // colleague and HR told), the one that does not stays with HR; an accept takes effect at once (trail sent → accepted,
 // decided by the colleague, the owner and HR told, HR's line at each one's rate, ref share_taken 'fair/<month>'); a
-// refusal (a closed month, a bill that moved) changes nothing, the answer included; HR's 'partner' wording; the
+// refusal (a closed month, a bill that moved) changes nothing, the answer included; a shared request reads "shared"
+// to a colleague who answers again and to an owner who would withdraw it; HR's 'partner' wording; the
 // revenue.shares topic (may, sync, seeded, its CHECK) and ref_kind share_taken. B: each part's weight — a live
 // penalty band (the bill's brand, its goods lines' brand, every brand's), none for a head, a stored close's or applied
 // run's multiplier (not a reopened close's, not a computed run's), 1 for what a close paid or a release, none with the
@@ -68,8 +69,9 @@ const PRODUCTION = {
   member_share_order_send: '388916e2f526dee74410a0ca3cf40e86',
   member_share_order_answer: '5da728faa7bf1a9f9756b3d3b0457c13',
   revenue_share_request_decide: '9b4e77261994128a41802f53666ea135',
+  member_share_order_cancel: '427e1e2ff8bc4da8a03dcb692ec86917',
 }
-const MADE = ['share_request_take_effect', 'member_share_order_answer', 'revenue_share_request_decide', 'notification_topic_may',
+const MADE = ['share_request_take_effect', 'member_share_order_answer', 'member_share_order_cancel', 'revenue_share_request_decide', 'notification_topic_may',
   'notification_topics_sync', 'member_order_facts_with_old_bills', 'member_order_book_for_staff',
   'member_principal_department_order_book', 'member_arena_history_for_staff', 'member_arena_booth_history_for_staff']
 
@@ -356,6 +358,11 @@ check((await notices(HR)).at(-1), { title: 'HC-SO-2611-015 · shared',
 check(await factsOf('HC-SO-2611-015'), [
   { staff: LOUIS, revenue: 5000, full: 10000, weight: 1 }, { staff: SHELDON, revenue: 5000, full: 10000, weight: 1 },
 ], 'RM 10,000 shared half: RM 5,000 each, the whole RM 10,000 beside it')
+await refuses(`SELECT member_share_order_answer($1, true, NULL)`, [r1],
+  /This share request was answered already — it is shared\./, 'answered again: it is shared')
+await as(U[LOUIS])
+await refuses(`SELECT member_share_order_cancel($1)`, [r1],
+  /This share request is shared already, so there is nothing to withdraw\./, 'nor can LOUIS withdraw it: it is shared')
 
 // A refusal changes nothing — the answer included.
 await as(U[LOUIS])

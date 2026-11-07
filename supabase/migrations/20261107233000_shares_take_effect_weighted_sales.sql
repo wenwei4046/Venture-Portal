@@ -22,6 +22,8 @@
 --    member_share_order_answer calls it once nobody is left to answer, and RAISES its refusal: nothing changes, the
 --    colleague's answer included. The requests with HR now are put through it here; one it refuses stays with HR (a
 --    NOTICE), and revenue_share_request_decide stays for that one. Its 'partner' refusal no longer says HR decides.
+--    An approved request reads "shared" where member_share_order_answer says it was answered already and
+--    member_share_order_cancel says there is nothing to withdraw — every other word as it was.
 --    notification_topic_may / notification_topics_sync know revenue.shares (revenue.edit, and Comm Cal's month page
 --    open for it); it is given to everybody who holds member.requests today, and may() still decides at send.
 --    app_notifications takes ref_kind 'share_taken'; notification_topics takes 'revenue.shares'.
@@ -48,7 +50,8 @@
 -- if production's body has changed since; a second run changes nothing:
 --
 --   share_request_take_effect               (new)                            → 06ae489079db169c81a870435a39aecc
---   member_share_order_answer               5da728faa7bf1a9f9756b3d3b0457c13 → 7973666744955b47838e957fb79c15bd
+--   member_share_order_answer               5da728faa7bf1a9f9756b3d3b0457c13 → fb798d142dec22cebf868bdb1d74435d
+--   member_share_order_cancel               427e1e2ff8bc4da8a03dcb692ec86917 → defbb352819379ed35ff1b6f29c7b814
 --   revenue_share_request_decide            9b4e77261994128a41802f53666ea135 → b01796bdaa1d718a14c3316db25e6938
 --   notification_topic_may                  5bd3decefb4fb753a3ef464573ff0b66 → 0ff1a9b15be23a1b8e2a60f4ac65b842
 --   notification_topics_sync                931c63761257d74fbe3b0162f2d71464 → 507c5b4dd216e1b6aba7e7dc682cf72f
@@ -72,7 +75,7 @@
 -- staff books and the department's as before but those two bills, fullRevenue on every entry, the margins the same.
 -- The fair boards: HR's shares split between their holders; each holder on the roster — LUCAS CHOOI's August halves
 -- now WEI PIN's (+RM 2,720) and ESTHER's (+RM 2,245). The penalty switched on in the transaction would cut Sep–Nov's
--- sales from RM 4,443,417.50 to RM 4,024,016.50 (85 parts).
+-- sales from RM 4,443,417.50 to RM 4,024,016.50 (85 parts). The "shared" wording of answer and cancel came after it.
 
 BEGIN;
 
@@ -83,7 +86,8 @@ DECLARE
   v_md5 text;
 BEGIN
   FOR r IN SELECT * FROM (VALUES
-      ('public.member_share_order_answer(uuid, boolean, text)', '5da728faa7bf1a9f9756b3d3b0457c13', '7973666744955b47838e957fb79c15bd'),
+      ('public.member_share_order_answer(uuid, boolean, text)', '5da728faa7bf1a9f9756b3d3b0457c13', 'fb798d142dec22cebf868bdb1d74435d'),
+      ('public.member_share_order_cancel(uuid)', '427e1e2ff8bc4da8a03dcb692ec86917', 'defbb352819379ed35ff1b6f29c7b814'),
       ('public.revenue_share_request_decide(uuid, boolean, text)', '9b4e77261994128a41802f53666ea135', 'b01796bdaa1d718a14c3316db25e6938'),
       ('public.notification_topic_may(uuid, text)', '5bd3decefb4fb753a3ef464573ff0b66', '0ff1a9b15be23a1b8e2a60f4ac65b842'),
       ('public.notification_topics_sync(text[])', '931c63761257d74fbe3b0162f2d71464', '507c5b4dd216e1b6aba7e7dc682cf72f'),
@@ -380,7 +384,7 @@ COMMENT ON FUNCTION public.share_request_take_effect(uuid, uuid, text) IS
 REVOKE ALL ON FUNCTION public.share_request_take_effect(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.share_request_take_effect(uuid, uuid, text) TO service_role;
 
-SELECT pg_temp.made_with('public.member_share_order_answer(uuid, boolean, text)', '7973666744955b47838e957fb79c15bd', ARRAY[
+SELECT pg_temp.made_with('public.member_share_order_answer(uuid, boolean, text)', 'fb798d142dec22cebf868bdb1d74435d', ARRAY[
     $o$v_waiting text;$o$,
     $n$v_waiting text;
   v_reason  text;$n$,
@@ -397,7 +401,16 @@ SELECT pg_temp.made_with('public.member_share_order_answer(uuid, boolean, text)'
       PERFORM public.notify_people(ARRAY[v_owner], 'share', v_r.order_no || ' · accepted — with HR now',
         v_name || ' accepted sharing ' || v_r.order_no || '. HR approves it on Comm Cal.', 'share_request', p_request::text);$o$,
     $n$ELSIF v_waiting IS NULL THEN
-      NULL;  -- (20261107233000) share_request_take_effect told the owner, the colleagues and HR.$n$
+      NULL;  -- (20261107233000) share_request_take_effect told the owner, the colleagues and HR.$n$,
+    -- An approved request is a shared one now.
+    $o$WHEN 'approved' THEN 'approved'$o$,
+    $n$WHEN 'approved' THEN 'shared'$n$
+  ]);
+
+SELECT pg_temp.made_with('public.member_share_order_cancel(uuid)', 'defbb352819379ed35ff1b6f29c7b814', ARRAY[
+    -- An approved request is a shared one now: "This share request is shared already, so there is nothing to withdraw."
+    $o$WHEN 'approved' THEN 'approved'$o$,
+    $n$WHEN 'approved' THEN 'shared'$n$
   ]);
 
 SELECT pg_temp.made_with('public.revenue_share_request_decide(uuid, boolean, text)', 'b01796bdaa1d718a14c3316db25e6938', ARRAY[
@@ -607,7 +620,8 @@ DECLARE
 BEGIN
   FOR r IN SELECT * FROM (VALUES
       ('public.share_request_take_effect(uuid, uuid, text)', '06ae489079db169c81a870435a39aecc'),
-      ('public.member_share_order_answer(uuid, boolean, text)', '7973666744955b47838e957fb79c15bd'),
+      ('public.member_share_order_answer(uuid, boolean, text)', 'fb798d142dec22cebf868bdb1d74435d'),
+      ('public.member_share_order_cancel(uuid)', 'defbb352819379ed35ff1b6f29c7b814'),
       ('public.revenue_share_request_decide(uuid, boolean, text)', 'b01796bdaa1d718a14c3316db25e6938'),
       ('public.notification_topic_may(uuid, text)', '0ff1a9b15be23a1b8e2a60f4ac65b842'),
       ('public.notification_topics_sync(text[])', '507c5b4dd216e1b6aba7e7dc682cf72f'),
