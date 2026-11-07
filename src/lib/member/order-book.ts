@@ -77,6 +77,14 @@ export interface MemberBookOrder {
    * nobody, 2026-10-25), where every bill is whole (`revenue` the bill's, never a part). Null: the ERP named nobody.
    */
   seller?: { id: string; name: string } | null;
+  /**
+   * An old bill topped up (2026-11-07): a departed salesperson's bill from before the portal paid, whose top-up the
+   * holder collected. It pays them commission only — listed, and counted in none of their sales, target, KPI, margin or
+   * the Arena (the user: "i want can view, then mention no count in sales target (arena)"). Absent on every other bill.
+   */
+  commissionOnly?: true;
+  /** Who sold an old bill, as the ERP names them; null when it names nobody. Only with `commissionOnly`. */
+  soldBy?: string | null;
 }
 
 export interface MemberBookShare {
@@ -197,6 +205,7 @@ function readOrder(value: unknown): MemberBookOrder | null {
     own: value.own !== false,
     share: readShare(value.share),
     ...("seller" in value ? { seller: readSeller(value.seller) } : {}),
+    ...(value.commissionOnly === true ? { commissionOnly: true as const, soldBy: text(value.soldBy)?.trim() || null } : {}),
   };
 }
 

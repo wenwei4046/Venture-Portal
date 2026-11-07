@@ -1630,6 +1630,22 @@ with comm, they will right click"*.
   salesperson's, one at its deposit before (ZNT4813's linked PG10672 — RM 4,200
   of RM 14,000, exactly 30%), one not topped up far enough, a cancelled one —
   skipped as before, the feed's log saying why.
+- **…and pays them commission only** (2026-11-07, the same evening; asked what
+  such a bill counts in, the user: *"is go with b, not a"*; of the Revenue app:
+  *"i want can view, then mention no count in sales target (arena)"*). The
+  holder is paid their rate on everything on it that earns, KPI items included,
+  no margin multiplier — one line, *… · old bill, commission only*; it waits on
+  its deposit like any bill and is released once paid (`SalesOrder.commissionOnly`,
+  set by `toEngineInput` for an ERP bill dated before the feed window in a month
+  from it on). It is none of the revenue anything else is measured on: no rung,
+  no group sales, no override to the upline, no margin or margin incentive, no
+  KPI item or threshold, not the directors' threshold. It is LISTED — the
+  ledger, All bills (*Top up deposit · Mar 2026 bill · Junie · commission
+  only*), My income, the Revenue app's bills (*Commission only · Not in sales ·
+  target · Arena*) — and left out of every sales figure: the month's cards and
+  exhibitions, All bills' sales value, the salesperson row, the app's sales,
+  target, KPI, margins and the Arena (`sales_order_old_bill()`, mig
+  `20261107230000`).
 
 ### 4.20 A bill moved to another salesperson — from its right-click (2026-10-12)
 

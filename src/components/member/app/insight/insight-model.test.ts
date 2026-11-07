@@ -245,3 +245,39 @@ describe("Insight › My team › a person", () => {
     expect(orderSheet(shared, "8")?.share?.sub).toBe("LUCAS’s bill · JAMES’s part 50% · RM 2,150 in JAMES’s sales");
   });
 });
+
+// 2026-11-07, the user, of an old bill topped up: "i want can view, then mention no count in sales target (arena)".
+describe("Insight › an old bill topped up", () => {
+  const old = order({ id: "9", number: "ZNT4813", sourceMonth: "2026-03", carried: true, week: "2026-03-13", date: "2026-03-10",
+    revenue: 6000, total: 6000, margin: 10, kpiQty: 3, commissionOnly: true, soldBy: "JUNIE TAN" });
+  const withOld = input({ book: book([...ORDERS, old]) });
+
+  it("counts in none of the member's sales, orders, brands or margin", () => {
+    expect(insightMain(withOld).personal).toEqual(insightMain(input()).personal);
+    expect(marginStanding(book([...ORDERS, old]), BANDS)).toEqual(marginStanding(book(ORDERS), BANDS));
+  });
+
+  it("is listed with the carried-in bills, muted, and says it counts in nothing but commission", () => {
+    const vm = billsView(withOld);
+    expect(vm.counted).toEqual(billsView(input()).counted);
+    expect(vm.waiting).toEqual(billsView(input()).waiting);
+    const row = vm.weeks.earlier.bills.find(b => b.no === "ZNT4813");
+    expect(row).toMatchObject({ pill: "Commission only", amtMuted: true, kpiText: null, sub: "Mdm Lee · Not in sales · target · Arena" });
+    expect(vm.weeks.earlier.stats).toMatch(/ · 1 old bill$/);
+  });
+
+  it("opens on whose bill it was, and that it pays commission only", () => {
+    expect(orderSheet(withOld, "9")).toMatchObject({
+      status: "Commission only", statusTone: "neutral", margin: "—", tier: "Not counted", kpi: "—",
+      oldBill: { line: "JUNIE TAN’s bill · Mar 2026", sub: "Pays you commission only. Not counted in your sales, your target or the Arena." },
+    });
+    expect(orderSheet(input({ book: book([old]), of: "SHAWN" }), "9")?.oldBill?.sub)
+      .toBe("Pays SHAWN commission only. Not counted in SHAWN’s sales, SHAWN’s target or the Arena.");
+    expect(orderSheet(withOld, "1")?.oldBill).toBeNull();
+  });
+
+  it("is no KPI order", () => {
+    const on = { kpi: { ...input().kpi!, enabled: true } };
+    expect(kpiView(input({ ...on, book: book([...ORDERS, old]) }), "Fair").orders.map(o => o.no)).not.toContain("ZNT4813");
+  });
+});
