@@ -388,7 +388,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
   }
   shareText() {
     const { pkg, total, changes, disc, adjust } = this.calc(); const c = this.state.cust;
-    const lines = [`Quotation · ${c.building}${c.unit ? " " + c.unit : ""}`, `${pkg.name}`, c.att ? `Attention: ${c.att}` : "", "",
+    const where = [c.building, c.unit].filter(Boolean).join(" "); const lines = [where ? `Quotation · ${where}` : "Quotation", this.lib.packageName(this.state.data?.packages, pkg), c.att ? `Attention: ${c.att}` : "", "",
       ...changes.map(x => `${x.tag}: ${title(x.l.name)}${x.l.qty !== 1 ? " × " + x.l.qty : ""}`),
       disc ? `Discount: ${rm(-disc)}` : "", ...adjust.map(a => `${a.label}: ${rm(a.amount)}`), `Total: ${rm(total)}`, "", `Prepared by ${c.by} · ${longDate(c.date)}`];
     return lines.filter((l, i, a) => l !== "" || (a[i - 1] !== "" && i > 0)).join("\n");
@@ -610,7 +610,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       styleSub: "Pick the look to show the client. Furniture and price follow the room type.",
       docSrc: step === 5 && pkg ? this.docHtml(false).replace("</head>", `<style>@media screen{html{background:#F2F2EF;color-scheme:light}body{width:210mm!important;min-height:297mm;box-sizing:border-box;padding:14mm!important;margin:24px auto!important;background:#fff;box-shadow:0 2px 12px rgba(30,43,39,.14)}}</style></head>`) : "",
       docRef: this._docRef || (this._docRef = el => { if (el && !el._fit) { el._fit = true; el.addEventListener("load", () => this._fitDoc({ currentTarget: el })); } }),
-      _fitDocSet: (this._fitDoc = e => { try { const f = e.currentTarget, de = f.contentDocument.documentElement; de.style.zoom = 1; const h = de.scrollHeight; const s = Math.min(1, f.clientWidth / (de.scrollWidth + 8)); de.style.zoom = s; f.style.height = Math.ceil(h * s + 4) + "px"; } catch (x) {} }),
+      _fitDocSet: (this._fitDoc = e => { try { const f = e.currentTarget, de = f.contentDocument.documentElement, box = (f.parentElement && f.parentElement.clientWidth) || f.clientWidth, A4 = 794; f.style.width = box + "px"; de.style.zoom = 1; de.style.width = box < A4 ? A4 + "px" : ""; const h = de.scrollHeight; const s = Math.min(1, box / (de.scrollWidth + 8)); de.style.zoom = s; f.style.height = Math.ceil(h * s + 4) + "px"; } catch (x) {} }),
       ...this.styleStep(group, byId, style),
       styleOpts: group ? [["classic", "Classic"], ["build", "Build in"]].filter(([k]) => group[k]).map(([k, label]) => {
         const p = byId(group[k]), on = style === k;
