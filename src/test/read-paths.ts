@@ -251,7 +251,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // A showroom's draft (mig 20261103100000): CRM · Manage only, [] for anybody else.
   'crm_showroom_drafts_read',
   // IR Quote (2026-11-05, mig 20261105120000): every read and write of the quotation, its drafts and the Drive.
-  'ir_quote_read', 'ir_drive_read', 'ir_quote_save_config', 'ir_quote_save_draft', 'ir_drive_save_board',
+  'ir_quote_read', 'ir_drive_read', 'ir_quote_member_view', 'ir_quote_save_config', 'ir_quote_save_draft', 'ir_drive_save_board',
   // An ad's name from Ads Manager (mig 20261019100000): the webhooks' service role alone — EXECUTE for nobody else.
   'crm_ads_unnamed', 'crm_meta_name_ad', 'crm_ads_to_check', 'crm_meta_ad_status',
   // Auto-replies sent (mig 20261019120000): the webhooks' service role alone — EXECUTE for nobody else.

@@ -750,6 +750,18 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   useEffect(() => {
     if (!onCrm && crmFrom) setCrmFrom(null);
   }, [onCrm, crmFrom]);
+  // Who the Principal picked under the CRM's View as comes along out of it (2026-11-06, the user: "要带"); leaving their
+  // View as there leaves it here. Somebody with no seat in the Revenue app stays the CRM's alone.
+  const crmAs = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (onCrm || crmAs.current === undefined) return;
+    const staff = crmAs.current;
+    crmAs.current = undefined;
+    if (!principal) return;
+    if (!staff) { if (route.staff) goScreen(route.screen, { staff: "" }); return; }
+    const seat = membership?.people.some(p => p.id === staff) ? membership : data.memberships.find(m => m.people.some(p => p.id === staff));
+    if (seat) goScreen(route.screen, { staff, department: seat.id });
+  }, [onCrm, principal, route.staff, route.screen, membership, data.memberships, goScreen]);
   // The CRM's way out: back where it was opened, else — a tapped notice opened it — home. Profile leads to it no more
   // (its My leads & appointments row went on 2026-10-20), so its way back is not Profile's either.
   const leaveCrm = () => {
@@ -1484,8 +1496,14 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   } else if (irqOn) {
     page = (
       <div className={desk ? s.irqColumn : s.irqLayer}>
-        <IrQuoteScreen inApp={desk} rootH="100%" readOnly={irqReadOnly} preview={irqPreview} offline={data.demo || fixture ? { name: me.name } : undefined}
-          onNav={irqNav} onSettings={productList ? openIrqSettings : undefined} onClosePreview={() => goScreen("quote")} />
+        <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
+          {!desk && viewed && <ViewingAsBar me={me} onSwitch={() => setVaOpen(true)} onExit={() => goScreen("account", { staff: "" })} />}
+          <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+            <IrQuoteScreen key={viewed ? viewed.id : "own"} inApp={desk} rootH="100%" readOnly={irqReadOnly} preview={irqPreview} offline={data.demo || fixture ? { name: me.name } : undefined}
+              view={viewed && membershipId ? { staffId: viewed.id, subDepartmentId: membershipId } : undefined}
+              onNav={irqNav} onSettings={viewed ? undefined : productList ? openIrqSettings : undefined} onClosePreview={() => goScreen("quote")} />
+          </div>
+        </div>
       </div>
     );
   } else if (onProducts) {
@@ -1619,7 +1637,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     } else if (pf === "crm" && crm) {
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
-      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen} onReady={() => setCrmReady(true)}
+      page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen} onReady={() => setCrmReady(true)} onViewAs={id => { crmAs.current = id; }}
         onExit={exitCrm} onQuoteSettings={!desk && productList ? openIrqSettings : undefined} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
@@ -1671,7 +1689,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       <DeskHeader greet={fixture?.greeting ?? greeting()} me={me} subName={membership?.name ?? ""} dateLine={`${longDayLabel(today)} · ${quarterLabel(today)}`}
         unread={nfCount > 0 || nf.items.some(n => n.unread)} onSubDept={() => openSheet("sd")} onNotif={toggleNotif}
         onSignOut={() => { const f = document.createElement("form"); f.method = "post"; f.action = "/member/signout"; document.body.appendChild(f); f.submit(); }} />
-      {viewed && <ViewingAsBar me={me} onSwitch={() => setVaOpen(true)} onExit={() => goScreen("account", { staff: "" })} />}
+      {viewed && (desk || !irqOn) && <ViewingAsBar me={me} onSwitch={() => setVaOpen(true)} onExit={() => goScreen("account", { staff: "" })} />}
       {/* The first open asks once whether this phone gets notifications (2026-10-11, the user) — not the Principal's, as Profile's row. */}
       {live && !principal && !data.demo && !fixture ? <PushAsk app="revenue" save={savePushSubscription} trouble={reportPushTrouble} /> : null}
       {showHeader && (
