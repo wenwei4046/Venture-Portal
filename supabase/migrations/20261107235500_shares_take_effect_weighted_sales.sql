@@ -70,14 +70,15 @@
 -- PGlite: tests/member-sql/validate-shares-weighted-sales.mjs (production's bodies, md5-checked; the migration
 -- verbatim, twice).
 --
--- Dry run on production, rolled back (2026-11-07 ~23:05 KL, 20261107230000 live; Fair's scheme, Sep–Nov): the two with
--- HR took effect — HC-SO-2610-015 LOUIS → SHELDON TAN, HC-SO-2611-028 KAR JIUN → SALLY; owner and colleague told, the
--- six HR accounts told (share_taken fair/2026-10-01, fair/2026-11-01). member_order_facts 784 → 786 rows: those two
--- bills in halves, every other row as before; no part weighs below 1 (Fair's penalty is off; nothing is stored). The 26
--- staff books and the department's as before but those two bills, fullRevenue on every entry, the margins the same.
--- The fair boards: HR's shares split between their holders; each holder on the roster — LUCAS CHOOI's August halves
--- now WEI PIN's (+RM 2,720) and ESTHER's (+RM 2,245). The penalty switched on in the transaction would cut Sep–Nov's
--- sales from RM 4,443,417.50 to RM 4,024,016.50 (85 parts). The "shared" wording of answer and cancel came after it.
+-- Dry run on production, rolled back (2026-11-07 ~23:30 KL, 20261107230000 and 20261107233000 live; Fair's scheme,
+-- Sep–Nov): the two with HR took effect — HC-SO-2610-015 LOUIS → SHELDON TAN, HC-SO-2611-028 KAR JIUN → SALLY; owner
+-- and colleague told, the six HR accounts told (share_taken fair/2026-10-01, fair/2026-11-01). member_order_facts 785
+-- → 787 rows: those two bills in halves, every other row as before; no part weighs below 1 (Fair's penalty is off;
+-- nothing is stored). The 26 staff books and the department's as before but those two bills, fullRevenue on every
+-- entry, the margins the same. The fair boards: HR's shares split between their holders; each holder on the roster —
+-- LUCAS CHOOI's August halves now WEI PIN's (+RM 2,720) and ESTHER's (+RM 2,245). The penalty switched on in the
+-- transaction would cut Sep–Nov's sales from RM 4,449,896.50 to RM 4,030,495.50 (85 parts). Every md5 as written;
+-- member_order_facts_with_old_bills made again keeps sku_ratios_by_brand's ladder, ratio by brand and its join.
 
 BEGIN;
 
