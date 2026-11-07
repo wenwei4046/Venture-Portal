@@ -274,7 +274,11 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       // pays it, and says so as the salesperson's ledger does.
       origin: o.cancelled ? null : rowOrigin(
         { upsale: false, orderTotal: o.orderTotal, periodMonth: period, status: o.depositMet ? 'eligible' : 'deposit_pending' },
-        period, { saleMonth: eventOf.get(o.orderId)?.saleMonth ?? null }),
+        period, {
+          saleMonth: eventOf.get(o.orderId)?.saleMonth ?? null,
+          // A departed salesperson's bill from before the feed window, in on its top-up (2026-11-07).
+          oldBill: eventOf.get(o.orderId)?.oldBill ?? null,
+        }),
       // Moved here from another salesperson (2026-10-12).
       moved: workbench?.moves?.[o.orderId] ?? null,
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changedPeople, nameWarnings, payrollState, unmatchedWarnings, type PayrollFacts } from './payroll-send'
+import { changedPeople, nameWarnings, payrollState, unassignedOldBillWarnings, unmatchedWarnings, type PayrollFacts } from './payroll-send'
 
 const KRIS = 'e2a52899-dd15-4020-87e0-9bd8cf22b113'
 
@@ -31,6 +31,21 @@ describe('unmatchedWarnings', () => {
     expect(unmatchedWarnings([])).toEqual([])
     expect(unmatchedWarnings(['HC-SO-1', 'HC-SO-2'])).toEqual([
       '2 order(s) carry an agent who is not a salesperson in the portal and were excluded. Match them in the import wizard.',
+    ])
+  })
+})
+
+describe('unassignedOldBillWarnings (2026-11-07)', () => {
+  // A departed salesperson's old bill, topped up since by nobody the portal
+  // pays: HR gives it to whoever collected the money — never by matching the
+  // departed salesperson's name.
+  it('names the bill and the fix, and nothing when there is none', () => {
+    expect(unassignedOldBillWarnings([])).toEqual([])
+    expect(unassignedOldBillWarnings(['HC-SO-006572'])).toEqual([
+      "HC-SO-006572 is a departed salesperson's old bill, topped up since by nobody the portal pays: give it to whoever collected the money (All bills → right-click → Move to another salesperson), or Don't count this bill.",
+    ])
+    expect(unassignedOldBillWarnings(['HC-SO-006572', 'HC-SO-008957'])).toEqual([
+      "2 departed salespeople's old bills were topped up since by nobody the portal pays (HC-SO-006572, HC-SO-008957): give each to whoever collected the money (All bills → right-click → Move to another salesperson), or Don't count this bill.",
     ])
   })
 })

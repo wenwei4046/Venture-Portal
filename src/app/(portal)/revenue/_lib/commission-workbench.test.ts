@@ -46,6 +46,8 @@ describe('commission workbench server metadata', () => {
       booth: null,
       // Sold at an August fair (no day named, so the fair's month) — 2026-10-12.
       saleMonth: '2026-08-01',
+      // Dated in the feed window: no old bill (2026-11-07).
+      oldBill: null,
     }])
     // Nothing from another month to explain: no upsells, no carried bills.
     expect(result.upsales).toEqual({})
@@ -53,6 +55,42 @@ describe('commission workbench server metadata', () => {
     expect(result.payRows).toEqual([])
     expect(result.payUnavailable).toBe(true)
     expect(result.payLinesClosed).toBeNull()
+  })
+
+  // An old bill topped up (2026-11-07, the user of ZNT4813: "如果那个 order 之前
+  // below depo，but 离职了 shawn 帮忙 handle 这样就是有 com"): dated before the
+  // feed window, in on its top-up — Top up deposit · Mar 2026 bill · Junie; one
+  // nobody the portal pays collected is said apart from the agents to match.
+  it('tells an old bill topped up by its date, and keeps one nobody collected apart from the agents to match', async () => {
+    mocks.input.mockResolvedValue({
+      input: { hierarchy: [], orders: [] }, currentHierarchy: [], currentRules: {},
+      unmatchedOrderNos: ['HC-SO-006572', 'HC-SO-2611-009'],
+    })
+    mocks.calendar.mockResolvedValue([])
+    mocks.pay.mockRejectedValue(new Error('no pay'))
+    const db = {
+      from: (table: string) => table === 'erp_feed_settings'
+        ? { select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: { min_order_date: '2026-08-01' }, error: null }) }) }) }
+        : { select: () => ({ in: () => Promise.resolve({ data: [], error: null }) }) },
+      rpc: () => Promise.resolve({ data: null, error: null }),
+    } as unknown as SupabaseClient
+    const bill = (over: Partial<MonthOrder>) => ({
+      orderId: 'x', orderNo: 'x', orderDate: '2026-11-03', eventDate: '2026-11-03', staffId: null, agentName: 'X',
+      cancelled: false, venue: null, venueGroupKey: null, venueGroupName: null, location: null, organizer: null, ...over,
+    }) as MonthOrder
+    const result = await loadCommissionWorkbench(db, 'sub-1', '2026-11-01', [
+      bill({ orderId: 'znt', orderNo: 'HC-SO-010734', orderDate: '2026-03-10', staffId: 'shawn', agentName: 'Junie' }),
+      bill({ orderId: 'pg', orderNo: 'HC-SO-006572', orderDate: '2025-06-04', agentName: 'Junie' }),
+      bill({ orderId: 'new', orderNo: 'HC-SO-2611-009', agentName: 'NEW HIRE' }),
+    ])
+    expect(result.orders.map(o => [o.orderId, o.oldBill])).toEqual([
+      ['znt', { soldIn: '2026-03-01', soldBy: 'Junie' }],
+      ['pg', { soldIn: '2025-06-01', soldBy: 'Junie' }],
+      ['new', null],
+    ])
+    // Nobody to match for the old one: the departed salesperson's name must not be matched to anybody for it.
+    expect(result.unmatchedOrderNos).toEqual(['HC-SO-2611-009'])
+    expect(result.unassignedOldBillNos).toEqual(['HC-SO-006572'])
   })
 
   // Sales exhibition groups a bill under the booth the salesperson picked in

@@ -31,6 +31,23 @@ export function unmatchedWarnings(orderNos: readonly string[]): string[] {
     : []
 }
 
+/**
+ * An old bill topped up that nobody the portal pays collected (2026-11-07):
+ * a departed salesperson's bill from before the feed window, in on its
+ * top-up, is the collector's — and when the ERP names nobody, or somebody the
+ * portal does not pay, it is nobody's until HR gives it to whoever did. Not a
+ * name to match: the departed salesperson's name must not be matched to
+ * anybody for it.
+ */
+export function unassignedOldBillWarnings(orderNos: readonly string[]): string[] {
+  if (orderNos.length === 0) return []
+  const which = orderNos.length === 1
+    ? `${orderNos[0]} is a departed salesperson's old bill, topped up since by nobody the portal pays`
+    : `${orderNos.length} departed salespeople's old bills were topped up since by nobody the portal pays (${orderNos.join(', ')})`
+  const it = orderNos.length === 1 ? 'it' : 'each'
+  return [`${which}: give ${it} to whoever collected the money (All bills → right-click → Move to another salesperson), or Don't count this bill.`]
+}
+
 const PERSON_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 
 /**

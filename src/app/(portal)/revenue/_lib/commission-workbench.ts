@@ -4,13 +4,13 @@ import { fetchByKeys } from '@/lib/paginate'
 import { loadCommissionInput } from './commission-input'
 import { loadMonthOrders, type MonthOrder } from './month-orders'
 import { saleMonthOf } from '@/lib/fair-calendar'
-import type { CloseBills } from '@/lib/commission/row-origin'
+import { oldBillOf, type CloseBills, type OldBill } from '@/lib/commission/row-origin'
 import { workbenchStaffIds } from '@/lib/commission/workbench'
 import { loadFairCalendar } from './fair-calendar'
 import { loadOrderFairs } from './order-fairs'
 import { fairDays } from './upsales'
 import { loadPayBoard } from './pay-preview'
-import { loadBillMoves, loadCarriedCloses, loadUpsaleFacts, type UpsaleFact } from './row-origins'
+import { loadBillMoves, loadCarriedCloses, loadFeedFloor, loadUpsaleFacts, type UpsaleFact } from './row-origins'
 import type { BillMoved } from '@/lib/commission/bill-move'
 
 /** Read-only inputs: opening the workbench never creates a run or changes payroll. */
@@ -39,7 +39,7 @@ export async function loadCommissionWorkbench(
   // exists yet), the carried-forward bills with every bill's fair, and the
   // other-month rows' facts. One after another they were the whole of a
   // month's wait.
-  const [people, pay, { allOrders, placed }, upsales, carriedCloses, moves] = await Promise.all([
+  const [people, pay, { allOrders, placed, periodOf }, upsales, carriedCloses, moves, feedFloor] = await Promise.all([
     fetchByKeys<{ id: string; employee_name: string; employee_code: string | null }, string>(ids, keys =>
       db.from('hr_staff_costs').select('id, employee_name, employee_code').in('id', keys)),
     withPay
@@ -60,13 +60,19 @@ export async function loadCommissionWorkbench(
     (async () => {
       const earlier = await Promise.all(earlierPeriods.map(p => loadMonthOrders(db, subDepartmentId, p)))
       const everyOrder = [...monthOrders, ...earlier.flat()]
-      return { allOrders: everyOrder, placed: await loadOrderFairs(db, everyOrder.map(order => order.orderId)) }
+      // The month each bill sits in — an old bill topped up is told by it (2026-11-07).
+      const months = new Map<string, string>([
+        ...monthOrders.map(o => [o.orderId, period] as const),
+        ...earlier.flatMap((bills, i) => bills.map(o => [o.orderId, earlierPeriods[i]] as const)),
+      ])
+      return { allOrders: everyOrder, placed: await loadOrderFairs(db, everyOrder.map(order => order.orderId)), periodOf: months }
     })(),
     loadUpsaleFacts(db, subDepartmentId, upsaleIds),
     loadCarriedCloses(db, subDepartmentId, earlierPeriods),
     // Bills somebody moved to another salesperson (2026-10-12): the month's
     // own and every one the ledgers carry — the bills All bills lists too.
     loadBillMoves(db, [...new Set([...monthOrders.map(o => o.orderId), ...input.orders.filter(o => !o.upsale).map(o => o.id)])]),
+    loadFeedFloor(db, subDepartmentId),
   ])
   const fairById = new Map(calendar.map(fair => [fair.fairId, fair]))
   const orders = allOrders.map(o => {
@@ -86,10 +92,22 @@ export async function loadCommissionWorkbench(
       // The month it was sold in by its fair: a bill keyed after its fair's
       // month is that month's late key-in, paid where it sits (2026-10-12).
       saleMonth: saleMonthOf(placed.get(o.orderId)?.fairDate, fair),
+      // A departed salesperson's bill from before the feed window, the
+      // collector's on its top-up (2026-11-07): Top up deposit · Mar 2026 bill · Junie.
+      oldBill: oldBillOf({ orderDate: o.orderDate, periodMonth: periodOf.get(o.orderId) ?? period, agentName: o.agentName }, feedFloor),
     }
   })
+  // An old bill nobody the portal pays collected is nobody's until HR gives it
+  // to whoever did (2026-11-07) — not an agent to match: said apart.
+  const oldWithNobody = new Set(allOrders
+    .filter(o => !o.staffId && !o.cancelled
+      && oldBillOf({ orderDate: o.orderDate, periodMonth: periodOf.get(o.orderId) ?? period, agentName: o.agentName }, feedFloor))
+    .map(o => o.orderNo))
   return {
-    input, currentHierarchy, currentRules, orders, unmatchedOrderNos,
+    input, currentHierarchy, currentRules, orders,
+    unmatchedOrderNos: unmatchedOrderNos.filter(orderNo => !oldWithNobody.has(orderNo)),
+    /** Old bills topped up by nobody the portal pays (2026-11-07): HR moves each to whoever collected it. */
+    unassignedOldBillNos: unmatchedOrderNos.filter(orderNo => oldWithNobody.has(orderNo)),
     /** Each upsell and drop on the ledgers (`comm_upsales.id`): the bill it changed. */
     upsales: upsales as Record<string, UpsaleFact>,
     /** The closes of the months the ledgers carry bills in from. */
@@ -111,11 +129,12 @@ type Loaded = Awaited<ReturnType<typeof loadCommissionWorkbench>>
  * other-month rows' facts (2026-10-12): absent, a row says only what its own
  * fields can — an upsell is an upsell, a carried bill the month it came from.
  */
-export type CommissionWorkbenchData = Omit<Loaded, 'payLinesClosed' | 'upsales' | 'carriedCloses' | 'moves' | 'orders'>
+export type CommissionWorkbenchData = Omit<Loaded, 'payLinesClosed' | 'upsales' | 'carriedCloses' | 'moves' | 'orders' | 'unassignedOldBillNos'>
   & {
     payLinesClosed?: string | null
+    unassignedOldBillNos?: readonly string[]
     upsales?: Readonly<Record<string, UpsaleFact>>
     carriedCloses?: readonly CloseBills[]
     moves?: Readonly<Record<string, BillMoved>>
-    orders: (Omit<Loaded['orders'][number], 'saleMonth'> & { saleMonth?: string | null })[]
+    orders: (Omit<Loaded['orders'][number], 'saleMonth' | 'oldBill'> & { saleMonth?: string | null; oldBill?: OldBill | null })[]
   }

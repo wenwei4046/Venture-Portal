@@ -39,6 +39,15 @@ import { adjustmentLabel, type AdjustmentReason } from './erp-changes'
  * sales, the Revenue app, the Arena); when its salesperson was already closed
  * for that month it is marked **After close** there, and the next month still
  * open for them pays it, coloured.
+ *
+ * AN OLD BILL TOPPED UP (2026-11-07, the user, of ZNT4813: "如果那个 order 之前
+ * below depo，but 离职了 shawn 帮忙 handle 这样就是有 com" — "bc that time below
+ * depo is without comm out"). A bill dated before the feed window — sold by
+ * somebody who has left, still under its deposit when the portal started
+ * paying, topped up past it since — sits in the month its top-up came in, on
+ * whoever collected the money (`ingest_erp_sales_order`, mig 20261107200000).
+ * It is **Top up deposit** too, with its own month and who sold it beside it:
+ * "Mar 2026 bill · Junie".
  */
 
 export type RowOriginKind = 'upsell' | 'drop' | 'deposit' | 'late' | 'early' | 'held' | 'carried' | 'after_close'
@@ -78,6 +87,37 @@ export interface RowOriginFacts {
    * will (`carry.ts`) — said here so it is not missed (user 2026-10-12).
    */
   afterClose?: boolean
+  /**
+   * An old bill topped up (2026-11-07, `oldBillOf`): the month it was sold in
+   * and the salesperson the ERP names — who has left; the bill is the
+   * collector's now.
+   */
+  oldBill?: OldBill | null
+}
+
+/** A bill from before the feed window that came in on its top-up (`ingest_erp_sales_order`, 2026-11-07). */
+export interface OldBill {
+  /** The month it was sold in, `YYYY-MM-01`. */
+  soldIn: string
+  /** Who sold it, as the ERP names them. */
+  soldBy: string | null
+}
+
+/**
+ * Whether a bill is an old bill topped up: dated before the feed window
+ * (`erp_feed_settings.min_order_date`) yet in a month from it on. Nothing else
+ * brings such a bill in — the window turns every other one away — so its date
+ * says it. A bill of a month before the window (August's claim form) is no
+ * old bill; nor is any bill while there is no window.
+ */
+export function oldBillOf(
+  bill: { orderDate: string; periodMonth: string; agentName: string | null },
+  feedFloor: string | null,
+): OldBill | null {
+  if (!feedFloor) return null
+  const floor = feedFloor.slice(0, 10)
+  if (!(bill.orderDate.slice(0, 10) < floor) || bill.periodMonth.slice(0, 10) < floor) return null
+  return { soldIn: `${bill.orderDate.slice(0, 7)}-01`, soldBy: bill.agentName?.trim() || null }
 }
 
 /** The row as `rowOrigin` reads it — a `CommissionOrderRow` will do. */
@@ -111,6 +151,13 @@ export function rowOrigin(row: OriginRow, period: string, facts: RowOriginFacts 
       detail: from ? `${monthShort(from)} bill` : 'An earlier bill',
       paysHere,
     }
+  }
+  // An old bill topped up (2026-11-07): Top up deposit, whichever month pays it.
+  if (facts.oldBill) {
+    const from = facts.oldBill.soldIn.slice(0, 10)
+    const detail = facts.oldBill.soldBy ? `${monthShort(from)} bill · ${facts.oldBill.soldBy}` : `${monthShort(from)} bill`
+    if (row.status === 'deposit_pending') return { kind: 'held', label: 'Below deposit', fromMonth: from, detail, paysHere: false }
+    return { kind: 'deposit', label: 'Top up deposit', fromMonth: from, detail, paysHere }
   }
   const own = row.periodMonth.slice(0, 10)
   if (own < month) {

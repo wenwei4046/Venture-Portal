@@ -1605,6 +1605,31 @@ with comm, they will right click"*.
   no such document had arrived (every held delivery was a re-send); after
   September's commission is applied, every September-fair bill keyed late would
   have been.
+- **An old bill topped up is the collector's** (2026-11-07, mig
+  `20261107200000`; the user, of ZNT4813 — Junie's bill of 10 Mar 2026, RM 800 of
+  RM 6,000 paid, Junie gone, Shawn collected RM 3,200 on 2 Nov: *"如果那个 order
+  之前 below depo，but 离职了 shawn 帮忙 handle 这样就是有 com"* — *"bc that time
+  below depo is without comm out"*; asked how: built in, only the person who
+  collected the top-up, back-pay only bills that were below their deposit before,
+  each ERP document on its own). A document dated before the feed window (§14)
+  was settled by hand in its month and never came in. One whose salesperson has
+  LEFT (the ERP's `salesperson.active` false), still under Rules' deposit when the
+  portal started paying (the payments dated before the cutover month, §8.3) and
+  topped up past it since by a payment dated in or after that month, comes in now
+  (`erp_sync_old_bill`): on whoever COLLECTED that payment (its `collected_by`,
+  matched by ERP id, still working here) — nobody recorded, or nobody the portal
+  pays, and it is nobody's, said on the payroll bar, for HR to *Move to another
+  salesperson*; in the first month still open from that payment's — not paid, not
+  closed to the feed, not one its collector is closed in (with no collector, not
+  one anybody is), never past the office's own month; none → held. Never on the
+  departed salesperson, nor on whoever their name is matched to; the ERP's
+  salesperson stays on the bill. Status *Top up deposit · Mar 2026 bill · Junie*.
+  Once in it is an ordinary bill: it keeps its month, its re-sends are written
+  (never removed by the window), a change after its commission was given is a
+  drop or an upsell, Move / Share / *Don't count* work on it. Not one: an active
+  salesperson's, one at its deposit before (ZNT4813's linked PG10672 — RM 4,200
+  of RM 14,000, exactly 30%), one not topped up far enough, a cancelled one —
+  skipped as before, the feed's log saying why.
 
 ### 4.20 A bill moved to another salesperson — from its right-click (2026-10-12)
 

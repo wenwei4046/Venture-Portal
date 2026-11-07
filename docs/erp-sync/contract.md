@@ -91,9 +91,11 @@ with three small additions marked **(add)**:
   "deleted": false,                                    // true when the SO row no longer exists
   "header":   { /* one row of scm.mfg_sales_orders_with_payment_totals, minus PII (below) */ },
   "items":    [ /* scm.mfg_sales_order_items rows for the doc, verbatim */ ],
-  "payments": [ /* scm.mfg_sales_order_payments rows for the doc, verbatim */ ],
+  "payments": [ /* scm.mfg_sales_order_payments rows for the doc, verbatim,  */
+                /* plus (add 2026-11-07) "collected_by_name": scm.staff.name of collected_by, null when none */ ],
   "salesperson": { "id": "<scm.staff.id>", "name": "Lucas Tan",     // (add) the person behind
-                   "staff_code": "EMP-0012", "user_id": 12 },        //       header.salesperson_id
+                   "staff_code": "EMP-0012", "user_id": 12,          //       header.salesperson_id
+                   "active": true },                                 // (add 2026-11-07) scm.staff.active
   "fair": { "projectId": 2212, "venue": "PENANG WATERFRONT CONVENTION CENTRE",   // (add 2026-09-27)
             "organizer": "MLE", "startDate": "2026-09-25", "endDate": "2026-09-27", //  the event the
             "status": "confirmed", "brand": "ZANOTTI", "match": "PICKED",         //  salesperson picked;
@@ -259,6 +261,23 @@ the ERP's side; this is the portal's half, so a month deleted here stays
 deleted whatever the ERP is configured to send. It is edited on the *Houzs ERP
 link* card, beside the key.
 
+**An old bill topped up (2026-11-07).** One kind of order from before the
+window does come in. The user, of ZNT4813 (Junie's bill of 10 Mar 2026, RM 800
+of RM 6,000 paid; Junie gone; Shawn collected RM 3,200 on 2 Nov): a departed
+salesperson's bill that was under its deposit when the portal started paying
+earned nobody anything then, and earns whoever collects its top-up now. The
+ERP sends an order dated before `vp.since` when its salesperson is no longer
+active (`scm.staff.active`) and it has a payment dated on or after `vp.since`
+(§5); the portal takes it in when `erp_sync_old_bill` finds the salesperson
+LEFT (`salesperson.active` false), the payments dated before the month the
+portal pays from (`comm_first_paid_month`) under Rules' deposit, and a payment
+dated since that took it to the deposit — on that payment's collector
+(`collected_by`, matched by ERP id; nobody the portal pays → nobody, for HR to
+move), in the first month still open from that payment's. Anything else from
+before the window is still `skipped`, its message saying why (*— its
+salesperson still works here*). Comm Cal: §4.19 of
+`docs/module-spec-revenue-commission.md`, `.claude/rules/revenue/comm-cal.md`.
+
 ---
 
 ## 4. What the portal does with a delivery
@@ -271,7 +290,7 @@ Every delivery becomes one row in the portal's `erp_sync_events` and one of:
 | `duplicate` | same `snapshotAt` as the row already holds | no |
 | `stale` | an older `snapshotAt` than the row already holds (out-of-order retry) | no |
 | `held` | the month's commission run is **applied/locked**, the month is **closed to the feed** (`erp_feed_closed_months`, 2026-09-26 — a delivery that would write into OR out of it), or the month was **file-imported**. Since 2026-10-12 (mig `20261012200000`) a NEW document whose sale month is paid or closed is no longer held: it is `applied` in the first month still open from the month it was keyed in (message *created — keyed late: sold in September 2026, which is paid, so it counts in October 2026*); held only when no month up to the office's own is open | no — payload kept; HR replays after reopening the run or the month |
-| `skipped` | a brand-new `DRAFT`; a delete for a document the portal never saw; an order dated before the feed window | no |
+| `skipped` | a brand-new `DRAFT`; a delete for a document the portal never saw; an order dated before the feed window — unless it is an old bill topped up (§3, *An old bill topped up*, 2026-11-07), which is `applied` in the first month still open from its top-up's | no |
 
 **Commission rule, mirrored from the ERP** (`scm/shared/hr-commission.ts`,
 `COMMISSION_EXCLUDED_STATUSES`): `CANCELLED`, `DRAFT`, the retired `ON_HOLD`
@@ -323,7 +342,9 @@ INSERT INTO scm.venture_portal_sync_config (k, v) VALUES
   ('vp.url',       'https://<portal-host>/api/erp/v1/sales-orders'),
   ('vp.secret',    '<the shared secret>'),
   ('vp.companies', '1'),            -- Houzs Century only; comma-separated ids
-  ('vp.since',     '2026-08-01')    -- orders dated before this are never sent
+  ('vp.since',     '2026-08-01')    -- orders dated before this are never sent — but one whose
+                                    -- salesperson has left and that has a payment dated on or
+                                    -- after it is (2026-11-07, scm.vp_old_orders_wanted)
 ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v;
 ```
 
