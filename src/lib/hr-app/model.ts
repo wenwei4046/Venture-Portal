@@ -91,6 +91,9 @@ export interface HrMemberRequest {
   effective?: string | null
   reason?: string | null
   category?: string | null
+  /** An Other claim's own words (2026-11-07): what it is for. */
+  subject?: string | null
+  remarks?: string | null
   location?: string | null
   amount?: string | null
 }
@@ -385,7 +388,8 @@ export const positionLabel = (h: HrHire) => h.position + (h.headcount > 1 ? ` ×
 export function requestTitle(r: HrMemberRequest): string {
   if (r.kind === 'waiting') return r.newPerson ?? ''
   if (r.kind === 'replacement') return `${r.originalName ?? '—'} → ${r.pickName || r.newPerson || 'seat released'}`
-  return (r.category || 'Claim') + (r.amount ? ` · RM ${r.amount}` : '')
+  // An Other claim reads by its subject too (2026-11-07): `Other claim · Parking at MITEC · RM 45.5`.
+  return [r.category || 'Claim', r.subject, r.amount ? `RM ${r.amount}` : ''].filter(Boolean).join(' · ')
 }
 
 export interface ReviewItem {
