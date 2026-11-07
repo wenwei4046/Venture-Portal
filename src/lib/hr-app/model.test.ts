@@ -40,6 +40,11 @@ describe('the HR app model', () => {
     expect(requestTitle(req({ kind: 'replacement', originalName: 'Louis', newPerson: '' }))).toBe('Louis → seat released')
   })
 
+  it('an Other claim reads by its subject (2026-11-07)', () => {
+    expect(requestTitle(req({ kind: 'claim', category: 'Other claim', subject: 'Parking at MITEC', amount: '45.5' }))).toBe('Other claim · Parking at MITEC · RM 45.5')
+    expect(requestTitle(req({ kind: 'claim', category: 'Outstation accommodation', amount: '480' }))).toBe('Outstation accommodation · RM 480')
+  })
+
   it('finds the compulsory letters a person has nothing on file for', () => {
     const d = {
       docTypes: [{ id: 'offer', name: 'Offer letter', compulsory: true }, { id: 'inc', name: 'Increment letter', compulsory: false }],

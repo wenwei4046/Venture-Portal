@@ -32,6 +32,26 @@ describe("requests", () => {
     expect(requestSummary(flown, nameOf)).toBe("Sabah · air ticket · RM 990.00");
   });
 
+  // The user, 2026-11-07: an Other claim — its subject, remarks, amount and invoice.
+  it("lists an Other claim on its own, by its subject, with its remarks and invoice in its sheet", () => {
+    const other = request({
+      title: "Other claim · Parking at MITEC",
+      detail: { claimType: "other", category: "Other claim", subject: "Parking at MITEC", remarks: "Three days of the fair", amount: 45.5, invoiceName: "parking.pdf", invoiceHash: "a".repeat(64) },
+    });
+    const [row] = requestRowsVM([other], nameOf);
+    expect(row).toMatchObject({ kind: "other", title: "Other claim · Parking at MITEC", status: "Pending review" });
+    expect(requestSummary(other, nameOf)).toBe("Parking at MITEC · RM 45.50");
+    const vm = requestDetailVM(other, null, { nameOf, readOnly: false });
+    expect(vm.facts).toEqual([
+      { l: "Type", v: "Other claim" }, { l: "Submitted", v: "5 Oct" }, { l: "Subject", v: "Parking at MITEC" },
+      { l: "Remarks", v: "Three days of the fair" }, { l: "Invoice", v: "parking.pdf" }, { l: "Claim amount", v: "RM 45.50" },
+      { l: "Current step", v: "Pending review" },
+    ]);
+    expect(vm.log[0]).toMatchObject({ what: "Submitted", note: "Parking at MITEC · RM 45.50" });
+    // Sent back by HR, it opens its whole form again, as every claim.
+    expect(requestDetailVM({ ...other, status: "needs_info" }, null, { nameOf, readOnly: false })).toMatchObject({ canUpdate: true, canCancel: true });
+  });
+
   it("names a replacement by the member it replaces, and leaves drafts out", () => {
     const rows = requestRowsVM([
       request({ id: "a", kind: "replacement", detail: { originalStaffId: "s2", replacementSource: "new" } }),

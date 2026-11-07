@@ -405,8 +405,50 @@ describe('a member sends a request', () => {
       expect(await food({ month: '2026-09', weeks })).toEqual({ ok: false, error: 'Tick the days you worked at the fairs.' })
     }
     expect(await submitMemberRequest(form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'lunch', week: '2026-10-09', notes: '' })))
-      .toEqual({ ok: false, error: 'Choose Outstation, Airbnb or a food claim.' })
+      .toEqual({ ok: false, error: 'Choose Outstation, Airbnb, a food claim or an other claim.' })
     mocks.rpc.mockReset()
+  })
+
+  // 2026-11-07, the user: an Other claim — "写主题是什么、remarks 是什么，and then attach 它的 invoice，然后填它的 amount".
+  describe('an Other claim', () => {
+    const pdf = () => new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])], 'parking.pdf', { type: 'application/pdf' })
+    const other = (fields: Record<string, string>, invoice: File | null = pdf()) => {
+      const data = form({ kind: 'claim', subDepartmentId: fair, idempotencyKey: key, claimType: 'other', subject: 'Parking at MITEC',
+        remarks: 'Three days of the fair', amount: '45.50', ...fields })
+      if (invoice) data.set('invoice', invoice)
+      return data
+    }
+    let insert: ReturnType<typeof vi.fn>
+    beforeEach(() => {
+      insert = vi.fn(async () => ({ error: null }))
+      const attachments = { select: () => ({ eq: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) }) }
+      mocks.createClient.mockResolvedValue({ rpc: mocks.rpc, from: () => attachments, storage: { from: () => ({ upload: vi.fn(async () => ({ error: null })), remove: vi.fn() }) } })
+      mocks.adminClient.mockReturnValue({ from: () => ({ insert }) })
+    })
+
+    it('passes on its subject, remarks, the amount as typed and the invoice, attested before it is sent — nothing else', async () => {
+      expect((await submitMemberRequest(other({ week: '2026-10-02', location: 'MITEC', rate: '999', notes: 'x' })))).toEqual({ ok: true, data: sent })
+      const prepared = mocks.rpc.mock.calls[0][1] as { p_kind: string; p_detail: Record<string, unknown> }
+      expect(prepared.p_kind).toBe('claim')
+      const { invoiceHash, ...detail } = prepared.p_detail
+      expect(detail).toEqual({ claimType: 'other', subject: 'Parking at MITEC', remarks: 'Three days of the fair', amount: 45.5, invoiceName: 'parking.pdf' })
+      expect(invoiceHash).toMatch(/^[0-9a-f]{64}$/)
+      expect(insert).toHaveBeenCalledWith(expect.objectContaining({ request_id: requestId, mime_type: 'application/pdf', content_sha256: invoiceHash }))
+      expect(mocks.rpc).toHaveBeenNthCalledWith(2, 'member_submit_request', { p_request: requestId })
+    })
+
+    it('refuses one without its subject, its remarks, an amount it can read or its invoice', async () => {
+      expect(await submitMemberRequest(other({ subject: '  ' }))).toEqual({ ok: false, error: 'Enter the claim\'s subject.' })
+      expect(await submitMemberRequest(other({ remarks: '' }))).toEqual({ ok: false, error: 'Add remarks: what it was for.' })
+      for (const amount of ['', '0', '0.00', '12.345', '1,200', 'RM 45'])
+        expect(await submitMemberRequest(other({ amount }))).toEqual({ ok: false, error: 'Enter the amount, as its invoice shows.' })
+      expect(await submitMemberRequest(other({}, null))).toMatchObject({ ok: false })
+      expect(await submitMemberRequest(other({}, new File([new Uint8Array([0x50, 0x4b, 0x03, 0x04])], 'parking.docx'))))
+        .toEqual({ ok: false, error: 'The invoice must be a valid JPG, PNG or PDF file.' })
+      expect(await submitMemberRequest(other({ subject: 'x'.repeat(101) }))).toMatchObject({ ok: false })
+      expect(mocks.rpc).not.toHaveBeenCalledWith('member_prepare_request', expect.anything())
+      mocks.rpc.mockReset()
+    })
   })
 
   it('a plane ticket: its price and its invoice, attested before it is sent', async () => {

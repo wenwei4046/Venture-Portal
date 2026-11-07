@@ -11,13 +11,16 @@ export type RequestFilter = "all" | RequestKindVM;
 const NEW: { kind: RequestKindVM; title: string; sub: string; d: string; tone: string }[] = [
   { kind: "claim", title: "Submit transport claim", sub: "Outstation and Airbnb stays", d: ICON.receipt, tone: s.newClaim },
   { kind: "food", title: "Submit food claim", sub: "Meals on the days you worked a fair", d: ICON.food, tone: s.newFood },
+  { kind: "other", title: "Submit other claim", sub: "Any other expense, with its invoice", d: ICON.otherClaim, tone: s.newOther },
   { kind: "replacement", title: "Submit replacement", sub: "Replacements, transfers and exits", d: ICON.team, tone: s.newRepl },
   { kind: "waiting", title: "Submit waiting list", sub: "Joining requests and allocation", d: ICON.calendar, tone: s.newWait },
 ];
 const FILTERS: { id: RequestFilter; label: string }[] = [
-  { id: "all", label: "All" }, { id: "claim", label: "Claim" }, { id: "food", label: "Food claim" }, { id: "replacement", label: "Replacement" },
-  { id: "waiting", label: "Waiting list" },
+  { id: "all", label: "All" }, { id: "claim", label: "Claim" }, { id: "food", label: "Food claim" }, { id: "other", label: "Other claim" },
+  { id: "replacement", label: "Replacement" }, { id: "waiting", label: "Waiting list" },
 ];
+/** A claim's own filter shows while it may be sent, or one was (the food claim since 2026-10-13, the Other claim since 2026-11-07). */
+const OWN_FILTER: readonly RequestKindVM[] = ["food", "other"];
 
 /** The transport claim's row for a title HR ticked for the air ticket alone (2026-10-31). */
 const PLANE_ONLY = "Air tickets to a fair you fly to";
@@ -30,7 +33,7 @@ const ALL_KINDS: readonly RequestKindVM[] = ["claim", "replacement", "waiting"];
  * Each opens its form, in View as too — the form is where read-only shows (it sends nothing).
  * `kinds`: the ones they may send (2026-10-11) — a claim (and a food claim) is this page's
  * Create, a waiting list or replacement Waiting list & replacements'. The Food claim filter
- * shows only while a food claim is offered or one was sent.
+ * shows only while a food claim is offered or one was sent; the Other claim's the same (2026-11-07).
  * `planeOnly` (2026-10-31): their title is ticked for the air ticket alone — the transport claim's row says so.
  */
 export default function RequestsPage({ rows, filter, kinds = ALL_KINDS, planeOnly = false, onFilter, onBack, onNew, onOpen }: {
@@ -45,7 +48,7 @@ export default function RequestsPage({ rows, filter, kinds = ALL_KINDS, planeOnl
 }) {
   const shown = rows.filter(r => filter === "all" || r.kind === filter);
   const starts = NEW.filter(n => kinds.includes(n.kind)).map(n => (n.kind === "claim" && planeOnly ? { ...n, sub: PLANE_ONLY } : n));
-  const filters = FILTERS.filter(f => f.id !== "food" || kinds.includes("food") || rows.some(r => r.kind === "food"));
+  const filters = FILTERS.filter(f => f.id === "all" || !OWN_FILTER.includes(f.id) || kinds.includes(f.id) || rows.some(r => r.kind === f.id));
   return (
     <div className={s.page}>
       <PageHead back="Profile" title="Requests" onBack={onBack} />

@@ -428,6 +428,135 @@ describe("a transport claim's parts, as HR ticked the title (2026-10-31)", () =>
 
 // HR revamp 7a (2026-10-10): the waiting list is drawn from the form Sales Groups › Form settings
 // versions — the four built-ins, HR's own questions, the application form to download and upload.
+// The user (2026-11-07): "Submit Claim 里面多一个东西叫 Other Claim … 写主题是什么、remarks 是什么，and then attach 它的
+// invoice，然后填它的 amount" — then HR decides it as any claim.
+describe("an Other claim (2026-11-07)", () => {
+  const otherForm = (onSubmit = vi.fn(), revising: { id: string; detail: Record<string, unknown> } | null = null, readOnly = false) =>
+    render(<RequestForm kind="other" options={options} revising={revising} readOnly={readOnly} onSubmit={onSubmit} onClose={() => {}} />);
+  const pdf = () => new File(["%PDF-1.7"], "parking.pdf", { type: "application/pdf" });
+  const fill = (container: HTMLElement, { subject = "Parking at MITEC", remarks = "Three days of the fair", amount = "45.50", invoice = true } = {}) => {
+    fireEvent.change(screen.getByRole("textbox", { name: "Subject" }), { target: { value: subject } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Remarks" }), { target: { value: remarks } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Amount (RM)" }), { target: { value: amount } });
+    if (invoice) fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [pdf()] } });
+  };
+  const submit = () => fireEvent.click(screen.getByRole("button", { name: "Review & submit claim" }));
+
+  it("is a row of Requests for whoever may send a claim, and opens its own form", () => {
+    const onNew = vi.fn();
+    render(<RequestsPage rows={[]} filter="all" kinds={["claim", "other", "replacement", "waiting"]} onFilter={() => {}} onBack={() => {}} onNew={onNew} onOpen={() => {}} />);
+    const row = screen.getByRole("button", { name: /Submit other claim/ });
+    expect(row).toHaveTextContent("Any other expense, with its invoice");
+    fireEvent.click(row);
+    expect(onNew).toHaveBeenLastCalledWith("other");
+    expect(screen.getAllByRole("button", { name: /^Submit/ }).map(b => b.textContent?.replace(/(claim|list|replacement)[A-Z].*$/, "$1")))
+      .toEqual(["Submit transport claim", "Submit other claim", "Submit replacement", "Submit waiting list"]);
+    expect(screen.getByRole("button", { name: "Other claim" })).toBeInTheDocument();
+  });
+
+  it("its filter shows only while one may be sent, or one was", () => {
+    const row = { id: "r1", kind: "other" as const, title: "Other claim · Parking at MITEC", sub: "RQ-2611-001 · 7 Nov", status: "Pending review", tone: "warn" as const };
+    const { rerender } = render(<RequestsPage rows={[]} filter="all" kinds={["claim", "replacement", "waiting"]} onFilter={() => {}} onBack={() => {}} onNew={() => {}} onOpen={() => {}} />);
+    expect(screen.queryByRole("button", { name: "Other claim" })).not.toBeInTheDocument();
+    rerender(<RequestsPage rows={[row]} filter="other" kinds={["replacement", "waiting"]} onFilter={() => {}} onBack={() => {}} onNew={() => {}} onOpen={() => {}} />);
+    expect(screen.getByRole("button", { name: "Other claim" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Other claim · Parking at MITEC/ })).toBeInTheDocument();
+  });
+
+  it("asks the subject, the remarks, its invoice and the amount — nothing goes until each is there", () => {
+    const onSubmit = vi.fn();
+    const { container } = otherForm(onSubmit);
+    expect(screen.getByRole("dialog", { name: "Submit other claim" })).toBeInTheDocument();
+    expect(screen.getByText("Any other expense, with its invoice")).toBeInTheDocument();
+    submit();
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter the claim's subject.");
+    fireEvent.change(screen.getByRole("textbox", { name: "Subject" }), { target: { value: "  " } });
+    submit();
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter the claim's subject.");
+    fireEvent.change(screen.getByRole("textbox", { name: "Subject" }), { target: { value: "Parking at MITEC" } });
+    submit();
+    expect(screen.getByRole("alert")).toHaveTextContent("Add remarks: what it was for.");
+    fireEvent.change(screen.getByRole("textbox", { name: "Remarks" }), { target: { value: "Three days of the fair" } });
+    submit();
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter the amount, as its invoice shows.");
+    for (const bad of ["0", "12.345", "RM 12", "-3"]) {
+      fireEvent.change(screen.getByRole("textbox", { name: "Amount (RM)" }), { target: { value: bad } });
+      submit();
+      expect(screen.getByRole("alert")).toHaveTextContent("Enter the amount, as its invoice shows.");
+    }
+    fireEvent.change(screen.getByRole("textbox", { name: "Amount (RM)" }), { target: { value: "45.5" } });
+    expect(screen.getByText("RM 45.50")).toBeInTheDocument();
+    submit();
+    expect(screen.getByRole("alert")).toHaveTextContent("Add the invoice.");
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [pdf()] } });
+    expect(screen.getByText("parking.pdf")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(container.querySelector('input[type="file"]')).toHaveAttribute("accept", "image/jpeg,image/png,application/pdf");
+    expect(screen.getByRole("textbox", { name: "Subject" })).toHaveAttribute("maxlength", "100");
+    expect(screen.getByRole("textbox", { name: "Remarks" })).toHaveAttribute("maxlength", "500");
+  });
+
+  it("sends them as a claim of its own kind — the amount as typed, its invoice beside it", async () => {
+    const onSubmit = vi.fn(async (form: FormData) => { void form; return { ok: true as const, code: "RQ-2611-004" }; });
+    const { container } = otherForm(onSubmit);
+    fill(container, { subject: " Parking at MITEC ", remarks: " Three days of the fair " });
+    submit();
+    expect(await screen.findByText("RQ-2611-004")).toBeInTheDocument();
+    expect(screen.getByText("HR will check your claim. Payment is tracked in Requests.")).toBeInTheDocument();
+    const { invoice, ...fields } = sent(onSubmit);
+    expect((invoice as File).name).toBe("parking.pdf");
+    expect(fields).toEqual({ kind: "claim", subDepartmentId: "fair", claimType: "other", subject: "Parking at MITEC", remarks: "Three days of the fair", amount: "45.50" });
+  });
+
+  it("a refusal is said over the button; sent again once changed, it goes on a new key — after a lost connection, on the same", async () => {
+    const onSubmit = vi.fn()
+      .mockResolvedValueOnce({ ok: false, error: "This invoice is already claimed in RQ-2611-001: an invoice is claimed once" })
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ ok: true, code: "RQ-2611-005" });
+    const { container } = otherForm(onSubmit);
+    fill(container);
+    submit();
+    expect(await screen.findByRole("alert")).toHaveTextContent("This invoice is already claimed in RQ-2611-001");
+    submit();
+    expect(await screen.findByText("Could not send it. Check your connection and try again.")).toBeInTheDocument();
+    submit();
+    expect(await screen.findByText("RQ-2611-005")).toBeInTheDocument();
+    const keys = onSubmit.mock.calls.map(c => (c[0] as FormData).get("idempotencyKey"));
+    expect(keys[1]).not.toBe(keys[0]);
+    expect(keys[2]).toBe(keys[1]);
+  });
+
+  it("one HR sent back opens as it was sent — the invoice attached again", async () => {
+    const onSubmit = vi.fn(async (form: FormData) => { void form; return { ok: true as const, code: "RQ-2611-001" }; });
+    const { container } = otherForm(onSubmit, {
+      id: "req-1", detail: { claimType: "other", category: "Other claim", subject: "Parking at MITEC", remarks: "Three days", amount: 45.5, invoiceName: "parking.pdf", invoiceHash: "a".repeat(64) },
+    });
+    expect(screen.getByRole("textbox", { name: "Subject" })).toHaveValue("Parking at MITEC");
+    expect(screen.getByRole("textbox", { name: "Remarks" })).toHaveValue("Three days");
+    expect(screen.getByRole("textbox", { name: "Amount (RM)" })).toHaveValue("45.50");
+    fireEvent.change(screen.getByRole("textbox", { name: "Remarks" }), { target: { value: "9–11 Oct, the fair days" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send the update" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Add the invoice.");
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [pdf()] } });
+    fireEvent.click(screen.getByRole("button", { name: "Send the update" }));
+    expect(await screen.findByText("RQ-2611-001")).toBeInTheDocument();
+    const { invoice, ...fields } = sent(onSubmit);
+    expect((invoice as File).name).toBe("parking.pdf");
+    expect(fields).toEqual({ kind: "claim", subDepartmentId: "fair", requestId: "req-1", claimType: "other", subject: "Parking at MITEC", remarks: "9–11 Oct, the fair days", amount: "45.50" });
+  });
+
+  it("in View as it fills in and sends nothing", () => {
+    const onSubmit = vi.fn();
+    const { container } = otherForm(onSubmit, null, true);
+    fill(container);
+    const cta = screen.getByRole("button", { name: "Read-only while viewing as" });
+    expect(cta).toBeDisabled();
+    fireEvent.click(cta);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
 describe("a waiting list, on HR's form", () => {
   const form = (over: Partial<WaitingForm> = {}): WaitingForm => ({
     version: 3, requireUpload: true, templatePath: null, templateName: BUILT_FORM_NAME, createdAt: null,

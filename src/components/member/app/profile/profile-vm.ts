@@ -198,8 +198,11 @@ export interface TeamVM {
 }
 
 // ── Requests ──
-/** `food` is a claim too (`claimType` food, 2026-10-13) — its own row on Requests, its own form and filter. */
-export type RequestKindVM = "claim" | "food" | "replacement" | "waiting";
+/**
+ * `food` is a claim too (`claimType` food, 2026-10-13) — its own row on Requests, its own form and filter; and so is
+ * `other` (`claimType` other, 2026-11-07): anything else, its subject, remarks, amount and invoice.
+ */
+export type RequestKindVM = "claim" | "food" | "other" | "replacement" | "waiting";
 export interface RequestRowVM {
   id: string;
   kind: RequestKindVM;

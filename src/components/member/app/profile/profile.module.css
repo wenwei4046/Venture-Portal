@@ -649,6 +649,7 @@
 .newRepl { background: var(--rv-green-bg); color: var(--rv-green); }
 .newWait { background: var(--rv-gold-tint); color: var(--rv-amber); }
 .newFood { background: var(--rv-sand); color: var(--rv-brown); }
+.newOther { background: var(--rv-slate-bg); color: var(--rv-slate); }
 .newTitle { display: block; font-size: calc(15px * var(--rv-type)); font-weight: 650; }
 .newSub { display: block; font-size: calc(12.5px * var(--rv-type)); color: var(--rv-sub); margin-top: 2px; }
 .filters { display: flex; gap: 8px; overflow-x: auto; margin: 6px -20px 4px; padding: 0 20px; scrollbar-width: none; }

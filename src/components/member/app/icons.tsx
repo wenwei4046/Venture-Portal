@@ -14,6 +14,8 @@ export const ICON = {
   receipt: "M5 3h14v18l-3-2-4 2-4-2-3 2V3Zm3 5h8M8 12h8M8 16h4",
   /* Submit food claim (2026-10-13): a fork and a knife */
   food: "M4 3v6a3 3 0 0 0 6 0V3M7 3v18M20 15V3a4 4 0 0 0-4 4v6a2 2 0 0 0 2 2h2Zm0 0v6",
+  /* Submit other claim (2026-11-07) — not in the prototype: a page with a plus, anything else on paper */
+  otherClaim: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8ZM14 3v5h5M12 11v6M9 14h6",
   chat: "M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z",
   bell: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4",
   calendar: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14",

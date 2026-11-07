@@ -1292,8 +1292,27 @@ export async function submitMemberRequest(
       // total is typed and paid up to a limit by head count — HR's figure a
       // night for a small group, the rate × people × nights for a bigger one
       // (2026-10-12: that rate is a limit too, not a fixed amount).
-      if (claimType !== "outstation" && claimType !== "airbnb" && claimType !== "food") throw new Error("Choose Outstation, Airbnb or a food claim.");
-      if (claimType === "food") {
+      if (claimType !== "outstation" && claimType !== "airbnb" && claimType !== "food" && claimType !== "other")
+        throw new Error("Choose Outstation, Airbnb, a food claim or an other claim.");
+      if (claimType === "other") {
+        // An Other claim (2026-11-07): its subject, remarks, the amount as its invoice shows and the invoice — kept
+        // as typed (`member_claim_other_detail` keeps nothing else); HR checks the amount against the invoice.
+        const subject = field(form, "subject", 100);
+        const remarks = field(form, "remarks", 500);
+        if (!subject) throw new Error("Enter the claim's subject.");
+        if (!remarks) throw new Error("Add remarks: what it was for.");
+        const amount = cents(field(form, "amount"));
+        if (amount === null || amount < 1) throw new Error("Enter the amount, as its invoice shows.");
+        verified = await invoice(form);
+        Object.assign(detail, {
+          claimType,
+          subject,
+          remarks,
+          amount: amount / 100,
+          invoiceName: verified.name,
+          invoiceHash: createHash("sha256").update(verified.bytes).digest("hex"),
+        });
+      } else if (claimType === "food") {
         // A food claim (2026-10-13 — "submit by total month … dont by week submit"): a month, its weekends and the
         // days of each they worked. The database checks each is their own brand week's, the days its fair's and
         // come already, the month over and claimed by no other food claim of theirs, and pays HR's rate a day.

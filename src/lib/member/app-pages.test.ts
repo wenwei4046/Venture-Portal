@@ -34,6 +34,9 @@ describe('the Revenue app’s pages and their tabs', () => {
 
   it('a claim is sent under Requests’ Create, a waiting list or replacement under its own page’s', () => {
     expect(requestPageOf('claim')).toBe('requests')
+    // The app's own claim kinds are claims too: a food claim (2026-10-13), an Other claim (2026-11-07).
+    expect(requestPageOf('food')).toBe('requests')
+    expect(requestPageOf('other')).toBe('requests')
     expect(requestPageOf('waiting')).toBe('track')
     expect(requestPageOf('replacement')).toBe('track')
   })
