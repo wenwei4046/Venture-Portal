@@ -32,7 +32,7 @@ export interface SalespersonFigures {
   titleLabel: string | null
   rankLabel: string | null
   productRate: number
-  /** Bills — upsales and drops are not bills, so they are not counted. */
+  /** Bills — upsales and drops are not bills, so they are not counted; nor is an old bill topped up, no sale of theirs. */
   orders: number
   /** Everything on those bills, transport and service included. */
   salesValue: number
@@ -67,7 +67,8 @@ const sum = <T,>(rows: readonly T[], get: (row: T) => number) => round2(rows.red
  */
 export function salespersonFigures(person: WorkbenchPerson): SalespersonFigures {
   const counted = person.personalRows.filter(r => r.status !== 'excluded')
-  const bills = counted.filter(r => !r.upsale)
+  // An old bill topped up pays them its commission (in `personal`) and is no sale of theirs (2026-11-07).
+  const bills = counted.filter(r => !r.upsale && !r.commissionOnly)
   return {
     name: person.name,
     titleLabel: person.titleLabel,
@@ -99,6 +100,8 @@ export interface ClosedBill {
   no: string
   status: CommissionOrderStatus
   total: number
+  /** An old bill topped up (2026-11-07): it paid its commission and was no sale of theirs. */
+  commissionOnly?: true
 }
 
 /** An override line as it stood at close: who it came from, and how much. */
@@ -140,7 +143,10 @@ export function closeSummary(person: WorkbenchPerson, nameOf: (staffId: string) 
   return {
     version: 1,
     ...salespersonFigures(person),
-    bills: person.personalRows.map(r => ({ id: r.orderId, no: r.orderNo, status: r.status, total: r.totalCommission })),
+    bills: person.personalRows.map(r => ({
+      id: r.orderId, no: r.orderNo, status: r.status, total: r.totalCommission,
+      ...(r.commissionOnly ? { commissionOnly: true as const } : {}),
+    })),
     overrides: [...overrides].map(([staffId, amount]) => ({ staffId, name: nameOf(staffId), amount })),
   }
 }
@@ -226,7 +232,7 @@ export function parseCloseSummary(raw: unknown, fallbackName: string): CloseSumm
       const id = r ? str(r.id) : null
       if (!r || !id) return []
       const status = STATUSES.find(s => s === r.status) ?? 'eligible'
-      return [{ id, no: str(r.no) ?? id, status, total: num(r.total) }]
+      return [{ id, no: str(r.no) ?? id, status, total: num(r.total), ...(r.commissionOnly === true ? { commissionOnly: true as const } : {}) }]
     }),
     overrides: overrides.flatMap(v => {
       const r = v && typeof v === 'object' ? v as Record<string, unknown> : null

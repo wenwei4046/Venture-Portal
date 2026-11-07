@@ -153,6 +153,13 @@ export function OrderSheet({ open, vm, onClose, canShare = false, request = null
               <span className={t.shareText}><span className={t.shareLabel}>SHARED</span><span className={t.shareLine}>{vm.share.line}</span><span className={t.shareSub}>{vm.share.sub}</span></span>
             </div>
           )}
+          {/* An old bill topped up (2026-11-07): whose it was, and that it counts in nothing but commission. */}
+          {vm.oldBill && (
+            <div className={t.shareRow}>
+              <span className={t.shareIcon}><Svg d={ICON.receipt} size={18} sw={1.9} /></span>
+              <span className={t.shareText}><span className={t.shareLabel}>OLD BILL</span><span className={t.shareLine}>{vm.oldBill.line}</span><span className={t.shareSub}>{vm.oldBill.sub}</span></span>
+            </div>
+          )}
           <div className={s.soCells}>
             <div className={s.soCell}><span className={s.soCellLabel}>Order amount</span><span className={`${s.soCellValue} ${s.soCellNum}`}>{vm.amt}</span></div>
             <div className={s.soCell}><span className={s.soCellLabel}>Margin</span><span className={s.soCellValue} style={{ color: vm.marginInk }}>{vm.margin}</span><span className={s.soCellSub}>{vm.tier}</span></div>

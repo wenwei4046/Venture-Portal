@@ -129,6 +129,17 @@ export interface SalesOrder {
    */
   upsale?: boolean
   /**
+   * An old bill topped up (2026-11-07): dated before the feed window, a
+   * departed salesperson's, in on its top-up as the collector's
+   * (`ingest_erp_sales_order`, `oldBillOf`). The user chose it pays its
+   * holder COMMISSION ONLY ("is go with b, not a"): their own rate on what
+   * earns, cut by its own margin's penalty band as any bill is ("need follow
+   * the margin as well") — and nothing else: no sales of theirs (the rate's
+   * rung, the group's revenue, the upline's override), not the month's margin
+   * or its incentive, no KPI.
+   */
+  commissionOnly?: boolean
+  /**
    * Set on every part of a SHARED bill, the owner's included
    * (`splitOrdersByShares`, 2026-09-30): whose bill it is and who holds which
    * part. Display only — the engine pays each part as the ordinary bill it is,

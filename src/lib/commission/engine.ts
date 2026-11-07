@@ -717,6 +717,35 @@ interface Draft {
   /** true when some eligible order carried no brand at all. */
   missingBrand: boolean
   marginPenaltyWithheld: number
+  /** Old bills topped up that cleared their deposit (2026-11-07): paid at the rate, counted as nothing else. */
+  commissionOnlyOrders: SalesOrder[]
+}
+
+/**
+ * The line an old bill topped up pays (2026-11-07, `SalesOrder.commissionOnly`;
+ * the user: commission only, no sales — then "need follow the margin as
+ * well"): the holder's rate on everything on it that earns, as billed — its KPI
+ * items are not taken off as KPI — scaled by its margin's penalty band as any
+ * bill is (`multiplier`; a department head's, like their own bills, by none).
+ * One line a bill, beside their own bills' lines; null when it pays nothing.
+ */
+function commissionOnlyLine(
+  order: SalesOrder, rate: number, periodMonth: string,
+  kpiIndex: KpiIndex, groupIndex: Map<string, boolean>,
+  penalty: { multiplier: number; note: string } = { multiplier: 1, note: '' },
+): StatementLine | null {
+  const basis = orderRevenueSplit(order, kpiIndex, groupIndex).commissionable
+  if (rate <= 0 || basis === 0) return null
+  const carried = order.periodMonth !== periodMonth
+  return {
+    component: 'product_revenue',
+    sourceOrderId: order.id,
+    basisAmount: basis,
+    rate,
+    qty: null,
+    amount: round2(round2(basis * rate) * penalty.multiplier),
+    note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''}${penalty.note} · old bill, commission only`,
+  }
 }
 
 export function computeCommissionRun(input: EngineInput): EngineResult {
@@ -822,6 +851,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     }
 
     const eligibleOrders: SalesOrder[] = []
+    const commissionOnlyOrders: SalesOrder[] = []
     let productRevenue = 0
     let excludedRevenue = 0
     let deferredRevenue = 0
@@ -846,6 +876,14 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           requiredAmount: depositRequired(order.orderTotal, scheme.depositThresholdPct),
           productRevenue: opr,
         })
+        continue
+      }
+
+      // An old bill topped up (2026-11-07) is paid at the rate in Pass D and is
+      // no sale of its holder's: none of the revenue a rung, a group, an
+      // override, a margin or KPI is measured on.
+      if (order.commissionOnly) {
+        commissionOnlyOrders.push(order)
         continue
       }
 
@@ -875,6 +913,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       marginByBrand: new Map(),
       missingBrand: false,
       marginPenaltyWithheld: 0,
+      commissionOnlyOrders,
     })
   }
 
@@ -1005,6 +1044,12 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''} · director's own bill`,
         })
       }
+      // An old bill topped up (2026-11-07): their rate on it too, and — as
+      // their own bills — nothing else, no margin penalty either.
+      for (const order of draft.commissionOnlyOrders) {
+        const line = commissionOnlyLine(order, headRate, input.periodMonth, kpiIndex, groupIndex)
+        if (line) draft.lines.push(line)
+      }
       continue
     }
     const rate = rateOf.get(draft.staffId) ?? 0
@@ -1110,6 +1155,49 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           bandLabel: penaltyBand.label,
           multiplier,
           withheld: withheldOnThisBill,
+        })
+      }
+    }
+
+    // An old bill topped up (2026-11-07): the rate, scaled by its own margin's
+    // penalty as any bill is (the user: "need follow the margin as well") —
+    // and nothing else: no margin tally or incentive, no KPI, no override base
+    // (after the KPI tally above, which it is no part of).
+    for (const order of scheme.enableProductRevenue ? draft.commissionOnlyOrders : []) {
+      const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis, order.brandCode ?? null)
+      const bill = billMargin(order, base)
+      let multiplier = 1
+      let penaltyBand: MarginBand | null = null
+      if (scheme.enableMarginPenalty) {
+        if (bill.pct === null) {
+          if (base.revenue > 0) ordersWithoutCost++
+        } else {
+          penaltyBand = penaltyBandFor(bill.pct, base.brandCode, input.marginBands)
+          if (penaltyBand) multiplier = penaltyBand.commissionMultiplier
+        }
+      }
+      const line = commissionOnlyLine(order, rate, input.periodMonth, kpiIndex, groupIndex, {
+        multiplier,
+        note: penaltyBand
+          ? ` · ${penaltyBand.label} (${round2(bill.pct! * 100)}% margin${bill.source === 'manual' ? ', keyed in' : ''}) × ${multiplier}`
+          : '',
+      })
+      if (!line) continue
+      draft.lines.push(line)
+      if (penaltyBand) {
+        const withheld = round2(round2(line.basisAmount * rate) - line.amount)
+        draft.marginPenaltyWithheld = round2(draft.marginPenaltyWithheld + withheld)
+        penalised.push({
+          staffId: draft.staffId,
+          orderId: order.id,
+          orderNo: order.orderNo,
+          brandCode: base.brandCode,
+          marginPct: bill.pct!,
+          marginSource: bill.source,
+          bandKey: penaltyBand.bandKey,
+          bandLabel: penaltyBand.label,
+          multiplier,
+          withheld,
         })
       }
     }

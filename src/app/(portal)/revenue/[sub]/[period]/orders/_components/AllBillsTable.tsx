@@ -84,6 +84,11 @@ export interface BillRow {
   origin?: RowOrigin | null
   /** Moved here from another salesperson (2026-10-12, `sales_order_reassignments`). */
   moved?: BillMoved | null
+  /**
+   * An old bill topped up (2026-11-07): it pays its holder commission only and
+   * is no sale — listed, its commission in the subtotal, out of the sales ones.
+   */
+  commissionOnly?: boolean
 }
 
 type Column =
@@ -173,8 +178,10 @@ export default function AllBillsTable({ rows, team, commissionNote, initialShowE
       })
   }, [rows, query, brand, sort, showExcluded])
 
-  const subtotalSales = round2(visible.filter(r => !r.cancelled).reduce((a, r) => a + r.orderTotal, 0))
-  const subtotalCommissionable = round2(visible.filter(r => !r.cancelled).reduce((a, r) => a + r.commissionable, 0))
+  // An old bill topped up is no sale (2026-11-07): its commission is in the subtotal, its value is not.
+  const sold = visible.filter(r => !r.cancelled && !r.commissionOnly)
+  const subtotalSales = round2(sold.reduce((a, r) => a + r.orderTotal, 0))
+  const subtotalCommissionable = round2(sold.reduce((a, r) => a + r.commissionable, 0))
   const subtotalCommission = round2(visible.reduce((a, r) => a + (r.commission?.total ?? 0), 0))
   const lateCount = visible.filter(r => !r.cancelled && r.origin?.paysHere).length
 

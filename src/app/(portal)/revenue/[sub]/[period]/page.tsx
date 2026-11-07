@@ -357,16 +357,23 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   // A live month carries its excluded orders (cancelled, held, draft) so the
   // feed can bring them back; the money below is the live ones'.
   const orders = monthOrders.filter(o => !o.cancelled)
+  // An old bill topped up pays its collector commission only (2026-11-07, the
+  // user: "is go with b, not a"): no sale of this month's — out of its sales,
+  // its count, its exhibitions and the directors' threshold. Still a bill to
+  // check (its lines, its paper), on its holder's ledger as Top up deposit; one
+  // nobody collected is the workbench's to give, not an agent to match.
+  const oldBillIds = new Set((workbench?.orders ?? []).filter(meta => meta.oldBill).map(meta => meta.orderId))
+  const sales = orders.filter(o => !oldBillIds.has(o.orderId))
 
   const linesWithoutCost = orders.reduce((a, o) => a + o.linesWithoutCost, 0)
 
-  const unmatched = orders.filter(o => !o.staffId)
-  const total = orders.reduce((a, o) => a + o.orderTotal, 0)
+  const unmatched = sales.filter(o => !o.staffId)
+  const total = sales.reduce((a, o) => a + o.orderTotal, 0)
   // The part of the same bills that earns: every line in a group the scheme
   // pays on (the RPC's margin base is exactly that sum). Transport, disposal
   // and other service lines are the difference (user 2026-09-26). The
   // directors' incentive threshold reads this same figure (2026-09-27).
-  const commissionableTotal = monthCommissionableValue(monthOrders)
+  const commissionableTotal = monthCommissionableValue(monthOrders.filter(o => !oldBillIds.has(o.orderId)))
 
   // Sales exhibition (the workbench's tab; Sales by venue until 2026-10-03):
   // every live bill — matched or not, so it adds up to Total sales value — at
@@ -376,7 +383,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
   // the booth the salesperson picked in the ERP, else the bill's own.
   const fairOf = new Map((workbench?.orders ?? []).map(meta => [meta.orderId, meta]))
   const exhibitionRows = salesByExhibition(
-    orders.map(o => {
+    sales.map(o => {
       const meta = fairOf.get(o.orderId)
       return {
         venue: o.venue,
@@ -576,7 +583,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           <section className="mb-6">
             <div className={workbenchStyles.metrics}>
               <Tile label="Total sales value" value={formatMoney(total)} big />
-              <Tile label="Total orders" value={String(orders.length)} />
+              <Tile label="Total orders" value={String(sales.length)} />
               <Tile
                 label="Unmatched agents"
                 value={String(new Set(unmatched.map(o => agentKeyOf(o.agentName))).size)}
@@ -602,7 +609,7 @@ export default async function CommissionPeriodPage({ params }: PageProps) {
           sellers: { panel: sellerChecksPanel, count: sellersWaiting },
           requests: { panel: shareRequestsPanel, count: requestsWaiting },
         }}
-        monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: orders.length,
+        monthStats={{ salesValue: total, commissionableValue: commissionableTotal, totalOrders: sales.length,
           unmatchedAgents: new Set(unmatched.map(o => agentKeyOf(o.agentName))).size, linesWithoutCost }}
         exhibitions={exhibitionRows}
         // Bills taken out by hand (Don't count this bill) — out of the

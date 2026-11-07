@@ -1772,3 +1772,82 @@ describe('Revenue Director pay', () => {
     expect(find(withDirector.statements, 'director').totalCommission).toBe(1)
   })
 })
+
+// ─── An old bill topped up: commission only (2026-11-07) ────────────────────
+
+describe('an old bill topped up pays its holder commission only (2026-11-07)', () => {
+  // A departed salesperson's March bill whose top-up rs collected in July:
+  // RM 10,000 that earns — a KPI pillow among it, uncosted, so its margin is
+  // not known yet and no penalty can be read.
+  const oldBill = (opts: { paidAmount?: number } = {}): SalesOrder => ({
+    ...order('old', 'rs', [
+      ['MATTRESS', 'M1', 1, 9_900, 9_000],
+      ['ACC', 'AK-CS AIRLOFT COMFY PIL', 2, 100],
+    ], { date: '2026-03-14', periodMonth: '2026-07-01', ...opts }),
+    commissionOnly: true,
+  })
+  const own = order('own', 'rs', [['MATTRESS', 'M2', 1, 4_000]])
+  const without = run({ orders: [own] })
+  const withOld = run({ orders: [own, oldBill()] })
+
+  it('pays the rate on everything on it that earns, one line', () => {
+    const line = find(withOld.statements, 'rs').lines.filter(l => l.sourceOrderId === 'old')
+    expect(line).toEqual([expect.objectContaining({ component: 'product_revenue', basisAmount: 10_000, rate: 0.05, amount: 500 })])
+    expect(line[0].note).toMatch(/old bill, commission only$/)
+    expect(find(withOld.statements, 'rs').productCommission).toBe(find(without.statements, 'rs').productCommission + 500)
+    expect(find(withOld.statements, 'rs').totalCommission).toBe(find(without.statements, 'rs').totalCommission + 500)
+  })
+
+  it('is no sale of theirs: no revenue, group sales, margin or KPI moves', () => {
+    const a = find(without.statements, 'rs')
+    const b = find(withOld.statements, 'rs')
+    for (const key of ['productRevenue', 'penaltyWeightedRevenue', 'groupRevenue', 'excludedRevenue', 'deferredRevenue',
+      'kpiQty', 'kpiBase', 'kpiCommission', 'marginRevenue', 'marginCost', 'marginPct', 'marginBandKey', 'marginIncentive'] as const) {
+      expect(b[key], key).toEqual(a[key])
+    }
+    expect(b.marginByBrand).toEqual(a.marginByBrand)
+    expect(withOld.penalised.filter(p => p.orderId === 'old')).toEqual([])
+  })
+
+  it('pays no upline an override on it', () => {
+    for (const staffId of ['ta', 'tl', 'stl']) {
+      expect(find(withOld.statements, staffId)).toEqual(find(without.statements, staffId))
+    }
+  })
+
+  it('waits on its deposit like any bill', () => {
+    const r = run({ orders: [oldBill({ paidAmount: 1_000 })] })
+    expect(r.deferred.map(d => d.orderId)).toEqual(['old'])
+    expect(r.statements.find(s => s.staffId === 'rs')?.productCommission ?? 0).toBe(0)
+  })
+
+  // The user, told the old bill paid its rate whatever its margin: "need follow the margin as well".
+  it('is cut by its margin as any bill is, and stays out of the month’s margin', () => {
+    // 26% on Akemi's ladder: Below margin Tier 1, half the commission.
+    const thin: SalesOrder = { ...order('thin', 'rs', [['MATTRESS', 'M1', 1, 10_000, 7_400]], { date: '2026-03-14', periodMonth: '2026-07-01' }), commissionOnly: true }
+    const r = run({ orders: [own, thin] })
+    const line = find(r.statements, 'rs').lines.find(l => l.sourceOrderId === 'thin')!
+    expect(line).toMatchObject({ basisAmount: 10_000, rate: 0.05, amount: 250 })
+    expect(line.note).toMatch(/Below margin Tier 1 \(26% margin\) × 0\.5 · old bill, commission only$/)
+    expect(r.penalised.filter(p => p.orderId === 'thin')).toEqual([expect.objectContaining({ bandKey: 'below_tier_1', multiplier: 0.5, withheld: 250 })])
+    expect(find(r.statements, 'rs').marginPenaltyWithheld).toBe(find(without.statements, 'rs').marginPenaltyWithheld + 250)
+    // …and is no part of the month's margin, nor of what the upline overrides.
+    expect(find(r.statements, 'rs').marginByBrand).toEqual(find(without.statements, 'rs').marginByBrand)
+    expect(find(r.statements, 'rs').penaltyWeightedRevenue).toBe(find(without.statements, 'rs').penaltyWeightedRevenue)
+  })
+
+  it('a director’s is paid at their rung’s rate, unscaled, as their own bills are', () => {
+    const RD: Rank = {
+      rankKey: 'rd_12', titleId: 'title-rd', titleLabel: 'Revenue Director', label: 'Rank SS', productRate: 0.12,
+      canRecruit: true, groupSalesThreshold: null, personalSalesThreshold: null, consecutiveMonths: null, sortOrder: 70,
+    }
+    const thin: SalesOrder = { ...order('thin', 'director', [['MATTRESS', 'M1', 1, 10_000, 7_400]], { date: '2026-03-14', periodMonth: '2026-07-01' }), commissionOnly: true }
+    const r = run({
+      ranks: [...RANKS, RD], orders: [thin], departmentHeadIds: ['director'],
+      directors: [{ staffId: 'director', rankKey: 'rd_12', fixedAmount: 0, salesThreshold: null, incentiveAmount: 0 }],
+    })
+    expect(find(r.statements, 'director').lines.map(l => [l.sourceOrderId, l.amount])).toEqual([['thin', 1_200]])
+    expect(find(r.statements, 'director').productRevenue).toBe(0)
+    expect(r.penalised).toEqual([])
+  })
+})

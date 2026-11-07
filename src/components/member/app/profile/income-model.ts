@@ -18,6 +18,14 @@ const pct = (rate: number) => `${(Math.round(rate * 1000) / 10).toFixed(1)}%`;
 /** `Incentive Tier 1` for `incentive_tier_1` — a band key the way the scheme names it. */
 const bandText = (key: string) => key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
+/**
+ * What an old bill topped up says of itself (2026-11-07, the user: "i want can
+ * view, then mention no count in sales target (arena)"): a departed
+ * salesperson's bill whose top-up the member collected — listed, paid its
+ * commission, and counted nowhere else.
+ */
+export const OLD_BILL_NOTE = "An old bill you collected the top-up for: it pays you commission only, and is not counted in your sales, your target or the Arena.";
+
 /** A brand list the way the prototype writes it: "Akemi, Ergotex and Zanotti". */
 function brandList(codes: readonly string[]): string {
   const names = codes.map(brandName);
@@ -60,7 +68,9 @@ export function incomeVM(data: MemberIncome, hidden: boolean, hasTeam = false): 
   const rows: IncomeRowVM[] = pay ? [] : [m.basic === null && m.state === "manual"
     ? { label: "Fixed salary", sub: "Paid outside the portal", amt: "—" }
     : { label: "Fixed salary", sub: m.basic === null ? "Not set" : basic === 0 ? "Commission only" : "Monthly base", amt: money(basic) }];
-  rows.push({ label: "Personal sales commission", sub: `${rm(m.countedSales)} counted sales${held.length ? ` · ${plural(held.length, "order")} held` : ""}`, amt: money(m.personal) });
+  // An old bill topped up pays here and is in no counted sales (2026-11-07): said, so the figures still add up.
+  const oldBills = m.bills.filter(b => b.commissionOnly && b.status === "eligible").length;
+  rows.push({ label: "Personal sales commission", sub: `${rm(m.countedSales)} counted sales${oldBills ? ` · ${plural(oldBills, "old bill")}` : ""}${held.length ? ` · ${plural(held.length, "order")} held` : ""}`, amt: money(m.personal) });
   if ((m.switches.override && hasTeam) || m.override !== 0 || m.overrides.length > 0) {
     const sellers = new Set(m.overrides.map(o => o.seller)).size;
     rows.push({ label: "Team override", sub: sellers ? `From ${plural(sellers, "person", "people")} in your team` : "From your team's sales", amt: money(m.override) });
@@ -165,11 +175,17 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
     const commission = Math.round(b.personal * 100) / 100;
     const margin = b.marginPct ?? o?.margin ?? null;
     const gift = margin === null && !!o && noSalesBill(o);
+    // An old bill topped up (2026-11-07): commission only, no sale of theirs — its margin cuts its commission as any
+    // bill's does ("need follow the margin as well"), so it is said beside it.
+    const old = b.commissionOnly === true;
     sheets[id] = {
       no: b.no,
-      meta: [o?.customer, weekOf(o), o?.venue].filter(Boolean).join(" · ") || brand,
-      tag: waiting ? "Waiting for deposit" : gift ? "No sales" : margin === null ? "Cost pending" : `${margin.toFixed(1)}% margin`,
-      tone: waiting || (margin === null && !gift) ? "warn" : toneOf(b, o, bands),
+      // An old bill (2026-11-07) was sold at a fair months before: no week of this month is its.
+      meta: [o?.customer, old ? null : weekOf(o), o?.venue].filter(Boolean).join(" · ") || brand,
+      tag: waiting ? "Waiting for deposit"
+        : old ? (margin === null ? "Commission only" : `Commission only · ${margin.toFixed(1)}% margin`)
+        : gift ? "No sales" : margin === null ? "Cost pending" : `${margin.toFixed(1)}% margin`,
+      tone: waiting ? "warn" : old && margin === null ? "neutral" : margin === null && !gift ? "warn" : toneOf(b, o, bands),
       amt: rm(o?.total ?? b.orderTotal ?? b.commissionable),
       commLabel: "Commission",
       comm: waiting ? "Waiting" : money(commission),
@@ -184,12 +200,13 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
       })),
       total: money(waiting ? 0 : b.pay),
       note: waiting ? "Its commission is added in the month the deposit clears."
+        : old ? `${OLD_BILL_NOTE} Commission is shared across lines by line amount.`
         : `${b.sharePct !== null ? `Your ${Math.round(b.sharePct * 100)}% of a shared bill. ` : ""}Commission is shared across lines by line amount.${b.kpi > 0 ? " Each KPI item pays as listed." : ""}`,
     };
     return {
-      id, no: b.no, meta: [o?.customer, weekOf(o), brand].filter(Boolean).join(" · "),
+      id, no: b.no, meta: [o?.customer, old ? null : weekOf(o), brand].filter(Boolean).join(" · "),
       pay: waiting ? "Waiting" : money(b.pay), held: waiting,
-      sub: waiting ? "Deposit due" : b.kpi > 0 ? `incl. KPI ${money(b.kpi)}` : `of ${rm(b.commissionable)}`,
+      sub: waiting ? "Deposit due" : old ? "Not in sales" : b.kpi > 0 ? `incl. KPI ${money(b.kpi)}` : `of ${rm(b.commissionable)}`,
     };
   });
 

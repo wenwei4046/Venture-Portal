@@ -65,6 +65,13 @@ export interface CommissionOrderRow {
   brands: string[]
   categories: string[]
   upsale: boolean
+  /**
+   * An old bill topped up (2026-11-07): it pays its holder the rate — cut by
+   * its own margin as any bill's — and is no sale of theirs: out of every
+   * sales, monthly margin, KPI and override figure. The builder always says;
+   * absent reads as an ordinary bill.
+   */
+  commissionOnly?: boolean
   /** Everything on the bill — transport, disposal and every other charge included. */
   orderTotal: number
   /**
@@ -316,6 +323,10 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       : order.alreadyReleased ? 'already_released'
         : !order.upsale && !isDepositMet(order, input.scheme.depositThresholdPct) ? 'deposit_pending' : 'eligible'
     const eligible = status === 'eligible'
+    // An old bill topped up (2026-11-07): the rate on it, scaled by its margin
+    // as any bill's ("need follow the margin as well") — and no upline is paid
+    // on it, nor is it in any margin of the month's.
+    const commissionOnly = !!order.commissionOnly
     const penalty = input.scheme.enableMarginPenalty && margin.pct !== null
       ? penaltyBandFor(margin.pct, base.brandCode, input.marginBands) : null
     const multiplier = penalty?.commissionMultiplier ?? 1
@@ -323,7 +334,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     const component = (kind: 'product_revenue' | 'kpi_item') => sum(sourceLines.filter(line => line.component === kind).map(line => line.amount))
     const key = `${order.staffId}:${order.id}`
     const kpiRevenue = split.kpiAmount
-    overrideBases.set(key, eligible ? round2(round2(productRevenue * multiplier) + (input.scheme.overrideIncludesKpi ? kpiRevenue : 0)) : 0)
+    overrideBases.set(key, eligible && !commissionOnly ? round2(round2(productRevenue * multiplier) + (input.scheme.overrideIncludesKpi ? kpiRevenue : 0)) : 0)
     return {
       key, orderId: order.id, originalOrderId: order.id, orderNo: order.orderNo,
       refNo: meta?.refNo ?? null, paperNo: meta?.paperNo ?? null,
@@ -335,7 +346,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       // brand riding on it does not make it that brand's too (2026-09-27).
       brands: order.brandCode ? [order.brandCode] : [...new Set(order.lines.flatMap(line => line.brandCode ? [line.brandCode] : []))],
       categories: [...new Set(order.lines.map(line => line.itemGroup))],
-      upsale: !!order.upsale, orderTotal: order.orderTotal,
+      upsale: !!order.upsale, commissionOnly, orderTotal: order.orderTotal,
       commissionableValue: orderCommissionableValue(order, groupIndex),
       paidAmount: order.paidAmount,
       productRevenue, marginRevenue: base.revenue,
@@ -345,7 +356,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       productCommission: component('product_revenue'),
       kpiQty: sourceLines.filter(line => line.component === 'kpi_item').reduce((qty, line) => qty + (line.qty ?? 0), 0),
       kpiBase: component('kpi_item'), kpiBonus: 0,
-      kpiThresholdPct: eligible ? statement?.kpiThresholdPct ?? 0 : 0,
+      kpiThresholdPct: eligible && !commissionOnly ? statement?.kpiThresholdPct ?? 0 : 0,
       marginIncentive: 0, marginAllocationBasis: null,
       penaltyMultiplier: multiplier,
       penaltyWithheld: eligible ? sum(result.penalised.filter(row => row.staffId === order.staffId && row.orderId === order.id).map(row => row.withheld)) : 0,
@@ -360,11 +371,13 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     const rows = personalRows.filter(row => row.staffId === staffId)
     const kpiBonus = sum((statement?.lines ?? []).filter(line => line.component === 'kpi_threshold').map(line => line.amount))
     const bonuses = allocateCommissionAmount(kpiBonus, rows.map(row => row.kpiBase))
-    const margins = allocateCommissionAmount(statement?.marginIncentive ?? 0, rows.map(row => row.status === 'eligible' ? Math.max(0, row.marginRevenue) : 0))
+    // An old bill topped up is in no margin (2026-11-07): none of the month's incentive rides on it.
+    const inMargin = (row: CommissionOrderRow) => row.status === 'eligible' && !row.commissionOnly
+    const margins = allocateCommissionAmount(statement?.marginIncentive ?? 0, rows.map(row => inMargin(row) ? Math.max(0, row.marginRevenue) : 0))
     rows.forEach((row, index) => {
       row.kpiBonus = bonuses[index]
       row.marginIncentive = margins[index]
-      row.marginAllocationBasis = statement?.marginIncentive && row.status === 'eligible' && row.marginRevenue > 0 ? 'eligible_goods_revenue' : null
+      row.marginAllocationBasis = statement?.marginIncentive && inMargin(row) && row.marginRevenue > 0 ? 'eligible_goods_revenue' : null
       row.totalCommission = sum([row.productCommission, row.kpiBase, row.kpiBonus, row.marginIncentive])
     })
 
@@ -403,7 +416,8 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
   const kpi: KpiAgentSummary[] = people.map(person => {
     const items = new Map<string, KpiItemSummary>()
     const rows = new Map(person.personalRows.map(row => [row.orderId, row]))
-    for (const order of input.orders.filter(order => order.staffId === person.staffId)) {
+    // An old bill topped up is no sale of theirs, so it moves no KPI item (2026-11-07).
+    for (const order of input.orders.filter(order => order.staffId === person.staffId && !order.commissionOnly)) {
       const row = rows.get(order.id)!
       // Found with every configured item, KPI pay on or off: what was SOLD.
       // What was PAID is the engine's — an eligible bill, KPI switched on,

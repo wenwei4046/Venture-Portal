@@ -9,7 +9,8 @@ import { monthCommissionableValue, needsMonthValue } from '@/lib/commission/dire
 import { carriesInto } from '@/lib/commission/carry'
 import { officeToday } from '@/lib/office-time'
 import { loadMonthOrders } from './month-orders'
-import { loadBillsByDocNo } from './row-origins'
+import { loadBillsByDocNo, loadFeedFloor } from './row-origins'
+import { isOldBillDate } from '@/lib/commission/row-origin'
 import { namesFabricSeries, readFabricSeries } from './fabric-series'
 import type {
   CostRatioRow,
@@ -96,9 +97,10 @@ export interface CommissionInputOptions {
    * The month's bills as the page already read them (`revenue_month_orders`),
    * for the directors' incentive threshold — Comm Cal's Commissionable value
    * card. Absent, they are read here when a director's incentive needs them,
-   * so the close the server recomputes judges the same figure.
+   * so the close the server recomputes judges the same figure. An old bill
+   * topped up is left out of it (2026-11-07: commission only, no sale).
    */
-  monthOrders?: readonly { cancelled: boolean; commissionable: number }[]
+  monthOrders?: readonly { cancelled: boolean; commissionable: number; orderDate: string }[]
 }
 
 /**
@@ -154,9 +156,14 @@ export async function loadCommissionInput(
   const batchId = (batchRow as { id: string } | null)?.id
   if (!batchId) throw new Error(`Nothing has been imported for ${period.slice(0, 7)} yet.`)
 
+  // The feed window's floor, read beside everything else (2026-11-07): a bill
+  // dated before it, in a month from it on, is an old bill topped up — it pays
+  // its holder commission only (`SalesOrder.commissionOnly`).
+  const feedFloorRead = loadFeedFloor(supabase, scheme.sub_department_id)
   // brand_code: the brand the bill was written under — it alone picks the
   // margin ladder; the brands of what rides on it do not (2026-09-27).
-  const orderSelect = 'id, order_no, staff_id, order_date, event_date, period_month, order_total, paid_amount, manual_margin_pct, brand_code'
+  // source: only the ERP's bills can be old bills topped up (2026-11-07).
+  const orderSelect = 'id, order_no, staff_id, order_date, event_date, period_month, order_total, paid_amount, manual_margin_pct, brand_code, source'
   const [thisMonth, earlier, releases, ranks, itemGroups, kpiItems, kpiThresholds,
     marginBands, hierarchy, upsales, currentHierarchyRows,
     currentKpiItems, currentKpiThresholds, cutover,
@@ -346,9 +353,12 @@ export async function loadCommissionInput(
     }
     return terms.rankKey !== null || terms.fixedAmount > 0 || terms.incentiveAmount > 0 ? [terms] : []
   })
-  // The incentive's measure is Comm Cal's card, read the card's way.
+  const feedFloor = await feedFloorRead
+  // The incentive's measure is Comm Cal's card, read the card's way — an old
+  // bill topped up is no sale of the month's (2026-11-07).
   const monthValue = needsMonthValue(directors)
-    ? monthCommissionableValue(options.monthOrders ?? await loadMonthOrders(supabase, scheme.sub_department_id, period))
+    ? monthCommissionableValue((options.monthOrders ?? await loadMonthOrders(supabase, scheme.sub_department_id, period))
+      .filter(order => !isOldBillDate(order.orderDate, period, feedFloor)))
     : undefined
 
   const sourceRows = {
@@ -358,6 +368,7 @@ export async function loadCommissionInput(
     departmentHeadIds: heads.map(head => head.id),
     directors,
     monthCommissionableValue: monthValue,
+    feedFloor,
   }
   const currentInput = toEngineInput({
     ...sourceRows, hierarchy: currentHierarchyRows, kpiItems: currentKpiItems,

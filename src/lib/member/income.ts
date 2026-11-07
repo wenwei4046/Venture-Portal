@@ -44,10 +44,21 @@ export interface IncomeBill {
   kpiQty: number;
   /** personal + KPI: what the bill pays the member this month. */
   pay: number;
+  /**
+   * The bill's layer-2 margin as a PERCENTAGE (41.2 for 41.2%) — the unit the app's ladders and the order book's
+   * `margin` read in; null while it has none. (Until 2026-11-07 the live month carried the engine's fraction, 0.412,
+   * which My income printed as "0.4% margin", every bill at the foot of its ladder.)
+   */
   marginPct: number | null;
   /** The member's part of a shared bill (0.5); null when it is theirs alone. */
   sharePct: number | null;
   brand: string | null;
+  /**
+   * An old bill topped up (2026-11-07): a departed salesperson's, collected by
+   * the member — it pays them its commission and is no sale of theirs (not in
+   * their sales, target or the Arena).
+   */
+  commissionOnly?: true;
 }
 
 export interface IncomeOverride {
@@ -145,9 +156,11 @@ function bill(row: CommissionOrderRow): IncomeBill {
     kpi,
     kpiQty: row.kpiQty,
     pay: round2(row.productCommission + kpi),
-    marginPct: row.marginPct,
+    // The engine's margin is a fraction; the app reads percentages.
+    marginPct: row.marginPct === null ? null : round2(row.marginPct * 100),
     sharePct: row.share && part ? part.pct : null,
     brand: row.brands[0] ?? null,
+    ...(row.commissionOnly ? { commissionOnly: true as const } : {}),
   };
 }
 
@@ -223,6 +236,7 @@ export function closedIncome(close: {
       orderId: b.id, no: b.no, status: deferred.has(b.id) ? "deposit_pending" : b.status, upsale: false,
       commissionable: o?.basis ?? 0, orderTotal: 0, personal: o?.personal ?? 0, kpi: o?.kpi ?? 0, kpiQty: o?.kpiQty ?? 0,
       pay: round2((o?.personal ?? 0) + (o?.kpi ?? 0)), marginPct: null, sharePct: null, brand: null,
+      ...(b.commissionOnly ? { commissionOnly: true as const } : {}),
     };
   });
   const overrides: IncomeOverride[] = lines.filter(l => l.component === "override").map(l => {

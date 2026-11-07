@@ -121,3 +121,23 @@ describe("the whole sub-department", () => {
     expect(readOrderBook(all)!.orders[0].seller).toBeNull();
   });
 });
+
+// 2026-11-07: an old bill topped up — commission only, and who sold it.
+describe("readOrderBook — an old bill topped up", () => {
+  it("reads it as commission only, with who sold it — every other bill says nothing", () => {
+    const r = raw();
+    Object.assign(r.orders[0], { commissionOnly: true, soldBy: " JUNIE TAN " });
+    expect(readOrderBook(r)!.orders[0]).toMatchObject({ commissionOnly: true, soldBy: "JUNIE TAN" });
+    const plain = readOrderBook(raw())!.orders[0];
+    expect(plain).not.toHaveProperty("commissionOnly");
+    expect(plain).not.toHaveProperty("soldBy");
+  });
+  it("names nobody when the ERP names nobody, and reads nothing but true as commission only", () => {
+    const r = raw();
+    Object.assign(r.orders[0], { commissionOnly: true, soldBy: null });
+    expect(readOrderBook(r)!.orders[0].soldBy).toBeNull();
+    const odd = raw();
+    Object.assign(odd.orders[0], { commissionOnly: "yes" });
+    expect(readOrderBook(odd)!.orders[0]).not.toHaveProperty("commissionOnly");
+  });
+});

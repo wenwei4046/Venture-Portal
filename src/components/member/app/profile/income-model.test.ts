@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { IncomeBill, IncomeMonth, MemberIncome } from "@/lib/member/income";
+import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { memberPay, salaryFromSchedule } from "@/lib/member/income-pay";
-import { incomeVM } from "./income-model";
+import { incomeOrdersVM, incomeVM, OLD_BILL_NOTE } from "./income-model";
 
 const bill = (over: Partial<IncomeBill> = {}): IncomeBill => ({
   orderId: "o1", no: "SO-1", status: "eligible", upsale: false, commissionable: 10000, orderTotal: 10500, personal: 500,
-  kpi: 0, kpiQty: 0, pay: 500, marginPct: 0.41, sharePct: null, brand: "AKEMI", ...over,
+  kpi: 0, kpiQty: 0, pay: 500, marginPct: 41, sharePct: null, brand: "AKEMI", ...over,
 });
 const month = (over: Partial<IncomeMonth> = {}): IncomeMonth => ({
   period: "2026-09", state: "live", asOf: "2026-10-05T02:00:00Z", closedAt: null, payrollStatus: null, paidOn: null,
@@ -136,5 +137,49 @@ describe("incomeVM — the fixed salary is paid out of the commission, as payrol
     expect(vm.rows.map(r => r.label)).toEqual(["Personal sales commission"]);
     expect(vm.paidAs).toBeNull();
     expect(vm.total).toBe("RM 7,974.20");
+  });
+});
+
+// 2026-11-07, the user: an old bill topped up "can view, then mention no count in sales target (arena)".
+describe("an old bill topped up in My income", () => {
+  const old = bill({ orderId: "old", no: "ZNT4813", commissionOnly: true, personal: 240, pay: 240, marginPct: null });
+  const m = month({ bills: [bill(), old] });
+
+  it("says the commission row has it, so its figures still add up", () => {
+    expect(incomeVM(data(m), false).rows.find(r => r.label === "Personal sales commission")?.sub)
+      .toBe("RM 159,484 counted sales · 1 old bill");
+  });
+
+  it("lists it among the member's orders, paid, and not counted in their sales, target or the Arena", () => {
+    const vm = incomeOrdersVM(data(m), null, [], false);
+    const row = vm.mine.rows.find(r => r.no === "ZNT4813")!;
+    expect(row).toMatchObject({ pay: "RM 240.00", sub: "Not in sales", held: false });
+    expect(vm.sheets[row.id]).toMatchObject({ tag: "Commission only", tone: "neutral", note: expect.stringContaining(OLD_BILL_NOTE) });
+    expect(OLD_BILL_NOTE).toMatch(/not counted in your sales, your target or the Arena/);
+  });
+
+  it("says its margin beside it, read on its brand's ladder, as it cuts its commission like any bill's", () => {
+    const bands = [
+      { brand: "AKEMI", key: "Below margin Tier 1", kind: "penalty" as const, threshold: 27, multiplier: 0.5, amount: 0 },
+      { brand: "AKEMI", key: "Standard margin", kind: "reference" as const, threshold: 33, multiplier: 1, amount: 0 },
+    ];
+    const vm = incomeOrdersVM(data(month({ bills: [bill({ orderId: "old", no: "ZNT4813", commissionOnly: true, marginPct: 26, personal: 250, pay: 250 })] })), null, bands, false);
+    const sheet = vm.sheets[vm.mine.rows[0].id];
+    expect(sheet.tag).toBe("Commission only · 26.0% margin");
+    expect(sheet.tone).toBe("bad");
+  });
+
+  it("names no week of the month: it was sold at a fair months before", () => {
+    const sold: MemberBookOrder = {
+      id: "old", number: "ZNT4813", ref: null, customer: "Mdm Lee", date: "2026-03-10", sourceMonth: "2026-09", recognitionMonth: "2026-09",
+      brand: "AKEMI", booth: "AKEMI", venue: "SUNWAY", fairStart: "2026-03-13", fairEnd: "2026-03-15", organiser: null, week: "2026-03-13",
+      revenue: 6000, margin: 10, kpiQty: 0, cleared: true, carried: false, manual: false, total: 6000, paid: 4000, depositNeeded: 1800,
+      lines: [], own: true, share: null, commissionOnly: true, soldBy: "JUNIE TAN",
+    };
+    const book: MemberOrderBook = { from: "2026-09", through: "2026-09", asOf: "2026-10-05T02:00:00Z", paysFrom: "2026-09", closedMonths: [], brandWeeks: {}, orders: [sold] };
+    const vm = incomeOrdersVM(data(m), book, [], false);
+    const row = vm.mine.rows.find(r => r.no === "ZNT4813")!;
+    expect(row.meta).toBe("Mdm Lee · Akemi");
+    expect(vm.sheets[row.id].meta).toBe("Mdm Lee · SUNWAY");
   });
 });

@@ -3,7 +3,7 @@ import type { MemberKpiSummary } from "@/lib/member/kpi-summary";
 import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { arenaMonthFridays } from "@/lib/member/arena";
 import { holdersLine, pctLabel } from "@/lib/member/share-requests";
-import { dayRange, firstName, initials, monthName, rm, shortDay } from "../format";
+import { dayRange, firstName, initials, monthName, monthShort, rm, shortDay } from "../format";
 import { barPos, brandLadder, pctText, rowFor, TONES, type Ladder, type LadderRow, type Tone } from "./ladder";
 import type { InsightPeriod } from "./period";
 
@@ -80,8 +80,22 @@ export interface BrandStat {
   row: LadderRow | null;
 }
 
-const counted = (book: MemberOrderBook | null) => (book?.orders ?? []).filter(o => o.cleared);
-const waiting = (book: MemberOrderBook | null) => (book?.orders ?? []).filter(o => !o.cleared);
+/**
+ * An old bill topped up (2026-11-07): commission only — listed with the member's bills, counted in no sales, KPI,
+ * margin, target or Arena (the user: "i want can view, then mention no count in sales target (arena)").
+ */
+const sold = (o: MemberBookOrder) => o.commissionOnly !== true;
+const counted = (book: MemberOrderBook | null) => (book?.orders ?? []).filter(o => o.cleared && sold(o));
+const waiting = (book: MemberOrderBook | null) => (book?.orders ?? []).filter(o => !o.cleared && sold(o));
+
+/** What an old bill says of itself, on its row and its sheet. */
+export const OLD_BILL_PILL = "Commission only";
+export const OLD_BILL_ROW = "Not in sales · target · Arena";
+/** "your" for the member's own book; a person's first name on My team's, the sub-department's name on the whole's. */
+export function oldBillNote(whose?: string): string {
+  const of = whose ? `${whose}’s` : "your";
+  return `Pays ${whose ?? "you"} commission only. Not counted in ${of} sales, ${of} target or the Arena.`;
+}
 
 function blend(orders: readonly MemberBookOrder[]): number | null {
   let revenue = 0;
@@ -374,7 +388,9 @@ export function billGroups(input: Pick<InsightInput, "book" | "period">): Group[
   const byWeek = new Map<string, MemberBookOrder[]>();
   const earlier: MemberBookOrder[] = [];
   for (const o of orders) {
-    if (o.carried) earlier.push(o);
+    // An old bill topped up (2026-11-07) sits in this month, dated by a fair months before: with the carried-in bills,
+    // never a week of its own.
+    if (o.carried || !sold(o)) earlier.push(o);
     else byWeek.set(o.week, [...(byWeek.get(o.week) ?? []), o]);
   }
   const groups: Group[] = [...byWeek.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([week, list]) => {
@@ -441,6 +457,11 @@ export function billsView(input: InsightInput): BillsVM {
   const who = (o: MemberBookOrder) => (whole ? `${sellerOf(o)} · ` : "");
 
   const row = (o: MemberBookOrder, sub: string): BillRowVM => {
+    // An old bill topped up (2026-11-07): listed, muted, and said to count in nothing but commission.
+    if (!sold(o)) {
+      return { id: o.id, no: o.number, sub: `${who(o)}${o.customer || "Walk-in"} · ${OLD_BILL_ROW}`, amt: rm(o.revenue), amtMuted: true,
+        pill: o.cleared ? OLD_BILL_PILL : "Deposit due", pillInk: o.cleared ? TONES.neutral.ink : TONES.warn.ink, kpiText: null };
+    }
     const band = billRow(o, ladders, input.bands);
     const due = stillDue(o);
     const gift = noSalesBill(o);
@@ -457,8 +478,9 @@ export function billsView(input: InsightInput): BillsVM {
     const colors = brand ? brandColors(brand) : NEUTRAL_BRAND;
     const fair = g.key === EARLIER ? null : weekFair(g, brand);
     const dates = weekDates(g, fair);
-    const done = g.orders.filter(o => o.cleared);
-    const wait = g.orders.length - done.length;
+    const done = g.orders.filter(o => o.cleared && sold(o));
+    const wait = g.orders.filter(o => !o.cleared && sold(o)).length;
+    const old = g.orders.length - done.length - wait;
     const kpi = done.reduce((s, o) => s + o.kpiQty, 0);
     const monthly = input.period.kind === "monthly";
     const all = whole && g.key !== EARLIER ? boothsOf(g.orders) : null;
@@ -472,7 +494,7 @@ export function billsView(input: InsightInput): BillsVM {
         : all ? [plural(all.booths, "booth"), all.venues || null].filter(Boolean).join(" · ")
         : [fair?.venue || null, fair?.organiser ?? null].filter(Boolean).join(" · ") || "No fair",
       dates: g.key === EARLIER || !monthly ? `${plural(g.orders.length, "bill")}` : dates,
-      stats: `${plural(done.length, "order")}${kpiEnabled ? ` · KPI ${kpi}` : ""}${wait ? ` · ${wait} waiting` : ""}`,
+      stats: `${plural(done.length, "order")}${kpiEnabled ? ` · KPI ${kpi}` : ""}${wait ? ` · ${wait} waiting` : ""}${old ? ` · ${plural(old, "old bill")}` : ""}`,
       tint: colors.tint,
       bills: [...g.orders].sort((a, b) => a.date.localeCompare(b.date) || a.number.localeCompare(b.number))
         .map(o => row(o, `${who(o)}${o.customer || "Walk-in"} · ${plural(o.lines.length, "line")}`)),
@@ -513,6 +535,11 @@ export interface OrderSheetVM {
    * somebody else's, and what of it counts in their sales.
    */
   share?: { line: string; sub: string } | null;
+  /**
+   * An old bill topped up (2026-11-07): whose bill it was and when ("JUNIE’s bill · Mar 2026"), and that it pays
+   * commission only — not counted in sales, target or the Arena.
+   */
+  oldBill?: { line: string; sub: string } | null;
 }
 
 export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM | null {
@@ -522,19 +549,27 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
   const group = billGroups(input).find(g => g.orders.some(x => x.id === o.id));
   const due = stillDue(o);
   const qty = (q: number) => (Number.isInteger(q) ? String(q) : String(Math.round(q * 100) / 100));
+  // An old bill topped up (2026-11-07): commission only — no KPI is read on it; its margin is, as it cuts its
+  // commission as any bill's does ("need follow the margin as well").
+  const old = !sold(o);
   return {
     no: o.number,
     ref: o.ref,
     // Everybody's bills (2026-10-25): whose it is, first.
     cust: input.whole ? `${sellerOf(o)} · ${o.customer || "Walk-in"}` : o.customer || "Walk-in",
     where: [group?.title, o.venue || null].filter(Boolean).join(" · "),
-    status: o.cleared ? "Deposit cleared" : due > 0 ? `Deposit due ${rm(due)}` : "Deposit due",
-    statusTone: o.cleared ? "good" : "warn",
+    status: old && o.cleared ? OLD_BILL_PILL : o.cleared ? "Deposit cleared" : due > 0 ? `Deposit due ${rm(due)}` : "Deposit due",
+    statusTone: old && o.cleared ? "neutral" : o.cleared ? "good" : "warn",
     amt: rm(o.total),
     margin: o.margin === null ? "—" : `${o.margin.toFixed(1)}%`,
     marginInk: noSalesBill(o) ? TONES[band?.tone ?? "bad"].ink : o.margin === null ? TONES.warn.ink : TONES[band?.tone ?? "neutral"].ink,
     tier: noSalesBill(o) ? "No sales" : o.margin === null ? "Cost pending" : band?.label ?? "No ladder",
-    kpi: kpiOn(input) ? String(o.kpiQty) : "—",
+    kpi: old ? "—" : kpiOn(input) ? String(o.kpiQty) : "—",
+    oldBill: old ? {
+      // The month it was SOLD in: its date's — the bill sits in the month its top-up came in (`sourceMonth`).
+      line: [o.soldBy ? `${firstName(o.soldBy)}’s bill` : "An old bill", monthShort(o.date.slice(0, 7))].filter(Boolean).join(" · "),
+      sub: oldBillNote(input.whole ?? input.of),
+    } : null,
     lines: o.lines.map(l => ({ name: l.name, qty: qty(l.qty), amt: l.amount ? rm(l.amount) : "Free", kpi: l.kpiQty, isKpi: l.kpiQty > 0 })),
     own: o.own,
     share: o.share ? {
@@ -598,7 +633,7 @@ export function kpiView(input: InsightInput, subName: string): KpiVM {
       const brand = monthly && !input.whole ? weekBrand(g, picks) : null;
       const colors = brand ? brandColors(brand) : NEUTRAL_BRAND;
       const label = brand ? brandName(brand) : !monthly ? `Month ${i + 1}` : input.whole ? plural(boothsOf(g.orders).booths, "booth") : "No booth";
-      return { key: g.key, week: monthly ? (g.title.startsWith("Week ") ? `W${g.title.slice(5)}` : g.title) : g.title, n: g.orders.filter(o => o.cleared).reduce((s, o) => s + o.kpiQty, 0), brand: label, ...colors };
+      return { key: g.key, week: monthly ? (g.title.startsWith("Week ") ? `W${g.title.slice(5)}` : g.title) : g.title, n: g.orders.filter(o => o.cleared && sold(o)).reduce((s, o) => s + o.kpiQty, 0), brand: label, ...colors };
     }) : [],
     orders: enabled ? done.filter(o => o.kpiQty > 0).map(o => ({ id: o.id, no: o.number, kpi: o.kpiQty, items: o.lines.filter(l => l.kpiQty > 0).map(l => `${l.name} × ${l.kpiQty}`).join(" · ") })) : [],
     orderCount: plural(enabled ? done.filter(o => o.kpiQty > 0).length : 0, "order"),
