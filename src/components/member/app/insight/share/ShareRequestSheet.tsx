@@ -12,8 +12,9 @@ type Outcome<T> = { ok: true; data: T } | { ok: false; error: string };
 
 /**
  * One share request (2026-10-21): the bill, the split it asks for, each colleague's answer and the whole trail — who sent
- * it, who accepted, HR's decision. A colleague still to answer accepts or declines it here (a note optional); its
- * salesperson may withdraw it until HR decides. View as reads it and sends nothing.
+ * it, who accepted (and, on a request from before 2026-11-07, HR's decision). A colleague still to answer accepts or
+ * declines it here (a note optional) — since 2026-11-07 their Accept shares the bill at once; its salesperson may withdraw
+ * it until then. View as reads it and sends nothing.
  */
 export default function ShareRequestSheet({ open, request, error, staffId, readOnly, onAnswer, onWithdraw, onClose }: {
   open: boolean;

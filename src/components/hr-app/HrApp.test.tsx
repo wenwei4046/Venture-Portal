@@ -817,6 +817,26 @@ describe('IT support stays in the HR app', () => {
     expect(window.location.pathname).toBe('/hr-app')
   })
 
+  // 2026-11-07: a share that took effect on its colleague's Accept — HR approves none any more, and is told.
+  it('a share_taken notice opens Comm Cal’s month on its Requests tab', () => {
+    window.history.pushState(null, '', '/hr-app')
+    const notices = {
+      unread: 1,
+      items: [{ id: 'n-sh', kind: 'share' as const, title: 'HC-SO-2611-028 · shared', body: 'KAR JIUN (5%) shared 50% with SALLY (9%)',
+        refKind: 'share_taken' as const, refId: 'fair/2026-11-01', at: '2026-11-07T15:00:00Z', read: false }],
+    }
+    render(<HrApp data={{ ...data, notices }} actions={actions} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Notifications, 1 new' }))
+    const assign = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign })
+    try {
+      fireEvent.click(screen.getByText('HC-SO-2611-028 · shared'))
+      expect(assign).toHaveBeenCalledWith('/revenue/fair/2026-11-01?view=requests')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   // 2026-10-27 — the user's phone: the list ran from one edge of the screen to the other, and its table came out
   // dark in the phone's dark mode (the portal's own tokens turn dark there; the sheet's never do).
   it('stands in a sub screen’s gutter, on the sheet’s palette', () => {

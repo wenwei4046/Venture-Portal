@@ -250,6 +250,9 @@ export function hrTopics(user: User): string[] {
     ...(parts.rooms && canDo(onPage(user, PART_PAGE.rooms), 'rooms', 'edit') ? ['rooms.guest'] : []),
     ...(may.decide ? ['member.requests'] : []),
     ...(may.termEdit ? ['people.probation'] : []),
+    // A share that took effect on its colleague's Accept (2026-11-07, mig 20261107235500): HR approves none any more,
+    // so whoever may Cancel share on Comm Cal's month (Revenue · Edit on its tab) is told — never while viewing as somebody.
+    ...(!user.viewingAs && canDo(onPage(user, '/revenue/[sub]/[period]'), 'revenue', 'edit') ? ['revenue.shares'] : []),
   ]
 }
 

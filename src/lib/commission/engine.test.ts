@@ -1357,7 +1357,9 @@ describe('below-margin penalty, end to end', () => {
 
   it('kills the override outright when the bill is killed', () => {
     const r = run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 7_700]])] })
-    expect(find(r.statements, 'ta').overrideCommission).toBe(0)
+    // A bill cut to nothing counts no sales either (2026-11-07), so the upline
+    // has no group sales from it — and no statement to show it.
+    expect(r.statements.find(s => s.staffId === 'ta')?.overrideCommission ?? 0).toBe(0)
     expect(r.totalCommission).toBe(0)
   })
 
@@ -1935,5 +1937,42 @@ describe('an old bill topped up pays its holder commission only (2026-11-07)', (
     expect(find(r.statements, 'director').lines.map(l => [l.sourceOrderId, l.amount])).toEqual([['thin', 1_200]])
     expect(find(r.statements, 'director').productRevenue).toBe(0)
     expect(r.penalised).toEqual([])
+  })
+})
+
+// ─── A bill cut for its margin counts the sales its commission is (2026-11-07) ─
+// The user: "只要是 drop com 的情况也是一样的 … 原本 1 万块的 total sales order 也只是算
+// 5,000 块的 sales。当然 commission 还是一样算 1 万块的 50%"; asked where: "连升级业绩也打折".
+
+describe('a bill cut for its margin counts the sales its commission is (2026-11-07)', () => {
+  // 26% on Akemi's ladder: Below margin Tier 1 — half the commission, and half the sales.
+  const thin = (id: string, amount: number) => order(id, 'rs', [['MATTRESS', 'M1', 1, amount, amount * 0.74]])
+  const good = (id: string, amount: number) => order(id, 'rs', [['MATTRESS', 'M1', 1, amount, amount * 0.6]])
+
+  it('counts half its sales where it pays half its commission', () => {
+    const rs = find(run({ orders: [thin('1', 10_000)] }).statements, 'rs')
+    expect(rs.productRevenue).toBe(5_000)
+    expect(rs.penaltyWeightedRevenue).toBe(5_000)
+    expect(rs.productCommission).toBe(250)
+  })
+
+  it('counts so in the upline’s group sales', () => {
+    const r = run({ orders: [thin('1', 10_000), good('2', 10_000)] })
+    expect(find(r.statements, 'rs').groupRevenue).toBe(15_000)
+    expect(find(r.statements, 'ta').groupRevenue).toBe(15_000)
+  })
+
+  it('and in a promotion: RM 400,000 at half commission is RM 200,000, short of a Team Assistant’s 300,000', () => {
+    const hierarchy = [node('rs', null, 'rs_6', 'variable')]
+    expect(find(run({ hierarchy, orders: [good('1', 400_000)] }).statements, 'rs').effectiveRankKey).toBe('ta_7')
+    expect(find(run({ hierarchy, orders: [thin('1', 400_000)] }).statements, 'rs').effectiveRankKey).toBe('rs_6')
+  })
+
+  it('cuts nothing while the penalty is off, nor a bill with no margin yet, nor a head’s own bill', () => {
+    const off = run({ scheme: { ...SCHEME, enableMarginPenalty: false }, orders: [thin('1', 10_000)] })
+    expect(find(off.statements, 'rs').productRevenue).toBe(10_000)
+    expect(find(run({ orders: [order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000]])] }).statements, 'rs').productRevenue).toBe(10_000)
+    const head = run({ orders: [{ ...thin('1', 10_000), staffId: 'director' }], departmentHeadIds: ['director'] })
+    expect(find(head.statements, 'director').productRevenue).toBe(10_000)
   })
 })

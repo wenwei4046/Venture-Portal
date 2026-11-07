@@ -355,11 +355,20 @@ export interface BillRowVM {
   id: string;
   no: string;
   sub: string;
+  /** The bill's whole sales — "完整 full figure" (2026-11-07). */
   amt: string;
   amtMuted: boolean;
   pill: string;
   pillInk: string;
   kpiText: string | null;
+  /** What of it counts for the reader when that is less than the whole — a part, a margin cut: "Arena RM 5,000". */
+  arena?: string | null;
+}
+
+/** The bill's whole sales, and what of it counts for the reader — said when the two differ (2026-11-07). */
+function counts(o: MemberBookOrder): { whole: number; arena: string | null } {
+  const whole = o.fullRevenue ?? o.revenue;
+  return { whole, arena: Math.round(o.revenue * 100) < Math.round(whole * 100) ? `Arena ${rm(o.revenue)}` : null };
 }
 export interface WeekTabVM { key: string; title: string; brand: string; dates: string; color: string; tint: string }
 export interface WeekCardVM { brandWeek: string; total: string; place: string; dates: string; stats: string; tint: string; bills: BillRowVM[] }
@@ -458,16 +467,19 @@ export function billsView(input: InsightInput): BillsVM {
 
   const row = (o: MemberBookOrder, sub: string): BillRowVM => {
     // An old bill topped up (2026-11-07): listed, muted, and said to count in nothing but commission.
+    const { whole, arena } = counts(o);
     if (!sold(o)) {
-      return { id: o.id, no: o.number, sub: `${who(o)}${o.customer || "Walk-in"} · ${OLD_BILL_ROW}`, amt: rm(o.revenue), amtMuted: true,
-        pill: o.cleared ? OLD_BILL_PILL : "Deposit due", pillInk: o.cleared ? TONES.neutral.ink : TONES.warn.ink, kpiText: null };
+      return { id: o.id, no: o.number, sub: `${who(o)}${o.customer || "Walk-in"} · ${OLD_BILL_ROW}`, amt: rm(whole), amtMuted: true,
+        pill: o.cleared ? OLD_BILL_PILL : "Deposit due", pillInk: o.cleared ? TONES.neutral.ink : TONES.warn.ink, kpiText: null, arena: null };
     }
     const band = billRow(o, ladders, input.bands);
     const due = stillDue(o);
     const gift = noSalesBill(o);
     const pill = !o.cleared ? (due > 0 ? `Due ${rm(due)}` : "Deposit due") : gift ? "No sales" : o.margin === null ? "Cost pending" : `${o.margin.toFixed(1)}%`;
     const ink = !o.cleared || (o.margin === null && !gift) ? TONES.warn.ink : TONES[band?.tone ?? (gift ? "bad" : "neutral")].ink;
-    return { id: o.id, no: o.number, sub, amt: rm(o.revenue), amtMuted: !o.cleared, pill, pillInk: ink, kpiText: kpiEnabled ? `KPI ${o.kpiQty}` : null };
+    // The whole bill, and what of it is the reader's sales — a part, a margin cut (the user: "Sales Order 那边会显示完整
+    // full figure，但会多一个 remark … 注明算他的 amount 是 5,000 块").
+    return { id: o.id, no: o.number, sub, amt: rm(whole), amtMuted: !o.cleared, pill, pillInk: ink, kpiText: kpiEnabled ? `KPI ${o.kpiQty}` : null, arena };
   };
 
   const tabs: WeekTabVM[] = [];
@@ -540,6 +552,11 @@ export interface OrderSheetVM {
    * commission only — not counted in sales, target or the Arena.
    */
   oldBill?: { line: string; sub: string } | null;
+  /**
+   * A bill whose margin cuts its commission (2026-11-07): what of it counts in the reader's sales, the Arena's, cut the
+   * same — "RM 5,000 counted", over why.
+   */
+  arena?: { line: string; sub: string } | null;
 }
 
 export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM | null {
@@ -569,6 +586,12 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
       // The month it was SOLD in: its date's — the bill sits in the month its top-up came in (`sourceMonth`).
       line: [o.soldBy ? `${firstName(o.soldBy)}’s bill` : "An old bill", monthShort(o.date.slice(0, 7))].filter(Boolean).join(" · "),
       sub: oldBillNote(input.whole ?? input.of),
+    } : null,
+    // The margin cut (2026-11-07 — the user: "只要是 drop com 的情况也是一样的 … 原本 1 万块的 total sales order 也只是算
+    // 5,000 块的 sales"): its sales count what its commission is.
+    arena: !old && o.weight !== undefined ? {
+      line: `${rm(o.revenue)} counted`,
+      sub: `Margin cut · ${Math.round(o.weight * 100)}% of its commission and its sales`,
     } : null,
     lines: o.lines.map(l => ({ name: l.name, qty: qty(l.qty), amt: l.amount ? rm(l.amount) : "Free", kpi: l.kpiQty, isKpi: l.kpiQty > 0 })),
     own: o.own,

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
-import { openTarget, type Notice, type NoticeRef } from '@/lib/push/notices'
+import { noticeUrl, openTarget, type Notice, type NoticeRef } from '@/lib/push/notices'
 import { PUSH_WORDS, popUpNeedsTurningOn, pushState, turnPushOff, turnPushOn, type PushState, type PushTrouble } from '@/components/pwa/push-client'
 import PopUpGuide from '@/components/pwa/PopUpGuide'
 import PushAsk from '@/components/pwa/PushAsk'
@@ -323,6 +323,12 @@ export default function HrApp({ data: d, actions }: { data: HrAppData; actions: 
     // screen of its own for it.
     if (kind === 'payment_request') {
       window.location.assign(`/claims?open=${encodeURIComponent(id)}`)
+      return
+    }
+    // A share that took effect on its colleague's Accept (2026-11-07): Comm Cal's month on its Requests tab, where
+    // Cancel share is — the app has no screen of its own for it.
+    if (kind === 'share_taken') {
+      window.location.assign(noticeUrl({ refKind: kind, refId: id }, 'hr'))
       return
     }
     if (kind === 'hiring_request') {

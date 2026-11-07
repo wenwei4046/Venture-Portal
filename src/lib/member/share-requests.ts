@@ -10,6 +10,11 @@
  * file reads what the functions answer and says it in words — the Revenue app's sheets and Comm Cal's Requests tab share
  * it. (The JSON still carries a list of parts: the first version named up to five, and HR's Approve writes whatever a
  * request names.)
+ *
+ * NO HR STEP SINCE 2026-11-07 (mig 20261107235500 — the user: "其实不需要 HR approval … Sally 那边 accept 了之后，这张单就
+ * 正常了 … 所以它的 trail 只有两个"): the colleague's Accept writes the shares at once — partner → approved, its trail sent →
+ * accepted — after the checks HR's Approve made; HR is told (topic `revenue.shares`, the `share_taken` notice) and may
+ * Cancel share on Comm Cal. `hr`, `rejected` and HR's steps are the requests from before it.
  */
 
 export type ShareStatus = "partner" | "hr" | "approved" | "rejected" | "declined" | "cancelled";
@@ -186,7 +191,7 @@ export function stepLabel(step: ShareStep): string {
 }
 
 /**
- * Who would hold the bill once HR approves a request: the colleagues it names at their parts, anybody holding a part now
+ * Who would hold the bill once a request takes effect: the colleagues it names at their parts, anybody holding a part now
  * whom it does not name at theirs, and the owner the rest — the owner first.
  */
 export function proposedHolders(r: Pick<ShareRequest, "owner" | "parts" | "holders">): ShareHolder[] {

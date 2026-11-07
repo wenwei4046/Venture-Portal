@@ -44,6 +44,21 @@ describe('Comm Cal › Requests', () => {
     ])
   })
 
+  // 2026-11-07 — the user: "Sally 那边 accept 了之后，这张单就正常了，不需要 HR approval，所以它的 trail 只有两个".
+  it('lists a request its colleague accepted as Shared — its trail the two steps, nothing for HR to approve', () => {
+    const shared = request({ status: 'approved', decidedAt: '2026-10-21T02:30:00Z', decidedByName: 'ANTHONY',
+      holders: [{ id: LUCAS, name: 'LUCAS', pct: 0.5, owner: true }, { id: ANTHONY, name: 'ANTHONY', pct: 0.5, owner: false }] })
+    render(<ShareRequestsPanel {...props} requests={[shared]} />)
+    const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    expect(rows[0].textContent).toMatch(/Shared$/)
+    fireEvent.click(screen.getByText('HC-SO-2610-004'))
+    const drawer = screen.getByRole('dialog')
+    expect(drawer).toHaveTextContent('Share request sent21 Oct, 10:00LUCAS')
+    expect(drawer).toHaveTextContent('Accepted21 Oct, 10:30ANTHONY')
+    expect(drawer).not.toHaveTextContent('Approved by HR')
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull()
+  })
+
   it('says so when nobody asked', () => {
     render(<ShareRequestsPanel {...props} requests={[]} />)
     expect(screen.getByText('No salesperson asked to share a bill of October 2026.')).toBeTruthy()

@@ -232,6 +232,8 @@
 .billMeta { display: block; font-size: calc(12px * var(--rv-type)); margin-top: 3px; white-space: nowrap; }
 .billPill { font-weight: 650; }
 .billKpi { color: var(--rv-sub); }
+/* What of the bill counts for the reader (2026-11-07): a part, a margin cut — "Calculated in Arena". */
+.billArena { display: block; font-size: calc(11px * var(--rv-type)); font-weight: 600; color: var(--rv-sub); margin-top: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 /* ── KPI items ────────────────────────────────────────────────────────── */
 .kpiHero { border-radius: 22px; background: var(--rv-green-bg); padding: 18px; display: flex; flex-direction: column; gap: 12px; }

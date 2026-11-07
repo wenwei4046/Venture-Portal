@@ -85,6 +85,17 @@ export interface MemberBookOrder {
   commissionOnly?: true;
   /** Who sold an old bill, as the ERP names them; null when it names nobody. Only with `commissionOnly`. */
   soldBy?: string | null;
+  /**
+   * The bill's whole sales (2026-11-07, mig 20261107235500): before any share and any margin cut — what the list shows,
+   * "完整 full figure", while `revenue` is what counts for the reader ("Calculated in Arena"). Absent from an answer the
+   * server gave before it knew.
+   */
+  fullRevenue?: number;
+  /**
+   * The margin cut its commission takes, and so its sales (2026-11-07 — the user: "只要是 drop com 的情况也是一样的"):
+   * 0.5 for half commission; absent when nothing cuts it.
+   */
+  weight?: number;
 }
 
 export interface MemberBookShare {
@@ -206,6 +217,8 @@ function readOrder(value: unknown): MemberBookOrder | null {
     share: readShare(value.share),
     ...("seller" in value ? { seller: readSeller(value.seller) } : {}),
     ...(value.commissionOnly === true ? { commissionOnly: true as const, soldBy: text(value.soldBy)?.trim() || null } : {}),
+    ...(num(value.fullRevenue) !== null ? { fullRevenue: num(value.fullRevenue)! } : {}),
+    ...(num(value.weight) !== null && num(value.weight)! >= 0 && num(value.weight)! < 1 ? { weight: num(value.weight)! } : {}),
   };
 }
 

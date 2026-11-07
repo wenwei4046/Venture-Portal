@@ -15,6 +15,9 @@ export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo'
   | 'it_request'
   // Share order (2026-10-21, mig 20261021150100): a bill shared with them, an answer to theirs, HR's decision — Revenue members.
   | 'share_request'
+  // A share that took effect on its colleague's Accept (2026-11-07, mig 20261107235500) — to HR, who no longer approves
+  // it but may Cancel share: its id is Comm Cal's month, `<sub slug>/<YYYY-MM-01>`, opened on its Requests tab.
+  | 'share_taken'
   // Marketing (2026-10-23, mig 20261023214000): a stage, an approval, a plan — the Marketing view's own bell lists them
   // (mkt_notices), never the HR or Revenue app's; a push of one opens Marketing's page.
   | 'mkt_project'
@@ -43,7 +46,10 @@ export interface Notices {
 }
 
 const KINDS: readonly NoticeKind[] = ['hiring', 'rooms', 'review', 'memo', 'it', 'share', 'people', 'claims']
-const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request', 'share_request', 'hr_staff', 'payment_request']
+const REFS: readonly NoticeRef[] = ['hiring_request', 'booking', 'member_request', 'memo', 'it_request', 'share_request', 'share_taken', 'hr_staff', 'payment_request']
+
+/** A `share_taken` notice's month on Comm Cal: `fair/2026-11-01` — anything else opens nothing of it. */
+const COMM_CAL_MONTH = /^[a-z0-9][a-z0-9-]*\/\d{4}-\d{2}-01$/
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -90,6 +96,8 @@ export function noticeUrl(n: Pick<Notice, 'refKind' | 'refId'>, app: PushApp): s
   if (n.refKind === 'it_request') return app === 'revenue' ? `/member?page=account&view=it&it=${id}` : `/?open=it:${id}`
   // A share request (2026-10-21) is the Revenue app's whichever app the phone signed up in: the request, open over Today.
   if (n.refKind === 'share_request') return `/member?share=${id}`
+  // A share that took effect (2026-11-07), to HR: Comm Cal's month, its Requests tab — where Cancel share is.
+  if (n.refKind === 'share_taken') return COMM_CAL_MONTH.test(n.refId) ? `/revenue/${n.refId}?view=requests` : '/revenue'
   // Marketing's (2026-10-23): its project's page — Marketing is the computer's; a phone opens the same page.
   if (n.refKind === 'mkt_project') return `/marketing/projects/${id}`
   // A payment request (2026-10-29): the Claim page, its drawer open — Claim & approve's for its approver.

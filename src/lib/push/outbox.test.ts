@@ -119,6 +119,12 @@ describe('a notice', () => {
     expect(noticesFromRow({ unread: 1, items: [{ id: 'n', kind: 'claims', title: 'A claim to approve — CHIN YEE RU', body: '', refKind: 'payment_request', refId: 'p1', at: 'x', read: false }] }).items)
       .toHaveLength(1)
     expect(noticeUrl({ refKind: 'share_request', refId: 's1' }, 'hr')).toBe('/member?share=s1')
+    // A share that took effect on its Accept (2026-11-07), to HR: Comm Cal's month, its Requests tab — nothing else.
+    expect(noticeUrl({ refKind: 'share_taken', refId: 'fair/2026-11-01' }, 'hr')).toBe('/revenue/fair/2026-11-01?view=requests')
+    expect(noticeUrl({ refKind: 'share_taken', refId: '//evil.example/x' }, 'hr')).toBe('/revenue')
+    expect(noticeUrl({ refKind: 'share_taken', refId: 'fair/2026-11-07' }, 'revenue')).toBe('/revenue')
+    expect(noticesFromRow({ unread: 1, items: [{ id: 'n', kind: 'share', title: 'HC-SO-2611-028 · shared', body: '', refKind: 'share_taken', refId: 'fair/2026-11-01', at: 'x', read: false }] }).items)
+      .toHaveLength(1)
     // Today › Remind all (2026-10-15): the app's front page, either app.
     expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'hr')).toBe('/hr-app')
     expect(noticeUrl({ refKind: 'att_today', refId: '2026-11-02' }, 'revenue')).toBe('/member')

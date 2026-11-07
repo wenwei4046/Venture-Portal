@@ -285,3 +285,29 @@ describe("Insight › an old bill topped up", () => {
     expect(kpiView(input({ ...on, book: book([...ORDERS, old]) }), "Fair").orders.map(o => o.no)).not.toContain("ZNT4813");
   });
 });
+
+// 2026-11-07, the user: "Sales Order 那边会显示完整 full figure，但会多一个 remark 特别显示出来，注明算他的 amount 是 5,000 块
+// （类似 'Calculated in Arena' 这样的标签）" — for a shared bill, and for one whose margin cuts its commission.
+describe("Insight › the whole bill, and what of it counts", () => {
+  it("lists a shared bill at its whole, with what counts for the reader beside it", () => {
+    const shared = order({ id: "7", revenue: 5000, total: 10000, fullRevenue: 10000, share: { part: 0.5, holders: [] } });
+    const row = billsView(input({ book: book([shared]) })).weeks["2026-09-11"].bills[0];
+    expect(row).toMatchObject({ amt: "RM 10,000", arena: "Arena RM 5,000" });
+  });
+
+  it("says so for a bill its margin cuts, on its row and its sheet", () => {
+    const cut = order({ id: "8", revenue: 2500, total: 10000, fullRevenue: 10000, weight: 0.25, margin: 24.5 });
+    const vm = input({ book: book([cut]) });
+    expect(billsView(vm).weeks["2026-09-11"].bills[0]).toMatchObject({ amt: "RM 10,000", arena: "Arena RM 2,500" });
+    expect(orderSheet(vm, "8")?.arena).toEqual({ line: "RM 2,500 counted", sub: "Margin cut · 25% of its commission and its sales" });
+  });
+
+  it("says nothing of a bill that counts whole, or of an answer from before the server knew", () => {
+    const whole = order({ id: "9", revenue: 1000, fullRevenue: 1000 });
+    const before = order({ id: "10", revenue: 1000 });
+    for (const o of [whole, before]) {
+      expect(billsView(input({ book: book([o]) })).weeks["2026-09-11"].bills[0]).toMatchObject({ amt: "RM 1,000", arena: null });
+      expect(orderSheet(input({ book: book([o]) }), o.id)?.arena).toBeNull();
+    }
+  });
+});

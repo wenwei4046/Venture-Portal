@@ -729,6 +729,15 @@ interface Draft {
   commissionOnlyOrders: SalesOrder[]
 }
 
+/** A bill's margin and the penalty band it falls in — read once for its sales and its commission (2026-11-07). */
+interface BillPenalty {
+  base: MarginBase
+  bill: BillMargin
+  band: MarginBand | null
+  /** 1 when no band cuts it (no penalty, no margin yet, or the penalty switched off). */
+  multiplier: number
+}
+
 /**
  * The line an old bill topped up pays (2026-11-07, `SalesOrder.commissionOnly`;
  * the user: commission only, no sales — then "need follow the margin as
@@ -847,6 +856,26 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     return key ? rankByKey.get(key) : undefined
   }
 
+  // Each bill's margin, and the penalty band it falls in, read once (2026-11-07):
+  // the multiplier that cuts its commission (Pass D) cuts the sales it counts
+  // too — its holder's rung, group sales and promotion (Pass A) — the user:
+  // "只要是 drop com 的情况也是一样的 … 原本 1 万块的 total sales order 也只是算
+  // 5,000 块的 sales。当然 commission 还是一样算 1 万块的 50%"; asked where,
+  // "连升级业绩也打折". A bill with no margin yet is cut by nothing, as its
+  // commission is not; a department head's own bills by nothing, ever.
+  const penalties = new Map<SalesOrder, BillPenalty>()
+  const penaltyOf = (order: SalesOrder): BillPenalty => {
+    let hit = penalties.get(order)
+    if (!hit) {
+      const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis, order.brandCode ?? null)
+      const bill = billMargin(order, base)
+      const band = scheme.enableMarginPenalty && bill.pct !== null ? penaltyBandFor(bill.pct, base.brandCode, input.marginBands) : null
+      hit = { base, bill, band, multiplier: band?.commissionMultiplier ?? 1 }
+      penalties.set(order, hit)
+    }
+    return hit
+  }
+
   // ── Pass A: deposit gate + own revenue ─────────────────────────────────
   for (const staffId of staffIds) {
     const node = nodes.get(staffId)
@@ -896,7 +925,9 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       }
 
       eligibleOrders.push(order)
-      productRevenue = round2(productRevenue + opr)
+      // The sales it counts are what its commission is (2026-11-07): cut by its
+      // margin's penalty — a head's own bills never are.
+      productRevenue = round2(productRevenue + (heads.has(staffId) ? opr : opr * penaltyOf(order).multiplier))
       for (const line of order.lines) {
         const cls = classifyLine(line, groupIndex)
         if (cls === 'excluded_group' || cls === 'unknown_group') {
@@ -1072,13 +1103,12 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       // import has a problem and the margin ladder becomes ambiguous. The
       // brand only chooses a margin ladder, so a month that pays no margin
       // has nothing to ask about it (2026-09-27).
-      const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis, order.brandCode ?? null)
+      const { base, bill, band: penaltyBand, multiplier } = penaltyOf(order)
       if (base.mixedBrand && (scheme.enableMarginPenalty || scheme.enableMarginIncentive)) {
         warnings.push(
           `Order ${order.orderNo} carries lines from more than one brand, which should not happen — the dominant brand's margin ladder was used.`,
         )
       }
-      const bill = billMargin(order, base)
       // A bill with no sales of its own still costs the month what its goods cost (2026-10-30) — no sales, so none of
       // the month's revenue, even where its KPI items and charges take more than it sold; a gift that costs nothing
       // is no part of it.
@@ -1098,16 +1128,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         }
       }
 
-      let multiplier = 1
-      let penaltyBand: MarginBand | null = null
-      if (scheme.enableMarginPenalty) {
-        if (bill.pct === null) {
-          if (base.revenue > 0) ordersWithoutCost++
-        } else {
-          penaltyBand = penaltyBandFor(bill.pct, base.brandCode, input.marginBands)
-          if (penaltyBand) multiplier = penaltyBand.commissionMultiplier
-        }
-      }
+      if (scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++
       draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + opr * multiplier)
 
       const penaltyNote = penaltyBand
@@ -1172,18 +1193,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     // and nothing else: no margin tally or incentive, no KPI, no override base
     // (after the KPI tally above, which it is no part of).
     for (const order of scheme.enableProductRevenue ? draft.commissionOnlyOrders : []) {
-      const base = marginBase(order.lines, kpiIndex, groupIndex, costBasis, order.brandCode ?? null)
-      const bill = billMargin(order, base)
-      let multiplier = 1
-      let penaltyBand: MarginBand | null = null
-      if (scheme.enableMarginPenalty) {
-        if (bill.pct === null) {
-          if (base.revenue > 0) ordersWithoutCost++
-        } else {
-          penaltyBand = penaltyBandFor(bill.pct, base.brandCode, input.marginBands)
-          if (penaltyBand) multiplier = penaltyBand.commissionMultiplier
-        }
-      }
+      const { base, bill, band: penaltyBand, multiplier } = penaltyOf(order)
+      if (scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++
       const line = commissionOnlyLine(order, rate, input.periodMonth, kpiIndex, groupIndex, {
         multiplier,
         note: penaltyBand

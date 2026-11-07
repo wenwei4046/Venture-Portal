@@ -141,3 +141,16 @@ describe("readOrderBook — an old bill topped up", () => {
     expect(readOrderBook(odd)!.orders[0]).not.toHaveProperty("commissionOnly");
   });
 });
+
+// 2026-11-07: the bill's whole sales and the margin cut, beside what counts.
+describe("readOrderBook — the whole bill and its margin cut", () => {
+  it("reads fullRevenue always, weight only when something cuts it", () => {
+    const r = raw();
+    Object.assign(r.orders[0], { revenue: 500, fullRevenue: 1000, weight: 0.5 });
+    expect(readOrderBook(r)!.orders[0]).toMatchObject({ revenue: 500, fullRevenue: 1000, weight: 0.5 });
+    const whole = raw();
+    Object.assign(whole.orders[0], { fullRevenue: 1000, weight: 1 });
+    expect(readOrderBook(whole)!.orders[0]).not.toHaveProperty("weight");
+    expect(readOrderBook(raw())!.orders[0]).not.toHaveProperty("fullRevenue");
+  });
+});

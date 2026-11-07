@@ -153,6 +153,13 @@ export function OrderSheet({ open, vm, onClose, canShare = false, request = null
               <span className={t.shareText}><span className={t.shareLabel}>SHARED</span><span className={t.shareLine}>{vm.share.line}</span><span className={t.shareSub}>{vm.share.sub}</span></span>
             </div>
           )}
+          {/* A margin cut (2026-11-07): what of the bill counts in their sales, cut as its commission is. */}
+          {vm.arena && (
+            <div className={t.shareRow}>
+              <span className={t.shareIcon}><Svg d={ICON.trophy} size={18} sw={1.9} /></span>
+              <span className={t.shareText}><span className={t.shareLabel}>ARENA</span><span className={t.shareLine}>{vm.arena.line}</span><span className={t.shareSub}>{vm.arena.sub}</span></span>
+            </div>
+          )}
           {/* An old bill topped up (2026-11-07): whose it was, and that it counts in nothing but commission. */}
           {vm.oldBill && (
             <div className={t.shareRow}>
