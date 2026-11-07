@@ -543,4 +543,93 @@ const keptBack = await moved({ no: 'HC-SO-2610-606', to: KINGSLEY, toSp: 'erp-ki
 check([await warningsOf(keptBack.eventId), await one(`SELECT staff_id FROM sales_order_reassignments WHERE order_id = $1`, [k7.orderId])],
   [[], KINGSLEY], 'nor its giving back: HR\'s pin stays')
 
+// ── 20261107183000 (IT-0009): the paper changed in the ERP before HR answered ──
+const PAPER_CHANGED = new URL('../../supabase/migrations/20261107183000_whose_sale_paper_changed.sql', import.meta.url)
+check(await one(`SELECT md5(prosrc) FROM pg_proc WHERE proname = 'erp_sync_after_delivery'`), 'bd763c208900b9eaa63e85bbd5cf4a7a',
+  'after 040000 the receiver is the body production runs (the next migration is guarded on it)')
+await db.exec(`INSERT INTO erp_order_papers (doc_no, ref_no, so_date, erp_created_at, erp_salesperson_id, salesperson_name, salesperson_active, status, total)
+  VALUES ('HC-SO-011582', 'HC10865', '2026-04-30', '2026-04-30T08:00:00Z', '${E.LUCAS_OLD}', 'Lucas', true, 'DELIVERED', 12150)`)
+const JAMES = id(16)
+await db.exec(`INSERT INTO hr_staff_costs (id, employee_name) VALUES ('${JAMES}', 'JAMES SEOW');
+  INSERT INTO comm_agent_aliases (agent_key, erp_salesperson_id, staff_id) VALUES ('JAMES SEOW', 'erp-james', '${JAMES}');`)
+/** The ERP saves the bill again with another Ref No.; the receiver rewrites it, then hands over an `updated` result. */
+const resaved = async (no, ref) => {
+  await q(`UPDATE sales_orders SET raw = jsonb_set(raw, '{header}', $2) WHERE order_no = $1`, [no, { customer_so_no: ref }])
+  return deliver({ no, ref, message: 'updated' })
+}
+// Before the migration: the second save leaves the bill held on a paper it no longer carries (what James saw).
+const james = await deliver({ no: 'HC-SO-2610-457', staff: JAMES, sp: 'erp-james', agent: 'James Seow', ref: 'HC10865', total: 4800,
+  date: '2026-10-31', erpCreated: '2026-10-31T15:31:34Z' })
+check(await stateOf(james.orderId), { cancelled: true, excluded_reason: 'manual', excluded_by_name: 'Whose sale check',
+  note: 'Whose sale? HC10865 is on Lucas\'s HC-SO-011582 (30 Apr 2026)', status: 'waiting' }, 'opened on HC10865: held, as it should be')
+await resaved('HC-SO-2610-457', 'HC11703')
+check((await stateOf(james.orderId)).status, 'waiting', 'before the fix the ERP\'s HC11703 changed nothing: still held')
+
+await db.exec(await migration(PAPER_CHANGED))
+check(await stateOf(james.orderId), { cancelled: false, excluded_reason: null, excluded_by_name: null, note: null, status: null },
+  'the migration lets HC-SO-2610-457 go: nothing is on HC11703 but James\'s own bill — it counts, no question left')
+await refuses(async () => db.exec(await migration(PAPER_CHANGED)), /erp_sync_after_delivery has changed on this database/,
+  'and refuses to run over any body but production\'s')
+await db.exec('ROLLBACK')
+check(await one(`SELECT has_function_privilege('anon', 'erp_sync_recheck_seller(uuid, uuid)', 'EXECUTE')`), false,
+  'the publishable key may not call erp_sync_recheck_seller')
+
+// From now on the receiver asks again on every later save.
+const j2 = await deliver({ no: 'HC-SO-2610-458', staff: JAMES, sp: 'erp-james', agent: 'James Seow', ref: 'HC10865', date: '2026-10-31' })
+check((await stateOf(j2.orderId)).status, 'waiting', 'a new bill on HC10865 is held')
+const sameRef = await resaved('HC-SO-2610-458', 'HC10865')
+check([(await stateOf(j2.orderId)).status, await warningsOf(sameRef.eventId)], ['waiting', []], 'saved again on the same paper: still asked, nothing said')
+const cleared = await resaved('HC-SO-2610-458', 'HC11704')
+check(await stateOf(j2.orderId), { cancelled: false, excluded_reason: null, excluded_by_name: null, note: null, status: null },
+  'saved with a paper nobody else has: the question comes off and the bill counts')
+check(await warningsOf(cleared.eventId), ['whose_sale_cleared'], 'the delivery says so')
+
+// Changed to ANOTHER paper somebody else has: still asked, about that paper.
+const j3 = await deliver({ no: 'HC-SO-2610-459', staff: JAMES, sp: 'erp-james', agent: 'James Seow', ref: 'HC10865', date: '2026-10-31' })
+const moved2 = await resaved('HC-SO-2610-459', 'HC12110')
+check(await stateOf(j3.orderId), { cancelled: true, excluded_reason: 'manual', excluded_by_name: 'Whose sale check',
+  note: 'Whose sale? HC12110 is on STEPHY\'s HC-SO-008712 (22 Oct 2025)', status: 'waiting' }, 'still held, the note about the paper it carries now')
+check([(await one(`SELECT seller_name FROM sales_order_seller_checks WHERE order_id = $1`, [j3.orderId])), await warningsOf(moved2.eventId)],
+  ['STEPHY', []], 'the question is about STEPHY now; nothing on the delivery')
+
+// Answered by HR: their word stands, whatever the paper does next.
+check((await answer(j3.orderId, false, null)).counts, false, 'HR: not James\'s')
+await resaved('HC-SO-2610-459', 'HC11705')
+check([(await stateOf(j3.orderId)).status, (await stateOf(j3.orderId)).cancelled], ['not_theirs', true], 'an answered question is left as HR answered it')
+
+// Counted by hand before HR answered, then the paper changed: the question goes, the bill stays counted.
+const j4 = await deliver({ no: 'HC-SO-2610-460', staff: JAMES, sp: 'erp-james', agent: 'James Seow', ref: 'HC10865', date: '2026-10-31' })
+await q(`SELECT revenue_include_order($1)`, [j4.orderId])
+await resaved('HC-SO-2610-460', 'HC11706')
+check(await stateOf(j4.orderId), { cancelled: false, excluded_reason: null, excluded_by_name: null, note: null, status: null },
+  'counted by hand: it only loses its question')
+
+// Held by a person's own Don't count this bill: their exclusion stays.
+const j5 = await deliver({ no: 'HC-SO-2610-461', staff: JAMES, sp: 'erp-james', agent: 'James Seow', ref: 'HC10865', date: '2026-10-31' })
+await q(`UPDATE sales_order_exclusions SET excluded_by = $2, excluded_by_name = 'HR Manager', note = 'test bill' WHERE order_id = $1`, [j5.orderId, HR])
+await resaved('HC-SO-2610-461', 'HC11707')
+check(await stateOf(j5.orderId), { cancelled: true, excluded_reason: 'manual', excluded_by_name: 'HR Manager', note: 'test bill', status: null },
+  'somebody\'s own exclusion is theirs: the question goes, the bill stays out')
+
+// A paid month: untouched.
+const j6 = await deliver({ no: 'HC-SO-2610-462', staff: JAMES, sp: 'erp-james', agent: 'James Seow', ref: 'HC10865', date: '2026-10-31' })
+await db.exec(`INSERT INTO locked_periods VALUES ('${FAIR}', '${OCT}')`)
+await resaved('HC-SO-2610-462', 'HC11708')
+check((await stateOf(j6.orderId)).status, 'waiting', 'a month whose run has paid: nothing moves')
+await db.exec(`DELETE FROM locked_periods`)
+
+// A signed-in caller needs Revenue · Edit.
+await refuses(() => as(MEMBER, 'revenue.view', () => q(`SELECT erp_sync_recheck_seller($1, NULL)`, [j6.orderId])), /Not open to your account/,
+  'asking again by hand needs Revenue · Edit')
+check((await as(HR, 'revenue.edit', () => one(`SELECT erp_sync_recheck_seller($1, NULL)`, [j6.orderId]))).cleared, true,
+  'and with it, HR lets the bill go')
+
+// A fault asking again is the delivery's warning, never its failure.
+await db.exec(`ALTER FUNCTION erp_sync_recheck_seller(uuid, uuid) RENAME TO erp_sync_recheck_seller_real;
+  CREATE FUNCTION erp_sync_recheck_seller(p uuid, e uuid) RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'boom'; END $$;`)
+const j7 = await deliver({ no: 'HC-SO-2610-463', staff: JAMES, sp: 'erp-james', agent: 'James Seow', ref: 'HC10865', date: '2026-10-31' })
+const broke = await resaved('HC-SO-2610-463', 'HC11709')
+check([broke.result.status, await warningsOf(broke.eventId)], ['applied', ['whose_sale_recheck_failed']], 'a fault is a warning on the delivery')
+check((await stateOf(j7.orderId)).status, 'waiting', 'and the bill stays as it was')
+
 console.log(`whose sale: ${checks} checks passed`)
