@@ -783,12 +783,16 @@ export interface GwpSkuRef {
   code: string
 }
 
-/** A gift with purchase as Product List › GWP lists it (2026-11-08). No dates (the user). */
+/** A gift of a GWP: its SKU and how many of it a unit bought earns. */
+export interface GwpGiftRef extends GwpSkuRef {
+  qty: number
+}
+
+/** A gift with purchase as Product List › GWP lists it (2026-11-08). No dates (the user); each gift its quantity. */
 export interface GwpEntry {
   id: string
-  perUnit: number
   buy: GwpSkuRef[]
-  gift: GwpSkuRef[]
+  gifts: GwpGiftRef[]
   updatedAt: string
 }
 
@@ -797,25 +801,23 @@ export async function loadGwp(): Promise<GwpEntry[]> {
   const sb = await untyped()
   const { data, error } = await sb
     .from('catalogue_gwp')
-    .select('id, qty_per_unit, updated_at, created_at, catalogue_gwp_items (role, erp_product_id, product_code)')
+    .select('id, updated_at, created_at, catalogue_gwp_items (role, erp_product_id, product_code, qty)')
     .order('created_at')
     .order('id')
   if (error) throw new Error(error.message)
   return ((data ?? []) as Row[]).flatMap(r => {
     const id = str(r.id)
-    const perUnit = num(r.qty_per_unit)
-    if (!id || perUnit === null) return []
+    if (!id) return []
     const items = Array.isArray(r.catalogue_gwp_items) ? (r.catalogue_gwp_items as Row[]) : []
-    const side = (role: string): GwpSkuRef[] =>
-      items
-        .filter(i => i.role === role && str(i.erp_product_id))
-        .map(i => ({ erpId: str(i.erp_product_id)!, code: str(i.product_code) ?? str(i.erp_product_id)! }))
-        .sort((a, b) => a.code.localeCompare(b.code))
+    const refOf = (i: Row): GwpSkuRef => ({ erpId: str(i.erp_product_id)!, code: str(i.product_code) ?? str(i.erp_product_id)! })
+    const byCode = (a: GwpSkuRef, b: GwpSkuRef) => a.code.localeCompare(b.code)
     return [{
       id,
-      perUnit,
-      buy: side('buy'),
-      gift: side('gift'),
+      buy: items.filter(i => i.role === 'buy' && str(i.erp_product_id)).map(refOf).sort(byCode),
+      gifts: items
+        .filter(i => i.role === 'gift' && str(i.erp_product_id) && (num(i.qty) ?? 0) > 0)
+        .map(i => ({ ...refOf(i), qty: num(i.qty)! }))
+        .sort(byCode),
       updatedAt: str(r.updated_at) ?? '',
     }]
   })

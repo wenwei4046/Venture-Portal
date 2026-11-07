@@ -152,24 +152,24 @@ export function toCostRatiosByBrand(rows: readonly CostRatioBrandRow[] | undefin
 
 /**
  * A gift with purchase (Product List › GWP, 2026-11-08), as the loader reads it: the codes of its buy and
- * gift SKUs (`catalogue_gwp_items.product_code`) and its gift units per unit bought. No dates (the user).
+ * gift SKUs (`catalogue_gwp_items.product_code`), each gift with its units per unit bought (`qty`, the user's
+ * "加 1、加 2、加 3"). No dates (the user).
  */
 export interface GwpRow {
   id: string
-  qty_per_unit: Num
-  catalogue_gwp_items: { role: string; product_code: string }[] | null
+  catalogue_gwp_items: { role: string; product_code: string; qty?: Num }[] | null
 }
 
-/** The rows as the costing reads them; a GWP with no buy or no gift SKU, or no units, is left out. */
+/** The rows as the costing reads them; a GWP with no buy SKU or no gift with a quantity is left out. */
 export function toGwpRules(rows: readonly GwpRow[] | undefined): GwpRule[] {
   return (rows ?? []).flatMap(r => {
     const items = r.catalogue_gwp_items ?? []
     const buy = items.filter(i => i.role === 'buy').map(i => i.product_code)
-    const gift = items.filter(i => i.role === 'gift').map(i => i.product_code)
-    const perUnit = numOrNull(r.qty_per_unit)
-    return perUnit !== null && perUnit > 0 && buy.length && gift.length
-      ? [{ id: r.id, buy, gift, perUnit }]
-      : []
+    const gifts = items.flatMap(i => {
+      const perUnit = i.role === 'gift' ? numOrNull(i.qty ?? null) : null
+      return perUnit !== null && perUnit > 0 ? [{ code: i.product_code, perUnit }] : []
+    })
+    return buy.length && gifts.length ? [{ id: r.id, buy, gifts }] : []
   })
 }
 

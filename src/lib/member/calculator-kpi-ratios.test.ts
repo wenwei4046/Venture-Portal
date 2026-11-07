@@ -129,7 +129,12 @@ describe("a gift with purchase leaves the cost", () => {
   });
   const cart = [mattress, pillow("mf", "MF PILLOW", 35), pillow("latex", "LATEX PILLOW", 70), pillow("nocost", "NEW PILLOW", null)];
   const gift = (id: string, quantity: number) => ({ productId: id, quantity, gift: true });
-  const ECO = { id: "eco", buy: ["ECOBLISS (Q)"], gift: ["MF PILLOW", "LATEX PILLOW", "NEW PILLOW"], perUnit: 2 };
+  // Each gift its own quantity a mattress (the user: "加 1、加 2、加 3"): two microfibre, one latex, two new.
+  const ECO = {
+    id: "eco",
+    buy: ["ECOBLISS (Q)"],
+    gifts: [{ code: "MF PILLOW", perUnit: 2 }, { code: "LATEX PILLOW", perUnit: 1 }, { code: "NEW PILLOW", perUnit: 2 }],
+  };
   const rules: QuoteRules = { costDivisor: 0.7, gwp: [ECO] };
 
   it("leaves the two pillows out of the cost: the mattress's alone", () => {
@@ -140,8 +145,13 @@ describe("a gift with purchase leaves the cost", () => {
     expect(without.margin).toBeCloseTo(((3000 - 2000 - 100) / 3000) * 100, 10); // 2 × 35 ÷ 0.7
   });
 
-  it("counts a pillow past the allowance, the dearest of them", () => {
-    // Two units free of a microfibre (35) and two latex (70): the microfibre and one latex go, one latex stays.
+  it("gives each gift its own quantity: two microfibre and a latex, all out of the cost", () => {
+    const r = calculateQuote(quote([one("eco-q"), gift("mf", 2), gift("latex", 1)], undefined, "3000"), cart, bands, rules);
+    expect(r.margin).toBeCloseTo(((3000 - 2000) / 3000) * 100, 10);
+  });
+
+  it("counts a gift past its own quantity", () => {
+    // A microfibre (35) within its two; two latex (70) past its one: one latex stays in the cost.
     const r = calculateQuote(quote([one("eco-q"), gift("mf", 1), gift("latex", 2)], undefined, "3000"), cart, bands, rules);
     expect(r.margin).toBeCloseTo(((3000 - 2000 - 100) / 3000) * 100, 10); // 70 ÷ 0.7
   });
@@ -294,8 +304,8 @@ describe("the quote context's rules, read defensively", () => {
     // 2026-11-08: the gifts with purchase, as member_quote_cost_rules hands them.
     expect(quoteCostRules({
       costDivisor: 0.7,
-      gwp: [{ id: "g1", buy: ["ECOBLISS (Q)"], gift: ["MF PILLOW"], perUnit: 2 }, { buy: [] }],
-    })?.gwp).toEqual([{ id: "g1", buy: ["ECOBLISS (Q)"], gift: ["MF PILLOW"], perUnit: 2 }]);
+      gwp: [{ id: "g1", buy: ["ECOBLISS (Q)"], gifts: [{ code: "MF PILLOW", perUnit: 2 }] }, { buy: [] }],
+    })?.gwp).toEqual([{ id: "g1", buy: ["ECOBLISS (Q)"], gifts: [{ code: "MF PILLOW", perUnit: 2 }] }]);
     // 2026-11-07: a rider SKU's ratio for each brand — anything not a positive number is left out.
     expect(quoteCostRules({
       costDivisor: 0.7,
