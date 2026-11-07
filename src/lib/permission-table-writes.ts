@@ -281,6 +281,7 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   erp_links: each(REVENUE_RULES),
   // The Product List's Costing Setting writes the scheme's divisor and the
   // per-SKU ratios.
+  comm_cost_ratio_brands: each([...REVENUE_RULES, 'product_list.edit']),
   comm_cost_ratios: each([...REVENUE_RULES, 'product_list.edit']),
   comm_schemes: each([...REVENUE_RULES, 'product_list.edit']),
 

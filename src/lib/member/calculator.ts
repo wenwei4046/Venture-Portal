@@ -290,9 +290,9 @@ export function calculateQuote(
   const divisor = rules.costDivisor;
   if (!Number.isFinite(divisor) || divisor <= 0)
     return invalid("The margin rules for this department are not configured.");
-  // A SKU may carry its own ratio (Product List › Costing Setting).
-  const basis = costBasisOf(divisor, rules.costRatios ?? []);
-  const divisorOf = (product: MemberProduct) => costDivisorFor(product.code, basis);
+  // A SKU may carry its own ratio, and a rider one for the brand the cart
+  // answers to (Product List › Costing Setting; 2026-11-07).
+  const basis = costBasisOf(divisor, rules.costRatios ?? [], rules.costRatiosByBrand ?? []);
   const price = cents(input.price),
     delivery = cents(input.delivery || "0");
   if (price === null || price <= 0)
@@ -363,6 +363,9 @@ export function calculateQuote(
     );
   const brand = branded[0]?.product!.brand ?? null,
     bands = brand ? allBands.filter((b) => b.brand === brand) : [];
+  // The ladder's brand decides a rider SKU's ratio by brand, as the run reads the bill;
+  // a cart of riders alone answers to no brand and keeps each SKU's own ratio.
+  const divisorOf = (product: MemberProduct) => costDivisorFor(product.code, basis, brand);
   if (brand && !bands.length)
     return invalid(
       "Margin thresholds have not been configured for this brand.",

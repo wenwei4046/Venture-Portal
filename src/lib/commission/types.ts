@@ -17,10 +17,10 @@
 
 import type { IrGroup } from './ir-groups'
 import type { KpiItem } from './kpi'
-import type { CostRatio } from './cost-basis'
+import type { CostRatio, CostRatioByBrand } from './cost-basis'
 
 export type { KpiItem, KpiOptionPool } from './kpi'
-export type { CostRatio } from './cost-basis'
+export type { CostRatio, CostRatioByBrand } from './cost-basis'
 
 // ─── Imported facts ─────────────────────────────────────────────────────────
 
@@ -351,6 +351,13 @@ export interface CommissionScheme {
    * line's product code. Absent = every line at `costDivisor`.
    */
   costRatios?: CostRatio[]
+  /**
+   * A rider SKU's ratio for a brand (Product List › Costing Setting,
+   * 2026-11-07): on a bill that answers to that brand's ladder, its line's cost
+   * is divided by it — ahead of the SKU's own ratio and the default. Absent =
+   * none.
+   */
+  costRatiosByBrand?: CostRatioByBrand[]
 }
 
 export interface EngineInput {

@@ -279,6 +279,23 @@ async function cloneSchemeChildren(
       'Could not clone the margin bands',
     )
   }
+
+  // A rider SKU's ratio for a brand (Costing Setting, 2026-11-07), once the
+  // new scheme has its brands: each names one by its code.
+  const { data: byBrand } = await supabase
+    .from('comm_cost_ratio_brands')
+    .select('erp_product_id, product_code, brand_code, ratio')
+    .eq('scheme_id', fromSchemeId)
+  if (byBrand?.length) {
+    check(
+      (
+        await supabase.from('comm_cost_ratio_brands').insert(
+          (byBrand as unknown as Array<Record<string, unknown>>).map(r => ({ ...r, scheme_id: toSchemeId })),
+        )
+      ).error,
+      'Could not clone the cost ratios by brand',
+    )
+  }
 }
 
 // ─── Scheme switches ────────────────────────────────────────────────────────

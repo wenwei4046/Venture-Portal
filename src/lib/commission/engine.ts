@@ -228,7 +228,9 @@ export interface MarginBase {
  * is the BILL's (user 2026-09-27 — an Akemi bill that gives away a
  * Dunlopillo pillow is measured on Akemi's ladder, the pillow's cost in it; a
  * Dunlopillo bill with the same pillow, on Dunlopillo's). A bed frame or an
- * accessory is a rider: it follows the brand of the bill it is sold on.
+ * accessory is a rider: it follows the brand of the bill it is sold on — and
+ * so does its ratio, when Costing Setting gives the SKU one for that brand
+ * (2026-11-07): the brand is picked first, then every line is costed.
  */
 export function marginBase(
   lines: SalesLine[],
@@ -247,17 +249,33 @@ export function marginBase(
   const basis = typeof costBasis === 'number' ? costBasisOf(costBasis) : costBasis
   // The brands the customer paid for — a free gift carries its brand at RM 0.
   const sold = new Set<string>()
+  const goods = lines.filter(line => inGoodsScope(line, groupIndex))
 
-  for (const line of lines) {
-    if (!inGoodsScope(line, groupIndex)) continue
-    revenue = round2(revenue + line.lineAmount)
-    charges = round2(charges + (line.optionCharge ?? 0))
-    if (line.costAmount === undefined || line.costAmount === null) complete = false
-    else cost = round2(cost + line.costAmount / costDivisorFor(line.productCode, basis))
+  for (const line of goods) {
     if (line.brandCode) {
       byBrand.set(line.brandCode, round2((byBrand.get(line.brandCode) ?? 0) + line.lineAmount))
       if (line.lineAmount > 0) sold.add(line.brandCode)
     }
+  }
+
+  // The bill's own brand decides; the lines only speak for a bill without one
+  // (the SQL twins pick it the same way: the most sold, the first line's on a tie).
+  let brandCode: string | null = orderBrand
+  if (!orderBrand) {
+    let best = -Infinity
+    for (const [brand, rev] of byBrand) {
+      if (rev > best) {
+        best = rev
+        brandCode = brand
+      }
+    }
+  }
+
+  for (const line of goods) {
+    revenue = round2(revenue + line.lineAmount)
+    charges = round2(charges + (line.optionCharge ?? 0))
+    if (line.costAmount === undefined || line.costAmount === null) complete = false
+    else cost = round2(cost + line.costAmount / costDivisorFor(line.productCode, basis, brandCode))
   }
   if (kpiIndex.size > 0) revenue = coverKpi(revenue, kpiAmountOf(orderKpiHits({ lines }, kpiIndex))).main
   // What its bed frames' divan, leg, gap and total height were charged is the customer's
@@ -265,17 +283,7 @@ export function marginBase(
   // both sides — it was never in the cost — while the rate is still paid on it.
   revenue = round2(revenue - charges)
 
-  // The bill's own brand decides; the lines only speak for a bill without one.
   if (orderBrand) return { revenue, cost, complete, brandCode: orderBrand, mixedBrand: false }
-
-  let brandCode: string | null = null
-  let best = -Infinity
-  for (const [brand, rev] of byBrand) {
-    if (rev > best) {
-      best = rev
-      brandCode = brand
-    }
-  }
 
   // Nothing priced at all (a rider carries the bill, every branded line is a
   // gift): two brands on it are still two ladders to choose between.
@@ -753,7 +761,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
   const { scheme } = input
   const kpiIndex = scheme.enableKpi ? indexKpiItems(input.kpiItems) : EMPTY_KPI_INDEX
   // Every line's cost ÷ its own SKU's ratio, else the sub-department's.
-  const costBasis = costBasisOf(scheme.costDivisor, scheme.costRatios)
+  const costBasis = costBasisOf(scheme.costDivisor, scheme.costRatios, scheme.costRatiosByBrand)
   const groupIndex = indexItemGroups(scheme.itemGroups)
   const ranks = [...input.ranks].sort((a, b) => a.sortOrder - b.sortOrder)
   const rankByKey = new Map(ranks.map(r => [r.rankKey, r]))

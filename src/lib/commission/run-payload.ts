@@ -132,6 +132,23 @@ export interface CostRatioRow {
   ratio: Num
 }
 
+/** A rider SKU's cost ratio for one brand (`comm_cost_ratio_brands`, Costing Setting, 2026-11-07). */
+export interface CostRatioBrandRow {
+  product_code: string
+  brand_code: string
+  ratio: Num
+}
+
+/** The rows as the engine reads them: a positive ratio, a code and a brand, else left out (that brand takes the next ratio). */
+export function toCostRatiosByBrand(rows: readonly CostRatioBrandRow[] | undefined): { productCode: string; brand: string; ratio: number }[] {
+  return (rows ?? []).flatMap(r => {
+    const ratio = numOrNull(r.ratio)
+    return ratio !== null && ratio > 0 && (r.product_code ?? '').trim() && (r.brand_code ?? '').trim()
+      ? [{ productCode: r.product_code, brand: r.brand_code, ratio }]
+      : []
+  })
+}
+
 export interface KpiThresholdRow {
   min_qty: number
   bonus_pct: Num
@@ -225,6 +242,8 @@ export interface RunSourceRows {
   upsaleShares?: OrderShareRow[]
   /** `comm_cost_ratios` of this scheme. Absent = every SKU at the default. */
   costRatios?: CostRatioRow[]
+  /** `comm_cost_ratio_brands` of this scheme (2026-11-07). Absent = no SKU has a ratio by brand. */
+  costRatiosByBrand?: CostRatioBrandRow[]
   /**
    * The ERP's fabric list (`erp_fabrics`), read only while a KPI item is a
    * fabric series (2026-10-29). Absent = no line's fabric has a series.
@@ -437,6 +456,7 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
         const ratio = numOrNull(r.ratio)
         return ratio !== null && ratio > 0 ? [{ productCode: r.product_code, ratio }] : []
       }),
+      ...(rows.costRatiosByBrand?.length ? { costRatiosByBrand: toCostRatiosByBrand(rows.costRatiosByBrand) } : {}),
     },
     ranks,
     orders,

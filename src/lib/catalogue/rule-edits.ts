@@ -49,6 +49,11 @@ export interface CostSettingEdit {
   divisor?: string | null
   /** SKUs' own ratios; blank sends a SKU back to its sub-department's. */
   ratios: ReadonlyArray<{ erpId: string; ratio: string | null; label?: string }>
+  /**
+   * A rider SKU's ratio for a brand (2026-11-07) — only the ones changed. Blank
+   * takes it off: that brand follows the SKU's own ratio, else the default.
+   */
+  brands?: ReadonlyArray<{ erpId: string; brand: string; ratio: string | null; label?: string }>
 }
 
 export interface CostSettingPlan {
@@ -56,7 +61,11 @@ export interface CostSettingPlan {
   divisor: number | null
   ratios: Array<{ erp_product_id: string; ratio: number }>
   removes: string[]
+  /** Null ratio = taken off. */
+  brands: Array<{ erp_product_id: string; brand_code: string; ratio: number | null }>
 }
+
+const BRAND_CODE = /^[A-Za-z0-9 _&.'-]{1,40}$/
 
 export function validateCostSetting(edit: CostSettingEdit): CostSettingPlan {
   let divisor: number | null = null
@@ -78,8 +87,21 @@ export function validateCostSetting(edit: CostSettingEdit): CostSettingPlan {
     if (ratio === null) removes.push(row.erpId)
     else ratios.push({ erp_product_id: row.erpId, ratio })
   }
-  if (divisor === null && ratios.length === 0 && removes.length === 0) throw new EditError('Nothing to save')
-  return { divisor, ratios, removes }
+  const brandRows = edit.brands ?? []
+  if (rows.length + brandRows.length > MAX_ROWS) throw new EditError(`Save at most ${MAX_ROWS.toLocaleString()} ratios at a time`)
+  const seenBrand = new Set<string>()
+  const brands: CostSettingPlan['brands'] = []
+  for (const row of brandRows) {
+    if (!row || typeof row.erpId !== 'string' || !ERP_ID.test(row.erpId)) throw new EditError('A row names no SKU')
+    if (typeof row.brand !== 'string' || !BRAND_CODE.test(row.brand)) throw new EditError('A row names no brand')
+    const name = `${row.label?.trim() || row.erpId} · ${row.brand}`
+    const key = `${row.erpId}\u0000${row.brand}`
+    if (seenBrand.has(key)) throw new EditError(`${name} appears twice`)
+    seenBrand.add(key)
+    brands.push({ erp_product_id: row.erpId, brand_code: row.brand, ratio: parseRatio(row.ratio, name) })
+  }
+  if (divisor === null && ratios.length === 0 && removes.length === 0 && brands.length === 0) throw new EditError('Nothing to save')
+  return { divisor, ratios, removes, brands }
 }
 
 /** Revenue Team cost: what a margin is judged against. Never rounded here. */

@@ -1,13 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMoney } from '@/lib/utils'
 import { parseRatio, teamCost, validateCostSetting, type CostSettingEdit } from '@/lib/catalogue/rule-edits'
 import { saveCostSetting } from '../actions'
-import type { CostRatioRow, KivCostRow, PickSku } from '../load'
+import type { CostRatioBrandRow, CostRatioRow, KivCostRow, PickSku, SchemeBrand } from '../load'
 import KivCostsSection from './KivCostsSection'
 import PageScrolledTable from './PageScrolledTable'
+import ProductRowMenu, { type ProductRowMenuAnchor, type ProductRowMenuItem } from './ProductRowMenu'
 import SubDepartmentChips, { type SubRef } from './SubDepartmentChips'
 import { useProductDraftGuard } from './ProductWorkspace'
 import {
@@ -36,9 +37,12 @@ export function costOf(sku: PickSku | undefined): CostRange | null {
   return null
 }
 
-function rangeLabel(range: CostRange, ratio = 1): string {
-  const low = money(teamCost(range.low, ratio))
-  return range.low === range.high ? low : `${low} – ${money(teamCost(range.high, ratio))}`
+/** The cost as the Revenue Team takes it, over every ratio it may be divided by: the lowest to the highest. */
+function rangeLabel(range: CostRange, ratios: number | readonly number[] = 1): string {
+  const list = typeof ratios === 'number' ? [ratios] : ratios.length > 0 ? ratios : [1]
+  const low = teamCost(range.low, Math.max(...list))
+  const high = teamCost(range.high, Math.min(...list))
+  return money(low) === money(high) ? money(low) : `${money(low)} – ${money(high)}`
 }
 
 function readRatio(text: string): number | null | 'bad' {
@@ -49,10 +53,18 @@ function readRatio(text: string): number | null | 'bad' {
   }
 }
 
+/** One key per SKU and brand. */
+const brandKeyOf = (erpId: string, brand: string) => `${erpId}\u0000${brand}`
+
 interface Line {
   erpId: string
+  /** Its own ratio as saved; null = none of its own (new, or listed for its brands alone). */
   saved: CostRatioRow | null
   sku: PickSku | undefined
+  /** On the list already — its own ratio or a ratio by brand saved. False: added this time. */
+  listed: boolean
+  /** The code a ratio of it was saved under. */
+  savedCode: string | null
 }
 
 /**
@@ -62,6 +74,18 @@ interface Line {
  * of their own. What it moves is the Revenue Team's cost — the one every
  * margin in the calculator, the month and the run is judged against — never a
  * price on the SKU Master.
+ *
+ * A RIDER SKU BY BRAND (2026-11-07 — the user: "right click 出来后 spread out，
+ * 也就是 by brand 可以有不同的除法 … Trion 我 right click 它，可以设成 0.6"; "在
+ * Costing Setting 的 SKU 清单上对 Trion 按 special add … 再按 brand 各填一个除法";
+ * "only special set in costing select there, if didnt set, then just follow the
+ * defauly rate"): a bed frame or an accessory rides on a bill of any brand and is
+ * judged on that brand's ladder, so it may divide by a ratio of its own for each
+ * brand. A right-click on its row — or its ⋯ — splits it by brand (*Split by
+ * brand*) or puts it back to one ratio (*One ratio for every brand*); the picker
+ * adds the ticked SKUs with their brands at once. A brand left blank follows the
+ * SKU's own ratio, else the sub-department's; a SKU may be listed for its brands
+ * alone.
  */
 export default function CostSettingTab({
   sub,
@@ -71,6 +95,8 @@ export default function CostSettingTab({
   ratios,
   skus,
   kivCosts = [],
+  byBrand = [],
+  brands = [],
 }: {
   sub: SubRef
   subs: SubRef[]
@@ -80,15 +106,24 @@ export default function CostSettingTab({
   skus: PickSku[]
   /** KIV bed frames' four costs (2026-10-31) — every sub-department's alike. */
   kivCosts?: KivCostRow[]
+  /** The rider SKUs' ratios by brand, as saved (2026-11-07). */
+  byBrand?: CostRatioBrandRow[]
+  /** The sub-department's brands with a ladder — what a ratio by brand is set for. */
+  brands?: SchemeBrand[]
 }) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [divisorDraft, setDivisorDraft] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<ReadonlyMap<string, string>>(new Map())
+  const [brandDrafts, setBrandDrafts] = useState<ReadonlyMap<string, string>>(new Map())
+  /** SKUs split by brand this time, before a brand of theirs has a figure. */
+  const [split, setSplit] = useState<ReadonlySet<string>>(new Set())
   const [added, setAdded] = useState<string[]>([])
   const [query, setQuery] = useState('')
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set())
   const [pickRatio, setPickRatio] = useState('')
+  const [pickBrands, setPickBrands] = useState<ReadonlyMap<string, string>>(new Map())
+  const [menu, setMenu] = useState<{ erpId: string; anchor: ProductRowMenuAnchor } | null>(null)
   const [pending, startSaving] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -96,10 +131,13 @@ export default function CostSettingTab({
   const reset = useCallback(() => {
     setDivisorDraft(null)
     setDrafts(new Map())
+    setBrandDrafts(new Map())
+    setSplit(new Set())
     setAdded([])
     setTicked(new Set())
     setQuery('')
     setPickRatio('')
+    setPickBrands(new Map())
   }, [])
 
   // A save leaves its drafts on screen, read-only, until the refreshed rows
@@ -107,7 +145,7 @@ export default function CostSettingTab({
   // moment (prod, 2026-09-27). Settled when the server's rows change — or,
   // should the refresh never land, a little later.
   const [settling, setSettling] = useState(false)
-  const settleFrom = useRef<{ ratios: CostRatioRow[]; divisor: number } | null>(null)
+  const settleFrom = useRef<{ ratios: CostRatioRow[]; divisor: number; byBrand: CostRatioBrandRow[] } | null>(null)
   const settle = useCallback(() => {
     settleFrom.current = null
     setSettling(false)
@@ -116,8 +154,8 @@ export default function CostSettingTab({
   }, [reset])
   useEffect(() => {
     const from = settleFrom.current
-    if (settling && from && (from.ratios !== ratios || from.divisor !== divisor)) settle()
-  }, [settling, ratios, divisor, settle])
+    if (settling && from && (from.ratios !== ratios || from.divisor !== divisor || from.byBrand !== byBrand)) settle()
+  }, [settling, ratios, divisor, byBrand, settle])
   useEffect(() => {
     if (!settling) return
     const timer = window.setTimeout(settle, 15_000)
@@ -125,36 +163,71 @@ export default function CostSettingTab({
   }, [settling, settle])
   const saving = pending || settling
 
+  const byBrandOn = brands.length > 0
   const skuById = useMemo(() => new Map(skus.map(s => [s.erpId, s])), [skus])
+  const savedBrand = useMemo(() => new Map(byBrand.map(r => [brandKeyOf(r.erpId, r.brand), r.ratio])), [byBrand])
   const lines = useMemo<Line[]>(() => {
-    const saved = new Set(ratios.map(r => r.erpId))
+    const listed = new Map<string, Line>()
+    for (const r of ratios) listed.set(r.erpId, { erpId: r.erpId, saved: r, sku: skuById.get(r.erpId), listed: true, savedCode: r.code })
+    for (const r of byBrand) {
+      if (!listed.has(r.erpId)) listed.set(r.erpId, { erpId: r.erpId, saved: null, sku: skuById.get(r.erpId), listed: true, savedCode: r.code })
+    }
     return [
       // Added this time first, where the picker put them.
-      ...added.filter(id => !saved.has(id)).map(id => ({ erpId: id, saved: null, sku: skuById.get(id) })),
-      ...ratios.map(r => ({ erpId: r.erpId, saved: r, sku: skuById.get(r.erpId) })),
+      ...added.filter(id => !listed.has(id)).map(id => ({ erpId: id, saved: null, sku: skuById.get(id), listed: false, savedCode: null })),
+      ...listed.values(),
     ]
-  }, [added, ratios, skuById])
+  }, [added, ratios, byBrand, skuById])
   const onList = useMemo(() => new Set(lines.map(l => l.erpId)), [lines])
 
-  const codeOf = (l: Line) => l.saved?.code ?? l.sku?.code ?? l.erpId
+  const codeOf = (l: Line) => l.savedCode ?? l.sku?.code ?? l.erpId
   // The ERP renamed the SKU: its new bills carry a code the ratio no longer matches.
-  const renamed = (l: Line) => l.saved !== null && l.sku !== undefined && l.sku.code !== l.saved.code
+  const renamed = (l: Line) => l.savedCode !== null && l.sku !== undefined && l.sku.code !== l.savedCode
   const differs = (text: string, saved: number) => {
     const n = readRatio(text)
     return n === null || n === 'bad' || n !== saved
   }
-  /** What saving sends for a line: undefined = nothing; '' = back to the sub-department's ratio. */
+  const riderLine = (l: Line) => byBrandOn && l.sku?.rider === true
+
+  /** What saving sends for a line's own ratio: undefined = nothing; '' = back to the sub-department's. */
   const changeOf = (l: Line): string | undefined => {
     const text = drafts.get(l.erpId)
-    if (l.saved === null) return text ?? ''
+    if (l.saved === null) return text !== undefined && text.trim() !== '' ? text.trim() : undefined
     if (text !== undefined && differs(text, l.saved.ratio)) return text.trim()
     if (renamed(l)) return String(l.saved.ratio)
     return undefined
   }
+  /** A brand's figure as it stands in the draft: typed, else saved, else blank. */
+  const brandTextOf = (erpId: string, brand: string): string => {
+    const text = brandDrafts.get(brandKeyOf(erpId, brand))
+    if (text !== undefined) return text
+    const saved = savedBrand.get(brandKeyOf(erpId, brand))
+    return saved === undefined ? '' : formatRatio(saved)
+  }
+  /** What saving sends for a SKU's brand: undefined = nothing; '' = taken off. */
+  const brandChangeOf = (erpId: string, brand: string): string | undefined => {
+    const text = brandDrafts.get(brandKeyOf(erpId, brand))
+    if (text === undefined) return undefined
+    const saved = savedBrand.get(brandKeyOf(erpId, brand))
+    if (saved === undefined) return text.trim() === '' ? undefined : text.trim()
+    return differs(text, saved) ? text.trim() : undefined
+  }
+  /** Split by brand: a brand of it has a figure, or it was split this time. */
+  const isSplit = (l: Line): boolean =>
+    riderLine(l) && (split.has(l.erpId) || brands.some(b => brandTextOf(l.erpId, b.code).trim() !== ''))
+  /** Nothing of it would stay on the list once saved. */
+  const goingOf = (l: Line): boolean => {
+    if (!l.listed) return false
+    const own = drafts.get(l.erpId) ?? (l.saved ? formatRatio(l.saved.ratio) : '')
+    return own.trim() === '' && !brands.some(b => brandTextOf(l.erpId, b.code).trim() !== '')
+  }
 
   const divisorChanged = divisorDraft !== null && differs(divisorDraft, divisor)
   const changed = editing ? lines.filter(l => changeOf(l) !== undefined) : []
-  const dirty = editing ? (divisorChanged ? 1 : 0) + changed.length : 0
+  const brandChanges = editing
+    ? lines.flatMap(l => brands.flatMap(b => (brandChangeOf(l.erpId, b.code) !== undefined ? [{ l, brand: b.code }] : [])))
+    : []
+  const dirty = editing ? (divisorChanged ? 1 : 0) + changed.length + brandChanges.length : 0
   const renamedCount = lines.filter(renamed).length
   // The KIV costs below keep drafts of their own; one guard holds both.
   const [kivDraft, setKivDraft] = useState({ changes: 0, saving: false })
@@ -168,6 +241,15 @@ export default function CostSettingTab({
     if (text === undefined) return l.saved?.ratio ?? null
     const n = readRatio(text)
     return n === 'bad' ? l.saved?.ratio ?? null : n
+  }
+  /** Every ratio a line may be divided by once saved: each brand's, else its own, else the sub-department's. */
+  const ratiosOf = (l: Line): number[] => {
+    const own = ratioOf(l) ?? shownDivisor
+    if (!isSplit(l)) return [own]
+    return brands.map(b => {
+      const n = readRatio(brandTextOf(l.erpId, b.code))
+      return typeof n === 'number' ? n : own
+    })
   }
 
   const q = query.trim().toLowerCase()
@@ -186,7 +268,15 @@ export default function CostSettingTab({
   )
   const shown = matches.slice(0, PICK_LIMIT)
   const tickedHere = [...ticked].filter(id => !onList.has(id))
-  const pickOk = (() => { const n = readRatio(pickRatio); return typeof n === 'number' })()
+  const shownFree = shown.filter(s => !onList.has(s.erpId))
+  const allShownTicked = shownFree.length > 0 && shownFree.every(s => ticked.has(s.erpId))
+  const pickRatioValue = readRatio(pickRatio)
+  const pickBrandValues = brands.flatMap(b => {
+    const text = (pickBrands.get(b.code) ?? '').trim()
+    return text ? [{ brand: b.code, text, value: readRatio(text) }] : []
+  })
+  const pickBad = pickRatioValue === 'bad' || pickBrandValues.some(p => p.value === 'bad')
+  const pickOk = !pickBad && (typeof pickRatioValue === 'number' || pickBrandValues.length > 0)
 
   function cancel() {
     if (saving) return
@@ -200,12 +290,58 @@ export default function CostSettingTab({
     setNotice(null)
   }
 
-  function dropDraft(erpId: string) {
+  function setBrandDraft(erpId: string, brand: string, text: string) {
+    setBrandDrafts(previous => new Map(previous).set(brandKeyOf(erpId, brand), text))
+    setNotice(null)
+  }
+
+  /** Forget what was typed for a line this time: its own ratio and its brands. */
+  function dropDrafts(erpId: string) {
     setDrafts(previous => {
       const next = new Map(previous)
       next.delete(erpId)
       return next
     })
+    setBrandDrafts(previous => {
+      const next = new Map(previous)
+      for (const b of brands) next.delete(brandKeyOf(erpId, b.code))
+      return next
+    })
+    setSplit(previous => {
+      const next = new Set(previous)
+      next.delete(erpId)
+      return next
+    })
+  }
+
+  /** Every brand of a line back to its own ratio: a saved one taken off, a typed one forgotten. */
+  function mergeBrands(erpId: string) {
+    setBrandDrafts(previous => {
+      const next = new Map(previous)
+      for (const b of brands) {
+        const k = brandKeyOf(erpId, b.code)
+        if (savedBrand.has(k)) next.set(k, '')
+        else next.delete(k)
+      }
+      return next
+    })
+    setSplit(previous => {
+      const next = new Set(previous)
+      next.delete(erpId)
+      return next
+    })
+    setNotice(null)
+  }
+
+  function splitByBrand(erpId: string) {
+    setEditing(true)
+    setSplit(previous => new Set(previous).add(erpId))
+    setNotice(null)
+  }
+
+  function removeLine(l: Line) {
+    setDrafts(previous => new Map(previous).set(l.erpId, ''))
+    mergeBrands(l.erpId)
   }
 
   function toggle(erpId: string) {
@@ -217,19 +353,53 @@ export default function CostSettingTab({
     })
   }
 
+  function tickAllShown() {
+    setTicked(previous => {
+      const next = new Set(previous)
+      for (const s of shownFree) {
+        if (allShownTicked) next.delete(s.erpId)
+        else next.add(s.erpId)
+      }
+      return next
+    })
+  }
+
   function addTicked() {
     if (tickedHere.length === 0) return
-    const ratio = readRatio(pickRatio)
-    if (ratio === 'bad' || ratio === null) {
-      setError(ratio === null ? 'Type the ratio the ticked SKUs are divided by, such as 0.6.' : `"${pickRatio}" is not a ratio above 0 and at most 10.`)
+    if (pickBad) {
+      setError(`"${pickRatioValue === 'bad' ? pickRatio : pickBrandValues.find(p => p.value === 'bad')?.text}" is not a ratio above 0 and at most 10.`)
+      return
+    }
+    if (!pickOk) {
+      setError('Type the ratio the ticked SKUs are divided by, such as 0.6 — or one for a brand.')
+      return
+    }
+    // A mattress or a sofa sells under its own brand: it takes the one ratio, never a brand's.
+    const own = tickedHere.filter(id => !skuById.get(id)?.rider)
+    if (pickRatioValue === null && own.length > 0) {
+      const sku = skuById.get(own[0])
+      setError(`${sku?.code ?? own[0]} sells under its own brand: type the ratio it divides by.`)
       return
     }
     setAdded(previous => [...tickedHere, ...previous])
     setDrafts(previous => {
       const next = new Map(previous)
-      for (const id of tickedHere) next.set(id, pickRatio.trim())
+      if (typeof pickRatioValue === 'number') for (const id of tickedHere) next.set(id, pickRatio.trim())
       return next
     })
+    const riders = tickedHere.filter(id => skuById.get(id)?.rider)
+    if (pickBrandValues.length > 0 && riders.length > 0) {
+      setBrandDrafts(previous => {
+        const next = new Map(previous)
+        for (const id of riders) for (const p of pickBrandValues) next.set(brandKeyOf(id, p.brand), p.text)
+        return next
+      })
+      setSplit(previous => {
+        const next = new Set(previous)
+        for (const id of riders) next.add(id)
+        return next
+      })
+    }
     setTicked(new Set())
     setError(null)
     setNotice(null)
@@ -237,7 +407,7 @@ export default function CostSettingTab({
 
   function save() {
     if (saving || dirty === 0) return
-    const blank = lines.find(l => l.saved === null && !(drafts.get(l.erpId) ?? '').trim())
+    const blank = lines.find(l => !l.listed && changeOf(l) === undefined && !brands.some(b => (brandChangeOf(l.erpId, b.code) ?? '') !== ''))
     if (blank) {
       setError(`${codeOf(blank)}: give it a ratio, or take it off the list.`)
       return
@@ -245,6 +415,7 @@ export default function CostSettingTab({
     const edit: CostSettingEdit = {
       divisor: divisorChanged && divisorDraft !== null ? divisorDraft : undefined,
       ratios: changed.map(l => ({ erpId: l.erpId, ratio: changeOf(l) ?? '', label: codeOf(l) })),
+      brands: brandChanges.map(({ l, brand }) => ({ erpId: l.erpId, brand, ratio: brandChangeOf(l.erpId, brand) ?? '', label: codeOf(l) })),
     }
     try {
       validateCostSetting(edit)
@@ -254,7 +425,7 @@ export default function CostSettingTab({
     }
     setError(null)
     setNotice(null)
-    const before = { ratios, divisor }
+    const before = { ratios, divisor, byBrand }
     startSaving(async () => {
       try {
         await saveCostSetting(schemeId, edit)
@@ -270,10 +441,36 @@ export default function CostSettingTab({
     })
   }
 
+  /** A rider row's menu: split it by brand, or back to one ratio. */
+  const menuItems = (l: Line): ProductRowMenuItem[] =>
+    isSplit(l)
+      ? [{ key: 'merge', label: 'One ratio for every brand', onSelect: () => { setEditing(true); mergeBrands(l.erpId) } }]
+      : [{ key: 'split', label: 'Split by brand', onSelect: () => splitByBrand(l.erpId) }]
+  const menuLine = menu ? lines.find(l => l.erpId === menu.erpId) : undefined
+  const closeMenu = useCallback(() => setMenu(null), [])
+
+  function openMenuAt(l: Line, e: ReactMouseEvent) {
+    if (!riderLine(l) || saving || goingOf(l)) return
+    // Shift + right-click, a field and selected text keep the browser's own menu.
+    if (e.shiftKey || (e.target instanceof HTMLElement && e.target.closest('input, textarea, select'))) return
+    if (window.getSelection()?.toString()) return
+    e.preventDefault()
+    setMenu({ erpId: l.erpId, anchor: { x: e.clientX, y: e.clientY } })
+  }
+
+  function openMenuFrom(l: Line, button: HTMLElement) {
+    const r = button.getBoundingClientRect()
+    setMenu({ erpId: l.erpId, anchor: { x: r.left, y: r.bottom + 4 } })
+  }
+
   const msg = !q ? 'Type to find SKUs. Nothing shows until you search.'
     : matches.length === 0 ? 'No SKU matches.'
     : matches.length > PICK_LIMIT ? `Showing ${PICK_LIMIT} of ${matches.length.toLocaleString()}. Narrow the search to see the rest.`
     : null
+  const columns = 6 + (byBrandOn ? 1 : 0) + (editing ? 1 : 0)
+  const addLabel = tickedHere.length === 0
+    ? 'Tick SKUs to add'
+    : `Add ${tickedHere.length}${typeof pickRatioValue === 'number' ? ` at ${pickRatio.trim()}` : pickBrandValues.length === 0 ? ' at …' : ''}${pickBrandValues.length > 0 && !pickBad ? ' · by brand' : ''}`
 
   return (
     <>
@@ -317,7 +514,7 @@ export default function CostSettingTab({
 
       <KivCostsSection costs={kivCosts} divisor={shownDivisor} onDraft={setKivDraft} />
 
-      <Heading title="SKUs at their own ratio" sub={plural(ratios.length, 'SKU')} />
+      <Heading title="SKUs at their own ratio" sub={plural(lines.filter(l => l.listed).length, 'SKU')} />
       <ActionRow>
         {editing ? (
           <EditingButtons cancelLabel="Cancel changes" onCancel={cancel} onSave={save} changes={dirty} saving={saving} pending={pending}
@@ -336,6 +533,11 @@ export default function CostSettingTab({
         <div className={c.picker} role="group" aria-label="Add SKUs">
           <div className={c.pickerHead}>
             <span className={c.pickerTitle}>ADD SKUS AT A RATIO OF THEIR OWN</span>
+            {shownFree.length > 1 ? (
+              <button type="button" className={c.cellLink} disabled={saving} onClick={tickAllShown}>
+                {allShownTicked ? 'Untick all' : `Tick all ${shownFree.length}`}
+              </button>
+            ) : null}
           </div>
           <div className={c.pickerControls}>
             <label className={c.pickerSearch}>
@@ -346,12 +548,25 @@ export default function CostSettingTab({
             <label className={c.pickerAmount}>
               <span className={c.selectLabel}>Ratio</span>
               <input className={c.pickerAmountInput} value={pickRatio} onChange={e => setPickRatio(e.target.value)} disabled={saving}
-                inputMode="decimal" placeholder="0.60" aria-label="Ratio for the ticked SKUs" />
+                inputMode="decimal" placeholder={formatRatio(shownDivisor)} aria-label="Ratio for the ticked SKUs" />
             </label>
             <button type="button" className={c.pickerAdd} disabled={saving} data-idle={(tickedHere.length === 0 || !pickOk) || undefined} onClick={addTicked}>
-              {tickedHere.length ? `Add ${tickedHere.length} at ${pickOk ? pickRatio.trim() : '…'}` : 'Tick SKUs to add'}
+              {addLabel}
             </button>
           </div>
+          {byBrandOn ? (
+            <div className={c.pickerBrands} role="group" aria-label="Ratios by brand for the ticked bed frames and accessories">
+              <span className={c.pickerBrandsLabel}>BY BRAND</span>
+              {brands.map(b => (
+                <label key={b.code} className={c.pickerAmount}>
+                  <span className={c.selectLabel}>{b.name}</span>
+                  <input className={`${c.pickerAmountInput} ${c.pickerBrandInput}`} value={pickBrands.get(b.code) ?? ''} disabled={saving}
+                    onChange={e => { const v = e.target.value; setPickBrands(previous => new Map(previous).set(b.code, v)) }}
+                    inputMode="decimal" placeholder={pickRatio.trim() || formatRatio(shownDivisor)} aria-label={`${b.name} ratio for the ticked SKUs`} />
+                </label>
+              ))}
+            </div>
+          ) : null}
           {msg ? <p className={c.pickerMsg}>{msg}</p> : null}
           {shown.length > 0 ? (
             <ul className={c.results}>
@@ -387,19 +602,24 @@ export default function CostSettingTab({
                 <th scope="col" className={c.th} style={{ minWidth: 100 }}>CATEGORY</th>
                 <th scope="col" className={c.th} data-num="" style={{ minWidth: 150 }}>PRODUCT LIST COST</th>
                 <th scope="col" className={c.th} data-num="" style={{ minWidth: 110 }}>RATIO</th>
+                {byBrandOn ? <th scope="col" className={c.th} style={{ minWidth: 260 }}>BY BRAND</th> : null}
                 <th scope="col" className={c.th} data-num="" style={{ minWidth: 160 }}>TEAM COST</th>
-                {editing ? <th scope="col" className={c.th} data-num="" style={{ minWidth: 110 }}><span className="sr-only">Remove</span>{' '}</th> : null}
+                {editing ? <th scope="col" className={c.th} data-num="" style={{ minWidth: 110 }}><span className="sr-only">Remove</span>{' '}</th> : null}
               </tr>
             </thead>
             <tbody>
               {lines.map((l, i) => {
                 const text = drafts.get(l.erpId)
-                const isNew = l.saved === null
-                const going = !isNew && text !== undefined && text.trim() === ''
+                const isNew = !l.listed
+                const going = goingOf(l)
                 const cost = costOf(l.sku)
-                const judged = ratioOf(l) ?? shownDivisor
+                const rider = riderLine(l)
+                const splitNow = isSplit(l)
+                const ownText = text ?? (l.saved ? formatRatio(l.saved.ratio) : '')
+                const ownPlaceholder = formatRatio(shownDivisor)
                 return (
-                  <tr key={l.erpId} className={c.row} data-stripe={(!isNew && i % 2 === 1) || undefined} data-new={isNew || undefined} data-removing={going || undefined}>
+                  <tr key={l.erpId} className={c.row} data-stripe={(!isNew && i % 2 === 1) || undefined} data-new={isNew || undefined} data-removing={going || undefined}
+                    onContextMenu={rider ? e => openMenuAt(l, e) : undefined}>
                     <td className={c.td} data-first="">
                       {codeOf(l)}
                       {isNew ? <CellChip tone="new">NEW</CellChip> : going ? <CellChip tone="removing">REMOVING</CellChip> : null}
@@ -411,21 +631,55 @@ export default function CostSettingTab({
                     <td className={c.td} data-num="">{cost ? rangeLabel(cost) : <span className={c.faint}>No price</span>}</td>
                     <td className={`${c.td} ${editing && !going ? c.inputCell : c.bold}`} data-num="">
                       {editing && !going ? (
-                        <CellInput value={text ?? (l.saved ? formatRatio(l.saved.ratio) : '')} onChange={v => setDraft(l.erpId, v)}
-                          edited={text !== undefined && (isNew || differs(text, l.saved!.ratio))} width={84} disabled={saving}
-                          placeholder={formatRatio(shownDivisor)} label={`${codeOf(l)} ratio`} />
-                      ) : l.saved ? formatRatio(l.saved.ratio) : '—'}
+                        <CellInput value={ownText} onChange={v => setDraft(l.erpId, v)}
+                          edited={text !== undefined && (l.saved === null ? text.trim() !== '' : differs(text, l.saved.ratio))} width={84} disabled={saving}
+                          placeholder={ownPlaceholder} label={`${codeOf(l)} ratio`} />
+                      ) : l.saved ? formatRatio(l.saved.ratio) : <span className={c.faint}>{ownPlaceholder}</span>}
                     </td>
-                    <td className={`${c.td} ${c.bold} ${c.accent}`} data-num="">{cost ? rangeLabel(cost, judged) : '—'}</td>
+                    {byBrandOn ? (
+                      <td className={`${c.td} ${editing && splitNow && !going ? c.inputCell : ''}`} data-wrap="">
+                        <div className={c.brandCell}>
+                          {!rider || !splitNow ? (
+                            <span className={c.faint}>—</span>
+                          ) : editing && !going ? (
+                            <div className={c.brandInputs} role="group" aria-label={`${codeOf(l)} by brand`}>
+                              {brands.map(b => {
+                                const typed = brandDrafts.get(brandKeyOf(l.erpId, b.code))
+                                return (
+                                  <label key={b.code} className={c.brandInput}>
+                                    <span>{b.name}</span>
+                                    <CellInput value={brandTextOf(l.erpId, b.code)} onChange={v => setBrandDraft(l.erpId, b.code, v)}
+                                      edited={typed !== undefined && brandChangeOf(l.erpId, b.code) !== undefined} width={64} disabled={saving}
+                                      placeholder={formatRatio(ratioOf(l) ?? shownDivisor)} label={`${codeOf(l)} · ${b.name} ratio`} />
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <span className={c.brandRatios}>
+                              {brands.flatMap(b => {
+                                const t = brandTextOf(l.erpId, b.code).trim()
+                                return t ? [<span key={b.code} className={c.brandRatio}>{b.name} <b>{t}</b></span>] : []
+                              })}
+                            </span>
+                          )}
+                          {rider && !going ? (
+                            <button type="button" className={c.rowDots} aria-label={`More for ${codeOf(l)}`} aria-haspopup="menu"
+                              disabled={saving} onClick={e => openMenuFrom(l, e.currentTarget)}>⋯</button>
+                          ) : null}
+                        </div>
+                      </td>
+                    ) : null}
+                    <td className={`${c.td} ${c.bold} ${c.accent}`} data-num="">{cost ? rangeLabel(cost, ratiosOf(l)) : '—'}</td>
                     {editing ? (
                       <td className={c.td} data-num="">
                         {isNew ? (
                           <button type="button" className={c.cellLink} data-tone="danger" disabled={saving}
-                            onClick={() => { setAdded(previous => previous.filter(id => id !== l.erpId)); dropDraft(l.erpId) }}>Take off</button>
+                            onClick={() => { setAdded(previous => previous.filter(id => id !== l.erpId)); dropDrafts(l.erpId) }}>Take off</button>
                         ) : going ? (
-                          <button type="button" className={c.cellLink} disabled={saving} onClick={() => dropDraft(l.erpId)}>Keep</button>
+                          <button type="button" className={c.cellLink} disabled={saving} onClick={() => dropDrafts(l.erpId)}>Keep</button>
                         ) : (
-                          <button type="button" className={c.cellLink} data-tone="danger" disabled={saving} onClick={() => setDraft(l.erpId, '')}>Remove</button>
+                          <button type="button" className={c.cellLink} data-tone="danger" disabled={saving} onClick={() => removeLine(l)}>Remove</button>
                         )}
                       </td>
                     ) : null}
@@ -433,13 +687,17 @@ export default function CostSettingTab({
                 )
               })}
               {lines.length === 0 ? (
-                <tr><td colSpan={editing ? 7 : 6} className={c.empty}>Every {sub.name} SKU divides by {formatRatio(divisor)}.</td></tr>
+                <tr><td colSpan={columns} className={c.empty}>Every {sub.name} SKU divides by {formatRatio(divisor)}.</td></tr>
               ) : null}
             </tbody>
           </table>
         </PageScrolledTable>
         <TableFoot shown={`${plural(lines.length, 'SKU')} · every other SKU divides by ${formatRatio(shownDivisor)}`} />
       </div>
+
+      {menu && menuLine ? (
+        <ProductRowMenu title={codeOf(menuLine)} anchor={menu.anchor} items={menuItems(menuLine)} onClose={closeMenu} />
+      ) : null}
     </>
   )
 }

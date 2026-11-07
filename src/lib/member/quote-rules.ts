@@ -18,13 +18,35 @@ import type { QuoteRules } from "./types";
  * one of their own. Null when the answer is not that shape — the quote then
  * refuses rather than judge a margin on the cost as keyed.
  */
-export function quoteCostRules(raw: unknown): Pick<QuoteRules, "costDivisor" | "costRatios"> | null {
+export function quoteCostRules(
+  raw: unknown,
+): Pick<QuoteRules, "costDivisor" | "costRatios" | "costRatiosByBrand"> | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const value = raw as Record<string, unknown>;
   if (typeof value.costDivisor !== "number" && typeof value.costDivisor !== "string") return null;
   const costDivisor = Number(value.costDivisor);
   if (!Number.isFinite(costDivisor) || costDivisor <= 0) return null;
-  return { costDivisor, costRatios: quoteCostRatios(value.costRatios) };
+  return {
+    costDivisor,
+    costRatios: quoteCostRatios(value.costRatios),
+    costRatiosByBrand: quoteCostRatiosByBrand(value.costRatioBrands),
+  };
+}
+
+/**
+ * A rider SKU's ratio for each brand (Costing Setting, 2026-11-07):
+ * `{ "<product code>": { "<brand>": ratio } }`. Anything that is not a positive
+ * number is left out — that brand keeps the SKU's own ratio, else the default.
+ */
+export function quoteCostRatiosByBrand(raw: unknown): { productCode: string; brand: string; ratio: number }[] {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+  return Object.entries(raw as Record<string, unknown>).flatMap(([productCode, brands]) => {
+    if (!productCode.trim() || !brands || typeof brands !== "object" || Array.isArray(brands)) return [];
+    return Object.entries(brands as Record<string, unknown>).flatMap(([brand, value]) => {
+      const ratio = Number(value);
+      return brand.trim() && Number.isFinite(ratio) && ratio > 0 ? [{ productCode, brand, ratio }] : [];
+    });
+  });
 }
 
 /**

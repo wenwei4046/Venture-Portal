@@ -2,7 +2,7 @@ import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import { priceGridOf, type PriceCell } from '@/lib/catalogue/pricing'
-import { calcCategoryOf, defaultGift, needsBrandPick, sellsUnderBrand, skuOptionLabel } from '@/lib/catalogue/options'
+import { calcCategoryOf, defaultGift, isRiderModel, needsBrandPick, sellsUnderBrand, skuOptionLabel } from '@/lib/catalogue/options'
 import { normaliseComboModules } from '@/lib/catalogue/combos'
 import { isKivSize, type KivSize } from '@/lib/catalogue/edits'
 import { brandCodeFor, type BrandWords } from '@/lib/brand-code'
@@ -176,6 +176,12 @@ export interface CatalogueSku {
   branding: string | null
   /** The margin ladder it sells under; null = a rider. */
   brand: string | null
+  /**
+   * It joins a cart of any brand (`isRiderModel`): a bed frame, an accessory —
+   * or a brandless mattress or sofa Modular marks Rider. Only such a SKU takes a
+   * cost ratio by brand on Costing Setting (2026-11-07).
+   */
+  rider?: boolean
   active: boolean
   removed: boolean
   isNew: boolean
@@ -195,6 +201,8 @@ interface SkuTables {
   offeredModels: Set<string>
   /** The names the portal gave its models (Modular, 2026-10-19), by ERP model id. */
   ownNames: Map<string, string>
+  /** Modular's margin-ladder pick, by ERP model id — read only where `needsBrandPick`. */
+  brandPicks: Map<string, string>
   brands: BrandRef[]
 }
 
@@ -237,7 +245,7 @@ async function loadSkuTables(sb: SupabaseClient): Promise<SkuTables> {
     ),
     loadBrands(sb),
     all((f, t) =>
-      sb.from('catalogue_models').select('erp_model_id, offered, model_name').order('erp_model_id').range(f, t),
+      sb.from('catalogue_models').select('erp_model_id, offered, model_name, brand_code').order('erp_model_id').range(f, t),
     ),
   ])
   return {
@@ -246,6 +254,10 @@ async function loadSkuTables(sb: SupabaseClient): Promise<SkuTables> {
     models: new Map(models.map(m => [String(m.erp_id), m])),
     offeredModels: new Set(modelRows.filter(m => m.offered === true).map(m => String(m.erp_model_id))),
     ownNames: ownNamesOf(modelRows),
+    brandPicks: new Map(modelRows.flatMap(m => {
+      const pick = str(m.brand_code)
+      return pick ? [[String(m.erp_model_id), pick] as const] : []
+    })),
     brands,
   }
 }
@@ -263,6 +275,8 @@ function toSku(r: Row, t: SkuTables, isNew: (s: string | null) => boolean): Cata
     size_label: str(r.size_label),
     item_code: String(r.item_code),
   }
+  const brand = brandOf(category, model ? str(model.branding) : null, str(r.branding), t.brands)
+  const pick = r.model_erp_id ? t.brandPicks.get(String(r.model_erp_id)) ?? null : null
   return {
     erpId,
     code: sku.item_code,
@@ -277,7 +291,8 @@ function toSku(r: Row, t: SkuTables, isNew: (s: string | null) => boolean): Cata
     sizeLabel: sku.size_label,
     optionLabel: skuOptionLabel(sku),
     branding: str(r.branding),
-    brand: brandOf(category, model ? str(model.branding) : null, str(r.branding), t.brands),
+    brand,
+    rider: isRiderModel(category, needsBrandPick(category, brand) ? pick : null),
     active: r.active !== false,
     removed: r.removed_at !== null && r.removed_at !== undefined,
     isNew: isNew(str(r.first_seen_at)),
@@ -728,6 +743,8 @@ export interface PickSku {
   priceHigh: number | null
   active: boolean
   removed: boolean
+  /** It rides on a bill of any brand, so it may take a ratio by brand (2026-11-07). */
+  rider?: boolean
 }
 
 export function toPickSku(s: CatalogueSku): PickSku {
@@ -743,6 +760,7 @@ export function toPickSku(s: CatalogueSku): PickSku {
     priceHigh: cells.length > 0 ? Math.max(...cells) : null,
     active: s.active,
     removed: s.removed,
+    rider: s.rider === true,
   }
 }
 
@@ -788,4 +806,56 @@ export async function loadCostRatios(schemeId: string): Promise<CostRatioRow[]> 
     ratio: num(r.ratio) ?? 1,
     updatedAt: str(r.updated_at),
   }))
+}
+
+/** A rider SKU's ratio for one brand of the sub-department (Costing Setting, 2026-11-07). */
+export interface CostRatioBrandRow {
+  erpId: string
+  /** The code it was saved under: what a sales line has to carry. */
+  code: string
+  /** `comm_brands.code`. */
+  brand: string
+  ratio: number
+}
+
+export async function loadCostRatioBrands(schemeId: string): Promise<CostRatioBrandRow[]> {
+  const sb = await untyped()
+  const rows = await all((f, t) =>
+    sb
+      .from('comm_cost_ratio_brands')
+      .select('erp_product_id, product_code, brand_code, ratio')
+      .eq('scheme_id', schemeId)
+      .order('product_code')
+      .order('erp_product_id')
+      .order('brand_code')
+      .range(f, t),
+  )
+  return rows.flatMap(r => {
+    const ratio = num(r.ratio)
+    return ratio !== null && ratio > 0
+      ? [{ erpId: String(r.erp_product_id), code: String(r.product_code), brand: String(r.brand_code), ratio }]
+      : []
+  })
+}
+
+/** A brand whose ladder the sub-department pays on: what a SKU's ratio by brand is set for. */
+export interface SchemeBrand {
+  code: string
+  name: string
+}
+
+/** The sub-department's own brands with a ladder (`comm_brands`, active), by name. */
+export async function loadSchemeBrands(schemeId: string): Promise<SchemeBrand[]> {
+  const sb = await untyped()
+  const rows = await all((f, t) =>
+    sb
+      .from('comm_brands')
+      .select('code, name')
+      .eq('scheme_id', schemeId)
+      .eq('is_active', true)
+      .order('name')
+      .order('code')
+      .range(f, t),
+  )
+  return rows.map(r => ({ code: String(r.code), name: str(r.name) ?? String(r.code) }))
 }
