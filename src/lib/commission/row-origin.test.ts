@@ -95,13 +95,13 @@ describe('an old bill topped up (2026-11-07)', () => {
     expect(oldBillOf({ orderDate: '2026-07-12', periodMonth: '2026-07-01', agentName: 'LUCAS' }, FLOOR)).toBeNull()
     expect(oldBillOf({ orderDate: '2026-03-10', periodMonth: NOV, agentName: 'Junie' }, null)).toBeNull()
   })
-  it('says Top up deposit, its month and who sold it, coloured where it pays', () => {
+  it('says Top up deposit, its month, who sold it and that it pays commission only, coloured where it pays', () => {
     expect(rowOrigin(row({ periodMonth: NOV }), NOV, { oldBill: { soldIn: '2026-03-01', soldBy: 'Junie' } }))
-      .toEqual({ kind: 'deposit', label: 'Top up deposit', fromMonth: '2026-03-01', detail: 'Mar 2026 bill · Junie', paysHere: true })
+      .toEqual({ kind: 'deposit', label: 'Top up deposit', fromMonth: '2026-03-01', detail: 'Mar 2026 bill · Junie · commission only', paysHere: true })
   })
   it('before its fair day or its close says otherwise', () => {
     expect(rowOrigin(row({ periodMonth: NOV }), NOV, { oldBill: { soldIn: '2026-03-01', soldBy: null }, saleMonth: '2026-03-01', afterClose: true }))
-      .toMatchObject({ kind: 'deposit', detail: 'Mar 2026 bill' })
+      .toMatchObject({ kind: 'deposit', detail: 'Mar 2026 bill · commission only' })
   })
   it('back under its deposit, it is Below deposit and pays nothing', () => {
     expect(rowOrigin(row({ periodMonth: NOV, status: 'deposit_pending' }), NOV, { oldBill: { soldIn: '2026-03-01', soldBy: 'Junie' } }))

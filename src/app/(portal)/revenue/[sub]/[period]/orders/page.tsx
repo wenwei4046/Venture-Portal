@@ -183,7 +183,10 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
     ? person?.employeeCode ?? null
     : !staffFilter && fairDetail ? fairDetail : null
 
-  const total = rows.reduce((a, o) => a + o.orderTotal, 0)
+  // An old bill topped up pays its collector commission only (2026-11-07): a
+  // bill in the list, no sale in the sales value.
+  const commissionOnly = (orderId: string) => Boolean(eventOf.get(orderId)?.oldBill)
+  const total = rows.filter(o => !commissionOnly(o.orderId)).reduce((a, o) => a + o.orderTotal, 0)
   const held = rows.filter(o => !o.cancelled && !o.depositMet)
   const heldValue = held.reduce((a, o) => a + o.orderTotal, 0)
   const noCost = rows.reduce((a, o) => a + o.linesWithoutCost, 0)
@@ -281,6 +284,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
         }),
       // Moved here from another salesperson (2026-10-12).
       moved: workbench?.moves?.[o.orderId] ?? null,
+      commissionOnly: commissionOnly(o.orderId),
     }
   })
 

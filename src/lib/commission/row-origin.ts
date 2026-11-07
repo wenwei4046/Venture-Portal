@@ -46,8 +46,9 @@ import { adjustmentLabel, type AdjustmentReason } from './erp-changes'
  * somebody who has left, still under its deposit when the portal started
  * paying, topped up past it since — sits in the month its top-up came in, on
  * whoever collected the money (`ingest_erp_sales_order`, mig 20261107200000).
- * It is **Top up deposit** too, with its own month and who sold it beside it:
- * "Mar 2026 bill · Junie".
+ * It is **Top up deposit** too, with its own month and who sold it beside it —
+ * and, since the user chose it pays its holder commission only and is no sale
+ * of theirs, says that: "Mar 2026 bill · Junie · commission only".
  */
 
 export type RowOriginKind = 'upsell' | 'drop' | 'deposit' | 'late' | 'early' | 'held' | 'carried' | 'after_close'
@@ -162,10 +163,11 @@ export function rowOrigin(row: OriginRow, period: string, facts: RowOriginFacts 
       paysHere,
     }
   }
-  // An old bill topped up (2026-11-07): Top up deposit, whichever month pays it.
+  // An old bill topped up (2026-11-07): Top up deposit, whichever month pays it
+  // — and commission only, no sale of its holder's ("is go with b, not a").
   if (facts.oldBill) {
     const from = facts.oldBill.soldIn.slice(0, 10)
-    const detail = facts.oldBill.soldBy ? `${monthShort(from)} bill · ${facts.oldBill.soldBy}` : `${monthShort(from)} bill`
+    const detail = [`${monthShort(from)} bill`, facts.oldBill.soldBy, 'commission only'].filter(Boolean).join(' · ')
     if (row.status === 'deposit_pending') return { kind: 'held', label: 'Below deposit', fromMonth: from, detail, paysHere: false }
     return { kind: 'deposit', label: 'Top up deposit', fromMonth: from, detail, paysHere }
   }
