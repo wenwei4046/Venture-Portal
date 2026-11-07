@@ -1,5 +1,5 @@
--- Production's bodies read with pg_get_functiondef on 2026-11-07 22:51 KL, 20261107230000 live — what
--- 20261107233000_shares_take_effect_weighted_sales.sql was written from (md5 of prosrc in each block's first line).
+-- Production's bodies read with pg_get_functiondef on 2026-11-07 23:25 KL, 20261107230000 and 20261107233000_sku_ratios_by_brand live — what
+-- 20261107235500_shares_take_effect_weighted_sales.sql was written from (md5 of prosrc in each block's first line).
 
 -- sales_order_old_bill() md5 b041e9f29254d99d6b13fbd269b3d3fb
 CREATE OR REPLACE FUNCTION public.sales_order_old_bill(p_source text, p_order_date date, p_period date, p_floor date)
@@ -32,7 +32,7 @@ AS $function$
 $function$
 ;
 
--- member_order_facts_with_old_bills() md5 a44fa5e5eb5934a60a8927a886ab69cf
+-- member_order_facts_with_old_bills() md5 3bd13b6f3d7d2b9a8e87d97850d2df4c
 CREATE OR REPLACE FUNCTION public.member_order_facts_with_old_bills(p_scheme uuid, p_from date, p_until date)
  RETURNS TABLE(order_id uuid, staff_id uuid, order_no text, order_date date, source_period date, recognition_month date, brand text, cleared boolean, revenue numeric, goods_revenue numeric, margin_pct numeric, kpi_qty numeric, manual boolean, no_sales_cost numeric, old_bill boolean)
  LANGUAGE sql
@@ -76,6 +76,17 @@ AS $function$
  ), windowed AS (
   SELECT o.* FROM scoped o
   WHERE (p_from IS NULL OR o.recognition>=p_from) AND (p_until IS NULL OR o.recognition<p_until)
+ ), ladder AS (
+  -- (20261107233000) The brand whose ladder each bill answers to, as marginBase() picks it: its own, else the brand its
+  -- goods lines sell the most of (on a tie, the one whose first line comes first). A rider SKU may divide by a ratio of
+  -- its own for that brand (Product List › Costing Setting).
+  SELECT w.id,upper(btrim(coalesce(nullif(btrim(w.brand_code),''),(
+   SELECT bl.brand_code FROM public.sales_order_lines bl
+   WHERE bl.order_id=w.id AND nullif(bl.brand_code,'') IS NOT NULL
+    AND EXISTS(SELECT 1 FROM public.comm_item_groups bg WHERE bg.scheme_id=p_scheme AND bg.commissionable
+     AND upper(btrim(bg.item_group))=upper(btrim(bl.item_group)))
+   GROUP BY bl.brand_code ORDER BY sum(bl.line_amount) DESC,min(bl.id::text COLLATE "C") LIMIT 1)))) AS brand
+  FROM windowed w
  ), kpi AS (
   -- (2026-09-27) The KPI items each bill carries, in force at the end of the
   -- month it is recognised in (the run's as-at): their amount is paid flat as
@@ -92,12 +103,16 @@ AS $function$
    o.brand_code,o.is_cleared,o.old_bill,o.manual_margin_pct,l.line_amount,l.cost_amount,l.option_charge_amount,
    -- Layer 2: the cost the salesperson is measured on, not the invoice cost —
    -- each line at its SKU's own ratio, else the scheme's (2026-09-27).
-   l.cost_amount/coalesce(cr.ratio,o.cost_divisor) AS team_cost,
+   l.cost_amount/coalesce(crb.ratio,cr.ratio,o.cost_divisor) AS team_cost,
    EXISTS(SELECT 1 FROM public.comm_item_groups g WHERE g.scheme_id=p_scheme
     AND upper(btrim(g.item_group))=upper(btrim(l.item_group)) AND g.commissionable) AS is_goods
   FROM windowed o JOIN public.sales_order_lines l ON l.order_id=o.id
   LEFT JOIN public.comm_cost_ratios cr ON cr.scheme_id=p_scheme
    AND upper(btrim(cr.product_code))=upper(btrim(l.product_code))
+  -- (20261107233000) The SKU's ratio for the brand the bill answers to (Costing Setting).
+  LEFT JOIN ladder lb ON lb.id=o.id
+  LEFT JOIN public.comm_cost_ratio_brands crb ON crb.scheme_id=p_scheme
+   AND upper(btrim(crb.product_code))=upper(btrim(l.product_code)) AND upper(btrim(crb.brand_code))=lb.brand
  ), bills AS (
   SELECT l.id,l.staff_id,l.order_no,l.order_date,l.period_month,l.recognition,
    l.brand_code,l.is_cleared,l.manual_margin_pct,l.old_bill,

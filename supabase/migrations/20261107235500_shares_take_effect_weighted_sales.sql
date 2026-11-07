@@ -1,5 +1,5 @@
 -- ============================================================================
--- 20261107233000_shares_take_effect_weighted_sales.sql
+-- 20261107235500_shares_take_effect_weighted_sales.sql
 -- A share takes effect when the colleague accepts; the app's sales are what the commission is (2026-11-07).
 -- ============================================================================
 --
@@ -33,8 +33,9 @@
 --    an applied run's penalised_orders entry for it (staffId, orderId, multiplier — the engine's PenalisedOrder); else 1
 --    for a part a standing close paid or a bill released; else, while the scheme cuts commission by margin, for a holder
 --    who is no department head, the penalty band the bill's margin falls in (engine.ts penaltyBandFor: the lowest
---    threshold at or above it, among its brand's bands — the brand it is written under, else the one its goods lines
---    sell most — or every brand's with neither); else 1. revenue is the part × that weight; full_revenue (the bill's
+--    threshold at or above it, among its brand's bands — ladder's brand, the one its cost ratios are read for since
+--    20261107233000: the brand it is written under, else the one its goods lines sell most — or every brand's with
+--    neither); else 1. revenue is the part × that weight; full_revenue (the bill's
 --    whole, unshared, unweighted) and weight are new columns; goods_revenue, the margins, kpi_qty and no_sales_cost stay
 --    unweighted. Read set-based: the stored multipliers once, the bands once. RETURNS changes, so it is dropped and made
 --    again from its own body — member_order_facts, the books and nothing else read it, by name. member_order_facts
@@ -46,21 +47,22 @@
 --    already out) joined back to the bill for its fair and booth: the roster per holder, 'held' the uncleared parts,
 --    an unassigned bill counted once; a week's booth is still guessed from the bills a seller wrote.
 --
--- Made again from PRODUCTION's bodies (2026-11-07 KL, 20261107230000 live; pg_get_functiondef, md5 of prosrc) — refused
+-- Made again from PRODUCTION's bodies (2026-11-07 KL, 20261107230000 and 20261107233000_sku_ratios_by_brand live — the
+-- latter's ratio by brand in member_order_facts_with_old_bills kept exactly; pg_get_functiondef, md5 of prosrc) — refused
 -- if production's body has changed since; a second run changes nothing:
 --
---   share_request_take_effect               (new)                            → 06ae489079db169c81a870435a39aecc
---   member_share_order_answer               5da728faa7bf1a9f9756b3d3b0457c13 → fb798d142dec22cebf868bdb1d74435d
+--   share_request_take_effect               (new)                            → 7fa694f7b7da2320831ef7fc4e574e49
+--   member_share_order_answer               5da728faa7bf1a9f9756b3d3b0457c13 → 8b15647e2780288ad8ef9a9dcef2d27e
 --   member_share_order_cancel               427e1e2ff8bc4da8a03dcb692ec86917 → defbb352819379ed35ff1b6f29c7b814
 --   revenue_share_request_decide            9b4e77261994128a41802f53666ea135 → b01796bdaa1d718a14c3316db25e6938
---   notification_topic_may                  5bd3decefb4fb753a3ef464573ff0b66 → 0ff1a9b15be23a1b8e2a60f4ac65b842
+--   notification_topic_may                  5bd3decefb4fb753a3ef464573ff0b66 → c55eeb6d4e2794570014a25f1206479b
 --   notification_topics_sync                931c63761257d74fbe3b0162f2d71464 → 507c5b4dd216e1b6aba7e7dc682cf72f
---   member_order_facts_with_old_bills       a44fa5e5eb5934a60a8927a886ab69cf → 95f3dd9275fdeed139a02ebea60fd6a8
+--   member_order_facts_with_old_bills       3bd13b6f3d7d2b9a8e87d97850d2df4c → c4daa35e4b387d744a5bef3b8edbc23f
 --   member_order_facts                      987d328c0ec4087e4ce6f3e58346a382 (read as it is)
---   member_order_book_for_staff             dda01c1653e5bccfc6191905c5f4e5bf → dfcd7bd64e1a09c4d859ba7a36439d3c
---   member_principal_department_order_book  06407bc90bc5e9ca1a888bd19a9fc730 → 33e4dcdcf33d2b22a18e99e72b46b0e3
---   member_arena_history_for_staff          44f66cb5dc4526ae177534929043bc5c → 38f1eebe1f89c44dfe5e8fe097b946e0
---   member_arena_booth_history_for_staff    877c601f547dd01fecec83a4799a93bd → 43ddde9e982853d0e6d02ed1d70359de
+--   member_order_book_for_staff             dda01c1653e5bccfc6191905c5f4e5bf → fd6297bdaa9b3ab0839613fc1e2ec221
+--   member_principal_department_order_book  06407bc90bc5e9ca1a888bd19a9fc730 → c56232677b0541b8aec7a564d4a33cc1
+--   member_arena_history_for_staff          44f66cb5dc4526ae177534929043bc5c → 46c35f67afd8c94d3bcdb6dd379bded1
+--   member_arena_booth_history_for_staff    877c601f547dd01fecec83a4799a93bd → 1eb40a99a7c9cc10c133f6e52f64abb8
 --
 -- CREATE OR REPLACE keeps each one's grants and comment; the dropped one gets its own back (service_role only) and its
 -- comment, a sentence longer. The new helper is the DEFINER bodies' and the service role's only.
@@ -86,17 +88,17 @@ DECLARE
   v_md5 text;
 BEGIN
   FOR r IN SELECT * FROM (VALUES
-      ('public.member_share_order_answer(uuid, boolean, text)', '5da728faa7bf1a9f9756b3d3b0457c13', 'fb798d142dec22cebf868bdb1d74435d'),
+      ('public.member_share_order_answer(uuid, boolean, text)', '5da728faa7bf1a9f9756b3d3b0457c13', '8b15647e2780288ad8ef9a9dcef2d27e'),
       ('public.member_share_order_cancel(uuid)', '427e1e2ff8bc4da8a03dcb692ec86917', 'defbb352819379ed35ff1b6f29c7b814'),
       ('public.revenue_share_request_decide(uuid, boolean, text)', '9b4e77261994128a41802f53666ea135', 'b01796bdaa1d718a14c3316db25e6938'),
-      ('public.notification_topic_may(uuid, text)', '5bd3decefb4fb753a3ef464573ff0b66', '0ff1a9b15be23a1b8e2a60f4ac65b842'),
+      ('public.notification_topic_may(uuid, text)', '5bd3decefb4fb753a3ef464573ff0b66', 'c55eeb6d4e2794570014a25f1206479b'),
       ('public.notification_topics_sync(text[])', '931c63761257d74fbe3b0162f2d71464', '507c5b4dd216e1b6aba7e7dc682cf72f'),
-      ('public.member_order_facts_with_old_bills(uuid, date, date)', 'a44fa5e5eb5934a60a8927a886ab69cf', '95f3dd9275fdeed139a02ebea60fd6a8'),
+      ('public.member_order_facts_with_old_bills(uuid, date, date)', '3bd13b6f3d7d2b9a8e87d97850d2df4c', 'c4daa35e4b387d744a5bef3b8edbc23f'),
       ('public.member_order_facts(uuid, date, date)', '987d328c0ec4087e4ce6f3e58346a382', '987d328c0ec4087e4ce6f3e58346a382'),
-      ('public.member_order_book_for_staff(uuid, uuid, date, date)', 'dda01c1653e5bccfc6191905c5f4e5bf', 'dfcd7bd64e1a09c4d859ba7a36439d3c'),
-      ('public.member_principal_department_order_book(uuid, text, text)', '06407bc90bc5e9ca1a888bd19a9fc730', '33e4dcdcf33d2b22a18e99e72b46b0e3'),
-      ('public.member_arena_history_for_staff(uuid, uuid)', '44f66cb5dc4526ae177534929043bc5c', '38f1eebe1f89c44dfe5e8fe097b946e0'),
-      ('public.member_arena_booth_history_for_staff(uuid, uuid)', '877c601f547dd01fecec83a4799a93bd', '43ddde9e982853d0e6d02ed1d70359de')
+      ('public.member_order_book_for_staff(uuid, uuid, date, date)', 'dda01c1653e5bccfc6191905c5f4e5bf', 'fd6297bdaa9b3ab0839613fc1e2ec221'),
+      ('public.member_principal_department_order_book(uuid, text, text)', '06407bc90bc5e9ca1a888bd19a9fc730', 'c56232677b0541b8aec7a564d4a33cc1'),
+      ('public.member_arena_history_for_staff(uuid, uuid)', '44f66cb5dc4526ae177534929043bc5c', '46c35f67afd8c94d3bcdb6dd379bded1'),
+      ('public.member_arena_booth_history_for_staff(uuid, uuid)', '877c601f547dd01fecec83a4799a93bd', '1eb40a99a7c9cc10c133f6e52f64abb8')
     ) AS t(sig, before_md5, after_md5)
   LOOP
     IF to_regprocedure(r.sig) IS NULL THEN
@@ -110,7 +112,7 @@ BEGIN
   IF to_regprocedure('public.share_request_take_effect(uuid, uuid, text)') IS NOT NULL THEN
     SELECT md5(replace(prosrc, E'\r', '')) INTO v_md5 FROM pg_proc
      WHERE oid = to_regprocedure('public.share_request_take_effect(uuid, uuid, text)');
-    IF v_md5 IS DISTINCT FROM '06ae489079db169c81a870435a39aecc' THEN
+    IF v_md5 IS DISTINCT FROM '7fa694f7b7da2320831ef7fc4e574e49' THEN
       RAISE EXCEPTION 'public.share_request_take_effect(uuid, uuid, text) is already here as md5 %, not this migration''s', v_md5;
     END IF;
   END IF;
@@ -202,7 +204,7 @@ BEGIN
     NULL;  -- made already
   ELSIF v_def = 'CHECK ((ref_kind = ANY (ARRAY[''att_request''::text, ''att_today''::text, ''booking''::text, ''crm_contact''::text, ''crm_invite''::text, ''hiring_request''::text, ''hr_staff''::text, ''it_request''::text, ''member_request''::text, ''memo''::text, ''mkt_project''::text, ''payment_request''::text, ''share_request''::text])))' THEN
     ALTER TABLE public.app_notifications DROP CONSTRAINT app_notifications_ref_kind_check;
-    -- (20261107233000) share_taken: a share that took effect, '<sub-department slug>/<its month, YYYY-MM-01>' — Comm
+    -- (20261107235500) share_taken: a share that took effect, '<sub-department slug>/<its month, YYYY-MM-01>' — Comm
     -- Cal's Requests for that month.
     ALTER TABLE public.app_notifications ADD CONSTRAINT app_notifications_ref_kind_check CHECK (ref_kind = ANY (ARRAY[
       'att_request', 'att_today', 'booking', 'crm_contact', 'crm_invite', 'hiring_request', 'hr_staff', 'it_request',
@@ -217,7 +219,7 @@ BEGIN
     NULL;  -- made already
   ELSIF v_def = 'CHECK ((topic = ANY (ARRAY[''hiring.guest''::text, ''it.requests''::text, ''member.requests''::text, ''people.probation''::text, ''rooms.guest''::text])))' THEN
     ALTER TABLE public.notification_topics DROP CONSTRAINT notification_topics_topic_check;
-    -- (20261107233000) revenue.shares: a share that took effect, for whoever may change shares on Comm Cal.
+    -- (20261107235500) revenue.shares: a share that took effect, for whoever may change shares on Comm Cal.
     ALTER TABLE public.notification_topics ADD CONSTRAINT notification_topics_topic_check CHECK (topic = ANY (ARRAY[
       'hiring.guest', 'it.requests', 'member.requests', 'people.probation', 'revenue.shares', 'rooms.guest']));
   ELSE
@@ -225,14 +227,14 @@ BEGIN
   END IF;
 END $$;
 
-SELECT pg_temp.made_with('public.notification_topic_may(uuid, text)', '0ff1a9b15be23a1b8e2a60f4ac65b842', ARRAY[
+SELECT pg_temp.made_with('public.notification_topic_may(uuid, text)', 'c55eeb6d4e2794570014a25f1206479b', ARRAY[
     $o$p_topic NOT IN ('hiring.guest', 'rooms.guest', 'member.requests', 'it.requests')$o$,
     $n$p_topic NOT IN ('hiring.guest', 'rooms.guest', 'member.requests', 'it.requests', 'revenue.shares')$n$,
     $o$WHEN 'member.requests' THEN public.member_is_manager('member_requests_manage') IS TRUE
         AND public.tab_write_open(ARRAY['/member-admin'], ARRAY['member.manage']) IS TRUE$o$,
     $n$WHEN 'member.requests' THEN public.member_is_manager('member_requests_manage') IS TRUE
         AND public.tab_write_open(ARRAY['/member-admin'], ARRAY['member.manage']) IS TRUE
-      -- (20261107233000) A share that took effect: whoever may change shares on Comm Cal.
+      -- (20261107235500) A share that took effect: whoever may change shares on Comm Cal.
       WHEN 'revenue.shares' THEN public.has_any_action(ARRAY['revenue.edit']) IS TRUE
         AND public.tab_write_open(ARRAY['/revenue/[sub]/[period]'], ARRAY['revenue.edit']) IS TRUE$n$
   ]);
@@ -267,7 +269,7 @@ DECLARE
   v_with   text;
   v_slug   text;
 BEGIN
-  -- (20261107233000) Handed who decides it: a signed-in caller only ever as themselves.
+  -- (20261107235500) Handed who decides it: a signed-in caller only ever as themselves.
   IF auth.uid() IS NOT NULL AND p_by IS DISTINCT FROM auth.uid() THEN
     RAISE EXCEPTION 'A share takes effect as the colleague who accepted it.' USING ERRCODE = '42501';
   END IF;
@@ -379,19 +381,19 @@ END
 $function$;
 
 COMMENT ON FUNCTION public.share_request_take_effect(uuid, uuid, text) IS
-  $c$A share takes effect (20261107233000): every check revenue_share_request_decide's approve makes, worded for the colleague — a refusal is returned and nothing is written; else the shares written as approve writes them, the request approved as decided by p_by (the colleague who accepted; no event: its trail is sent → accepted), and the owner, the colleagues and HR (topic revenue.shares, ref share_taken '<slug>/<YYYY-MM-01>') told. member_share_order_answer calls it once everybody has accepted; 20261107233000 put the requests with HR through it.$c$;
+  $c$A share takes effect (20261107235500): every check revenue_share_request_decide's approve makes, worded for the colleague — a refusal is returned and nothing is written; else the shares written as approve writes them, the request approved as decided by p_by (the colleague who accepted; no event: its trail is sent → accepted), and the owner, the colleagues and HR (topic revenue.shares, ref share_taken '<slug>/<YYYY-MM-01>') told. member_share_order_answer calls it once everybody has accepted; 20261107235500 put the requests with HR through it.$c$;
 
 REVOKE ALL ON FUNCTION public.share_request_take_effect(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.share_request_take_effect(uuid, uuid, text) TO service_role;
 
-SELECT pg_temp.made_with('public.member_share_order_answer(uuid, boolean, text)', 'fb798d142dec22cebf868bdb1d74435d', ARRAY[
+SELECT pg_temp.made_with('public.member_share_order_answer(uuid, boolean, text)', '8b15647e2780288ad8ef9a9dcef2d27e', ARRAY[
     $o$v_waiting text;$o$,
     $n$v_waiting text;
   v_reason  text;$n$,
     $o$ELSIF v_waiting IS NULL THEN
     UPDATE public.sales_order_share_requests SET status = 'hr', updated_at = now() WHERE id = p_request;$o$,
     $n$ELSIF v_waiting IS NULL THEN
-    -- (20261107233000) Everybody has accepted: the share takes effect now, on every check HR's approval made — or
+    -- (20261107235500) Everybody has accepted: the share takes effect now, on every check HR's approval made — or
     -- nothing changes, this answer included.
     v_reason := public.share_request_take_effect(p_request, v_me, v_name);
     IF v_reason IS NOT NULL THEN
@@ -401,7 +403,7 @@ SELECT pg_temp.made_with('public.member_share_order_answer(uuid, boolean, text)'
       PERFORM public.notify_people(ARRAY[v_owner], 'share', v_r.order_no || ' · accepted — with HR now',
         v_name || ' accepted sharing ' || v_r.order_no || '. HR approves it on Comm Cal.', 'share_request', p_request::text);$o$,
     $n$ELSIF v_waiting IS NULL THEN
-      NULL;  -- (20261107233000) share_request_take_effect told the owner, the colleagues and HR.$n$,
+      NULL;  -- (20261107235500) share_request_take_effect told the owner, the colleagues and HR.$n$,
     -- An approved request is a shared one now.
     $o$WHEN 'approved' THEN 'approved'$o$,
     $n$WHEN 'approved' THEN 'shared'$n$
@@ -419,14 +421,14 @@ SELECT pg_temp.made_with('public.revenue_share_request_decide(uuid, boolean, tex
   ]);
 
 -- ── B. 1. Every bill, flagged and weighed ───────────────────────────────────────────────────────────────────────────
-SELECT pg_temp.made_with('public.member_order_facts_with_old_bills(uuid, date, date)', '95f3dd9275fdeed139a02ebea60fd6a8', ARRAY[
+SELECT pg_temp.made_with('public.member_order_facts_with_old_bills(uuid, date, date)', 'c4daa35e4b387d744a5bef3b8edbc23f', ARRAY[
     $o$no_sales_cost numeric, old_bill boolean)$o$,
     $n$no_sales_cost numeric, old_bill boolean, full_revenue numeric, weight numeric)$n$
   ], p_spans => ARRAY[
     $o$SELECT s.id,x.staff_id,s.order_no$o$,
     $o$LEFT JOIN given g ON g.order_id=s.id;$o$,
     $n$, stored AS (
-  -- (20261107233000) What a standing close or an applied run paid a part at: the multiplier its margin penalty left
+  -- (20261107235500) What a standing close or an applied run paid a part at: the multiplier its margin penalty left
   -- (the engine's PenalisedOrder: staffId, orderId, multiplier), a close's before a run's, the newest first. Read once.
   SELECT DISTINCT ON (e.staff_id,e.order_id) e.staff_id,e.order_id,e.multiplier
   FROM (
@@ -457,20 +459,9 @@ SELECT pg_temp.made_with('public.member_order_facts_with_old_bills(uuid, date, d
   SELECT DISTINCT r.order_no FROM public.comm_order_releases r JOIN scheme c ON c.sub_department_id=r.sub_department_id
  ), bands AS (
   -- The penalty bands, only while the scheme cuts commission by margin (engine.ts penaltyBandFor). Read once.
-  SELECT b.id,b.margin_pct,b.commission_multiplier,b.sort_order,br.code
+  SELECT b.id,b.margin_pct,b.commission_multiplier,b.sort_order,upper(btrim(br.code)) AS code
   FROM public.comm_margin_bands b JOIN public.comm_brands br ON br.id=b.brand_id JOIN scheme c ON c.id=b.scheme_id
   WHERE b.kind='penalty' AND c.enable_margin_penalty
- ), line_brand AS (
-  -- A bill written under no brand answers to the brand its goods lines sell most (marginBase).
-  SELECT DISTINCT ON (z.order_id) z.order_id,z.brand
-  FROM (SELECT l.order_id,btrim(l.brand_code) AS brand,sum(l.line_amount) AS rev,min(l.line_no) AS first_line
-        FROM split s JOIN public.sales_order_lines l ON l.order_id=s.id
-        WHERE nullif(btrim(s.brand_code),'') IS NULL AND nullif(btrim(l.brand_code),'') IS NOT NULL
-         AND EXISTS(SELECT 1 FROM bands)
-         AND EXISTS(SELECT 1 FROM public.comm_item_groups g WHERE g.scheme_id=p_scheme
-          AND upper(btrim(g.item_group))=upper(btrim(l.item_group)) AND g.commissionable)
-        GROUP BY l.order_id,btrim(l.brand_code)) z
-  ORDER BY z.order_id,z.rev DESC,z.first_line,z.brand
  ), held AS (
   SELECT s.id,x.staff_id,s.order_no,s.order_date,s.period_month,s.recognition,
   coalesce(nullif(btrim(s.brand_code),''),'UNCLASSIFIED') AS brand,s.is_cleared,
@@ -483,11 +474,13 @@ SELECT pg_temp.made_with('public.member_order_facts_with_old_bills(uuid, date, d
   s.manual_margin_pct IS NOT NULL AS manual,
   CASE WHEN x.owner THEN s.no_sales_cost-coalesce(g.no_sales_cost,0) ELSE round(s.no_sales_cost*x.part,2) END AS no_sales_cost,
   s.old_bill,  -- (20261107230000) an old bill topped up: commission, never sales
-  -- (20261107233000) The bill's whole revenue, unshared and unweighted; the brand its penalty bands are read for.
+  -- (20261107235500) The bill's whole revenue, unshared and unweighted; the brand its penalty bands are read for —
+  -- ladder's, the one its cost ratios are read for (marginBase's: its own, else its goods lines' most sold; none, every
+  -- brand's).
   s.main AS full_revenue,
-  coalesce(nullif(btrim(s.brand_code),''),lb.brand) AS band_brand
+  nullif(lg.brand,'') AS band_brand
   FROM split s JOIN parts x ON x.order_id=s.id LEFT JOIN given g ON g.order_id=s.id
-  LEFT JOIN line_brand lb ON lb.order_id=s.id
+  LEFT JOIN ladder lg ON lg.id=s.id
  ), weighed AS (
   -- What a part counts at: what it was paid at, else the penalty its margin falls in now (none for a head), else all.
   SELECT h.*,CASE
@@ -505,7 +498,7 @@ SELECT pg_temp.made_with('public.member_order_facts_with_old_bills(uuid, date, d
     WHERE (h.band_brand IS NULL OR bd.code=h.band_brand) AND h.margin_pct<=bd.margin_pct+1e-9
     ORDER BY bd.margin_pct,bd.sort_order,bd.id LIMIT 1) pb ON true
  )
- -- (20261107233000) The part counts as its commission is: a RM 10,000 bill shared half, RM 5,000; cut to x0.5, RM 2,500.
+ -- (20261107235500) The part counts as its commission is: a RM 10,000 bill shared half, RM 5,000; cut to x0.5, RM 2,500.
  SELECT w.id,w.staff_id,w.order_no,w.order_date,w.period_month,w.recognition,w.brand,w.is_cleared,
   round(w.part_revenue*w.weight,2),w.goods_revenue,w.margin_pct,w.kpi_qty,w.manual,w.no_sales_cost,w.old_bill,
   w.full_revenue,w.weight
@@ -516,22 +509,22 @@ REVOKE ALL ON FUNCTION public.member_order_facts_with_old_bills(uuid, date, date
 GRANT EXECUTE ON FUNCTION public.member_order_facts_with_old_bills(uuid, date, date) TO service_role;
 
 COMMENT ON FUNCTION public.member_order_facts_with_old_bills(uuid, date, date) IS
-  $c$One private document-facts calculation for Insight, Arena and recent Income orders. Margin is the REVENUE TEAM margin - cost divided by comm_schemes.revenue_cost_divisor, the same basis the engine pays on - because the company's own margin is not the salesperson's to see. A bill of a month before the portal pays (comm_cutovers) is recognised in its own month as settled. Authorization stays in the public/member entry points. no_sales_cost (2026-10-30): a bill with no sales of its own (margin base RM 0 or less) has no margin, but what its goods cost — the holder's part, once every goods line is costed — counts against the month's margin. old_bill (20261107230000): every bill, the old bills topped up too (sales_order_old_bill) — commission, never sales. The order books list them, flagged commissionOnly; everything else reads member_order_facts, which leaves them out. weight (20261107233000): revenue is each holder's part times what its commission is multiplied by — a stored penalty, else 1 for what a close paid or a release, else the penalty band its margin falls in (no head's), else 1; full_revenue is the bill's whole, unshared and unweighted.$c$;
+  $c$One private document-facts calculation for Insight, Arena and recent Income orders. Margin is the REVENUE TEAM margin - cost divided by comm_schemes.revenue_cost_divisor, the same basis the engine pays on - because the company's own margin is not the salesperson's to see. A bill of a month before the portal pays (comm_cutovers) is recognised in its own month as settled. Authorization stays in the public/member entry points. no_sales_cost (2026-10-30): a bill with no sales of its own (margin base RM 0 or less) has no margin, but what its goods cost — the holder's part, once every goods line is costed — counts against the month's margin. old_bill (20261107230000): every bill, the old bills topped up too (sales_order_old_bill) — commission, never sales. The order books list them, flagged commissionOnly; everything else reads member_order_facts, which leaves them out. weight (20261107235500): revenue is each holder's part times what its commission is multiplied by — a stored penalty, else 1 for what a close paid or a release, else the penalty band its margin falls in (no head's), else 1; full_revenue is the bill's whole, unshared and unweighted.$c$;
 
 -- ── B. 2. The order books ───────────────────────────────────────────────────────────────────────────────────────────
-SELECT pg_temp.made_with('public.member_order_book_for_staff(uuid, uuid, date, date)', 'dfcd7bd64e1a09c4d859ba7a36439d3c', ARRAY[
+SELECT pg_temp.made_with('public.member_order_book_for_staff(uuid, uuid, date, date)', 'fd6297bdaa9b3ab0839613fc1e2ec221', ARRAY[
     $o$|| CASE WHEN f.old_bill THEN jsonb_build_object('commissionOnly',true,'soldBy',nullif(btrim(so.agent_name),'')) ELSE '{}'::jsonb END$o$,
     $n$|| CASE WHEN f.old_bill THEN jsonb_build_object('commissionOnly',true,'soldBy',nullif(btrim(so.agent_name),'')) ELSE '{}'::jsonb END
-   -- (20261107233000) The whole bill's revenue; and what this part counts at, when its commission is cut.
+   -- (20261107235500) The whole bill's revenue; and what this part counts at, when its commission is cut.
    || jsonb_build_object('fullRevenue',f.full_revenue)
    || CASE WHEN f.weight < 1 THEN jsonb_build_object('weight',f.weight) ELSE '{}'::jsonb END$n$
   ]);
 
-SELECT pg_temp.made_with('public.member_principal_department_order_book(uuid, text, text)', '33e4dcdcf33d2b22a18e99e72b46b0e3', ARRAY[
+SELECT pg_temp.made_with('public.member_principal_department_order_book(uuid, text, text)', 'c56232677b0541b8aec7a564d4a33cc1', ARRAY[
     $o$bool_or(f.old_bill) AS old_bill
   FROM public.member_order_facts_with_old_bills(v_scheme,lower(v_range),upper(v_range)) f$o$,
     $n$bool_or(f.old_bill) AS old_bill,
-   -- (20261107233000) The whole bill's revenue; what its parts count at together — the one weight they share, else
+   -- (20261107235500) The whole bill's revenue; what its parts count at together — the one weight they share, else
    -- what they come to over the whole.
    min(f.full_revenue) AS full_revenue,
    CASE WHEN min(f.weight) = max(f.weight) THEN min(f.weight)
@@ -540,23 +533,23 @@ SELECT pg_temp.made_with('public.member_principal_department_order_book(uuid, te
   FROM public.member_order_facts_with_old_bills(v_scheme,lower(v_range),upper(v_range)) f$n$,
     $o$|| CASE WHEN f.old_bill THEN jsonb_build_object('commissionOnly',true,'soldBy',nullif(btrim(so.agent_name),'')) ELSE '{}'::jsonb END$o$,
     $n$|| CASE WHEN f.old_bill THEN jsonb_build_object('commissionOnly',true,'soldBy',nullif(btrim(so.agent_name),'')) ELSE '{}'::jsonb END
-   -- (20261107233000) The whole bill's revenue; and what it counts at, when its parts' commission is cut.
+   -- (20261107235500) The whole bill's revenue; and what it counts at, when its parts' commission is cut.
    || jsonb_build_object('fullRevenue',f.full_revenue)
    || CASE WHEN f.weight < 1 THEN jsonb_build_object('weight',f.weight) ELSE '{}'::jsonb END$n$
   ]);
 
 -- ── B. 3. The Arena's fair boards: each holder's part, counted as its commission is ────────────────────────────────
-SELECT pg_temp.made_with('public.member_arena_history_for_staff(uuid, uuid)', '38f1eebe1f89c44dfe5e8fe097b946e0', ARRAY[
+SELECT pg_temp.made_with('public.member_arena_history_for_staff(uuid, uuid)', '46c35f67afd8c94d3bcdb6dd379bded1', ARRAY[
     $o$-- (20261107230000) The feed window: a bill dated before it, in a month from it on, is an old bill topped up.
   v_floor date := (SELECT f.min_order_date FROM public.erp_feed_settings f WHERE f.sub_department_id = p_sub_department);$o$,
-    $n$-- (20261107233000) The bills are member_order_facts' — the old bills topped up out of them already.$n$,
+    $n$-- (20261107235500) The bills are member_order_facts' — the old bills topped up out of them already.$n$,
     $o$SELECT count(*) AS orders,coalesce(sum(o.revenue),0) AS sales$o$,
     $n$SELECT count(DISTINCT o.id) AS orders,coalesce(sum(o.revenue),0) AS sales$n$
   ], p_spans => ARRAY[
     $o$), sources AS ($o$,
     $o$WHERE b.has_goods OR k.order_id IS NOT NULL$o$,
     $n$), order_facts AS (
-    -- (20261107233000) Each holder's part of each bill, counted as its commission is — member_order_facts' reading:
+    -- (20261107235500) Each holder's part of each bill, counted as its commission is — member_order_facts' reading:
     -- every bill up to this month, its deposit, its KPI items off, a shared bill in its holders' parts, a part a margin
     -- penalty cuts by as much — for a holder on the roster; its fair is the bill's.
     SELECT f.order_id AS id,f.staff_id,so.fair_event_id,f.cleared,f.revenue
@@ -565,10 +558,10 @@ SELECT pg_temp.made_with('public.member_arena_history_for_staff(uuid, uuid)', '3
     WHERE f.staff_id IN (SELECT id FROM roster)$n$
   ]);
 
-SELECT pg_temp.made_with('public.member_arena_booth_history_for_staff(uuid, uuid)', '43ddde9e982853d0e6d02ed1d70359de', ARRAY[
+SELECT pg_temp.made_with('public.member_arena_booth_history_for_staff(uuid, uuid)', '1eb40a99a7c9cc10c133f6e52f64abb8', ARRAY[
     $o$-- (20261107230000) The feed window: a bill dated before it, in a month from it on, is an old bill topped up.
   v_floor date := (SELECT f.min_order_date FROM public.erp_feed_settings f WHERE f.sub_department_id = p_sub_department);$o$,
-    $n$-- (20261107233000) The bills are member_order_facts' — the old bills topped up out of them already.$n$,
+    $n$-- (20261107235500) The bills are member_order_facts' — the old bills topped up out of them already.$n$,
     $o$FROM fairs f JOIN order_facts o ON o.fair_event_id=f.id
     WHERE coalesce(o.booth_pick,o.own_brand) IS NOT NULL$o$,
     $n$FROM fairs f JOIN order_facts o ON o.fair_event_id=f.id
@@ -581,7 +574,7 @@ SELECT pg_temp.made_with('public.member_arena_booth_history_for_staff(uuid, uuid
     $o$), sources AS ($o$,
     $o$WHERE b.has_goods OR k.order_id IS NOT NULL$o$,
     $n$), order_facts AS (
-    -- (20261107233000) Each holder's part of each bill, counted as its commission is — member_order_facts' reading:
+    -- (20261107235500) Each holder's part of each bill, counted as its commission is — member_order_facts' reading:
     -- every bill up to this month, its deposit, its KPI items off, a shared bill in its holders' parts, a part a margin
     -- penalty cuts by as much — for a holder on the roster, with the bill's fair, the booth it was picked at and its own
     -- brand. owner: the salesperson it is written on — a week's booth is guessed from the bills a seller wrote.
@@ -600,16 +593,16 @@ SELECT pg_temp.made_with('public.member_arena_booth_history_for_staff(uuid, uuid
     $o$), held_parts AS ($o$,
     $o$LEFT JOIN held_given g ON g.order_id=o.id$o$,
     $n$), order_parts AS (
-    -- (20261107233000) Each holder's part already, counted as its commission is (member_order_facts).
+    -- (20261107235500) Each holder's part already, counted as its commission is (member_order_facts).
     SELECT o.id,o.staff_id,o.fair_event_id,o.booth_pick,o.own_brand,o.cleared,o.revenue
     FROM order_facts o WHERE o.fair_event_id IS NOT NULL$n$
   ]);
 
 COMMENT ON FUNCTION public.member_arena_history_for_staff(uuid, uuid) IS
-  $c$Completed-fair results for one Revenue sub-department, from comm_venue_events dates and sales_orders.fair_event_id. Same roster, committed sources, deposit gate and commissionable lines as member_arena_for_staff. Provisional: a sale is not attendance, and unplaced bills are reported rather than spread. Since 20261107233000 its bills are member_order_facts': each holder's part, counted as its commission is (a share's part; a margin penalty's cut); unassignedOrders counts a bill once.$c$;
+  $c$Completed-fair results for one Revenue sub-department, from comm_venue_events dates and sales_orders.fair_event_id. Same roster, committed sources, deposit gate and commissionable lines as member_arena_for_staff. Provisional: a sale is not attendance, and unplaced bills are reported rather than spread. Since 20261107235500 its bills are member_order_facts': each holder's part, counted as its commission is (a share's part; a margin penalty's cut); unassignedOrders counts a bill once.$c$;
 
 COMMENT ON FUNCTION public.member_arena_booth_history_for_staff(uuid, uuid) IS
-  $c$The Arena's Fair results booth by booth (2026-10-03): one board per (completed fair, booth brand) holding every bill written there — the booth it was picked at, else its seller's booth that week, else its own brand, else the fair's no-brand board. A seller is on every board they wrote at; ONE a week scores (scoring = true): the brand they picked for the week (member_arena_brand_weeks.picks), else the brand they opened the most bills for (confirmed = false; auto-located once locked), at the fair with the most bills for it. offWeekOrders/Sales = what is on a board without scoring; unassignedOrders/Sales = bills on no fair. Since 20261107233000 its bills are member_order_facts': each holder's part, counted as its commission is (a share's part; a margin penalty's cut); a week's booth is still guessed from the bills a seller wrote.$c$;
+  $c$The Arena's Fair results booth by booth (2026-10-03): one board per (completed fair, booth brand) holding every bill written there — the booth it was picked at, else its seller's booth that week, else its own brand, else the fair's no-brand board. A seller is on every board they wrote at; ONE a week scores (scoring = true): the brand they picked for the week (member_arena_brand_weeks.picks), else the brand they opened the most bills for (confirmed = false; auto-located once locked), at the fair with the most bills for it. offWeekOrders/Sales = what is on a board without scoring; unassignedOrders/Sales = bills on no fair. Since 20261107235500 its bills are member_order_facts': each holder's part, counted as its commission is (a share's part; a margin penalty's cut); a week's booth is still guessed from the bills a seller wrote.$c$;
 
 -- What this migration made is what it was written to make — every mismatch in one refusal.
 DO $$
@@ -619,18 +612,18 @@ DECLARE
   v_bad text := '';
 BEGIN
   FOR r IN SELECT * FROM (VALUES
-      ('public.share_request_take_effect(uuid, uuid, text)', '06ae489079db169c81a870435a39aecc'),
-      ('public.member_share_order_answer(uuid, boolean, text)', 'fb798d142dec22cebf868bdb1d74435d'),
+      ('public.share_request_take_effect(uuid, uuid, text)', '7fa694f7b7da2320831ef7fc4e574e49'),
+      ('public.member_share_order_answer(uuid, boolean, text)', '8b15647e2780288ad8ef9a9dcef2d27e'),
       ('public.member_share_order_cancel(uuid)', 'defbb352819379ed35ff1b6f29c7b814'),
       ('public.revenue_share_request_decide(uuid, boolean, text)', 'b01796bdaa1d718a14c3316db25e6938'),
-      ('public.notification_topic_may(uuid, text)', '0ff1a9b15be23a1b8e2a60f4ac65b842'),
+      ('public.notification_topic_may(uuid, text)', 'c55eeb6d4e2794570014a25f1206479b'),
       ('public.notification_topics_sync(text[])', '507c5b4dd216e1b6aba7e7dc682cf72f'),
-      ('public.member_order_facts_with_old_bills(uuid, date, date)', '95f3dd9275fdeed139a02ebea60fd6a8'),
+      ('public.member_order_facts_with_old_bills(uuid, date, date)', 'c4daa35e4b387d744a5bef3b8edbc23f'),
       ('public.member_order_facts(uuid, date, date)', '987d328c0ec4087e4ce6f3e58346a382'),
-      ('public.member_order_book_for_staff(uuid, uuid, date, date)', 'dfcd7bd64e1a09c4d859ba7a36439d3c'),
-      ('public.member_principal_department_order_book(uuid, text, text)', '33e4dcdcf33d2b22a18e99e72b46b0e3'),
-      ('public.member_arena_history_for_staff(uuid, uuid)', '38f1eebe1f89c44dfe5e8fe097b946e0'),
-      ('public.member_arena_booth_history_for_staff(uuid, uuid)', '43ddde9e982853d0e6d02ed1d70359de')
+      ('public.member_order_book_for_staff(uuid, uuid, date, date)', 'fd6297bdaa9b3ab0839613fc1e2ec221'),
+      ('public.member_principal_department_order_book(uuid, text, text)', 'c56232677b0541b8aec7a564d4a33cc1'),
+      ('public.member_arena_history_for_staff(uuid, uuid)', '46c35f67afd8c94d3bcdb6dd379bded1'),
+      ('public.member_arena_booth_history_for_staff(uuid, uuid)', '1eb40a99a7c9cc10c133f6e52f64abb8')
     ) AS t(sig, after_md5)
   LOOP
     SELECT md5(replace(prosrc, E'\r', '')) INTO v_md5 FROM pg_proc WHERE oid = to_regprocedure(r.sig);

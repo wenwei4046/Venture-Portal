@@ -1,4 +1,4 @@
-// Local PostgreSQL regression for 20261107233000 — a share takes effect when the colleague accepts, and the app's
+// Local PostgreSQL regression for 20261107235500 — a share takes effect when the colleague accepts, and the app's
 // sales are what the commission is (2026-11-07; the user: "Sally 那边 accept 了之后，这张单就正常了，不需要 HR
 // approval，所以它的 trail 只有两个" · "原本 1 万块的单分 50% 过去，他就只有 5,000 块的 Sales Record" · "drop 50%，原本 1 万块
 // 的 total sales order 也只是算 5,000 块的 sales").
@@ -21,7 +21,7 @@ import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
 
 const db = new PGlite()
-const MIGRATION = new URL('../../supabase/migrations/20261107233000_shares_take_effect_weighted_sales.sql', import.meta.url)
+const MIGRATION = new URL('../../supabase/migrations/20261107235500_shares_take_effect_weighted_sales.sql', import.meta.url)
 const q = async (sql, params = []) => (await db.query(sql, params)).rows
 const one = async (sql, params = []) => Object.values((await q(sql, params))[0])[0]
 const id = v => `00000000-0000-4000-8000-${String(v).padStart(12, '0')}`
@@ -47,12 +47,12 @@ const HR = id(301), HR_NO_EDIT = id(302), HR_UNSUBSCRIBED = id(303)
 // Bills.
 const B1 = id(401), B2 = id(402), B3 = id(403), B4 = id(404), B5 = id(405), OLD1 = id(406)
 const W1 = id(501), W2 = id(502), W3 = id(503), W3B = id(504), W3C = id(505), W3D = id(506), W4 = id(507), W5 = id(508),
-  W6 = id(509), W7 = id(510), W8 = id(511), W9 = id(512), W10 = id(513)
+  W6 = id(509), W7 = id(510), W8 = id(511), W9 = id(512), W10 = id(513), W11 = id(514)
 const REQ_LEGACY_OK = id(601), REQ_LEGACY_BAD = id(602)
 const PRODUCTION = {
   sales_order_old_bill: 'b041e9f29254d99d6b13fbd269b3d3fb',
   sales_order_parts: '5232a846101d466c329cf34148db4d48',
-  member_order_facts_with_old_bills: 'a44fa5e5eb5934a60a8927a886ab69cf',
+  member_order_facts_with_old_bills: '3bd13b6f3d7d2b9a8e87d97850d2df4c',
   member_order_facts: '987d328c0ec4087e4ce6f3e58346a382',
   member_order_book_for_staff: 'dda01c1653e5bccfc6191905c5f4e5bf',
   member_principal_department_order_book: '06407bc90bc5e9ca1a888bd19a9fc730',
@@ -144,6 +144,7 @@ await db.exec(`
   CREATE TABLE comm_order_releases(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), order_no text, sub_department_id uuid, period_month date);
   CREATE TABLE comm_item_groups(scheme_id uuid, item_group text, commissionable boolean);
   CREATE TABLE comm_cost_ratios(scheme_id uuid, product_code text, ratio numeric);
+  CREATE TABLE comm_cost_ratio_brands(scheme_id uuid, erp_product_id text, product_code text, brand_code text, ratio numeric);
   CREATE TABLE comm_venue_events(id uuid PRIMARY KEY, venue_key text, start_date date, end_date date, period_month date,
     organiser_id uuid, erp_organiser_text text);
   CREATE TABLE comm_venues(venue_key text PRIMARY KEY, display_name text);
@@ -234,7 +235,11 @@ await db.exec(`
     ('${W7}', '${BATCH}', '${MONTH}', 'HC-SO-2611-110', '${MONTH}', '${WEI}', 'Wei Pin', 10000, 10000, NULL, NULL),
     ('${W8}', '${BATCH}', '${MONTH}', 'HC-SO-2611-111', '${MONTH}', '${WEI}', 'Wei Pin', 10000, 10000, 'ZANOTTI', NULL),
     ('${W9}', '${BATCH}', '${MONTH}', 'HC-SO-2611-112', '${MONTH}', '${WEI}', 'Wei Pin', 10000, 10000, 'ZANOTTI', '${FAIR_EVENT}'),
-    ('${W10}', '${BATCH}', '${MONTH}', 'HC-SO-2611-113', '${MONTH}', '${SHELDON}', 'Sheldon', 10000, 1000, 'ZANOTTI', '${FAIR_EVENT}');
+    ('${W10}', '${BATCH}', '${MONTH}', 'HC-SO-2611-113', '${MONTH}', '${SHELDON}', 'Sheldon', 10000, 1000, 'ZANOTTI', '${FAIR_EVENT}'),
+    ('${W11}', '${BATCH}', '${MONTH}', 'HC-SO-2611-114', '${MONTH}', '${WEI}', 'Wei Pin', 10000, 10000, 'ZANOTTI', NULL);
+  -- 20261107233000's ratio by brand: Z-13 sold on a ZANOTTI bill divides its cost by 0.8, not 0.7.
+  INSERT INTO comm_cost_ratio_brands(scheme_id, erp_product_id, product_code, brand_code, ratio)
+    VALUES ('${SCHEME}', 'P-13', 'Z-13', 'ZANOTTI', 0.8);
   INSERT INTO sales_order_lines(order_id, line_no, item_group, product_code, line_amount, cost_amount, brand_code) VALUES
     ('${B1}', 1, 'SOFA', 'S-1', 10000, 5000, NULL), ('${B2}', 1, 'SOFA', 'S-2', 8000, 4000, NULL),
     ('${B3}', 1, 'SOFA', 'S-3', 6000, 3000, NULL), ('${B4}', 1, 'SOFA', 'S-4', 5000, 2500, NULL),
@@ -246,7 +251,8 @@ await db.exec(`
     ('${W6}', 1, 'SOFA', 'A-1', 6000, 3108, 'AKEMI'), ('${W6}', 2, 'SOFA', 'Z-9', 4000, 2072, 'ZANOTTI'),
     ('${W6}', 3, 'DELIVERY', 'DLV', 900, NULL, 'ZANOTTI'),
     ('${W7}', 1, 'SOFA', 'N-1', 10000, 5180, NULL), ('${W8}', 1, 'SOFA', 'Z-10', 10000, 5600, NULL),
-    ('${W9}', 1, 'SOFA', 'Z-11', 10000, 5180, NULL), ('${W10}', 1, 'SOFA', 'Z-12', 10000, 5000, NULL);
+    ('${W9}', 1, 'SOFA', 'Z-11', 10000, 5180, NULL), ('${W10}', 1, 'SOFA', 'Z-12', 10000, 5000, NULL),
+    ('${W11}', 1, 'SOFA', 'Z-13', 10000, 5180, NULL);
 
   -- What a close or a run left: WEI's standing close stored x0.25 on W3 and paid W5; a reopened one stored x0.2 on W3D;
   -- an applied run x0.1 on W3B; a computed one x0.1 on W3C. W4 was released.
@@ -428,6 +434,9 @@ check(w['HC-SO-2611-108'], [10000, 10000, 1], 'paid by a standing close with not
 check(w['HC-SO-2611-109'], [5000, 10000, 0.5], 'no brand on the bill: its goods lines sell AKEMI most — AKEMI’s 27% x0.5')
 check(w['HC-SO-2611-110'], [4000, 10000, 0.4], 'no brand anywhere: every brand’s bands — the lowest it falls under, 26.5% x0.4')
 check(w['HC-SO-2611-111'], [0, 10000, 0], 'at 20%: x0 — nothing counted')
+check(w['HC-SO-2611-114'], [10000, 10000, 1], 'its SKU’s ratio for ZANOTTI (20261107233000, kept as it is) puts it at 35.25%: no cut')
+check(await q(`SELECT margin_pct::float8 AS m FROM member_order_facts_with_old_bills($1, NULL, NULL) WHERE order_no = 'HC-SO-2611-114'`, [SCHEME]),
+  [{ m: 0.3525 }], '(RM 5,180 ÷ 0.8 against RM 10,000)')
 check([w['HC-SO-2611-112'], w['HC-SO-2611-112 KRIS']], [[2000, 10000, 0.4], [5000, 10000, 1]],
   'shared with a head: WEI’s half cut to RM 2,000, KRIS’s RM 5,000 whole')
 check(await q(`SELECT revenue::float8 AS revenue FROM member_order_facts($1, NULL, NULL) WHERE order_no = 'HC-SO-2611-101'`, [SCHEME]),
