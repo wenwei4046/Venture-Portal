@@ -1,0 +1,72 @@
+/*
+ * A claim's invoice, full screen, before the claim is sent (InvoiceViewer.tsx, 2026-11-08). Portalled to the page's
+ * body above the request sheet — the sheet's panel moves by transform, so nothing fixed inside it could cover the
+ * screen — it carries the app's tokens itself (data-revenue-app) and its own type dial: .92 on a phone, 1 on a
+ * computer, as the app's screen (shell.module.css).
+ */
+.overlay {
+  --rv-type: .92;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--rv-sand);
+  color: var(--rv-ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: calc(16px * var(--rv-type));
+  line-height: normal;
+  -webkit-font-smoothing: antialiased;
+}
+@media (min-width: 1024px) {
+  .overlay { --rv-type: 1; }
+}
+.head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  height: calc(56px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) 14px 0 4px;
+  background: var(--rv-white);
+  border-bottom: 1px solid var(--rv-line);
+}
+.close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
+  background: none;
+  color: var(--rv-ink);
+  cursor: pointer;
+}
+.titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.title { font-size: calc(15px * var(--rv-type)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { color: var(--rv-sub); font-size: calc(12px * var(--rv-type)); font-variant-numeric: tabular-nums; }
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y pinch-zoom;
+  padding: 16px 14px calc(28px + var(--safe-bottom));
+}
+/* A photo, or one page of a PDF: white on the sand, as Me's viewer draws a document. */
+.sheet {
+  max-width: 900px;
+  margin: 0 auto 14px;
+  background: var(--rv-white);
+  border-radius: 4px;
+  box-shadow: 0 2px 10px var(--rv-ink-14);
+  overflow: hidden;
+}
+.photo { display: block; width: 100%; height: auto; }
+.page { max-width: none; }
+.page canvas { display: block; }
+.note { margin: 40px 16px 0; text-align: center; color: var(--rv-sub); font-size: calc(13px * var(--rv-type)); line-height: 1.5; }
