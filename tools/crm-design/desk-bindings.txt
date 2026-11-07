@@ -281,6 +281,7 @@ kReports
 kSection
 kTeam
 kTopMove
+kUpNext
 kWorkspace
 leadsByAd
 listCards
@@ -475,6 +476,7 @@ toggleMenu
 toggleSb
 undoSend
 unpinMsg
+upNextProps
 waAdd
 waAuto
 waAutoRows

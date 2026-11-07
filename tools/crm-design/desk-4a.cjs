@@ -267,7 +267,8 @@ module.exports = function desk4a(body) {
     // performance tab draws Ads Performance's body (kAdsPerf, vm/adsperf.ts), so the block is the 4a body alone.
     const head = body.lastIndexOf("{!!(v.kInsight) && (<>", a), close = body.indexOf("{!!(v.kCh) && (<>", b);
     if (head < 0 || close < b) throw new Error("desk-4a: insight block");
-    body = body.slice(0, head) + "{!!(v.kInsight) && (<DeskInsight4a v={v} />)}\n              " + body.slice(close);
+    // Insight › Up next (docs/design_handoff_crm_up_next): its own component, a third tab beside the two above.
+    body = body.slice(0, head) + "{!!(v.kInsight) && (<DeskInsight4a v={v} />)}\n              {!!(v.kUpNext && v.upNextProps) && (<DeskUpNext4a {...v.upNextProps!} />)}\n              " + body.slice(close);
   }
   // Frame 10 · Settings: a General tab first, the frame's two-column groups (Desk4a.tsx › DeskSettings4a); Cold lead
   // templates and Notifications, production's, stay as the head's other two tabs.

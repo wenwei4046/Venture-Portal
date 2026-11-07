@@ -11,7 +11,7 @@ import type { Icon4a } from "../../shared/icons4a";
 export interface F4Item { label: string; icon: Icon4a; on: boolean; pick: () => void; badge: string }
 export interface F4Tab { label: string; on: boolean; pick: () => void }
 export interface F4Menu { open: boolean; close: () => void; items: { tag: string; label: string; bg: string; fg: string; pick: () => void }[] }
-export interface F4Head { title: string; tabs: F4Tab[]; subTabs?: F4Tab[]; sub: string; cta: { label: string; icon: Icon4a | null; act: () => void; menu?: F4Menu } | null;
+export interface F4Head { title: string; tabs: F4Tab[]; subTabs?: F4Tab[]; /** Up next: the tab bar holds the ad dropdown (DeskUpNext). */ subSlot?: boolean; sub: string; cta: { label: string; icon: Icon4a | null; act: () => void; menu?: F4Menu } | null;
   /** An outline button left of the primary one (Showrooms' Save as draft). */
   alt?: { label: string; act: () => void } | null }
 
@@ -67,7 +67,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
     account: { ini: fr.me.ini, name: fr.me.name, sub: fr.me.sub },
     greet: app.greeting, first: ctx.me.role === "boss" ? "Principal" : ctx.me.name.trim().split(/\s+/)[0] ?? "",
     subName: app.subName, openSubDept: app.openSubDept, date: topDate(ctx.now),
-    head: { title: fr.pageTitle, tabs: h?.tabs ?? [], subTabs: h?.subTabs, sub: h?.sub ?? "", cta: h?.cta ?? null, alt: h?.alt ?? null } as F4Head,
+    head: { title: fr.pageTitle, tabs: h?.tabs ?? [], subTabs: h?.subTabs, subSlot: h?.subSlot, sub: h?.sub ?? "", cta: h?.cta ?? null, alt: h?.alt ?? null } as F4Head,
     alertsN: fr.alertsN, openAlerts: fr.openAlerts,
     // Inbox runs its columns edge to edge under a rule (frame 02); every other page has the 36 px gutter.
     // Calendar's Book a visit (frame 04): pick the customer, then the booking pane every chat's Appointment opens.
@@ -89,7 +89,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
       return { open: ui.bookPick, close: () => ctx.patch({ bookPick: false, bookQ: "" }), q: ui.bookQ, setQ: (e: { target: { value: string } }) => ctx.patch({ bookQ: e.target.value }),
         rows: rows.map(c => ({ id: c.id, name: c.name, sub: [c.phone, c.ad].filter(Boolean).join(" · "), pick: () => ctx.patch({ bookPick: false, bookQ: "", pane: "overlay", kind: "book", chat: c.id, book: null }) })) };
     })(),
-    pad: tab === "inbox" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "calendar" ? "0 24px 16px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : "24px", bodyTop: ["inbox", "people", "calendar", "showrooms", "forms"].includes(tab) ? "1px solid var(--crm-rule)" : "0",
+    pad: tab === "insight" && ui.insTab === "upnext" ? "24px 36px 32px" : tab === "inbox" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "calendar" ? "0 24px 16px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : tab === "insight" && ui.insTab === "upnext" ? "32px" : "24px", bodyTop: ["inbox", "people", "calendar", "showrooms", "forms"].includes(tab) ? "1px solid var(--crm-rule)" : "0",
   };
 }
 export type Frame4a = ReturnType<typeof frame4aVM>;
@@ -121,6 +121,7 @@ interface HeadBits {
   insightPdf: () => void;
   insightSub: string;
   insTabs: F4Tab[];
+  kUpNext?: boolean;
   ap4: { tabs: { label: string; on: boolean; custom: boolean; pick: () => void }[] };
   addAd?: { canAdd: boolean; show: () => void };
   reports?: { cats: { label: string; on: boolean; pick: () => void }[]; canCsv: boolean; csv: () => void };
@@ -132,7 +133,7 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
   const n = (k: number, one: string, many: string) => `${k.toLocaleString("en-MY")} ${k === 1 ? one : many}`;
   return {
     // v2 frames 01 / 01b: Team performance | Ads performance under the title; Export PDF.
-    insight: { tabs: v.periodOpts, subTabs: v.insTabs, sub: v.insightSub, cta: { label: "Export PDF", icon: "file-text", act: v.insightPdf } },
+    insight: v.kUpNext ? { tabs: [], subTabs: v.insTabs, subSlot: true, sub: "", cta: null } : { tabs: v.periodOpts, subTabs: v.insTabs, sub: v.insightSub, cta: { label: "Export PDF", icon: "file-text", act: v.insightPdf } },
     // v2 frames 02 / 03 (the owner: "做手动新增客户"): New chat and Add customer — one sheet, a customer added by hand.
     inbox: { tabs: [], sub: "", cta: ctx.data.can.editOwn ? { label: "New chat", icon: "plus", act: () => ctx.patch({ addCust: "chat" }) } : null },
     people: { tabs: [], sub: n(v.ppCount, "customer", "customers"), cta: ctx.data.can.editOwn ? { label: "Add customer", icon: "user-plus", act: () => ctx.patch({ addCust: "contact" }) } : null },

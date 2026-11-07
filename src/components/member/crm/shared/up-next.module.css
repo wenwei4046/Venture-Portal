@@ -1,0 +1,4 @@
+/* The prototype's two style-hover rules (CRM Up Next v3.dc.html), its only motion. !important: the desk root reverts every element. */
+.menuRow:hover { background: var(--crm-hover) !important; }
+.give { background: var(--crm-rust) !important; }
+.give:hover { background: var(--crm-rust-press) !important; }

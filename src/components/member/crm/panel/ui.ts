@@ -114,6 +114,8 @@ export interface PanelUi {
   ftsShut: Record<string, boolean>;
   /** Insight's Team performance | Ads performance switch (v3 T01): true = Ads performance, drawn on Insight. */
   ovAds: boolean;
+  /** Insight's Up next side (docs/design_handoff_crm_up_next). */
+  ovUp?: boolean;
   /** Assignment › Active: switches not saved yet (id → locked), null = as saved. */
   actDraft: Record<string, boolean> | null;
   // Calendar

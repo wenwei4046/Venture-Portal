@@ -7,6 +7,7 @@
 import { Fragment } from "react";
 import H from "../crm.module.css";
 import { PickEditor } from "../shared/pick-editor";
+import { PhoneUpNext } from "../shared/PhoneUpNext";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
@@ -633,6 +634,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
         </div>
       </>)}
     </>)}
+    {!!(v.show.up && v.upNext) && (<PhoneUpNext head={<Phone4aTeamHead h={v.th} />} {...v.upNext!} />)}
     {!!(v.show.ad) && (<>
       {!!(v.ad.onAds) && (<>
         <Phone4aAdsPerf p={v.adp} head={v.ad.inIns ? (<Phone4aTeamHead h={v.th} />) : (<h1 style={{ flex: "none", margin: "0", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(28.26px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.02em" }}>Ads Performance</h1>)} />

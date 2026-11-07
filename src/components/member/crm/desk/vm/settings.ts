@@ -63,7 +63,7 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   const leaveOf: Record<string, CrmLeave[]> = {};
   (data.leaves ?? []).filter(l => l.to >= today).forEach(l => { (leaveOf[l.staffId] ??= []).push(l); });
   const actVM = { ...actBase, leads: actLeads, leave: { can: !!data.can.manage, today, of: leaveOf,
-    save: (l: { id: string | null; staffId: string; from: string; to: string; note: string }) => act.saveLeave(l).then(okd => { if (okd) patch({ toast: "Saved · Leave" }); return okd; }),
+    save: (l: { id: string | null; staffId: string; fromAt: string; toAt: string; reason: CrmLeave["reason"]; note: string }) => act.saveLeave(l).then(okd => { if (okd) patch({ toast: "Saved · Leave" }); return okd; }),
     remove: (id: string) => act.deleteLeave(id).then(okd => { if (okd) patch({ toast: "Leave removed" }); return okd; }) } };
   const mwtSave = () => { if (!dirty) return; const changed = Object.keys(on).filter(id => !!on[id] !== !!saved[id]);
     void Promise.all(changed.map(id => act.setFullTime(id, !!on[id]))).then(rs => { if (rs.every(Boolean)) patch({ mwt: null, mwtSaved: true, toast: "Saved · Member work type" }); }); };

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc><helmet data-dc-atomics><meta name="design_doc_mode" content="canvas"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600&display=swap" rel="stylesheet"><style>body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif}a{color:#BD4A19}a:hover{color:#963A14}</style></helmet>
+<div style="display:flex;gap:40px;align-items:flex-start;padding:40px 44px">
+<div style="width:1440px;flex:none;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.08)">
+<div style="width:1440px;height:900px;position:relative;overflow:hidden;background:#fff;font-family:Inter, sans-serif;color:#422315;-webkit-font-smoothing:antialiased">
+  <aside style="position:absolute;left:0;top:0;bottom:0;width:68px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:2px;padding:22px 12px 18px;background:#422315">
+    <div style="width:30px;height:30px;border-radius:7px;display:grid;place-items:center;font:600 14px 'Inter Tight', Inter, sans-serif;background:#EE5E08;color:#fff;margin-bottom:20px">H</div>
+    <sc-for list="{{ revNav }}" as="n" hint-placeholder-count="7"><span style="width:44px;height:38px;border-radius:7px;display:grid;place-items:center;background:{{ n.bg }};color:{{ n.fg }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg></span></sc-for>
+    <span style="margin-top:auto;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font:500 12px 'Inter Tight', Inter, sans-serif;background:#FFF8F1;color:#422315">PR</span>
+  </aside>
+  <aside style="position:absolute;left:68px;top:0;bottom:0;width:237px;box-sizing:border-box;display:flex;flex-direction:column;gap:1px;padding:24px 12px 18px;background:#FBF4EC;border-right:1px solid #F0E2D4">
+    <div style="display:flex;align-items:center;padding:0 10px 18px"><span style="flex:1;font:500 22px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.01em">CRM</span></div>
+    <sc-for list="{{ crmNav }}" as="g" hint-placeholder-count="5"><div style="display:flex;flex-direction:column;gap:1px"><sc-if value="{{ g.head }}"><div style="padding:20px 10px 6px;font:500 10px Inter, sans-serif;letter-spacing:0.14em;color:#A8968B">{{ g.head }}</div></sc-if><sc-for list="{{ g.items }}" as="i"><div style="display:flex;align-items:center;gap:11px;height:36px;padding:0 10px;border-radius:7px;position:relative;font-size:14px;font-weight:{{ i.w }};background:{{ i.bg }};color:{{ i.fg }}"><span style="position:absolute;left:-12px;top:9px;bottom:9px;width:2px;background:{{ i.bar }}"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ i.d }}"></path></svg><span>{{ i.label }}</span><sc-if value="{{ i.badge }}"><span style="margin-left:auto;min-width:20px;height:18px;padding:0 6px;box-sizing:border-box;border-radius:9px;display:grid;place-items:center;font:600 10px 'Inter Tight', Inter, sans-serif;background:#BD4A19;color:#fff">{{ i.badge }}</span></sc-if></div></sc-for></div></sc-for>
+    <div style="margin-top:auto;display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;font-size:13px;color:#5A4034"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>Back to Revenue app</div>
+  </aside>
+  <header style="position:absolute;left:305px;right:0;top:0;height:56px;box-sizing:border-box;display:flex;align-items:center;padding:0 36px;border-bottom:1px solid #EEE8E3"><div style="font-size:14px;color:#7A6255">Good evening, <span style="font-weight:500;color:#422315">Principal</span></div><div style="margin-left:auto;font-size:13px;color:#7A6255">Fri, 6 Nov 2026</div></header>
+  <div style="position:absolute;left:305px;top:56px;right:0;bottom:0;display:flex;flex-direction:column;font-size:14px">
+    <div style="flex:none;padding:26px 36px 12px;font:500 30px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.025em">Insight</div>
+    <div style="flex:none;display:flex;align-items:center;gap:26px;padding:0 36px;border-bottom:1px solid #EEE8E3;font:500 13px Inter, sans-serif">
+      <span style="padding:10px 0;color:#A8968B">Team performance</span><span style="padding:10px 0;color:#A8968B">Ads performance</span><span style="padding:10px 0;margin-bottom:-1px;border-bottom:2px solid #BD4A19">Up next</span>
+      <div onMouseEnter="{{ d.tipOn }}" onMouseLeave="{{ d.tipOff }}" style="position:relative;z-index:6;margin-left:auto;margin-bottom:6px"><span onClick="{{ d.toggleAd }}" style="height:34px;padding:0 12px;box-sizing:border-box;border-radius:7px;border:1px solid #E2D8D0;display:flex;align-items:center;gap:8px;font:500 13px Inter, sans-serif;white-space:nowrap;cursor:pointer"><span style="font-weight:400;color:#A8968B">Ad</span>{{ d.adName }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span><sc-if value="{{ d.tipShow }}"><span style="position:absolute;right:0;top:calc(100% + 6px);z-index:6;width:280px;padding:10px 12px;border-radius:10px;background:#422315;color:#fff;font-size:12.5px;line-height:1.5;font-weight:400;text-wrap:pretty;box-shadow:0 10px 30px rgba(42,22,12,.25)">{{ d.splitLine }}</span></sc-if><sc-if value="{{ d.adOpen }}"><div style="position:absolute;top:calc(100% + 6px);right:0;z-index:7;width:280px;padding:6px;box-sizing:border-box;background:#fff;border-radius:10px;box-shadow:0 14px 36px rgba(42,22,12,.18);display:flex;flex-direction:column"><sc-for list="{{ d.ads }}" as="a" hint-placeholder-count="5"><div onClick="{{ a.pick }}" style="display:flex;align-items:center;gap:10px;height:38px;padding:0 10px;border-radius:7px;font-size:13px;background:{{ a.rowBg }};cursor:pointer" style-hover="background:#FBF7F3"><span style="flex:1;font-weight:{{ a.w }}">{{ a.name }}</span><span style="font-size:11.5px;color:#A8968B">{{ a.sub }}</span></div></sc-for></div></sc-if></div>
+    </div>
+    <div style="flex:1;min-height:0;overflow:auto;padding:24px 36px 32px;display:flex;flex-direction:column;gap:32px">
+      <div style="flex:none;position:relative;z-index:{{ d.cardZ }};display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:48px;padding:24px;border-radius:12px;background:#F5F0EA">
+        <div style="display:flex;flex-direction:column;gap:16px;padding-right:24px;margin-right:-24px;border-right:1px solid #ECE3DA">
+          <span style="font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">Next lead</span>
+          <div onMouseEnter="{{ d.whyOn }}" onMouseLeave="{{ d.whyOff }}" style="align-self:flex-start;display:flex;align-items:center;gap:12px;cursor:help"><span style="width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#fff;font:500 16px 'Inter Tight', Inter, sans-serif">{{ d.first.ini }}</span><span style="display:flex;flex-direction:column;gap:4px"><span style="display:flex;align-items:center;gap:8px"><span style="font:500 26px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.02em;line-height:1">{{ d.first.name }}</span><sc-if value="{{ d.first.pinned }}"><span style="height:20px;line-height:20px;padding:0 8px;border-radius:10px;background:#FDE3D2;color:#8A1F0A;font-size:11px;font-weight:600">Set by you</span></sc-if></span><span style="display:flex;align-items:center;gap:6px;font-size:13px;color:#7A6255"><span style="width:7px;height:7px;border-radius:50%;background:{{ d.first.dot }}"></span>{{ d.firstLine }}</span></span></div>
+          <div style="display:flex;gap:8px">
+            <sc-if value="{{ d.first.notPinned }}"><span onClick="{{ d.first.skip }}" title="Give this one lead to the next person. They keep their place after that." style="height:34px;padding:0 14px;border-radius:7px;border:1px solid #E2D8D0;background:#fff;display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer">Skip</span><span onClick="{{ d.first.pause }}" title="Stop giving this person ad leads until you resume them" style="height:34px;padding:0 14px;border-radius:7px;border:1px solid #E2D8D0;background:#fff;display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer">Pause</span></sc-if>
+            <sc-if value="{{ d.first.pinned }}"><span onClick="{{ d.unpin }}" style="height:34px;padding:0 14px;border-radius:7px;border:1px solid #E2D8D0;background:#fff;display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer">Undo</span></sc-if>
+            <span style="position:relative"><span onClick="{{ d.togglePick }}" style="height:34px;padding:0 14px;border-radius:7px;display:flex;align-items:center;font:500 13px Inter, sans-serif;background:#BD4A19;color:#fff;cursor:pointer" style-hover="background:#A33F14">Give to…</span><sc-if value="{{ d.pickOpen }}"><div style="position:absolute;top:calc(100% + 6px);left:0;z-index:5;width:260px;padding:6px;box-sizing:border-box;background:#fff;border-radius:10px;box-shadow:0 14px 36px rgba(42,22,12,.18);display:flex;flex-direction:column"><sc-for list="{{ d.pickList }}" as="p"><sc-if value="{{ p.head }}"><div style="padding:8px 8px 4px;font:500 10.5px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">{{ p.head }}</div></sc-if><div onClick="{{ p.give }}" style="display:flex;align-items:center;gap:10px;height:36px;padding:0 8px;border-radius:7px;font-size:13px;cursor:pointer" style-hover="background:#FBF7F3"><span style="width:7px;height:7px;border-radius:50%;background:{{ p.dot }}"></span><span style="flex:1">{{ p.name }}</span><span style="font-size:11px;color:#A8968B">{{ p.team }}</span></div></sc-for></div></sc-if></span>
+          </div>
+          <div style="margin-top:auto;padding-top:12px;border-top:1px solid #ECE3DA"><div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#A8968B;white-space:nowrap;overflow:hidden"><span>Last lead</span><span style="font-weight:500;color:#7A6255">{{ d.last.name }}</span><span style="overflow:hidden;text-overflow:ellipsis">· {{ d.last.meta }}</span></div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;min-width:0">
+          <div style="padding-bottom:8px;font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">After that</div>
+          <sc-for list="{{ d.chain }}" as="s" hint-placeholder-count="3"><div onMouseEnter="{{ s.hovOn }}" onMouseLeave="{{ s.hovOff }}" title="{{ s.why }}" style="display:grid;grid-template-columns:44px 7px 150px minmax(0,1fr) auto;align-items:center;column-gap:10px;height:44px;border-top:1px solid #ECE3DA"><span style="font:600 12px 'Inter Tight', Inter, sans-serif;color:#A8968B">#{{ s.k }}</span><span style="width:7px;height:7px;border-radius:50%;background:{{ s.dot }}"></span><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span><span style="font-size:12px;color:#A8968B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.team }}</span><span style="display:flex;gap:14px;font:500 12px Inter, sans-serif;opacity:{{ s.actOp }}"><span onClick="{{ s.give }}" style="color:#BD4A19;cursor:pointer">Make next</span><span onClick="{{ s.skip }}" style="color:#7A6255;cursor:pointer">Skip</span><span onClick="{{ s.pause }}" title="Stop giving this person ad leads until you resume them" style="color:#7A6255;cursor:pointer">Pause</span></span></div></sc-for>
+          <span onClick="{{ d.toggleMore }}" style="align-self:stretch;display:flex;align-items:center;gap:6px;padding:10px 0 0 61px;border-top:1px solid #ECE3DA;font:500 12.5px Inter, sans-serif;color:#BD4A19;cursor:pointer">{{ d.moreLabel }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+        </div>
+      </div>
+      <div style="flex:none;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:48px;padding:0 24px">
+        <div style="display:flex;flex-direction:column;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;padding-bottom:10px"><span style="font:500 17px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.01em">In today's turn</span><span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;display:inline-grid;place-items:center;background:#F7F3EF;color:#7A6255;font:600 11px Inter, sans-serif">{{ d.inCount }}</span></div>
+          <sc-for list="{{ d.inTurn }}" as="m" hint-placeholder-count="5"><div onMouseEnter="{{ m.hovOn }}" onMouseLeave="{{ m.hovOff }}" style="display:grid;grid-template-columns:44px 7px 150px minmax(0,1fr);align-items:center;column-gap:10px;height:44px;border-top:1px solid #F0EAE4"><span style="font:600 12px 'Inter Tight', Inter, sans-serif;color:#A8968B">{{ m.nextTxt }}</span><span style="width:7px;height:7px;border-radius:50%;background:{{ m.dot }}"></span><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</span><span style="min-width:0"><span style="display:{{ m.txtDisp }};font-size:12px;color:#A8968B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.team }} · {{ m.last }}</span><span style="display:{{ m.actDisp }};align-items:center;gap:14px;font:500 12px Inter, sans-serif"><span onClick="{{ m.skip }}" style="color:#7A6255;cursor:pointer">Skip</span><span onClick="{{ m.pause }}" title="Stop giving this person ad leads until you resume them" style="color:#7A6255;cursor:pointer">Pause</span><span onClick="{{ m.leave }}" style="color:#7A6255;cursor:pointer">Leave</span></span></span></div></sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;padding-bottom:10px"><span style="font:500 17px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.01em">Not in turn</span><span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;display:inline-grid;place-items:center;background:#F7F3EF;color:#7A6255;font:600 11px Inter, sans-serif">{{ d.offCount }}</span></div>
+          <sc-for list="{{ d.greyed }}" as="g" hint-placeholder-count="4"><div onMouseEnter="{{ g.hovOn }}" onMouseLeave="{{ g.hovOff }}" style="display:grid;grid-template-columns:44px 7px 150px minmax(0,1fr);align-items:center;column-gap:10px;height:44px;border-top:1px solid #F0EAE4;color:#A8968B"><span style="font:600 12px 'Inter Tight', Inter, sans-serif">—</span><span style="width:7px;height:7px;border-radius:50%;box-sizing:border-box;border:1.5px solid {{ g.dot }}"></span><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.name }}</span><span style="min-width:0;display:flex;align-items:center;gap:10px"><span style="display:{{ g.txtDisp }};flex:1;min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.whyShort }}</span><sc-if value="{{ g.canEnd }}"><span style="display:{{ g.actDisp }};align-items:center;gap:14px;font:500 12px Inter, sans-serif"><span onClick="{{ g.editLeave }}" style="color:#7A6255;cursor:pointer">Edit</span><span onClick="{{ g.endLeave }}" style="color:#BD4A19;cursor:pointer">End leave</span></span></sc-if><sc-if value="{{ g.canResume }}"><span onClick="{{ g.resume }}" style="margin-left:auto;font:500 12px Inter, sans-serif;color:#BD4A19;cursor:pointer">Resume</span></sc-if></span></div></sc-for>
+          <div style="display:flex;align-items:center;gap:8px;padding:28px 0 10px"><span style="font:500 17px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.01em">Upcoming leave</span><span style="min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;display:inline-grid;place-items:center;background:#F7F3EF;color:#7A6255;font:600 11px Inter, sans-serif">{{ d.upCount }}</span></div>
+          <sc-for list="{{ d.upcoming }}" as="u" hint-placeholder-count="1"><div onMouseEnter="{{ u.hovOn }}" onMouseLeave="{{ u.hovOff }}" style="display:grid;grid-template-columns:44px 7px 150px minmax(0,1fr);align-items:center;column-gap:10px;height:44px;border-top:1px solid #F0EAE4"><span style="font:600 12px 'Inter Tight', Inter, sans-serif;color:#A8968B">{{ u.day }}</span><span style="width:7px;height:7px;border-radius:50%;background:{{ u.dot }}"></span><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.name }}</span><span style="min-width:0"><span style="display:{{ u.txtDisp }};font-size:12px;color:#7A6255;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.label }} · {{ u.range }}</span><span style="display:{{ u.actDisp }};align-items:center;gap:14px;font:500 12px Inter, sans-serif"><span onClick="{{ u.edit }}" style="color:#7A6255;cursor:pointer">Edit</span><span onClick="{{ u.cancel }}" style="color:#BD4A19;cursor:pointer">Cancel leave</span></span></span></div></sc-for>
+          <sc-if value="{{ d.upNone }}"><div style="height:44px;display:flex;align-items:center;border-top:1px solid #F0EAE4;font-size:12.5px;color:#A8968B">No leave coming up</div></sc-if>
+        </div>
+      </div>
+    </div>
+  </div>
+  <sc-if value="{{ d.anyOpen }}"><div onClick="{{ d.closeAll }}" style="position:absolute;inset:0;z-index:4"></div></sc-if>
+  <sc-if value="{{ d.leaveOn }}"><div onClick="{{ d.lv.cancel }}" style="position:absolute;inset:0;z-index:9;background:rgba(42,22,12,.32);display:flex;align-items:center;justify-content:center"><div onClick="{{ stop }}" style="width:400px;border-radius:12px;padding:22px;box-shadow:0 20px 50px rgba(42,22,12,.25);background:#fff;box-sizing:border-box;display:flex;flex-direction:column;gap:16px"><div style="font:500 18px 'Inter Tight', Inter, sans-serif">{{ d.lv.name }} on leave</div><div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">Reason<div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ d.lv.reasons }}" as="r"><span onClick="{{ r.pick }}" style="height:34px;padding:0 14px;box-sizing:border-box;border-radius:17px;border:1px solid {{ r.bd }};background:{{ r.bg }};color:{{ r.fg }};display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer">{{ r.label }}</span></sc-for></div><sc-if value="{{ d.lv.isOther }}"><input type="text" placeholder="Write the reason" value="{{ d.lv.note }}" onChange="{{ d.lv.setNote }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315;width:100%;margin-top:4px"></sc-if></div><div style="display:grid;grid-template-columns:1fr;gap:10px"><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">From<span style="display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:6px"><input type="date" value="{{ d.lv.fromDate }}" onChange="{{ d.lv.setFD }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315;width:100%;min-width:0"><select value="{{ d.lv.fromTime }}" onChange="{{ d.lv.setFT }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315;width:100%"><sc-for list="{{ d.lv.times }}" as="t"><option value="{{ t.v }}">{{ t.v }}</option></sc-for></select></span></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">To<span style="display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:6px"><input type="date" value="{{ d.lv.toDate }}" onChange="{{ d.lv.setTD }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315;width:100%;min-width:0"><select value="{{ d.lv.toTime }}" onChange="{{ d.lv.setTT }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315;width:100%"><sc-for list="{{ d.lv.times }}" as="t"><option value="{{ t.v }}">{{ t.v }}</option></sc-for></select></span></label></div><div style="display:flex;gap:8px;justify-content:flex-end"><span onClick="{{ d.lv.cancel }}" style="height:36px;padding:0 16px;border-radius:7px;border:1px solid #E2D8D0;display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer;">Cancel</span><span onClick="{{ d.lv.save }}" style="height:36px;padding:0 16px;border-radius:7px;background:#BD4A19;color:#fff;display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer;">Save</span></div></div></div></sc-if>
+  <sc-if value="{{ d.toastOn }}"><div style="position:absolute;left:50%;bottom:28px;transform:translateX(-50%);padding:11px 18px;border-radius:10px;background:#422315;color:#fff;font-size:13px;box-shadow:0 10px 30px rgba(42,22,12,.25)">{{ d.toast }}</div></sc-if>
+</div>
+</div>
+
+<div style="width:390px;flex:none;border-radius:28px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.08)">
+<div style="width:390px;height:844px;position:relative;overflow:hidden;background:#fff;font-family:Inter, sans-serif;color:#422315;-webkit-font-smoothing:antialiased">
+  <main style="position:absolute;inset:0 0 62px 0;overflow-y:auto;scrollbar-width:none;padding:18px 20px 32px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px">
+    <div style="flex:none;display:flex;padding:3px;border-radius:20px;background:#F7F3EF"><span style="flex:1;height:34px;display:grid;place-items:center;font-size:12px;font-weight:500;color:#7A6255">Team</span><span style="flex:1;height:34px;display:grid;place-items:center;font-size:12px;font-weight:500;color:#7A6255">Ads</span><span style="flex:1;height:34px;border-radius:17px;display:grid;place-items:center;font-size:12px;font-weight:600;background:#fff;color:#422315;box-shadow:0 1px 2px rgba(42,22,12,.12)">Up next</span></div>
+    <div style="flex:none;position:relative;z-index:6"><span onClick="{{ p.toggleAd }}" style="height:44px;padding:0 14px;box-sizing:border-box;border-radius:12px;background:#F7F3EF;display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500;cursor:pointer"><span style="flex:1">{{ p.adName }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span><sc-if value="{{ p.adOpen }}"><div style="position:absolute;top:calc(100% + 6px);left:0;z-index:7;width:350px;padding:6px;box-sizing:border-box;background:#fff;border-radius:10px;box-shadow:0 14px 36px rgba(42,22,12,.18);display:flex;flex-direction:column"><sc-for list="{{ p.ads }}" as="a" hint-placeholder-count="5"><div onClick="{{ a.pick }}" style="display:flex;align-items:center;gap:10px;height:44px;padding:0 10px;border-radius:7px;font-size:13px;background:{{ a.rowBg }};cursor:pointer" style-hover="background:#FBF7F3"><span style="flex:1;font-weight:{{ a.w }}">{{ a.name }}</span><span style="font-size:11.5px;color:#A8968B">{{ a.sub }}</span></div></sc-for></div></sc-if></div>
+    <div style="flex:none;display:flex;flex-direction:column;padding:14px 16px 14px;border-radius:14px;background:#422315;color:#fff">
+      <div style="display:flex;align-items:center;gap:6px;padding-bottom:12px;font-size:11.5px;color:#CDB7A8;white-space:nowrap;overflow:hidden"><span>Last lead</span><span style="font-weight:600;color:#fff">{{ p.last.name }}</span><span>· {{ p.lastWhen }}</span></div>
+      <div onClick="{{ p.first.open }}" style="display:flex;align-items:center;gap:12px;cursor:pointer"><span style="width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.18);color:#fff;font:500 16px 'Inter Tight', Inter, sans-serif">{{ p.first.ini }}</span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="display:flex;align-items:center;gap:6px"><span style="font:500 22px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.02em;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.first.name }}</span><sc-if value="{{ p.first.pinned }}"><span style="flex:none;height:17px;line-height:17px;padding:0 6px;border-radius:9px;background:rgba(255,191,150,.22);color:#FFD9BF;font-size:10px;font-weight:600">Set by you</span></sc-if></span><span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#E8D9CE"><span style="width:14px;height:14px;border-radius:50%;flex:none;background:#fff;display:grid;place-items:center"><span style="width:8px;height:8px;border-radius:50%;background:{{ p.first.dot }}"></span></span>{{ p.first.team }} · next lead</span></span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:8px;padding:14px 0 0"><sc-if value="{{ p.first.notPinned }}"><span onClick="{{ p.first.skip }}" style="height:44px;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center;font-size:13.5px;font-weight:600;cursor:pointer">Skip</span><span onClick="{{ p.first.pause }}" style="height:44px;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center;font-size:13.5px;font-weight:600;cursor:pointer">Pause</span><span onClick="{{ p.togglePick }}" style="height:44px;border-radius:12px;background:#fff;color:#BD4A19;display:grid;place-items:center;font-size:13.5px;font-weight:600;cursor:pointer">Give to…</span></sc-if><sc-if value="{{ p.first.pinned }}"><span onClick="{{ p.unpin }}" style="grid-column:1 / -1;height:44px;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center;font-size:13.5px;font-weight:600;cursor:pointer">Undo</span></sc-if></div>
+      </div>
+    <div style="flex:none;display:flex;flex-direction:column;margin-top:-8px"><sc-for list="{{ p.chain }}" as="s" hint-placeholder-count="3"><div onClick="{{ s.open }}" style="display:flex;align-items:center;gap:10px;height:46px;padding:0 4px;border-bottom:1px solid #EEE8E3;cursor:pointer"><span style="width:24px;font:600 12px 'Inter Tight', Inter, sans-serif;color:#8A7466">#{{ s.k }}</span><span style="flex:1;min-width:0;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</span><span style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:#8A7466"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ s.dot }}"></span>{{ s.teamShort }}</span></div></sc-for>
+      <span onClick="{{ p.toggleMore }}" style="height:40px;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12.5px;font-weight:600;color:#BD4A19;cursor:pointer">{{ p.moreLabel }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+    </div>
+    <section style="flex:none;display:flex;flex-direction:column">
+      <div style="display:flex;padding:3px;border-radius:12px;background:#F7F3EF;margin-bottom:4px"><sc-for list="{{ p.ltabs }}" as="t" hint-placeholder-count="3"><span onClick="{{ t.go }}" style="flex:1;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:6px;background:{{ t.bg }};box-shadow:{{ t.sh }};font-size:12.5px;font-weight:600;color:{{ t.fg }};cursor:pointer">{{ t.label }}<span style="font:600 11px Inter, sans-serif;color:{{ t.nc }}">{{ t.n }}</span></span></sc-for></div>
+      <sc-if value="{{ p.tabIn }}"><sc-for list="{{ p.inTurn }}" as="m" hint-placeholder-count="5"><div onClick="{{ m.open }}" style="display:flex;align-items:center;gap:10px;min-height:48px;border-top:1px solid #EEE8E3;cursor:pointer"><span style="width:26px;font:600 12px 'Inter Tight', Inter, sans-serif;color:#8A7466">{{ m.nextTxt }}</span><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ m.dot }}"></span><span style="flex:1;min-width:0;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</span><span style="font-size:11.5px;color:#8A7466;white-space:nowrap">{{ m.last }}</span></div></sc-for></sc-if>
+      <sc-if value="{{ p.tabOff }}"><sc-for list="{{ p.greyed }}" as="g" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;min-height:48px;border-top:1px solid #EEE8E3;color:#8A7466"><span style="width:26px"></span><span style="width:7px;height:7px;border-radius:50%;flex:none;box-sizing:border-box;border:1.5px solid {{ g.dot }}"></span><span style="flex:none;font-size:14px;font-weight:500">{{ g.name }}</span><span style="flex:1;min-width:0;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.whyMini }}</span><sc-if value="{{ g.canResume }}"><span onClick="{{ g.resume }}" style="height:44px;display:flex;align-items:center;font-size:12.5px;font-weight:600;color:#BD4A19;cursor:pointer">Resume</span></sc-if><sc-if value="{{ g.canEnd }}"><span onClick="{{ g.editLeave }}" style="height:44px;display:flex;align-items:center;font-size:12.5px;font-weight:600;color:#BD4A19;cursor:pointer">Edit</span></sc-if></div></sc-for></sc-if>
+      <sc-if value="{{ p.tabUp }}"><sc-for list="{{ p.upcoming }}" as="u" hint-placeholder-count="1"><div onClick="{{ u.edit }}" style="display:flex;align-items:center;gap:10px;min-height:48px;border-top:1px solid #EEE8E3;cursor:pointer"><span style="width:26px;font:600 11.5px 'Inter Tight', Inter, sans-serif;color:#8A7466">{{ u.dayNum }}</span><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ u.dot }}"></span><span style="flex:none;font-size:14px;font-weight:500">{{ u.name }}</span><span style="flex:1;min-width:0;font-size:11.5px;color:#7A6255;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.short }}</span></div></sc-for><sc-if value="{{ p.upNone }}"><div style="min-height:48px;display:flex;align-items:center;font-size:12.5px;color:#8A7466">No leave coming up</div></sc-if></sc-if>
+    </section>
+  </main>
+  <nav style="position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;height:62px;padding:0 4px;background:#fff;border-top:1px solid #EEE8E3"><sc-for list="{{ phoneNav }}" as="t" hint-placeholder-count="5"><span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0 8px;font-size:9.5px;font-weight:{{ t.w }};color:{{ t.c }}"><span style="position:relative;display:grid;place-items:center;width:56px;height:30px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.d }}"></path></svg><sc-if value="{{ t.badge }}"><b style="position:absolute;top:0;right:8px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:#BD4A19;color:#fff;font-size:9px;font-weight:700;line-height:16px;text-align:center;box-shadow:0 0 0 2px #fff">{{ t.badge }}</b></sc-if></span><span>{{ t.label }}</span></span></sc-for></nav>
+  <sc-if value="{{ p.pickOpen }}"><div onClick="{{ p.togglePick }}" style="position:absolute;inset:0;z-index:8;background:rgba(42,22,12,.32);display:flex;flex-direction:column;justify-content:flex-end"><div onClick="{{ stop }}" style="background:#fff;border-radius:26px 26px 0 0;padding:10px 12px 22px;display:flex;flex-direction:column"><span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#EEE8E3;margin-bottom:10px"></span><div style="padding:0 8px 4px;font:500 16px 'Inter Tight', Inter, sans-serif">Give the next lead to</div><sc-for list="{{ p.pickList }}" as="q"><sc-if value="{{ q.head }}"><div style="padding:8px 8px 4px;font:500 10.5px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">{{ q.head }}</div></sc-if><div onClick="{{ q.give }}" style="display:flex;align-items:center;gap:10px;height:46px;padding:0 8px;border-radius:10px;font-size:14px;cursor:pointer"><span style="width:8px;height:8px;border-radius:50%;background:{{ q.dot }}"></span><span style="flex:1">{{ q.name }}</span><span style="font-size:11.5px;color:#A8968B">{{ q.team }}</span></div></sc-for></div></div></sc-if>
+  <sc-if value="{{ p.sheetOn }}"><div onClick="{{ p.close }}" style="position:absolute;inset:0;z-index:8;background:rgba(42,22,12,.32);display:flex;flex-direction:column;justify-content:flex-end"><div onClick="{{ stop }}" style="background:#fff;border-radius:26px 26px 0 0;padding:10px 20px 26px;display:flex;flex-direction:column;gap:14px"><span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#EEE8E3"></span><div style="display:flex;align-items:center;gap:12px"><span style="width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#FCEEE2;font:500 15px 'Inter Tight', Inter, sans-serif">{{ p.sh.ini }}</span><span style="display:flex;flex-direction:column;gap:2px"><strong style="font:500 18px 'Inter Tight', Inter, sans-serif">{{ p.sh.name }}</strong><span style="font-size:12px;color:#7A6255">{{ p.sh.team }} · {{ p.sh.pos }}</span></span></div><div style="padding:10px 12px;border-radius:12px;background:#F7F3EF;font-size:12.5px;line-height:1.45;color:#5A4034">{{ p.sh.why }}</div><span onClick="{{ p.sh.give }}" style="height:48px;border-radius:24px;display:grid;place-items:center;background:#BD4A19;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Give them the next lead</span><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><span onClick="{{ p.sh.skip }}" style="height:44px;border-radius:22px;border:1px solid #E2D8D0;display:grid;place-items:center;font-size:13.5px;font-weight:600;cursor:pointer">Skip this turn</span><span onClick="{{ p.sh.pause }}" style="height:44px;border-radius:22px;border:1px solid #E2D8D0;display:grid;place-items:center;font-size:13.5px;font-weight:600;color:#8A1F0A;cursor:pointer">Pause</span><span onClick="{{ p.sh.leave }}" style="grid-column:1 / -1;height:44px;border-radius:22px;border:1px solid #E2D8D0;display:grid;place-items:center;font-size:13.5px;font-weight:600;cursor:pointer">Mark on leave</span></div></div></div></sc-if>
+  <sc-if value="{{ p.adOpen }}"><div onClick="{{ p.closeAll }}" style="position:absolute;inset:0;z-index:4"></div></sc-if>
+  <sc-if value="{{ p.leaveOn }}"><div onClick="{{ p.lv.cancel }}" style="position:absolute;inset:0;z-index:9;background:rgba(42,22,12,.32);display:flex;flex-direction:column;justify-content:flex-end"><div onClick="{{ stop }}" style="border-radius:26px 26px 0 0;padding:20px 20px 26px;background:#fff;box-sizing:border-box;display:flex;flex-direction:column;gap:16px"><div style="font:500 18px 'Inter Tight', Inter, sans-serif">{{ p.lv.name }} on leave</div><div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">Reason<div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ p.lv.reasons }}" as="r"><span onClick="{{ r.pick }}" style="height:34px;padding:0 14px;box-sizing:border-box;border-radius:17px;border:1px solid {{ r.bd }};background:{{ r.bg }};color:{{ r.fg }};display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer">{{ r.label }}</span></sc-for></div><sc-if value="{{ p.lv.isOther }}"><input type="text" placeholder="Write the reason" value="{{ p.lv.note }}" onChange="{{ p.lv.setNote }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315;width:100%;margin-top:4px"></sc-if></div><div style="display:grid;grid-template-columns:1fr;gap:10px"><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">From<span style="display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:6px"><input type="date" value="{{ p.lv.fromDate }}" onChange="{{ p.lv.setFD }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315;width:100%;min-width:0"><select value="{{ p.lv.fromTime }}" onChange="{{ p.lv.setFT }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315;width:100%"><sc-for list="{{ p.lv.times }}" as="t"><option value="{{ t.v }}">{{ t.v }}</option></sc-for></select></span></label><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">To<span style="display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:6px"><input type="date" value="{{ p.lv.toDate }}" onChange="{{ p.lv.setTD }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315;width:100%;min-width:0"><select value="{{ p.lv.toTime }}" onChange="{{ p.lv.setTT }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315;width:100%"><sc-for list="{{ p.lv.times }}" as="t"><option value="{{ t.v }}">{{ t.v }}</option></sc-for></select></span></label></div><div style="display:flex;gap:8px;justify-content:flex-end"><span onClick="{{ p.lv.cancel }}" style="height:44px;padding:0 16px;border-radius:22px;border:1px solid #E2D8D0;display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer;flex:1;justify-content:center">Cancel</span><span onClick="{{ p.lv.save }}" style="height:44px;padding:0 16px;border-radius:22px;background:#BD4A19;color:#fff;display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer;flex:1;justify-content:center">Save</span></div></div></div></sc-if>
+  <sc-if value="{{ p.toastOn }}"><div style="position:absolute;left:16px;right:16px;bottom:76px;padding:11px 14px;border-radius:12px;background:#422315;color:#fff;font-size:12.5px;text-align:center">{{ p.toast }}</div></sc-if>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const TEAMS = [
+  { id: 'dir', name: 'Revenue Director', share: 10, dot: '#422315', members: ['peter'] },
+  { id: 'stanley', name: 'Team Stanley', share: 40, dot: '#EE5E08', members: ['chea', 'stanley', 'tjy'] },
+  { id: 'alvin', name: 'Team Alvin', share: 30, dot: '#FFA91F', members: ['alvin', 'mei', 'jason', 'hector'] },
+  { id: 'anthony', name: 'Team Anthony', share: 20, dot: '#8A1F0A', members: ['kumar', 'anthony'] },
+];
+const P = {
+  peter: { name: 'PETER', ft: true, last: '5 h ago' },
+  stanley: { name: 'STANLEY', ft: true, last: '3 h ago' },
+  chea: { name: 'CHEA HUAN', ft: true, last: '1 d ago' },
+  tjy: { name: 'TAN JIN YANG', ft: false, last: '2 d ago' },
+  alvin: { name: 'ALVIN', ft: true, last: '2 d ago' },
+  mei: { name: 'MEI LING', ft: true, last: '6 h ago' },
+  hector: { name: 'HECTOR', ft: true, locked: true },
+  jason: { name: 'JASON', ft: true, last: '3 d ago' },
+  anthony: { name: 'ANTHONY', ft: false, last: '4 h ago' },
+  kumar: { name: 'KUMAR', ft: true, last: '1 d ago' },
+};
+const ADS = [
+  { id: 'all', name: 'All ads', sub: '' },
+  { id: 'raya', name: 'Raya Promo', sub: 'Facebook', shares: { stanley: 50, alvin: 50 } },
+  { id: 'ev', name: 'EV Test Drive', sub: 'Instagram', shares: { dir: 20, stanley: 40, anthony: 40 } },
+  { id: 'trade', name: 'Trade-in Week', sub: 'Facebook', shares: { alvin: 60, anthony: 40 } },
+  { id: 'lead', name: 'Lead form · Website', sub: 'Form', shares: { dir: 100 } },
+];
+const LAST = { all: ['stanley', '3 h ago', 'Raya Promo'], raya: ['stanley', '3 h ago'], ev: ['peter', '5 h ago'], trade: ['anthony', '4 h ago'], lead: ['peter', '1 d ago'] };
+const teamOf = id => TEAMS.find(t => t.members.includes(id));
+const ini = n => n.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+const eligible = id => P[id].ft && !P[id].locked;
+const TODAY = '2026-11-06';
+const NOW = '2026-11-06T18:00';
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const fmtD = s => { const [dt, tm] = s.split('T'); const [y, m, d] = dt.split('-').map(Number); return { d, m: MON[m - 1], t: tm || '', day: dt }; };
+const fmtRange = (a, b) => { const x = fmtD(a), y = fmtD(b); return x.day === y.day ? `${x.d} ${x.m} ${x.t}–${y.t}` : `${x.d} ${x.m} ${x.t} – ${y.d} ${y.m} ${y.t}`; };
+const leaveLabel = l => l.reason === 'Other' ? (l.note || 'Other') : `${l.reason} leave`;
+const ORD = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
+const D = {
+  cal: 'M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM3 10h18',
+  trend: 'M22 7l-8.5 8.5-5-5L2 17M16 7h6v6',
+  file: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7ZM14 2v4a2 2 0 0 0 2 2h4M10 9H8M16 13H8M16 17H8',
+  flag: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7',
+  msg: 'M7.9 20A9 9 0 1 0 4 16.1L2 22Z',
+  user: 'M17 8a5 5 0 1 1-10 0 5 5 0 0 1 10 0ZM20 21a8 8 0 0 0-16 0',
+  bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
+  inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
+  contact: 'M16 2v2M7 22v-2a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M8 2v2M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z',
+  arrow: 'M7 7h10v10M7 17 17 7',
+  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  pin: 'M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0M15 10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
+  list: 'M3 12h.01M3 18h.01M3 6h.01M8 12h13M8 18h13M8 6h13',
+  phone: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z',
+  sliders: 'M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4',
+  clock: 'M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM12 6v6h4.5',
+};
+
+class Component extends DCLogic {
+  state = { ad: 'all', skipped: [], leave: { jason: { from: '2026-11-05T09:00', to: '2026-11-08T18:00', reason: 'Sick' }, chea: { from: '2026-11-09T09:00', to: '2026-11-10T13:00', reason: 'Annual' } }, leaveEdit: null, rot: { dir: ['peter'], stanley: ['chea', 'stanley'], alvin: ['alvin', 'mei', 'jason'], anthony: ['kumar'] }, paused: [], pinned: null, pick: null, sheet: null, toast: null };
+
+  flash(where, text) {
+    clearTimeout(this._t);
+    this.setState({ toast: { where, text } });
+    this._t = setTimeout(() => this.setState({ toast: null }), 2600);
+  }
+  skip(id, where) {
+    this.setState(s => ({ skipped: [...s.skipped, id], pinned: s.pinned === id ? null : s.pinned, sheet: null, pick: null }), () => {
+      const o = this.seq(1).out[0];
+      this.flash(where, `${P[id].name} skipped · next lead goes to ${o ? P[o.id].name : '—'}`);
+    });
+  }
+  onLeave(id) { const l = this.state.leave[id]; return !!(l && l.from <= NOW && NOW <= l.to); }
+  openLeave(id, where) { const l = this.state.leave[id]; this.setState({ leaveEdit: { where, id, from: l ? l.from : TODAY + 'T09:00', to: l ? l.to : TODAY + 'T18:00', reason: l ? l.reason : 'Annual', note: l ? (l.note || '') : '' }, sheet: null, pick: null }); }
+  saveLeave() {
+    const e = this.state.leaveEdit; if (!e || e.to < e.from) return;
+    this.setState(s => ({ leave: { ...s.leave, [e.id]: { from: e.from, to: e.to, reason: e.reason, note: e.note } }, leaveEdit: null, pinned: s.pinned === e.id ? null : s.pinned }));
+    this.flash(e.where, `${P[e.id].name} on leave ${fmtRange(e.from, e.to)}`);
+  }
+  endLeave(id, where) {
+    this.setState(s => { const l = { ...s.leave }; delete l[id]; return { leave: l }; });
+    this.flash(where, `${P[id].name} is back in today's turn`);
+  }
+  pause(id, where) {
+    this.setState(s => ({ paused: [...s.paused, id], pinned: s.pinned === id ? null : s.pinned, sheet: null, pick: null }));
+    this.flash(where, `${P[id].name} paused · resume from Not in turn`);
+  }
+  resume(id, where) {
+    this.setState(s => ({ paused: s.paused.filter(x => x !== id) }));
+    this.flash(where, `${P[id].name} is back in ${teamOf(id).name}'s turn`);
+  }
+  give(id, where) {
+    this.setState(s => ({ pinned: id, paused: s.paused.filter(x => x !== id), sheet: null, pick: null }));
+    this.flash(where, `Next ad lead goes to ${P[id].name}`);
+  }
+
+  shareOf() { const ad = ADS.find(a => a.id === this.state.ad); return t => ad.shares ? (ad.shares[t.id] || 0) : t.share; }
+  seq(n) {
+    const { rot, paused, pinned } = this.state;
+    const act = {};
+    TEAMS.forEach(t => { act[t.id] = rot[t.id].filter(id => !paused.includes(id) && !this.onLeave(id)); });
+    const sh = this.shareOf();
+    const live = TEAMS.filter(t => act[t.id].length && sh(t) > 0);
+    const S = live.reduce((a, t) => a + sh(t), 0) || 1;
+    const given = {}, ptr = {};
+    live.forEach(t => { given[t.id] = 0; ptr[t.id] = 0; });
+    const out = [];
+    if (pinned) out.push({ id: pinned, team: teamOf(pinned), pinned: true });
+    let c = 0;
+    const extra = this.state.skipped.length;
+    while (out.length < n + extra && live.length) {
+      c++;
+      let best = null, bv = -1e9;
+      live.forEach(t => { const v = (sh(t) / S) * c - given[t.id]; if (v > bv + 1e-9) { bv = v; best = t; } });
+      given[best.id]++;
+      const arr = act[best.id], p = ptr[best.id];
+      out.push({ id: arr[p % arr.length], team: best, pinned: false, p });
+      ptr[best.id]++;
+    }
+    this.state.skipped.forEach(sid => { const i = out.findIndex(o => o.id === sid && !o.pinned); if (i >= 0) out.splice(i, 1); });
+    out.length = Math.min(out.length, n);
+    return { out, act, S };
+  }
+
+  frame(where) {
+    const st = this.state;
+    const { out, act, S } = this.seq(10);
+    const shr = this.shareOf(), ad = ADS.find(a => a.id === st.ad), adWord = ad.shares ? 'this ad\'s leads' : 'ad leads';
+    const pct = t => `${Math.round((shr(t) / S) * 100)}%`;
+    const whyOf = o => {
+      if (o.pinned) return `${o.team.name} · set by you`;
+      const p = P[o.id], arr = act[o.team.id];
+      const pr = o.p === 0 ? `last lead ${p.last}` : o.p < arr.length ? `${ORD[o.p]} in team` : 'next round';
+      return `${o.team.name} · ${pct(o.team)} · ${pr}`;
+    };
+    const whyLong = o => {
+      if (o.pinned) return `You set ${P[o.id].name} to get the next ad lead. After that the split carries on as set in Assignment.`;
+      const arr = act[o.team.id];
+      return `${o.team.name} is due its ${pct(o.team)} share of ${adWord}. Inside the team ${P[o.id].name} is ${o.p === 0 ? `first, longest without a lead (${P[o.id].last})` : ORD[o.p % arr.length] + ' in turn'}. Fri is a Full time day, so only ticked people count.`;
+    };
+    const slots = out.map((o, i) => ({ teamShort: o.team.name.replace('Team ', ''),
+      k: i + 1, id: o.id, name: P[o.id].name, ini: ini(P[o.id].name), team: o.team.name, dot: o.team.dot, why: whyOf(o), whyLong: whyLong(o),
+      pinned: !!o.pinned, notPinned: !o.pinned,
+      skip: () => this.skip(o.id, where), pause: () => this.pause(o.id, where), give: () => this.give(o.id, where),
+      open: () => this.setState({ sheet: { where, id: o.id, k: i + 1 } }),
+      actOp: st.hov === where + ':c' + i ? 1 : 0, hovOn: () => this.setState({ hov: where + ':c' + i }), hovOff: () => this.setState({ hov: null }),
+    }));
+    const offOf = id => {
+      const p = P[id];
+      if (this.onLeave(id)) { const l = st.leave[id]; return { why: 'On leave', whyShort: `${leaveLabel(l)} · ${fmtRange(l.from, l.to)}`, canResume: false, canEnd: true }; }
+      if (st.paused.includes(id)) return { why: 'Paused by you', whyShort: 'paused', canResume: true };
+      if (!shr(teamOf(id)) && eligible(id)) return { why: `${teamOf(id).name} is not on this ad`, whyShort: 'team not on this ad', canResume: false };
+      if (p.locked) return { why: 'Locked · no CRM login yet', whyShort: 'no CRM login', canResume: false };
+      if (!p.ft) return { why: 'Not ticked for Full time on Fri', whyShort: 'not Full time today', canResume: false };
+      return null;
+    };
+    const greyed = Object.keys(P).filter(id => offOf(id)).sort((a, b) => ((offOf(b).canResume || offOf(b).canEnd) ? 1 : 0) - ((offOf(a).canResume || offOf(a).canEnd) ? 1 : 0)).map(id => ({ name: P[id].name, dot: teamOf(id).dot, ...offOf(id), whyMini: (() => { const o = offOf(id); if (o.canEnd) { const l = st.leave[id], y = fmtD(l.to); return `${l.reason === 'Other' ? (l.note || 'Leave') : l.reason} · to ${y.d} ${y.m}`; } return o.whyShort.replace('not Full time today', 'not Full time').replace('team not on this ad', 'not on this ad'); })(), resume: () => this.resume(id, where), canEnd: !!offOf(id).canEnd, actDisp: st.hov === where + ':g' + id && offOf(id).canEnd ? 'flex' : 'none', txtDisp: st.hov === where + ':g' + id && offOf(id).canEnd ? 'none' : 'block', hovOn: () => this.setState({ hov: where + ':g' + id }), hovOff: () => this.setState({ hov: null }), endLeave: () => this.endLeave(id, where), editLeave: () => this.openLeave(id, where) }));
+    const inTurn = TEAMS.filter(t => shr(t)).flatMap(t => act[t.id].map(id => ({ id, t }))).map(({ id, t }) => { const i = out.findIndex(o => o.id === id); return { i: i < 0 ? 99 : i, name: P[id].name, team: t.name, dot: t.dot, last: P[id].last, nextTxt: i < 0 ? '10+' : `#${i + 1}`, leaveFull: (() => { const l = st.leave[id]; return l ? `${leaveLabel(l)} · ${fmtRange(l.from, l.to)}` : ''; })(), leaveTag: (() => { const l = st.leave[id]; if (!(l && l.from > NOW)) return ''; const x = fmtD(l.from), y = fmtD(l.to); const r = l.reason === 'Other' ? (l.note || 'Leave') : l.reason; return x.day === y.day ? `${r} · ${x.d} ${x.m}` : x.m === y.m ? `${r} · ${x.d}–${y.d} ${x.m}` : `${r} · ${x.d} ${x.m}–${y.d} ${y.m}`; })(), actOp: st.hov === where + ':m' + id ? 1 : 0, actDisp: st.hov === where + ':m' + id ? 'flex' : 'none', txtDisp: st.hov === where + ':m' + id ? 'none' : 'block', hovOn: () => this.setState({ hov: where + ':m' + id }), hovOff: () => this.setState({ hov: null }),
+      skip: () => this.skip(id, where), pause: () => this.pause(id, where), leave: () => this.openLeave(id, where), open: () => this.setState({ sheet: { where, id, k: i + 1 } }) }; }).sort((a, b) => a.i - b.i);
+    const inIds = TEAMS.filter(t => shr(t)).flatMap(t => act[t.id]);
+    const otherIds = Object.keys(P).filter(id => eligible(id) && !st.paused.includes(id) && !this.onLeave(id) && !inIds.includes(id));
+    const pickList = [...inIds.map((id, j) => ({ id, head: j === 0 ? "In today's turn" : '' })), ...otherIds.map((id, j) => ({ id, head: j === 0 ? 'Outside this ad' : '' }))]
+      .map(({ id, head }) => ({ head, name: P[id].name, team: teamOf(id).name, dot: teamOf(id).dot, give: () => this.give(id, where) }));
+    const lanes = TEAMS.map(t => {
+      const firstIdx = out.findIndex(o => o.team.id === t.id);
+      return {
+        name: t.name, dot: t.dot, cnt: out.filter(o => o.team.id === t.id && !o.pinned).length,
+        shareTxt: !shr(t) ? 'not on this ad' : act[t.id].length ? pct(t) : 'no one today', laneOp: shr(t) ? 1 : 0.45, firstAt: firstIdx < 0 ? '—' : firstIdx + 1,
+        members: act[t.id].map((id, j) => ({ k: j + 1, name: P[id].name, last: P[id].last,
+          numBg: j === 0 ? '#BD4A19' : '#fff', numFg: j === 0 ? '#fff' : '#7A6255', chipBg: j === 0 ? '#FDE3D2' : '#F7F3EF' })),
+      };
+    });
+    const sh = st.sheet && st.sheet.where === where ? st.sheet : null;
+    const shO = sh ? (out.find(o => o.id === sh.id) || { id: sh.id, team: teamOf(sh.id), p: 0 }) : null;
+    const toastOn = !!(st.toast && st.toast.where === where);
+    return {
+      ads: ADS.map(a => ({ name: a.name, sub: a.sub, w: a.id === st.ad ? 600 : 400, rowBg: a.id === st.ad ? '#F7F3EF' : 'transparent', pick: () => this.setState({ ad: a.id, adOpen: null, skipped: [], pinned: null, sheet: null, pick: null }) })),
+      adName: ad.name, adOpen: st.adOpen === where, tipShow: st.adTip === where && st.adOpen !== where, tipOn: () => this.setState({ adTip: where }), tipOff: () => this.setState({ adTip: null }), toggleAd: () => this.setState(s => ({ adOpen: s.adOpen === where ? null : where })),
+      nextLabel: ad.shares ? `Next lead from ${ad.name} goes to` : 'Next ad lead goes to',
+      splitLine: ad.shares ? 'Split for this ad: ' + TEAMS.filter(t => shr(t)).map(t => `${t.name} ${shr(t)}%`).join(' · ') + ' · set in Assignment' : 'Each ad keeps its own split from Assignment. This view adds them together.',
+      anyOpen: st.pick === where || st.adOpen === where, cardZ: st.pick === where ? 5 : 'auto', closeAll: () => this.setState({ pick: null, adOpen: null }),
+      last: (() => { const [id, when, adN] = LAST[st.ad]; return { name: P[id].name, dot: teamOf(id).dot, meta: [teamOf(id).name, when, adN].filter(Boolean).join(' · ') }; })(),
+      ltabs: [['in', 'In turn'], ['off', 'Not in turn'], ['up', 'Leave']].map(([k, label]) => { const on = (st.ltab || 'in') === k; return { label, n: k === 'in' ? inTurn.length : k === 'off' ? greyed.length : Object.keys(st.leave).filter(id => st.leave[id].from > NOW).length, bd: on ? '#BD4A19' : 'transparent', bg: on ? '#fff' : 'transparent', sh: on ? '0 1px 2px rgba(42,22,12,.12)' : 'none', fg: on ? '#422315' : '#7A6255', nc: '#8A7466', go: () => this.setState({ ltab: k }) }; }),
+      tabIn: (st.ltab || 'in') === 'in', tabOff: st.ltab === 'off', tabUp: st.ltab === 'up',
+      upAny: Object.keys(st.leave).some(id => st.leave[id].from > NOW), lastWhen: LAST[st.ad][1],
+      upCount: Object.keys(st.leave).filter(id => st.leave[id].from > NOW).length, upNone: !Object.keys(st.leave).some(id => st.leave[id].from > NOW),
+      firstLine: slots[0] ? (st.why === where ? slots[0].why : slots[0].team) : '', upcoming: Object.keys(st.leave).filter(id => st.leave[id].from > NOW).sort((a, b) => st.leave[a].from < st.leave[b].from ? -1 : 1).map(id => { const l = st.leave[id], k = where + ':u' + id, x = fmtD(l.from); return { name: P[id].name, dot: teamOf(id).dot, label: leaveLabel(l), range: fmtRange(l.from, l.to), day: `${x.d} ${x.m}`, dayNum: `${x.d} ${x.m}`, short: (() => { const y = fmtD(l.to); const r = l.reason === 'Other' ? (l.note || 'Leave') : l.reason; return x.day === y.day ? `${r} · ${x.t}–${y.t}` : `${r} · to ${y.d} ${y.m}`; })(),
+        actDisp: st.hov === k ? 'flex' : 'none', txtDisp: st.hov === k ? 'none' : 'block', hovOn: () => this.setState({ hov: k }), hovOff: () => this.setState({ hov: null }),
+        edit: () => this.openLeave(id, where), cancel: () => { this.setState(s => { const L = { ...s.leave }; delete L[id]; return { leave: L }; }); this.flash(where, `${P[id].name}'s leave cancelled`); } }; }),
+      inTurn, inCount: inTurn.length, offCount: greyed.length, first: slots[0] || {}, chain: (st.more === where ? slots.slice(1) : slots.slice(1, 4)), greyed,
+      moreLabel: st.more === where ? 'Show less' : `${Math.max(slots.length - 4, 0)} more`,
+      whyShow: st.why === where, whyOn: () => this.setState({ why: where }), whyOff: () => this.setState({ why: null }),
+      toggleMore: () => this.setState(s => ({ more: s.more === where ? null : where })), pickList, lanes,
+      unpin: () => { this.setState({ pinned: null }); this.flash(where, 'Back to the split as set in Assignment'); },
+      pickOpen: st.pick === where, togglePick: () => this.setState(s => ({ pick: s.pick === where ? null : where })),
+      sheetOn: !!sh, close: () => this.setState({ sheet: null }),
+      sh: sh && shO ? { name: P[sh.id].name, ini: ini(P[sh.id].name), team: teamOf(sh.id).name, pos: sh.k > 0 ? `#${sh.k} in line` : 'after #10', why: whyLong(shO),
+        give: () => this.give(sh.id, where), skip: () => this.skip(sh.id, where), pause: () => this.pause(sh.id, where), leave: () => this.openLeave(sh.id, where) } : {},
+      leaveOn: !!(st.leaveEdit && st.leaveEdit.where === where), lv: st.leaveEdit && st.leaveEdit.where === where ? { name: P[st.leaveEdit.id].name, from: st.leaveEdit.from, to: st.leaveEdit.to, bad: st.leaveEdit.to < st.leaveEdit.from,
+        setFrom: e => { const v = e.target.value; this.setState(s => ({ leaveEdit: { ...s.leaveEdit, from: v, to: s.leaveEdit.to < v ? v : s.leaveEdit.to } })); },
+        setTo: e => { const v = e.target.value; this.setState(s => ({ leaveEdit: { ...s.leaveEdit, to: v } })); },
+        reasons: ['Annual', 'Sick', 'Training', 'Other'].map(r => ({ label: r, bg: st.leaveEdit.reason === r ? '#422315' : '#fff', fg: st.leaveEdit.reason === r ? '#fff' : '#422315', bd: st.leaveEdit.reason === r ? '#422315' : '#E2D8D0', pick: () => this.setState(s => ({ leaveEdit: { ...s.leaveEdit, reason: r } })) })),
+        isOther: st.leaveEdit.reason === 'Other', note: st.leaveEdit.note, setNote: e => { const v = e.target.value; this.setState(s => ({ leaveEdit: { ...s.leaveEdit, note: v } })); },
+        fromDate: st.leaveEdit.from.split('T')[0], fromTime: st.leaveEdit.from.split('T')[1], toDate: st.leaveEdit.to.split('T')[0], toTime: st.leaveEdit.to.split('T')[1],
+        times: Array.from({ length: 48 }, (_, i) => { const v = `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`; return { v }; }),
+        setFD: e => { const v = e.target.value; this.setState(s => { const f = v + 'T' + s.leaveEdit.from.split('T')[1]; return { leaveEdit: { ...s.leaveEdit, from: f, to: s.leaveEdit.to < f ? v + 'T' + s.leaveEdit.to.split('T')[1] : s.leaveEdit.to } }; }); },
+        setFT: e => { const v = e.target.value; this.setState(s => ({ leaveEdit: { ...s.leaveEdit, from: s.leaveEdit.from.split('T')[0] + 'T' + v } })); },
+        setTD: e => { const v = e.target.value; this.setState(s => ({ leaveEdit: { ...s.leaveEdit, to: v + 'T' + s.leaveEdit.to.split('T')[1] } })); },
+        setTT: e => { const v = e.target.value; this.setState(s => ({ leaveEdit: { ...s.leaveEdit, to: s.leaveEdit.to.split('T')[0] + 'T' + v } })); },
+        save: () => this.saveLeave(), cancel: () => this.setState({ leaveEdit: null }) } : {},
+      toastOn, toast: toastOn ? st.toast.text : '',
+    };
+  }
+
+  renderVals() {
+    const nav = (d, on) => ({ d, bg: on ? '#BD4A19' : 'transparent', fg: on ? '#fff' : '#CDB7A8' });
+    const ci = (label, d, on, badge) => ({ label, d, badge: badge || '', w: on ? 500 : 400, bg: on ? '#EFE6DD' : 'transparent', fg: on ? '#422315' : '#5A4034', bar: on ? '#EE5E08' : 'transparent' });
+    return {
+      stop: e => e.stopPropagation(),
+      revNav: [nav(D.cal), nav(D.trend), nav(D.file), nav(D.flag), nav(D.msg, true), nav(D.user), nav(D.bell)],
+      crmNav: [
+        { head: '', items: [ci('Insight', D.trend, true), ci('Inbox', D.inbox, false, '12'), ci('Contacts', D.contact), ci('Calendar', D.cal)] },
+        { head: 'MARKETING', items: [ci('Ads Performance', D.arrow), ci('Assignment', D.users)] },
+        { head: 'REPORTS', items: [ci('Reports', D.file)] },
+        { head: 'MANAGEMENT', items: [ci('Showrooms', D.pin), ci('Forms', D.list), ci('Channels', D.phone), ci('Settings', D.sliders), ci('Audit log', D.clock)] },
+      ],
+      phoneNav: [['Insight', 'M4 20V11m6 9V5m6 15v-6m4 6H2', true, ''], ['Inbox', 'M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12Z', false, '12'], ['Assignment', 'M6 3v6a6 6 0 0 0 6 6h6m0 0-3-3m3 3-3 3M6 21v-6', false, '2'], ['Calendar', 'M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14', false, '4'], ['Profile', 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0', false, '']]
+        .map(([label, d, on, badge]) => ({ label, d, badge, c: on ? '#BD4A19' : '#7A6255', w: on ? 600 : 500 })),
+      d: this.frame('d'), p: this.frame('p'),
+    };
+  }
+}
+</script>
+</body>
+</html>

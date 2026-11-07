@@ -9,6 +9,7 @@ import { DeskApptTypes } from "./DeskApptTypes";
 import type { apptTypesVM } from "./vm/appt-types";
 import { DeskKeyLog } from "./DeskKeyLog";
 export { DeskReplyLibrary as DeskReplyLibrary4a } from "./DeskReplyLibrary";
+export { DeskUpNext as DeskUpNext4a } from "./DeskUpNext";
 export { DeskBookingBar as DeskBookingBar4a, DeskBookingLink as DeskBookingLink4a, DeskPartnerPane as DeskPartnerPane4a } from "./DeskPartner";
 import type { KeyLogVM } from "./vm/key-log";
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
@@ -266,9 +267,10 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
     </div>
     {/* v2 frames 01 / 01b: a second row of tabs under the title (Insight's Team performance | Ads performance). */}
     {h.subTabs && h.subTabs.length > 0 && (
-      <div style={{ flex: "none", display: "flex", gap: "26px", padding: "0 36px", marginTop: "-10px", borderBottom: "1px solid var(--crm-rule)", font: "500 13px Inter, sans-serif" }}>
-        {h.subTabs.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: "8px 0 10px", whiteSpace: "nowrap", font: "inherit", marginBottom: "-1px",
+      <div style={{ flex: "none", display: "flex", alignItems: h.subSlot ? "center" : undefined, gap: "26px", padding: "0 36px", marginTop: "-10px", borderBottom: "1px solid var(--crm-rule)", font: "500 13px Inter, sans-serif" }}>
+        {h.subTabs.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: h.subSlot ? "10px 0" : "8px 0 10px", whiteSpace: "nowrap", font: "inherit", marginBottom: "-1px",
           borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>)}
+        {h.subSlot && <div data-up-next-slot="" style={{ display: "contents" }} />}
       </div>
     )}
   </>);

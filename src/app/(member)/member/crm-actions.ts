@@ -63,6 +63,8 @@ const CRM_WRITES = [
   "crm_partner_link_set", "crm_partner_booking_cancel",
   // Members' leave (mig 20261029220000), CRM · Manage.
   "crm_save_leave", "crm_delete_leave",
+  // Insight › Up next (mig 20261108120000): Skip, Pause, Give to…, leave with a time and a reason. CRM · Manage, or a leader on their own line.
+  "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_clear", "crm_up_next_save_leave", "crm_up_next_end_leave",
   // v2 frame 08: put another form in use (mig 20261024160000), CRM · Manage.
   "crm_set_active_form",
   // v2 frames 02 / 03: a customer added by hand (mig 20261024180000), CRM · Edit (own).
@@ -81,6 +83,22 @@ const TELLS: ReadonlySet<string> = new Set([
   "crm_invite", "crm_answer_invite", "crm_remind",
 ]);
 const pushAfter = () => import("@/lib/push/outbox").then(m => m.pushSoon(), () => undefined);
+
+/**
+ * Insight › Up next: who the real dealer gives the next leads to (crm_up_next runs crm_assign_contact and rolls it back),
+ * and who is in turn, in the database's own answer. The database asks who may read.
+ */
+export async function fetchUpNext(a: { ad: string; ads: string[] | null; line: string | null }): Promise<{ ok: true; read: import("@/components/member/crm/shared/up-next").UpNextRead } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    await requireCrm("view");
+    const { data, error } = await db.rpc("crm_up_next", { p_ad: a.ad, p_ads: a.ads, p_n: 10, p_line: a.line });
+    if (error) throw new Error(error.message);
+    return { ok: true, read: data as import("@/components/member/crm/shared/up-next").UpNextRead };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message.slice(0, 250) : "Could not read who is next." };
+  }
+}
 
 export async function crmWrite(name: CrmWrite, args: Record<string, unknown>): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
   try {
@@ -146,6 +164,7 @@ const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
   "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded", "crm_set_key_photo",
   "crm_add_note", "crm_add_contact",
+  "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_clear", "crm_up_next_save_leave", "crm_up_next_end_leave",
 ]);
 const friendly = (error: unknown, fallback: string) => {
   const message = error instanceof Error ? error.message : fallback;
@@ -211,7 +230,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
-      forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
+      forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, upNextEvents: more.upNextEvents, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
     }));
     // Where Meta shows every template's review (2026-11-04) — for whoever writes templates; the account's id, never a token.
     const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim();
@@ -237,7 +256,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order, kind")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -266,14 +285,16 @@ async function desktopRows(db: Db, journey: boolean) {
       .gte("start_at", new Date(Date.now() - 62 * 86_400_000).toISOString()).order("start_at").limit(2000)),
     // The partners' links with their codes, CRM · Manage only ([] for anybody else, and before the migration).
     // Members' leave (mig 20261029220000): what has not ended yet (yesterday on, for the office's day).
-    soft<NonNullable<CrmDataRows["leaves"]>>(db.from("crm_staff_leave").select("id, staff_id, starts_on, ends_on, note").gte("ends_on", new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)).order("starts_on")),
+    soft<NonNullable<CrmDataRows["leaves"]>>(db.from("crm_staff_leave").select("id, staff_id, starts_on, ends_on, note, from_at, to_at, reason").gte("ends_on", new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)).order("starts_on")),
     (async () => { try { const { data, error } = await db.rpc("crm_partner_links_read"); return error || !Array.isArray(data) ? [] : (data as { id: string; name: string; code: string; on: boolean }[]); } catch { return []; } })(),
     // A lead form ad's answers (mig 20261030060000), read softly so the CRM opens before the column.
     soft<{ id: string; lead_form: CrmDataRows["contacts"][number]["lead_form"] }[]>(db.from("crm_contacts").select("id, lead_form").not("lead_form", "is", null).limit(5000)),
     // Showrooms' drafts (mig 20261103100000): CRM · Manage only, [] for anybody else and before the table.
     (async () => { try { const { data, error } = await db.rpc("crm_showroom_drafts_read"); return error || !Array.isArray(data) ? [] : (data as { room: string; draft: unknown; saved_by: string | null; saved_at: string }[]); } catch { return []; } })(),
+    // Up next's actions, for the Audit log (mig 20261108120000; the row policy gives them to CRM · Manage).
+    soft<NonNullable<CrmDataRows["upNextEvents"]>>(db.from("crm_events").select("id, at, actor, data").eq("kind", "up_next").order("at", { ascending: false }).limit(500)),
   ]);
-  return { roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
+  return { upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */
