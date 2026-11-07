@@ -36,6 +36,7 @@ import {
   round2,
 } from './engine'
 import { EMPTY_FABRIC_SERIES, indexFabricSeries, isKpiOptionPool, lineKpiFactsOf, type FabricSeriesRow } from './kpi'
+import { isOldBillDate } from './row-origin'
 import type {
   DirectorTerms,
   EngineInput,
@@ -187,11 +188,19 @@ export interface SalesOrderRow {
   manual_margin_pct: Num
   /** The brand the bill was written under (the ERP's Branding). Absent in older fixtures. */
   brand_code?: string | null
+  /** `erp_sync` for the ERP's bills (2026-11-07: only those can be an old bill topped up). Absent in older fixtures. */
+  source?: string | null
   sales_order_lines: SalesLineRow[] | null
 }
 
 export interface RunSourceRows {
   periodMonth: string
+  /**
+   * The feed window's floor (`erp_feed_settings.min_order_date`, 2026-11-07):
+   * an ERP bill dated before it, in a month from it on, is an old bill topped
+   * up and pays commission only. Absent = no old bills.
+   */
+  feedFloor?: string | null
   scheme: SchemeRow
   ranks: RankRow[]
   itemGroups: ItemGroupRow[]
@@ -287,6 +296,7 @@ export function toKpiItems(rows: readonly KpiItemRow[]): KpiItem[] {
 
 export function toEngineInput(rows: RunSourceRows): EngineInput {
   const released = new Set(rows.releasedOrderNos)
+  // (2026-11-07) An old bill topped up: commission only.
   // A bed frame's or a sofa's specials and fabric series — how an option KPI item is found.
   const fabrics = rows.fabrics?.length ? indexFabricSeries(rows.fabrics) : EMPTY_FABRIC_SERIES
   const lineFacts = (l: SalesLineRow) => lineKpiFactsOf(l.item_group, l.description2, l.variants, fabrics)
@@ -375,6 +385,9 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
       orderTotal: num(o.order_total),
       paidAmount: num(o.paid_amount),
       alreadyReleased: released.has(o.order_no),
+      // An old bill topped up pays its holder commission only (2026-11-07).
+      ...((o.source ?? 'erp_sync') === 'erp_sync' && isOldBillDate(o.order_date, o.period_month, rows.feedFloor ?? null)
+        ? { commissionOnly: true } : {}),
       manualMarginPct: numOrNull(o.manual_margin_pct),
       brandCode: o.brand_code?.trim() || null,
       lines: (o.sales_order_lines ?? []).map(l => ({

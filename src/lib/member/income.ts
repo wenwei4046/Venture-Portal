@@ -48,6 +48,12 @@ export interface IncomeBill {
   /** The member's part of a shared bill (0.5); null when it is theirs alone. */
   sharePct: number | null;
   brand: string | null;
+  /**
+   * An old bill topped up (2026-11-07): a departed salesperson's, collected by
+   * the member — it pays them its commission and is no sale of theirs (not in
+   * their sales, target or the Arena).
+   */
+  commissionOnly?: true;
 }
 
 export interface IncomeOverride {
@@ -148,6 +154,7 @@ function bill(row: CommissionOrderRow): IncomeBill {
     marginPct: row.marginPct,
     sharePct: row.share && part ? part.pct : null,
     brand: row.brands[0] ?? null,
+    ...(row.commissionOnly ? { commissionOnly: true as const } : {}),
   };
 }
 
@@ -223,6 +230,7 @@ export function closedIncome(close: {
       orderId: b.id, no: b.no, status: deferred.has(b.id) ? "deposit_pending" : b.status, upsale: false,
       commissionable: o?.basis ?? 0, orderTotal: 0, personal: o?.personal ?? 0, kpi: o?.kpi ?? 0, kpiQty: o?.kpiQty ?? 0,
       pay: round2((o?.personal ?? 0) + (o?.kpi ?? 0)), marginPct: null, sharePct: null, brand: null,
+      ...(b.commissionOnly ? { commissionOnly: true as const } : {}),
     };
   });
   const overrides: IncomeOverride[] = lines.filter(l => l.component === "override").map(l => {

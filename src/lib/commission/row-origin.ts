@@ -114,10 +114,20 @@ export function oldBillOf(
   bill: { orderDate: string; periodMonth: string; agentName: string | null },
   feedFloor: string | null,
 ): OldBill | null {
-  if (!feedFloor) return null
-  const floor = feedFloor.slice(0, 10)
-  if (!(bill.orderDate.slice(0, 10) < floor) || bill.periodMonth.slice(0, 10) < floor) return null
+  if (!isOldBillDate(bill.orderDate, bill.periodMonth, feedFloor)) return null
   return { soldIn: `${bill.orderDate.slice(0, 7)}-01`, soldBy: bill.agentName?.trim() || null }
+}
+
+/**
+ * The rule by dates alone: sold before the feed window, in a month from it on.
+ * Such a bill pays its holder commission only (the user, 2026-11-07: "is go
+ * with b, not a") — the engine's `SalesOrder.commissionOnly`; in SQL,
+ * `sales_order_old_bill()` keeps it out of the Revenue app's sales.
+ */
+export function isOldBillDate(orderDate: string, periodMonth: string, feedFloor: string | null): boolean {
+  if (!feedFloor) return false
+  const floor = feedFloor.slice(0, 10)
+  return orderDate.slice(0, 10) < floor && periodMonth.slice(0, 10) >= floor
 }
 
 /** The row as `rowOrigin` reads it — a `CommissionOrderRow` will do. */

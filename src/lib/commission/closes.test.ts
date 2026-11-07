@@ -197,3 +197,34 @@ describe('closing several at once', () => {
     ])
   })
 })
+
+// ─── An old bill topped up (2026-11-07) ─────────────────────────────────────
+
+describe('an old bill topped up', () => {
+  // A departed salesperson's March bill whose top-up the agent collected.
+  const old = sale('old', 4_000, { orderDate: '2026-03-14', commissionOnly: true })
+  const source = input({ orders: [sale('one'), old] })
+  const plain = input({ orders: [sale('one')] })
+
+  it('pays the agent its commission and is none of their sales', () => {
+    const melvin = board(source).people.find(p => p.staffId === 'agent')!
+    // 6% of their own 1,000 and of the old bill's 4,000.
+    expect(salespersonFigures(melvin)).toMatchObject({ orders: 1, salesValue: 1_000, commissionable: 1_000, personal: 300, total: 300 })
+    expect(melvin.personalRows.find(r => r.orderId === 'old')).toMatchObject({
+      commissionOnly: true, productCommission: 240, kpiThresholdPct: 0, marginIncentive: 0, totalCommission: 240,
+    })
+  })
+
+  it('pays the upline nothing on it', () => {
+    const leader = board(source).people.find(p => p.staffId === 'leader')!
+    const before = board(plain).people.find(p => p.staffId === 'leader')!
+    expect(leader.overridingRows.map(r => r.orderId)).toEqual(['one'])
+    expect(leader.overrideTotal).toBe(before.overrideTotal)
+  })
+
+  it('is kept as such by the close, through JSON', () => {
+    const bills = closeOf(source, 'agent').summary.bills
+    expect(bills.find(b => b.id === 'old')).toEqual({ id: 'old', no: 'SO-old', status: 'eligible', total: 240, commissionOnly: true })
+    expect(bills.find(b => b.id === 'one')).not.toHaveProperty('commissionOnly')
+  })
+})

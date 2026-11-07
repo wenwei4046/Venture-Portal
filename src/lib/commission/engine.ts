@@ -717,6 +717,35 @@ interface Draft {
   /** true when some eligible order carried no brand at all. */
   missingBrand: boolean
   marginPenaltyWithheld: number
+  /** Old bills topped up that cleared their deposit (2026-11-07): paid at the rate, counted as nothing else. */
+  commissionOnlyOrders: SalesOrder[]
+}
+
+/**
+ * The lines an old bill topped up pays (2026-11-07, `SalesOrder.commissionOnly`;
+ * the user: commission only, no sales): the holder's rate on everything on it
+ * that earns, as billed — its KPI items are not taken off as KPI, no margin
+ * scales it — one line a bill, beside their own bills' lines.
+ */
+function commissionOnlyLines(
+  orders: readonly SalesOrder[], rate: number, periodMonth: string,
+  kpiIndex: KpiIndex, groupIndex: Map<string, boolean>,
+): StatementLine[] {
+  if (rate <= 0) return []
+  return orders.flatMap(order => {
+    const basis = orderRevenueSplit(order, kpiIndex, groupIndex).commissionable
+    if (basis === 0) return []
+    const carried = order.periodMonth !== periodMonth
+    return [{
+      component: 'product_revenue' as const,
+      sourceOrderId: order.id,
+      basisAmount: basis,
+      rate,
+      qty: null,
+      amount: round2(basis * rate),
+      note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''} · old bill, commission only`,
+    }]
+  })
 }
 
 export function computeCommissionRun(input: EngineInput): EngineResult {
@@ -822,6 +851,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
     }
 
     const eligibleOrders: SalesOrder[] = []
+    const commissionOnlyOrders: SalesOrder[] = []
     let productRevenue = 0
     let excludedRevenue = 0
     let deferredRevenue = 0
@@ -846,6 +876,14 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           requiredAmount: depositRequired(order.orderTotal, scheme.depositThresholdPct),
           productRevenue: opr,
         })
+        continue
+      }
+
+      // An old bill topped up (2026-11-07) is paid at the rate in Pass D and is
+      // no sale of its holder's: none of the revenue a rung, a group, an
+      // override, a margin or KPI is measured on.
+      if (order.commissionOnly) {
+        commissionOnlyOrders.push(order)
         continue
       }
 
@@ -875,6 +913,7 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       marginByBrand: new Map(),
       missingBrand: false,
       marginPenaltyWithheld: 0,
+      commissionOnlyOrders,
     })
   }
 
@@ -1005,6 +1044,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''} · director's own bill`,
         })
       }
+      // An old bill topped up (2026-11-07): their rate on it too, and nothing else.
+      draft.lines.push(...commissionOnlyLines(draft.commissionOnlyOrders, headRate, input.periodMonth, kpiIndex, groupIndex))
       continue
     }
     const rate = rateOf.get(draft.staffId) ?? 0
@@ -1112,6 +1153,12 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
           withheld: withheldOnThisBill,
         })
       }
+    }
+
+    // An old bill topped up (2026-11-07): the rate, and nothing else — after
+    // the KPI tally above, which it is no part of.
+    if (scheme.enableProductRevenue) {
+      draft.lines.push(...commissionOnlyLines(draft.commissionOnlyOrders, rate, input.periodMonth, kpiIndex, groupIndex))
     }
 
     // C2 threshold uplift — a single line on the whole KPI base.

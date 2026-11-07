@@ -123,4 +123,29 @@ describe("snapshotIncome — one member's month for Today's hero", () => {
     expect(snapshotIncome({ ...live, payrollStatus: "paid" }, "s1").status).toBe("locked");
   });
 });
-
+
+// 2026-11-07: an old bill topped up pays the member commission only — said on the bill, live and closed.
+describe("an old bill topped up", () => {
+  it("is marked commission only on the live month", () => {
+    const person = {
+      rankLabel: "Rank F", productRate: 0.05, overrideTotal: 0, monthlyGroupIncentive: 0, monthlyDirectorPay: 0, totalCommission: 740,
+      statement: { productCommission: 740, kpiCommission: 0, kpiQty: 0, marginIncentive: 0, productRevenue: 10000, marginBandKey: null, marginByBrand: [] },
+      personalRows: [orderRow({}), orderRow({ originalOrderId: "old", orderNo: "ZNT4813", productCommission: 240, commissionOnly: true })],
+      overridingRows: [],
+    } as unknown as WorkbenchPerson;
+    const bills = liveIncome(person, extra).bills;
+    expect(bills.find(b => b.no === "ZNT4813")).toMatchObject({ commissionOnly: true, personal: 240, pay: 240 });
+    expect(bills.find(b => b.no === "SO-1")).not.toHaveProperty("commissionOnly");
+  });
+
+  it("is kept so by the close", () => {
+    const m = closedIncome({
+      closedAt: "2026-12-01T08:00:00Z",
+      summary: { rankLabel: null, productRate: 0.05, personal: 240, overriding: 0, groupIncentive: 0, directorPay: 0, total: 240, commissionable: 0,
+        bills: [{ id: "old", no: "ZNT4813", status: "eligible", total: 240, commissionOnly: true }], overrides: [] } as unknown as CloseSummary,
+      statement: null,
+      deferred: [],
+    }, new Map(), extra);
+    expect(m.bills).toEqual([expect.objectContaining({ no: "ZNT4813", commissionOnly: true })]);
+  });
+});

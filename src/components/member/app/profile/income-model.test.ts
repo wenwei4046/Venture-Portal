@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { IncomeBill, IncomeMonth, MemberIncome } from "@/lib/member/income";
 import { memberPay, salaryFromSchedule } from "@/lib/member/income-pay";
-import { incomeVM } from "./income-model";
+import { incomeOrdersVM, incomeVM, OLD_BILL_NOTE } from "./income-model";
 
 const bill = (over: Partial<IncomeBill> = {}): IncomeBill => ({
   orderId: "o1", no: "SO-1", status: "eligible", upsale: false, commissionable: 10000, orderTotal: 10500, personal: 500,
@@ -136,5 +136,24 @@ describe("incomeVM — the fixed salary is paid out of the commission, as payrol
     expect(vm.rows.map(r => r.label)).toEqual(["Personal sales commission"]);
     expect(vm.paidAs).toBeNull();
     expect(vm.total).toBe("RM 7,974.20");
+  });
+});
+
+// 2026-11-07, the user: an old bill topped up "can view, then mention no count in sales target (arena)".
+describe("an old bill topped up in My income", () => {
+  const old = bill({ orderId: "old", no: "ZNT4813", commissionOnly: true, personal: 240, pay: 240, marginPct: null });
+  const m = month({ bills: [bill(), old] });
+
+  it("says the commission row has it, so its figures still add up", () => {
+    expect(incomeVM(data(m), false).rows.find(r => r.label === "Personal sales commission")?.sub)
+      .toBe("RM 159,484 counted sales · 1 old bill");
+  });
+
+  it("lists it among the member's orders, paid, and not counted in their sales, target or the Arena", () => {
+    const vm = incomeOrdersVM(data(m), null, [], false);
+    const row = vm.mine.rows.find(r => r.no === "ZNT4813")!;
+    expect(row).toMatchObject({ pay: "RM 240.00", sub: "Not in sales", held: false });
+    expect(vm.sheets[row.id]).toMatchObject({ tag: "Commission only", tone: "neutral", note: expect.stringContaining(OLD_BILL_NOTE) });
+    expect(OLD_BILL_NOTE).toMatch(/not counted in your sales, your target or the Arena/);
   });
 });

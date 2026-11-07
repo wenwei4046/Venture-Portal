@@ -599,3 +599,31 @@ describe('IR package database mapping', () => {
     expect(payload.p_statements[0]).toMatchObject({ group_incentive: 0, group_subsidy_cap: 0, group_breakdown: [], full_spec: false })
   })
 })
+
+// ─── An old bill topped up (2026-11-07) ─────────────────────────────────────
+
+describe('an old bill topped up', () => {
+  const old = order({ id: 'old-1', order_no: 'ZNT4813', order_date: '2026-03-14', period_month: '2026-07-01', source: 'erp_sync' })
+
+  it('is commission only: an ERP bill dated before the feed window, in a month from it on', () => {
+    const input = toEngineInput(baseRows({ feedFloor: '2026-06-01', orders: [old, order({ source: 'erp_sync' })] }))
+    expect(input.orders.find(o => o.id === 'old-1')?.commissionOnly).toBe(true)
+    expect(input.orders.find(o => o.id === 'order-1')).not.toHaveProperty('commissionOnly')
+  })
+
+  it('is nothing of the kind without a window, or from a file', () => {
+    expect(toEngineInput(baseRows({ orders: [old] })).orders[0]).not.toHaveProperty('commissionOnly')
+    expect(toEngineInput(baseRows({ feedFloor: '2026-06-01', orders: [{ ...old, source: 'file' }] })).orders[0])
+      .not.toHaveProperty('commissionOnly')
+  })
+
+  it('is released once paid, so no later month pays it again', () => {
+    const input = toEngineInput(baseRows({ feedFloor: '2026-06-01', orders: [old] }))
+    const result = computeCommissionRun(input)
+    expect(releasedOrders(input, result).map(r => r.order_no)).toEqual(['ZNT4813'])
+    // 5% of the RM 10,000 that earns, and none of it sales.
+    const statement = result.statements.find(s => s.staffId === 'staff-a')!
+    expect(statement.productCommission).toBe(500)
+    expect(statement.productRevenue).toBe(0)
+  })
+})
