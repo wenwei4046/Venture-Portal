@@ -19,7 +19,7 @@ import {
   type SalesLine,
 } from '@/lib/commission/engine'
 import { EMPTY_FABRIC_SERIES, indexFabricSeries, kpiItemLabel, lineKpiFactsOf } from '@/lib/commission/kpi'
-import { toKpiItems, type CostRatioRow, type KpiItemRow } from '@/lib/commission/run-payload'
+import { toCostRatiosByBrand, toKpiItems, type CostRatioBrandRow, type CostRatioRow, type KpiItemRow } from '@/lib/commission/run-payload'
 import { chargeText, costProvenance } from '@/lib/catalogue/provenance'
 import LedgerRow from '@/components/LedgerRow'
 import ReturnLink from '@/components/layout/ReturnLink'
@@ -214,7 +214,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // The ledger's owner, when it is not the bill's own salesperson (an upline
   // reading a downline's bill on Overriding).
   const backPerson = back?.personId && back.personId !== order.staff_id && UUID.test(back.personId) ? back.personId : null
-  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail] =
+  const [{ data: lineData }, { data: groupData }, { data: kpiData }, { data: venueData }, { data: schemeData }, exclusions, { data: ratioData }, { data: backPersonData }, shares, { data: changeData }, moves, trail, { data: brandRatioData }] =
     await Promise.all([
       // Every column rather than a list: `cost_detail` exists only once
       // 20260924030000 is applied, and naming it would break this page before.
@@ -285,6 +285,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             }))
             .catch(() => null)
         : Promise.resolve(null),
+      // A rider SKU's ratio for the brand the bill answers to (Costing Setting, 2026-11-07).
+      subDept.schemeId
+        ? supabase.from('comm_cost_ratio_brands').select('product_code, brand_code, ratio').eq('scheme_id', subDept.schemeId)
+        : Promise.resolve({ data: null }),
     ])
   const byHand = exclusions?.get(orderId) ?? null
   const moved = moves[orderId] ?? null
@@ -328,6 +332,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const costBasis = costBasisOf(
     scheme?.revenue_cost_divisor === null || scheme?.revenue_cost_divisor === undefined ? 1 : Number(scheme.revenue_cost_divisor),
     ((ratioData ?? []) as CostRatioRow[]).map(r => ({ productCode: r.product_code, ratio: Number(r.ratio) })),
+    toCostRatiosByBrand((brandRatioData ?? []) as CostRatioBrandRow[]),
   )
 
   // The lines as the engine reads them.

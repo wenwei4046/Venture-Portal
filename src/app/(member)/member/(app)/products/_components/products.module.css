@@ -641,6 +641,91 @@
   text-decoration: none;
 }
 .cellLink[data-tone="danger"] { color: var(--rv-red); }
+.cellLink:disabled { cursor: default; opacity: .45; }
+
+/* ── Costing Setting › a rider SKU by brand (2026-11-07): its BY BRAND cell, its ⋯ and its menu ── */
+.brandCell { display: flex; align-items: center; gap: 10px; min-height: 34px; }
+.brandRatios { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; }
+.brandRatio {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 12px;
+  background: var(--rv-sand);
+  color: var(--rv-brown);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 24px;
+  white-space: nowrap;
+}
+.brandRatio b { color: var(--rv-ink); font-weight: 700; }
+.brandInputs { display: flex; flex-wrap: wrap; gap: 6px 12px; flex: 1 1 auto; }
+.brandInput { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 650; color: var(--rv-sub); white-space: nowrap; }
+.brandCell > .faint { flex: 1 1 auto; }
+.rowDots {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rv-sub);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.rowDots:hover, .rowDots:focus-visible { background: var(--rv-sand); color: var(--rv-ink); outline: none; }
+.rowDots:disabled { cursor: default; opacity: .4; background: transparent; }
+.rowMenu {
+  position: absolute;
+  z-index: 6;
+  min-width: 220px;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--rv-line);
+  background: var(--rv-white);
+  box-shadow: 0 14px 34px var(--rv-window-shadow);
+  font-size: 13.5px;
+  box-sizing: border-box;
+}
+.rowMenu[data-fixed] { position: fixed; }
+.rowMenuTitle {
+  margin-bottom: 4px;
+  padding: 7px 10px 8px;
+  border-bottom: 1px solid var(--rv-rule);
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--rv-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+.rowMenuItem {
+  display: flex;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--rv-ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.rowMenuItem:hover, .rowMenuItem:focus-visible { background: var(--rv-cream); outline: none; }
+.rowMenuItem[data-tone="danger"] { color: var(--rv-red); }
+.rowMenuItem:disabled { cursor: default; opacity: .45; background: transparent; }
+/* The picker's ratios by brand, under its controls. */
+.pickerBrands { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.pickerBrandsLabel { font-size: 12px; font-weight: 650; letter-spacing: .1em; color: var(--rv-sub); }
+.pickerBrandInput { width: 56px; }
 .empty { padding: 40px 14px; text-align: center; color: var(--rv-sub); font-size: 14px; white-space: normal; }
 .foot {
   display: flex;

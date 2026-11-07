@@ -282,7 +282,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
   const configuredKpiIndex = indexKpiItems(input.kpiItems)
   const kpiIndex = input.scheme.enableKpi ? configuredKpiIndex : EMPTY_KPI_INDEX
   const groupIndex = indexItemGroups(input.scheme.itemGroups)
-  const costBasis = costBasisOf(input.scheme.costDivisor, input.scheme.costRatios)
+  const costBasis = costBasisOf(input.scheme.costDivisor, input.scheme.costRatios, input.scheme.costRatiosByBrand)
   const nameOf = (staffId: string) => personMeta.get(staffId)?.name ?? staffId
   const rankOf = (staffId: string) => input.ranks.find(rank =>
     rank.rankKey === (statements.get(staffId)?.effectiveRankKey ?? hierarchy.get(staffId)?.baseRankKey))

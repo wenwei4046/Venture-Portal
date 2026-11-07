@@ -141,6 +141,24 @@ describe('toEngineInput', () => {
     expect(input.orders[0].lines[1].optionCharge).toBe(200)
   })
 
+  // 2026-11-07: a rider SKU's ratio by brand (Costing Setting) — strings read, anything else left out.
+  it("carries a rider SKU's ratios by brand, and no key at all while it has none", () => {
+    expect(toEngineInput(baseRows()).scheme).not.toHaveProperty('costRatiosByBrand')
+    const input = toEngineInput(baseRows({
+      costRatiosByBrand: [
+        { product_code: 'TRION (A)-(K)', brand_code: 'DUNLOP', ratio: '0.6000' },
+        { product_code: 'TRION (A)-(K)', brand_code: 'ERGOTEX', ratio: 0.5 },
+        { product_code: 'TRION (A)-(K)', brand_code: 'AKEMI', ratio: '0' },
+        { product_code: ' ', brand_code: 'AKEMI', ratio: '0.6' },
+        { product_code: 'TRION (A)-(Q)', brand_code: '', ratio: '0.6' },
+      ],
+    }))
+    expect(input.scheme.costRatiosByBrand).toEqual([
+      { productCode: 'TRION (A)-(K)', brand: 'DUNLOP', ratio: 0.6 },
+      { productCode: 'TRION (A)-(K)', brand: 'ERGOTEX', ratio: 0.5 },
+    ])
+  })
+
   it('carries each rung\'s title, and the title a person holds, into the engine', () => {
     const input = toEngineInput(
       baseRows({

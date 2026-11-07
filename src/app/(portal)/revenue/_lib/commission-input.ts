@@ -13,6 +13,7 @@ import { loadBillsByDocNo, loadFeedFloor } from './row-origins'
 import { isOldBillDate } from '@/lib/commission/row-origin'
 import { namesFabricSeries, readFabricSeries } from './fabric-series'
 import type {
+  CostRatioBrandRow,
   CostRatioRow,
   HierarchyRow,
   ItemGroupRow,
@@ -167,7 +168,7 @@ export async function loadCommissionInput(
   const [thisMonth, earlier, releases, ranks, itemGroups, kpiItems, kpiThresholds,
     marginBands, hierarchy, upsales, currentHierarchyRows,
     currentKpiItems, currentKpiThresholds, cutover,
-    costRatios, heads, directorRows, directorPayRows, standingCloses, appliedRuns] = await Promise.all([
+    costRatios, costRatiosByBrand, heads, directorRows, directorPayRows, standingCloses, appliedRuns] = await Promise.all([
     readRows<SalesOrderRow>('the sales orders', (from, to) =>
       supabase.from('sales_orders').select(orderSelect).eq('batch_id', batchId)
         .eq('cancelled', false).order('id').range(from, to)),
@@ -232,6 +233,10 @@ export async function loadCommissionInput(
     readRows<CostRatioRow>('the cost ratios', (from, to) =>
       supabase.from('comm_cost_ratios').select('product_code, ratio')
         .eq('scheme_id', scheme.id).order('erp_product_id').range(from, to)),
+    // A rider SKU's ratio for the brand its bill answers to (Costing Setting, 2026-11-07).
+    readRows<CostRatioBrandRow>('the cost ratios by brand', (from, to) =>
+      supabase.from('comm_cost_ratio_brands').select('product_code, brand_code, ratio')
+        .eq('scheme_id', scheme.id).order('erp_product_id').order('brand_code').range(from, to)),
     // A Revenue Director's own bills earn nothing by rule (2026-09-27): the
     // engine must know them from somebody merely left off the team.
     readRows<{ id: string; title_id: string | null }>('who heads the department', (from, to) =>
@@ -364,7 +369,7 @@ export async function loadCommissionInput(
   const sourceRows = {
     periodMonth: period, scheme, ranks, itemGroups, kpiItems, kpiThresholds,
     marginBands, hierarchy, orders: orderRows,
-    releasedOrderNos, priorMonths, shares, upsales, upsaleShares, costRatios, fabrics,
+    releasedOrderNos, priorMonths, shares, upsales, upsaleShares, costRatios, costRatiosByBrand, fabrics,
     departmentHeadIds: heads.map(head => head.id),
     directors,
     monthCommissionableValue: monthValue,

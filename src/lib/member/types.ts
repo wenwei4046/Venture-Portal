@@ -353,6 +353,12 @@ export interface QuoteRules {
    */
   costRatios?: { productCode: string; ratio: number }[];
   /**
+   * A rider SKU's ratio for a brand (Costing Setting, 2026-11-07): in a cart
+   * that answers to that brand's ladder, ahead of the SKU's own ratio and the
+   * divisor. Server-only, as every ratio. Absent = none.
+   */
+  costRatiosByBrand?: { productCode: string; brand: string; ratio: number }[];
+  /**
    * The department's KPI items while its KPI pay is on (Rules › KPI items;
    * 2026-09-27, on Rules since 2026-10-08): a cart carrying one has that amount off
    * its price for the margin — the run pays it flat as KPI. Absent = none.

@@ -286,18 +286,27 @@ function schemeOf(schemeId: string): string {
   return schemeId
 }
 
-/** One sub-department's cost ratio and its SKUs' own, in one transaction. */
+/**
+ * One sub-department's cost ratio, its SKUs' own and — since 2026-11-07 — its
+ * rider SKUs' ratios by brand, in one transaction. A save with no brand in it
+ * goes through the 4-argument writer as it always has; one with brands through
+ * the 5-argument one, which calls it first.
+ */
 export async function saveCostSetting(schemeId: string, edit: CostSettingEdit): Promise<SaveSummary> {
   await requireProductListEdit()
   const scheme = schemeOf(schemeId)
   const plan = guard(() => validateCostSetting(edit))
   const sb = await client()
-  const { data, error } = await sb.rpc('catalogue_save_cost_setting', {
+  const args = {
     p_scheme: scheme,
     p_divisor: plan.divisor,
     p_ratios: plan.ratios,
     p_removes: plan.removes,
-  })
+  }
+  const { data, error } = await sb.rpc(
+    'catalogue_save_cost_setting',
+    plan.brands.length > 0 ? { ...args, p_brands: plan.brands } : args,
+  )
   if (error) ruleFail('the costing setting', error)
   refresh()
   return { saved: Number(data ?? 0) }
