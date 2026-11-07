@@ -979,8 +979,18 @@ invariant survives.
 | **total** | **500** = 10% of 5,000 |
 
 It does **not** scale the flat KPI allowance — that is paid for moving the item,
-not for the margin — and it does not reduce **group sales**, which is a sales
-figure used for promotion, not a commission figure.
+not for the margin.
+
+~~It does not reduce group sales, which is a sales figure used for promotion.~~
+**Since 2026-11-07 it does** (the user: *"只要是 drop com 的情况也是一样的 …
+原本 1 万块的 total sales order 也只是算 5,000 块的 sales。当然 commission 还是一样算 1 万块的
+50%"*; asked where, *"连升级业绩也打折"*): a bill's sales count at the
+multiplier its commission is paid at — its holder's personal sales, the group
+sales up the line, the rung a variable rate resolves and a promotion's figures
+(`Statement.productRevenue`, Pass A), and the Revenue app's sales, target and
+Arena (`member_order_facts`, mig `20261107233000`). A bill with no margin yet,
+a department head's own bill, and every bill while the penalty is switched off
+count whole, as their commission is paid whole.
 
 ### 4.6.1 The incentive is per brand, and every brand must clear the tier
 
@@ -1251,6 +1261,13 @@ bills are read (user 2026-09-30: 右 click 加多一个 option 是 share 单 —
 `shareOrder` / `unshareOrder` answer with the bill's holders as they now stand
 (`BillShareResult`, `lib/commission/bill-share.ts`); the menu's form, its
 checks and its words are that file's. No migration.
+
+**A salesperson's share request takes effect on its colleague's Accept**
+(2026-11-07, mig `20261107233000`; the user: *"其实不需要 HR approval … accept
+了之后，这张单就正常了 … 所以它的 trail 只有两个"*): the checks HR's Approve made run on
+the Accept, the shares are written then, and HR is told (*"生效时通知 HR"*) —
+each half is paid at its holder's own rate, so a share to a colleague on a
+higher rate pays more, and HR's *Cancel share* is the check after the fact.
 
 ### 4.14 Possible double claims — and why each one is there (2026-09-30)
 
