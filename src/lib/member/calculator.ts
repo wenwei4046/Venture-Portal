@@ -27,6 +27,7 @@ import {
 import { valueKey } from "@/lib/catalogue/keys";
 import { pickCombo, spreadComboTotal, type PricedCombo } from "@/lib/catalogue/combos";
 import { costBasisOf, costDivisorFor } from "@/lib/commission/cost-basis";
+import { gwpFreeUnits } from "@/lib/catalogue/gwp";
 import { indexKpiItems, kpiItemLabel, orderKpiHits, type KpiLine } from "@/lib/commission/kpi";
 import { buildChoicesFor, buildError, buildKey, buildLines, frameBuildError, frameBuildText, kindOf, specialQtyOf } from "./build";
 import { atPrice, cents } from "./quote-price";
@@ -402,24 +403,46 @@ export function calculateQuote(
     return invalid(
       "That seat height is not available for a sofa module in the cart. Pick another height.",
     );
+  // A gift with purchase (Product List › GWP, 2026-11-08): with one of a GWP's
+  // buy SKUs in the cart, up to its units of the gift SKUs leave the cost,
+  // cheapest first — as the run reads the bill (gwpFreeUnits, its SQL twin
+  // sales_order_gwp_free). Nothing on screen says so (the user: "no need show
+  // gwp wording").
+  const lineKey = (i: number) => String(i).padStart(4, "0");
+  const hasUnit = (l: (typeof costed)[number]) =>
+    l.unit != null && Number.isFinite(l.unit) && l.unit >= 0;
+  const gwpFree = gwpFreeUnits(
+    costed.map((l, i) => ({
+      id: lineKey(i),
+      productCode: l.product.code,
+      qty: l.line.quantity,
+      costAmount: l.comboCents !== null ? l.comboCents / 100 : hasUnit(l) ? l.unit! * l.line.quantity : null,
+    })),
+    rules.gwp ?? [],
+  );
+  const freeOf = (i: number) => gwpFree.get(lineKey(i)) ?? 0;
   // A module the portal has not priced is still costed when a priced combo
-  // covers it — the combo is the set's cost, the ERP's rule.
+  // covers it — the combo is the set's cost, the ERP's rule. A line wholly
+  // given with a purchase needs no price either: its cost is not the margin's.
   if (
     costed.some(
-      (l) =>
+      (l, i) =>
         l.comboCents === null &&
-        (l.unit == null || !Number.isFinite(l.unit) || l.unit < 0),
+        !hasUnit(l) &&
+        freeOf(i) < l.line.quantity,
     )
   )
     return invalid(
       "Product cost is pending a Principal update. Margin cannot be confirmed yet.",
     );
   const cost = costed.reduce(
-    (sum, l) =>
+    (sum, l, i) =>
       sum +
       (l.comboCents !== null
-        ? Math.round(l.comboCents / divisorOf(l.product))
-        : teamCostCents(l.unit!, divisorOf(l.product)) * l.line.quantity),
+        ? Math.round((l.comboCents * (1 - Math.min(1, freeOf(i) / l.line.quantity))) / divisorOf(l.product))
+        : hasUnit(l)
+          ? teamCostCents(l.unit!, divisorOf(l.product)) * (l.line.quantity - freeOf(i))
+          : 0),
     0,
   );
   if (!Number.isSafeInteger(cost))

@@ -274,8 +274,14 @@ export function marginBase(
   for (const line of goods) {
     revenue = round2(revenue + line.lineAmount)
     charges = round2(charges + (line.optionCharge ?? 0))
-    if (line.costAmount === undefined || line.costAmount === null) complete = false
-    else cost = round2(cost + line.costAmount / costDivisorFor(line.productCode, basis, brandCode))
+    // A gift with purchase (Product List › GWP, 2026-11-08): its part of the line costs the margin
+    // nothing, and a line wholly given never holds the bill as uncosted (the SQL twins read it the same).
+    const given = Math.min(1, Math.max(0, line.gwpFree ?? 0))
+    if (line.costAmount === undefined || line.costAmount === null) {
+      if (given < 1) complete = false
+    } else {
+      cost = round2(cost + (line.costAmount * (1 - given)) / costDivisorFor(line.productCode, basis, brandCode))
+    }
   }
   if (kpiIndex.size > 0) revenue = coverKpi(revenue, kpiAmountOf(orderKpiHits({ lines }, kpiIndex))).main
   // What its bed frames' divan, leg, gap and total height were charged is the customer's

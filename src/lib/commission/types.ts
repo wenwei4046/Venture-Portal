@@ -79,6 +79,13 @@ export interface SalesLine {
    * the ERP billed.
    */
   upsale?: boolean
+  /**
+   * The part of this line given as a gift with purchase (Product List › GWP, 2026-11-08), 0 < part ≤ 1 —
+   * worked out for the whole bill before it is shared (`gwpFreeParts`, lib/catalogue/gwp.ts), so a holder's
+   * share keeps it. Its cost leaves the margin by that part; a line wholly given never holds the bill as
+   * uncosted. Absent = none.
+   */
+  gwpFree?: number
 }
 
 export interface SalesOrder {
