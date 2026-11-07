@@ -1084,8 +1084,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   }, [reqPick, fxp, cancelled, myRequests, history, nameOf, readOnlyView, queues, closed]);
   // A waiting list or replacement opens the handoff's sheet (Edit request → Update); a claim keeps its own.
   const reqKind = fxp ? (reqPick ? fxp.requests.rows.find(r => r.id === reqPick)?.kind ?? null : null) : myRequests.find(r => r.id === reqPick)?.kind ?? null;
-  // A claim's own sheet — a food claim's too (the app's `food`).
-  const reqIsClaim = reqKind === "claim" || reqKind === "food";
+  // A claim's own sheet — a food claim's and an Other claim's too (the app's `food`, `other`).
+  const reqIsClaim = reqKind === "claim" || reqKind === "food" || reqKind === "other";
   const vaGroups = useMemo(() => (fxp
     ? protoVaGroups(fxp.va.people, fxp.va.departments, vaQuery, viewed?.id ?? "")
     : vaGroupsVM(data.memberships, vaQuery, viewed?.id ?? "")), [fxp, data.memberships, vaQuery, viewed?.id]);
@@ -1344,8 +1344,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // …and a transport claim (Outstation, a plane ticket, an Airbnb stay) only for a title HR ticked for any of it
   // (2026-10-20; the air ticket alone since 2026-10-31).
   const transportOpen = canRoad || canPlane;
+  // …and an Other claim (2026-11-07) to whoever may send a claim at all: no title list, no rates.
   const pageKinds = useMemo<RequestKindVM[]>(() => requestKinds.flatMap(k => (k === "claim"
-    ? [...(transportOpen ? ["claim"] : []), ...(foodOpen ? ["food"] : [])] as RequestKindVM[]
+    ? [...(transportOpen ? ["claim"] : []), ...(foodOpen ? ["food"] : []), "other"] as RequestKindVM[]
     : [k])), [requestKinds, foodOpen, transportOpen]);
 
   // ── pull to refresh: the end of it ──

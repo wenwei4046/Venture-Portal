@@ -138,6 +138,17 @@ describe('Request reviews · words and facts', () => {
       'Rate a day: RM 20.00 × 3 days', 'Submitted by: ANTHONY',
     ])
     expect(foodDaysLine({ days: ['2026-11-01', '2026-10-30', '2026-10-31', 'x'] })).toBe('30, 31 Oct, 1 Nov')
+    // An Other claim (2026-11-07): what it is for in the member's words, the amount theirs — HR checks it against the invoice.
+    const other = requestFacts(req({ kind: 'claim', detail: {
+      claimType: 'other', category: 'Other claim', subject: 'Parking at MITEC', remarks: 'Three days of the fair', amount: 45.5,
+      invoiceName: 'parking.pdf', invoiceHash: 'a'.repeat(64),
+    } }), { submittedBy: 'ANTHONY', original: null, successor: null, target: null, acceptedAt: null, events: [] }, { departments })
+    expect(other.map(r => `${r.l}: ${r.v}`)).toEqual([
+      'Claim category: Other claim', 'Subject: Parking at MITEC', 'Remarks: Three days of the fair', 'Claim amount: RM 45.50', 'Submitted by: ANTHONY',
+    ])
+    // A subject on another kind of claim is not one of its facts.
+    expect(requestFacts(req({ kind: 'claim', detail: { claimType: 'airbnb', subject: 'x', remarks: 'y', amount: 1 } }), undefined, { departments }).map(r => r.l))
+      .not.toContain('Subject')
   })
 
   it('says what HR does next', () => {
