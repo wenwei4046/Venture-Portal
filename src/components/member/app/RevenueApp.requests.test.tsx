@@ -17,6 +17,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => nav.router,
 }));
 vi.mock("@/app/(member)/member/actions", () => ({}));
+// An invoice stays the File itself in the form (the trip to R2 needs a signed-in browser).
+vi.mock("@/lib/storage/stage", () => import("@/test/stage-in-place"));
 vi.mock("@/app/(member)/member/rooms-actions", () => ({}));
 vi.mock("@/app/(member)/member/docs-actions", () => ({}));
 vi.mock("@/app/(member)/member/it-actions", () => ({}));
@@ -326,6 +328,35 @@ describe("a transport claim", () => {
   it("is not offered to anybody when HR ticked no title", async () => {
     await open(memberData, "?page=account&view=requests&department=ir", TRANSPORT([]));
     await waitFor(() => expect(screen.queryByRole("button", { name: /Submit transport claim/ })).not.toBeInTheDocument());
+  });
+
+  // The user, 2026-11-07: "Submit Claim 里面多一个东西叫 Other Claim" — for whoever may send a claim, no title list.
+  it("an Other claim is offered whatever the title, and goes as a claim of its own kind", async () => {
+    const live = await open(memberData, "?page=account&view=requests&department=ir", TRANSPORT([]));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Submit transport claim/ })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /Submit other claim/ }));
+    const other = within(form("Submit other claim"));
+    fireEvent.change(other.getByRole("textbox", { name: "Subject" }), { target: { value: "Parking at MITEC" } });
+    fireEvent.change(other.getByRole("textbox", { name: "Remarks" }), { target: { value: "Three days of the fair" } });
+    fireEvent.change(other.getByRole("textbox", { name: "Amount (RM)" }), { target: { value: "45.50" } });
+    fireEvent.change(form("Submit other claim").querySelector('input[type="file"]')!, {
+      target: { files: [new File(["%PDF-1.7"], "parking.pdf", { type: "application/pdf" })] },
+    });
+    fireEvent.click(other.getByRole("button", { name: "Review & submit claim" }));
+    await waitFor(() => expect(live.submitRequest).toHaveBeenCalledTimes(1));
+    const sentForm = live.submitRequest.mock.calls[0][0] as FormData;
+    expect(Object.fromEntries([...sentForm.entries()].filter(([k]) => k !== "idempotencyKey" && k !== "invoice" && k !== "subDepartmentId")))
+      .toEqual({ kind: "claim", claimType: "other", subject: "Parking at MITEC", remarks: "Three days of the fair", amount: "45.50" });
+    expect((sentForm.get("invoice") as File).name).toBe("parking.pdf");
+  });
+
+  it("an Other claim in View as opens on nothing sent, and sends nothing", async () => {
+    const live = await open(principalData, "?page=account&view=requests&department=fair&staff=yuny", TRANSPORT([]));
+    fireEvent.click(await screen.findByRole("button", { name: /Submit other claim/ }));
+    const cta = within(form("Submit other claim")).getByRole("button", { name: "Read-only while viewing as" });
+    expect(cta).toBeDisabled();
+    fireEvent.click(cta);
+    expect(live.submitRequest).not.toHaveBeenCalled();
   });
 
   // The user, 2026-10-31: "有一些人如果不可以 claim 普通 transport claim，但他可以 claim Air ticket claim".

@@ -33,6 +33,7 @@ export type FormLink = () => Promise<{ ok: true; data: { url: string; name: stri
 const TEXT: Record<RequestKindVM, [string, string, string, string]> = {
   claim: ["Submit transport claim", "Outstation or Airbnb stay for a fair", "Review & submit claim", "HR will check your claim. Payment is tracked in Requests."],
   food: ["Submit food claim", "Meals on the days you worked a fair", "Review & submit claim", "HR will check your claim. Payment is tracked in Requests."],
+  other: ["Submit other claim", "Any other expense, with its invoice", "Review & submit claim", "HR will check your claim. Payment is tracked in Requests."],
   replacement: ["Submit replacement", "Replace, transfer or release a team member", "Review & submit", "HR reviews it, and the receiving department confirms if it is a transfer."],
   waiting: ["Submit waiting list", "Bring a new member into the team", "Review & submit", "HR matches the request to an open place by eligibility and start date."],
 };
@@ -113,6 +114,12 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   const [file, setFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [notes, setNotes] = useState(str("notes"));
+  // ── other (2026-11-07 — the user: "写主题是什么、remarks 是什么，and then attach 它的 invoice，然后填它的 amount"):
+  // a returned one comes back as it was sent, its invoice attached again ──
+  const otherPrior = str("claimType") === "other";
+  const [subject, setSubject] = useState(otherPrior ? str("subject") : "");
+  const [remarks, setRemarks] = useState(otherPrior ? str("remarks") : "");
+  const [otherAmount, setOtherAmount] = useState(() => (otherPrior && typeof prior.amount === "number" ? prior.amount.toFixed(2) : ""));
   // ── food (2026-10-13): a MONTH at a time (the user: "submit by total month … dont by week submit") — every brand
   // week of it, each opened to its fair's days, every day they may claim ticked to start; sent once the month is over.
   // A day is claimed in its own month (2026-11-01): a weekend across two months is on both, the other month's days
@@ -215,6 +222,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   const regionProblem = regionRow ? regionClaimProblem(regionRow, venue, options.rates.base, cat) : null;
   const ticketValue = money(ticket);
   const stayValue = money(stay);
+  const otherValue = money(otherAmount);
   const nights = nightsBetween(checkIn, checkOut);
   const pax = male + female;
   // The invoice's total is typed and paid up to a cap by head count: up to HR's small group, HR's
@@ -282,8 +290,8 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
     if (busy || readOnly) return;
     setError(null);
     const form = new FormData();
-    // A food claim is a claim to the database (`claimType` food).
-    form.set("kind", kind === "food" ? "claim" : kind);
+    // A food claim and an Other claim are claims to the database (`claimType` food, other).
+    form.set("kind", kind === "food" || kind === "other" ? "claim" : kind);
     form.set("subDepartmentId", options.departmentId);
     form.set("idempotencyKey", idem.current);
     if (revising) form.set("requestId", revising.id);
@@ -298,6 +306,18 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       form.set("month", foodMonth);
       form.set("weeks", JSON.stringify(foodWeeks.filter(x => x.days.length).map(x => ({ week: x.week.key, days: x.days }))));
       form.set("notes", notes.trim());
+    } else if (kind === "other") {
+      // Its subject, remarks, amount and invoice — the amount as the invoice shows it, which HR checks.
+      if (!subject.trim()) return setError("Enter the claim's subject.");
+      if (!remarks.trim()) return setError("Add remarks: what it was for.");
+      if (!(otherValue !== null && otherValue > 0)) return setError("Enter the amount, as its invoice shows.");
+      if (!file) return setError("Add the invoice.");
+      if (file.size > 100 * 1024 * 1024) return setError("The invoice must be 100 MB or smaller.");
+      form.set("claimType", "other");
+      form.set("subject", subject.trim());
+      form.set("remarks", remarks.trim());
+      form.set("amount", otherAmount.trim());
+      form.set("invoice", file);
     } else if (kind === "claim") {
       // The week is all that is sent: its fair, venue and region are the database's own records.
       if (!weekRow?.claimable) return setError("Choose one of your brand weeks. A claim is only for your own brand week.");
@@ -408,10 +428,10 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       const outcome = await onSubmit(form);
       if (outcome.ok) {
         setDone(outcome.code);
-        if (kind !== "claim" && kind !== "food" && signedName) setDoneFile(`Signed form attached · ${signedName}`);
+        if (kind !== "claim" && kind !== "food" && kind !== "other" && signedName) setDoneFile(`Signed form attached · ${signedName}`);
       } else {
         setError(outcome.error);
-        freshKey();
+        freshKey(true);
       }
     } catch {
       setError("Could not send it. Check your connection and try again.");
@@ -422,8 +442,12 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   };
   // A food claim sent again after a refusal is a new submission: the days it holds may have changed, and a key
   // already used for other days is refused. Sending twice cannot pay twice — a day is claimed once (the database).
-  const freshKey = () => {
-    if (kind === "food") idem.current = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
+  // An Other claim refused is a new one too once it is changed (2026-11-07) — but not after a lost connection, when
+  // the same key finds the claim the first press may have sent; its invoice is claimed once either way (the database).
+  const freshKey = (refused = false) => {
+    if (kind === "food" || (kind === "other" && refused && !revising)) {
+      idem.current = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
+    }
   };
 
   const point = (e: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -531,6 +555,24 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
               <span className={s.sumNote}>Set by HR&apos;s rate a day. You can&apos;t edit the amount.</span>
             </div>
             <label className={s.field}><span className={s.fieldLabel}>Notes (optional)</span><textarea rows={2} className={`${s.input} ${s.textarea}`} placeholder="Anything HR should know" value={notes} onChange={e => setNotes(e.target.value)} maxLength={1500} /></label>
+          </>
+        )}
+        {kind === "other" && (
+          <>
+            <label className={s.field}><span className={s.fieldLabel}>Subject</span>
+              <input type="text" className={s.input} placeholder="e.g. Parking at MITEC" value={subject} onChange={e => { setSubject(e.target.value); setError(null); }} maxLength={100} />
+            </label>
+            <label className={s.field}><span className={s.fieldLabel}>Remarks</span>
+              <textarea rows={3} className={`${s.input} ${s.textarea}`} placeholder="What it was for, and when" value={remarks} onChange={e => { setRemarks(e.target.value); setError(null); }} maxLength={500} />
+            </label>
+            <Invoice file={file} fileRef={fileRef} onFile={f => { setFile(f); setError(null); }} />
+            <label className={s.field}><span className={s.fieldLabel}>Amount (RM)</span>
+              <input type="text" inputMode="decimal" className={s.input} placeholder="e.g. 45.00" value={otherAmount} onChange={e => { setOtherAmount(e.target.value); setError(null); }} maxLength={12} />
+            </label>
+            <div className={s.sum}>
+              <div className={s.sumTotal}><span className={s.sumTotalLabel}>Claim amount</span><span className={s.sumTotalValue}>{rm2(otherValue ?? 0)}</span></div>
+              <span className={s.sumNote}>As its invoice shows. HR checks it against the invoice.</span>
+            </div>
           </>
         )}
         {kind === "claim" && (

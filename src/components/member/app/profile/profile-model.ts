@@ -84,7 +84,7 @@ export const requestStatus = (status: string, at?: { position?: number | null; d
   return [word, tone];
 };
 
-const KIND_LABEL: Record<RequestKindVM, string> = { claim: "Claim", food: "Food claim", replacement: "Replacement", waiting: "Waiting list" };
+const KIND_LABEL: Record<RequestKindVM, string> = { claim: "Claim", food: "Food claim", other: "Other claim", replacement: "Replacement", waiting: "Waiting list" };
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const num = (v: unknown) => (typeof v === "number" ? v : typeof v === "string" && v !== "" ? Number(v) : NaN);
 /** A food claim's days, as stored (`YYYY-MM-DD`). */
@@ -95,9 +95,11 @@ const foodMonth = (d: Record<string, unknown>) => str(d.monthLabel) || (/^\d{4}-
 const foodFairs = (d: Record<string, unknown>) => [...new Set((Array.isArray(d.weeks) ? d.weeks : [])
   .map(w => (w && typeof w === "object" ? str((w as Record<string, unknown>).location) : "")).filter(Boolean))];
 
-/** The app's kind of a request: a food claim is a claim the app shows on its own (2026-10-13). */
+/** The app's kind of a request: a food claim (2026-10-13) and an Other claim (2026-11-07) are claims the app shows on their own. */
 export function requestKindOf(r: Pick<MemberRequest, "kind" | "detail">): RequestKindVM {
-  return r.kind === "claim" && r.detail?.claimType === "food" ? "food" : r.kind;
+  if (r.kind === "claim" && r.detail?.claimType === "food") return "food";
+  if (r.kind === "claim" && r.detail?.claimType === "other") return "other";
+  return r.kind;
 }
 
 /** `Outstation claim · Mid Valley Megamall`, `Amelia Tan · Waiting List`, `DARREN ONG · Replacement`. */
@@ -107,6 +109,8 @@ export function requestTitle(r: MemberRequest, nameOf: (staffId: string) => stri
     const type = str(d.claimType);
     const where = str(d.location);
     if (type === "food") return `Food claim${foodMonth(d) ? ` · ${foodMonth(d)}` : ""}`;
+    // Anything else (2026-11-07): `Other claim · Parking at MITEC`, as the database titles it.
+    if (type === "other") return `Other claim${str(d.subject) ? ` · ${str(d.subject)}` : ""}`;
     // An air ticket (*Plane ticket* until 2026-11-01 — the user: "go with the same name Air ticket claim").
     if (type === "outstation" && d.planeTicket === true) return `Air ticket claim${where ? ` · ${where}` : ""}`;
     if (type === "outstation") return `Outstation claim${where ? ` · ${where}` : ""}`;
@@ -138,6 +142,7 @@ export function requestSummary(r: MemberRequest, nameOf: (staffId: string) => st
       const days = foodDays(d);
       return [days.length ? `${days.length} day${days.length === 1 ? "" : "s"}` : "", foodMonth(d), money].filter(Boolean).join(" · ");
     }
+    if (str(d.claimType) === "other") return [str(d.subject), money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "outstation" && d.planeTicket === true) return [str(d.regionName), "air ticket", money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "outstation") return [str(d.regionName) || str(d.region), Number.isFinite(num(d.spots)) ? `${num(d.spots)} spots` : "", money].filter(Boolean).join(" · ");
     if (str(d.claimType) === "airbnb") {
@@ -263,6 +268,12 @@ export function requestDetailVM(r: MemberRequest, events: readonly RequestEvent[
             { l: "Days", v: foodDays(d).length ? `${dayList(foodDays(d))} · ${foodDays(d).length} day${foodDays(d).length === 1 ? "" : "s"}` : "" },
             { l: "Fairs", v: foodFairs(d).join(", ") },
             { l: "Rate a day", v: Number.isFinite(num(d.rate)) ? rm2(num(d.rate)) : "" },
+          ] : []),
+          // An Other claim (2026-11-07): what it is for, in the member's own words, and its invoice.
+          ...(requestKindOf(r) === "other" ? [
+            { l: "Subject", v: str(d.subject) },
+            { l: "Remarks", v: str(d.remarks) },
+            { l: "Invoice", v: str(d.invoiceName) },
           ] : []),
           ...(Number.isFinite(amount) ? [{ l: "Claim amount", v: rm2(amount) }] : []),
           { l: "Current step", v: status },

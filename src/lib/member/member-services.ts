@@ -158,6 +158,9 @@ export function requestFacts(r: MemberRequest, facts: RequestFacts | undefined, 
           ]
         : [
             ["Claim category", CATEGORY[str(d.category)] ?? str(d.category)],
+            // An Other claim (2026-11-07): what it is for, in the member's words — its amount is theirs, from the invoice.
+            ["Subject", str(d.claimType) === "other" ? str(d.subject) : ""],
+            ["Remarks", str(d.claimType) === "other" ? str(d.remarks) : ""],
             ["Claim amount", money(d.amount)],
             // A food claim (2026-10-13): its month, the days it is for and the fair of each weekend, at HR's rate a day.
             ["Month", str(d.claimType) === "food" ? str(d.monthLabel) || str(d.month) : ""],

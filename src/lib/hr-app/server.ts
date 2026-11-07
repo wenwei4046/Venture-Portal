@@ -72,6 +72,9 @@ export function memberRequestOf(r: MemberRequest, facts: RequestFacts | undefine
     effective: str(d.effective) || null,
     reason: str(d.reason) || null,
     category: CATEGORY[str(d.category)] ?? (str(d.category) || null),
+    // An Other claim (2026-11-07): its subject and remarks, as Request reviews shows them.
+    subject: r.kind === 'claim' && str(d.claimType) === 'other' ? str(d.subject) || null : null,
+    remarks: r.kind === 'claim' && str(d.claimType) === 'other' ? str(d.remarks) || null : null,
     location: str(d.location) || null,
     amount,
   }

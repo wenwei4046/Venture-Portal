@@ -194,6 +194,26 @@ describe('Approve', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Request payment' }))
     await waitFor(() => expect(decide).toHaveBeenCalledWith('q1', 'approve', 'Receipts checked', 'payment'))
   })
+
+  // 2026-11-07: an Other claim reads by its subject, its remarks beside it — HR decides it on the phone as any claim.
+  it('Members: an Other claim shows its subject and remarks, and is decided as any claim', async () => {
+    const other = {
+      id: 'q2', code: 'RQ-2611-004', kind: 'claim' as const, status: 'submitted', sub: 'Fair', byName: 'Kar Jun',
+      category: 'Other claim', subject: 'Parking at MITEC', remarks: 'Three days of the fair', location: null, amount: '45.5',
+    }
+    const decide = vi.fn(async () => ({ ok: true as const }))
+    render(<HrApp data={{ ...data, requests: [other], parts: { ...data.parts, requests: true }, may: { ...data.may, decide: true } }} actions={{ ...actions, requestDecide: decide }} />)
+    tab('Approve')
+    fireEvent.click(screen.getByRole('button', { name: /^Members/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Other claim · Parking at MITEC · RM 45\.5/ }))
+    expect(screen.getByText('Subject')).toBeInTheDocument()
+    expect(screen.getAllByText('Parking at MITEC').length).toBeGreaterThan(0)
+    expect(screen.getByText('Remarks')).toBeInTheDocument()
+    expect(screen.getByText('Three days of the fair')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add to payroll' }))
+    await waitFor(() => expect(decide).toHaveBeenCalledWith('q2', 'approve', '', 'payroll'))
+  })
 })
 
 describe('the sub screens', () => {

@@ -261,7 +261,7 @@ export function MemberScreen({ r, note, setNote, canDecide }: { r: HrMemberReque
     ...(r.kind === 'waiting'
       ? [['Applicant', r.newPerson], ['Mobile', r.contact], ['Joining', r.start]]
       : r.kind === 'claim'
-        ? [['Category', r.category], ['Location', r.location], ['Amount', r.amount ? `RM ${r.amount}` : '']]
+        ? [['Category', r.category], ['Subject', r.subject], ['Remarks', r.remarks], ['Location', r.location], ['Amount', r.amount ? `RM ${r.amount}` : '']]
         : [['Leaving', r.originalName], ['Effective', r.effective], ['Reason', r.reason]]),
   ] as Array<[string, string | null | undefined]>).filter(([, x]) => x).map(([k, x]) => ({ k, v: x as string }))
   const a = avatarOf(r.byName)

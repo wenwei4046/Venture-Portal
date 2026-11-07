@@ -211,6 +211,16 @@ describe('Member services’ requests and the meeting rooms', () => {
     expect(memberRequestOf(request({ kind: 'memo' as never }), undefined, subs)).toBeNull()
   })
 
+  it('an Other claim carries its subject and remarks; no other claim does (2026-11-07)', () => {
+    const subs = [{ id: 'fair', name: 'Fair' }] as never
+    const other = memberRequestOf(request({ detail: {
+      claimType: 'other', category: 'Other claim', subject: 'Parking at MITEC', remarks: 'Three days of the fair', amount: 45.5, subDepartmentId: 'fair',
+    } }), undefined, subs)
+    expect(other).toMatchObject({ category: 'Other claim', subject: 'Parking at MITEC', remarks: 'Three days of the fair', location: null, amount: '45.5' })
+    expect(memberRequestOf(request({ detail: { claimType: 'airbnb', subject: 'x', remarks: 'y', amount: 1 } }), undefined, subs)).toMatchObject({ subject: null, remarks: null })
+    expect(memberRequestOf(request({ kind: 'waiting', detail: { claimType: 'other', subject: 'x', newPerson: 'A' } }), undefined, subs)).toMatchObject({ subject: null })
+  })
+
   it('says Any time ready for a waiting-list applicant ready whenever HR calls them (2026-10-14)', () => {
     const subs = [{ id: 'fair', name: 'Fair' }] as never
     const waiting = (start: string) => request({ kind: 'waiting', detail: { newPerson: 'Joan Quek', contact: '018', start, subDepartmentId: 'fair' } })
