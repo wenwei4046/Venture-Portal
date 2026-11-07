@@ -15,7 +15,7 @@ export type NoticeRef = 'hiring_request' | 'booking' | 'member_request' | 'memo'
   | 'it_request'
   // Share order (2026-10-21, mig 20261021150100): a bill shared with them, an answer to theirs, HR's decision — Revenue members.
   | 'share_request'
-  // A share that took effect on its colleague's Accept (2026-11-07, mig 20261107233000) — to HR, who no longer approves
+  // A share that took effect on its colleague's Accept (2026-11-07, mig 20261107235500) — to HR, who no longer approves
   // it but may Cancel share: its id is Comm Cal's month, `<sub slug>/<YYYY-MM-01>`, opened on its Requests tab.
   | 'share_taken'
   // Marketing (2026-10-23, mig 20261023214000): a stage, an approval, a plan — the Marketing view's own bell lists them

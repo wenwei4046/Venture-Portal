@@ -61,7 +61,7 @@ const monthName = (period: string) => officeTime(`${period}T00:00:00+08:00`).for
  * (the bill's sales value, KPI items and commission are split between its holders from then on, on every board), Reject
  * says why. A row opens its drawer: the bill, the split asked for, each colleague's answer, and the whole trail.
  *
- * Since 2026-11-07 (mig 20261107233000 — the user: "其实不需要 HR approval … accept 了之后，这张单就正常了"): the
+ * Since 2026-11-07 (mig 20261107235500 — the user: "其实不需要 HR approval … accept 了之后，这张单就正常了"): the
  * colleague's Accept shares the bill, so nothing waits on HR; this tab is the record of the month's shares, HR is told of
  * each as it takes effect (the `share_taken` notice opens this tab), and Cancel share on the bill's row undoes one.
  * Approve / Reject stay for a request from before it still `hr`.

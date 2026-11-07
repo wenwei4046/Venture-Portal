@@ -86,7 +86,7 @@ export interface MemberBookOrder {
   /** Who sold an old bill, as the ERP names them; null when it names nobody. Only with `commissionOnly`. */
   soldBy?: string | null;
   /**
-   * The bill's whole sales (2026-11-07, mig 20261107233000): before any share and any margin cut — what the list shows,
+   * The bill's whole sales (2026-11-07, mig 20261107235500): before any share and any margin cut — what the list shows,
    * "完整 full figure", while `revenue` is what counts for the reader ("Calculated in Arena"). Absent from an answer the
    * server gave before it knew.
    */
