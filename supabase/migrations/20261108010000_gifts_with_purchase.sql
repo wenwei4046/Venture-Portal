@@ -32,7 +32,7 @@
 -- Made from PRODUCTION's bodies (2026-11-08 KL, pg_get_functiondef, md5 of prosrc) — member_order_facts_with_old_bills
 -- as 20261107235500 left it — refused if one has changed since; a second run changes nothing. Checked at the end:
 --
---   catalogue_save_gwp(uuid, jsonb)        (new)                                  → 63d3d0104c92966e459e96b5f83e4f30
+--   catalogue_save_gwp(uuid, jsonb)        (new)                                  → 9769e1ae67c9a0516e2613d3a924c539
 --   sales_order_gwp_free(uuid[])           (new)                                  → 658722b990b11b99acc37995ce8dc8f3
 --   member_quote_cost_rules                49c4eff9990a4bc0f48c550ecd5fda6e       → 9973901db6f5109566723a1ed4ad2b67
 --   revenue_month_orders                   33b6bd204e8345202879f058bde05933       → 99c8386e4549d99c963b250c4538ce80
@@ -182,7 +182,7 @@ BEGIN
         IF jsonb_typeof(p_changes->'qty') IS DISTINCT FROM 'number'
            OR (p_changes->>'qty')::NUMERIC <> TRUNC((p_changes->>'qty')::NUMERIC)
            OR (p_changes->>'qty')::NUMERIC NOT BETWEEN 1 AND 100 THEN
-            RAISE EXCEPTION 'Free a unit is a whole number from 1 to 100' USING ERRCODE = '22023';
+            RAISE EXCEPTION 'Free per unit is a whole number from 1 to 100' USING ERRCODE = '22023';
         END IF;
         v_qty := (p_changes->>'qty')::INTEGER;
     END IF;
@@ -417,7 +417,7 @@ DECLARE
   v_bad text := '';
 BEGIN
   FOR r IN SELECT * FROM (VALUES
-      ('public.catalogue_save_gwp(uuid, jsonb)', '63d3d0104c92966e459e96b5f83e4f30'),
+      ('public.catalogue_save_gwp(uuid, jsonb)', '9769e1ae67c9a0516e2613d3a924c539'),
       ('public.sales_order_gwp_free(uuid[])', '658722b990b11b99acc37995ce8dc8f3'),
       ('public.member_quote_cost_rules(uuid)', '9973901db6f5109566723a1ed4ad2b67'),
       ('public.revenue_month_orders(uuid, date)', '99c8386e4549d99c963b250c4538ce80'),

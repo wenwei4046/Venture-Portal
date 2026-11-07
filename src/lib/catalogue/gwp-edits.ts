@@ -28,16 +28,24 @@ export interface GwpChanges {
   gift?: string[]
 }
 
+/** A GWP's two sides. */
+export type GwpSide = 'buy' | 'gift'
+
 const sameSet = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every(x => b.includes(x))
 
-const QTY = 'Free a unit is a whole number from 1 to 100'
+const QTY = 'Free per unit is a whole number from 1 to 100'
 
-/** The changes to send, or an `EditError` in the words the page shows. `codeOf` names a SKU in a refusal. */
+/**
+ * The changes to send, or an `EditError` in the words the page shows. `codeOf` names a SKU in a refusal.
+ * `stale`: the sides holding a SKU the ERP renamed since — a bill matches a GWP by the code its lines carry, so such
+ * a side is sent as it stands even unchanged, and the Save follows the SKU to its new code.
+ */
 export function gwpChangesOf(
   saved: GwpSaved | null,
   draft: GwpDraft,
   codeOf: (erpId: string) => string = id => id,
+  stale: readonly GwpSide[] = [],
 ): GwpChanges {
   const buy = [...new Set(draft.buy)]
   const gift = [...new Set(draft.gift)]
@@ -54,8 +62,8 @@ export function gwpChangesOf(
 
   const changes: GwpChanges = {}
   if (perUnit !== saved.perUnit) changes.qty = perUnit
-  if (!sameSet(buy, saved.buy)) changes.buy = buy
-  if (!sameSet(gift, saved.gift)) changes.gift = gift
+  if (!sameSet(buy, saved.buy) || stale.includes('buy')) changes.buy = buy
+  if (!sameSet(gift, saved.gift) || stale.includes('gift')) changes.gift = gift
   if (Object.keys(changes).length === 0) throw new EditError('Nothing to save')
   return changes
 }

@@ -28,13 +28,18 @@ describe('gwpChangesOf — Product List › GWP Save', () => {
     expect(gwpChangesOf(saved, draft({ buy: ['eco-q'] }))).toEqual({ buy: ['eco-q'] })
   })
 
+  it('sends a side holding a SKU the ERP renamed, unchanged, so the Save follows it to its new code', () => {
+    expect(gwpChangesOf(saved, draft(), id => id, ['gift'])).toEqual({ gift: ['mf'] })
+    expect(gwpChangesOf(saved, draft({ perUnit: '3' }), id => id, ['buy'])).toEqual({ qty: 3, buy: ['eco-q', 'eco-k'] })
+  })
+
   it("refuses what the database would, in the page's words", () => {
     const refuse = (d: GwpDraft, s: GwpSaved | null = null) => refusal(() => gwpChangesOf(s, d, id => codes[id] ?? id))
     expect(refuse(draft({ buy: [] }))).toBe('Pick the SKUs bought')
     expect(refuse(draft({ gift: [] }))).toBe('Pick the gifts')
     expect(refuse(draft({ gift: ['mf', 'eco-q'] }))).toBe('ECOBLISS (Q) is both bought and given')
     for (const perUnit of ['0', '101', '1.5', '', 'two']) {
-      expect(refuse(draft({ perUnit }))).toBe('Free a unit is a whole number from 1 to 100')
+      expect(refuse(draft({ perUnit }))).toBe('Free per unit is a whole number from 1 to 100')
     }
     expect(refuse(draft(), saved)).toBe('Nothing to save')
   })
@@ -49,7 +54,7 @@ describe('cleanGwpChanges — what the server takes from the page', () => {
   it('refuses the rest', () => {
     expect(refusal(() => cleanGwpChanges(null, false))).toBe('Nothing to save')
     expect(refusal(() => cleanGwpChanges({}, false))).toBe('Nothing to save')
-    expect(refusal(() => cleanGwpChanges({ qty: 0 }, false))).toBe('Free a unit is a whole number from 1 to 100')
+    expect(refusal(() => cleanGwpChanges({ qty: 0 }, false))).toBe('Free per unit is a whole number from 1 to 100')
     expect(refusal(() => cleanGwpChanges({ buy: 'a' }, false))).toBe('Bought is a list of SKUs')
     expect(refusal(() => cleanGwpChanges({ gift: [''] }, false))).toBe('Gifts is a list of SKUs')
     expect(refusal(() => cleanGwpChanges({ qty: 2, buy: ['a'] }, true))).toBe('A new GWP needs what is bought, the gifts and how many a unit')

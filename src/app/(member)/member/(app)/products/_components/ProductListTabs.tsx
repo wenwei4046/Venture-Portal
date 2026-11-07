@@ -6,7 +6,7 @@ import { useProductDraftState } from './ProductWorkspace'
 import { plural } from './ui'
 import c from './products.module.css'
 
-export type ProductTab = 'sku' | 'modular' | 'maintenance' | 'combos' | 'gaps' | 'costing'
+export type ProductTab = 'sku' | 'modular' | 'maintenance' | 'combos' | 'gaps' | 'costing' | 'gwp'
 
 /**
  * Add-on / KPI Items was the seventh until 2026-10-08: which items count as
@@ -20,6 +20,8 @@ export const PRODUCT_TABS: ReadonlyArray<{ key: ProductTab; label: string }> = [
   { key: 'combos', label: 'Combo Pricing' },
   { key: 'gaps', label: 'Costing gaps' },
   { key: 'costing', label: 'Costing Setting' },
+  // Gifts with purchase (2026-11-08): what a purchase earns free, its cost out of every margin.
+  { key: 'gwp', label: 'GWP' },
 ]
 
 /** The query a tab opens at; Costing Setting carries the sub-department, any tab may carry a search. */

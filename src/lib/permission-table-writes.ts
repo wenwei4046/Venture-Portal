@@ -290,6 +290,8 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   catalogue_combos: each(['product_list.edit']),
   catalogue_fabric_upgrade_series: each(['product_list.edit']),
   catalogue_fabric_upgrades: each(['product_list.edit']),
+  catalogue_gwp: each(['product_list.edit']),
+  catalogue_gwp_items: each(['product_list.edit']),
   catalogue_kiv_costs: each(['product_list.edit']),
   catalogue_models: each(['product_list.edit']),
   catalogue_option_prices: each(['product_list.edit']),

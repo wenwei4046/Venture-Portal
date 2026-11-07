@@ -217,7 +217,7 @@ await db.exec(migration)
 check(await q(BODIES, [NAMES]), md5After, 'the second run changes no body')
 check(await tablesAfter(), firstTables, 'nor the tables’ policies, permission rows and audit lines')
 check(Object.fromEntries(md5After.map(r => [r.sig, r.md5])), {
-  'catalogue_save_gwp(uuid,jsonb)': '63d3d0104c92966e459e96b5f83e4f30',
+  'catalogue_save_gwp(uuid,jsonb)': '9769e1ae67c9a0516e2613d3a924c539',
   'sales_order_gwp_free(uuid[])': '658722b990b11b99acc37995ce8dc8f3',
   'member_quote_cost_rules(uuid)': '9973901db6f5109566723a1ed4ad2b67',
   'revenue_month_orders(uuid,date)': '99c8386e4549d99c963b250c4538ce80',
