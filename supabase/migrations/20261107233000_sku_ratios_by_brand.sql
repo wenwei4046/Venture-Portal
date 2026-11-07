@@ -38,8 +38,12 @@
 --   revenue_month_orders                       3cca3cc89e13641177d59dfb8718522e       → 33b6bd204e8345202879f058bde05933
 --   member_order_facts_with_old_bills          a44fa5e5eb5934a60a8927a886ab69cf       → 3bd13b6f3d7d2b9a8e87d97850d2df4c
 --
--- Dry run on production (2026-11-07 ~23:00 KL, one transaction ending in its own RAISE, nothing stayed): every
--- statement swapped found exactly once; the bodies above.
+-- Dry run on production (2026-11-07 23:15 KL, one transaction ending in its own RAISE, nothing stayed), over Fair's
+-- October: before any ratio by brand, revenue_month_orders and member_order_facts answered every row as before and the
+-- calculator's rules only gained costRatioBrands {}; the Save, as principal@, wrote JM-CL JAC WP MP (Q) at Ergotex 0.5
+-- (touched 1, updated_by principal@) and refused a branded mattress (22023); then the four Ergotex bills carrying it
+-- moved, each by its cost × (1/0.5 − 1/0.7) — HC-SO-2610-075 2,110.50 → 2,139.07, -345 4,731.07 → 4,788.21, -346
+-- 1,301.43 → 1,330.00, -347 3,058.57 → 3,115.71 — and no Akemi or Dunlopillo bill with it; the facts, the same four.
 -- PGlite: tests/member-sql/validate-sku-ratios-by-brand.mjs (production's bodies, md5-checked; the migration verbatim,
 -- twice).
 
