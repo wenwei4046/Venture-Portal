@@ -85,6 +85,35 @@ describe("a SKU's own cost ratio", () => {
   });
 });
 
+// 2026-11-07 (Costing Setting): a bed frame rides on a cart of any brand and is judged on that
+// brand's ladder, so it divides by its ratio for that brand — the brand the cart answers to, as
+// the run reads the bill. Unset: the SKU's own ratio, else the department's.
+describe("a rider SKU's ratio by brand", () => {
+  const rules: QuoteRules = {
+    costDivisor: 0.7,
+    costRatiosByBrand: [
+      { productCode: "Y04-(Q)", brand: "ZANOTTI", ratio: 0.5 },
+      { productCode: "Y04-(Q)", brand: "AKEMI", ratio: 0.6 },
+    ],
+  };
+
+  it("divides a bed frame in a Zanotti cart by its Zanotti ratio", () => {
+    // 1A(LHF) 1,000 ÷ 0.7 + Y04 800 ÷ 0.5 = 1,428.57 + 1,600.
+    const r = calculateQuote(quote([one("a"), one("y04-q")], sofa, "6000"), products, bands, rules, pricing);
+    expect(r.valid).toBe(true);
+    expect(r.margin).toBeCloseTo(((6000 - 1428.57 - 1600) / 6000) * 100, 10);
+  });
+
+  it("keeps the frame's own ratio — else the department's — in a cart with no brand of its own", () => {
+    // Riders alone answer to no brand: 800 ÷ 0.7.
+    const alone = calculateQuote(quote([one("y04-q")], undefined, "2000"), products, bands, rules, pricing);
+    expect(alone.margin).toBeCloseTo(((2000 - 1142.86) / 2000) * 100, 10);
+    const own = calculateQuote(quote([one("y04-q")], undefined, "2000"), products, bands,
+      { ...rules, costRatios: [{ productCode: "Y04-(Q)", ratio: 0.8 }] }, pricing);
+    expect(own.margin).toBeCloseTo(((2000 - 1000) / 2000) * 100, 10);
+  });
+});
+
 // 2026-10-05: the price keyed is the SELLING price (the prototype's keypad).
 // A KPI item the customer buys rides on top of it, out of the margin, paid flat
 // as KPI; one given free comes off it. The run reads the bill the same way:
@@ -202,9 +231,17 @@ describe("the quote context's rules, read defensively", () => {
   // 2026-10-05: the cost rules arrive from member_quote_cost_rules (service role only).
   it("reads the cost rules, and refuses an answer with no usable ratio", () => {
     expect(quoteCostRules({ costDivisor: "0.7000", costRatios: { "Y04-(Q)": 0.6, bad: -1 } })).toEqual({
-      costDivisor: 0.7, costRatios: [{ productCode: "Y04-(Q)", ratio: 0.6 }],
+      costDivisor: 0.7, costRatios: [{ productCode: "Y04-(Q)", ratio: 0.6 }], costRatiosByBrand: [],
     });
-    expect(quoteCostRules({ costDivisor: 1 })).toEqual({ costDivisor: 1, costRatios: [] });
+    expect(quoteCostRules({ costDivisor: 1 })).toEqual({ costDivisor: 1, costRatios: [], costRatiosByBrand: [] });
+    // 2026-11-07: a rider SKU's ratio for each brand — anything not a positive number is left out.
+    expect(quoteCostRules({
+      costDivisor: 0.7,
+      costRatioBrands: { "TRION (A)-(K)": { DUNLOP: "0.6000", ERGOTEX: 0.5, AKEMI: 0, ZANOTTI: "x" }, junk: 7, " ": { DUNLOP: 0.6 } },
+    })?.costRatiosByBrand).toEqual([
+      { productCode: "TRION (A)-(K)", brand: "DUNLOP", ratio: 0.6 },
+      { productCode: "TRION (A)-(K)", brand: "ERGOTEX", ratio: 0.5 },
+    ]);
     for (const raw of [null, undefined, [], {}, { costDivisor: null }, { costDivisor: 0 }, { costDivisor: -0.7 }, { costDivisor: "abc" }, { costDivisor: "" }, { costDivisor: true }]) {
       expect(quoteCostRules(raw)).toBeNull();
     }

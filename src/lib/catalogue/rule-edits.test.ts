@@ -39,7 +39,42 @@ describe('validateCostSetting', () => {
           { erpId: 'p-2', ratio: '' },
         ],
       }),
-    ).toEqual({ divisor: 0.7, ratios: [{ erp_product_id: 'p-1', ratio: 0.6 }], removes: ['p-2'] })
+    ).toEqual({ divisor: 0.7, ratios: [{ erp_product_id: 'p-1', ratio: 0.6 }], removes: ['p-2'], brands: [] })
+  })
+
+  // 2026-11-07: a rider SKU's ratio for a brand — set, or blank to take it off.
+  it("carries a rider SKU's brands: a ratio set, a blank one taken off", () => {
+    expect(
+      validateCostSetting({
+        ratios: [],
+        brands: [
+          { erpId: 'trion-k', brand: 'DUNLOP', ratio: '0.6', label: 'TRION (A)-(K)' },
+          { erpId: 'trion-k', brand: 'ERGOTEX', ratio: ' .5 ' },
+          { erpId: 'trion-k', brand: 'AKEMI', ratio: '' },
+        ],
+      }),
+    ).toEqual({
+      divisor: null,
+      ratios: [],
+      removes: [],
+      brands: [
+        { erp_product_id: 'trion-k', brand_code: 'DUNLOP', ratio: 0.6 },
+        { erp_product_id: 'trion-k', brand_code: 'ERGOTEX', ratio: 0.5 },
+        { erp_product_id: 'trion-k', brand_code: 'AKEMI', ratio: null },
+      ],
+    })
+  })
+
+  it('refuses a brand named twice for a SKU, a brand that is no code, and a ratio that is none', () => {
+    expect(() => validateCostSetting({ ratios: [], brands: [
+      { erpId: 'trion-k', brand: 'DUNLOP', ratio: '0.6', label: 'TRION (A)-(K)' },
+      { erpId: 'trion-k', brand: 'DUNLOP', ratio: '0.5', label: 'TRION (A)-(K)' },
+    ] })).toThrow('TRION (A)-(K) · DUNLOP appears twice')
+    expect(() => validateCostSetting({ ratios: [], brands: [{ erpId: 'trion-k', brand: '', ratio: '0.6' }] })).toThrow('A row names no brand')
+    expect(() => validateCostSetting({ ratios: [], brands: [{ erpId: 'trion-k', brand: 'AK;DROP', ratio: '0.6' }] })).toThrow('A row names no brand')
+    expect(() => validateCostSetting({ ratios: [], brands: [{ erpId: 'trion-k', brand: 'DUNLOP', ratio: '0', label: 'TRION' }] }))
+      .toThrow('TRION · DUNLOP: a ratio must be above 0 and at most 10')
+    expect(() => validateCostSetting({ ratios: [], brands: [] })).toThrow('Nothing to save')
   })
 
   it("leaves the department's ratio alone unless it is sent", () => {

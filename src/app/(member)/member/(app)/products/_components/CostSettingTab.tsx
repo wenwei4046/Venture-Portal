@@ -56,6 +56,12 @@ function readRatio(text: string): number | null | 'bad' {
 /** One key per SKU and brand. */
 const brandKeyOf = (erpId: string, brand: string) => `${erpId}\u0000${brand}`
 
+// Defaults that keep their identity from one render to the next: a save settles
+// when the server's rows CHANGE, and a fresh `[]` every render would look like that.
+const NO_KIV: KivCostRow[] = []
+const NO_BRAND_RATIOS: CostRatioBrandRow[] = []
+const NO_BRANDS: SchemeBrand[] = []
+
 interface Line {
   erpId: string
   /** Its own ratio as saved; null = none of its own (new, or listed for its brands alone). */
@@ -94,9 +100,9 @@ export default function CostSettingTab({
   divisor,
   ratios,
   skus,
-  kivCosts = [],
-  byBrand = [],
-  brands = [],
+  kivCosts = NO_KIV,
+  byBrand = NO_BRAND_RATIOS,
+  brands = NO_BRANDS,
 }: {
   sub: SubRef
   subs: SubRef[]
@@ -189,9 +195,14 @@ export default function CostSettingTab({
   }
   const riderLine = (l: Line) => byBrandOn && l.sku?.rider === true
 
-  /** What saving sends for a line's own ratio: undefined = nothing; '' = back to the sub-department's. */
+  /**
+   * What saving sends for a line's own ratio: undefined = nothing; '' = back to
+   * the sub-department's. A line added this time always says something — blank
+   * is its brands alone, or nothing yet (which Save refuses).
+   */
   const changeOf = (l: Line): string | undefined => {
     const text = drafts.get(l.erpId)
+    if (!l.listed) return (text ?? '').trim()
     if (l.saved === null) return text !== undefined && text.trim() !== '' ? text.trim() : undefined
     if (text !== undefined && differs(text, l.saved.ratio)) return text.trim()
     if (renamed(l)) return String(l.saved.ratio)
@@ -223,10 +234,13 @@ export default function CostSettingTab({
   }
 
   const divisorChanged = divisorDraft !== null && differs(divisorDraft, divisor)
-  const changed = editing ? lines.filter(l => changeOf(l) !== undefined) : []
   const brandChanges = editing
     ? lines.flatMap(l => brands.flatMap(b => (brandChangeOf(l.erpId, b.code) !== undefined ? [{ l, brand: b.code }] : [])))
     : []
+  /** Added this time with no ratio of its own but a brand's: its brands are what it changes. */
+  const brandsOnly = (l: Line) =>
+    !l.listed && changeOf(l) === '' && brandChanges.some(ch => ch.l.erpId === l.erpId && brandChangeOf(l.erpId, ch.brand) !== '')
+  const changed = editing ? lines.filter(l => changeOf(l) !== undefined && !brandsOnly(l)) : []
   const dirty = editing ? (divisorChanged ? 1 : 0) + changed.length + brandChanges.length : 0
   const renamedCount = lines.filter(renamed).length
   // The KIV costs below keep drafts of their own; one guard holds both.
@@ -407,7 +421,7 @@ export default function CostSettingTab({
 
   function save() {
     if (saving || dirty === 0) return
-    const blank = lines.find(l => !l.listed && changeOf(l) === undefined && !brands.some(b => (brandChangeOf(l.erpId, b.code) ?? '') !== ''))
+    const blank = changed.find(l => !l.listed && changeOf(l) === '')
     if (blank) {
       setError(`${codeOf(blank)}: give it a ratio, or take it off the list.`)
       return
@@ -415,7 +429,9 @@ export default function CostSettingTab({
     const edit: CostSettingEdit = {
       divisor: divisorChanged && divisorDraft !== null ? divisorDraft : undefined,
       ratios: changed.map(l => ({ erpId: l.erpId, ratio: changeOf(l) ?? '', label: codeOf(l) })),
-      brands: brandChanges.map(({ l, brand }) => ({ erpId: l.erpId, brand, ratio: brandChangeOf(l.erpId, brand) ?? '', label: codeOf(l) })),
+      ...(brandChanges.length > 0
+        ? { brands: brandChanges.map(({ l, brand }) => ({ erpId: l.erpId, brand, ratio: brandChangeOf(l.erpId, brand) ?? '', label: codeOf(l) })) }
+        : {}),
     }
     try {
       validateCostSetting(edit)
@@ -632,7 +648,7 @@ export default function CostSettingTab({
                     <td className={`${c.td} ${editing && !going ? c.inputCell : c.bold}`} data-num="">
                       {editing && !going ? (
                         <CellInput value={ownText} onChange={v => setDraft(l.erpId, v)}
-                          edited={text !== undefined && (l.saved === null ? text.trim() !== '' : differs(text, l.saved.ratio))} width={84} disabled={saving}
+                          edited={text !== undefined && (isNew || (l.saved === null ? text.trim() !== '' : differs(text, l.saved.ratio)))} width={84} disabled={saving}
                           placeholder={ownPlaceholder} label={`${codeOf(l)} ratio`} />
                       ) : l.saved ? formatRatio(l.saved.ratio) : <span className={c.faint}>{ownPlaceholder}</span>}
                     </td>

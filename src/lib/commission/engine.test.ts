@@ -851,6 +851,92 @@ describe('a SKU judged at its own cost ratio — 2026-09-27', () => {
   })
 })
 
+// ─── A rider SKU's ratio by brand (Costing Setting, 2026-11-07) ─────────────
+// The user: "Trion 我 right click 它，可以设成 0.6 … 不要同一个 item 在不同的 brand 卖不一样的
+// margin"; "if didnt set, then just follow the defauly rate". A bed frame rides on a bill of any
+// brand and is judged on that brand's ladder, so its cost divides by its ratio for that brand.
+
+describe("a rider SKU's ratio by brand — 2026-11-07", () => {
+  const groupIndex = indexItemGroups(ITEM_GROUPS)
+  // TRION's own ratio is none (the default 0.7); Dunlopillo 0.6, Ergotex 0.5 — Akemi and Zanotti unset.
+  const basis = costBasisOf(0.7, [{ productCode: 'TRION (K)', ratio: 0.65 }], [
+    { productCode: ' trion (k) ', brand: 'dunlop', ratio: 0.6 },
+    { productCode: 'TRION (K)', brand: 'ERGOTEX', ratio: 0.5 },
+    { productCode: 'TRION (Q)', brand: 'DUNLOP', ratio: 0.6 },
+    { productCode: 'TRION (Q)', brand: 'AKEMI', ratio: 0 },
+  ])
+
+  it("divides by the SKU's ratio for the brand, else its own, else the default", () => {
+    expect(costDivisorFor('TRION (K)', basis, 'DUNLOP')).toBe(0.6)
+    expect(costDivisorFor('trion (k)', basis, ' Ergotex ')).toBe(0.5)
+    // A brand left unset follows the SKU's own ratio …
+    expect(costDivisorFor('TRION (K)', basis, 'AKEMI')).toBe(0.65)
+    // … and with none of its own, the sub-department's.
+    expect(costDivisorFor('TRION (Q)', basis, 'ZANOTTI')).toBe(0.7)
+    // A ratio that is no ratio is none: AKEMI on the Queen falls through.
+    expect(costDivisorFor('TRION (Q)', basis, 'AKEMI')).toBe(0.7)
+    // No brand — a cart of riders alone, a bill nobody can tell the brand of — is never a brand's.
+    expect(costDivisorFor('TRION (K)', basis, null)).toBe(0.65)
+    expect(costDivisorFor('TRION (K)', basis)).toBe(0.65)
+    // Any other SKU is untouched.
+    expect(costDivisorFor('M1', basis, 'DUNLOP')).toBe(0.7)
+  })
+
+  it("costs a bed frame on a bill at the ratio for the bill's own brand", () => {
+    const lines = order('1', 'rs', [
+      ['MATTRESS', 'M1', 1, 3_000, 700],
+      ['BEDFRAME', 'TRION (K)', 1, 1_000, 300],
+    ]).lines
+    // Dunlopillo: 700 ÷ 0.7 + 300 ÷ 0.6 = 1,000 + 500.
+    expect(marginBase(lines, indexKpiItems([]), groupIndex, basis, 'DUNLOP').cost).toBe(1_500)
+    // Ergotex: 1,000 + 300 ÷ 0.5 = 1,600.
+    expect(marginBase(lines, indexKpiItems([]), groupIndex, basis, 'ERGOTEX').cost).toBe(1_600)
+    // Akemi has none: the frame's own 0.65 — 1,000 + 461.54.
+    expect(marginBase(lines, indexKpiItems([]), groupIndex, basis, 'AKEMI').cost).toBe(1_461.54)
+  })
+
+  it('a bill with no brand of its own: the brand its goods sell the most of, the first on a tie', () => {
+    const most = order('2', 'rs', [
+      ['ACC', 'PILLOW', 1, 200, 50, 'AKEMI'],
+      ['MATTRESS', 'M1', 1, 3_000, 700, 'DUNLOP'],
+      ['BEDFRAME', 'TRION (K)', 1, 1_000, 300],
+    ])
+    const base = marginBase(most.lines, indexKpiItems([]), groupIndex, basis)
+    expect(base.brandCode).toBe('DUNLOP')
+    expect(base.cost).toBe(1_571.43) // 50 ÷ 0.7 + 1,000 + 300 ÷ 0.6
+    const tie = order('3', 'rs', [
+      ['MATTRESS', 'M2', 1, 1_000, 280, 'ERGOTEX'],
+      ['MATTRESS', 'M1', 1, 1_000, 280, 'DUNLOP'],
+      ['BEDFRAME', 'TRION (K)', 1, 1_000, 300],
+    ])
+    expect(marginBase(tie.lines, indexKpiItems([]), groupIndex, basis).cost).toBe(1_400) // 400 + 400 + 300 ÷ 0.5
+  })
+
+  it('nobody can tell the brand: the SKU keeps its own ratio', () => {
+    // '' — a line the ERP sent with no brand (the helper gives a costed line Akemi's otherwise).
+    const lines = order('4', 'rs', [['BEDFRAME', 'TRION (K)', 1, 1_000, 300, '']]).lines
+    const base = marginBase(lines, indexKpiItems([]), groupIndex, basis)
+    expect(base.brandCode).toBeNull()
+    expect(base.cost).toBe(461.54)
+  })
+
+  it('carries them into the run: the same frame, two brands, two margins', () => {
+    const r = run({
+      orders: [
+        order('1', 'rs', [['BEDFRAME', 'TRION (K)', 1, 1_000, 300]], { brandCode: 'DUNLOP' }),
+        order('2', 'ta', [['BEDFRAME', 'TRION (K)', 1, 1_000, 300]], { brandCode: 'AKEMI' }),
+      ],
+      scheme: {
+        ...SCHEME,
+        costDivisor: 0.7,
+        costRatiosByBrand: [{ productCode: 'TRION (K)', brand: 'DUNLOP', ratio: 0.6 }],
+      },
+    })
+    expect(find(r.statements, 'rs').marginPct).toBeCloseTo(0.5, 10) // 1 − 300 ÷ 0.6 ÷ 1,000
+    expect(find(r.statements, 'ta').marginPct).toBeCloseTo(0.5714, 4) // 1 − 428.57 ÷ 1,000
+  })
+})
+
 // ─── Hierarchy override ─────────────────────────────────────────────────────
 
 describe('hierarchy override — differential roll-up', () => {

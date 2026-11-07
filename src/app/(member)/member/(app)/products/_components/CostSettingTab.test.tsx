@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CostRatioRow, KivCostRow, PickSku } from '../load'
+import type { CostRatioBrandRow, CostRatioRow, KivCostRow, PickSku, SchemeBrand } from '../load'
 
 const { saveCostSetting, saveKivCosts, refresh, push } = vi.hoisted(() => ({ saveCostSetting: vi.fn(), saveKivCosts: vi.fn(), refresh: vi.fn(), push: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push }), usePathname: () => '/member/products', useSearchParams: () => new URLSearchParams() }))
@@ -224,6 +224,125 @@ describe('Costing Setting', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Saved.')
     // The notice lands inside the save; the button says Saved only once its transition has ended.
     expect(await screen.findByRole('button', { name: 'Saved' })).toBeDisabled()
+  })
+})
+
+// ── A rider SKU by brand (2026-11-07): "Trion 我 right click 它，可以设成 0.6"; "在 Costing Setting 的 SKU 清单上对
+// Trion 按 special add … 再按 brand 各填一个除法"; "if didnt set, then just follow the defauly rate" ──
+const BRANDS: SchemeBrand[] = [
+  { code: 'AKEMI', name: 'Akemi' }, { code: 'DUNLOP', name: 'Dunlopillo' },
+  { code: 'ERGOTEX', name: 'Ergotex' }, { code: 'ZANOTTI', name: 'Zanotti' },
+]
+const riderSkus = [
+  ...skus,
+  sku({ erpId: 'trion-k', code: 'TRION (A)-(K)', description: 'TRION (A) BEDFRAME (6FT)', category: 'BEDFRAME', model: 'TRION (A)', price: 830, rider: true }),
+  sku({ erpId: 'trion-q', code: 'TRION (A)-(Q)', description: 'TRION (A) BEDFRAME (5FT)', category: 'BEDFRAME', model: 'TRION (A)', price: 725, rider: true }),
+]
+const trionBy = (brand: string, ratio: number): CostRatioBrandRow => ({ erpId: 'trion-k', code: 'TRION (A)-(K)', brand, ratio })
+function renderBrands(ratios: CostRatioRow[] = [], byBrand: CostRatioBrandRow[] = []) {
+  return render(<CostSettingTab sub={subs[0]} subs={subs} schemeId={SCHEME} divisor={0.7} ratios={ratios} skus={riderSkus}
+    byBrand={byBrand} brands={BRANDS} />)
+}
+const rowOf = (code: string) => bodyRows().find(r => within(r).getAllByRole('cell')[0].textContent?.startsWith(code))!
+
+describe('Costing Setting › a rider SKU by brand', () => {
+  it("shows a bed frame's ratios by brand, the default for the rest, and its team cost across them", () => {
+    renderBrands([ultK], [trionBy('DUNLOP', 0.6), trionBy('ERGOTEX', 0.5)])
+    expect(screen.getByRole('columnheader', { name: 'BY BRAND' })).toBeInTheDocument()
+    expect(screen.getByText('2 SKUs')).toBeInTheDocument()
+    // Listed for its brands alone: its own ratio is the sub-department's.
+    expect(cells(rowOf('TRION (A)-(K)'))).toEqual(['TRION (A)-(K)', 'TRION (A) BEDFRAME (6FT)', 'Bedframe', '830.00', '0.70',
+      'Dunlopillo 0.60Ergotex 0.50⋯', '1,185.71 – 1,660.00'])
+    // A mattress sells under its own brand: no brands, no menu.
+    expect(cells(rowOf('AK-ULTIMATE MATT (K)'))[5]).toBe('—')
+    expect(screen.queryByRole('button', { name: 'More for AK-ULTIMATE MATT (K)' })).toBeNull()
+  })
+
+  it('splits a bed frame by brand from a right-click, and saves only the brand typed', async () => {
+    renderBrands([{ erpId: 'trion-k', code: 'TRION (A)-(K)', ratio: 0.65, updatedAt: null }])
+    // A mattress's row keeps the browser's own menu.
+    fireEvent.contextMenu(rowOf('AK-ULTIMATE MATT (K)') ?? document.body)
+    expect(screen.queryByRole('menu')).toBeNull()
+    fireEvent.contextMenu(rowOf('TRION (A)-(K)'))
+    const menu = screen.getByRole('menu', { name: 'Actions for TRION (A)-(K)' })
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Split by brand' }))
+    expect(screen.queryByRole('menu')).toBeNull()
+    // Every brand's box, each showing what it follows until a figure is typed: the SKU's own 0.65.
+    const group = screen.getByRole('group', { name: 'TRION (A)-(K) by brand' })
+    expect(within(group).getAllByRole('textbox').map(box => box.getAttribute('placeholder'))).toEqual(['0.65', '0.65', '0.65', '0.65'])
+    type('TRION (A)-(K) · Dunlopillo ratio', '0.6')
+    expect(cells(rowOf('TRION (A)-(K)'))[6]).toBe('1,276.92 – 1,383.33') // 830 ÷ 0.65 … 830 ÷ 0.6
+    click('Save 1 change')
+    await waitFor(() => expect(saveCostSetting).toHaveBeenCalledWith(SCHEME, {
+      ratios: [],
+      brands: [{ erpId: 'trion-k', brand: 'DUNLOP', ratio: '0.6', label: 'TRION (A)-(K)' }],
+    }))
+  })
+
+  it('adds the ticked bed frames with their brands at once, and none of their own', async () => {
+    renderBrands()
+    click('Edit ratios')
+    search('Find a SKU', 'trion')
+    click('Tick all 2')
+    expect(screen.getByRole('button', { name: 'Untick all' })).toBeInTheDocument()
+    type('Dunlopillo ratio for the ticked SKUs', '0.6')
+    type('Ergotex ratio for the ticked SKUs', '0.5')
+    click('Add 2 · by brand')
+    expect(cells(rowOf('TRION (A)-(Q)'))[0]).toBe('TRION (A)-(Q)NEW')
+    // Four changes: two SKUs × two brands; neither gets a ratio of its own.
+    click('Save 4 changes')
+    await waitFor(() => expect(saveCostSetting).toHaveBeenCalledWith(SCHEME, {
+      ratios: [],
+      brands: [
+        { erpId: 'trion-k', brand: 'DUNLOP', ratio: '0.6', label: 'TRION (A)-(K)' },
+        { erpId: 'trion-k', brand: 'ERGOTEX', ratio: '0.5', label: 'TRION (A)-(K)' },
+        { erpId: 'trion-q', brand: 'DUNLOP', ratio: '0.6', label: 'TRION (A)-(Q)' },
+        { erpId: 'trion-q', brand: 'ERGOTEX', ratio: '0.5', label: 'TRION (A)-(Q)' },
+      ],
+    }))
+  })
+
+  it('refuses a mattress ticked with brands alone: it sells under its own brand', () => {
+    renderBrands()
+    click('Edit ratios')
+    search('Find a SKU', 'queen')
+    tick('AK-ULTIMATE MATT (Q)')
+    type('Dunlopillo ratio for the ticked SKUs', '0.6')
+    click('Add 1 · by brand')
+    expect(screen.getByRole('alert')).toHaveTextContent('AK-ULTIMATE MATT (Q) sells under its own brand: type the ratio it divides by.')
+  })
+
+  it("puts a bed frame back to one ratio from its ⋯, taking every brand of it off", async () => {
+    renderBrands([{ erpId: 'trion-k', code: 'TRION (A)-(K)', ratio: 0.65, updatedAt: null }], [trionBy('DUNLOP', 0.6), trionBy('ERGOTEX', 0.5)])
+    fireEvent.click(screen.getByRole('button', { name: 'More for TRION (A)-(K)' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'One ratio for every brand' }))
+    expect(cells(rowOf('TRION (A)-(K)'))[5]).toBe('—⋯')
+    expect(cells(rowOf('TRION (A)-(K)'))[6]).toBe('1,276.92')
+    click('Save 2 changes')
+    await waitFor(() => expect(saveCostSetting).toHaveBeenCalledWith(SCHEME, {
+      ratios: [],
+      brands: [
+        { erpId: 'trion-k', brand: 'DUNLOP', ratio: '', label: 'TRION (A)-(K)' },
+        { erpId: 'trion-k', brand: 'ERGOTEX', ratio: '', label: 'TRION (A)-(K)' },
+      ],
+    }))
+  })
+
+  it('removes a SKU listed for its brands alone with every brand of it', async () => {
+    renderBrands([], [trionBy('DUNLOP', 0.6)])
+    click('Edit ratios')
+    fireEvent.click(within(rowOf('TRION (A)-(K)')).getByRole('button', { name: 'Remove' }))
+    expect(cells(rowOf('TRION (A)-(K)'))[0]).toBe('TRION (A)-(K)REMOVING')
+    click('Save 1 change')
+    await waitFor(() => expect(saveCostSetting).toHaveBeenCalledWith(SCHEME, {
+      ratios: [],
+      brands: [{ erpId: 'trion-k', brand: 'DUNLOP', ratio: '', label: 'TRION (A)-(K)' }],
+    }))
+  })
+
+  it('has no BY BRAND column where the sub-department has no brand (IR)', () => {
+    renderTab()
+    expect(screen.queryByRole('columnheader', { name: 'BY BRAND' })).toBeNull()
   })
 })
 
