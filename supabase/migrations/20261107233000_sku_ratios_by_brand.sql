@@ -16,7 +16,8 @@
 --                               ONE transaction (the 4-argument writer, untouched, does the first two)
 --   3. member_quote_cost_rules  the calculator's rules carry them: costRatioBrands { code: { brand: ratio } }
 --   4. revenue_month_orders     Comm Cal's month divides by them
---   5. member_order_facts       Insight, the Arena, Today divide by them
+--   5. member_order_facts_with_old_bills   Insight, the Arena, Today divide by them (member_order_facts reads it since
+--                               20261107230000, leaving out an old bill topped up; it is not touched here)
 --
 -- A LINE'S RATIO, everywhere a margin is taken (marginBase() and the calculator are the TypeScript twins,
 -- lib/commission/cost-basis.ts): its SKU's ratio for the brand the bill answers to, else its SKU's own ratio, else the
@@ -32,10 +33,10 @@
 -- Made from PRODUCTION's bodies (2026-11-07 KL, pg_get_functiondef, md5 of prosrc), refused if one has changed since;
 -- a second run changes nothing. What each became is checked at the end:
 --
---   catalogue_save_cost_setting(…, p_brands)   (new)                                  → dae898c708d208cb029c48b65b544801
+--   catalogue_save_cost_setting(…, p_brands)   (new)                                  → a97bf8e72a9944a5c3f62409735fa483
 --   member_quote_cost_rules                    2e7e32cdb544b400461cacc750934314       → 49c4eff9990a4bc0f48c550ecd5fda6e
 --   revenue_month_orders                       3cca3cc89e13641177d59dfb8718522e       → 33b6bd204e8345202879f058bde05933
---   member_order_facts                         137eb24ba94e9c5bb49789225ff4c271       → 80efce6255c1462e2a46e794b2062d14
+--   member_order_facts_with_old_bills          a44fa5e5eb5934a60a8927a886ab69cf       → 3bd13b6f3d7d2b9a8e87d97850d2df4c
 --
 -- Dry run on production (2026-11-07 ~23:00 KL, one transaction ending in its own RAISE, nothing stayed): every
 -- statement swapped found exactly once; the bodies above.
@@ -54,7 +55,7 @@ BEGIN
       ('public.catalogue_save_cost_setting(uuid, numeric, jsonb, text[])', 'eb9f0116074174ee38a3ea508f0e9582', 'eb9f0116074174ee38a3ea508f0e9582'),
       ('public.member_quote_cost_rules(uuid)', '2e7e32cdb544b400461cacc750934314', '49c4eff9990a4bc0f48c550ecd5fda6e'),
       ('public.revenue_month_orders(uuid, date)', '3cca3cc89e13641177d59dfb8718522e', '33b6bd204e8345202879f058bde05933'),
-      ('public.member_order_facts(uuid, date, date)', '137eb24ba94e9c5bb49789225ff4c271', '80efce6255c1462e2a46e794b2062d14')
+      ('public.member_order_facts_with_old_bills(uuid, date, date)', 'a44fa5e5eb5934a60a8927a886ab69cf', '3bd13b6f3d7d2b9a8e87d97850d2df4c')
     ) AS t(sig, before_md5, after_md5)
   LOOP
     IF to_regprocedure(r.sig) IS NULL THEN
@@ -194,14 +195,18 @@ BEGIN
                 WHERE b.ratio IS NOT NULL AND NOT (b.ratio > 0 AND b.ratio <= 10)) THEN
         RAISE EXCEPTION 'A cost ratio must be above 0 and at most 10' USING ERRCODE = '22023';
     END IF;
-    -- … and a rider: a mattress or a sofa sells under its own brand, unless Modular marks its model Rider.
+    -- … and a rider, as member_catalogue reads one (the twin is isRiderModel): a bed frame, an accessory — anything but
+    -- a mattress or a sofa — or a mattress or a sofa the ERP gives no brand, marked Rider on Modular. A mattress or a
+    -- sofa with a brand sells under it.
     SELECT p.item_code INTO v_bad
       FROM jsonb_to_recordset(p_brands) AS b(erp_product_id TEXT, brand_code TEXT, ratio NUMERIC)
       JOIN erp_products p ON p.erp_id = b.erp_product_id
-      LEFT JOIN catalogue_models m ON m.erp_model_id = p.model_erp_id
+      LEFT JOIN erp_product_models pm ON pm.erp_id = p.model_erp_id
+      LEFT JOIN catalogue_models cm ON cm.erp_model_id = p.model_erp_id
      WHERE b.ratio IS NOT NULL
-       AND UPPER(BTRIM(COALESCE(p.category, ''))) IN ('MATTRESS', 'SOFA')
-       AND m.brand_code IS DISTINCT FROM 'RIDER'
+       AND UPPER(BTRIM(COALESCE(pm.category, p.category, ''))) IN ('MATTRESS', 'SOFA')
+       AND NOT (catalogue_brand_of(COALESCE(pm.category, p.category), pm.branding, p.branding) IS NULL
+                AND COALESCE(cm.brand_code = 'RIDER', FALSE))
      LIMIT 1;
     IF FOUND THEN
         RAISE EXCEPTION '% sells under its own brand: only a bed frame, an accessory or another rider takes a ratio by brand', v_bad
@@ -328,8 +333,9 @@ SELECT pg_temp.made_with('public.revenue_month_orders(uuid, date)', '33b6bd204e8
                       AND UPPER(BTRIM(crb.brand_code)) = lb.brand$n$
   ]);
 
--- ── 5. member_order_facts: Insight, the Arena, Today ───────────────────────────────────────────────────────────────
-SELECT pg_temp.made_with('public.member_order_facts(uuid, date, date)', '80efce6255c1462e2a46e794b2062d14', ARRAY[
+-- ── 5. member_order_facts_with_old_bills: Insight, the Arena, Today ────────────────────────────────────────────────
+-- Where member_order_facts' calculation lives since 20261107230000 (member_order_facts reads it, an old bill left out).
+SELECT pg_temp.made_with('public.member_order_facts_with_old_bills(uuid, date, date)', '3bd13b6f3d7d2b9a8e87d97850d2df4c', ARRAY[
     -- (a) The brand each bill answers to.
     $o$), kpi AS ($o$,
     $n$), ladder AS (
@@ -366,10 +372,10 @@ DECLARE
 BEGIN
   FOR r IN SELECT * FROM (VALUES
       ('public.catalogue_save_cost_setting(uuid, numeric, jsonb, text[])', 'eb9f0116074174ee38a3ea508f0e9582'),
-      ('public.catalogue_save_cost_setting(uuid, numeric, jsonb, text[], jsonb)', 'dae898c708d208cb029c48b65b544801'),
+      ('public.catalogue_save_cost_setting(uuid, numeric, jsonb, text[], jsonb)', 'a97bf8e72a9944a5c3f62409735fa483'),
       ('public.member_quote_cost_rules(uuid)', '49c4eff9990a4bc0f48c550ecd5fda6e'),
       ('public.revenue_month_orders(uuid, date)', '33b6bd204e8345202879f058bde05933'),
-      ('public.member_order_facts(uuid, date, date)', '80efce6255c1462e2a46e794b2062d14')
+      ('public.member_order_facts_with_old_bills(uuid, date, date)', '3bd13b6f3d7d2b9a8e87d97850d2df4c')
     ) AS t(sig, after_md5)
   LOOP
     SELECT md5(replace(prosrc, E'\r', '')) INTO v_md5 FROM pg_proc WHERE oid = to_regprocedure(r.sig);
@@ -385,6 +391,7 @@ END $$;
 COMMIT;
 
 -- Rollback, in words (the database tool refuses a migration that spells it out): put member_quote_cost_rules,
--- revenue_month_orders and member_order_facts back as production had them (md5 2e7e32cd…, 3cca3cc8…, 137eb24b…), take
+-- revenue_month_orders and member_order_facts_with_old_bills back as production had them (md5 2e7e32cd…, 3cca3cc8…,
+-- a44fa5e5…), take
 -- away the 5-argument catalogue_save_cost_setting, comm_cost_ratio_brands' rows in permission_table_reads /
 -- permission_table_writes / audit_tables, and the table itself.
