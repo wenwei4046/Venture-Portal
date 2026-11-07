@@ -905,6 +905,20 @@
 }
 .uploadTitle { font-size: calc(14px * var(--rv-type)); font-weight: 650; }
 .uploadSub { font-size: calc(12px * var(--rv-type)); color: var(--rv-sub); }
+/* A claim's invoice once picked (InvoiceField.tsx, 2026-11-08 — "i want it can be view … double confirm before submit"):
+   its photo or its PDF's first page, its name and PDF · pages · size, then View (full screen) and Change. */
+.invoicePicked { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; border: 1px solid var(--rv-line); background: var(--rv-paper-warm); }
+.invoiceThumb { flex: none; width: 56px; height: 72px; padding: 0; border-radius: 8px; border: 1px solid var(--rv-line); background: var(--rv-white); overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.invoiceThumb:disabled { cursor: default; }
+.invoiceThumb img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.invoiceThumb canvas { align-self: flex-start; }
+.invoiceTag { color: var(--rv-sub); font-size: calc(11px * var(--rv-type)); font-weight: 700; letter-spacing: .04em; }
+.invoiceText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.invoiceName { font-size: calc(14px * var(--rv-type)); font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.invoiceMeta { color: var(--rv-sub); font-size: calc(12px * var(--rv-type)); }
+.invoiceBtns { display: flex; gap: 8px; margin-top: 8px; }
+.invoiceBtn { height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--rv-handle); background: var(--rv-white); color: var(--rv-ink); font-size: calc(13px * var(--rv-type)); font-weight: 600; cursor: pointer; }
+.invoiceView { border-color: var(--rv-accent); color: var(--rv-accent); }
 .pills { display: flex; flex-wrap: wrap; gap: 8px; }
 .pill { height: 38px; padding: 0 14px; border-radius: 19px; border: 1px solid var(--rv-handle); background: var(--rv-white); color: var(--rv-ink); font-size: calc(13.5px * var(--rv-type)); font-weight: 500; }
 .pillOn { border-color: var(--rv-accent); background: var(--rv-cream); color: var(--rv-accent); font-weight: 650; }

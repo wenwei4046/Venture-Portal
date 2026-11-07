@@ -1,8 +1,9 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ICON, Svg } from "../icons";
 import Sheet, { SheetHandle } from "../Sheet";
+import InvoiceField from "./InvoiceField";
 import { dayList, dayRange, initials, klToday, monthShort, MONTHS_SHORT, rm2, shortDay, weekdayShort } from "../format";
 import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
 import StayCalendar from "./StayCalendar";
@@ -19,7 +20,6 @@ import s from "./profile.module.css";
 
 const CAT_OUT = "M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18";
 const CAT_AIR = "M3 11 12 4l9 7v9h-6v-6H9v6H3v-9Z";
-const CAMERA = "M4 8h3l2-3h6l2 3h3v11H4V8Zm8 9a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z";
 const PLANE = "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z";
 const CLOSE = "M6 6l12 12M18 6 6 18";
 const DOWNLOAD = "M12 4v11M7 10l5 5 5-5M4 19h16";
@@ -565,7 +565,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
             <label className={s.field}><span className={s.fieldLabel}>Remarks</span>
               <textarea rows={3} className={`${s.input} ${s.textarea}`} placeholder="What it was for, and when" value={remarks} onChange={e => { setRemarks(e.target.value); setError(null); }} maxLength={500} />
             </label>
-            <Invoice file={file} fileRef={fileRef} onFile={f => { setFile(f); setError(null); }} />
+            <InvoiceField file={file} fileRef={fileRef} onFile={f => { setFile(f); setError(null); }} />
             <label className={s.field}><span className={s.fieldLabel}>Amount (RM)</span>
               <input type="text" inputMode="decimal" className={s.input} placeholder="e.g. 45.00" value={otherAmount} onChange={e => { setOtherAmount(e.target.value); setError(null); }} maxLength={12} />
             </label>
@@ -635,7 +635,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                         <div className={s.sumTotal}><span className={s.sumTotalLabel}>Claim amount</span><span className={s.sumTotalValue}>{rm2(amount)}</span></div>
                         <span className={s.sumNote}>HR checks it against the invoice.</span>
                       </div>
-                      <Invoice file={file} fileRef={fileRef} onFile={setFile} />
+                      <InvoiceField file={file} fileRef={fileRef} onFile={setFile} />
                     </>
                   )}
                   {!partProblem && !regionProblem && regionRow && !regionRow.planeTicket && regionRow.spots > 0 && (
@@ -699,7 +699,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
                         ? "HR has not set the Airbnb rate yet."
                         : `${capPerNight > 0 ? `More than ${options.rates.groupMaxPax} pax claim` : "You claim"} the invoice's total, up to ${rm0(perPax)} per pax a night. HR checks it against the invoice.`}</span>
                 </div>
-                <Invoice file={file} fileRef={fileRef} onFile={setFile} />
+                <InvoiceField file={file} fileRef={fileRef} onFile={setFile} />
               </>
             )}
             <label className={s.field}><span className={s.fieldLabel}>Notes (optional)</span><textarea rows={2} className={`${s.input} ${s.textarea}`} placeholder="Anything HR should know" value={notes} onChange={e => setNotes(e.target.value)} maxLength={1500} /></label>
@@ -884,20 +884,6 @@ function save(blob: Blob, name: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
-
-/** The invoice: an Airbnb stay's, or an air ticket's. */
-function Invoice({ file, fileRef, onFile }: { file: File | null; fileRef: RefObject<HTMLInputElement | null>; onFile: (file: File | null) => void }) {
-  return (
-    <div className={s.field}><span className={s.fieldLabel}>Invoice</span>
-      <button className={s.upload} onClick={() => fileRef.current?.click()}>
-        <Svg d={CAMERA} size={24} sw={1.8} stroke="var(--rv-accent)" />
-        <span className={s.uploadTitle}>{file ? file.name : "Take a photo or choose a file"}</span>
-        <span className={s.uploadSub}>{file ? `${Math.max(1, Math.round(file.size / 1024))} KB · tap to change` : "JPG, PNG or PDF, up to 100 MB"}</span>
-      </button>
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,application/pdf" hidden onChange={e => onFile(e.target.files?.[0] ?? null)} />
-    </div>
-  );
 }
 
 function Counter({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
