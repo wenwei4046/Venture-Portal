@@ -86,11 +86,14 @@ export default function GwpSkuPicker({ title, searchLabel, skus, chosen, elsewhe
           ))}
         </span>
       ) : null}
-      <label className={c.pickerSearch}>
-        <SearchIcon />
-        <input type="search" className={c.searchInput} value={query} disabled={disabled} onChange={e => setQuery(e.target.value)}
-          placeholder="Search SKU code, description or model…" aria-label={searchLabel} />
-      </label>
+      {/* In a row, as Costing Setting's: the search box's flex basis is a width (in the card's column it became a height). */}
+      <div className={c.pickerControls}>
+        <label className={c.pickerSearch}>
+          <SearchIcon />
+          <input type="search" className={c.searchInput} value={query} disabled={disabled} onChange={e => setQuery(e.target.value)}
+            placeholder="Search SKU code, description or model…" aria-label={searchLabel} />
+        </label>
+      </div>
       {msg ? <p className={c.pickerMsg}>{msg}</p> : null}
       {shown.length > 0 ? (
         <ul className={c.results}>

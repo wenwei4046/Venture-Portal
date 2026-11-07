@@ -69,6 +69,17 @@ describe('Product List › GWP', () => {
     expect(refresh).toHaveBeenCalled()
   })
 
+  it("keeps each search box in a row of its own, never straight in the picker's column", () => {
+    // In the card's flex column the search box's flex basis (280px, a width in Costing Setting's row) became its
+    // height: a box 280px tall (seen on the PR's preview, 2026-11-08).
+    render(<GwpTab entries={[]} skus={skus} />)
+    click('+ Add GWP')
+    for (const label of ['Find a SKU bought', 'Find a gift']) {
+      const box = screen.getByRole('searchbox', { name: label }).closest('label')
+      expect(box?.parentElement?.getAttribute('role')).not.toBe('group')
+    }
+  })
+
   it('never lets one SKU be bought and given', () => {
     render(<GwpTab entries={[]} skus={skus} />)
     click('+ Add GWP')

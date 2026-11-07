@@ -7,7 +7,8 @@
 // read; the migration then runs VERBATIM, twice. What is under test is its own work: a GWP's allowance on a bill is
 // its units a unit × the units of its buy SKUs there, taken by its gift SKUs' lines cheapest first — an unknown cost
 // first — and that part of their cost leaves Comm Cal's month, the Revenue app's facts and the calculator's rules;
-// a line wholly given never holds a bill as uncosted; and the Save takes only what is right. No live I/O.
+// a line wholly given never holds a bill as uncosted; and the Save takes only what is right. Then 20261108011500:
+// the five bodies with \r ending every line, as production was given them, made again without. No live I/O.
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { PGlite } from '@electric-sql/pglite'
@@ -352,5 +353,57 @@ check(await q(`SELECT count(*)::int AS n FROM public.catalogue_gwp_items`), [{ n
 check(await month(), before.month, "Comm Cal's month as it was")
 check(await facts(), before.facts, "the Revenue app's facts as they were")
 check(await rules(), { ...before.rules, gwp: [] }, "the calculator's rules carry none")
+
+// ── 20261108011500: the bodies as production was given them — \r ending every line — made again without ──
+// 20261108010000 went onto production from a CRLF copy: each line it wrote ends in \r (found by the old bills'
+// session, 2026-11-08). Every line of each body is given its \r here, then the fix runs verbatim, twice.
+const FIX = (await readFile(new URL('../../supabase/migrations/20261108011500_gwp_bodies_without_cr.sql', import.meta.url), 'utf8'))
+  .replace(/\r\n/g, '\n')
+const MADE = ['catalogue_save_gwp', 'sales_order_gwp_free', 'member_quote_cost_rules', 'revenue_month_orders', 'member_order_facts_with_old_bills']
+const plainMd5 = async () => Object.fromEntries((await q(`SELECT replace(p.oid::regprocedure::text, 'public.', '') AS sig, md5(p.prosrc) AS md5,
+    position(E'\\r' IN p.prosrc) > 0 AS cr
+  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname = ANY ($1)`, [MADE]))
+  .map(r => [r.sig, r.cr ? 'has \\r' : r.md5]))
+const lfMd5 = Object.fromEntries(md5After.filter(r => r.sig !== 'member_order_facts(uuid,date,date)').map(r => [r.sig, r.md5]))
+check(await plainMd5(), lfMd5, 'here (LF) the bodies are the md5s 20261108010000 names, md5(prosrc) as it stands')
+const aclsMade = await q(ACLS, [MADE])
+const defOf = sig => one(`SELECT pg_get_functiondef(to_regprocedure($1))`, [sig])
+const SIGS = ['public.catalogue_save_gwp(uuid, jsonb)', 'public.sales_order_gwp_free(uuid[])', 'public.member_quote_cost_rules(uuid)',
+  'public.revenue_month_orders(uuid, date)', 'public.member_order_facts_with_old_bills(uuid, date, date)']
+const lf = {}
+for (const sig of SIGS) {
+  lf[sig] = await defOf(sig)
+  await db.exec(lf[sig].replace(/\n/g, '\r\n'))
+}
+check(Object.values(await plainMd5()), MADE.map(() => 'has \\r'), 'given \\r, as production holds them')
+check(await month(), before.month, '— which reads no differently')
+
+// A body changed since is refused, and the fix leaves nothing behind.
+await db.exec(lf['public.sales_order_gwp_free(uuid[])'].replace('WITH lines AS (', '-- changed since\n    WITH lines AS ('))
+let fixRefused = null
+try {
+  await db.exec(FIX)
+} catch (e) {
+  fixRefused = e.message
+}
+await db.exec('ROLLBACK').catch(() => {})
+check(/sales_order_gwp_free.*not the body 20261108010000 wrote/.test(fixRefused ?? ''), true, 'a body changed since: refused')
+check((await plainMd5())['catalogue_save_gwp(uuid,jsonb)'], 'has \\r', '— and nothing of the fix stayed')
+await db.exec(lf['public.sales_order_gwp_free(uuid[])'].replace(/\n/g, '\r\n'))
+
+await db.exec(FIX)
+const fixed = await plainMd5()
+await db.exec(FIX)
+check(await plainMd5(), fixed, 'the second run changes nothing')
+check(fixed, lfMd5, "after it: no \\r, and md5(prosrc) as it stands is 20261108010000's")
+check(await q(ACLS, [MADE]), aclsMade, '— each granted as before')
+check(await one(`SELECT obj_description('public.catalogue_save_gwp(uuid, jsonb)'::regprocedure, 'pg_proc') LIKE 'Product List › GWP''s Save%'`), true,
+  '— its comment kept')
+const ecoAgain = await save(null, { qty: 2, buy: ['P-ECO-Q', 'P-ECO-K'], gift: ['P-MF', 'P-LATEX'] })
+check((await month())['HC-SO-2610-601'], [2000, 0.333333, 0], "the user's bill reads as it did: the mattress alone")
+check(await facts(), { ...before.facts, 'HC-SO-2610-601': 0.333333, 'HC-SO-2610-602': 0.332653, 'HC-SO-2610-604': 0.333333,
+  'HC-SO-2610-605': 0.304762, 'HC-SO-2610-606': 0.325 }, '— the facts too')
+await save(ecoAgain, { remove: true })
+check(await month(), before.month, 'taken away: every month as before')
 
 console.log(`OK gifts with purchase: ${checks} checks`)
