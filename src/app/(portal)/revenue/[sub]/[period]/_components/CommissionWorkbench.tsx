@@ -19,7 +19,7 @@ import { personPayLinesLock } from '@/lib/revenue-pay-lines'
 import { brandLabel, exhibitionQuery, NO_BRAND, type ExhibitionSales } from '@/lib/exhibitions'
 import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench'
 import { excludeOrder, includeOrder } from '../../../run-actions'
-import { nameWarnings, payrollState, unmatchedWarnings, type RunStatus } from '@/lib/commission/payroll-send'
+import { nameWarnings, payrollState, unassignedOldBillWarnings, unmatchedWarnings, type RunStatus } from '@/lib/commission/payroll-send'
 import { useEntryScroll } from '@/components/layout/useEntryScroll'
 import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillMoveOutcome, type BillShareOutcome } from '../orders/_components/BillContextMenu'
 import BillCountNotice from '../orders/_components/BillCountNotice'
@@ -323,7 +323,12 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     }, {
       total: sendBoard.result.totalCommission,
       byStaff: new Map(sendBoard.result.statements.map(st => [st.staffId, st.totalCommission])),
-      blockers: nameWarnings([...unmatchedWarnings(data.unmatchedOrderNos), ...sendBoard.result.warnings], id => names.get(id)),
+      blockers: nameWarnings([
+        ...unmatchedWarnings(data.unmatchedOrderNos),
+        // An old bill nobody the portal pays collected: HR gives it to whoever did (2026-11-07).
+        ...unassignedOldBillWarnings(data.unassignedOldBillNos ?? []),
+        ...sendBoard.result.warnings,
+      ], id => names.get(id)),
     })
   }, [payroll, data, runStatus, savedTotals, sendBoard])
   const selected = board.people.find(p => p.staffId === personId)
@@ -496,6 +501,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   // drawn in the other-month colour.
   const verdictOf = useMemo(() => closeVerdicts(data.carriedCloses ?? []), [data.carriedCloses])
   const saleMonths = useMemo(() => new Map(data.orders.map(o => [o.orderId, o.saleMonth ?? null])), [data.orders])
+  // An old bill topped up (2026-11-07): Top up deposit · Mar 2026 bill · Junie.
+  const oldBills = useMemo(() => new Map(data.orders.flatMap(o => o.oldBill ? [[o.orderId, o.oldBill] as const] : [])), [data.orders])
   function originOf(row: CommissionOrderRow | OverrideOrderRow): RowOrigin | null {
     const fact = row.upsale ? data.upsales?.[row.orderId] : undefined
     return rowOrigin(row, period, {
@@ -507,6 +514,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
       // A bill of this month its salesperson's close did not take: the next
       // open month pays it (`carry.ts`).
       afterClose: !row.upsale && row.periodMonth === period && cameAfterClose(row.staffId, row.orderId),
+      oldBill: row.upsale ? null : oldBills.get(row.orderId) ?? null,
     })
   }
   function cameAfterClose(staffId: string, orderId: string): boolean {

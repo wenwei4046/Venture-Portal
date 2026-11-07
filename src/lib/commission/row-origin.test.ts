@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { closeVerdicts, monthShort, ORIGIN_TONE, rowOrigin, type OriginRow } from './row-origin'
+import { closeVerdicts, monthShort, oldBillOf, ORIGIN_TONE, rowOrigin, type OriginRow } from './row-origin'
 
 // 2026-10-12 — the user: "if the commission is pay in current month, but the
 // bill is come from another month, i need the bar show different colour …
@@ -76,6 +76,36 @@ describe('rowOrigin — a bill of the month that came in after its salesperson w
   })
   it('is coloured in the month that does pay it — the late key-in of its own month', () => {
     expect(rowOrigin(row({ periodMonth: SEP }), OCT, { closed: 'absent' })).toMatchObject({ kind: 'late', paysHere: true })
+  })
+})
+
+describe('an old bill topped up (2026-11-07)', () => {
+  // The user, of ZNT4813 — Junie's bill of 10 Mar 2026, RM 800 of RM 6,000
+  // paid, Junie left, Shawn collected RM 3,200 on 2 Nov: "如果那个 order 之前
+  // below depo，but 离职了 shawn 帮忙 handle 这样就是有 com".
+  const NOV = '2026-11-01'
+  const FLOOR = '2026-08-01'
+  it('is a bill dated before the feed window in a month from it on', () => {
+    expect(oldBillOf({ orderDate: '2026-03-10', periodMonth: NOV, agentName: 'Junie' }, FLOOR))
+      .toEqual({ soldIn: '2026-03-01', soldBy: 'Junie' })
+  })
+  it('is no ordinary bill, no bill of a month before the window, nor anything while there is no window', () => {
+    expect(oldBillOf({ orderDate: '2026-10-28', periodMonth: NOV, agentName: 'SHAWN' }, FLOOR)).toBeNull()
+    expect(oldBillOf({ orderDate: '2026-08-01', periodMonth: '2026-08-01', agentName: 'LUCAS' }, FLOOR)).toBeNull()
+    expect(oldBillOf({ orderDate: '2026-07-12', periodMonth: '2026-07-01', agentName: 'LUCAS' }, FLOOR)).toBeNull()
+    expect(oldBillOf({ orderDate: '2026-03-10', periodMonth: NOV, agentName: 'Junie' }, null)).toBeNull()
+  })
+  it('says Top up deposit, its month and who sold it, coloured where it pays', () => {
+    expect(rowOrigin(row({ periodMonth: NOV }), NOV, { oldBill: { soldIn: '2026-03-01', soldBy: 'Junie' } }))
+      .toEqual({ kind: 'deposit', label: 'Top up deposit', fromMonth: '2026-03-01', detail: 'Mar 2026 bill · Junie', paysHere: true })
+  })
+  it('before its fair day or its close says otherwise', () => {
+    expect(rowOrigin(row({ periodMonth: NOV }), NOV, { oldBill: { soldIn: '2026-03-01', soldBy: null }, saleMonth: '2026-03-01', afterClose: true }))
+      .toMatchObject({ kind: 'deposit', detail: 'Mar 2026 bill' })
+  })
+  it('back under its deposit, it is Below deposit and pays nothing', () => {
+    expect(rowOrigin(row({ periodMonth: NOV, status: 'deposit_pending' }), NOV, { oldBill: { soldIn: '2026-03-01', soldBy: 'Junie' } }))
+      .toMatchObject({ kind: 'held', label: 'Below deposit', paysHere: false })
   })
 })
 

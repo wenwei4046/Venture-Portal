@@ -141,6 +141,27 @@ export async function loadBillMoves(db: SupabaseClient, orderIds: readonly strin
   }
 }
 
+/**
+ * The feed window's floor (`erp_feed_settings.min_order_date`, Fair
+ * 2026-08-01): a bill dated before it, in a month from it on, is an old bill
+ * that came in on its top-up (2026-11-07, `oldBillOf`). Read softly: without
+ * it a row is said as before, never a month without a page.
+ */
+export async function loadFeedFloor(db: SupabaseClient, subDepartmentId: string): Promise<string | null> {
+  try {
+    const { data, error } = await db
+      .from('erp_feed_settings')
+      .select('min_order_date')
+      .eq('sub_department_id', subDepartmentId)
+      .maybeSingle()
+    if (error) return null
+    return (data as { min_order_date: string | null } | null)?.min_order_date ?? null
+  } catch (error) {
+    console.error('[comm-cal] could not read the feed window', error)
+    return null
+  }
+}
+
 interface CloseRow {
   staff_id: string
   period_month: string
