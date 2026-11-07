@@ -3,6 +3,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ICON, Svg } from "../icons";
 import Sheet, { SheetHandle } from "../Sheet";
+import { useBackStep } from "../useBackStep";
+import DiscardAsk from "./DiscardAsk";
 import InvoiceField from "./InvoiceField";
 import { dayList, dayRange, initials, klToday, monthShort, MONTHS_SHORT, rm2, shortDay, weekdayShort } from "../format";
 import type { ClaimWeek, FormOptions, RequestKindVM } from "./profile-vm";
@@ -49,6 +51,9 @@ const SOURCES = [
   ["vacancy", "No replacement", "Release the position"],
 ] as const;
 
+/** The form's history step (../useBackStep.ts): the phone's Back shuts the form, never Requests under it. */
+export const REQUEST_FORM_STEP = "rvRequestForm";
+
 /** The request form (lines 1553–1679): claim, replacement or waiting list, then the request ID. */
 export default function RequestForm({ kind, options, revising, readOnly, onSubmit, onClose, formLink, replFormLink }: {
   kind: RequestKindVM | null;
@@ -67,16 +72,38 @@ export default function RequestForm({ kind, options, revising, readOnly, onSubmi
   const open = kind !== null;
   // A fresh form every time it opens; the same key on a retry (idempotent submission).
   const [session, setSession] = useState(0);
-  useEffect(() => { if (open) setSession(n => n + 1); }, [open, kind]);
+  // The phone's Back (2026-11-08 — the side note the user forwarded: with only the claim form open, Back left Requests,
+  // and the Subject, Remarks, Amount and invoice typed in went with it; the user: "do this"): Back shuts the form. With
+  // something filled in and not sent it asks first — Back again, Escape or Keep editing keep it; Discard shuts it.
+  // `unsent` is FormBody's say: anything typed, picked or tapped in the form, until it is sent.
+  const unsent = useRef(false);
+  const [asking, setAsking] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    setSession(n => n + 1);
+    unsent.current = false;
+    setAsking(false);
+  }, [open, kind]);
+  useBackStep(REQUEST_FORM_STEP, () => {
+    if (asking) { setAsking(false); return true; }
+    if (unsent.current && !readOnly) { setAsking(true); return true; }
+    onClose();
+  }, open);
+  const isClaim = kind === "claim" || kind === "food" || kind === "other";
   return (
-    <Sheet open={open} onClose={onClose} z={23} height="90%" className={s.rfPanel} label={kind ? TEXT[kind][0] : "Request"}>
+    // Asked, a tap on the dim answers the question as Keep editing — it never shuts the form under it.
+    <Sheet open={open} onClose={asking ? () => setAsking(false) : onClose} z={23} height="90%" className={s.rfPanel} label={kind ? TEXT[kind][0] : "Request"}>
       {kind && <FormBody key={`${kind}-${session}`} kind={kind} options={options} revising={revising} readOnly={readOnly} onSubmit={onSubmit} onClose={onClose}
-        formLink={kind === "replacement" ? replFormLink : formLink} />}
+        formLink={kind === "replacement" ? replFormLink : formLink} onUnsent={u => { unsent.current = u; }} />}
+      {kind && asking && (
+        <DiscardAsk title={isClaim ? "Discard this claim?" : "Discard this request?"} onKeep={() => setAsking(false)}
+          onDiscard={() => { setAsking(false); onClose(); }} />
+      )}
     </Sheet>
   );
 }
 
-function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLink }: {
+function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLink, onUnsent }: {
   kind: RequestKindVM;
   options: FormOptions;
   revising: { id: string; detail: Record<string, unknown> } | null;
@@ -85,6 +112,8 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
   onClose: () => void;
   /** This kind's Download form: the waiting list's, or the replacement's. */
   formLink?: FormLink;
+  /** Something filled in and not sent (true), or sent (false): what the phone's Back asks before it shuts the form. */
+  onUnsent: (unsent: boolean) => void;
 }) {
   // What of a transport claim their title may send (2026-10-31): by road and an Airbnb stay, a plane ticket.
   const parts = options.transport ?? { road: true, plane: true };
@@ -428,6 +457,7 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
       const outcome = await onSubmit(form);
       if (outcome.ok) {
         setDone(outcome.code);
+        onUnsent(false);
         if (kind !== "claim" && kind !== "food" && kind !== "other" && signedName) setDoneFile(`Signed form attached · ${signedName}`);
       } else {
         setError(outcome.error);
@@ -486,7 +516,10 @@ function FormBody({ kind, options, revising, readOnly, onSubmit, onClose, formLi
           <button className={s.rfClose} onClick={onClose} aria-label="Close"><Svg d={CLOSE} size={16} sw={2} /></button>
         </div>
       </div>
-      <div className={s.rfScroll} data-rq-form-scroll="1">
+      {/* Anything typed or chosen in it (a field, a file, a pill, a counter, a day, the signature) is something to lose:
+          the phone's Back asks first (RequestForm). Its own events, and the invoice viewer's portalled under it. */}
+      <div className={s.rfScroll} data-rq-form-scroll="1" onChange={() => onUnsent(true)}
+        onClick={e => { if (e.target instanceof Element && e.target.closest("button, canvas")) onUnsent(true); }}>
         {kind === "food" && (
           <>
             <div className={s.field}><span className={s.fieldLabel}>Month</span>

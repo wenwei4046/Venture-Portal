@@ -1036,6 +1036,13 @@
 .doneText { font-size: calc(14px * var(--rv-type)); color: var(--rv-sub); line-height: 1.5; }
 .doneId { font-size: calc(13px * var(--rv-type)); font-weight: 650; color: var(--rv-ink); background: var(--rv-sand); border-radius: 9px; padding: 5px 10px; }
 .doneBtn { margin-top: 8px; width: 100%; height: 48px; border-radius: 14px; border: 1px solid var(--rv-line); background: var(--rv-white); color: var(--rv-ink); font-size: calc(15px * var(--rv-type)); font-weight: 600; }
+/* The phone's Back on a form with something filled in (2026-11-08, DiscardAsk): asked over the form, inside its sheet. */
+.rfAsk { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--rv-dim); border-radius: inherit; }
+.rfAskCard { width: 100%; max-width: 340px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; padding: 22px 20px 20px; border-radius: 18px; background: var(--rv-white); box-shadow: 0 6px 24px var(--rv-ink-14); }
+.rfAskTitle { font-family: var(--font-display-rv); font-size: calc(18px * var(--rv-type)); font-weight: 700; letter-spacing: -.01em; color: var(--rv-ink); text-align: center; }
+.rfAskBtns { display: flex; flex-direction: column; gap: 10px; }
+.rfAskKeep { height: 48px; border-radius: 14px; border: 0; background: var(--rv-accent); color: var(--rv-white); font-size: calc(15px * var(--rv-type)); font-weight: 600; }
+.rfAskDrop { height: 48px; border-radius: 14px; border: 1px solid var(--rv-line); background: var(--rv-white); color: var(--rv-red); font-size: calc(15px * var(--rv-type)); font-weight: 600; }
 
 /* ── Memos ── */
 .memo {
