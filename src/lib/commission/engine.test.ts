@@ -1985,7 +1985,7 @@ describe('a bill cut for its margin counts the sales its commission is (2026-11-
 // only"): a line's part given with a purchase leaves the margin's cost, worked out on the whole bill.
 describe('a gift with purchase leaves the margin (2026-11-08)', () => {
   const groupIndex = indexItemGroups(ITEM_GROUPS)
-  const ECO: GwpRule = { id: 'eco', buy: ['ECOBLISS (Q)'], gift: ['MF PILLOW'], perUnit: 2 }
+  const ECO: GwpRule = { id: 'eco', buy: ['ECOBLISS (Q)'], gifts: [{ code: 'MF PILLOW', perUnit: 2 }] }
   const bill = (pillows: number, pillowCost: number | undefined) =>
     withGwp(order('g1', 'rs', [
       ['MATTRESS', 'ECOBLISS (Q)', 1, 3_000, 1_400, 'AKEMI'],
@@ -2027,11 +2027,16 @@ describe('a gift with purchase leaves the margin (2026-11-08)', () => {
     expect(costOf(owner) + costOf(other)).toBeCloseTo(2_050, 2)
   })
 
-  it('reads the rows as the loader hands them', () => {
+  it('reads the rows as the loader hands them, each gift with its quantity', () => {
     expect(toGwpRules([
-      { id: 'g', qty_per_unit: '2',
-        catalogue_gwp_items: [{ role: 'buy', product_code: 'ECOBLISS (Q)' }, { role: 'gift', product_code: 'MF PILLOW' }] },
-      { id: 'h', qty_per_unit: 2, catalogue_gwp_items: [{ role: 'buy', product_code: 'X' }] },
-    ])).toEqual([{ id: 'g', buy: ['ECOBLISS (Q)'], gift: ['MF PILLOW'], perUnit: 2 }])
+      { id: 'g', catalogue_gwp_items: [
+        { role: 'buy', product_code: 'ECOBLISS (Q)', qty: null },
+        { role: 'gift', product_code: 'MF PILLOW', qty: '2' },
+        { role: 'gift', product_code: 'MP (Q)', qty: 1 },
+      ] },
+      { id: 'h', catalogue_gwp_items: [{ role: 'buy', product_code: 'X' }] },
+      // A gift with no quantity gives nothing: the GWP has no gift.
+      { id: 'k', catalogue_gwp_items: [{ role: 'buy', product_code: 'X' }, { role: 'gift', product_code: 'Y' }] },
+    ])).toEqual([{ id: 'g', buy: ['ECOBLISS (Q)'], gifts: [{ code: 'MF PILLOW', perUnit: 2 }, { code: 'MP (Q)', perUnit: 1 }] }])
   })
 })
