@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { useRef, useState } from "react";
+import { StrictMode, useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // pdf.js itself does not run under happy-dom: a PDF here is a fake of three A4 pages, drawn by a spy.
@@ -77,7 +77,7 @@ describe("a claim's invoice, before it is sent", () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:invoice-photo");
   });
 
-  it("View opens the photo full screen over the form; × closes it and gives its history step back", () => {
+  it("View opens the photo full screen over the form; × closes it and gives its history step back", async () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
     const { container } = render(<Field />);
     choose(container, photo());
@@ -91,11 +91,34 @@ describe("a claim's invoice, before it is sent", () => {
     expect((window.history.state as Record<string, unknown> | null)?.[INVOICE_VIEW_STEP]).toBe(1);
     fireEvent.click(within(shown).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(back).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(back).toHaveBeenCalledTimes(1));
     expect(screen.getByRole("button", { name: "View parking-receipt.jpg" })).toHaveFocus();
   });
 
-  it("the phone's Back closes the preview and leaves the form as it was — no second step back", () => {
+  it("stays open under React's Strict Mode, whose effects run twice (it opened and closed at once on the preview)", async () => {
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const { container } = render(<StrictMode><Field /></StrictMode>);
+    choose(container, photo());
+    fireEvent.click(screen.getByRole("button", { name: "View parking-receipt.jpg" }));
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    expect(viewer()).toBeInTheDocument();
+    expect(back).not.toHaveBeenCalled();
+    fireEvent.click(within(viewer()).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(back).toHaveBeenCalledTimes(1));
+  });
+
+  it("closed after the address moved on, it never takes the move back", async () => {
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const { container } = render(<Field />);
+    choose(container, photo());
+    fireEvent.click(screen.getByRole("button", { name: "View parking-receipt.jpg" }));
+    window.history.pushState(window.history.state, "", "/member?page=today");
+    fireEvent.click(within(viewer()).getByRole("button", { name: "Close" }));
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
+    expect(back).not.toHaveBeenCalled();
+  });
+
+  it("the phone's Back closes the preview and leaves the form as it was — no second step back", async () => {
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
     const { container } = render(<Field />);
     choose(container, photo());
@@ -109,6 +132,7 @@ describe("a claim's invoice, before it is sent", () => {
       window.dispatchEvent(new PopStateEvent("popstate", { state: under }));
     });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await act(async () => { await new Promise(r => setTimeout(r, 20)); });
     expect(back).not.toHaveBeenCalled();
     expect(screen.getByText("parking-receipt.jpg")).toBeInTheDocument();
     expect(window.location.search).toBe("?page=account&view=requests");

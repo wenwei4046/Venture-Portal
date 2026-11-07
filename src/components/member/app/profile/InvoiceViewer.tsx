@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
-import { useBackCloses } from "@/components/member/crm/shared/back";
 import { drawPage, pdfjs } from "@/components/member/crm/shared/pdf";
 import { canDraw, invoiceMeta, invoicePageMeta, type InvoiceKind } from "@/lib/member/invoice-file";
 import { Svg } from "../icons";
+import { useBackStep } from "../useBackStep";
 import v from "./invoice-viewer.module.css";
 
 const CLOSE = "M6 6l12 12M18 6 6 18";
-/** Its history step's key (crm/shared/back.ts): the phone's Back closes the viewer, never the form under it. */
+/** Its history step's key (useBackStep): the phone's Back closes the viewer, never the form under it. */
 export const INVOICE_VIEW_STEP = "rvInvoiceView";
 
 /**
@@ -19,7 +19,8 @@ export const INVOICE_VIEW_STEP = "rvInvoiceView";
  * (*PDF · page 1 of 2 · 245 KB*, *Photo · 1.2 MB*), then the file itself as white pages on sand — a photo as it is, a PDF
  * drawn page by page by pdf.js (as Me's viewer and the CRM's, so a phone shows every page, upright). Nothing is sent: it
  * reads the phone's own copy. Portalled over the request sheet (whose panel moves by transform); the phone's Back closes
- * it (the side note the user forwarded the same day: Back left the page, and the claim typed in with it), as Escape does.
+ * it, never the form (the side note the user forwarded the same day: Back left the page, and the claim typed in with
+ * it — ../useBackStep.ts), as × and Escape do.
  */
 export default function InvoiceViewer({ file, kind, imageUrl, onClose }: {
   file: File;
@@ -28,7 +29,7 @@ export default function InvoiceViewer({ file, kind, imageUrl, onClose }: {
   imageUrl: string | null;
   onClose: () => void;
 }) {
-  useBackCloses(true, onClose, INVOICE_VIEW_STEP);
+  useBackStep(INVOICE_VIEW_STEP, onClose);
   const closeRef = useRef<HTMLButtonElement>(null);
   const latest = useRef(onClose);
   const box = useRef<HTMLDivElement>(null);
