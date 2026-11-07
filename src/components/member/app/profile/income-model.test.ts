@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { IncomeBill, IncomeMonth, MemberIncome } from "@/lib/member/income";
+import type { MemberBookOrder, MemberOrderBook } from "@/lib/member/order-book";
 import { memberPay, salaryFromSchedule } from "@/lib/member/income-pay";
 import { incomeOrdersVM, incomeVM, OLD_BILL_NOTE } from "./income-model";
 
@@ -155,5 +156,19 @@ describe("an old bill topped up in My income", () => {
     expect(row).toMatchObject({ pay: "RM 240.00", sub: "Not in sales", held: false });
     expect(vm.sheets[row.id]).toMatchObject({ tag: "Commission only", tone: "neutral", note: expect.stringContaining(OLD_BILL_NOTE) });
     expect(OLD_BILL_NOTE).toMatch(/not counted in your sales, your target or the Arena/);
+  });
+
+  it("names no week of the month: it was sold at a fair months before", () => {
+    const sold: MemberBookOrder = {
+      id: "old", number: "ZNT4813", ref: null, customer: "Mdm Lee", date: "2026-03-10", sourceMonth: "2026-09", recognitionMonth: "2026-09",
+      brand: "AKEMI", booth: "AKEMI", venue: "SUNWAY", fairStart: "2026-03-13", fairEnd: "2026-03-15", organiser: null, week: "2026-03-13",
+      revenue: 6000, margin: 10, kpiQty: 0, cleared: true, carried: false, manual: false, total: 6000, paid: 4000, depositNeeded: 1800,
+      lines: [], own: true, share: null, commissionOnly: true, soldBy: "JUNIE TAN",
+    };
+    const book: MemberOrderBook = { from: "2026-09", through: "2026-09", asOf: "2026-10-05T02:00:00Z", paysFrom: "2026-09", closedMonths: [], brandWeeks: {}, orders: [sold] };
+    const vm = incomeOrdersVM(data(m), book, [], false);
+    const row = vm.mine.rows.find(r => r.no === "ZNT4813")!;
+    expect(row.meta).toBe("Mdm Lee · Akemi");
+    expect(vm.sheets[row.id].meta).toBe("Mdm Lee · SUNWAY");
   });
 });

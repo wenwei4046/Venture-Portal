@@ -179,7 +179,8 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
     const old = b.commissionOnly === true;
     sheets[id] = {
       no: b.no,
-      meta: [o?.customer, weekOf(o), o?.venue].filter(Boolean).join(" · ") || brand,
+      // An old bill (2026-11-07) was sold at a fair months before: no week of this month is its.
+      meta: [o?.customer, old ? null : weekOf(o), o?.venue].filter(Boolean).join(" · ") || brand,
       tag: waiting ? "Waiting for deposit" : old ? "Commission only" : gift ? "No sales" : margin === null ? "Cost pending" : `${margin.toFixed(1)}% margin`,
       tone: waiting ? "warn" : old ? "neutral" : margin === null && !gift ? "warn" : toneOf(b, o, bands),
       amt: rm(o?.total ?? b.orderTotal ?? b.commissionable),
@@ -200,7 +201,7 @@ export function incomeOrdersVM(data: MemberIncome, book: MemberOrderBook | null,
         : `${b.sharePct !== null ? `Your ${Math.round(b.sharePct * 100)}% of a shared bill. ` : ""}Commission is shared across lines by line amount.${b.kpi > 0 ? " Each KPI item pays as listed." : ""}`,
     };
     return {
-      id, no: b.no, meta: [o?.customer, weekOf(o), brand].filter(Boolean).join(" · "),
+      id, no: b.no, meta: [o?.customer, old ? null : weekOf(o), brand].filter(Boolean).join(" · "),
       pay: waiting ? "Waiting" : money(b.pay), held: waiting,
       sub: waiting ? "Deposit due" : old ? "Not in sales" : b.kpi > 0 ? `incl. KPI ${money(b.kpi)}` : `of ${rm(b.commissionable)}`,
     };

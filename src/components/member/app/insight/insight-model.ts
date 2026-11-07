@@ -388,7 +388,9 @@ export function billGroups(input: Pick<InsightInput, "book" | "period">): Group[
   const byWeek = new Map<string, MemberBookOrder[]>();
   const earlier: MemberBookOrder[] = [];
   for (const o of orders) {
-    if (o.carried) earlier.push(o);
+    // An old bill topped up (2026-11-07) sits in this month, dated by a fair months before: with the carried-in bills,
+    // never a week of its own.
+    if (o.carried || !sold(o)) earlier.push(o);
     else byWeek.set(o.week, [...(byWeek.get(o.week) ?? []), o]);
   }
   const groups: Group[] = [...byWeek.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([week, list]) => {
@@ -563,7 +565,8 @@ export function orderSheet(input: InsightInput, orderId: string): OrderSheetVM |
     tier: old ? "Not counted" : noSalesBill(o) ? "No sales" : o.margin === null ? "Cost pending" : band?.label ?? "No ladder",
     kpi: old ? "—" : kpiOn(input) ? String(o.kpiQty) : "—",
     oldBill: old ? {
-      line: [o.soldBy ? `${firstName(o.soldBy)}’s bill` : "An old bill", monthShort(o.sourceMonth)].filter(Boolean).join(" · "),
+      // The month it was SOLD in: its date's — the bill sits in the month its top-up came in (`sourceMonth`).
+      line: [o.soldBy ? `${firstName(o.soldBy)}’s bill` : "An old bill", monthShort(o.date.slice(0, 7))].filter(Boolean).join(" · "),
       sub: oldBillNote(input.whole ?? input.of),
     } : null,
     lines: o.lines.map(l => ({ name: l.name, qty: qty(l.qty), amt: l.amount ? rm(l.amount) : "Free", kpi: l.kpiQty, isKpi: l.kpiQty > 0 })),

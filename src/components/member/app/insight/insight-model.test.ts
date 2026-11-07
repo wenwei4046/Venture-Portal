@@ -248,7 +248,9 @@ describe("Insight › My team › a person", () => {
 
 // 2026-11-07, the user, of an old bill topped up: "i want can view, then mention no count in sales target (arena)".
 describe("Insight › an old bill topped up", () => {
-  const old = order({ id: "9", number: "ZNT4813", sourceMonth: "2026-03", carried: true, week: "2026-03-13", date: "2026-03-10",
+  // As the server sends it: in the month its top-up came in (its sourceMonth and recognitionMonth), not carried, dated
+  // and weeked by its own fair months before.
+  const old = order({ id: "9", number: "ZNT4813", week: "2026-03-13", date: "2026-03-10", fairStart: "2026-03-13", fairEnd: "2026-03-15",
     revenue: 6000, total: 6000, margin: 10, kpiQty: 3, commissionOnly: true, soldBy: "JUNIE TAN" });
   const withOld = input({ book: book([...ORDERS, old]) });
 
@@ -259,6 +261,8 @@ describe("Insight › an old bill topped up", () => {
 
   it("is listed with the carried-in bills, muted, and says it counts in nothing but commission", () => {
     const vm = billsView(withOld);
+    // No week of its own (its March fair's): with the bills from earlier months.
+    expect(vm.tabs.map(t => t.key)).toEqual(billsView(input()).tabs.map(t => t.key));
     expect(vm.counted).toEqual(billsView(input()).counted);
     expect(vm.waiting).toEqual(billsView(input()).waiting);
     const row = vm.weeks.earlier.bills.find(b => b.no === "ZNT4813");
