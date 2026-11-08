@@ -63,7 +63,7 @@ const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSea
  * computer, the phone's on a phone). The Control panel then opens as panel/desk/PanelDesk — the same data, writes and
  * view models, laid out wide; the salesperson CRM stays the phone's until its desktop is built on the same frame.
  */
-export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings }: { live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void }) {
+export default function CrmApp({ live, salesperson, onExit, desk = false, deskApp, open = null, onReady, onQuoteSettings, onViewAs }: { onViewAs?: (staffId: string | null) => void; live: boolean; salesperson: string; onExit: () => void; desk?: boolean; deskApp?: DeskAppFrame; open?: CrmOpen | null; onReady?: () => void; onQuoteSettings?: () => void }) {
   const [data, setData] = useState<CrmData | null>(() => (live ? null : crmDemoData(salesperson)));
   // Settings › Reply targets: the urgency lines every screen below draws by (lib/member/crm.ts › replyUrgency).
   setUrgencyThresholds(data?.settings);
@@ -73,6 +73,9 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   const [now, setNow] = useState(() => new Date());
   const [ui, setUi] = useState<SalesUi>(initialSalesUi);
   const [viewing, setViewing] = useState<string | null>(null);
+  // Whom the Principal viewed here goes with them out of the CRM (RevenueApp): told when it changes, never on opening.
+  const viewingSeen = useRef(viewing);
+  useEffect(() => { if (viewingSeen.current !== viewing) { viewingSeen.current = viewing; onViewAs?.(viewing); } }, [viewing, onViewAs]);
   // The Principal and the Director: the Control panel, or (the Director) their own CRM.
   const [panelUi, setPanelUi] = useState<PanelUi>(initialPanelUi);
   // Team (the Control panel) or Mine (one's own CRM): null until chosen — the Director opens on Team, a leader on Mine.
