@@ -314,7 +314,6 @@ export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(
     ["Share", "var(--crm-brown)", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6", () => patch({ menu: false, kind: "share" }), "", false],
     ["Customer info", "var(--crm-brown)", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => { if (c) patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true }); }, "", true],
     ["Appointment", "var(--crm-ink-soft)", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => { if (c) patch({ menu: false, kind: "book", book: null }); }, "", false],
-    ["Starred messages", "var(--crm-brown)", "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", () => { patch({ menu: false }); chat.starredOpen(); }, `${chat.starCount} in this chat`, false],
     [unread ? "Mark as read" : "Mark as unread", "var(--crm-ink-soft)", "M21 12a9 9 0 1 1-9-9M19 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
       () => { if (!c) return; if (unread) { flag({ markedUnread: false }, "Marked as read"); if (c.assignedTo === me.id) act.openChat(c.id); } else flag({ markedUnread: true }, "Marked as unread"); }, "", true],
     [muted ? "Unmute" : "Mute notifications", "var(--crm-ink-soft)", muted ? "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" : "M18 8a6 6 0 0 0-9.3-5M6 8c0 7-3 7-3 9h14M10 21h4M2 2l20 20",

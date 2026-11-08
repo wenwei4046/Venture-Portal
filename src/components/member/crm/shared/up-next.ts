@@ -53,6 +53,8 @@ export function agoWords(iso: string | null | undefined, nowOffice: string): str
 export const OFF_WORDS: Record<Exclude<UpNextWhy, "leave" | null>, string> = {
   paused: "paused", not_on_ad: "team not on this ad", locked: "locked", not_full_time: "not Full time today", no_share: "no share in this ad", at_limit: "at their limit",
 };
+/** Not in turn's order (the owner, 2026-11-08: "按原因，再按团队"): by reason in this order, then team, then name. */
+const OFF_ORDER = ["paused", "at_limit", "not_full_time", "no_share", "not_on_ad"];
 const OFF_MINI: Record<string, string> = { "not Full time today": "not Full time", "team not on this ad": "not on this ad" };
 
 export interface UpNextUi {
@@ -108,11 +110,11 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
     const l = p.leave;
     const short = onLeave && l ? `${leaveLabel(l)} · ${fmtRange(l.from, l.to)}`
       : p.why === "not_on_ad" && !single ? "not on any ad" : OFF_WORDS[p.why as keyof typeof OFF_WORDS];
-    return { id, name: nameOf(id), dot: t.dot, whyShort: short, canResume: canResume && may(id), canEnd: onLeave && may(id), first: canResume || onLeave,
+    return { id, name: nameOf(id), team: t.name, rank: OFF_ORDER.indexOf(p.why ?? "") >>> 0, dot: t.dot, whyShort: short, canResume: canResume && may(id), canEnd: onLeave && may(id), first: canResume || onLeave,
       whyMini: onLeave && l ? `${leaveShort(l)} · to ${fmtD(l.to).d} ${fmtD(l.to).m}` : OFF_MINI[short] ?? short,
       resume: () => a.resume(id), endLeave: () => { if (l) a.endLeave(id, l.id); }, editLeave: () => a.openLeave(id),
       actDisp: ui.hov === key && onLeave && may(id) ? "flex" : "none", txtDisp: ui.hov === key && onLeave && may(id) ? "none" : "block", hovOn: () => a.set({ hov: key }), hovOff: () => a.set({ hov: null }) };
-  }).sort((x, y) => Number(y.first) - Number(x.first));
+  }).sort((x, y) => Number(y.first) - Number(x.first) || x.rank - y.rank || x.team.localeCompare(y.team) || x.name.localeCompare(y.name));
   const inTurn = turn.map(p => {
     const id = p.staff, t = book.teamOf(p.team), i = slots.findIndex(s => s.id === id), key = `m${id}`, hov = ui.hov === key && may(id);
     return { i: i < 0 ? 99 : i, id, name: nameOf(id), team: t.name, dot: t.dot, last: lastOf(id), nextTxt: i < 0 ? "10+" : `#${i + 1}`,

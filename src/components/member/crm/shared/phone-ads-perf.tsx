@@ -12,6 +12,9 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { fetchAdDaily, fetchAdInsights } from "@/app/(member)/member/crm-actions";
 import { ALL, METRICS, metaFigures } from "../desk/vm/adsperf";
+import { ST_META } from "../desk/vm/tokens";
+import { adStatusOf } from "@/lib/member/crm-ad-running";
+import type { CrmData } from "@/lib/member/crm-data";
 import { chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, isoOf, scaled } from "../desk/vm/adschart";
 import { PHONE_TYPE, typePx } from "./type";
 import { Ic } from "./icons4a";
@@ -55,7 +58,11 @@ const KEPT = "crm-ads-meta-v1";
 function keptGet<T>(k: string): T | undefined { try { return (JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, T>)[k]; } catch { return undefined; } }
 function keptSet(k: string, v: unknown) { try { const all = JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, unknown>; all[k] = v; const ks = Object.keys(all); for (const x of ks.slice(0, Math.max(0, ks.length - 24))) delete all[x]; localStorage.setItem(KEPT, JSON.stringify(all)); } catch { /* storage full or off */ } }
 
-export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: Record<string, { name: string; hidden?: boolean }>; now: Date; live: boolean; manage: boolean;
+/** The desktop's status filter (Ads Performance › All ads · Running · Paused · Pending — adStatusOf, as Assignment's). */
+export const AD_STATUSES = ["all", "Running", "Paused", "Pending"] as const;
+export type AdStatusPick = (typeof AD_STATUSES)[number];
+
+export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: NonNullable<CrmData["adNames"]>; now: Date; live: boolean; manage: boolean;
   range: Range; cmp: Range | null; chips: { label: string; on: boolean; pick: () => void }[]; custom: boolean; openDates: () => void; openCompare: () => void; clearCompare: () => void }; head?: ReactNode }) {
   const cmp = !!p.cmp, [keys, setKeys] = useState(DEF), [pick, setPick] = useState(false), [openAd, setOpenAd] = useState<string | null>(null), [src, setSrc] = useState<SourcePick>("all");
   // The source picked (the owner, 2026-10-27): The Conts / DC, each by WhatsApp · Messenger — the ads, tiles and chart follow it.
@@ -69,9 +76,14 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
       // The ad itself: the link Meta sent with its leads, else Ads Manager (the owner, 2026-10-24: "加個按鈕可以導入去看那隻廣告").
       url: id.startsWith("ch:") ? "" : `/member/crm-ad/${encodeURIComponent(id)}` }; });
   }, [customers, p.adNames]);
-  // An ad hidden earlier (crm_hide_ad) stays out of the list and the totals.
-  const hidIds = new Set(ads.filter(a => a.hidden).map(a => a.id));
-  const ids = ads.filter(a => !a.hidden).map(a => a.id), si = isoOf(r.a), ui = isoOf(r.b), sb = isoOf(rb.a), ub = isoOf(rb.b);
+  // Each ad's status, as the desktop's filter works it out: Ads Manager's word, else its last lead (the owner, 2026-11-08:
+  // "没得选状态？" — the phone had no status filter). An ad of another status leaves the list, the tiles and the chart.
+  const [stF, setStF] = useState<AdStatusPick>("all");
+  const statusOf = (a: (typeof ads)[number]) => adStatusOf(p.adNames[a.id], a.cs.map(c => c.createdAt).sort().at(-1) ?? null, p.now);
+  const stCount = (k: AdStatusPick) => ads.filter(a => !a.hidden && (k === "all" || statusOf(a) === k)).length;
+  // An ad hidden earlier (crm_hide_ad) stays out of the list and the totals; so does one of another status.
+  const hidIds = new Set(ads.filter(a => a.hidden || (stF !== "all" && statusOf(a) !== stF)).map(a => a.id));
+  const ids = ads.filter(a => !hidIds.has(a.id)).map(a => a.id), si = isoOf(r.a), ui = isoOf(r.b), sb = isoOf(rb.a), ub = isoOf(rb.b);
   // Meta's figures, read on the server (CRM · Manage); none on the demo.
   // Drawn from the phone's last answer from the first frame — after the app was closed too — then read again (the owner, 2026-10-24).
   const idKey = [...ids].sort().join(","), kA = `f|${si}|${ui}`, kD = `d|${si}|${ui}`, kB = `f|${sb}|${ub}`; // by dates only: the answers are by ad, so a new ad keeps the rest on screen
@@ -93,7 +105,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   const all = customers.filter(c => c.adId && !hidIds.has(c.adId));
   const tot = figsOf(all, r, ids, figA), totB = figsOf(all, rb, ids, figB);
   const days = daysOf(r.a, r.b), series = dailySeries(keys, days, all, p.visits, ids.map(i => daily[i]));
-  const rows = ads.filter(a => !a.hidden).map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA), fb: cmp ? figsOf(a.cs, rb, [a.id], figB) : null })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
+  const rows = ads.filter(a => !hidIds.has(a.id)).map(a => ({ ...a, f: figsOf(a.cs, r, [a.id], figA), fb: cmp ? figsOf(a.cs, rb, [a.id], figB) : null })).filter(a => (a.f.leads ?? 0) > 0 || figA[a.id]).sort((x, y) => (y.f.leads ?? 0) - (x.f.leads ?? 0));
   // The change on the comparison picked — the tiles and every ad's figures (the owner, 2026-10-24: "进行对比后，下方数据并没有显示增多或减少").
   const change = (k: string, a: number | null | undefined, b: number | null | undefined) => {
     if (!cmp || a == null || b == null) return null;
@@ -118,6 +130,12 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "6px", overflowX: "auto", scrollbarWidth: "none" }}>
           {SOURCE_PICKS.map(s => <button key={s.v} type="button" onClick={() => setSrc(s.v)} style={{ ...chip(src === s.v), height: "28px", fontSize: fs(12) }}>{s.label}</button>)}
+        </div>
+        {/* Status, as the desktop's filter: its colours, the ads of each counted. */}
+        <div data-ads-status="" style={{ display: "flex", alignItems: "center", gap: "6px", overflowX: "auto", scrollbarWidth: "none" }}>
+          {AD_STATUSES.map(k => { const [label, dot, , bg, fg] = ST_META[k], on = stF === k;
+            return <button key={k} type="button" aria-pressed={on} onClick={() => setStF(k)} style={{ ...BTN, flex: "none", height: "28px", padding: "0 11px", borderRadius: "14px", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: fs(12), fontWeight: on ? 600 : 500, background: on ? bg : "transparent", color: on ? fg : "var(--crm-ink)", border: on ? "1px solid transparent" : "1px solid var(--crm-line)" }}>
+              {k !== "all" && <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: dot }} />}{label}<span style={{ color: "var(--crm-faint)", fontWeight: 500 }}>{stCount(k)}</span></button>; })}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: fs(12), color: "var(--crm-muted)" }}>
           <span>{short(r.a)}{r.a !== r.b ? ` – ${short(r.b)}` : ""}</span>

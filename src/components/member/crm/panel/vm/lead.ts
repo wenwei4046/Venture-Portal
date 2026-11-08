@@ -79,7 +79,7 @@ export function leadVM(ctx: PanelCtx) {
     } : null };
   };
   const gallery = galleryOf(c?.messages ?? []), al = albumsOf(c?.messages ?? []);
-  const hiddenMsgs = new Set(ctx.data.hiddenMessages), stars = new Set(ctx.data.starredMessages ?? []);
+  const hiddenMsgs = new Set(ctx.data.hiddenMessages), stars = new Set<string>(); // Stars are gone (the owner, 2026-11-08).
   const msgs = (c?.messages ?? []).filter(m => !hiddenMsgs.has(m.id)).map((m, k, arr) => {
     const sep = daySep(m.at, now), mine = m.from === "me", by = mine && m.by && m.by !== ow ? `Sent by ${nameOf(m.by)}` : m.auto ? "Auto-reply" : "";
     // A photo, video or voice note shows as itself (2026-10-13), as in the salesperson's chat; a file opens.
@@ -103,7 +103,6 @@ export function leadVM(ctx: PanelCtx) {
           { label: "Forward", icon: MENU_ICON.forward, run: () => {} },
           ...(m.text ? [{ label: "Copy", icon: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(m.text).catch(() => {}); } }] : []),
           { label: "Info", icon: MENU_ICON.info, run: () => {} },
-          { label: stars.has(m.id) ? "Unstar" : "Star", icon: MENU_ICON.star, run: () => void ctx.act.star(m.id, !stars.has(m.id)) },
           { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void ctx.act.hideMessage(m.id) },
         ],
       }), () => { patch({ pReply: { chat: c?.id ?? "", msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }); focusDraft(); }) },
@@ -343,8 +342,6 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
       { label: "Appointment", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", bg: "var(--crm-tint-new)", fg: "var(--crm-ink-soft)", go: appointment },
       // A WhatsApp chat past its 24 hours: the template is here, since the bar stays a bar (2026-10-30).
       ...(c && shut && c.channel === "whatsapp" && ctx.data.settings?.suggestTemplate !== false ? [{ label: "Send template message", icon: "M4 6h16v12H4zM4 7l8 6 8-6", bg: "var(--crm-tint-attention)", fg: "var(--crm-rust)", go: () => { patch({ pMenu: false }); void openTpl(); } }] : []),
-      // One's own starred messages in this chat (the message menu's Star, 2026-10-14).
-      { label: "Starred messages", icon: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z", bg: "var(--crm-tint-appt)", fg: "var(--crm-brown)", go: () => { patch({ pMenu: false }); if (c) openStarred(c.messages.filter(x => (ctx.data.starredMessages ?? []).includes(x.id)).map(x => ({ id: x.id, who: x.from === "me" ? "You" : c.name, text: x.text || (x.media ? mediaWord(x) : ""), at: msgTime(x.at) }))); } },
     ],
     shareOpen: false, closeShare: NONE, shareList: [] as { name: string; role: string; ini: string; pick: () => void }[],
     infoOpen: on && ui.pInfo, closeInfo: () => patch({ pInfo: false }), info,
