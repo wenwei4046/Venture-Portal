@@ -112,7 +112,7 @@ export function DeskUpNext({ live, book, ads, canAct, line }: { live: boolean; b
             <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "var(--crm-muted)" }}>{f && <span style={DOT(f.dot)} />}{d.firstLine}</span>
           </span>
         </div>
-        {d.canAct && f && (
+        {d.canAct && f?.act && (
           <div style={{ display: "flex", gap: "8px" }}>
             {f.notPinned && (<>
               <span {...act(f.skip, "Give this one lead to the next person. They keep their place after that.")} style={BTN}>Skip</span>

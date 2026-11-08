@@ -38,6 +38,14 @@ export interface MatrixReview {
 const REVIEW_HINT = 'Their requests are approved by their department’s Claim & approve first, then go to Finance'
 
 /**
+ * CRM · Up next (2026-11-08): stored as By management approve is (flag `crm_up_next`), drawn under Profile · My leads &
+ * appointments when its View is ticked — a TL / STL / TA may use Insight › Up next's actions for the people under them.
+ */
+const UP_NEXT_TAB = 'rev.leads'
+const UP_NEXT_HINT =
+  'A TL / STL / TA may use Insight › Up next’s actions (Skip, Pause, Give to…, fill in leave) for the people under them only. The Principal and Revenue Director already can (CRM · Manage)'
+
+/**
  * The handoff's permission matrix (2026-10-11, People › Permissions and the
  * person window): the views on the left with how many of their tabs are
  * seen ("8/8"), the open view's tabs on the right, each with View · Create ·
@@ -68,6 +76,7 @@ export default function TabMatrix({
   held,
   reach,
   review,
+  upNext,
   canEdit,
   compact = false,
 }: {
@@ -88,6 +97,8 @@ export default function TabMatrix({
   reach?: MatrixReach
   /** By management approve, under the Claim rows. */
   review?: MatrixReview
+  /** CRM · Up next (2026-11-08), under Profile · My leads & appointments — the same shape as `review`. */
+  upNext?: MatrixReview
   canEdit: boolean
   /** The person window's tighter rail. */
   compact?: boolean
@@ -159,6 +170,24 @@ export default function TabMatrix({
                       <span className={s.subTick} aria-hidden>{review.on ? '✓' : ''}</span>
                       By management approve
                       {review.mine ? <span className={s.dot} aria-label="changed for this person" /> : null}
+                    </button>
+                  </span>
+                ) : null}
+                {upNext && t.id === UP_NEXT_TAB && ticks.has(grantOf(t.id, 'view')) ? (
+                  <span className={s.subs} role="group" aria-label={`${t.label} · Up next`}>
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={upNext.on}
+                      aria-label={`${t.label} · CRM · Up next`}
+                      title={UP_NEXT_HINT}
+                      disabled={!canEdit}
+                      className={`${s.sub} ${upNext.on ? s.subOn : ''}`}
+                      onClick={upNext.onToggle}
+                    >
+                      <span className={s.subTick} aria-hidden>{upNext.on ? '✓' : ''}</span>
+                      CRM · Up next
+                      {upNext.mine ? <span className={s.dot} aria-label="changed for this person" /> : null}
                     </button>
                   </span>
                 ) : null}

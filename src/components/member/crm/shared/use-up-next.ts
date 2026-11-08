@@ -117,7 +117,7 @@ export function useUpNext(o: { live: boolean; book: UpNextBook; ads: UpNextAd[];
     flash(`${nameOf(e.id)} on leave ${fmtRange(e.from, e.to)}`);
   };
 
-  const d = read ? upNextFrame(read, book, ads, ui, acts, o.canAct) : null;
+  const d = read ? upNextFrame(read, book, ads, ui, acts, o.canAct && (read.manage || !!read.canAct)) : null;
   const lv = edit ? leaveFormVM(edit, nameOf(edit.id), p => setEdit(e => (e ? { ...e, ...p } : e)), () => void saveLeave(), () => setEdit(null)) : null;
   return { d, lv, toast, failed, close: () => set({ pick: false, adOpen: false }) };
 }

@@ -82,7 +82,7 @@ export function PhoneUpNext({ head, live, book, ads, canAct, line }: { head: Rea
             {f && <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: fs(12), color: UN_ESPRESSO_TEXT }}><span style={{ width: "14px", height: "14px", borderRadius: "50%", flex: "none", background: "#fff", display: "grid", placeItems: "center" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: f.dot }} /></span><span>{f.team}</span><span>· next lead</span></span>}
           </span>
         </div>
-        {d.canAct && f && (
+        {d.canAct && f?.act && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1.4fr", gap: "8px", padding: "14px 0 0" }}>
             {f.notPinned && (<>
               <span {...tap(f.skip)} style={WHITE12}>Skip</span>
@@ -158,12 +158,12 @@ export function PhoneUpNext({ head, live, book, ads, canAct, line }: { head: Rea
             <span style={{ display: "flex", flexDirection: "column", gap: "2px" }}><strong style={{ font: `500 ${fs(18)} ${TIGHT}` }}>{d.sh.name}</strong><span style={{ fontSize: fs(12), color: "var(--crm-muted)" }}>{d.sh.team} · {d.sh.pos}</span></span>
           </div>
           <div style={{ padding: "10px 12px", borderRadius: "12px", background: "var(--crm-field)", fontSize: fs(12.5), lineHeight: 1.45, color: "var(--crm-ink-soft)" }}>{d.sh.why}</div>
-          <span {...tap(d.sh.give)} style={{ height: "48px", flex: "none", borderRadius: "24px", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", fontSize: fs(14), fontWeight: 600, cursor: "pointer" }}>Give them the next lead</span>
+          {d.sh.act && <><span {...tap(d.sh.give)} style={{ height: "48px", flex: "none", borderRadius: "24px", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", fontSize: fs(14), fontWeight: 600, cursor: "pointer" }}>Give them the next lead</span>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
             <span {...tap(d.sh.skip)} style={{ height: "44px", borderRadius: "22px", border: "1px solid var(--crm-line)", display: "grid", placeItems: "center", fontSize: fs(13.5), fontWeight: 600, cursor: "pointer" }}>Skip this turn</span>
             <span {...tap(d.sh.pause)} style={{ height: "44px", borderRadius: "22px", border: "1px solid var(--crm-line)", display: "grid", placeItems: "center", fontSize: fs(13.5), fontWeight: 600, color: "var(--crm-oxblood)", cursor: "pointer" }}>Pause</span>
             <span {...tap(d.sh.leave)} style={{ gridColumn: "1 / -1", height: "44px", borderRadius: "22px", border: "1px solid var(--crm-line)", display: "grid", placeItems: "center", fontSize: fs(13.5), fontWeight: 600, cursor: "pointer" }}>Mark on leave</span>
-          </div>
+          </div></>}
         </div>
       </div>
     )}

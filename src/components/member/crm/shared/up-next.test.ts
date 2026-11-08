@@ -48,6 +48,14 @@ describe("Up next's words (README › Screens)", () => {
     expect(d.pickList.some(p => p.head === "Outside this ad")).toBe(true);
     expect(d.last.meta).toBe("Team Stanley · 3 h ago");
   });
+  it("a ticked leader acts on the people under them, never on themselves", () => {
+    const r = { ...new UpNextDemo().read("all"), manage: false, canAct: true, me: "chea" };
+    const d = upNextFrame(r, demoBook, DEMO_ADS, ui({ hov: "mchea" }), acts, true);
+    expect(d.first).toMatchObject({ name: "CHEA HUAN", act: false });
+    expect(d.inTurn.find(m => m.id === "chea")?.actDisp).toBe("none");
+    expect(d.pickList.some(p => p.id === "chea")).toBe(false);
+    expect(d.chain[0].act).toBe(true);
+  });
   it("offers no action to somebody viewing", () => {
     const d = upNextFrame(new UpNextDemo().read("all"), demoBook, DEMO_ADS, ui({ hov: "mpeter" }), acts, false);
     expect(d.canAct).toBe(false);

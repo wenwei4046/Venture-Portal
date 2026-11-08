@@ -32,6 +32,8 @@ export interface TemplateRecord {
   sensitive: SensitiveField[]
   /** By management approve (2026-10-29, mig 20261029200000): its holders’ requests are approved in their department first. */
   review: boolean
+  /** CRM · Up next (2026-11-08, flag `crm_up_next`): its TL / STL / TA may use Insight › Up next's actions for the people under them. */
+  upNext: boolean
   /** Its ticked boxes, view › tab › action (2026-10-11) — null until its first save on tabs: then its cells give them. */
   tabs: string[] | null
 }
@@ -145,6 +147,7 @@ export async function loadPermissionsData(client: SupabaseClient): Promise<Permi
     grants: grantsFromRows(grantRows.filter(g => g.template_id === t.id)),
     sensitive: sensRows.filter(s => s.template_id === t.id).map(s => s.field).filter(isSensitiveField),
     review: flagRows.some(f => f.template_id === t.id && f.flag === 'claims_review'),
+    upNext: flagRows.some(f => f.template_id === t.id && f.flag === 'crm_up_next'),
     tabs: tabRows.some(r => r.template_id === t.id) ? tabRows.filter(r => r.template_id === t.id).map(r => `${r.tab_id}.${r.action}`) : null,
   }))
 

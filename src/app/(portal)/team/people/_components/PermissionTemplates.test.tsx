@@ -46,12 +46,12 @@ function data(): PermissionsData {
         // No ticks stored yet: drawn from its cells.
         id: HR, key: 'hr', name: 'HR · Payroll', description: 'Runs the roster and payroll.', baseRole: 'hr', version: 3,
         grants: { dashboard: { view: 'all' }, hr_costing: { view: 'all', create: 'all', edit: 'all', export: 'all' } },
-        sensitive: ['salary'], tabs: null, review: false,
+        sensitive: ['salary'], tabs: null, review: false, upNext: false,
       },
       {
         id: STAFF, key: 'staff', name: 'Staff · Basic', description: null, baseRole: 'staff', version: 1,
         grants: { dashboard: { view: 'all' }, claims: { view: 'own', create: 'own' } }, sensitive: [],
-        tabs: ['dept.overview.view', 'dept.my_claims.view', 'dept.my_claims.create'], review: false,
+        tabs: ['dept.overview.view', 'dept.my_claims.view', 'dept.my_claims.create'], review: false, upNext: false,
       },
     ],
     titles: [
@@ -253,6 +253,25 @@ describe('People Management › Permissions, by view and tab (HR revamp 8)', () 
     expect(screen.getByText('Unsaved changes to Staff · Basic')).toBeInTheDocument()
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
     expect(mocks.saveTemplateTabs).toHaveBeenCalledWith(expect.objectContaining({ templateId: STAFF, version: 1, review: true }))
+  })
+  // 2026-11-08: CRM · Up next, ticked once for a title — under Profile · My leads & appointments when its View is ticked.
+  it('ticks CRM · Up next for every holder of a template, sent alone — By management approve untouched', async () => {
+    const LEADS = '00000000-0000-4000-8000-000000000007'
+    const d = data()
+    d.templates.push({
+      id: LEADS, key: 'rev_team', name: 'Revenue Team', description: null, baseRole: 'revenue_member', version: 2,
+      grants: { revenue_app: { view: 'own' } }, sensitive: [], tabs: ['rev.leads.view'], review: false, upNext: false,
+    })
+    mocks.saveTemplateTabs.mockResolvedValue({ ok: true, version: 3, titles: 0 })
+    renderTab({ data: d, initialTemplateId: LEADS })
+    const pill = () => box('Profile · My leads & appointments · CRM · Up next')
+    expect(pill()).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(pill())
+    expect(pill()).toHaveAttribute('aria-checked', 'true')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
+    const sent = mocks.saveTemplateTabs.mock.calls[0][0]
+    expect(sent).toMatchObject({ templateId: LEADS, version: 2, upNext: true })
+    expect(sent).not.toHaveProperty('review')
   })
 })
 

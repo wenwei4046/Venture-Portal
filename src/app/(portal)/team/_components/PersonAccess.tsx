@@ -107,15 +107,21 @@ function TemplateAccess({
   const savedReview = access.ownReview ?? null
   const ownReview = reviewDraft ? reviewDraft.own : savedReview
   const reviewOn = ownReview ?? access.template.review ?? false
+  // Their own CRM · Up next over the template's (2026-11-08), kept as By management approve is: null follows the template.
+  const [upNextDraft, setUpNextDraft] = useState<{ own: boolean | null } | null>(null)
+  const savedUpNext = access.ownUpNext ?? null
+  const ownUpNext = upNextDraft ? upNextDraft.own : savedUpNext
+  const upNextOn = ownUpNext ?? access.template.upNext ?? false
   const [view, setView] = useState<TabView>(() => TAB_VIEWS.find(v => viewCount(v.id, saved).seen > 0)?.id ?? 'hr')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
-  const changes = boxesOf(base, ticks).length + reachTicks.length + sensTicks.length + (ownReview === null ? 0 : 1)
+  const changes = boxesOf(base, ticks).length + reachTicks.length + sensTicks.length + (ownReview === null ? 0 : 1) + (ownUpNext === null ? 0 : 1)
   const reachDirty = reachDraft !== null && !sameReachTicks(reachDraft, savedReach)
   const sensDirty = sensDraft !== null && !sameSensitiveTicks(sensDraft, access.ownSensitive)
   const reviewDirty = reviewDraft !== null && reviewDraft.own !== savedReview
-  const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep || reachDirty || sensDirty || reviewDirty
+  const upNextDirty = upNextDraft !== null && upNextDraft.own !== savedUpNext
+  const dirty = (draft !== null && !sameTicks(draft, saved)) || outOfStep || reachDirty || sensDirty || reviewDirty || upNextDirty
   const who = personName?.trim() || 'this person'
   // Their sensitive fields (the template's with their own over them) and the kind decide what a ticked tab opens.
   const held = useMemo(() => heldTabs(ticks, sensitive, access.template.baseRole, access.cellKeys), [ticks, sensitive, access])
@@ -132,12 +138,14 @@ function TemplateAccess({
         sensitive: sensTicks,
         // Only when it moved: their tick is left as it is otherwise.
         ...(reviewDirty ? { review: ownReview } : {}),
+        ...(upNextDirty ? { upNext: ownUpNext } : {}),
       })
       if (!result.ok) return setError(result.reason)
       setDraft(null)
       setReachDraft(null)
       setSensDraft(null)
       setReviewDraft(null)
+      setUpNextDraft(null)
       onSaved?.()
       router.refresh()
     })
@@ -156,7 +164,7 @@ function TemplateAccess({
   const actions = canEdit ? (
     <span className={s.footActions}>
       {changes > 0 ? (
-        <button type="button" className={s.footGhost} disabled={pending} onClick={() => { setDraft(new Set(base)); setReachDraft([]); setSensDraft([]); setReviewDraft({ own: null }) }}>Reset to title</button>
+        <button type="button" className={s.footGhost} disabled={pending} onClick={() => { setDraft(new Set(base)); setReachDraft([]); setSensDraft([]); setReviewDraft({ own: null }); setUpNextDraft({ own: null }) }}>Reset to title</button>
       ) : null}
       <button type="button" className={s.footSave} disabled={!dirty || pending} onClick={() => save(boxesOf(base, ticks))}>
         {pending ? 'Saving…' : 'Save'}
@@ -214,6 +222,11 @@ function TemplateAccess({
           mine: ownReview !== null,
           // Back to the template's when it matches it; their own otherwise.
           onToggle: () => setReviewDraft({ own: !reviewOn === (access.template.review ?? false) ? null : !reviewOn }),
+        }}
+        upNext={{
+          on: upNextOn,
+          mine: ownUpNext !== null,
+          onToggle: () => setUpNextDraft({ own: !upNextOn === (access.template.upNext ?? false) ? null : !upNextOn }),
         }}
       />
       {actions && footSlot ? createPortal(actions, footSlot) : actions ? <div className={s.inlineFoot}>{actions}</div> : null}

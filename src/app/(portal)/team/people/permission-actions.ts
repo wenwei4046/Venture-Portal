@@ -26,6 +26,7 @@ import {
 import { describeHistory, type AuditRow, type HistoryEntry } from '@/lib/permission-history'
 import { isReachTickList, sortedTicks, type ReachTick } from '@/lib/sub-department-reach'
 import { isSensitiveTickList, type SensitiveTick } from '@/lib/person-sensitive'
+import { flagsMoved, personFlagList, templateFlagList } from '@/lib/permission-flags'
 
 /**
  * Writing permission templates (2026-10-08, the People Management revamp;
@@ -206,6 +207,8 @@ export async function saveTemplateTabs(input: {
   tabs: string[]
   sensitive: string[]
   review?: boolean
+  /** CRM · Up next (2026-11-08, flag `crm_up_next`) — sent, as `review`, only when it moved. */
+  upNext?: boolean
 }): Promise<Result<{ version: number; titles: number }>> {
   await requireActionOn('/team/people', 'accounts', 'manage')
   if (
@@ -215,7 +218,8 @@ export async function saveTemplateTabs(input: {
     !ticksAreShaped(input.tabs) ||
     !Array.isArray(input.sensitive) ||
     !input.sensitive.every(isSensitiveField) ||
-    (input.review !== undefined && typeof input.review !== 'boolean')
+    (input.review !== undefined && typeof input.review !== 'boolean') ||
+    (input.upNext !== undefined && typeof input.upNext !== 'boolean')
   ) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -237,13 +241,21 @@ export async function saveTemplateTabs(input: {
   if (error) return { ok: false, reason: error.message }
   const saved = data as { version: number; titles: number }
   let version = saved.version
-  if (input.review !== undefined) {
+  // By management approve and CRM · Up next: the function takes the WHOLE list, so a tick that did not move is sent as stored.
+  const ticks = { review: input.review, upNext: input.upNext }
+  if (flagsMoved(ticks)) {
+    let stored: string[] = []
+    if (input.review === undefined || input.upNext === undefined) {
+      const current = await supabase.from('permission_template_flags').select('flag').eq('template_id', input.templateId)
+      if (current.error) return { ok: false, reason: `Its boxes were saved; its ticks were not — ${current.error.message}` }
+      stored = ((current.data ?? []) as Array<{ flag: string }>).map(f => f.flag)
+    }
     const { data: flagged, error: flagError } = await supabase.rpc('permission_template_flags_set', {
       p_template: input.templateId,
       p_version: saved.version,
-      p_flags: input.review ? ['claims_review'] : [],
+      p_flags: templateFlagList(ticks, stored),
     })
-    if (flagError) return { ok: false, reason: `Its boxes were saved; By management approve was not — ${flagError.message}` }
+    if (flagError) return { ok: false, reason: `Its boxes were saved; By management approve and CRM · Up next were not — ${flagError.message}` }
     if (typeof flagged === 'number') version = flagged
   }
   refresh()
@@ -285,6 +297,8 @@ export async function setPersonTabs(input: {
   sensitive?: SensitiveTick[]
   /** Their own By management approve over the template's (2026-10-29); null: the template's again. */
   review?: boolean | null
+  /** Their own CRM · Up next over the template's (2026-11-08); null: the template's again. */
+  upNext?: boolean | null
 }): Promise<Result> {
   await requireActionOn('/team/people', 'accounts', 'manage')
   if (
@@ -296,7 +310,8 @@ export async function setPersonTabs(input: {
     !input.boxes.every(b => b && typeof b.granted === 'boolean' && parseGrant(`${b.tab}.${b.action}`) !== null) ||
     (input.reach !== undefined && !isReachTickList(input.reach)) ||
     (input.sensitive !== undefined && !isSensitiveTickList(input.sensitive)) ||
-    (input.review !== undefined && input.review !== null && typeof input.review !== 'boolean')
+    (input.review !== undefined && input.review !== null && typeof input.review !== 'boolean') ||
+    (input.upNext !== undefined && input.upNext !== null && typeof input.upNext !== 'boolean')
   ) {
     return { ok: false, reason: 'Reload the page and try again.' }
   }
@@ -320,9 +335,17 @@ export async function setPersonTabs(input: {
     const { error: sensitiveError } = await supabase.rpc('permission_user_sensitive_set', { p_user: input.userId, p_fields: input.sensitive })
     if (sensitiveError) return { ok: false, reason: sensitiveError.message }
   }
-  // Their own By management approve (2026-10-29): the whole list — none, back to the template's.
-  if (input.review !== undefined) {
-    const flags = input.review === null ? [] : [{ flag: 'claims_review', granted: input.review }]
+  // Their own By management approve (2026-10-29) and CRM · Up next (2026-11-08): the whole list — a tick that did not
+  // move is sent as stored, so one never wipes the other; none, back to the template's.
+  const flagTicks = { review: input.review, upNext: input.upNext }
+  if (flagsMoved(flagTicks)) {
+    let stored: Array<{ flag: string; granted: boolean }> = []
+    if (input.review === undefined || input.upNext === undefined) {
+      const current = await supabase.from('user_permission_flags').select('flag, granted').eq('user_id', input.userId)
+      if (current.error) return { ok: false, reason: current.error.message }
+      stored = (current.data ?? []) as Array<{ flag: string; granted: boolean }>
+    }
+    const flags = personFlagList(flagTicks, stored)
     const { error: flagError } = await supabase.rpc('permission_user_flags_set', { p_user: input.userId, p_flags: flags })
     if (flagError) return { ok: false, reason: flagError.message }
   }

@@ -13,6 +13,8 @@ export interface UpNextRead {
   me: string | null;
   now: string;
   manage: boolean;
+  /** CRM · Manage, or ticked for People › Permissions › CRM · Up next (a leader, their own line). */
+  canAct?: boolean;
   fullTimeDay: boolean;
   /** Every ad counted together with one split (Assignment › Save and apply to all › Count together). */
   together?: boolean;
@@ -66,6 +68,8 @@ export interface UpNextActs {
 
 /** What each screen draws: the prototype's frame(where), with the same names. */
 export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui: UpNextUi, a: UpNextActs, canAct: boolean) {
+  // A leader acts on the people under them, never on themselves (the database asks the same).
+  const may = (id: string) => canAct && (r.manage || id !== r.me);
   const ad = ads.find(x => x.id === ui.ad) ?? { id: ui.ad, name: book.adName(ui.ad), sub: "" };
   const single = ui.ad !== "all", adWord = single ? "this ad's leads" : "ad leads";
   const nameOf = (id: string) => book.nameOf(id);
@@ -94,28 +98,29 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
   const slots = out.map((o, i) => {
     const t = book.teamOf(o.team), key = `c${i}`;
     return { teamShort: t.name.replace(/^Team /, ""), k: i + 1, id: o.staff, name: nameOf(o.staff), ini: ini(nameOf(o.staff)), team: t.name, dot: t.dot, why: whyOf(o), whyLong: whyLong(o),
-      pinned: o.pinned, notPinned: !o.pinned,
+      pinned: o.pinned, notPinned: !o.pinned, act: may(o.staff),
       skip: () => a.skip(o.staff), pause: () => a.pause(o.staff), give: () => a.give(o.staff), open: () => a.set({ sheet: { id: o.staff, k: i + 1 } }),
-      actOp: ui.hov === key ? 1 : 0, hovOn: () => a.set({ hov: key }), hovOff: () => a.set({ hov: null }) };
+      actOp: ui.hov === key && may(o.staff) ? 1 : 0, hovOn: () => a.set({ hov: key }), hovOff: () => a.set({ hov: null }) };
   });
   const off = r.people.filter(p => p.why).map(p => {
     const id = p.staff, t = book.teamOf(p.team), key = `g${id}`, onLeave = p.why === "leave" && !!p.leave, canResume = p.why === "paused";
     const l = p.leave;
     const short = onLeave && l ? `${leaveLabel(l)} · ${fmtRange(l.from, l.to)}`
       : p.why === "not_on_ad" && !single ? "not on any ad" : OFF_WORDS[p.why as keyof typeof OFF_WORDS];
-    return { id, name: nameOf(id), dot: t.dot, whyShort: short, canResume: canResume && canAct, canEnd: onLeave && canAct, first: canResume || onLeave,
+    return { id, name: nameOf(id), dot: t.dot, whyShort: short, canResume: canResume && may(id), canEnd: onLeave && may(id), first: canResume || onLeave,
       whyMini: onLeave && l ? `${leaveShort(l)} · to ${fmtD(l.to).d} ${fmtD(l.to).m}` : OFF_MINI[short] ?? short,
       resume: () => a.resume(id), endLeave: () => { if (l) a.endLeave(id, l.id); }, editLeave: () => a.openLeave(id),
-      actDisp: ui.hov === key && onLeave && canAct ? "flex" : "none", txtDisp: ui.hov === key && onLeave && canAct ? "none" : "block", hovOn: () => a.set({ hov: key }), hovOff: () => a.set({ hov: null }) };
+      actDisp: ui.hov === key && onLeave && may(id) ? "flex" : "none", txtDisp: ui.hov === key && onLeave && may(id) ? "none" : "block", hovOn: () => a.set({ hov: key }), hovOff: () => a.set({ hov: null }) };
   }).sort((x, y) => Number(y.first) - Number(x.first));
   const inTurn = turn.map(p => {
-    const id = p.staff, t = book.teamOf(p.team), i = slots.findIndex(s => s.id === id), key = `m${id}`, hov = ui.hov === key && canAct;
+    const id = p.staff, t = book.teamOf(p.team), i = slots.findIndex(s => s.id === id), key = `m${id}`, hov = ui.hov === key && may(id);
     return { i: i < 0 ? 99 : i, id, name: nameOf(id), team: t.name, dot: t.dot, last: lastOf(id), nextTxt: i < 0 ? "10+" : `#${i + 1}`,
       actDisp: hov ? "flex" : "none", txtDisp: hov ? "none" : "block", hovOn: () => a.set({ hov: key }), hovOff: () => a.set({ hov: null }),
       skip: () => a.skip(id), pause: () => a.pause(id), leave: () => a.openLeave(id), open: () => a.set({ sheet: { id, k: i + 1 } }) };
   }).sort((x, y) => x.i - y.i);
   const others = r.people.filter(p => p.why && p.pickable && p.why !== "leave" && p.why !== "paused" && p.why !== "locked" && p.why !== "not_full_time");
-  const pickList = [...turn.map((p, j) => ({ id: p.staff, team: p.team, head: j === 0 ? "In today's turn" : "" })), ...others.map((p, j) => ({ id: p.staff, team: p.team, head: j === 0 ? "Outside this ad" : "" }))]
+  const turnMay = turn.filter(p => may(p.staff)), othersMay = others.filter(p => may(p.staff));
+  const pickList = [...turnMay.map((p, j) => ({ id: p.staff, team: p.team, head: j === 0 ? "In today's turn" : "" })), ...othersMay.map((p, j) => ({ id: p.staff, team: p.team, head: j === 0 ? "Outside this ad" : "" }))]
     .map(({ id, team, head }) => ({ id, head, name: nameOf(id), team: book.teamOf(team).name, dot: book.teamOf(team).dot, give: () => a.give(id) }));
   const shares = Object.entries(r.shares).filter(([, n]) => n > 0).sort(([x], [y]) => (x === DIRECTOR_KEY ? -1 : y === DIRECTOR_KEY ? 1 : 0) || book.teamOf(x).name.localeCompare(book.teamOf(y).name));
   const splitText = shares.map(([k, n]) => `${book.teamOf(k).name} ${pctOf(n)}`).join(" · ");
@@ -125,7 +130,7 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
     : "No split for this ad · set in Assignment";
   const last = r.last ? { name: nameOf(r.last.staff), meta: [book.teamOf(teamKeyOf(r.last.staff)).name, agoWords(r.last.at, r.now), single ? "" : book.adName(r.last.ad)].filter(Boolean).join(" · "), when: agoWords(r.last.at, r.now) } : { name: "—", meta: "", when: "" };
   const upcoming = r.upcoming.map(l => {
-    const key = `u${l.id}`, hov = ui.hov === key && canAct, x = fmtD(l.from), y = fmtD(l.to), t = book.teamOf(teamKeyOf(l.staff));
+    const key = `u${l.id}`, hov = ui.hov === key && may(l.staff), x = fmtD(l.from), y = fmtD(l.to), t = book.teamOf(teamKeyOf(l.staff));
     return { id: l.id, name: nameOf(l.staff), dot: t.dot, label: leaveLabel(l), range: fmtRange(l.from, l.to), day: `${x.d} ${x.m}`, dayNum: `${x.d} ${x.m}`,
       short: x.day === y.day ? `${leaveShort(l)} · ${x.t}–${y.t}` : `${leaveShort(l)} · to ${y.d} ${y.m}`,
       actDisp: hov ? "flex" : "none", txtDisp: hov ? "none" : "block", hovOn: () => a.set({ hov: key }), hovOff: () => a.set({ hov: null }),
@@ -150,7 +155,7 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
     whyOn: () => a.set({ why: true }), whyOff: () => a.set({ why: false }), toggleMore: () => a.set({ more: !ui.more }),
     pickList, unpin: a.unpin, pickOpen: ui.pick, togglePick: () => a.set({ pick: !ui.pick }),
     sheetOn: !!sh, close: () => a.set({ sheet: null }),
-    sh: sh && shO ? { name: nameOf(sh.id), ini: ini(nameOf(sh.id)), team: book.teamOf(shO.team).name, pos: sh.k > 0 ? `#${sh.k} in line` : "after #10", why: whyLong(shO),
+    sh: sh && shO ? { act: may(sh.id), name: nameOf(sh.id), ini: ini(nameOf(sh.id)), team: book.teamOf(shO.team).name, pos: sh.k > 0 ? `#${sh.k} in line` : "after #10", why: whyLong(shO),
       give: () => a.give(sh.id), skip: () => a.skip(sh.id), pause: () => a.pause(sh.id), leave: () => a.openLeave(sh.id) } : null,
   };
 }

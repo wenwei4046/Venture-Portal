@@ -9,8 +9,8 @@
 --                           until the lead it is about is dealt (used_at), or it is undone (cleared_at).
 --   crm_staff_locked        the one place every dealing path already asks: it now also says paused, and "skipped for the
 --                           lead being dealt" (crm.deal_skip, this transaction only).
---   crm_assign_contact      production's body with two checked insertions: a pin first, and a skip (deal again without
---                           that person). Nothing else of the dealer changes.
+--   crm_assign_contact      production's body with three checked insertions: a pin first, a leader's pin inside their team,
+--                           a skip (deal again without that person). Nothing else of the dealer changes.
 --   crm_up_next             the queue. NOT a second dealer: inside a sub-transaction it inserts throwaway contacts, calls the
 --                           real crm_assign_contact for each, reads who it picked, and rolls all of it back. So the screen
 --                           and the dealing cannot disagree, whatever the dealer does now or later.
@@ -82,6 +82,8 @@ create table if not exists public.crm_deal_overrides (
   -- 'all' = the next ad lead of any ad; otherwise that ad's id.
   scope text not null,
   staff_id uuid not null references public.hr_staff_costs(id) on delete cascade,
+  -- A leader's pin stays inside their team: it never moves a lead from another team's share.
+  team_only boolean not null default false,
   created_by uuid references public.hr_staff_costs(id) on delete set null,
   created_at timestamptz not null default now(),
   used_at timestamptz,
@@ -130,7 +132,7 @@ begin
 ' || a2);
   v_new := replace(v_new, a3, '  -- Up next › Give to… (mig 20261108120000): the next ad lead goes to the pinned person, once; then the split carries on.
   select o.* into v_over from crm_deal_overrides o
-   where o.kind = ''pin'' and o.used_at is null and o.cleared_at is null
+   where o.kind = ''pin'' and o.used_at is null and o.cleared_at is null and not o.team_only
      and o.scope in (c.ad_source_id, ''all'') and not crm_staff_locked(o.staff_id)
    order by (o.scope = c.ad_source_id) desc, o.created_at desc limit 1 for update;
   if v_over.id is not null then
@@ -142,6 +144,17 @@ begin
   end if;
 ' || a3);
   v_new := replace(v_new, a4, '  if c.ad_source_id is not null then
+    -- A leader''s Give to…: once the split has given their team this lead, it goes to the person they named.
+    select o.* into v_over from crm_deal_overrides o
+     where o.kind = ''pin'' and o.used_at is null and o.cleared_at is null and o.team_only
+       and o.scope in (c.ad_source_id, ''all'') and not crm_staff_locked(o.staff_id)
+       and crm_team_of(o.staff_id) is not distinct from v_team
+     order by (o.scope = c.ad_source_id) desc, o.created_at desc limit 1 for update;
+    if v_over.id is not null then
+      update crm_deal_overrides set used_at = now(), used_contact = p_contact where id = v_over.id;
+      update crm_contacts set team_id = v_team, assigned_to = v_over.staff_id, held_reason = null where id = p_contact;
+      return jsonb_build_object(''assigned'', true, ''team'', v_team, ''member'', v_over.staff_id, ''member_by'', ''pinned'', ''pin_by'', v_over.created_by);
+    end if;
     -- Up next › Skip: this one lead goes to the next person; the skipped person keeps their place for later turns.
     select o.* into v_over from crm_deal_overrides o
      where o.kind = ''skip'' and o.used_at is null and o.cleared_at is null and o.staff_id = v_who
@@ -198,11 +211,54 @@ create trigger crm_staff_leave_log after insert or update or delete on public.cr
   for each row execute function public.crm_staff_leave_log();
 
 -- ── The writes ───────────────────────────────────────────────────────────────────────────────────────────────────────
--- As every assignment write: CRM · Manage (the Principal, the Revenue Director). A leader only looks at their line.
+-- ── The tick: People › Permissions › CRM · Up next ─────────────────────────────────────────────────────────────────────
+-- The owner (2026-11-08): the Principal ticks a title or a person, and that TL / STL / TA may Skip, Pause, Give to… and fill
+-- in leave for the people under them. Stored as By management approve is (20261029200000): the person's own tick over
+-- their title's template's. Not a cell: it opens nothing but these writes, on their own line.
+do $$
+declare c record;
+begin
+  for c in select conrelid::regclass::text t, conname from pg_constraint
+            where conrelid in ('public.permission_template_flags'::regclass, 'public.user_permission_flags'::regclass)
+              and contype = 'c' and pg_get_constraintdef(oid) like '%claims_review%'
+  loop
+    execute format('alter table %s drop constraint %I', c.t, c.conname);
+  end loop;
+end $$;
+alter table public.permission_template_flags add constraint permission_template_flags_flag_check check (flag in ('claims_review', 'crm_up_next'));
+alter table public.user_permission_flags add constraint user_permission_flags_flag_check check (flag in ('claims_review', 'crm_up_next'));
+do $$
+declare f text; v_src text; v_new text;
+begin
+  foreach f in array array['public.permission_template_flags_set(uuid, integer, text[])', 'public.permission_user_flags_set(uuid, jsonb)'] loop
+    select pg_get_functiondef(f::regprocedure) into v_src;
+    v_new := replace(v_src, 'NOT IN (''claims_review'')', 'NOT IN (''claims_review'', ''crm_up_next'')');
+    if v_new = v_src then raise exception 'crm_up_next: % has changed; look before replacing.', f; end if;
+    execute v_new;
+  end loop;
+end $$;
+
+-- Has this login the tick? Their own, else their title's template's.
+create or replace function public.crm_up_next_ticked(p_user uuid)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select f.granted from public.user_permission_flags f where f.user_id = p_user and f.flag = 'crm_up_next'),
+    exists (select 1 from public.permission_template_flags tf
+             where tf.flag = 'crm_up_next'
+               and tf.template_id = (select t.template_id from public.hr_staff_costs s join public.titles t on t.id = s.title_id
+                                      where s.user_id = p_user order by s.created_at, s.id limit 1)));
+$$;
+revoke execute on function public.crm_up_next_ticked(uuid) from public, anon, authenticated;
+grant execute on function public.crm_up_next_ticked(uuid) to service_role;
+
+-- CRM · Manage may act on anybody; a leader ticked for CRM · Up next on the people under them (never themselves).
 create or replace function public.crm_up_next_may(p_staff uuid)
 returns boolean language plpgsql stable security definer set search_path = public as $$
 begin
-  return p_staff is not null and crm_manages();
+  if p_staff is null then return false; end if;
+  if crm_manages() then return true; end if;
+  return auth.uid() is not null and crm_up_next_ticked(auth.uid()) and crm_can('view', 'own')
+     and p_staff is distinct from crm_me() and p_staff in (select crm_my_downline());
 end $$;
 revoke execute on function public.crm_up_next_may(uuid) from public, anon, authenticated;
 grant execute on function public.crm_up_next_may(uuid) to service_role;
@@ -235,27 +291,28 @@ end $$;
 
 create or replace function public.crm_up_next_give(p_ad text, p_staff uuid)
 returns void language plpgsql security definer set search_path = public as $$
-declare v_was uuid;
+declare v_was uuid; v_me uuid := crm_me(); v_all boolean := crm_manages();
 begin
   if not crm_up_next_may(p_staff) then perform crm_deny('give the next lead to this person'); end if;
   if crm_staff_locked(p_staff) then raise exception 'They are locked, paused or on leave.' using errcode = '22023'; end if;
   select staff_id into v_was from crm_deal_overrides
-   where kind = 'pin' and scope = p_ad and used_at is null and cleared_at is null order by created_at desc limit 1;
-  update crm_deal_overrides set cleared_at = now() where kind = 'pin' and scope = p_ad and used_at is null and cleared_at is null;
-  insert into crm_deal_overrides (kind, scope, staff_id, created_by) values ('pin', p_ad, p_staff, crm_me());
+   where kind = 'pin' and scope = p_ad and used_at is null and cleared_at is null and team_only = not v_all
+     and (v_all or created_by = v_me) order by created_at desc limit 1;
+  update crm_deal_overrides set cleared_at = now()
+   where kind = 'pin' and scope = p_ad and used_at is null and cleared_at is null and team_only = not v_all and (v_all or created_by = v_me);
+  insert into crm_deal_overrides (kind, scope, staff_id, team_only, created_by) values ('pin', p_ad, p_staff, not v_all, v_me);
   perform crm_up_next_log('give', p_staff, p_ad, jsonb_build_object('pinned', v_was), jsonb_build_object('pinned', p_staff));
 end $$;
 
 create or replace function public.crm_up_next_undo(p_ad text)
 returns void language plpgsql security definer set search_path = public as $$
-declare v_was uuid;
+declare v_me uuid := crm_me(); v_all boolean := crm_manages(); v_was uuid;
 begin
-  if not crm_manages() then perform crm_deny('undo the next lead''s pin'); end if;
-  -- The pin on screen: this ad's or All ads' (All ads shows every ad's).
+  if v_me is null or not (v_all or (crm_up_next_ticked(auth.uid()) and crm_can('view', 'own'))) then perform crm_deny('undo the next lead''s pin'); end if;
   select staff_id into v_was from crm_deal_overrides
-   where kind = 'pin' and (p_ad = 'all' or scope in (p_ad, 'all')) and used_at is null and cleared_at is null order by created_at desc limit 1;
+   where kind = 'pin' and (p_ad = 'all' or scope in (p_ad, 'all')) and used_at is null and cleared_at is null and (v_all or created_by = v_me) order by created_at desc limit 1;
   update crm_deal_overrides set cleared_at = now()
-   where kind = 'pin' and (p_ad = 'all' or scope in (p_ad, 'all')) and used_at is null and cleared_at is null;
+   where kind = 'pin' and (p_ad = 'all' or scope in (p_ad, 'all')) and used_at is null and cleared_at is null and (v_all or created_by = v_me);
   if v_was is not null then perform crm_up_next_log('undo', v_was, p_ad, jsonb_build_object('pinned', v_was), jsonb_build_object('pinned', null)); end if;
 end $$;
 
@@ -456,7 +513,10 @@ begin
     from crm_staff_leave l where l.from_at > v_at and (not v_scoped or l.staff_id = any (v_line));
 
   return jsonb_build_object('me', v_me, 'now', to_char(v_at at time zone 'Asia/Kuala_Lumpur', 'YYYY-MM-DD"T"HH24:MI'),
-    'manage', crm_manages(), 'fullTimeDay', exists (select 1 from crm_fulltime_teams(v_at)),
+    'manage', crm_manages(),
+    -- May the viewer act here at all (CRM · Manage, or ticked for CRM · Up next on their own line)?
+    'canAct', crm_manages() or (auth.uid() is not null and crm_up_next_ticked(auth.uid()) and crm_can('view', 'own')),
+    'fullTimeDay', exists (select 1 from crm_fulltime_teams(v_at)),
     -- Every ad counted is in the together group with one split (Save and apply to all › Count together): one pool.
     'together', coalesce(array_length(v_ads, 1), 0) > 1 and not exists (select 1 from unnest(v_ads) x left join crm_ad_assign a on a.ad_source_id = x where a.together is not true)
       and (select count(distinct a.team_split) from crm_ad_assign a where a.ad_source_id = any (v_ads)) = 1,

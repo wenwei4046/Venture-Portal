@@ -90,7 +90,7 @@ export type PersonAccessData =
       kind: 'template'
       userId: string
       titleName: string
-      template: { id: string; name: string; baseRole: string; grants: Grants; sensitive: SensitiveField[]; tabs: string[] | null; review: boolean }
+      template: { id: string; name: string; baseRole: string; grants: Grants; sensitive: SensitiveField[]; tabs: string[] | null; review: boolean; upNext: boolean }
       cells: PersonCells
       /** Their own boxes over the template's ticks (2026-10-11); none stored yet = their cells give them. */
       boxes: PersonBox[]
@@ -102,6 +102,8 @@ export type PersonAccessData =
       ownSensitive: SensitiveTick[]
       /** Their own By management approve over the template's (2026-10-29, mig 20261029200000) — null: the template's. */
       ownReview: boolean | null
+      /** Their own CRM · Up next over the template's (2026-11-08, flag `crm_up_next`) — null: the template's. */
+      ownUpNext: boolean | null
       functions: PermFunction[]
       cellKeys: CellKey[]
     }
@@ -158,6 +160,7 @@ export async function loadPersonAccess(
       sensitive: ((sens.data ?? []) as Array<{ field: string }>).map(s => s.field).filter(isSensitiveField),
       tabs: (tabs.data ?? []).length ? ((tabs.data ?? []) as Array<{ tab_id: string; action: string }>).map(t => `${t.tab_id}.${t.action}`) : null,
       review: !tplFlags.error && ((tplFlags.data ?? []) as Array<{ flag: string }>).some(f => f.flag === 'claims_review'),
+      upNext: !tplFlags.error && ((tplFlags.data ?? []) as Array<{ flag: string }>).some(f => f.flag === 'crm_up_next'),
     },
     boxes: ((boxes.data ?? []) as Array<{ tab_id: string; action: string; granted: boolean }>).map(b => ({ tab: b.tab_id, action: b.action as TabAction, granted: b.granted })),
     cells: personCellsFromRows((cells.data ?? []) as Array<{ function_key: string; action: string; scope: string | null }>),
@@ -169,6 +172,7 @@ export async function loadPersonAccess(
     reach: reach.error ? null : personReachFromJson(reach.data),
     ownSensitive: sensitiveTicksFromRows((ownSens.data ?? []) as Array<{ field: string; granted: boolean }>),
     ownReview: ownFlags.error ? null : (((ownFlags.data ?? []) as Array<{ flag: string; granted: boolean }>).find(f => f.flag === 'claims_review')?.granted ?? null),
+    ownUpNext: ownFlags.error ? null : (((ownFlags.data ?? []) as Array<{ flag: string; granted: boolean }>).find(f => f.flag === 'crm_up_next')?.granted ?? null),
     functions: functionsFromRows(
       (fns.data ?? []) as Array<{ key: string; label: string; section: string; actions: string[]; scopes: string[]; description: string | null }>,
     ),
