@@ -281,6 +281,8 @@ function teamInsight(body) {
   const H = '<div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "6px", padding: "0 4px" }}>';
   // v3 T01: the avatar left, the greeting, the house right, then Team performance | Ads performance (shared/phone4a.tsx).
   body = swap(body, H, "div", "<Phone4aTeamHead h={v.th} />", "team insight head");
+  // Insight › Up next (docs/design_handoff_crm_up_next): the third side of the head's switch, its own component.
+  body = once(body, "{!!(v.show.ad) && (<>", "{!!(v.show.up && v.upNext) && (<PhoneUpNext head={<Phone4aTeamHead h={v.th} />} {...v.upNext!} />)}\n    {!!(v.show.ad) && (<>", "up next");
   // "vs Sep" on the period card: it picks the period the hero compares with (production's Comparison).
   const pc = body.indexOf('<div onClick={v.ov.ovOpenPeriod}');
   const chev = body.indexOf('<svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16"', pc);

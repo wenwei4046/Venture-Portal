@@ -245,6 +245,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_note_channel_save',
   // Settings › General (mig 20261018100000): crm_me() first — anybody in the CRM reads the reply lines and switches.
   'crm_settings_read',
+  // Insight › Up next (mig 20261108120000): crm_me() first, then View at All or a downline.
+  'crm_up_next',
   'crm_appt_types_read',
   // The chat's suggested replies (mig 20261029150000): crm_me() first — anybody in the CRM reads the team's past answers.
   'crm_reply_examples',

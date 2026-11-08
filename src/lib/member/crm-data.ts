@@ -46,6 +46,9 @@ export function apptTypesFrom(raw: unknown): ApptType[] {
     .map(t => ({ id: t.id, label: t.label, on: t.on !== false, base: t.base === "online" ? "online" : "place",
       fields: (Array.isArray(t.fields) ? t.fields : []).filter(f => f && typeof f.id === "string" && kinds.has(f.kind)).map(f => ({ id: f.id, label: String(f.label ?? ""), kind: f.kind, ...(f.required ? { required: true } : {}), ...(Array.isArray(f.options) ? { options: f.options.map(String) } : {}) })) }));
 }
+/** An instant as the office writes it: "2026-11-06T09:00". */
+export const officeStamp = (iso: string | null | undefined): string | null => (iso ? new Date(new Date(iso).getTime() + 8 * 3_600_000).toISOString().slice(0, 16) : null);
+
 /** The customers less the ones from an ad hidden from Ads Performance (crm_hide_ad) — Insight leaves them out too (the owner, 2026-10-24: "這裡的數據也是要減掉hide 的廣告"). */
 export function withoutHiddenAds(d: CrmData): CrmData {
   const hid = d.adNames ? new Set(Object.entries(d.adNames).filter(([, n]) => n.hidden).map(([id]) => id)) : null;
@@ -202,7 +205,10 @@ export interface CrmPartnerBooking {
   booker: string; bookerPhone: string; customer: string; customerPhone: string; info: Record<string, string>; remarks: string; note: string; createdAt: string;
 }
 /** A member's leave (mig 20261029220000): no new lead goes to them from the first day to the last, both included. */
-export interface CrmLeave { id: string; staffId: string; from: string; to: string; note: string }
+/** Since mig 20261108120000 a leave has a time and a reason (`fromAt` / `toAt`, the office's "2026-11-06T09:00"); `from` / `to` are their days. */
+export interface CrmLeave { id: string; staffId: string; from: string; to: string; note: string; fromAt: string; toAt: string; reason: "Annual" | "Sick" | "Training" | "Other" }
+/** One Up next action on the record (crm_events, kind up_next): who, when, what, before and after. */
+export interface CrmUpNextEvent { id: number; at: string; actor: string | null; action: string; staff: string | null; ad: string | null; before: Record<string, unknown> | null; after: Record<string, unknown> | null }
 /** A partner's booking link (CRM · Manage only). */
 export interface CrmPartnerLink { id: string; name: string; code: string; on: boolean }
 export interface CrmReplyItem { id: string | null; title: string; category: string; body: string; keywords: string[] }
@@ -311,6 +317,10 @@ export interface CrmData {
   partnerLinks?: CrmPartnerLink[];
   /** Members' leave that has not ended (mig 20261029220000). */
   leaves?: CrmLeave[];
+  /** Up next's actions, for the Audit log (CRM · Manage reads them). */
+  upNextEvents?: CrmUpNextEvent[];
+  /** Leaders CRM › Settings › Up next lets act on their people. */
+  upNextStaff?: string[];
   autoReplies: CrmAutoReplySet;
   /** Other people's auto-replies, for View as (read only) — only for whoever sees everybody's CRM. */
   autoRepliesOf?: Record<string, CrmAutoReplySet>;
@@ -511,7 +521,9 @@ export interface CrmDataRows {
   library?: { id: string; title: string; category: string; body: string; keywords: string[] | null; sort_order: number }[];
   partnerBookings?: { id: string; ref: string; partner: string; showroom: string; start_at: string; minutes: number | null; state: "booked" | "cancelled"; booker_name: string; booker_phone: string | null; customer_name: string; customer_phone: string | null; info: Record<string, string> | null; remarks: string | null; booker_note: string | null; created_at: string }[];
   partnerLinks?: { id: string; name: string; code: string; on: boolean }[];
-  leaves?: { id: string; staff_id: string; starts_on: string; ends_on: string; note: string | null }[];
+  leaves?: { id: string; staff_id: string; starts_on: string; ends_on: string; note: string | null; from_at?: string | null; to_at?: string | null; reason?: string | null }[];
+  upNextEvents?: { id: number; at: string; actor: string | null; data: Record<string, unknown> }[];
+  upNextStaff?: string[];
   labels: { id: string; name: string; color: string; sort_order: number }[];
   contactLabels: { label_id: string; contact_id: string }[];
   quickReplies: { id: string; shortcut: string; message: string; sort_order: number }[];
@@ -682,7 +694,12 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     partnerBookings: (rows.partnerBookings ?? []).map(b => ({ id: b.id, ref: b.ref, partner: b.partner, showroomId: b.showroom, start: b.start_at, minutes: b.minutes ?? 60, state: b.state,
       booker: b.booker_name, bookerPhone: b.booker_phone ?? "", customer: b.customer_name, customerPhone: b.customer_phone ?? "", info: b.info ?? {}, remarks: b.remarks ?? "", note: b.booker_note ?? "", createdAt: b.created_at })),
     partnerLinks: rows.partnerLinks ?? [],
-    leaves: (rows.leaves ?? []).map(l => ({ id: l.id, staffId: l.staff_id, from: l.starts_on, to: l.ends_on, note: l.note ?? "" })),
+    leaves: (rows.leaves ?? []).map(l => ({ id: l.id, staffId: l.staff_id, from: l.starts_on, to: l.ends_on, note: l.note ?? "",
+      fromAt: officeStamp(l.from_at) ?? `${l.starts_on}T00:00`, toAt: officeStamp(l.to_at) ?? `${l.ends_on}T23:30`,
+      reason: (["Annual", "Sick", "Training", "Other"].includes(l.reason ?? "") ? l.reason : "Other") as CrmLeave["reason"] })),
+    upNextStaff: rows.upNextStaff ?? [],
+    upNextEvents: (rows.upNextEvents ?? []).map(e => ({ id: e.id, at: e.at, actor: e.actor, action: String(e.data.action ?? ""), staff: (e.data.staff as string | null) ?? null, ad: (e.data.ad as string | null) ?? null,
+      before: (e.data.before as Record<string, unknown> | null) ?? null, after: (e.data.after as Record<string, unknown> | null) ?? null })),
     replyLibrary: (rows.library ?? []).map(r => ({ id: r.id, title: r.title, category: r.category ?? "", body: r.body, keywords: r.keywords ?? [] })),
     labels: [...rows.labels].sort((a, b) => a.sort_order - b.sort_order).map(l => ({ id: l.id, name: l.name, color: l.color })),
     customerLabels,

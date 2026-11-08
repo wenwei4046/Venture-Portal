@@ -14,7 +14,7 @@ import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
 import { SuggestFloat } from "../shared/suggest-float";
 import { DeskTemplateFormat, DeskTemplateKind, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a } from "./Desk4a";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a, DeskUpNext4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -1861,6 +1861,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
             <div style={{ flex: "1", minWidth: "0", boxSizing: "border-box", padding: v.f4.pad, display: "flex", flexDirection: "column", gap: v.f4.gap, overflow: "auto" }}>
               {!!(v.kList) && (<DeskInboxList4a v={v} />)}
               {!!(v.kInsight) && (<DeskInsight4a v={v} />)}
+              {!!(v.kUpNext && v.upNextProps) && (<DeskUpNext4a {...v.upNextProps!} />)}
               {!!(v.kCh) && (<>
                 <div style={{ display: "flex", flexDirection: "column", gap: "20px", paddingTop: "8px" }}>
                   <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", borderBottom: "1px solid var(--crm-rule)" }}>

@@ -20,6 +20,13 @@ import { rangeLine } from "./frame4a";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
 import { inSource, type SourcePick } from "@/lib/member/crm-source";
 import type { CrmData } from "@/lib/member/crm-data";
+import { upNextAdsOf, upNextBookOf, upNextOpen } from "../../shared/up-next-data";
+
+/** Up next's props on the desktop. View as (no viewAs on the ctx): that person's line, read-only. */
+function deskUpNextProps(ctx: DeskCtx) {
+  const own = !!ctx.viewAs;
+  return { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: own ? null : ctx.me.id, canAct: own };
+}
 
 /** Insight for one brand (the owner, 2026-10-29: "Insight 要可以筛选 DC / The Conts"): its customers, their visits and journey. */
 export function inBrand(d: CrmData, src: SourcePick | null | undefined): CrmData {
@@ -178,9 +185,13 @@ export function insightVM(ctx0: DeskCtx) {
   const insAdCols = [IW.name ? `${IW.name}px` : "minmax(220px, 1.6fr)", ...IH.slice(1).map(([k]) => (IW[k] ? `${IW[k]}px` : "minmax(72px, 1fr)"))].join(" ");
   const insAdMinW = Math.max(820, 40 + (IW.name ?? 220) + IH.slice(1).reduce((n, [k]) => n + (IW[k] ?? 72) + 12, 0));
   const lt = adPerf.reduce((a, x) => a + x._n, 0), at = adPerf.reduce((a, x) => a + Number(x.appt), 0);
+  const mayUp = upNextOpen(ctx0.data, ctx0.me.id), upOn = ctx.ui.tab === "insight" && ctx.ui.insTab === "upnext" && mayUp;
   return {
-    kInsight: ctx.ui.tab === "insight" && ctx.ui.insTab !== "ads",
-    insTabs: ([["team", "Team performance"], ["ads", "Ads performance"]] as const).map(([k, label]) => ({ label, on: (ctx.ui.insTab ?? "team") === k, pick: () => ctx.patch({ insTab: k }) })),
+    kInsight: ctx.ui.tab === "insight" && ctx.ui.insTab !== "ads" && !upOn,
+    // Up next (docs/design_handoff_crm_up_next): the Principal, the Director and whoever has a downline; never a salesperson.
+    kUpNext: upOn,
+    upNextProps: upOn ? deskUpNextProps(ctx0) : null,
+    insTabs: ([["team", "Team performance"], ["ads", "Ads performance"], ...(mayUp ? [["upnext", "Up next"] as const] : [])] as const).map(([k, label]) => ({ label, on: (ctx.ui.insTab ?? "team") === k, pick: () => ctx.patch({ insTab: k }) })),
     hero, heroStats, teams: teamsOut, leadStatus,
     // 4a (frame 01): the hero's six figures, the teams with their people (opened in place), all seven statuses.
     metrics4, status4, statusTotal: tot7,

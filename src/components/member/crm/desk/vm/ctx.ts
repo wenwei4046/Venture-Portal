@@ -168,7 +168,7 @@ export interface DeskUi {
   /** Ads Performance's table a page at a time (v2 frame 05: "5 rows + pager (Show 5/10/20)"). */
   apPer: number; apPg: number;
   /** Insight's own tabs (v2 frames 01 / 01b): Team performance | Ads performance. */
-  insTab: "team" | "ads";
+  insTab: "team" | "ads" | "upnext";
   apChart: (string | null)[] | null; apChartOff: Record<string, boolean>; apChartShut: boolean; apTableShut: boolean;
   addAdOpen: boolean; addAdQ: string; addAdList: MetaAdRow[] | null | "error"; addAdId: string;
   mwtSaved: boolean;

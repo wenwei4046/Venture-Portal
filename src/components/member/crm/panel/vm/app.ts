@@ -5,6 +5,7 @@
  * the bottom bar, the customer form) every time.
  */
 import { headVM } from "./head";
+import { upNextAdsOf, upNextBookOf, upNextOpen } from "../../shared/up-next-data";
 import { bellVM } from "./bell";
 import { overviewVM } from "./overview";
 import { inboxVM } from "./inbox";
@@ -64,13 +65,14 @@ function profile6(ctx: PanelCtx, house: boolean) {
 }
 
 /** v3 T01 · Insight's head, on both of its sides. */
-function insightHead(ctx: PanelCtx, house: boolean, ads: boolean) {
+function insightHead(ctx: PanelCtx, house: boolean, ads: boolean, up: boolean) {
   const { me, patch } = ctx, boss = me.role === "boss";
   return {
     greet: `Hello, ${boss ? "Principal" : first(me.name)}`, // the owner, 2026-10-18: "改成 hello"
     sub: `${boss ? "Principal" : jobTitle(me)} · ${ctx.data.can.viewAll ? "All access" : teamName(teamOf(me.id, ctx.data.people)) || "My team"}`,
     ini: ini(me.name), house, exit: () => ctx.exitApp(),
-    sw: ctx.data.can.manage ? { ads, team: () => patch({ ovAds: false }), adsPick: () => patch({ ovAds: true }) } : null,
+    sw: ctx.data.can.manage || upNextOpen(ctx.data, me.id) ? { ads, up, canAds: ctx.data.can.manage, canUp: upNextOpen(ctx.data, me.id),
+      team: () => patch({ ovAds: false, ovUp: false }), adsPick: () => patch({ ovAds: true, ovUp: false }), upPick: () => patch({ ovUp: true, ovAds: false }) } : null,
   };
 }
 
@@ -78,7 +80,8 @@ export function panelAppVM(ctx: PanelCtx) {
   const { ui, set, now } = ctx, tab = ui.tab, lead = !!ui.lead;
   // v3 T01: Insight's Ads performance side is the Ads Performance page under Insight's head (CRM · Manage, as that page).
   const ovAds = tab === "overview" && !lead && ui.ovAds && ctx.data.can.manage;
-  const show = { ov: tab === "overview" && !lead && !ovAds, ib: tab === "inbox" && !lead, ld: lead, ad: tab === "ads" || ovAds, as: tab === "assign" && !lead, cal: tab === "calendar" && !lead, pf: tab === "profile" };
+  const ovUp = tab === "overview" && !lead && !!ui.ovUp && !ovAds && upNextOpen(ctx.data, ctx.me.id);
+  const show = { up: ovUp, ov: tab === "overview" && !lead && !ovAds && !ovUp, ib: tab === "inbox" && !lead, ld: lead, ad: tab === "ads" || ovAds, as: tab === "assign" && !lead, cal: tab === "calendar" && !lead, pf: tab === "profile" };
   const ld = show.ld ? leadVM(ctx) : off<ReturnType<typeof leadVM>>();
   const cf = customerForm({
     form: ui.pForm, data: ctx.data, saveDetails: ctx.act.saveDetails,
@@ -110,7 +113,8 @@ export function panelAppVM(ctx: PanelCtx) {
     // The house on Insight too, the page Team opens on (2026-10-16, the owner) — left of the avatar.
     houseOv: !!bl.showBell && show.ov,
     // Insight's head (v3 T01): the avatar left, the greeting, the house right, then Team performance | Ads performance.
-    th: insightHead(ctx, !!bl.showBell, ovAds),
+    th: insightHead(ctx, !!bl.showBell, ovAds, ovUp),
+    upNext: ovUp ? { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: ctx.viewingAs ? ctx.me.id : null, canAct: !ctx.viewingAs } : null,
     // v3 T06 · Profile as the prototype draws it (the owner, 2026-10-23: "我的profile 應該長這樣才對").
     pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,
     // Ads performance on the phone, as the desktop's, simpler (shared/phone-ads-perf.tsx; the owner, 2026-10-24).

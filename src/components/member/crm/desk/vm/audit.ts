@@ -12,6 +12,7 @@
 import type { DeskCtx, HistRow } from "./ctx";
 import { arrayDrag } from "./columns";
 import { MON } from "./insight";
+import { officeStamp } from "@/lib/member/crm-data";
 
 const DAY = 86_400_000;
 const CAT: Record<string, [string, string, string]> = { chat: ["Chat flow", "var(--crm-rust)", "var(--crm-tint-attention)"], marketing: ["Marketing", "var(--crm-ink-soft)", "var(--crm-tint-cold)"], management: ["Management", "var(--crm-ink-soft)", "var(--crm-tint-new)"] };
@@ -43,8 +44,31 @@ export function auditEvents(ctx: DeskCtx): E[] {
   for (const c of data.customers) if (c.adId) { const f = firstOf.get(c.adId); if (!f || c.createdAt < f.at) firstOf.set(c.adId, { at: c.createdAt, ad: c.ad, ch: c.channel === "whatsapp" ? "WhatsApp" : "Messenger" }); }
   for (const [id, f] of firstOf) out.push({ cat: "marketing", at: f.at, who: "System", action: "New ad found", target: f.ad, detail: `${f.ch} · ${data.adRules.some(r => r.adId === id) ? "split set" : "no split yet"}` });
   for (const h of ctx.ui.history ?? []) out.push(...histEvent(h));
+  // Insight › Up next (mig 20261108120000): who, when, before → after; shown under Assignment.
+  for (const e of data.upNextEvents ?? []) {
+    const adName = e.ad && e.ad !== "all" ? cust2(data, e.ad) : e.ad === "all" ? "All ads" : "";
+    const leave = (l: Record<string, unknown> | null) => (l ? `${String(l.reason ?? "")} · ${fmtAt(l.from)} – ${fmtAt(l.to)}` : "none");
+    const pinned = (l: Record<string, unknown> | null) => (l?.pinned ? nameOf(String(l.pinned)) : "the split");
+    const [action, detail] = UP_ACTIONS[e.action]?.(e.before, e.after, leave, pinned) ?? [e.action, ""];
+    out.push({ cat: "marketing", at: e.at, who: e.actor ? nameOf(e.actor) : "System", action, target: [e.staff ? nameOf(e.staff) : "", adName].filter(Boolean).join(" · "), detail });
+  }
   return out.sort((a, b) => b.at.localeCompare(a.at));
 }
+
+const fmtAt = (v: unknown) => { const s = officeStamp(typeof v === "string" ? v : null); return s ? `${Number(s.slice(8, 10))} ${MON[Number(s.slice(5, 7)) - 1].slice(0, 3)} ${s.slice(11)}` : "—"; };
+const cust2 = (d: DeskCtx["data"], ad: string) => d.adNames?.[ad]?.name ?? d.customers.find(c => c.adId === ad)?.ad ?? `Ad ${ad}`;
+type UpRow = Record<string, unknown> | null;
+const UP_ACTIONS: Record<string, (b: UpRow, a: UpRow, leave: (l: UpRow) => string, pinned: (l: UpRow) => string) => [string, string]> = {
+  skip: () => ["Up next · skipped", "This one lead goes to the next person"],
+  access: (b, a) => ["Up next · may act on their people", `${b?.mayAct ? "On" : "Off"} → ${a?.mayAct ? "On" : "Off"}`],
+  pause: () => ["Up next · paused", "In turn → Paused"],
+  resume: () => ["Up next · resumed", "Paused → In turn"],
+  give: (b, a, _l, p) => ["Up next · next lead given", `${p(b)} → ${p(a)}`],
+  undo: (b, a, _l, p) => ["Up next · pin undone", `${p(b)} → ${p(a)}`],
+  leave_added: (b, a, l) => ["Leave added", `${l(b)} → ${l(a)}`],
+  leave_changed: (b, a, l) => ["Leave changed", `${l(b)} → ${l(a)}`],
+  leave_removed: (b, a, l) => ["Leave removed", `${l(b)} → ${l(a)}`],
+};
 
 function histEvent(h: HistRow): E[] {
   const change = h.changes.map(x => `${x.field}: ${x.from} → ${x.to}`).join(" · ");

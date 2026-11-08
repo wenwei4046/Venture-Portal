@@ -8,6 +8,7 @@ import { avatarTint, STATUS, teamColour } from "./shared/palette";
 
 const ROOT = resolve(__dirname);
 const KEEP: Record<string, string> = {
+  "shared/up-next-style.ts": "the Up next prototype's four colours with no token: the owner asked for the design 100% and for no new tokens (2026-11-08)",
   "shared/pick-editor.tsx": "the photo editor's pens and text, drawn into the picture",
   "shared/edit-render.ts": "draws the editor's marks on a canvas",
   "shared/in-app-camera.tsx": "the camera's black screen and its controls over the picture",

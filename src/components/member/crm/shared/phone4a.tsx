@@ -114,9 +114,10 @@ export function Phone4aHero({ items, cols, compact }: { items: { label: string; 
 
 /** T01 (v3) · Team Insight's head: the avatar left, "Hello, …" and the line under it, the house right; then, for CRM ·
  * Manage, Team performance | Ads performance (the Ads side is the Ads Performance page drawn under this head). */
-export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: string; house: boolean; exit: () => void; sw: { ads: boolean; team: () => void; adsPick: () => void } | null } }) {
-  const seg = (label: string, on: boolean, pick: () => void) => (
-    <button type="button" onClick={pick} aria-pressed={on} style={{ ...BTN, flex: 1, height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs(13), fontWeight: 500,
+export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: string; house: boolean; exit: () => void; sw: { ads: boolean; up: boolean; canAds: boolean; canUp: boolean; team: () => void; adsPick: () => void; upPick: () => void } | null } }) {
+  // Up next's handoff: the words Team · Ads · Up next at 12 px, the one on show 600 — the old full names kept for a screen reader.
+  const seg = (label: string, on: boolean, pick: () => void, aria?: string) => (
+    <button type="button" onClick={pick} aria-pressed={on} aria-label={aria} style={{ ...BTN, flex: 1, height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs(12), fontWeight: on ? 600 : 500,
       background: on ? "#fff" : "transparent", boxShadow: on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{label}</button>);
   return (<>
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px" }}>
@@ -127,7 +128,7 @@ export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: s
       </span>
       {h.house && <button type="button" onClick={h.exit} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ ...BTN, flex: "none", width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}><Ic name="house" size={18} /></button>}
     </div>
-    {h.sw && <div style={{ flex: "none", display: "flex", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{seg("Team performance", !h.sw.ads, h.sw.team)}{seg("Ads performance", h.sw.ads, h.sw.adsPick)}</div>}
+    {h.sw && <div style={{ flex: "none", display: "flex", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{seg("Team", !h.sw.ads && !h.sw.up, h.sw.team, "Team performance")}{h.sw.canAds && seg("Ads", h.sw.ads, h.sw.adsPick, "Ads performance")}{h.sw.canUp && seg("Up next", h.sw.up, h.sw.upPick)}</div>}
   </>);
 }
 

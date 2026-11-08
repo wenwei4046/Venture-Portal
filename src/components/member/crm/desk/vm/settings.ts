@@ -63,7 +63,7 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
   const leaveOf: Record<string, CrmLeave[]> = {};
   (data.leaves ?? []).filter(l => l.to >= today).forEach(l => { (leaveOf[l.staffId] ??= []).push(l); });
   const actVM = { ...actBase, leads: actLeads, leave: { can: !!data.can.manage, today, of: leaveOf,
-    save: (l: { id: string | null; staffId: string; from: string; to: string; note: string }) => act.saveLeave(l).then(okd => { if (okd) patch({ toast: "Saved · Leave" }); return okd; }),
+    save: (l: { id: string | null; staffId: string; fromAt: string; toAt: string; reason: CrmLeave["reason"]; note: string }) => act.saveLeave(l).then(okd => { if (okd) patch({ toast: "Saved · Leave" }); return okd; }),
     remove: (id: string) => act.deleteLeave(id).then(okd => { if (okd) patch({ toast: "Leave removed" }); return okd; }) } };
   const mwtSave = () => { if (!dirty) return; const changed = Object.keys(on).filter(id => !!on[id] !== !!saved[id]);
     void Promise.all(changed.map(id => act.setFullTime(id, !!on[id]))).then(rs => { if (rs.every(Boolean)) patch({ mwt: null, mwtSaved: true, toast: "Saved · Member work type" }); }); };
@@ -239,6 +239,16 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
       { t: "Auto-assign by the ad's split", s: cur.autoAssign ? "Uses Assignment › Ads to teams · an ad with no split goes to the Revenue Director" : "Off · new leads wait in the Team inbox to be sent by hand", v: cur.autoAssign ? "On" : "Off", key: "autoAssign" },
       { t: "Send auto-reply", s: cur.sendAutoReply ? "The person's own auto-reply, if set in their Profile" : "Off · no auto-reply for anyone", v: cur.sendAutoReply ? "On" : "Off", key: "sendAutoReply" }] },
   ];
+  // CRM › Settings › Up next (the owner, 2026-11-08: "能不能只是放在 crm > manage 里面"): every TL / STL / TA with people
+  // under them, switched on to Skip, Pause, Give to… and fill in leave for those people in Insight › Up next.
+  const onUp = new Set(data.upNextStaff ?? []);
+  const upNextAccess = {
+    can: !!data.can.manage,
+    rows: data.people.filter(p => ["tl", "stl", "ta"].includes(p.role) && data.people.some(q => q.uplineId === p.id))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(p => ({ id: p.id, name: ctx.nameOf(p.id), sub: `${jobTitle(p)} · ${data.people.filter(q => q.uplineId === p.id).length} under them`, on: onUp.has(p.id),
+        toggle: () => act.setUpNext(p.id, !onUp.has(p.id)).then(okd => { if (okd) patch({ toast: `${ctx.nameOf(p.id)} ${onUp.has(p.id) ? "may no longer act" : "may act"} in Up next` }); return okd; }) })),
+  };
   const settings4 = {
     can: !!data.can.manage, cur,
     save: (st: CrmSettings) => act.saveSettings(st).then(okd => { if (okd) patch({ toast: "Saved · Settings" }); return okd; }),
@@ -267,7 +277,7 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     toast: (msg: string) => patch({ toast: msg }),
   };
   return {
-    set4, settings4, replyLib, partnerPane, partnerLink,
+    set4, settings4, upNextAccess, replyLib, partnerPane, partnerLink,
     actVM, mwtTeams, mwtDirty: dirty, mwtClean: !dirty, mwtBtnBg: dirty ? "var(--crm-rust)" : "var(--crm-line)", mwtBtnCur: dirty ? "pointer" : "default", mwtSavedMsg: !dirty && ui.mwtSaved, mwtSave,
     cltOpen: !ui.frmOpen && !!cE && opItem === "Cold lead templates" && sheetOpen, cltE: cE ?? card({ t: { id: "", name: "", ch: "whatsapp", st: "draft", body: "", on: false, metaName: null, language: "en", reason: null }, status: "Draft", ch: "WhatsApp" }),
     cltTaRef: { current: null },

@@ -8,7 +8,7 @@ import type { ApptType } from "@/lib/member/crm-data";
 import { crmWrite, fetchMetaAds, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
 import type { MetaAdRow } from "@/lib/member/crm-ad-names-meta";
 import { adToSync } from "@/lib/member/crm-ad-running";
-import type { CrmData, CrmReplyItem, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
+import type { CrmData, CrmLeave, CrmReplyItem, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
 import type { SalesActions } from "../sales/actions";
 import { teamOf } from "../shared/people";
 import type { Dispatch, SetStateAction } from "react";
@@ -45,8 +45,10 @@ export interface PanelActions extends SalesActions {
   setFullTime(staffId: string, on: boolean): Promise<boolean>;
   /** Lock a member out of the dealing for now, or back in (crm_set_locked, CRM · Manage). */
   setLocked(staffId: string, on: boolean): Promise<boolean>;
+  /** CRM › Settings › Up next: may this leader act on their people in Up next. */
+  setUpNext(staffId: string, on: boolean): Promise<boolean>;
   /** A member's leave (mig 20261029220000, CRM · Manage): add or change one; remove one. */
-  saveLeave(leave: { id: string | null; staffId: string; from: string; to: string; note: string }): Promise<boolean>;
+  saveLeave(leave: { id: string | null; staffId: string; fromAt: string; toAt: string; reason: CrmLeave["reason"]; note: string }): Promise<boolean>;
   deleteLeave(id: string): Promise<boolean>;
   /** Cold lead templates (rev 1011): save a draft, or save and submit a WhatsApp one for Meta's review. */
   saveTemplate(t: { id: string | null; name: string; ch: CrmTemplate["ch"]; body: string; language?: string; category?: string }, submit: boolean): Promise<CrmTemplate | false>;
@@ -204,11 +206,16 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
       setData(d => ({ ...d, lockedStaff: on ? [...new Set([...(d.lockedStaff ?? []), staffId])] : (d.lockedStaff ?? []).filter(id => id !== staffId) }));
       return true;
     },
+    async setUpNext(staffId, on) {
+      if (!(await write("crm_set_up_next", { p_staff: staffId, p_on: on }))) return false;
+      setData(d => ({ ...d, upNextStaff: on ? [...new Set([...(d.upNextStaff ?? []), staffId])] : (d.upNextStaff ?? []).filter(id => id !== staffId) }));
+      return true;
+    },
     async saveLeave(l) {
-      const r = await write("crm_save_leave", { p_id: l.id, p_staff: l.staffId, p_from: l.from, p_to: l.to, p_note: l.note });
+      const r = await write("crm_up_next_save_leave", { p_id: l.id, p_staff: l.staffId, p_from: `${l.fromAt}:00+08:00`, p_to: `${l.toAt}:00+08:00`, p_reason: l.reason, p_note: l.note });
       if (!r) return false;
       const id = typeof r.data === "string" ? r.data : l.id ?? `local-${Date.now()}`;
-      setData(d => ({ ...d, leaves: [...(d.leaves ?? []).filter(x => x.id !== l.id), { id, staffId: l.staffId, from: l.from, to: l.to, note: l.note }].sort((a, b) => a.from.localeCompare(b.from)) }));
+      setData(d => ({ ...d, leaves: [...(d.leaves ?? []).filter(x => x.id !== l.id), { id, staffId: l.staffId, from: l.fromAt.slice(0, 10), to: l.toAt.slice(0, 10), fromAt: l.fromAt, toAt: l.toAt, reason: l.reason, note: l.note }].sort((a, b) => a.from.localeCompare(b.from)) }));
       return true;
     },
     async deleteLeave(id) {
