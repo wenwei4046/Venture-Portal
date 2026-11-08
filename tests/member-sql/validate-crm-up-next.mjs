@@ -67,6 +67,7 @@ await q(`insert into crm_ad_assign (ad_source_id, ad_label, mode, team_split, pe
 
 // The migration under test, verbatim.
 await db.exec((await readFile(new URL('20261108120000_crm_up_next.sql', dir), 'utf8')).replace(/\r\n/g, '\n'))
+await db.exec((await readFile(new URL('20261108140000_crm_up_next_faster.sql', dir), 'utf8')).replace(/\r\n/g, '\n'))
 
 const read = async (who, a = ad, line = null) => { await as(who); return (await q(`select crm_up_next($1, null, 10, $2) r`, [a, line]))[0].r }
 const names = Object.fromEntries(PEOPLE.map(([w]) => [S(w), w]))

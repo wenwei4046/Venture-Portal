@@ -88,6 +88,7 @@ function InSlot({ children }: { children: ReactNode }) {
 
 export function DeskUpNext({ live, book, ads, canAct, line }: { live: boolean; book: UpNextBook; ads: UpNextAd[]; canAct: boolean; line: string | null }) {
   const { d, lv, toast, failed, close } = useUpNext({ live, book, ads, canAct, line });
+  const [offOpen, setOffOpen] = useState(false);
   // Clicking any blank area closes open menus.
   useEffect(() => {
     if (!d?.anyOpen) return;
@@ -171,8 +172,9 @@ export function DeskUpNext({ live, book, ads, canAct, line }: { live: boolean; b
         ))}
       </div>
       <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "10px" }}><span style={HEAD}>Not in turn</span><span style={CHIP}>{d.offCount}</span></div>
-        {d.greyed.map(g => (
+        {/* Folded at first (the owner, 2026-11-08: "not in turn 默认收起"): a click on its head opens it. */}
+        <div {...act(() => setOffOpen(v => !v))} aria-expanded={offOpen} style={{ display: "flex", alignItems: "center", gap: "8px", paddingBottom: "10px", cursor: "pointer" }}><span style={HEAD}>Not in turn</span><span style={CHIP}>{d.offCount}</span><span style={{ display: "flex", color: "var(--crm-faint)", transform: offOpen ? "rotate(180deg)" : undefined }}><Chev /></span></div>
+        {offOpen && d.greyed.map(g => (
           <div key={g.id} onMouseEnter={g.hovOn} onMouseLeave={g.hovOff} style={{ ...ROW, color: "var(--crm-faint)" }}>
             <span style={{ font: `600 12px ${TIGHT}` }}>—</span><span style={{ width: "7px", height: "7px", borderRadius: "50%", boxSizing: "border-box", border: `1.5px solid ${g.dot}` }} /><span style={NAME}>{g.name}</span>
             <span style={{ minWidth: 0, display: "flex", alignItems: "center", gap: "10px" }}>
@@ -182,17 +184,17 @@ export function DeskUpNext({ live, book, ads, canAct, line }: { live: boolean; b
             </span>
           </div>
         ))}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "28px 0 10px" }}><span style={HEAD}>Upcoming leave</span><span style={CHIP}>{d.upCount}</span></div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "28px 0 10px" }}><span style={HEAD}>Leave</span><span style={CHIP}>{d.upCount}</span></div>
         {d.upcoming.map(u => (
           <div key={u.id} onMouseEnter={u.hovOn} onMouseLeave={u.hovOff} style={ROW}>
             <span style={NUM}>{u.day}</span><span style={DOT(u.dot)} /><span style={NAME}>{u.name}</span>
             <span style={{ minWidth: 0 }}>
               <span style={{ display: u.txtDisp, fontSize: "12px", color: "var(--crm-muted)", ...CLIP }}>{u.label} · {u.range}</span>
-              <span style={{ display: u.actDisp, ...ACTS }}><span {...act(u.edit)} style={LINK("var(--crm-muted)")}>Edit</span><span {...act(u.cancel)} style={LINK("var(--crm-rust)")}>Cancel leave</span></span>
+              <span style={{ display: u.actDisp, ...ACTS }}><span {...act(u.edit)} style={LINK("var(--crm-muted)")}>Edit</span><span {...act(u.cancel)} style={LINK("var(--crm-rust)")}>{u.cancelWord}</span></span>
             </span>
           </div>
         ))}
-        {d.upNone && <div style={{ height: "44px", display: "flex", alignItems: "center", borderTop: `1px solid ${UN_RULE_2}`, fontSize: "12.5px", color: "var(--crm-faint)" }}>No leave coming up</div>}
+        {d.upNone && <div style={{ height: "44px", display: "flex", alignItems: "center", borderTop: `1px solid ${UN_RULE_2}`, fontSize: "12.5px", color: "var(--crm-faint)" }}>Nobody on leave</div>}
       </div>
     </div>
     {lv && <LeaveWindow lv={lv} />}

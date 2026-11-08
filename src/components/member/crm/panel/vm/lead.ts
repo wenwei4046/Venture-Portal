@@ -28,6 +28,7 @@ import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { actionsOnScreen, closeActions, openActions, type ActionSheet } from "../../shared/action-sheet";
 import { fillWithFor, libraryFor, suggestReplies, waitingWords } from "../../shared/suggest-reply";
 import { openSuggest } from "../../shared/suggest-float";
+import { isFbBlocked } from "../../shared/fb-blocked";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
 let recTimer: ReturnType<typeof setInterval> | undefined;
@@ -63,6 +64,8 @@ const ALL_TIMES = ["10:00 am", "11:00 am", "12:00 pm", "1:00 pm", "2:00 pm", "3:
 export function leadVM(ctx: PanelCtx) {
   const { ui, patch, now, nameOf } = ctx;
   const c = ui.lead ? ctx.data.customers.find(x => x.id === ui.lead) : undefined;
+  // Blocked on Facebook (2026-11-08): the strip says so and the composer gives way to a note (shared/fb-blocked.ts).
+  const fbBlocked = !!c && isFbBlocked(c, ctx.data);
   const on = !!c && ["overview", "calendar", "assign", "inbox"].includes(ui.tab);
   const ow = c?.assignedTo ?? null, ownerName = ow ? nameOf(ow) : "No one yet";
   const rec = c ? ui.movedRec[c.id] : undefined;
@@ -118,7 +121,7 @@ export function leadVM(ctx: PanelCtx) {
     ld: {
       // 4a (M04 / change list 18): the customer's tint, "ad · channel", the status strip.
       avBg: avatarTint(c?.name ?? "")[0], avFg: avatarTint(c?.name ?? "")[1], sub: [c?.ad, c ? (c.channel === "messenger" ? "Messenger" : "WhatsApp") : ""].filter(Boolean).join(" · "),
-      strip: c ? chatStripOf(c, now) : { cold: false, left: "", right: "", dot: "transparent" },
+      strip: c ? chatStripOf(c, now, fbBlocked) : { cold: false, left: "", right: "", dot: "transparent" },
       name: c?.name ?? "", ini: c ? ini(c.name) : "", ad: c?.ad ?? "", ownerFirst: ow ? first(ownerName) : "No one", ownerName,
       // No "· reply window open Xh Ym" under the name (rev 1011 §2.3, as RS rev 1010 §1.4); the cold banner stays.
       windowNote: "",
@@ -202,6 +205,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   // kept from earlier would go stale — and the sheet waiting on the read is replaced only while it is still on screen
   // (closed, it stays closed: a template is never offered over another chat).
   const shut = !!c && windowShut(c, now);
+  const fbBlocked = !!c && isFbBlocked(c, ctx.data);
   const openTpl = async () => {
     if (!c) return;
     const name = first(c.name), id = c.id;
@@ -239,10 +243,10 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   const cmp: ComposerIn = {
     key: cid, state: composerOf(ui.pCmp, cid) ?? initialComposer(), set: setCmp,
     placeholder: c ? `Reply to ${first(c.name)}…` : "", draft, setDraft, canSend: has, send: () => void send(),
-    warm: true, openTpl: () => void openTpl(), tplOn: ctx.data.settings?.suggestTemplate !== false, coldSub: c ? coldLine(c, now) : "",
+    warm: !fbBlocked, blocked: fbBlocked, openTpl: () => void openTpl(), tplOn: ctx.data.settings?.suggestTemplate !== false, coldSub: c ? coldLine(c, now) : "",
     coldTile: !!c && shut && c.channel === "whatsapp" && ctx.data.settings?.suggestTemplate !== false,
-    suggest: c && !shut ? suggestReplies(c, ctx.data.replyExamples ?? [], ctx.data.quickReplies, 3, { library: ctx.data.replyLibrary, ...fillWithFor(ctx.data, c, ctx.me.name, now) }) : undefined, suggestLogo: !!c && !!waitingWords(c),
-    suggestLibrary: c && !shut ? libraryFor(c, ctx.data.replyLibrary, fillWithFor(ctx.data, c, ctx.me.name, now)) : undefined,
+    suggest: c && !shut && !fbBlocked ? suggestReplies(c, ctx.data.replyExamples ?? [], ctx.data.quickReplies, 3, { library: ctx.data.replyLibrary, ...fillWithFor(ctx.data, c, ctx.me.name, now) }) : undefined, suggestLogo: !!c && !!waitingWords(c),
+    suggestLibrary: c && !shut && !fbBlocked ? libraryFor(c, ctx.data.replyLibrary, fillWithFor(ctx.data, c, ctx.me.name, now)) : undefined,
     reply: reply ? { who: reply.who, text: reply.text } : null, cancelReply: () => patch({ pReply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()) } : null,

@@ -64,6 +64,7 @@ export const ST: Record<string, [string, string]> = {
   Booked: [STATUS.Appointment.tint, STATUS.Appointment.text], "Showed up": [C.tintFollow, C.brown], "To mark": [C.tintAppt, C.textAppt],
   Urgent: [C.tintAttention, C.oxblood], "Reply soon": [C.field, C.ink], Won: [STATUS.Won.tint, STATUS.Won.text], Lost: [STATUS.Lost.tint, STATUS.Lost.text],
   Cold: [STATUS["Cold leads"].tint, STATUS["Cold leads"].text], "No show": [C.tintAttention, C.oxblood], "No show yet": [C.field, C.muted],
+  Blocked: [STATUS.Blocked.tint, STATUS.Blocked.text],
 };
 export const SOLID = [C.rust, C.ink, C.brown, C.oxblood, C.inkSoft];
 export const PHONE_IC: Record<string, string> = {

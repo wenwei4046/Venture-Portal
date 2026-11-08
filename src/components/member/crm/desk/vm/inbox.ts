@@ -20,6 +20,7 @@ import { isNewChat } from "../../shared/new-chat";
 import { saidInChat, snippetAround } from "../../shared/chat-search";
 import { jobTitle, personOf, teamAssignees } from "../../shared/people";
 import { labelsOn } from "./labels";
+import { FB_BLOCKED, FB_BLOCKED_CATEGORY } from "../../shared/fb-blocked";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
 
@@ -78,10 +79,12 @@ export function inboxVM(ctx: DeskCtx) {
     // 4a's Inbox list (frame 02): Everyone ▾, search, the eight status tabs Mine and Team share, the rows.
     list4: (() => {
       const isCold = (x: ChatRow) => x.key === "Cold";
+      // Blocked on Facebook (2026-11-08): its own tab after Cold leads, and in no other (data.ts › chatRows' key).
+      const isBlocked = (x: ChatRow) => x.key === "Blocked";
       const T4: [string, (x: ChatRow) => boolean, boolean][] = [
-        ["All", () => true, false], ["New", x => !isCold(x) && isNewChat(x.c), false], ["Attention", x => ["Overdue", "Urgent", "Reply soon"].includes(x.key), true],
+        ["All", () => true, false], ["New", x => !isCold(x) && !isBlocked(x) && isNewChat(x.c), false], ["Attention", x => ["Overdue", "Urgent", "Reply soon"].includes(x.key), true],
         ["Follow up", x => x.key === "Follow up", false], ["Appointment", x => x.key === "Appointment", false], ["Won", x => x.key === "Won", false],
-        ["Lost", x => x.key === "Lost", false], ["Cold leads", isCold, false]];
+        ["Lost", x => x.key === "Lost", false], ["Cold leads", isCold, false], [FB_BLOCKED_CATEGORY, isBlocked, false]];
       const cur = T4.find(t => t[0] === ui.inbF) ?? T4[0];
       const q = (ui.ibQ ?? "").trim().toLowerCase();
       const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q) || sourceOf(x.c).label.toLowerCase().includes(q) || !!saidInChat(x.c, q);
@@ -102,7 +105,7 @@ export function inboxVM(ctx: DeskCtx) {
           const p = pref(x.id), n = x.c.unread, dot = !n && !!p?.markedUnread, [avBg, avFg] = avatarTint(x.name);
           const u = urgencyOf(x.c, now), visit = data.visits.filter(v => v.customerId === x.id && v.state === "booked" && new Date(v.start) >= now).sort((a, b) => a.start.localeCompare(b.start))[0];
           const lastIn = x.c.lastCustomerAt ? new Date(x.c.lastCustomerAt).getTime() : null;
-          const note = u.level !== "none" ? { text: u.label, kind: u.level === "soon" ? "warm" : "hot" }
+          const note = isBlocked(x) ? { text: FB_BLOCKED, kind: "mute" } : u.level !== "none" ? { text: u.label, kind: u.level === "soon" ? "warm" : "hot" }
             : visit ? { text: `Visit · ${fmtVisit(new Date(visit.start))}`, kind: "calm" }
               : isCold(x) && lastIn ? { text: `Cold · ${Math.max(1, Math.floor((now.getTime() - lastIn) / DAY_MS))} d`, kind: "mute" } : null;
           const sel = ui.pane === "docked" && ui.chat === x.id;

@@ -83,7 +83,9 @@ const ABOVE = [
   '          <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>',
   '            <svg style={{ flex: "none", marginTop: "2px", color: "#3F2B22" }} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>',
   '            <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "0" }}>',
-  '              <strong style={{ fontSize: "16px", fontWeight: "600", color: "#3F2B22" }}>This chat is cold</strong>',
+  // Its title is the view model's (2026-11-08): "This chat is cold", or "Blocked on Facebook" for a Messenger customer
+  // Facebook says the Page can no longer reply to — the same card stands in the composer's place (shared/fb-blocked.ts).
+  '              <strong style={{ fontSize: "16px", fontWeight: "600", color: "#3F2B22" }}>{p.coldTitle}</strong>',
   '              <span style={{ fontSize: "15px", lineHeight: "1.45", color: "#806B60" }}>{p.coldSub}</span>',
   '            </div>',
   '          </div>',

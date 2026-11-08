@@ -130,7 +130,7 @@ export function PhoneUpNext({ head, live, book, ads, canAct, line }: { head: Rea
             <span style={{ flex: 1, minWidth: 0, fontSize: fs(11.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.short}</span>
           </div>
         ))}
-        {d.tabUp && d.upNone && <div style={{ minHeight: "48px", display: "flex", alignItems: "center", fontSize: fs(12.5), color: FAINT }}>No leave coming up</div>}
+        {d.tabUp && d.upNone && <div style={{ minHeight: "48px", display: "flex", alignItems: "center", fontSize: fs(12.5), color: FAINT }}>Nobody on leave</div>}
       </section>
     </main>
     {d.pickOpen && (

@@ -6,6 +6,7 @@
  */
 import { gb, day0, DAY, firstName, ini, isCold, urgencyOf, type SalesCtx } from "./common";
 import { URGENCY_THRESHOLDS } from "@/lib/member/crm";
+import { isFbBlocked } from "../../shared/fb-blocked";
 
 export interface SalesNotif {
   id: string;
@@ -82,7 +83,7 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
   // The lines are Settings' (URGENCY_THRESHOLDS, 3 · 6 · 9 h until changed).
   const L = { soon: URGENCY_THRESHOLDS.soonMinutes / 60, urgent: URGENCY_THRESHOLDS.urgentMinutes / 60, overdue: URGENCY_THRESHOLDS.overdueMinutes / 60 };
   for (const c of rem ? data.customers : []) {
-    if (c.assignedTo !== me || !c.lastCustomerAt || isCold(c, now)) continue;
+    if (c.assignedTo !== me || !c.lastCustomerAt || isCold(c, now) || isFbBlocked(c, data)) continue;
     const u = urgencyOf(c, now);
     if (u.level === "none") continue;
     const h = L[u.level], t = new Date(c.lastCustomerAt).getTime() + h * 3_600_000;
@@ -106,7 +107,7 @@ export function salesNotifs(ctx: SalesCtx): SalesNotif[] {
         ok: false, text: `Visit at ${hm(s0)} has passed · mark whether they came` });
   }
   for (const c of rem ? data.customers : []) {
-    if (c.assignedTo !== me || !c.lastCustomerAt || isCold(c, now) || c.status === "won" || c.status === "lost") continue;
+    if (c.assignedTo !== me || !c.lastCustomerAt || isCold(c, now) || isFbBlocked(c, data) || c.status === "won" || c.status === "lost") continue;
     const left = new Date(c.lastCustomerAt).getTime() + DAY - now.getTime();
     if (left <= 0 || left > 3 * 3_600_000) continue;
     const t = new Date(c.lastCustomerAt).getTime() + 21 * 3_600_000;

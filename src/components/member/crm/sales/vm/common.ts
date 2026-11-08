@@ -9,6 +9,7 @@ import { asLead, type CrmChatMessage, type CrmCustomer, type CrmData, type CrmPe
 import { windowOpen } from "@/lib/whatsapp/send";
 import { HUMAN_AGENT_APPROVED, messengerWindow } from "@/lib/messenger/send";
 import type { SalesRefs, SalesUi } from "../ui";
+import { FB_BLOCKED } from "../../shared/fb-blocked";
 import { formatIntlDate } from "@/lib/utils";
 
 /** A date in the design's words, months always three letters (DESIGN.md › Date format). */
@@ -139,8 +140,10 @@ export interface SalesCtx {
  * pale orange; a cold chat grey ("Cold · no reply for N days" / "Window closed"). From the status and the customer's
  * last message time only.
  */
-export function chatStripOf(c: CrmCustomer, now: Date) {
+export function chatStripOf(c: CrmCustomer, now: Date, blocked = false) {
   const H = 3_600_000, last = c.lastCustomerAt ? new Date(c.lastCustomerAt).getTime() : null;
+  // Blocked on Facebook (2026-11-08, shared/fb-blocked.ts): said in place of the wait and the window, grey as a cold chat.
+  if (blocked) return { cold: true, left: FB_BLOCKED, right: "", dot: "var(--crm-faint-2)" };
   if (isCold(c, now)) {
     const lr = lastReal(c), since = now.getTime() - new Date(lr?.at ?? now).getTime(), days = Math.max(1, Math.floor(since / (24 * H)));
     // The customer wrote last and nobody answered: how long they have waited (hours under two days).

@@ -6,6 +6,7 @@ import { flushPush } from '@/lib/push/outbox'
 import { sweepHiringLeftovers } from '@/lib/hiring/leftovers'
 import { sweepDataCenterBin } from '@/lib/documentation/drive-bin-sweep'
 import { refreshAdStatuses } from '@/lib/member/crm-ad-names-meta'
+import { refreshMessengerBlocked } from '@/lib/messenger/blocked'
 import { sweepFileObjects } from '@/lib/storage/sweep'
 
 export const runtime = 'nodejs'
@@ -64,6 +65,10 @@ export async function GET(request: Request) {
     // phone's Assignment tabs (Running | Paused). Best effort — a count only.
     const adStatuses = await refreshAdStatuses(db, process.env.META_SYSTEM_USER_TOKEN?.trim())
     if (adStatuses) console.info('CRM ad statuses kept', adStatuses)
+    // Messenger customers blocked on Facebook (mig 20261108150000): Meta sends no webhook for a block, so each hour the
+    // CRM Pages' conversations are read for can_reply = false (lib/messenger/blocked.ts). Best effort — a count only.
+    const fbBlocked = await refreshMessengerBlocked(db, process.env.META_SYSTEM_USER_TOKEN?.trim())
+    if (fbBlocked) console.info('Messenger blocked customers changed', fbBlocked)
     // Phone notifications a write left unsent (mig 20261011180000) — through the outbox's own secret, not the service role.
     await flushPush()
     // Hiring's leftovers (mig 20261011210000; the user: every hour, even when nobody touches Hiring): files no

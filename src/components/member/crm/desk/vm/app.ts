@@ -29,6 +29,7 @@ import { bookVM, customerFormVM, historyVM, noteVM } from "./extras";
 import { adHref } from "../../shared/AdLink";
 import { urgencyOf } from "../../sales/vm/common";
 import { avatarTint } from "../../shared/palette";
+import { FB_BLOCKED, FB_BLOCKED_NOTE, isFbBlocked } from "../../shared/fb-blocked";
 
 export function deskVM(ctx: DeskCtx) {
   const { ui, patch, data } = ctx;
@@ -84,7 +85,11 @@ export function deskVM(ctx: DeskCtx) {
     // waiting 6 h") or its status in the muted line's colour.
     ph: { avBg: undefined as string | undefined, avFg: undefined as string | undefined, status: "", statusColor: "var(--crm-muted)", ...(heads[ui.kind] ?? heads.chat),
       ...(ui.kind === "chat" && cur ? (() => { const u = urgencyOf(cur, ctx.now), [avBg, avFg] = avatarTint(cur.name);
+        // Blocked on Facebook (2026-11-08, shared/fb-blocked.ts) is said in place of the wait, muted.
+        if (isFbBlocked(cur, data)) return { avBg, avFg, status: FB_BLOCKED, statusColor: "var(--crm-muted)" };
         return { avBg, avFg, status: u.level !== "none" ? `Attention · waiting ${Math.floor(u.waitingMinutes / 60)} h` : "", statusColor: "var(--crm-oxblood)" }; })() : {}) },
+    // …and the composer gives way to one line (desk-4a.cjs' composer patch).
+    fbBlocked: !!cur && isFbBlocked(cur, data), fbBlockedNote: FB_BLOCKED_NOTE,
     chatOwner: chat.owner, chatReply: chat.reply, msgs: chat.msgs, firstDay: chat.firstDay, draft: chat.draft, setDraft: chat.setDraft, draftKey: chat.draftKey, send: chat.send, micD: chat.micD, sendTitle: chat.sendTitle, photo: chat.photo,
     pinShown: chat.pinShown, pinText: chat.pinText, unpinMsg: chat.unpinMsg, replyOn: chat.replyOn, replyWho: chat.replyWho, replyText: chat.replyText, cancelReply: chat.cancelReply,
     attachOpen: chat.attachOpen, attachToggle: chat.attachToggle, attachClose: chat.attachClose, attachOpts: chat.attachOpts,
