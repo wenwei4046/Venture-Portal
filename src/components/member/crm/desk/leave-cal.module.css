@@ -1,0 +1,14 @@
+/* Calendar, Assignment › People and Team activity (docs/design_handoff_crm): the prototypes' style-hover rules, and the
+   CRM's own motion for the side panel and drawer (the owner, 2026-11-08: keep the CRM's slide-in). !important: desk-root
+   resets every element (all: revert). */
+.cell:hover { background: var(--crm-hover) !important; }
+.row:hover { background: var(--crm-hover) !important; }
+.opt:hover { background: var(--crm-hover) !important; }
+.soft:hover { background: var(--crm-field) !important; }
+.cta:hover { background: var(--crm-rust-press) !important; }
+.name:hover { color: var(--crm-rust) !important; }
+@keyframes lcSlideIn { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes lcFade { from { opacity: 0; } to { opacity: 1; } }
+.slideIn { animation: lcSlideIn .24s cubic-bezier(.2, .8, .2, 1) both !important; }
+.fadeIn { animation: lcFade .2s ease-out both !important; }
+@media (prefers-reduced-motion: reduce) { .slideIn, .fadeIn { animation: none !important; } }

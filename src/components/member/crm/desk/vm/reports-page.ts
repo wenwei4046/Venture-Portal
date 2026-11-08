@@ -21,7 +21,7 @@ const SALES_COLS: [keyof SalesRow, string, "n" | "pct" | "wait"][] = [["leads", 
 
 export function reportsVM(ctx: DeskCtx) {
   const { ui, set, patch, data, now, nameOf } = ctx;
-  const cat: RpCat = ui.rpCat ?? "ads", per = ui.rpPer ?? "month", range = periodRange(per, now);
+  const cat: RpCat = ui.rpCat ?? "ads", per = ui.rpPer ?? "month", range: [number, number] = per === "custom" && ui.rpRange ? [ui.rpRange.a, ui.rpRange.b] : periodRange(per, now);
   // v2 (frame 12b, note 05): each mini card has its stacked bar and a colour a row — the status ramp, the channels' own,
   // else the CRM series in order.
   const SERIES = ["var(--crm-ink)", "var(--crm-orange)", "var(--crm-brown)", "var(--crm-amber)", "var(--crm-series-5)", "var(--crm-series-7)", "var(--crm-track-2)"];
@@ -122,7 +122,8 @@ export function reportsVM(ctx: DeskCtx) {
     kReports: ui.tab === "reports",
     reports: {
       cat, cats: RP_CATS.map(([k, label]) => ({ label, on: k === cat, pick: () => patch({ rpCat: k }) })),
-      periods: RP_PERIODS.map(([k, label]) => ({ label, on: k === per, pick: () => patch({ rpPer: k }) })),
+      periods: RP_PERIODS.map(([k, label]) => ({ label, on: k === per, pick: () => patch(k === "custom" ? { rpPer: k, rpDates: true } : { rpPer: k, rpDates: false }) })),
+      picker: ui.rpDates ? { value: ui.rpRange ?? { a: range[0], b: range[1] }, apply: (r: { a: number; b: number }) => patch({ rpPer: "custom", rpRange: r, rpDates: false }), cancel: () => patch({ rpDates: false }) } : null,
       sales, sales2, appt, src, csv, canCsv: cat === "sales" || cat === "appt" || cat === "src",
       openAds: () => patch({ tab: "adsperf" }),
     },

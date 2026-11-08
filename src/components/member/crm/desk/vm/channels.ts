@@ -34,7 +34,8 @@ export function channelsVM(ctx: DeskCtx) {
   const g = <T,>(k: string, d: T): T => (k in D ? (D[k] as T) : d);
   const put = (k: string, v: unknown) => set(u => ({ ...u, chDraft: { ...u.chDraft, [k]: v }, chDirty: { ...u.chDirty, [u.chTab]: true } }));
   const toast = (t: string) => patch({ toast: t });
-  const TABS: [typeof ui.chTab, string][] = [["conn", "Connections"], ["page", "Facebook Page"], ["msgr", "Messenger"], ["wa", "WhatsApp"], ["tpl", "Templates"], ["ads", "Ads"]];
+  const TABS: [typeof ui.chTab, string][] = [["conn", "Connections"], ["page", "Facebook Page"], ["msgr", "Messenger"], ["wa", "WhatsApp"], ["tpl", "Templates"]];
+  // Channels › Ads removed (docs/design_handoff_crm, CRM Navigation Audit 2026-11-08): Ads Performance is the one full ad table.
   const dirty = !!ui.chDirty[tab];
   const linkOf = (kind: string, id: string) => M?.links.find(l => l.kind === kind && l.externalId === id);
   const isLinked = (kind: string, id: string) => linkOf(kind, id)?.linked ?? true;

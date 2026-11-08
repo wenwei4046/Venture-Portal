@@ -3,7 +3,9 @@
  * the salesperson sees the video or picture the customer saw before replying (the owner, 2026-10-15: "在 customer info
  * 新增一個是廣告的鏈接…業務可以看到他們影片的內容進行相應的回復"). Anything else is shown as it was.
  */
-export function InfoValue({ v, href }: { v: string; href?: string | null }) {
+export function InfoValue({ v, href, go }: { v: string; href?: string | null; go?: (() => void) | null }) {
+  // A salesperson's name opens Team activity on them (docs/design_handoff_crm: it replaces the person report).
+  if (go) return <button type="button" onClick={go} title="Open Team activity" style={{ border: 0, padding: 0, margin: 0, background: "transparent", font: "inherit", color: "var(--crm-rust)", textDecoration: "underline", textUnderlineOffset: "2px", cursor: "pointer", textAlign: "inherit" }}>{v}</button>;
   if (!href) return <>{v}</>;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" title="Open the ad"

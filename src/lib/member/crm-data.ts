@@ -19,6 +19,10 @@ export interface CrmPerson {
   fullTime: boolean;
   /** Their title in People ("Senior Revenue Specialist"); the CRM shows it. Empty = the role's own name. */
   title?: string;
+  /** Can sign in (People names a login) — false reads "No CRM login" (mig 20261109100000; before it, true). */
+  login?: boolean;
+  /** Up next's / People's Pause: no ad leads until Resume (crm_staff.paused). */
+  paused?: boolean;
 }
 
 /**
@@ -680,7 +684,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     viewerId: rows.people.role ? rows.people.me : null,
     can: canFrom(rows.can, rows.people.role),
     setup: !rows.people.me ? "not_linked" : !rows.people.role ? "no_role" : null,
-    people: rows.people.people.map(p => ({ id: p.id, name: personName(p.name), role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "" })),
+    people: rows.people.people.map(p => ({ id: p.id, name: personName(p.name), role: p.role, uplineId: p.uplineId, fullTime: p.fullTime, title: p.title ?? "", login: p.login ?? true, paused: !!p.paused })),
     // An ad's name (crm_ad_names) where it has one: the chat's header, Customer info, the inbox and the ad filters read
     // a customer's `ad` (the owner, 2026-10-16: "顯示廣告的名稱，不然業務也看不懂"); Meta's headline stays in adHeadline.
     customers: rows.contacts.map(c => {

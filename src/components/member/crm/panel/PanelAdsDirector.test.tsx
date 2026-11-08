@@ -21,8 +21,10 @@ describe("Ads to teams on the phone", () => {
     window.history.replaceState({}, "", "/member/preview?crmAs=boss");
     render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
     await act(async () => {});
-    await tap(screen.getAllByText("Assignment", { exact: true }).find(e => e.closest("nav")) ?? null);
-    await tap(screen.getByText("Ads to teams", { exact: true }));
+    // Assignment is Profile › Manage's since docs/design_handoff_crm (2026-11-08): the bottom bar has Activity in its place.
+    await tap(screen.getAllByText("Profile", { exact: true }).find(e => e.closest("nav"))!);
+    await tap(screen.getByText("Assignment", { exact: true }));
+    await tap(screen.getByText("Ad split", { exact: true }));
     await tap(screen.getByText("Akemi Mattress · October Fair", { exact: true }));
     const byTeam = screen.queryAllByText(/^By team/)[0]; if (byTeam) await tap(byTeam);
     expect(screen.getAllByText(/Revenue Director/).length).toBeGreaterThan(0);

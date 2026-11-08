@@ -18,7 +18,18 @@ export const C = {
   tintAttention: v("tint-attention"), tintAppt: v("tint-appt"), tintFollow: v("tint-follow"), tintNew: v("tint-new"),
   tintWon: v("tint-won"), tintLost: v("tint-lost"), tintCold: v("tint-cold"), textAppt: v("text-appt"),
   tickRead: v("tick-read"),
+  // docs/design_handoff_crm (2026-11-08): Team activity, Calendar's leave layer, Assignment › People.
+  rule2: v("rule-2"), listSub: v("list-sub"), disabled: v("disabled"), green: v("green"), greenDark: v("green-dark"), greenRing: v("green-ring"),
+  warn: v("warn"), fullTime: v("full-time"), outMonth: v("out-month"), sumLine: v("sum-line"), heroLine: v("hero-line"), sel: v("sel"),
 } as const;
+
+/** A leave's reason: [chip, words] — Annual · Sick · Training · Other (docs/design_handoff_crm › Design tokens). */
+export const LEAVE_TINT: Record<"Annual" | "Sick" | "Training" | "Other", [string, string]> = {
+  Annual: [v("leave-annual"), v("leave-annual-text")],
+  Sick: [C.tintAttention, C.oxblood],
+  Training: [v("leave-training"), v("leave-training-text")],
+  Other: [v("leave-other"), v("green-dark")],
+};
 
 export type StatusName = "New" | "Attention" | "Follow up" | "Appointment" | "Won" | "Lost" | "Cold leads" | "Blocked";
 

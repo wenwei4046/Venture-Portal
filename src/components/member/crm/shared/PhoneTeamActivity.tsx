@@ -1,0 +1,146 @@
+"use client";
+/**
+ * Team activity on the phone (the Control panel's Activity tab) — CRM Team Activity.dc.html's 390 frame element for
+ * element, on shared/team-activity.ts, the desktop's own view model. Its sheets fade their scrim in and slide up as
+ * every Control panel sheet (the owner, 2026-11-08). Sizes are the Revenue app's (typePx).
+ */
+import type { CSSProperties, ReactNode } from "react";
+import type { CrmData } from "@/lib/member/crm-data";
+import type { PeopleBook } from "./people-book";
+import type { ActivityVM } from "./team-activity";
+import { typePx as fs } from "./type";
+import { useTeamActivity } from "./use-team-activity";
+
+const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
+const INTER = "Inter, sans-serif";
+const COLS = "minmax(0,1fr) 36px 44px 56px 36px 38px";
+const press = (fn: () => void) => ({ role: "button" as const, tabIndex: 0, onClick: fn, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } } });
+const Chev = ({ style }: { style?: CSSProperties }) => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}><path d="m6 9 6 6 6-6" /></svg>;
+const SCRIM: CSSProperties = { position: "absolute", inset: 0, zIndex: 40, background: "rgba(42,22,12,.32)", animation: "fadeIn 200ms ease-out" };
+const SHEET: CSSProperties = { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 41, borderRadius: "26px 26px 0 0", background: "#fff", animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", color: "var(--crm-ink)", fontFamily: INTER, boxSizing: "border-box" };
+const DATE: CSSProperties = { height: "44px", minWidth: 0, padding: "0 10px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-line)", font: `500 ${fs(13)} ${INTER}`, color: "var(--crm-ink)", background: "#fff" };
+
+export interface PhoneActivityIn { data: CrmData; book: PeopleBook; live: boolean; who: string | null; nameOf(id: string | null | undefined): string; roleOf(id: string): string; openChat(id: string): void }
+
+export function PhoneTeamActivity({ a, top }: { a: PhoneActivityIn; top?: ReactNode }) {
+  const v = useTeamActivity(a);
+  return <PhoneTeamActivityView v={v} top={top} />;
+}
+
+export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNode }) {
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", font: `400 ${fs(14)} ${INTER}`, color: "var(--crm-ink)" }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: "14px", padding: "6px 20px 24px" }}>
+        {top}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <h1 style={{ margin: 0, font: `500 ${fs(26)} ${TIGHT}`, letterSpacing: "-0.025em" }}>Team activity</h1>
+          <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: fs(12), color: "var(--crm-muted)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "var(--crm-green)" }} />{v.clock}</span>
+        </div>
+        <div style={{ flex: "none", display: "flex", gap: "8px" }}>
+          <span {...press(v.pOpenMenu)} style={{ flex: 1, minWidth: 0, height: "40px", boxSizing: "border-box", padding: "0 12px", borderRadius: "20px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "7px", font: `500 ${fs(13.5)} ${INTER}`, cursor: "pointer" }}>
+            {v.selDot && <span style={{ width: "8px", height: "8px", borderRadius: "50%", flex: "none", background: v.selDot }} />}
+            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.selLabel}</span>
+            <Chev style={{ marginLeft: "auto", flex: "none", color: "var(--crm-muted)" }} />
+          </span>
+          <span style={{ position: "relative", flex: "none", height: "40px", borderRadius: "20px", background: "var(--crm-field)", display: "flex", alignItems: "center" }}>
+            <select value={v.perVal} onChange={v.setPer} aria-label="Period" style={{ appearance: "none", WebkitAppearance: "none", height: "40px", padding: "0 32px 0 14px", border: 0, background: "transparent", font: `500 ${fs(13.5)} ${INTER}`, color: "var(--crm-ink)", cursor: "pointer", outline: "none" }}>
+              <option value="Today">Today</option><option value="Week">Week</option><option value="Month">Month</option><option value="Custom">Custom</option>
+            </select>
+            <Chev style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "var(--crm-muted)" }} />
+          </span>
+        </div>
+        {v.isCustom && (
+          <div style={{ flex: "none", display: "grid", gridTemplateColumns: "minmax(0,1fr) auto minmax(0,1fr)", gap: "8px", alignItems: "center" }}>
+            <input type="date" value={v.cFrom} onChange={v.setFrom} style={DATE} /><span style={{ color: "var(--crm-faint)" }}>–</span><input type="date" value={v.cTo} onChange={v.setTo} style={DATE} />
+          </div>
+        )}
+        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", padding: "4px 0 6px" }}>
+          {v.pTiles.map(t => (
+            <div key={t.k} style={{ display: "flex", flexDirection: "column", gap: "5px", minWidth: 0 }}>
+              <span style={{ font: `500 ${fs(22)} ${TIGHT}`, letterSpacing: "-0.02em", lineHeight: 1, color: t.c }}>{v.loading ? "—" : t.v}</span>
+              <span style={{ fontSize: fs(11), color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{t.k}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ flex: "none", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "grid", gridTemplateColumns: COLS, columnGap: "5px", height: "28px", alignItems: "center", borderBottom: "1px solid var(--crm-rule)", font: `500 ${fs(10.5)} ${INTER}`, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--crm-faint)" }}>
+            <span /><span style={{ textAlign: "right" }}>Leads</span><span style={{ textAlign: "right" }}>Avg</span><span style={{ textAlign: "right" }}>Wait</span><span style={{ textAlign: "right" }}>Appt</span><span style={{ textAlign: "right" }}>Came</span>
+          </div>
+          {v.pRows.map(r => (
+            <div key={r.id} style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--crm-rule-2)" }}>
+              <div {...press(r.toggle)} aria-expanded={r.open} style={{ display: "grid", gridTemplateColumns: COLS, columnGap: "5px", alignItems: "center", minHeight: "50px", fontSize: fs(13.5), fontVariantNumeric: "tabular-nums", cursor: "pointer", color: r.rowFg }}>
+                <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                  <span style={{ width: "7px", height: "7px", borderRadius: "50%", flex: "none", background: r.tdot, opacity: r.op }} />
+                  <span style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
+                    <span style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                    {r.off && <span style={{ fontSize: fs(11), color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.turn}</span>}
+                  </span>
+                </span>
+                <span style={{ textAlign: "right", fontWeight: 600 }}>{r.leads}</span>
+                <span style={{ textAlign: "right" }}>{r.avg}</span>
+                <span style={{ textAlign: "right", fontWeight: 600, whiteSpace: "nowrap", color: r.waitFg }}>{r.waitTxt}</span>
+                <span style={{ textAlign: "right" }}>{r.appt}</span>
+                <span style={{ textAlign: "right" }}>{r.show}</span>
+              </div>
+              {r.open && (
+                <div style={{ display: "flex", flexDirection: "column", padding: "0 0 10px 18px" }}>
+                  {r.list.map(l => (
+                    <div key={l.key} {...press(l.go)} style={{ display: "grid", gridTemplateColumns: "42px minmax(0,1fr) auto", columnGap: "10px", alignItems: "center", minHeight: "44px", padding: "0 8px", margin: "0 -8px", borderRadius: "10px", cursor: "pointer", background: l.bg }}>
+                      <span style={{ font: `600 ${fs(12)} ${TIGHT}`, color: "var(--crm-list-sub)" }}>{l.got}</span>
+                      <span style={{ fontSize: fs(13.5), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
+                      <span style={{ fontSize: fs(12.5), fontWeight: 600, whiteSpace: "nowrap", color: l.rc }}>{l.reply}</span>
+                    </div>
+                  ))}
+                  {r.none && <div style={{ minHeight: "40px", display: "flex", alignItems: "center", fontSize: fs(12.5), color: "var(--crm-faint)" }}>No leads</div>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      {v.pMenuOpen && (<>
+        <div onClick={v.pCloseMenu} style={SCRIM} />
+        <div style={{ ...SHEET, maxHeight: "86%", overflow: "auto", padding: "10px 12px calc(28px + var(--sheet-safe, 0px))" }}>
+          <div style={{ width: "36px", height: "4px", borderRadius: "2px", background: "var(--crm-line)", margin: "0 auto 10px" }} />
+          {v.menu.map(m => (
+            <div key={m.key} {...press(m.go)} style={{ minHeight: m.ph, display: "flex", alignItems: "center", gap: "9px", padding: `0 12px 0 ${m.pl}`, borderRadius: "10px", cursor: "pointer", fontSize: fs(14), fontWeight: m.w, background: m.bg, borderTop: `1px solid ${m.bt}` }}>
+              {m.dot && <span style={{ width: "8px", height: "8px", borderRadius: "50%", flex: "none", background: m.dot }} />}
+              <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</span>
+              <span style={{ fontSize: fs(12), fontWeight: 400, color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{m.role}</span>
+            </div>
+          ))}
+        </div>
+      </>)}
+      {v.pd.open && (<>
+        <div onClick={v.pd.close} style={SCRIM} />
+        <div style={{ ...SHEET, maxHeight: "90%", display: "flex", flexDirection: "column" }}>
+          <div style={{ width: "36px", height: "4px", borderRadius: "2px", background: "var(--crm-line)", margin: "10px auto 0" }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: "3px", padding: "12px 22px 14px" }}>
+            <span style={{ font: `500 ${fs(22)} ${TIGHT}`, letterSpacing: "-0.02em" }}>{v.pd.name}</span>
+            <span style={{ fontSize: fs(13), color: "var(--crm-muted)" }}>{v.pd.ad}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: "8px", padding: "0 22px 14px", borderBottom: "1px solid var(--crm-rule)" }}>
+            {v.pd.facts.map(f => <div key={f.k} style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: 0 }}><span style={{ fontSize: fs(11), color: "var(--crm-faint)" }}>{f.k}</span><span style={{ font: `500 ${fs(15)} ${TIGHT}`, color: f.c, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.v}</span></div>)}
+          </div>
+          <div style={{ flex: 1, overflow: "auto", padding: "10px 22px" }}>
+            {v.pd.events.map(e => (
+              <div key={e.key} style={{ display: "grid", gridTemplateColumns: "42px 12px minmax(0,1fr)", columnGap: "10px" }}>
+                <span style={{ paddingTop: "10px", textAlign: "right", font: `600 ${fs(12)} ${TIGHT}`, color: "var(--crm-muted)" }}>{e.t}</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span style={{ width: "1px", height: "14px", background: e.top }} /><span style={{ width: "9px", height: "9px", borderRadius: "50%", flex: "none", background: e.dot }} /><span style={{ flex: 1, width: "1px", background: e.bot }} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "8px 0 14px", fontSize: fs(13.5) }}>
+                  <span style={{ fontWeight: 600, color: e.c }}>{e.title}</span>
+                  {e.sub && <span style={{ fontSize: fs(12), color: "var(--crm-faint)" }}>{e.sub}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ padding: "12px 22px calc(30px + var(--sheet-safe, 0px))" }}>
+            <span {...press(v.pd.openChat)} style={{ height: "48px", borderRadius: "12px", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", font: `500 ${fs(15)} ${INTER}`, cursor: "pointer" }}>Open chat</span>
+          </div>
+        </div>
+      </>)}
+    </div>
+  );
+}

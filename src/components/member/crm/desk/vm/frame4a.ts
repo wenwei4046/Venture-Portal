@@ -11,13 +11,15 @@ import type { Icon4a } from "../../shared/icons4a";
 export interface F4Item { label: string; icon: Icon4a; on: boolean; pick: () => void; badge: string }
 export interface F4Tab { label: string; on: boolean; pick: () => void }
 export interface F4Menu { open: boolean; close: () => void; items: { tag: string; label: string; bg: string; fg: string; pick: () => void }[] }
-export interface F4Head { title: string; tabs: F4Tab[]; subTabs?: F4Tab[]; /** Up next: the tab bar holds the ad dropdown (DeskUpNext). */ subSlot?: boolean; sub: string; cta: { label: string; icon: Icon4a | null; act: () => void; menu?: F4Menu } | null;
+export interface F4Head { title: string; tabs: F4Tab[]; subTabs?: F4Tab[]; /** Up next: the tab bar holds the ad dropdown (DeskUpNext). */ subSlot?: boolean; /** A tab's padding where the design differs (Assignment: 10px 0, CRM Assignment People.dc.html). */ subPad?: string; sub: string; cta: { label: string; icon: Icon4a | null; act: () => void; menu?: F4Menu } | null;
+  /** A tab's date picker open (Insight's Custom — shared/date-range.tsx), anchored on the tab it belongs to. */
+  picker?: { tab: string; value: { a: number; b: number } | null; apply(r: { a: number; b: number }): void; cancel(): void } | null;
   /** An outline button left of the primary one (Showrooms' Save as draft). */
   alt?: { label: string; act: () => void } | null }
 
 const CRM_ICON: Record<DeskTab, Icon4a> = {
   insight: "trending-up", inbox: "inbox", people: "contact", calendar: "calendar", adsperf: "arrow-up-right", assignment: "users",
-  showrooms: "map-pin", forms: "list", channels: "phone", settings: "sliders-horizontal", auditlog: "clock-3", reports: "file-text", workspace: "file-text",
+  showrooms: "map-pin", forms: "list", channels: "phone", settings: "sliders-horizontal", auditlog: "clock-3", reports: "file-text", workspace: "file-text", activity: "activity",
 };
 
 /** "Sun, 18 Oct 2026" — the top bar's date, as the frames write it. */
@@ -41,7 +43,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
   const hidden = new Set(app.hidden ?? []);
   const inboxUnread = data.customers.reduce((n, c) => n + (c.unread || 0), 0);
   const ids: Record<string, DeskTab> = { Insight: "insight", Inbox: "inbox", Contacts: "people", Calendar: "calendar", "Ads Performance": "adsperf", Assignment: "assignment",
-    Showrooms: "showrooms", "Customer form": "forms", Forms: "forms", Channels: "channels", Settings: "settings", "Audit log": "auditlog", Reports: "reports", Workspace: "workspace" };
+    Showrooms: "showrooms", "Customer form": "forms", Forms: "forms", Channels: "channels", Settings: "settings", "Audit log": "auditlog", Reports: "reports", Workspace: "workspace", "Team activity": "activity" };
   const crmNav = fr.crmGroups.map(g => ({ head: g.label ?? "", items: g.items.map((n): F4Item => {
     const id = ids[n.label] ?? "insight";
     return { label: n.label, icon: CRM_ICON[id], on: n.on, pick: n.pick, badge: id === "inbox" && inboxUnread ? (inboxUnread > 99 ? "99+" : String(inboxUnread)) : "" };
@@ -67,7 +69,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
     account: { ini: fr.me.ini, name: fr.me.name, sub: fr.me.sub },
     greet: app.greeting, first: ctx.me.role === "boss" ? "Principal" : ctx.me.name.trim().split(/\s+/)[0] ?? "",
     subName: app.subName, openSubDept: app.openSubDept, date: topDate(ctx.now),
-    head: { title: fr.pageTitle, tabs: h?.tabs ?? [], subTabs: h?.subTabs, subSlot: h?.subSlot, sub: h?.sub ?? "", cta: h?.cta ?? null, alt: h?.alt ?? null } as F4Head,
+    head: { title: fr.pageTitle, tabs: h?.tabs ?? [], subTabs: h?.subTabs, subSlot: h?.subSlot, subPad: h?.subPad, picker: h?.picker ?? null, sub: h?.sub ?? "", cta: h?.cta ?? null, alt: h?.alt ?? null } as F4Head,
     alertsN: fr.alertsN, openAlerts: fr.openAlerts,
     // Inbox runs its columns edge to edge under a rule (frame 02); every other page has the 36 px gutter.
     // Calendar's Book a visit (frame 04): pick the customer, then the booking pane every chat's Appointment opens.
@@ -89,7 +91,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
       return { open: ui.bookPick, close: () => ctx.patch({ bookPick: false, bookQ: "" }), q: ui.bookQ, setQ: (e: { target: { value: string } }) => ctx.patch({ bookQ: e.target.value }),
         rows: rows.map(c => ({ id: c.id, name: c.name, sub: [c.phone, c.ad].filter(Boolean).join(" · "), pick: () => ctx.patch({ bookPick: false, bookQ: "", pane: "overlay", kind: "book", chat: c.id, book: null }) })) };
     })(),
-    pad: tab === "insight" && ui.insTab === "upnext" ? "24px 36px 32px" : tab === "inbox" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "calendar" ? "0 24px 16px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : tab === "insight" && ui.insTab === "upnext" ? "32px" : "24px", bodyTop: ["inbox", "people", "calendar", "showrooms", "forms"].includes(tab) ? "1px solid var(--crm-rule)" : "0",
+    pad: tab === "insight" && ui.insTab === "upnext" ? "24px 36px 32px" : tab === "inbox" || tab === "calendar" || tab === "activity" ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : tab === "insight" && ui.insTab === "upnext" ? "32px" : "24px", ownHead: tab === "calendar" || tab === "activity", bodyTop: ["inbox", "people", "showrooms", "forms"].includes(tab) ? "1px solid var(--crm-rule)" : "0",
   };
 }
 export type Frame4a = ReturnType<typeof frame4aVM>;
@@ -121,6 +123,7 @@ interface HeadBits {
   insightPdf: () => void;
   insightSub: string;
   insTabs: F4Tab[];
+  insPicker?: { value: { a: number; b: number } | null; apply(r: { a: number; b: number }): void; cancel(): void } | null;
   kUpNext?: boolean;
   ap4: { tabs: { label: string; on: boolean; custom: boolean; pick: () => void }[] };
   addAd?: { canAdd: boolean; show: () => void };
@@ -128,12 +131,21 @@ interface HeadBits {
   dpOpen: () => void;
 }
 
+/** Assignment's tabs as the design names them (docs/design_handoff_crm, CRM Assignment People.dc.html). */
+const TAB_WORDS: Record<string, string> = { "Ads to teams": "Ad split", "Full time lead allocation": "Full time days" };
+
+/** Reports' two tabs: Ready-made (the categories) and My reports (what was Workspace). */
+const rpTabs = (ctx: DeskCtx, mine: boolean): F4Tab[] => [
+  { label: "Ready-made", on: !mine, pick: () => ctx.patch({ tab: "reports" }) },
+  { label: "My reports", on: mine, pick: () => ctx.patch({ tab: "workspace" }) },
+];
+
 /** Each page's head (frames 01–11): its tabs, its line and its one primary button — each bound to what the page already does. */
 export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit<F4Head, "title">>> {
   const n = (k: number, one: string, many: string) => `${k.toLocaleString("en-MY")} ${k === 1 ? one : many}`;
   return {
     // v2 frames 01 / 01b: Team performance | Ads performance under the title; Export PDF.
-    insight: v.kUpNext ? { tabs: [], subTabs: v.insTabs, subSlot: true, sub: "", cta: null } : { tabs: v.periodOpts, subTabs: v.insTabs, sub: v.insightSub, cta: { label: "Export PDF", icon: "file-text", act: v.insightPdf } },
+    insight: v.kUpNext ? { tabs: [], subTabs: v.insTabs, subSlot: true, sub: "", cta: null } : { tabs: v.periodOpts, subTabs: v.insTabs, sub: v.insightSub, cta: { label: "Export PDF", icon: "file-text", act: v.insightPdf }, picker: v.insPicker ? { tab: "Custom", ...v.insPicker } : null },
     // v2 frames 02 / 03 (the owner: "做手动新增客户"): New chat and Add customer — one sheet, a customer added by hand.
     inbox: { tabs: [], sub: "", cta: ctx.data.can.editOwn ? { label: "New chat", icon: "plus", act: () => ctx.patch({ addCust: "chat" }) } : null },
     people: { tabs: [], sub: n(v.ppCount, "customer", "customers"), cta: ctx.data.can.editOwn ? { label: "Add customer", icon: "user-plus", act: () => ctx.patch({ addCust: "contact" }) } : null },
@@ -142,7 +154,7 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
     // menu Excel / CSV / PDF report as before.
     adsperf: { tabs: [], sub: "", cta: { label: "Export", icon: null, act: v.apToggleDl, menu: { open: v.apDlOpen, close: v.apToggleDl, items: v.apDl } } },
     // v2 (frames 06b / 06c): Assignment's five sections are the second row of tabs.
-    assignment: { tabs: [], subTabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: v.opItem === "Ads to teams" && v.addAd?.canAdd ? { label: "Add ad", icon: "plus", act: v.addAd.show } : null },
+    assignment: { tabs: [], subPad: "10px 0", subTabs: v.listCards.map(c => ({ label: TAB_WORDS[c.title] ?? c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: v.opItem === "Ads to teams" && v.addAd?.canAdd ? { label: "Add ad", icon: "plus", act: v.addAd.show } : null },
     // Showrooms and Appointment types (2026-10-24: "在電腦端有個控制面板，可以放在showroom 那邊"), each saved by the head's Save.
     // …and Key log (2026-10-29: "在 showroom 要有一个表单，去记录 member 借还钥匙的情况"), read only, no Save.
     showrooms: { tabs: [], subTabs: ([["rooms", "Showrooms"], ["types", "Appointment types"], ["keys", "Key log"]] as const).map(([k, label]) => ({ label, on: v.srPage === k, pick: () => ctx.patch({ srPage: k }) })),
@@ -151,12 +163,14 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
       alt: v.srPage === "rooms" && v.sr4.draftable ? { label: "Save as draft", act: v.sr4.saveDraft } : null },
     forms: { tabs: [], sub: v.cfSummary, cta: { label: "Publish", icon: "check", act: v.cfSave } },
     channels: { tabs: [], sub: "", cta: { label: "Add a number", icon: "plus", act: () => window.open("https://business.facebook.com/wa/manage/phone-numbers/", "_blank", "noopener") } },
+    // Settings: General · Booking link · Cold lead templates · Notifications (the owner, 2026-11-08: Reply library deleted).
     settings: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },
     auditlog: { tabs: [], sub: n(v.auCount, "change", "changes"), cta: { label: "Export CSV", icon: "download", act: v.auditCsv } },
     // Reports (2026-10-23): its categories as the head's tabs, Export CSV of the one on screen.
     // v2 frame 12: the categories are the second row of tabs; Ads performance is frame 05's body and its Export menu.
-    reports: { tabs: [], subTabs: v.reports?.cats ?? [], sub: "", cta: v.reports?.cats.find(c => c.on)?.label === "Ads performance"
+    reports: { tabs: rpTabs(ctx, false), subTabs: v.reports?.cats ?? [], sub: "", cta: v.reports?.cats.find(c => c.on)?.label === "Ads performance"
       ? { label: "Export", icon: "download", act: v.apToggleDl, menu: { open: v.apDlOpen, close: v.apToggleDl, items: v.apDl } }
       : v.reports?.canCsv ? { label: "Export", icon: "download", act: v.reports.csv } : null },
+    workspace: { tabs: rpTabs(ctx, true), sub: "", cta: null },
   };
 }

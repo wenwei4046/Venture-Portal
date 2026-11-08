@@ -11,15 +11,16 @@ import type { CrmCustomer, CrmVisit } from "@/lib/member/crm-data";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { sourceOf, SOURCE_PICKS } from "@/lib/member/crm-source";
 
-export type RpPeriod = "week" | "month" | "last" | "all";
-export const RP_PERIODS: [RpPeriod, string][] = [["week", "This week"], ["month", "This month"], ["last", "Last month"], ["all", "All time"]];
+export type RpPeriod = "week" | "month" | "last" | "all" | "custom";
+/** Custom: any From and To (voice-and-dates.md §2: every period choice has Custom). */
+export const RP_PERIODS: [RpPeriod, string][] = [["week", "This week"], ["month", "This month"], ["last", "Last month"], ["all", "All time"], ["custom", "Custom"]];
 const DAY = 86_400_000;
 
 /** The period's first and last moment (local days; the week from Monday). */
 export function periodRange(p: RpPeriod, now: Date): [number, number] {
   const T = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   if (p === "week") return [T - ((now.getDay() + 6) % 7) * DAY, T + DAY - 1];
-  if (p === "month") return [new Date(now.getFullYear(), now.getMonth(), 1).getTime(), T + DAY - 1];
+  if (p === "month" || p === "custom") return [new Date(now.getFullYear(), now.getMonth(), 1).getTime(), T + DAY - 1];
   if (p === "last") return [new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), new Date(now.getFullYear(), now.getMonth(), 1).getTime() - 1];
   return [-Infinity, T + DAY - 1];
 }

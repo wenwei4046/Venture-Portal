@@ -53,7 +53,7 @@ export type CrmOpen = { chat: string } | { notifs: true };
  * The desktop's Mine keeps the page: the Control panel's page → one's CRM page. (The phone's round Team | Mine button sits
  * on each side's first page alone since 2026-10-14 and goes first page ⇄ first page: Mine's Inbox ⇄ Team's Insight.)
  */
-const MINE_TAB: Record<PanelTab, SalesTab> = { overview: "insight", inbox: "inbox", calendar: "calendar", profile: "profile", assign: "inbox", ads: "insight" };
+const MINE_TAB: Record<PanelTab, SalesTab> = { overview: "insight", inbox: "inbox", calendar: "calendar", profile: "profile", assign: "inbox", ads: "insight", activity: "inbox" };
 
 /** On demo data (/member/preview) the Control panel is looked at with ?crmAs=boss or ?crmAs=hod. */
 const demoViewer = () => (typeof window === "undefined" ? undefined : new URLSearchParams(window.location.search).get("crmAs") ?? undefined);

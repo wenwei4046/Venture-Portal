@@ -6,6 +6,17 @@
  * page is narrow. The panels' slide-in is desk-motion.cjs.
  */
 module.exports = [
+  // In-page logs show the last 5 changes and View all (docs/design_handoff_crm, CRM Navigation Audit 2026-11-08): the
+  // sidebar's Audit log is the only full one, opened on this area (vm/assign-v2.ts › adLogAll). The harness binds none.
+  ['{(v.adLog).map((e, e_i) => (<Fragment key={e_i}>',
+    '{!!(v.adLogAll) && (<button type="button" onClick={v.adLogAll} style={{ alignSelf: "flex-start", margin: "0 0 10px", padding: "0", border: "0", background: "transparent", font: "500 12.5px Inter, sans-serif", color: "var(--crm-rust)", cursor: "pointer" }}>View all in Audit log</button>)}{(v.adLog).map((e, e_i) => (<Fragment key={e_i}>',
+    "Ad split's Audit log: the last 5 changes, then View all (the sidebar's log, Assignment)."],
+  // Ad split's Custom calendar (docs/design_handoff_crm/fixes/voice-and-dates.md §2): the design writes "October 2026";
+  // live it names the month shown and ‹ › move to earlier months (vm/assign-v2.ts › adCalMonth / adCalStep). The
+  // prototype harness binds neither, so its frames keep the design's words.
+  ['<strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>October 2026</strong>',
+    '<strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>{v.adCalMonth ?? "October 2026"}</strong>{!!(v.adCalStep) && (<><button type="button" onClick={() => v.adCalStep!(-1)} title="Previous month" style={{ width: "26px", height: "26px", border: "0", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"></path></svg></button><button type="button" onClick={() => v.adCalStep!(1)} title="Next month" style={{ width: "26px", height: "26px", border: "0", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"></path></svg></button></>)}',
+    "Ad split's calendar: any month, not only this one (voice-and-dates.md §2)."],
   [/(<aside style=\{\{ position: "relative", flex: `0 1 \$\{v\.perfW\}px`[\s\S]*?<\/aside>)/,
     m => `{!(v.perfShut) && (<>${m.replace('minWidth: "220px", boxSizing: "border-box", background: "#fff",', 'minWidth: "220px", boxSizing: "border-box", background: "#FBF6F2",')}</>)}{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}`,
     "Ad performance folds to a strip, and open sits on sand (the owner, 2026-10-15)."],
@@ -60,7 +71,7 @@ module.exports = [
     "Inbox's Customer info column links the ad too (the owner, 2026-10-16: 電腦版尚未有 ad link)."],
   // Active members (2026-10-22, the owner: a member not active for now is off Assignment's lists, their share to the others;
   // its own section after Ads to teams, saved at once through crm_set_locked; vm/settings.ts). Ads to teams says who is locked.
-  ['{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}', '{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}{!!(v.isLbaOp) && (<DeskLeadsByAd v={v.leadsByAd} />)}',
+  ['{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}', '{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}{!!(v.isLbaOp) && (<DeskLeadsByAd v={v.leadsByAd} />)}{!!(v.isPeopleOp) && (<DeskLeaveCalPage mode="people" input={v.leaveCal} title="Assignment" bare />)}',
     "Assignment › Active members: each person Active or Locked (crm_set_locked); Ads to teams' + picker (DeskAddAd, crm_add_ad)."],
   // A locked person stays in Ads to teams' list, grey with a lock instead of the box (the owner, 2026-10-22: "不要消失在
   // assignment list 里面，而是改成小锁头，灰色，不能 edit"; vm/assign.ts appends them with `locked`).

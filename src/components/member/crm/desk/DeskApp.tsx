@@ -12,9 +12,11 @@ import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/ch
 import { InfoValue } from "../shared/AdLink";
 import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
+import { DeskLeaveCalPage } from "./DeskLeaveCal";
+import { DeskTeamActivity } from "./DeskTeamActivity";
 import { SuggestFloat } from "../shared/suggest-float";
 import { DeskTemplateFormat, DeskTemplateKind, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskCalendar4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a, DeskUpNext4a } from "./Desk4a";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a, DeskUpNext4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -553,7 +555,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </>)}
                 </div>
               </>)}
-              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}{!!(v.isLbaOp) && (<DeskLeadsByAd v={v.leadsByAd} />)}{!!(v.isMwtOp) && (<>
+              {!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}{!!(v.isLbaOp) && (<DeskLeadsByAd v={v.leadsByAd} />)}{!!(v.isPeopleOp) && (<DeskLeaveCalPage mode="people" input={v.leaveCal} title="Assignment" bare />)}{!!(v.isMwtOp) && (<>
                 <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", marginTop: "-10px" }}>
                   <span style={{ flex: "1", minWidth: "260px", fontSize: "14px", color: "var(--crm-muted)" }}>Turned on here, they appear in Assignment › Full time lead allocation, where you pick their days.</span>
                   {!!(v.mwtSavedMsg) && (<>
@@ -788,7 +790,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                                   </path>
                                 </svg>
                               </button>
-                              <strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>October 2026</strong>
+                              <strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>{v.adCalMonth ?? "October 2026"}</strong>{!!(v.adCalStep) && (<><button type="button" onClick={() => v.adCalStep!(-1)} title="Previous month" style={{ width: "26px", height: "26px", border: "0", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"></path></svg></button><button type="button" onClick={() => v.adCalStep!(1)} title="Next month" style={{ width: "26px", height: "26px", border: "0", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"></path></svg></button></>)}
                             </div>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 28px)", gap: "2px", fontSize: "10.5px", fontWeight: "700", color: "var(--crm-faint)", textAlign: "center" }}>
                               <span>M</span>
@@ -867,7 +869,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </div>
                   <DeskAdTabs4a v={v} which="audit" />
                   <div style={{ flex: "1", minHeight: "0", overflow: "auto", padding: "16px", display: "flex", flexDirection: "column" }}>
-                    {(v.adLog).map((e, e_i) => (<Fragment key={e_i}>
+                    {!!(v.adLogAll) && (<button type="button" onClick={v.adLogAll} style={{ alignSelf: "flex-start", margin: "0 0 10px", padding: "0", border: "0", background: "transparent", font: "500 12.5px Inter, sans-serif", color: "var(--crm-rust)", cursor: "pointer" }}>View all in Audit log</button>)}{(v.adLog).map((e, e_i) => (<Fragment key={e_i}>
                       <div style={{ display: "grid", gridTemplateColumns: "44px 24px minmax(0, 1fr)", columnGap: "10px" }}>
                         <span style={{ display: "flex", flexDirection: "column", gap: "2px", paddingTop: "4px", textAlign: "right" }}>
                           <strong style={{ fontSize: "12px", fontWeight: "700", whiteSpace: "nowrap" }}>{e.date}</strong>
@@ -2487,7 +2489,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </div>
               </>)}
               {!!(v.kPeople) && (<DeskContacts4a v={v} pager={<DeskPager v={v.ppPager} />} />)}
-              {!!(v.kAudit) && (<DeskAudit4a v={v} />)} {!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>
+              {!!(v.kAudit) && (<DeskAudit4a v={v} />)} {!!(v.kActivity) && (<DeskTeamActivity a={v.activity} />)}{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>
                 <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "6px 0 10px" }}>
                   <span style={{ position: "relative" }}>
                     <button type="button" onClick={v.apStToggle} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
@@ -2592,7 +2594,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </>)}
                 <DeskAdsTable4a v={v} />
               </>)}
-              {!!(v.kCal) && (<DeskCalendar4a v={v} />)}
+              {!!(v.kCal) && (<DeskLeaveCalPage mode="calendar" input={v.leaveCal} title="Calendar" />)}
             </div>
           </>)}
           {!!(v.showScrim) && (<>

@@ -13,6 +13,8 @@ export { DeskUpNext as DeskUpNext4a } from "./DeskUpNext";
 export { DeskBookingBar as DeskBookingBar4a, DeskBookingLink as DeskBookingLink4a, DeskPartnerPane as DeskPartnerPane4a } from "./DeskPartner";
 import type { KeyLogVM } from "./vm/key-log";
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { DateRangePicker } from "../shared/date-range";
+import { InfoValue } from "../shared/AdLink";
 import { boldRuns, wrapBold } from "../shared/bold-text";
 import { ViewAsList } from "./ViewAsList";
 import { Ic, type Icon4a } from "../shared/icons4a";
@@ -194,13 +196,17 @@ export function Desk4aTop({ f4, left }: { f4: Frame4a; left: number }) {
 /** A page's head: its title, underline tabs, a muted line, CRM alerts and the page's one primary button. */
 export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
   const h = f4.head;
+  const pickAt = useRef<HTMLButtonElement>(null);
+  // Calendar and Team activity draw their prototypes' own title rows (docs/design_handoff_crm, 2026-11-08).
+  if (f4.ownHead) return f4.addCust ? <DeskAddCustomer v={f4.addCust} /> : null;
   return (<>
     {f4.addCust && <DeskAddCustomer v={f4.addCust} />}
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "22px", padding: "26px 36px 22px", minWidth: 0 }}>
       <div style={{ font: `500 30px ${TIGHT}`, letterSpacing: "-0.025em", whiteSpace: "nowrap", color: "var(--crm-ink)" }}>{h.title}</div>
       {h.tabs.length > 0 && (
         <div style={{ display: "flex", gap: "22px", font: "500 13px Inter, sans-serif" }}>
-          {h.tabs.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: "6px 0", whiteSpace: "nowrap", font: "inherit",
+          {h.picker && <DateRangePicker value={h.picker.value} onApply={h.picker.apply} onCancel={h.picker.cancel} anchor={pickAt} />}
+          {h.tabs.map(t => <button key={t.label} ref={h.picker?.tab === t.label ? pickAt : undefined} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: "6px 0", whiteSpace: "nowrap", font: "inherit",
             borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>)}
         </div>
       )}
@@ -268,7 +274,7 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
     {/* v2 frames 01 / 01b: a second row of tabs under the title (Insight's Team performance | Ads performance). */}
     {h.subTabs && h.subTabs.length > 0 && (
       <div style={{ flex: "none", display: "flex", alignItems: h.subSlot ? "center" : undefined, gap: "26px", padding: "0 36px", marginTop: "-10px", borderBottom: "1px solid var(--crm-rule)", font: "500 13px Inter, sans-serif" }}>
-        {h.subTabs.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: h.subSlot ? "10px 0" : "8px 0 10px", whiteSpace: "nowrap", font: "inherit", marginBottom: "-1px",
+        {h.subTabs.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: h.subPad ?? (h.subSlot ? "10px 0" : "8px 0 10px"), whiteSpace: "nowrap", font: "inherit", marginBottom: "-1px",
           borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>)}
         {h.subSlot && <div data-up-next-slot="" style={{ display: "contents" }} />}
       </div>
@@ -495,7 +501,7 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
 interface InboxSideBits {
   ibHas: boolean; ibNone: boolean; ibInfoShut: boolean; ibInfoFold: () => void; ibInfoRail: { open: () => void }; ibInfoW: number;
   dragInfo: (e: never) => void; resetInfo: () => void;
-  ibInfo: { groups: { label: string; rows: { k: string; v: string; href: string | null; c: string }[] }[] };
+  ibInfo: { groups: { label: string; rows: { k: string; v: string; href: string | null; c: string; go?: (() => void) | null }[] }[] };
   ibCpOpen: boolean; ibCpToggle: () => void; ibCpW?: number; dragCp?: (e: never) => void; resetCp?: () => void;
   ibCp: { audit4: { what: string; detail: string; who: string; time: string; main: boolean; hot: boolean }[] };
   ibBook: () => void; editInfo: () => void;
@@ -559,7 +565,7 @@ export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: str
                 {g.rows.map(r => (
                   <div key={r.k} style={{ display: "flex", justifyContent: "space-between", gap: "12px", font: "400 13px Inter, sans-serif" }}>
                     <span style={{ color: "var(--crm-muted)", flex: "none" }}>{r.k}</span>
-                    <span style={{ textAlign: "right", fontWeight: 500, color: r.c, overflowWrap: "anywhere", minWidth: 0 }}>{value(r.v, r.href)}</span>
+                    <span style={{ textAlign: "right", fontWeight: 500, color: r.c, overflowWrap: "anywhere", minWidth: 0 }}>{r.go ? <InfoValue v={r.v} go={r.go} /> : value(r.v, r.href)}</span>
                   </div>
                 ))}
               </div>
@@ -2095,13 +2101,14 @@ interface AuOpt { label: string; on: boolean; pick: () => void }
 interface AuditBits {
   auQ: string; setAuQ: (e: { target: { value: string } }) => void; auEmpty: boolean; auClear: () => void;
   au4: { open: "who" | "area" | "per" | null; toggle: (k: "who" | "area" | "per") => void; close: () => void; whoLabel: string; areaLabel: string; perLabel: string;
-    who: AuOpt[]; areas: AuOpt[]; pers: AuOpt[];
+    who: AuOpt[]; areas: AuOpt[]; pers: AuOpt[]; picker?: { value: { a: number; b: number } | null; apply(r: { a: number; b: number }): void; cancel(): void } | null;
     rows: { time: string; day: string; who: string; sys: boolean; area: string; change: string; before: string; after: string }[] };
 }
 const AU_COLS = "111px 130px 111px 224px minmax(0,1fr)";
 /** Frame 11 · Audit log: a search, Everyone / All areas / Last 7 days, and the table When · Who · Area · Change · Before → after. */
 export function DeskAudit4a({ v }: { v: AuditBits }) {
   const A = v.au4;
+  const dates = A.picker ? <DateRangePicker value={A.picker.value} onApply={A.picker.apply} onCancel={A.picker.cancel} /> : null;
   const Menu = ({ k, label, opts }: { k: "who" | "area" | "per"; label: string; opts: AuOpt[] }) => (
     <span style={{ position: "relative" }}>
       <button type="button" onClick={() => A.toggle(k)} style={{ ...BTN, display: "inline-flex", alignItems: "center", gap: "8px", height: "36px", padding: "0 12px", borderRadius: "8px", border: "1px solid var(--crm-line)", background: "#fff", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap" }} className="crm4a-outline">
@@ -2121,6 +2128,7 @@ export function DeskAudit4a({ v }: { v: AuditBits }) {
   );
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      {dates}
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <span style={{ display: "flex", alignItems: "center", gap: "8px", width: "260px", height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "8px", background: "var(--crm-field)", color: "var(--crm-faint)" }}>
           <Ic name="search" size={15} />

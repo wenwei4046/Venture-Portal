@@ -11,13 +11,15 @@ import type { ApptType, CrmData, CrmForm, CrmFormField, CrmPerson } from "@/lib/
 import type { PanelActions } from "../../panel/actions";
 import type { Team } from "../../panel/vm/common";
 
-export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog" | "reports" | "workspace";
+export type DeskTab = "insight" | "inbox" | "assignment" | "calendar" | "adsperf" | "showrooms" | "settings" | "people" | "forms" | "channels" | "auditlog" | "reports" | "workspace" | "activity";
 export type PaneMode = "closed" | "empty" | "docked" | "overlay" | "wide" | "wideEmpty";
 export type PaneKind = "chat" | "alerts" | "section" | "info" | "clist" | "metrics" | "team" | "assign" | "book" | "note" | "form" | "move" | "share" | "partner";
 
 /** The screen's own state. Every key is the prototype's (same name, same meaning) unless it says otherwise. */
 export interface DeskUi {
   tab: DeskTab;
+  /** Team activity opened on one person (Inbox's name, 2026-11-08). */
+  actWho?: string | null;
   pane: PaneMode;
   kind: PaneKind;
   collapsed: boolean;
@@ -51,6 +53,8 @@ export interface DeskUi {
   // Insight's period (the design draws the switch; choosing is filled in, BUILD-NOTES.md)
   insPer: "day" | "week" | "month" | "custom";
   insRange: { a: number; b: number } | null;
+  /** Insight's Custom dates open (shared/date-range.tsx, docs/design_handoff_crm/fixes/voice-and-dates.md). */
+  insPick?: boolean;
   insOpen: boolean;
   /** 4a's Insight: the team opened in place to its people (frame 01). */
   insTeam: string | null;
@@ -157,7 +161,9 @@ export interface DeskUi {
   /** Active members / Member work type: a team's card folded (by team name). */
   teamShut: Record<string, boolean>;
   /** Reports (2026-10-23): the category on screen, the period of Salespeople / Appointments / Lead sources, Salespeople's sort. */
-  rpCat: import("./reports-page").RpCat; rpPer: import("./reports").RpPeriod; rpSort: { k: string; dir: "asc" | "desc" } | null;
+  rpCat: import("./reports-page").RpCat; rpPer: import("./reports").RpPeriod;
+  /** Reports' and the Audit log's Custom dates, and their picker open (shared/date-range.tsx, voice-and-dates.md §2). */
+  rpRange?: { a: number; b: number } | null; rpDates?: boolean; auRange?: { a: number; b: number } | null; auDates?: boolean; rpSort: { k: string; dir: "asc" | "desc" } | null;
   /** Reports › Salespeople (v2 12c / 12c·2): the team filter, the search, the person picked (their panel folded), the lead opened. */
   rpTeam: string; rpQ: string; rpPick: string | null; rpPickShut: boolean; rpLead: string | null;
   /** Ads Performance: Meta's figures by range ("from|to") and ad (null = one the token cannot see). */
@@ -210,13 +216,15 @@ export interface DeskUi {
   applyChk: boolean; ftApplyChk: boolean; evOpen: Record<string, boolean>;
   adPer: "Today" | "This week" | "This month" | "Custom"; adPerOpen: boolean; adCal: boolean;
   adCust: { a: number; b: number } | null; adCustT: { a: number; b: number; step: number } | null;
+  /** Ad split's Custom calendar: months back from this one (0 = this month). */
+  adCalM?: number;
   // Calendar
   calBy: "team" | "room";
   // Contacts
   ppF: Record<string, string | null>; ppBy: string; ppQ: string; ppOpen: string | null; ppVis: string[] | null;
   ppSort: { k: string | null; dir: 1 | -1 }; ppCW: Record<string, number>; ppAdd: boolean;
   // Audit log
-  auCat: "chat" | "marketing" | "management"; auPer: "today" | "7d" | "month"; auWho: string; auQ: string; auCols: number[] | null; auArea: string; auOpen: "who" | "area" | "per" | null;
+  auCat: "chat" | "marketing" | "management"; auPer: "today" | "7d" | "month" | "custom"; auWho: string; auQ: string; auCols: number[] | null; auArea: string; auOpen: "who" | "area" | "per" | null;
   // Customer form (the page): its draft, the preview's device
   cfDraft: import("./form").FormSectionV2[] | null; cfDev: "phone" | "desktop";
   /** v2 frame 08: which of the saved forms the editor is on (null = the first, the one Customer info asks); Delete asked again. */

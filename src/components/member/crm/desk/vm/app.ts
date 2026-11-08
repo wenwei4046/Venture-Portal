@@ -6,6 +6,10 @@
 import { deskLabelsVM } from "./labels";
 import type { DeskCtx } from "./ctx";
 import { frameVM } from "./frame";
+import { leaveCalData } from "../../shared/leave-cal-data";
+import { peopleBook } from "../../shared/people-book";
+import { upNextOpen } from "../../shared/up-next-data";
+import { jobTitle } from "../../shared/people";
 import { frame4aVM, heads4a } from "./frame4a";
 import { clistVM, insightVM } from "./insight";
 import { alertsVM, assignVM, chatMenuVM, infoVM, inboxVM, moveHolder, teamPaneVM } from "./inbox";
@@ -78,6 +82,14 @@ export function deskVM(ctx: DeskCtx) {
     ...reportsVM(ctx),
     // Workspace (2026-10-27): one's own Weekly / Monthly reports (DeskWorkspace.tsx, vm/workspace-report.ts).
     kWorkspace: ui.tab === "workspace",
+    // Calendar and Assignment › People (docs/design_handoff_crm): one leave record, one Pause, one Lock (shared/leave-cal*).
+    leaveCal: leaveCalData({ data, me: ctx.me, now: ctx.now, act: ctx.act, teams: ctx.teams, directors: ctx.directors,
+      openAppt: a => patch({ pane: "docked", kind: "info", visit: a.visitId, infoId: null }) }),
+    kActivity: ui.tab === "activity",
+    // Team activity (docs/design_handoff_crm): its own page, on the people book Calendar and People read.
+    activity: { data, book: peopleBook(data, ctx.teams, ctx.directors), live: ctx.live, who: ui.actWho ?? null, nameOf: ctx.nameOf,
+      roleOf: (id: string) => { const p = data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },
+      openChat: (id: string) => patch({ tab: "inbox", pane: "docked", kind: "chat", chat: id, ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null }) },
     workspace: { customers: data.customers, visits: data.visits, adNames: data.adNames ?? {}, nameOf: ctx.nameOf, now: ctx.now, live: ctx.live,
       teams: ctx.teams.map(t => ({ id: t.id, name: t.name, people: t.people.map(p => p.id) })) },
     ...chatProgressVM(ctx, op),
@@ -102,7 +114,9 @@ export function deskVM(ctx: DeskCtx) {
     ibInfo: (() => { const c = cur; const secs = formV2(data);
       return { name: c?.name ?? "", ini: c ? initials(c.name) : "", groups: c ? secs.map(sec => ({ label: sec.label,
         rows: sec.fields.filter(fl => fl.id !== "name").map((fl, i) => { const val = answerOf(data, c, fl, ctx.nameOf);
-          return { k: fl.label.replace(/ (RM)$/, ""), v: val, href: fl.id === "ad" ? adHref(c.adUrl) : null, bt: i ? "1px solid var(--crm-field)" : "0", w: val === "—" ? 400 : 650, c: val === "—" ? "var(--crm-faint)" : "var(--crm-ink)" }; }) })) : [] }; })(),
+          // The salesperson's name opens Team activity on them (docs/design_handoff_crm, 2026-11-08 — the person report's place).
+          const who = fl.id === "sp" && c.assignedTo && upNextOpen(data, ctx.me.id) ? c.assignedTo : null;
+          return { k: fl.label.replace(/ (RM)$/, ""), v: val, href: fl.id === "ad" ? adHref(c.adUrl) : null, go: who ? () => patch({ tab: "activity", pane: "closed", chat: null, actWho: who }) : null, bt: i ? "1px solid var(--crm-field)" : "0", w: val === "—" ? 400 : 650, c: val === "—" ? "var(--crm-faint)" : "var(--crm-ink)" }; }) })) : [] }; })(),
     awInfo: () => { if (awC) patch({ awMenuOpen: false, tab: ui.tab, pane: "overlay", kind: "info", infoId: awC.id, visit: null }); },
     awBook: () => { if (awC) patch({ awMenuOpen: false, pane: "overlay", kind: "book", chat: awC.id, book: null }); },
     // 4a Customer info's Book a visit (frame 02): the chat's own Appointment, as its ⋮ menu opens it.
@@ -114,7 +128,9 @@ export function deskVM(ctx: DeskCtx) {
     book: bookVM(ctx, cur), note: noteVM(ctx, cur), cform: customerFormVM(ctx, data.customers.find(c => c.id === (ui.infoId ?? ui.chat ?? ""))), history: historyVM(ctx),
     cyclePeriod: () => { const order = ["month", "week", "day"] as const, i = order.indexOf(ui.insPer as (typeof order)[number]); patch({ insPer: order[(i + 1) % order.length], insRange: null }); },
     periodOpts: (["day", "week", "month", "custom"] as const).map((k, i) => ({ label: ["Today", "This week", "This month", "Custom"][i], on: ui.insPer === k, off: ui.insPer !== k,
-      pick: () => (k === "custom" ? patch({ insPer: "custom", insRange: ui.insRange ?? { a: new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1).getTime(), b: ctx.now.getTime() } }) : patch({ insPer: k, insRange: null })) })),
+      // Custom opens the shared picker (any From and To, earlier months too); Apply sets the range (voice-and-dates.md §2).
+      pick: () => (k === "custom" ? patch({ insPer: "custom", insPick: true, insRange: ui.insRange ?? { a: new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1).getTime(), b: ctx.now.getTime() } }) : patch({ insPer: k, insRange: null, insPick: false })) })),
+    insPicker: ui.insPick ? { value: ui.insRange, apply: (r: { a: number; b: number }) => patch({ insPer: "custom", insRange: r, insPick: false }), cancel: () => patch({ insPick: false }) } : null,
     periodNow: ({ day: "Today", week: "This week", month: "This month", custom: "Custom" } as const)[ui.insPer],
     // The toast's Undo (30 s): a Send to goes back to whoever had the customer; a delete brings the notifications back.
     canUndo: undoOn,

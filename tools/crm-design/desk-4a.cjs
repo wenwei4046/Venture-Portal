@@ -155,7 +155,9 @@ module.exports = function desk4a(body) {
   body = once(body, "{!!(v.railOn) && (<DeskRail v={v.rail} />)}", "{!!(v.railOn) && (<DeskRail4a v={v.rail} extra={v.kPeople ? <DeskContactFigures4a v={v.ppStats} /> : <DeskCalFigures4a v={v} />} />)}", "rail");
 
   // Frame 04 · Calendar: 4a's toolbar and views (DeskCalendar4a) — the week a time grid, visits Came / Booked / No-show.
-  body = fragSwap(body, "{!!(v.kCal) && (<>", "{!!(v.kCal) && (<DeskCalendar4a v={v} />)}", "calendar");
+  body = fragSwap(body, "{!!(v.kCal) && (<>", "{!!(v.kCal) && (<DeskLeaveCalPage mode=\"calendar\" input={v.leaveCal} title=\"Calendar\" />)}", "calendar");
+  // …since docs/design_handoff_crm (2026-11-08): Calendar is the prototype's exactly — Month | Week, appointments and leave
+  // as two layers (DeskLeaveCal.tsx on shared/leave-cal.ts); the owner chose to drop Day, Upcoming, the filters and the rail.
 
   // Frame 05 · Ads Performance: the head carries the period (tabs) and Download PDF; under it production's own controls
   // in 4a's outline (which ads, the range with its date picker and compare, Export) and the info line; the table is
@@ -292,7 +294,8 @@ module.exports = function desk4a(body) {
   body = once(body, '<p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.chatOwner}</p>', "", "v2 chat owner line");
   // v2 (2026-10-23, note 06 › Inbox and Audit log colours): the chat wall is #F7F3EF, no longer cream.
   body = every(body, 'padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>', 'padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>', "v2 chat wall");
-  body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>", "reports page");
+  body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kActivity) && (<DeskTeamActivity a={v.activity} />)}{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>", "reports page");
+  // Team activity (docs/design_handoff_crm, 2026-11-08): a sidebar page of its own, DeskTeamActivity.tsx.
   // Workspace (2026-10-27, the owner: "workspace 可以放在左边report的下方（独立）"): one's own Weekly / Monthly reports, DeskWorkspace.tsx.
   // Frame 08 · Customer form: pages · sections and fields · live preview (Desk4a.tsx › DeskForm4a), on formpage.ts as before.
   {

@@ -11,6 +11,7 @@ import { adToSync } from "@/lib/member/crm-ad-running";
 import type { CrmData, CrmLeave, CrmReplyItem, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
 import type { SalesActions } from "../sales/actions";
 import { teamOf } from "../shared/people";
+import { officeTime } from "@/lib/office-time";
 import type { Dispatch, SetStateAction } from "react";
 
 export interface PanelActions extends SalesActions {
@@ -50,6 +51,13 @@ export interface PanelActions extends SalesActions {
   /** A member's leave (mig 20261029220000, CRM · Manage): add or change one; remove one. */
   saveLeave(leave: { id: string | null; staffId: string; fromAt: string; toAt: string; reason: CrmLeave["reason"]; note: string }): Promise<boolean>;
   deleteLeave(id: string): Promise<boolean>;
+  /** Remove a leave from Calendar / People (crm_up_next_end_leave — Up next's End / Cancel leave): one not started yet goes,
+   *  one under way ends now. CRM · Manage, or a ticked leader on their own line. */
+  removeLeave(id: string): Promise<boolean>;
+  /** People's Pause / Resume — the same flag as Up next's (crm_up_next_pause). */
+  setPaused(staffId: string, on: boolean): Promise<boolean>;
+  /** People's Full time days, Mon = 0 … Sun = 6 (crm_set_person_days): kept in their team's Full time row, where the dealer reads them. */
+  setPersonDays(staffId: string, days: number[], tlId: string | null): Promise<boolean>;
   /** Cold lead templates (rev 1011): save a draft, or save and submit a WhatsApp one for Meta's review. */
   saveTemplate(t: { id: string | null; name: string; ch: CrmTemplate["ch"]; body: string; language?: string; category?: string }, submit: boolean): Promise<CrmTemplate | false>;
   templateOn(id: string, on: boolean): Promise<boolean>;
@@ -221,6 +229,36 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     async deleteLeave(id) {
       if (!(await write("crm_delete_leave", { p_id: id }))) return false;
       setData(d => ({ ...d, leaves: (d.leaves ?? []).filter(x => x.id !== id) }));
+      return true;
+    },
+    async removeLeave(id) {
+      if (!(await write("crm_up_next_end_leave", { p_id: id }))) return false;
+      const now = officeTime().format("YYYY-MM-DDTHH:mm");
+      setData(d => ({ ...d, leaves: (d.leaves ?? []).flatMap(x => x.id !== id ? [x] : x.fromAt > now ? [] : [{ ...x, toAt: now, to: now.slice(0, 10) }]) }));
+      return true;
+    },
+    async setPaused(staffId, on) {
+      if (!(await write("crm_up_next_pause", { p_staff: staffId, p_on: on }))) return false;
+      setData(d => ({ ...d, people: d.people.map(p => (p.id === staffId ? { ...p, paused: on } : p)) }));
+      return true;
+    },
+    async setPersonDays(staffId, days, tlId) {
+      const r = await write("crm_set_person_days", { p_staff: staffId, p_days: days });
+      if (!r) return false;
+      setData(d => {
+        // The same row the database wrote: their team's (whose rule lists them, else the first whose team holds them).
+        const row = d.ftRules.find(x => staffId in x.vals) ?? d.ftRules.find(x => x.tlId === tlId);
+        const vals = (rule: { vals: Record<string, Record<string, number>> }) => {
+          const { [staffId]: _was, ...rest } = rule.vals;
+          return days.length ? { ...rest, [staffId]: Object.fromEntries(days.map(k => [String(k), 1])) } : rest;
+        };
+        const ftRules = row ? d.ftRules.map(x => {
+          if (x !== row) return x;
+          const v = vals(x);
+          return { ...x, mode: "turns" as const, vals: v, days: [...new Set(Object.values(v).flatMap(m => Object.entries(m).filter(([, n]) => n > 0).map(([k]) => Number(k))))].sort() };
+        }) : tlId && days.length ? [...d.ftRules, { tlId, mode: "turns" as const, days: [...days].sort(), vals: { [staffId]: Object.fromEntries(days.map(k => [String(k), 1])) } }] : d.ftRules;
+        return { ...d, ftRules, people: d.people.map(p => (p.id === staffId ? { ...p, fullTime: days.length > 0 } : p)) };
+      });
       return true;
     },
     async setFullTime(staffId, on) {

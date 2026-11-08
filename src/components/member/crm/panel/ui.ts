@@ -2,7 +2,7 @@ import type { CustomerForm } from "../sales/ui";
 import type { CustomFields } from "../shared/custom-book";
 import type { ApplyPick } from "../shared/apply-ads";
 /** The Control panel's screen state (design 1a) — what is open and typed, not data. */
-export type PanelTab = "overview" | "inbox" | "assign" | "calendar" | "profile" | "ads";
+export type PanelTab = "overview" | "inbox" | "assign" | "calendar" | "profile" | "ads" | "activity";
 export type Period = "day" | "week" | "month" | "custom";
 export interface Range { a: number; b: number }
 
@@ -45,7 +45,7 @@ export interface PanelUi {
   /** The Leads list for these people only (Team Insight's Revenue Director row, 2026-10-24); null = everybody's. */
   cLsWho?: string[] | null;
   /** Assignment's open section (rev 1011 §6.1); null = the overview. Leaving the tab resets it. */
-  asSec: "Org" | "Ads" | "Act" | "Aw" | "Ft" | null;
+  asSec: "Org" | "Ads" | "Act" | "Aw" | "Ft" | "People" | null;
   /** Full time lead allocation's editor: the team and its draft ticks (staff → weekdays, 0 = Monday). */
   ftx: { tid: string; v: Record<string, number[]> } | null;
   /** By team's inside-team draft for the ad being edited: modes, values, and who was typed in (for the auto-balance). */
