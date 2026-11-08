@@ -322,5 +322,5 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
   });
   const table = `<table style="width:100%;border-collapse:collapse;font-family:${font};font-size:12px;color:#1C1714">${out}</table>`;
   if (excel) return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>${table}</body></html>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:14mm}body{margin:0;padding:0}@media screen{body{padding:28px 30px}}</style></head><body>${table}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>html{-webkit-text-size-adjust:100%;text-size-adjust:100%}@page{size:A4;margin:14mm}body{margin:0;padding:0}@media screen{body{padding:28px 30px}}</style></head><body>${table}</body></html>`;
 }
