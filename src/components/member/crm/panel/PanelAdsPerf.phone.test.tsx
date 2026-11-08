@@ -37,8 +37,9 @@ describe("Ads performance on the phone", () => {
     const btn = (l: string) => within(row as HTMLElement).getByRole("button", { name: new RegExp(`^${l}`) });
     const n = (l: string) => Number(btn(l).textContent!.replace(/\D/g, ""));
     expect(btn("All ads")).toHaveAttribute("aria-pressed", "true");
-    expect(n("Running") + n("Paused") + n("Pending")).toBe(n("All ads"));
-    const none = ["Running", "Paused", "Pending"].find(l => n(l) === 0), some = ["Running", "Paused", "Pending"].find(l => n(l) > 0)!;
+    expect(n("Running") + n("Paused")).toBe(n("All ads"));
+    expect(within(row as HTMLElement).queryByRole("button", { name: /^Pending/ })).toBeNull();
+    const none = ["Running", "Paused"].find(l => n(l) === 0), some = ["Running", "Paused"].find(l => n(l) > 0)!;
     await tap(btn(some));
     expect(btn(some)).toHaveAttribute("aria-pressed", "true");
     if (none) { await tap(btn(none)); expect(screen.getByText("No leads from an ad in this period.")).toBeInTheDocument(); }

@@ -264,7 +264,7 @@ export function adsPerfVM(ctx: DeskCtx) {
     apSrcOpen: !!ui.apSrcOpen, apSrcToggle: () => set(u => ({ ...u, apSrcOpen: !u.apSrcOpen, apStOpen: false })), apSrcCur: { label: sourceLabel(src), n: AD.length },
     apSrcOpts: SOURCE_PICKS.map(p => { const on = src === p.v; return { label: p.label, sub: p.sub, bg: on ? "var(--crm-tint-attention)" : "transparent", w: on ? 700 : 550, pad: p.sub ? "22px" : "10px", pick: () => patch({ apSrc: p.v, apSrcOpen: false, apPg: 0 } as Partial<typeof ui>) }; }),
     apStOpen: ui.apStOpen, apStToggle: () => set(u => ({ ...u, apStOpen: !u.apStOpen })), apStCur: { label: ST_META[apStF][0], dot: ST_META[apStF][1], n: AD.length },
-    apStOpts: (["all", "Running", "Paused", "Pending"] as const).map(k => { const on = apStF === k, n = k === "all" ? ads.length : ads.filter(a => status(a.id) === k).length;
+    apStOpts: (["all", "Running", "Paused"] as const).map(k => { const on = apStF === k, n = k === "all" ? ads.length : ads.filter(a => status(a.id) === k).length;
       return { label: ST_META[k][0], dot: ST_META[k][1], n, bg: on ? ST_META[k][3] : "transparent", fg: on ? ST_META[k][4] : "var(--crm-ink)", w: on ? 700 : 550, pick: () => patch({ apStF: k, apStOpen: false }) }; }),
     apHead: cols.map(m => { const on = srt?.k === m[0]; return { resize: resizer(m[0], 104), unsize: () => unsize(m[0]), label: m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "var(--crm-rust)" : "var(--crm-faint-2)", fg: on ? "var(--crm-ink)" : "var(--crm-muted)",
       sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) }; }),

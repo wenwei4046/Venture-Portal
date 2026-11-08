@@ -58,8 +58,8 @@ const KEPT = "crm-ads-meta-v1";
 function keptGet<T>(k: string): T | undefined { try { return (JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, T>)[k]; } catch { return undefined; } }
 function keptSet(k: string, v: unknown) { try { const all = JSON.parse(localStorage.getItem(KEPT) || "{}") as Record<string, unknown>; all[k] = v; const ks = Object.keys(all); for (const x of ks.slice(0, Math.max(0, ks.length - 24))) delete all[x]; localStorage.setItem(KEPT, JSON.stringify(all)); } catch { /* storage full or off */ } }
 
-/** The desktop's status filter (Ads Performance › All ads · Running · Paused · Pending — adStatusOf, as Assignment's). */
-export const AD_STATUSES = ["all", "Running", "Paused", "Pending"] as const;
+/** The desktop's status filter (Ads Performance › All ads · Running · Paused — adStatusOf, as Assignment's). */
+export const AD_STATUSES = ["all", "Running", "Paused"] as const; // no Pending (the owner, 2026-11-08: "广告不会有pending")
 export type AdStatusPick = (typeof AD_STATUSES)[number];
 
 export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; visits: CrmVisit[]; adNames: NonNullable<CrmData["adNames"]>; now: Date; live: boolean; manage: boolean;
@@ -118,7 +118,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   const card: CSSProperties = { borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)" };
 
   return (
-    <main style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 28px", display: "flex", flexDirection: "column", gap: "14px" }}>
+    <main style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 28px", display: "flex", flexDirection: "column", gap: "14px" }}>
       {head}
       {/* The period, and "vs the period before" */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

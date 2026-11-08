@@ -127,7 +127,7 @@ export function assignPageVM(ctx: DeskCtx, opItem: string) {
       open: () => openAdById(a.id) }; });
   const stN = (k: string) => (k === "all" ? ads.length : ads.filter(a => statusOf(a.id) === k).length);
   const stCur = { label: ST_META[adSt][0], color: ST_META[adSt][1], tint: ST_META[adSt][3], ink: ST_META[adSt][4], n: stN(adSt) };
-  const stOpts = (["Running", "Paused", "Pending", "all"] as const).map(k => ({ label: ST_META[k][0], color: ST_META[k][1], hint: ST_META[k][2], n: stN(k), tint: ST_META[k][3], ink: ST_META[k][4],
+  const stOpts = (["Running", "Paused", "all"] as const).map(k => ({ label: ST_META[k][0], color: ST_META[k][1], hint: ST_META[k][2], n: stN(k), tint: ST_META[k][3], ink: ST_META[k][4],
     bg: k === adSt ? ST_META[k][3] : "transparent", fg: ST_META[k][4], pick: () => patch({ adSt: k, stOpen: false }) }));
 
   // The split editor (D3): Evenly / By team; the team split auto-balances to 100; inside each team Evenly / By % / By max.

@@ -34,3 +34,10 @@ describe("Up next's ad picker on the phone (2026-11-08: on an iPhone a tap on an
     expect(picker().textContent).toContain("All ads");
   });
 });
+
+describe("Up next keeps the head where Team and Ads have it (2026-11-08: switching jumped — 10 · 6 · 18px)", () => {
+  it("starts 10px down, as the Overview's page", () => {
+    const { container } = draw();
+    expect(container.querySelector("main")!.style.padding.split(" ")[0]).toBe("10px");
+  });
+});
