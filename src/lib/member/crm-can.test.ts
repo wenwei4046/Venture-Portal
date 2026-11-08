@@ -32,13 +32,15 @@ describe('what the CRM lets the signed-in person do', () => {
 })
 
 describe('the Control panel’s bottom bar', () => {
-  const ctx = (manage: boolean) => ({
-    ui: { tab: 'overview' }, set: () => undefined, now: new Date('2026-10-10T10:00:00+08:00'),
-    data: { can: { viewAll: true, editOwn: true, editAll: true, manage }, customers: [], visits: [] },
+  const ctx = (manage: boolean, viewAll = true, downline = false) => ({
+    ui: { tab: 'overview' }, set: () => undefined, now: new Date('2026-10-10T10:00:00+08:00'), me: { id: 'me' },
+    data: { can: { viewAll, editOwn: true, editAll: true, manage }, customers: [], visits: [], people: downline ? [{ id: 'rs', uplineId: 'me' }] : [] },
   }) as unknown as PanelCtx
 
-  it('offers Assignment only with CRM · Manage', () => {
-    expect(navVM(ctx(true)).nav.map(n => n.label)).toEqual(['Insight', 'Inbox', 'Assignment', 'Calendar', 'Profile'])
-    expect(navVM(ctx(false)).nav.map(n => n.label)).toEqual(['Insight', 'Inbox', 'Calendar', 'Profile'])
+  // docs/design_handoff_crm (2026-11-08): Activity (Team activity) takes Assignment's place — Assignment is Profile › Manage's.
+  it('offers Activity to whoever sees everyone or leads somebody', () => {
+    expect(navVM(ctx(true)).nav.map(n => n.label)).toEqual(['Insight', 'Inbox', 'Activity', 'Calendar', 'Profile'])
+    expect(navVM(ctx(false, false, true)).nav.map(n => n.label)).toEqual(['Insight', 'Inbox', 'Activity', 'Calendar', 'Profile'])
+    expect(navVM(ctx(false, false, false)).nav.map(n => n.label)).toEqual(['Insight', 'Inbox', 'Calendar', 'Profile'])
   })
 })
