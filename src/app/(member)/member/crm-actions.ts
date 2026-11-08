@@ -63,8 +63,8 @@ const CRM_WRITES = [
   "crm_partner_link_set", "crm_partner_booking_cancel",
   // Members' leave (mig 20261029220000), CRM · Manage.
   "crm_save_leave", "crm_delete_leave",
-  // Insight › Up next (mig 20261108120000): Skip, Pause, Give to…, leave with a time and a reason. CRM · Manage, or a leader on their own line.
-  "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_clear", "crm_up_next_save_leave", "crm_up_next_end_leave",
+  // Insight › Up next (mig 20261108120000): Skip, Pause, Give to…, leave with a time and a reason. CRM · Manage, as every assignment write.
+  "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_save_leave", "crm_up_next_end_leave",
   // v2 frame 08: put another form in use (mig 20261024160000), CRM · Manage.
   "crm_set_active_form",
   // v2 frames 02 / 03: a customer added by hand (mig 20261024180000), CRM · Edit (own).
@@ -154,6 +154,7 @@ const requireCrm = async (need: "view" | "edit" | "manage") => {
 
 /** Which cell each of the CRM's writes needs (the database asks the same). */
 const MANAGE_WRITES: ReadonlySet<string> = new Set([
+  "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_save_leave", "crm_up_next_end_leave",
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ads", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
@@ -164,7 +165,6 @@ const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_set_status", "crm_book", "crm_move_appointment", "crm_book_custom", "crm_move_custom", "crm_book_typed", "crm_move_typed", "crm_set_appointment_state", "crm_assign_member", "crm_save_team_settings",
   "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded", "crm_set_key_photo",
   "crm_add_note", "crm_add_contact",
-  "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_clear", "crm_up_next_save_leave", "crm_up_next_end_leave",
 ]);
 const friendly = (error: unknown, fallback: string) => {
   const message = error instanceof Error ? error.message : fallback;

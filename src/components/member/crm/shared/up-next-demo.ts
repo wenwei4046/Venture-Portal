@@ -93,7 +93,6 @@ export class UpNextDemo {
   resume(id: string) { this.paused = this.paused.filter(x => x !== id); }
   give(id: string) { this.pinned = id; }
   undo() { this.pinned = null; }
-  clear() { this.skipped = []; this.pinned = null; }
   saveLeave(id: string, from: string, to: string, reason: LeaveReason, note: string) { this.leave[id] = { from, to, reason, note }; if (this.pinned === id) this.pinned = null; }
   endLeave(id: string) { delete this.leave[id]; }
 }

@@ -90,6 +90,10 @@ const deal = async () => {
   const want = queue(r).slice(0, 6), got = []
   for (let i = 0; i < 6; i++) got.push(await deal())
   check(got, want, 'really dealing six leads gives the six the screen said')
+  // Everybody the real dealer gives a lead to is listed In today's turn, and nobody it would skip.
+  const r2 = await read('hod')
+  check(r2.queue.every(x => r2.people.find(p => p.staff === x.staff)?.why === null), true, 'whoever is dealt is in turn')
+  check(r2.people.filter(p => p.why === null).every(p => r2.queue.some(x => x.staff === p.staff)), true, 'whoever is in turn is dealt within ten leads')
 }
 // Skip: this one lead to the next person; they keep their place after.
 {
@@ -123,13 +127,11 @@ const deal = async () => {
   check(await deal(), 'amy', 'the real lead goes to the pin')
   check((await read('hod')).queue[0].how !== 'pinned', true, 'only once')
 }
-// Changing the ad drops the viewer's own, not somebody else's.
+// Undo clears the pin, whoever set it may.
 {
   await as('hod'); await q(`select crm_up_next_give($1, $2)`, [ad, S('bob')])
-  await as('boss'); await q(`select crm_up_next_clear($1)`, [ad])
-  check((await read('hod')).queue[0].how, 'pinned', "somebody else's pin stays")
-  await as('hod'); await q(`select crm_up_next_clear($1)`, [ad])
-  check((await read('hod')).queue[0].how !== 'pinned', true, 'their own goes')
+  await as('hod'); await q(`select crm_up_next_undo($1)`, [ad])
+  check((await read('hod')).queue[0].how !== 'pinned', true, 'Undo clears it')
 }
 // Leave to the half hour: out while NOW is inside; a later one is upcoming and still dealt.
 {
@@ -154,7 +156,7 @@ const deal = async () => {
   const old = (await q(`select to_char(from_at at time zone 'Asia/Kuala_Lumpur', 'HH24:MI') a, to_char(to_at at time zone 'Asia/Kuala_Lumpur', 'HH24:MI') b from crm_staff_leave where note = 'old'`))[0]
   check([old.a, old.b], ['00:00', '23:59'], 'days alone are whole days')
 }
-// Who may: a leader their own line; a salesperson nothing.
+// Who may: a leader reads their own line and changes nothing; a salesperson nothing.
 {
   await as('rs') ; await db.exec(`set test.uid = '${id('u', 'ann')}'`)
   await assert.rejects(q(`select crm_up_next($1)`, [ad]), /./); checks++
@@ -163,12 +165,12 @@ const deal = async () => {
   check(r.queue.every(x => [S('tla'), S('ann'), S('amy')].includes(x.staff)), true, 'a leader reads only their line')
   check(r.queue.length > 0, true, 'and reads it')
   check(r.people.every(p => [S('tla'), S('ann'), S('amy')].includes(p.staff)), true, 'in the lists too')
+  // A leader only looks: every write asks CRM · Manage, as every assignment write.
   await as('tla')
-  await assert.rejects(q(`select crm_up_next_pause($1, true)`, [S('bob')]), /./); checks++
-  await q(`select crm_up_next_give($1, $2)`, [ad, S('amy')])
-  check((await q(`select team_only from crm_deal_overrides where kind = 'pin' and used_at is null and cleared_at is null`))[0].team_only, true, "a leader's pin stays inside their team")
-  check(await (async () => { const seq = queue(await read('tla')); return seq[0] })(), 'amy', 'first of their line')
-  await as('tla'); await q(`select crm_up_next_undo($1)`, [ad])
+  for (const [sql, args] of [['select crm_up_next_pause($1, true)', [S('ann')]], ['select crm_up_next_give($1, $2)', [ad, S('amy')]], ['select crm_up_next_skip($1, $2)', [ad, S('amy')]],
+    ['select crm_up_next_undo($1)', [ad]], ["select crm_up_next_save_leave(null, $1, now(), now() + interval '1 hour', 'Sick', '')", [S('amy')]]]) {
+    await assert.rejects(q(sql, args), /./); checks++
+  }
   await noOne()
   const v = (await read('boss', ad, S('tlb')))
   check(v.queue.every(x => [S('tlb'), S('bob')].includes(x.staff)), true, "View as reads that person's line")
@@ -177,7 +179,7 @@ const deal = async () => {
 {
   const rows = await q(`select actor, data, at from crm_events where kind = 'up_next' order by id`)
   const acts = new Set(rows.map(r => r.data.action))
-  for (const a of ['skip', 'pause', 'resume', 'give', 'undo', 'clear', 'leave_added', 'leave_changed']) check(acts.has(a), true, `${a} is recorded`)
+  for (const a of ['skip', 'pause', 'resume', 'give', 'undo', 'leave_added', 'leave_changed']) check(acts.has(a), true, `${a} is recorded`)
   check(rows.every(r => r.at && 'before' in r.data && 'after' in r.data), true, 'with when, before and after')
   check(rows.find(r => r.data.action === 'pause').actor, S('hod'), 'and who')
 }

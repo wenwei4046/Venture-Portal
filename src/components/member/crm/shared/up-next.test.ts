@@ -77,11 +77,6 @@ describe("Up next's behaviour on the demo (the same shapes as crm_up_next)", () 
     x.undo();
     expect(x.read("all").queue[0].how).not.toBe("pinned");
   });
-  it("changing the ad clears the pin and the skips", () => {
-    const x = new UpNextDemo();
-    x.give("kumar"); x.skip("chea"); x.clear();
-    expect(x.read("all").queue[0].staff).toBe("chea");
-  });
 });
 
 describe("the leave form", () => {

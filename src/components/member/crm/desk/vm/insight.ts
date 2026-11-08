@@ -25,7 +25,7 @@ import { upNextAdsOf, upNextBookOf, upNextOpen } from "../../shared/up-next-data
 /** Up next's props on the desktop. View as (no viewAs on the ctx): that person's line, read-only. */
 function deskUpNextProps(ctx: DeskCtx) {
   const own = !!ctx.viewAs;
-  return { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: own ? null : ctx.me.id, canAct: own && (ctx.data.can.manage || ctx.data.can.editOwn) };
+  return { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: own ? null : ctx.me.id, canAct: own && ctx.data.can.manage };
 }
 
 /** Insight for one brand (the owner, 2026-10-29: "Insight 要可以筛选 DC / The Conts"): its customers, their visits and journey. */

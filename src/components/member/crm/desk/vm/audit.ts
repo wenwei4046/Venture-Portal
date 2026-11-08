@@ -64,7 +64,6 @@ const UP_ACTIONS: Record<string, (b: UpRow, a: UpRow, leave: (l: UpRow) => strin
   resume: () => ["Up next · resumed", "Paused → In turn"],
   give: (b, a, _l, p) => ["Up next · next lead given", `${p(b)} → ${p(a)}`],
   undo: (b, a, _l, p) => ["Up next · pin undone", `${p(b)} → ${p(a)}`],
-  clear: b => ["Up next · ad changed", `${String(b?.waiting ?? 0)} waiting pins and skips cleared`],
   leave_added: (b, a, l) => ["Leave added", `${l(b)} → ${l(a)}`],
   leave_changed: (b, a, l) => ["Leave changed", `${l(b)} → ${l(a)}`],
   leave_removed: (b, a, l) => ["Leave removed", `${l(b)} → ${l(a)}`],

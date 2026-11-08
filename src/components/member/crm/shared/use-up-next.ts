@@ -59,12 +59,9 @@ export function useUpNext(o: { live: boolean; book: UpNextBook; ads: UpNextAd[];
 
   const acts: UpNextActs = {
     set,
-    pickAd: id => {
-      const was = ui.ad;
-      set({ ad: id, adOpen: false, pick: false, sheet: null });
-      if (id === was) return;
-      if (demo.current) demo.current.clear(); else void write("crm_up_next_clear", { p_ad: was });
-    },
+    // The dropdown only changes what is looked at (the owner, 2026-11-08: the rules are Assignment's; Up next shows who is
+    // next). A pin or skip set stays until a lead uses it or Undo.
+    pickAd: id => set({ ad: id, adOpen: false, pick: false, sheet: null }),
     skip: async id => {
       if (demo.current) demo.current.skip(id); else if (!(await write("crm_up_next_skip", { p_ad: ui.ad, p_staff: id }))) return;
       set(shut);

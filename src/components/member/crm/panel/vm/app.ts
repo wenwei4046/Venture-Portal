@@ -114,7 +114,7 @@ export function panelAppVM(ctx: PanelCtx) {
     houseOv: !!bl.showBell && show.ov,
     // Insight's head (v3 T01): the avatar left, the greeting, the house right, then Team performance | Ads performance.
     th: insightHead(ctx, !!bl.showBell, ovAds, ovUp),
-    upNext: ovUp ? { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: ctx.viewingAs ? ctx.me.id : null, canAct: !ctx.viewingAs && (ctx.data.can.manage || ctx.data.can.editOwn) } : null,
+    upNext: ovUp ? { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: ctx.viewingAs ? ctx.me.id : null, canAct: !ctx.viewingAs && ctx.data.can.manage } : null,
     // v3 T06 · Profile as the prototype draws it (the owner, 2026-10-23: "我的profile 應該長這樣才對").
     pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,
     // Ads performance on the phone, as the desktop's, simpler (shared/phone-ads-perf.tsx; the owner, 2026-10-24).
