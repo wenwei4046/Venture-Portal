@@ -14,6 +14,8 @@ export interface UpNextRead {
   now: string;
   manage: boolean;
   fullTimeDay: boolean;
+  /** Every ad counted together with one split (Assignment › Save and apply to all › Count together). */
+  together?: boolean;
   queue: { staff: string; team: string; how: string | null; pinBy: string | null; ad: string }[];
   people: { staff: string; team: string; why: UpNextWhy; pickable: boolean; leave: UpNextLeave | null }[];
   /** Team key → % of this ad (All ads: each ad's added together). */
@@ -68,7 +70,8 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
   const single = ui.ad !== "all", adWord = single ? "this ad's leads" : "ad leads";
   const nameOf = (id: string) => book.nameOf(id);
   const teamKeyOf = (id: string) => r.people.find(p => p.staff === id)?.team ?? r.queue.find(q => q.staff === id)?.team ?? "";
-  const pct = (key: string) => `${Math.round(r.shares[key] ?? 0)}%`;
+  const pctOf = (n: number) => `${Math.round(n * 100) / 100}%`;
+  const pct = (key: string) => pctOf(r.shares[key] ?? 0);
   const turn = r.people.filter(p => !p.why);
   const seen: Record<string, number> = {};
   const out = r.queue.map(q => { const pinned = q.how === "pinned"; const p = pinned ? 0 : (seen[q.team] = (seen[q.team] ?? -1) + 1); return { ...q, pinned, p }; });
@@ -115,8 +118,10 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
   const pickList = [...turn.map((p, j) => ({ id: p.staff, team: p.team, head: j === 0 ? "In today's turn" : "" })), ...others.map((p, j) => ({ id: p.staff, team: p.team, head: j === 0 ? "Outside this ad" : "" }))]
     .map(({ id, team, head }) => ({ id, head, name: nameOf(id), team: book.teamOf(team).name, dot: book.teamOf(team).dot, give: () => a.give(id) }));
   const shares = Object.entries(r.shares).filter(([, n]) => n > 0).sort(([x], [y]) => (x === DIRECTOR_KEY ? -1 : y === DIRECTOR_KEY ? 1 : 0) || book.teamOf(x).name.localeCompare(book.teamOf(y).name));
-  const splitLine = !single ? "Each ad keeps its own split from Assignment. This view adds them together."
-    : shares.length ? `Split for this ad: ${shares.map(([k, n]) => `${book.teamOf(k).name} ${Math.round(n)}%`).join(" · ")} · set in Assignment`
+  const splitText = shares.map(([k, n]) => `${book.teamOf(k).name} ${pctOf(n)}`).join(" · ");
+  // All ads counted together (the boss's Save and apply to all) are one pool with one split; say that, not the prototype's "adds them together".
+  const splitLine = !single ? (r.together && shares.length ? `All ads counted together: ${splitText} · set in Assignment` : "Each ad keeps its own split from Assignment. This view adds them together.")
+    : shares.length ? `Split for this ad: ${splitText} · set in Assignment`
     : "No split for this ad · set in Assignment";
   const last = r.last ? { name: nameOf(r.last.staff), meta: [book.teamOf(teamKeyOf(r.last.staff)).name, agoWords(r.last.at, r.now), single ? "" : book.adName(r.last.ad)].filter(Boolean).join(" · "), when: agoWords(r.last.at, r.now) } : { name: "—", meta: "", when: "" };
   const upcoming = r.upcoming.map(l => {

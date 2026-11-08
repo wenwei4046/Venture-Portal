@@ -33,6 +33,11 @@ describe("Up next's words (README › Screens)", () => {
     expect(d.upcoming[0]).toMatchObject({ name: "CHEA HUAN", day: "9 Nov", label: "Annual leave", range: "9 Nov 09:00 – 10 Nov 13:00", short: "Annual · to 10 Nov" });
     expect(d.pickList[0].head).toBe("In today's turn");
   });
+  it("says All ads are one pool when every ad is counted together, to the half percent", () => {
+    const x = new UpNextDemo(), r = { ...x.read("all"), together: true, shares: { stanley: 40, alvin: 22.5, anthony: 37.5 } };
+    const d = upNextFrame(r, demoBook, DEMO_ADS, ui(), acts, true);
+    expect(d.splitLine).toBe("All ads counted together: Team Alvin 22.5% · Team Anthony 37.5% · Team Stanley 40% · set in Assignment");
+  });
   it("swaps the team line for the reason on hover", () => {
     expect(frame(new UpNextDemo(), { why: true }).firstLine).toBe("Team Stanley · 40% · last lead 1 d ago");
   });

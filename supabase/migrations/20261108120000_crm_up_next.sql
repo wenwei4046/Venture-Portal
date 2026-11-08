@@ -483,6 +483,9 @@ begin
 
   return jsonb_build_object('me', v_me, 'now', to_char(v_at at time zone 'Asia/Kuala_Lumpur', 'YYYY-MM-DD"T"HH24:MI'),
     'manage', crm_manages(), 'fullTimeDay', exists (select 1 from crm_fulltime_teams(v_at)),
+    -- Every ad counted is in the together group with one split (Save and apply to all › Count together): one pool.
+    'together', coalesce(array_length(v_ads, 1), 0) > 1 and not exists (select 1 from unnest(v_ads) x left join crm_ad_assign a on a.ad_source_id = x where a.together is not true)
+      and (select count(distinct a.team_split) from crm_ad_assign a where a.ad_source_id = any (v_ads)) = 1,
     'queue', v_queue, 'people', v_people, 'shares', v_shares, 'last', v_last, 'lastBy', v_lastby, 'upcoming', v_up);
 end $$;
 
