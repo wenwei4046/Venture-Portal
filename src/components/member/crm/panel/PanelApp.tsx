@@ -8,6 +8,8 @@ import { Fragment } from "react";
 import H from "../crm.module.css";
 import { PickEditor } from "../shared/pick-editor";
 import { PhoneUpNext } from "../shared/PhoneUpNext";
+import { PhoneTeamActivity } from "../shared/PhoneTeamActivity";
+import { PhoneCalendar, PhonePeople } from "../shared/PhoneLeaveCal";
 import { InfoValue } from "../shared/AdLink";
 import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
@@ -633,6 +635,8 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
       </>)}
     </>)}
     {!!(v.show.up && v.upNext) && (<PhoneUpNext head={<Phone4aTeamHead h={v.th} />} {...v.upNext!} />)}
+    {!!(v.show.act && v.activity) && (<PhoneTeamActivity a={v.activity!} />)}
+    {!!(v.show.lc && v.leaveCal) && (<PhoneCalendar input={v.leaveCal!} />)}
     {!!(v.show.ad) && (<>
       {!!(v.ad.onAds) && (<>
         <Phone4aAdsPerf p={v.adp} head={v.ad.inIns ? (<Phone4aTeamHead h={v.th} />) : (<h1 style={{ flex: "none", margin: "0", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(28.26px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.02em" }}>Ads Performance</h1>)} />
@@ -878,7 +882,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </div>
             </section>
           </>)}
-          {!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onFt) && (<>
+          {!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onPeople && v.leaveCal) && (<PhonePeople input={v.leaveCal!} />)}{!!(v.asx.onFt) && (<>
             <section style={{ flex: "none", position: "relative", padding: "16px 16px 16px 20px", borderRadius: "20px", background: "var(--crm-tint-follow)", border: "1px solid var(--crm-tint-follow)", display: "flex", flexDirection: "column", gap: "12px", overflow: "hidden" }}>
               <span style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: "5px", background: "var(--crm-brown)" }}>
               </span>

@@ -6,6 +6,8 @@
  */
 import { headVM } from "./head";
 import { upNextAdsOf, upNextBookOf, upNextOpen } from "../../shared/up-next-data";
+import { leaveCalData } from "../../shared/leave-cal-data";
+import { peopleBook } from "../../shared/people-book";
 import { bellVM } from "./bell";
 import { overviewVM } from "./overview";
 import { inboxVM } from "./inbox";
@@ -58,6 +60,8 @@ function profile6(ctx: PanelCtx, house: boolean) {
       { label: "Showrooms", icon: "map-pin" as const, open: () => patch({ roomsOpen: true }), n: n(data.rooms.filter(r => r.active).length), badge: false },
       { label: "Cold lead templates", icon: "message-square-text" as const, open: () => { patch({ tplOpen: true }); void ctx.act.refreshTemplates(); }, n: n((data.templates ?? []).length), badge: false },
       { label: "Ads Performance", icon: "arrow-up-right" as const, open: () => patch({ tab: "ads", lead: null }), n: "", badge: false },
+      // Assignment left the bottom bar for Activity (docs/design_handoff_crm, 2026-11-08): it is Profile › Manage's.
+      { label: "Assignment", icon: "users" as const, open: () => patch({ tab: "assign", lead: null }), n: "", badge: false },
       // IR Quote's settings (the handoff: "CRM → Profile → below Ads performance → Quotation settings").
       ...(ctx.openQuoteSettings ? [{ label: "Quotation settings", icon: "file-text" as const, open: ctx.openQuoteSettings, n: "", badge: false }] : []),
     ] : [] }],
@@ -81,7 +85,7 @@ export function panelAppVM(ctx: PanelCtx) {
   // v3 T01: Insight's Ads performance side is the Ads Performance page under Insight's head (CRM · Manage, as that page).
   const ovAds = tab === "overview" && !lead && ui.ovAds && ctx.data.can.manage;
   const ovUp = tab === "overview" && !lead && !!ui.ovUp && !ovAds && upNextOpen(ctx.data, ctx.me.id);
-  const show = { up: ovUp, ov: tab === "overview" && !lead && !ovAds && !ovUp, ib: tab === "inbox" && !lead, ld: lead, ad: tab === "ads" || ovAds, as: tab === "assign" && !lead, cal: tab === "calendar" && !lead, pf: tab === "profile" };
+  const show = { up: ovUp, ov: tab === "overview" && !lead && !ovAds && !ovUp, ib: tab === "inbox" && !lead, ld: lead, ad: tab === "ads" || ovAds, as: tab === "assign" && !lead, cal: false, lc: tab === "calendar" && !lead, act: tab === "activity" && !lead, pf: tab === "profile" };
   const ld = show.ld ? leadVM(ctx) : off<ReturnType<typeof leadVM>>();
   const cf = customerForm({
     form: ui.pForm, data: ctx.data, saveDetails: ctx.act.saveDetails,
@@ -114,6 +118,12 @@ export function panelAppVM(ctx: PanelCtx) {
     houseOv: !!bl.showBell && show.ov,
     // Insight's head (v3 T01): the avatar left, the greeting, the house right, then Team performance | Ads performance.
     th: insightHead(ctx, !!bl.showBell, ovAds, ovUp),
+    // Calendar (appointments + leave) and Assignment › People, and Team activity (docs/design_handoff_crm): the desktop's
+    // view models, drawn as the prototypes' phone frames (shared/PhoneLeaveCal.tsx, shared/PhoneTeamActivity.tsx).
+    leaveCal: show.lc || (show.as && ui.asSec === "People") ? leaveCalData({ data: ctx.data, me: ctx.me, now, act: ctx.act, teams: ctx.teams, directors: ctx.directors, readOnly: !!ctx.viewingAs }) : null,
+    activity: show.act ? { data: ctx.data, book: peopleBook(ctx.data, ctx.teams, ctx.directors), live: ctx.live, who: null, nameOf: ctx.nameOf,
+      roleOf: (id: string) => { const p = ctx.data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },
+      openChat: (id: string) => set(u => ({ ...u, tab: "inbox", lead: id })) } : null,
     upNext: ovUp ? { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: ctx.viewingAs ? ctx.me.id : null, canAct: !ctx.viewingAs } : null,
     // v3 T06 · Profile as the prototype draws it (the owner, 2026-10-23: "我的profile 應該長這樣才對").
     pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,
