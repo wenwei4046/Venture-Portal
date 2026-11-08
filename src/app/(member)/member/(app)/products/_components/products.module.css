@@ -1201,7 +1201,6 @@
 /* ── GWP (2026-11-08): the two pickers side by side, the SKUs as chips ── */
 .gwpEditor { display: flex; flex-direction: column; gap: 12px; }
 .gwpSides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
-.gwpQty { align-self: flex-start; }
 .gwpPickCount {
   min-width: 22px;
   height: 22px;
@@ -1247,6 +1246,41 @@
 .gwpChipX:disabled { cursor: default; opacity: .45; background: transparent; }
 .gwpChipNote { font-size: 11px; font-weight: 500; color: var(--rv-brown); }
 .gwpRowActions { display: inline-flex; gap: 14px; align-items: center; }
+/* A gift's quantity a unit bought (2026-11-08 — the user: "加 1、加 2、加 3"): ×N on its chip, a − / + on its match. */
+.gwpChipQty { font-weight: 700; color: var(--rv-accent); font-variant-numeric: tabular-nums; }
+.gwpStepper {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--rv-line-strong);
+  background: var(--rv-white);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.gwpStep {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--rv-accent);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 28px;
+}
+.gwpStep:hover:not(:disabled), .gwpStep:focus-visible { background: var(--rv-sand); outline: none; }
+.gwpStep:disabled { cursor: default; color: var(--rv-faint); }
+.gwpStepCount {
+  min-width: 26px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--rv-ink);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.gwpStepCount[data-zero] { color: var(--rv-faint); font-weight: 600; }
 
 /* ── a phone (2026-10-08) ──
    The prototype draws the desktop only. The page itself folds on its own; a
