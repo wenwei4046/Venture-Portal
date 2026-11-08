@@ -194,6 +194,8 @@ export function Desk4aTop({ f4, left }: { f4: Frame4a; left: number }) {
 /** A page's head: its title, underline tabs, a muted line, CRM alerts and the page's one primary button. */
 export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
   const h = f4.head;
+  // Calendar and Team activity draw their prototypes' own title rows (docs/design_handoff_crm, 2026-11-08).
+  if (f4.ownHead) return f4.addCust ? <DeskAddCustomer v={f4.addCust} /> : null;
   return (<>
     {f4.addCust && <DeskAddCustomer v={f4.addCust} />}
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "22px", padding: "26px 36px 22px", minWidth: 0 }}>
@@ -268,7 +270,7 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
     {/* v2 frames 01 / 01b: a second row of tabs under the title (Insight's Team performance | Ads performance). */}
     {h.subTabs && h.subTabs.length > 0 && (
       <div style={{ flex: "none", display: "flex", alignItems: h.subSlot ? "center" : undefined, gap: "26px", padding: "0 36px", marginTop: "-10px", borderBottom: "1px solid var(--crm-rule)", font: "500 13px Inter, sans-serif" }}>
-        {h.subTabs.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: h.subSlot ? "10px 0" : "8px 0 10px", whiteSpace: "nowrap", font: "inherit", marginBottom: "-1px",
+        {h.subTabs.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: h.subPad ?? (h.subSlot ? "10px 0" : "8px 0 10px"), whiteSpace: "nowrap", font: "inherit", marginBottom: "-1px",
           borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>)}
         {h.subSlot && <div data-up-next-slot="" style={{ display: "contents" }} />}
       </div>

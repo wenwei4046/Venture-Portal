@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600&display=swap" rel="stylesheet"><style>body{margin:0;background:#f0eee9;font-family:Inter, sans-serif}a{color:#BD4A19}a:hover{color:#963A14}</style></helmet>
+<div style="padding:40px 44px;display:flex;gap:64px;align-items:flex-start">
+<div style="width:1440px;flex:none;height:900px;position:relative;overflow:hidden;background:#fff;font-family:Inter, sans-serif;color:#422315;-webkit-font-smoothing:antialiased;border-radius:8px;border:1px solid rgba(0,0,0,.08)">
+  <aside style="position:absolute;left:0;top:0;bottom:0;width:68px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:2px;padding:22px 12px 18px;background:#422315">
+    <div style="width:30px;height:30px;border-radius:7px;display:grid;place-items:center;font:600 14px 'Inter Tight', Inter, sans-serif;background:#EE5E08;color:#fff;margin-bottom:20px">H</div>
+    <sc-for list="{{ revNav }}" as="n" hint-placeholder-count="7"><span style="width:44px;height:38px;border-radius:7px;display:grid;place-items:center;background:{{ n.bg }};color:{{ n.fg }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg></span></sc-for>
+    <span style="margin-top:auto;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font:500 12px 'Inter Tight', Inter, sans-serif;background:#FFF8F1;color:#422315">PR</span>
+  </aside>
+  <aside style="position:absolute;left:68px;top:0;bottom:0;width:237px;box-sizing:border-box;display:flex;flex-direction:column;gap:1px;padding:24px 12px 18px;background:#FBF4EC;border-right:1px solid #F0E2D4">
+    <div style="padding:0 10px 18px;font:500 22px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.01em">CRM</div>
+    <sc-for list="{{ crmNav }}" as="g" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:1px"><sc-if value="{{ g.head }}"><div style="padding:20px 10px 6px;font:500 10px Inter, sans-serif;letter-spacing:0.14em;color:#A8968B">{{ g.head }}</div></sc-if><sc-for list="{{ g.items }}" as="i"><div style="display:flex;align-items:center;gap:11px;height:36px;padding:0 10px;border-radius:7px;position:relative;font-size:14px;font-weight:{{ i.w }};background:{{ i.bg }};color:{{ i.fg }}"><span style="position:absolute;left:-12px;top:9px;bottom:9px;width:2px;background:{{ i.bar }}"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ i.d }}"></path></svg><span>{{ i.label }}</span></div></sc-for></div></sc-for>
+  </aside>
+  <header style="position:absolute;left:305px;right:0;top:0;height:56px;box-sizing:border-box;display:flex;align-items:center;padding:0 36px;border-bottom:1px solid #EEE8E3"><div style="font-size:14px;color:#7A6255">Good evening, <span style="font-weight:500;color:#422315">Principal</span></div><div style="margin-left:auto;font-size:13px;color:#7A6255">Fri, 6 Nov 2026</div></header>
+  <div style="position:absolute;left:305px;top:56px;right:0;bottom:0;display:flex;flex-direction:column;font-size:14px">
+    <div style="flex:none;display:flex;align-items:center;gap:16px;padding:26px 36px 18px">
+      <span style="flex:none;white-space:nowrap;font:500 30px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.025em">Team activity</span>
+      <span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:6px;font-size:12.5px;color:#7A6255"><span style="width:7px;height:7px;border-radius:50%;background:#2F8A57;box-shadow:0 0 0 3px rgba(47,138,87,.18)"></span>{{ clock }}</span>
+      <div style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:8px"><div style="display:flex;align-items:center;gap:10px">
+        <div style="position:relative">
+          <span onClick="{{ toggleMenu }}" style="height:36px;min-width:200px;box-sizing:border-box;padding:0 10px 0 12px;border-radius:7px;border:1px solid #E2D8D0;display:flex;align-items:center;gap:8px;font:500 13px Inter, sans-serif;white-space:nowrap;cursor:pointer;background:#fff"><sc-if value="{{ selDot }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ selDot }}"></span></sc-if><span>{{ selLabel }}</span><span style="font-size:12px;font-weight:400;color:#A8968B">{{ selRole }}</span><svg style="margin-left:auto;color:#A8968B" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+          <sc-if value="{{ menuOpen }}"><div onClick="{{ closeMenu }}" style="position:fixed;inset:0;z-index:20"></div><div style="position:absolute;top:42px;right:0;z-index:21;width:280px;max-height:520px;overflow:auto;box-sizing:border-box;padding:6px;border-radius:10px;background:#fff;box-shadow:0 14px 36px rgba(42,22,12,.18)">
+            <sc-for list="{{ menu }}" as="m" hint-placeholder-count="12"><div onClick="{{ m.go }}" style="height:{{ m.h }};display:flex;align-items:center;gap:8px;padding:0 10px 0 {{ m.pl }};border-radius:7px;cursor:pointer;font-size:13px;font-weight:{{ m.w }};background:{{ m.bg }};border-top:1px solid {{ m.bt }}" style-hover="background:#F7F3EF"><sc-if value="{{ m.dot }}"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ m.dot }}"></span></sc-if><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span><span style="font-size:11.5px;font-weight:400;color:#A8968B;white-space:nowrap">{{ m.role }}</span></div></sc-for>
+          </div></sc-if>
+        </div>
+        <div style="display:flex;padding:3px;border-radius:9px;background:#F7F3EF"><sc-for list="{{ periods }}" as="p" hint-placeholder-count="4"><span onClick="{{ p.go }}" style="height:30px;padding:0 12px;border-radius:7px;display:flex;align-items:center;font:500 12.5px Inter, sans-serif;white-space:nowrap;background:{{ p.bg }};color:{{ p.fg }};box-shadow:{{ p.sh }};cursor:pointer">{{ p.label }}</span></sc-for></div>
+        </div><sc-if value="{{ isCustom }}"><div style="display:flex;align-items:center;gap:6px"><input type="date" value="{{ cFrom }}" onChange="{{ setFrom }}" style="height:36px;padding:0 8px;box-sizing:border-box;border-radius:7px;border:1px solid #E2D8D0;font:500 12.5px Inter, sans-serif;color:#422315"><span style="color:#A8968B">–</span><input type="date" value="{{ cTo }}" onChange="{{ setTo }}" style="height:36px;padding:0 8px;box-sizing:border-box;border-radius:7px;border:1px solid #E2D8D0;font:500 12.5px Inter, sans-serif;color:#422315"></div></sc-if>
+      </div>
+    </div>
+    <div style="flex:1;min-height:0;overflow:auto;padding:0 36px 32px;display:flex;flex-direction:column;gap:24px">
+      <div style="flex:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:20px 0;border-radius:12px;background:#F5F0EA">
+        <sc-for list="{{ tiles }}" as="t" hint-placeholder-count="6"><div style="display:flex;flex-direction:column;gap:8px;padding:0 20px;border-left:1px solid {{ t.bl }}"><span style="font:500 12px Inter, sans-serif;color:#7A6255">{{ t.k }}</span><span style="font:500 32px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.03em;line-height:1;color:{{ t.c }}">{{ t.v }}</span></div></sc-for>
+      </div>
+      <div style="flex:none;display:flex;flex-direction:column">
+        <div style="display:grid;grid-template-columns:{{ cols }};column-gap:12px;align-items:center;height:38px;border-bottom:1px solid #EEE8E3;position:sticky;top:0;background:#fff;z-index:1"><sc-for list="{{ heads }}" as="c" hint-placeholder-count="9"><span onClick="{{ c.sort }}" style="display:flex;align-items:center;gap:4px;justify-content:{{ c.just }};font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:{{ c.fg }};cursor:pointer;white-space:nowrap">{{ c.label }}<span style="font-size:10px">{{ c.arrow }}</span></span></sc-for></div>
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4"><div style="display:flex;flex-direction:column">
+          
+          <sc-for list="{{ g.rows }}" as="r"><div style="display:flex;flex-direction:column;border-top:1px solid #F0EAE4">
+            <div onClick="{{ r.toggle }}" style="display:grid;grid-template-columns:{{ cols }};column-gap:12px;align-items:center;height:48px;font-variant-numeric:tabular-nums;cursor:pointer;background:{{ r.bg }}" style-hover="background:#FBF7F3">
+              <span style="display:flex;align-items:center;gap:10px;min-width:0;opacity:{{ r.op }}"><svg style="flex:none;color:#A8968B;transform:rotate({{ r.rot }});transition:transform .15s" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg><span style="width:8px;height:8px;border-radius:50%;flex:none;background:{{ r.tdot }}"></span><span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.nameFg }}">{{ r.name }}</span><sc-if value="{{ r.off }}"><span style="font-size:11.5px;color:#A8968B;white-space:nowrap">{{ r.turn }}</span></sc-if></span></span>
+              <span style="text-align:right;font-weight:600">{{ r.leads }}</span>
+              <span style="text-align:right;color:{{ r.avgFg }}">{{ r.avg }}</span>
+              <span style="justify-self:end"><sc-if value="{{ r.waitOn }}"><span style="color:{{ r.waitFg }};font-weight:600;white-space:nowrap">{{ r.wait }}</span></sc-if><sc-if value="{{ r.waitOff }}"><span style="color:#C4B5AB">—</span></sc-if></span>
+              <span style="text-align:right">{{ r.appt }}</span>
+              <span style="text-align:right">{{ r.show }}</span>
+            </div>
+            <sc-if value="{{ r.open }}"><div style="display:flex;flex-direction:column;padding:0 0 10px">
+              <sc-for list="{{ r.list }}" as="l"><div onClick="{{ l.go }}" style="display:grid;grid-template-columns:{{ cols }};column-gap:12px;align-items:center;height:34px;font-size:12.5px;color:#8A7466;font-variant-numeric:tabular-nums;cursor:pointer;background:{{ l.bg }}" style-hover="background:#FBF7F3"><span style="display:flex;align-items:center;gap:12px;min-width:0;padding-left:24px"><span style="flex:none;width:36px;font:600 12px 'Inter Tight', Inter, sans-serif">{{ l.got }}</span><span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#422315">{{ l.name }}</span></span><span style="grid-column:span 1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:{{ l.sFg }}">{{ l.status }}</span><span style="text-align:right">{{ l.repT }}</span><span style="text-align:right;font-weight:600;white-space:nowrap;color:{{ l.rc }}">{{ l.waitT }}</span><span></span><span></span></div></sc-for>
+              <sc-if value="{{ r.none }}"><div style="height:42px;display:flex;align-items:center;font-size:12.5px;color:#A8968B">No leads in this period</div></sc-if>
+            </div></sc-if>
+          </div></sc-for>
+        </div></sc-for>
+      </div>
+    </div>
+  </div>
+  <sc-if value="{{ dOpen }}"><div onClick="{{ dClose }}" style="position:absolute;inset:56px 0 0 305px;background:rgba(42,22,12,.12);z-index:30"></div><div style="position:absolute;top:56px;right:0;bottom:0;width:400px;z-index:31;background:#fff;box-shadow:-16px 0 40px rgba(42,22,12,.16);display:flex;flex-direction:column">
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:22px 22px 18px;border-bottom:1px solid #EEE8E3">
+      <div style="flex:1;display:flex;flex-direction:column;gap:4px;min-width:0"><span style="font:500 20px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.02em">{{ d.name }}</span><span style="font-size:12.5px;color:#7A6255">{{ d.ad }}</span></div>
+      <span onClick="{{ dClose }}" style="width:30px;height:30px;border-radius:7px;display:grid;place-items:center;color:#7A6255;cursor:pointer" style-hover="background:#F7F3EF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:16px 22px;border-bottom:1px solid #EEE8E3"><sc-for list="{{ d.facts }}" as="f" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:11.5px;color:#A8968B">{{ f.k }}</span><span style="font:500 16px 'Inter Tight', Inter, sans-serif;color:{{ f.c }};white-space:nowrap">{{ f.v }}</span></div></sc-for></div>
+    <div style="flex:1;overflow:auto;padding:12px 22px">
+      <sc-for list="{{ d.events }}" as="e" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:44px 12px minmax(0,1fr);column-gap:10px"><span style="padding-top:10px;text-align:right;font:600 12px 'Inter Tight', Inter, sans-serif;color:#7A6255">{{ e.t }}</span><div style="display:flex;flex-direction:column;align-items:center"><span style="width:1px;height:14px;background:{{ e.top }}"></span><span style="width:9px;height:9px;border-radius:50%;flex:none;background:{{ e.dot }}"></span><span style="flex:1;width:1px;background:{{ e.bot }}"></span></div><div style="display:flex;flex-direction:column;gap:2px;padding:8px 0 14px;font-size:13px"><span style="font-weight:600;color:{{ e.c }}">{{ e.title }}</span><sc-if value="{{ e.sub }}"><span style="font-size:12px;color:#A8968B">{{ e.sub }}</span></sc-if></div></div></sc-for>
+    </div>
+    <div style="padding:16px 22px;border-top:1px solid #EEE8E3"><span style="height:42px;border-radius:8px;display:grid;place-items:center;background:#BD4A19;color:#fff;font:500 14px Inter, sans-serif;cursor:pointer" style-hover="background:#A33F14">Open chat</span></div>
+  </div></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;flex:none">
+<div style="width:390px;height:844px;position:relative;overflow:hidden;background:#fff;border-radius:44px;outline:10px solid #1d1410;font-family:Inter, sans-serif;color:#422315;-webkit-font-smoothing:antialiased;font-size:14px">
+  <div style="height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 30px;font:600 15px Inter, sans-serif"><span>9:41</span><span style="width:24px;height:11px;border-radius:3px;border:1.5px solid #422315"></span></div>
+  <div style="position:absolute;top:46px;left:0;right:0;bottom:64px;overflow:auto;display:flex;flex-direction:column;gap:14px;padding:6px 20px 24px">
+    <div style="display:flex;align-items:center;gap:10px"><span style="font:500 26px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.025em">Team activity</span><span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#7A6255"><span style="width:7px;height:7px;border-radius:50%;background:#2F8A57"></span>{{ clock }}</span></div>
+    <div style="flex:none;display:flex;gap:8px">
+      <span onClick="{{ pOpenMenu }}" style="flex:1;min-width:0;height:40px;box-sizing:border-box;padding:0 12px;border-radius:20px;background:#F7F3EF;display:flex;align-items:center;gap:7px;font:500 13.5px Inter, sans-serif;cursor:pointer"><sc-if value="{{ selDot }}"><span style="width:8px;height:8px;border-radius:50%;flex:none;background:{{ selDot }}"></span></sc-if><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ selLabel }}</span><svg style="margin-left:auto;flex:none;color:#7A6255" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+      <span style="position:relative;flex:none;height:40px;border-radius:20px;background:#F7F3EF;display:flex;align-items:center"><select value="{{ perVal }}" onChange="{{ setPer }}" style="appearance:none;-webkit-appearance:none;height:40px;padding:0 32px 0 14px;border:0;background:transparent;font:500 13.5px Inter, sans-serif;color:#422315;cursor:pointer;outline:none"><option value="Today">Today</option><option value="Week">Week</option><option value="Month">Month</option><option value="Custom">Custom</option></select><svg style="position:absolute;right:12px;pointer-events:none;color:#7A6255" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+    </div>
+    <sc-if value="{{ isCustom }}"><div style="flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center"><input type="date" value="{{ cFrom }}" onChange="{{ setFrom }}" style="height:44px;min-width:0;padding:0 10px;box-sizing:border-box;border-radius:10px;border:1px solid #E2D8D0;font:500 13px Inter, sans-serif;color:#422315;background:#fff"><span style="color:#A8968B">–</span><input type="date" value="{{ cTo }}" onChange="{{ setTo }}" style="height:44px;min-width:0;padding:0 10px;box-sizing:border-box;border-radius:10px;border:1px solid #E2D8D0;font:500 13px Inter, sans-serif;color:#422315;background:#fff"></div></sc-if>
+    <div style="flex:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:4px 0 6px"><sc-for list="{{ pTiles }}" as="t" hint-placeholder-count="5"><div style="display:flex;flex-direction:column;gap:5px;min-width:0"><span style="font:500 22px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.02em;line-height:1;color:{{ t.c }}">{{ t.v }}</span><span style="font-size:11px;color:#7A6255;white-space:nowrap">{{ t.k }}</span></div></sc-for></div>
+    <div style="flex:none;display:flex;flex-direction:column">
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 36px 44px 56px 36px 38px;column-gap:5px;height:28px;align-items:center;border-bottom:1px solid #EEE8E3;font:500 10.5px Inter, sans-serif;letter-spacing:0.04em;text-transform:uppercase;color:#A8968B"><span></span><span style="text-align:right">Leads</span><span style="text-align:right">Avg</span><span style="text-align:right">Wait</span><span style="text-align:right">Appt</span><span style="text-align:right">Came</span></div>
+      <sc-for list="{{ pRows }}" as="r" hint-placeholder-count="8"><div style="display:flex;flex-direction:column;border-bottom:1px solid #F0EAE4">
+        <div onClick="{{ r.toggle }}" style="display:grid;grid-template-columns:minmax(0,1fr) 36px 44px 56px 36px 38px;column-gap:5px;align-items:center;min-height:50px;font-size:13.5px;font-variant-numeric:tabular-nums;cursor:pointer;color:{{ r.rowFg }}">
+          <span style="display:flex;align-items:center;gap:8px;min-width:0"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ r.tdot }};opacity:{{ r.op }}"></span><span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span><sc-if value="{{ r.off }}"><span style="font-size:11px;color:#A8968B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.turn }}</span></sc-if></span></span>
+          <span style="text-align:right;font-weight:600">{{ r.leads }}</span>
+          <span style="text-align:right">{{ r.avg }}</span>
+          <span style="text-align:right;font-weight:600;white-space:nowrap;color:{{ r.waitFg }}">{{ r.waitTxt }}</span>
+          <span style="text-align:right">{{ r.appt }}</span>
+          <span style="text-align:right">{{ r.show }}</span>
+        </div>
+        <sc-if value="{{ r.open }}"><div style="display:flex;flex-direction:column;padding:0 0 10px 18px">
+          <sc-for list="{{ r.list }}" as="l"><div onClick="{{ l.go }}" style="display:grid;grid-template-columns:42px minmax(0,1fr) auto;column-gap:10px;align-items:center;min-height:44px;padding:0 8px;margin:0 -8px;border-radius:10px;cursor:pointer;background:{{ l.bg }}"><span style="font:600 12px 'Inter Tight', Inter, sans-serif;color:#8A7466">{{ l.got }}</span><span style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.name }}</span><span style="font-size:12.5px;font-weight:600;white-space:nowrap;color:{{ l.rc }}">{{ l.reply }}</span></div></sc-for>
+          <sc-if value="{{ r.none }}"><div style="min-height:40px;display:flex;align-items:center;font-size:12.5px;color:#A8968B">No leads</div></sc-if>
+        </div></sc-if>
+      </div></sc-for>
+    </div>
+  </div>
+  <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;box-sizing:border-box;padding-bottom:8px;border-top:1px solid #EEE8E3;background:#fff;display:grid;grid-template-columns:repeat(5,1fr)"><sc-for list="{{ pNav }}" as="n" hint-placeholder-count="5"><span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10.5px;font-weight:{{ n.w }};color:{{ n.fg }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg>{{ n.l }}</span></sc-for></nav>
+  <sc-if value="{{ pMenuOpen }}"><div onClick="{{ pCloseMenu }}" style="position:absolute;inset:0;background:rgba(42,22,12,.32);z-index:10"></div><div style="position:absolute;left:0;right:0;bottom:0;z-index:11;max-height:640px;overflow:auto;box-sizing:border-box;padding:10px 12px 28px;border-radius:26px 26px 0 0;background:#fff">
+    <div style="width:36px;height:4px;border-radius:2px;background:#E2D8D0;margin:0 auto 10px"></div>
+    <sc-for list="{{ menu }}" as="m" hint-placeholder-count="12"><div onClick="{{ m.go }}" style="min-height:{{ m.ph }};display:flex;align-items:center;gap:9px;padding:0 12px 0 {{ m.pl }};border-radius:10px;cursor:pointer;font-size:14px;font-weight:{{ m.w }};background:{{ m.bg }};border-top:1px solid {{ m.bt }}"><sc-if value="{{ m.dot }}"><span style="width:8px;height:8px;border-radius:50%;flex:none;background:{{ m.dot }}"></span></sc-if><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.label }}</span><span style="font-size:12px;font-weight:400;color:#A8968B;white-space:nowrap">{{ m.role }}</span></div></sc-for>
+  </div></sc-if>
+  <sc-if value="{{ pd.open }}"><div onClick="{{ pd.close }}" style="position:absolute;inset:0;background:rgba(42,22,12,.32);z-index:10"></div><div style="position:absolute;left:0;right:0;bottom:0;z-index:11;max-height:700px;display:flex;flex-direction:column;border-radius:26px 26px 0 0;background:#fff">
+    <div style="width:36px;height:4px;border-radius:2px;background:#E2D8D0;margin:10px auto 0"></div>
+    <div style="display:flex;flex-direction:column;gap:3px;padding:12px 22px 14px"><span style="font:500 22px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.02em">{{ pd.name }}</span><span style="font-size:13px;color:#7A6255">{{ pd.ad }}</span></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0 22px 14px;border-bottom:1px solid #EEE8E3"><sc-for list="{{ pd.facts }}" as="f" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:3px;min-width:0"><span style="font-size:11px;color:#A8968B">{{ f.k }}</span><span style="font:500 15px 'Inter Tight', Inter, sans-serif;color:{{ f.c }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.v }}</span></div></sc-for></div>
+    <div style="flex:1;overflow:auto;padding:10px 22px"><sc-for list="{{ pd.events }}" as="e" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:42px 12px minmax(0,1fr);column-gap:10px"><span style="padding-top:10px;text-align:right;font:600 12px 'Inter Tight', Inter, sans-serif;color:#7A6255">{{ e.t }}</span><div style="display:flex;flex-direction:column;align-items:center"><span style="width:1px;height:14px;background:{{ e.top }}"></span><span style="width:9px;height:9px;border-radius:50%;flex:none;background:{{ e.dot }}"></span><span style="flex:1;width:1px;background:{{ e.bot }}"></span></div><div style="display:flex;flex-direction:column;gap:2px;padding:8px 0 14px;font-size:13.5px"><span style="font-weight:600;color:{{ e.c }}">{{ e.title }}</span><sc-if value="{{ e.sub }}"><span style="font-size:12px;color:#A8968B">{{ e.sub }}</span></sc-if></div></div></sc-for></div>
+    <div style="padding:12px 22px 30px"><span style="height:48px;border-radius:12px;display:grid;place-items:center;background:#BD4A19;color:#fff;font:500 15px Inter, sans-serif;cursor:pointer">Open chat</span></div>
+  </div></sc-if>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const D = {
+  cal: 'M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM3 10h18', trend: 'M22 7l-8.5 8.5-5-5L2 17M16 7h6v6',
+  file: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7ZM14 2v4a2 2 0 0 0 2 2h4', flag: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7',
+  msg: 'M7.9 20A9 9 0 1 0 4 16.1L2 22Z', user: 'M17 8a5 5 0 1 1-10 0 5 5 0 0 1 10 0ZM20 21a8 8 0 0 0-16 0', bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
+  inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
+  contact: 'M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z', arrow: 'M7 7h10v10M7 17 17 7',
+  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  sliders: 'M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4',
+};
+const TEAMS = [
+  { id: 'dir', name: 'Revenue Director', short: 'Director', dot: '#422315', members: ['peter'] },
+  { id: 'stanley', name: 'Team Stanley', short: 'Stanley', dot: '#EE5E08', members: ['stanley', 'chea', 'tjy'] },
+  { id: 'alvin', name: 'Team Alvin', short: 'Alvin', dot: '#FFA91F', members: ['alvin', 'mei', 'jason', 'hector'] },
+  { id: 'anthony', name: 'Team Anthony', short: 'Anthony', dot: '#8A1F0A', members: ['anthony', 'kumar'] },
+];
+// turn: ['in', k] | ['off', reason]; leads: [got, customer, ad, replyMin|null(waiting since got), status, appt?, show?]
+const P = {
+  peter: { name: 'PETER', turn: ['in', 5], leads: [['08:50', 'Azman', 'Lead form', null, 'New'], ['09:40', 'Hafiz', 'Lead form', 5, 'Follow up'], ['15:10', 'Grace T.', 'EV Test Drive', 18, 'Appointment', 1, 0]] },
+  stanley: { name: 'STANLEY', turn: ['in', 4], leads: [['10:30', 'Daniel K.', 'Raya Promo', 6, 'Appointment', 1, 1], ['13:55', 'Suresh', 'Raya Promo', 9, 'Follow up'], ['11:20', 'Wendy L.', 'Trade-in Week', null, 'New']] },
+  chea: { name: 'CHEA HUAN', turn: ['in', 1], leads: [['10:02', 'Lee Wei Ming', 'Raya Promo → ALVIN', 7, 'Handed away'], ['11:18', 'Nur Aisyah', 'EV Test Drive', 4, 'Appointment', 1, 1], ['12:40', 'Tan Kok Wai', 'Raya Promo', 12, 'Follow up'], ['14:05', 'Priya R.', 'Trade-in Week', 9, 'Appointment', 1, 0], ['15:22', 'Ong Mei Xin', 'Raya Promo', 15, 'New'], ['17:34', 'Jason Lim', 'EV Test Drive', null, 'New']] },
+  tjy: { name: 'TAN JIN YANG', turn: ['off', 'Not Full time'], leads: [] },
+  alvin: { name: 'ALVIN', turn: ['in', 2], leads: [['09:52', 'Kelvin Ng', 'EV Test Drive', 6, 'Follow up'], ['13:10', 'Farah Z.', 'Raya Promo', 13, 'Follow up'], ['14:30', 'Lee Wei Ming', 'from CHEA HUAN', 11, 'Appointment', 1, 0], ['16:48', 'Sam Wong', 'Trade-in Week', 8, 'New']] },
+  mei: { name: 'MEI LING', turn: ['in', 6], leads: [['11:45', 'Aaron C.', 'Raya Promo', 34, 'Follow up'], ['14:40', 'Lim S.', 'EV Test Drive', null, 'New']] },
+  jason: { name: 'JASON', turn: ['off', 'Sick leave'], leads: [] },
+  hector: { name: 'HECTOR', turn: ['off', 'No CRM login'], leads: [] },
+  anthony: { name: 'ANTHONY', turn: ['off', 'Not Full time'], leads: [['10:15', 'Rachel O.', 'Trade-in Week', 21, 'Appointment', 1, 1]] },
+  kumar: { name: 'KUMAR', turn: ['in', 3], leads: [['12:05', 'Vincent', 'Trade-in Week', 10, 'Follow up'], ['15:40', 'Mira', 'Raya Promo', 7, 'Appointment', 1, 0]] },
+};
+const toMin = t => { const [a, b] = t.split(':').map(Number); return a * 60 + b; };
+const fmt = m => m == null ? '—' : m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+// CRM rule: customer waiting 3 h Reply soon · 6 h Urgent · 9 h Overdue (crm_settings reply_soon_h / reply_urgent_h / reply_overdue_h)
+const LV = m => m >= 540 ? ['Overdue', '#8A1F0A'] : m >= 360 ? ['Urgent', '#BD4A19'] : m >= 180 ? ['Reply soon', '#B26B00'] : ['', '#422315'];
+const ST = { 'Handed away': ['#C4B5AB', '#A8968B'], Appointment: ['#2F8A57', '#2F5A3C'], 'Follow up': ['#FFA91F', '#7A4A00'], New: ['#BD4A19', '#8A1F0A'] };
+const ROLE = { peter: 'Revenue Director', stanley: 'Team Leader', alvin: 'Team Leader', anthony: 'Team Leader' };
+const COLS = '240px repeat(5,minmax(0,1fr))';
+const hm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+
+class Component extends DCLogic {
+  state = { now: 18 * 60 + 2, team: 'all', who: null, menu: false, per: 'Today', from: '2026-11-01', to: '2026-11-06', open: { chea: true }, lead: null, sort: null, pOpen: {}, pLead: null, pMenu: false };
+  componentDidMount() { this._iv = setInterval(() => this.setState(s => ({ now: s.now + 1 })), 60000); }
+  componentWillUnmount() { clearInterval(this._iv); }
+  stat(id) {
+    const now = this.state.now, ls = P[id].leads, rep = ls.filter(l => l[3] != null), w = ls.filter(l => l[3] == null).map(l => now - toMin(l[0]));
+    return { leads: ls.length, avg: rep.length ? Math.round(rep.reduce((a, l) => a + l[3], 0) / rep.length) : null,
+      waitN: w.length, waitMax: w.length ? Math.max(...w) : 0, appt: ls.filter(l => l[5]).length, show: ls.filter(l => l[6]).length };
+  }
+  groups(openKey, leadKey) {
+    const st = this.state, sortKey = st.sort ? st.sort.k : null, dir = st.sort ? st.sort.d : 1, sel = st[leadKey];
+    return TEAMS.filter(t => st.team === 'all' || t.id === st.team).map(t => {
+      let rows = t.members.filter(id => !st.who || id === st.who).map(id => ({ id, s: this.stat(id) }));
+      if (sortKey) rows.sort((a, b) => ((a.s[sortKey] ?? -1) - (b.s[sortKey] ?? -1)) * dir);
+      return { name: t.name, dot: t.dot, rows: rows.map(({ id, s }) => {
+        const p = P[id], on = p.turn[0] === 'in', open = !!st[openKey][id] || st.who === id, wl = LV(s.waitMax);
+        return { rowFg: on || s.leads ? '#422315' : '#B5A498', waitTxt: s.waitN ? (s.waitMax >= 60 ? `${Math.floor(s.waitMax / 60)}h${String(s.waitMax % 60).padStart(2, '0')}` : `${s.waitMax}m`) : '—', line: !on && !s.leads ? p.turn[1] : [`${s.leads} leads`, s.avg != null && `${fmt(s.avg)} avg`, s.appt && `${s.appt} appt`, s.show && `${s.show} came`, !on && p.turn[1]].filter(Boolean).join(' · '), tdot: t.dot, name: p.name, nameFg: on ? '#422315' : '#A8968B', turn: p.turn[1], off: !on, op: on || s.leads ? 1 : 0.55,
+          leads: s.leads, avg: fmt(s.avg), avgFg: LV(s.avg || 0)[1],
+          waitOn: s.waitN > 0, waitOff: s.waitN === 0, wait: fmt(s.waitMax), waitFg: wl[1], waitLv: wl[0],
+          appt: s.appt, show: s.show, open, rot: open ? '90deg' : '0deg', bg: 'transparent', none: !p.leads.length,
+          toggle: () => this.setState(x => ({ [openKey]: { ...x[openKey], [id]: !x[openKey][id] } })),
+          list: p.leads.slice().reverse().map(l => { const w = l[3] == null ? st.now - toMin(l[0]) : null, S = ST[l[4]], key = id + ':' + l[0];
+            return { repT: w == null ? fmt(l[3]) : '', waitT: w != null ? fmt(w) : '', got: l[0], name: l[1], ad: l[2], reply: w != null ? `waiting ${fmt(w)}` : `${fmt(l[3])} reply`, rc: w != null ? (LV(w)[0] ? LV(w)[1] : '#7A4A00') : '#422315',
+              lv: w != null ? LV(w)[0] : '', lvFg: w != null ? LV(w)[1] : '',
+              go: () => this.setState({ [leadKey]: { id, l } }), bg: sel && sel.id + ':' + sel.l[0] === key ? '#F7F3EF' : 'transparent',
+              status: w != null ? '' : l[4], sDot: w != null ? 'transparent' : S[0], sFg: S[1] }; }) };
+      }) };
+    });
+  }
+  drawer(lead, close) {
+    if (!lead) return { open: false, close, name: '', ad: '', facts: [], events: [] };
+    const st = this.state, { id, l } = lead, [got, name, ad, rep, status, appt, show] = l, g = toMin(got);
+    const who = P[id].name, hand = status === 'Handed away', from = ad.startsWith('from ') ? ad.slice(5) : null;
+    const ev = [{ t: got, title: from ? `Moved to ${who}` : `Got by ${who}`, sub: from ? `from ${from} · by Principal` : (ad.split(' → ')[0] + ' · auto'), dot: '#422315' }];
+    if (rep == null) { const w = st.now - g, lv = LV(w); ev.push({ t: hm(st.now), title: `No reply · ${fmt(w)}`, sub: lv[0] || 'still waiting', dot: lv[0] ? lv[1] : '#FFA91F', c: lv[0] ? lv[1] : '#422315' }); }
+    else ev.push({ t: hm(g + rep), title: `First reply · ${fmt(rep)}`, sub: who, dot: '#2F8A57' });
+    if (hand) { const to = ad.split(' → ')[1]; ev.push({ t: '14:30', title: `Moved to ${to}`, sub: 'by Principal', dot: '#422315' }); ev.push({ t: '14:41', title: 'First reply · 11m', sub: to, dot: '#2F8A57' }); }
+    if (appt) ev.push({ t: hm(g + (rep || 0) + 40), title: 'Appointment booked', sub: 'Sat 11:00', dot: '#2F8A57' });
+    if (show) ev.push({ t: hm(g + (rep || 0) + 160), title: 'Showed up', sub: '', dot: '#2F8A57' });
+    const w = rep == null ? st.now - g : null;
+    return { open: true, close, name, ad: from ? `from ${from}` : ad.split(' → ')[0],
+      facts: [{ k: 'Got', v: got, c: '#422315' }, { k: 'First reply', v: w != null ? `waiting ${fmt(w)}` : fmt(rep), c: w != null && LV(w)[0] ? LV(w)[1] : '#422315' }, { k: 'Now with', v: hand ? ad.split(' → ')[1] : who, c: '#422315' }],
+      events: ev.map((e, i) => ({ c: '#422315', ...e, top: i ? '#EEE8E3' : 'transparent', bot: i < ev.length - 1 ? '#EEE8E3' : 'transparent' })) };
+  }
+  renderVals() {
+    const st = this.state;
+    const ids = TEAMS.filter(t => st.team === 'all' || t.id === st.team).flatMap(t => t.members).filter(id => !st.who || id === st.who);
+    const all = ids.map(id => this.stat(id)), sum = k => all.reduce((a, s) => a + s[k], 0);
+    const repAll = ids.flatMap(id => P[id].leads.filter(l => l[3] != null).map(l => l[3]));
+    const waitAll = sum('waitN'), lateAll = all.some(s => LV(s.waitMax)[0]);
+    const sortKey = st.sort ? st.sort.k : null, dir = st.sort ? st.sort.d : 1;
+    const H = [['', null, 'flex-start'], ['Leads', 'leads'], ['Avg reply', 'avg'], ['Waiting', 'waitMax'], ['Appt', 'appt'], ['Show-up', 'show']];
+    const nav = (d, on) => ({ d, bg: on ? '#BD4A19' : 'transparent', fg: on ? '#fff' : '#CDB7A8' });
+    const ci = (l, d, on) => ({ label: l, d, w: on ? 500 : 400, bg: on ? '#EFE6DD' : 'transparent', fg: on ? '#422315' : '#5A4034', bar: on ? '#EE5E08' : 'transparent' });
+    const seg = (on) => ({ bg: on ? '#fff' : 'transparent', fg: on ? '#422315' : '#7A6255', sh: on ? '0 1px 2px rgba(42,22,12,.12)' : 'none' });
+    const pick = (team, who) => () => this.setState({ team, who, menu: false, pMenu: false });
+    const T = TEAMS.find(t => t.id === st.team);
+    const sel = st.who ? { label: P[st.who].name, role: ROLE[st.who] || 'Sales', dot: TEAMS.find(t => t.members.includes(st.who)).dot } : T ? { label: T.name, role: '', dot: T.dot } : { label: 'Everyone', role: '', dot: '' };
+    const row = (o) => ({ h: '34px', ph: '44px', pl: '10px', w: 400, bt: 'transparent', role: '', dot: '', ...o });
+    const menu = [row({ label: 'Everyone', w: 500, bg: !T && !st.who ? '#F7F3EF' : 'transparent', go: pick('all', null) })];
+    TEAMS.forEach(t => {
+      menu.push(row({ label: t.name, dot: t.dot, w: 600, bt: '#F0EAE4', h: '38px', ph: '48px', bg: st.team === t.id && !st.who ? '#F7F3EF' : 'transparent', go: pick(t.id, null) }));
+      t.members.forEach(id => menu.push(row({ label: P[id].name, role: ROLE[id] || 'Sales', pl: '25px', bg: st.who === id ? '#F7F3EF' : 'transparent', go: pick('all', id) })));
+    });
+    const tiles = [['Leads', sum('leads')], ['Avg reply', fmt(repAll.length ? Math.round(repAll.reduce((a, b) => a + b, 0) / repAll.length) : null)], ['Waiting', waitAll], ['Appt', sum('appt')], ['Show-up', sum('show')]]
+      .map(([k, v], i) => ({ k, v, bl: i ? '#EBD6C3' : 'transparent', c: k === 'Waiting' && lateAll ? '#BD4A19' : '#422315' }));
+    const pGroups = this.groups('pOpen', 'pLead');
+    return {
+      revNav: [nav(D.cal), nav(D.trend), nav(D.file), nav(D.flag), nav(D.msg, true), nav(D.user), nav(D.bell)],
+      crmNav: [{ head: '', items: [ci('Insight', D.trend), ci('Inbox', D.inbox), ci('Contacts', D.contact), ci('Calendar', D.cal), ci('Team activity', D.users, true)] }, { head: 'MARKETING', items: [ci('Ads Performance', D.arrow), ci('Assignment', D.users)] }, { head: 'MANAGEMENT', items: [ci('Settings', D.sliders)] }],
+      clock: hm(st.now),
+      selLabel: sel.label, selRole: sel.role, selDot: sel.dot, menu, menuOpen: st.menu, toggleMenu: () => this.setState(s => ({ menu: !s.menu })), closeMenu: () => this.setState({ menu: false }),
+      pMenuOpen: st.pMenu, pOpenMenu: () => this.setState({ pMenu: true }), pCloseMenu: () => this.setState({ pMenu: false }),
+      periods: ['Today', 'Week', 'Month', 'Custom'].map(l => ({ label: l, ...seg(st.per === l), go: () => this.setState({ per: l }) })),
+      isCustom: st.per === 'Custom', cFrom: st.from, cTo: st.to, setFrom: e => { const v = e.target.value; this.setState(s => ({ from: v, to: s.to < v ? v : s.to })); }, setTo: e => this.setState({ to: e.target.value }),
+      tiles, cols: COLS, pTiles: tiles.map(t => ({ ...t, k: ({ 'Avg reply': 'Avg reply', 'Show-up': 'Came' })[t.k] || t.k })),
+      pHeads: ['Leads', 'Replied', 'Avg', 'Wait', 'Appt', 'Came'], pShadow: '6px 0 8px -6px rgba(42,22,12,.14)',
+      perVal: st.per, setPer: e => this.setState({ per: e.target.value }),
+      heads: H.map(([label, k, just]) => { const on = k && sortKey === k; return { label, just: just || 'flex-end', fg: on ? '#422315' : '#A8968B', arrow: on ? (dir > 0 ? '↑' : '↓') : '',
+        sort: () => k && this.setState(s => ({ sort: s.sort && s.sort.k === k ? (s.sort.d < 0 ? null : { k, d: -1 }) : { k, d: 1 } })) }; }),
+      groups: this.groups('open', 'lead'),
+      pRows: pGroups.flatMap(g => g.rows),
+      dOpen: !!st.lead, dClose: () => this.setState({ lead: null }), d: this.drawer(st.lead, () => this.setState({ lead: null })),
+      pd: this.drawer(st.pLead, () => this.setState({ pLead: null })),
+      pNav: [['Insight', D.trend], ['Inbox', D.inbox], ['Activity', D.users, true], ['Calendar', D.cal], ['More', 'M4 6h16M4 12h16M4 18h16']].map(([l, d, on]) => ({ l, d, fg: on ? '#BD4A19' : '#A8968B', w: on ? 600 : 500 })),
+    };
+  }
+}
+</script>
+</body>
+</html>

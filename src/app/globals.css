@@ -470,6 +470,21 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-series-6: #9A6B55;
   --crm-series-7: #DCC6B8;
   --crm-series-tint-1: #F3EBE5;
+  /* docs/design_handoff_crm (2026-11-08): Team activity, Calendar's leave layer, Assignment › People. */
+  --crm-rule-2: #F0EAE4;
+  --crm-list-sub: #8A7466;
+  --crm-disabled: #C4B5AB;
+  --crm-green: #2F8A57;
+  --crm-green-dark: #2F5A3C;
+  --crm-green-ring: rgba(47, 138, 87, .18);
+  --crm-warn: #B26B00;
+  --crm-full-time: #F3ECE5;
+  --crm-out-month: #FBF8F5;
+  --crm-leave-annual: #FFE9C2;
+  --crm-leave-annual-text: #7A4A00;
+  --crm-leave-training: #E6DDF3;
+  --crm-leave-training-text: #4B2E7A;
+  --crm-leave-other: #E4ECE6;
   --crm-series-tint-2: #FDE3D2;
   --crm-series-tint-3: #F1E3DA;
   --crm-series-tint-4: #FFF0D1;

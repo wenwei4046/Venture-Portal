@@ -23,7 +23,7 @@ export interface RailChart {
 
 export function railVM(ctx: DeskCtx, pp: People, calAn: Analysis, cal?: Cal) {
   const { ui, patch } = ctx;
-  const page = ui.tab === "people" ? "people" : ui.tab === "calendar" ? "calendar" : null;
+  const page = ui.tab === "people" ? "people" : null;
   const people = page === "people", open = !!page && ui.rail;
   const chart: RailChart | null = !page ? null : people
     ? { title: pp.ppChartTitle, sum: pp.ppChartSum, empty: !pp.ppPieHas, bys: pp.ppBys.map(o => ({ label: o.label, on: o.on, pick: o.pick })), pie: pp.ppPie,
@@ -38,7 +38,8 @@ export function railVM(ctx: DeskCtx, pp: People, calAn: Analysis, cal?: Cal) {
       open, toggle: () => patch({ rail: !ui.rail }),
       title: people ? "Contacts insights" : "Visits insights",
       chart, side: people ? pp.ppSide : null,
-      stats: page === "calendar" && cal ? { figures: cal.calStats, by: cal.calBarBy, bars: cal.calTeamBars } : null,
+      // Calendar has no rail since docs/design_handoff_crm (the owner: the prototype exactly); Contacts never had figures here.
+      stats: null as { figures: Cal["calStats"]; by: Cal["calBarBy"]; bars: Cal["calTeamBars"] } | null,
     },
   };
 }

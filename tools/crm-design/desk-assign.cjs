@@ -60,7 +60,7 @@ module.exports = [
     "Inbox's Customer info column links the ad too (the owner, 2026-10-16: 電腦版尚未有 ad link)."],
   // Active members (2026-10-22, the owner: a member not active for now is off Assignment's lists, their share to the others;
   // its own section after Ads to teams, saved at once through crm_set_locked; vm/settings.ts). Ads to teams says who is locked.
-  ['{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}', '{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}{!!(v.isLbaOp) && (<DeskLeadsByAd v={v.leadsByAd} />)}',
+  ['{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}', '{!!(v.isHistOp) && (<DeskHistory v={v.history} />)}{!!(v.isActOp) && (<DeskActive v={v.actVM} />)}{!!(v.addAd?.open) && (<DeskAddAd v={v.addAd} />)}{!!(v.isLbaOp) && (<DeskLeadsByAd v={v.leadsByAd} />)}{!!(v.isPeopleOp) && (<DeskLeaveCalPage mode="people" input={v.leaveCal} title="Assignment" bare />)}',
     "Assignment › Active members: each person Active or Locked (crm_set_locked); Ads to teams' + picker (DeskAddAd, crm_add_ad)."],
   // A locked person stays in Ads to teams' list, grey with a lock instead of the box (the owner, 2026-10-22: "不要消失在
   // assignment list 里面，而是改成小锁头，灰色，不能 edit"; vm/assign.ts appends them with `locked`).

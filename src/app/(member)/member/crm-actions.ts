@@ -65,6 +65,8 @@ const CRM_WRITES = [
   "crm_save_leave", "crm_delete_leave",
   // Insight › Up next (mig 20261108120000): Skip, Pause, Give to…, leave with a time and a reason. CRM · Manage, as every assignment write.
   "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_save_leave", "crm_up_next_end_leave", "crm_set_up_next",
+  // Assignment › People (mig 20261109100000): a person's Full time days — CRM · Manage, or a ticked leader on their own line (crm_up_next_may).
+  "crm_set_person_days",
   // v2 frame 08: put another form in use (mig 20261024160000), CRM · Manage.
   "crm_set_active_form",
   // v2 frames 02 / 03: a customer added by hand (mig 20261024180000), CRM · Edit (own).
@@ -97,6 +99,26 @@ export async function fetchUpNext(a: { ad: string; ads: string[] | null; line: s
     return { ok: true, read: data as import("@/components/member/crm/shared/up-next").UpNextRead };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message.slice(0, 250) : "Could not read who is next." };
+  }
+}
+
+/**
+ * Team activity (docs/design_handoff_crm, 2026-11-08): every time a customer was given to somebody since `fromIso` — who,
+ * when, by whom (null = the dealer on arrival) and from whom. Each one is a "lead got" on the page; the next one for the
+ * same customer ends it (Handed away). The journey trigger writes them (kind `assigned`); the row policy decides whose.
+ * Paged: a month can pass 1,000.
+ */
+export async function fetchCrmAssignedSince(fromIso: string): Promise<{ ok: true; rows: { contact_id: string; actor: string | null; data: { to?: string | null; from?: string | null } | null; at: string }[] } | { ok: false; error: string }> {
+  try {
+    const db = await session();
+    await requireCrm("view");
+    if (!/^\d{4}-\d{2}-\d{2}T/.test(fromIso)) throw new Error("Pick a date.");
+    const rows = await fetchAllRowsParallel<{ id: number; contact_id: string; actor: string | null; data: { to?: string | null; from?: string | null } | null; at: string }>((from, to, withCount) => db.from("crm_events")
+      .select("id, contact_id, actor, data, at", withCount ? { count: "exact" } : undefined).eq("kind", "assigned").gte("at", fromIso)
+      .order("at").order("id").range(from, to), "crm assigned events");
+    return { ok: true, rows: rows.map(({ id: _id, ...r }) => r) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message.slice(0, 250) : "Could not read Team activity." };
   }
 }
 
@@ -167,7 +189,7 @@ const EDIT_WRITES: ReadonlySet<string> = new Set([
   "crm_visit_outcome", "crm_save_details", "crm_invite", "crm_answer_invite", "crm_mark_reminded", "crm_set_key_photo",
   "crm_add_note", "crm_add_contact",
   // Insight › Up next: CRM · Manage, or a leader ticked for CRM · Up next on their own line — the database decides (crm_up_next_may).
-  "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_save_leave", "crm_up_next_end_leave",
+  "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_save_leave", "crm_up_next_end_leave", "crm_set_person_days",
 ]);
 const friendly = (error: unknown, fallback: string) => {
   const message = error instanceof Error ? error.message : fallback;
@@ -288,7 +310,7 @@ async function desktopRows(db: Db, journey: boolean) {
       .gte("start_at", new Date(Date.now() - 62 * 86_400_000).toISOString()).order("start_at").limit(2000)),
     // The partners' links with their codes, CRM · Manage only ([] for anybody else, and before the migration).
     // Members' leave (mig 20261029220000): what has not ended yet (yesterday on, for the office's day).
-    soft<NonNullable<CrmDataRows["leaves"]>>(db.from("crm_staff_leave").select("id, staff_id, starts_on, ends_on, note, from_at, to_at, reason").gte("ends_on", new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)).order("starts_on")),
+    soft<NonNullable<CrmDataRows["leaves"]>>(db.from("crm_staff_leave").select("id, staff_id, starts_on, ends_on, note, from_at, to_at, reason").gte("ends_on", new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10)).order("starts_on")),
     (async () => { try { const { data, error } = await db.rpc("crm_partner_links_read"); return error || !Array.isArray(data) ? [] : (data as { id: string; name: string; code: string; on: boolean }[]); } catch { return []; } })(),
     // A lead form ad's answers (mig 20261030060000), read softly so the CRM opens before the column.
     soft<{ id: string; lead_form: CrmDataRows["contacts"][number]["lead_form"] }[]>(db.from("crm_contacts").select("id, lead_form").not("lead_form", "is", null).limit(5000)),

@@ -9,7 +9,8 @@ import { notifsVM } from "../../panel/vm/notifs";
 import { urgencyOf } from "../../sales/vm/common";
 import type { DeskCtx, DeskTab, PaneKind, PaneMode } from "./ctx";
 import { first, initials } from "./data";
-import { ICON, LI, MANAGE_TABS, NAV, NAV_GROUPS, PANE_MODE, PANEL_TABS, PHONE_IC, SECTION_PICK, SHEET_COPY, SOLID, TINTS } from "./tokens";
+import { upNextOpen } from "../../shared/up-next-data";
+import { ICON, LEADER_TABS, LI, MANAGE_TABS, NAV, NAV_GROUPS, PANE_MODE, PANEL_TABS, PHONE_IC, SECTION_PICK, SHEET_COPY, SOLID, TINTS } from "./tokens";
 import { edgeDrag } from "./columns";
 import { alertsUnreadN } from "./inbox";
 import { jobTitle } from "../../shared/people";
@@ -32,9 +33,10 @@ export function lists(ctx: DeskCtx): Record<string, [string, string, string][]> 
       ["Ads to teams", `${adIds.length} ads · ` + (held ? `${held} ${held === 1 ? "lead" : "leads"} over the limit` : unset ? `${unset} on the default (evenly)` : "all set"), "megaphone"],
       // v2 (06b / 06c): no line under the tabs — the table card carries its own title and counts.
       ["Leads by ad", "", "users"],
-      ["Active members", "", "users"],
       ["Full time lead allocation", ftTeams ? `On for ${ftTeams} of ${ctx.teams.length} teams` : "Not set for any team", "users"],
-      ["Member work type", "Full time or part time for each member", "briefcase"],
+      // Assignment › People (docs/design_handoff_crm, 2026-11-08): Active members, Member work type and each person's
+      // Full time days, Pause and leave on one calendar.
+      ["People", "", "users"],
     ],
     // Settings = Cold lead templates and Notifications (v2). History is the sidebar's Audit log now.
     settings: [["General", "", "file"], ["Reply library", "", "file"], ["Booking link", "", "file"], ["Cold lead templates", "", "file"], ["Notifications", "", "bell"]],
@@ -91,7 +93,8 @@ export function frameVM(ctx: DeskCtx) {
   if (ibOn) dockW = crmW - ibListW - (infoShut ? 44 : ibInfoW) - (ibCpDock ? ibCpW : 44);
   const ibSpare = Math.max(0, dockW - 300);
   const manage = data.can.manage;
-  const tabList = PANEL_TABS.filter(([id]) => manage || !MANAGE_TABS.has(id));
+  const leads = upNextOpen(data, ctx.me.id);
+  const tabList = PANEL_TABS.filter(([id]) => LEADER_TABS.has(id) ? leads : manage || !MANAGE_TABS.has(id));
   // Entering Inbox always gives its columns their standard widths and shuts Chat progress (README › Navigation).
   const go = (id: DeskTab) => set(u => ({ ...u, tab: id, pane: PANE_MODE[id], toast: "", pick: null, stage: "op", // 4a: no right-hand menu — Assignment's sections are the head's tabs (frame 06)
     ...(id === "inbox" ? { ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null } : {}), adLog: false, mwtLog: false, meMenu: false,
@@ -132,7 +135,7 @@ export function frameVM(ctx: DeskCtx) {
   const fold = ui.fold;
   const mkSec = <T,>(id: string, items: T[]) => ({ num: "", label: "", scope: false, items, open: !fold[id], rot: fold[id] ? -90 : 0,
     toggle: () => set(u => ({ ...u, fold: { ...u.fold, [id]: !u.fold[id] } })) });
-  const crmItems = tabList.map(([id, label]) => ({ label, d: ICON[id], count: null as number | null, on: id === tab, off: id !== tab, pick: () => go(id) }));
+  const crmItems = tabList.map(([id, label]) => ({ label, d: ICON[id], count: null as number | null, on: id === tab || (id === "reports" && tab === "workspace"), off: !(id === tab || (id === "reports" && tab === "workspace")), pick: () => go(id) }));
   // The sidebar's groups (v2): the reading pages, MARKETING, MANAGEMENT — a page one may not open is left out, and so is a group with none.
   const crmGroups = NAV_GROUPS.map(([label, ids]) => ({ label: label || null, items: ids.map(id => crmItems[tabList.findIndex(t => t[0] === id)]).filter(Boolean) }))
     .filter(g => g.items.length).map((g, gi) => ({ ...g, pt: gi ? "14px" : "0" }));
@@ -215,14 +218,14 @@ export function frameVM(ctx: DeskCtx) {
     showKicker: tab !== "showrooms" && tab !== "forms", // The section pill ("All assignment ⌄") is gone (the owner, 2026-10-13): the right menu already switches sections.
     showOpChip: false,
     isAdsOp: opItem[0] === "Ads to teams", notAdsOp: opItem[0] !== "Ads to teams" && opItem[0] !== "Full time lead allocation",
-    isFtOp: opItem[0] === "Full time lead allocation", isMwtOp: opItem[0] === "Member work type", isActOp: opItem[0] === "Active members", isLbaOp: opItem[0] === "Leads by ad", isHistOp: false, isSrOp: opItem[0] === "Showrooms", isCltOp: opItem[0] === "Cold lead templates",
+    isFtOp: opItem[0] === "Full time lead allocation", isMwtOp: false, isActOp: false, isPeopleOp: tab === "assignment" && opItem[0] === "People", isLbaOp: opItem[0] === "Leads by ad", isHistOp: false, isSrOp: opItem[0] === "Showrooms", isCltOp: opItem[0] === "Cold lead templates",
     isCpOp: opItem[0] === "Chat progress", isFrmOp: opItem[0] === "Forms" && tab !== "forms", isNtfOp: tab === "settings" && opItem[0] === "Notifications", isGenOp: tab === "settings" && opItem[0] === "General", isLibOp: tab === "settings" && opItem[0] === "Reply library", isLinkOp: tab === "settings" && opItem[0] === "Booking link",
     // v2's page padding and title size: Ads to teams and Full time take the frame's whole width.
     // 4a: the pages' gutter under the head (frames 06–11): 16 px down, 36 px in.
-    pagePad: tab === "forms" ? "0" : opItem[0] === "Ads to teams" ? "16px 28px 20px 36px" : tab === "settings" && (opItem[0] === "General" || opItem[0] === "Reply library" || opItem[0] === "Booking link") ? "6px 36px 32px" : "16px 36px 32px",
+    pagePad: tab === "forms" || (tab === "assignment" && opItem[0] === "People") ? "0" : opItem[0] === "Ads to teams" ? "16px 28px 20px 36px" : tab === "settings" && (opItem[0] === "General" || opItem[0] === "Reply library" || opItem[0] === "Booking link") ? "6px 36px 32px" : "16px 36px 32px",
     h1Size: opItem[0] === "Full time lead allocation" || opItem[0] === "Ads to teams" ? "22px" : "34px",
     kAudit: tab === "auditlog", kPeople: tab === "people", kCh: tab === "channels", cfOn: tab === "forms",
-    plainOp: !["Ads to teams", "Leads by ad", "Active members", "Full time lead allocation", "Member work type", "Cold lead templates", "Showrooms", "Forms"].includes(opItem[0]) && !(tab === "settings" && (opItem[0] === "Notifications" || opItem[0] === "General" || opItem[0] === "Reply library" || opItem[0] === "Booking link")),
+    plainOp: !["Ads to teams", "Leads by ad", "People", "Active members", "Full time lead allocation", "Member work type", "Cold lead templates", "Showrooms", "Forms"].includes(opItem[0]) && !(tab === "settings" && (opItem[0] === "Notifications" || opItem[0] === "General" || opItem[0] === "Reply library" || opItem[0] === "Booking link")),
     opItem: opItem[0],
     showToast: !!ui.toast, toastText: ui.toast, canUndo: !!undo && undo.until > ctx.now.getTime(),
     // The Revenue app's own top bar (desk-patches.cjs).

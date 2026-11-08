@@ -6,6 +6,9 @@
 import { deskLabelsVM } from "./labels";
 import type { DeskCtx } from "./ctx";
 import { frameVM } from "./frame";
+import { leaveCalData } from "../../shared/leave-cal-data";
+import { peopleBook } from "../../shared/people-book";
+import { jobTitle } from "../../shared/people";
 import { frame4aVM, heads4a } from "./frame4a";
 import { clistVM, insightVM } from "./insight";
 import { alertsVM, assignVM, chatMenuVM, infoVM, inboxVM, moveHolder, teamPaneVM } from "./inbox";
@@ -78,6 +81,13 @@ export function deskVM(ctx: DeskCtx) {
     ...reportsVM(ctx),
     // Workspace (2026-10-27): one's own Weekly / Monthly reports (DeskWorkspace.tsx, vm/workspace-report.ts).
     kWorkspace: ui.tab === "workspace",
+    // Calendar and Assignment › People (docs/design_handoff_crm): one leave record, one Pause, one Lock (shared/leave-cal*).
+    leaveCal: leaveCalData({ data, me: ctx.me, now: ctx.now, act: ctx.act, teams: ctx.teams, directors: ctx.directors }),
+    kActivity: ui.tab === "activity",
+    // Team activity (docs/design_handoff_crm): its own page, on the people book Calendar and People read.
+    activity: { data, book: peopleBook(data, ctx.teams, ctx.directors), live: ctx.live, who: ui.actWho ?? null, nameOf: ctx.nameOf,
+      roleOf: (id: string) => { const p = data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },
+      openChat: (id: string) => patch({ tab: "inbox", pane: "docked", kind: "chat", chat: id, ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null }) },
     workspace: { customers: data.customers, visits: data.visits, adNames: data.adNames ?? {}, nameOf: ctx.nameOf, now: ctx.now, live: ctx.live,
       teams: ctx.teams.map(t => ({ id: t.id, name: t.name, people: t.people.map(p => p.id) })) },
     ...chatProgressVM(ctx, op),

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600&display=swap" rel="stylesheet"><style>body{margin:0;background:#f0eee9;font-family:system-ui,sans-serif}a{color:#BD4A19}a:hover{color:#963A14}</style></helmet>
+<div style="padding:40px 44px;display:flex;gap:64px;align-items:flex-start">
+<div style="flex:none;width:1440px;height:900px;position:relative;overflow:hidden;background:#fff;font-family:Inter, sans-serif;color:#422315;-webkit-font-smoothing:antialiased;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.08)">
+  <aside style="position:absolute;left:0;top:0;bottom:0;width:68px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:2px;padding:22px 12px 18px;background:#422315">
+    <div style="width:30px;height:30px;border-radius:7px;display:grid;place-items:center;font:600 14px 'Inter Tight', Inter, sans-serif;background:#EE5E08;color:#fff;margin-bottom:20px">H</div>
+    <sc-for list="{{ revNav }}" as="n" hint-placeholder-count="7"><span style="width:44px;height:38px;border-radius:7px;display:grid;place-items:center;background:{{ n.bg }};color:{{ n.fg }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg></span></sc-for>
+    <span style="margin-top:auto;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font:500 12px 'Inter Tight', Inter, sans-serif;background:#FFF8F1;color:#422315">PR</span>
+  </aside>
+  <aside style="position:absolute;left:68px;top:0;bottom:0;width:237px;box-sizing:border-box;display:flex;flex-direction:column;gap:1px;padding:24px 12px 18px;background:#FBF4EC;border-right:1px solid #F0E2D4">
+    <div style="padding:0 10px 18px;font:500 22px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.01em">CRM</div>
+    <sc-for list="{{ crmNav }}" as="g" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:1px"><sc-if value="{{ g.head }}"><div style="padding:20px 10px 6px;font:500 10px Inter, sans-serif;letter-spacing:0.14em;color:#A8968B">{{ g.head }}</div></sc-if><sc-for list="{{ g.items }}" as="i"><div style="display:flex;align-items:center;gap:11px;height:36px;padding:0 10px;border-radius:7px;position:relative;font-size:14px;font-weight:{{ i.w }};background:{{ i.bg }};color:{{ i.fg }}"><span style="position:absolute;left:-12px;top:9px;bottom:9px;width:2px;background:{{ i.bar }}"></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ i.d }}"></path></svg><span>{{ i.label }}</span></div></sc-for></div></sc-for>
+  </aside>
+  <header style="position:absolute;left:305px;right:0;top:0;height:56px;box-sizing:border-box;display:flex;align-items:center;padding:0 36px;border-bottom:1px solid #EEE8E3"><div style="font-size:14px;color:#7A6255">Good evening, <span style="font-weight:500;color:#422315">Principal</span></div><div style="margin-left:auto;font-size:13px;color:#7A6255">Fri, 6 Nov 2026</div></header>
+  <div style="position:absolute;left:305px;top:56px;right:0;bottom:0;display:flex;flex-direction:column;font-size:14px">
+    <div style="flex:none;display:flex;align-items:center;gap:16px;padding:26px 36px 4px"><span style="font:500 30px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.025em">Calendar</span>
+      <div style="margin-left:auto;display:flex;gap:8px"><sc-for list="{{ layers }}" as="y" hint-placeholder-count="2"><span onClick="{{ y.go }}" style="height:34px;padding:0 14px 0 10px;border-radius:17px;border:1px solid {{ y.bd }};background:{{ y.bg }};color:{{ y.fg }};display:flex;align-items:center;gap:8px;font:500 13px Inter, sans-serif;cursor:pointer"><span style="width:16px;height:16px;border-radius:5px;box-sizing:border-box;border:1.5px solid {{ y.boxBd }};background:{{ y.boxBg }};display:grid;place-items:center;color:#fff"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>{{ y.label }}<span style="font-size:12px;color:#A8968B">{{ y.n }}</span></span></sc-for></div></div>
+    <div style="flex:none;display:flex;align-items:center;gap:12px;padding:18px 36px 14px">
+      <div style="display:flex;padding:3px;border-radius:9px;background:#F7F3EF"><sc-for list="{{ views }}" as="v" hint-placeholder-count="2"><span onClick="{{ v.go }}" style="height:28px;padding:0 14px;border-radius:7px;display:flex;align-items:center;font:500 12.5px Inter, sans-serif;background:{{ v.bg }};color:{{ v.fg }};box-shadow:{{ v.sh }};cursor:pointer">{{ v.label }}</span></sc-for></div>
+      <span onClick="{{ prevWeek }}" style="width:34px;height:34px;border-radius:7px;border:1px solid #E2D8D0;display:grid;place-items:center;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg></span>
+      <span onClick="{{ nextWeek }}" style="width:34px;height:34px;border-radius:7px;border:1px solid #E2D8D0;display:grid;place-items:center;cursor:pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span>
+      <span style="font:500 18px 'Inter Tight', Inter, sans-serif;white-space:nowrap">{{ weekLabel }}</span>
+      <sc-if value="{{ notThisWeek }}"><span onClick="{{ thisWeek }}" style="font:500 12.5px Inter, sans-serif;color:#BD4A19;cursor:pointer">{{ todayLabel }}</span></sc-if>
+      <div style="margin-left:auto;min-width:0;overflow:hidden;white-space:nowrap;display:flex;align-items:center;gap:16px;font-size:12px;color:#7A6255"><sc-if value="{{ showAppt }}"><span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#2F8A57"></span>Appt</span></sc-if><sc-if value="{{ showLeave }}"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:#F3ECE5"></span>Full time</span></sc-if><sc-for list="{{ legend }}" as="l" hint-placeholder-count="4"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:3px;background:{{ l.bg }}"></span>{{ l.label }}</span></sc-for></div>
+      <sc-if value="{{ showLeave }}"><span onClick="{{ addLeave }}" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;border-radius:7px;display:flex;align-items:center;gap:6px;font:500 13px Inter, sans-serif;background:#BD4A19;color:#fff;cursor:pointer" style-hover="background:#A33F14"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg>Add leave</span></sc-if>
+    </div>
+    <sc-if value="{{ isMonth }}"><div style="flex:1;min-height:0;display:flex;flex-direction:column;padding:0 36px 28px">
+      <div style="flex:none;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-bottom:1px solid #EEE8E3"><sc-for list="{{ dowHead }}" as="d" hint-placeholder-count="7"><span style="height:36px;display:flex;align-items:center;padding-left:10px;font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">{{ d }}</span></sc-for></div>
+      <div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);border-left:1px solid #F0EAE4"><sc-for list="{{ monthCells }}" as="c" hint-placeholder-count="35"><div onClick="{{ c.add }}" style="min-width:0;min-height:0;display:flex;flex-direction:column;gap:3px;padding:6px 6px 4px;box-sizing:border-box;border-right:1px solid #F0EAE4;border-bottom:1px solid #F0EAE4;background:{{ c.bg }};overflow:hidden;cursor:pointer" style-hover="background:#FBF7F3"><span style="flex:none;align-self:flex-start;min-width:22px;height:22px;padding:0 5px;box-sizing:border-box;border-radius:11px;display:grid;place-items:center;font:500 12px Inter, sans-serif;background:{{ c.numBg }};color:{{ c.numFg }}">{{ c.num }}</span><sc-for list="{{ c.chips }}" as="k"><span onClick="{{ k.edit }}" title="{{ k.title }}" style="flex:none;display:block;height:20px;line-height:20px;padding:0 6px;margin:0 {{ k.mr }} 0 {{ k.ml }};border-radius:{{ k.rad }};background:{{ k.bg }};color:{{ k.fg }};font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ k.label }}</span></sc-for><sc-for list="{{ c.appts }}" as="a"><span title="{{ a.title }}" style="flex:none;display:flex;align-items:center;gap:5px;height:18px;padding:0 4px;min-width:0;font-size:11px;color:#422315"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:{{ a.dot }}"></span><b style="font-weight:600;flex:none">{{ a.t }}</b><span style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#7A6255">{{ a.who }}</span></span></sc-for><sc-if value="{{ c.more }}"><span style="flex:none;font-size:11px;color:#7A6255;padding-left:4px">{{ c.more }}</span></sc-if></div></sc-for></div>
+    </div></sc-if>
+    <sc-if value="{{ isWeek }}"><div style="flex:1;min-height:0;overflow:auto;padding:0 36px 32px">
+      <div style="display:grid;grid-template-columns:220px repeat(7,minmax(0,1fr));position:sticky;top:0;z-index:2;background:#fff;border-bottom:1px solid #EEE8E3">
+        <span style="height:44px;display:flex;align-items:center;font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">Person</span>
+        <sc-for list="{{ days }}" as="d" hint-placeholder-count="7"><span style="height:44px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;color:{{ d.fg }};font-weight:{{ d.w }}">{{ d.dow }}<span style="min-width:24px;height:24px;padding:0 4px;box-sizing:border-box;border-radius:12px;display:grid;place-items:center;background:{{ d.numBg }};color:{{ d.numFg }}">{{ d.num }}</span></span></sc-for>
+      </div>
+      <sc-for list="{{ groups }}" as="t" hint-placeholder-count="4"><div style="display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:8px;height:38px;padding-top:6px;font:500 12px Inter, sans-serif;color:#7A6255"><span style="width:8px;height:8px;border-radius:50%;background:{{ t.dot }}"></span>{{ t.name }}</div>
+        <sc-for list="{{ t.rows }}" as="r"><div style="display:grid;grid-template-columns:220px repeat(7,minmax(0,1fr));height:48px;border-top:1px solid #F0EAE4;background:{{ r.rowBg }}">
+          <span onClick="{{ r.open }}" style="display:flex;flex-direction:column;justify-content:center;gap:2px;min-width:0;padding-right:12px;cursor:pointer"><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ r.nameFg }}" style-hover="color:#BD4A19">{{ r.name }}</span><span style="font-size:11.5px;color:#A8968B;white-space:nowrap">{{ r.status }}</span></span>
+          <sc-for list="{{ r.cells }}" as="c"><span onClick="{{ c.click }}" title="{{ c.title }}" style="position:relative;display:flex;align-items:center;padding:7px 0;box-sizing:border-box;background:{{ c.colBg }};cursor:pointer"><span style="flex:1;height:100%;margin:0 {{ c.mr }} 0 {{ c.ml }};border-radius:{{ c.rad }};background:{{ c.bg }};display:flex;align-items:center;padding:0 8px;min-width:0;overflow:hidden;font-size:11.5px;font-weight:600;color:{{ c.fg }}"><span style="display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.label }}</span><sc-if value="{{ c.appt }}"><span style="display:flex;align-items:center;gap:5px;min-width:0;font-size:11.5px;font-weight:500;color:#422315;white-space:nowrap;overflow:hidden"><span style="width:6px;height:6px;border-radius:50%;flex:none;background:#2F8A57"></span>{{ c.appt }}</span></sc-if></span></span></sc-for>
+        </div></sc-for>
+      </div></sc-for>
+    </div></sc-if>
+  </div>
+
+  <sc-if value="{{ panelOn }}"><div onClick="{{ closePanel }}" style="position:absolute;inset:56px 0 0 305px;z-index:7;background:rgba(42,22,12,.12)"></div><div style="position:absolute;top:56px;right:0;bottom:0;z-index:8;width:380px;box-sizing:border-box;background:#fff;box-shadow:-16px 0 40px rgba(42,22,12,.14);display:flex;flex-direction:column;overflow:auto">
+    <div style="display:flex;align-items:center;gap:12px;padding:22px 24px 18px;border-bottom:1px solid #EEE8E3"><span style="width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#F5F0EA;font:500 15px 'Inter Tight', Inter, sans-serif">{{ pn.ini }}</span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span style="font:500 20px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.015em">{{ pn.name }}</span><span style="display:flex;align-items:center;gap:6px;font-size:12.5px;color:#7A6255"><span style="width:7px;height:7px;border-radius:50%;background:{{ pn.dot }}"></span>{{ pn.team }} · {{ pn.status }}</span></span><span onClick="{{ closePanel }}" style="width:32px;height:32px;border-radius:7px;display:grid;place-items:center;color:#7A6255;cursor:pointer" style-hover="background:#F7F3EF"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></span></div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:20px 24px;border-bottom:1px solid #EEE8E3">
+      <span style="font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">Full time days</span>
+      <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px"><sc-for list="{{ pn.ft }}" as="f" hint-placeholder-count="7"><span onClick="{{ f.toggle }}" style="height:36px;border-radius:8px;display:grid;place-items:center;font:500 12.5px Inter, sans-serif;background:{{ f.bg }};color:{{ f.fg }};border:1px solid {{ f.bd }};box-sizing:border-box;cursor:pointer">{{ f.dow }}</span></sc-for></div>
+    </div>
+    <div style="display:flex;flex-direction:column;padding:20px 24px;border-bottom:1px solid #EEE8E3">
+      <div style="display:flex;align-items:center;padding-bottom:8px"><span style="flex:1;font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">Leave</span><span onClick="{{ pn.add }}" style="font:500 12.5px Inter, sans-serif;color:#BD4A19;cursor:pointer">+ Add</span></div>
+      <sc-for list="{{ pn.leaves }}" as="l" hint-placeholder-count="2"><div style="display:flex;align-items:center;gap:10px;min-height:52px;border-top:1px solid #F0EAE4;opacity:{{ l.op }}"><span style="width:10px;height:10px;border-radius:3px;flex:none;background:{{ l.bg }}"></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px;font-weight:500">{{ l.label }}<span style="font-weight:400;color:#A8968B"> · {{ l.when }}</span></span><span style="font-size:12px;color:#7A6255">{{ l.range }}</span></span><sc-if value="{{ l.editable }}"><span onClick="{{ l.edit }}" style="font:500 12px Inter, sans-serif;color:#7A6255;cursor:pointer">Edit</span><span onClick="{{ l.del }}" style="font:500 12px Inter, sans-serif;color:#BD4A19;cursor:pointer">Remove</span></sc-if></div></sc-for>
+      <sc-if value="{{ pn.noLeave }}"><div style="min-height:44px;display:flex;align-items:center;border-top:1px solid #F0EAE4;font-size:12.5px;color:#A8968B">No leave</div></sc-if>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding:20px 24px">
+      <span style="font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">Ad leads</span>
+      <div style="display:flex;align-items:center;gap:12px"><span style="flex:1;font-size:13px;color:#5A4034">{{ pn.pauseTxt }}</span><span onClick="{{ pn.togglePause }}" style="height:34px;padding:0 14px;border-radius:7px;border:1px solid #E2D8D0;display:flex;align-items:center;font:500 13px Inter, sans-serif;color:{{ pn.pauseFg }};cursor:pointer">{{ pn.pauseBtn }}</span></div>
+    </div>
+  </div></sc-if>
+
+  <sc-if value="{{ dModalOn }}"><div onClick="{{ cancelLeave }}" style="position:absolute;inset:0;z-index:9;background:rgba(42,22,12,.32);display:flex;align-items:center;justify-content:center"><div onClick="{{ stop }}" style="width:420px;border-radius:12px;padding:22px;box-sizing:border-box;background:#fff;box-shadow:0 20px 50px rgba(42,22,12,.25);display:flex;flex-direction:column;gap:16px">
+    <div style="font:500 18px 'Inter Tight', Inter, sans-serif">{{ lv.title }}</div>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">Person<div style="position:relative"><span onClick="{{ lv.toggleWho }}" style="height:40px;padding:0 12px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;display:flex;align-items:center;gap:8px;font:500 13.5px Inter, sans-serif;color:#422315;cursor:pointer"><span style="width:7px;height:7px;border-radius:50%;background:{{ lv.whoDot }}"></span><span style="flex:1">{{ lv.whoName }}</span><span style="font-size:12px;font-weight:400;color:#A8968B">{{ lv.whoTeam }}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span><sc-if value="{{ lv.whoOpen }}"><div style="position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:3;max-height:240px;overflow:auto;padding:6px;box-sizing:border-box;background:#fff;border-radius:10px;box-shadow:0 14px 36px rgba(42,22,12,.18)"><sc-for list="{{ lv.people }}" as="o"><div onClick="{{ o.pick }}" style="display:flex;align-items:center;gap:10px;height:34px;padding:0 8px;border-radius:7px;font-size:13px;color:#422315;font-weight:{{ o.w }};background:{{ o.bg }};cursor:pointer" style-hover="background:#FBF7F3"><span style="width:7px;height:7px;border-radius:50%;background:{{ o.dot }}"></span><span style="flex:1">{{ o.name }}</span><span style="font-size:11.5px;color:#A8968B">{{ o.team }}</span></div></sc-for></div></sc-if></div></div>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">Reason<div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ lv.reasons }}" as="r"><span onClick="{{ r.pick }}" style="height:34px;padding:0 14px;box-sizing:border-box;border-radius:17px;border:1px solid {{ r.bd }};background:{{ r.bg }};color:{{ r.fg }};display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer">{{ r.label }}</span></sc-for></div><sc-if value="{{ lv.isOther }}"><input type="text" placeholder="Write the reason" value="{{ lv.note }}" onChange="{{ lv.setNote }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;font:500 13.5px Inter, sans-serif;color:#422315;margin-top:4px"></sc-if></div>
+    <sc-for list="{{ lv.ends }}" as="e"><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">{{ e.label }}<span style="display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:6px"><input type="date" value="{{ e.date }}" onChange="{{ e.setDate }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;font:500 13.5px Inter, sans-serif;color:#422315;min-width:0"><select value="{{ e.time }}" onChange="{{ e.setTime }}" style="height:40px;padding:0 10px;box-sizing:border-box;border-radius:8px;border:1px solid #E2D8D0;background:#fff;font:500 13.5px Inter, sans-serif;color:#422315"><sc-for list="{{ times }}" as="t"><option value="{{ t.v }}">{{ t.v }}</option></sc-for></select></span></label></sc-for>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><span onClick="{{ cancelLeave }}" style="height:36px;padding:0 16px;border-radius:7px;border:1px solid #E2D8D0;display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer">Cancel</span><span onClick="{{ saveLeave }}" style="height:36px;padding:0 16px;border-radius:7px;background:#BD4A19;color:#fff;display:flex;align-items:center;font:500 13px Inter, sans-serif;cursor:pointer">Save</span></div>
+  </div></div></sc-if>
+  <sc-if value="{{ toastOn }}"><div style="position:absolute;left:50%;bottom:28px;z-index:10;transform:translateX(-50%);padding:11px 18px;border-radius:10px;background:#422315;color:#fff;font-size:13px;box-shadow:0 10px 30px rgba(42,22,12,.25)">{{ toast }}</div></sc-if>
+</div>
+<div style="flex:none;width:390px;height:844px;position:relative;overflow:hidden;background:#fff;border-radius:44px;outline:10px solid #1d1410;font-family:Inter, sans-serif;color:#422315;-webkit-font-smoothing:antialiased;font-size:14px">
+  <div style="height:46px;display:flex;align-items:center;justify-content:space-between;padding:0 30px;font:600 15px Inter, sans-serif"><span>9:41</span><span style="width:24px;height:11px;border-radius:3px;border:1.5px solid #422315"></span></div>
+  <div style="position:absolute;top:46px;left:0;right:0;bottom:64px;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:6px 20px 24px">
+    <div style="flex:none;display:flex;align-items:center;gap:8px"><span style="font:500 26px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.025em">Calendar</span>
+      <sc-if value="{{ showLeave }}"><span onClick="{{ pAdd }}" style="margin-left:auto;width:40px;height:40px;border-radius:20px;display:grid;place-items:center;background:#BD4A19;color:#fff;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"></path></svg></span></sc-if></div>
+    <div style="flex:none;display:flex;gap:8px"><sc-for list="{{ layers }}" as="y" hint-placeholder-count="2"><span onClick="{{ y.go }}" style="height:36px;padding:0 14px 0 10px;border-radius:18px;border:1px solid {{ y.bd }};background:{{ y.bg }};color:{{ y.fg }};display:flex;align-items:center;gap:8px;font:500 13px Inter, sans-serif;cursor:pointer"><span style="width:16px;height:16px;border-radius:5px;box-sizing:border-box;border:1.5px solid {{ y.boxBd }};background:{{ y.boxBg }};display:grid;place-items:center;color:#fff"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span>{{ y.label }}</span></sc-for></div>
+    <div style="flex:none;display:flex;align-items:center;gap:4px;padding-top:4px">
+      <span style="font:500 18px 'Inter Tight', Inter, sans-serif;white-space:nowrap">{{ pMonthLabel }}</span>
+      <sc-if value="{{ notThisWeek }}"><span onClick="{{ thisWeek }}" style="margin-left:8px;font:500 13px Inter, sans-serif;color:#BD4A19;cursor:pointer">Today</span></sc-if>
+      <span onClick="{{ pPrev }}" style="margin-left:auto;width:40px;height:40px;border-radius:20px;display:grid;place-items:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg></span>
+      <span onClick="{{ pNext }}" style="width:40px;height:40px;border-radius:20px;display:grid;place-items:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span>
+    </div>
+    <div style="flex:none;display:grid;grid-template-columns:repeat(7,minmax(0,1fr))"><sc-for list="{{ pDow }}" as="d" hint-placeholder-count="7"><span style="height:24px;display:grid;place-items:center;font:500 11px Inter, sans-serif;color:#A8968B">{{ d }}</span></sc-for>
+      <sc-for list="{{ pCells }}" as="c" hint-placeholder-count="35"><div onClick="{{ c.pick }}" style="height:48px;display:flex;flex-direction:column;align-items:center;gap:3px;padding-top:4px;box-sizing:border-box;cursor:pointer"><span style="width:32px;height:32px;border-radius:16px;display:grid;place-items:center;font-size:14px;font-weight:{{ c.w }};background:{{ c.bg }};color:{{ c.fg }};box-shadow:{{ c.ring }}">{{ c.num }}</span><span style="display:flex;gap:3px;height:5px"><sc-for list="{{ c.dots }}" as="o"><span style="width:5px;height:5px;border-radius:50%;background:{{ o }}"></span></sc-for></span></div></sc-for>
+    </div>
+    <div style="flex:none;display:flex;flex-direction:column;border-top:1px solid #EEE8E3;padding-top:12px">
+      <span style="font:500 13px Inter, sans-serif;color:#7A6255;padding-bottom:4px">{{ pDayLabel }}</span>
+      <sc-for list="{{ pItems }}" as="it" hint-placeholder-count="3"><div onClick="{{ it.go }}" style="display:grid;grid-template-columns:48px minmax(0,1fr);column-gap:12px;align-items:center;min-height:52px;border-bottom:1px solid #F0EAE4;cursor:pointer"><span style="font:600 13px 'Inter Tight', Inter, sans-serif;color:{{ it.tFg }}">{{ it.t }}</span><span style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:4px;align-self:stretch;margin:10px 0;border-radius:2px;flex:none;background:{{ it.bar }}"></span><span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ it.title }}</span><span style="font-size:12px;color:#8A7466;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ it.sub }}</span></span></span></div></sc-for>
+      <sc-if value="{{ pEmpty }}"><span style="min-height:52px;display:flex;align-items:center;font-size:13px;color:#A8968B">Nothing this day</span></sc-if>
+    </div>
+  </div>
+  <nav style="position:absolute;left:0;right:0;bottom:0;height:64px;box-sizing:border-box;padding-bottom:8px;border-top:1px solid #EEE8E3;background:#fff;display:grid;grid-template-columns:repeat(5,1fr)"><sc-for list="{{ pNav }}" as="n" hint-placeholder-count="5"><span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10.5px;font-weight:{{ n.w }};color:{{ n.fg }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg>{{ n.l }}</span></sc-for></nav>
+  <sc-if value="{{ pModalOn }}"><div onClick="{{ cancelLeave }}" style="position:absolute;inset:0;z-index:10;background:rgba(42,22,12,.32)"></div><div style="position:absolute;left:0;right:0;bottom:0;z-index:11;max-height:760px;overflow:auto;box-sizing:border-box;padding:10px 20px 30px;border-radius:26px 26px 0 0;background:#fff;display:flex;flex-direction:column;gap:16px">
+    <div style="width:36px;height:4px;border-radius:2px;background:#E2D8D0;margin:0 auto"></div>
+    <span style="font:500 20px 'Inter Tight', Inter, sans-serif">{{ lv.title }}</span>
+    <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">Person<select value="{{ lv.who }}" onChange="{{ lv.setWho }}" style="height:44px;min-width:0;padding:0 12px;box-sizing:border-box;border-radius:10px;border:1px solid #E2D8D0;background:#fff;font:500 14px Inter, sans-serif;color:#422315;appearance:none;-webkit-appearance:none"><sc-for list="{{ pPeople }}" as="o"><option value="{{ o.id }}" selected="{{ o.sel }}">{{ o.name }}</option></sc-for></select></label>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">Reason<div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ lv.reasons }}" as="r"><span onClick="{{ r.pick }}" style="height:40px;padding:0 16px;box-sizing:border-box;border-radius:20px;border:1px solid {{ r.bd }};background:{{ r.bg }};color:{{ r.fg }};display:flex;align-items:center;font:500 14px Inter, sans-serif;cursor:pointer">{{ r.label }}</span></sc-for></div><sc-if value="{{ lv.isOther }}"><input type="text" placeholder="Write the reason" value="{{ lv.note }}" onChange="{{ lv.setNote }}" style="height:44px;min-width:0;padding:0 12px;box-sizing:border-box;border-radius:10px;border:1px solid #E2D8D0;background:#fff;font:500 14px Inter, sans-serif;color:#422315;margin-top:4px"></sc-if></div>
+    <sc-for list="{{ lv.ends }}" as="e"><label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:#7A6255">{{ e.label }}<span style="display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:8px"><input type="date" value="{{ e.date }}" onChange="{{ e.setDate }}" style="height:44px;min-width:0;padding:0 12px;box-sizing:border-box;border-radius:10px;border:1px solid #E2D8D0;background:#fff;font:500 14px Inter, sans-serif;color:#422315"><input type="time" step="1800" value="{{ e.time }}" onChange="{{ e.setTime }}" style="height:44px;min-width:0;padding:0 12px;box-sizing:border-box;border-radius:10px;border:1px solid #E2D8D0;background:#fff;font:500 14px Inter, sans-serif;color:#422315"></span></label></sc-for>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:4px"><span onClick="{{ cancelLeave }}" style="height:48px;border-radius:12px;border:1px solid #E2D8D0;display:grid;place-items:center;font:500 15px Inter, sans-serif;cursor:pointer">Cancel</span><span onClick="{{ saveLeave }}" style="height:48px;border-radius:12px;background:#BD4A19;color:#fff;display:grid;place-items:center;font:500 15px Inter, sans-serif;cursor:pointer">Save</span></div>
+  </div></sc-if>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const TEAMS = [
+  { id: 'dir', name: 'Revenue Director', dot: '#422315', members: ['peter'] },
+  { id: 'stanley', name: 'Team Stanley', dot: '#EE5E08', members: ['stanley', 'chea', 'tjy'] },
+  { id: 'alvin', name: 'Team Alvin', dot: '#FFA91F', members: ['alvin', 'mei', 'jason', 'hector'] },
+  { id: 'anthony', name: 'Team Anthony', dot: '#8A1F0A', members: ['anthony', 'kumar'] },
+];
+const P = {
+  peter: { name: 'PETER', ft: [1, 1, 1, 1, 1, 0, 0] }, stanley: { name: 'STANLEY', ft: [1, 1, 1, 1, 1, 1, 0] },
+  chea: { name: 'CHEA HUAN', ft: [1, 1, 1, 1, 1, 1, 0] }, tjy: { name: 'TAN JIN YANG', ft: [1, 1, 1, 1, 0, 1, 1] },
+  alvin: { name: 'ALVIN', ft: [1, 1, 1, 1, 1, 0, 0] }, mei: { name: 'MEI LING', ft: [1, 1, 0, 1, 1, 1, 0] },
+  jason: { name: 'JASON', ft: [1, 1, 1, 1, 1, 0, 0] }, hector: { name: 'HECTOR', ft: [1, 1, 1, 1, 1, 0, 0], locked: true },
+  anthony: { name: 'ANTHONY', ft: [1, 1, 1, 1, 0, 1, 1] }, kumar: { name: 'KUMAR', ft: [1, 1, 1, 1, 1, 0, 0] },
+};
+const APPTS = [
+  ['chea', '2026-11-03', '15:00', 'Priya R.'], ['stanley', '2026-11-04', '11:00', 'Daniel K.'], ['alvin', '2026-11-06', '16:00', 'Lee Wei Ming'], ['chea', '2026-11-06', '11:00', 'Nur Aisyah'],
+  ['kumar', '2026-11-07', '10:30', 'Mira'], ['peter', '2026-11-07', '14:00', 'Grace T.'], ['anthony', '2026-11-07', '11:00', 'Rachel O.'], ['alvin', '2026-11-07', '15:30', 'Farah Z.'], ['mei', '2026-11-08', '12:00', 'Aaron C.'],
+  ['stanley', '2026-11-11', '10:00', 'Suresh'], ['alvin', '2026-11-14', '11:00', 'Kelvin Ng'], ['chea', '2026-11-14', '14:00', 'Tan Kok Wai'], ['kumar', '2026-11-18', '16:00', 'Vincent'], ['mei', '2026-11-21', '10:00', 'Lim S.'],
+].map(([who, day, t, cust]) => ({ who, day, t, cust }));
+const REASON = { Annual: ['#FFE9C2', '#7A4A00'], Sick: ['#FDE3D2', '#8A1F0A'], Training: ['#E6DDF3', '#4B2E7A'], Other: ['#E4ECE6', '#2F5A3C'] };
+const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONF = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const shiftMonth = (m, n) => { const d = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5) - 1 + n, 1)); return d.toISOString().slice(0, 7); };
+const TODAY = '2026-11-06', NOW = '2026-11-06T18:00', THIS_MON = '2026-11-02';
+const addDays = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const dd = s => { const [y, m, d] = s.split('-').map(Number); return { d, m: MON[m - 1], y }; };
+const teamOf = id => TEAMS.find(t => t.members.includes(id));
+const ini = n => n.split(/\s+/).map(w => w[0]).join('').slice(0, 2);
+const label = l => l.reason === 'Other' ? (l.note || 'Other') : l.reason;
+const rng = l => { const [a, at] = l.from.split('T'), [b, bt] = l.to.split('T'); const x = dd(a), y = dd(b); return a === b ? `${x.d} ${x.m} · ${at}–${bt}` : `${x.d} ${x.m} ${at} – ${y.d} ${y.m} ${bt}`; };
+const D = {
+  cal: 'M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM3 10h18', trend: 'M22 7l-8.5 8.5-5-5L2 17M16 7h6v6',
+  file: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7ZM14 2v4a2 2 0 0 0 2 2h4', flag: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7',
+  msg: 'M7.9 20A9 9 0 1 0 4 16.1L2 22Z', user: 'M17 8a5 5 0 1 1-10 0 5 5 0 0 1 10 0ZM20 21a8 8 0 0 0-16 0', bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
+  inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
+  contact: 'M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z', arrow: 'M7 7h10v10M7 17 17 7',
+  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  sliders: 'M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4',
+};
+
+class Component extends DCLogic {
+  state = {
+    pDay: TODAY, showAppt: true, showLeave: true, view: 'month', month: '2026-11', week: THIS_MON, panel: null, modal: null, toast: null, paused: [], ft: Object.fromEntries(Object.keys(P).map(k => [k, P[k].ft.slice()])),
+    leaves: [
+      { id: 1, who: 'jason', from: '2026-11-05T09:00', to: '2026-11-08T18:00', reason: 'Sick' },
+      { id: 2, who: 'chea', from: '2026-11-09T09:00', to: '2026-11-10T13:00', reason: 'Annual' },
+      { id: 3, who: 'mei', from: '2026-11-04T14:00', to: '2026-11-04T18:00', reason: 'Training' },
+      { id: 4, who: 'kumar', from: '2026-11-12T09:00', to: '2026-11-13T18:00', reason: 'Other', note: 'Wedding' },
+      { id: 5, who: 'alvin', from: '2026-10-20T09:00', to: '2026-10-21T18:00', reason: 'Annual' },
+    ],
+  };
+  flash(t) { clearTimeout(this._t); this.setState({ toast: t }); this._t = setTimeout(() => this.setState({ toast: null }), 2400); }
+  openModal(o) { this.setState({ modal: { reason: 'Annual', note: '', ...o } }); }
+  edit(l) { this.openModal({ ...l, editId: l.id }); }
+  save() {
+    const m = this.state.modal; if (!m || m.to < m.from) return;
+    const rec = { id: m.editId || Date.now(), who: m.who, from: m.from, to: m.to, reason: m.reason, note: m.note };
+    this.setState(s => ({ modal: null, leaves: m.editId ? s.leaves.map(l => l.id === m.editId ? rec : l) : [...s.leaves, rec] }));
+    this.flash(`${P[m.who].name} · ${label(rec)} · ${rng(rec)}`);
+  }
+  phone(st, SA, SL, apptsOn) {
+    const first = st.month + '-01', fdow = (new Date(first + 'T00:00:00Z').getUTCDay() + 6) % 7, gridStart = addDays(first, -fdow);
+    const nDays = new Date(Date.UTC(+st.month.slice(0, 4), +st.month.slice(5), 0)).getUTCDate(), nCells = Math.ceil((fdow + nDays) / 7) * 7;
+    const leavesOn = day => SL ? st.leaves.filter(l => l.from.slice(0, 10) <= day && day <= l.to.slice(0, 10)) : [];
+    const pCells = Array.from({ length: nCells }, (_, i) => { const day = addDays(gridStart, i), inM = day.slice(0, 7) === st.month, sel = day === st.pDay, t = day === TODAY;
+      const dots = [...new Set(leavesOn(day).map(l => REASON[l.reason][1]))].slice(0, 2); if (apptsOn(null, day).length) dots.push('#2F8A57');
+      return { num: dd(day).d, dots, w: sel || t ? 600 : 400, bg: sel ? '#422315' : 'transparent', fg: sel ? '#fff' : t ? '#BD4A19' : inM ? '#422315' : '#C4B5AB', ring: t && !sel ? 'inset 0 0 0 1.5px #BD4A19' : 'none',
+        pick: () => this.setState({ pDay: day, month: day.slice(0, 7) }) }; });
+    const day = st.pDay, x = dd(day), dow = DOW[(new Date(day + 'T00:00:00Z').getUTCDay() + 6) % 7];
+    const items = [
+      ...leavesOn(day).map(l => { const s = l.from.slice(0, 10), e = l.to.slice(0, 10), allDay = s < day && day < e;
+        return { t: allDay ? 'All day' : s === day ? l.from.slice(11) : 'until', tFg: '#8A7466', bar: REASON[l.reason][0], title: `${P[l.who].name} · ${label(l)}`, sub: rng(l), go: () => this.openModal({ ...l, editId: l.id, phone: true }) }; }),
+      ...apptsOn(null, day).map(a => ({ t: a.t, tFg: '#422315', bar: '#2F8A57', title: a.cust, sub: `Appointment · ${P[a.who].name}`, go: () => {} })),
+    ];
+    const mo = MONF[+st.month.slice(5) - 1];
+    return { pCells, pDow: DOW.map(d => d[0]), pItems: items, pEmpty: !items.length, pDayLabel: `${dow}, ${x.d} ${x.m}`, pMonthLabel: `${mo} ${st.month.slice(0, 4)}`,
+      pPrev: () => this.setState(s => ({ month: shiftMonth(s.month, -1) })), pNext: () => this.setState(s => ({ month: shiftMonth(s.month, 1) })),
+      pAdd: () => this.openModal({ who: 'peter', from: day + 'T09:00', to: day + 'T18:00', phone: true }),
+      pModalOn: !!(st.modal && st.modal.phone), dModalOn: !!(st.modal && !st.modal.phone),
+      pPeople: Object.keys(P).map(id => ({ id, name: P[id].name, sel: st.modal ? st.modal.who === id : false })),
+      pNav: [['Insight', D.trend], ['Inbox', D.inbox], ['Activity', D.users], ['Calendar', D.cal, true], ['More', 'M4 6h16M4 12h16M4 18h16']].map(([l, d, on]) => ({ l, d, fg: on ? '#BD4A19' : '#A8968B', w: on ? 600 : 500 })) };
+  }
+  renderVals() {
+    const st = this.state;
+    const days = Array.from({ length: 7 }, (_, i) => addDays(st.week, i));
+    const leaveOn = (who, day) => st.leaves.find(l => l.who === who && l.from.slice(0, 10) <= day && day <= l.to.slice(0, 10));
+    const SA = st.showAppt, SL = st.showLeave;
+    const apptsOn = (who, day) => SA ? APPTS.filter(a => (!who || a.who === who) && a.day === day).sort((a, b) => a.t < b.t ? -1 : 1) : [];
+    const groups = TEAMS.map(t => ({ name: t.name, dot: t.dot, rows: t.members.map(id => {
+      const p = P[id], paused = st.paused.includes(id), cur = leaveOn(id, TODAY);
+      const status = p.locked ? 'No CRM login' : paused ? 'Paused' : cur ? `${label(cur)} leave` : 'Active';
+      return { name: p.name, status, nameFg: p.locked ? '#A8968B' : '#422315', rowBg: 'transparent', open: () => this.setState({ panel: id }),
+        cells: days.map((day, i) => {
+          const l = SL ? leaveOn(id, day) : null, ft = st.ft[id][i], isToday = day === TODAY, ap = apptsOn(id, day);
+          const appt = ap.length > 1 ? `${ap.length} appts` : ap.length ? `${ap[0].t} ${ap[0].cust}` : '';
+          const colBg = isToday ? '#FBF7F3' : 'transparent';
+          if (l) {
+            const prev = leaveOn(id, addDays(day, -1)) === l && i > 0, next = leaveOn(id, addDays(day, 1)) === l && i < 6;
+            const [bg, fg] = REASON[l.reason]; const part = l.from.slice(0, 10) === l.to.slice(0, 10) ? ` · ${l.from.slice(11)}` : '';
+            return { appt: '', bg, fg, label: prev ? '' : label(l) + part, rad: `${prev ? 0 : 6}px ${next ? 0 : 6}px ${next ? 0 : 6}px ${prev ? 0 : 6}px`, ml: prev ? '0' : '3px', mr: next ? '0' : '3px', colBg,
+              title: `${label(l)} · ${rng(l)}`, click: () => this.edit(l) };
+          }
+          const off = p.locked || paused;
+          return { appt, bg: SL && ft && !off ? '#F3ECE5' : 'transparent', fg: '#A8968B', label: SL && off && ft && !appt ? '—' : '', rad: '6px', ml: '3px', mr: '3px', colBg,
+            title: ap.length ? ap.map(a => `${a.t} ${a.cust}`).join(' · ') : p.locked ? 'No CRM login' : paused ? 'Paused' : ft ? 'Full time · click to add leave' : 'Off · click to add leave',
+            click: () => SL && this.openModal({ who: id, from: day + 'T09:00', to: day + 'T18:00' }) };
+        }) };
+    }) }));
+    const w0 = dd(days[0]), w6 = dd(days[6]);
+    const isMonth = st.view === 'month';
+    const first = st.month + '-01', fdow = (new Date(first + 'T00:00:00Z').getUTCDay() + 6) % 7, gridStart = addDays(first, -fdow);
+    const nDays = new Date(Date.UTC(+st.month.slice(0, 4), +st.month.slice(5), 0)).getUTCDate(), nCells = Math.ceil((fdow + nDays) / 7) * 7;
+    const lane = {}, laneEnd = [];
+    (SL ? st.leaves.slice().sort((x, y) => x.from < y.from ? -1 : 1) : []).forEach(l => { const s = l.from.slice(0, 10), e = l.to.slice(0, 10); let k = laneEnd.findIndex(end => end < s); if (k < 0) { k = laneEnd.length; laneEnd.push(e); } else laneEnd[k] = e; lane[l.id] = k; });
+    const monthCells = Array.from({ length: nCells }, (_, i) => { const day = addDays(gridStart, i), inM = day.slice(0, 7) === st.month, t = day === TODAY;
+      const ls = SL ? st.leaves.filter(l => l.from.slice(0, 10) <= day && day <= l.to.slice(0, 10)) : [], aps = apptsOn(null, day);
+      const lanes = ls.length ? Math.max(...ls.map(l => lane[l.id])) + 1 : 0, dow = i % 7;
+      const room0 = Math.max(0, 3 - Math.min(lanes, 3)), over = ls.filter(l => lane[l.id] >= 3).length + Math.max(0, aps.length - room0) > 0, room = over && room0 > 0 && lanes > 0 ? room0 - 1 : room0;
+      const appts = aps.slice(0, room).map(a => ({ t: a.t, who: P[a.who].name.split(' ')[0], dot: '#2F8A57', title: `${a.t} · ${a.cust} · ${P[a.who].name}` }));
+      const chips = Array.from({ length: Math.min(lanes, 3) }, (_, k) => { const l = ls.find(x => lane[x.id] === k);
+        if (!l) return { label: '', title: '', bg: 'transparent', fg: 'transparent', ml: '0', mr: '0', rad: '4px', edit: () => {} };
+        const prev = dow > 0 && l.from.slice(0, 10) < day, next = dow < 6 && day < l.to.slice(0, 10);
+        return { label: prev ? '' : `${P[l.who].name.split(' ')[0]} · ${label(l)}`, title: `${P[l.who].name} · ${label(l)} · ${rng(l)}`, bg: REASON[l.reason][0], fg: REASON[l.reason][1],
+          ml: prev ? '-6px' : '0', mr: next ? '-7px' : '0', rad: `${prev ? 0 : 4}px ${next ? 0 : 4}px ${next ? 0 : 4}px ${prev ? 0 : 4}px`, edit: e => { e.stopPropagation(); this.edit(l); } }; });
+      const extra = ls.filter(l => lane[l.id] >= 3).length + Math.max(0, aps.length - room);
+      return { num: dd(day).d, chips, appts, more: extra ? `+${extra} more` : '', bg: inM ? '#fff' : '#FBF8F5', numBg: t ? '#BD4A19' : 'transparent', numFg: t ? '#fff' : inM ? '#422315' : '#C4B5AB',
+        add: () => SL && this.openModal({ who: 'peter', from: day + 'T09:00', to: day + 'T18:00' }) }; });
+    const pid = st.panel, m = st.modal;
+    const pn = pid ? (() => {
+      const p = P[pid], t = teamOf(pid), paused = st.paused.includes(pid);
+      const ls = st.leaves.filter(l => l.who === pid).sort((a, b) => a.from < b.from ? 1 : -1);
+      return { name: p.name, ini: ini(p.name), team: t.name, dot: t.dot, status: p.locked ? 'No CRM login' : paused ? 'Paused' : 'Active',
+        ft: DOW.map((dow, i) => { const on = st.ft[pid][i]; return { dow: dow.slice(0, 2), bg: on ? '#422315' : '#fff', fg: on ? '#fff' : '#7A6255', bd: on ? '#422315' : '#E2D8D0',
+          toggle: () => this.setState(s => ({ ft: { ...s.ft, [pid]: s.ft[pid].map((v, j) => j === i ? (v ? 0 : 1) : v) } })) }; }),
+        leaves: ls.map(l => { const past = l.to < NOW, now = l.from <= NOW && NOW <= l.to; return { label: label(l), when: past ? 'past' : now ? 'now' : 'upcoming', range: rng(l), bg: REASON[l.reason][0], op: past ? 0.5 : 1, editable: !past,
+          edit: () => this.edit(l), del: () => { this.setState(s => ({ leaves: s.leaves.filter(x => x.id !== l.id) })); this.flash('Leave removed'); } }; }),
+        noLeave: !ls.length, add: () => this.openModal({ who: pid, from: TODAY + 'T09:00', to: TODAY + 'T18:00' }),
+        pauseTxt: paused ? 'Paused · gets no ad leads' : 'Gets ad leads on Full time days', pauseBtn: paused ? 'Resume' : 'Pause', pauseFg: paused ? '#BD4A19' : '#422315',
+        togglePause: () => this.setState(s => ({ paused: paused ? s.paused.filter(x => x !== pid) : [...s.paused, pid] })) };
+    })() : {};
+    const setEnd = (k, part) => e => { const v = e.target.value; this.setState(s => { const [d, t] = s.modal[k].split('T'); const nv = part === 'd' ? v + 'T' + t : d + 'T' + v; const mm = { ...s.modal, [k]: nv }; if (k === 'from' && mm.to < nv) mm.to = nv.slice(0, 10) + 'T' + mm.to.split('T')[1]; return { modal: mm }; }); };
+    const nav = (d, on) => ({ d, bg: on ? '#BD4A19' : 'transparent', fg: on ? '#fff' : '#CDB7A8' });
+    const ci = (l, d, on) => ({ label: l, d, w: on ? 500 : 400, bg: on ? '#EFE6DD' : 'transparent', fg: on ? '#422315' : '#5A4034', bar: on ? '#EE5E08' : 'transparent' });
+    return {
+      stop: e => e.stopPropagation(), showAppt: SA, showLeave: SL,
+      ...this.phone(st, SA, SL, apptsOn),
+      layers: [['showAppt', 'Appointments', APPTS.filter(a => a.day.slice(0, 7) === st.month).length], ['showLeave', 'Leave', st.leaves.filter(l => l.from.slice(0, 7) <= st.month && st.month <= l.to.slice(0, 7)).length]].map(([k, label, n]) => { const on = st[k];
+        return { label, n, bg: on ? '#fff' : '#F7F3EF', fg: on ? '#422315' : '#7A6255', bd: on ? '#E2D8D0' : 'transparent', boxBg: on ? '#422315' : '#fff', boxBd: on ? '#422315' : '#C4B5AB',
+          go: () => this.setState(s => { const other = k === 'showAppt' ? 'showLeave' : 'showAppt'; return s[k] && !s[other] ? { [other]: true, [k]: false } : { [k]: !s[k] }; }) }; }),
+      revNav: [nav(D.cal), nav(D.trend), nav(D.file), nav(D.flag), nav(D.msg, true), nav(D.user), nav(D.bell)],
+      crmNav: [{ head: '', items: [ci('Insight', D.trend), ci('Inbox', D.inbox), ci('Contacts', D.contact), ci('Calendar', D.cal, true)] }, { head: 'MARKETING', items: [ci('Ads Performance', D.arrow), ci('Assignment', D.users)] }, { head: 'MANAGEMENT', items: [ci('Settings', D.sliders)] }],
+      weekLabel: isMonth ? `${MONF[+st.month.slice(5) - 1]} ${st.month.slice(0, 4)}` : w0.m === w6.m ? `${w0.d}–${w6.d} ${w0.m} ${w0.y}` : `${w0.d} ${w0.m} – ${w6.d} ${w6.m} ${w6.y}`,
+      notThisWeek: isMonth ? st.month !== '2026-11' : st.week !== THIS_MON, todayLabel: isMonth ? 'This month' : 'This week', thisWeek: () => this.setState({ week: THIS_MON, month: '2026-11', pDay: TODAY }),
+      prevWeek: () => this.setState(s => s.view === 'month' ? { month: shiftMonth(s.month, -1) } : { week: addDays(s.week, -7) }), nextWeek: () => this.setState(s => s.view === 'month' ? { month: shiftMonth(s.month, 1) } : { week: addDays(s.week, 7) }),
+      isMonth, isWeek: !isMonth, dowHead: DOW, monthCells,
+      views: [['month', 'Month'], ['week', 'Week']].map(([k, label]) => { const on = st.view === k; return { label, bg: on ? '#fff' : 'transparent', fg: on ? '#422315' : '#7A6255', sh: on ? '0 1px 2px rgba(42,22,12,.12)' : 'none', go: () => this.setState({ view: k }) }; }),
+      days: days.map((day, i) => { const t = day === TODAY; return { dow: DOW[i], num: dd(day).d, fg: t ? '#422315' : '#7A6255', w: t ? 600 : 500, numBg: t ? '#BD4A19' : 'transparent', numFg: t ? '#fff' : 'inherit' }; }),
+      legend: (SL ? Object.keys(REASON) : []).map(k => ({ label: k, bg: REASON[k][0] })),
+      groups, addLeave: () => this.openModal({ who: 'peter', from: TODAY + 'T09:00', to: TODAY + 'T18:00' }),
+      panelOn: !!pid, pn, closePanel: () => this.setState({ panel: null }),
+      modalOn: !!m, cancelLeave: () => this.setState({ modal: null }), saveLeave: () => this.save(),
+      times: Array.from({ length: 48 }, (_, i) => ({ v: `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}` })),
+      lv: m ? { title: m.editId ? 'Edit leave' : 'Add leave', who: m.who, setWho: e => { const v = e.target.value; this.setState(s => ({ modal: { ...s.modal, who: v } })); },
+        people: Object.keys(P).map(id => ({ name: P[id].name, team: teamOf(id).name, dot: teamOf(id).dot, w: id === m.who ? 600 : 400, bg: id === m.who ? '#F7F3EF' : 'transparent', pick: () => this.setState(s => ({ modal: { ...s.modal, who: id, whoOpen: false } })) })),
+        whoOpen: !!m.whoOpen, toggleWho: () => this.setState(s => ({ modal: { ...s.modal, whoOpen: !s.modal.whoOpen } })), whoName: P[m.who].name, whoTeam: teamOf(m.who).name, whoDot: teamOf(m.who).dot,
+        reasons: Object.keys(REASON).map(r => ({ label: r, bg: m.reason === r ? '#422315' : '#fff', fg: m.reason === r ? '#fff' : '#422315', bd: m.reason === r ? '#422315' : '#E2D8D0', pick: () => this.setState(s => ({ modal: { ...s.modal, reason: r } })) })),
+        isOther: m.reason === 'Other', note: m.note || '', setNote: e => { const v = e.target.value; this.setState(s => ({ modal: { ...s.modal, note: v } })); },
+        ends: [['From', 'from'], ['To', 'to']].map(([lb, k]) => ({ label: lb, date: m[k].split('T')[0], time: m[k].split('T')[1], setDate: setEnd(k, 'd'), setTime: setEnd(k, 't') })) } : {},
+      toastOn: !!st.toast, toast: st.toast || '',
+    };
+  }
+}
+</script>
+</body>
+</html>

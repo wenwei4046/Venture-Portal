@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600&display=swap" rel="stylesheet"><style>body{margin:0;background:#FBF7F3;font-family:Inter, sans-serif;color:#422315;-webkit-font-smoothing:antialiased}a{color:#BD4A19}a:hover{color:#963A14}</style></helmet>
+<div style="max-width:1180px;margin:0 auto;padding:48px 32px 80px;display:flex;flex-direction:column;gap:56px">
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <span style="font:500 11px Inter, sans-serif;letter-spacing:0.08em;text-transform:uppercase;color:#A8968B">CRM · navigation · decided 8 Nov 2026</span>
+    <h1 style="margin:0;font:500 38px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.025em">What is where, what repeats, what to do</h1>
+    <p style="margin:0;max-width:720px;font-size:15px;line-height:1.6;color:#5A4034;text-wrap:pretty">Read from the source (desk/vm/tokens.ts, desk/vm/frame.ts, panel/vm/nav.ts, sales/vm/header.ts) and crm.md. Repeats the owner chose to keep are flagged.</p>
+  </header>
+
+  <section style="display:flex;flex-direction:column;gap:20px">
+    <h2 style="margin:0;font:500 24px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.015em">New navigation</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+      <div style="flex:none;width:237px;box-sizing:border-box;display:flex;flex-direction:column;gap:1px;padding:24px 12px 18px;border-radius:12px;background:#FBF4EC;border:1px solid #F0E2D4">
+        <div style="padding:0 10px 14px;font:500 22px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.01em">CRM</div>
+        <sc-for list="{{ side }}" as="g" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:1px"><sc-if value="{{ g.head }}"><div style="padding:18px 10px 6px;font:500 10px Inter, sans-serif;letter-spacing:0.14em;color:#A8968B">{{ g.head }}</div></sc-if><sc-for list="{{ g.items }}" as="i"><div style="display:flex;align-items:center;gap:11px;height:36px;padding:0 10px;border-radius:7px;font-size:14px;color:#5A4034;background:{{ i.bg }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ i.d }}"></path></svg><span style="flex:1">{{ i.l }}</span><sc-if value="{{ i.tag }}"><span style="font-size:10.5px;font-weight:600;color:#2F5A3C">{{ i.tag }}</span></sc-if></div></sc-for></div></sc-for>
+      </div>
+      <div style="flex:none;display:flex;flex-direction:column;gap:14px;width:390px">
+        <span style="font:600 12px Inter, sans-serif;letter-spacing:0.04em;color:#A8968B">PHONE · PRINCIPAL / DIRECTOR</span>
+        <div style="height:64px;box-sizing:border-box;border-radius:14px;border:1px solid #EEE8E3;background:#fff;display:grid;grid-template-columns:repeat(5,1fr)"><sc-for list="{{ phoneNav }}" as="n" hint-placeholder-count="5"><span style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10.5px;font-weight:500;color:{{ n.fg }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ n.d }}"></path></svg>{{ n.l }}</span></sc-for></div>
+        <div style="display:flex;flex-direction:column;border-top:1px solid #EEE8E3"><sc-for list="{{ phoneTabs }}" as="t" hint-placeholder-count="5"><div style="display:grid;grid-template-columns:84px minmax(0,1fr);gap:12px;padding:10px 0;border-bottom:1px solid #F0EAE4;font-size:13px;line-height:1.5"><b style="font-weight:600">{{ t.l }}</b><span style="color:#5A4034">{{ t.s }}</span></div></sc-for></div>
+        <span style="font:600 12px Inter, sans-serif;letter-spacing:0.04em;color:#A8968B;padding-top:8px">PHONE · SALESPERSON</span>
+        <span style="font-size:13px;line-height:1.5;color:#5A4034">No change: Inbox · Contacts · Calendar · Insight · Profile.</span>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:20px">
+    <h2 style="margin:0;font:500 24px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.015em">1 · Desktop sidebar (Principal), now vs new</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px">
+      <sc-for list="{{ cols }}" as="c" hint-placeholder-count="2"><div style="display:flex;flex-direction:column;gap:16px;padding:24px;border-radius:12px;background:#fff;border:1px solid #EEE8E3">
+        <span style="font:600 12px Inter, sans-serif;letter-spacing:0.04em;color:{{ c.headFg }}">{{ c.head }}</span>
+        <sc-for list="{{ c.groups }}" as="g"><div style="display:flex;flex-direction:column;gap:4px"><sc-if value="{{ g.head }}"><span style="padding:0 10px;font:500 10px Inter, sans-serif;letter-spacing:0.14em;color:#A8968B">{{ g.head }}</span></sc-if><sc-for list="{{ g.items }}" as="i"><div style="display:flex;flex-direction:column;gap:3px;padding:9px 10px;border-radius:7px;background:{{ i.bg }}"><span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;font-weight:500;color:{{ i.fg }}"><span style="text-decoration:{{ i.strike }}">{{ i.name }}</span><sc-if value="{{ i.flag }}"><span style="height:18px;line-height:18px;padding:0 7px;border-radius:9px;background:{{ i.flagBg }};color:{{ i.flagFg }};font-size:10.5px;font-weight:600">{{ i.flag }}</span></sc-if></span><sc-if value="{{ i.sub }}"><span style="font-size:12px;line-height:1.45;color:#7A6255;text-wrap:pretty">{{ i.sub }}</span></sc-if></div></sc-for></div></sc-for>
+      </div></sc-for>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:20px">
+    <h2 style="margin:0;font:500 24px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.015em">2 · Every repeat and what to do</h2>
+    <div style="display:flex;flex-direction:column;border-top:1px solid #E2D8D0">
+      <sc-for list="{{ repeats }}" as="r" hint-placeholder-count="7"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px 32px;padding:20px 0;border-bottom:1px solid #E2D8D0">
+        <div style="display:flex;flex-direction:column;gap:8px"><span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font:600 12px 'Inter Tight', Inter, sans-serif;color:#A8968B">{{ r.n }}</span><span style="font:500 17px 'Inter Tight', Inter, sans-serif">{{ r.title }}</span><span style="height:20px;line-height:20px;padding:0 8px;border-radius:10px;background:{{ r.stBg }};color:{{ r.stFg }};font-size:11px;font-weight:600">{{ r.status }}</span></span><div style="display:flex;flex-direction:column;gap:3px"><sc-for list="{{ r.where }}" as="w"><span style="font-size:13px;line-height:1.5;color:#5A4034">· {{ w }}</span></sc-for></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">Proposal</span><span style="font-size:14px;line-height:1.55;text-wrap:pretty">{{ r.fix }}</span><sc-if value="{{ r.note }}"><span style="font-size:12.5px;line-height:1.5;color:#8A1F0A">{{ r.note }}</span></sc-if></div>
+      </div></sc-for>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:20px">
+    <h2 style="margin:0;font:500 24px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.015em">3 · Reports vs Workspace, side by side</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px">
+      <sc-for list="{{ rw }}" as="c" hint-placeholder-count="2"><div style="display:flex;flex-direction:column;gap:10px;padding:22px 24px;border-radius:12px;background:#fff;border:1px solid #EEE8E3"><span style="font:500 18px 'Inter Tight', Inter, sans-serif">{{ c.name }}</span><span style="font-size:13px;line-height:1.5;color:#7A6255">{{ c.what }}</span><div style="display:flex;flex-direction:column;border-top:1px solid #F0EAE4"><sc-for list="{{ c.items }}" as="i"><span style="padding:9px 0;border-bottom:1px solid #F0EAE4;font-size:13.5px">{{ i }}</span></sc-for></div></div></sc-for>
+    </div>
+    <p style="margin:0;max-width:760px;font-size:14px;line-height:1.6;color:#5A4034;text-wrap:pretty">Overlap: both export per-ad and per-salesperson figures. Difference: Reports is fixed categories for anyone with Manage; Workspace is a report you build from chosen metrics and save for your weekly update. Proposal: one <b>Reports</b> page with two tabs, <b>Ready-made</b> (today's five categories) and <b>My reports</b> (today's Workspace).</p>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:20px">
+    <h2 style="margin:0;font:500 24px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.015em">4 · By role</h2>
+    <div style="display:flex;flex-direction:column;border-top:1px solid #E2D8D0">
+      <sc-for list="{{ roles }}" as="r" hint-placeholder-count="5"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:8px 32px;padding:18px 0;border-bottom:1px solid #E2D8D0"><div style="display:flex;flex-direction:column;gap:4px"><span style="font:500 16px 'Inter Tight', Inter, sans-serif">{{ r.who }}</span><span style="font-size:12.5px;color:#7A6255">{{ r.where }}</span></div><div style="display:flex;flex-direction:column;gap:4px"><span style="font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">Now</span><span style="font-size:13.5px;line-height:1.5">{{ r.now }}</span></div><div style="display:flex;flex-direction:column;gap:4px"><span style="font:500 11px Inter, sans-serif;letter-spacing:0.06em;text-transform:uppercase;color:#A8968B">Changes</span><span style="font-size:13.5px;line-height:1.5;text-wrap:pretty">{{ r.change }}</span></div></div></sc-for>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2 style="margin:0;font:500 24px 'Inter Tight', Inter, sans-serif;letter-spacing:-0.015em">5 · Decided 8 Nov</h2>
+    <sc-for list="{{ open }}" as="o" hint-placeholder-count="4"><div style="display:flex;gap:12px;font-size:14px;line-height:1.55"><span style="font:600 13px 'Inter Tight', Inter, sans-serif;color:#BD4A19">{{ o.n }}</span><span style="text-wrap:pretty">{{ o.q }}</span></div></sc-for>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const DONE = ['#E4ECE6', '#2F5A3C'], PROP = ['#FDE3D2', '#8A1F0A'], KEPT = ['#FFE9C2', '#7A4A00'];
+const it = (name, sub, flag, kind) => ({ name, sub: sub || '', flag: flag || '', flagBg: (kind || PROP)[0], flagFg: (kind || PROP)[1], bg: 'transparent', fg: '#422315', strike: 'none' });
+const gone = (name, sub) => ({ ...it(name, sub, 'Remove', PROP), fg: '#A8968B', strike: 'line-through' });
+const neu = (name, sub, flag) => ({ ...it(name, sub, flag || 'New', DONE), bg: '#F5F0EA' });
+
+const I = {
+  trend: 'M22 7l-8.5 8.5-5-5L2 17M16 7h6v6', inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
+  contact: 'M15 11a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z', cal: 'M8 2v4M16 2v4M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM3 10h18',
+  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75', act: 'M22 12h-4l-3 9L9 3l-3 9H2',
+  arrow: 'M7 7h10v10M7 17 17 7', split: 'M16 3h5v5M8 3H3v5M21 3l-7 7M3 3l7 7M12 22v-8', file: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7ZM14 2v4a2 2 0 0 0 2 2h4',
+  home: 'M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z', form: 'M9 11h6M9 15h6M5 4h14v16H5z', plug: 'M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4',
+  sliders: 'M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4', log: 'M12 8v4l3 2M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5', user: 'M17 8a5 5 0 1 1-10 0 5 5 0 0 1 10 0ZM20 21a8 8 0 0 0-16 0',
+};
+const s = (l, d, tag) => ({ l, d, tag: tag || '', bg: tag ? '#EFE6DD' : 'transparent' });
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      side: [
+        { head: '', items: [s('Insight', I.trend), s('Inbox', I.inbox), s('Contacts', I.contact), s('Calendar', I.cal, 'Leave'), s('Team activity', I.act, 'New')] },
+        { head: 'MARKETING', items: [s('Ads Performance', I.arrow), s('Assignment', I.split)] },
+        { head: 'REPORTS', items: [s('Reports', I.file, '+ My reports')] },
+        { head: 'MANAGEMENT', items: [s('Showrooms', I.home), s('Forms', I.form), s('Channels', I.plug), s('Settings', I.sliders), s('Audit log', I.log)] },
+      ],
+      phoneNav: [['Overview', I.trend, 1], ['Inbox', I.inbox], ['Activity', I.act], ['Calendar', I.cal], ['Profile', I.user]].map(([l, d, on]) => ({ l, d, fg: on ? '#BD4A19' : '#A8968B' })),
+      phoneTabs: [
+        { l: 'Overview', s: 'Team · Ads summary · Up next' },
+        { l: 'Inbox', s: 'Unchanged' },
+        { l: 'Activity', s: 'Team activity (new). Replaces the person report pop-up.' },
+        { l: 'Calendar', s: 'Appointments + leave, toggle either' },
+        { l: 'Profile', s: 'Manage: Assignment · Showrooms · Replies & templates · Ads Performance' },
+      ],
+      cols: [
+        { head: 'NOW · 13 PAGES · 5 GROUPS', headFg: '#A8968B', groups: [
+          { head: '', items: [it('Insight', 'Team performance · Ads performance'), it('Inbox'), it('Contacts'), it('Calendar')] },
+          { head: 'MARKETING', items: [it('Ads Performance'), it('Assignment', 'Ads to teams (Split · Ad performance · Audit log) · Leads by ad · Active members · Full time lead allocation · Member work type')] },
+          { head: 'REPORTS', items: [it('Reports', 'Ads performance · Leads by ad · Salespeople · Appointments & show-ups · Lead sources & status')] },
+          { head: 'WORKSPACE', items: [it('Workspace', 'Build your own weekly / monthly report')] },
+          { head: 'MANAGEMENT', items: [it('Showrooms', 'Showrooms · weekly slots · Key log'), it('Forms'), it('Channels', 'Connections · Facebook Page · Messenger · WhatsApp · Templates · Ads'), it('Settings', 'General · Reply library · Booking link · Cold lead templates · Notifications'), it('Audit log')] },
+        ] },
+        { head: 'NEW · 13 PAGES · 4 GROUPS', headFg: '#BD4A19', groups: [
+          { head: '', items: [it('Insight', 'Team performance · Ads summary (links to Ads Performance) · Up next', 'Up next added', DONE), it('Inbox'), it('Contacts'), it('Calendar', 'Appointments + leave, toggle either', 'Leave added', DONE), neu('Team activity', 'Leads, reply speed, waiting, appt per person; replaces the person report pop-up')] },
+          { head: 'MARKETING', items: [it('Ads Performance', 'The one full ad table'), it('Assignment', 'Ad split · Leads by ad · People (members, work type, Full time days, leave)', 'Regrouped', DONE)] },
+          { head: 'REPORTS', items: [it('Reports', 'Ready-made · My reports', 'Workspace merged in', DONE)] },
+          { head: 'MANAGEMENT', items: [it('Showrooms'), it('Forms'), it('Channels', 'Connections · Facebook Page · Messenger · WhatsApp · Templates', 'Ads tab removed', DONE), it('Settings', 'General · Replies & templates · Booking link · Notifications', 'Regrouped', DONE), it('Audit log', 'The only full log; pages link here filtered')] },
+        ] },
+      ],
+      repeats: [
+        { n: '01', title: 'Ad performance', status: 'Decided', stBg: DONE[0], stFg: DONE[1],
+          where: ['Ads Performance page', 'Insight › Ads performance tab', 'Assignment › Ads to teams › Ad performance pane', 'Reports › Ads performance', 'Channels › Ads'],
+          fix: 'Ads Performance is the one full table. Insight keeps a short summary card that opens it. The pane inside Ads to teams shows only the picked ad\'s numbers with "Open in Ads Performance". Reports › Ads performance stays as the export.', note: '' },
+        { n: '02', title: 'Leads by ad', status: 'Kept twice by owner', stBg: KEPT[0], stFg: KEPT[1],
+          where: ['Assignment › Leads by ad', 'Reports › Leads by ad'],
+          fix: 'Keep both, but make Assignment\'s the live view (who is getting what now) and Reports\' the period export. Same columns, one source.', note: 'crm.md › REPORTS (2026-10-23): owner said "两边都保留".' },
+        { n: '03', title: 'Audit log', status: 'Decided', stBg: DONE[0], stFg: DONE[1],
+          where: ['Sidebar › Audit log (every area)', 'Assignment › Ads to teams › Audit log pane', 'Assignment › Member work type › log', 'Inbox › chat › Audit log column'],
+          fix: 'Sidebar Audit log is the only full list. The in-page logs become a short "last 5 changes" with "View all" opening the sidebar log already filtered to that area. The chat\'s log stays: it is one customer\'s history, not a settings log.', note: '' },
+        { n: '04', title: 'Reports and Workspace', status: 'Decided', stBg: DONE[0], stFg: DONE[1],
+          where: ['Reports: 5 fixed categories', 'Workspace: build-your-own report'],
+          fix: 'Merge into one Reports page: Ready-made · My reports. Saves a sidebar group.', note: '' },
+        { n: '05', title: 'People and availability', status: 'Decided', stBg: DONE[0], stFg: DONE[1],
+          where: ['Assignment › Active members', 'Assignment › Member work type (full / part time)', 'Assignment › Full time lead allocation', 'New: leave (People calendar)'],
+          fix: 'One Assignment › People tab: who is active, work type, Full time days and leave on one calendar. Full time lead allocation keeps only the team-level rule.', note: '' },
+        { n: '06', title: 'Templates and replies', status: 'Decided', stBg: DONE[0], stFg: DONE[1],
+          where: ['Channels › Templates (WhatsApp templates)', 'Settings › Reply library', 'Settings › Cold lead templates', 'Phone › Profile › Manage › Cold lead templates'],
+          fix: 'Settings › Replies & templates with three tabs: Quick replies · Cold lead · WhatsApp templates. Channels › Templates links there.', note: 'WhatsApp templates need Meta approval, so their editor may have to stay under Channels.' },
+        { n: '07', title: 'Up next', status: 'Decided: Insight', stBg: DONE[0], stFg: DONE[1],
+          where: ['Insight › Up next (designed)', 'Leave edits there also exist in Assignment › People'],
+          fix: 'Insight shows the queue and quick actions. Leave and Full time are edited in Assignment › People; Up next\'s "Leave" opens the same editor.', note: '' },
+        { n: '08', title: 'Leave calendar', status: 'Decided', stBg: DONE[0], stFg: DONE[1],
+          where: ['Assignment › People (leave + Full time)', 'Calendar (appointments)'],
+          fix: 'Calendar shows appointments and leave together with a toggle. Leave can be edited in both places; one record.', note: '' },
+        { n: '09', title: 'Person report', status: 'Decided', stBg: DONE[0], stFg: DONE[1],
+          where: ['Inbox › name in chat header › person report pop-up', 'Team activity (new page)'],
+          fix: 'Remove the pop-up. Clicking a salesperson\'s name opens Team activity filtered to that person.', note: '' },
+      ],
+      rw: [
+        { name: 'Reports', what: 'Fixed categories, for anyone with Manage.', items: ['Ads performance', 'Leads by ad', 'Salespeople', 'Appointments & show-ups', 'Lead sources & status'] },
+        { name: 'Workspace', what: 'Your own report for the weekly / monthly update.', items: ['Pick and order metrics', 'Each ad', 'Salespeople', 'Who the leads went to (by team)', 'Properties asked about', 'Questions customers asked'] },
+      ],
+      roles: [
+        { who: 'Principal', where: 'Desktop + phone Control panel', now: 'All 13 desktop pages. Phone: Overview · Inbox · Assignment · Calendar · Profile (Manage: Showrooms, Cold lead templates, Ads Performance).', change: 'Desktop as above. Phone: Assignment tab replaced by Activity; Assignment moves to Profile › Manage; Cold lead templates moves to Replies & templates.' },
+        { who: 'Revenue Director', where: 'Desktop + phone, Team | Mine', now: 'Same as Principal on Team; salesperson CRM on Mine.', change: 'Same as Principal. Up next and People scoped to the director\'s teams.' },
+        { who: 'Team leader (STL / TL / TA)', where: 'Desktop + phone, Team | Mine', now: 'Insight · Inbox · Contacts · Calendar. With assign rights also Assignment, Showrooms, Channels, Reports.', change: 'Insight gains Up next (own team only). Assignment › People read-only unless they can assign.' },
+        { who: 'Salesperson', where: 'Phone (salesperson CRM)', now: 'Inbox · Contacts · Calendar · Insight · Profile.', change: 'No change. Optional: see own leave and "you are #3 for the next lead" in Profile.' },
+        { who: 'Phone Control panel', where: 'Principal / Director phone', now: 'Overview · Inbox · Assignment · Calendar · Profile.', change: 'Overview gains Up next. Assignment tab replaced by Activity (Team activity); Assignment moves to Profile › Manage. Calendar shows leave + appointments.' },
+      ],
+      open: [
+        { n: '✓', q: 'Insight › Ads: keep a short summary card that opens Ads Performance.' },
+        { n: '✓', q: 'Ads to teams: keep only the picked ad\'s numbers, with "Open in Ads Performance".' },
+        { n: '✓', q: 'In-page audit logs: last 5 changes + "View all" to the sidebar Audit log.' },
+        { n: '✓', q: 'Workspace merges into Reports as "My reports".' },
+        { n: '✓', q: 'Leads by ad stays in Assignment (live) and Reports (export).' },
+        { n: '✓', q: 'Replies & templates in one place under Settings.' },
+        { n: '✓', q: 'Leave edited in Calendar and Assignment › People, one record.' },
+        { n: '✓', q: 'Team activity is its own sidebar page; the person report pop-up is removed.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
