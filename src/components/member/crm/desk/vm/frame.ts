@@ -39,7 +39,8 @@ export function lists(ctx: DeskCtx): Record<string, [string, string, string][]> 
       ["People", "", "users"],
     ],
     // Settings = Cold lead templates and Notifications (v2). History is the sidebar's Audit log now.
-    settings: [["General", "", "file"], ["Reply library", "", "file"], ["Booking link", "", "file"], ["Cold lead templates", "", "file"], ["Notifications", "", "bell"]],
+    // The owner, 2026-11-08: Reply library deleted; Cold lead templates stays in Settings (supersedes the handoff's Replies & templates).
+    settings: [["General", "", "file"], ["Booking link", "", "file"], ["Cold lead templates", "", "file"], ["Notifications", "", "bell"]],
     showrooms: [["Showrooms", "", "store"]],
     forms: [["Forms", "", "file"]],
   };

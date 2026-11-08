@@ -163,22 +163,8 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
       alt: v.srPage === "rooms" && v.sr4.draftable ? { label: "Save as draft", act: v.sr4.saveDraft } : null },
     forms: { tabs: [], sub: v.cfSummary, cta: { label: "Publish", icon: "check", act: v.cfSave } },
     channels: { tabs: [], sub: "", cta: { label: "Add a number", icon: "plus", act: () => window.open("https://business.facebook.com/wa/manage/phone-numbers/", "_blank", "noopener") } },
-    // Settings: General · Replies & templates · Booking link · Notifications (docs/design_handoff_crm, CRM Navigation Audit
-    // 2026-11-08). Replies & templates holds three tabs — Quick replies (the reply library), Cold lead templates, and WhatsApp
-    // templates, which opens Channels › Templates (Meta approves them there).
-    settings: (() => {
-      const RT = ["Reply library", "Cold lead templates"], inRt = RT.includes(v.opItem), card = (t: string) => v.listCards.find(c => c.title === t);
-      return {
-        tabs: v.listCards.filter(c => c.title !== "Cold lead templates").map(c => c.title === "Reply library"
-          ? { label: "Replies & templates", on: inRt, pick: c.pick } : { label: c.title, on: c.title === v.opItem, pick: c.pick }),
-        subTabs: inRt ? [
-          { label: "Quick replies", on: v.opItem === "Reply library", pick: () => card("Reply library")?.pick() },
-          { label: "Cold lead templates", on: v.opItem === "Cold lead templates", pick: () => card("Cold lead templates")?.pick() },
-          { label: "WhatsApp templates", on: false, pick: () => ctx.patch({ tab: "channels", chTab: "tpl", pane: "closed" }) },
-        ] : undefined,
-        sub: "", cta: null,
-      };
-    })(),
+    // Settings: General · Booking link · Cold lead templates · Notifications (the owner, 2026-11-08: Reply library deleted).
+    settings: { tabs: v.listCards.map(c => ({ label: c.title, on: c.title === v.opItem, pick: c.pick })), sub: "", cta: null },
     auditlog: { tabs: [], sub: n(v.auCount, "change", "changes"), cta: { label: "Export CSV", icon: "download", act: v.auditCsv } },
     // Reports (2026-10-23): its categories as the head's tabs, Export CSV of the one on screen.
     // v2 frame 12: the categories are the second row of tabs; Ads performance is frame 05's body and its Export menu.
