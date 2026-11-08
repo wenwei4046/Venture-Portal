@@ -44,8 +44,8 @@ interface Props {
   onNotice: (message: string) => void
 }
 
-/** Its boxes, its sensitive fields, By management approve (2026-10-29, the claim process's PR ③) and CRM · Up next (2026-11-08). */
-type Draft = { ticks: Set<string>; sensitive: SensitiveField[]; review: boolean; upNext: boolean }
+/** Its boxes, its sensitive fields, and By management approve (2026-10-29, the claim process's PR ③). */
+type Draft = { ticks: Set<string>; sensitive: SensitiveField[]; review: boolean }
 
 /** The view a template opens on: the first it has a tab of, else the HR view. */
 function firstView(ticks: ReadonlySet<string>): TabView {
@@ -87,10 +87,8 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
   const sensitive = draft?.sensitive ?? template?.sensitive ?? []
   const savedReview = template?.review ?? false
   const review = draft?.review ?? savedReview
-  const savedUpNext = template?.upNext ?? false
-  const upNext = draft?.upNext ?? savedUpNext
   const dirty =
-    !!template && !!draft && (!sameTicks(draft.ticks, saved) || !sameSensitive(draft.sensitive, template.sensitive) || draft.review !== savedReview || draft.upNext !== savedUpNext)
+    !!template && !!draft && (!sameTicks(draft.ticks, saved) || !sameSensitive(draft.sensitive, template.sensitive) || draft.review !== savedReview)
   const warnings = useMemo(() => sodWarnings(grantsOfTicks(ticks), functions), [ticks, functions])
   const held = useMemo(() => (template ? heldTabs(ticks, sensitive, template.baseRole, cellKeys) : new Map<string, string>()), [ticks, sensitive, template, cellKeys])
 
@@ -110,7 +108,7 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
 
   function edit(next: (d: Draft) => Draft) {
     if (!template || !canManage) return
-    setDraft(d => next(d ?? { ticks: saved, sensitive: template.sensitive, review: savedReview, upNext: savedUpNext }))
+    setDraft(d => next(d ?? { ticks: saved, sensitive: template.sensitive, review: savedReview }))
   }
 
   function onSave() {
@@ -124,7 +122,6 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
         sensitive: draft.sensitive,
         // Only when it moved: an untouched tick costs no second write.
         ...(draft.review !== savedReview ? { review: draft.review } : {}),
-        ...(draft.upNext !== savedUpNext ? { upNext: draft.upNext } : {}),
       })
       if (!result.ok) return setError(result.reason)
       setDraft(null)
@@ -242,7 +239,6 @@ export default function PermissionTemplates({ data, canManage, canSeeHistory, in
         onColumn={action => edit(d => ({ ...d, ticks: toggleColumn(d.ticks, view, action) }))}
         onAll={() => edit(d => ({ ...d, ticks: toggleView(d.ticks, view) }))}
         review={{ on: review, onToggle: () => edit(d => ({ ...d, review: !d.review })) }}
-        upNext={{ on: upNext, onToggle: () => edit(d => ({ ...d, upNext: !d.upNext })) }}
       />
 
       {canManage ? (

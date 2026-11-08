@@ -319,6 +319,8 @@ export interface CrmData {
   leaves?: CrmLeave[];
   /** Up next's actions, for the Audit log (CRM · Manage reads them). */
   upNextEvents?: CrmUpNextEvent[];
+  /** Leaders CRM › Settings › Up next lets act on their people. */
+  upNextStaff?: string[];
   autoReplies: CrmAutoReplySet;
   /** Other people's auto-replies, for View as (read only) — only for whoever sees everybody's CRM. */
   autoRepliesOf?: Record<string, CrmAutoReplySet>;
@@ -521,6 +523,7 @@ export interface CrmDataRows {
   partnerLinks?: { id: string; name: string; code: string; on: boolean }[];
   leaves?: { id: string; staff_id: string; starts_on: string; ends_on: string; note: string | null; from_at?: string | null; to_at?: string | null; reason?: string | null }[];
   upNextEvents?: { id: number; at: string; actor: string | null; data: Record<string, unknown> }[];
+  upNextStaff?: string[];
   labels: { id: string; name: string; color: string; sort_order: number }[];
   contactLabels: { label_id: string; contact_id: string }[];
   quickReplies: { id: string; shortcut: string; message: string; sort_order: number }[];
@@ -694,6 +697,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     leaves: (rows.leaves ?? []).map(l => ({ id: l.id, staffId: l.staff_id, from: l.starts_on, to: l.ends_on, note: l.note ?? "",
       fromAt: officeStamp(l.from_at) ?? `${l.starts_on}T00:00`, toAt: officeStamp(l.to_at) ?? `${l.ends_on}T23:30`,
       reason: (["Annual", "Sick", "Training", "Other"].includes(l.reason ?? "") ? l.reason : "Other") as CrmLeave["reason"] })),
+    upNextStaff: rows.upNextStaff ?? [],
     upNextEvents: (rows.upNextEvents ?? []).map(e => ({ id: e.id, at: e.at, actor: e.actor, action: String(e.data.action ?? ""), staff: (e.data.staff as string | null) ?? null, ad: (e.data.ad as string | null) ?? null,
       before: (e.data.before as Record<string, unknown> | null) ?? null, after: (e.data.after as Record<string, unknown> | null) ?? null })),
     replyLibrary: (rows.library ?? []).map(r => ({ id: r.id, title: r.title, category: r.category ?? "", body: r.body, keywords: r.keywords ?? [] })),

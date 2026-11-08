@@ -24,14 +24,13 @@ const access = (overrides: Partial<Extract<PersonAccessData, { kind: 'template' 
   kind: 'template',
   userId: USER,
   titleName: 'TEAM LEADER',
-  template: { id: 't', name: 'Revenue Team', baseRole: 'revenue_member', grants: { revenue_app: { view: 'own', create: 'own' } }, sensitive: [], tabs: null, review: false, upNext: false },
+  template: { id: 't', name: 'Revenue Team', baseRole: 'revenue_member', grants: { revenue_app: { view: 'own', create: 'own' } }, sensitive: [], tabs: null, review: false },
   cells: {},
   boxes: [],
   legacy: [],
   reach: null,
   ownSensitive: [],
   ownReview: null,
-  ownUpNext: null,
   functions: [fn('revenue_app', 'Revenue app', 'view create', 'own')],
   cellKeys: [
     K('revenue_app', 'view', 'member_portal'), K('revenue_app', 'view', 'member_insight'), K('revenue_app', 'view', 'member_memos'),
@@ -156,7 +155,7 @@ describe('a person’s sub-departments on the Revenue tabs', () => {
   const kris = (ticks: Array<{ area: 'crm' | 'comm_cal' | 'sales_groups' | 'rules'; sub: string; granted: boolean }> = []) => access({
     template: {
       id: 't', name: 'Revenue Director', baseRole: 'revenue_member', grants: { revenue_app: { view: 'own' } }, sensitive: [],
-      tabs: ['rev.today.view', 'rev.leads.view', 'rev.leads.edit', 'rev.crm_team.view'], review: false, upNext: false,
+      tabs: ['rev.today.view', 'rev.leads.view', 'rev.leads.edit', 'rev.crm_team.view'], review: false,
     },
     reach: { subs: [{ id: FAIR, name: 'Fair' }, { id: IR, name: 'IR' }], handled: [FAIR], ticks },
   })
@@ -242,7 +241,7 @@ describe('a person’s own By management approve', () => {
       titleName: 'CONTENT CREATOR',
       template: {
         id: 't', name: 'Marketing · Staff', baseRole: 'staff', grants: { claims: { view: 'own', create: 'own' } }, sensitive: [],
-        tabs: ['mkt.my_claims.view', 'mkt.my_claims.create'], review: true, upNext: false,
+        tabs: ['mkt.my_claims.view', 'mkt.my_claims.create'], review: true,
       },
       ownReview: null,
       functions: [fn('claims', 'Claims', 'view create', 'own dept all')],
@@ -280,65 +279,5 @@ describe('a person’s own By management approve', () => {
     fireEvent.click(box('Sensitive fields · Salary amounts'))
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
     expect(mocks.setPersonTabs.mock.calls[0][0]).not.toHaveProperty('review')
-  })
-})
-
-// 2026-11-08: CRM · Up next — a TL / STL / TA may use Insight › Up next's actions for the people under them; stored as
-// By management approve is, drawn under Profile · My leads & appointments when its View is ticked.
-describe('a person’s own CRM · Up next', () => {
-  const lead = (over: Partial<Extract<PersonAccessData, { kind: 'template' }>> = {}) =>
-    access({
-      template: {
-        id: 't', name: 'Revenue Team', baseRole: 'revenue_member', grants: { revenue_app: { view: 'own' } }, sensitive: [],
-        tabs: ['rev.today.view', 'rev.leads.view', 'rev.leads.edit'], review: false, upNext: false,
-      },
-      ...over,
-    })
-  const UP_NEXT = 'Profile · My leads & appointments · CRM · Up next'
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mocks.setPersonTabs.mockResolvedValue({ ok: true })
-  })
-
-  it('shows under My leads & appointments only while its View is ticked', () => {
-    render(<PersonAccess access={lead()} canEdit />)
-    expect(box(UP_NEXT)).toHaveAttribute('aria-checked', 'false')
-    fireEvent.click(box('Profile · My leads & appointments · View'))
-    expect(screen.queryByRole('checkbox', { name: UP_NEXT })).toBeNull()
-  })
-
-  it('ticks it for one person — a red dot — and sends only it, not By management approve', async () => {
-    render(<PersonAccess access={lead()} canEdit />)
-    fireEvent.click(box(UP_NEXT))
-    expect(box(UP_NEXT)).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getAllByLabelText('changed for this person')).toHaveLength(1)
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
-    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [], upNext: true })
-  })
-
-  it('clicked back to the title’s, it is theirs no more', () => {
-    render(<PersonAccess access={lead({ template: { ...(lead() as Extract<PersonAccessData, { kind: 'template' }>).template, upNext: true } })} canEdit />)
-    expect(box(UP_NEXT)).toHaveAttribute('aria-checked', 'true')
-    fireEvent.click(box(UP_NEXT))
-    fireEvent.click(box(UP_NEXT))
-    expect(box(UP_NEXT)).toHaveAttribute('aria-checked', 'true')
-    expect(screen.queryAllByLabelText('changed for this person')).toHaveLength(0)
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-  })
-
-  it('their own tick over the title’s; Reset to title sends null', async () => {
-    render(<PersonAccess access={lead({ ownUpNext: true })} canEdit />)
-    expect(box(UP_NEXT)).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getAllByLabelText('changed for this person')).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: 'Reset to title' }))
-    expect(box(UP_NEXT)).toHaveAttribute('aria-checked', 'false')
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })))
-    expect(mocks.setPersonTabs).toHaveBeenCalledWith({ userId: USER, templateId: 't', sensitive: [], boxes: [], upNext: null })
-  })
-
-  it('is read-only without accounts.manage', () => {
-    render(<PersonAccess access={lead()} canEdit={false} />)
-    expect(box(UP_NEXT)).toBeDisabled()
   })
 })

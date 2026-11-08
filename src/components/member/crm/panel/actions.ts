@@ -45,6 +45,8 @@ export interface PanelActions extends SalesActions {
   setFullTime(staffId: string, on: boolean): Promise<boolean>;
   /** Lock a member out of the dealing for now, or back in (crm_set_locked, CRM · Manage). */
   setLocked(staffId: string, on: boolean): Promise<boolean>;
+  /** CRM › Settings › Up next: may this leader act on their people in Up next. */
+  setUpNext(staffId: string, on: boolean): Promise<boolean>;
   /** A member's leave (mig 20261029220000, CRM · Manage): add or change one; remove one. */
   saveLeave(leave: { id: string | null; staffId: string; fromAt: string; toAt: string; reason: CrmLeave["reason"]; note: string }): Promise<boolean>;
   deleteLeave(id: string): Promise<boolean>;
@@ -202,6 +204,11 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     async setLocked(staffId, on) {
       if (!(await write("crm_set_locked", { p_staff: staffId, p_locked: on }))) return false;
       setData(d => ({ ...d, lockedStaff: on ? [...new Set([...(d.lockedStaff ?? []), staffId])] : (d.lockedStaff ?? []).filter(id => id !== staffId) }));
+      return true;
+    },
+    async setUpNext(staffId, on) {
+      if (!(await write("crm_set_up_next", { p_staff: staffId, p_on: on }))) return false;
+      setData(d => ({ ...d, upNextStaff: on ? [...new Set([...(d.upNextStaff ?? []), staffId])] : (d.upNextStaff ?? []).filter(id => id !== staffId) }));
       return true;
     },
     async saveLeave(l) {

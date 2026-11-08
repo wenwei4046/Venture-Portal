@@ -211,45 +211,32 @@ create trigger crm_staff_leave_log after insert or update or delete on public.cr
   for each row execute function public.crm_staff_leave_log();
 
 -- ── The writes ───────────────────────────────────────────────────────────────────────────────────────────────────────
--- ── The tick: People › Permissions › CRM · Up next ─────────────────────────────────────────────────────────────────────
--- The owner (2026-11-08): the Principal ticks a title or a person, and that TL / STL / TA may Skip, Pause, Give to… and fill
--- in leave for the people under them. Stored as By management approve is (20261029200000): the person's own tick over
--- their title's template's. Not a cell: it opens nothing but these writes, on their own line.
-do $$
-declare c record;
-begin
-  for c in select conrelid::regclass::text t, conname from pg_constraint
-            where conrelid in ('public.permission_template_flags'::regclass, 'public.user_permission_flags'::regclass)
-              and contype = 'c' and pg_get_constraintdef(oid) like '%claims_review%'
-  loop
-    execute format('alter table %s drop constraint %I', c.t, c.conname);
-  end loop;
-end $$;
-alter table public.permission_template_flags add constraint permission_template_flags_flag_check check (flag in ('claims_review', 'crm_up_next'));
-alter table public.user_permission_flags add constraint user_permission_flags_flag_check check (flag in ('claims_review', 'crm_up_next'));
-do $$
-declare f text; v_src text; v_new text;
-begin
-  foreach f in array array['public.permission_template_flags_set(uuid, integer, text[])', 'public.permission_user_flags_set(uuid, jsonb)'] loop
-    select pg_get_functiondef(f::regprocedure) into v_src;
-    v_new := replace(v_src, 'NOT IN (''claims_review'')', 'NOT IN (''claims_review'', ''crm_up_next'')');
-    if v_new = v_src then raise exception 'crm_up_next: % has changed; look before replacing.', f; end if;
-    execute v_new;
-  end loop;
-end $$;
+-- ── Who else may act: CRM › Settings › Up next ─────────────────────────────────────────────────────────────────────────
+-- The owner (2026-11-08): the Principal switches a TL / STL / TA on in the CRM's own management pages, and that leader may
+-- Skip, Pause, Give to… and fill in leave for the people under them. Kept on the person's CRM record, beside Locked.
+alter table public.crm_staff add column if not exists up_next boolean not null default false;
 
--- Has this login the tick? Their own, else their title's template's.
-create or replace function public.crm_up_next_ticked(p_user uuid)
+create or replace function public.crm_up_next_ticked(p_staff uuid)
 returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce(
-    (select f.granted from public.user_permission_flags f where f.user_id = p_user and f.flag = 'crm_up_next'),
-    exists (select 1 from public.permission_template_flags tf
-             where tf.flag = 'crm_up_next'
-               and tf.template_id = (select t.template_id from public.hr_staff_costs s join public.titles t on t.id = s.title_id
-                                      where s.user_id = p_user order by s.created_at, s.id limit 1)));
+  select coalesce((select s.up_next from crm_staff s where s.staff_id = p_staff), false)
 $$;
 revoke execute on function public.crm_up_next_ticked(uuid) from public, anon, authenticated;
 grant execute on function public.crm_up_next_ticked(uuid) to service_role;
+
+-- CRM · Manage switches it, on the record like every Up next change.
+create or replace function public.crm_set_up_next(p_staff uuid, p_on boolean)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_was boolean;
+begin
+  if not crm_manages() then perform crm_deny('let somebody act in Up next'); end if;
+  if p_staff is null or not exists (select 1 from hr_staff_costs where id = p_staff) then raise exception 'Pick a member.' using errcode = '22023'; end if;
+  select up_next into v_was from crm_staff where staff_id = p_staff;
+  insert into crm_staff (staff_id, up_next, updated_by, updated_at) values (p_staff, coalesce(p_on, false), auth.uid(), now())
+  on conflict (staff_id) do update set up_next = excluded.up_next, updated_by = excluded.updated_by, updated_at = now();
+  if coalesce(v_was, false) is distinct from coalesce(p_on, false) then
+    perform crm_up_next_log('access', p_staff, null, jsonb_build_object('mayAct', coalesce(v_was, false)), jsonb_build_object('mayAct', coalesce(p_on, false)));
+  end if;
+end $$;
 
 -- CRM · Manage may act on anybody; a leader ticked for CRM · Up next on the people under them (never themselves).
 create or replace function public.crm_up_next_may(p_staff uuid)
@@ -257,7 +244,7 @@ returns boolean language plpgsql stable security definer set search_path = publi
 begin
   if p_staff is null then return false; end if;
   if crm_manages() then return true; end if;
-  return auth.uid() is not null and crm_up_next_ticked(auth.uid()) and crm_can('view', 'own')
+  return crm_up_next_ticked(crm_me()) and crm_can('view', 'own')
      and p_staff is distinct from crm_me() and p_staff in (select crm_my_downline());
 end $$;
 revoke execute on function public.crm_up_next_may(uuid) from public, anon, authenticated;
@@ -308,7 +295,7 @@ create or replace function public.crm_up_next_undo(p_ad text)
 returns void language plpgsql security definer set search_path = public as $$
 declare v_me uuid := crm_me(); v_all boolean := crm_manages(); v_was uuid;
 begin
-  if v_me is null or not (v_all or (crm_up_next_ticked(auth.uid()) and crm_can('view', 'own'))) then perform crm_deny('undo the next lead''s pin'); end if;
+  if v_me is null or not (v_all or (crm_up_next_ticked(v_me) and crm_can('view', 'own'))) then perform crm_deny('undo the next lead''s pin'); end if;
   select staff_id into v_was from crm_deal_overrides
    where kind = 'pin' and (p_ad = 'all' or scope in (p_ad, 'all')) and used_at is null and cleared_at is null and (v_all or created_by = v_me) order by created_at desc limit 1;
   update crm_deal_overrides set cleared_at = now()
@@ -515,7 +502,7 @@ begin
   return jsonb_build_object('me', v_me, 'now', to_char(v_at at time zone 'Asia/Kuala_Lumpur', 'YYYY-MM-DD"T"HH24:MI'),
     'manage', crm_manages(),
     -- May the viewer act here at all (CRM · Manage, or ticked for CRM · Up next on their own line)?
-    'canAct', crm_manages() or (auth.uid() is not null and crm_up_next_ticked(auth.uid()) and crm_can('view', 'own')),
+    'canAct', crm_manages() or (crm_up_next_ticked(v_me) and crm_can('view', 'own')),
     'fullTimeDay', exists (select 1 from crm_fulltime_teams(v_at)),
     -- Every ad counted is in the together group with one split (Save and apply to all › Count together): one pool.
     'together', coalesce(array_length(v_ads, 1), 0) > 1 and not exists (select 1 from unnest(v_ads) x left join crm_ad_assign a on a.ad_source_id = x where a.together is not true)
@@ -527,7 +514,7 @@ do $$
 declare f text;
 begin
   foreach f in array array[
-    'crm_up_next_skip(text, uuid)', 'crm_up_next_pause(uuid, boolean)', 'crm_up_next_give(text, uuid)', 'crm_up_next_undo(text)',
+    'crm_up_next_skip(text, uuid)', 'crm_up_next_pause(uuid, boolean)', 'crm_up_next_give(text, uuid)', 'crm_up_next_undo(text)', 'crm_set_up_next(uuid, boolean)',
     'crm_up_next_save_leave(uuid, uuid, timestamptz, timestamptz, text, text)', 'crm_up_next_end_leave(uuid)', 'crm_up_next(text, text[], int, uuid)']
   loop
     execute format('revoke execute on function public.%s from public, anon', f);

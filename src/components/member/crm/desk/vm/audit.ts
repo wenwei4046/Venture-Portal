@@ -60,6 +60,7 @@ const cust2 = (d: DeskCtx["data"], ad: string) => d.adNames?.[ad]?.name ?? d.cus
 type UpRow = Record<string, unknown> | null;
 const UP_ACTIONS: Record<string, (b: UpRow, a: UpRow, leave: (l: UpRow) => string, pinned: (l: UpRow) => string) => [string, string]> = {
   skip: () => ["Up next · skipped", "This one lead goes to the next person"],
+  access: (b, a) => ["Up next · may act on their people", `${b?.mayAct ? "On" : "Off"} → ${a?.mayAct ? "On" : "Off"}`],
   pause: () => ["Up next · paused", "In turn → Paused"],
   resume: () => ["Up next · resumed", "Paused → In turn"],
   give: (b, a, _l, p) => ["Up next · next lead given", `${p(b)} → ${p(a)}`],

@@ -64,7 +64,7 @@ const CRM_WRITES = [
   // Members' leave (mig 20261029220000), CRM · Manage.
   "crm_save_leave", "crm_delete_leave",
   // Insight › Up next (mig 20261108120000): Skip, Pause, Give to…, leave with a time and a reason. CRM · Manage, as every assignment write.
-  "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_save_leave", "crm_up_next_end_leave",
+  "crm_up_next_skip", "crm_up_next_pause", "crm_up_next_give", "crm_up_next_undo", "crm_up_next_save_leave", "crm_up_next_end_leave", "crm_set_up_next",
   // v2 frame 08: put another form in use (mig 20261024160000), CRM · Manage.
   "crm_set_active_form",
   // v2 frames 02 / 03: a customer added by hand (mig 20261024180000), CRM · Edit (own).
@@ -154,6 +154,8 @@ const requireCrm = async (need: "view" | "edit" | "manage") => {
 
 /** Which cell each of the CRM's writes needs (the database asks the same). */
 const MANAGE_WRITES: ReadonlySet<string> = new Set([
+  // CRM › Settings › Up next (mig 20261108120000): who else may act in Up next.
+  "crm_set_up_next",
   "crm_send_to", "crm_send_to_team", "crm_give_to_hod", "crm_save_ad_assign", "crm_save_ads", "crm_save_ad_rule", "crm_save_fulltime",
   "crm_save_team_shares", "crm_set_full_time", "crm_set_locked", "crm_save_showroom", "crm_save_showroom_full",
   "crm_save_template", "crm_template_on", "crm_delete_template",
@@ -231,7 +233,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
-      forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, upNextEvents: more.upNextEvents, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
+      forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, upNextEvents: more.upNextEvents, upNextStaff: more.upNextStaff, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
     }));
     // Where Meta shows every template's review (2026-11-04) — for whoever writes templates; the account's id, never a token.
     const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim();
@@ -257,7 +259,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents, upNextStaff] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order, kind")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -294,8 +296,10 @@ async function desktopRows(db: Db, journey: boolean) {
     (async () => { try { const { data, error } = await db.rpc("crm_showroom_drafts_read"); return error || !Array.isArray(data) ? [] : (data as { room: string; draft: unknown; saved_by: string | null; saved_at: string }[]); } catch { return []; } })(),
     // Up next's actions, for the Audit log (mig 20261108120000; the row policy gives them to CRM · Manage).
     soft<NonNullable<CrmDataRows["upNextEvents"]>>(db.from("crm_events").select("id, at, actor, data").eq("kind", "up_next").order("at", { ascending: false }).limit(500)),
+    // Who CRM › Settings › Up next lets act on their people (mig 20261108120000).
+    soft<{ staff_id: string }[]>(db.from("crm_staff").select("staff_id").eq("up_next", true)),
   ]);
-  return { upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
+  return { upNextStaff: upNextStaff.map(r => r.staff_id), upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */

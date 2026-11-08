@@ -65,22 +65,6 @@ const ad = 'ad-1'
 const split = { [S('tla')]: 50, [S('tlb')]: 50 }
 await q(`insert into crm_ad_assign (ad_source_id, ad_label, mode, team_split, people_mode, people) values ($1, 'Ad 1', 'split', $2::jsonb, 'cnt', '{}'::jsonb)`, [ad, JSON.stringify(split)])
 
-// Production's flag tables and their two writers (20261029200000), as far as this migration touches them.
-await db.exec()
-
-// Production's flag tables and their two writers (20261029200000), as far as this migration touches them.
-await db.exec(`
-  alter table titles add column template_id uuid;
-  alter table hr_staff_costs add column if not exists created_at timestamptz not null default now();
-  create table permission_templates (id uuid primary key, name text, version integer not null default 1);
-  create table permission_template_flags (template_id uuid references permission_templates(id), flag text not null check (flag in ('claims_review')), primary key (template_id, flag));
-  create table user_permission_flags (user_id uuid references users(id), flag text not null check (flag in ('claims_review')), granted boolean not null, primary key (user_id, flag));
-  create function permission_template_flags_set(p_template uuid, p_version integer, p_flags text[]) returns integer language plpgsql as $f$
-  begin if exists (select 1 from unnest(p_flags) f where f NOT IN ('claims_review')) then raise exception 'Not a tick a template takes'; end if; return p_version; end $f$;
-  create function permission_user_flags_set(p_user uuid, p_flags jsonb) returns void language plpgsql as $f$
-  begin if exists (select 1 from jsonb_to_recordset(p_flags) as f(flag text, granted boolean) where f.flag NOT IN ('claims_review')) then raise exception 'bad'; end if; end $f$;
-`)
-
 // The migration under test, verbatim.
 await db.exec((await readFile(new URL('20261108120000_crm_up_next.sql', dir), 'utf8')).replace(/\r\n/g, '\n'))
 
@@ -184,20 +168,18 @@ const deal = async () => {
   await as('tla')
   for (const [sql, args] of [['select crm_up_next_pause($1, true)', [S('ann')]], ['select crm_up_next_give($1, $2)', [ad, S('amy')]], ['select crm_up_next_undo($1)', [ad]],
     ["select crm_up_next_save_leave(null, $1, now() + interval '30 days', now() + interval '31 days', 'Sick', '')", [S('amy')]]]) { await assert.rejects(q(sql, args), /./); checks++ }
-  // The Principal ticks the title: their own line, never another's, never themselves.
-  await noOne()
-  await q(`insert into permission_templates (id, name) values ($1, 'TL') on conflict do nothing`, [id('tpl', 'tl')])
-  await q(`update titles set template_id = $1 where id = $2`, [id('tpl', 'tl'), id('t', 'tl')])
-  await q(`insert into permission_template_flags (template_id, flag) values ($1, 'crm_up_next')`, [id('tpl', 'tl')])
+  // A salesperson or a leader cannot switch it; CRM · Manage does, in CRM › Settings.
+  await as('tla'); await assert.rejects(q(`select crm_set_up_next($1, true)`, [S('tla')]), /./); checks++
+  await as('hod'); await q(`select crm_set_up_next($1, true)`, [S('tla')])
   await as('tla')
   await q("select crm_up_next_save_leave(null, $1, now() + interval '30 days', now() + interval '31 days', 'Sick', '')", [S('amy')])
   check(Number((await q(`select count(*) n from crm_staff_leave where staff_id = $1 and reason = 'Sick'`, [S('amy')]))[0].n) > 0, true, "a ticked leader fills in their people's leave")
   await assert.rejects(q(`select crm_up_next_pause($1, true)`, [S('bob')]), /./); checks++
   await assert.rejects(q(`select crm_up_next_pause($1, true)`, [S('tla')]), /./); checks++
-  // A person's own untick wins over the title's tick.
-  await noOne(); await q(`insert into user_permission_flags (user_id, flag, granted) values ($1, 'crm_up_next', false)`, [id('u', 'tla')])
+  // Switched off again: back to looking only.
+  await as('hod'); await q(`select crm_set_up_next($1, false)`, [S('tla')])
   await as('tla'); await assert.rejects(q(`select crm_up_next_pause($1, true)`, [S('ann')]), /./); checks++
-  await noOne(); await q(`delete from user_permission_flags where user_id = $1`, [id('u', 'tla')])
+  await as('hod'); await q(`select crm_set_up_next($1, true)`, [S('tla')])
   await as('tla')
   await q(`select crm_up_next_give($1, $2)`, [ad, S('amy')])
   check((await q(`select team_only from crm_deal_overrides where kind = 'pin' and used_at is null and cleared_at is null`))[0].team_only, true, "a leader's pin stays inside their team")
@@ -207,15 +189,11 @@ const deal = async () => {
   const v = (await read('boss', ad, S('tlb')))
   check(v.queue.every(x => [S('tlb'), S('bob')].includes(x.staff)), true, "View as reads that person's line")
 }
-// People › Permissions' two writers take the new tick.
-await noOne()
-await q(`select permission_template_flags_set($1, 1, array['claims_review', 'crm_up_next'])`, [id('tpl', 'tl')])
-await q(`select permission_user_flags_set($1, '[{"flag":"crm_up_next","granted":true}]'::jsonb)`, [id('u', 'tla')]); checks++
 // Every action is on the record: who, when, before, after.
 {
   const rows = await q(`select actor, data, at from crm_events where kind = 'up_next' order by id`)
   const acts = new Set(rows.map(r => r.data.action))
-  for (const a of ['skip', 'pause', 'resume', 'give', 'undo', 'leave_added', 'leave_changed']) check(acts.has(a), true, `${a} is recorded`)
+  for (const a of ['skip', 'pause', 'resume', 'give', 'undo', 'access', 'leave_added', 'leave_changed']) check(acts.has(a), true, `${a} is recorded`)
   check(rows.every(r => r.at && 'before' in r.data && 'after' in r.data), true, 'with when, before and after')
   check(rows.find(r => r.data.action === 'pause').actor, S('hod'), 'and who')
 }

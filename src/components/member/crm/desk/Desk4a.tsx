@@ -1990,7 +1990,7 @@ const HOUR_KEYS: SetKey[] = ["replySoonH", "replyUrgentH", "replyOverdueH"];
  * switch for CRM · Manage; the rest keep
  * the frame's locked row (a padlock and the value). Any change brings up Cancel / Save changes, as Showrooms.
  */
-export function DeskSettings4a({ v }: { v: SettingsBits }) {
+export function DeskSettings4a({ v }: { v: SettingsBits & { upNextAccess?: UpNextAccess } }) {
   const S = v.settings4;
   const [draft, setDraft] = useState<SetVals | null>(null);
   const [busy, setBusy] = useState(false);
@@ -2043,6 +2043,7 @@ export function DeskSettings4a({ v }: { v: SettingsBits }) {
           </div>
         ))}
       </div>
+      {v.upNextAccess && v.upNextAccess.rows.length > 0 && <DeskUpNextAccess v={v.upNextAccess} />}
       {dirty && (
         <div style={{ position: "sticky", bottom: 0, display: "flex", alignItems: "center", gap: "10px", padding: "14px 0", background: "#fff", borderTop: "1px solid var(--crm-rule)" }}>
           <span style={{ flex: 1, font: "400 12px Inter, sans-serif", color: rising ? "var(--crm-muted)" : "var(--crm-oxblood)" }}>
@@ -2055,6 +2056,37 @@ export function DeskSettings4a({ v }: { v: SettingsBits }) {
           <button type="button" onClick={save} disabled={!rising || busy} style={{ ...BTN, height: "36px", padding: "0 18px", borderRadius: "7px", font: "500 13px Inter, sans-serif", color: "#fff", background: rising ? "var(--crm-rust)" : "var(--crm-line)", cursor: rising && !busy ? "pointer" : "default" }} className={rising ? "crm4a-primary" : undefined}>{busy ? "Saving…" : "Save changes"}</button>
         </div>
       )}
+    </div>
+  );
+}
+
+interface UpNextAccess { can: boolean; rows: { id: string; name: string; sub: string; on: boolean; toggle: () => Promise<boolean> }[] }
+/** CRM › Settings › Up next (2026-11-08): the leaders who may act on their own people there — Settings' own group and switch. */
+function DeskUpNextAccess({ v }: { v: UpNextAccess }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", minWidth: 0, maxWidth: "calc(50% - 24px)" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "2px", paddingBottom: "10px", borderBottom: "1px solid var(--crm-ink)" }}>
+        <span style={{ font: `500 18px ${TIGHT}`, color: "var(--crm-ink)" }}>Up next</span>
+        <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>Leaders switched on may Skip, Pause, Give to… and fill in leave for the people under them</span>
+      </div>
+      {v.rows.map(r => (
+        <div key={r.id} style={{ display: "flex", alignItems: "center", gap: "16px", minHeight: "58px", padding: "8px 0", boxSizing: "border-box", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+          <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "1px" }}>
+            <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>{r.name}</span>
+            <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>{r.sub}</span>
+          </span>
+          {!v.can ? (
+            <span title="Only CRM · Manage changes this" style={{ display: "flex", alignItems: "center", gap: "5px", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}><Ic name="lock" size={13} />{r.on ? "On" : "Off"}</span>
+          ) : (
+            <button type="button" role="switch" aria-checked={r.on} aria-label={`${r.name} may act in Up next`} disabled={busy === r.id}
+              onClick={() => { setBusy(r.id); void r.toggle().finally(() => setBusy(null)); }}
+              style={{ ...BTN, width: "40px", height: "24px", borderRadius: "12px", position: "relative", background: r.on ? "var(--crm-rust)" : "var(--crm-line)", transition: "background .15s" }}>
+              <span style={{ position: "absolute", top: "3px", left: r.on ? "19px" : "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.25)", transition: "left .15s" }} />
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
