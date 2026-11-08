@@ -66,7 +66,8 @@ export function PhoneUpNext({ head, live, book, ads, canAct, line }: { head: Rea
     document.addEventListener("click", on);
     return () => document.removeEventListener("click", on);
   }, [adOpen, close]);
-  const main: CSSProperties = { flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "18px 20px 32px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "16px", color: "var(--crm-ink)" };
+  // The head starts 10px down, as Team's Overview and Ads (the owner, 2026-11-08: switching Team · Ads · Up next jumped — 10 · 6 · 18px).
+  const main: CSSProperties = { flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 32px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "16px", color: "var(--crm-ink)" };
   if (!d) return <main style={main}>{head}{failed && <div style={{ fontSize: fs(13), color: "var(--crm-muted)" }}>{failed}</div>}</main>;
   const f = d.first;
   return (<>
@@ -127,8 +128,8 @@ export function PhoneUpNext({ head, live, book, ads, canAct, line }: { head: Rea
         {d.tabOff && d.greyed.map(g => (
           <div key={g.id} style={{ ...ROW, color: FAINT }}>
             <span style={{ width: "26px" }} /><span style={{ width: "7px", height: "7px", borderRadius: "50%", flex: "none", boxSizing: "border-box", border: `1.5px solid ${g.dot}` }} />
-            <span style={{ flex: "none", fontSize: fs(14), fontWeight: 500 }}>{g.name}</span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: fs(11.5), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.whyMini}</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: fs(14), fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{g.name}</span>
+            <span style={{ flex: "none", fontSize: fs(11.5), whiteSpace: "nowrap", textAlign: "right" }}>{g.whyMini}</span>
             {g.canResume && <span {...tap(g.resume)} style={{ height: "44px", display: "flex", alignItems: "center", fontSize: fs(12.5), fontWeight: 600, color: "var(--crm-rust)", cursor: "pointer" }}>Resume</span>}
             {g.canEnd && <span {...tap(g.editLeave)} style={{ height: "44px", display: "flex", alignItems: "center", fontSize: fs(12.5), fontWeight: 600, color: "var(--crm-rust)", cursor: "pointer" }}>Edit</span>}
           </div>
@@ -136,8 +137,8 @@ export function PhoneUpNext({ head, live, book, ads, canAct, line }: { head: Rea
         {d.tabUp && d.upcoming.map(u => (
           <div key={u.id} {...(d.canAct ? tap(u.edit) : {})} style={{ ...ROW, cursor: "pointer" }}>
             <span style={{ width: "26px", font: `600 ${fs(11.5)} ${TIGHT}`, color: FAINT }}>{u.dayNum}</span><span style={DOT(u.dot)} />
-            <span style={{ flex: "none", fontSize: fs(14), fontWeight: 500 }}>{u.name}</span>
-            <span style={{ flex: 1, minWidth: 0, fontSize: fs(11.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.short}</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: fs(14), fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</span>
+            <span style={{ flex: "none", maxWidth: "55%", fontSize: fs(11.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "right" }}>{u.short}</span>
           </div>
         ))}
         {d.tabUp && d.upNone && <div style={{ minHeight: "48px", display: "flex", alignItems: "center", fontSize: fs(12.5), color: FAINT }}>Nobody on leave</div>}

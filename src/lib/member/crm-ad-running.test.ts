@@ -35,14 +35,15 @@ describe('an ad’s run in a line', () => {
   })
 })
 
-describe('Running · Paused · Pending (the desktop filter, 2026-10-23)', () => {
+describe('Running · Paused (the desktop filter, 2026-10-23; no Pending since 2026-11-08)', () => {
   const now = new Date('2026-10-23T10:00:00+08:00')
   const fresh = '2026-10-23T01:00:00Z'
   it('follows Ads Manager while it is fresh, else the last lead', () => {
     expect(adStatusOf({ status: 'ACTIVE', statusAt: fresh }, null, now)).toBe('Running')
     expect(adStatusOf({ status: 'ADSET_PAUSED', statusAt: fresh }, '2026-10-22T00:00:00Z', now)).toBe('Paused')
-    expect(adStatusOf({ status: 'PENDING_REVIEW', statusAt: fresh }, null, now)).toBe('Pending')
-    expect(adStatusOf({ status: 'ACTIVE', statusAt: fresh, startAt: '2026-10-25T01:00:00Z' }, null, now)).toBe('Pending')
+    // No Pending since 2026-11-08 (the owner: "广告不会有pending"): in review or starting later reads as the rest do.
+    expect(adStatusOf({ status: 'PENDING_REVIEW', statusAt: fresh }, null, now)).toBe('Running')
+    expect(adStatusOf({ status: 'ACTIVE', statusAt: fresh, startAt: '2026-10-25T01:00:00Z' }, null, now)).toBe('Running')
     expect(adStatusOf({ status: 'ACTIVE', statusAt: fresh, endAt: '2026-10-20T01:00:00Z' }, null, now)).toBe('Paused')
     expect(adStatusOf(undefined, '2026-10-21T00:00:00Z', now)).toBe('Running')
     expect(adStatusOf(undefined, '2026-10-01T00:00:00Z', now)).toBe('Paused')
