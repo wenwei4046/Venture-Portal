@@ -4,7 +4,7 @@
  * equals; sizes through phone4a's fs(), as every 4a phone page). Mounted by phone-4a.cjs under Insight's head. Its sheets take the
  * phone's own fadeIn / sheetUp, as every sheet of the Control panel (the prototype draws no motion).
  */
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { fs } from "./phone4a";
 import { useUpNext } from "./use-up-next";
 import type { LeaveForm, UpNextAd, UpNextBook } from "./up-next";
@@ -56,13 +56,23 @@ function LeaveSheet({ lv }: { lv: LeaveForm }) {
 
 export function PhoneUpNext({ head, live, book, ads, canAct, line }: { head: ReactNode; live: boolean; book: UpNextBook; ads: UpNextAd[]; canAct: boolean; line: string | null }) {
   const { d, lv, toast, failed, close } = useUpNext({ live, book, ads, canAct, line });
+  // A tap outside the ad menu closes it. Not a see-through layer over the screen: on an iPhone the CRM's scrollers take
+  // -webkit-overflow-scrolling: touch (crm.module.css), which makes <main> a layer of its own, so a layer beside it sat
+  // OVER the menu and every tap on an ad only closed it — the ad never changed (2026-11-08, the owner's iPhone).
+  const adOpen = !!d?.adOpen;
+  useEffect(() => {
+    if (!adOpen) return;
+    const on = (e: Event) => { if (!(e.target as Element | null)?.closest?.("[data-un-menu]")) close(); };
+    document.addEventListener("click", on);
+    return () => document.removeEventListener("click", on);
+  }, [adOpen, close]);
   const main: CSSProperties = { flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "18px 20px 32px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "16px", color: "var(--crm-ink)" };
   if (!d) return <main style={main}>{head}{failed && <div style={{ fontSize: fs(13), color: "var(--crm-muted)" }}>{failed}</div>}</main>;
   const f = d.first;
   return (<>
     <main style={main}>
       {head}
-      <div style={{ flex: "none", position: "relative", zIndex: 6 }}>
+      <div data-un-menu="" style={{ flex: "none", position: "relative", zIndex: 6 }}>
         <span {...tap(d.toggleAd)} style={{ height: "44px", padding: "0 14px", boxSizing: "border-box", borderRadius: "12px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "8px", fontSize: fs(13.5), fontWeight: 500, cursor: "pointer" }}><span style={{ flex: 1 }}>{d.adName}</span><Chev /></span>
         {d.adOpen && (
           <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 7, padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", maxHeight: "50vh", overflowY: "auto" }}>
@@ -167,7 +177,6 @@ export function PhoneUpNext({ head, live, book, ads, canAct, line }: { head: Rea
         </div>
       </div>
     )}
-    {d.adOpen && <div onClick={close} style={{ position: "absolute", inset: 0, zIndex: 4 }} />}
     {lv && <LeaveSheet lv={lv} />}
     {toast && <div style={{ position: "absolute", left: "16px", right: "16px", bottom: "76px", zIndex: 42, padding: "11px 14px", borderRadius: "12px", background: "var(--crm-ink)", color: "#fff", fontSize: fs(12.5), textAlign: "center" }}>{toast}</div>}
   </>);
