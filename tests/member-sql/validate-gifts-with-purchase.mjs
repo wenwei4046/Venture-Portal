@@ -406,4 +406,94 @@ check(await facts(), { ...before.facts, 'HC-SO-2610-601': 0.333333, 'HC-SO-2610-
 await save(ecoAgain, { remove: true })
 check(await month(), before.month, 'taken away: every month as before')
 
+// ── 20261108020000: each gift its own quantity (the user, on the gifts' list: "换成就是 Quantity，就可以加 1、加 2、
+// 加 3 这样子") ── A GWP saved the old way first (one number for all its gifts): it must come through as each gift at it.
+const QTY_MIGRATION = (await readFile(new URL('../../supabase/migrations/20261108020000_gwp_gift_quantities.sql', import.meta.url), 'utf8'))
+  .replace(/\r\n/g, '\n')
+const oldShape = await save(null, { qty: 2, buy: ['P-ECO-Q', 'P-ECO-K'], gift: ['P-MF', 'P-LATEX'] })
+const QTY_MADE = ['catalogue_save_gwp', 'sales_order_gwp_free', 'member_quote_cost_rules']
+const aclsQty = await q(ACLS, [QTY_MADE])
+await db.exec(QTY_MIGRATION)
+const qtyMd5 = await plainMd5()
+const qtyTables = await q(`SELECT
+  (SELECT is_nullable FROM information_schema.columns WHERE table_name = 'catalogue_gwp' AND column_name = 'qty_per_unit') AS per_unit_nullable,
+  (SELECT count(*) FROM pg_constraint WHERE conname = 'catalogue_gwp_items_qty')::int AS checks`)
+await db.exec(QTY_MIGRATION)
+check(await plainMd5(), qtyMd5, 'the second run changes no body')
+check(Object.fromEntries(Object.entries(qtyMd5).filter(([sig]) => QTY_MADE.some(n => sig.startsWith(`${n}(`)))), {
+  'catalogue_save_gwp(uuid,jsonb)': '6f9850c635b623868cb1c1ba3bcf6ad4',
+  'sales_order_gwp_free(uuid[])': 'defa093c0cd313e1e330dcdd603b54d5',
+  'member_quote_cost_rules(uuid)': 'd300e873e6ddc7eb8c9cb5461d92533e',
+}, 'the bodies it makes, md5(prosrc) as they stand')
+check(Object.fromEntries(Object.entries(qtyMd5).filter(([sig]) => !QTY_MADE.some(n => sig.startsWith(`${n}(`)))), {
+  'revenue_month_orders(uuid,date)': lfMd5['revenue_month_orders(uuid,date)'],
+  'member_order_facts_with_old_bills(uuid,date,date)': lfMd5['member_order_facts_with_old_bills(uuid,date,date)'],
+}, 'Comm Cal’s month and the facts untouched: they read sales_order_gwp_free as before')
+check(qtyTables, [{ per_unit_nullable: 'YES', checks: 1 }], 'qty_per_unit retired (may be empty), one check on a gift’s quantity')
+check(await q(ACLS, [QTY_MADE]), aclsQty, '— each granted as before')
+
+const itemsQ = async () => (await q(`SELECT role, erp_product_id, qty FROM public.catalogue_gwp_items ORDER BY role, erp_product_id`))
+  .map(r => [r.role, r.erp_product_id, r.qty])
+check(await itemsQ(), [
+  ['buy', 'P-ECO-K', null], ['buy', 'P-ECO-Q', null],
+  ['gift', 'P-LATEX', 2], ['gift', 'P-MF', 2],
+], 'the GWP saved before: each of its gifts at its old number')
+
+// Each gift its own allowance: the latex (60) no longer shares the microfibres' two.
+check(await free(B.CHEAP), [['LATEX PILLOW', 1], ['MF PILLOW', 1], ['MF PILLOW', 1]], 'two microfibre AND the latex, each its own')
+check(await month(), {
+  ...before.month,
+  'HC-SO-2610-601': [2000, 0.333333, 0],
+  'HC-SO-2610-602': [2335.71, 0.332654, 0],
+  'HC-SO-2610-604': [2000, 0.333333, 0],
+  'HC-SO-2610-605': [2000, 0.333333, 0],
+  'HC-SO-2610-606': [4050, 0.325, 1],
+}, "the month: the user's bill the mattress alone; three pillows, one counted; the cheap bill's latex given too (2,000)")
+check(await facts(), { ...before.facts, 'HC-SO-2610-601': 0.333333, 'HC-SO-2610-602': 0.332653, 'HC-SO-2610-604': 0.333333,
+  'HC-SO-2610-605': 0.333333, 'HC-SO-2610-606': 0.325 }, '— the facts the same')
+check((await rules()).gwp, [{ id: oldShape, buy: ['ECOBLISS (K)', 'ECOBLISS (Q)'],
+  gifts: [{ code: 'LATEX PILLOW', perUnit: 2 }, { code: 'MF PILLOW', perUnit: 2 }] }], "the calculator's rules: each gift with its quantity")
+
+// The Save, the new shape: only the gifts sent; a SKU sent twice takes its last.
+check(await save(oldShape, { gifts: [{ id: 'P-MF', qty: 1 }, { id: 'P-MF', qty: 1 }] }), oldShape, 'the gifts: one microfibre a unit')
+check(await itemsQ(), [['buy', 'P-ECO-K', null], ['buy', 'P-ECO-Q', null], ['gift', 'P-MF', 1]], '— the latex off, the bought untouched')
+check((await month())['HC-SO-2610-601'], [2050, 0.316667, 0], "the user's bill: one pillow given, one counted (50)")
+await save(oldShape, { gifts: [{ id: 'P-MF', qty: 3 }, { id: 'P-MF', qty: 2 }, { id: 'P-BOLSTER', qty: 1 }] })
+check(await itemsQ(), [['buy', 'P-ECO-K', null], ['buy', 'P-ECO-Q', null], ['gift', 'P-BOLSTER', 1], ['gift', 'P-MF', 2]],
+  'a SKU sent twice: its last; a bolster added')
+check((await month())['HC-SO-2610-606'], [4000, 0.333333, 1], 'two mattresses: four microfibre and the bolster (one a unit, two bought) given')
+const fresh = await save(null, { buy: ['P-ECO-Q'], gifts: [{ id: 'P-LATEX', qty: 1 }] })
+check(await one(`SELECT qty_per_unit IS NULL FROM public.catalogue_gwp WHERE id = $1`, [fresh]), true, 'a new GWP leaves qty_per_unit empty')
+check((await month())['HC-SO-2610-605'], [2000, 0.333333, 0], '— and gives its latex, the other GWP its microfibres')
+await save(fresh, { remove: true })
+
+const tryQty = changes => [`SELECT public.catalogue_save_gwp($1, $2::jsonb)`, [oldShape, JSON.stringify(changes)]]
+await refuses(...tryQty({ qty: 2 }), '22023', 'the shape before: reload')
+await refuses(...tryQty({ gift: ['P-MF'] }), '22023', '— a gift list without quantities too')
+await refuses(...tryQty({ gifts: [] }), '22023', 'no gift')
+await refuses(...tryQty({ gifts: 'P-MF' }), '22023', 'gifts that are no list')
+await refuses(...tryQty({ gifts: ['P-MF'] }), '22023', 'a gift with no quantity')
+for (const qty of [0, 101, 1.5, '2', null]) {
+  await refuses(...tryQty({ gifts: [{ id: 'P-MF', qty }] }), '22023', `a gift at ${JSON.stringify(qty)}`)
+}
+await refuses(...tryQty({ gifts: [{ id: 'P-NOWHERE', qty: 1 }] }), '23503', 'a SKU not in the SKU Master')
+await refuses(...tryQty({ gifts: [{ id: 'P-ECO-Q', qty: 1 }] }), '22023', 'a SKU both bought and given')
+await refuses(`SELECT public.catalogue_save_gwp(NULL, $1::jsonb)`, [JSON.stringify({ buy: ['P-ECO-Q'] })], '22023', 'a new GWP with no gifts')
+await refuses(`SELECT public.catalogue_save_gwp($1, $2::jsonb)`, [id(77), JSON.stringify({ gifts: [{ id: 'P-MF', qty: 1 }] })], 'P0002',
+  'a GWP no longer on the list')
+check(await itemsQ(), [['buy', 'P-ECO-K', null], ['buy', 'P-ECO-Q', null], ['gift', 'P-BOLSTER', 1], ['gift', 'P-MF', 2]],
+  'a refused Save leaves it as it was')
+let directQty = null
+try {
+  await db.exec(`INSERT INTO public.catalogue_gwp_items (gwp_id, role, erp_product_id, product_code, qty) VALUES ('${oldShape}', 'buy', 'P-LATEX', 'LATEX PILLOW', 1)`)
+} catch (e) {
+  directQty = e.code
+}
+check(directQty, '23514', 'a bought SKU carries no quantity')
+
+check(await save(oldShape, { remove: true }), oldShape, 'taken away')
+check(await month(), before.month, "Comm Cal's month as it was")
+check(await facts(), before.facts, "the Revenue app's facts as they were")
+check(await rules(), { ...before.rules, gwp: [] }, "the calculator's rules carry none")
+
 console.log(`OK gifts with purchase: ${checks} checks`)

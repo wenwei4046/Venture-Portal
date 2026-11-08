@@ -240,7 +240,7 @@ export async function loadCommissionInput(
         .eq('scheme_id', scheme.id).order('erp_product_id').order('brand_code').range(from, to)),
     // Product List › GWP (2026-11-08): what a purchase earns free, its cost out of the margin.
     readRows<GwpRow>('the gifts with purchase', (from, to) =>
-      supabase.from('catalogue_gwp').select('id, qty_per_unit, catalogue_gwp_items (role, product_code)')
+      supabase.from('catalogue_gwp').select('id, catalogue_gwp_items (role, product_code, qty)')
         .order('id').range(from, to)),
     // A Revenue Director's own bills earn nothing by rule (2026-09-27): the
     // engine must know them from somebody merely left off the team.

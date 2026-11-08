@@ -291,7 +291,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         ? supabase.from('comm_cost_ratio_brands').select('product_code, brand_code, ratio').eq('scheme_id', subDept.schemeId)
         : Promise.resolve({ data: null }),
       // What a purchase earns free, its cost out of the margin (Product List › GWP, 2026-11-08).
-      supabase.from('catalogue_gwp').select('id, qty_per_unit, catalogue_gwp_items (role, product_code)'),
+      supabase.from('catalogue_gwp').select('id, catalogue_gwp_items (role, product_code, qty)'),
     ])
   const byHand = exclusions?.get(orderId) ?? null
   const moved = moves[orderId] ?? null

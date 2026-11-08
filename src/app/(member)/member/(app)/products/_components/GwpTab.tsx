@@ -5,27 +5,30 @@ import { useRouter } from 'next/navigation'
 import { EditError } from '@/lib/catalogue/edits'
 import { gwpChangesOf, gwpDraftChanged, type GwpChanges, type GwpDraft, type GwpSaved, type GwpSide } from '@/lib/catalogue/gwp-edits'
 import { removeGwp, saveGwp } from '../actions'
-import type { GwpEntry, GwpSkuRef, PickSku } from '../load'
+import type { GwpEntry, GwpGiftRef, GwpSkuRef, PickSku } from '../load'
 import GwpSkuPicker from './GwpSkuPicker'
 import PageScrolledTable from './PageScrolledTable'
 import { useProductDraftGuard } from './ProductWorkspace'
 import { ActionRow, CellChip, EditingButtons, Heading, Notice, plural, TableFoot } from './ui'
 import c from './products.module.css'
 
-const EMPTY: GwpDraft = { buy: [], gift: [], perUnit: '' }
-const SIDES: readonly GwpSide[] = ['buy', 'gift']
+const EMPTY: GwpDraft = { buy: [], gifts: [] }
 
-const savedOf = (g: GwpEntry): GwpSaved => ({ buy: g.buy.map(r => r.erpId), gift: g.gift.map(r => r.erpId), perUnit: g.perUnit })
+const savedOf = (g: GwpEntry): GwpSaved => ({
+  buy: g.buy.map(r => r.erpId),
+  gifts: g.gifts.map(r => ({ erpId: r.erpId, qty: r.qty })),
+})
 
 /**
  * Product List › GWP (2026-11-08 — the user: "i want the product list tab for one more new tab is gwp … example,
  * dullop mattress ecobliss, set a gwp 2 micorfibre pillow. so the margin calculator and margin leader will not
  * calculate the cost in for those 2 pillow. is jsut calculate the mattress cost only"). A gift with purchase: the
- * SKUs whose purchase earns it — any sizes ticked together ("2, or can select all as well") — the SKUs it may be,
- * any of them, and how many each unit bought earns ("每买一张送 N 个"). No dates ("gwp no need got set date
- * funtion"): while it is on the list it counts on every bill. Every margin reads it — the Quote's (with nothing
- * said on the Quote: "no need show gwp wording as well"), Comm Cal's month, Insight, the Arena and a run computed
- * again. Every sub-department alike.
+ * SKUs whose purchase earns it — any sizes ticked together ("2, or can select all as well") — and its gifts, each
+ * with how many a unit bought earns (the user, the same night, on the gifts' list: "换成就是 Quantity，就可以加 1、
+ * 加 2、加 3 这样子" — a mattress protector ×1, pillows ×2). No dates ("gwp no need got set date funtion"): while it
+ * is on the list it counts on every bill. Every margin reads it — the Quote's (with nothing said on the Quote: "no
+ * need show gwp wording as well"), Comm Cal's month, Insight, the Arena and a run computed again. Every
+ * sub-department alike.
  *
  * One GWP is open at a time, new or saved; a Save sends only what changed (`gwpChangesOf`) and a remove asks a
  * second click.
@@ -74,7 +77,7 @@ export default function GwpTab({ entries, skus }: { entries: GwpEntry[]; skus: P
   const skuById = useMemo(() => new Map(skus.map(s => [s.erpId, s])), [skus])
   const savedCode = useMemo(() => {
     const codes = new Map<string, string>()
-    for (const g of entries) for (const r of [...g.buy, ...g.gift]) codes.set(r.erpId, r.code)
+    for (const g of entries) for (const r of [...g.buy, ...g.gifts]) codes.set(r.erpId, r.code)
     return codes
   }, [entries])
   /** A SKU as the SKU Master names it today, else as it was saved. */
@@ -87,12 +90,15 @@ export default function GwpTab({ entries, skus }: { entries: GwpEntry[]; skus: P
 
   const openEntry = open?.id ? entries.find(g => g.id === open.id) ?? null : null
   const saved = openEntry ? savedOf(openEntry) : null
-  const stale = openEntry ? SIDES.filter(side => openEntry[side].some(renamed)) : []
+  const stale: GwpSide[] = openEntry
+    ? [...(openEntry.buy.some(renamed) ? (['buy'] as const) : []), ...(openEntry.gifts.some(renamed) ? (['gift'] as const) : [])]
+    : []
   const dirty = open && (gwpDraftChanged(saved, draft) || stale.length > 0) ? 1 : 0
   useProductDraftGuard(dirty, saving)
 
+  const buyPicks = useMemo(() => draft.buy.map(erpId => ({ erpId, qty: 1 })), [draft.buy])
   const buySet = useMemo(() => new Set(draft.buy), [draft.buy])
-  const giftSet = useMemo(() => new Set(draft.gift), [draft.gift])
+  const giftSet = useMemo(() => new Set(draft.gifts.map(g => g.erpId)), [draft.gifts])
 
   function edit(next: Partial<GwpDraft>) {
     setDraft(previous => ({ ...previous, ...next }))
@@ -109,7 +115,7 @@ export default function GwpTab({ entries, skus }: { entries: GwpEntry[]; skus: P
 
   function startEdit(g: GwpEntry) {
     setOpen({ id: g.id })
-    setDraft({ buy: g.buy.map(r => r.erpId), gift: g.gift.map(r => r.erpId), perUnit: String(g.perUnit) })
+    setDraft({ buy: g.buy.map(r => r.erpId), gifts: g.gifts.map(r => ({ erpId: r.erpId, qty: r.qty })) })
     setArmed(null)
     setError(null)
     setNotice(null)
@@ -179,14 +185,15 @@ export default function GwpTab({ entries, skus }: { entries: GwpEntry[]; skus: P
     })
   }
 
-  /** A side of a saved GWP: its SKUs as chips. */
-  const chipsOf = (refs: readonly GwpSkuRef[]) => (
+  /** A side of a saved GWP: its SKUs as chips, a gift with its quantity. */
+  const chipsOf = (refs: readonly (GwpSkuRef | GwpGiftRef)[]) => (
     <span className={c.gwpChips}>
       {refs.map(r => {
         const sku = skuById.get(r.erpId)
         return (
           <span key={r.erpId} className={c.gwpChip} title={sku?.description ?? undefined}>
             {r.code}
+            {'qty' in r ? <span className={c.gwpChipQty}>×{r.qty}</span> : null}
             {sku && renamed(r) ? <span className={c.gwpChipNote}>now {sku.code}</span> : null}
             {sku?.removed ? <span className={c.gwpChipNote}>gone from ERP</span> : null}
           </span>
@@ -213,16 +220,11 @@ export default function GwpTab({ entries, skus }: { entries: GwpEntry[]; skus: P
       {open ? (
         <div className={c.gwpEditor} role="group" aria-label={open.id ? 'Edit GWP' : 'New GWP'}>
           <div className={c.gwpSides}>
-            <GwpSkuPicker title="Bought" searchLabel="Find a SKU bought" skus={skus} chosen={draft.buy} elsewhere={giftSet}
-              elsewhereLabel="Gift" codeOf={codeOf} disabled={saving} onChange={buy => edit({ buy })} />
-            <GwpSkuPicker title="Gifts" searchLabel="Find a gift" skus={skus} chosen={draft.gift} elsewhere={buySet}
-              elsewhereLabel="Bought" codeOf={codeOf} disabled={saving} onChange={gift => edit({ gift })} />
+            <GwpSkuPicker title="Bought" searchLabel="Find a SKU bought" skus={skus} picks={buyPicks} counted={false} elsewhere={giftSet}
+              elsewhereLabel="Gift" codeOf={codeOf} disabled={saving} onChange={next => edit({ buy: next.map(p => p.erpId) })} />
+            <GwpSkuPicker title="Gifts" searchLabel="Find a gift" skus={skus} picks={draft.gifts} counted elsewhere={buySet}
+              elsewhereLabel="Bought" codeOf={codeOf} disabled={saving} onChange={gifts => edit({ gifts })} />
           </div>
-          <label className={`${c.pickerAmount} ${c.gwpQty}`}>
-            <span className={c.selectLabel}>Free per unit</span>
-            <input className={c.pickerAmountInput} value={draft.perUnit} onChange={e => edit({ perUnit: e.target.value })} disabled={saving}
-              inputMode="numeric" placeholder="—" aria-label="Free per unit" />
-          </label>
         </div>
       ) : null}
 
@@ -231,9 +233,8 @@ export default function GwpTab({ entries, skus }: { entries: GwpEntry[]; skus: P
           <table className={c.table}>
             <thead>
               <tr>
-                <th scope="col" className={c.th} data-first="" style={{ minWidth: 300 }}>BOUGHT</th>
-                <th scope="col" className={c.th} style={{ minWidth: 300 }}>GIFTS</th>
-                <th scope="col" className={c.th} data-num="" style={{ minWidth: 130 }}>FREE PER UNIT</th>
+                <th scope="col" className={c.th} data-first="" style={{ minWidth: 320 }}>BOUGHT</th>
+                <th scope="col" className={c.th} style={{ minWidth: 360 }}>GIFTS · PER UNIT BOUGHT</th>
                 <th scope="col" className={c.th} data-num="" style={{ minWidth: 190 }}><span className="sr-only">Edit or remove</span>{' '}</th>
               </tr>
             </thead>
@@ -244,8 +245,7 @@ export default function GwpTab({ entries, skus }: { entries: GwpEntry[]; skus: P
                   <tr key={g.id} className={c.row} data-stripe={(!editingThis && i % 2 === 1) || undefined} data-new={editingThis || undefined}
                     data-testid={`gwp-${g.id}`}>
                     <td className={c.td} data-first="" data-wrap="">{chipsOf(g.buy)}</td>
-                    <td className={c.td} data-wrap="">{chipsOf(g.gift)}</td>
-                    <td className={`${c.td} ${c.bold}`} data-num="">{g.perUnit}</td>
+                    <td className={c.td} data-wrap="">{chipsOf(g.gifts)}</td>
                     <td className={c.td} data-num="">
                       {editingThis ? (
                         <CellChip tone="new">EDITING</CellChip>
@@ -262,7 +262,7 @@ export default function GwpTab({ entries, skus }: { entries: GwpEntry[]; skus: P
                 )
               })}
               {entries.length === 0 ? (
-                <tr><td colSpan={4} className={c.empty}>No GWP yet</td></tr>
+                <tr><td colSpan={3} className={c.empty}>No GWP yet</td></tr>
               ) : null}
             </tbody>
           </table>
