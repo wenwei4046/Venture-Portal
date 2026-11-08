@@ -84,8 +84,8 @@ export function DeskLeaveCal({ v, title, tabs, bare }: { v: LeaveCalVM; title: s
                 {c.chips.map(k => (
                   <span key={k.key} onClick={k.edit} title={k.title} style={{ flex: "none", display: "block", height: "20px", lineHeight: "20px", padding: "0 6px", margin: `0 ${k.mr} 0 ${k.ml}`, borderRadius: k.rad, background: k.bg, color: k.fg, fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.label}</span>
                 ))}
-                {c.appts.map((a, i) => (
-                  <span key={i} title={a.title} style={{ flex: "none", display: "flex", alignItems: "center", gap: "5px", height: "18px", padding: "0 4px", minWidth: 0, fontSize: "11px", color: "var(--crm-ink)" }}>
+                {c.appts.map(a => (
+                  <span key={a.key} title={a.title} onClick={a.open} className={s.name} style={{ flex: "none", display: "flex", alignItems: "center", gap: "5px", height: "18px", padding: "0 4px", minWidth: 0, fontSize: "11px", color: "var(--crm-ink)", cursor: "pointer" }}>
                     <span style={{ width: "6px", height: "6px", borderRadius: "50%", flex: "none", background: a.dot }} /><b style={{ fontWeight: 600, flex: "none" }}>{a.t}</b>
                     <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-muted)" }}>{a.who}</span>
                   </span>

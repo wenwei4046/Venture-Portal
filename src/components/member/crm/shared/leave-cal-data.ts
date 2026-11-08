@@ -23,7 +23,7 @@ export function mayEditPerson(d: CrmData, me: string) {
 export function leaveCalData(o: {
   data: CrmData; me: CrmPerson; now: Date; act: PanelActions; readOnly?: boolean;
   teams: { id: string; name: string; tl: CrmPerson; people: CrmPerson[] }[]; directors: CrmPerson[];
-  openAppt?: (customerId: string) => void;
+  openAppt?: (a: CalAppt) => void;
 }): Omit<LeaveCalIn, "mode" | "ui" | "set" | "flash"> {
   const { data: d } = o;
   const book = peopleBook(d, o.teams, o.directors);
@@ -33,7 +33,7 @@ export function leaveCalData(o: {
     const c = byId.get(v.customerId);
     if (!c?.assignedTo) return [];
     const at = officeStamp(v.start);
-    return [{ who: c.assignedTo, day: at.slice(0, 10), t: at.slice(11), cust: c.name, customerId: c.id }];
+    return [{ who: c.assignedTo, day: at.slice(0, 10), t: at.slice(11), cust: c.name, customerId: c.id, visitId: v.id }];
   });
   return {
     book, leaves: d.leaves ?? [], appts, now: officeStamp(o.now),

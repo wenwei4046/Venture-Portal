@@ -17,7 +17,7 @@ const data = {
   settings: DEFAULT_CRM_SETTINGS, can: { viewAll: true, editAll: true, editOwn: true, manage: true }, upNextStaff: [],
 } as unknown as CrmData;
 const acts = { saveLeave: vi.fn(async () => true), removeLeave: vi.fn(async () => true), setPaused: vi.fn(async () => true), setDays: vi.fn(async () => true), setLocked: vi.fn(async () => true) };
-const input = { book: peopleBook(data, teams, []), leaves: data.leaves!, appts: [{ who: "a", day: "2026-11-06", t: "11:00", cust: "Nur Aisyah", customerId: "x" }], now: "2026-11-06T18:00", canEdit: () => true, canLock: true, acts };
+const input = { book: peopleBook(data, teams, []), leaves: data.leaves!, appts: [{ who: "a", day: "2026-11-06", t: "11:00", cust: "Nur Aisyah", customerId: "x", visitId: "v1" }], now: "2026-11-06T18:00", canEdit: () => true, canLock: true, acts };
 
 describe("the phone's Calendar, People and Team activity", () => {
   it("Calendar: the two layers, the month, the day's list", () => {

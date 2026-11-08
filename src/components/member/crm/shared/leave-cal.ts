@@ -18,14 +18,15 @@ export interface LeaveCalUi {
   view: "month" | "week"; month: string; week: string; panel: string | null; pp: boolean; modal: LeaveModal | null;
   showAppt: boolean; showLeave: boolean; pDay: string; toast: string | null;
 }
-export interface CalAppt { who: string; day: string; t: string; cust: string; customerId: string }
+export interface CalAppt { who: string; day: string; t: string; cust: string; customerId: string; visitId: string }
 export interface LeaveCalActs {
   saveLeave(l: { id: string | null; staffId: string; fromAt: string; toAt: string; reason: Reason; note: string }): Promise<boolean>;
   removeLeave(id: string): Promise<boolean>;
   setPaused(id: string, on: boolean): Promise<boolean>;
   setDays(id: string, days: number[]): Promise<boolean>;
   setLocked(id: string, on: boolean): Promise<boolean>;
-  openAppt?(customerId: string): void;
+  /** A tapped appointment opens its Customer info, whose Open chat goes to the chat (the owner, 2026-11-08). */
+  openAppt?(a: CalAppt): void;
 }
 export interface LeaveCalIn {
   mode: "calendar" | "people";
@@ -115,7 +116,7 @@ export function leaveCalVM(x: LeaveCalIn) {
         const off = offOf(id);
         return { appt, bg: SL && ft && !off ? C.fullTime : "transparent", fg: C.faint, label: SL && off && ft && !appt ? "—" : "", rad: "6px", ml: "3px", mr: "3px", colBg,
           title: ap.length ? ap.map(a => `${a.t} ${a.cust}`).join(" · ") : s.code === "login" || s.code === "locked" ? s.label : s.code === "paused" ? "Paused" : ft ? "Full time · click to add leave" : "Off · click to add leave",
-          click: () => { if (SL) openModal({ who: id, from: `${day}T09:00`, to: `${day}T18:00` }); } };
+          click: () => { if (ap.length && x.acts.openAppt) x.acts.openAppt(ap[0]); else if (SL) openModal({ who: id, from: `${day}T09:00`, to: `${day}T18:00` }); } };
       }),
     };
   }) }));
@@ -136,7 +137,8 @@ export function leaveCalVM(x: LeaveCalIn) {
     const ls = SL ? leaves.filter(l => leaveOnDay(l, day)) : [], aps = apptsOn(null, day);
     const lanes = ls.length ? Math.max(...ls.map(l => lane[l.id])) + 1 : 0, dow = i % 7;
     const room0 = Math.max(0, 3 - Math.min(lanes, 3)), over = ls.filter(l => lane[l.id] >= 3).length + Math.max(0, aps.length - room0) > 0, room = over && room0 > 0 && lanes > 0 ? room0 - 1 : room0;
-    const appts = aps.slice(0, room).map(a => ({ t: a.t, who: first(name(a.who)), dot: C.green, title: `${a.t} · ${a.cust} · ${name(a.who)}` }));
+    const appts = aps.slice(0, room).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), dot: C.green, title: `${a.t} · ${a.cust} · ${name(a.who)}`,
+      open: (e: { stopPropagation(): void }) => { e.stopPropagation(); x.acts.openAppt?.(a); } }));
     const chips = isCal
       ? Array.from({ length: Math.min(lanes, 3) }, (_, k) => {
         const l = ls.find(y => lane[y.id] === k);
@@ -215,7 +217,7 @@ export function leaveCalVM(x: LeaveCalIn) {
       const s = l.fromAt.slice(0, 10), e = l.toAt.slice(0, 10), allDay = s < pd && pd < e;
       return { key: l.id, t: allDay ? "All day" : s === pd ? l.fromAt.slice(11) : "until", tFg: C.listSub, bar: leaveTint(l.reason)[0], title: `${name(l.staffId)} · ${label(l)}`, sub: rng(l), go: () => edit(l, true) };
     }),
-    ...apptsOn(null, pd).map(a => ({ key: `${a.customerId}-${a.t}`, t: a.t, tFg: C.ink, bar: C.green, title: a.cust, sub: `Appointment · ${name(a.who)}`, go: () => x.acts.openAppt?.(a.customerId) })),
+    ...apptsOn(null, pd).map(a => ({ key: a.visitId, t: a.t, tFg: C.ink, bar: C.green, title: a.cust, sub: `Appointment · ${name(a.who)}`, go: () => x.acts.openAppt?.(a) })),
   ];
   const peopleIds = book.groups.flatMap(g => g.people.map(p => p.id)).filter((id, i, a) => a.indexOf(id) === i && x.canEdit(id));
 

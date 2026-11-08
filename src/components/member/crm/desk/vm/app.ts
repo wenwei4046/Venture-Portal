@@ -83,7 +83,8 @@ export function deskVM(ctx: DeskCtx) {
     // Workspace (2026-10-27): one's own Weekly / Monthly reports (DeskWorkspace.tsx, vm/workspace-report.ts).
     kWorkspace: ui.tab === "workspace",
     // Calendar and Assignment › People (docs/design_handoff_crm): one leave record, one Pause, one Lock (shared/leave-cal*).
-    leaveCal: leaveCalData({ data, me: ctx.me, now: ctx.now, act: ctx.act, teams: ctx.teams, directors: ctx.directors }),
+    leaveCal: leaveCalData({ data, me: ctx.me, now: ctx.now, act: ctx.act, teams: ctx.teams, directors: ctx.directors,
+      openAppt: a => patch({ pane: "docked", kind: "info", visit: a.visitId, infoId: null }) }),
     kActivity: ui.tab === "activity",
     // Team activity (docs/design_handoff_crm): its own page, on the people book Calendar and People read.
     activity: { data, book: peopleBook(data, ctx.teams, ctx.directors), live: ctx.live, who: ui.actWho ?? null, nameOf: ctx.nameOf,
