@@ -102,7 +102,8 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
       skip: () => a.skip(o.staff), pause: () => a.pause(o.staff), give: () => a.give(o.staff), open: () => a.set({ sheet: { id: o.staff, k: i + 1 } }),
       actOp: ui.hov === key && may(o.staff) ? 1 : 0, hovOn: () => a.set({ hov: key }), hovOff: () => a.set({ hov: null }) };
   });
-  const off = r.people.filter(p => p.why).map(p => {
+  // On leave is listed under Leave; locked people are not listed (Assignment › Active members says so) — the owner, 2026-11-08.
+  const off = r.people.filter(p => p.why && p.why !== "leave" && p.why !== "locked").map(p => {
     const id = p.staff, t = book.teamOf(p.team), key = `g${id}`, onLeave = p.why === "leave" && !!p.leave, canResume = p.why === "paused";
     const l = p.leave;
     const short = onLeave && l ? `${leaveLabel(l)} · ${fmtRange(l.from, l.to)}`
@@ -129,12 +130,14 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
     : shares.length ? `Split for this ad: ${splitText} · set in Assignment`
     : "No split for this ad · set in Assignment";
   const last = r.last ? { name: nameOf(r.last.staff), meta: [book.teamOf(teamKeyOf(r.last.staff)).name, agoWords(r.last.at, r.now), single ? "" : book.adName(r.last.ad)].filter(Boolean).join(" · "), when: agoWords(r.last.at, r.now) } : { name: "—", meta: "", when: "" };
-  const upcoming = r.upcoming.map(l => {
+  // Leave: who is on leave now, then what is coming.
+  const nowLeave = r.people.filter(p => p.why === "leave" && p.leave).map(p => ({ ...p.leave!, staff: p.staff, now: true }));
+  const upcoming = [...nowLeave, ...r.upcoming.map(l => ({ ...l, now: false }))].map(l => {
     const key = `u${l.id}`, hov = ui.hov === key && may(l.staff), x = fmtD(l.from), y = fmtD(l.to), t = book.teamOf(teamKeyOf(l.staff));
-    return { id: l.id, name: nameOf(l.staff), dot: t.dot, label: leaveLabel(l), range: fmtRange(l.from, l.to), day: `${x.d} ${x.m}`, dayNum: `${x.d} ${x.m}`,
+    return { id: l.id, now: l.now, name: nameOf(l.staff), dot: t.dot, label: leaveLabel(l), range: fmtRange(l.from, l.to), day: l.now ? "Now" : `${x.d} ${x.m}`, dayNum: l.now ? "Now" : `${x.d} ${x.m}`,
       short: x.day === y.day ? `${leaveShort(l)} · ${x.t}–${y.t}` : `${leaveShort(l)} · to ${y.d} ${y.m}`,
       actDisp: hov ? "flex" : "none", txtDisp: hov ? "none" : "block", hovOn: () => a.set({ hov: key }), hovOff: () => a.set({ hov: null }),
-      edit: () => a.openLeave(l.staff), cancel: () => a.cancelLeave(l.staff, l.id) };
+      edit: () => a.openLeave(l.staff), cancel: () => (l.now ? a.endLeave(l.staff, l.id) : a.cancelLeave(l.staff, l.id)), cancelWord: l.now ? "End leave" : "Cancel leave" };
   });
   const sh = ui.sheet;
   const shO = sh ? out.find(o => o.staff === sh.id) ?? { staff: sh.id, team: teamKeyOf(sh.id), p: 0, pinned: false, pinBy: null } : null;

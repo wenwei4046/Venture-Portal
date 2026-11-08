@@ -27,10 +27,12 @@ describe("Up next's words (README › Screens)", () => {
     expect(d.moreLabel).toBe("6 more");
     expect(d.last).toMatchObject({ name: "STANLEY", meta: "Team Stanley · 3 h ago · Raya Promo" });
     expect(d.splitLine).toBe("Each ad keeps its own split from Assignment. This view adds them together.");
-    // Paused and on-leave first; Sick leave's range; the other reasons.
-    expect(d.greyed[0]).toMatchObject({ name: "JASON", whyShort: "Sick leave · 5 Nov 09:00 – 8 Nov 18:00", whyMini: "Sick · to 8 Nov", canEnd: true });
+    // On leave is under Leave, now first; locked people are not listed (the owner, 2026-11-08).
+    expect(d.greyed.map(g => g.name)).not.toContain("JASON");
+    expect(d.greyed.map(g => g.name)).not.toContain("HECTOR");
     expect(d.greyed.map(g => g.whyShort)).toContain("not Full time today");
-    expect(d.upcoming[0]).toMatchObject({ name: "CHEA HUAN", day: "9 Nov", label: "Annual leave", range: "9 Nov 09:00 – 10 Nov 13:00", short: "Annual · to 10 Nov" });
+    expect(d.upcoming[0]).toMatchObject({ name: "JASON", now: true, day: "Now", short: "Sick · to 8 Nov", cancelWord: "End leave" });
+    expect(d.upcoming[1]).toMatchObject({ name: "CHEA HUAN", day: "9 Nov", label: "Annual leave", range: "9 Nov 09:00 – 10 Nov 13:00", short: "Annual · to 10 Nov", cancelWord: "Cancel leave" });
     expect(d.pickList[0].head).toBe("In today's turn");
   });
   it("says All ads are one pool when every ad is counted together, to the half percent", () => {

@@ -35,6 +35,7 @@ import { CHAT_WALL } from "../wall";
 import { fillWithFor, libraryFor, suggestReplies, waitingWords } from "../../shared/suggest-reply";
 import { openSuggest } from "../../shared/suggest-float";
 import { avatarTint } from "../../shared/palette";
+import { isFbBlocked } from "../../shared/fb-blocked";
 
 const RUST = "var(--crm-rust)", INK = "var(--crm-ink)", SUB = "rgb(128 107 96)", BD = "var(--crm-rule)";
 /** Own bubbles (rev 1010 §1.2; was var(--crm-tint-attention)). */
@@ -137,6 +138,8 @@ export function chatVM(ctx: SalesCtx) {
   const ch = CHANNEL[c.channel], first = firstName(c.name);
   const hidden = new Set(data.hiddenMessages);
   const shut = windowShut(c, now);
+  // Blocked on Facebook (2026-11-08): the strip says so and the composer gives way to a note (shared/fb-blocked.ts).
+  const fbBlocked = isFbBlocked(c, data);
   const draft = ui.draft[c.id] ?? "";
   const setDraft = (v: string) => set(u => ({ ...u, draft: { ...u.draft, [c.id]: v } }));
   const scrollDown = () => setTimeout(() => document.querySelectorAll<HTMLElement>("[data-chat-list]").forEach(el => { el.scrollTop = el.scrollHeight; }), 60);
@@ -508,11 +511,13 @@ export function chatVM(ctx: SalesCtx) {
   const cmp: ComposerIn = {
     key: c.id, state: composerOf(ui.cmp, c.id) ?? initialComposer(), set: setCmp,
     placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
-    warm: true, // past the window too: the reply is kept in the chat, marked not sent (crm-actions › keptUnsent, 2026-10-30)
+    // Past the window too: the reply is kept in the chat, marked not sent (crm-actions › keptUnsent, 2026-10-30) — but
+    // never to a customer blocked on Facebook, who can receive nothing.
+    warm: !fbBlocked, blocked: fbBlocked,
     openTpl: () => void openTpl(), tplOn: data.settings?.suggestTemplate !== false, coldSub: coldLine(c, now),
     coldTile: shut && c.channel === "whatsapp" && data.settings?.suggestTemplate !== false,
-    suggest: shut ? undefined : suggestReplies(c, data.replyExamples ?? [], data.quickReplies, 3, { library: data.replyLibrary, ...fillWithFor(data, c, owner.name, now) }), suggestLogo: !!waitingWords(c),
-    suggestLibrary: shut ? undefined : libraryFor(c, data.replyLibrary, fillWithFor(data, c, owner.name, now)),
+    suggest: shut || fbBlocked ? undefined : suggestReplies(c, data.replyExamples ?? [], data.quickReplies, 3, { library: data.replyLibrary, ...fillWithFor(data, c, owner.name, now) }), suggestLogo: !!waitingWords(c),
+    suggestLibrary: shut || fbBlocked ? undefined : libraryFor(c, data.replyLibrary, fillWithFor(data, c, owner.name, now)),
     reply: ui.reply ? { who: ui.reply.from === "me" ? "You" : c.name, text: plain(ui.reply.text) } : null,
     cancelReply: () => patch({ reply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,
@@ -539,7 +544,7 @@ export function chatVM(ctx: SalesCtx) {
   async function openTpl() { patch({ tpl: true }); if (c!.channel === "whatsapp" && ui.templates == null) { const t = await act.loadTemplates(); patch({ templates: t ?? [] }); } }
 
   return {
-    cl: { name: c.name, ad: [sourceOf(c).brandLabel, c.ad].filter(Boolean).join(" · "), first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], strip: chatStripOf(c, ctx.now) },
+    cl: { name: c.name, ad: [sourceOf(c).brandLabel, c.ad].filter(Boolean).join(" · "), first, ini: ini(c.name), chanName: ch.name, chanFg: ch.fg, chanIcon: ch.icon, avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], strip: chatStripOf(c, ctx.now, fbBlocked) },
     wallBg: CHAT_WALL.bg, wallImg: CHAT_WALL.img, wallSize: CHAT_WALL.size,
     // Leaving a chat folds the composer's panel away, so the next chat opens tidy (the owner, 2026-10-13).
     closeChat: () => set(u => ({ ...u, chat: null, menu: null, book: null, tpl: false, qr: false, hm: null, reply: null, cmp: null, pick: null })),

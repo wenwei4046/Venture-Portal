@@ -10,6 +10,8 @@ import { fmtRange, leaveFormVM, upNextFrame, type LeaveEdit, type UpNextAd, type
 
 const TOAST_MS = 2600;
 const POLL_MS = 15_000;
+/** The last read of each ad (and line), for an instant screen on the way back to it. */
+const SEEN = new Map<string, UpNextRead>();
 const iso = (s: string) => `${s}:00+08:00`;
 
 export function useUpNext(o: { live: boolean; book: UpNextBook; ads: UpNextAd[]; canAct: boolean; line: string | null }) {
@@ -29,16 +31,22 @@ export function useUpNext(o: { live: boolean; book: UpNextBook; ads: UpNextAd[];
   const adRef = useRef(ui.ad); adRef.current = ui.ad;
   const seq = useRef(0);
   // The ads taking leads now go round on All ads (the read's p_ads), each dealt by its own split.
-  const allIds = useMemo(() => ads.filter(a => a.id !== "all").map(a => a.id), [ads]);
+  // A stable key (the CRM re-renders every 5 s with a new ads array): a new array here started the read again at every
+  // render and dropped the answer on its way — the screen sat loading and a picked ad never arrived (2026-11-08).
+  const allKey = ads.filter(a => a.id !== "all").map(a => a.id).join(",");
   const load = useCallback(async (ad: string): Promise<UpNextRead | null> => {
     if (demo.current) { const r = demo.current.read(ad); setRead(r); return r; }
+    // What this ad showed last time shows at once while it is read again.
+    const key = `${o.line ?? ""}|${ad}`, kept = SEEN.get(key);
+    if (kept && ad === adRef.current) setRead(kept);
     const n = ++seq.current;
-    const got = await fetchUpNext({ ad, ads: ad === "all" ? allIds : null, line: o.line });
+    const got = await fetchUpNext({ ad, ads: ad === "all" ? (allKey ? allKey.split(",") : []) : null, line: o.line });
+    if (!got.ok) { if (n === seq.current) setFailed(got.error); return null; }
+    SEEN.set(key, got.read);
     if (n !== seq.current || ad !== adRef.current) return null;
-    if (!got.ok) { setFailed(got.error); return null; }
     setFailed(null); setRead(got.read);
     return got.read;
-  }, [allIds, o.line]);
+  }, [allKey, o.line]);
 
   useEffect(() => {
     void load(ui.ad);

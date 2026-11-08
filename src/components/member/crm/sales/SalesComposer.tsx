@@ -46,7 +46,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
           <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
             <svg style={{ flex: "none", marginTop: "2px", color: "var(--crm-ink)" }} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "0" }}>
-              <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)" }}>This chat is cold</strong>
+              <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "600", color: "var(--crm-ink)" }}>{p.coldTitle}</strong>
               <span style={{ fontSize: "calc(15px * var(--rv-type, 1))", lineHeight: "1.45", color: "var(--crm-muted)" }}>{p.coldSub}</span>
             </div>
           </div>

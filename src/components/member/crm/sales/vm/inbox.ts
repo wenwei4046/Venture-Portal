@@ -15,6 +15,7 @@ import { saidInChat } from "../../shared/chat-search";
 import { mediaWord } from "../../shared/chat-media";
 import { leaderAssignees } from "./chat";
 import { STATUS, avatarTint } from "../../shared/palette";
+import { FB_BLOCKED_CATEGORY, isFbBlocked } from "../../shared/fb-blocked";
 import type { Icon4a } from "../../shared/icons4a";
 
 /** One row's preview: a card we sent reads as what it was; ours start "You: ". */
@@ -37,9 +38,14 @@ const OWNER_COLORS = ["var(--crm-ink-soft)", "var(--crm-ink-soft)", "var(--crm-b
 export function inboxVM(ctx: SalesCtx) {
   const { ui, set, patch, data, now, mine, refs, act, owner, nameOf } = ctx;
   const labelsOf = (c: CrmCustomer) => (data.customerLabels[c.id] ?? []).map(id => data.labels.find(l => l.id === id)).filter((l): l is CrmLabel => !!l);
-  const warm = mine.filter(c => !isCold(c, now));
+  // Blocked on Facebook (2026-11-08): its own category and no other, ahead even of Cold leads (shared/fb-blocked.ts).
+  const blocked = (c: CrmCustomer) => isFbBlocked(c, data);
+  const coldOf = (c: CrmCustomer) => !blocked(c) && isCold(c, now);
+  const warm = mine.filter(c => !blocked(c) && !isCold(c, now));
   const f = ui.filter;
   const match = (c: CrmCustomer) => {
+    if (f?.type === "blocked") return blocked(c);
+    if (blocked(c)) return false;
     const cold = isCold(c, now);
     if (f?.type === "cold") return cold;
     if (cold) return false;
@@ -57,7 +63,8 @@ export function inboxVM(ctx: SalesCtx) {
     ["Attention", "urgency", STATUS.Attention.dot, warm.filter(c => urgencyOf(c, now).level !== "none").length],
     ...([["Follow up", STATUS["Follow up"].dot], ["Appointment", STATUS.Appointment.dot], ["Won", STATUS.Won.dot], ["Lost", STATUS.Lost.dot]] as const)
       .map(([s, dot]): [string, "status", string, number] => [s, "status", dot, warm.filter(c => STATUS_LABEL[c.status] === s).length]),
-    ["Cold leads", "cold", STATUS["Cold leads"].dot, mine.filter(c => isCold(c, now)).length],
+    ["Cold leads", "cold", STATUS["Cold leads"].dot, mine.filter(coldOf).length],
+    [FB_BLOCKED_CATEGORY, "blocked", STATUS.Blocked.dot, mine.filter(blocked).length],
     ...usedLabels.map((l): [string, "label", string, number] => [l.name, "label", l.color, warm.filter(c => labelsOf(c).some(x => x.id === l.id)).length]),
   ];
   const chips3b = chipDefs.map(([label, type, dot, n]) => {
@@ -69,7 +76,7 @@ export function inboxVM(ctx: SalesCtx) {
   // Ad filter: pick one or more ads, Save applies.
   const ads = [...new Set(mine.map(c => c.ad))];
   const draft = ui.adSheet ? ui.adSheet.sel : ui.adSel;
-  const nSel = mine.filter(c => !isCold(c, now) && (!draft.length || draft.includes(c.ad))).length;
+  const nSel = mine.filter(c => !blocked(c) && !isCold(c, now) && (!draft.length || draft.includes(c.ad))).length;
   const q = ui.q.trim().toLowerCase();
   const pinned = (c: CrmCustomer) => !!data.prefs[c.id]?.pinned;
   const view = mine
@@ -132,7 +139,7 @@ export function inboxVM(ctx: SalesCtx) {
   };
   const ownerColor = new Map<string, string>();
   const leadsView = view.map((c, n) => {
-    const p = data.prefs[c.id], mu = !!p?.muted, pi = !!p?.pinned, cold = isCold(c, now), u = urgencyOf(c, now), ch = CHANNEL[c.channel];
+    const p = data.prefs[c.id], mu = !!p?.muted, pi = !!p?.pinned, bl = blocked(c), cold = coldOf(c), u = urgencyOf(c, now), ch = CHANNEL[c.channel];
     const shared = c.assignedTo && c.assignedTo !== owner.id;
     if (shared && !ownerColor.has(c.assignedTo!)) ownerColor.set(c.assignedTo!, OWNER_COLORS[ownerColor.size % OWNER_COLORS.length]);
     const firstMarked = ctx.data.visits.filter(v => v.customerId === c.id && (v.state === "attended" || v.state === "no_show")).sort((a, b) => a.start.localeCompare(b.start))[0];
@@ -146,7 +153,7 @@ export function inboxVM(ctx: SalesCtx) {
       // A chat marked unread shows the badge as a dot, as WhatsApp's.
       unread: c.unread || (marked(c) ? "\u00a0" : 0), chanName: sourceOf(c).label, chanFg: ch.fg, chanIcon: ch.icon, cold,
       ownerTag: shared ? firstName(nameOf(c.assignedTo)) : "", ownerC: shared ? ownerColor.get(c.assignedTo!)! : "var(--crm-muted)",
-      urgShow: !cold && u.level !== "none", urg: u.label, urg3b: u.color,
+      urgShow: !cold && !bl && u.level !== "none", urg: u.label, urg3b: u.color,
       firstVisit: firstMarked ? `${dayLabel(new Date(firstMarked.start))}, ${timeLabel(new Date(firstMarked.start))}` : "",
       tags: labelsOf(c).map(l => ({ t: l.name, c: l.color })),
       rule: n ? `1px solid ${BORDER}` : "0", isMuted: mu, isPinned: pi, iconRight: c.unread || marked(c) ? "28px" : "0px", padR: `${32 + (mu ? 22 : 0) + (pi ? 22 : 0)}px`,
@@ -189,6 +196,7 @@ export function inboxVM(ctx: SalesCtx) {
     Won: ["circle-check", "No won deals yet", "A chat moves here when you mark the customer Won."],
     Lost: ["circle-x", "No lost chats", "A chat moves here when you mark the customer Lost."],
     "Cold leads": ["lock", "No cold leads", "A chat moves here when its reply window shuts."],
+    [FB_BLOCKED_CATEGORY]: ["circle-x", "No blocked chats", "A Messenger chat moves here when Facebook says the Page can no longer reply."],
   };
   const all = () => patch({ filter: null, q: "" });
   const empty4 = leadsView.length ? null
@@ -204,7 +212,7 @@ export function inboxVM(ctx: SalesCtx) {
     adOpen: !!ui.adSheet, openAd: () => patch({ adSheet: { sel: ui.adSel } }), closeAd: () => patch({ adSheet: null }),
     adClear: () => patch({ adSheet: { sel: [] } }),
     adList: ads.map((a, k) => {
-      const on = draft.includes(a), first = mine.find(c => c.ad === a), cnt = mine.filter(c => c.ad === a && !isCold(c, now)).length, cc = mine.filter(c => c.ad === a && isCold(c, now)).length;
+      const on = draft.includes(a), first = mine.find(c => c.ad === a), cnt = mine.filter(c => c.ad === a && !blocked(c) && !isCold(c, now)).length, cc = mine.filter(c => c.ad === a && coldOf(c)).length;
       return { name: a, chan: first ? CHANNEL[first.channel].name : "", chanFg: first ? CHANNEL[first.channel].fg : "var(--crm-muted)", n: cnt, s: cnt === 1 ? "" : "s", coldNote: cc ? ` · ${cc} cold` : "", on,
         rule: k ? "1px solid var(--crm-rule)" : "0", ring: on ? "var(--crm-rust)" : "var(--crm-line)", fill: on ? "var(--crm-rust)" : "transparent",
         toggle: () => patch({ adSheet: { sel: on ? draft.filter(x => x !== a) : [...draft, a] } }) };

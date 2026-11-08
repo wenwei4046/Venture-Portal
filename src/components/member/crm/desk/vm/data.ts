@@ -8,6 +8,7 @@ import { STATUS_LABEL, isCold, lastChat, lastReal, urgencyOf } from "../../sales
 import { DIRECTOR_TEAM, teamColours } from "./tokens";
 import type { DeskCtx } from "./ctx";
 import { mediaWord } from "../../shared/chat-media";
+import { FB_BLOCKED_CATEGORY, isFbBlocked } from "../../shared/fb-blocked";
 
 export const initials = (name: string) => name.trim().split(/\s+/).map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase() || "?";
 export const first = (name: string) => name.trim().split(/\s+/)[0] ?? name;
@@ -20,7 +21,7 @@ export interface ChatRow {
   /** "New", "Follow up", "Appointment", "Won", "Lost", or the reply urgency ("Overdue · 15 h"). */
   status: string;
   /** The status the chip's colour is picked by. */
-  key: "New" | "Follow up" | "Appointment" | "Overdue" | "Urgent" | "Reply soon" | "Won" | "Lost" | "Cold";
+  key: "New" | "Follow up" | "Appointment" | "Overdue" | "Urgent" | "Reply soon" | "Won" | "Lost" | "Cold" | "Blocked";
   last: number;
 }
 
@@ -38,15 +39,17 @@ export function chatRows(ctx: DeskCtx): ChatRow[] {
     const teamId = c.assignedTo ? null : c.teamId;
     const team = c.assignedTo ? teamNameOf(ctx, c.assignedTo) : teamId ? ctx.teams.find(t => t.id === teamId)?.name ?? null : null;
     const owner = c.assignedTo ? nameOf(c.assignedTo) : team ? `${team} · to assign` : "Organic · to assign";
-    const cold = c.status !== "won" && c.status !== "lost" && isCold(c, now);
+    // Blocked on Facebook (2026-11-08) is its own key, before every other (shared/fb-blocked.ts).
+    const blocked = isFbBlocked(c, data);
+    const cold = !blocked && c.status !== "won" && c.status !== "lost" && isCold(c, now);
     // A closed window is Cold first, whatever the wait (2026-10-18): only a template can reach them.
-    const key: ChatRow["key"] = cold ? "Cold" : u.level === "overdue" ? "Overdue" : u.level === "urgent" ? "Urgent" : u.level === "soon" ? "Reply soon"
+    const key: ChatRow["key"] = blocked ? "Blocked" : cold ? "Cold" : u.level === "overdue" ? "Overdue" : u.level === "urgent" ? "Urgent" : u.level === "soon" ? "Reply soon"
       : cold ? "Cold" : (STATUS_LABEL[c.status] as ChatRow["key"]);
     return {
       id: c.id, c, ini: initials(c.name), name: c.name, time: last ? lastChat(last.at, now) : lastChat(c.createdAt, now), ad: c.ad,
       msg: last ? (last.from === "me" ? "You: " : "") + (last.text || mediaWord(last)) : "",
       owner, ownerId: c.assignedTo, teamId: c.teamId, team,
-      status: cold ? "Cold" : u.level !== "none" ? u.label : STATUS_LABEL[c.status], key,
+      status: blocked ? FB_BLOCKED_CATEGORY : cold ? "Cold" : u.level !== "none" ? u.label : STATUS_LABEL[c.status], key,
       last: new Date(last?.at ?? c.createdAt).getTime(),
     };
   }).sort((a, b) => b.last - a.last);

@@ -38,17 +38,18 @@ function gestures(ctx: PanelCtx, c: CrmCustomer) {
 /** One chat as the panel lists it: who has it, its state, its last line. */
 function chatRow(ctx: PanelCtx, c: CrmCustomer) {
   const { now, nameOf } = ctx, u = urgencyOf(c, now), seat = (c.assignedTo ? seatOf(ctx, c.assignedTo) : c.teamId ? seatOf(ctx, c.teamId) : null) ?? NO_SEAT;
-  const last = lastReal(c), needs = u.level !== "none";
-  const state = needs ? u.label : STATUS_LABEL[c.status];
+  // A chat blocked on Facebook waits on nobody: never Attention, its card says so.
+  const blocked = isFbBlocked(c, ctx.data), last = lastReal(c), needs = !blocked && u.level !== "none";
+  const state = blocked ? FB_BLOCKED : needs ? u.label : STATUS_LABEL[c.status];
   return {
-    c, seat, needs, name: c.name, ini: ini(c.name), ad: c.ad, state, uc: UC[u.level],
+    c, seat, needs, name: c.name, ini: ini(c.name), ad: c.ad, state, uc: blocked ? "var(--crm-muted)" : UC[u.level],
     // 4a (T02): the customer's tint; a lead waiting for a team in oxblood.
     avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], toAssign: !c.assignedTo,
     who: c.assignedTo ? nameOf(c.assignedTo) : `${seat.name || "Team"} · to assign`, wc: seat.c, ownBg: seat.own,
     preview: last ? (last.from === "me" ? "You: " : "") + (last.text || mediaWord(last)) : "", at: last ? lastChat(last.at, now) : "",
     // Its unread messages on the card, so the Inbox badge's number can be found (the owner, 2026-10-14: "inbox 2 是誰？").
     unread: c.unread ? String(c.unread) : "",
-    stBg: u.level === "overdue" ? "var(--crm-tint-attention)" : u.level === "urgent" ? "var(--crm-tint-appt)" : u.level === "soon" ? "var(--crm-field)" : "transparent", hasSt: !!state,
+    stBg: blocked ? "var(--crm-field)" : u.level === "overdue" ? "var(--crm-tint-attention)" : u.level === "urgent" ? "var(--crm-tint-appt)" : u.level === "soon" ? "var(--crm-field)" : "transparent", hasSt: !!state,
     // rev 1011 §1.1: a chat opens here, as the Principal / Director, whoever has it (as Calendar and Awaiting reply do);
     // acting as a salesperson is Profile › View as only.
     open: () => ctx.patch({ lead: c.id, pick: "", toast: "" }),
@@ -61,6 +62,7 @@ import { mediaWord } from "../../shared/chat-media";
 import { isNewChat } from "../../shared/new-chat";
 import { STATUS, avatarTint } from "../../shared/palette";
 import { saidInChat } from "../../shared/chat-search";
+import { FB_BLOCKED, FB_BLOCKED_CATEGORY, isFbBlocked } from "../../shared/fb-blocked";
 
 /** The chats the panel shows: everyone's, and those waiting in a team. Organic Leads are Assignment's. */
 const listed = (ctx: PanelCtx) => ctx.data.customers.filter(c => c.assignedTo || c.teamId);
@@ -76,7 +78,8 @@ export function inboxVM(ctx: PanelCtx) {
   const need = list.filter(r => r.needs);
   // The same categories as everybody's Mine inbox, in its order (the owner, 2026-10-14: "只要在 mine 有的，team 也要有"):
   // a Cold lead (the window shut, we wrote last) is its own column and nowhere else, as in Mine.
-  const col = (r: typeof all[number]) => (isCold(r.c, ctx.now) ? "cold" : isNewChat(r.c) ? "new" : r.needs ? "need" : r.c.status === "appointment" ? "appt" : r.c.status === "won" ? "won" : r.c.status === "lost" ? "lost" : "fup");
+  // Blocked on Facebook (2026-11-08): its own column, after Cold leads, and nowhere else (shared/fb-blocked.ts).
+  const col = (r: typeof all[number]) => (isFbBlocked(r.c, ctx.data) ? "blocked" : isCold(r.c, ctx.now) ? "cold" : isNewChat(r.c) ? "new" : r.needs ? "need" : r.c.status === "appointment" ? "appt" : r.c.status === "won" ? "won" : r.c.status === "lost" ? "lost" : "fup");
   return {
     onInbox: ui.tab === "inbox" && !ui.lead,
     inbSummary: `${list.length} chats · ${need.length} need attention`,
@@ -88,7 +91,7 @@ export function inboxVM(ctx: PanelCtx) {
       const on = who === id;
       return { label, on, n: all.filter(r => r.seat.id === f && (!id || r.c.assignedTo === id)).length, bg: on ? "var(--crm-ink)" : "transparent", fg: on ? "#fff" : "var(--crm-muted)", bd: on ? "var(--crm-ink)" : "var(--crm-line)", pick: () => set(u => ({ ...u, inbWho: id })) };
     }) : [],
-    inbCols: (([["new", "New"], ["need", "Attention"], ["fup", "Follow up"], ["appt", "Appointment"], ["won", "Won"], ["lost", "Lost"], ["cold", "Cold leads"]] as const).map(([k, t]) => [k, t, STATUS[t].dot, STATUS[t].tint] as const))
+    inbCols: (([["new", "New"], ["need", "Attention"], ["fup", "Follow up"], ["appt", "Appointment"], ["won", "Won"], ["lost", "Lost"], ["cold", "Cold leads"], ["blocked", FB_BLOCKED_CATEGORY]] as const).map(([k, t]) => [k, t, STATUS[t].dot, STATUS[t].tint] as const))
       .map(([k, title, c, bg], i) => { const rows = list.filter(r => col(r) === k); return { title, c, bg, n: rows.length, rows, empty: !rows.length, on: (ui.inbCol ?? 0) === i, hot: k === "need",
         // The chip above the board slides it to this column.
         jump: () => { set(u => ({ ...u, inbCol: i })); const b = document.querySelector<HTMLElement>("[data-inb-board]"), el = b?.children[i] as HTMLElement | undefined; if (b && el) b.scrollTo({ left: el.offsetLeft - b.offsetLeft - 20, behavior: "smooth" }); } }; }),

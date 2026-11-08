@@ -233,7 +233,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
-      forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, upNextEvents: more.upNextEvents, upNextStaff: more.upNextStaff, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
+      forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, upNextEvents: more.upNextEvents, upNextStaff: more.upNextStaff, messengerBlocked: more.messengerBlocked, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
     }));
     // Where Meta shows every template's review (2026-11-04) — for whoever writes templates; the account's id, never a token.
     const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim();
@@ -259,7 +259,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents, upNextStaff] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents, upNextStaff, fbBlocked] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order, kind")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -298,8 +298,10 @@ async function desktopRows(db: Db, journey: boolean) {
     soft<NonNullable<CrmDataRows["upNextEvents"]>>(db.from("crm_events").select("id, at, actor, data").eq("kind", "up_next").order("at", { ascending: false }).limit(500)),
     // Who CRM › Settings › Up next lets act on their people (mig 20261108120000).
     soft<{ staff_id: string }[]>(db.from("crm_staff").select("staff_id").eq("up_next", true)),
+    // Messenger customers blocked on Facebook (mig 20261108150000; read softly, so the CRM opens before the column).
+    soft<{ id: string }[]>(db.from("crm_contacts").select("id").eq("fb_blocked", true)),
   ]);
-  return { upNextStaff: upNextStaff.map(r => r.staff_id), upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
+  return { messengerBlocked: fbBlocked.map(r => r.id), upNextStaff: upNextStaff.map(r => r.staff_id), upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */

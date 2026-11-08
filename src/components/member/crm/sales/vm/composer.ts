@@ -7,6 +7,7 @@
  * the mic). The Sticker panel's GIF and Sticker tabs are not live (the owner: "这2个分页就不用上线先") — Emoji is its tab.
  */
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, Ref } from "react";
+import { FB_BLOCKED, FB_BLOCKED_SUB } from "../../shared/fb-blocked";
 
 /** null: the keyboard or nothing under the bar. */
 export type ComposerPanel = null | "sticker" | "attach";
@@ -171,6 +172,8 @@ export interface ComposerVM {
   tplOn: boolean; tplOff: boolean;
   /** Frame M08: the cold card's line — who last wrote when, and what opens the chat again. */
   coldSub: string;
+  /** The cold card's title: "This chat is cold", or "Blocked on Facebook". */
+  coldTitle: string;
   recTime: string; recCancel: Click; trashRef: Ref<HTMLSpanElement>;
   /** Slide to cancel: the hint follows the finger (a transform), red near the line. */
   recSlide: string; recHintC: string;
@@ -190,6 +193,8 @@ export interface ComposerIn {
   canSend: boolean;
   send: () => void;
   warm: boolean;
+  /** Blocked on Facebook (shared/fb-blocked.ts): no composer, the cold card says why (pass warm: false too). */
+  blocked?: boolean;
   openTpl: () => void;
   /** Settings › Suggest a template (on unless Settings turned it off). */
   tplOn?: boolean;
@@ -287,7 +292,9 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     homeBg: homeBg(shown), toast: s.toast,
     replyText: v.reply?.text ?? "", replyWho: v.reply?.who ?? "", cancelReply: () => v.cancelReply(),
     slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: v.qrEdit ? () => v.qrEdit?.() : undefined,
-    openTpl: () => v.openTpl(), tplOn: v.tplOn !== false, tplOff: v.tplOn === false, coldSub: v.coldSub ?? "",
+    openTpl: () => v.openTpl(), tplOn: v.tplOn !== false && !v.blocked, tplOff: v.tplOn === false && !v.blocked,
+    // Blocked on Facebook: the cold card says so, with no template button (shared/fb-blocked.ts).
+    coldTitle: v.blocked ? FB_BLOCKED : "This chat is cold", coldSub: v.blocked ? FB_BLOCKED_SUB : v.coldSub ?? "",
     recTime: v.rec?.time ?? "", recCancel: () => d.recCancel(), trashRef: d.trashRef,
     recSlide: `translateX(${d.slide}px)`, recHintC: d.slide <= -70 ? "var(--crm-oxblood)" : "var(--crm-muted)",
   };

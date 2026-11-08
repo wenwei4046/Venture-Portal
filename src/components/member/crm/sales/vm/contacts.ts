@@ -7,6 +7,7 @@ import type { ChangeEvent, KeyboardEvent, MouseEvent } from "react";
 import { STATUS_LABEL, ini, isCold, stop, urgencyOf, type PEvent, type SalesCtx } from "./common";
 import { STATUS, avatarTint } from "../../shared/palette";
 import { contactInfoVM, customerFormVM, phoneLabel, telHref } from "./customer";
+import { FB_BLOCKED_CATEGORY, isFbBlocked } from "../../shared/fb-blocked";
 
 const letterOf = (n: string) => { const c = n.trim().charAt(0).toUpperCase(); return c >= "A" && c <= "Z" ? c : "#"; };
 const AZ = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("");
@@ -32,7 +33,7 @@ export function contactsVM(ctx: SalesCtx) {
     const sx = sw ? sw.x : 0;
     return {
       // 4a (M09): the customer's tint, and the status as a pill on the ramp (Attention and Cold leads as the Inbox counts them).
-      avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], ...(() => { const k = (isCold(c, ctx.now) && c.status !== "won" && c.status !== "lost" ? "Cold leads" : urgencyOf(c, ctx.now).level !== "none" ? "Attention" : STATUS_LABEL[c.status]) as keyof typeof STATUS;
+      avBg: avatarTint(c.name)[0], avFg: avatarTint(c.name)[1], ...(() => { const k = (isFbBlocked(c, ctx.data) ? FB_BLOCKED_CATEGORY : isCold(c, ctx.now) && c.status !== "won" && c.status !== "lost" ? "Cold leads" : urgencyOf(c, ctx.now).level !== "none" ? "Attention" : STATUS_LABEL[c.status]) as keyof typeof STATUS;
         const s = STATUS[k] ?? STATUS.New; return { st: k, stBg: s.tint, stFg: s.text, stDot: s.dot }; })(),
       head, name: c.name, ini: ini(c.name), status: STATUS_LABEL[c.status], phone: phoneLabel(c.phone) || "—", tel: telHref(c.phone), hasTel: !!c.phone.replace(/\D/g, ""),
       sx, sTrans: sw && sw.drag ? "none" : "transform 220ms ease", actOp: sx < -4 ? 1 : 0,

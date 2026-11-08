@@ -2802,7 +2802,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </button>
                     </div>
                   </>)}
-                  {v.suggest && <SuggestFloat key={v.suggestKey} list={v.suggest} pick={v.pickSuggest} library={v.suggestLib} showLogo={v.suggestLogo && !!v.suggest.length && !v.draft} desk />}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
+                  {v.fbBlocked ? (<div data-fb-blocked="" style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", height: "50px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 18px", borderRadius: "25px", background: "var(--crm-field)", border: "1px solid var(--crm-line)", font: "500 14px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.fbBlockedNote}</div>) : (<>{v.suggest && <SuggestFloat key={v.suggestKey} list={v.suggest} pick={v.pickSuggest} library={v.suggestLib} showLogo={v.suggestLogo && !!v.suggest.length && !v.draft} desk />}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
                     <div style={{ flex: "1", minWidth: "0", height: "50px", borderRadius: "25px", display: "flex", alignItems: "center", gap: "16px", padding: "0 18px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-line)", boxShadow: "0 6px 20px rgba(42,22,12,.08)", color: "var(--crm-muted)" }}>
                       <span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" x2="9.01" y1="9" y2="9"></line><line x1="15" x2="15.01" y1="9" y2="9"></line></svg>{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}
@@ -2830,7 +2830,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     <span title={v.sendTitle} onClick={v.send} style={{ flex: "0 0 auto", width: "50px", height: "50px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer", boxShadow: "0 6px 20px rgba(42,22,12,.15)" }} className="crm4a-primary">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={v.micD}></path></svg>
                     </span>
-                  </div>
+                  </div></>)}
                 </>)}
                 {!!(v.kBook) && (<DeskBook v={v.book} />)}{!!(v.kNote) && (<DeskNote v={v.note} />)}{!!(v.kForm) && (<DeskCustomerForm v={v.cform} />)}{!!(v.kAlerts) && (<DeskAlerts v={v.alertsP} />)}
                 {!!(v.kTopMove) && (<>

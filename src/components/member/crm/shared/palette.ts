@@ -20,7 +20,7 @@ export const C = {
   tickRead: v("tick-read"),
 } as const;
 
-export type StatusName = "New" | "Attention" | "Follow up" | "Appointment" | "Won" | "Lost" | "Cold leads";
+export type StatusName = "New" | "Attention" | "Follow up" | "Appointment" | "Won" | "Lost" | "Cold leads" | "Blocked";
 
 /** The status ramp (change list 5): the dot / bar, the pill's tint and the words on it. */
 export const STATUS: Record<StatusName, { dot: string; tint: string; text: string }> = {
@@ -31,11 +31,13 @@ export const STATUS: Record<StatusName, { dot: string; tint: string; text: strin
   Won: { dot: v("st-won"), tint: C.tintWon, text: C.brown },
   Lost: { dot: v("st-lost"), tint: C.tintLost, text: C.muted },
   "Cold leads": { dot: v("st-cold"), tint: C.tintCold, text: C.muted },
+  // Blocked on Facebook (2026-11-08, shared/fb-blocked.ts): Lost's greys with the faint dot — no colour of its own.
+  Blocked: { dot: C.faint2, tint: C.tintLost, text: C.muted },
 };
 /** The ramp by the CRM's own status keys (crm_contacts.status, plus the inbox's derived ones). */
 export const STATUS_BY_KEY: Record<string, (typeof STATUS)[StatusName]> = {
   new: STATUS.New, need: STATUS.Attention, attention: STATUS.Attention, urgency: STATUS.Attention, follow_up: STATUS["Follow up"], fup: STATUS["Follow up"],
-  appointment: STATUS.Appointment, appt: STATUS.Appointment, won: STATUS.Won, lost: STATUS.Lost, cold: STATUS["Cold leads"],
+  appointment: STATUS.Appointment, appt: STATUS.Appointment, won: STATUS.Won, lost: STATUS.Lost, cold: STATUS["Cold leads"], blocked: STATUS.Blocked,
 };
 
 /**
