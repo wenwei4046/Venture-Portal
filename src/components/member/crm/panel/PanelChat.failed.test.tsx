@@ -1,3 +1,4 @@
+import { stepStatuses } from "./step-statuses.test-util";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CrmApp from "../CrmApp";
@@ -36,8 +37,7 @@ const NOTE = failNote("131053 Media upload error");
 
 /** The board shows one status at a time (2026-10-24): step through the status tabs until `name` shows. */
 async function toCustomer(name: string) {
-  const tabs = [...document.querySelectorAll<HTMLElement>("span")].filter(e => e.style.borderBottom && /^(New|Attention|Follow up|Appointment|Won|Lost|Cold leads)/.test(e.textContent ?? ""));
-  for (const t of tabs) { if (screen.queryAllByText(name, { exact: true }).length) break; fireEvent.click(t); await act(async () => {}); }
+  await stepStatuses(name);
 }
 
 describe("a message WhatsApp refused", () => {

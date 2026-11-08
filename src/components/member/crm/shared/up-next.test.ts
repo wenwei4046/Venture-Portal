@@ -40,6 +40,15 @@ describe("Up next's words (README › Screens)", () => {
     const d = upNextFrame(r, demoBook, DEMO_ADS, ui(), acts, true);
     expect(d.splitLine).toBe("All ads counted together: Team Alvin 22.5% · Team Anthony 37.5% · Team Stanley 40% · set in Assignment");
   });
+  it("lists Not in turn by reason, then team, then name (the owner, 2026-11-08)", () => {
+    const x = new UpNextDemo(), r = x.read("raya");
+    const mixed = { ...r, people: [...r.people].reverse() };
+    const g = upNextFrame(mixed, demoBook, DEMO_ADS, ui({ ad: "raya" }), acts, true).greyed;
+    expect(g.length).toBeGreaterThan(2);
+    const want = [...g].sort((a, b) => a.rank - b.rank || a.team.localeCompare(b.team) || a.name.localeCompare(b.name));
+    expect(g.map(e => e.id)).toEqual(want.map(e => e.id));
+    expect(new Set(g.map(e => e.whyShort)).size).toBeGreaterThan(1);
+  });
   it("swaps the team line for the reason on hover", () => {
     expect(frame(new UpNextDemo(), { why: true }).firstLine).toBe("Team Stanley · 40% · last lead 1 d ago");
   });

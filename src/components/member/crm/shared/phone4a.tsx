@@ -57,6 +57,44 @@ export function Phone4aChip({ label, count, on, hot, onClick, children }: { labe
   );
 }
 
+/**
+ * The Team inbox's status as a dropdown (the owner, 2026-11-08: "做成下拉式选择状态吧" — the tabs ran onto three lines): the
+ * status shown, its colour and count; a tap lists every status. Closed by a tap outside it — never by a see-through layer,
+ * which an iPhone draws over a menu inside a scroller (PhoneUpNext, the same day).
+ */
+export function Phone4aStatusPick({ cols }: { cols: { title: string; c: string; n: number; on: boolean; hot?: boolean; jump: () => void }[] }) {
+  const [open, setOpen] = useState(false), cur = cols.find(g => g.on) ?? cols[0];
+  useEffect(() => {
+    if (!open) return;
+    const on = (e: Event) => { if (!(e.target as Element | null)?.closest?.("[data-status-pick]")) setOpen(false); };
+    document.addEventListener("click", on);
+    return () => document.removeEventListener("click", on);
+  }, [open]);
+  if (!cur) return null;
+  const dot = (c: string): CSSProperties => ({ flex: "none", width: "9px", height: "9px", borderRadius: "2px", background: c });
+  return (
+    <div data-status-pick="" style={{ flex: "none", position: "relative", zIndex: 6 }}>
+      <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label={`Status: ${cur.title}`} onClick={() => setOpen(o => !o)}
+        style={{ ...BTN, width: "100%", height: "44px", padding: "0 14px", boxSizing: "border-box", borderRadius: "12px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "8px", fontSize: fs(14), fontWeight: 500 }}>
+        <span style={dot(cur.c)} /><span style={{ color: cur.hot ? "var(--crm-oxblood)" : "var(--crm-ink)" }}>{cur.title}</span>
+        <span style={{ flex: 1, color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums", textAlign: "left" }}>{cur.n}</span>
+        <Ic name="chevron-down" size={14} />
+      </button>
+      {open && (
+        <div role="listbox" aria-label="Status" style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 7, padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "12px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", maxHeight: "60vh", overflowY: "auto" }}>
+          {cols.map(g => (
+            <button key={g.title} type="button" role="option" aria-selected={g.on} onClick={() => { g.jump(); setOpen(false); }}
+              style={{ ...BTN, flex: "none", height: "44px", padding: "0 10px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "10px", fontSize: fs(14), fontWeight: g.on ? 600 : 400, background: g.on ? "var(--crm-field)" : "transparent", textAlign: "left" }}>
+              <span style={dot(g.c)} /><span style={{ flex: 1, color: g.hot ? "var(--crm-oxblood)" : "var(--crm-ink)" }}>{g.title}</span>
+              <span style={{ color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{g.n}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Change list 18 · the chat's 34 px status strip: status and wait (oxblood on pale orange), the reply window on the right; grey when cold. */
 export function Phone4aStrip({ s }: { s: { cold: boolean; left: string; right: string; dot: string } }) {
   return (

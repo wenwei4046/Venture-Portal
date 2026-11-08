@@ -53,7 +53,7 @@ const NOOP = () => {};
 export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
   const { data, nameOf, now, patch, set, ui, act } = ctx;
   type It = { at: string; m?: CrmChatMessage; sys?: string };
-  const hidden = new Set(data.hiddenMessages), stars = new Set(data.starredMessages ?? []);
+  const hidden = new Set(data.hiddenMessages), stars = new Set<string>(); // Stars are gone (the owner, 2026-11-08).
   const pinnedId = data.prefs[c.id]?.pinnedMessageId ?? null;
   const its: It[] = [...c.messages.filter(m => !hidden.has(m.id)).map(m => ({ at: m.at, m })),
     ...data.events.filter(e => e.customerId === c.id).map(e => { const to = nameOf(String(e.data.to ?? e.owner ?? "")), k = e.kind as string;
@@ -92,7 +92,6 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
         forward: { chats: forwardChats(data.customers, c.id, nameOf), send: toId => void act.forward(m.id, toId).then(ok => { if (ok) patch({ toast: `Forwarded to ${data.customers.find(x => x.id === toId)?.name ?? "the customer"}` }); }) } }, "forward"); } },
       ...(m.text ? [{ label: "Copy", d: MENU_ICON.copy, run: () => { void navigator.clipboard?.writeText(m.text).catch(() => {}); say("Copied"); } }] : []),
       { label: "Info", d: MENU_ICON.info, run: () => { patch({ msgMenu: null }); openMsgView({ mine, preview, reaction: rx, react: NOOP, actions: [], info: messageInfo(m, c, nameOf) }, "info"); } },
-      { label: star ? "Unstar" : "Star", d: MENU_ICON.star, run: () => { say(star ? "Unstarred" : "Starred"); void act.star(m.id, !star); } },
       { label: pinned ? "Unpin" : "Pin", d: MENU_ICON.pin, run: () => { patch({ msgMenu: null }); void act.setPref(c.id, { pinnedMessageId: pinned ? null : m.id }); } },
       { label: "Delete for me", d: MENU_ICON.del, run: () => { patch({ msgMenu: null }); void act.hideMessage(m.id); } },
     ].map(a => ({ ...a, fg: a.label === "Delete for me" ? "var(--crm-oxblood)" : "var(--crm-ink)" }));
