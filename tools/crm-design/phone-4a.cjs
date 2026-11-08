@@ -350,6 +350,11 @@ function teamInbox(body) {
   // The status tabs wrap onto a second line rather than slide (the owner, 2026-10-24: "還是能移動"), as the desktop's do.
   b = once(b, '<div data-drag-scroll="1" style={{ flex: "0 0 auto", display: "flex", gap: "20px", overflowX: "auto", scrollbarWidth: "none", margin: "-4px -20px 0", padding: "0 20px", borderBottom: "1px solid var(--crm-rule)", userSelect: "none" }}>',
     '<div style={{ flex: "0 0 auto", display: "flex", flexWrap: "wrap", columnGap: "16px", margin: "-4px -20px 0", padding: "0 20px", borderBottom: "1px solid var(--crm-rule)", userSelect: "none" }}>', "team status tabs wrap");
+  // …and since 2026-11-08 one dropdown instead of the tabs (the owner: "做成下拉式选择状态吧" — eight tabs ran onto three lines).
+  { const open = '<div style={{ flex: "0 0 auto", display: "flex", flexWrap: "wrap", columnGap: "16px", margin: "-4px -20px 0", padding: "0 20px", borderBottom: "1px solid var(--crm-rule)", userSelect: "none" }}>';
+    const i = b.indexOf(open), j = i < 0 ? -1 : b.indexOf("</div>", i);
+    if (i < 0 || j < 0 || b.indexOf(open, i + 1) >= 0 || !b.slice(i, j).includes("{(v.ib.inbCols).map(")) throw new Error("phone-4a: team status dropdown");
+    b = b.slice(0, i) + "<Phone4aStatusPick cols={v.ib.inbCols} />" + b.slice(j + "</div>".length); }
   // The board shows the status picked above it, full width, and no longer pans sideways (the owner, 2026-10-24: "怎麼可以隨意
   // 拖動" — the tabs and the board's columns drifted apart).
   b = once(b, '<div data-inb-board="1" data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "12px", overflowX: "auto", overflowY: "hidden",',

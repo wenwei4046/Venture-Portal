@@ -1,3 +1,4 @@
+import { stepStatuses } from "./step-statuses.test-util";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CrmApp from "../CrmApp";
@@ -26,8 +27,7 @@ async function openTeamChat(name = "Lim Wei Jie") {
   await act(async () => {});
   await tap(screen.getAllByText("Inbox", { exact: true }).find(e => e.closest("nav")) ?? null);
   // The board shows one status at a time (2026-10-24): step through the status tabs to the customer.
-  const tabs = [...document.querySelectorAll<HTMLElement>("span")].filter(e => e.style.borderBottom && /^(New|Attention|Follow up|Appointment|Won|Lost|Cold leads)/.test(e.textContent ?? ""));
-  for (const t of tabs) { if (screen.queryAllByText(name, { exact: true }).length) break; await tap(t); }
+  await stepStatuses(name);
   await tap(screen.getAllByText(name, { exact: true })[0]);
   expect(document.querySelector('main[data-chat-screen] [title="Back to Inbox"]')).not.toBeNull();
 }
@@ -49,8 +49,7 @@ const emojiCells = () => [...composer().querySelectorAll<HTMLElement>('div[style
 
 /** The board shows one status at a time (2026-10-24): step through the status tabs until `name` shows. */
 async function toCustomer(name: string) {
-  const tabs = [...document.querySelectorAll<HTMLElement>("span")].filter(e => e.style.borderBottom && /^(New|Attention|Follow up|Appointment|Won|Lost|Cold leads)/.test(e.textContent ?? ""));
-  for (const t of tabs) { if (screen.queryAllByText(name, { exact: true }).length) break; fireEvent.click(t); await act(async () => {}); }
+  await stepStatuses(name);
 }
 
 describe("the Team chat is Mine's", () => {
