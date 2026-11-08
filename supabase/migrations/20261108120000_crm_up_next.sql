@@ -179,7 +179,7 @@ alter table public.crm_events drop constraint if exists crm_events_kind_check;
 alter table public.crm_events add constraint crm_events_kind_check check (kind = any (array['won','lost','moved','shared','share_declined','move_declined','assigned','first_reply','appt_booked','appt_changed','appt_cancelled','visit','status','reminded','up_next']));
 drop policy if exists crm_events_up_next_read on public.crm_events;
 create policy crm_events_up_next_read on public.crm_events for select to authenticated
-  using (kind = 'up_next' and (select crm_manages()));
+  using (kind = 'up_next' and (select crm_sees_all()));
 
 -- Who (crm_me), when (at), what, about whom, before and after.
 create or replace function public.crm_up_next_log(p_action text, p_staff uuid, p_ad text, p_before jsonb, p_after jsonb)
