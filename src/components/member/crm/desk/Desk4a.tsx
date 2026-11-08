@@ -14,6 +14,7 @@ export { DeskBookingBar as DeskBookingBar4a, DeskBookingLink as DeskBookingLink4
 import type { KeyLogVM } from "./vm/key-log";
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { DateRangePicker } from "../shared/date-range";
+import { InfoValue } from "../shared/AdLink";
 import { boldRuns, wrapBold } from "../shared/bold-text";
 import { ViewAsList } from "./ViewAsList";
 import { Ic, type Icon4a } from "../shared/icons4a";
@@ -500,7 +501,7 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
 interface InboxSideBits {
   ibHas: boolean; ibNone: boolean; ibInfoShut: boolean; ibInfoFold: () => void; ibInfoRail: { open: () => void }; ibInfoW: number;
   dragInfo: (e: never) => void; resetInfo: () => void;
-  ibInfo: { groups: { label: string; rows: { k: string; v: string; href: string | null; c: string }[] }[] };
+  ibInfo: { groups: { label: string; rows: { k: string; v: string; href: string | null; c: string; go?: (() => void) | null }[] }[] };
   ibCpOpen: boolean; ibCpToggle: () => void; ibCpW?: number; dragCp?: (e: never) => void; resetCp?: () => void;
   ibCp: { audit4: { what: string; detail: string; who: string; time: string; main: boolean; hot: boolean }[] };
   ibBook: () => void; editInfo: () => void;
@@ -564,7 +565,7 @@ export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: str
                 {g.rows.map(r => (
                   <div key={r.k} style={{ display: "flex", justifyContent: "space-between", gap: "12px", font: "400 13px Inter, sans-serif" }}>
                     <span style={{ color: "var(--crm-muted)", flex: "none" }}>{r.k}</span>
-                    <span style={{ textAlign: "right", fontWeight: 500, color: r.c, overflowWrap: "anywhere", minWidth: 0 }}>{value(r.v, r.href)}</span>
+                    <span style={{ textAlign: "right", fontWeight: 500, color: r.c, overflowWrap: "anywhere", minWidth: 0 }}>{r.go ? <InfoValue v={r.v} go={r.go} /> : value(r.v, r.href)}</span>
                   </div>
                 ))}
               </div>

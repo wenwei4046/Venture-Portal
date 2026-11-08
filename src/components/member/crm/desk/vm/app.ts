@@ -8,6 +8,7 @@ import type { DeskCtx } from "./ctx";
 import { frameVM } from "./frame";
 import { leaveCalData } from "../../shared/leave-cal-data";
 import { peopleBook } from "../../shared/people-book";
+import { upNextOpen } from "../../shared/up-next-data";
 import { jobTitle } from "../../shared/people";
 import { frame4aVM, heads4a } from "./frame4a";
 import { clistVM, insightVM } from "./insight";
@@ -112,7 +113,9 @@ export function deskVM(ctx: DeskCtx) {
     ibInfo: (() => { const c = cur; const secs = formV2(data);
       return { name: c?.name ?? "", ini: c ? initials(c.name) : "", groups: c ? secs.map(sec => ({ label: sec.label,
         rows: sec.fields.filter(fl => fl.id !== "name").map((fl, i) => { const val = answerOf(data, c, fl, ctx.nameOf);
-          return { k: fl.label.replace(/ (RM)$/, ""), v: val, href: fl.id === "ad" ? adHref(c.adUrl) : null, bt: i ? "1px solid var(--crm-field)" : "0", w: val === "—" ? 400 : 650, c: val === "—" ? "var(--crm-faint)" : "var(--crm-ink)" }; }) })) : [] }; })(),
+          // The salesperson's name opens Team activity on them (docs/design_handoff_crm, 2026-11-08 — the person report's place).
+          const who = fl.id === "sp" && c.assignedTo && upNextOpen(data, ctx.me.id) ? c.assignedTo : null;
+          return { k: fl.label.replace(/ (RM)$/, ""), v: val, href: fl.id === "ad" ? adHref(c.adUrl) : null, go: who ? () => patch({ tab: "activity", pane: "closed", chat: null, actWho: who }) : null, bt: i ? "1px solid var(--crm-field)" : "0", w: val === "—" ? 400 : 650, c: val === "—" ? "var(--crm-faint)" : "var(--crm-ink)" }; }) })) : [] }; })(),
     awInfo: () => { if (awC) patch({ awMenuOpen: false, tab: ui.tab, pane: "overlay", kind: "info", infoId: awC.id, visit: null }); },
     awBook: () => { if (awC) patch({ awMenuOpen: false, pane: "overlay", kind: "book", chat: awC.id, book: null }); },
     // 4a Customer info's Book a visit (frame 02): the chat's own Appointment, as its ⋮ menu opens it.
