@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { onlyOneAudio } from "./one-audio";
 import { typePx } from "./type";
+
+// The viewer's player stops a voice note playing in the chat, and the other way round (one-audio.ts).
+onlyOneAudio();
 
 /**
  * A document other than a PDF, opened in the viewer (the owner, 2026-10-14: "文件功能目前雙方都能打開 pdf，但是其他文件類型

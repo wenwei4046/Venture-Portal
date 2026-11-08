@@ -91,11 +91,12 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
   const adFunnel = FN.map(([k, n, sub], i) => ({ k, n: n == null ? "—" : n.toLocaleString("en-MY"), sub, w: n ? Math.max(3, Math.round(Math.sqrt(n / mx) * 100)) : 0, color: ["var(--crm-line)", "var(--crm-st-won)", "var(--crm-rust)", "var(--crm-brown)"][i] }));
   const adCosts = [["Cost per click", rm(M.cpc)], ["Cost per lead", rm(M.cpl)], ["Cost per appointment", rm(M.cpappt)], ["Click-through rate", M.ctr == null ? "—" : `${(M.ctr as number).toFixed(2)}%`]].map(([k, v]) => ({ k, v }));
   const adSumRows = [["Spend", M.spend == null ? "RM —" : rm(M.spend as number), ""], ["Leads", String(leads), ""], ["Cost per lead", rm(M.cpl), ""], ["Appointments", String(appt), leads ? `${Math.round((appt / leads) * 100)}% of leads` : ""]].map(([k, v, sub]) => ({ k, v, sub }));
-  // The custom range's calendar: this month, days after today greyed.
+  // The custom range's calendar: any month (‹ ›, voice-and-dates.md §2 — it was this month only), days after today greyed;
+  // an end picked before the start swaps them (below).
   const t0 = ui.adCustT ?? { ...cu, step: 0 };
-  const first = new Date(now.getFullYear(), now.getMonth(), 1), lead = (first.getDay() + 6) % 7, days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const mOff = Math.min(0, ui.adCalM ?? 0), first = new Date(now.getFullYear(), now.getMonth() + mOff, 1), lead = (first.getDay() + 6) % 7, days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
   const adCalDays = [...Array.from({ length: lead }, () => ({ l: "", bg: "transparent", fg: "transparent", cur: "default", w: 500, pick: () => {} })),
-    ...Array.from({ length: days }, (_, k) => { const d = new Date(now.getFullYear(), now.getMonth(), k + 1).getTime(), fut = d > T, ends = d === t0.a || d === t0.b, inR = d > t0.a && d < t0.b;
+    ...Array.from({ length: days }, (_, k) => { const d = new Date(first.getFullYear(), first.getMonth(), k + 1).getTime(), fut = d > T, ends = d === t0.a || d === t0.b, inR = d > t0.a && d < t0.b;
       return { l: String(k + 1), bg: ends ? "var(--crm-rust)" : inR ? "var(--crm-tint-attention)" : "transparent", fg: fut ? "var(--crm-faint-2)" : ends ? "#fff" : "var(--crm-ink)", cur: fut ? "not-allowed" : "pointer", w: ends ? 700 : 500,
         pick: () => { if (fut) return; set(u => { const x = u.adCustT ?? { ...cu, step: 0 }; return { ...u, adCustT: x.step !== 1 ? { a: d, b: d, step: 1 } : d < x.a ? { a: d, b: x.a, step: 0 } : { a: x.a, b: d, step: 0 } }; }); } }; })];
   const calLbl = (x: { a: number; b: number }) => `${x.a === x.b ? new Date(x.a).getDate() : `${new Date(x.a).getDate()} – ${new Date(x.b).getDate()}`} ${MON[new Date(x.b).getMonth()].slice(0, 3)} ${new Date(x.b).getFullYear()}`;
@@ -252,7 +253,9 @@ export function assignV2VM(ctx: DeskCtx, opItem: string, as: ReturnType<typeof a
     adPerOpts: PER.map(([label, range]) => { const on = label === per[0]; return { label, range, bg: on ? "var(--crm-sel)" : "transparent", w: on ? 650 : 500,
       pick: () => (label === "Custom" ? patch({ adCal: true, adCustT: { ...cu, step: 0 } }) : patch({ adPer: label, adPerOpen: false, adCal: false })) }; }),
     adCalOpen: ui.adCal, adCalList: !ui.adCal, adCalHint: t0.step === 1 ? "Now pick the end date" : "Pick the start date", adCalLabel: calLbl(t0),
-    adCalBack: () => patch({ adCal: false }), adCalApply: () => patch({ adCust: { a: t0.a, b: t0.b }, adPer: "Custom", adCal: false, adPerOpen: false }), adCalDays,
+    adCalBack: () => patch({ adCal: false }),
+    adCalMonth: `${MON[first.getMonth()]} ${first.getFullYear()}`,
+    adCalStep: (n: number) => patch({ adCalM: Math.min(0, (ui.adCalM ?? 0) + n) }), adCalApply: () => patch({ adCust: { a: t0.a, b: t0.b }, adPer: "Custom", adCal: false, adPerOpen: false }), adCalDays,
     openAdsPerf: () => patch({ tab: "adsperf", pane: "closed", ad: null, adLog: false, toast: "" }),
     // Ad performance and the Audit log are panels of their own beside Split, each folding to its strip (the owner,
     // 2026-10-18: "ads performance, audit log 分开"); both start folded so the split keeps its room.

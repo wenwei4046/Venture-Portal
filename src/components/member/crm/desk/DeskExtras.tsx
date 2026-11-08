@@ -5,7 +5,8 @@
  * customer, History — written in the design's own vocabulary: the pane's back bar, its 18 / 20 px padding, its chips,
  * fields and rust buttons, Inter, the same colours. Behaviour: vm/extras.ts.
  */
-import { Fragment, useState, type CSSProperties } from "react";
+import { Fragment, useRef, useState, type CSSProperties } from "react";
+import { DateRangePicker } from "../shared/date-range";
 
 const XBTN: CSSProperties = { border: 0, background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left", margin: 0, boxSizing: "border-box", padding: 0 };
 const TIGHT_X = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
@@ -900,6 +901,10 @@ export async function exportLeadsByAd(v: Pick<LbaV, "title" | "ads" | "periods" 
 
 export function DeskLeadsByAd({ v }: { v: LbaV }) {
   const C = useLbaCols(), P = v.panel;
+  // Custom's dates (voice-and-dates.md §2): the shared picker — its two invisible date fields over the pill often did not open.
+  const [pick, setPick] = useState(false), pickAt = useRef<HTMLButtonElement>(null);
+  const isoOf = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const at = (s: string, end: boolean) => { const [y, m, d] = s.split("-").map(Number); return end ? new Date(y, m - 1, d, 23, 59, 59, 999).getTime() : new Date(y, m - 1, d).getTime(); };
   const head = (label: string, k: LbaSortK | null, col: (typeof LBA_COLS)[number] | null, right?: boolean) => (
     <div style={{ position: "relative", display: "flex", alignItems: "center", gap: "5px", height: "100%", justifyContent: right ? "flex-end" : undefined, minWidth: 0 }}>
       <button type="button" onClick={k ? v.sort[k].pick : undefined} style={{ ...XBTN, display: "flex", alignItems: "center", gap: "5px", font: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "inherit", cursor: k ? "pointer" : "default" }}>
@@ -925,11 +930,14 @@ export function DeskLeadsByAd({ v }: { v: LbaV }) {
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "0 14px 12px" }}>
           <div style={SEG}>{v.periods.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={segOpt(o.on)}>{o.label}</button>)}</div>
           {v.custom && (
-            <label style={{ position: "relative", height: "32px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "7px", boxSizing: "border-box", border: "1px solid var(--crm-rust)", font: "500 12px Inter, sans-serif", whiteSpace: "nowrap", color: "var(--crm-ink)" }}>
+            <button ref={pickAt} type="button" onClick={() => setPick(o => !o)} aria-expanded={pick} style={{ ...XBTN, height: "32px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "7px", boxSizing: "border-box", border: "1px solid var(--crm-rust)", background: "#fff", font: "500 12px Inter, sans-serif", whiteSpace: "nowrap", color: "var(--crm-ink)" }}>
               <span style={{ display: "flex", color: "var(--crm-rust)" }}><Ic name="calendar" size={13} /></span>{v.custom.label}
-              <input type="date" value={v.custom.from} onChange={v.custom.setFrom} aria-label="From" style={{ position: "absolute", left: 0, top: 0, width: "50%", height: "100%", opacity: 0, cursor: "pointer" }} />
-              <input type="date" value={v.custom.to} onChange={v.custom.setTo} aria-label="To" style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%", opacity: 0, cursor: "pointer" }} />
-            </label>
+            </button>
+          )}
+          {v.custom && pick && (
+            <DateRangePicker anchor={pickAt} value={v.custom.from && v.custom.to ? { a: at(v.custom.from, false), b: at(v.custom.to, true) } : null}
+              onCancel={() => setPick(false)}
+              onApply={r => { const c = v.custom!; c.setFrom({ target: { value: isoOf(r.a) } } as React.ChangeEvent<HTMLInputElement>); c.setTo({ target: { value: isoOf(r.b) } } as React.ChangeEvent<HTMLInputElement>); setPick(false); }} />
           )}
           <span style={{ flexBasis: "100%", height: 0 }} />
           <div style={SEG}>{v.statuses.map(o => <button key={o.label} type="button" onClick={o.pick} aria-pressed={o.on} style={segOpt(o.on)}>

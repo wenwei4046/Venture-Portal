@@ -7,6 +7,7 @@
  */
 import { useState, type ComponentProps, type CSSProperties, type ReactNode } from "react";
 import { DeskAdsTable4a } from "./Desk4a";
+import { DateRangePicker } from "../shared/date-range";
 import { DeskLeadsByAd, LeadsPanel } from "./DeskExtras";
 import { Ic } from "../shared/icons4a";
 import type { reportsVM } from "./vm/reports-page";
@@ -208,6 +209,7 @@ function SalesTable2({ s, head }: { s: S2; head: ReactNode }) {
 export function DeskReports({ r, lba }: { r: R; ads?: AdsV; lba: LbaV }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px", minWidth: 0, paddingTop: r.cat === "ads" || r.cat === "lba" ? 0 : "16px" }}>
+      {r.picker && <DateRangePicker value={r.picker.value} onApply={r.picker.apply} onCancel={r.picker.cancel} />}
       {/* Ads performance (v2 frame 12) is Ads Performance's own body — toolbar, chart, table, pager — drawn by kAdsPerf. */}
       {r.cat === "lba" && <DeskLeadsByAd v={lba} />}
       {(r.cat === "appt" || r.cat === "src") && <Seg opts={r.periods} />}

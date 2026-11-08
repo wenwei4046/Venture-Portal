@@ -12,6 +12,8 @@ export interface F4Item { label: string; icon: Icon4a; on: boolean; pick: () => 
 export interface F4Tab { label: string; on: boolean; pick: () => void }
 export interface F4Menu { open: boolean; close: () => void; items: { tag: string; label: string; bg: string; fg: string; pick: () => void }[] }
 export interface F4Head { title: string; tabs: F4Tab[]; subTabs?: F4Tab[]; /** Up next: the tab bar holds the ad dropdown (DeskUpNext). */ subSlot?: boolean; /** A tab's padding where the design differs (Assignment: 10px 0, CRM Assignment People.dc.html). */ subPad?: string; sub: string; cta: { label: string; icon: Icon4a | null; act: () => void; menu?: F4Menu } | null;
+  /** A tab's date picker open (Insight's Custom — shared/date-range.tsx), anchored on the tab it belongs to. */
+  picker?: { tab: string; value: { a: number; b: number } | null; apply(r: { a: number; b: number }): void; cancel(): void } | null;
   /** An outline button left of the primary one (Showrooms' Save as draft). */
   alt?: { label: string; act: () => void } | null }
 
@@ -67,7 +69,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
     account: { ini: fr.me.ini, name: fr.me.name, sub: fr.me.sub },
     greet: app.greeting, first: ctx.me.role === "boss" ? "Principal" : ctx.me.name.trim().split(/\s+/)[0] ?? "",
     subName: app.subName, openSubDept: app.openSubDept, date: topDate(ctx.now),
-    head: { title: fr.pageTitle, tabs: h?.tabs ?? [], subTabs: h?.subTabs, subSlot: h?.subSlot, subPad: h?.subPad, sub: h?.sub ?? "", cta: h?.cta ?? null, alt: h?.alt ?? null } as F4Head,
+    head: { title: fr.pageTitle, tabs: h?.tabs ?? [], subTabs: h?.subTabs, subSlot: h?.subSlot, subPad: h?.subPad, picker: h?.picker ?? null, sub: h?.sub ?? "", cta: h?.cta ?? null, alt: h?.alt ?? null } as F4Head,
     alertsN: fr.alertsN, openAlerts: fr.openAlerts,
     // Inbox runs its columns edge to edge under a rule (frame 02); every other page has the 36 px gutter.
     // Calendar's Book a visit (frame 04): pick the customer, then the booking pane every chat's Appointment opens.
@@ -121,6 +123,7 @@ interface HeadBits {
   insightPdf: () => void;
   insightSub: string;
   insTabs: F4Tab[];
+  insPicker?: { value: { a: number; b: number } | null; apply(r: { a: number; b: number }): void; cancel(): void } | null;
   kUpNext?: boolean;
   ap4: { tabs: { label: string; on: boolean; custom: boolean; pick: () => void }[] };
   addAd?: { canAdd: boolean; show: () => void };
@@ -142,7 +145,7 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
   const n = (k: number, one: string, many: string) => `${k.toLocaleString("en-MY")} ${k === 1 ? one : many}`;
   return {
     // v2 frames 01 / 01b: Team performance | Ads performance under the title; Export PDF.
-    insight: v.kUpNext ? { tabs: [], subTabs: v.insTabs, subSlot: true, sub: "", cta: null } : { tabs: v.periodOpts, subTabs: v.insTabs, sub: v.insightSub, cta: { label: "Export PDF", icon: "file-text", act: v.insightPdf } },
+    insight: v.kUpNext ? { tabs: [], subTabs: v.insTabs, subSlot: true, sub: "", cta: null } : { tabs: v.periodOpts, subTabs: v.insTabs, sub: v.insightSub, cta: { label: "Export PDF", icon: "file-text", act: v.insightPdf }, picker: v.insPicker ? { tab: "Custom", ...v.insPicker } : null },
     // v2 frames 02 / 03 (the owner: "做手动新增客户"): New chat and Add customer — one sheet, a customer added by hand.
     inbox: { tabs: [], sub: "", cta: ctx.data.can.editOwn ? { label: "New chat", icon: "plus", act: () => ctx.patch({ addCust: "chat" }) } : null },
     people: { tabs: [], sub: n(v.ppCount, "customer", "customers"), cta: ctx.data.can.editOwn ? { label: "Add customer", icon: "user-plus", act: () => ctx.patch({ addCust: "contact" }) } : null },

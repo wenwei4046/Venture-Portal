@@ -790,7 +790,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                                   </path>
                                 </svg>
                               </button>
-                              <strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>October 2026</strong>
+                              <strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>{v.adCalMonth ?? "October 2026"}</strong>{!!(v.adCalStep) && (<><button type="button" onClick={() => v.adCalStep!(-1)} title="Previous month" style={{ width: "26px", height: "26px", border: "0", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"></path></svg></button><button type="button" onClick={() => v.adCalStep!(1)} title="Next month" style={{ width: "26px", height: "26px", border: "0", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"></path></svg></button></>)}
                             </div>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 28px)", gap: "2px", fontSize: "10.5px", fontWeight: "700", color: "var(--crm-faint)", textAlign: "center" }}>
                               <span>M</span>

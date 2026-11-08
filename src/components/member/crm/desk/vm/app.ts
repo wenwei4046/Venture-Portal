@@ -124,7 +124,9 @@ export function deskVM(ctx: DeskCtx) {
     book: bookVM(ctx, cur), note: noteVM(ctx, cur), cform: customerFormVM(ctx, data.customers.find(c => c.id === (ui.infoId ?? ui.chat ?? ""))), history: historyVM(ctx),
     cyclePeriod: () => { const order = ["month", "week", "day"] as const, i = order.indexOf(ui.insPer as (typeof order)[number]); patch({ insPer: order[(i + 1) % order.length], insRange: null }); },
     periodOpts: (["day", "week", "month", "custom"] as const).map((k, i) => ({ label: ["Today", "This week", "This month", "Custom"][i], on: ui.insPer === k, off: ui.insPer !== k,
-      pick: () => (k === "custom" ? patch({ insPer: "custom", insRange: ui.insRange ?? { a: new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1).getTime(), b: ctx.now.getTime() } }) : patch({ insPer: k, insRange: null })) })),
+      // Custom opens the shared picker (any From and To, earlier months too); Apply sets the range (voice-and-dates.md §2).
+      pick: () => (k === "custom" ? patch({ insPer: "custom", insPick: true, insRange: ui.insRange ?? { a: new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1).getTime(), b: ctx.now.getTime() } }) : patch({ insPer: k, insRange: null, insPick: false })) })),
+    insPicker: ui.insPick ? { value: ui.insRange, apply: (r: { a: number; b: number }) => patch({ insPer: "custom", insRange: r, insPick: false }), cancel: () => patch({ insPick: false }) } : null,
     periodNow: ({ day: "Today", week: "This week", month: "This month", custom: "Custom" } as const)[ui.insPer],
     // The toast's Undo (30 s): a Send to goes back to whoever had the customer; a delete brings the notifications back.
     canUndo: undoOn,

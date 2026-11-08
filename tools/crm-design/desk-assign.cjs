@@ -6,6 +6,12 @@
  * page is narrow. The panels' slide-in is desk-motion.cjs.
  */
 module.exports = [
+  // Ad split's Custom calendar (docs/design_handoff_crm/fixes/voice-and-dates.md §2): the design writes "October 2026";
+  // live it names the month shown and ‹ › move to earlier months (vm/assign-v2.ts › adCalMonth / adCalStep). The
+  // prototype harness binds neither, so its frames keep the design's words.
+  ['<strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>October 2026</strong>',
+    '<strong style={{ flex: "1", fontSize: "13px", fontWeight: "650" }}>{v.adCalMonth ?? "October 2026"}</strong>{!!(v.adCalStep) && (<><button type="button" onClick={() => v.adCalStep!(-1)} title="Previous month" style={{ width: "26px", height: "26px", border: "0", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"></path></svg></button><button type="button" onClick={() => v.adCalStep!(1)} title="Next month" style={{ width: "26px", height: "26px", border: "0", borderRadius: "8px", background: "transparent", color: "var(--crm-muted)", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h8}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"></path></svg></button></>)}',
+    "Ad split's calendar: any month, not only this one (voice-and-dates.md §2)."],
   [/(<aside style=\{\{ position: "relative", flex: `0 1 \$\{v\.perfW\}px`[\s\S]*?<\/aside>)/,
     m => `{!(v.perfShut) && (<>${m.replace('minWidth: "220px", boxSizing: "border-box", background: "#fff",', 'minWidth: "220px", boxSizing: "border-box", background: "#FBF6F2",')}</>)}{!!(v.perfShut) && (<DeskFoldRail v={v.perfRail} />)}`,
     "Ad performance folds to a strip, and open sits on sand (the owner, 2026-10-15)."],

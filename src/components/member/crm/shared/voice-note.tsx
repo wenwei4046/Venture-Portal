@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { onlyOneAudio, takeTurn } from "./one-audio";
 import { typePx } from "./type";
+
+onlyOneAudio();
 
 /**
  * A voice note drawn as WhatsApp draws one (the owner, 2026-10-14, WhatsApp's voice message beside our audio player):
@@ -40,7 +43,8 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
     const a = audio.current;
     if (!a) return;
     a.playbackRate = speed;
-    if (a.paused) { setStarted(true); void a.play().catch(() => {}); } else a.pause();
+    // Only one note plays at a time (docs/design_handoff_crm/fixes/voice-and-dates.md): the one playing stops.
+    if (a.paused) { takeTurn(a); setStarted(true); void a.play().catch(() => {}); } else a.pause();
   };
   const faster = () => { const s = nextSpeed(speed); lastSpeed = s; setSpeed(s); };
   const seek = (e: React.MouseEvent<HTMLSpanElement>) => {

@@ -105,12 +105,14 @@ export function auditVM(ctx: DeskCtx) {
   const { ui, set, patch, now } = ctx;
   const all = ui.tab === "auditlog" ? auditEvents(ctx) : [];
   const T = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const lo = ui.auPer === "today" ? T : ui.auPer === "7d" ? T - 6 * DAY : new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const custom = ui.auPer === "custom" && ui.auRange ? ui.auRange : null;
+  const lo = custom ? custom.a : ui.auPer === "today" ? T : ui.auPer === "7d" ? T - 6 * DAY : new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const hi = custom ? custom.b : Infinity;
   const cat = ui.auCat, q = ui.auQ.trim().toLowerCase(), who = ui.auWho;
   // 4a: every area on one list, narrowed by the Area menu (production's three tabs, Chat flow · Marketing · Management, are its areas).
   const area = ui.auArea, inCat = all.filter(e => area === "all" || facet(e).area === area);
   void cat;
-  const rows = inCat.filter(e => new Date(e.at).getTime() >= lo && (who === "all" || e.who === who) && (!q || `${e.action} ${e.target} ${e.detail} ${e.who}`.toLowerCase().includes(q)));
+  const rows = inCat.filter(e => new Date(e.at).getTime() >= lo && new Date(e.at).getTime() <= hi && (who === "all" || e.who === who) && (!q || `${e.action} ${e.target} ${e.detail} ${e.who}`.toLowerCase().includes(q)));
   const ppl = [...new Set(all.map(e => e.who))];
   const c = CAT[cat];
   const dayLbl = (t: number) => { const d = new Date(t), s = `${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}`; const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -143,10 +145,11 @@ export function auditVM(ctx: DeskCtx) {
     au4: {
       open: ui.auOpen, toggle: (k: "who" | "area" | "per") => patch({ auOpen: ui.auOpen === k ? null : k }), close: () => patch({ auOpen: null }),
       whoLabel: who === "all" ? "Everyone" : who, areaLabel: area === "all" ? "All areas" : area,
-      perLabel: ui.auPer === "today" ? "Today" : ui.auPer === "7d" ? "Last 7 days" : "This month",
+      perLabel: ui.auPer === "today" ? "Today" : ui.auPer === "7d" ? "Last 7 days" : ui.auPer === "custom" ? "Custom" : "This month",
       who: [{ label: "Everyone", on: who === "all", pick: () => patch({ auWho: "all", auOpen: null }) }, ...ppl.map(n => ({ label: n, on: who === n, pick: () => patch({ auWho: n, auOpen: null }) }))],
       areas: [{ label: "All areas", on: area === "all", pick: () => patch({ auArea: "all", auOpen: null }) }, ...AREAS.map(a => ({ label: a, on: area === a, pick: () => patch({ auArea: a, auOpen: null }) }))],
-      pers: ([["today", "Today"], ["7d", "Last 7 days"], ["month", "This month"]] as const).map(([k, label]) => ({ label, on: k === ui.auPer, pick: () => patch({ auPer: k, auOpen: null }) })),
+      pers: ([["today", "Today"], ["7d", "Last 7 days"], ["month", "This month"], ["custom", "Custom"]] as const).map(([k, label]) => ({ label, on: k === ui.auPer, pick: () => patch(k === "custom" ? { auPer: k, auOpen: null, auDates: true } : { auPer: k, auOpen: null }) })),
+      picker: ui.auDates ? { value: ui.auRange ?? { a: lo, b: now.getTime() }, apply: (r: { a: number; b: number }) => patch({ auPer: "custom", auRange: r, auDates: false }), cancel: () => patch({ auDates: false }) } : null,
       rows: rows.map(e => { const f = facet(e), d = dayLbl(new Date(e.at).getTime()), sys = e.who === "System" || e.who === "The CRM";
         return { time: time(e.at).replace(/\s?(am|pm)$/i, ""), day: d.replace(/ · .*$/, "").replace(/^(\d+ \w+)$/, (x) => { const t = new Date(e.at); return `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][t.getDay()]} ${x}`; }),
           who: e.who, sys, ...f }; }),
