@@ -869,7 +869,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </div>
                   <DeskAdTabs4a v={v} which="audit" />
                   <div style={{ flex: "1", minHeight: "0", overflow: "auto", padding: "16px", display: "flex", flexDirection: "column" }}>
-                    {(v.adLog).map((e, e_i) => (<Fragment key={e_i}>
+                    {!!(v.adLogAll) && (<button type="button" onClick={v.adLogAll} style={{ alignSelf: "flex-start", margin: "0 0 10px", padding: "0", border: "0", background: "transparent", font: "500 12.5px Inter, sans-serif", color: "var(--crm-rust)", cursor: "pointer" }}>View all in Audit log</button>)}{(v.adLog).map((e, e_i) => (<Fragment key={e_i}>
                       <div style={{ display: "grid", gridTemplateColumns: "44px 24px minmax(0, 1fr)", columnGap: "10px" }}>
                         <span style={{ display: "flex", flexDirection: "column", gap: "2px", paddingTop: "4px", textAlign: "right" }}>
                           <strong style={{ fontSize: "12px", fontWeight: "700", whiteSpace: "nowrap" }}>{e.date}</strong>

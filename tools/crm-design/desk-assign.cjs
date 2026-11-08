@@ -6,6 +6,11 @@
  * page is narrow. The panels' slide-in is desk-motion.cjs.
  */
 module.exports = [
+  // In-page logs show the last 5 changes and View all (docs/design_handoff_crm, CRM Navigation Audit 2026-11-08): the
+  // sidebar's Audit log is the only full one, opened on this area (vm/assign-v2.ts › adLogAll). The harness binds none.
+  ['{(v.adLog).map((e, e_i) => (<Fragment key={e_i}>',
+    '{!!(v.adLogAll) && (<button type="button" onClick={v.adLogAll} style={{ alignSelf: "flex-start", margin: "0 0 10px", padding: "0", border: "0", background: "transparent", font: "500 12.5px Inter, sans-serif", color: "var(--crm-rust)", cursor: "pointer" }}>View all in Audit log</button>)}{(v.adLog).map((e, e_i) => (<Fragment key={e_i}>',
+    "Ad split's Audit log: the last 5 changes, then View all (the sidebar's log, Assignment)."],
   // Ad split's Custom calendar (docs/design_handoff_crm/fixes/voice-and-dates.md §2): the design writes "October 2026";
   // live it names the month shown and ‹ › move to earlier months (vm/assign-v2.ts › adCalMonth / adCalStep). The
   // prototype harness binds neither, so its frames keep the design's words.

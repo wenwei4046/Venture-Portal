@@ -17,6 +17,7 @@ adFunnel
 adGrid
 adList
 adLog
+adLogAll
 adLogStyle
 adNone
 adNoneW
