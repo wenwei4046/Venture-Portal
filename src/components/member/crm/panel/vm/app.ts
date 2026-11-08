@@ -60,8 +60,6 @@ function profile6(ctx: PanelCtx, house: boolean) {
       { label: "Showrooms", icon: "map-pin" as const, open: () => patch({ roomsOpen: true }), n: n(data.rooms.filter(r => r.active).length), badge: false },
       { label: "Cold lead templates", icon: "message-square-text" as const, open: () => { patch({ tplOpen: true }); void ctx.act.refreshTemplates(); }, n: n((data.templates ?? []).length), badge: false },
       { label: "Ads Performance", icon: "arrow-up-right" as const, open: () => patch({ tab: "ads", lead: null }), n: "", badge: false },
-      // Assignment left the bottom bar for Activity (docs/design_handoff_crm, 2026-11-08): it is Profile › Manage's.
-      { label: "Assignment", icon: "users" as const, open: () => patch({ tab: "assign", lead: null }), n: "", badge: false },
       // IR Quote's settings (the handoff: "CRM → Profile → below Ads performance → Quotation settings").
       ...(ctx.openQuoteSettings ? [{ label: "Quotation settings", icon: "file-text" as const, open: ctx.openQuoteSettings, n: "", badge: false }] : []),
     ] : [] }],
@@ -69,14 +67,17 @@ function profile6(ctx: PanelCtx, house: boolean) {
 }
 
 /** v3 T01 · Insight's head, on both of its sides. */
-function insightHead(ctx: PanelCtx, house: boolean, ads: boolean, up: boolean) {
+function insightHead(ctx: PanelCtx, house: boolean, ads: boolean, up: boolean, act = false) {
   const { me, patch } = ctx, boss = me.role === "boss";
   return {
     greet: `Hello, ${boss ? "Principal" : first(me.name)}`, // the owner, 2026-10-18: "改成 hello"
     sub: `${boss ? "Principal" : jobTitle(me)} · ${ctx.data.can.viewAll ? "All access" : teamName(teamOf(me.id, ctx.data.people)) || "My team"}`,
     ini: ini(me.name), house, exit: () => ctx.exitApp(),
-    sw: ctx.data.can.manage || upNextOpen(ctx.data, me.id) ? { ads, up, canAds: ctx.data.can.manage, canUp: upNextOpen(ctx.data, me.id),
-      team: () => patch({ ovAds: false, ovUp: false }), adsPick: () => patch({ ovAds: true, ovUp: false }), upPick: () => patch({ ovUp: true, ovAds: false }) } : null,
+    // Team · Activity · Ads · Up next — Activity is Team activity (the owner, 2026-11-09: "team activity 放到 insight 的 team 中，可以和
+    // team performance 開多一個分頁"; it was the bottom bar's).
+    sw: ctx.data.can.manage || upNextOpen(ctx.data, me.id) ? { ads, up, act, canAds: ctx.data.can.manage, canUp: upNextOpen(ctx.data, me.id), canAct: upNextOpen(ctx.data, me.id),
+      team: () => patch({ ovAds: false, ovUp: false, ovAct: false }), adsPick: () => patch({ ovAds: true, ovUp: false, ovAct: false }), upPick: () => patch({ ovUp: true, ovAds: false, ovAct: false }),
+      actPick: () => patch({ ovAct: true, ovAds: false, ovUp: false }) } : null,
   };
 }
 
@@ -85,7 +86,8 @@ export function panelAppVM(ctx: PanelCtx) {
   // v3 T01: Insight's Ads performance side is the Ads Performance page under Insight's head (CRM · Manage, as that page).
   const ovAds = tab === "overview" && !lead && ui.ovAds && ctx.data.can.manage;
   const ovUp = tab === "overview" && !lead && !!ui.ovUp && !ovAds && upNextOpen(ctx.data, ctx.me.id);
-  const show = { up: ovUp, ov: tab === "overview" && !lead && !ovAds && !ovUp, ib: tab === "inbox" && !lead, ld: lead, ad: tab === "ads" || ovAds, as: tab === "assign" && !lead, cal: false, lc: tab === "calendar" && !lead, act: tab === "activity" && !lead, pf: tab === "profile" };
+  const ovAct = tab === "overview" && !lead && !!ui.ovAct && !ovAds && !ovUp && upNextOpen(ctx.data, ctx.me.id);
+  const show = { up: ovUp, ov: tab === "overview" && !lead && !ovAds && !ovUp && !ovAct, ib: tab === "inbox" && !lead, ld: lead, ad: tab === "ads" || ovAds, as: tab === "assign" && !lead, cal: false, lc: tab === "calendar" && !lead, act: ovAct, pf: tab === "profile" };
   const ld = show.ld ? leadVM(ctx) : off<ReturnType<typeof leadVM>>();
   const cf = customerForm({
     form: ui.pForm, data: ctx.data, saveDetails: ctx.act.saveDetails,
@@ -117,10 +119,10 @@ export function panelAppVM(ctx: PanelCtx) {
     // The house on Insight too, the page Team opens on (2026-10-16, the owner) — left of the avatar.
     houseOv: !!bl.showBell && show.ov,
     // Insight's head (v3 T01): the avatar left, the greeting, the house right, then Team performance | Ads performance.
-    th: insightHead(ctx, !!bl.showBell, ovAds, ovUp),
+    th: insightHead(ctx, !!bl.showBell, ovAds, ovUp, ovAct),
     // Calendar (appointments + leave) and Assignment › People, and Team activity (docs/design_handoff_crm): the desktop's
     // view models, drawn as the prototypes' phone frames (shared/PhoneLeaveCal.tsx, shared/PhoneTeamActivity.tsx).
-    leaveCal: show.lc || (show.as && ui.asSec === "People") ? leaveCalData({ data: ctx.data, me: ctx.me, now, act: ctx.act, teams: ctx.teams, directors: ctx.directors, readOnly: !!ctx.viewingAs, openAppt: a => set(u => ({ ...u, calInfo: a.customerId })) }) : null,
+    leaveCal: show.lc ? leaveCalData({ data: ctx.data, me: ctx.me, now, act: ctx.act, teams: ctx.teams, directors: ctx.directors, readOnly: !!ctx.viewingAs, openAppt: a => set(u => ({ ...u, calInfo: a.customerId })) }) : null,
     activity: show.act ? { data: ctx.data, book: peopleBook(ctx.data, ctx.teams, ctx.directors), live: ctx.live, who: null, nameOf: ctx.nameOf,
       roleOf: (id: string) => { const p = ctx.data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },
       openChat: (id: string) => set(u => ({ ...u, tab: "inbox", lead: id })) } : null,

@@ -59,15 +59,15 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
   const asx = {
     onHome: false, inSub: true, back: () => patch({ asSec: null }),
     tabs4: [
-      { label: "Ad split", on: sec === "Ads", pick: go("Ads") },
-      { label: "Full time days", on: sec === "Ft", pick: go("Ft") },
-      // Assignment › People (docs/design_handoff_crm, 2026-11-08): Active members, Member work type and each person's days,
-      // Pause and leave in one place.
-      { label: "People", on: sec === "People", pick: () => patch({ asSec: "People", ftsOpen: false, actDraft: null }) },
+      { label: data.can.viewAll ? "Ads to teams" : "Ads to my team", on: sec === "Ads", pick: go("Ads") },
+      // Active members, its own tab after Ads (the owner, 2026-10-22). CRM · Manage only, as Work type.
+      ...(data.can.manage ? [{ label: "Active", on: sec === "Act" && !ui.ftsOpen, pick: () => patch({ asSec: "Act", ftsOpen: false, actDraft: null }) }] : []),
+      { label: "Full time", on: sec === "Ft", pick: go("Ft") },
+      ...(data.can.manage ? [{ label: "Work type", on: !!ui.ftsOpen, pick: () => patch({ ftsOpen: true }) }] : []),
     ],
     heldAny: !!heldC.length, openHeld: () => patch({ hlOpen: true }),
     heldTitle: heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit",
-    onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft", onAct: false, onPeople: sec === "People",
+    onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft", onAct: sec === "Act",
     act: activeVM([
       { name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) },
       ...teams.map(t => ({ name: t.name, color: t.c, people: t.people })),

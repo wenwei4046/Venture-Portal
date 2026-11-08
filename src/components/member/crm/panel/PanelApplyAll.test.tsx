@@ -15,9 +15,7 @@ async function openSheet() {
   window.history.replaceState({}, "", "/member/preview?crmAs=boss");
   render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
   await act(async () => {});
-  // Assignment is Profile › Manage's since docs/design_handoff_crm (2026-11-08): the bottom bar has Activity in its place.
-    await tap(screen.getAllByText("Profile", { exact: true }).find(e => e.closest("nav"))!);
-    await tap(screen.getByText("Assignment", { exact: true }));
+  await tap(screen.getAllByText("Assignment", { exact: true }).find(e => e.closest("nav"))!);
   await tap(screen.getByText("Akemi Mattress · October Fair"));
   await tap(screen.getByText("By team", { exact: true }));
   expect(screen.queryByText(/^Save and apply to all \d+ ads$/)).toBeNull();
