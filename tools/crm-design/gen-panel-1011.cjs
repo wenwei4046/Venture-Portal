@@ -45,7 +45,7 @@ import { PickEditor } from "../shared/pick-editor";
 import { PhoneUpNext } from "../shared/PhoneUpNext";
 import { PhoneTeamActivity } from "../shared/PhoneTeamActivity";
 import { PhoneCalendar } from "../shared/PhoneLeaveCal";
-${require("./ad-link.cjs").IMPORT(body, "../shared/AdLink")}import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
+${require("./ad-link.cjs").IMPORT(body, "../shared/AdLink")}import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
 ${require("./phone-4a.cjs").IMPORT(body, "../shared/phone4a")}import type { PanelAppVM } from "./vm/app";
 

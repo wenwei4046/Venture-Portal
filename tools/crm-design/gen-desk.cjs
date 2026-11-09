@@ -49,7 +49,7 @@ import { Fragment } from "react";
 import type React from "react";
 import DH from "./desk-hover.module.css";
 import DX from "./desk-extras.module.css";
-import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
+import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { InfoValue } from "../shared/AdLink";
 import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";

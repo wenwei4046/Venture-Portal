@@ -14,11 +14,13 @@ import { docLabel, mediaHeight, openViewer, rememberShape, type ViewerItem } fro
  * - later the same day: a PDF shows its first page (`isPdf` → PdfCard), a voice note is WhatsApp's voice bubble
  *   (VoiceNote), and four or more photos / videos sent together are one album (`albumsOf` → MediaAlbum).
  */
-type Msg = Pick<CrmChatMessage, "id" | "media"> & Partial<Pick<CrmChatMessage, "from" | "at" | "text">>;
+type Msg = Pick<CrmChatMessage, "id" | "media"> & Partial<Pick<CrmChatMessage, "from" | "at" | "text" | "call">>;
 
 export const NO_MEDIA = {
   img: "", vid: "", vidSrc: "", aud: "", file: "", mh: "", docName: "", docType: "", isPdf: false, voiceMine: false,
   album: [] as AlbumTile[], albumMore: 0,
+  /** A missed Messenger call (CallCard): where Call back goes. */
+  call: null as CrmChatMessage["call"] | null,
   view: undefined as (() => void) | undefined, shape: undefined as ((e: SyntheticEvent<HTMLImageElement | HTMLVideoElement>) => void) | undefined,
   pad: "10px 13px", inPad: "0",
   /** The time row's top margin: a voice note's time sits on its own duration line, as WhatsApp's (the bubble one line shorter). */
@@ -28,7 +30,8 @@ export const NO_MEDIA = {
 };
 
 /** A message with no words, named in a chat list as the chat names it (it read "Attachment", or nothing). */
-export function mediaWord(m: Pick<CrmChatMessage, "media">): string {
+export function mediaWord(m: Pick<CrmChatMessage, "media"> & { call?: CrmChatMessage["call"] }): string {
+  if (m.call) return "📞 Missed call";
   const k = m.media?.kind;
   return k === "image" ? "📷 Photo" : k === "video" ? "🎥 Video" : k === "audio" ? "🎤 Voice message" : k === "file" ? `📄 ${m.media?.name ?? "Document"}` : "Attachment";
 }
@@ -87,6 +90,7 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
       albumMore: album.length - 4,
     };
   }
+  if (m.call) return { ...NO_MEDIA, voiceMine, call: m.call, pad: "6px 6px 5px", inPad: "0 7px" };
   const md = m.media;
   if (!md) return { ...NO_MEDIA, voiceMine };
   const k = md.kind, url = md.url, framed = k === "image" || k === "video" || k === "file";

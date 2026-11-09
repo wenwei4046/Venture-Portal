@@ -116,3 +116,34 @@ export function ChatVideo({ src, base, onLoadedMetadata, style }: { src: string;
       onLoadedData={e => { if (!poster.kept) keepPoster(base, e.currentTarget); }} />
   );
 }
+
+/**
+ * A customer's Messenger call we missed, as Messenger draws it (the owner, 2026-11-09: "可以一摸一样显示在 crm 中，业务能打回去"):
+ * the round phone in red, *Missed call*, then **Call back** — which opens the conversation in Meta Business Suite, whose call
+ * button calls them back on Messenger (a Page cannot place a call through the API) — and their phone when the CRM has it.
+ */
+export function CallCard({ c }: { c: { thread: string; phone?: string } }) {
+  const btn = { display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", height: "34px", borderRadius: "17px", background: "rgba(63,43,34,.07)",
+    color: "var(--crm-ink)", fontSize: typePx(13.5), fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" as const };
+  return (
+    <span data-missed-call="1" style={{ display: "flex", flexDirection: "column", gap: "8px", width: "220px", maxWidth: "100%" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <span style={{ flex: "none", width: "36px", height: "36px", borderRadius: "50%", background: "rgba(200,64,42,.12)", color: "var(--crm-oxblood)", display: "grid", placeItems: "center" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" />
+            <path d="m16 2 6 6M22 2l-6 6" />
+          </svg>
+        </span>
+        <span style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
+          <strong style={{ fontSize: typePx(15), fontWeight: 650, color: "var(--crm-ink)" }}>Missed call</strong>
+          <small style={{ fontSize: typePx(12), color: "var(--crm-muted)" }}>Messenger</small>
+        </span>
+      </span>
+      <a href={c.thread} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={btn}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" /></svg>
+        Call back
+      </a>
+      {c.phone && <a href={`tel:${c.phone.replace(/[^\d+]/g, "")}`} onClick={e => e.stopPropagation()} style={btn}>Call {c.phone}</a>}
+    </span>
+  );
+}

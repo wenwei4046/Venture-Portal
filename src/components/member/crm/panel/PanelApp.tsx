@@ -11,7 +11,7 @@ import { PhoneUpNext } from "../shared/PhoneUpNext";
 import { PhoneTeamActivity } from "../shared/PhoneTeamActivity";
 import { PhoneCalendar } from "../shared/PhoneLeaveCal";
 import { InfoValue } from "../shared/AdLink";
-import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
+import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
 import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aBookMode, Phone4aChip, Phone4aCustomBook, Phone4aHero, Phone4aKeepHeight, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStatusPick, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
