@@ -39,7 +39,7 @@ describe("the desktop chat past WhatsApp's window (notes/11)", () => {
     vm.draftKey({ key: "Enter", shiftKey: false, preventDefault: () => {} });
     expect(send).not.toHaveBeenCalled();
     expect(vm.draft).toBe("Ok I can arrange delivery on Saturday");
-    expect(vm.chatPadB).toBe("20px 24px 168px");
+    expect(vm.chatPadB).toBe("20px 28px 168px");
     expect(vm.replyBottom).toBe("144px");
   });
   it("its Template button opens the templates", async () => {

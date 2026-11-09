@@ -37,7 +37,7 @@ export const sentenceCase = (s: string) => (s === s.toUpperCase() ? s.charAt(0) 
 /** Customer info's folded strip: the cream rail with its name running down (unchanged since v2). */
 function InfoStrip({ onOpen }: { onOpen: () => void }) {
   return (
-    <button type="button" onClick={onOpen} title="Open Customer info" style={{ ...BTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", paddingTop: "20px",
+    <button type="button" onClick={onOpen} title="Open Customer info" style={{ ...BTN, width: "45px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", padding: "20px 0 0",
       borderLeft: "1px solid var(--crm-rule)", background: "var(--crm-cream-nav)" }}>
       <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name="user-round" size={16} /></span>
       <span style={{ writingMode: "vertical-rl", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>Customer info</span>
@@ -49,7 +49,7 @@ function InfoStrip({ onOpen }: { onOpen: () => void }) {
 /** D5a's Audit log rail: 44px on sand, the history icon in a 30px box, "Audit log · N" running down. */
 function AuditRail({ n, onOpen }: { n: number; onOpen: () => void }) {
   return (
-    <button type="button" onClick={onOpen} title="Open the Audit log" data-audit-rail="" style={{ ...BTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", paddingTop: "20px",
+    <button type="button" onClick={onOpen} title="Open the Audit log" data-audit-rail="" style={{ ...BTN, width: "45px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", padding: "20px 0 0",
       borderLeft: "1px solid var(--crm-rule)", background: "var(--crm-hover)" }}>
       <span style={{ width: "30px", height: "30px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--crm-muted)" }}><Ic name="history" size={16} /></span>
       <span style={{ writingMode: "vertical-rl", font: "500 12.5px Inter, sans-serif", color: "var(--crm-muted)" }}>Audit log · {n}</span>
@@ -78,7 +78,7 @@ export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: str
     {v.ibInfoShut ? <InfoStrip onOpen={v.ibInfoRail.open} /> : (
       <aside data-customer-info="" style={{ position: "relative", width: `${v.ibInfoW}px`, flex: "none", boxSizing: "border-box", display: "flex", flexDirection: "column", minHeight: 0, borderLeft: "1px solid var(--crm-rule)", background: "#fff" }}>
         <div onPointerDown={v.dragInfo as never} onDoubleClick={v.resetInfo} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: 0, bottom: 0, width: "9px", zIndex: 6, cursor: "col-resize", touchAction: "none" }} />
-        <button type="button" onClick={v.ibInfoFold} title="Fold Customer info" style={{ ...BTN, height: "62px", flex: "none", display: "flex", alignItems: "center", gap: "12px", padding: "0 20px",
+        <button type="button" onClick={v.ibInfoFold} title="Fold Customer info" style={{ ...BTN, height: "65px", flex: "none", display: "flex", alignItems: "center", gap: "12px", padding: "0 20px",
           borderBottom: "1px solid var(--crm-rule)", color: "var(--crm-ink)" }}>
           <span style={{ font: `500 16px ${TIGHT}` }}>Customer info</span>
           <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-right" size={15} /></span>
@@ -126,7 +126,7 @@ export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: str
     {!v.ibCpOpen ? <AuditRail n={v.ibHas ? v.ibCp.audit4.length : 0} onOpen={v.ibCpToggle} /> : (
       <aside data-audit-panel="" style={{ position: "relative", width: `${v.ibCpW ?? 320}px`, flex: "none", boxSizing: "border-box", display: "flex", flexDirection: "column", minHeight: 0, borderLeft: "1px solid var(--crm-rule)", background: "#fff" }}>
         {v.dragCp && <span onPointerDown={v.dragCp as never} onDoubleClick={v.resetCp} title="Drag to resize" style={{ position: "absolute", top: 0, bottom: 0, left: "-5px", width: "10px", zIndex: 2, cursor: "col-resize", touchAction: "none" }} />}
-        <button type="button" onClick={v.ibCpToggle} title="Fold the Audit log" style={{ ...BTN, height: "62px", flex: "none", display: "flex", alignItems: "center", gap: "12px", padding: "0 20px", borderBottom: "1px solid var(--crm-rule)", color: "var(--crm-ink)" }}>
+        <button type="button" onClick={v.ibCpToggle} title="Fold the Audit log" style={{ ...BTN, height: "65px", flex: "none", display: "flex", alignItems: "center", gap: "12px", padding: "0 20px", borderBottom: "1px solid var(--crm-rule)", color: "var(--crm-ink)" }}>
           <span style={{ font: `500 16px ${TIGHT}` }}>Audit log</span>
           <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-right" size={15} /></span>
         </button>

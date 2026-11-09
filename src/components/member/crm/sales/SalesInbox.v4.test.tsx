@@ -36,12 +36,12 @@ describe("Mine's Inbox (10b)", () => {
     expect(document.querySelectorAll("[data-inbox-row]").length).toBe(rows);
   });
 
-  it("every row: a 22 px first line, a 16 px ad line and a 22 px message line; the old note lines are gone", async () => {
+  it("every row: a 20 px first line (10b: 95 px a row), a 16 px ad line and a 22 px message line; the old note lines are gone", async () => {
     await mine();
     const rows = [...document.querySelectorAll<HTMLElement>("[data-inbox-row]")];
     for (const r of rows) {
       const lines = r.querySelector<HTMLElement>("[data-inbox-row] > div > span:last-child")!.children;
-      expect([...lines].map(l => (l as HTMLElement).style.height)).toEqual(["22px", "16px", "22px"]);
+      expect([...lines].map(l => (l as HTMLElement).style.height)).toEqual(["20px", "16px", "22px"]);
     }
     expect(screen.queryByText(/^Cold lead$/)).toBeNull();
     expect(screen.queryByText(/^1st visit/)).toBeNull();

@@ -176,7 +176,7 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
     // (none while Suggest a template is off); Send / the mic grey, the wall and the reply quote clear of the row.
     waShut, warnText: waShut && c ? waShutText(first(c.name)) : "", warnBtn: waShut && tplOn, alertIcon: ALERT_ICON, openTpl,
     sendBg: waShut ? SHUT_GREY : "var(--crm-rust)", sendCursor: waShut ? "default" : "pointer", sendSh: waShut ? "none" : "0 6px 20px rgba(42,22,12,.15)",
-    sendCls: waShut ? undefined : "crm4a-primary", chatPadB: waShut ? "20px 24px 168px" : "20px 24px 104px", replyBottom: waShut ? "144px" : "82px",
+    sendCls: waShut ? undefined : "crm4a-primary", chatPadB: waShut ? "20px 28px 168px" : "20px 28px 104px", replyBottom: waShut ? "144px" : "82px",
     setDraft: (e: { target: { value: string } }) => setD(e.target.value),
     draftKey: (e: { key: string; shiftKey: boolean; preventDefault(): void }) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } },
     send, micD: draft.trim() ? "M5 12h14M13 6l6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3",

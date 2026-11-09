@@ -6,18 +6,21 @@
  *     month, lighter grid lines, appointments as a dot + time + first name; the look every CRM calendar shares (cal-look.ts).
  *   - Assignment › Leave: the people by team; a name opens Add leave with them set (Edit leave when they have one) —
  *     frames 13d / 13e, one sheet for both ways in, drawn ABOVE the CRM's tab bar (portalled into the CRM's shell).
- * Sheets fade their scrim in and slide up as every Control panel sheet. Sizes are the Revenue app's (typePx).
+ * Sheets fade their scrim in and slide up as every Control panel sheet. Sizes are the frames' on-screen px (fs below).
  */
 import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { CAL } from "./cal-look";
 import { InShell } from "./shell-portal";
 import type { LeaveCalIn, LeaveCalVM } from "./leave-cal";
-import { typePx as fs } from "./type";
+import { typePx } from "./type";
+import { fs as frameFs } from "./phone4a";
 import { V4 } from "./up-next-style";
 import { openLeaveSheetFor, useLeaveCal, useLeaveSheetReady } from "./use-leave-cal";
 
 type In = Omit<LeaveCalIn, "mode" | "ui" | "set" | "flash">;
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
+/** A v4 frame's on-screen px (13d / 13e, notes/19), as every v4 phone screen (phone4a › fs); under 10 px as drawn. */
+const fs = (px: number) => (px < 10 ? typePx(px) : frameFs(px));
 const INTER = "Inter, sans-serif";
 const press = (fn: () => void) => ({ role: "button" as const, tabIndex: 0, onClick: fn, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } } });
 const Svg = ({ d, size, w = 2, style }: { d: string; size: number; w?: number; style?: CSSProperties }) => (

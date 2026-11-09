@@ -205,7 +205,7 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
   if (f4.ownHead) return f4.addCust ? <DeskAddCustomer v={f4.addCust} /> : null;
   return (<>
     {f4.addCust && <DeskAddCustomer v={f4.addCust} />}
-    <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "22px", padding: "26px 36px 22px", minWidth: 0 }}>
+    <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "22px", padding: `26px ${f4.gut} 22px`, minWidth: 0 }}>
       <div style={{ font: `500 30px ${TIGHT}`, letterSpacing: "-0.025em", whiteSpace: "nowrap", color: "var(--crm-ink)" }}>{h.title}</div>
       {/* v4 notes/20 (frame D1a's period row): one segmented control — the sand track, a white pill on the one picked —
           then the dates in grey, 20 px after it; Custom still opens the date picker under its own option. Ads performance
@@ -216,11 +216,14 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
             {h.picker && <DateRangePicker value={h.picker.value} onApply={h.picker.apply} onCancel={h.picker.cancel} anchor={pickAt} allFrom={h.picker.allFrom} />}
             {h.tabs.map(t => <button key={t.label} ref={h.picker?.tab === t.label || (!h.picker && t.label === "Custom") ? pickAt : undefined} type="button" onClick={t.pick} aria-pressed={t.on}
               style={{ ...BTN, height: "30px", padding: "0 14px", borderRadius: "8px", display: "flex", alignItems: "center", whiteSpace: "nowrap", font: `${t.on ? 600 : 500} 13.5px Inter, sans-serif`,
-                background: t.on ? "#fff" : "transparent", boxShadow: t.on ? "0 1px 2px #2A160C1F" : "none", color: t.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{t.label}</button>)}
+                background: t.on ? "#fff" : "transparent", boxShadow: t.on ? "0 1px 2px #2A160C1F" : "none", color: t.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>
+                {/* Each option keeps its 600 width (crm4a-seg draws a hidden bold copy, desk-root.module.css), so picking one never nudges the rest by a pixel. */}
+                <span className="crm4a-seg" data-label={t.label}>{t.label}</span>
+              </button>)}
           </div>
           {h.sub && <span data-period-dates="" style={{ font: "400 14px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{h.sub}</span>}
           {h.cmp && (
-            <button type="button" onClick={h.cmp.toggle} aria-pressed={h.cmp.on} title={h.cmp.on ? "Stop comparing" : "Compare with the period before"} style={{ ...BTN, display: "flex", alignItems: "center", gap: "5px", whiteSpace: "nowrap", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
+            <button type="button" onClick={h.cmp.toggle} aria-pressed={h.cmp.on} title={h.cmp.on ? "Stop comparing" : "Compare with the period before"} style={{ ...BTN, padding: 0, display: "flex", alignItems: "center", gap: "5px", whiteSpace: "nowrap", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
               {h.cmp.on ? <>{h.cmp.label}<Ic name="x" size={13} /></> : <><Ic name="plus" size={13} />Compare</>}
             </button>
           )}
@@ -302,7 +305,7 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
     </div>
     {/* v2 frames 01 / 01b: a second row of tabs under the title (Insight's Team performance | Ads performance). */}
     {h.subTabs && h.subTabs.length > 0 && (
-      <div style={{ flex: "none", display: "flex", alignItems: h.subSlot ? "center" : undefined, gap: "26px", padding: "0 36px", marginTop: "-10px", borderBottom: "1px solid var(--crm-rule)", font: "500 13px Inter, sans-serif" }}>
+      <div style={{ flex: "none", display: "flex", alignItems: h.subSlot ? "center" : undefined, gap: "26px", padding: `0 ${f4.gut}`, marginTop: "-10px", borderBottom: "1px solid var(--crm-rule)", font: "500 13px Inter, sans-serif" }}>
         {h.subTabs.map(t => <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: h.subPad ?? (h.subSlot ? "10px 0" : "8px 0 10px"), whiteSpace: "nowrap", font: "inherit", marginBottom: "-1px",
           borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>)}
         {h.subSlot && <div data-up-next-slot="" style={{ display: "contents" }} />}
@@ -1266,7 +1269,7 @@ const adsShown = (c: AdsCell, id: string) => (/%$/.test(c.v) ? (id === "showrate
 export function DeskAdsStrip({ S }: { S: AdsStripBits }) {
   const [hov, setHov] = useState<string | null>(null);
   return (
-    <div data-ads-strip="" style={{ flex: "none", display: "flex", alignItems: "stretch", height: "84px", boxSizing: "border-box", borderRadius: "14px", border: "1px solid var(--crm-rule)" }}>
+    <div data-ads-strip="" style={{ flex: "none", display: "flex", alignItems: "stretch", height: "86px", boxSizing: "border-box", borderRadius: "14px", border: "1px solid var(--crm-rule)" }}>
       <div style={{ flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: `repeat(${Math.max(1, S.items.length)},minmax(0,1fr))`, alignItems: "center" }}>
         {S.items.map((f, i) => (
           <div key={f.key} data-ads-figure={f.key} onMouseEnter={() => setHov(f.key)} onMouseLeave={() => setHov(h => (h === f.key ? null : h))}
@@ -1283,9 +1286,9 @@ export function DeskAdsStrip({ S }: { S: AdsStripBits }) {
         ))}
       </div>
       <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "14px", padding: "0 20px", borderLeft: "1px solid var(--crm-rule)" }}>
-        <button type="button" onClick={S.add} disabled={!S.canAdd} title={S.canAdd ? "Add a figure" : "Six figures at most"} aria-label="Add a figure" style={{ ...BTN, width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+        <button type="button" onClick={S.add} disabled={!S.canAdd} title={S.canAdd ? "Add a figure" : "Six figures at most"} aria-label="Add a figure" style={{ ...BTN, padding: 0, width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
           background: "var(--crm-field)", color: S.canAdd ? "var(--crm-ink)" : "var(--crm-faint-2)", cursor: S.canAdd ? "pointer" : "default" }}><Ic name="plus" size={16} /></button>
-        <button type="button" onClick={S.toggle} aria-expanded={S.open} style={{ ...BTN, display: "flex", alignItems: "center", gap: "6px", font: "500 13.5px Inter, sans-serif", color: "var(--crm-rust)", whiteSpace: "nowrap" }}>
+        <button type="button" onClick={S.toggle} aria-expanded={S.open} style={{ ...BTN, padding: 0, display: "flex", alignItems: "center", gap: "6px", font: "500 13.5px Inter, sans-serif", color: "var(--crm-rust)", whiteSpace: "nowrap" }}>
           {S.open ? "Hide chart" : "Show chart"}<span style={{ display: "flex", transform: S.open ? "rotate(180deg)" : "none", transition: "transform .16s" }}><Ic name="chevron-down" size={13} /></span>
         </button>
       </div>
@@ -1317,7 +1320,7 @@ function DeskAdsD2a({ v, C, S }: { v: AdsBits; C: NonNullable<AdsBits["apChartV"
           <span style={{ font: `500 18px ${TIGHT}`, color: "var(--crm-ink)" }}>By ad</span>
           <span style={{ font: "400 14px Inter, sans-serif", color: "var(--crm-faint)" }}>{C.adsN}</span>
           {/* Columns replaces the dashed + column button (D2a), so nothing overlaps the header. */}
-          <button type="button" onClick={v.openMetrics} style={{ ...BTN, marginLeft: "auto", alignSelf: "center", display: "flex", alignItems: "center", gap: "6px", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
+          <button type="button" onClick={v.openMetrics} style={{ ...BTN, padding: 0, marginLeft: "auto", alignSelf: "center", display: "flex", alignItems: "center", gap: "6px", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
             <Ic name="sliders-horizontal" size={14} />Columns
           </button>
         </div>

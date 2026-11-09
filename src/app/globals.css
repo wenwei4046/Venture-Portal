@@ -511,6 +511,8 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-strip-late: #FFB38A;
   /* v4 13d / 13e: Assignment's tab row rule. */
   --crm-tab-rule: #E6DED7;
+  /* v4 8b / 8c (phone QA): a figure's label on the rust hero — the frames' #F7D3C0, not --crm-peach-soft. */
+  --crm-hero-label: #F7D3C0;
 }
 
 /* ─── The design system's tokens (2026-10-14) ───

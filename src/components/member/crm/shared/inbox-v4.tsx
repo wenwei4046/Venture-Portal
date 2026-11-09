@@ -163,8 +163,8 @@ function MineRowView({ l }: { l: MineRow }) {
         style={{ WebkitTouchCallout: "none", position: "relative", display: "flex", alignItems: "center", gap: "14px", padding: "14px 20px", background: "var(--crm-page)", transform: `translateX(${l.tx})`, transition: "transform 220ms cubic-bezier(.2,.8,.2,1)", touchAction: "pan-y", userSelect: "none", cursor: "pointer" }}>
         <Avatar size={50} font={17} a={l} />
         <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "4px" }}>
-          {/* Line 1 is as tall as a tag (22 px), so a tag never changes the row's height. */}
-          <span style={{ display: "flex", alignItems: "center", gap: "8px", height: "22px" }}>
+          {/* Line 1 is 20 px — the 17 px name, as tall as a label tag — so a tag never changes the row (10b: 95 px a row). */}
+          <span style={{ display: "flex", alignItems: "center", gap: "8px", height: "20px" }}>
             <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "7px", overflow: "hidden" }}>
               <strong style={{ flex: "0 1 auto", minWidth: 0, fontSize: fs(17), fontWeight: l.nameW, color: l.nameC, ...ELLIPSIS }}>{l.name}</strong>
               {!!l.ownerTag && <Tag t={l.ownerTag} c={l.ownerC} />}
@@ -275,21 +275,21 @@ function FilterSheet({ s }: { s: NonNullable<T2["sheet"]> }) {
 }
 
 type Card = T2["cards"][number];
-/** One Team card (2d): bordered, 15/16 padding, radius 18; inside, the 10b layout with the owner first on line 2. */
+/** One Team card (2d): bordered, 15/16 padding, radius 18; inside, the 10b layout with the owner first on line 2 — lines 20 · 15 · 22 px, 5 apart (2d: 98 px a card). */
 function TeamCard({ r }: { r: Card }) {
   return (
     <div onClick={r.open} onClickCapture={r.guard} onPointerDown={r.down} onPointerMove={r.move} onPointerUp={r.up} onPointerCancel={r.cancel} onContextMenu={r.noMenu}
       style={{ WebkitTouchCallout: "none", userSelect: "none", flex: "none", display: "flex", gap: "14px", padding: "15px 16px", borderRadius: "18px", background: "var(--crm-page)", border: "1px solid var(--crm-card-line)", cursor: "pointer" }}>
       <Avatar size={44} font={15} a={r} />
       <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "5px" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: "8px", height: "22px" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: "8px", height: "20px" }}>
           <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "7px", overflow: "hidden" }}>
             <strong style={{ flex: "0 1 auto", minWidth: 0, fontSize: fs(16), fontWeight: r.nameW, color: r.nameC, ...ELLIPSIS }}>{r.name}</strong>
             {r.tags.map(t => <Tag key={t.t} t={t.t} c={t.c} />)}
           </span>
           <TimeOrWait w={r} at={r.at} size={12.5} />
         </span>
-        <span style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, height: "16px", fontSize: fs(12.5), color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0, height: "15px", fontSize: fs(12.5), color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
           <span style={{ flex: "none", width: "7px", height: "7px", borderRadius: "50%", background: r.wc }} />
           <span style={{ flex: "0 0 auto", maxWidth: "55%", fontWeight: 500, color: r.toAssign ? "var(--crm-oxblood)" : "var(--crm-ink-soft)", overflow: "hidden", textOverflow: "ellipsis" }}>{r.who}</span>
           {!!r.ad && <><span style={{ flex: "none", color: "var(--crm-faint-2)" }}>·</span><span style={{ flex: "0 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-faint)" }}>{r.ad}</span></>}

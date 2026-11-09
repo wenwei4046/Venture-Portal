@@ -89,12 +89,13 @@ export function frameVM(ctx: DeskCtx) {
   // strip when folded, docked beside the chat at every width. From 1680 px both may be open; below, opening one folds
   // the other (the toggles below).
   const ibCpOpen = !!ui.ibCp, ibCpDock = ibCpOpen;
-  const ibListW = ui.ibListW ?? 340, ibInfoW = ui.ibInfoW ?? 260, ibCpW = ui.ibCpW ?? 290;
+  // v4 D5a: Customer info is 290 px and its 1 px rule (291 border-box); the list 340, the Audit log 290.
+  const ibListW = ui.ibListW ?? 340, ibInfoW = ui.ibInfoW ?? 291, ibCpW = ui.ibCpW ?? 290;
   const BOTH = W >= 1680;
   // Customer info opens by default (the owner, 2026-10-16); on a narrow screen (1280) it starts folded so the chat keeps room.
-  const infoShut = ui.ibInfoShut ?? (crmW - ibListW - ibInfoW - 44 < 300);
+  const infoShut = ui.ibInfoShut ?? (crmW - ibListW - ibInfoW - 45 < 300);
   let dockW = W1440 ? 440 : 400;
-  if (ibOn) dockW = crmW - ibListW - (infoShut ? 44 : ibInfoW) - (ibCpDock ? ibCpW : 44);
+  if (ibOn) dockW = crmW - ibListW - (infoShut ? 45 : ibInfoW) - (ibCpDock ? ibCpW : 45);
   const ibSpare = Math.max(0, dockW - 300);
   const manage = data.can.manage;
   const leads = upNextOpen(data, ctx.me.id);

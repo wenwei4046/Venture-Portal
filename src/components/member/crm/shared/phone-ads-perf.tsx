@@ -165,21 +165,20 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
       </div>
 
       {/* Day by day: one line a metric, each against its own highest day */}
-      <div style={{ ...card, padding: "12px 12px 8px" }}>
+      <div style={{ ...card, padding: "12px" }}>
         <Chart days={days} lines={keys.map((k, i) => ({ k, c: COLORS[i], v: series[k] ?? [] }))} />
       </div>
 
       {/* Every ad with those figures */}
       <div style={{ display: "flex", flexDirection: "column" }}>
-        <span style={{ display: "flex", alignItems: "baseline", gap: "6px", fontFamily: TIGHT, fontSize: fs(15), fontWeight: 500, marginBottom: "4px" }}>By ad <span style={{ fontFamily: "Inter, sans-serif", fontSize: fs(12), fontWeight: 400, color: "var(--crm-faint)" }}>{rows.length}</span></span>
+        <span style={{ display: "flex", alignItems: "baseline", gap: "6px", fontFamily: TIGHT, fontSize: fs(15), fontWeight: 500, marginBottom: "8px" }}>By ad <span style={{ fontFamily: "Inter, sans-serif", fontSize: fs(12), fontWeight: 400, color: "var(--crm-faint)" }}>{rows.length}</span></span>
         {!rows.length && <span style={{ padding: "12px 0", fontSize: fs(13), color: "var(--crm-faint)" }}>No leads from an ad in this period.</span>}
         {rows.map(a => { const on = openAd === a.id; return (
           <div key={a.id} data-ad-row="" role="button" tabIndex={0} onClick={() => setOpenAd(on ? null : a.id)} style={{ ...BTN, padding: "10px 0", borderBottom: "1px solid var(--crm-rule-soft)", display: "flex", flexDirection: "column", gap: "6px", textAlign: "left" }}>
             <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ flex: 1, minWidth: 0, fontSize: fs(14), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: on ? "normal" : "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
               {/* View ad, a small icon right of the name (the owner, 2026-10-24: "只需要view ad（做成小小的圖標即可）做廣告名字右邊"). */}
-              <a href={a.url} target="_blank" rel="noopener noreferrer" title="View ad" aria-label="View ad" onClick={e => e.stopPropagation()} style={{ flex: "none", width: "26px", height: "26px", display: "grid", placeItems: "center", color: "var(--crm-muted)" }}><Ic name="arrow-up-right" size={13} /></a>
-              <span style={{ display: "flex", color: "var(--crm-faint-2)", transform: on ? "rotate(180deg)" : "none", transition: "transform 160ms" }}><Ic name="chevron-down" size={13} /></span>
+              <a href={a.url} target="_blank" rel="noopener noreferrer" title="View ad" aria-label="View ad" onClick={e => e.stopPropagation()} style={{ flex: "none", width: "26px", height: "26px", margin: "-5px -6px -5px 0", display: "grid", placeItems: "center", color: "var(--crm-muted)" }}><Ic name="arrow-up-right" size={13} /></a>
             </span>
             <span style={{ display: "grid", gridTemplateColumns: `repeat(${keys.length}, minmax(0,1fr))`, gap: "6px" }}>
               {/* v4 8c: the metric names go — each figure's dot is its tile's colour above. */}
@@ -227,12 +226,12 @@ function Chart({ days, lines }: { days: string[]; lines: { k: string; c: string;
   const path = (v: (number | null)[]) => { const s = scaled(v); let d = ""; s.forEach((y, i) => { if (y == null) return; d += `${d ? "L" : "M"}${((i / n) * W).toFixed(1)},${(H - 6 - y * (H - 12)).toFixed(1)}`; }); return d; };
   const empty = lines.every(l => l.v.every(x => x == null || x === 0));
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="120" preserveAspectRatio="none" role="img" aria-label="Day by day">
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="96" preserveAspectRatio="none" role="img" aria-label="Day by day">
         {[0.25, 0.5, 0.75].map(f => <line key={f} x1="0" x2={W} y1={H * f} y2={H * f} stroke="var(--crm-rule-soft)" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
         {lines.map(l => <path key={l.k} d={path(l.v)} fill="none" stroke={l.c} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />)}
       </svg>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: fs(10.5), color: "var(--crm-faint)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: fs(11), color: "var(--crm-faint)" }}>
         <span>{days[0] ? dayLabel(days[0]) : ""}</span>{empty && <span>No activity yet</span>}<span>{days.length > 1 ? dayLabel(days[days.length - 1]) : ""}</span>
       </div>
     </div>

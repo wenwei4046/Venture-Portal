@@ -19,7 +19,13 @@ const CLIP: CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOver
 const PAUSE_TIP = "Stop giving this person ad leads until you resume them";
 const act = (fn: () => void, title?: string) => ({ role: "button", tabIndex: 0, title, onClick: fn, onKeyDown: (e: { key: string }) => { if (e.key === "Enter") fn(); } });
 /** D3a's queue: # · Next in turn · Team · Leads today · Last lead · the actions' reserved column. */
-export const UN_COLS = "44px minmax(0,1fr) 140px 96px 96px 196px";
+export const UN_COLS = "44px minmax(120px,1fr) minmax(80px,140px) 96px 96px 196px";
+/**
+ * The queue never narrower than its columns’ least (44 + 120 + 80 + 96 + 96 + 196, five 16 px gaps, 12 px a side): the
+ * prototype draws D3a 1376 px wide with no CRM sidebar, the app’s column is ~1072 px at 1440 × 900, so the 420 px left
+ * column gives way first (down to 280 px) and the queue keeps its names; at the prototype’s width both are D3a’s.
+ */
+const UN_MIN = 44 + 120 + 80 + 96 + 96 + 196 + 5 * 16 + 24;
 /** The #1 card's buttons (42 px, radius 21, 14 px 600, icons 15 px). */
 const CARD_BTN: CSSProperties = { flex: 1, height: "42px", borderRadius: "21px", display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", font: `600 14px ${INTER}`, background: "#FFFFFF1F", color: "#fff", cursor: "pointer", whiteSpace: "nowrap" };
 /** A row's hover action (30 px, radius 15, 1 px #E2D8D0, 12.5 px). */
@@ -113,7 +119,7 @@ export function DeskUpNext({ live, book, ads, canAct, line, today = {}, lastAt =
   );
   const sub: CSSProperties = { display: "flex", alignItems: "center", gap: "10px", minHeight: "44px", padding: "0 4px", borderBottom: "1px solid var(--crm-rule-soft)", font: `400 14px ${INTER}` };
   return (<>
-    <div data-up-next-d3a="" style={{ flex: "1 1 auto", minHeight: 0, display: "grid", gridTemplateColumns: "420px minmax(0,1fr)", gap: "32px", alignItems: "start", color: "var(--crm-ink)" }}>
+    <div data-up-next-d3a="" style={{ flex: "1 1 auto", minHeight: 0, display: "grid", gridTemplateColumns: `clamp(280px, calc(100% - 32px - ${UN_MIN}px), 420px) minmax(0,1fr)`, gap: "32px", alignItems: "start", color: "var(--crm-ink)" }}>
       {/* Left: All ads ▾ · N in turn, the #1 card, Not in turn · On leave. */}
       <div style={{ display: "flex", flexDirection: "column", gap: "14px", minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -205,15 +211,15 @@ export function DeskUpNext({ live, book, ads, canAct, line, today = {}, lastAt =
         )}
       </div>
       {/* Right: the queue (#2 onward), the actions on hover only. */}
-      <div style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "grid", gridTemplateColumns: UN_COLS, columnGap: "16px", height: "38px", alignItems: "center", padding: "0 12px", borderRadius: "8px", background: "var(--crm-hover)", font: `500 12.5px ${INTER}`, color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
+      <div style={{ minWidth: 0, display: "flex", flexDirection: "column", overflowX: "auto" }}>
+        <div style={{ minWidth: `${UN_MIN}px`, boxSizing: "border-box", display: "grid", gridTemplateColumns: UN_COLS, columnGap: "16px", height: "38px", alignItems: "center", padding: "0 12px", borderRadius: "8px", background: "var(--crm-hover)", font: `500 12.5px ${INTER}`, color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
           <span>#</span><span>Next in turn</span><span>Team</span><span style={{ textAlign: "right" }}>Leads today</span><span style={{ textAlign: "right" }}>Last lead</span><span />
         </div>
         {queue.map((m, i) => {
           const k = n(m.id), on = hov === m.id, last = lastAt[m.id] ? lastLeadWords(lastAt[m.id], now) : m.last === "no lead yet" ? "—" : m.last;
           return (
             <div key={m.id} data-un-row={m.id} onMouseEnter={() => { setHov(m.id); m.hovOn(); }} onMouseLeave={() => { setHov(h => (h === m.id ? null : h)); m.hovOff(); }}
-              style={{ display: "grid", gridTemplateColumns: UN_COLS, columnGap: "16px", height: "56px", alignItems: "center", padding: "0 12px", borderBottom: "1px solid var(--crm-rule-soft)", font: `400 14.5px ${INTER}`, fontVariantNumeric: "tabular-nums", background: on ? "var(--crm-hover)" : "transparent" }}>
+              style={{ minWidth: `${UN_MIN}px`, boxSizing: "border-box", display: "grid", gridTemplateColumns: UN_COLS, columnGap: "16px", height: "56px", alignItems: "center", padding: "0 12px", borderBottom: "1px solid var(--crm-rule-soft)", font: `400 14.5px ${INTER}`, fontVariantNumeric: "tabular-nums", background: on ? "var(--crm-hover)" : "transparent" }}>
               <span style={{ width: "30px", height: "30px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", font: `500 13px ${TIGHT}`, background: "var(--crm-field)", color: "var(--crm-muted)" }}>{m.nextTxt === "10+" ? "10+" : i + 2}</span>
               <span style={{ fontWeight: 500, ...CLIP }}>{m.name}</span>
               <span style={{ color: "var(--crm-muted)", ...CLIP }}>{m.team}</span>

@@ -39,3 +39,7 @@
 /* Contacts' column edges show where to drag (2026-10-23, the owner drew them in: "做成可调节宽度"). */
 .root.root.root :global(.crm4a-colgrip-seen)::after { background: var(--crm-line) !important; }
 .root.root.root :global(.crm4a-colgrip):hover::after, .root.root.root :global(.crm4a-colgrip):active::after { background: var(--crm-rust) !important; }
+
+/* v4 notes/20: a period option is as wide as its bold (picked) self, so picking another moves nothing (Desk4a › Desk4aHead). */
+.root.root.root :global(.crm4a-seg) { display: inline-flex !important; flex-direction: column !important; align-items: center !important; }
+.root.root.root :global(.crm4a-seg)::after { content: attr(data-label); font-weight: 600; visibility: hidden; height: 0; overflow: hidden; }

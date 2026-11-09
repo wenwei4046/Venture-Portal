@@ -175,7 +175,7 @@ export function Phone4aHero({ items, cols, compact }: { items: { label: string; 
       {items.map((m, i) => (
         <div key={m.label} onClick={m.open} role={m.open ? "button" : undefined} style={{ display: "flex", flexDirection: "column", gap: "3px", padding: "0 16px", borderLeft: i % n ? "1px solid rgba(255,255,255,.22)" : "1px solid transparent", minWidth: 0, cursor: m.open ? "pointer" : "default" }}>
           <span style={{ width: "18px", height: "2px", background: i ? "transparent" : "var(--crm-amber)" }} />
-          <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: fs(12), fontWeight: 500, color: "var(--crm-peach-soft)", whiteSpace: "nowrap" }}>{m.label}{m.open && <Ic name="chevron-right" size={11} />}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: fs(12), fontWeight: 500, color: "var(--crm-hero-label)", whiteSpace: "nowrap" }}>{m.label}{m.open && <Ic name="chevron-right" size={11} />}</span>
           <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(24), letterSpacing: "-0.02em", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{m.value}</span>
           <span style={{ minHeight: "14px", fontSize: fs(11), fontWeight: 500, color: m.good ? "var(--crm-delta-good)" : "var(--crm-delta-bad)" }}>{m.delta}</span>
         </div>
@@ -243,7 +243,7 @@ export function Phone4aTeamOverview({ ov }: { ov: { adPerT: string; adPerD: stri
       {ov.hero4.map((m, i) => (
         <div key={m.label} onClick={m.open} role={m.open ? "button" : undefined} style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: 0, padding: "0 16px", borderLeft: i % 2 ? "1px solid rgba(255,255,255,.22)" : "1px solid transparent", cursor: m.open ? "pointer" : "default" }}>
           <span style={{ width: "18px", height: "2px", background: i ? "transparent" : "var(--crm-amber)" }} />
-          <span style={{ fontSize: fs(12), fontWeight: 500, color: "var(--crm-peach-soft)", whiteSpace: "nowrap" }}>{m.label}</span>
+          <span style={{ fontSize: fs(12), fontWeight: 500, color: "var(--crm-hero-label)", whiteSpace: "nowrap" }}>{m.label}</span>
           <span style={{ display: "flex", alignItems: "baseline", gap: "8px", minWidth: 0, whiteSpace: "nowrap" }}>
             <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(24), letterSpacing: "-0.02em", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{m.value}</span>
             {m.delta && <span style={{ fontSize: fs(11), fontWeight: 500, color: m.good ? "var(--crm-delta-good)" : "var(--crm-delta-bad)", overflow: "hidden", textOverflow: "ellipsis" }}>{m.delta}</span>}

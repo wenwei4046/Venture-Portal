@@ -166,9 +166,14 @@ const cellStyle = (c: Cell, i: number, big: boolean): CSSProperties => ({ ...NUM
 function Overview({ o }: { o: O }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [more, setMore] = useState<Record<string, boolean>>({});
-  const grid = `minmax(240px,1fr) ${o.heads.map(h => `${h.w}px`).join(" ")}`;
-  const minW = 240 + o.heads.reduce((n, h) => n + h.w, 0) + o.heads.length * 16 + 32;
-  const row: CSSProperties = { display: "grid", gridTemplateColumns: grid, columnGap: "16px", alignItems: "center", padding: "0 16px" };
+  // A person's panel open (D6a) leaves the table 452 px less: in the prototype's 1440 px that still fits every column; in
+  // the app's column (~1070 px at 1440 × 900, beside the CRM sidebar) it does not, so Ad gives way to 200 px, each
+  // figure to 58 px (enough for "Avg reply", "1h 07m") and the gaps to 10 px, and nothing runs under the panel. Closed, the columns are D6a's.
+  const tight = !!o.panel;
+  const grid = tight ? `minmax(200px,1fr) ${o.heads.map(h => `minmax(58px,${h.w}px)`).join(" ")}` : `minmax(240px,1fr) ${o.heads.map(h => `${h.w}px`).join(" ")}`;
+  const gap = tight ? 10 : 16;
+  const minW = tight ? 200 + o.heads.length * (58 + gap) + 32 : 240 + o.heads.reduce((n, h) => n + h.w, 0) + o.heads.length * 16 + 32;
+  const row: CSSProperties = { display: "grid", gridTemplateColumns: grid, columnGap: `${gap}px`, alignItems: "center", padding: "0 16px" };
   const byAd = o.by === "ad";
   const Person = ({ p, top }: { p: O["people"][number]; top: boolean }) => (
     <div role={p.pick ? "button" : undefined} tabIndex={p.pick ? 0 : undefined} onClick={p.pick ?? undefined} onKeyDown={e => { if (p.pick && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); p.pick(); } }}
@@ -176,8 +181,9 @@ function Overview({ o }: { o: O }) {
       className={p.pick ? "crm4a-row" : undefined}>
       <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, paddingLeft: top ? 0 : "23px" }}>
         <span style={{ flex: "none", display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-right" size={top ? 13 : 11} /></span>
-        <span style={{ fontWeight: p.on ? 600 : top ? 500 : 400, color: p.on ? "var(--crm-rust)" : p.none ? "var(--crm-muted)" : undefined, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
-        {p.need && <span style={{ flex: "none", font: "600 11.5px Inter, sans-serif", color: "var(--crm-oxblood)", whiteSpace: "nowrap" }}>{p.need}</span>}
+        <span style={{ flex: "0 1 auto", minWidth: 0, fontWeight: p.on ? 600 : top ? 500 : 400, color: p.on ? "var(--crm-rust)" : p.none ? "var(--crm-muted)" : undefined, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+        {/* The name keeps its width; a narrow column (panel open) cuts "N need a reply" first. */}
+        {p.need && <span style={{ flex: "0 1000 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", font: "600 11.5px Inter, sans-serif", color: "var(--crm-oxblood)", whiteSpace: "nowrap" }}>{p.need}</span>}
       </span>
       {p.cells.map((c, i) => <span key={c.k} style={cellStyle(c, i, false)}>{c.text}</span>)}
     </div>

@@ -71,7 +71,7 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
     account: { ini: fr.me.ini, name: fr.me.name, sub: fr.me.sub },
     greet: app.greeting, first: ctx.me.role === "boss" ? "Principal" : ctx.me.name.trim().split(/\s+/)[0] ?? "",
     subName: app.subName, openSubDept: app.openSubDept, date: topDate(ctx.now),
-    head: { title: fr.pageTitle, tabs: h?.tabs ?? [], subTabs: h?.subTabs, subSlot: h?.subSlot, subPad: h?.subPad, picker: h?.picker ?? null, sub: h?.sub ?? "", vs: h?.vs, cta: h?.cta ?? null, alt: h?.alt ?? null } as F4Head,
+    head: { title: fr.pageTitle, tabs: h?.tabs ?? [], seg: h?.seg, cmp: h?.cmp ?? null, subTabs: h?.subTabs, subSlot: h?.subSlot, subPad: h?.subPad, picker: h?.picker ?? null, sub: h?.sub ?? "", vs: h?.vs, cta: h?.cta ?? null, alt: h?.alt ?? null } as F4Head,
     alertsN: fr.alertsN, openAlerts: fr.openAlerts,
     // Reports draws its own head too (v4 D6a, DeskReports).
     // Inbox runs its columns edge to edge under a rule (frame 02); every other page has the 36 px gutter.
@@ -94,7 +94,9 @@ export function frame4aVM(ctx: DeskCtx, fr: FrameBits, head: Partial<Record<Desk
       return { open: ui.bookPick, close: () => ctx.patch({ bookPick: false, bookQ: "" }), q: ui.bookQ, setQ: (e: { target: { value: string } }) => ctx.patch({ bookQ: e.target.value }),
         rows: rows.map(c => ({ id: c.id, name: c.name, sub: [c.phone, c.ad].filter(Boolean).join(" · "), pick: () => ctx.patch({ bookPick: false, bookQ: "", pane: "overlay", kind: "book", chat: c.id, book: null }) })) };
     })(),
-    pad: tab === "insight" && ui.insTab === "upnext" ? "24px 36px 32px" : (tab === "reports" || tab === "workspace") && ui.rpCat !== "ads" ? "0" : tab === "inbox" || tab === "calendar" || tab === "activity" || (tab === "insight" && ui.insTab === "activity") ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : tab === "insight" && ui.insTab === "upnext" ? "32px" : "24px", ownHead: tab === "calendar" || tab === "activity" || tab === "reports" || tab === "workspace", bodyTop: ["inbox", "people", "showrooms", "forms"].includes(tab) ? "1px solid var(--crm-rule)" : "0",
+    // v4 frames D1a–D4b: Insight keeps the prototype’s 32 px gutter (head, tab row and body); every other page keeps 36.
+    gut: tab === "insight" ? "32px" : "36px",
+    pad: tab === "insight" && ui.insTab === "upnext" ? "24px 32px 32px" : tab === "insight" && ui.insTab !== "activity" ? "0 32px 32px" : (tab === "reports" || tab === "workspace") && ui.rpCat !== "ads" ? "0" : tab === "inbox" || tab === "calendar" || tab === "activity" || (tab === "insight" && ui.insTab === "activity") ? "0" : tab === "people" ? "0 28px 20px 36px" : tab === "auditlog" ? "7px 36px 32px" : "0 36px 32px", gap: tab === "inbox" || tab === "adsperf" || (tab === "insight" && ui.insTab === "ads") || (tab === "reports" && ui.rpCat === "ads") ? "0" : tab === "insight" && ui.insTab === "upnext" ? "32px" : "24px", ownHead: tab === "calendar" || tab === "activity" || tab === "reports" || tab === "workspace", bodyTop: ["inbox", "people", "showrooms", "forms"].includes(tab) ? "1px solid var(--crm-rule)" : "0",
   };
 }
 export type Frame4a = ReturnType<typeof frame4aVM>;

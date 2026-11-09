@@ -29,13 +29,19 @@ const INTER = "Inter, sans-serif";
 const CLIP: CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 const press = (fn: () => void) => ({ role: "button" as const, tabIndex: 0, onClick: fn, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } } });
 
-/** D4a's columns, and D4b's while a lead is open (notes/22). */
-export const ACT_COLS = "260px 200px repeat(5,minmax(0,1fr))";
-export const ACT_COLS_TIGHT = "230px 160px repeat(5,minmax(0,1fr))";
+/**
+ * D4a's columns, and D4b's while a lead is open (notes/22): 260 / 200 and 230 / 160 wherever there is the room the
+ * prototype has (1440 px with no CRM sidebar). The app's column is ~1070 px at 1440 × 900, which leaves the five figures
+ * ~28 px each beside a 420 px drawer — so Name and Team give way first (to 140 / 96) and a figure keeps 56 px, enough for
+ * "Avg reply" and "1h 05m"; past that the list scrolls sideways rather than letting the headers run into each other.
+ */
+export const ACT_COLS = "minmax(160px,260px) minmax(110px,200px) repeat(5,minmax(56px,1fr))";
+export const ACT_COLS_TIGHT = "minmax(140px,230px) minmax(96px,160px) repeat(5,minmax(56px,1fr))";
 /** The drawer's width and the table's right padding while it is open. */
 export const ACT_DRAWER_W = 420;
 export const ACT_PAD_OPEN = 452;
-const PAD_X = 36;
+/** The page’s side gutter: 32 px under Insight (frames D4a / D4b), 36 px on its own page (v3). */
+const PAD_X = 36, PAD_X_INSIGHT = 32;
 /** D4a / D4b colours: labels on espresso and the facts' dividers. */
 const ON_DARK = "var(--crm-on-dark-meta)", DIVIDER = "var(--crm-fig-div)";
 
@@ -156,7 +162,7 @@ export function DeskTeamActivityView({ v, inInsight = true }: { v: ActivityVM; i
             onApply={r => { v.setFrom({ target: { value: ymd(r.a) } }); v.setTo({ target: { value: ymd(r.b) } }); setPick(false); }} />}
         </div>
       )}
-      <div data-act-scroll="" style={{ flex: 1, minHeight: 0, overflow: "auto", padding: `20px ${open ? ACT_PAD_OPEN : PAD_X}px 32px ${PAD_X}px`, display: "flex", flexDirection: "column", gap: "20px" }}>
+      <div data-act-scroll="" style={{ flex: 1, minHeight: 0, overflow: "auto", padding: `20px ${open ? ACT_PAD_OPEN : inInsight ? PAD_X_INSIGHT : PAD_X}px 32px ${inInsight ? PAD_X_INSIGHT : PAD_X}px`, display: "flex", flexDirection: "column", gap: "20px" }}>
         <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "8px" }}>
           <div style={{ position: "relative" }}>
             <span {...press(v.toggleMenu)} style={pill}>

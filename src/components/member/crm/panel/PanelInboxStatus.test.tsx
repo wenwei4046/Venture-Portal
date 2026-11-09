@@ -1,6 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CrmApp from "../CrmApp";
+// Renders the whole CrmApp: slow under the full suite's parallel load (passes alone in ~1 s).
+vi.setConfig({ testTimeout: 20_000 });
 
 // v4 (docs/design_handoff_crm_redesign_v4, notes/17 — frame 2d with frame 2c's filters): the Team inbox's Status is one
 // button with the 2c·2 sheet — several statuses at once, each a removable tag; "N chats of M"; a card shows its status

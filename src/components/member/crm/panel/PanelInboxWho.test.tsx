@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach } from "vitest";
 import CrmApp from "../CrmApp";
+// Renders the whole CrmApp: slow under the full suite's parallel load (passes alone in ~1 s).
+vi.setConfig({ testTimeout: 20_000 });
 
 vi.mock("@/app/(member)/member/crm-actions", async importOriginal => ({ ...(await importOriginal<object>()), fetchCrmAssignedSince: vi.fn(async () => ({ ok: true, rows: [] })) }));
 afterEach(() => { cleanup(); window.history.replaceState({}, "", "/"); });

@@ -4,14 +4,14 @@
  * shared/team-activity.ts, the desktop's own view model: the head and segment (8b), ONE filter row (Everyone ▾ · All ads ▾
  * · Today ▾, the live clock at its end), the espresso figure strip, the table — the rows in activityOrder, the top 5 and
  * "Show N more", Not in turn folded below. No "Team activity" title (the switch says Activity). Its sheets fade their
- * scrim in and slide up as every Control panel sheet. Sizes are the Revenue app's (typePx).
+ * scrim in and slide up as every Control panel sheet. Sizes are the frame's on-screen px (phone4a › fs), as 8b / 8c / 9g, so nothing changes size between the Insight sides.
  */
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { DateRangePicker, rangeWords } from "./date-range";
 import type { CrmData } from "@/lib/member/crm-data";
 import type { PeopleBook } from "./people-book";
 import { ACT_TOP_PHONE, foldTop, type ActivityVM } from "./team-activity";
-import { typePx as fs } from "./type";
+import { fs } from "./phone4a";
 import { V4 } from "./up-next-style";
 import { useTeamActivity } from "./use-team-activity";
 

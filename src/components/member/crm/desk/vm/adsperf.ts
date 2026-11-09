@@ -9,7 +9,7 @@ import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { DeskCtx } from "./ctx";
-import { INS_CARDS, MON, insightRange } from "./insight";
+import { INS_CARDS, MON, insightDates, insightRange } from "./insight";
 import { columnSizer } from "./columns";
 import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES, SERIES_TINT } from "./adschart";
 import { ST_META } from "./tokens";
@@ -268,13 +268,16 @@ export function adsPerfVM(ctx: DeskCtx) {
   const per = ui.apPer || 5, pages = Math.max(1, Math.ceil(ADs.length / per)), pg = Math.min(ui.apPg, pages - 1);
   const apPager = { range: ADs.length ? `${pg * per + 1}–${Math.min(ADs.length, pg * per + per)} of ${ADs.length} ads` : "0 ads", per, sizes: [5, 10, 20],
     setPer: (n: number) => patch({ apPer: n, apPg: 0 }), pages, cur: pg, go: (i: number) => patch({ apPg: i }) };
+  // v4 D2a: under Insight, Running is the v4 green (`--crm-v4-green`); the Ads Performance page keeps v2 brown.
+  const stDot = (k: string) => (onIns && k === "Running" ? "var(--crm-v4-green)" : ST_META[k][1]);
   return {
     apNeed, apDayNeed, apChartV, apPager, apStrip,
     // D2a: under Insight the range button (the third filter) goes — the head's period drives the page.
     apInIns: onIns,
     // D2a: "+ Compare" in Insight's head (the range button that held it went); on, it reads "vs 22–31 Oct" with ×.
     insCmp: onIns && ui.insTab === "ads" ? { on: cmp, label: `vs ${rangeTxt(ca, cb)}`, toggle: () => patch({ apCmp: !cmp, apCmpMode: 0 }) } : null,
-    ...(onIns && ui.insTab === "ads" ? { insightSub: rangeTxt(ra, rb) } : {}),
+    // v4 notes/20: the head reads its dates as every Insight tab does ("1–10 Nov", D2a), so switching tabs changes no width.
+    ...(onIns && ui.insTab === "ads" ? { insightSub: insightDates({ a: ra, b: rb }) } : {}),
     // Insight › Ads performance (v2 frame 01b) is this page's body under Insight's head.
     kAdsPerf: ui.tab === "adsperf" || (ui.tab === "insight" && ui.insTab === "ads") || (ui.tab === "reports" && ui.rpCat === "ads"),
     // 4a (frame 05): the head's tabs, the table's rows with their channel and Meta's headline, the total under an ink rule.
@@ -296,9 +299,9 @@ export function adsPerfVM(ctx: DeskCtx) {
     },
     apSrcOpen: !!ui.apSrcOpen, apSrcToggle: () => set(u => ({ ...u, apSrcOpen: !u.apSrcOpen, apStOpen: false })), apSrcCur: { label: sourceLabel(src), n: AD.length },
     apSrcOpts: SOURCE_PICKS.map(p => { const on = src === p.v; return { label: p.label, sub: p.sub, bg: on ? "var(--crm-tint-attention)" : "transparent", w: on ? 700 : 550, pad: p.sub ? "22px" : "10px", pick: () => patch({ apSrc: p.v, apSrcOpen: false, apPg: 0 } as Partial<typeof ui>) }; }),
-    apStOpen: ui.apStOpen, apStToggle: () => set(u => ({ ...u, apStOpen: !u.apStOpen })), apStCur: { label: ST_META[apStF][0], dot: ST_META[apStF][1], n: AD.length },
+    apStOpen: ui.apStOpen, apStToggle: () => set(u => ({ ...u, apStOpen: !u.apStOpen })), apStCur: { label: ST_META[apStF][0], dot: stDot(apStF), n: AD.length },
     apStOpts: (["all", "Running", "Paused"] as const).map(k => { const on = apStF === k, n = k === "all" ? ads.length : ads.filter(a => status(a.id) === k).length;
-      return { label: ST_META[k][0], dot: ST_META[k][1], n, bg: on ? ST_META[k][3] : "transparent", fg: on ? ST_META[k][4] : "var(--crm-ink)", w: on ? 700 : 550, pick: () => patch({ apStF: k, apStOpen: false }) }; }),
+      return { label: ST_META[k][0], dot: stDot(k), n, bg: on ? ST_META[k][3] : "transparent", fg: on ? ST_META[k][4] : "var(--crm-ink)", w: on ? 700 : 550, pick: () => patch({ apStF: k, apStOpen: false }) }; }),
     apHead: cols.map(m => { const on = srt?.k === m[0]; return { resize: resizer(m[0], 104), unsize: () => unsize(m[0]), label: m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: on ? (srt?.dir === "asc" ? "▲" : "▼") : "↕", ac: on ? "var(--crm-rust)" : "var(--crm-faint-2)", fg: on ? "var(--crm-ink)" : "var(--crm-muted)",
       sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) }; }),
     apNameArrow: srt?.k === "name" ? (srt.dir === "asc" ? "▲" : "▼") : "↕", apNameAc: srt?.k === "name" ? "var(--crm-rust)" : "var(--crm-faint-2)",

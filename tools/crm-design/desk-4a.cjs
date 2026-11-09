@@ -83,9 +83,10 @@ module.exports = function desk4a(body) {
   if (body.split(DAY_OLD).length - 1 < 2) throw new Error("desk-4a: day labels");
   body = body.split(DAY_OLD).join(DAY_NEW);
   body = every(body, 'borderRadius: "16px 16px 16px 4px", boxShadow: "rgba(42,22,12,.1) 0 1px 1px", background: "#fff", color: "var(--crm-ink)" }}>',
-    'borderRadius: "14px 14px 14px 4px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}>', "customer bubble");
+    // v4 D5a: bubbles are 16 px round with a 4 px tail and a 1 px shadow again (no hairline), as v2 drew them.
+    'borderRadius: "16px 16px 16px 4px", boxShadow: "rgba(42,22,12,.08) 0 1px 1px", background: "#fff", color: "var(--crm-ink)" }}>', "customer bubble");
   body = every(body, 'borderRadius: "16px 16px 4px 16px", boxShadow: "rgba(42,22,12,.1) 0 1px 1px", background: m.outBg ?? "var(--crm-tint-attention)", color: m.outFg ?? "var(--crm-ink)" }}>',
-    'borderRadius: "14px 14px 4px 14px", border: `1px solid ${m.outBg ?? "var(--crm-tint-attention)"}`, background: m.outBg ?? "var(--crm-tint-attention)", color: m.outFg ?? "var(--crm-ink)" }}>', "own bubble");
+    'borderRadius: "16px 16px 4px 16px", boxShadow: "rgba(42,22,12,.08) 0 1px 1px", background: m.outBg ?? "var(--crm-tint-attention)", color: m.outFg ?? "var(--crm-ink)" }}>', "own bubble");
   body = swap(body, '<div data-msg={m.id} onClick={m.appt.go} style={{ cursor: "pointer", alignSelf: "flex-end", width: "300px"', "div",
     `<div data-msg={m.id} onClick={m.appt.go} style={{ cursor: "pointer", alignSelf: "flex-end", maxWidth: "78%", padding: "10px 14px 8px", boxSizing: "border-box", borderRadius: "14px 14px 4px 14px", background: "var(--crm-rust)", border: "1px solid var(--crm-rust)", color: "#fff", display: "flex", flexDirection: "column", gap: "4px" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "3px", padding: "2px" }}>
@@ -133,14 +134,14 @@ module.exports = function desk4a(body) {
                     </span>
                   </div></>)}`, "composer");
 
-  // Frame 02 · the chat's head: 62 px, the avatar in its tint, the name, ad · channel, the wait in oxblood, ⋮ — and no
+  // Frame 02 · the chat's head (v4 D5a: 64 px + its 1 px rule, 20 px a side, a 38 px avatar in 13 px, the name 600): the avatar in its tint, the name, ad · channel, the wait in oxblood, ⋮ — and no
   // close (×) while the chat sits in Inbox's columns (the list picks another; other panes keep theirs).
   body = once(body, '<div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 16px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>',
-    '<div style={{ flex: "0 0 62px", height: "62px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "12px", padding: "0 22px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>', "pane head");
+    '<div style={{ flex: "0 0 65px", height: "65px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "12px", padding: "0 20px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>', "pane head");
   body = once(body, '<span style={{ flex: "0 0 auto", width: "34px", height: "34px", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: "11px", fontWeight: "700", background: "var(--crm-tint-cold)", color: "var(--crm-ink)" }}>{v.ph.avatar}</span>',
-    '<span style={{ flex: "0 0 auto", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", font: "500 12px var(--font-display-rv), \'Inter Tight\', Inter, sans-serif", background: v.ph.avBg ?? "var(--crm-cream)", color: v.ph.avFg ?? "var(--crm-ink)" }}>{v.ph.avatar}</span>', "pane avatar");
+    '<span style={{ flex: "0 0 auto", width: "38px", height: "38px", borderRadius: "50%", display: "grid", placeItems: "center", font: "500 13px var(--font-display-rv), \'Inter Tight\', Inter, sans-serif", background: v.ph.avBg ?? "var(--crm-cream)", color: v.ph.avFg ?? "var(--crm-ink)" }}>{v.ph.avatar}</span>', "pane avatar");
   body = once(body, '<strong style={{ fontSize: "15px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.title}</strong>\n                    <span style={{ fontSize: "12.5px", color: v.ph.subColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.sub}</span>\n                  </span>',
-    '<strong style={{ font: "500 15px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.title}</strong>\n                    <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.sub}</span>\n                  </span>\n                  <DeskChatWait4a ph={v.ph} />', "pane title");
+    '<strong style={{ font: "600 15px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.title}</strong>\n                    <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.sub}</span>\n                  </span>\n                  <DeskChatWait4a ph={v.ph} />', "pane title");
   {
     const start = '<button type="button" onClick={v.closePane} title="Close (Esc)" style={{ width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", display: "grid", placeItems: "cente';
     const at = body.lastIndexOf(start); if (at < 0) throw new Error("desk-4a: pane close");
@@ -302,7 +303,8 @@ module.exports = function desk4a(body) {
   // CRM v4 notes/11: the open chat's wall clears the WhatsApp cold warning row (104 + its 56 + 8) — the Inbox chat's only
   // (the awaiting preview's wall, the other one, has no composer).
   body = once(body, 'gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>\n                    {!!(v.firstDay)',
-    'gap: "8px", padding: v.chatPadB, backgroundColor: "var(--crm-field)" }}>\n                    {!!(v.firstDay)', "chat wall clears the cold row");
+    // v4 D5a: the Inbox chat's messages 10 px apart (its padding, v.chatPadB, is 28 px a side).
+    'gap: "10px", padding: v.chatPadB, backgroundColor: "var(--crm-field)" }}>\n                    {!!(v.firstDay)', "chat wall clears the cold row");
   body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kActivity) && (<DeskTeamActivity a={v.activity} />)}{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>", "reports page");
   // Team activity (docs/design_handoff_crm, 2026-11-08): a sidebar page of its own, DeskTeamActivity.tsx.
   // Workspace (2026-10-27, the owner: "workspace 可以放在左边report的下方（独立）"): one's own Weekly / Monthly reports, DeskWorkspace.tsx.
