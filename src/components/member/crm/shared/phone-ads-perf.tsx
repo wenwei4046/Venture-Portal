@@ -78,7 +78,7 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   }, [customers, p.adNames]);
   // Each ad's status, as the desktop's filter works it out: Ads Manager's word, else its last lead (the owner, 2026-11-08:
   // "没得选状态？" — the phone had no status filter). An ad of another status leaves the list, the tiles and the chart.
-  const [stF, setStF] = useState<AdStatusPick>("all");
+  const [stF, setStF] = useState<AdStatusPick>("Running"); // Running first (the owner, 2026-11-09: "ads performance 默认开 running")
   const statusOf = (a: (typeof ads)[number]) => adStatusOf(p.adNames[a.id], a.cs.map(c => c.createdAt).sort().at(-1) ?? null, p.now);
   const stCount = (k: AdStatusPick) => ads.filter(a => !a.hidden && (k === "all" || statusOf(a) === k)).length;
   // An ad hidden earlier (crm_hide_ad) stays out of the list and the totals; so does one of another status.

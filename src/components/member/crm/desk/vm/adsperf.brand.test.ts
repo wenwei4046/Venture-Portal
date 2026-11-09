@@ -20,7 +20,7 @@ const data = {
 } as unknown as CrmData;
 
 function names(brand: string) {
-  const ui: DeskUi = { ...initialDeskUi(), stage: "op", insSrc: brand };
+  const ui: DeskUi = { ...initialDeskUi(), stage: "op", insSrc: brand, apStF: "all" };
   const ctx = { ui, data: inBrand(data, brand as never), now: new Date(2026, 9, 30), nameOf: (x: string) => x, act: {}, deskAct: {}, set: () => {}, patch: () => {} } as unknown as DeskCtx;
   return adsPerfVM(ctx).ap4.rows.map(r => r.name);
 }

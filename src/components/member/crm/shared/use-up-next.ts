@@ -5,6 +5,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { crmWrite, fetchUpNext } from "@/app/(member)/member/crm-actions";
+import { createClient } from "@/lib/supabase/client";
+import { idbStore, MAX_AGE_MS } from "@/components/member/app/read-memory";
 import { DEMO_ADS, UpNextDemo, demoBook } from "./up-next-demo";
 import { fmtRange, leaveFormVM, upNextFrame, type LeaveEdit, type UpNextAd, type UpNextActs, type UpNextBook, type UpNextRead, type UpNextUi } from "./up-next";
 
@@ -13,6 +15,37 @@ const POLL_MS = 15_000;
 /** The last read of each ad (and line), for an instant screen on the way back to it. */
 const SEEN = new Map<string, UpNextRead>();
 const iso = (s: string) => `${s}:00+08:00`;
+
+/*
+ * Fast (the owner, 2026-11-09: "up next 电脑 & 手机版的载入时间还是很慢"). Two holds made it slow:
+ * (1) it was a Server Action, and the browser runs those one at a time — behind the CRM's own read every 5 s, which takes
+ *     seconds; it is now asked of the database straight from the browser under the member's own session (the same
+ *     function, its own checks; crm_up_next writes nothing that stays), falling back to the Server Action;
+ * (2) every open began empty: the last read of each ad is kept on the device in the Revenue app's kept-reads store
+ *     (account "crm", which /login deletes) and shown at once while it is read again.
+ */
+const KEPT = "crm", keptKey = (k: string) => `upnext|${k}`;
+async function keptRead(key: string): Promise<UpNextRead | null> {
+  const store = idbStore();
+  if (!store) return null;
+  try {
+    const row = (await store.load(KEPT)).find(r => r.key === keptKey(key));
+    return row && Date.now() - row.at < MAX_AGE_MS ? (row.value as UpNextRead) : null;
+  } catch { return null; }
+}
+function keepRead(key: string, read: UpNextRead) {
+  const store = idbStore();
+  if (store) void store.save([{ id: `${KEPT}|${keptKey(key)}`, account: KEPT, key: keptKey(key), at: Date.now(), value: read }]).catch(() => {});
+}
+export async function readUpNext(a: { ad: string; ads: string[] | null; line: string | null }): Promise<{ ok: true; read: UpNextRead } | { ok: false; error: string }> {
+  try {
+    // Not in the generated types (the Server Action reads it untyped too).
+    const db = createClient(), rpc = db.rpc as unknown as (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+    const { data, error } = await rpc.call(db, "crm_up_next", { p_ad: a.ad, p_ads: a.ads, p_n: 10, p_line: a.line });
+    if (!error && data) return { ok: true, read: data as UpNextRead };
+  } catch { /* the Server Action below */ }
+  return fetchUpNext(a);
+}
 
 export function useUpNext(o: { live: boolean; book: UpNextBook; ads: UpNextAd[]; canAct: boolean; line: string | null }) {
   const demo = useRef<UpNextDemo | null>(null);
@@ -38,11 +71,12 @@ export function useUpNext(o: { live: boolean; book: UpNextBook; ads: UpNextAd[];
     if (demo.current) { const r = demo.current.read(ad); setRead(r); return r; }
     // What this ad showed last time shows at once while it is read again.
     const key = `${o.line ?? ""}|${ad}`, kept = SEEN.get(key);
-    if (kept && ad === adRef.current) setRead(kept);
     const n = ++seq.current;
-    const got = await fetchUpNext({ ad, ads: ad === "all" ? (allKey ? allKey.split(",") : []) : null, line: o.line });
+    if (kept) { if (ad === adRef.current) setRead(kept); }
+    else void keptRead(key).then(r => { if (r && !SEEN.has(key) && n === seq.current && ad === adRef.current) setRead(r); });
+    const got = await readUpNext({ ad, ads: ad === "all" ? (allKey ? allKey.split(",") : []) : null, line: o.line });
     if (!got.ok) { if (n === seq.current) setFailed(got.error); return null; }
-    SEEN.set(key, got.read);
+    SEEN.set(key, got.read); keepRead(key, got.read);
     if (n !== seq.current || ad !== adRef.current) return null;
     setFailed(null); setRead(got.read);
     return got.read;

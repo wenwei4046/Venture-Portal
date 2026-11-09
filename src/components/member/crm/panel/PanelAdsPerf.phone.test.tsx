@@ -36,7 +36,8 @@ describe("Ads performance on the phone", () => {
     const row = document.querySelector("[data-ads-status]")!;
     const btn = (l: string) => within(row as HTMLElement).getByRole("button", { name: new RegExp(`^${l}`) });
     const n = (l: string) => Number(btn(l).textContent!.replace(/\D/g, ""));
-    expect(btn("All ads")).toHaveAttribute("aria-pressed", "true");
+    // Running first (the owner, 2026-11-09: "ads performance 默认开 running").
+    expect(btn("Running")).toHaveAttribute("aria-pressed", "true");
     expect(n("Running") + n("Paused")).toBe(n("All ads"));
     expect(within(row as HTMLElement).queryByRole("button", { name: /^Pending/ })).toBeNull();
     const none = ["Running", "Paused"].find(l => n(l) === 0), some = ["Running", "Paused"].find(l => n(l) > 0)!;
