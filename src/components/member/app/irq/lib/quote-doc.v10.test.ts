@@ -221,3 +221,12 @@ describe("a room type's name", () => {
     expect(specText({ beds: "3", baths: "2", note: "Twin-Key", sqft: "1,000" })).toBe("3 Bedrooms · 2 Bathrooms · 1,000 sq.ft.");
   });
 });
+
+// The user, 2026-11-06 and again 2026-11-09 (an iPhone: the address and "We refer to our meeting…" drawn huge, over
+// each other): iOS inflated the document's text inside the iframe. The page turns that off.
+describe("the quotation on an iPhone", () => {
+  it("turns off iOS's text inflation", () => {
+    const html = renderDoc(defaults(packagesJson, catalogJson), { facts: {}, cats: [], custRows: [], total: 0 });
+    expect(html).toContain("html{-webkit-text-size-adjust:100%;text-size-adjust:100%}");
+  });
+});
