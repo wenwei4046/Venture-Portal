@@ -47,7 +47,6 @@ export interface IrqBoot {
   liveAt: string | null;
   draft: unknown;
   drafts: unknown[];
-  boards: unknown[];
   /** The CRM's Customer info form — CRM › Customer form, the active one (its first by sort order). */
   crmFields: IrqCrmField[];
   user: { id: string; name: string };
@@ -78,14 +77,14 @@ async function crmFields(db: SupabaseClient): Promise<IrqCrmField[]> {
 export async function loadIrQuote(): Promise<Outcome<IrqBoot>> {
   try {
     const { db, user } = await session("read");
-    const [main, drive, fields] = await Promise.all([db.rpc("ir_quote_read"), db.rpc("ir_drive_read"), crmFields(db)]);
+    const [main, fields] = await Promise.all([db.rpc("ir_quote_read"), crmFields(db)]);
     if (main.error) return { ok: false, error: words(main.error, "The quotation settings could not be read.") };
     const m = (main.data ?? {}) as Partial<IrqBoot> & { liveAt?: string | null };
     return {
       ok: true,
       data: {
         quote: !!m.quote, edit: !!m.edit, live: m.live ?? null, liveAt: m.liveAt ?? null, draft: m.draft ?? null,
-        drafts: Array.isArray(m.drafts) ? m.drafts : [], boards: drive.error || !Array.isArray(drive.data) ? [] : drive.data,
+        drafts: Array.isArray(m.drafts) ? m.drafts : [],
         crmFields: fields, user: { id: user.id, name: user.name ?? "" },
       },
     };
@@ -116,18 +115,6 @@ export async function saveIrQuoteDraft(id: string, draft: unknown): Promise<Outc
     return error ? { ok: false, error: words(error, "The draft could not be saved.") } : { ok: true, data: null };
   } catch (e) {
     return failed(e, "The draft could not be saved.");
-  }
-}
-
-/** One Drive folder of the caller's own; null deletes it. */
-export async function saveIrDriveBoard(id: string, board: unknown): Promise<Outcome<null>> {
-  try {
-    if (typeof id !== "string" || !id || id.length > 128) return { ok: false, error: "That folder has no name." };
-    const { db } = await session("quote");
-    const { error } = await db.rpc("ir_drive_save_board", { p_id: id, p_board: board ?? null });
-    return error ? { ok: false, error: words(error, "The Drive could not be saved.") } : { ok: true, data: null };
-  } catch (e) {
-    return failed(e, "The Drive could not be saved.");
   }
 }
 

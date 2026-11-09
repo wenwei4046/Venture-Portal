@@ -3,7 +3,6 @@
 import { DcLogic } from "../dc";
 import React from "react";
 import * as quoteDocLib from "../lib/quote-doc";
-import * as wsStore from "../lib/workspace-store";
 import { productSlug } from "../lib/catalog-import";
 import { irqStorage } from "../storage";
 import seedPackages from "../data/packages.json";
@@ -85,12 +84,8 @@ export class QuoteLogic extends DcLogic {
   };
 
   componentDidMount() {
-    setTimeout(() => this.loadDrive(), 400);
     this.onZoomKey = e => { if (!this.state.zoomList) return; if (e.key === "ArrowRight") this.stepZoom(1); else if (e.key === "ArrowLeft") this.stepZoom(-1); else if (e.key === "Escape") this.setState({ zoomList: null }); };
     window.addEventListener("keydown", this.onZoomKey);
-    this.wsMod = wsStore;
-    this.onUser = () => { const nm = this.wsMod ? this.wsMod.currentUser().name : ""; this.setState(s => ({ drive: {}, draftId: null, draftAt: null, cust: { ...s.cust, by: nm || s.cust.by } })); this.loadDrive(); this.flash("Switched to " + (this.wsMod ? this.wsMod.currentUser().name : "account")); };
-    window.addEventListener("irq-user", this.onUser);
     this._slideT = setInterval(() => { const sl = (this._slides || []).filter(x => x.k !== this._hover && x.k !== this._held); if (!sl.length || document.hidden) return; this.setState(s => { const ci = { ...(s.ci || {}) }; sl.forEach(x => { ci[x.k] = ((ci[x.k] || 0) + 1) % x.n; }); return { ci }; }); }, 3500);
     Promise.all([Promise.resolve({ ...quoteDocLib, CRM_FIELDS: this.props.crmFields || quoteDocLib.CRM_FIELDS, CRM_CUSTOMERS: [] }), Promise.resolve(seedPackages), Promise.resolve(seedCatalog)])
       .then(([lib, pj, cj]) => {
@@ -115,7 +110,7 @@ export class QuoteLogic extends DcLogic {
   }
   attachRo() { const el = this.rootRef.current; if (this.ro || !el || !window.ResizeObserver) return; this.ro = new ResizeObserver(e => { const w = e[0].contentRect.width; if (Math.abs(w - this.state.width) > 1) this.setState({ width: w }); }); this.ro.observe(el); }
   componentDidUpdate() { if (!this.ro) this.attachRo(); }
-  componentWillUnmount() { window.removeEventListener("resize", this.onWinResize); clearInterval(this._slideT); window.removeEventListener("keydown", this.onZoomKey); window.removeEventListener("irq-user", this.onUser); this.ro && this.ro.disconnect(); clearTimeout(this.tt); this.offStore && this.offStore(); clearTimeout(this._crmT); }
+  componentWillUnmount() { window.removeEventListener("resize", this.onWinResize); clearInterval(this._slideT); window.removeEventListener("keydown", this.onZoomKey); this.ro && this.ro.disconnect(); clearTimeout(this.tt); this.offStore && this.offStore(); clearTimeout(this._crmT); }
 
   load(pid, data = this.state.data, keep = false) {
     const p = data.packages.find(x => x.id === pid);
@@ -360,7 +355,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     return false;
   }
   styleStep(group, byId, style) {
-    const st = this.state, styles = (this.cfg && this.cfg.styles) || [], drive = this.props.salesPhotos ? (st.drive || {}) : {}; // v10: style photos are the company's alone (Quote Settings › Styles)
+    const st = this.state, styles = (this.cfg && this.cfg.styles) || [], drive = {}; // style photos are the company's alone (Quote Settings › Styles); the Drive went 2026-11-09
     const sid = st.styleId && styles.some(x => x.id === st.styleId) ? st.styleId : (styles[0] || {}).id;
     const styleCards = styles.map(x => { const imgs = drive[x.id] || [], cover = x.cover || (imgs[0] && imgs[0].src) || "", on = x.id === sid;
       return { name: x.name, desc: x.desc || "", count: imgs.length ? imgs.length + " photo" + (imgs.length === 1 ? "" : "s") : "", cover: this.u(cover), noCover: !cover, on, border: on ? "#111111" : "#E7E7E2", ring: on ? "0 0 0 1px #111111, 0 10px 24px rgba(17,17,17,.12)" : "0 1px 2px rgba(20,20,18,.04)", pick: () => this.setState({ styleId: x.id, gi: 0 }), chipBg: on ? "#111111" : "#FFFFFF", chipInk: on ? "#FFFFFF" : "#1F1F1C", chipBorder: on ? "#111111" : "#DEDED8" }; });
@@ -388,14 +383,9 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       thumbs: imgs.map((t, k) => ({ src: this.u(t.src), ring: k === gi ? "0 0 0 2px #F5871F" : "none", op: k === gi ? 1 : .6, pick: () => set(k) })),
       inPhoto: "", cats } };
   }
-  loadDrive() { Promise.resolve(wsStore).then(ws => ws.byStyle()).then(drive => this.setState({ drive })).catch(() => {}); }
-  wsKey() { const c = this.state.cust || {}; return [c.building, c.unit, c.att].map(x => (x || "").trim()).join("|") || "draft"; }
-  wsLabel() { const c = this.state.cust || {}; return [c.att || "New customer", [c.building, c.unit].filter(Boolean).join(" ")].filter(Boolean).join(" · "); }
-  refreshWsCount() { Promise.resolve(wsStore).then(ws => ws.countFor(this.wsKey())).then(n => { if (n !== this.state.wsCount) this.setState({ wsCount: n }); }).catch(() => {}); }
   async exportPdf() {
     if (!this.checkReq()) return;
     let html = this.docHtml(false);
-    try { const ws = await Promise.resolve(wsStore); const sx = ((this.cfg && this.cfg.styles) || []).find(x => x.id === this.state.styleId) || ((this.cfg && this.cfg.styles) || [])[0] || {}; const extra = this.props.salesPhotos ? await ws.pdfHtml(sx.id, sx.name) : ""; if (extra) html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, extra + "</body>") : html + extra; } catch (e) {}
     const f = document.createElement("iframe");
     f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
     document.body.appendChild(f);
@@ -558,19 +548,13 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
           { label: "More", bg: "#F2F2EF", ink: "#1F1F1C", d: "M5 12h.01M12 12h.01M19 12h.01", run: () => { done(); this.share(); } }
         ]; })() } : false, selAll: e => e.target.select(), docBoxD: !phone || st.docFull ? "flex" : "none", docBox: phone ? (() => { return { pos: "fixed", z: 160, b: "0", r: "0", full: true }; })() : { pos: "relative", z: "auto", b: "1px solid #E7E7E2", r: "14px", full: false }, openDoc: () => this.setState({ docFull: true }, () => { setTimeout(() => { const f = this.rootRef.current && this.rootRef.current.querySelector("iframe[title=\"Quotation preview\"]"); if (f && this._fitDoc) this._fitDoc({ currentTarget: f }); }, 60); }), closeDoc: () => this.setState({ docFull: false }), phoneStep: phone && !st.home, cgPad: phone ? "2px 4px 0" : "10px 4px 0", cz: phone ? { pad: "0", h: "14.5px", meta: "none", add: "38px", r: "0", b: "0", bg: "transparent", sh: "none", plus: true, addRow: false, stepCols: "26px 24px 26px", stepH: "30px", cntW: "22px", cntH: "22px", cntP: "6px", cntBg: "#FFFFFF", rowPad: "12px 4px 12px 10px", hPad: "4px 4px 4px 10px", hPos: "sticky", hBg: "#EEEEEA", hR: "8px", hMargin: "10px 0 2px", swapBg: "transparent" } : { pad: "18px", h: "19px", meta: "block", add: "44px", r: "14px", b: "1px solid rgba(20,20,18,.05)", bg: "#FFFFFF", sh: "0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)", plus: false, addRow: true, stepCols: "32px 28px 32px", stepH: "34px", cntW: "0", cntH: "auto", cntP: "0", cntBg: "transparent", rowPad: "12px 0", hPad: "0", hPos: "static", hBg: "transparent", hR: "0", hMargin: "0 0 2px", swapBg: "#F0F0ED" }, svCard: phone ? { r: "0", b: "0", bg: "transparent", m: "-20px", ar: "4/3", ir: "0", thumbs: "none", bedLbl: "none", segFlex: "1 1 100%" } : { r: "14px", b: "1px solid #E7E7E2", bg: "#FFFFFF", m: "0", ar: "16/10", ir: "0", thumbs: "flex", bedLbl: "inline", segFlex: "0 0 auto" }, mainPad: phone ? "8px 20px 28px" : "20px 28px 36px", appNavD: (phone && !st.home) || /embed=1/.test(location.search) ? "none" : "block", phoneHome: phone && !!st.home, phoneFooterD: phone && st.home ? "none" : "block", homeNew: () => { this.setState({ home: false }); if (this._newQuote) this._newQuote(); }, chgTxt: phone ? "none" : "inline", chgIco: phone ? "block" : "none", chgPad: phone ? "4px" : "14px", thumbD: phone ? "none" : "flex", priceIn: phone ? "block" : "none", nameBasis: phone ? "140px" : "160px", stGridD: phone ? "none" : "grid", stWrap: phone ? { tc: "none", flow: "column", col: "38%", ox: "auto", m: "-20px", p: "20px", desc: "none" } : { tc: "repeat(auto-fill,minmax(min(100%,190px),1fr))", flow: "row", col: "auto", ox: "visible", m: "0", p: "0", desc: "block" }, inH: phone ? "50px" : "42px", phoneDrafts: phone && !!st.draftsOpen, stopProp: e => e.stopPropagation(), secPad: phone ? "0" : "18px", secBorder: phone ? "0" : "1px solid rgba(20,20,18,.05)", secBg: phone ? "transparent" : "#FFFFFF", secShadow: phone ? "none" : "0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)",
       sizeWrap: phone ? { tc: "none", d: "grid", flow: "column", col: "62%", ox: "auto", m: "-20px", p: "20px" } : { tc: "repeat(auto-fill,minmax(min(100%,220px),1fr))", d: "grid", flow: "row", col: "auto", ox: "visible", m: "0", p: "0" }, frameMax: vp === "phone" ? "430px" : "none",
-      ...(() => { const ws = this.wsMod, me = this.props.user || { id: "", name: "" }, ini = n => String(n || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase();
+      ...(() => { const ws = null /* the prototype's account switcher; Profile here */, me = this.props.user || { id: "", name: "" }, ini = n => String(n || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase();
         return { userName: me.name, userInitials: ini(me.name), acctOpen: !!this.state.acctOpen,
           toggleAcct: () => this.props.onNav && this.props.onNav("Profile"), closeAcct: () => this.setState({ acctOpen: false }),
           acctList: ws ? ws.users().map(u => ({ name: u.name, initials: ini(u.name), on: u.id === me.id, bg: u.id === me.id ? "#F2F2EF" : "transparent", avBg: u.id === me.id ? "#F5871F" : "#EEEEEA", pick: () => { this.setState({ acctOpen: false }); ws.setUser(u.id); } })) : [],
           addAcct: e => { e.preventDefault(); const n = e.target.nm.value; if (ws && ws.addUser(n)) this.setState({ acctOpen: false }); } }; })(),
       dateLine: `${DAYS[d.getDay()].toUpperCase()} ${d.getDate()} ${MONTHS[d.getMonth()].toUpperCase()} ${d.getFullYear()}`,
-      deskNav: [["Today", ICON.home], ["Insight", ICON.chart], ["Quote", ICON.quoteDesk], ["Workspace", "M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15 9h.01"], ["Arena", ICON.trophy], ["Profile", ICON.user]].map(([label, dd]) => { const on = label === "Workspace" ? !!this.state.wsOpen : label === "Quote" && !this.state.wsOpen; return { label, d: dd, bg: on ? "#F5871F" : "transparent", color: on ? "#111111" : "#A3A3A3", weight: on ? 650 : 550, go: label === "Workspace" ? () => this.setState({ wsOpen: true }) : label === "Quote" ? () => this.setState({ wsOpen: false }) : undefined }; }),
-      wsOpen: !!this.state.wsOpen, openWs: () => this.setState({ wsOpen: true }), closeWs: () => { this.setState({ wsOpen: false }); this.loadDrive(); },
-      wsStyles: ((this.cfg && this.cfg.styles) || []).map(x => ({ id: x.id, label: x.name })), wsStyleId: this.state.styleId || (((this.cfg && this.cfg.styles) || [])[0] || {}).id || "",
-      wsFurniture: [...new Set(((this.state.data && this.state.data.packages) || []).flatMap(p => p.cats.flatMap(c => c.items.map(i => i.name))))].sort().map(nm => ({ id: nm, name: nm })),
-      wsKey: this.wsKey(), wsLabel: this.wsLabel(), wsCount: String(this.state.wsCount || 0),
-      wsStyle: (((this.state.data && this.state.data.packages) || []).find(p => p.id === this.state.pid) || {}).name || "",
-      wsItems: (this.state.lines || []).map(l => ({ id: String(l.id), name: String(l.name || "") })),
+      deskNav: [["Today", ICON.home], ["Insight", ICON.chart], ["Quote", ICON.quoteDesk], ["Arena", ICON.trophy], ["Profile", ICON.user]].map(([label, dd]) => { const on = label === "Quote"; return { label, d: dd, bg: on ? "#F5871F" : "transparent", color: on ? "#111111" : "#A3A3A3", weight: on ? 650 : 550, go: undefined }; }),
       navLeft: [{ label: "Today", d: ICON.home }, { label: "Insight", d: ICON.chart }].map(n => ({ ...n, go: () => this.props.onNav && this.props.onNav(n.label) })),
       navRight: [{ label: "Arena", d: ICON.trophy }, { label: "Profile", d: ICON.user }].map(n => ({ ...n, go: () => this.props.onNav && this.props.onNav(n.label) })),
       deskAside: desk && !this.props.inApp, deskHeader: desk && !this.props.inApp, rootH: this.props.rootH || "100vh", canSettings: !!this.props.canSettings, settingsHref: "#",
@@ -655,7 +639,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       draftBadge: st.draftId ? "Draft · saved " + new Date(st.draftAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "",
       ...(() => { const ds = this.drafts(); return { draftCount: ds.length || false, noDrafts: !ds.length,
         newQuote: this._newQuote = () => { this.setState({ draftId: null, draftAt: null, draftsOpen: false, step: 1, cust: { att: "", bill: "", building: "", unit: "", date: todayIso(), by: st.cust.by }, crm: {}, crmId: null, extra: {}, sigs: {}, discount: "", withMood: false, selOpen: null }); const g = st.data && st.data.groups[0]; if (g) this.load(g.classic || g.build);  },
-        homeList: (st.homeAll ? ds : ds.slice(0, 4)).map(d => ({ name: d.name, total: rm0(d.total || 0), meta: [d.room, "Step " + (d.s.step || 1) + "/5", new Date(d.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })].filter(Boolean).join(" · "), open: () => this.openDraft(d), delIcon: st.armDraft === d.id ? "Delete?" : "✕", remove: () => { if (st.armDraft !== d.id) { this.setState({ armDraft: d.id }); return; } irqStorage.setItem(this.draftKey(), JSON.stringify(this.drafts().filter(x => x.id !== d.id))); this.setState({ armDraft: null }); } })), homeMore: ds.length > 4 ? { label: st.homeAll ? "Show less" : "See all " + ds.length, toggle: () => this.setState(z => ({ homeAll: !z.homeAll })) } : false, homeDraftN: ds.length + (ds.length === 1 ? " draft" : " drafts"), homeHello: "Hi, " + ((this.wsMod && this.wsMod.currentUser().name) || "there"), draftList: ds.map(d => ({ ini: String(d.name || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase(), room: d.room || "", when: new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }), bars: [1, 2, 3, 4, 5].map(k => ({ bg: k <= (d.s.step || 1) ? "#F5871F" : "#E7E7E2" })), delIcon: st.armDraft === d.id ? "Delete?" : "✕", name: d.name, total: rm0(d.total || 0), sub: [d.room, "Step " + (d.s.step || 1), new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · "), bg: d.id === st.draftId ? "#FFEBD9" : "transparent",
+        homeList: (st.homeAll ? ds : ds.slice(0, 4)).map(d => ({ name: d.name, total: rm0(d.total || 0), meta: [d.room, "Step " + (d.s.step || 1) + "/5", new Date(d.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })].filter(Boolean).join(" · "), open: () => this.openDraft(d), delIcon: st.armDraft === d.id ? "Delete?" : "✕", remove: () => { if (st.armDraft !== d.id) { this.setState({ armDraft: d.id }); return; } irqStorage.setItem(this.draftKey(), JSON.stringify(this.drafts().filter(x => x.id !== d.id))); this.setState({ armDraft: null }); } })), homeMore: ds.length > 4 ? { label: st.homeAll ? "Show less" : "See all " + ds.length, toggle: () => this.setState(z => ({ homeAll: !z.homeAll })) } : false, homeDraftN: ds.length + (ds.length === 1 ? " draft" : " drafts"), homeHello: "Hi, " + ((this.props.user && this.props.user.name) || "there"), draftList: ds.map(d => ({ ini: String(d.name || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase(), room: d.room || "", when: new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }), bars: [1, 2, 3, 4, 5].map(k => ({ bg: k <= (d.s.step || 1) ? "#F5871F" : "#E7E7E2" })), delIcon: st.armDraft === d.id ? "Delete?" : "✕", name: d.name, total: rm0(d.total || 0), sub: [d.room, "Step " + (d.s.step || 1), new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · "), bg: d.id === st.draftId ? "#FFEBD9" : "transparent",
           open: () => this.openDraft(d), delLabel: st.armDraft === d.id ? "Delete?" : "Delete",
           remove: () => { if (st.armDraft !== d.id) { this.setState({ armDraft: d.id }); return; } irqStorage.setItem(this.draftKey(), JSON.stringify(this.drafts().filter(x => x.id !== d.id))); this.setState(s => ({ armDraft: null, ...(s.draftId === d.id ? { draftId: null, draftAt: null } : {}) })); } })) }; })(),
       exportsDesk: [

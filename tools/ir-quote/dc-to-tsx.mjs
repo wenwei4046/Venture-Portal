@@ -25,7 +25,6 @@ const FILES = [
   ["IR Quote v10.dc.html", "QuoteTpl"],
   ["Quote Settings v4.dc.html", "SettingsTpl"],
   ["Quote Settings Mobile.dc.html", "SettingsMobileTpl"],
-  ["Workspace.dc.html", "WorkspaceTpl"],
 ];
 
 // ── where the app takes over from the prototype ──
@@ -55,6 +54,11 @@ const PATCHES = {
     // The Change item sheet's header shows the item being replaced (the user, 2026-11-06), drawn as the list's own photos.
     ['<div style="min-width:0">\n              <p style="margin:0;font-size:11.5px;font-weight:650;letter-spacing:.08em;color:#111111">{{ sheet.eyebrow }}', '<div style="min-width:0;display:flex;align-items:flex-start;gap:12px"><sc-if value="{{ sheet.img }}" hint-placeholder-val="{{ false }}"><span onClick="{{ sheet.zoom }}" title="View larger" style="position:relative;flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:#EEEEEA url(\'{{ sheet.img }}\') center/cover no-repeat;cursor:zoom-in"><span style="position:absolute;right:3px;bottom:3px;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.92);display:grid;place-items:center;box-shadow:0 1px 3px rgba(20,20,18,0.15)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#34342F" strokeWidth="2.4" strokeLinecap="round"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3M11 8v6M8 11h6"></path></svg></span></span></sc-if><div style="min-width:0">\n              <p style="margin:0;font-size:11.5px;font-weight:650;letter-spacing:.08em;color:#111111">{{ sheet.eyebrow }}'],
     ['{{ staleText }}</p></sc-if>\n            </div>\n            <button aria-label="Close" onClick="{{ closeSheet }}"', '{{ staleText }}</p></sc-if>\n            </div></div>\n            <button aria-label="Close" onClick="{{ closeSheet }}"'],
+    // The bar's round Quote button rises above the bar whole, as Fair's does: Home's page (z-index 25) covered its top half
+    // (the user, 2026-11-09, a phone screenshot: "overlap了"). Above Home only — toasts (30) and sheets stay over it.
+    ['<nav style="flex:0 0 auto;display:{{ appNavD }};', '<nav style="position:relative;z-index:26;flex:0 0 auto;display:{{ appNavD }};'],
+    // No Drive on the quote (the user, 2026-11-09: "drive 是不是没有用处了？没有的话可以删掉"): photos are Quote Settings'.
+    ["      <sc-if value=\"{{ wsOpen }}\" hint-placeholder-val=\"{{ false }}\">\n        <div style=\"position:absolute;inset:0;z-index:30;background:#F7F7F5;display:block\">\n          <dc-import name=\"Workspace\" board-key=\"{{ wsKey }}\" quote-label=\"{{ wsLabel }}\" items=\"{{ wsItems }}\" pkg-style=\"{{ wsStyle }}\" styles=\"{{ wsStyles }}\" active-style=\"{{ wsStyleId }}\" furniture=\"{{ wsFurniture }}\" on-close=\"{{ closeWs }}\" hint-size=\"100%,100%\" style=\"display:block;width:100%;height:100%\"></dc-import>\n        </div>\n      </sc-if>\n", ""],
     // Sales upload no picture of their own: an image section shows the Principal's, with no Upload / Remove (the user, 2026-11-09).
     ['<label style="display:flex;align-items:center;height:36px;padding:0 14px;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;font-size:13px;font-weight:650;color:#1F1F1C;cursor:pointer">Upload image<input type="file" accept="image/*" onChange="{{ xf.onUpload }}" style="display:none"></label>\n      <sc-if value="{{ xf.hasImg }}" hint-placeholder-val="{{ false }}"><button onClick="{{ xf.clear }}" style="height:36px;padding:0 10px;border:0;background:transparent;color:#8A2E1C;font-size:13px;font-weight:650">Remove</button></sc-if>',
      '<sc-if value="{{ xf.canUpload }}" hint-placeholder-val="{{ false }}"><label style="display:flex;align-items:center;height:36px;padding:0 14px;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;font-size:13px;font-weight:650;color:#1F1F1C;cursor:pointer">Upload image<input type="file" accept="image/*" onChange="{{ xf.onUpload }}" style="display:none"></label>\n      <sc-if value="{{ xf.hasImg }}" hint-placeholder-val="{{ false }}"><button onClick="{{ xf.clear }}" style="height:36px;padding:0 10px;border:0;background:transparent;color:#8A2E1C;font-size:13px;font-weight:650">Remove</button></sc-if></sc-if>'],
@@ -78,15 +82,6 @@ const PATCHES = {
   ],
   "Quote Settings Mobile.dc.html": [
     ['<a href="#" aria-label="Back to Profile"', '<a href="#" onClick="{{ back }}" aria-label="Back to Profile"'],
-  ],
-  "Workspace.dc.html": [
-    // Fills the space the quote gives it. At a whole screen's height, under the app's header, its foot ran off the screen (the user, 2026-11-06).
-    ['height:100%;min-height:100vh;display:flex;overflow:hidden;background:#F7F7F5', 'height:100%;min-height:0;display:flex;overflow:hidden;background:#F7F7F5'],
-    // A phone's viewer: the rooms take a row of their own; among the buttons, many rooms ran under them (the user, 2026-11-06).
-    ['<div style="flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:14px 18px 10px 24px">', '<div data-ws-bar="" style="flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:14px 18px 10px 24px">'],
-    ['<div style="flex:1;min-width:0;display:flex;gap:4px;justify-content:center;overflow-x:auto">', '<div data-ws-chapters="" style="flex:1;min-width:0;display:flex;gap:4px;justify-content:center;overflow-x:auto">'],
-    // The pin: this photo comes first (the user, 2026-11-06).
-    ['<button onClick="{{ im.remove }}" title="Delete photo"', '<button onClick="{{ im.pin }}" title="{{ im.pinTitle }}" aria-label="{{ im.pinTitle }}" style="position:absolute;left:8px;bottom:8px;width:28px;height:28px;padding:0;border-radius:14px;border:0;background:{{ im.pinBg }};color:{{ im.pinInk }};display:grid;place-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 17v5M5 3h14l-2 7 3 4H4l3-4z"></path></svg></button><button onClick="{{ im.remove }}" title="Delete photo"'],
   ],
 };
 
@@ -353,7 +348,7 @@ const base = [
   rules,
 ].join("\n");
 const sheets = {
-  QUOTE: [globalsOf("IR Quote v10.dc.html"), globalsOf("Workspace.dc.html").replace(/\.irq-root\{[^}]*\}/g, "")],
+  QUOTE: [globalsOf("IR Quote v10.dc.html")],
   SETTINGS: [globalsOf("Quote Settings v4.dc.html")],
   SETTINGS_MOBILE: [globalsOf("Quote Settings Mobile.dc.html")],
 };

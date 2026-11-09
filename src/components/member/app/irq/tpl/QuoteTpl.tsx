@@ -435,16 +435,6 @@ export function renderQuote(v: DcVals, C: DcComponents) {
             {"\n      "}
           </>) : null}
           {"\n      "}
-          {(v["wsOpen"]) ? (<>
-            {"\n        "}
-            <div style={{"position":"absolute","inset":"0","zIndex":"30","background":"var(--irq-c-f7f7f5)","display":"block"}}>
-              {"\n          "}
-              <C.Workspace boardKey={v["wsKey"]} quoteLabel={v["wsLabel"]} items={v["wsItems"]} pkgStyle={v["wsStyle"]} styles={v["wsStyles"]} activeStyle={v["wsStyleId"]} furniture={v["wsFurniture"]} onClose={v["closeWs"]} hostStyle={dcCss(`display:block;width:100%;height:100%`)} />
-              {"\n        "}
-            </div>
-            {"\n      "}
-          </>) : null}
-          {"\n      "}
           <main style={{"flex":"1","minWidth":"0","overflowY":"auto","overflowX":"hidden","background":"var(--irq-c-f7f7f5)"}}>
             {"\n        "}
             <div style={dcCss(`max-width:1200px;margin:0 auto;padding:${dcS(v["mainPad"])};display:flex;flex-direction:column;gap:14px;box-sizing:border-box`)}>
@@ -2195,7 +2185,7 @@ export function renderQuote(v: DcVals, C: DcComponents) {
             {"\n      "}
           </div>
           {"\n      "}
-          <nav style={dcCss(`flex:0 0 auto;display:${dcS(v["appNavD"])};background:var(--irq-c-ffffff);border-top:1px solid var(--irq-c-e7e7e2);padding-bottom:var(--safe-bottom)`)}>
+          <nav style={dcCss(`position:relative;z-index:26;flex:0 0 auto;display:${dcS(v["appNavD"])};background:var(--irq-c-ffffff);border-top:1px solid var(--irq-c-e7e7e2);padding-bottom:var(--safe-bottom)`)}>
             {"\n        "}
             <div style={{"display":"grid","gridTemplateColumns":"repeat(5,minmax(0,1fr))","alignItems":"end","height":"62px","padding":"0 4px"}}>
               {"\n          "}

@@ -1,20 +1,16 @@
 "use client";
 // IR Quote (2026-11-05): what the ported prototype modules need from the app — who is signed in, where a photo goes,
-// how a Drive folder is kept. Set by the screen before its logic mounts (`IrQuoteScreen`).
+// (the Drive went 2026-11-09). Set by the screen before its logic mounts (`IrQuoteScreen`).
 import { createClient } from "@/lib/supabase/client";
 import { fileRoute } from "@/lib/storage/browser";
-
-type SaveBoard = (id: string, board: unknown) => Promise<void>;
 
 export const irqEnv: {
   user: { id: string; name: string };
   readOnly: boolean;
-  saveBoard: SaveBoard;
   onError: (message: string) => void;
 } = {
   user: { id: "", name: "" },
   readOnly: false,
-  saveBoard: async () => {},
   onError: () => {},
 };
 
@@ -41,7 +37,7 @@ export async function uploadDataUrl(src: string, scope: "config" | "drive"): Pro
   return url;
 }
 
-/** Every data: picture inside a value (a Drive folder, the settings), moved to the app's files — the rest as it is. */
+/** Every data: picture inside a value (a draft, the settings), moved to the app's files — the rest as it is. */
 export async function uploadPictures<T>(value: T, scope: "config" | "drive"): Promise<T> {
   const walk = async (v: unknown): Promise<unknown> => {
     if (typeof v === "string") return v.startsWith("data:image/") ? uploadDataUrl(v, scope) : v;
