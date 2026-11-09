@@ -249,6 +249,7 @@ ftSaveOrApply
 history
 ibCols
 infoAudit
+infoAuditOpen
 infoBack
 infoBackLabel
 infoChat

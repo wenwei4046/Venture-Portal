@@ -206,13 +206,75 @@ function SalesTable2({ s, head }: { s: S2; head: ReactNode }) {
   );
 }
 
+/**
+ * The overall report (the owner, 2026-11-09): each ad and its leads, under it who has them now with their leads and average
+ * reply, and a person opened lists their customers — status, average reply, the ad, and Open chat. Ads open at first.
+ */
+const OV_COLS = "minmax(0,1fr) 90px 130px";
+function Overview({ o }: { o: R["overview"] }) {
+  const [shut, setShut] = useState<Record<string, boolean>>({});
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const head: CSSProperties = { font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" };
+  const num: CSSProperties = { textAlign: "right", fontVariantNumeric: "tabular-nums" };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", border: "1px solid var(--crm-rule)", borderRadius: "12px", background: "#fff", overflow: "hidden" }}>
+      <div style={{ display: "grid", gridTemplateColumns: OV_COLS, gap: "12px", alignItems: "center", padding: "12px 18px", borderBottom: "1px solid var(--crm-rule)", background: "var(--crm-cream-nav)" }}>
+        <span style={head}>Ad · salesperson <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "var(--crm-muted)" }}>· {o.count}</span></span>
+        <span style={{ ...head, ...num }}>Leads</span><span style={{ ...head, ...num }}>Average reply</span>
+      </div>
+      {!o.ads.length && <span style={{ padding: "28px", textAlign: "center", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>No leads in this period</span>}
+      {o.ads.map(a => (
+        <div key={a.key} style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--crm-rule)" }}>
+          <button type="button" onClick={() => setShut(x => ({ ...x, [a.key]: !x[a.key] }))} aria-expanded={!shut[a.key]} style={{ ...BTN, display: "grid", gridTemplateColumns: OV_COLS, gap: "12px", alignItems: "center", padding: "12px 18px", background: "var(--crm-sum)" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, font: "600 14px Inter, sans-serif", color: "var(--crm-ink)" }}>
+              <span style={{ display: "flex", color: "var(--crm-faint)", transform: shut[a.key] ? "none" : "rotate(90deg)", transition: "transform .15s" }}><Ic name="chevron-right" size={14} /></span>
+              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
+            </span>
+            <span style={{ ...num, font: "600 14px Inter, sans-serif" }}>{a.n}</span>
+            <span style={{ ...num, font: "500 13px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>{a.avg}</span>
+          </button>
+          {!shut[a.key] && a.people.map(p => { const k = `${a.key}|${p.id}`;
+            return (
+              <div key={k} style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--crm-rule-2)" }}>
+                <button type="button" onClick={() => setOpen(x => ({ ...x, [k]: !x[k] }))} aria-expanded={!!open[k]} style={{ ...BTN, display: "grid", gridTemplateColumns: OV_COLS, gap: "12px", alignItems: "center", padding: "10px 18px 10px 40px" }} className="crm4a-row">
+                  <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, font: "500 13.5px Inter, sans-serif", color: p.id ? "var(--crm-ink)" : "var(--crm-muted)" }}>
+                    <span style={{ display: "flex", color: "var(--crm-faint)", transform: open[k] ? "rotate(90deg)" : "none", transition: "transform .15s" }}><Ic name="chevron-right" size={13} /></span>{p.name}
+                  </span>
+                  <span style={{ ...num, font: "500 13.5px Inter, sans-serif" }}>{p.n}</span>
+                  <span style={{ ...num, font: "500 13px Inter, sans-serif", color: p.late ? "var(--crm-oxblood)" : "var(--crm-ink-soft)" }}>{p.avg}</span>
+                </button>
+                {open[k] && (
+                  <div style={{ display: "flex", flexDirection: "column", padding: "0 18px 10px 64px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) 120px 110px minmax(0,1fr) 96px", gap: "12px", alignItems: "center", height: "30px", ...head }}>
+                      <span>Customer</span><span>Status</span><span style={num}>Average reply</span><span>Ad source</span><span />
+                    </div>
+                    {p.customers.map(x => (
+                      <div key={x.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) 120px 110px minmax(0,1fr) 96px", gap: "12px", alignItems: "center", minHeight: "40px", borderTop: "1px solid var(--crm-rule-2)", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)" }}>
+                        <span style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.name}</span>
+                        <span style={{ justifySelf: "start", height: "22px", padding: "0 9px", borderRadius: "11px", display: "inline-flex", alignItems: "center", background: "var(--crm-field)", font: "600 11.5px Inter, sans-serif", whiteSpace: "nowrap" }}>{x.status}</span>
+                        <span style={{ ...num, color: "var(--crm-ink-soft)" }}>{x.avg}</span>
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-muted)" }} title={x.ad}>{x.ad}</span>
+                        <button type="button" onClick={x.open} style={{ ...BTN, justifySelf: "end", height: "30px", padding: "0 12px", borderRadius: "15px", background: "var(--crm-rust)", color: "#fff", font: "500 12.5px Inter, sans-serif", textAlign: "center", whiteSpace: "nowrap" }} className="crm4a-primary">Open chat</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ); })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function DeskReports({ r, lba }: { r: R; ads?: AdsV; lba: LbaV }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px", minWidth: 0, paddingTop: r.cat === "ads" || r.cat === "lba" ? 0 : "16px" }}>
       {r.picker && <DateRangePicker value={r.picker.value} onApply={r.picker.apply} onCancel={r.picker.cancel} />}
       {/* Ads performance (v2 frame 12) is Ads Performance's own body — toolbar, chart, table, pager — drawn by kAdsPerf. */}
       {r.cat === "lba" && <DeskLeadsByAd v={lba} />}
-      {(r.cat === "appt" || r.cat === "src") && <Seg opts={r.periods} />}
+      {(r.cat === "appt" || r.cat === "src" || r.cat === "overview") && <Seg opts={r.periods} />}
+      {r.cat === "overview" && <Overview o={r.overview} />}
       {r.cat === "sales" && <SalesTable2 s={r.sales2} head={<div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}><Seg opts={r.periods} /><span style={{ width: "1px", height: "20px", background: "var(--crm-line)" }} /><Seg opts={r.sales2.teams.map(t => ({ ...t, label: t.label, dot: t.dot }))} /></div>} />}
       {r.cat === "appt" && (<><Tiles tiles={r.appt.tiles} /><Cards cards={r.appt.cards} /></>)}
       {r.cat === "src" && (<><Tiles tiles={r.src.tiles} /><AdsTable a={r.src.ads} /><Cards cards={r.src.cards} /></>)}

@@ -6,6 +6,7 @@
  * other photos and videos), a video shows its first frame with a play button and plays full screen in the viewer.
  * Later the same day: four or more photos / videos sent together are one album (MediaAlbum), a PDF shows its first page
  * (PdfCard), a voice note is WhatsApp's voice bubble (VoiceNote) — shared/chat-media-parts.tsx, imported by the generators.
+ * A missed Messenger call is CallCard (2026-11-09).
  * And a photo / video is ChatImg / ChatVideo: drawn from the phone's kept copy when there is one (shared/media-cache.ts).
  */
 module.exports =

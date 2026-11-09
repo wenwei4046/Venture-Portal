@@ -95,6 +95,49 @@ export function Phone4aStatusPick({ cols }: { cols: { title: string; c: string; 
   );
 }
 
+/**
+ * The Team inbox's whose-chats dropdown (the owner, 2026-11-09: "inbox 中的人员，做筛选"): All, each team and, under it, its
+ * people, each with their chats — one pick filters the board. Drawn as the status dropdown under it.
+ */
+export function Phone4aWhoPick({ v }: { v: { label: string; dot: string; n: number; all: { n: number; on: boolean; pick: () => void };
+  groups: { key: string; label: string; dot: string; n: number; on: boolean; pick: () => void; people: { key: string; label: string; n: number; on: boolean; pick: () => void }[] }[] } }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const on = (e: Event) => { if (!(e.target as Element | null)?.closest?.("[data-who-pick]")) setOpen(false); };
+    document.addEventListener("click", on);
+    return () => document.removeEventListener("click", on);
+  }, [open]);
+  const row = (on: boolean, pad: string): CSSProperties => ({ ...BTN, flex: "none", minHeight: "44px", padding: `0 10px 0 ${pad}`, borderRadius: "8px", display: "flex", alignItems: "center", gap: "10px", fontSize: fs(14), fontWeight: on ? 600 : 400, background: on ? "var(--crm-field)" : "transparent", textAlign: "left" });
+  const n = (x: number) => <span style={{ color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{x}</span>;
+  const pick = (f: () => void) => () => { f(); setOpen(false); };
+  return (
+    <div data-who-pick="" style={{ flex: "none", position: "relative", zIndex: 7 }}>
+      <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label={`Showing: ${v.label}`} onClick={() => setOpen(o => !o)}
+        style={{ ...BTN, width: "100%", height: "44px", padding: "0 14px", boxSizing: "border-box", borderRadius: "12px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "8px", fontSize: fs(14), fontWeight: 500 }}>
+        <Ic name="users" size={15} /><span style={{ color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.label}</span>
+        <span style={{ flex: 1, color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums", textAlign: "left" }}>{v.n}</span>
+        <Ic name="chevron-down" size={14} />
+      </button>
+      {open && (
+        <div role="listbox" aria-label="Whose chats" style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 8, padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "12px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", maxHeight: "60vh", overflowY: "auto" }}>
+          <button type="button" role="option" aria-selected={v.all.on} onClick={pick(v.all.pick)} style={row(v.all.on, "10px")}><span style={{ flex: 1 }}>All</span>{n(v.all.n)}</button>
+          {v.groups.map(g => (
+            <div key={g.key} style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--crm-rule-2)", marginTop: "4px", paddingTop: "4px" }}>
+              <button type="button" role="option" aria-selected={g.on} onClick={pick(g.pick)} style={row(g.on, "10px")}>
+                <span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: g.dot }} /><span style={{ flex: 1, fontWeight: 600 }}>{g.label}</span>{n(g.n)}
+              </button>
+              {g.people.map(p => (
+                <button key={p.key} type="button" role="option" aria-selected={p.on} onClick={pick(p.pick)} style={row(p.on, "28px")}><span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.label}</span>{n(p.n)}</button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Change list 18 · the chat's 34 px status strip: status and wait (oxblood on pale orange), the reply window on the right; grey when cold. */
 export function Phone4aStrip({ s }: { s: { cold: boolean; left: string; right: string; dot: string } }) {
   return (
@@ -153,6 +196,7 @@ export function Phone4aHero({ items, cols, compact }: { items: { label: string; 
 /** T01 (v3) · Team Insight's head: the avatar left, "Hello, …" and the line under it, the house right; then, for CRM ·
  * Manage, Team performance | Ads performance (the Ads side is the Ads Performance page drawn under this head). */
 export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: string; house: boolean; exit: () => void; sw: { ads: boolean; up: boolean; act?: boolean; canAds: boolean; canUp: boolean; canAct?: boolean; team: () => void; adsPick: () => void; upPick: () => void; actPick?: () => void } | null } }) {
+  // Order (the owner, 2026-11-09: "整理一下手机版的 insight 顺序; team-ads-up next-activity"): Team · Ads · Up next · Activity.
   // Up next's handoff: the words Team · Ads · Up next at 12 px, the one on show 600 — the old full names kept for a screen reader.
   const seg = (label: string, on: boolean, pick: () => void, aria?: string) => (
     <button type="button" onClick={pick} aria-pressed={on} aria-label={aria} style={{ ...BTN, flex: 1, height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs(12), fontWeight: on ? 600 : 500,
@@ -166,7 +210,7 @@ export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: s
       </span>
       {h.house && <button type="button" onClick={h.exit} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ ...BTN, flex: "none", width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}><Ic name="house" size={18} /></button>}
     </div>
-    {h.sw && <div style={{ flex: "none", display: "flex", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{seg("Team", !h.sw.ads && !h.sw.up && !h.sw.act, h.sw.team, "Team performance")}{h.sw.canAct && h.sw.actPick && seg("Activity", !!h.sw.act, h.sw.actPick, "Team activity")}{h.sw.canAds && seg("Ads", h.sw.ads, h.sw.adsPick, "Ads performance")}{h.sw.canUp && seg("Up next", h.sw.up, h.sw.upPick)}</div>}
+    {h.sw && <div style={{ flex: "none", display: "flex", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{seg("Team", !h.sw.ads && !h.sw.up && !h.sw.act, h.sw.team, "Team performance")}{h.sw.canAds && seg("Ads", h.sw.ads, h.sw.adsPick, "Ads performance")}{h.sw.canUp && seg("Up next", h.sw.up, h.sw.upPick)}{h.sw.canAct && h.sw.actPick && seg("Activity", !!h.sw.act, h.sw.actPick, "Team activity")}</div>}
   </>);
 }
 

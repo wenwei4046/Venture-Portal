@@ -91,7 +91,21 @@ export interface CrmChatMessage {
   theirReaction?: string;
   card?: CrmCard;
   media?: { kind: "image" | "video" | "audio" | "file"; url: string; name?: string; mime?: string };
+  /** A call the customer made that we missed (Messenger, 2026-11-09) — drawn as Messenger's missed call with Call back. */
+  call?: CrmMissedCall;
 }
+
+/**
+ * A customer's Messenger call (the owner, 2026-11-09: Ly Loong's empty 10:06 "这个是客户打了 miss call 进来，可以一摸一样显示在
+ * crm 中，业务能打回去"). Meta sends a Page no call event; the call reaches the webhook as a message with nothing in it, and the
+ * Graph API holds nothing for it either. A Page cannot place a Messenger call through the API, so Call back opens the
+ * conversation in Meta Business Suite (its call button calls them back on Messenger), and the customer's phone when known.
+ */
+export interface CrmMissedCall { thread: string; phone?: string }
+
+/** The customer's Messenger conversation in Meta Business Suite — on a phone it opens the Business Suite app. */
+export const businessSuiteThread = (page: string, psid: string) =>
+  `https://business.facebook.com/latest/inbox/all?asset_id=${encodeURIComponent(page)}&mailbox_id=${encodeURIComponent(page)}&selected_item_id=${encodeURIComponent(psid)}&thread_type=FB_MESSAGE`;
 
 export interface CrmDetails { type: string; size: string; loc: string; req: string; budget: string }
 
@@ -565,7 +579,12 @@ const MEDIA_LABEL: Record<string, string> = {
 const MEDIA_KIND: Record<string, NonNullable<CrmChatMessage["media"]>["kind"]> = { image: "image", sticker: "image", video: "video", audio: "audio", document: "file" };
 const lostReasons = new Set<string>(CRM_LOST_REASONS.map(r => r.value));
 
-export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
+/** What a customer's message the channel handed over empty reads as — in the chat and its inbox line. */
+export const unshownWords = (ch?: string | null) =>
+  ch === "whatsapp" ? "📎 Sent something WhatsApp does not pass on · see it on the WhatsApp Business app"
+    : "📎 Sent something Messenger does not pass on · see it in Meta Business Suite";
+
+export function chatMessage(row: CrmMessageRowX, channel?: string | null, who?: { page?: string | null; psid?: string | null; phone?: string | null }): CrmChatMessage {
   const label = MEDIA_LABEL[row.kind];
   // A file to show: WhatsApp's media id, our own copy of what we sent, or Messenger's address — all through our route.
   const shown = row.media_id || row.media_path || row.media_url ? MEDIA_KIND[row.kind] : undefined;
@@ -576,11 +595,17 @@ export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
   const text = row.kind === "template" || row.kind === "text" ? row.body ?? ""
     : fileName ? (caption && caption !== fileName ? caption : "")
     : shown ? row.body ?? "" : label ? (row.body ? `${label} · ${row.body}` : label) : row.body ?? "";
+  // A customer's message the channel handed over with nothing in it (the owner, 2026-11-09: "客户发的 attachment 又看不到了" —
+  // Ly Loong's 10:06 came from Messenger as its id alone, and Meta's own API holds no words, file or share for it: a post or
+  // reel Messenger does not pass to apps). It is named, never an empty bubble.
+  const unshown = row.direction === "in" && !shown && !text.trim() && !row.card;
   return {
     id: row.id,
     from: row.direction === "in" ? "lead" : "me",
     kind: row.kind,
-    text,
+    // Messenger: the empty message is a call (above); WhatsApp keeps the words.
+    text: unshown ? (channel === "messenger" ? "" : unshownWords(channel)) : text,
+    ...(unshown && channel === "messenger" && who?.page && who.psid ? { call: { thread: businessSuiteThread(who.page, who.psid), ...(who.phone ? { phone: who.phone } : {}) } } : {}),
     at: row.sent_at,
     ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: fileName || row.body || "Document", ...(row.media_mime ? { mime: row.media_mime } : {}) } : {}) } } : {}),
     ...(row.direction === "out" && row.status && row.status !== "received" ? { status: row.status } : {}),
@@ -627,7 +652,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     ...(row.lead_form && Array.isArray(row.lead_form.answers) ? { leadForm: { kind: row.lead_form.kind === "instant" ? "instant" as const : "messenger" as const, complete: row.lead_form.complete !== false,
       at: row.lead_form.at ?? null, answers: row.lead_form.answers.filter(x => x?.q).map(x => ({ q: String(x.q), a: String(x.a ?? "") })) } } : {}),
     detailsSaved: !!row.details_at,
-    messages: messages.filter(m => m.contact_id === row.id).sort((a, b) => a.sent_at.localeCompare(b.sent_at)).map(chatMessage),
+    messages: messages.filter(m => m.contact_id === row.id).sort((a, b) => a.sent_at.localeCompare(b.sent_at)).map(m => chatMessage(m, row.channel, { page: row.account_id, psid: row.external_id, phone: row.phone })),
   };
 }
 

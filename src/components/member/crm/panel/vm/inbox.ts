@@ -91,6 +91,18 @@ export function inboxVM(ctx: PanelCtx) {
       const on = who === id;
       return { label, on, n: all.filter(r => r.seat.id === f && (!id || r.c.assignedTo === id)).length, bg: on ? "var(--crm-ink)" : "transparent", fg: on ? "#fff" : "var(--crm-muted)", bd: on ? "var(--crm-ink)" : "var(--crm-line)", pick: () => set(u => ({ ...u, inbWho: id })) };
     }) : [],
+    // One dropdown for whose chats (the owner, 2026-11-09: "inbox 中的人员，做筛选" — the team chips ran off the screen and the
+    // people showed only after a team was picked): All, then each team (the Director's first) and its people, with counts.
+    inbWhoMenu: (() => {
+      const groups = chipDefs.filter(([id]) => id).map(([id, label, dot]) => {
+        const people = id === "hod" ? ctx.directors : ctx.teams.find(t => t.id === id)?.people ?? [];
+        return { key: id, label, dot, n: all.filter(r => r.seat.id === id).length, on: f === id && !who, pick: () => set(u => ({ ...u, inbTeam: id, inbWho: "" })),
+          people: people.map(p => ({ key: p.id, label: p.name, n: all.filter(r => r.c.assignedTo === p.id).length, on: who === p.id, pick: () => set(u => ({ ...u, inbTeam: id, inbWho: p.id })) })) };
+      });
+      const g = groups.find(x => x.key === f), p = g?.people.find(x => x.key === who);
+      return { label: p ? p.label : g ? g.label : "All", dot: g ? g.dot : "var(--crm-ink)", n: list.length,
+        all: { n: all.length, on: !f && !who, pick: () => set(u => ({ ...u, inbTeam: "", inbWho: "" })) }, groups };
+    })(),
     // All first, and where the board opens (the owner, 2026-11-09: "All 要能看完全部的咨询" — it opened on New alone).
     inbCols: withAll(list, ui.inbCol ?? 0, i => set(u => ({ ...u, inbCol: i })), (([["new", "New"], ["need", "Attention"], ["fup", "Follow up"], ["appt", "Appointment"], ["won", "Won"], ["lost", "Lost"], ["cold", "Cold leads"], ["blocked", FB_BLOCKED_CATEGORY]] as const).map(([k, t]) => [k, t, STATUS[t].dot, STATUS[t].tint] as const))
       .map(([k, title, c, bg], i) => { const rows = list.filter(r => col(r) === k); return { title, c, bg, n: rows.length, rows, empty: !rows.length, on: (ui.inbCol ?? 0) === i + 1, hot: k === "need",

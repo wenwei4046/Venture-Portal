@@ -28,10 +28,14 @@ export function PhoneTeamActivity({ a, top }: { a: PhoneActivityIn; top?: ReactN
   return <PhoneTeamActivityView v={v} top={top} />;
 }
 
+/** The fold, kept with the page's filters across a chat (use-team-activity.ts). */
+const GREY = { open: false };
+
 export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNode }) {
   // The owner, 2026-11-09: the greyed people (out of today's turn with no leads) go to the bottom, folded at first; Custom is
   // one centred line of dates on the CRM's own picker (the phone's native one was large and dark).
-  const [greyOpen, setGreyOpen] = useState(false), [pick, setPick] = useState(false);
+  const [greyOpen, setGrey] = useState(GREY.open), [pick, setPick] = useState(false);
+  const setGreyOpen = (f: (o: boolean) => boolean) => setGrey(o => (GREY.open = f(o)));
   const active = v.pRows.filter(r => r.op === 1), grey = v.pRows.filter(r => r.op !== 1);
   const iso = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const at = (s: string, end: boolean) => { const [y, m, d] = s.split("-").map(Number); return end ? new Date(y, m - 1, d, 23, 59, 59, 999).getTime() : new Date(y, m - 1, d).getTime(); };
@@ -87,6 +91,13 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
             <Chev style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "var(--crm-muted)" }} />
           </span>
         </div>
+        {/* All ads, or one ad's leads (the owner, 2026-11-09: "加入可以筛选广告"). */}
+        <span style={{ position: "relative", flex: "none", height: "40px", borderRadius: "20px", background: v.adOn ? "var(--crm-tint-attention)" : "var(--crm-field)", display: "flex", alignItems: "center" }}>
+          <select value={v.adVal} onChange={v.setAd} aria-label="Ad" style={{ appearance: "none", WebkitAppearance: "none", width: "100%", minWidth: 0, height: "40px", padding: "0 32px 0 14px", border: 0, background: "transparent", font: `500 ${fs(13.5)} ${INTER}`, color: v.adOn ? "var(--crm-rust)" : "var(--crm-ink)", cursor: "pointer", outline: "none", textOverflow: "ellipsis" }}>
+            {v.ads.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+          </select>
+          <Chev style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "var(--crm-muted)" }} />
+        </span>
         {v.isCustom && (
           <span {...press(() => setPick(true))} style={{ alignSelf: "center", flex: "none", height: "36px", padding: "0 16px", borderRadius: "18px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "8px", font: `500 ${fs(13)} ${INTER}`, color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }}>
             {rangeWords(v.cFrom, v.cTo)}<Chev style={{ color: "var(--crm-muted)" }} />
@@ -94,9 +105,10 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
         )}
         {pick && <DateRangePicker sheet value={{ a: at(v.cFrom, false), b: at(v.cTo, true) }} onCancel={() => setPick(false)}
           onApply={r => { v.setFrom({ target: { value: iso(r.a) } }); v.setTo({ target: { value: iso(r.b) } }); setPick(false); }} />}
-        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", padding: "4px 0 6px" }}>
+        {/* Centred, each figure over its word, on the desktop figures' band (the owner, 2026-11-09: "置中" — "Came" ran off the edge). */}
+        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", padding: "12px 0", borderRadius: "12px", background: "var(--crm-sum)" }}>
           {v.pTiles.map(t => (
-            <div key={t.k} style={{ display: "flex", flexDirection: "column", gap: "5px", minWidth: 0 }}>
+            <div key={t.k} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", minWidth: 0, textAlign: "center" }}>
               <span style={{ font: `500 ${fs(22)} ${TIGHT}`, letterSpacing: "-0.02em", lineHeight: 1, color: t.c }}>{v.loading ? "—" : t.v}</span>
               <span style={{ fontSize: fs(11), color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{t.k}</span>
             </div>

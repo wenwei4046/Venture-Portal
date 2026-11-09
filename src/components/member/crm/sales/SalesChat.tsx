@@ -9,7 +9,7 @@ import H from "../crm.module.css";
 import ChatComposer from "./ChatComposer";
 import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
-import { ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
+import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import { Phone4aBookMode, Phone4aCustomBook, Phone4aKeepHeight, Phone4aRoomRemarks, Phone4aStrip } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { ChatVM } from "./vm/chat";

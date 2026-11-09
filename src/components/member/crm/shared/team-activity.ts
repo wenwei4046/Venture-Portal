@@ -23,6 +23,8 @@ export interface ActivityUi {
   team: string; who: string | null; menu: boolean; per: Period; from: string; to: string;
   open: Record<string, boolean>; lead: { id: string; key: string } | null; sort: { k: SortKey; d: 1 | -1 } | null;
   pMenu: boolean; pOpen: Record<string, boolean>; pLead: { id: string; key: string } | null;
+  /** The ad shown ("all", an ad's id, or "none" = leads from no ad) — the owner, 2026-11-09: "加入可以筛选广告". */
+  ad?: string;
 }
 type SortKey = "leads" | "avg" | "waitMax" | "appt" | "show";
 
@@ -95,7 +97,17 @@ export function activityVM(x: ActivityIn) {
   const LV = (m: number): [string, string] => m >= S.replyOverdueH * 60 ? ["Overdue", C.oxblood] : m >= S.replyUrgentH * 60 ? ["Urgent", C.rust] : m >= S.replySoonH * 60 ? ["Reply soon", C.warn] : ["", C.ink];
   const ST: Record<string, [string, string]> = { "Handed away": [C.disabled, C.faint], Appointment: [C.green, C.greenDark], "Follow up": [C.amber, "var(--crm-leave-annual-text)"], New: [C.rust, C.oxblood] };
   const range = periodDays(st, today);
-  const stints = x.rows ? stintsOf(d, x.rows, range, nowIso) : [];
+  const stints0 = x.rows ? stintsOf(d, x.rows, range, nowIso) : [];
+  // One ad, or all of them (the owner, 2026-11-09: "加入可以筛选广告，这样我才能看到总体，或单独的广告分配"): every figure,
+  // row and lead below is that ad's. The choices are the ads the period's leads came from, the most leads first.
+  const adOf = (s: Stint) => s.customer.adId || "none";
+  const adSel = st.ad && st.ad !== "all" ? st.ad : "all";
+  const stints = adSel === "all" ? stints0 : stints0.filter(s => adOf(s) === adSel);
+  const adN = new Map<string, number>(); stints0.forEach(s => adN.set(adOf(s), (adN.get(adOf(s)) ?? 0) + 1));
+  if (adSel !== "all" && !adN.has(adSel)) adN.set(adSel, 0);
+  const adName = (id: string) => id === "none" ? "No ad" : d.adNames?.[id]?.name ?? stints0.find(s => s.customer.adId === id)?.customer.ad ?? `Ad ${id}`;
+  const ads = [{ value: "all", label: `All ads · ${stints0.length}` },
+    ...[...adN].sort((a, b) => (a[0] === "none" ? 1 : b[0] === "none" ? -1 : b[1] - a[1])).map(([id, n]) => ({ value: id, label: `${adName(id)} · ${n}` }))];
   const byWho = new Map<string, Stint[]>();
   stints.forEach(s => { const l = byWho.get(s.who) ?? []; l.push(s); byWho.set(s.who, l); });
   const statusOf = (s: Stint) => (s.end ? "Handed away" : s.appt ? "Appointment" : s.customer.status === "follow_up" ? "Follow up" : s.customer.status === "appointment" ? "Appointment" : "New");
@@ -175,9 +187,12 @@ export function activityVM(x: ActivityIn) {
     pMenuOpen: st.pMenu, pOpenMenu: () => set({ pMenu: true }), pCloseMenu: () => set({ pMenu: false }),
     periods: (["Today", "Week", "Month", "Custom"] as const).map(l => ({ label: l, ...seg(st.per === l), go: () => set({ per: l }) })),
     isCustom: st.per === "Custom", cFrom: st.from, cTo: st.to,
+    /** The first lead ever, for the picker's All time. */
+    allFrom: d.customers.reduce((m, c) => Math.min(m, new Date(c.createdAt).getTime() || m), Date.now()),
     setFrom: (e: { target: { value: string } }) => { const v = e.target.value; if (v) set(u => ({ from: v, to: u.to < v ? v : u.to })); },
     setTo: (e: { target: { value: string } }) => { const v = e.target.value; if (v) set({ to: v }); },
     tiles, cols: COLS, pTiles: tiles.map(t => ({ ...t, k: t.k === "Show-up" ? "Came" : t.k })),
+    ads, adVal: adSel, adOn: adSel !== "all", setAd: (e: { target: { value: string } }) => set({ ad: e.target.value }),
     perVal: st.per, setPer: (e: { target: { value: string } }) => set({ per: e.target.value as Period }),
     heads: H.map(([label, k, just]) => { const on = !!k && sortKey === k; return { label, just: just ?? "flex-end", fg: on ? C.ink : C.faint, arrow: on ? (dir > 0 ? "↑" : "↓") : "",
       sort: () => { if (k) set(u => ({ sort: u.sort && u.sort.k === k ? (u.sort.d < 0 ? null : { k, d: -1 }) : { k, d: 1 } })); } }; }),
