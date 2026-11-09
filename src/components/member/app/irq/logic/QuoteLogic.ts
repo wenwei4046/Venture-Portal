@@ -1,9 +1,8 @@
 /* eslint-disable */
-// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/IR Quote v9 Bold.dc.html), kept line for line so the screens behave as it does.
+// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/IR Quote v10.dc.html), kept line for line so the screens behave as it does.
 import { DcLogic } from "../dc";
 import React from "react";
 import * as quoteDocLib from "../lib/quote-doc";
-import * as wsStore from "../lib/workspace-store";
 import { productSlug } from "../lib/catalog-import";
 import { irqStorage } from "../storage";
 import seedPackages from "../data/packages.json";
@@ -31,6 +30,12 @@ const title = s => s.toLowerCase().replace(/(^|[\s/(+])([a-z])/g, (m, a, b) => a
 const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const imgFor = code => /^(\d{6}|K\d{5})$/.test(code || "") ? `https://mm.hinlim.com/cache/b2bfs/product/${code}/${code}-550x500.jpg` : "";
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+// v10 Customer step: Property type is one of these two; Budget is shown without its "RM" and kept with it.
+export const PROPERTY_TYPES = ["Landed", "Condo"];
+export const propertyType = v => PROPERTY_TYPES.find(o => o.toLowerCase() === String(v || "").trim().toLowerCase()) || "";
+export const budgetShown = v => String(v || "").replace(/^\s*RM\s*/i, "");
+export const budgetStored = typed => { const val = String(typed || "").replace(/[^0-9.,\-\sk+–]/gi, "").replace(/^\s+/, ""); /* "RM" typed or pasted leaves no second space */ return val ? "RM " + val : ""; };
+export const budgetWithRm = v => { const s = String(v || "").trim(); return !s || /^RM(?![a-z])/i.test(s) ? s.replace(/^RM\s*/i, "RM ") : "RM " + s; };
 const longDate = iso => { const d = new Date(iso + "T00:00:00"); return isNaN(d) ? iso : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
 
 export class QuoteLogic extends DcLogic {
@@ -45,12 +50,12 @@ export class QuoteLogic extends DcLogic {
     const st = this.state, { total } = this.calc(), p = st.data && st.data.packages.find(x => x.id === st.pid);
     const id = st.draftId || "d" + Date.now().toString(36);
     const d = { id, at: Date.now(), name: st.cust.att || "Unnamed customer", room: p ? [p.groupLabel || p.name, this.lib.versionWord(st.data?.packages, p)].filter(Boolean).join(" · ") : "", total,
-      s: { step: st.step, pid: st.pid, cust: st.cust, crm: st.crm || {}, crmId: st.crmId || null, crmPick: st.crmPick || null, extra: st.extra, sigs: st.sigs, lines: st.lines, discount: st.discount, styleId: st.styleId || null, room: st.room || null } };
+      s: { step: st.step, pid: st.pid, cust: st.cust, crm: st.crm || {}, crmId: st.crmId || null, crmPick: st.crmPick || null, extra: st.extra, sigs: st.sigs, lines: st.lines, discount: st.discount, styleId: st.styleId || null, room: st.room || null, withMood: !!st.withMood } };
     const list = [d, ...this.drafts().filter(x => x.id !== id)];
     if (this.props.readOnly) { this.flash("Read-only while viewing as"); return; }
     try { irqStorage.setItem(this.draftKey(), JSON.stringify(list)); this.setState({ draftId: id, draftAt: d.at }); this.flash("Draft saved"); } catch (e) { this.flash("Couldn't save: storage is full"); }
   }
-  openDraft(d) { this.setState({ ...d.s, home: false, draftId: d.id, draftAt: d.at, draftsOpen: false, sheet: null }); this.flash("Draft opened"); }
+  openDraft(d) { this.setState({ withMood: false, selOpen: null, ...d.s, home: false, draftId: d.id, draftAt: d.at, draftsOpen: false, sheet: null }); this.flash("Draft opened"); }
   rootRef = React.createRef();
   padRef = React.createRef();
   padPt(e) { const c = this.padRef.current, r = c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
@@ -79,12 +84,8 @@ export class QuoteLogic extends DcLogic {
   };
 
   componentDidMount() {
-    setTimeout(() => this.loadDrive(), 400);
     this.onZoomKey = e => { if (!this.state.zoomList) return; if (e.key === "ArrowRight") this.stepZoom(1); else if (e.key === "ArrowLeft") this.stepZoom(-1); else if (e.key === "Escape") this.setState({ zoomList: null }); };
     window.addEventListener("keydown", this.onZoomKey);
-    this.wsMod = wsStore;
-    this.onUser = () => { const nm = this.wsMod ? this.wsMod.currentUser().name : ""; this.setState(s => ({ drive: {}, draftId: null, draftAt: null, cust: { ...s.cust, by: nm || s.cust.by } })); this.loadDrive(); this.flash("Switched to " + (this.wsMod ? this.wsMod.currentUser().name : "account")); };
-    window.addEventListener("irq-user", this.onUser);
     this._slideT = setInterval(() => { const sl = (this._slides || []).filter(x => x.k !== this._hover && x.k !== this._held); if (!sl.length || document.hidden) return; this.setState(s => { const ci = { ...(s.ci || {}) }; sl.forEach(x => { ci[x.k] = ((ci[x.k] || 0) + 1) % x.n; }); return { ci }; }); }, 3500);
     Promise.all([Promise.resolve({ ...quoteDocLib, CRM_FIELDS: this.props.crmFields || quoteDocLib.CRM_FIELDS, CRM_CUSTOMERS: [] }), Promise.resolve(seedPackages), Promise.resolve(seedCatalog)])
       .then(([lib, pj, cj]) => {
@@ -109,7 +110,7 @@ export class QuoteLogic extends DcLogic {
   }
   attachRo() { const el = this.rootRef.current; if (this.ro || !el || !window.ResizeObserver) return; this.ro = new ResizeObserver(e => { const w = e[0].contentRect.width; if (Math.abs(w - this.state.width) > 1) this.setState({ width: w }); }); this.ro.observe(el); }
   componentDidUpdate() { if (!this.ro) this.attachRo(); }
-  componentWillUnmount() { window.removeEventListener("resize", this.onWinResize); clearInterval(this._slideT); window.removeEventListener("keydown", this.onZoomKey); window.removeEventListener("irq-user", this.onUser); this.ro && this.ro.disconnect(); clearTimeout(this.tt); this.offStore && this.offStore(); clearTimeout(this._crmT); }
+  componentWillUnmount() { window.removeEventListener("resize", this.onWinResize); clearInterval(this._slideT); window.removeEventListener("keydown", this.onZoomKey); this.ro && this.ro.disconnect(); clearTimeout(this.tt); this.offStore && this.offStore(); clearTimeout(this._crmT); }
 
   load(pid, data = this.state.data, keep = false) {
     const p = data.packages.find(x => x.id === pid);
@@ -205,12 +206,17 @@ export class QuoteLogic extends DcLogic {
     return { m, pkg, changes, changeSell, disc, total, xrows, xsum, adjust, xTitle: tb?.extraTitle || "OTHERS" };
   }
 
+  // v10: the style moodboard — the company's photos of the style picked in step 3 (Quote Settings › Styles), or its cover.
+  moodPhotos() { const styles = (this.cfg && this.cfg.styles) || [], sx = styles.find(x => x.id === this.state.styleId) || styles[0] || {}; const ok = s => /^(data:image|https?:|blob:)/.test(String(s || "")) || /\.(jpe?g|png|webp|gif)(\?|$)/i.test(String(s || "")) || /^\/files\//.test(String(s || ""));
+    return { sx, imgs: (sx.photos && sx.photos.length ? sx.photos : (sx.cover ? [sx.cover] : [])).filter(ok) }; }
+  moodboard() { if (!this.state.withMood) return null; const { sx, imgs } = this.moodPhotos(); if (!imgs.length) return null;
+    const pkg = this.state.data && this.state.data.packages.find(x => x.id === this.state.pid); return { name: sx.name || "", note: this.lib.versionWord(this.state.data?.packages, pkg), imgs }; } // one version says no Classic / Build in (2026-11-06)
   docRows(pkg, m) {
     let n = 0;
     return pkg.cats.map((c, ci) => {
       const rows = this.state.lines.filter(l => l.ci === ci && l.qty > 0).map(l => {
         const unit = Math.round(l.cost * m);
-        const ci2 = (l.code && (this.state.catalog?.items || []).find(x => x.code === l.code)) || {}; const clr = this.colorFor(l); return { no: ++n, item: l.name, desc: l.desc || "", code: [l.code, clr].filter(Boolean).join(" / "), qty: l.qty, unit, sum: unit * l.qty, kind: ((this.state.catalog?.kinds || {})[l.kind] || {}).label || "", collection: ci2.collection || "", color: clr, remark: "" };
+        const ci2 = (l.code && (this.state.catalog?.items || []).find(x => x.code === l.code)) || {}; const clr = this.colorFor(l); return { no: ++n, item: l.name, desc: l.desc || "", code: [l.code, clr].filter(Boolean).join(" / "), photo: this.imgFor(l), qty: l.qty, unit, sum: unit * l.qty, kind: ((this.state.catalog?.kinds || {})[l.kind] || {}).label || "", collection: ci2.collection || "", color: clr, remark: l.remark || "" };
       });
       return { name: c.name, rows };
     }).filter(c => c.rows.length).concat((() => {
@@ -244,7 +250,7 @@ export class QuoteLogic extends DcLogic {
       const facts = { att: c.att, by: c.by, bill: c.bill, building: c.building, address: [c.unit, c.building, cfg.buildings?.find(b => b.name === c.building)?.address].filter(Boolean).join(", "), unit: this.unitFact(pkg), layout: this.lib.packageName(this.state.data?.packages, pkg), date: longDate(c.date) };
       (cfg.doc.blocks.find(b => b.type === "facts")?.labels || []).filter(f => f.custom).forEach(f => { facts[f.key] = this.state.extra[f.key] || ""; });
       const ci = cfg.custInfo || {}, custRows = [...(this.lib.CRM_FIELDS || []).filter(f => f.id !== "name" && (ci.crm || {})[f.id] && ci.crm[f.id].show && ci.crm[f.id].print).map(f => ({ label: f.label, value: (this.state.crm || {})[f.id] })), ...(ci.own || []).filter(f => !["unit", "bill", "building", "date", "by"].includes(f.id) && f.print).map(f => ({ label: f.label, value: this.state.extra["ci_" + f.id] }))];
-      return this.lib.renderDoc(cfg, { facts, adjust, custRows, extra: this.state.extra, sigs: this.state.sigs, building: cfg.buildings?.find(b => b.name === c.building), cats, discount: disc, saving: priced ? Math.max(0, list - (total - adjSum) - disc) : 0, total }, { excel: forExcel, title: this.fileBase() });
+      return this.lib.renderDoc(cfg, { facts, adjust, custRows, extra: this.lib.principalPictures(cfg.doc.blocks, this.state.extra), sigs: this.state.sigs, building: cfg.buildings?.find(b => b.name === c.building), cats, discount: disc, saving: priced ? Math.max(0, list - (total - adjSum) - disc) : 0, total, moodboard: this.moodboard() }, { excel: forExcel, title: this.fileBase() });
     }
     return this.docHtmlLegacy(forExcel);
   }
@@ -294,11 +300,20 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     const crmVal = id => id === "name" ? st.cust.att : (st.crm || {})[id] || "";
     const setCrm = id => e => { const val = e.target.value; if (id === "name") this.setState(s => ({ cust: { ...s.cust, att: val } })); else this.setState(s => ({ crm: { ...(s.crm || {}), [id]: val } })); };
     const fields = [
-      ...CF.filter(f => f.core || (ci.crm[f.id] || {}).show).map(f => ({ label: f.label, value: crmVal(f.id), ph: f.id === "name" ? "Customer name" : "", type: "text", onChange: setCrm(f.id), crm: true, req: !!f.core || !!(ci.crm[f.id] || {}).required })),
-      ...(ci.own || []).map(f => { const core = ["unit", "bill", "building", "date", "by"].includes(f.id), key = "ci_" + f.id;
-        return { label: f.label, value: core ? st.cust[f.id] : st.extra[key] || "", ph: f.ph || "", type: f.type === "date" ? "date" : f.type === "number" ? "number" : "text", crm: false, req: !!f.required,
+      // v10: the CRM's Property type (`type`; the prototype's `ptype`) is a Landed / Condo dropdown that also sets step 2's chips; Budget is "RM …".
+      ...CF.filter(f => f.core || (ci.crm[f.id] || {}).show).map(f => { const sel = f.id === "type" || f.id === "ptype", money = f.id === "budget", raw = crmVal(f.id);
+        const value = money ? budgetShown(raw) : sel ? propertyType(raw) : raw;
+        const onChange = money ? e => { const val = budgetStored(e.target.value); this.setState(s => ({ crm: { ...(s.crm || {}), [f.id]: val } })); } : setCrm(f.id);
+        return { label: f.label, value, ph: f.id === "name" ? "Customer name" : money ? "0" : "", type: "text", onChange, crm: true, req: !!f.core || !!(ci.crm[f.id] || {}).required,
+          isSelect: sel, isMoney: money, isPlain: !sel && !money, selInk: value ? "#1F1F1C" : "#97978F", selLabel: value || "Select",
+          open: sel && st.selOpen === f.id, selBorder: sel && st.selOpen === f.id ? "#111111" : "rgba(20,20,18,.12)", selRing: sel && st.selOpen === f.id ? "0 0 0 3px rgba(17,17,17,.12)" : "none",
+          toggle: () => this.setState(s => ({ selOpen: s.selOpen === f.id ? null : f.id })), close: () => this.setState({ selOpen: null }),
+          opts: sel ? PROPERTY_TYPES.map(o => ({ label: o, on: o === value, bg: o === value ? "#FFF5EC" : "transparent", fw: o === value ? 650 : 500, pick: () => this.setState(s => ({ selOpen: null, crm: { ...(s.crm || {}), [f.id]: o }, cust: { ...s.cust, ptype: o } })) })) : [] }; }),
+      // v10: Billing address is asked only while the Principal ticks it to print (2026-11-09; `billOn`).
+      ...(ci.own || []).filter(f => f.id !== "bill" || (lib && lib.billOn(this.cfg))).map(f => { const core = ["unit", "bill", "building", "date", "by"].includes(f.id), key = "ci_" + f.id;
+        return { label: f.label, value: core ? st.cust[f.id] : st.extra[key] || "", ph: f.ph || "", type: f.type === "date" ? "date" : f.type === "number" ? "number" : "text", crm: false, req: !!f.required, isPlain: true,
           onChange: core ? setCust(f.id) : e => { const val = e.target.value; this.setState(s => ({ extra: { ...s.extra, [key]: val } })); } }; }),
-      ...((this.cfg?.doc.blocks.find(b => b.type === "facts" && !b.hidden)?.labels) || []).filter(f => f.custom && !f.hidden).map(f => ({ label: f.label, value: st.extra[f.key] || "", ph: "", type: "text", crm: false, req: false, onChange: e => { const val = e.target.value; this.setState(s => ({ extra: { ...s.extra, [f.key]: val } })); } }))
+      ...((this.cfg?.doc.blocks.find(b => b.type === "facts" && !b.hidden)?.labels) || []).filter(f => f.custom && !f.hidden).map(f => ({ label: f.label, value: st.extra[f.key] || "", ph: "", type: "text", crm: false, req: false, isPlain: true, onChange: e => { const val = e.target.value; this.setState(s => ({ extra: { ...s.extra, [f.key]: val } })); } }))
     ];
     const q = (st.crmQ || "").trim().toLowerCase(), digits = q.replace(/\D/g, "");
     const list = (st.crmHits || []).filter(c => !q || c.name.toLowerCase().includes(q) || (digits && String(c.phone || "").replace(/\D/g, "").includes(digits))).slice(0, 6);
@@ -320,24 +335,27 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
   }
   pickCrm(c) {
     const crm = {}; (this.lib.CRM_FIELDS || []).forEach(f => { if (f.id !== "name") crm[f.id] = c[f.id] || ""; });
-    this.setState(s => ({ crmId: c.id, crmPick: c, crmOpen: false, crmQ: "", crm, cust: { ...s.cust, att: c.name, ptype: c.ptype || s.cust.ptype } }));
+    // v10: the CRM's budget keeps one "RM" (it prints as typed), its property type the dropdown's own word (step 2's chips too).
+    if (crm.budget) crm.budget = budgetWithRm(crm.budget);
+    if (crm.type) crm.type = propertyType(crm.type) || crm.type;
+    this.setState(s => ({ crmId: c.id, crmPick: c, crmOpen: false, crmQ: "", crm, cust: { ...s.cust, att: c.name, ptype: propertyType(c.ptype) || s.cust.ptype } }));
     const m = String(c.usize || "").match(/(\d+)\s*R\s*(\d+)/i), data = this.state.data;
     if (m && data) { const k = m[1] + "-" + m[2]; const p = data.packages.find(p => { const sp = p.spec || {}; return parseInt(sp.beds) + "-" + parseInt(sp.baths) === k && p.style !== "build"; }) || data.packages.find(p => { const sp = p.spec || {}; return parseInt(sp.beds) + "-" + parseInt(sp.baths) === k; });
       if (p) { this.setState({ room: (p.spec.beds || "?") + "-" + (p.spec.baths || "?") }); this.load(p.id); this.flash(`${c.name} added · ${c.usize} selected in step 2`); return; } }
     this.flash(c.name + " added from CRM");
   }
   checkReq() {
-    const own = ((this.cfg && this.cfg.custInfo && this.cfg.custInfo.own) || []).filter(f => f.required && !(["unit", "bill", "building", "date", "by"].includes(f.id) ? this.state.cust[f.id] : this.state.extra["ci_" + f.id]));
+    const own = ((this.cfg && this.cfg.custInfo && this.cfg.custInfo.own) || []).filter(f => (f.id !== "bill" || this.lib.billOn(this.cfg)) && f.required && !(["unit", "bill", "building", "date", "by"].includes(f.id) ? this.state.cust[f.id] : this.state.extra["ci_" + f.id]));
     const crmMiss = ((this.lib && this.lib.CRM_FIELDS) || []).filter(f => f.id !== "name" && ((this.cfg?.custInfo?.crm || {})[f.id] || {}).show && ((this.cfg?.custInfo?.crm || {})[f.id] || {}).required && !(this.state.crm || {})[f.id]); own.unshift(...crmMiss);
     if (!this.state.cust.att || own.length) { this.flash(`Fill in ${[...(!this.state.cust.att ? ["Name"] : []), ...own.map(f => f.label)].join(", ")} first`); this.setState({ step: 1 }); return false; }
-    const miss = (this.cfg?.doc.blocks || []).filter(b => b.type === "field" && !b.hidden && b.required && this.lib.isEmpty(b, this.state.extra[b.id] ?? b.value));
+    const miss = (this.cfg?.doc.blocks || []).filter(b => b.type === "field" && !b.hidden && b.required && b.kind !== "image" /* the Principal's picture: nothing for sales to fill in */ &&this.lib.isEmpty(b, this.state.extra[b.id] ?? b.value));
     if (!miss.length) return true;
     this.flash(`Fill in ${miss.map(b => b.label).join(", ")} first`);
     this.setState({ step: 1 });
     return false;
   }
   styleStep(group, byId, style) {
-    const st = this.state, styles = (this.cfg && this.cfg.styles) || [], drive = st.drive || {};
+    const st = this.state, styles = (this.cfg && this.cfg.styles) || [], drive = {}; // style photos are the company's alone (Quote Settings › Styles); the Drive went 2026-11-09
     const sid = st.styleId && styles.some(x => x.id === st.styleId) ? st.styleId : (styles[0] || {}).id;
     const styleCards = styles.map(x => { const imgs = drive[x.id] || [], cover = x.cover || (imgs[0] && imgs[0].src) || "", on = x.id === sid;
       return { name: x.name, desc: x.desc || "", count: imgs.length ? imgs.length + " photo" + (imgs.length === 1 ? "" : "s") : "", cover: this.u(cover), noCover: !cover, on, border: on ? "#111111" : "#E7E7E2", ring: on ? "0 0 0 1px #111111, 0 10px 24px rgba(17,17,17,.12)" : "0 1px 2px rgba(20,20,18,.04)", pick: () => this.setState({ styleId: x.id, gi: 0 }), chipBg: on ? "#111111" : "#FFFFFF", chipInk: on ? "#FFFFFF" : "#1F1F1C", chipBorder: on ? "#111111" : "#DEDED8" }; });
@@ -365,14 +383,9 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       thumbs: imgs.map((t, k) => ({ src: this.u(t.src), ring: k === gi ? "0 0 0 2px #F5871F" : "none", op: k === gi ? 1 : .6, pick: () => set(k) })),
       inPhoto: "", cats } };
   }
-  loadDrive() { Promise.resolve(wsStore).then(ws => ws.byStyle()).then(drive => this.setState({ drive })).catch(() => {}); }
-  wsKey() { const c = this.state.cust || {}; return [c.building, c.unit, c.att].map(x => (x || "").trim()).join("|") || "draft"; }
-  wsLabel() { const c = this.state.cust || {}; return [c.att || "New customer", [c.building, c.unit].filter(Boolean).join(" ")].filter(Boolean).join(" · "); }
-  refreshWsCount() { Promise.resolve(wsStore).then(ws => ws.countFor(this.wsKey())).then(n => { if (n !== this.state.wsCount) this.setState({ wsCount: n }); }).catch(() => {}); }
   async exportPdf() {
     if (!this.checkReq()) return;
     let html = this.docHtml(false);
-    try { const ws = await Promise.resolve(wsStore); const sx = ((this.cfg && this.cfg.styles) || []).find(x => x.id === this.state.styleId) || ((this.cfg && this.cfg.styles) || [])[0] || {}; const extra = await ws.pdfHtml(sx.id, sx.name); if (extra) html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, extra + "</body>") : html + extra; } catch (e) {}
     const f = document.createElement("iframe");
     f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
     document.body.appendChild(f);
@@ -439,6 +452,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
             tag: ch ? ch.tag.toUpperCase() : "", delta: ch ? signed(ch.d) : "", tagInk: tone ? tone[0] : "", tagBg: tone ? tone[1] : "",
             ...((im) => ({ lImg: im, lCursor: im ? "zoom-in" : "default", lView: () => { if (!im) return; const zl = st.lines.filter(x => x.qty > 0).map(x => { const i2 = this.imgFor(x); const c2 = changes.find(y => y.l.id === x.id); return i2 ? { img: i2, name: title(x.name), code: x.code || "", delta: c2 ? signed(c2.d) : "In package", item: null } : null; }).filter(Boolean); this.openZoom(zl, zl.findIndex(z => z.img === im)); } }))(this.imgFor(l)),
             canSwap: !!l.kind, swap: () => this.openSheet({ mode: "swap", id: l.id }),
+            remarkOn: !!((this.cfg?.doc.blocks.find(b => b.type === "table")?.columns) || []).find(c => c.key === "remark" && c.show), remarkV: l.remark || "", onRemark: e => { const v = e.target.value; this.setLine(l.id, x => ({ ...x, remark: v })); },
             minus: () => this.bump(l.id, -1), plus: () => this.bump(l.id, 1), onQty: e => { const n = Math.max(0, Math.min(999, parseInt(e.target.value.replace(/\D/g, "")) || 0)); this.setLine(l.id, x => ({ ...x, qty: n })); }, undo: e => { if (e) e.stopPropagation(); this.undo(l); }
           };
         })
@@ -517,6 +531,10 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
 
     return {
       rootRef: this.rootRef, desk, phone, stepBarD: phone ? "none" : "flex", deskOnlyFlex: phone ? "none" : "flex",
+      mood: (() => { const { sx, imgs } = this.moodPhotos(), on = !!st.withMood && imgs.length > 0, none = !imgs.length;
+        return { on, none, boxBg: on ? "#F5871F" : "#FFFFFF", boxBorder: on ? "#F5871F" : "#C9C9C2", op: none ? .5 : 1, cursor: none ? "not-allowed" : "pointer",
+          sub: none ? "No photos for " + (sx.name || "this style") + " in Quote Settings" : (sx.name || "Style") + " · " + imgs.length + " photo" + (imgs.length === 1 ? "" : "s") + " under the customer details",
+          toggle: () => { if (!none) this.setState(s => ({ withMood: !s.withMood })); } }; })(),
       saveDraftC: () => { this.saveDraft(); this.setState({ confirm: { title: "Draft saved", sub: "Find it anytime under Quote · Drafts." } }); },
       doPdfC: () => { this.exportPdf(); this.setState({ confirm: { title: "PDF ready", sub: "Choose “Save as PDF” in the next screen to keep it on this device." } }); },
       confirmBox: st.confirm ? { ...st.confirm, close: () => this.setState({ confirm: null }) } : false,
@@ -530,26 +548,20 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
           { label: "More", bg: "#F2F2EF", ink: "#1F1F1C", d: "M5 12h.01M12 12h.01M19 12h.01", run: () => { done(); this.share(); } }
         ]; })() } : false, selAll: e => e.target.select(), docBoxD: !phone || st.docFull ? "flex" : "none", docBox: phone ? (() => { return { pos: "fixed", z: 160, b: "0", r: "0", full: true }; })() : { pos: "relative", z: "auto", b: "1px solid #E7E7E2", r: "14px", full: false }, openDoc: () => this.setState({ docFull: true }, () => { setTimeout(() => { const f = this.rootRef.current && this.rootRef.current.querySelector("iframe[title=\"Quotation preview\"]"); if (f && this._fitDoc) this._fitDoc({ currentTarget: f }); }, 60); }), closeDoc: () => this.setState({ docFull: false }), phoneStep: phone && !st.home, cgPad: phone ? "2px 4px 0" : "10px 4px 0", cz: phone ? { pad: "0", h: "14.5px", meta: "none", add: "38px", r: "0", b: "0", bg: "transparent", sh: "none", plus: true, addRow: false, stepCols: "26px 24px 26px", stepH: "30px", cntW: "22px", cntH: "22px", cntP: "6px", cntBg: "#FFFFFF", rowPad: "12px 4px 12px 10px", hPad: "4px 4px 4px 10px", hPos: "sticky", hBg: "#EEEEEA", hR: "8px", hMargin: "10px 0 2px", swapBg: "transparent" } : { pad: "18px", h: "19px", meta: "block", add: "44px", r: "14px", b: "1px solid rgba(20,20,18,.05)", bg: "#FFFFFF", sh: "0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)", plus: false, addRow: true, stepCols: "32px 28px 32px", stepH: "34px", cntW: "0", cntH: "auto", cntP: "0", cntBg: "transparent", rowPad: "12px 0", hPad: "0", hPos: "static", hBg: "transparent", hR: "0", hMargin: "0 0 2px", swapBg: "#F0F0ED" }, svCard: phone ? { r: "0", b: "0", bg: "transparent", m: "-20px", ar: "4/3", ir: "0", thumbs: "none", bedLbl: "none", segFlex: "1 1 100%" } : { r: "14px", b: "1px solid #E7E7E2", bg: "#FFFFFF", m: "0", ar: "16/10", ir: "0", thumbs: "flex", bedLbl: "inline", segFlex: "0 0 auto" }, mainPad: phone ? "8px 20px 28px" : "20px 28px 36px", appNavD: (phone && !st.home) || /embed=1/.test(location.search) ? "none" : "block", phoneHome: phone && !!st.home, phoneFooterD: phone && st.home ? "none" : "block", homeNew: () => { this.setState({ home: false }); if (this._newQuote) this._newQuote(); }, chgTxt: phone ? "none" : "inline", chgIco: phone ? "block" : "none", chgPad: phone ? "4px" : "14px", thumbD: phone ? "none" : "flex", priceIn: phone ? "block" : "none", nameBasis: phone ? "140px" : "160px", stGridD: phone ? "none" : "grid", stWrap: phone ? { tc: "none", flow: "column", col: "38%", ox: "auto", m: "-20px", p: "20px", desc: "none" } : { tc: "repeat(auto-fill,minmax(min(100%,190px),1fr))", flow: "row", col: "auto", ox: "visible", m: "0", p: "0", desc: "block" }, inH: phone ? "50px" : "42px", phoneDrafts: phone && !!st.draftsOpen, stopProp: e => e.stopPropagation(), secPad: phone ? "0" : "18px", secBorder: phone ? "0" : "1px solid rgba(20,20,18,.05)", secBg: phone ? "transparent" : "#FFFFFF", secShadow: phone ? "none" : "0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)",
       sizeWrap: phone ? { tc: "none", d: "grid", flow: "column", col: "62%", ox: "auto", m: "-20px", p: "20px" } : { tc: "repeat(auto-fill,minmax(min(100%,220px),1fr))", d: "grid", flow: "row", col: "auto", ox: "visible", m: "0", p: "0" }, frameMax: vp === "phone" ? "430px" : "none",
-      ...(() => { const ws = this.wsMod, me = this.props.user || { id: "", name: "" }, ini = n => String(n || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase();
+      ...(() => { const ws = null /* the prototype's account switcher; Profile here */, me = this.props.user || { id: "", name: "" }, ini = n => String(n || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase();
         return { userName: me.name, userInitials: ini(me.name), acctOpen: !!this.state.acctOpen,
           toggleAcct: () => this.props.onNav && this.props.onNav("Profile"), closeAcct: () => this.setState({ acctOpen: false }),
           acctList: ws ? ws.users().map(u => ({ name: u.name, initials: ini(u.name), on: u.id === me.id, bg: u.id === me.id ? "#F2F2EF" : "transparent", avBg: u.id === me.id ? "#F5871F" : "#EEEEEA", pick: () => { this.setState({ acctOpen: false }); ws.setUser(u.id); } })) : [],
           addAcct: e => { e.preventDefault(); const n = e.target.nm.value; if (ws && ws.addUser(n)) this.setState({ acctOpen: false }); } }; })(),
       dateLine: `${DAYS[d.getDay()].toUpperCase()} ${d.getDate()} ${MONTHS[d.getMonth()].toUpperCase()} ${d.getFullYear()}`,
-      deskNav: [["Today", ICON.home], ["Insight", ICON.chart], ["Quote", ICON.quoteDesk], ["Workspace", "M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15 9h.01"], ["Arena", ICON.trophy], ["Profile", ICON.user]].map(([label, dd]) => { const on = label === "Workspace" ? !!this.state.wsOpen : label === "Quote" && !this.state.wsOpen; return { label, d: dd, bg: on ? "#F5871F" : "transparent", color: on ? "#111111" : "#A3A3A3", weight: on ? 650 : 550, go: label === "Workspace" ? () => this.setState({ wsOpen: true }) : label === "Quote" ? () => this.setState({ wsOpen: false }) : undefined }; }),
-      wsOpen: !!this.state.wsOpen, openWs: () => this.setState({ wsOpen: true }), closeWs: () => { this.setState({ wsOpen: false }); this.loadDrive(); },
-      wsStyles: ((this.cfg && this.cfg.styles) || []).map(x => ({ id: x.id, label: x.name })), wsStyleId: this.state.styleId || (((this.cfg && this.cfg.styles) || [])[0] || {}).id || "",
-      wsFurniture: [...new Set(((this.state.data && this.state.data.packages) || []).flatMap(p => p.cats.flatMap(c => c.items.map(i => i.name))))].sort().map(nm => ({ id: nm, name: nm })),
-      wsKey: this.wsKey(), wsLabel: this.wsLabel(), wsCount: String(this.state.wsCount || 0),
-      wsStyle: (((this.state.data && this.state.data.packages) || []).find(p => p.id === this.state.pid) || {}).name || "",
-      wsItems: (this.state.lines || []).map(l => ({ id: String(l.id), name: String(l.name || "") })),
+      deskNav: [["Today", ICON.home], ["Insight", ICON.chart], ["Quote", ICON.quoteDesk], ["Arena", ICON.trophy], ["Profile", ICON.user]].map(([label, dd]) => { const on = label === "Quote"; return { label, d: dd, bg: on ? "#F5871F" : "transparent", color: on ? "#111111" : "#A3A3A3", weight: on ? 650 : 550, go: undefined }; }),
       navLeft: [{ label: "Today", d: ICON.home }, { label: "Insight", d: ICON.chart }].map(n => ({ ...n, go: () => this.props.onNav && this.props.onNav(n.label) })),
       navRight: [{ label: "Arena", d: ICON.trophy }, { label: "Profile", d: ICON.user }].map(n => ({ ...n, go: () => this.props.onNav && this.props.onNav(n.label) })),
       deskAside: desk && !this.props.inApp, deskHeader: desk && !this.props.inApp, rootH: this.props.rootH || "100vh", canSettings: !!this.props.canSettings, settingsHref: "#",
       openSettings: e => { e.preventDefault(); this.props.onSettings && this.props.onSettings(); },
       phoneBack: phone ? !st.home : step > 1, phoneLogo: phone ? !!st.home : step === 1, backLabel: stepNames[step - 2] || "", goBack: step === 1 ? () => this.setState({ home: true }) : go(step - 1),
       steps, stepNow, showPrice: step > 1 && !!pkg, noPrice: step === 1, stepCust: step === 1 && !!pkg, stepRoom: step === 2 && !!pkg, stepStyle: step === 3 && !!pkg, stepEarly: step <= 3 && !!pkg, step1: false, step2: step === 4 && !!pkg, step3: step === 5 && !!pkg, loading: !pkg,
-      ...(() => { const fl = this.lib ? (this.cfg?.doc.blocks || []).filter(b => b.type === "field" && !b.hidden) : []; return { hasExtra: fl.length > 0, extraFields: fl.map(f => this.lib.fieldEditor(f, st.extra[f.id] ?? f.value, v => this.setState(s => ({ extra: { ...s.extra, [f.id]: v } })))) }; })(),
+      ...(() => { const fl = this.lib ? (this.cfg?.doc.blocks || []).filter(b => b.type === "field" && !b.hidden) : []; return { hasExtra: fl.length > 0, extraFields: fl.map(f => { const ex = this.lib.principalPictures([f], st.extra); return this.lib.fieldEditor(f, ex[f.id] ?? f.value, v => this.setState(s => ({ extra: { ...s.extra, [f.id]: v } })), { upload: false }); }) }; })(),
       ...(() => {
         const sb = this.lib ? (this.cfg?.doc.blocks || []).filter(b => b.type === "signature" && !b.hidden) : [];
         const slots = [];
@@ -597,7 +609,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
           return { ...u, on, img: this.u(ph[ci] || ""), noImg: !n, multi: n > 1, prev: go(-1), next: go(1),
             tStart: e => { this._tx = e.touches[0].clientX; }, tEnd: e => { const dx = e.changedTouches[0].clientX - (this._tx ?? 0); this._tx = null; if (n > 1 && Math.abs(dx) > 35) { this._held = u._k; this._swiped = Date.now(); step(dx < 0 ? 1 : -1); } },
             hoverOn: () => { this._hover = u._k; }, hoverOff: () => { if (this._hover === u._k) this._hover = null; }, dots: ph.map((_, k) => ({ op: k === ci ? 1 : .55 })),
-            eyebrow: `${b} bedroom${b > 1 ? "s" : ""} · ${t} bathroom${t > 1 ? "s" : ""}`, sqft: sp.sqft ? sp.sqft + " sq.ft." : "", title: u.label, price: u._from,
+            eyebrow: `${b} bedroom${b > 1 ? "s" : ""} · ${t} bathroom${t > 1 ? "s" : ""}`, sqft: sp.sqft ? sp.sqft + " sq.ft." : "", title: [u.label, String(sp.note || "").trim()].filter(Boolean).join(" ") /* the room type's name: room count + Note (2026-11-09) */, price: u._from,
             cShadow: on ? "inset 0 0 0 3px #F5871F" : "none", rowRing: on ? "inset 0 0 0 2px #F5871F" : "0 1px 2px rgba(20,20,18,.05)", radioBorder: on ? "#F5871F" : "#DEDED8", radioBg: on ? "#F5871F" : "#FFFFFF" }; });
         const missingSizes = unitSizes.filter(u => !u._gs.length).map(u => u.label).join(", ");
         return { unitSizes, sizeCards, missingSizes, propTypes, roomTypes, pkgCountText: `${shown.length} layout${shown.length === 1 ? "" : "s"} for this room type`, _shown: shown };
@@ -626,8 +638,8 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
       draftsOpen: !!st.draftsOpen, toggleDrafts: () => this.setState(s => ({ draftsOpen: !s.draftsOpen, armDraft: null })), saveDraft: () => this.saveDraft(),
       draftBadge: st.draftId ? "Draft · saved " + new Date(st.draftAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "",
       ...(() => { const ds = this.drafts(); return { draftCount: ds.length || false, noDrafts: !ds.length,
-        newQuote: this._newQuote = () => { this.setState({ draftId: null, draftAt: null, draftsOpen: false, step: 1, cust: { att: "", bill: "", building: "", unit: "", date: todayIso(), by: st.cust.by }, crm: {}, crmId: null, extra: {}, sigs: {}, discount: "" }); const g = st.data && st.data.groups[0]; if (g) this.load(g.classic || g.build);  },
-        homeList: (st.homeAll ? ds : ds.slice(0, 4)).map(d => ({ name: d.name, total: rm0(d.total || 0), meta: [d.room, "Step " + (d.s.step || 1) + "/5", new Date(d.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })].filter(Boolean).join(" · "), open: () => this.openDraft(d), delIcon: st.armDraft === d.id ? "Delete?" : "✕", remove: () => { if (st.armDraft !== d.id) { this.setState({ armDraft: d.id }); return; } irqStorage.setItem(this.draftKey(), JSON.stringify(this.drafts().filter(x => x.id !== d.id))); this.setState({ armDraft: null }); } })), homeMore: ds.length > 4 ? { label: st.homeAll ? "Show less" : "See all " + ds.length, toggle: () => this.setState(z => ({ homeAll: !z.homeAll })) } : false, homeDraftN: ds.length + (ds.length === 1 ? " draft" : " drafts"), homeHello: "Hi, " + ((this.wsMod && this.wsMod.currentUser().name) || "there"), draftList: ds.map(d => ({ ini: String(d.name || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase(), room: d.room || "", when: new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }), bars: [1, 2, 3, 4, 5].map(k => ({ bg: k <= (d.s.step || 1) ? "#F5871F" : "#E7E7E2" })), delIcon: st.armDraft === d.id ? "Delete?" : "✕", name: d.name, total: rm0(d.total || 0), sub: [d.room, "Step " + (d.s.step || 1), new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · "), bg: d.id === st.draftId ? "#FFEBD9" : "transparent",
+        newQuote: this._newQuote = () => { this.setState({ draftId: null, draftAt: null, draftsOpen: false, step: 1, cust: { att: "", bill: "", building: "", unit: "", date: todayIso(), by: st.cust.by }, crm: {}, crmId: null, extra: {}, sigs: {}, discount: "", withMood: false, selOpen: null }); const g = st.data && st.data.groups[0]; if (g) this.load(g.classic || g.build);  },
+        homeList: (st.homeAll ? ds : ds.slice(0, 4)).map(d => ({ name: d.name, total: rm0(d.total || 0), meta: [d.room, "Step " + (d.s.step || 1) + "/5", new Date(d.at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })].filter(Boolean).join(" · "), open: () => this.openDraft(d), delIcon: st.armDraft === d.id ? "Delete?" : "✕", remove: () => { if (st.armDraft !== d.id) { this.setState({ armDraft: d.id }); return; } irqStorage.setItem(this.draftKey(), JSON.stringify(this.drafts().filter(x => x.id !== d.id))); this.setState({ armDraft: null }); } })), homeMore: ds.length > 4 ? { label: st.homeAll ? "Show less" : "See all " + ds.length, toggle: () => this.setState(z => ({ homeAll: !z.homeAll })) } : false, homeDraftN: ds.length + (ds.length === 1 ? " draft" : " drafts"), homeHello: "Hi, " + ((this.props.user && this.props.user.name) || "there"), draftList: ds.map(d => ({ ini: String(d.name || "?").split(/\s+/).map(x => x[0]).join("").slice(0, 2).toUpperCase(), room: d.room || "", when: new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }), bars: [1, 2, 3, 4, 5].map(k => ({ bg: k <= (d.s.step || 1) ? "#F5871F" : "#E7E7E2" })), delIcon: st.armDraft === d.id ? "Delete?" : "✕", name: d.name, total: rm0(d.total || 0), sub: [d.room, "Step " + (d.s.step || 1), new Date(d.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })].filter(Boolean).join(" · "), bg: d.id === st.draftId ? "#FFEBD9" : "transparent",
           open: () => this.openDraft(d), delLabel: st.armDraft === d.id ? "Delete?" : "Delete",
           remove: () => { if (st.armDraft !== d.id) { this.setState({ armDraft: d.id }); return; } irqStorage.setItem(this.draftKey(), JSON.stringify(this.drafts().filter(x => x.id !== d.id))); this.setState(s => ({ armDraft: null, ...(s.draftId === d.id ? { draftId: null, draftAt: null } : {}) })); } })) }; })(),
       exportsDesk: [

@@ -7,6 +7,7 @@ export const COLUMNS = [
   { key: "item", label: "ITEM", show: true, num: false },
   { key: "desc", label: "DESCRIPTION", show: true, num: false },
   { key: "code", label: "CODE/COLOUR", show: true, num: false },
+  { key: "photo", label: "PHOTO", show: true, num: false },
   { key: "qty", label: "QTY", show: true, num: true },
   { key: "price", label: "PRICE", show: false, num: true },
   { key: "sum", label: "SUM", show: false, num: true }
@@ -233,18 +234,44 @@ export function specText(spec, short = false) {
 export const FONTS = {
   Georgia: "Georgia, 'Noto Serif SC', serif",
   Helvetica: "Helvetica, Arial, 'Noto Sans SC', sans-serif",
-  Times: "'Times New Roman', Times, serif"
+  Times: "'Times New Roman', Times, 'Noto Serif SC', serif"
 };
 
 const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export const money = n => (n < 0 ? "-" : "") + Math.abs(n).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Style moodboard, laid out by photo count so nothing overlaps (max 12).
+function moodRows(mb, n, b) {
+  const imgs = (mb.imgs || []).filter(Boolean).slice(0, 12), k = imgs.length;
+  if (!k) return "";
+  const tile = (src, extra) => `<div style="${extra}min-width:0;min-height:0;overflow:hidden;border-radius:3px;background:#EEEDE8"><img src="${esc(src)}" alt="" style="display:block;width:100%;height:100%;object-fit:cover"></div>`;
+  const head = `<tr style="break-after:avoid;page-break-after:avoid"><td colspan="${n}" style="padding:12px 6px 6px"><div style="display:flex;justify-content:space-between;align-items:baseline;font-size:${b.size}px"><span style="font-weight:bold;letter-spacing:.08em">STYLE PREVIEW · ${esc(String(mb.name || "").toUpperCase())}</span><span style="font-size:${b.size - 1}px;color:#6B6660">${esc(mb.note || "")} · ${k} photo${k === 1 ? "" : "s"}</span></div></td></tr>`;
+  const row = (inner, pad = "0 6px 4px") => `<tr style="break-inside:avoid;page-break-inside:avoid"><td colspan="${n}" style="padding:${pad}">${inner}</td></tr>`;
+  if (k <= 5) {
+    // 1–5: one large photo + the rest beside it
+    const L = {
+      1: ["1fr", "1fr", ["'a'"]], 2: ["1fr 1fr", "1fr", ["'a b'"]], 3: ["3fr 2fr", "1fr 1fr", ["'a b'", "'a c'"]],
+      4: ["2fr 1fr 1fr", "1fr 1fr", ["'a b b'", "'a c d'"]], 5: ["2fr 1fr 1fr", "1fr 1fr", ["'a b c'", "'a d e'"]]
+    }[k];
+    const cells = imgs.map((src, i) => tile(src, `grid-area:${"abcde"[i]};`)).join("");
+    return head + row(`<div style="display:grid;grid-template-columns:${L[0]};grid-template-rows:${L[1]};grid-template-areas:${L[2].join(" ")};gap:4px;height:${k === 1 ? 300 : 260}px">${cells}</div>`, "0 6px 6px");
+  }
+  // 6+: rows of three (2 when it can't split evenly). Each row is its own unit so the PDF can break between rows, never through a photo.
+  let out = head;
+  // row sizes: threes; a leftover single photo turns the last two rows into 2 + 2 (7 → 3·2·2, 10 → 3·3·2·2)
+  const sizes = Array(Math.floor(k / 3)).fill(3); if (k % 3 === 2) sizes.push(2); if (k % 3 === 1) sizes.splice(-1, 1, 2, 2);
+  let i = 0;
+  sizes.forEach((sz, r) => { const chunk = imgs.slice(i, i + sz); i += sz;
+    out += row(`<div style="display:grid;grid-template-columns:repeat(${sz},1fr);gap:4px;height:${sz === 3 ? 150 : 180}px">${chunk.map(src => tile(src, "")).join("")}</div>`, r === sizes.length - 1 ? "0 6px 6px" : "0 6px 4px"); });
+  return out;
+}
 
 // q: { facts: {key: value}, cats: [{name, rows: [{no,item,desc,code,qty,unit,sum}]}], discount, saving, total }
 export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}) {
   const co = config.company;
   const blocks = config.doc.blocks.filter(b => !b.hidden);
   const tb = config.doc.blocks.find(b => b.type === "table");
-  const cols = (tb ? tb.columns : COLUMNS).filter(c => c.show);
+  const cols = (tb ? tb.columns : COLUMNS).filter(c => c.show && !(excel && c.key === "photo"));
   const n = Math.max(cols.length, 4);
   const font = FONTS[config.doc.font] || FONTS.Georgia;
   const cell = (b, extra = "") => `text-align:${b.align};font-size:${b.size}px;${b.bold ? "font-weight:bold;" : ""}${b.italic ? "font-style:italic;" : ""}${b.underline ? "text-decoration:underline;" : ""}${extra}`;
@@ -278,12 +305,13 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
       (q.custRows || []).forEach(r => { out += `<tr><td style="${cell(b, "font-weight:bold;padding:2px 6px")}">${esc(String(r.label).toUpperCase())} :</td><td colspan="${n - 1}" style="${cell(b, "padding:2px 6px")}">${esc(r.value || "-")}</td></tr>`; });
       const bx = q.building?.extra || {};
       (config.bldFields || []).filter(f => f.show).forEach(f => { out += fieldRows(f, bx[f.id], n, b); });
+      if (q.moodboard && !excel) out += moodRows(q.moodboard, n, b);
     } else if (b.type === "table") {
-      out += `<tr style="background:#E7E5DE">${cols.map(c => `<td style="padding:6px;border-top:1px solid #bbb;border-bottom:1px solid #bbb;font-weight:bold;font-size:${b.size - 1}px;${c.num ? "text-align:right" : ""}">${esc(c.label)}</td>`).join("")}</tr>`;
+      out += `<tr style="background:#E7E5DE">${cols.map(c => `<td style="padding:6px;border-top:1px solid #bbb;border-bottom:1px solid #bbb;font-weight:bold;font-size:${b.size - 1}px;${c.num ? "text-align:right" : c.key === "photo" ? "text-align:center" : ""}">${esc(c.label)}</td>`).join("")}</tr>`;
       q.cats.forEach(cat => {
         out += `<tr><td colspan="${n}" style="padding:10px 6px 3px;font-weight:bold;letter-spacing:.05em;font-size:${b.size}px">${esc(cat.name)}</td></tr>`;
         cat.rows.forEach(r => {
-          out += `<tr>${cols.map(c => { const v = c.key === "price" ? money(r.unit) : c.key === "sum" ? money(r.sum) : r[c.key]; return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;font-size:${b.size}px;${c.num ? "text-align:right" : ""}">${esc(v)}</td>`; }).join("")}</tr>`;
+          out += `<tr>${cols.map(c => { if (c.key === "photo") return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;width:64px;text-align:center;vertical-align:middle">${r.photo ? `<img src="${esc(r.photo)}" alt="" style="display:block;width:56px;height:56px;object-fit:contain;margin:0 auto">` : ""}</td>`; const v = c.key === "price" ? money(r.unit) : c.key === "sum" ? money(r.sum) : r[c.key]; return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;font-size:${b.size}px;${c.num ? "text-align:right" : ""}">${esc(v)}</td>`; }).join("")}</tr>`;
         });
       });
     } else if (b.type === "totals") {
@@ -302,7 +330,7 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
       out += `<tr><td colspan="${n}" style="height:14px"></td></tr><tr><td colspan="${half}" style="${cell(b, "padding:0 6px;vertical-align:bottom")}">${im(L)}______________________________<br>${esc(b.text || "Prepared by")}</td><td colspan="${n - half}" style="${cell(b, "padding:0 6px;vertical-align:bottom")}">${im(R)}______________________________<br>${esc(b.text2 || "Customer acknowledgement")}</td></tr>`;
     }
   });
-  const table = `<table style="width:100%;border-collapse:collapse;font-family:${font};font-size:12px;color:#1C1714">${out}</table>`;
+  const table = `<table style="width:100%;border-collapse:collapse;font-family:${font};font-size:12px;color:#1C1714;font-variant-numeric:lining-nums tabular-nums">${out}</table>`;
   if (excel) return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>${table}</body></html>`;
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:14mm}body{margin:0;padding:0}@media screen{body{padding:28px 30px}}</style></head><body>${table}</body></html>`;
 }

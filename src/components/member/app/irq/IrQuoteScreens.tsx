@@ -5,26 +5,18 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { IRQ_CSS_QUOTE, IRQ_CSS_SETTINGS, IRQ_CSS_SETTINGS_MOBILE } from "./irq-css";
-import { DcHost, type DcComponents, type DcVals } from "./dc";
+import { DcHost } from "./dc";
 import { manrope, spaceGrotesk } from "./irq-fonts";
 import { useIrqBoot } from "./useIrqBoot";
 import { QuoteLogic } from "./logic/QuoteLogic";
 import { SettingsLogic } from "./logic/SettingsLogic";
 import { SettingsMobileLogic } from "./logic/SettingsMobileLogic";
-import { WorkspaceLogic } from "./logic/WorkspaceLogic";
 import { renderQuote } from "./tpl/QuoteTpl";
 import { renderSettings } from "./tpl/SettingsTpl";
 import { renderSettingsMobile } from "./tpl/SettingsMobileTpl";
-import { renderWorkspace } from "./tpl/WorkspaceTpl";
 import { CRM_CUSTOMERS } from "./lib/quote-doc";
 import { searchIrQuoteCustomers, type IrqCrmCustomer } from "@/app/(member)/member/ir-quote-actions";
 
-/** The Drive, as the quote's `<dc-import name="Workspace">` mounts it. */
-function Workspace(p: DcVals) {
-  const { hostStyle, ...props } = p;
-  return <DcHost logic={WorkspaceLogic} render={renderWorkspace} props={props} hostStyle={hostStyle as CSSProperties | undefined} />;
-}
-const COMPONENTS: DcComponents = { Workspace };
 
 /** A CRM customer as the prototype's step 1 reads one (its own names beside the CRM form's). */
 function asCustomer(c: IrqCrmCustomer) {
@@ -115,7 +107,7 @@ export function IrQuoteScreen(p: {
   }, [boot.status]);
   return (
     <Frame css={IRQ_CSS_QUOTE}>
-      {props ? <DcHost logic={QuoteLogic} render={renderQuote} props={props} components={COMPONENTS} hostStyle={{ height: "100%" }} />
+      {props ? <DcHost logic={QuoteLogic} render={renderQuote} props={props} hostStyle={{ height: "100%" }} />
         : <Waiting rootH={p.rootH} error={boot.status === "error" ? boot.error : undefined} />}
       {toast && <Toast text={toast} onClose={clear} />}
     </Frame>

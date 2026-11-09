@@ -1,5 +1,5 @@
 /* eslint-disable */
-// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/Quote Settings v3 Bold.dc.html), kept line for line so the screens behave as it does.
+// @ts-nocheck — ported from the prototype (.design/ir-quote/design_handoff_ir_quote/Quote Settings v4.dc.html), kept line for line so the screens behave as it does.
 import { DcLogic } from "../dc";
 import React from "react";
 import * as quoteDocLib from "../lib/quote-doc";
@@ -75,7 +75,7 @@ export class SettingsLogic extends DcLogic {
   }
   nameBySize(c, group) {
     const ps = c.packages.filter(p => p.group === group); if (!ps.length) return;
-    const lab = sizeLabel(sizeKey(ps[0].spec)); if (!sizeKey(ps[0].spec)) return;
+    if (!sizeKey(ps[0].spec)) return; const lab = quoteDocLib.roomName(ps[0].spec); // room count + Note (2026-11-09)
     ps.forEach(p => { p.groupLabel = lab; p.layout = lab; p.name = lab + " " + (p.style === "build" ? "BUILD IN" : "CLASSIC"); p.building = ""; });
   }
   applyRev() {
@@ -333,7 +333,7 @@ export class SettingsLogic extends DcLogic {
     (p0 ? p0.cats : []).forEach(c => {
       totalRows += c.items.length;
       if (sampleCats.length >= 2) return;
-      sampleCats.push({ name: c.name, rows: c.items.map(it => { n++; shown++; const unit = Math.round((+it.cost || 0) * m); const r = { no: n, item: it.name, desc: it.desc, code: it.code, qty: it.qty, price: money(unit), sum: money(unit * it.qty) }; return { cells: cols.map(cl => ({ v: r[cl.key], align: cl.num ? "right" : "left" })) }; }) });
+      sampleCats.push({ name: c.name, rows: c.items.map(it => { n++; shown++; const unit = Math.round((+it.cost || 0) * m); const ph = ((cfg.catalog && cfg.catalog.items) || []).find(x => it.code && x.code === it.code) || {}; const r = { no: n, item: it.name, desc: it.desc, code: it.code, qty: it.qty, price: money(unit), sum: money(unit * it.qty) }; return { cells: cols.map(cl => cl.key === "photo" ? { v: "", isImg: true, isTxt: false, img: ph.img || "", noImg: !ph.img, align: "center" } : cl.key === "remark" ? { v: "Sales fills in", isImg: false, isTxt: true, align: "left", ink: "#97978F", fs: "italic" } : { v: r[cl.key] ?? ({ kind: (cfg.catalog.kinds[it.kind] || {}).label, collection: ph.collection, color: ph.color })[cl.key] ?? "", isImg: false, isTxt: true, align: cl.num ? "right" : "left", ink: "inherit", fs: "normal" }) }; }) });
     });
     const sampleFacts = { att: "MR HANDSOME", by: "WILLIAM", bill: "-", building: p0?.building || "", address: p0?.building || "", unit: p0 ? [p0.layout, lib.specText(p0.spec)].filter(Boolean).join(" · ") : "", layout: lib.packageName(cfg.packages, p0), date: `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` };
     const edit = (fn) => e => { const v = e.currentTarget.innerText.replace(/\n+$/, ""); fn(v); };
@@ -380,7 +380,7 @@ export class SettingsLogic extends DcLogic {
         hasX: b.type === "table" && (b.extraRows || []).some(r => r.item), xTitle: b.extraTitle || "OTHERS",
         xrows: b.type === "table" ? (b.extraRows || []).filter(r => r.item).map((r, ri) => { const rr = { no: "", item: r.item, desc: "", code: "", qty: +r.qty || 1, price: money(+r.price || 0), sum: money((+r.price || 0) * (+r.qty || 1)) }; return { cells: cols.map(cl => ({ v: rr[cl.key], align: cl.num ? "right" : "left" })) }; }) : [],
         adjPv: b.type === "totals" ? (b.extras || []).filter(e => e.label).map(e => ({ label: e.label + (e.mode === "percent" ? ` (${e.value || 0}%)` : ""), v: (e.sign === "less" ? "-" : "") + (e.mode === "percent" ? "…" : money(+e.value || 0)) })) : [],
-        facts: b.type === "facts" ? b.labels.map((f, fi) => ({ f, fi })).filter(o => !o.f.hidden).map(({ f, fi }) => ({ label: f.label, sample: sampleFacts[f.key] || "-", onBlur: edit(v => this.setBlock(b.id, x => { x.labels[fi].label = v; })) })) : [],
+        facts: b.type === "facts" ? b.labels.map((f, fi) => ({ f, fi })).filter(o => !o.f.hidden && !lib.factsOff(cfg).has(o.f.key)).map(({ f, fi }) => ({ label: f.label, sample: sampleFacts[f.key] || "-", onBlur: edit(v => this.setBlock(b.id, x => { x.labels[fi].label = v; })) })) : [],
         terms: b.type === "terms" ? b.lines.map((l, li) => ({ value: l, onBlur: edit(v => this.setBlock(b.id, x => { x.lines[li] = v; })) })) : [],
         onTextBlur: edit(v => this.setBlock(b.id, x => { x.text = v; })),
         onSaving: edit(v => this.setBlock(b.id, x => { x.labels.saving = v; })), onDiscount: edit(v => this.setBlock(b.id, x => { x.labels.discount = v; })), onTotal: edit(v => this.setBlock(b.id, x => { x.labels.total = v; })),
@@ -410,16 +410,17 @@ export class SettingsLogic extends DcLogic {
         moveUp: () => this.upd(c => { const L = c.doc.blocks, i = L.findIndex(x => x.id === sb.id); if (i > 0) L.splice(i - 1, 0, L.splice(i, 1)[0]); }),
         moveDown: () => this.upd(c => { const L = c.doc.blocks, i = L.findIndex(x => x.id === sb.id); if (i < L.length - 1) L.splice(i + 1, 0, L.splice(i, 1)[0]); }),
         ...this.styleBtns(sb, k => this.setBlock(sb.id, x => { x[k] = !x[k]; })),
-        factRows: t === "facts" ? sb.labels.map((f, i) => ({
+        factRows: t === "facts" ? sb.labels.map((f, i) => { const off = f.hidden || (f.key === "bill" && !lib.billOn(cfg)); return {
           ...this.dnd("facts", i, (a, b) => this.setBlock(sb.id, x => { const L = x.labels; L.splice(b, 0, L.splice(a, 1)[0]); })),
           label: f.label, custom: !!f.custom, hint: f.custom ? "IR fills in" : (FACT_NAMES[f.key] || f.key),
-          boxBorder: f.hidden ? "1.5px solid #C4C1B6" : "0", boxBg: f.hidden ? "#FFFFFF" : "#111111",
-          toggle: () => this.setBlock(sb.id, x => { x.labels[i].hidden = !x.labels[i].hidden; }),
+          boxBorder: off ? "1.5px solid #C4C1B6" : "0", boxBg: off ? "#FFFFFF" : "#111111",
+          // Billing address: this tick and Customer info's are one switch, off until the Principal ticks it (2026-11-09).
+          toggle: () => this.setBlock(sb.id, (x, c) => { if (f.key !== "bill") { x.labels[i].hidden = !x.labels[i].hidden; return; } x.labels[i].hidden = !off ? x.labels[i].hidden : false; c.custInfo = c.custInfo || lib.defaultCustInfo(); const o = c.custInfo.own.find(y => y.id === "bill"); if (o) o.print = off; }),
           onLabel: e => { const v = e.target.value; this.setBlock(sb.id, x => { x.labels[i].label = v; }); },
           up: () => this.setBlock(sb.id, x => { if (i > 0) x.labels.splice(i - 1, 0, x.labels.splice(i, 1)[0]); }),
           down: () => this.setBlock(sb.id, x => { if (i < x.labels.length - 1) x.labels.splice(i + 1, 0, x.labels.splice(i, 1)[0]); }),
           remove: () => this.setBlock(sb.id, x => { x.labels.splice(i, 1); })
-        })) : false,
+        }; }) : false,
         addFact: () => this.setBlock(sb.id, x => { x.labels.push({ key: lib.newId("x-"), label: "New detail", custom: true }); }),
         xrows: t === "table" ? (sb.extraRows || []).map((r, i) => ({
           item: r.item || "", qty: String(r.qty ?? 1), price: String(r.price ?? ""),
@@ -519,7 +520,7 @@ export class SettingsLogic extends DcLogic {
       const pc = cost(ep), armKey = "delpkg-" + ep.id;
       const setP = fn => this.upd(c => { const p = this.pkgOf(c, ep.id); if (p) fn(p, c); });
       ed = {
-        title: [sizeKey(ep.spec) ? sizeLabel(sizeKey(ep.spec)) : (ep.groupLabel || ep.name), lib.versionWord(cfg.packages, ep)].filter(Boolean).join(" · "), sub: sizeKey(ep.spec) ? "" : "Set bedrooms & bathrooms",
+        title: [sizeKey(ep.spec) ? lib.roomName(ep.spec) : (ep.groupLabel || ep.name), lib.versionWord(cfg.packages, ep)].filter(Boolean).join(" · "), sub: sizeKey(ep.spec) ? "" : "Set bedrooms & bathrooms",
         groupLabel: ep.groupLabel || "", layout: ep.layout || "", building: ep.building || "", price: String(ep.price ?? ""),
         onGroupLabel: e => { const v = e.target.value; this.upd(c => c.packages.filter(p => p.group === ep.group).forEach(p => { p.groupLabel = v; })); },
         onLayout: e => { const v = e.target.value; setP(p => { p.layout = v; }); },
@@ -545,7 +546,7 @@ export class SettingsLogic extends DcLogic {
               drop: e => { e.preventDefault(); const f = this.state.phDrag; this.setState({ phDrag: null }); if (f == null || f === k) return; const a = [...(sp.photos || [])]; const [x] = a.splice(f, 1); a.splice(k, 0, x); setS("photos", a); } })),
             onPhotos: e => { const fs = [...(e.target.files || [])]; e.target.value = ""; if (!fs.length) return; Promise.all(fs.map(f => lib.fileToDataUrl(f, 1000))).then(ds => { setS("photos", [...(sp.photos || []), ...ds]); this.setState({ phStrip: true }); }); },
             onUpload: e => { const f = e.target.files && e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { const img = new Image(); img.onload = () => { const k = Math.min(1, 1400 / Math.max(img.width, img.height)); const cv = document.createElement("canvas"); cv.width = img.width * k; cv.height = img.height * k; const x = cv.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, cv.width, cv.height); x.drawImage(img, 0, 0, cv.width, cv.height); setS("plan", cv.toDataURL("image/jpeg", .82)); }; img.src = r.result; }; r.readAsDataURL(f); e.target.value = ""; } };
-          ["beds", "baths", "sqft", "note"].forEach(k => { o[k] = sp[k] || ""; o["on_" + k] = e => setS(k, e.target.value); });
+          ["beds", "baths", "sqft", "note"].forEach(k => { o[k] = sp[k] || ""; o["on_" + k] = k === "note" ? e => { const v = e.target.value; this.upd(c => { c.packages.filter(p => p.group === ep.group).forEach(p => { p.spec = { ...(p.spec || {}), note: v }; }); this.nameBySize(c, ep.group); }); } : e => setS(k, e.target.value); });
           return o;
         })(),
         cost: rm0(pc), suggested: rm0(pc * m), effective: pc ? "×" + (ep.price / pc).toFixed(2) : "—",
@@ -733,16 +734,16 @@ export class SettingsLogic extends DcLogic {
               toggleShow: () => setCI(x => { const o = x.crm[f.id] = x.crm[f.id] || {}; o.show = !o.show; if (!o.show) o.print = false; }),
               togglePrint: () => setCI(x => { const o = x.crm[f.id] = x.crm[f.id] || {}; o.print = !o.print; }) }; }),
           ciOwn: own.map((f, i) => { const mv = d => () => setCI(x => { const [z] = x.own.splice(i, 1); x.own.splice(i + d, 0, z); }), ak = "ci-" + f.id;
-            return { app: f.core ? "none" : "auto", label: f.label, type: f.type || "short", core: !!f.core, never: false, typeOp: f.core ? .55 : 1, rq: sw(!!f.required), pr: sw(f.core ? f.print !== false : !!f.print, false),
+            return { app: f.core ? "none" : "auto", label: f.label, type: f.type || "short", core: !!f.core, never: false, typeOp: f.core ? .55 : 1, rq: sw(!!f.required), pr: sw(lib.printsOwn(f), false),
               first: i === 0, last: i === own.length - 1, upOp: i === 0 ? .35 : 1, downOp: i === own.length - 1 ? .35 : 1, up: mv(-1), down: mv(1),
               onLabel: e => { const v = e.target.value; setCI(x => { x.own[i].label = v; }); }, onType: e => { const v = e.target.value; setCI(x => { x.own[i].type = v; }); },
-              toggleReq: () => setCI(x => { x.own[i].required = !x.own[i].required; }), togglePrint: () => setCI(x => { const o = x.own[i]; o.print = o.core ? o.print === false : !o.print; }),
+              toggleReq: () => setCI(x => { x.own[i].required = !x.own[i].required; }), togglePrint: () => this.upd(c => { c.custInfo = c.custInfo || lib.defaultCustInfo(); const o = c.custInfo.own[i]; o.print = !lib.printsOwn(o); if (o.id === "bill" && o.print) (c.doc.blocks.find(b => b.type === "facts")?.labels || []).forEach(l => { if (l.key === "bill") l.hidden = false; }); }),
               delOp: f.core ? .25 : 1, delBg: st.arm === ak ? "#F6E1DA" : "transparent", remove: () => this.arm(ak, () => setCI(x => { x.own.splice(i, 1); })) }; }),
           ciPvTabs: [["phone", "Phone", "M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2ZM11 18h2"], ["desk", "Desktop", "M3 4h18v12H3zM8 20h8M12 16v4"]].map(([k, label, d]) => { const on = (st.ciPv || "phone") === k; return { label, d, bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", shadow: on ? "0 1px 2px rgba(20,20,18,.14)" : "none", pick: () => this.setState({ ciPv: k }) }; }),
           ciPv: { phone: (st.ciPv || "phone") === "phone", desk: st.ciPv === "desk" },
-          ciPrevForm: [...lib.CRM_FIELDS.filter(f => f.core || (ci.crm[f.id] || {}).show).map(f => ({ label: f.label, req: !!f.core || !!(ci.crm[f.id] || {}).required })), ...own.map(f => ({ label: f.label, req: !!f.required }))],
+          ciPrevForm: [...lib.CRM_FIELDS.filter(f => f.core || (ci.crm[f.id] || {}).show).map(f => ({ label: f.label, req: !!f.core || !!(ci.crm[f.id] || {}).required })), ...own.filter(f => f.id !== "bill" || lib.printsOwn(f)).map(f => ({ label: f.label, req: !!f.required }))], // Billing address is asked only while ticked (2026-11-09)
           ciPrevPrint: (() => { const SAMPLE = { name: "Tan Wei Ming", phone: "012-338 4471", ptype: "Condo", usize: "3R 2R", uloc: "Block B", type: "Condo", size: "3R 2R", loc: "Block B", req: "Full furnish", budget: "RM 40k–50k", unit: "B-23-05", bill: "—", building: "Skyline Embassy", date: "5 Nov 2026", by: "William Lim" };
-            const core = own.filter(f => f.core && f.print !== false).map(f => ({ label: f.label.toUpperCase() + " :", value: SAMPLE[f.id] || "—" }));
+            const core = own.filter(f => f.core && lib.printsOwn(f)).map(f => ({ label: f.label.toUpperCase() + " :", value: SAMPLE[f.id] || "—" }));
             return [{ label: "ATTENTION :", value: SAMPLE.name }, ...core, ...lib.CRM_FIELDS.filter(f => f.id !== "name" && (ci.crm[f.id] || {}).show && (ci.crm[f.id] || {}).print).map(f => ({ label: f.label.toUpperCase() + " :", value: SAMPLE[f.id] })), ...own.filter(f => !f.core && f.print).map(f => ({ label: f.label.toUpperCase() + " :", value: "…" }))]; })(),
           ciAdd: e => { e.preventDefault(); const n = (e.target.nf.value || "").trim(); if (!n) return; e.target.nf.value = ""; setCI(x => { x.own.push({ id: lib.newId("cf-"), label: n, type: "short", ph: "", required: false, print: true }); }); }
         }; })(),
@@ -852,9 +853,9 @@ export class SettingsLogic extends DcLogic {
       coPhone: coEdit(() => co.phone, (o, v) => { o.phone = v; }), coEmail: coEdit(() => co.email, (o, v) => { o.email = v; }),
       coAddr: co.addr.map((a, i) => coEdit(() => a, (o, v) => { o.addr[i] = v; })),
       colAdd: { stop: e => e.stopPropagation(), addCustom: e => { e.preventDefault(); const v = (e.target.cn.value || "").trim(); if (!v) return; const key = "c_" + lib.newId(""); this.setBlock(tb.id, x => { const at = x.columns.findIndex(c => c.key === "qty"); x.columns.splice(at < 0 ? x.columns.length : at, 0, { key, label: v.toUpperCase(), show: true, num: false, custom: true }); }); this.setState({ colAddOpen: false }); }, addRow: e => { if (e) e.stopPropagation(); this.setBlock(tb.id, x => { x.extraRows = [...(x.extraRows || []), { id: lib.newId("xr-"), item: "", qty: 1, price: "" }]; }); this.setState({ sel: tb.id }); }, btnD: st.colHover || st.colAddOpen ? "grid" : "none", enter: () => { if (!this.state.colHover) this.setState({ colHover: true }); }, leave: () => this.setState({ colHover: false, colAddOpen: false }), open: !!st.colAddOpen, toggle: e => { if (e) e.stopPropagation(); this.setState(z => ({ colAddOpen: !z.colAddOpen })); },
-        opts: [["kind", "CATEGORY"], ["collection", "COLLECTION"], ["color", "COLOUR"], ["remark", "REMARKS"]].map(([key, label]) => { const has = (tb.columns || []).some(c => c.key === key); return { label: label.charAt(0) + label.slice(1).toLowerCase(), off: has, op: has ? .4 : 1, add: () => { this.setBlock(tb.id, x => { const at = x.columns.findIndex(c => c.key === "qty"); x.columns.splice(at < 0 ? x.columns.length : at, 0, { key, label, show: true, num: false, custom: true }); }); this.setState({ colAddOpen: false }); } }; }) },
-      tableHead: cols.map(c => ({ label: c.label, align: c.num ? "right" : "left", onBlur: edit(v => this.setBlock(tb.id, x => { const col = x.columns.find(y => y.key === c.key); col.label = v; })) })),
-      tableCols: cols.map(c => c.key === "no" ? "28px" : c.key === "item" ? "minmax(120px,2.2fr)" : c.num ? "minmax(44px,.6fr)" : "minmax(70px,1fr)").join(" "),
+        opts: [["photo", "PHOTO"], ["kind", "CATEGORY"], ["collection", "COLLECTION"], ["color", "COLOUR"], ["remark", "REMARKS"]].map(([key, label]) => { const has = (tb.columns || []).some(c => c.key === key); return { label: label.charAt(0) + label.slice(1).toLowerCase(), off: has, op: has ? .4 : 1, add: () => { this.setBlock(tb.id, x => { const at = x.columns.findIndex(c => c.key === "qty"); x.columns.splice(at < 0 ? x.columns.length : at, 0, { key, label, show: true, num: false, custom: true }); }); this.setState({ colAddOpen: false }); } }; }) },
+      tableHead: cols.map(c => ({ label: c.label, align: c.num ? "right" : c.key === "photo" ? "center" : "left", onBlur: edit(v => this.setBlock(tb.id, x => { const col = x.columns.find(y => y.key === c.key); col.label = v; })) })),
+      tableCols: cols.map(c => c.key === "photo" ? "44px" : c.key === "no" ? "28px" : c.key === "item" ? "minmax(120px,2.2fr)" : c.num ? "minmax(44px,.6fr)" : "minmax(70px,1fr)").join(" "),
       sampleCats, sampleMore: false ? `Sample from ${p0.groupLabel || p0.name} · ${totalRows - shown} more rows on the real quotation` : "",
       sampleTotal: p0 ? money(p0.price - 500) : "",
       // units
@@ -869,7 +870,7 @@ export class SettingsLogic extends DcLogic {
           const keep = gs.find(g => g.classic === st.pid || g.build === st.pid) || gs[0], armK = "comb-" + sk;
           return { label: sizeLabel(sk), building: multi ? (st.arm === armK ? `Keep ${keep.label}, delete ${gs.length - 1}?` : `${gs.length} versions`) : "", canCombine: !!multi, combineLabel: st.arm === armK ? "Confirm" : "Combine",
             combine: () => this.arm(armK, () => this.upd(c => { const drop = gs.filter(g => g !== keep).map(g => g.id); c.packages = c.packages.filter(p => !drop.includes(p.group)); this.nameBySize(c, keep.id); })),
-            rows: gs.flatMap(g => [["classic", "Classic"], ["build", "Build in"]].filter(([k]) => g[k]).map(([k, label]) => { const p = cfg.packages.find(x => x.id === g[k]); const on = p.id === st.pid; return { style: (sk ? sizeLabel(sk) : g.label) + ((g.classic && g.build) || multi ? " · " + label : ""), price: rm0(cost(p)), bg: on || (st.ctx && st.ctx.pkg === p.id) ? "#FFEBD9" : "#FFFFFF", ctxOpen: e => { e.preventDefault(); e.stopPropagation(); this.setState({ pid: p.id, arm: "", ctx: { pkg: p.id, x: Math.min(e.clientX, window.innerWidth - 210), y: Math.min(e.clientY, window.innerHeight - 240) } }); }, bar: on ? "inset 3px 0 0 #111111" : "none", ink: on ? "#111111" : "#1F1F1C", weight: on ? 650 : 500, pick: () => this.setState({ pid: p.id, arm: "" }) }; })) }; }); })(),
+            rows: gs.flatMap(g => [["classic", "Classic"], ["build", "Build in"]].filter(([k]) => g[k]).map(([k, label]) => { const p = cfg.packages.find(x => x.id === g[k]); const on = p.id === st.pid; return { style: (sk ? lib.roomName(p.spec) : g.label) + ((g.classic && g.build) || multi ? " · " + label : ""), price: rm0(cost(p)), bg: on || (st.ctx && st.ctx.pkg === p.id) ? "#FFEBD9" : "#FFFFFF", ctxOpen: e => { e.preventDefault(); e.stopPropagation(); this.setState({ pid: p.id, arm: "", ctx: { pkg: p.id, x: Math.min(e.clientX, window.innerWidth - 210), y: Math.min(e.clientY, window.innerHeight - 240) } }); }, bar: on ? "inset 3px 0 0 #111111" : "none", ink: on ? "#111111" : "#1F1F1C", weight: on ? 650 : 500, pick: () => this.setState({ pid: p.id, arm: "" }) }; })) }; }); })(),
       ed,
       // catalogue
       kindRooms: (() => { const chip = (k, label, count, paused) => { const on = st.kindFilter === k; return { label, count, op: paused ? ".5" : "1", border: on ? "#111111" : "#DEDED8", bg: on ? "#F0F0ED" : "#FFFFFF", color: on ? "#111111" : "#1F1F1C", weight: on ? "650" : "500", pick: () => this.setState({ kindFilter: k }) }; };

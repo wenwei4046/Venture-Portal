@@ -11,8 +11,8 @@ const tpls = readdirSync(DIR).filter(f => f.endsWith(".tsx")).map(f => [f, readF
 const ALL = IRQ_CSS_QUOTE + IRQ_CSS_SETTINGS + IRQ_CSS_SETTINGS_MOBILE;
 
 describe("the generated IR Quote templates", () => {
-  it("are the four prototypes", () => {
-    expect(tpls.map(([f]) => f).sort()).toEqual(["QuoteTpl.tsx", "SettingsMobileTpl.tsx", "SettingsTpl.tsx", "WorkspaceTpl.tsx"]);
+  it("are the three prototypes", () => {
+    expect(tpls.map(([f]) => f).sort()).toEqual(["QuoteTpl.tsx", "SettingsMobileTpl.tsx", "SettingsTpl.tsx"]); // the Drive (WorkspaceTpl) went 2026-11-09
   });
 
   it("carry no hex colour of their own", () => {
@@ -31,7 +31,7 @@ describe("the generated IR Quote templates", () => {
   });
 
   it("have keyframes for every animation the prototype names", () => {
-    for (const name of ["rvSheetUp", "rvPanelIn", "rvFade", "wsIn", "wsFade"]) expect(ALL.includes(`@keyframes ${name}`), name).toBe(true);
+    for (const name of ["rvSheetUp", "rvPanelIn", "rvFade"]) expect(ALL.includes(`@keyframes ${name}`), name).toBe(true);
   });
 
   // globals.css's 16px floor stops at the shadow root, so each screen's sheet carries its own: under 16px, a tap on

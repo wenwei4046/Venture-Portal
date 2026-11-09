@@ -2,10 +2,9 @@
 // IR Quote (2026-11-05): reads everything a screen opens on (`loadIrQuote`), hands it to the ported modules, and wires
 // their writes to the server — the link between the prototype's browser storage and the app's tables.
 import { useEffect, useState } from "react";
-import { loadIrQuote, saveIrDriveBoard, saveIrQuoteConfig, saveIrQuoteDraft, type IrqBoot } from "@/app/(member)/member/ir-quote-actions";
+import { loadIrQuote, saveIrQuoteConfig, saveIrQuoteDraft, type IrqBoot } from "@/app/(member)/member/ir-quote-actions";
 import { configureIrqStorage, irqStorage, preloadIrqStorage } from "./storage";
 import { irqEnv, uploadPictures } from "./env";
-import { preloadBoards } from "./lib/workspace-store";
 
 export const IRQ_LIVE = "irq.config.v1";
 export const IRQ_DRAFT = "irq.preview.v1";
@@ -28,11 +27,6 @@ function wire(boot: IrqBoot, readOnly: boolean, onError: (m: string) => void) {
   irqEnv.user = boot.user;
   irqEnv.readOnly = readOnly;
   irqEnv.onError = onError;
-  irqEnv.saveBoard = async (id, board) => {
-    if (readOnly) throw new Error("Read-only while viewing as — nothing is saved.");
-    const r = await saveIrDriveBoard(id, board);
-    if (!r.ok) throw new Error(r.error);
-  };
   const dKey = draftsKey(boot.user.id);
   let kept = new Map<string, string>((boot.drafts as Draft[]).filter(d => d?.id).map(d => [d.id, JSON.stringify(d)]));
   preloadIrqStorage({
@@ -40,7 +34,6 @@ function wire(boot: IrqBoot, readOnly: boolean, onError: (m: string) => void) {
     [IRQ_DRAFT]: boot.draft ? JSON.stringify(boot.draft) : null,
     [dKey]: JSON.stringify(boot.drafts),
   });
-  preloadBoards(boot.boards);
   configureIrqStorage(
     async (key, value) => {
       if (readOnly) throw new Error("Read-only while viewing as — nothing is saved.");
@@ -70,7 +63,7 @@ function wire(boot: IrqBoot, readOnly: boolean, onError: (m: string) => void) {
 
 /** The preview and the demo: no session, so the handoff's own price list, nothing sent anywhere. */
 const OFFLINE_BOOT: IrqBoot = {
-  quote: true, edit: true, live: null, liveAt: null, draft: null, drafts: [], boards: [],
+  quote: true, edit: true, live: null, liveAt: null, draft: null, drafts: [],
   crmFields: [
     { id: "name", label: "Name", section: "Contact", core: true }, { id: "phone", label: "Phone", section: "Contact" },
     { id: "type", label: "Property type", section: "Property" }, { id: "size", label: "Unit size", section: "Property" },
@@ -91,7 +84,6 @@ export function useIrqBoot(readOnly: boolean, onError: (m: string) => void, offl
       const boot = { ...OFFLINE_BOOT, user: { id: "preview", name: offline.name } };
       wire(boot, readOnly, onError);
       configureIrqStorage(async () => {}, () => {});
-      irqEnv.saveBoard = async () => {};
       setState({ status: "ready", boot });
       return () => { live = false; };
     }
