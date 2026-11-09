@@ -33,6 +33,8 @@ vi.mock('./VoucherDrawer', async (orig) => {
   return { ...real, VoucherDrawer: ({ id }: { id: string | null }) => (mocks.drawer(id), id ? <div data-testid="drawer">{id}</div> : null) }
 })
 vi.mock('./AmendDateButton', () => ({ default: () => null }))
+// The row menu reads its voucher on a right-click (2026-11-09).
+vi.mock('../page-actions', () => ({ openVoucherPage: vi.fn().mockResolvedValue({ ok: false, reason: 'not_found' }) }))
 vi.mock('./AmendRepaymentButton', () => ({ default: () => null }))
 
 import PaymentsHubClient from './PaymentsHubClient'

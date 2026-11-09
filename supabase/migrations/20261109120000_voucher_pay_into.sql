@@ -102,7 +102,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $fn$
 BEGIN
-  PERFORM public.tab_write_guard(ARRAY['/payments/[id]'], ARRAY['treasury.create']);
+  PERFORM public.tab_write_guard(ARRAY['/payments', '/payments/[id]', '/receipts'], ARRAY['treasury.create']);
   IF auth.uid() IS NULL OR NOT coalesce(public.has_any_action(ARRAY['treasury.create']), false) THEN
     RAISE EXCEPTION 'Copy needs Treasury · Create.' USING ERRCODE = '42501';
   END IF;

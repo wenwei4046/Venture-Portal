@@ -1250,7 +1250,7 @@ export async function approveVoucher(formData: FormData) {
 // still live; the amount then stays locked to that split, as on any repayment
 // voucher. A deal since repaid gets a plain copy, as before.
 export async function copyPaymentVoucher(formData: FormData): Promise<void> {
-  const user = await requireActionOn('/payments/[id]', 'treasury', 'create')
+  const user = await requireActionOn(['/payments', '/payments/[id]', '/receipts'], 'treasury', 'create')
   const created = await copyPaymentVoucherWork(user, formData)
   redirect(`/payments/${created.id}/edit`)
 }
@@ -1261,7 +1261,7 @@ export async function copyPaymentVoucher(formData: FormData): Promise<void> {
  * copy on its own screen, its Edit sheet up, instead of the portal's edit page.
  */
 export async function copyPaymentVoucherInWords(formData: FormData): Promise<{ ok: true; id: string; voucherNo: string } | { ok: false; reason: string }> {
-  const user = await requireActionOn('/payments/[id]', 'treasury', 'create')
+  const user = await requireActionOn(['/payments', '/payments/[id]', '/receipts'], 'treasury', 'create')
   try {
     const created = await copyPaymentVoucherWork(user, formData)
     return { ok: true, ...created }
@@ -1780,7 +1780,7 @@ export async function reassignVoucherGlAccount(
   formData: FormData,
 ): Promise<{ error?: string; changed?: number }> {
   try {
-    await requireActionOn('/payments/[id]', 'treasury', 'edit')
+    await requireActionOn(['/payments', '/payments/[id]', '/receipts'], 'treasury', 'edit')
     const supabase = await createClient()
 
     const id = ((formData.get('id') as string) ?? '').trim()
