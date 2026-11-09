@@ -1635,8 +1635,11 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                 {"\n                          "}
                                 {dcList(v["tableHead"]).map((L_th_x, L_th_x_i) => (
                                   <Fragment key={L_th_x_i}>
-                                    <span contentEditable={"true"} suppressContentEditableWarning={true} onBlur={L_th_x?.["onBlur"]} style={dcCss(`text-align:${dcS(L_th_x?.["align"])}`)}>
-                                      {dcText(L_th_x?.["label"])}
+                                    <span style={dcCss(`position:relative;min-width:0;text-align:${dcS(L_th_x?.["align"])}`)}>
+                                      <span contentEditable={"true"} suppressContentEditableWarning={true} onBlur={L_th_x?.["onBlur"]} style={{"display":"block"}}>
+                                        {dcText(L_th_x?.["label"])}
+                                      </span>
+                                      <span onPointerDown={L_th_x?.["grab"]} title={"Drag to change the width"} style={dcCss(`position:absolute;top:-6px;bottom:-6px;right:-8px;width:8px;cursor:col-resize;touch-action:none;z-index:3;display:${dcS(L_th_x?.["handle"])};background:${dcS(L_th_x?.["handleBg"])}`)} className={"irq-pf"} />
                                     </span>
                                   </Fragment>
                                 ))}
@@ -2034,7 +2037,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                         </label>
                         {"\n                    "}
                         {(v["ed"]?.["sp"]?.["noPhotos"]) ? (<>
-                          <label title={"Add photos"} style={{"flex":"0 0 44px","width":"44px","height":"44px","display":"grid","placeItems":"center","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-6b6b66)","cursor":"pointer"}} className={"irq-pf"}>
+                          <label title={"Add photos"} style={{"flex":"0 0 44px","width":"44px","height":"44px","display":"grid","placeItems":"center","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-6b6b66)","cursor":"pointer"}} className={"irq-pg"}>
                             <svg width={"19"} height={"19"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"}>
                               <path d={"M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15 9h.01"} />
                             </svg>
@@ -2192,7 +2195,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                   </svg>
                                 </button>
                                 {"\n                          "}
-                                <input value={dcValue(L_c_1d?.["name"])} onChange={L_c_1d?.["onName"]} style={{"flex":"0 1 260px","minWidth":"0","height":"32px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"13px","fontWeight":"700","letterSpacing":".04em","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pg"} />
+                                <input value={dcValue(L_c_1d?.["name"])} onChange={L_c_1d?.["onName"]} style={{"flex":"0 1 260px","minWidth":"0","height":"32px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"13px","fontWeight":"700","letterSpacing":".04em","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph"} />
                                 {"\n                          "}
                                 <span style={{"fontSize":"12px","color":"var(--irq-c-6b6b66)"}}>
                                   {dcText(L_c_1d?.["count"])}
@@ -2876,7 +2879,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                         <div style={dcCss(`display:grid;grid-template-columns:40px 56px 110px minmax(220px,1fr) 140px 110px 120px 92px 36px;align-items:center;border-bottom:1px solid var(--irq-c-eeeeea);background:${dcS(L_r_1q?.["rowBg"])}`)}>
                           {"\n                  "}
                           <span style={{"display":"grid","placeItems":"center"}}>
-                            <input type={"checkbox"} aria-label={"Select item"} checked={dcChecked(L_r_1q?.["selected"])} onChange={L_r_1q?.["onSel"]} style={{"width":"17px","height":"17px","margin":"0","accentColor":"var(--irq-c-111111)","cursor":"pointer"}} className={"irq-ph irq-p7"} />
+                            <input type={"checkbox"} aria-label={"Select item"} checked={dcChecked(L_r_1q?.["selected"])} onChange={L_r_1q?.["onSel"]} style={{"width":"17px","height":"17px","margin":"0","accentColor":"var(--irq-c-111111)","cursor":"pointer"}} className={"irq-pi irq-p7"} />
                           </span>
                           {"\n                  "}
                           <label title={"Add or change the photo"} style={{"padding":"6px 6px 6px 0","cursor":"pointer"}}>
@@ -2887,11 +2890,11 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                           </label>
                           {"\n                  "}
                           <span style={{"padding":"6px 4px"}}>
-                            <input value={dcValue(L_r_1q?.["code"])} onChange={L_r_1q?.["onCode"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontFamily":"var(--font-mono),Menlo,monospace","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph irq-p7"} />
+                            <input value={dcValue(L_r_1q?.["code"])} onChange={L_r_1q?.["onCode"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontFamily":"var(--font-mono),Menlo,monospace","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pi irq-p7"} />
                           </span>
                           {"\n                  "}
                           <span style={{"padding":"6px 4px","display":"flex","flexDirection":"column","gap":"2px","minWidth":"0"}}>
-                            <input value={dcValue(L_r_1q?.["name"])} onChange={L_r_1q?.["onName"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"13.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph irq-p7"} />
+                            <input value={dcValue(L_r_1q?.["name"])} onChange={L_r_1q?.["onName"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"13.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pi irq-p7"} />
                             {(L_r_1q?.["specs"]) ? (<>
                               <span title={L_r_1q?.["specs"]} style={{"padding":"0 8px","fontSize":"11.5px","color":"var(--irq-c-6b6b66)","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis"}}>
                                 {dcText(L_r_1q?.["specs"])}
@@ -2900,7 +2903,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                           </span>
                           {"\n                  "}
                           <span style={{"padding":"6px 4px"}}>
-                            <select value={dcValue(L_r_1q?.["kind"])} onChange={L_r_1q?.["onKind"]} style={{"width":"100%","height":"34px","padding":"0 4px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph irq-p7"}>
+                            <select value={dcValue(L_r_1q?.["kind"])} onChange={L_r_1q?.["onKind"]} style={{"width":"100%","height":"34px","padding":"0 4px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pi irq-p7"}>
                               {dcList(v["kindOptsReq"]).map((L_ko_1r, L_ko_1r_i) => (
                                 <Fragment key={L_ko_1r_i}>
                                   <option value={dcValue(L_ko_1r?.["v"])}>
@@ -3144,7 +3147,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                           </span>
                           {"\n                  "}
                           <span style={{"display":"flex","alignItems":"center","gap":"8px","minWidth":"0","paddingRight":"10px"}}>
-                            <input value={dcValue(L_of_1u?.["label"])} onChange={L_of_1u?.["onLabel"]} style={{"flex":"1","minWidth":"0","height":"34px","padding":"0 8px","marginLeft":"-8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"14px","fontWeight":"500","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pi irq-p7"} />
+                            <input value={dcValue(L_of_1u?.["label"])} onChange={L_of_1u?.["onLabel"]} style={{"flex":"1","minWidth":"0","height":"34px","padding":"0 8px","marginLeft":"-8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"14px","fontWeight":"500","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pj irq-p7"} />
                           </span>
                           {"\n                  "}
                           <select value={dcValue(L_of_1u?.["type"])} onChange={L_of_1u?.["onType"]} disabled={L_of_1u?.["core"]} style={dcCss(`appearance:${dcS(L_of_1u?.["app"])};-webkit-appearance:${dcS(L_of_1u?.["app"])};height:34px;padding:0 4px;margin-left:-4px;border-radius:8px;border:1px solid transparent;background:transparent;font-size:12.5px;color:var(--irq-c-6b6b66);outline:none;opacity:${dcS(L_of_1u?.["typeOp"])}`)}>
@@ -3187,7 +3190,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                     {"\n              "}
                     <form onSubmit={v["ciAdd"]} style={{"display":"flex","gap":"8px","padding":"12px 18px","borderTop":"1px solid var(--irq-c-eeeeea)"}}>
                       {"\n                "}
-                      <input name={"nf"} placeholder={"New field, e.g. Key collection date"} style={{"flex":"1","minWidth":"0","height":"38px","padding":"0 12px","borderRadius":"10px","border":"1px dashed var(--irq-c-d2d2cb)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pj"} />
+                      <input name={"nf"} placeholder={"New field, e.g. Key collection date"} style={{"flex":"1","minWidth":"0","height":"38px","padding":"0 12px","borderRadius":"10px","border":"1px dashed var(--irq-c-d2d2cb)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pk"} />
                       {"\n                "}
                       <button type={"submit"} style={{"height":"38px","padding":"0 16px","borderRadius":"10px","border":"0","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"13.5px","fontWeight":"650","whiteSpace":"nowrap"}}>
                         {"+ Add field"}
@@ -3599,9 +3602,9 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                         {"\n                  "}
                         <div style={{"display":"flex","flexDirection":"column","gap":"6px","padding":"12px 14px 12px"}}>
                           {"\n                    "}
-                          <input value={dcValue(L_sr_20?.["name"])} onChange={L_sr_20?.["onName"]} placeholder={"Style name"} style={{"height":"36px","padding":"0 8px","margin":"0 -8px","border":"1px solid transparent","borderRadius":"8px","background":"transparent","fontSize":"16px","fontWeight":"650","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pg"} />
+                          <input value={dcValue(L_sr_20?.["name"])} onChange={L_sr_20?.["onName"]} placeholder={"Style name"} style={{"height":"36px","padding":"0 8px","margin":"0 -8px","border":"1px solid transparent","borderRadius":"8px","background":"transparent","fontSize":"16px","fontWeight":"650","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph"} />
                           {"\n                    "}
-                          <input value={dcValue(L_sr_20?.["desc"])} onChange={L_sr_20?.["onDesc"]} placeholder={"Short description for the client"} style={{"height":"34px","padding":"0 8px","margin":"0 -8px","border":"1px solid transparent","borderRadius":"8px","background":"transparent","fontSize":"13px","color":"var(--irq-c-6b6b66)","outline":"none"}} className={"irq-pg"} />
+                          <input value={dcValue(L_sr_20?.["desc"])} onChange={L_sr_20?.["onDesc"]} placeholder={"Short description for the client"} style={{"height":"34px","padding":"0 8px","margin":"0 -8px","border":"1px solid transparent","borderRadius":"8px","background":"transparent","fontSize":"13px","color":"var(--irq-c-6b6b66)","outline":"none"}} className={"irq-ph"} />
                           {"\n                    "}
                           <div style={{"display":"flex","alignItems":"center","gap":"6px","paddingTop":"4px"}}>
                             {"\n                      "}
