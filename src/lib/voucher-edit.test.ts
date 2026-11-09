@@ -72,6 +72,16 @@ describe('a voucher’s Edit — what is sent', () => {
     expect(entries(voucherEditForm('pr', 'credit', was, { ...was, accountCode: '5010', notes: 'reclassed' }))).toEqual({ id: 'pr', notes: 'reclassed', account_code: '5010' })
   })
 
+  it('Pay into (2026-11-09) goes as a pair, only when the form offers it and it changed', () => {
+    const was = storedVoucherFields({ ...V, payee_bank: 'Maybank', payee_account_no: '514012340009' }, ROWS, null)
+    expect(voucherEditsNothing(voucherEditForm('pv', 'debit', was, { ...was, payeeAccount: '5140-1234 0009' }))).toBe(true)
+    expect(entries(voucherEditForm('pv', 'debit', was, { ...was, payeeAccount: '7000222' }))).toEqual({ id: 'pv', payee_bank: 'Maybank', payee_account_no: '7000222' })
+    expect(entries(voucherEditForm('pv', 'debit', was, { ...was, payeeBank: '', payeeAccount: '' }))).toEqual({ id: 'pv', payee_bank: '', payee_account_no: '' })
+    // Not offered (the phone's sheet), or not this reader's to see: never sent.
+    const { payeeBank: _b, payeeAccount: _a, ...without } = was
+    expect(voucherEditsNothing(voucherEditForm('pv', 'debit', was, without))).toBe(true)
+  })
+
   it('finds an override half filled', () => {
     expect(halfOverride([{ pool: 'p', amount: '1', account_code: '9000', override_account_type: 'expense' }])).toBe(0)
     expect(halfOverride(ROWS)).toBeNull()

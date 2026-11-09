@@ -41,6 +41,9 @@ interface Props {
     amount: number
     payee_name: string
     payee_company_id: string | null
+    payee_bank?: string | null
+    payee_account_no?: string | null
+    payee_account_masked?: boolean
     bank_account_id: string | null
     description: string
     notes: string | null

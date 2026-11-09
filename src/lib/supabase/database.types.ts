@@ -8554,6 +8554,9 @@ export type Database = {
         Returns: undefined
       }
       payment_requests_for_pv: { Args: { p_ids: string[] }; Returns: Json }
+      voucher_payee_copy: { Args: { p_from: string; p_to: string }; Returns: undefined }
+      voucher_payee_set: { Args: { p_voucher: string; p_bank: string; p_account: string }; Returns: undefined }
+      voucher_payees: { Args: { p_ids: string[] }; Returns: { voucher_id: string; bank: string | null; account_no: string | null }[] }
       payment_requests_attach_pv: {
         Args: { p_ids: string[]; p_pv: string; p_bill: Json }
         Returns: Json
