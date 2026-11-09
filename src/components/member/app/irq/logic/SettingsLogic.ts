@@ -27,7 +27,7 @@ const TABS = [["doc", "Quotation document"], ["cust", "Customer info"], ["units"
 const SIZES = ["1-1", "2-1", "2-2", "3-2", "3-3", "4-2", "4-3", "4-4"];
 const sizeKey = sp => { const b = parseInt((sp || {}).beds), t = parseInt((sp || {}).baths); return b && t ? b + "-" + t : ""; };
 const sizeLabel = k => k ? k.split("-").map(n => n + "R").join(" ") : "No room count";
-const SECTION = { doc: ["doc", "company"], cust: ["custInfo"], units: ["packages"], styles: ["styles"], cat: ["catalog"], kinds: [], bld: ["buildings", "bldFields"], price: ["markup"] };
+const SECTION = { doc: ["doc", "company"], cust: ["custInfo"], units: ["packages"], styles: ["styles"], cat: ["catalog"], kinds: ["sections"], bld: ["buildings", "bldFields"], price: ["markup"] };
 const rm0 = n => "RM " + Math.round(n).toLocaleString("en-MY");
 const money = n => (n < 0 ? "-" : "") + Math.abs(n).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const imgFor = code => /^(\d{6}|K\d{5})$/.test(code || "") ? `https://mm.hinlim.com/cache/b2bfs/product/${code}/${code}-550x500.jpg` : "";
@@ -159,7 +159,7 @@ export class SettingsLogic extends DcLogic {
     try { const [h, b64] = x.split(","), mime = (h.match(/data:([^;]+)/) || [])[1] || "image/jpeg", bin = atob(b64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([arr], { type: mime })); this._blobs.set(x, url); return url; } catch (e) { return ""; } }
   loadXlsx() { if (window.XLSX) return Promise.resolve(window.XLSX); return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"; sc.onload = () => res(window.XLSX); sc.onerror = rej; document.head.appendChild(sc); }); }
   async dlTemplate(ep) {
-    const typeOf = c => (c.section || (c.items.some(i => i.kind) ? "furn" : "serv")) === "furn" ? "Furniture" : "Services";
+    const lib = quoteDocLib, cfg0 = this.state.cfg, typeOf = c => ((lib.sectionsOf(cfg0).find(s => s.id === lib.sectionOfCat(cfg0, c)) || {}).label || "Furniture");
     const rows = [["CATEGORY", "ITEM", "DESCRIPTION", "CODE/COLOUR", "QTY", "PRICE", "TYPE"]];
     (ep.cats || []).forEach(c => { if (!c.items.length) rows.push([c.name, "", "", "", "", "", typeOf(c)]); c.items.forEach(i => rows.push([c.name, i.name, i.desc || "", i.code || "", i.qty ?? 1, i.cost ?? "", typeOf(c)])); });
     if (rows.length === 1) rows.push(["LIVING", "TV CABINET", "", "336103", 1, 519]);
@@ -198,7 +198,7 @@ export class SettingsLogic extends DcLogic {
         const catName = cK >= 0 ? String(r[cK]).trim() : "", qty = cQ >= 0 ? num(r[cQ]) : null, price = cP >= 0 ? num(r[cP]) : null;
         if (catName && (!cur || cur.name !== catName.toUpperCase())) { const N = catName.toUpperCase(); cur = cats.find(x => x.name === N) || null; if (!cur) { cur = { name: N, label: /[a-z]/.test(catName) ? catName : catName.toLowerCase().replace(/(^|\s)\S/g, m => m.toUpperCase()), items: [] }; cats.push(cur); } }
         if (cK < 0 && name && qty == null && price == null && !(cC >= 0 && String(r[cC]).trim())) { cur = { name: name.toUpperCase(), label: name, items: [] }; cats.push(cur); return; }
-        const typ = cT >= 0 ? String(r[cT]).trim() : ""; if (cur && /^furn/i.test(typ)) cur.section = "furn"; else if (cur && /^serv/i.test(typ)) cur.section = "serv";
+        const typ = cT >= 0 ? String(r[cT]).trim().toLowerCase() : ""; const secHit = typ ? quoteDocLib.sectionsOf(this.state.cfg).find(s => s.label.toLowerCase() === typ || (typ.length >= 4 && s.label.toLowerCase().startsWith(typ.slice(0, 4)))) : null; if (cur && secHit) cur.section = secHit.id; // TYPE names a section (2026-11-09)
         if (!name) return; if (!cur) { cur = { name: "ITEMS", label: "Items", items: [] }; cats.push(cur); }
         cur.items.push({ name: name.toUpperCase(), desc: cD >= 0 ? String(r[cD]).trim() : "", code: cC >= 0 ? String(r[cC]).trim() : "", qty: qty == null ? 1 : qty, cost: price == null ? 0 : price, kind: kindOfCode(cC >= 0 ? r[cC] : "") });
       });
@@ -569,7 +569,7 @@ export class SettingsLogic extends DcLogic {
         remove: () => this.arm(armKey, () => { this.upd(c => { c.packages = c.packages.filter(p => p.id !== ep.id); }); this.setState({ pid: cfg.packages.find(p => p.id !== ep.id)?.id }); }),
         addCat: () => setP(p => { p.cats.push({ name: "NEW CATEGORY", label: "New category", items: [] }); }),
         cats: ep.cats.map((c, ci) => ({
-          section: c.section || (c.items.some(i => i.kind) ? "furn" : "serv"), onSection: e => { const v = e.target.value; setP(p => { p.cats[ci].section = v; }); },
+          section: lib.sectionOfCat(cfg, c), onSection: e => { const v = e.target.value; setP(p => { p.cats[ci].section = v; }); },
           name: c.name, open: !(st.catShut || {})[ep.id + ":" + ci], rot: (st.catShut || {})[ep.id + ":" + ci] ? "rotate(-90deg)" : "none", toggle: () => this.setState(z => ({ catShut: { ...(z.catShut || {}), [ep.id + ":" + ci]: !(z.catShut || {})[ep.id + ":" + ci] } })), count: `${c.items.length} item${c.items.length === 1 ? "" : "s"}`, sum: money(c.items.reduce((a, i) => a + (+i.cost || 0) * (+i.qty || 0), 0)),
           onName: e => { const v = e.target.value.toUpperCase(); setP(p => { p.cats[ci].name = v; p.cats[ci].label = v.charAt(0) + v.slice(1).toLowerCase(); }); },
           remove: () => setP(p => { p.cats.splice(ci, 1); }),
@@ -921,6 +921,20 @@ export class SettingsLogic extends DcLogic {
       kindRows: Object.entries(kinds).map(([k, v]) => ({ key: k, label: v.label, url: v.url || "", room: v.room || "", onRoom: e => { const val = e.target.value.toUpperCase(); this.upd(c => { c.catalog.kinds[k].room = val; }); },
         pauseLabel: v.paused ? "Paused" : "On", pauseInk: v.paused ? "#97978F" : "#387557", trackBg: v.paused ? "#D5D2C8" : "#4E9A6E", knobX: v.paused ? "2px" : "14px", togglePause: () => this.upd(c => { c.catalog.kinds[k].paused = !c.catalog.kinds[k].paused; }), onLabel: e => { const val = e.target.value; this.upd(c => { c.catalog.kinds[k].label = val; }); }, onUrl: e => { const val = e.target.value; this.upd(c => { c.catalog.kinds[k].url = val; }); }, remove: () => this.upd(c => { delete c.catalog.kinds[k]; }) })),
       newKind: st.newKind, onNewKind: e => this.setState({ newKind: e.target.value }),
+      // Sections: the quote's Customize tabs (2026-11-09: "新增电器；是否可以在哪个位置可以让我control加什么类型").
+      sectionOpts: lib.sectionsOf(cfg).map(s => ({ v: s.id, l: s.label })),
+      sectionRows: lib.sectionsOf(cfg).map((s, i, all) => { const used = (cfg.packages || []).reduce((n, p) => n + (p.cats || []).filter(c => lib.sectionOfCat(cfg, c) === s.id).length, 0), builtIn = s.id === "furn" || s.id === "serv", ak = "sec-" + s.id;
+        const setS = fn => this.upd(c => { c.sections = lib.sectionsOf(c); const x = c.sections.find(y => y.id === s.id); if (x) fn(x, c.sections); });
+        return { label: s.label, kind: s.goods ? "goods" : "list", used: used ? used + " categor" + (used === 1 ? "y" : "ies") : "Not used yet",
+          onLabel: e => { const v = e.target.value; setS(x => { x.label = v; x.head = v.toUpperCase(); }); },
+          onKind: e => { const v = e.target.value; setS(x => { x.goods = v === "goods"; }); },
+          up: () => this.upd(c => { c.sections = lib.sectionsOf(c); if (i > 0) c.sections.splice(i - 1, 0, c.sections.splice(i, 1)[0]); }), upOp: i ? 1 : .35,
+          down: () => this.upd(c => { c.sections = lib.sectionsOf(c); if (i < all.length - 1) c.sections.splice(i + 1, 0, c.sections.splice(i, 1)[0]); }), downOp: i < all.length - 1 ? 1 : .35,
+          delOp: builtIn || used ? .3 : 1, delTip: builtIn ? "Furniture and Services are built in" : used ? "In use — move its categories first" : st.arm === ak ? "Click again to delete" : "Delete",
+          delInk: st.arm === ak ? "#8A2E1C" : "#6B6B66",
+          remove: () => { if (builtIn || used) return; if (st.arm !== ak) { this.setState({ arm: ak }); return; } this.setState({ arm: "" }); this.upd(c => { c.sections = lib.sectionsOf(c).filter(y => y.id !== s.id); }); } }; }),
+      newSection: st.newSection || "", onNewSection: e => this.setState({ newSection: e.target.value }),
+      addSection: () => { const label = String(st.newSection || "").trim(); if (!label) return; this.upd(c => { c.sections = [...lib.sectionsOf(c), { id: lib.newId("sec-"), label, head: label.toUpperCase(), goods: true }]; }); this.setState({ newSection: "" }); },
       addKind: () => { const label = st.newKind.trim(); if (!label) return; const key = label.toLowerCase().replace(/[^a-z0-9]+/g, "-"); this.upd(c => { c.catalog.kinds[key] = { label, url: "" }; }); this.setState({ newKind: "" }); },
       // buildings
       bldCount: `${cfg.buildings.length} building${cfg.buildings.length === 1 ? "" : "s"}`,

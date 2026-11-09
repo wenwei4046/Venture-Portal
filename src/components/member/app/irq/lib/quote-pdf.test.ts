@@ -49,3 +49,20 @@ describe("the PDF's pictures", () => {
     expect(src).toMatch(/toJpeg\(page, \{[^}]*includeQueryParams: true/);
   });
 });
+
+// The user, 2026-11-09: "新增电器；是否可以在哪个位置可以让我control加什么类型" — sections, one Customize tab each.
+describe("the quote's sections", async () => {
+  const { sectionsOf, sectionOfCat, goodsSection } = await import("./quote-doc");
+  it("are Furniture and Services until Quote settings adds more", () => {
+    expect(sectionsOf({}).map((s: { id: string; label: string; goods: boolean }) => [s.id, s.label, s.goods])).toEqual([["furn", "Furniture", true], ["serv", "Services", false]]);
+    const cfg = { sections: [...sectionsOf({}), { id: "sec-e", label: "Electrical", goods: true }] };
+    expect(sectionsOf(cfg).map((s: { head: string }) => s.head)).toEqual(["FURNITURE & APPLIANCES", "SERVICES & FITTINGS", "ELECTRICAL"]);
+    expect(goodsSection(cfg, "sec-e")).toBe(true);
+  });
+  it("put a category in the section it names, else by its rows", () => {
+    const cfg = { sections: [...sectionsOf({}), { id: "sec-e", label: "Electrical", goods: true }] };
+    expect(sectionOfCat(cfg, { section: "sec-e", items: [] })).toBe("sec-e");
+    expect(sectionOfCat(cfg, { section: "gone", items: [{ kind: "sofa" }] })).toBe("furn"); // a section deleted since
+    expect(sectionOfCat(cfg, { items: [{}] })).toBe("serv");
+  });
+});

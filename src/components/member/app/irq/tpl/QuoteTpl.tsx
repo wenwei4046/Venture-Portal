@@ -1503,7 +1503,7 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                     {dcList(v["czTabs"]).map((L_zt_q, L_zt_q_i) => (
                       <Fragment key={L_zt_q_i}>
                         {"\n                  "}
-                        <button onClick={L_zt_q?.["pick"]} style={dcCss(`flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 6px;border-radius:8px;border:0;background:${dcS(L_zt_q?.["bg"])};color:${dcS(L_zt_q?.["ink"])};box-shadow:${dcS(L_zt_q?.["shadow"])};white-space:nowrap`)}>
+                        <button onClick={L_zt_q?.["pick"]} style={dcCss(`flex:1 1 0;min-width:0;display:flex;flex-direction:${dcS(L_zt_q?.["dir"])};align-items:center;justify-content:center;gap:${dcS(L_zt_q?.["gap"])};height:${dcS(L_zt_q?.["h"])};padding:0 6px;border-radius:8px;border:0;background:${dcS(L_zt_q?.["bg"])};color:${dcS(L_zt_q?.["ink"])};box-shadow:${dcS(L_zt_q?.["shadow"])};white-space:nowrap`)}>
                           <span style={{"fontSize":"13px","fontWeight":"700"}}>
                             {dcText(L_zt_q?.["label"])}
                           </span>

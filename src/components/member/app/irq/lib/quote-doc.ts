@@ -197,6 +197,17 @@ export function syncPrices(cfg) {
   return cfg;
 }
 const withSum = cfg => { syncPrices(cfg); (cfg.packages || []).forEach(p => { p.price = Math.round((p.cats || []).reduce((a, c) => a + c.items.reduce((b, it) => b + (+it.cost || 0) * (+it.qty || 1), 0), 0)); }); return cfg; };
+// The quote's sections — the Customize step's tabs (the user, 2026-11-09: "新增电器；是否可以在哪个位置可以让我control加什么类型";
+// a new one is "多一个分页" and behaves "像家私"). Furniture and Services are built in; Quote settings › Categories adds,
+// names and orders the rest. `goods`: its items are products (Change item, photos, the Style step's furniture list).
+export const DEFAULT_SECTIONS = [
+  { id: "furn", label: "Furniture", head: "FURNITURE & APPLIANCES", goods: true },
+  { id: "serv", label: "Services", head: "SERVICES & FITTINGS", goods: false },
+];
+export const sectionsOf = cfg => (Array.isArray(cfg && cfg.sections) && cfg.sections.length ? cfg.sections : DEFAULT_SECTIONS).map(s => ({ ...s, head: s.head || String(s.label || "").toUpperCase() }));
+/** A room type category's section: the one it names while that one exists, else by its rows (a catalogue code: Furniture). */
+export const sectionOfCat = (cfg, c) => { const ids = sectionsOf(cfg).map(s => s.id); return c && c.section && ids.includes(c.section) ? c.section : (c && (c.items || []).some(i => i.kind) ? "furn" : "serv"); };
+export const goodsSection = (cfg, id) => !!(sectionsOf(cfg).find(s => s.id === id) || {}).goods;
 export const DEFAULT_STYLES = [{ id: "muji", name: "Muji", desc: "Light oak, linen and calm neutrals" }, { id: "modern", name: "Modern", desc: "Clean lines, darker tones, metal accents" }, { id: "nordic", name: "Nordic", desc: "Bright, airy, soft textures" }];
 // Customer info: CRM fields mirror CRM › Customer form (read-only here). "own" = quote-only fields.
 export const CRM_FIELDS = [

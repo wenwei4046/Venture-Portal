@@ -60,6 +60,12 @@ describe("the generated IR Quote templates", () => {
     expect(settings).toContain('v["ed"]?.["vers"]');
   });
 
+  // 2026-11-09 Sections: a third Customize tab overlapped on a phone ("overlap") — 3+ tabs stack each label over its sum.
+  it("let three or more Customize tabs fit a phone", () => {
+    const quote = tpls.find(([f]) => f === "QuoteTpl.tsx")![1];
+    expect(quote).toMatch(/min-width:0;display:flex;flex-direction:\$\{dcS\(L_zt[^)]*\?\.\["dir"\]\)\}/);
+  });
+
   it("show the item being replaced in the Change item sheet's header", () => {
     const quote = tpls.find(([f]) => f === "QuoteTpl.tsx")![1];
     expect(quote).toContain('v["sheet"]?.["img"]');

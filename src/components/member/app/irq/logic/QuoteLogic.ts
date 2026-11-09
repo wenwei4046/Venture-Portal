@@ -389,7 +389,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     const okSrc = s => /^(data:image|https?:|blob:)/.test(String(s || "")); const imgs = [...((sx.photos && sx.photos.length ? sx.photos : (sx.cover ? [sx.cover] : [])).map((src, k) => ({ src, title: sx.name + (k ? " · " + (k + 1) : ""), sectionName: "Overview", items: [] }))), ...(drive[sid] || []).filter(x => okSrc(x.src))];
     const gi = Math.min(st.gi || 0, Math.max(0, imgs.length - 1)), im = imgs[gi];
     const inIm = () => false;
-    const live = c => c.items.filter(i => (i.qty ?? 1) > 0), isF = c => c.section ? c.section === "furn" : c.items.some(i => i.kind);
+    const live = c => c.items.filter(i => (i.qty ?? 1) > 0), isF = c => this.lib.goodsSection(this.cfg, this.lib.sectionOfCat(this.cfg, c)); // a products section (2026-11-09: Quote settings › Categories › Sections)
     const fItems = p.cats.filter(isF).flatMap(live), zl = fItems.map(i => { const im = this.imgFor(i); return im ? { img: im, name: title(i.name), code: i.code || "", delta: rm0((i.cost || 0) * (i.qty ?? 1)), item: null } : null; }).filter(Boolean), furn = fItems.map(i => { const im = this.imgFor(i); return { name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0((i.cost || 0) * (i.qty ?? 1)), cur: im ? "zoom-in" : "default", view: () => { if (im) this.openZoom(zl, zl.findIndex(z => z.img === im)); } }; });
     const sCats = p.cats.filter(c => !isF(c) && live(c).length), sItems = sCats.flatMap(live), sSum = sItems.reduce((a, i) => a + (i.cost || 0) * (i.qty ?? 1), 0);
     const serv = sCats.length ? { count: sItems.length + " items", sum: rm0(sSum), open: !!st.servOpen, rot: st.servOpen ? "rotate(180deg)" : "none", toggle: () => this.setState(s => ({ servOpen: !s.servOpen })),
@@ -497,12 +497,12 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
         })
       };
     }) : [];
-    const isFurn = ci => pkg && (pkg.cats[ci].section ? pkg.cats[ci].section === "furn" : pkg.cats[ci].items.some(i => i.kind));
+    const secOf = ci => pkg && this.lib ? this.lib.sectionOfCat(this.cfg, pkg.cats[ci]) : "furn";
     const grpSum = vs => rm0(vs.reduce((a, cv) => a + st.lines.filter(l => l.ci === cv._ci).reduce((b, l) => b + (+l.cost || 0) * Math.max(l.qty, 0), 0), 0));
-    const furnV = catViews.filter(cv => isFurn(cv._ci)), servV = catViews.filter(cv => !isFurn(cv._ci));
-    const catGroups = [{ key: "furn", short: "Furniture", label: "FURNITURE & APPLIANCES", cats: furnV }, { key: "serv", short: "Services", label: "SERVICES & FITTINGS", cats: servV }].filter(g => g.cats.length).map(g => ({ ...g, sum: grpSum(g.cats) }));
+    // One tab a section, in Quote settings' order (Furniture, Services, then what the Principal added — 2026-11-09).
+    const catGroups = (this.lib ? this.lib.sectionsOf(this.cfg) : []).map(s => ({ key: s.id, short: s.label, label: s.head, cats: catViews.filter(cv => secOf(cv._ci) === s.id) })).filter(g => g.cats.length).map(g => ({ ...g, sum: grpSum(g.cats) }));
     const czKey = catGroups.some(g => g.key === st.czTab) ? st.czTab : (catGroups[0] || {}).key;
-    const czTabs = phone && catGroups.length > 1 ? catGroups.map(g => { const on = g.key === czKey; return { label: g.short, sum: g.sum, bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", sub: on ? "#D96E0B" : "#97978F", shadow: on ? "0 1px 3px rgba(20,20,18,.12)" : "none", pick: () => { this.setState({ czTab: g.key }); const el = this.rootRef.current && this.rootRef.current.querySelector("main"); if (el) el.scrollTop = 0; } }; }) : false;
+    const czTabs = phone && catGroups.length > 1 ? catGroups.map(g => { const on = g.key === czKey; const many = catGroups.length > 2; return { label: g.short, sum: g.sum, dir: many ? "column" : "row", gap: many ? "0" : "6px", h: many ? "40px" : "32px", bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", sub: on ? "#D96E0B" : "#97978F", shadow: on ? "0 1px 3px rgba(20,20,18,.12)" : "none", pick: () => { this.setState({ czTab: g.key }); const el = this.rootRef.current && this.rootRef.current.querySelector("main"); if (el) el.scrollTop = 0; } }; }) : false;
     const catGroupsShown = phone && catGroups.length > 1 ? catGroups.filter(g => g.key === czKey).map(g => ({ ...g, label: "", sum: "" })) : catGroups;
 
     // sheet
