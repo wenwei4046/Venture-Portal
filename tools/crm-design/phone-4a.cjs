@@ -282,7 +282,7 @@ function teamInsight(body) {
   // v3 T01: the avatar left, the greeting, the house right, then Team performance | Ads performance (shared/phone4a.tsx).
   body = swap(body, H, "div", "<Phone4aTeamHead h={v.th} />", "team insight head");
   // Insight › Up next (docs/design_handoff_crm_up_next): the third side of the head's switch, its own component.
-  body = once(body, "{!!(v.show.ad) && (<>", "{!!(v.show.up && v.upNext) && (<PhoneUpNext head={<Phone4aTeamHead h={v.th} />} {...v.upNext!} />)}\n    {!!(v.show.act && v.activity) && (<PhoneTeamActivity a={v.activity!} />)}\n    {!!(v.show.lc && v.leaveCal) && (<PhoneCalendar input={v.leaveCal!} />)}\n    {!!(v.show.ad) && (<>", "up next");
+  body = once(body, "{!!(v.show.ad) && (<>", "{!!(v.show.up && v.upNext) && (<PhoneUpNext head={<Phone4aTeamHead h={v.th} />} {...v.upNext!} />)}\n    {!!(v.show.act && v.activity) && (<PhoneTeamActivity top={<Phone4aTeamHead h={v.th} />} a={v.activity!} />)}\n    {!!(v.show.lc && v.leaveCal) && (<PhoneCalendar input={v.leaveCal!} />)}\n    {!!(v.show.ad) && (<>", "up next");
   // docs/design_handoff_crm (2026-11-08): Activity (Team activity) and Calendar (appointments + leave) are hand-written
   // screens on the desktop's view models — shared/PhoneTeamActivity.tsx, shared/PhoneLeaveCal.tsx.
   // "vs Sep" on the period card: it picks the period the hero compares with (production's Comparison).
@@ -547,7 +547,7 @@ function panel(body) {
     'overflowY: "auto", scrollbarWidth: "none", padding: "14px 16px 0", display: "flex", flexDirection: "column", gap: "14px" }} data-scroll-keep="">', "full time list keeps its cards");
   // Assignment › Active (2026-10-22, the owner: "把这个 active member 的功能独立在" Ads to teams 后面): every team, each
   // person Active or Locked (shared/locked.ts › activeGroups, crm_set_locked).
-  body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onPeople && v.leaveCal) && (<PhonePeople input={v.leaveCal!} />)}{!!(v.asx.onFt) && (<>", "assign active");
+  body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onFt) && (<>", "assign active");
   body = teamCalendar(body);
   // The team split's slider and 84px decimal box are Phone4aSplitTeams' own since v3 T04 (teamSplit).
   body = teamRooms(body);

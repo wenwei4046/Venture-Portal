@@ -71,10 +71,10 @@ describe("the CRM's three round buttons, on the first page alone", () => {
     await go("Inbox");
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
     expect(screen.queryByText(/need attention/)).toBeNull();
-    // Activity took Assignment's place in the bottom bar (docs/design_handoff_crm, 2026-11-08).
-    await go("Activity");
-    expect(screen.getByRole("heading", { name: "Team activity" })).toBeInTheDocument();
+    await go("Assignment");
+    expect(screen.getByRole("heading", { name: "Assignment" })).toBeInTheDocument();
     noButtons();
+    expect(screen.queryByText("Who gets each new enquiry")).toBeNull();
     await go("Calendar");
     expect(screen.getByRole("heading", { name: "Calendar" })).toBeInTheDocument();
     noButtons();

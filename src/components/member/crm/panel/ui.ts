@@ -45,7 +45,7 @@ export interface PanelUi {
   /** The Leads list for these people only (Team Insight's Revenue Director row, 2026-10-24); null = everybody's. */
   cLsWho?: string[] | null;
   /** Assignment's open section (rev 1011 §6.1); null = the overview. Leaving the tab resets it. */
-  asSec: "Org" | "Ads" | "Act" | "Aw" | "Ft" | "People" | null;
+  asSec: "Org" | "Ads" | "Act" | "Aw" | "Ft" | null;
   /** Full time lead allocation's editor: the team and its draft ticks (staff → weekdays, 0 = Monday). */
   ftx: { tid: string; v: Record<string, number[]> } | null;
   /** By team's inside-team draft for the ad being edited: modes, values, and who was typed in (for the auto-balance). */
@@ -116,6 +116,8 @@ export interface PanelUi {
   ovAds: boolean;
   /** Insight's Up next side (docs/design_handoff_crm_up_next). */
   ovUp?: boolean;
+  /** Insight's Activity side: Team activity, beside Team performance (the owner, 2026-11-09). */
+  ovAct?: boolean;
   /** Assignment › Active: switches not saved yet (id → locked), null = as saved. */
   actDraft: Record<string, boolean> | null;
   // Calendar
