@@ -77,6 +77,8 @@ const PATCHES = {
     ['<span style="padding:6px 6px 6px 0"><span style="display:grid;place-items:center;width:44px;height:40px;border-radius:9px;background:#EEEEEA url(\'{{ r.img }}\') center/cover no-repeat;font-size:10px;font-weight:700;color:#111111">{{ r.initials }}</span></span>', '<label title="Add or change the photo" style="padding:6px 6px 6px 0;cursor:pointer"><span style="display:grid;place-items:center;width:44px;height:40px;border-radius:9px;background:#EEEEEA url(\'{{ r.img }}\') center/cover no-repeat;font-size:10px;font-weight:700;color:#111111">{{ r.initials }}</span><input type="file" accept="image/*" onChange="{{ r.onImg }}" style="display:none"></label>'],
     // A room type's category says which side of the quote it stands on (the user, 2026-11-06).
     ['<span style="font-size:12px;color:#6B6B66">{{ c.count }}</span>', '<span style="font-size:12px;color:#6B6B66">{{ c.count }}</span><select value="{{ c.section }}" onChange="{{ c.onSection }}" aria-label="Furniture or services" style="height:28px;padding:0 6px;border-radius:8px;border:1px solid #DEDED8;background:#FFFFFF;font-size:12px;font-weight:600;color:#1F1F1C"><option value="furn">Furniture</option><option value="serv">Services</option></select>'],
+    // Classic | Build in beside a room type's title: open the other version, or add it (the user, 2026-11-09).
+    ['<span style="font-size:13px;color:#6B6B66">{{ ed.sub }}</span>', '<span style="font-size:13px;color:#6B6B66">{{ ed.sub }}</span><div style="align-self:center;display:flex;gap:2px;padding:3px;border-radius:11px;background:#EEEEEA"><sc-for list="{{ ed.vers }}" as="vt" hint-placeholder-count="2"><button onClick="{{ vt.pick }}" title="{{ vt.tip }}" style="height:28px;padding:0 12px;border:0;border-radius:8px;background:{{ vt.bg }};color:{{ vt.ink }};box-shadow:{{ vt.shadow }};font-size:12.5px;font-weight:650;white-space:nowrap;cursor:pointer">{{ vt.label }}</button></sc-for></div>'],
     // The Catalogue's column heads sort it (the user, 2026-11-06).
     ['<span style="padding:0 8px">CODE</span><span style="padding:0 8px">NAME</span><span style="padding:0 8px">CATEGORY</span><span style="padding:0 8px;text-align:right">PRICE (RM)</span><span style="padding:0 8px"></span><span style="padding:0 8px">SHOW</span>', '<span onClick="{{ catSortH.code.go }}" title="Sort by code" style="padding:0 8px;cursor:pointer;user-select:none">CODE{{ catSortH.code.mark }}</span><span onClick="{{ catSortH.name.go }}" title="Sort by name" style="padding:0 8px;cursor:pointer;user-select:none">NAME{{ catSortH.name.mark }}</span><span onClick="{{ catSortH.kind.go }}" title="Sort by category" style="padding:0 8px;cursor:pointer;user-select:none">CATEGORY{{ catSortH.kind.mark }}</span><span onClick="{{ catSortH.cost.go }}" title="Sort by price" style="padding:0 8px;text-align:right;cursor:pointer;user-select:none">PRICE (RM){{ catSortH.cost.mark }}</span><span style="padding:0 8px"></span><span onClick="{{ catSortH.show.go }}" title="Sort by show" style="padding:0 8px;cursor:pointer;user-select:none">SHOW{{ catSortH.show.mark }}</span>'],
   ],
@@ -338,13 +340,13 @@ const base = [
   "/* The quote header's Quote settings link shows only to those who may edit them (a patch in this script). */",
   '[data-irq-settings="false"] { display: none !important; }',
   '[data-irq-tabs="0"] { display: none !important; }',
-  "[data-ws-chapters] { justify-content: safe center !important; }",
-  "@media (max-width: 767px) { [data-ws-bar] { flex-wrap: wrap; gap: 8px !important; padding: 10px 12px 6px 16px !important; } [data-ws-bar] > span:first-child { flex: 1 1 0 !important; } [data-ws-chapters] { order: 9; flex: 1 1 100% !important; justify-content: flex-start !important; } }",
   "/* iOS Safari zooms the page on a focused control under 16px and leaves it zoomed. globals.css holds this floor for the app, but it cannot reach into a shadow root. */",
   "@media (max-width: 767px) { input:not([type='checkbox']):not([type='radio']):not([type='range']), select, textarea { font-size: 16px !important; } }",
   "/* iOS draws a date field at its own width, past its card; the prototype's fields fill the card. */",
   "input[type='date'] { -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; display: block; text-align: left; }",
   "input[type='date']::-webkit-date-and-time-value { text-align: left; }",
+  // iOS draws a date field's value at the top of its box (the user, 2026-11-09, an iPhone screenshot: "date 选择的日期置中"). Touch screens only: a computer keeps the prototype's field.
+  "@media (pointer: coarse) { input[type='date'] { -webkit-appearance: none; appearance: none; display: flex; align-items: center; } input[type='date']::-webkit-date-and-time-value { text-align: left; margin: 0; } }",
   rules,
 ].join("\n");
 const sheets = {

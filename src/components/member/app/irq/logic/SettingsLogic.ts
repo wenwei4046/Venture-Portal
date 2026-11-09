@@ -520,6 +520,12 @@ export class SettingsLogic extends DcLogic {
       const pc = cost(ep), armKey = "delpkg-" + ep.id;
       const setP = fn => this.upd(c => { const p = this.pkgOf(c, ep.id); if (p) fn(p, c); });
       ed = {
+        // Classic | Build in beside the title (the user, 2026-11-09: "是不是应该要加一个button 选择classic, build in"): the room
+        // type's other version opens; a missing one is added as a copy of this one — what the list's right-click menu did.
+        vers: (() => { const g = groups.find(x => x.classic === ep.id || x.build === ep.id) || {};
+          return [["classic", "Classic"], ["build", "Build in"]].map(([k, label]) => { const id = g[k], on = id === ep.id;
+            return { label: id ? label : "+ " + label, tip: id ? "" : "Add a " + label + " version (a copy of this one)", bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", shadow: on ? "0 1px 3px rgba(20,20,18,.14)" : "none",
+              pick: () => { if (on) return; if (id) { this.setState({ pid: id }); return; } const nid = lib.newId("p"), cp = { ...JSON.parse(JSON.stringify(ep)), id: nid, style: k, name: `${(ep.groupLabel || ep.layout || "").toUpperCase()} ${k === "build" ? "BUILD IN" : "CLASSIC"}` }; this.upd(c => { const at = c.packages.findIndex(x => x.id === ep.id); c.packages.splice(at + 1, 0, cp); }); this.setState({ pid: nid }); } }; }); })(),
         title: [sizeKey(ep.spec) ? lib.roomName(ep.spec) : (ep.groupLabel || ep.name), lib.versionWord(cfg.packages, ep)].filter(Boolean).join(" · "), sub: sizeKey(ep.spec) ? "" : "Set bedrooms & bathrooms",
         groupLabel: ep.groupLabel || "", layout: ep.layout || "", building: ep.building || "", price: String(ep.price ?? ""),
         onGroupLabel: e => { const v = e.target.value; this.upd(c => c.packages.filter(p => p.group === ep.group).forEach(p => { p.groupLabel = v; })); },
@@ -569,7 +575,7 @@ export class SettingsLogic extends DcLogic {
               ...(() => { const mode = it.adjust ? "adj" : it.fixed ? "fix" : "b2b";
                 const L = { b2b: ["#B5B5AE", "b2b", "Follows the b2b price · click to change"], fix: ["#111111", "fixed", "Fixed price · IR can't change it · click to change"], adj: ["#F5871F", "edit", "IR can edit this price in the quote · click to change"] }[mode];
                 return { srcDot: L[0], srcLabel: L[1], srcTip: L[2],
-                  toggleFix: () => setI(x => { if (mode === "b2b") { x.fixed = true; x.adjust = false; } else if (mode === "fix") { x.fixed = true; x.adjust = true; } else { x.adjust = false; x.fixed = !it.linked; } }) }; })(), kindBorder: it.kind ? "#DEDED8" : "transparent", kindBg: it.kind ? "#FFFFFF" : "transparent", kindInk: it.kind ? "#1F1F1C" : "#C4C4BD", kindApp: it.kind ? "auto" : "none", selKey: ep.id + ":" + ci + ":" + ii + ":" + (it.kind || "") + ":" + kindOpts.length,
+                  toggleFix: () => setI(x => { if (mode === "b2b") { x.fixed = true; x.adjust = false; } else if (mode === "fix") { x.fixed = true; x.adjust = true; } else { x.adjust = false; x.fixed = !it.linked; } }) }; })(), kindBorder: it.kind || it.code ? "#DEDED8" : "transparent", kindBg: it.kind || it.code ? "#FFFFFF" : "transparent", kindInk: it.kind ? "#1F1F1C" : "#C4C4BD", kindApp: it.kind || it.code ? "auto" : "none", // a coded row's cell reads as a dropdown before it has a category (2026-11-09) selKey: ep.id + ":" + ci + ":" + ii + ":" + (it.kind || "") + ":" + kindOpts.length,
               qty: String(it.qty ?? ""), sum: money((+it.cost || 0) * (+it.qty || 0)), bg: ii % 2 ? "#F8F8F6" : "#FFFFFF",
               onName: e => { const v = e.target.value; setI(x => { x.name = v; }); }, onDesc: e => { const v = e.target.value; setI(x => { x.desc = v; }); },
               onCode: e => { const v = e.target.value; setI(x => { x.code = v; }); }, onKind: e => { const v = e.target.value || null; setI(x => { x.kind = v; }); },
