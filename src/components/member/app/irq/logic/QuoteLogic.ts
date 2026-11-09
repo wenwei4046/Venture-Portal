@@ -4,6 +4,7 @@ import { DcLogic } from "../dc";
 import React from "react";
 import * as quoteDocLib from "../lib/quote-doc";
 import { productSlug } from "../lib/catalog-import";
+import { makeQuotePdf } from "../lib/quote-pdf";
 import { irqStorage } from "../storage";
 import seedPackages from "../data/packages.json";
 import seedCatalog from "../data/catalog.json";
@@ -109,8 +110,27 @@ export class QuoteLogic extends DcLogic {
     this.attachRo();
   }
   attachRo() { const el = this.rootRef.current; if (this.ro || !el || !window.ResizeObserver) return; this.ro = new ResizeObserver(e => { const w = e[0].contentRect.width; if (Math.abs(w - this.state.width) > 1) this.setState({ width: w }); }); this.ro.observe(el); }
-  componentDidUpdate() { if (!this.ro) this.attachRo(); }
-  componentWillUnmount() { window.removeEventListener("resize", this.onWinResize); clearInterval(this._slideT); window.removeEventListener("keydown", this.onZoomKey); this.ro && this.ro.disconnect(); clearTimeout(this.tt); this.offStore && this.offStore(); clearTimeout(this._crmT); }
+  componentDidUpdate() {
+    if (!this.ro) this.attachRo();
+    // A phone makes the quotation's PDF while step 5 is open, so Share and Download hand it over the moment they are
+    // pressed — a phone shares a file only inside the press itself (2026-11-09).
+    if (this.touch() && this.state.step === 5 && this.lib && !this.state.home) { clearTimeout(this._pdfT); this._pdfT = setTimeout(() => { this.pdfFor().catch(() => {}); }, 1200); }
+  }
+  touch() { return typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(pointer: coarse)").matches; }
+  /** This quotation as a PDF (lib/quote-pdf.ts): made once for what is on screen now, again only when it changes. */
+  pdfFor() {
+    const key = this.docHtml(false);
+    if (this._pdf && this._pdf.key === key) return this._pdf.promise;
+    const job = { key, blob: null, promise: null };
+    job.promise = makeQuotePdf(key).then(b => { job.blob = b; return b; });
+    job.promise.catch(() => { if (this._pdf === job) this._pdf = null; });
+    this._pdf = job;
+    return job.promise;
+  }
+  pdfReady() { const key = this.docHtml(false); return this._pdf && this._pdf.key === key && this._pdf.blob ? this._pdf.blob : null; }
+  pdfFile(blob) { return new File([blob], this.fileBase() + ".pdf", { type: "application/pdf" }); }
+  saveFile(blob, name) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); }
+  componentWillUnmount() { window.removeEventListener("resize", this.onWinResize); clearInterval(this._slideT); window.removeEventListener("keydown", this.onZoomKey); this.ro && this.ro.disconnect(); clearTimeout(this.tt); this.offStore && this.offStore(); clearTimeout(this._crmT); clearTimeout(this._pdfT); }
 
   load(pid, data = this.state.data, keep = false) {
     const p = data.packages.find(x => x.id === pid);
@@ -292,7 +312,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
   }
   fileBase() {
     const { cust } = this.state; const { pkg } = this.calc();
-    return `Quotation ${cust.building} ${cust.unit || pkg.layout} ${cust.date}`.replace(/[\\/:*?"<>|]+/g, "-");
+    return `Quotation ${cust.building} ${cust.unit || pkg.layout} ${cust.date}`.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
   }
   custView(setCust) {
     const st = this.state, lib = this.lib, ci = (this.cfg && this.cfg.custInfo) || (lib ? lib.defaultCustInfo() : { crm: {}, own: [] }), CF = lib ? lib.CRM_FIELDS : [];
@@ -385,6 +405,13 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
   }
   async exportPdf() {
     if (!this.checkReq()) return;
+    if (this.touch()) {
+      // A phone cannot print the hidden frame (the user, 2026-11-09: "下载成pdf 也是没有的"): it saves the PDF it made.
+      const ready = this.pdfReady();
+      if (!ready) this.flash("Making the PDF…");
+      try { const blob = ready || await this.pdfFor(); this.saveFile(blob, this.fileBase() + ".pdf"); this.flash("PDF downloaded"); } catch (e) { this.flash("Could not make the PDF. Try again."); }
+      return;
+    }
     let html = this.docHtml(false);
     const f = document.createElement("iframe");
     f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
@@ -409,6 +436,16 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
   async share() {
     if (!this.checkReq()) return;
     const text = this.shareText();
+    // A phone shares the quotation itself, as a PDF (the user, 2026-11-09: "分享出去是文字，不是pdf"), the summary beside it.
+    if (this.touch() && navigator.canShare) {
+      const ready = this.pdfReady();
+      if (!ready) { this.flash("Preparing the PDF — tap Share again in a moment"); this.pdfFor().then(() => this.flash("PDF ready — tap Share"), () => this.flash("Could not make the PDF. Try again.")); return; }
+      const file = this.pdfFile(ready);
+      if (navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: this.fileBase(), text }); } catch (e) { /* closed */ }
+        return;
+      }
+    }
     try {
       if (navigator.share) { await navigator.share({ text }); return; }
       await navigator.clipboard.writeText(text); this.flash("Quote copied — paste it to the customer");
@@ -536,9 +573,9 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
           sub: none ? "No photos for " + (sx.name || "this style") + " in Quote Settings" : (sx.name || "Style") + " · " + imgs.length + " photo" + (imgs.length === 1 ? "" : "s") + " under the customer details",
           toggle: () => { if (!none) this.setState(s => ({ withMood: !s.withMood })); } }; })(),
       saveDraftC: () => { this.saveDraft(); this.setState({ confirm: { title: "Draft saved", sub: "Find it anytime under Quote · Drafts." } }); },
-      doPdfC: () => { this.exportPdf(); this.setState({ confirm: { title: "PDF ready", sub: "Choose “Save as PDF” in the next screen to keep it on this device." } }); },
+      doPdfC: () => { this.exportPdf(); if (!this.touch()) this.setState({ confirm: { title: "PDF ready", sub: "Choose “Save as PDF” in the next screen to keep it on this device." } }); }, // a phone saves the file itself (exportPdf), no print screen
       confirmBox: st.confirm ? { ...st.confirm, close: () => this.setState({ confirm: null }) } : false,
-      openShare: () => { if (this.checkReq()) this.setState({ shareOpen: true }); },
+      openShare: () => { if (!this.checkReq()) return; if (this.touch() && navigator.canShare) { this.share(); return; } this.setState({ shareOpen: true }); }, // a phone: the PDF, through its own share sheet
       shareSheet: st.shareOpen ? { close: () => this.setState({ shareOpen: false }), apps: (() => { const t = () => encodeURIComponent(this.shareText()), done = () => this.setState({ shareOpen: false });
         return [
           { label: "WhatsApp", bg: "#E5F7EC", ink: "#1E9E55", d: "M3 21l1.6-4.7A8.5 8.5 0 1 1 7.8 19.6ZM9 8.5c0 3.5 2.5 6.5 6.5 6.5l1-1.5-2-1-1 1c-1.2-.5-2.2-1.5-2.7-2.7l1-1-1-2Z", run: () => { window.open("https://wa.me/?text=" + t(), "_blank"); done(); } },

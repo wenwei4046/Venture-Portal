@@ -78,7 +78,7 @@ describe("the style moodboard's layout (moodRows)", () => {
   });
 });
 
-type Col = { key: string; label: string; show: boolean; num: boolean; custom?: boolean };
+type Col = { key: string; label: string; show: boolean; num: boolean; custom?: boolean; width?: number };
 const tableOf = (c: ReturnType<typeof defaults>) => c.doc.blocks.find(b => b.type === "table") as unknown as { columns: Col[] };
 
 describe("the quotation (renderDoc)", () => {
@@ -283,7 +283,7 @@ describe("Quote settings › Item table › Photo size and Code / colour text", 
 describe("Quote settings › Item table › a column's width", () => {
   it("prints a column at the % it is given, the rest sharing what is left", () => {
     const c = defaults(packagesJson, catalogJson);
-    tableOf(c).columns.find(x => x.key === "item")!.width = 25 as never;
+    tableOf(c).columns.find(x => x.key === "item")!.width = 25;
     const html = renderDoc(c, { facts: {}, cats: [], custRows: [], total: 0 });
     expect(html).toContain('font-size:11px;;width:25%">ITEM</td>');
     expect(html).not.toContain(";width:" + "NaN");
