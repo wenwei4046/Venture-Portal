@@ -199,7 +199,10 @@ export function roomsVM(ctx: PanelCtx) {
       addBg: ed.newT ? "var(--crm-rust)" : "var(--crm-line)",
       addSlot: ed.newT ? () => setD({ slots: srt([...ed.slots.filter(x => x.split("@")[0] !== ed.newT), ed.newT + (nd.length < 7 ? `@${nd.join("")}` : "")]), newT: "", newD: null }) : undefined,
       cancel: () => patch({ rmEdit: null }),
-      save: () => void act.saveRoom({ id: ed.id, name: ed.name.trim() || "Showroom", address: ed.addr.trim(), active: true, slots: ed.slots, cap: ed.cap, weekly: ed.weekly, blocks: ed.blocks }).then(ok => { if (ok) patch({ rmEdit: null }); }),
+      // v4 (the owner, 2026-11-10, asked whether Add closure should publish at once: "要" a draft): the full editor's Save
+      // publishes nothing — it hands its changes back to the Showrooms page as unsaved changes, where Save draft / Publish
+      // (and the leave sheet on Back) decide, as every other change on the page.
+      save: () => patch({ rmEdit: { ...ed, quick: true }, rmAt: ed.i }),
       remove: () => patch({ rmDel: i }),
     };
   });

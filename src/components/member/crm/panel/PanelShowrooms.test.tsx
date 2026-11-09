@@ -109,3 +109,24 @@ describe("Showrooms, one page with a tab a showroom (3a)", () => {
     expect(tabs(page)[0]).toMatch(/^Kuala Lumpur Showroom.*draft$/);
   });
 });
+
+describe("Add closure's editor saves into the page's draft, never live (the owner, 2026-11-10: \"要\")", () => {
+  it("Save in the full editor returns to the page with its changes unsaved there; nothing is published", async () => {
+    const page = await openShowrooms();
+    const closures = within(page).getByText("Closures").parentElement!;
+    await tap(within(closures).getByRole("button", { name: "Add" }));
+    expect(document.querySelector("[data-showrooms4]")).toBeNull();
+    // The editor's name field: change it, so there is something to carry back.
+    const name = screen.getAllByRole("textbox").find(e => (e as HTMLInputElement).value === "Kuala Lumpur Showroom") as HTMLInputElement;
+    fireEvent.change(name, { target: { value: "KL Closure Test" } });
+    await act(async () => {});
+    const saves = [...document.querySelectorAll("span")].filter(e => e.textContent === "Save");
+    await tap(saves[saves.length - 1]);
+    const back = document.querySelector("[data-showrooms4]") as HTMLElement;
+    expect(back).not.toBeNull();
+    expect(within(back).getByLabelText("Name")).toHaveValue("KL Closure Test");
+    // Unsaved on the page (Save draft · Publish), and the tab still the published name — nothing went live.
+    expect(back.querySelector("[data-room-bar]")).toHaveTextContent(/unsaved change/);
+    expect(tabs(back)).toContain("Kuala Lumpur Showroom");
+  });
+});

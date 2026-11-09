@@ -225,11 +225,12 @@ type OvTeam = { name: string; c: string; leads: number; appt: string; show: stri
 /**
  * v4 8b · Team Insight under its head: the period as one row (This month ▾ and the dates · vs Sep), the rust 2 × 2 hero
  * with each change beside its figure ("vs last" said once, by the row above), and Teams as a table — the column names
- * once, a row a team (Leads · Appt · Show · Won); a team still opens to its people, in the same columns.
+ * once, a row a team (Leads · Appt · Show — no Won: the owner, 2026-11-10, "不要 won", as on 2026-10-23); a team still
+ * opens to its people, in the same columns.
  */
 export function Phone4aTeamOverview({ ov }: { ov: { adPerT: string; adPerD: string; vsLabel: string; ovOpenPeriod: () => void; cmpPick: () => void;
   hero4: { label: string; value: string; delta: string; good: boolean; open?: () => void }[]; teamRows: OvTeam[] } }) {
-  const COLS = "minmax(0,1fr) 44px 44px 44px 52px";
+  const COLS = "minmax(0,1fr) 52px 52px 52px";
   const num = (bold: boolean): CSSProperties => ({ textAlign: "right", fontWeight: bold ? 500 : 400, whiteSpace: "nowrap" });
   return (<>
     <div data-ov-period="" style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -254,7 +255,7 @@ export function Phone4aTeamOverview({ ov }: { ov: { adPerT: string; adPerD: stri
     <div data-ov-teams="" style={{ flex: "none", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "grid", gridTemplateColumns: COLS, columnGap: "6px", alignItems: "baseline", paddingBottom: "8px", borderBottom: "1px solid var(--crm-rule)" }}>
         <h2 style={{ margin: 0, fontFamily: TIGHT, fontSize: fs(17), fontWeight: 500 }}>Teams</h2>
-        {["Leads", "Appt", "Show", "Won"].map(c => <span key={c} style={{ fontSize: fs(11), fontWeight: 500, color: "var(--crm-muted)", textAlign: "right" }}>{c}</span>)}
+        {["Leads", "Appt", "Show"].map(c => <span key={c} style={{ fontSize: fs(11), fontWeight: 500, color: "var(--crm-muted)", textAlign: "right" }}>{c}</span>)}
       </div>
       {ov.teamRows.map(t => (
         <div key={t.name} style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--crm-rule-soft)" }}>
@@ -264,7 +265,7 @@ export function Phone4aTeamOverview({ ov }: { ov: { adPerT: string; adPerD: stri
               <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
               {t.canOpen && <span style={{ flex: "none", display: "flex", color: "var(--crm-faint-2)", transform: `rotate(${t.rot})`, transition: "transform 150ms" }}><Ic name="chevron-right" size={12} /></span>}
             </span>
-            <span style={num(true)}>{t.leads}</span><span style={num(false)}>{t.appt}</span><span style={num(false)}>{t.show}</span><span style={num(false)}>{t.won ?? "—"}</span>
+            <span style={num(true)}>{t.leads}</span><span style={num(false)}>{t.appt}</span><span style={num(false)}>{t.show}</span>
           </div>
           {t.open && t.people.map(p => (
             <div key={p.name} onClick={p.open} role="button" style={{ display: "grid", gridTemplateColumns: COLS, columnGap: "6px", alignItems: "center", minHeight: "48px", padding: `0 0 0 ${p.pad}`, borderTop: "1px dashed var(--crm-rule)", fontSize: fs(13), fontVariantNumeric: "tabular-nums", cursor: "pointer" }}>
@@ -275,7 +276,7 @@ export function Phone4aTeamOverview({ ov }: { ov: { adPerT: string; adPerD: stri
                   <span style={{ fontSize: fs(11), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.tag}<b style={{ fontWeight: 600, color: "var(--crm-oxblood)" }}>{p.waiting}</b></span>
                 </span>
               </span>
-              <span style={num(true)}>{p.leads}</span><span style={num(false)}>{p.appt}</span><span style={num(false)}>{p.show}</span><span style={num(false)}>{p.won ?? "—"}</span>
+              <span style={num(true)}>{p.leads}</span><span style={num(false)}>{p.appt}</span><span style={num(false)}>{p.show}</span>
             </div>
           ))}
         </div>

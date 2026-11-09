@@ -44,9 +44,10 @@ describe("the overview's rows", () => {
     expect([A.wa, A.ms, A.need]).toEqual([2, 0, 1]);
     expect(A.people.find(p => p.id === "p1")!.need).toBe(1);
   });
-  it("columns: the six, then the extras in the picker's order; Channel is two counts", () => {
+  it("columns: the six, then the extras in the picker's order; no Channel (its tile is before the ad's name)", () => {
     expect(reportColumns([]).map(c => c[1])).toEqual(["Leads", "Avg reply", "Appts", "Show-up", "Won", "Lost"]);
-    expect(reportColumns(["channel", "st:New", "wonRate"]).slice(6).map(c => c[1])).toEqual(["Won rate", "New", "WhatsApp", "Messenger"]);
+    expect(reportColumns(["channel", "st:New", "wonRate"]).slice(6).map(c => c[1])).toEqual(["Won rate", "New"]);
+    expect(readReportCols(["channel"])).toEqual([]);
     expect(readReportCols(["st:Cold leads", "junk", 3])).toEqual(["st:Cold leads"]);
     expect(readReportCols(undefined)).toEqual([]);
     expect(colValue(r.byAd[0], "st:Attention", null)).toBe(1);
@@ -89,9 +90,9 @@ describe("Reports (D6a)", () => {
   });
   it("a remembered column shows on ad rows and people rows", () => {
     const { ctx, data } = ctxOf({ rpPer: "custom", rpRange: { a: 0, b: Date.now() } });
-    data.uiPrefs = { reportCols: ["channel"] };
+    data.uiPrefs = { reportCols: ["st:New", "st:Cold leads"] };
     const o = reportsVM(ctx).reports.overview;
-    expect(o.heads.slice(-2).map(h => h.label)).toEqual(["WhatsApp", "Messenger"]);
+    expect(o.heads.slice(-2).map(h => h.label)).toEqual(["New", "Cold"]);
     expect(o.ads.every(a => a.cells.length === 8 && a.people.every(p => p.cells.length === 8))).toBe(true);
   });
   it("a person opens their leads, needs-a-reply first; a customer opens their log", () => {

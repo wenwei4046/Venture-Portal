@@ -176,7 +176,6 @@ export const RP_PICKS: [string, string, [RpColKey, string, number][]][] = [
   ["spend", "Spend", [["spend", "Spend", 90]]], ["perLead", "Per lead", [["perLead", "Per lead", 80]]], ["wonRate", "Won rate", [["wonRate", "Won rate", 84]]],
   ["st:New", "New", [["st:New", "New", 64]]], ["st:Attention", "Attention", [["st:Attention", "Attention", 84]]], ["st:Follow up", "Follow up", [["st:Follow up", "Follow up", 84]]],
   ["st:Appointment", "Appointment", [["st:Appointment", "Appointment", 104]]], ["st:Cold leads", "Cold", [["st:Cold leads", "Cold", 64]]],
-  ["channel", "Channel", [["ch:wa", "WhatsApp", 90], ["ch:ms", "Messenger", 94]]],
 ];
 /** The picks remembered on the server, kept to the ones the picker knows (anything else ignored). */
 export function readReportCols(v: unknown): string[] {

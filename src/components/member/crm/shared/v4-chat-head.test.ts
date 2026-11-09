@@ -86,8 +86,10 @@ describe("notes/24 §3 · the desktop chat's ⋮ is the phone's + Block", () => 
   it("lists Assign to (if allowed) · Share · Move (if allowed) · Customer info · Appointment · Label, a divider, Block NAME", () => {
     const { ctx } = ctxOf(P("ben", "rs", "peter"), false);
     const items = chatMenuVM(ctx, { starCount: 0, starredOpen: () => {} }).chatMenuItems;
-    expect(items.map(i => i.label)).toEqual(["Share", "Move", "Customer info", "Appointment", "Label", "Block Daniel Lim"]);
-    expect(items.map(i => i.sub)).toEqual(["Invite a teammate", "Hand over to PETER", null, null, "Add a label", null]);
+    expect(items.map(i => i.label)).toEqual(["Share", "Move", "Customer info", "Appointment", "Label",
+      // …and, kept on the desktop (the owner, 2026-11-10: "要"), Mark as unread · Mute · Pin before Block.
+      "Mark as unread", "Mute notifications", "Pin chat", "Block Daniel Lim"]);
+    expect(items.map(i => i.sub)).toEqual(["Invite a teammate", "Hand over to PETER", null, null, "Add a label", null, null, null, null]);
     expect(items.filter(i => i.sep).map(i => i.label)).toEqual(["Block Daniel Lim"]);
     expect(items.at(-1)).toMatchObject({ danger: true, fg: "var(--crm-oxblood)" });
     const mgr = chatMenuVM(ctxOf(P("peter", "hod", "boss"), true).ctx, { starCount: 0, starredOpen: () => {} }).chatMenuItems;

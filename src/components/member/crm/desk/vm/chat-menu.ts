@@ -36,11 +36,33 @@ export function deskChatMenu(ctx: DeskCtx, c: DeskCtx["data"]["customers"][numbe
     it("Customer info", ICON.info, "var(--crm-tint-follow)", "var(--crm-brown)", () => patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true, infoAudit: false })),
     it("Appointment", ICON.appt, "var(--crm-cream)", "var(--crm-ink-soft)", () => patch({ menu: false, kind: "book", book: null })),
     it("Label", LABEL_ICON, "var(--crm-tint-appt)", "var(--crm-text-appt)", () => patch({ menu: false, labPop: { view: "labels", form: null } }), labelSub(data, c.id)),
+    // Kept on the desktop past the phone's list (the owner, 2026-11-10, asked whether they should stay reachable: "要"):
+    // Mark as unread · Mute · Pin, as before v4 — the Inbox list shows each.
+    ...prefItems(ctx, c, it),
     // Block: off one's Inbox and Contacts — the customer stays in the CRM, WhatsApp / Messenger are not told (the Inbox's More).
     it(`Block ${c.name}`, ICON.block, "var(--crm-tint-attention)", "var(--crm-oxblood)", () => {
       const name = c.name;
       patch({ menu: false });
       void act.setPref(c.id, { blocked: true, hidden: true }).then(() => patch({ chat: null, toast: `${name} blocked · removed from your Inbox` }));
     }, "", { sep: true, danger: true }),
+  ];
+}
+
+type MakeItem = (label: string, d: string, bg: string, fg: string, run: () => void, sub?: string) => DeskMenuItem;
+
+/** Mark as unread / read, Mute / Unmute, Pin / Unpin — one's own view of the chat (crm_set_pref), each with its toast. */
+function prefItems(ctx: DeskCtx, c: DeskCtx["data"]["customers"][number], it: MakeItem): DeskMenuItem[] {
+  const { patch, act, data, me } = ctx;
+  const pref = data.prefs[c.id];
+  const unread = !!pref?.markedUnread || c.unread > 0, muted = !!pref?.muted, pinned = !!pref?.pinned;
+  const flag = (p: Partial<{ markedUnread: boolean; muted: boolean; pinned: boolean }>, msg: string) => { patch({ menu: false, toast: msg }); void act.setPref(c.id, p); };
+  return [
+    it(unread ? "Mark as read" : "Mark as unread", "M21 12a9 9 0 1 1-9-9M19 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z", "var(--crm-field)", "var(--crm-ink-soft)", () => {
+      if (unread) { flag({ markedUnread: false }, "Marked as read"); if (c.assignedTo === me.id) act.openChat(c.id); } else flag({ markedUnread: true }, "Marked as unread");
+    }),
+    it(muted ? "Unmute" : "Mute notifications", muted ? "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" : "M18 8a6 6 0 0 0-9.3-5M6 8c0 7-3 7-3 9h14M10 21h4M2 2l20 20",
+      "var(--crm-field)", "var(--crm-ink-soft)", () => flag({ muted: !muted }, muted ? "Notifications on" : "Muted · no alerts for this chat"), muted ? "Muted" : ""),
+    it(pinned ? "Unpin chat" : "Pin chat", "M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z", "var(--crm-field)", "var(--crm-ink-soft)",
+      () => flag({ pinned: !pinned }, pinned ? "Unpinned" : "Pinned to the top of Inbox")),
   ];
 }
