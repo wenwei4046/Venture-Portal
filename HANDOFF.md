@@ -1,5 +1,22 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-09 c (#991 SHIPPED, migration applied first) — Invoice attachments; PDFs with their attachments
+
+Session 171188af.
+
+- **MERGED:** squash `6fa62792` (2026-11-09 10:23Z), every check green, on the user's "上 migration，全绿就 merge" → "现在看并 merge". Unit tests (2/2) failed once in `GwpTab.test.tsx` (Product List, not this PR's); it passed on a re-run of that job.
+- **Migration `20261109170000_invoice_attachments` on production FIRST**, after a dry run as Finance Manager (rolled back: add → list → object not removable while its row stands → remove → object deleted by the policy; no direct table read). schema_migrations row, created_by `claude-invoice-attachments`.
+- **What the user asked:** "我issue invoice 时可以放attachment 一起print 出来吗？ export pdf 也一起" → "invoice + attachment, invoice + attachment", "export 可以选要不要include attachment", "不想要调顺序", "payment 也要有办法attachment 一起export", "就是我开invoice 时放，也可以看完后放". Sample `mockups/invoice-attachments-export-mockup.html` (OneDrive cwd). Cost asked: none extra (R2 ~206 MB of the free 10 GB; pdf-lib is open source).
+- **Built:**
+  - Create invoice's *Attachments*: filed after the draft is saved; not for *Several companies* or Edit.
+  - The invoice page's **Attachments** card: open, add, Remove? (not once voided).
+  - Every invoice / voucher PDF or Print asks **Export PDF · Include attachments** (never pre-ticked).
+  - Ticked: each document is followed by its own PDF / JPG / PNG files.
+  - Over 4 MB: the PDF goes to R2 `payment-attachments/exports/` and a 10-minute link opens it. Copies older than a day are swept on the next such export.
+  - Phone apps and Debtor Aging: plain PDF.
+  - DESIGN v4.244; `.claude/rules/finance/finance-view.md` › INVOICE ATTACHMENTS AND PDFS WITH THEIR FILES.
+- **Not checked:** logged in on the live site; a real upload and a real PDF with files.
+
 ## CHECKPOINT 2026-11-09 b (#986 SHIPPED, migration applied first) — Payroll request PVs pay into their bank; real bank numbers
 
 Session 171188af.
