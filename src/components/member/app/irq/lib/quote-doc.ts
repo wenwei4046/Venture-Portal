@@ -197,6 +197,17 @@ export function syncPrices(cfg) {
   return cfg;
 }
 const withSum = cfg => { syncPrices(cfg); (cfg.packages || []).forEach(p => { p.price = Math.round((p.cats || []).reduce((a, c) => a + c.items.reduce((b, it) => b + (+it.cost || 0) * (+it.qty || 1), 0), 0)); }); return cfg; };
+// The quote's sections — the Customize step's tabs (the user, 2026-11-09: "新增电器；是否可以在哪个位置可以让我control加什么类型";
+// a new one is "多一个分页" and behaves "像家私"). Furniture and Services are built in; Quote settings › Categories adds,
+// names and orders the rest. `goods`: its items are products (Change item, photos, the Style step's furniture list).
+export const DEFAULT_SECTIONS = [
+  { id: "furn", label: "Furniture", head: "FURNITURE & APPLIANCES", goods: true },
+  { id: "serv", label: "Services", head: "SERVICES & FITTINGS", goods: false },
+];
+export const sectionsOf = cfg => (Array.isArray(cfg && cfg.sections) && cfg.sections.length ? cfg.sections : DEFAULT_SECTIONS).map(s => ({ ...s, head: s.head || String(s.label || "").toUpperCase() }));
+/** A room type category's section: the one it names while that one exists, else by its rows (a catalogue code: Furniture). */
+export const sectionOfCat = (cfg, c) => { const ids = sectionsOf(cfg).map(s => s.id); return c && c.section && ids.includes(c.section) ? c.section : (c && (c.items || []).some(i => i.kind) ? "furn" : "serv"); };
+export const goodsSection = (cfg, id) => !!(sectionsOf(cfg).find(s => s.id === id) || {}).goods;
 export const DEFAULT_STYLES = [{ id: "muji", name: "Muji", desc: "Light oak, linen and calm neutrals" }, { id: "modern", name: "Modern", desc: "Clean lines, darker tones, metal accents" }, { id: "nordic", name: "Nordic", desc: "Bright, airy, soft textures" }];
 // Customer info: CRM fields mirror CRM › Customer form (read-only here). "own" = quote-only fields.
 export const CRM_FIELDS = [
@@ -382,13 +393,14 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
       const bx = q.building?.extra || {};
       (config.bldFields || []).filter(f => f.show).forEach(f => { out += fieldRows(f, bx[f.id], n, b); });
       if (q.moodboard && !excel) out += moodRows(q.moodboard, n, b);
+    // Every cell framed (the user, 2026-11-09: "quotation没有线，有点难看懂"): the head, each row, each category.
     } else if (b.type === "table") {
       const ps = photoSizeOf(b), cs = codeSizeOf(b); // Quote settings › Item table: Photo size, Code / colour text (2026-11-09)
-      out += `<tr style="background:#E7E5DE">${cols.map(c => `<td style="padding:6px;border-top:1px solid #bbb;border-bottom:1px solid #bbb;font-weight:bold;font-size:${b.size - 1}px;${c.num ? "text-align:right" : c.key === "photo" ? "text-align:center" : ""}${+c.width > 0 ? ";width:" + Math.min(80, +c.width) + "%" : ""}">${esc(c.label)}</td>`).join("")}</tr>`;
+      out += `<tr style="background:#E7E5DE">${cols.map(c => `<td style="padding:6px;border:1px solid #bbb;font-weight:bold;font-size:${b.size - 1}px;${c.num ? "text-align:right" : c.key === "photo" ? "text-align:center" : ""}${+c.width > 0 ? ";width:" + Math.min(80, +c.width) + "%" : ""}">${esc(c.label)}</td>`).join("")}</tr>`;
       q.cats.forEach(cat => {
-        out += `<tr><td colspan="${n}" style="padding:10px 6px 3px;font-weight:bold;letter-spacing:.05em;font-size:${b.size}px">${esc(cat.name)}</td></tr>`;
+        out += `<tr><td colspan="${n}" style="padding:6px;font-weight:bold;letter-spacing:.05em;font-size:${b.size}px;border:1px solid #ccc;background:#F6F5F1">${esc(cat.name)}</td></tr>`;
         cat.rows.forEach(r => {
-          out += `<tr>${cols.map(c => { if (c.key === "photo") return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;width:${ps + 8}px;text-align:center;vertical-align:middle">${r.photo ? `<img src="${esc(r.photo)}" alt="" style="display:block;width:${ps}px;height:${ps}px;object-fit:contain;margin:0 auto">` : ""}</td>`; if (c.key === "code") return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;font-size:${cs}px">${esc(r.code)}</td>`; const v = c.key === "price" ? money(r.unit) : c.key === "sum" ? money(r.sum) : r[c.key]; return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;font-size:${b.size}px;${c.num ? "text-align:right" : ""}">${esc(v)}</td>`; }).join("")}</tr>`;
+          out += `<tr>${cols.map(c => { if (c.key === "photo") return `<td style="padding:4px 6px;border:1px solid #ccc;width:${ps + 8}px;text-align:center;vertical-align:middle">${r.photo ? `<img src="${esc(r.photo)}" alt="" style="display:block;width:${ps}px;height:${ps}px;object-fit:contain;margin:0 auto">` : ""}</td>`; if (c.key === "code") return `<td style="padding:4px 6px;border:1px solid #ccc;font-size:${cs}px">${esc(r.code)}</td>`; const v = c.key === "price" ? money(r.unit) : c.key === "sum" ? money(r.sum) : r[c.key]; return `<td style="padding:4px 6px;border:1px solid #ccc;font-size:${b.size}px;${c.num ? "text-align:right" : ""}">${esc(v)}</td>`; }).join("")}</tr>`;
         });
       });
     } else if (b.type === "totals") {

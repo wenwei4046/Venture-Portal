@@ -48,9 +48,22 @@ describe("the generated IR Quote templates", () => {
     expect(at).toBeGreaterThan(IRQ_CSS_QUOTE.indexOf("display: block; text-align: left; }"));
   });
 
+  // 2026-11-09: "可以让我直接在预览中调整宽度，输入数字看不懂" — a column's width dragged at its head in the A4 sample.
+  it("let a column's width be dragged at its head in Quote settings' A4 sample", () => {
+    const settings = tpls.find(([f]) => f === "SettingsTpl.tsx")![1];
+    expect(settings).toContain('title={"Drag to change the width"}');
+    expect(settings).toMatch(/onPointerDown=\{L_th[^}]*\?\.\["grab"\]\}/);
+  });
+
   it("put Classic | Build in beside a room type's title in Quote settings", () => {
     const settings = tpls.find(([f]) => f === "SettingsTpl.tsx")![1];
     expect(settings).toContain('v["ed"]?.["vers"]');
+  });
+
+  // 2026-11-09 Sections: a third Customize tab overlapped on a phone ("overlap") — 3+ tabs stack each label over its sum.
+  it("let three or more Customize tabs fit a phone", () => {
+    const quote = tpls.find(([f]) => f === "QuoteTpl.tsx")![1];
+    expect(quote).toMatch(/min-width:0;display:flex;flex-direction:\$\{dcS\(L_zt[^)]*\?\.\["dir"\]\)\}/);
   });
 
   it("show the item being replaced in the Change item sheet's header", () => {

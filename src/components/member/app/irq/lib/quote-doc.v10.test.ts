@@ -290,3 +290,14 @@ describe("Quote settings › Item table › a column's width", () => {
     expect(renderDoc(defaults(packagesJson, catalogJson), { facts: {}, cats: [], custRows: [], total: 0 })).not.toMatch(/;width:\d+%">ITEM/);
   });
 });
+
+// The user, 2026-11-09: "quotation没有线，有点难看懂" — every cell of the item table framed.
+describe("the item table's lines", () => {
+  it("frames the head, every row's cells and every category", () => {
+    const html = renderDoc(defaults(packagesJson, catalogJson), { facts: {}, custRows: [], total: 0, cats: [{ name: "LIVING", rows: [{ no: 1, item: "SOFA", desc: "", code: "1", qty: 1, unit: 1, sum: 1 }] }] });
+    expect(html).toContain("padding:6px;border:1px solid #bbb;font-weight:bold");
+    expect(html).toContain("border:1px solid #ccc;background:#F6F5F1\">LIVING</td>");
+    expect(html).toMatch(/border:1px solid #ccc;font-size:12px;">SOFA<\/td>/);
+    expect(html).not.toContain("border-bottom:1px solid #ddd;font-size:12px");
+  });
+});

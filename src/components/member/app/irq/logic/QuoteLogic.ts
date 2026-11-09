@@ -112,9 +112,6 @@ export class QuoteLogic extends DcLogic {
   attachRo() { const el = this.rootRef.current; if (this.ro || !el || !window.ResizeObserver) return; this.ro = new ResizeObserver(e => { const w = e[0].contentRect.width; if (Math.abs(w - this.state.width) > 1) this.setState({ width: w }); }); this.ro.observe(el); }
   componentDidUpdate() {
     if (!this.ro) this.attachRo();
-    // A phone makes the quotation's PDF while step 5 is open, so Share and Download hand it over the moment they are
-    // pressed — a phone shares a file only inside the press itself (2026-11-09).
-    if (this.touch() && this.state.step === 5 && this.lib && !this.state.home) { clearTimeout(this._pdfT); this._pdfT = setTimeout(() => { this.pdfFor().catch(() => {}); }, 1200); }
   }
   touch() { return typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(pointer: coarse)").matches; }
   /** This quotation as a PDF (lib/quote-pdf.ts): made once for what is on screen now, again only when it changes. */
@@ -126,6 +123,11 @@ export class QuoteLogic extends DcLogic {
     job.promise.catch(() => { if (this._pdf === job) this._pdf = null; });
     this._pdf = job;
     return job.promise;
+  }
+  /** Makes the PDF (it takes a few seconds), saying so, then offers `label`: a press of its own, which a phone wants to share a file. */
+  pdfWhenReady(label, run) {
+    this.setState({ confirm: { title: "Preparing the PDF…", sub: "A few seconds, the photos included." } });
+    this.pdfFor().then(() => this.setState({ confirm: { title: "PDF ready", sub: this.fileBase() + ".pdf", ok: label, run } }), () => this.setState({ confirm: { title: "Could not make the PDF", sub: "Check the connection and try again." } }));
   }
   pdfReady() { const key = this.docHtml(false); return this._pdf && this._pdf.key === key && this._pdf.blob ? this._pdf.blob : null; }
   pdfFile(blob) { return new File([blob], this.fileBase() + ".pdf", { type: "application/pdf" }); }
@@ -387,7 +389,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     const okSrc = s => /^(data:image|https?:|blob:)/.test(String(s || "")); const imgs = [...((sx.photos && sx.photos.length ? sx.photos : (sx.cover ? [sx.cover] : [])).map((src, k) => ({ src, title: sx.name + (k ? " · " + (k + 1) : ""), sectionName: "Overview", items: [] }))), ...(drive[sid] || []).filter(x => okSrc(x.src))];
     const gi = Math.min(st.gi || 0, Math.max(0, imgs.length - 1)), im = imgs[gi];
     const inIm = () => false;
-    const live = c => c.items.filter(i => (i.qty ?? 1) > 0), isF = c => c.section ? c.section === "furn" : c.items.some(i => i.kind);
+    const live = c => c.items.filter(i => (i.qty ?? 1) > 0), isF = c => this.lib.goodsSection(this.cfg, this.lib.sectionOfCat(this.cfg, c)); // a products section (2026-11-09: Quote settings › Categories › Sections)
     const fItems = p.cats.filter(isF).flatMap(live), zl = fItems.map(i => { const im = this.imgFor(i); return im ? { img: im, name: title(i.name), code: i.code || "", delta: rm0((i.cost || 0) * (i.qty ?? 1)), item: null } : null; }).filter(Boolean), furn = fItems.map(i => { const im = this.imgFor(i); return { name: title(i.name), qty: i.qty > 1 ? "× " + i.qty : "", price: rm0((i.cost || 0) * (i.qty ?? 1)), cur: im ? "zoom-in" : "default", view: () => { if (im) this.openZoom(zl, zl.findIndex(z => z.img === im)); } }; });
     const sCats = p.cats.filter(c => !isF(c) && live(c).length), sItems = sCats.flatMap(live), sSum = sItems.reduce((a, i) => a + (i.cost || 0) * (i.qty ?? 1), 0);
     const serv = sCats.length ? { count: sItems.length + " items", sum: rm0(sSum), open: !!st.servOpen, rot: st.servOpen ? "rotate(180deg)" : "none", toggle: () => this.setState(s => ({ servOpen: !s.servOpen })),
@@ -408,8 +410,8 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     if (this.touch()) {
       // A phone cannot print the hidden frame (the user, 2026-11-09: "下载成pdf 也是没有的"): it saves the PDF it made.
       const ready = this.pdfReady();
-      if (!ready) this.flash("Making the PDF…");
-      try { const blob = ready || await this.pdfFor(); this.saveFile(blob, this.fileBase() + ".pdf"); this.flash("PDF downloaded"); } catch (e) { this.flash("Could not make the PDF. Try again."); }
+      if (ready) { this.saveFile(ready, this.fileBase() + ".pdf"); this.flash("PDF downloaded"); return; }
+      this.pdfWhenReady("Download PDF", blob => { this.saveFile(blob, this.fileBase() + ".pdf"); this.flash("PDF downloaded"); });
       return;
     }
     let html = this.docHtml(false);
@@ -439,7 +441,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     // A phone shares the quotation itself, as a PDF (the user, 2026-11-09: "分享出去是文字，不是pdf"), the summary beside it.
     if (this.touch() && navigator.canShare) {
       const ready = this.pdfReady();
-      if (!ready) { this.flash("Preparing the PDF — tap Share again in a moment"); this.pdfFor().then(() => this.flash("PDF ready — tap Share"), () => this.flash("Could not make the PDF. Try again.")); return; }
+      if (!ready) { this.pdfWhenReady("Share PDF", () => this.share()); return; }
       const file = this.pdfFile(ready);
       if (navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], title: this.fileBase(), text }); } catch (e) { /* closed */ }
@@ -495,12 +497,12 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
         })
       };
     }) : [];
-    const isFurn = ci => pkg && (pkg.cats[ci].section ? pkg.cats[ci].section === "furn" : pkg.cats[ci].items.some(i => i.kind));
+    const secOf = ci => pkg && this.lib ? this.lib.sectionOfCat(this.cfg, pkg.cats[ci]) : "furn";
     const grpSum = vs => rm0(vs.reduce((a, cv) => a + st.lines.filter(l => l.ci === cv._ci).reduce((b, l) => b + (+l.cost || 0) * Math.max(l.qty, 0), 0), 0));
-    const furnV = catViews.filter(cv => isFurn(cv._ci)), servV = catViews.filter(cv => !isFurn(cv._ci));
-    const catGroups = [{ key: "furn", short: "Furniture", label: "FURNITURE & APPLIANCES", cats: furnV }, { key: "serv", short: "Services", label: "SERVICES & FITTINGS", cats: servV }].filter(g => g.cats.length).map(g => ({ ...g, sum: grpSum(g.cats) }));
+    // One tab a section, in Quote settings' order (Furniture, Services, then what the Principal added — 2026-11-09).
+    const catGroups = (this.lib ? this.lib.sectionsOf(this.cfg) : []).map(s => ({ key: s.id, short: s.label, label: s.head, cats: catViews.filter(cv => secOf(cv._ci) === s.id) })).filter(g => g.cats.length).map(g => ({ ...g, sum: grpSum(g.cats) }));
     const czKey = catGroups.some(g => g.key === st.czTab) ? st.czTab : (catGroups[0] || {}).key;
-    const czTabs = phone && catGroups.length > 1 ? catGroups.map(g => { const on = g.key === czKey; return { label: g.short, sum: g.sum, bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", sub: on ? "#D96E0B" : "#97978F", shadow: on ? "0 1px 3px rgba(20,20,18,.12)" : "none", pick: () => { this.setState({ czTab: g.key }); const el = this.rootRef.current && this.rootRef.current.querySelector("main"); if (el) el.scrollTop = 0; } }; }) : false;
+    const czTabs = phone && catGroups.length > 1 ? catGroups.map(g => { const on = g.key === czKey; const many = catGroups.length > 2; return { label: g.short, sum: g.sum, dir: many ? "column" : "row", gap: many ? "0" : "6px", h: many ? "40px" : "32px", bg: on ? "#FFFFFF" : "transparent", ink: on ? "#111111" : "#6B6B66", sub: on ? "#D96E0B" : "#97978F", shadow: on ? "0 1px 3px rgba(20,20,18,.12)" : "none", pick: () => { this.setState({ czTab: g.key }); const el = this.rootRef.current && this.rootRef.current.querySelector("main"); if (el) el.scrollTop = 0; } }; }) : false;
     const catGroupsShown = phone && catGroups.length > 1 ? catGroups.filter(g => g.key === czKey).map(g => ({ ...g, label: "", sum: "" })) : catGroups;
 
     // sheet
@@ -574,7 +576,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
           toggle: () => { if (!none) this.setState(s => ({ withMood: !s.withMood })); } }; })(),
       saveDraftC: () => { this.saveDraft(); this.setState({ confirm: { title: "Draft saved", sub: "Find it anytime under Quote · Drafts." } }); },
       doPdfC: () => { this.exportPdf(); if (!this.touch()) this.setState({ confirm: { title: "PDF ready", sub: "Choose “Save as PDF” in the next screen to keep it on this device." } }); }, // a phone saves the file itself (exportPdf), no print screen
-      confirmBox: st.confirm ? { ...st.confirm, close: () => this.setState({ confirm: null }) } : false,
+      confirmBox: st.confirm ? { ...st.confirm, ok: st.confirm.ok || "OK", close: () => this.setState({ confirm: null }), act: () => { const run = st.confirm.run; this.setState({ confirm: null }); if (run) run(); } } : false,
       openShare: () => { if (!this.checkReq()) return; if (this.touch() && navigator.canShare) { this.share(); return; } this.setState({ shareOpen: true }); }, // a phone: the PDF, through its own share sheet
       shareSheet: st.shareOpen ? { close: () => this.setState({ shareOpen: false }), apps: (() => { const t = () => encodeURIComponent(this.shareText()), done = () => this.setState({ shareOpen: false });
         return [
