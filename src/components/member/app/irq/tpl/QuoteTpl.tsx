@@ -2720,8 +2720,8 @@ export function renderQuote(v: DcVals, C: DcComponents) {
                 {dcText(v["confirmBox"]?.["sub"])}
               </span>
               {"\n          "}
-              <button onClick={v["confirmBox"]?.["close"]} style={{"width":"100%","height":"46px","marginTop":"6px","borderRadius":"12px","border":"0","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"15px","fontWeight":"700"}}>
-                {"OK"}
+              <button onClick={v["confirmBox"]?.["act"]} style={{"width":"100%","height":"46px","marginTop":"6px","borderRadius":"12px","border":"0","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"15px","fontWeight":"700"}}>
+                {dcText(v["confirmBox"]?.["ok"])}
               </button>
               {"\n        "}
             </div>
