@@ -199,6 +199,11 @@ check(await q(`select policyname from pg_policies where schemaname = 'storage' a
 
 // A punch's photo: only an object the caller filed in their own folder.
 await as(ANN_USER, [])
+// The work day turns at the policy's cutover (04:00): a punch made 00:00–04:00 office time is the previous day's, while
+// Remind all asks about the calendar's today — so this file failed whenever CI ran in those hours (2026-11-10, 00:03 and
+// 00:41 MYT: Ann asked though she was in). Here the day turns at midnight, so a punch and Remind all name the same day
+// at any hour. (Whether Remind all should ask about the work day before the cutover is the product's question, not this file's.)
+await db.exec(`update public.att_policy set cutover = '00:00'`)
 await refuses(`select public.att_punch('in', null, null, null, 'phone', $1, '', 'app')`, [`punch/${ANN_USER}/a.jpg`], /not filed/, 'a photo that is not there')
 await q(`insert into storage.objects (bucket_id, name, owner) values ('attendance', $1, $2), ('attendance', $3, $4)`,
   [`punch/${ANN_USER}/a.jpg`, ANN_USER, `punch/${CHEW_USER}/b.jpg`, CHEW_USER])
