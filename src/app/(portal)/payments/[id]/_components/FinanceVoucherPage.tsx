@@ -9,6 +9,7 @@ import FullPageFiles from './FullPageFiles'
 import CopyAsDraft from './CopyAsDraft'
 import s from '@/components/finv/full.module.css'
 import { FullAudit, FullCard as Card, FullFact as Fact, FullPanelRow as PanelRow, FullRow as Row, FullTrail } from '@/components/finv/FullParts'
+import { PdfExportButton } from '@/components/finv/PdfExport'
 
 // A payment voucher's full page (2026-10-14, the Finance revamp v2 — D06 of
 // `.design/fin-r2/handoff`): "← Payments" and the crumb; the number, its
@@ -68,9 +69,9 @@ export default function FinanceVoucherPage({ detail: v, extras, canCopy }: { det
           </div>
         </div>
         <div className={s.topActs}>
-          <a href={`/payments/voucher-doc?id=${v.id}`} target="_blank" rel="noopener noreferrer" className={s.topBtn}>
+          <PdfExportButton href={`/payments/voucher-doc?id=${v.id}`} what="voucher" sub={v.no ?? undefined} className={s.topBtn}>
             Print
-          </a>
+          </PdfExportButton>
           {canCopy ? <CopyAsDraft voucherId={v.id} voucherNo={v.no} /> : null}
         </div>
       </div>

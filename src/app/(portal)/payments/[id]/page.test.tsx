@@ -55,7 +55,7 @@ describe('HR payroll voucher detail access', () => {
     expect(table).toHaveTextContent('Recorded Employee')
     expect(table).toHaveTextContent('Original Department')
     expect(within(table).getByRole('row', { name: /Total contribution/ })).toHaveTextContent('100.10')
-    expect(screen.getByRole('link', { name: 'Print' })).toHaveAttribute('href', '/payments/voucher-doc?id=stat')
+    expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Back to HR Payment/ })).toHaveAttribute('href', '/hr-costing/payment')
     for (const testId of ['voucher-actions', 'copy-voucher', 'reassign-gl', 'attachment-uploader', 'attachment-list']) expect(screen.queryByTestId(testId)).not.toBeInTheDocument()
     expect(from).not.toHaveBeenCalledWith('payment_attachments')
@@ -249,7 +249,7 @@ describe('a payment voucher’s full page (D06)', () => {
     asFinance()
     database('ordinary_payment')
     render(await PaymentDetailPage({ params: Promise.resolve({ id: 'stat' }) }))
-    expect(screen.getByRole('link', { name: 'Print' })).toHaveAttribute('href', '/payments/voucher-doc?id=stat')
+    expect(screen.getByRole('button', { name: 'Print' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument()
   })
 

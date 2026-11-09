@@ -100,7 +100,7 @@ const LINES = [
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.createLines.mockResolvedValue({ ok: true, value: 'HV-INV-202609-0070' })
+  mocks.createLines.mockResolvedValue({ ok: true, value: { no: 'HV-INV-202609-0070', id: 'i70' } })
   mocks.update.mockResolvedValue({ ok: true, value: null })
   mocks.hr.mockImplementation(async (_month: string, mode: string) => ({
     ok: true,
@@ -113,7 +113,7 @@ describe('Create invoice', () => {
     draw()
     expect(dialog()).toHaveTextContent('Create invoice')
     expect(dialog()).toHaveTextContent('Saved as draft · approve to issue')
-    expect(Array.from(dialog().querySelectorAll('label')).map((l) => l.textContent)).toEqual(['Bill to', 'Invoice date', 'Description', 'Billing mode', 'Lines', 'Due date'])
+    expect(Array.from(dialog().querySelectorAll('label')).map((l) => l.textContent)).toEqual(['Bill to', 'Invoice date', 'Description', 'Billing mode', 'Lines', 'Due date', 'Attachments'])
     // The two side by side: one row of their own, the Description under it.
     const row = screen.getByLabelText('Bill to').parentElement?.parentElement
     expect(row).toContainElement(within(dialog()).getByRole('button', { name: /^Invoice date/ }))

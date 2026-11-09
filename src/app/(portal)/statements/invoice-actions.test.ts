@@ -188,7 +188,7 @@ describe('the invoice dialogs', () => {
   it('lines: the multi-line create (its gate names the hub), its number back', async () => {
     mocks.createMultiLineInvoice.mockResolvedValue({ id: 'i9', invoice_no: 'HV-INV-202609-0063' })
     const lines = [{ description: 'Salary', amount: 100, categoryCode: '5050' }]
-    expect(await hubCreateLinesInvoice({ billKind: 'dept_pool', deptId: 'd-mkt', ...head, lines })).toEqual({ ok: true, value: 'HV-INV-202609-0063' })
+    expect(await hubCreateLinesInvoice({ billKind: 'dept_pool', deptId: 'd-mkt', ...head, lines })).toEqual({ ok: true, value: { no: 'HV-INV-202609-0063', id: 'i9' } })
     expect(mocks.requireActionOn).toHaveBeenCalledWith('/statements', 'billing', 'create')
     expect(mocks.createMultiLineInvoice).toHaveBeenCalledWith(
       expect.objectContaining({

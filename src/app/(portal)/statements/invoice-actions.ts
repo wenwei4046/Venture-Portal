@@ -220,7 +220,9 @@ export async function hubCreateInvoice(payload: HubInvoiceParty & HubInvoiceHead
 }
 
 /** A draft with lines: Create invoice's, one line or several — and each of its several companies', HR's figure itemised the way HR keyed it. Its number back. */
-export async function hubCreateLinesInvoice(payload: HubInvoiceParty & HubInvoiceHead & { lines: InvoiceLineInput[] }): Promise<HubResult<string | null>> {
+export async function hubCreateLinesInvoice(
+  payload: HubInvoiceParty & HubInvoiceHead & { lines: InvoiceLineInput[] },
+): Promise<HubResult<{ no: string | null; id: string }>> {
   await requireActionOn('/statements', 'billing', 'create')
   return attempt(async () => {
     const created = await createMultiLineInvoice({
@@ -233,7 +235,8 @@ export async function hubCreateLinesInvoice(payload: HubInvoiceParty & HubInvoic
       headerDescription: payload.description,
       lines: payload.lines,
     })
-    return created.invoice_no
+    // Its id too (2026-11-09): Create invoice's attachments are filed with it straight after.
+    return { no: created.invoice_no, id: created.id }
   })
 }
 

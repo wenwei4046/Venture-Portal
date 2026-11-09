@@ -8554,6 +8554,12 @@ export type Database = {
         Returns: undefined
       }
       payment_requests_for_pv: { Args: { p_ids: string[] }; Returns: Json }
+      invoice_attachments_of: {
+        Args: { p_ids: string[] }
+        Returns: { id: string; invoice_id: string; file_name: string; file_type: string; file_size: number | null; storage_path: string; uploaded_by: string | null; uploaded_at: string }[]
+      }
+      invoice_attachment_add: { Args: { p_invoice: string; p_name: string; p_type: string; p_size: number; p_path: string }; Returns: string }
+      invoice_attachment_remove: { Args: { p_id: string }; Returns: string }
       voucher_payee_copy: { Args: { p_from: string; p_to: string }; Returns: undefined }
       voucher_payee_set: { Args: { p_voucher: string; p_bank: string; p_account: string }; Returns: undefined }
       voucher_payees: { Args: { p_ids: string[] }; Returns: { voucher_id: string; bank: string | null; account_no: string | null }[] }

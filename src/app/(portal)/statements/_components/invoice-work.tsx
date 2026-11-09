@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { flash } from '@/components/hrv/toast'
 import { DialogConfirm, DialogMenu, Field, FinDialog, Input, type DialogMenuItem } from '@/components/finv/Dialog'
 import { money } from '@/components/finv/form-words'
+import { PdfExportDialog } from '@/components/finv/PdfExport'
 import { invoiceSteps, type InvoiceCan, type InvoiceStepKey } from './InvoiceDrawer'
 import SettleDialog from './SettleDialog'
 import InvoiceLinesDialog from './InvoiceLinesDialog'
@@ -102,6 +103,12 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
   const [reason, setReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Export PDF's one choice, Include attachments (2026-11-09), asked before any invoice PDF opens.
+  const [pdf, setPdf] = useState<{ href: string; sub?: string; open: boolean } | null>(null)
+  const askPdf = (href: string, sub?: string) => {
+    setMenu(null)
+    setPdf({ href, sub, open: true })
+  }
 
   const closeAsk = () => {
     if (busy) return
@@ -282,7 +289,7 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
         ]
       : []),
     ...(can.docExport
-      ? [menuItem('docs', 'PDF · per invoice', () => window.open(`/billing/invoice-doc?period=${month}`, '_blank', 'noopener,noreferrer'), 'Each invoice on its own page')]
+      ? [menuItem('docs', 'PDF · per invoice', () => askPdf(`/billing/invoice-doc?period=${month}`, monthLong), 'Each invoice on its own page')]
       : []),
   ]
   const sel = settleSelection(ticked)
@@ -368,6 +375,7 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
       <FinDialog open={menu === 'payroll'} onClose={() => setMenu(null)} title="From payroll">
         <DialogMenu items={payrollItems} />
       </FinDialog>
+      <PdfExportDialog open={!!pdf?.open} onClose={() => setPdf((p) => (p ? { ...p, open: false } : p))} href={pdf?.href ?? ''} what="invoice" sub={pdf?.sub} />
       <FinDialog open={menu === 'export'} onClose={() => setMenu(null)} title="Export" sub={monthLong}>
         <DialogMenu items={exportItems} />
       </FinDialog>
@@ -375,7 +383,7 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
         <DialogMenu
           items={[
             ...(can.docExport
-              ? [menuItem('print', 'Print selected', () => window.open(`/billing/invoice-doc?ids=${ticked.map((i) => i.id).join(',')}`, '_blank', 'noopener,noreferrer'))]
+              ? [menuItem('print', 'Print selected', () => askPdf(`/billing/invoice-doc?ids=${ticked.map((i) => i.id).join(',')}`, `${ticked.length} selected`))]
               : []),
             ...(can.void
               ? [
@@ -540,6 +548,7 @@ export function useInvoiceWork(setup: InvoiceWorkSetup) {
     askApproveMonth: () => setAsk({ kind: 'approve-month' }),
     askCreditNote: (kind: 'cn-approve' | 'cn-void' | 'cn-delete', cn: HubCreditNote) => setAsk({ kind, cn }),
     settle: (ids: string[]) => setSettleIds(ids),
+    askPdf,
     exportItems,
     drafts,
     dialogs,

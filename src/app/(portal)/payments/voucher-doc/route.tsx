@@ -10,6 +10,7 @@ import { can } from '@/lib/permissions'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
 import { exportPdfResponse } from '@/lib/export/response'
+import { fetchPrintFiles, pdfWithAttachmentsResponse, renderParts, withAttachments } from '@/lib/export/attachments-response'
 import { VoucherDocPdf, type SalaryPaymentData, type StatutoryCoverageData, type VoucherDocData } from '../_format/voucher-doc-pdf'
 import { officeTime } from '@/lib/office-time'
 import { readPayrollLineAccounts, withLineAccounts } from '@/lib/private-fields'
@@ -219,6 +220,27 @@ export async function GET(req: Request) {
   const filename = id && docs.length === 1
     ? `voucher-${docs[0].voucher_no ?? docs[0].id.slice(0, 8)}`
     : `vouchers-batch-${officeTime().format('YYYYMMDD')}-${docs.length}`
+
+  // Include attachments (2026-11-09): each voucher, then its own files in the order they were added.
+  if (withAttachments(url)) {
+    const { data: files } = await supabase
+      .from('payment_attachments')
+      .select('voucher_id, file_name, file_type, storage_path, uploaded_at')
+      .in('voucher_id', docs.map((d) => d.id))
+      .order('uploaded_at', { ascending: true })
+    const filesBy = new Map<string, Array<{ name: string; type: string | null; path: string }>>()
+    for (const f of (files ?? []) as Array<{ voucher_id: string; file_name: string; file_type: string | null; storage_path: string }>) {
+      const list = filesBy.get(f.voucher_id) ?? []
+      list.push({ name: f.file_name, type: f.file_type, path: f.storage_path })
+      filesBy.set(f.voucher_id, list)
+    }
+    const parts = await renderParts(
+      docs,
+      (d) => <VoucherDocPdf vouchers={[d]} />,
+      (d) => fetchPrintFiles(supabase, 'payment-attachments', filesBy.get(d.id) ?? []),
+    )
+    return pdfWithAttachmentsResponse({ filename: `${filename}-with-attachments`, parts })
+  }
 
   return exportPdfResponse({ filename, element: <VoucherDocPdf vouchers={docs} /> })
 }

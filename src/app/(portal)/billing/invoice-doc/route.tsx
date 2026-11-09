@@ -13,6 +13,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireActionOn } from '@/lib/auth'
 import { exportPdfResponse } from '@/lib/export/response'
+import { fetchPrintFiles, pdfWithAttachmentsResponse, renderParts, withAttachments } from '@/lib/export/attachments-response'
 import { fetchByKeys } from '@/lib/paginate'
 import { billingModeLabel } from '@/lib/invoice-labels'
 import { extraBillingModeOptions, primedRegistryRows } from '@/lib/dept-registry'
@@ -189,6 +190,26 @@ export async function GET(req: Request) {
     filename = `invoices-${period.replace('-', '')}-batch`
   } else {
     filename = `invoices-batch-${officeTime().format('YYYYMMDD')}-${docs.length}`
+  }
+
+  // Include attachments (2026-11-09): each invoice, then its own files in the order they were added.
+  if (withAttachments(url)) {
+    const { data: files } = await supabase.rpc('invoice_attachments_of', { p_ids: docs.map((d) => d.id) })
+    const filesBy = group(
+      ((files ?? []) as Array<{ invoice_id: string; file_name: string; file_type: string | null; storage_path: string }>).map((f) => ({
+        invoice_id: f.invoice_id,
+        name: f.file_name,
+        type: f.file_type,
+        path: f.storage_path,
+      })),
+      (f) => f.invoice_id,
+    )
+    const parts = await renderParts(
+      docs,
+      (d) => <InvoiceDocPdf invoices={[d]} />,
+      (d) => fetchPrintFiles(supabase, 'payment-attachments', filesBy.get(d.id) ?? []),
+    )
+    return pdfWithAttachmentsResponse({ filename: `${filename}-with-attachments`, parts })
   }
 
   return exportPdfResponse({ filename, element: <InvoiceDocPdf invoices={docs} /> })

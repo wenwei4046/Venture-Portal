@@ -144,7 +144,7 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   monthly_statements: ['treasury.create', 'treasury.edit', 'treasury.export', 'treasury.view'],
   overdue_config: ['categories.view', 'settings.manage'],
   overdue_records: ['treasury.create', 'treasury.edit', 'treasury.view'],
-  payment_attachments: ['approvals.approve', 'approvals.view', 'director_salary.approve', 'hr_costing.approve', 'hr_costing.view:own', 'treasury.approve', 'treasury.create', 'treasury.edit', 'treasury.view'],
+  payment_attachments: ['approvals.approve', 'approvals.view', 'director_salary.approve', 'hr_costing.approve', 'hr_costing.export', 'hr_costing.view:own', 'treasury.approve', 'treasury.create', 'treasury.edit', 'treasury.export', 'treasury.view'],
   payment_voucher_sources: ['approvals.approve', 'approvals.view', 'billing.create', 'claims.approve', 'dept_pool.view', 'director_salary.approve', 'hr_costing.approve', 'hr_costing.export', 'hr_costing.view:own', 'treasury.approve', 'treasury.create', 'treasury.edit', 'treasury.export', 'treasury.view'],
   payment_vouchers: ['approvals.approve', 'approvals.view', 'billing.create', 'billing.export', 'billing.view', 'billing.void', 'claims.approve', 'dept_pool.view', 'dept_reports.export', 'dept_reports.view', 'director_salary.approve', 'hr_costing.approve', 'hr_costing.export', 'hr_costing.view:own', 'reconciliation.create', 'reconciliation.edit', 'reports.export', 'reports.view', 'treasury.approve', 'treasury.create', 'treasury.edit', 'treasury.export', 'treasury.view', 'treasury.void'],
   payroll_batch_lines: ['hr_costing.create', 'hr_costing.view:own'],

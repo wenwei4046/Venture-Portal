@@ -28,6 +28,7 @@ import { NavOwner } from '@/components/layout/nav-owner'
 import { loadVoucherDetail } from '../_lib/voucher-detail'
 import { loadVoucherPageExtras } from '../_lib/voucher-page'
 import FinanceVoucherPage from './_components/FinanceVoucherPage'
+import { PdfExportButton } from '@/components/finv/PdfExport'
 
 const POOL_LABELS: Record<string, string> = {
   venture_pool: 'Venture Pool',
@@ -402,14 +403,14 @@ export default async function PaymentDetailPage({ params }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
-          <Link
+          <PdfExportButton
             href={`/payments/voucher-doc?id=${voucher.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
+            what="voucher"
+            sub={voucher.voucher_no ?? undefined}
             className="bg-surface hover:bg-surface-2 border border-hairline text-ink font-serif italic text-sm px-4 py-2 rounded-md transition-colors"
           >
             Print
-          </Link>
+          </PdfExportButton>
           {voucherCan.create ? <CopyVoucherButton voucherId={voucher.id} voucherNo={voucher.voucher_no} /> : null}
         </div>
       </div>

@@ -10,6 +10,9 @@ import { dueNote, statusText, statusTone } from '@/app/(portal)/statements/_lib/
 import InvoicePageSteps from './_components/InvoicePageSteps'
 import CopyInvoice from './_components/CopyInvoice'
 import { loadInvoicePage } from './_lib/invoice-page'
+import { readInvoiceFiles } from './_lib/invoice-files'
+import InvoiceFiles from './_components/InvoiceFiles'
+import { PdfExportButton } from '@/components/finv/PdfExport'
 
 // An invoice's full page (2026-10-15, the Finance revamp v2 — D06 of
 // `.design/fin-r2/handoff` for the Invoice drawer's *View full page ↗*; the
@@ -39,7 +42,7 @@ export default async function InvoicePage({ params }: Props) {
   const { id } = await params
   const supabase = await createClient()
 
-  const page = await loadInvoicePage(supabase, id)
+  const [page, files] = await Promise.all([loadInvoicePage(supabase, id), readInvoiceFiles(supabase, id)])
   if (!page) notFound()
   const { invoice: h, trail: steps, audit } = page
   const no = h.no ?? 'Draft'
@@ -88,9 +91,7 @@ export default async function InvoicePage({ params }: Props) {
         </div>
         <div className={s.topActs}>
           {can.docExport ? (
-            <a href={`/billing/invoice-doc?id=${h.id}`} target="_blank" rel="noopener noreferrer" className={s.topBtn}>
-              PDF
-            </a>
+            <PdfExportButton href={`/billing/invoice-doc?id=${h.id}`} what="invoice" sub={no} className={s.topBtn} />
           ) : null}
           {can.create ? <CopyInvoice id={h.id} no={h.no} thisMonth={officeMonth()} /> : null}
         </div>
@@ -191,6 +192,10 @@ export default async function InvoicePage({ params }: Props) {
               </div>
             </FullCard>
           ) : null}
+
+          <FullCard n={++n} title="Attachments" aside={plural(files.length, 'FILE', 'FILES')}>
+            <InvoiceFiles invoiceId={h.id} files={files} open={h.status !== 'voided'} canEdit={can.create} />
+          </FullCard>
 
           {page.said ? (
             <FullCard n={++n} title="Description">

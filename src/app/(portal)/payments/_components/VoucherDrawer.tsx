@@ -10,6 +10,7 @@ import type { VoucherDetail } from '../_lib/voucher-detail'
 import { useVoucherSteps } from './voucher-steps'
 import { REFUSED } from '../_lib/voucher-refusals'
 import { VoucherDetailBody } from './VoucherDetailBody'
+import { PdfExportButton } from '@/components/finv/PdfExport'
 
 // A voucher in the hub's drawer (2026-10-14, the Finance revamp v2 — D05 of
 // `.design/fin-r2/handoff`): the dark hero, the numbered groups, the files and
@@ -104,9 +105,9 @@ export function VoucherDrawer({ id, onClose, onChanged }: { id: string | null; o
                   View full page ↗
                 </Link>
               )}
-              <a href={`/payments/voucher-doc?id=${v.id}`} target="_blank" rel="noopener noreferrer" className={d.headBtn}>
+              <PdfExportButton href={`/payments/voucher-doc?id=${v.id}`} what="voucher" sub={v.no ?? undefined} className={d.headBtn}>
                 Print
-              </a>
+              </PdfExportButton>
             </>
           ) : null
         }
