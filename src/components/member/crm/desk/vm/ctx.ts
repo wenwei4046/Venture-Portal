@@ -65,6 +65,8 @@ export interface DeskUi {
   rpAd?: string;
   /** Reports › Overview grouped by ad or by salesperson. */
   rpOvBy?: "ad" | "rep";
+  /** Reports › Overview: one brand (The Conts, Dream Crafter) or all (the owner, 2026-11-09: "可筛选品牌"). */
+  rpSrc?: string;
   insOpen: boolean;
   /** 4a's Insight: the team opened in place to its people (frame 01). */
   insTeam: string | null;

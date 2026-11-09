@@ -110,6 +110,8 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <h1 style={{ margin: 0, font: `500 ${fs(26)} ${TIGHT}`, letterSpacing: "-0.025em" }}>Team activity</h1>
           <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: fs(12), color: "var(--crm-muted)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "var(--crm-green)" }} />{v.clock}</span>
+          {/* The days the figures are of (the owner, 2026-11-09: "选择时间后，要显示目前的数据是哪个时间"); Custom's pill says them. */}
+          {!v.isCustom && <span style={{ marginLeft: "auto", fontSize: fs(12.5), fontWeight: 500, color: "var(--crm-ink-soft)", whiteSpace: "nowrap" }}>{rangeWords(v.range.a, v.range.b)}</span>}
         </div>
         <div style={{ flex: "none", display: "flex", gap: "8px" }}>
           <span {...press(v.pOpenMenu)} style={{ flex: 1, minWidth: 0, height: "40px", boxSizing: "border-box", padding: "0 12px", borderRadius: "20px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "7px", font: `500 ${fs(13.5)} ${INTER}`, cursor: "pointer" }}>
