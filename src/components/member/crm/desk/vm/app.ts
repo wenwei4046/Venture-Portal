@@ -81,7 +81,7 @@ export function deskVM(ctx: DeskCtx) {
     ...adsPerfVM(ctx),
     ...reportsVM(ctx),
     // Workspace (2026-10-27): one's own Weekly / Monthly reports (DeskWorkspace.tsx, vm/workspace-report.ts).
-    kWorkspace: ui.tab === "workspace",
+    kWorkspace: false, // My reports left Reports (2026-11-09); a stored "workspace" tab shows Reports
     // Calendar and Assignment › People (docs/design_handoff_crm): one leave record, one Pause, one Lock (shared/leave-cal*).
     leaveCal: leaveCalData({ data, me: ctx.me, now: ctx.now, act: ctx.act, teams: ctx.teams, directors: ctx.directors,
       openAppt: a => patch({ pane: "docked", kind: "info", visit: a.visitId, infoId: null }) }),

@@ -212,6 +212,34 @@ function SalesTable2({ s, head }: { s: S2; head: ReactNode }) {
  */
 const OV_COLS = "minmax(0,1fr) 70px 110px 70px 76px 60px 60px";
 const OV_HEADS = ["Leads", "Avg reply", "Appts", "Show-up", "Won", "Lost"];
+const CUST_COLS = "minmax(0,1fr) minmax(0,1.3fr) 110px 90px 92px";
+/** The ad dropdown in the CRM's own look (the native one opened as the browser's blue list): each ad, its leads, a tick. */
+function AdDrop({ o }: { o: R["overview"] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span style={{ position: "relative" }}>
+      <button type="button" onClick={() => setOpen(x => !x)} aria-expanded={open} aria-label={`Ad: ${o.adLabel}`} style={{ ...BTN, height: "34px", maxWidth: "380px", padding: "0 10px 0 12px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px",
+        border: `1px solid ${o.adOn ? "var(--crm-rust)" : "var(--crm-line)"}`, background: o.adOn ? "var(--crm-tint-attention)" : "#fff", font: "500 12.5px Inter, sans-serif", color: "var(--crm-ink)" }} className="crm4a-outline">
+        <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.adLabel}</span>
+        <span style={{ flex: "none", color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{o.adN}</span><Ic name="chevron-down" size={13} />
+      </button>
+      {open && (<>
+        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
+        <div role="listbox" style={{ position: "absolute", top: "40px", left: 0, zIndex: 21, width: "420px", maxHeight: "420px", overflow: "auto", padding: "6px", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "grid", gridAutoRows: "max-content", gap: "1px" }}>
+          {o.adOpts.map(x => { const on = x.value === o.adVal;
+            return (
+              <button key={x.value} type="button" role="option" aria-selected={on} onClick={() => { o.setAd({ target: { value: x.value } }); setOpen(false); }} style={{ ...BTN, minHeight: "34px", padding: "6px 8px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "10px",
+                font: `${on ? 600 : 400} 13px Inter, sans-serif`, background: on ? "var(--crm-sel)" : "transparent", color: "var(--crm-ink)" }} className="crm4a-row">
+                <span style={{ flex: 1, minWidth: 0, lineHeight: 1.35 }}>{x.label}</span>
+                <span style={{ flex: "none", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{x.n}</span>
+                <span style={{ flex: "none", width: "16px", display: "flex", color: "var(--crm-rust)" }}>{on && <Ic name="check" size={14} />}</span>
+              </button>
+            ); })}
+        </div>
+      </>)}
+    </span>
+  );
+}
 function Overview({ o }: { o: R["overview"] }) {
   const [shut, setShut] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -249,16 +277,16 @@ function Overview({ o }: { o: R["overview"] }) {
                 </button>
                 {open[k] && (
                   <div style={{ display: "flex", flexDirection: "column", padding: `0 18px 10px ${byAd ? 64 : 42}px` }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) 120px 110px minmax(0,1fr) 96px", gap: "12px", alignItems: "center", height: "30px", ...head }}>
-                      <span>Customer</span><span>Status</span><span style={num}>Average reply</span><span>Ad source</span><span />
+                    <div style={{ display: "grid", gridTemplateColumns: CUST_COLS, gap: "12px", alignItems: "center", height: "30px", ...head }}>
+                      <span>Customer</span><span>Ad source</span><span>Status</span><span style={num}>Avg reply</span><span />
                     </div>
                     {p.customers.map(x => (
-                      <div key={x.id} style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) 120px 110px minmax(0,1fr) 96px", gap: "12px", alignItems: "center", minHeight: "40px", borderTop: "1px solid var(--crm-rule-2)", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)" }}>
+                      <div key={x.id} style={{ display: "grid", gridTemplateColumns: CUST_COLS, gap: "12px", alignItems: "center", minHeight: "40px", borderTop: "1px solid var(--crm-rule-2)", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)" }}>
                         <span style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.name}</span>
+                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-muted)", fontSize: "12.5px" }} title={x.ad}>{x.ad}</span>
                         <span style={{ justifySelf: "start", height: "22px", padding: "0 9px", borderRadius: "11px", display: "inline-flex", alignItems: "center", background: "var(--crm-field)", font: "600 11.5px Inter, sans-serif", whiteSpace: "nowrap" }}>{x.status}</span>
                         <span style={{ ...num, color: "var(--crm-ink-soft)" }}>{x.avg}</span>
-                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-muted)" }} title={x.ad}>{x.ad}</span>
-                        <button type="button" onClick={x.open} style={{ ...BTN, justifySelf: "end", height: "30px", padding: "0 12px", borderRadius: "15px", background: "var(--crm-rust)", color: "#fff", font: "500 12.5px Inter, sans-serif", textAlign: "center", whiteSpace: "nowrap" }} className="crm4a-primary">Open chat</button>
+                        <button type="button" onClick={x.open} style={{ ...BTN, justifySelf: "end", height: "28px", padding: "0 12px", borderRadius: "14px", border: "1px solid var(--crm-line)", color: "var(--crm-rust)", font: "600 12px Inter, sans-serif", textAlign: "center", whiteSpace: "nowrap" }} className="crm4a-outline">Open chat</button>
                       </div>
                     ))}
                   </div>
@@ -279,17 +307,14 @@ export function DeskReports({ r, lba }: { r: R; ads?: AdsV; lba: LbaV }) {
       {r.cat === "lba" && <DeskLeadsByAd v={lba} />}
       {(r.cat === "appt" || r.cat === "src") && <Seg opts={r.periods} />}
       {r.cat === "overview" && (
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+        // The owner, 2026-11-09: "可筛选品牌 · 排版一下 · 选择时间后，要显示目前的数据是哪个时间" — brand, period with its dates,
+        // the view, and the ad on one row; the dates said beside the period.
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          <Seg opts={r.overview.srcs} />
           <Seg opts={r.periods} />
-          <Seg opts={r.overview.bys} />
-          {/* One ad, or all of them (the owner, 2026-11-09: "可以选广告"). */}
-          <span style={{ position: "relative", display: "flex", alignItems: "center" }}>
-            <select value={r.overview.adVal} onChange={r.overview.setAd} aria-label="Ad" style={{ appearance: "none", WebkitAppearance: "none", height: "34px", maxWidth: "420px", padding: "0 30px 0 12px", borderRadius: "8px",
-              border: `1px solid ${r.overview.adVal !== "all" ? "var(--crm-rust)" : "var(--crm-line)"}`, background: r.overview.adVal !== "all" ? "var(--crm-tint-attention)" : "#fff", font: "500 12.5px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", outline: "none", textOverflow: "ellipsis" }}>
-              {r.overview.adOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <span style={{ position: "absolute", right: "10px", pointerEvents: "none", display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-down" size={13} /></span>
-          </span>
+          <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{r.overview.rangeText}</span>
+          <span style={{ width: "1px", height: "20px", background: "var(--crm-line)" }} />
+          <AdDrop o={r.overview} />
         </div>
       )}
       {r.cat === "overview" && <Overview o={r.overview} />}

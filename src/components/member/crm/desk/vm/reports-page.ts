@@ -4,6 +4,8 @@
  * for the last three, and Export CSV of the category on screen.
  */
 import type { DeskCtx } from "./ctx";
+import { INSIGHT_SOURCES, inBrand } from "./insight";
+import type { SourcePick } from "@/lib/member/crm-source";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import { lbaStatus } from "./leads-by-ad";
 import { panelLeads } from "./lead-panel";
@@ -112,19 +114,33 @@ export function reportsVM(ctx: DeskCtx) {
 
   // Overview: each ad → who has its leads (leads, average reply) → each customer (status, average reply, ad, Open chat).
   const stOf = new Map(chatRows(ctx).map(r => [r.id, ["Overdue", "Urgent", "Reply soon"].includes(r.key) ? "Attention" : r.key === "Cold" ? "Cold leads" : r.key]));
+  // One brand or all (the owner, 2026-11-09: "可筛选品牌"), as Insight's switch; and the dates the figures are of, said
+  // beside the period ("选择时间后，要显示目前的数据是哪个时间").
+  const brand = (ui.rpSrc ?? "all") as SourcePick, bd = inBrand(data, brand);
+  const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const rangeText = (() => {
+    if (!Number.isFinite(range[0])) return "All time";
+    const a = new Date(range[0]), b = new Date(Math.min(range[1], now.getTime()));
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
+      ? `${a.getDate()} – ${b.getDate()} ${MON3[b.getMonth()]} ${b.getFullYear()}`
+      : `${a.getDate()} ${MON3[a.getMonth()]}${a.getFullYear() !== b.getFullYear() ? ` ${a.getFullYear()}` : ""} – ${b.getDate()} ${MON3[b.getMonth()]} ${b.getFullYear()}`;
+  })();
   const adNm = (c: { adId?: string | null; ad: string }) => (c.adId && data.adNames?.[c.adId]?.name) || c.ad || `Ad ${c.adId}`;
-  const allAds = overviewReport(data.customers, range, adNm, nameOf, c => stOf.get(c.id) ?? "New", data.visits).byAd;
+  const allAds = overviewReport(bd.customers, range, adNm, nameOf, c => stOf.get(c.id) ?? "New", bd.visits).byAd;
   const rpAd = ui.rpAd && allAds.some(a => a.key === ui.rpAd) ? ui.rpAd : "all";
-  const ov = overviewReport(data.customers, range, adNm, nameOf, c => stOf.get(c.id) ?? "New", data.visits, rpAd);
+  const ov = overviewReport(bd.customers, range, adNm, nameOf, c => stOf.get(c.id) ?? "New", bd.visits, rpAd);
   const by = ui.rpOvBy ?? "ad";
   const openChat = (id: string) => () => patch({ tab: "inbox", pane: "docked", kind: "chat", chat: id, ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null });
   const figs = (x: { n: number; avgMin: number | null; appt: number; show: number; won: number; lost: number }) => ({ cells: [String(x.n), waitLabel(x.avgMin), String(x.appt), String(x.show), String(x.won), String(x.lost)], late: (x.avgMin ?? 0) > 240 });
   const person = (p: (typeof ov.byRep)[number]) => ({ key: p.id, name: p.name, ...figs(p), customers: p.customers.map(x => ({ ...x, avg: waitLabel(x.avgMin), open: openChat(x.id) })) });
   const leadsN = ov.byRep.reduce((n, p) => n + p.n, 0);
   const overview = {
+    rangeText, srcs: INSIGHT_SOURCES.map(([k, label]) => ({ label, on: brand === k, pick: () => patch({ rpSrc: k, rpAd: "all" }) })),
+    adOn: rpAd !== "all", adLabel: rpAd === "all" ? "All ads" : allAds.find(a => a.key === rpAd)?.name ?? "All ads",
+    adN: rpAd === "all" ? allAds.reduce((n, a) => n + a.n, 0) : allAds.find(a => a.key === rpAd)?.n ?? 0,
     by, bys: ([["ad", "By ad"], ["rep", "By salesperson"]] as const).map(([k, label]) => ({ label, on: by === k, pick: () => patch({ rpOvBy: k }) })),
     count: by === "ad" ? `${ov.byAd.length} ad${ov.byAd.length === 1 ? "" : "s"} · ${leadsN} leads` : `${ov.byRep.filter(p => p.id).length} people · ${leadsN} leads`,
-    adOpts: [{ value: "all", label: `All ads · ${allAds.reduce((n, a) => n + a.n, 0)}` }, ...allAds.map(a => ({ value: a.key, label: `${a.name} · ${a.n}` }))],
+    adOpts: [{ value: "all", label: "All ads", n: allAds.reduce((n, a) => n + a.n, 0) }, ...allAds.map(a => ({ value: a.key, label: a.name, n: a.n }))],
     adVal: rpAd, setAd: (e: { target: { value: string } }) => patch({ rpAd: e.target.value }),
     groups: by === "ad" ? ov.byAd.map(a => ({ key: a.key, name: a.name, ...figs(a), people: a.people.map(person) }))
       : [{ key: "rep", name: "", ...figs({ n: 0, avgMin: null, appt: 0, show: 0, won: 0, lost: 0 }), people: ov.byRep.map(person) }],
@@ -144,7 +160,7 @@ export function reportsVM(ctx: DeskCtx) {
   };
 
   return {
-    kReports: ui.tab === "reports",
+    kReports: ui.tab === "reports" || ui.tab === "workspace",
     reports: {
       cat, cats: RP_CATS.map(([k, label]) => ({ label, on: k === cat, pick: () => patch({ rpCat: k }) })),
       periods: RP_PERIODS.map(([k, label]) => ({ label, on: k === per, pick: () => patch(k === "custom" ? { rpPer: k, rpDates: true } : { rpPer: k, rpDates: false }) })),

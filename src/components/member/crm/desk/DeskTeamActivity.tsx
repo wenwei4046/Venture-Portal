@@ -95,6 +95,8 @@ export function DeskTeamActivityView({ v }: { v: ActivityVM }) {
         <span style={{ flex: "none", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "6px", fontSize: "12.5px", color: "var(--crm-muted)" }}>
           <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "var(--crm-green)", boxShadow: "0 0 0 3px var(--crm-green-ring)" }} />{v.clock}
         </span>
+        {/* The days the figures are of (the owner, 2026-11-09); Custom's button says them. */}
+        {!v.isCustom && <span style={{ flex: "none", whiteSpace: "nowrap", font: `500 13px ${INTER}`, color: "var(--crm-ink-soft)" }}>{rangeWords(v.range.a, v.range.b)}</span>}
         <div style={{ marginLeft: "auto", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{ position: "relative" }}>
