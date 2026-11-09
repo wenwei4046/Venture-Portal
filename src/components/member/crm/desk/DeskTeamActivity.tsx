@@ -28,6 +28,50 @@ export function DeskTeamActivity({ a }: { a: DeskActivityIn }) {
 
 export function DeskTeamActivityView({ v }: { v: ActivityVM }) {
   const root = useRef<HTMLDivElement>(null);
+  // The owner, 2026-11-09: the greyed people (out of today's turn with no leads) at the bottom, folded at first — as the phone.
+  const [greyOpen, setGreyOpen] = useState(false);
+  const rows = v.groups.flatMap(g => g.rows), active = rows.filter(r => r.op === 1), grey = rows.filter(r => r.op !== 1);
+  const C: CSSProperties = { textAlign: "center", justifySelf: "center" };
+  const row = (r: ActivityVM["groups"][number]["rows"][number]) => (
+    <div key={r.id} style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--crm-rule-2)" }}>
+      <div {...press(r.toggle)} aria-expanded={r.open} className={s.row} style={{ display: "grid", gridTemplateColumns: v.cols, columnGap: "12px", alignItems: "center", height: "48px", fontVariantNumeric: "tabular-nums", cursor: "pointer", background: r.bg }}>
+        <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, opacity: r.op }}>
+          <Svg d="m9 18 6-6-6-6" size={14} w={2.2} style={{ flex: "none", color: "var(--crm-faint)", transform: `rotate(${r.rot})`, transition: "transform .15s" }} />
+          <span style={{ width: "8px", height: "8px", borderRadius: "50%", flex: "none", background: r.tdot }} />
+          <span style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
+            <span style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: r.nameFg }}>{r.name}</span>
+            {r.off && <span style={{ fontSize: "11.5px", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{r.turn}</span>}
+          </span>
+        </span>
+        <span style={{ ...C, fontWeight: 600 }}>{r.leads}</span>
+        <span style={{ ...C, color: r.avgFg }}>{r.avg}</span>
+        <span style={C}>
+          {r.waitOn && <span style={{ color: r.waitFg, fontWeight: 600, whiteSpace: "nowrap" }}>{r.wait}</span>}
+          {r.waitOff && <span style={{ color: "var(--crm-disabled)" }}>—</span>}
+        </span>
+        <span style={C}>{r.appt}</span>
+        <span style={C}>{r.show}</span>
+      </div>
+      {r.open && (
+        <div style={{ display: "flex", flexDirection: "column", padding: "0 0 10px" }}>
+          {r.list.map(l => (
+            <div key={l.key} {...press(l.go)} className={s.row} style={{ display: "grid", gridTemplateColumns: v.cols, columnGap: "12px", alignItems: "center", height: "34px", fontSize: "12.5px", color: "var(--crm-list-sub)", fontVariantNumeric: "tabular-nums", cursor: "pointer", background: l.bg }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, paddingLeft: "24px" }}>
+                <span style={{ flex: "none", width: "36px", font: `600 12px ${TIGHT}` }}>{l.got}</span>
+                <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-ink)" }}>{l.name}</span>
+                {l.status && <span style={{ flex: "none", whiteSpace: "nowrap", fontSize: "12px", color: l.sFg }}>{l.status}</span>}
+              </span>
+              <span />
+              <span style={C}>{l.repT}</span>
+              <span style={{ ...C, fontWeight: 600, whiteSpace: "nowrap", color: l.rc }}>{l.waitT}</span>
+              <span /><span />
+            </div>
+          ))}
+          {r.none && <div style={{ height: "42px", display: "flex", alignItems: "center", paddingLeft: "24px", fontSize: "12.5px", color: "var(--crm-faint)" }}>No leads in this period</div>}
+        </div>
+      )}
+    </div>
+  );
   const [left, setLeft] = useState(305);
   useLayoutEffect(() => {
     const el = root.current; if (!el) return;
@@ -75,9 +119,11 @@ export function DeskTeamActivityView({ v }: { v: ActivityVM }) {
         </div>
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "0 36px 32px", display: "flex", flexDirection: "column", gap: "24px" }}>
-        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", padding: "20px 0", borderRadius: "12px", background: "var(--crm-sum)" }}>
+        {/* The figures stand over the table's own columns (the owner, 2026-11-09: "对齐"), every figure centred under its head. */}
+        <div style={{ flex: "none", display: "grid", gridTemplateColumns: v.cols, columnGap: "12px", alignItems: "center", padding: "20px 0", borderRadius: "12px", background: "var(--crm-sum)" }}>
+          <span style={{ paddingLeft: "20px", font: `500 13px ${INTER}`, color: "var(--crm-muted)" }}>{v.selLabel}</span>
           {v.tiles.map(t => (
-            <div key={t.k} style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "0 20px", borderLeft: `1px solid ${t.bl}` }}>
+            <div key={t.k} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", borderLeft: `1px solid ${t.bl}` }}>
               <span style={{ font: `500 12px ${INTER}`, color: "var(--crm-muted)" }}>{t.k}</span>
               <span style={{ font: `500 32px ${TIGHT}`, letterSpacing: "-0.03em", lineHeight: 1, color: t.c }}>{v.loading ? "—" : t.v}</span>
             </div>
@@ -85,51 +131,16 @@ export function DeskTeamActivityView({ v }: { v: ActivityVM }) {
         </div>
         <div style={{ flex: "none", display: "flex", flexDirection: "column" }}>
           <div style={{ display: "grid", gridTemplateColumns: v.cols, columnGap: "12px", alignItems: "center", height: "38px", borderBottom: "1px solid var(--crm-rule)", position: "sticky", top: 0, background: "#fff", zIndex: 1 }}>
-            {v.heads.map((c, i) => <span key={i} onClick={c.sort} style={{ display: "flex", alignItems: "center", gap: "4px", justifyContent: c.just, font: `500 11px ${INTER}`, letterSpacing: "0.06em", textTransform: "uppercase", color: c.fg, cursor: "pointer", whiteSpace: "nowrap" }}>{c.label}<span style={{ fontSize: "10px" }}>{c.arrow}</span></span>)}
+            {v.heads.map((c, i) => <span key={i} onClick={c.sort} style={{ display: "flex", alignItems: "center", gap: "4px", justifyContent: i ? "center" : c.just, font: `500 11px ${INTER}`, letterSpacing: "0.06em", textTransform: "uppercase", color: c.fg, cursor: "pointer", whiteSpace: "nowrap" }}>{c.label}<span style={{ fontSize: "10px" }}>{c.arrow}</span></span>)}
           </div>
-          {v.groups.map(g => (
-            <div key={g.name} style={{ display: "flex", flexDirection: "column" }}>
-              {g.rows.map(r => (
-                <div key={r.id} style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--crm-rule-2)" }}>
-                  <div {...press(r.toggle)} aria-expanded={r.open} className={s.row} style={{ display: "grid", gridTemplateColumns: v.cols, columnGap: "12px", alignItems: "center", height: "48px", fontVariantNumeric: "tabular-nums", cursor: "pointer", background: r.bg }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, opacity: r.op }}>
-                      <Svg d="m9 18 6-6-6-6" size={14} w={2.2} style={{ flex: "none", color: "var(--crm-faint)", transform: `rotate(${r.rot})`, transition: "transform .15s" }} />
-                      <span style={{ width: "8px", height: "8px", borderRadius: "50%", flex: "none", background: r.tdot }} />
-                      <span style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
-                        <span style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: r.nameFg }}>{r.name}</span>
-                        {r.off && <span style={{ fontSize: "11.5px", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{r.turn}</span>}
-                      </span>
-                    </span>
-                    <span style={{ textAlign: "right", fontWeight: 600 }}>{r.leads}</span>
-                    <span style={{ textAlign: "right", color: r.avgFg }}>{r.avg}</span>
-                    <span style={{ justifySelf: "end" }}>
-                      {r.waitOn && <span style={{ color: r.waitFg, fontWeight: 600, whiteSpace: "nowrap" }}>{r.wait}</span>}
-                      {r.waitOff && <span style={{ color: "var(--crm-disabled)" }}>—</span>}
-                    </span>
-                    <span style={{ textAlign: "right" }}>{r.appt}</span>
-                    <span style={{ textAlign: "right" }}>{r.show}</span>
-                  </div>
-                  {r.open && (
-                    <div style={{ display: "flex", flexDirection: "column", padding: "0 0 10px" }}>
-                      {r.list.map(l => (
-                        <div key={l.key} {...press(l.go)} className={s.row} style={{ display: "grid", gridTemplateColumns: v.cols, columnGap: "12px", alignItems: "center", height: "34px", fontSize: "12.5px", color: "var(--crm-list-sub)", fontVariantNumeric: "tabular-nums", cursor: "pointer", background: l.bg }}>
-                          <span style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, paddingLeft: "24px" }}>
-                            <span style={{ flex: "none", width: "36px", font: `600 12px ${TIGHT}` }}>{l.got}</span>
-                            <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-ink)" }}>{l.name}</span>
-                          </span>
-                          <span style={{ gridColumn: "span 1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontSize: "12px", color: l.sFg }}>{l.status}</span>
-                          <span style={{ textAlign: "right" }}>{l.repT}</span>
-                          <span style={{ textAlign: "right", fontWeight: 600, whiteSpace: "nowrap", color: l.rc }}>{l.waitT}</span>
-                          <span /><span />
-                        </div>
-                      ))}
-                      {r.none && <div style={{ height: "42px", display: "flex", alignItems: "center", fontSize: "12.5px", color: "var(--crm-faint)" }}>No leads in this period</div>}
-                    </div>
-                  )}
-                </div>
-              ))}
+          {active.map(row)}
+          {grey.length > 0 && (
+            <div {...press(() => setGreyOpen(o => !o))} aria-expanded={greyOpen} className={s.row} style={{ display: "flex", alignItems: "center", gap: "10px", height: "44px", borderTop: "1px solid var(--crm-rule-2)", cursor: "pointer", font: `500 12.5px ${INTER}`, color: "var(--crm-muted)" }}>
+              <Svg d="m9 18 6-6-6-6" size={14} w={2.2} style={{ flex: "none", color: "var(--crm-faint)", transform: `rotate(${greyOpen ? 90 : 0}deg)`, transition: "transform .15s" }} />
+              Not in turn <span style={{ color: "var(--crm-faint)" }}>{grey.length}</span>
             </div>
-          ))}
+          )}
+          {greyOpen && grey.map(row)}
         </div>
       </div>
       {v.dOpen && v.d.open && (<>

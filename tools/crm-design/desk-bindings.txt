@@ -123,6 +123,7 @@ chatFromTeam
 chatMenuItems
 chatReply
 ci
+clReps
 clSortLabel
 clSortOpen
 clSortToggle
@@ -247,6 +248,7 @@ ftOpen
 ftSaveOrApply
 history
 ibCols
+infoAudit
 infoBack
 infoBackLabel
 infoChat

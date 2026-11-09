@@ -4,7 +4,8 @@
  * element, on shared/team-activity.ts, the desktop's own view model. Its sheets fade their scrim in and slide up as
  * every Control panel sheet (the owner, 2026-11-08). Sizes are the Revenue app's (typePx).
  */
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
+import { DateRangePicker, rangeWords } from "./date-range";
 import type { CrmData } from "@/lib/member/crm-data";
 import type { PeopleBook } from "./people-book";
 import type { ActivityVM } from "./team-activity";
@@ -13,12 +14,12 @@ import { useTeamActivity } from "./use-team-activity";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const INTER = "Inter, sans-serif";
-const COLS = "minmax(0,1fr) 36px 44px 56px 36px 38px";
+const COLS = "minmax(0,1fr) 30px 56px 52px 32px 34px";
 const press = (fn: () => void) => ({ role: "button" as const, tabIndex: 0, onClick: fn, onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } } });
 const Chev = ({ style }: { style?: CSSProperties }) => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}><path d="m6 9 6 6 6-6" /></svg>;
 const SCRIM: CSSProperties = { position: "absolute", inset: 0, zIndex: 40, background: "rgba(42,22,12,.32)", animation: "fadeIn 200ms ease-out" };
 const SHEET: CSSProperties = { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 41, borderRadius: "26px 26px 0 0", background: "#fff", animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", color: "var(--crm-ink)", fontFamily: INTER, boxSizing: "border-box" };
-const DATE: CSSProperties = { height: "44px", minWidth: 0, padding: "0 10px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-line)", font: `500 ${fs(13)} ${INTER}`, color: "var(--crm-ink)", background: "#fff" };
+
 
 export interface PhoneActivityIn { data: CrmData; book: PeopleBook; live: boolean; who: string | null; nameOf(id: string | null | undefined): string; roleOf(id: string): string; openChat(id: string): void }
 
@@ -28,45 +29,14 @@ export function PhoneTeamActivity({ a, top }: { a: PhoneActivityIn; top?: ReactN
 }
 
 export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNode }) {
-  return (
-    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", font: `400 ${fs(14)} ${INTER}`, color: "var(--crm-ink)" }}>
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: "14px", padding: "6px 20px 24px" }}>
-        {top}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <h1 style={{ margin: 0, font: `500 ${fs(26)} ${TIGHT}`, letterSpacing: "-0.025em" }}>Team activity</h1>
-          <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: fs(12), color: "var(--crm-muted)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "var(--crm-green)" }} />{v.clock}</span>
-        </div>
-        <div style={{ flex: "none", display: "flex", gap: "8px" }}>
-          <span {...press(v.pOpenMenu)} style={{ flex: 1, minWidth: 0, height: "40px", boxSizing: "border-box", padding: "0 12px", borderRadius: "20px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "7px", font: `500 ${fs(13.5)} ${INTER}`, cursor: "pointer" }}>
-            {v.selDot && <span style={{ width: "8px", height: "8px", borderRadius: "50%", flex: "none", background: v.selDot }} />}
-            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.selLabel}</span>
-            <Chev style={{ marginLeft: "auto", flex: "none", color: "var(--crm-muted)" }} />
-          </span>
-          <span style={{ position: "relative", flex: "none", height: "40px", borderRadius: "20px", background: "var(--crm-field)", display: "flex", alignItems: "center" }}>
-            <select value={v.perVal} onChange={v.setPer} aria-label="Period" style={{ appearance: "none", WebkitAppearance: "none", height: "40px", padding: "0 32px 0 14px", border: 0, background: "transparent", font: `500 ${fs(13.5)} ${INTER}`, color: "var(--crm-ink)", cursor: "pointer", outline: "none" }}>
-              <option value="Today">Today</option><option value="Week">Week</option><option value="Month">Month</option><option value="Custom">Custom</option>
-            </select>
-            <Chev style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "var(--crm-muted)" }} />
-          </span>
-        </div>
-        {v.isCustom && (
-          <div style={{ flex: "none", display: "grid", gridTemplateColumns: "minmax(0,1fr) auto minmax(0,1fr)", gap: "8px", alignItems: "center" }}>
-            <input type="date" value={v.cFrom} onChange={v.setFrom} style={DATE} /><span style={{ color: "var(--crm-faint)" }}>–</span><input type="date" value={v.cTo} onChange={v.setTo} style={DATE} />
-          </div>
-        )}
-        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", padding: "4px 0 6px" }}>
-          {v.pTiles.map(t => (
-            <div key={t.k} style={{ display: "flex", flexDirection: "column", gap: "5px", minWidth: 0 }}>
-              <span style={{ font: `500 ${fs(22)} ${TIGHT}`, letterSpacing: "-0.02em", lineHeight: 1, color: t.c }}>{v.loading ? "—" : t.v}</span>
-              <span style={{ fontSize: fs(11), color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{t.k}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{ flex: "none", display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "grid", gridTemplateColumns: COLS, columnGap: "5px", height: "28px", alignItems: "center", borderBottom: "1px solid var(--crm-rule)", font: `500 ${fs(10.5)} ${INTER}`, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--crm-faint)" }}>
-            <span /><span style={{ textAlign: "right" }}>Leads</span><span style={{ textAlign: "right" }}>Avg</span><span style={{ textAlign: "right" }}>Wait</span><span style={{ textAlign: "right" }}>Appt</span><span style={{ textAlign: "right" }}>Came</span>
-          </div>
-          {v.pRows.map(r => (
+  // The owner, 2026-11-09: the greyed people (out of today's turn with no leads) go to the bottom, folded at first; Custom is
+  // one centred line of dates on the CRM's own picker (the phone's native one was large and dark).
+  const [greyOpen, setGreyOpen] = useState(false), [pick, setPick] = useState(false);
+  const active = v.pRows.filter(r => r.op === 1), grey = v.pRows.filter(r => r.op !== 1);
+  const iso = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const at = (s: string, end: boolean) => { const [y, m, d] = s.split("-").map(Number); return end ? new Date(y, m - 1, d, 23, 59, 59, 999).getTime() : new Date(y, m - 1, d).getTime(); };
+  const setPer = (e: { target: { value: string } }) => { v.setPer(e); if (e.target.value === "Custom") setPick(true); };
+  const row = (r: ActivityVM["pRows"][number]) => (
             <div key={r.id} style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--crm-rule-2)" }}>
               <div {...press(r.toggle)} aria-expanded={r.open} style={{ display: "grid", gridTemplateColumns: COLS, columnGap: "5px", alignItems: "center", minHeight: "50px", fontSize: fs(13.5), fontVariantNumeric: "tabular-nums", cursor: "pointer", color: r.rowFg }}>
                 <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
@@ -77,7 +47,7 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
                   </span>
                 </span>
                 <span style={{ textAlign: "right", fontWeight: 600 }}>{r.leads}</span>
-                <span style={{ textAlign: "right" }}>{r.avg}</span>
+                <span style={{ textAlign: "right", whiteSpace: "nowrap" }}>{r.avg}</span>
                 <span style={{ textAlign: "right", fontWeight: 600, whiteSpace: "nowrap", color: r.waitFg }}>{r.waitTxt}</span>
                 <span style={{ textAlign: "right" }}>{r.appt}</span>
                 <span style={{ textAlign: "right" }}>{r.show}</span>
@@ -95,7 +65,55 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
                 </div>
               )}
             </div>
+  );
+  return (
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", font: `400 ${fs(14)} ${INTER}`, color: "var(--crm-ink)" }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: "14px", padding: "6px 20px 24px" }}>
+        {top}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <h1 style={{ margin: 0, font: `500 ${fs(26)} ${TIGHT}`, letterSpacing: "-0.025em" }}>Team activity</h1>
+          <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: fs(12), color: "var(--crm-muted)" }}><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "var(--crm-green)" }} />{v.clock}</span>
+        </div>
+        <div style={{ flex: "none", display: "flex", gap: "8px" }}>
+          <span {...press(v.pOpenMenu)} style={{ flex: 1, minWidth: 0, height: "40px", boxSizing: "border-box", padding: "0 12px", borderRadius: "20px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "7px", font: `500 ${fs(13.5)} ${INTER}`, cursor: "pointer" }}>
+            {v.selDot && <span style={{ width: "8px", height: "8px", borderRadius: "50%", flex: "none", background: v.selDot }} />}
+            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.selLabel}</span>
+            <Chev style={{ marginLeft: "auto", flex: "none", color: "var(--crm-muted)" }} />
+          </span>
+          <span style={{ position: "relative", flex: "none", height: "40px", borderRadius: "20px", background: "var(--crm-field)", display: "flex", alignItems: "center" }}>
+            <select value={v.perVal} onChange={setPer} aria-label="Period" style={{ appearance: "none", WebkitAppearance: "none", height: "40px", padding: "0 32px 0 14px", border: 0, background: "transparent", font: `500 ${fs(13.5)} ${INTER}`, color: "var(--crm-ink)", cursor: "pointer", outline: "none" }}>
+              <option value="Today">Today</option><option value="Week">Week</option><option value="Month">Month</option><option value="Custom">Custom</option>
+            </select>
+            <Chev style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "var(--crm-muted)" }} />
+          </span>
+        </div>
+        {v.isCustom && (
+          <span {...press(() => setPick(true))} style={{ alignSelf: "center", flex: "none", height: "36px", padding: "0 16px", borderRadius: "18px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "8px", font: `500 ${fs(13)} ${INTER}`, color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }}>
+            {rangeWords(v.cFrom, v.cTo)}<Chev style={{ color: "var(--crm-muted)" }} />
+          </span>
+        )}
+        {pick && <DateRangePicker sheet value={{ a: at(v.cFrom, false), b: at(v.cTo, true) }} onCancel={() => setPick(false)}
+          onApply={r => { v.setFrom({ target: { value: iso(r.a) } }); v.setTo({ target: { value: iso(r.b) } }); setPick(false); }} />}
+        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", padding: "4px 0 6px" }}>
+          {v.pTiles.map(t => (
+            <div key={t.k} style={{ display: "flex", flexDirection: "column", gap: "5px", minWidth: 0 }}>
+              <span style={{ font: `500 ${fs(22)} ${TIGHT}`, letterSpacing: "-0.02em", lineHeight: 1, color: t.c }}>{v.loading ? "—" : t.v}</span>
+              <span style={{ fontSize: fs(11), color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{t.k}</span>
+            </div>
           ))}
+        </div>
+        <div style={{ flex: "none", display: "flex", flexDirection: "column" }}>
+          <div style={{ display: "grid", gridTemplateColumns: COLS, columnGap: "5px", height: "28px", alignItems: "center", borderBottom: "1px solid var(--crm-rule)", font: `500 ${fs(10.5)} ${INTER}`, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--crm-faint)" }}>
+            <span /><span style={{ textAlign: "right" }}>Leads</span><span style={{ textAlign: "right" }}>Avg</span><span style={{ textAlign: "right" }}>Wait</span><span style={{ textAlign: "right" }}>Appt</span><span style={{ textAlign: "right" }}>Came</span>
+          </div>
+          {active.map(row)}
+          {grey.length > 0 && (
+            <div {...press(() => setGreyOpen(o => !o))} aria-expanded={greyOpen} style={{ display: "flex", alignItems: "center", gap: "8px", minHeight: "44px", borderBottom: "1px solid var(--crm-rule-2)", font: `500 ${fs(13)} ${INTER}`, color: "var(--crm-faint)", cursor: "pointer" }}>
+              Not in turn<span style={{ fontVariantNumeric: "tabular-nums" }}>{grey.length}</span>
+              <Chev style={{ marginLeft: "auto", transform: greyOpen ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+            </div>
+          )}
+          {greyOpen && grey.map(row)}
         </div>
       </div>
       {v.pMenuOpen && (<>

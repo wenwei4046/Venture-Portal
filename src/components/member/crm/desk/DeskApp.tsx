@@ -16,7 +16,7 @@ import { DeskLeaveCalPage } from "./DeskLeaveCal";
 import { DeskTeamActivity } from "./DeskTeamActivity";
 import { SuggestFloat } from "../shared/suggest-float";
 import { DeskTemplateFormat, DeskTemplateKind, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a, DeskUpNext4a } from "./Desk4a";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInfoAudit4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskRepPick4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a, DeskUpNext4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -3041,10 +3041,11 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         </svg>
                       </button>
                       {!!(v.clSortOpen) && (<>
-                        <div style={{ position: "absolute", top: "38px", right: "0", width: "180px", padding: "6px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "12px", boxShadow: "0 10px 30px rgba(42,22,12,.14)", display: "flex", flexDirection: "column" }}>
+                        <div style={{ position: "absolute", top: "38px", right: "0", width: "220px", maxHeight: "min(70vh, 520px)", overflowY: "auto", padding: "6px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "12px", boxShadow: "0 10px 30px rgba(42,22,12,.14)", display: "flex", flexDirection: "column" }}>
                           {(v.clSorts).map((o, o_i) => (<Fragment key={o_i}>
                             <button type="button" onClick={o.pick} style={{ height: "36px", padding: "0 10px", border: "0", borderRadius: "8px", background: o.bg, color: o.fg, font: "inherit", fontSize: "13.5px", fontWeight: o.w, textAlign: "left", cursor: "pointer" }} className={DH.h4}>{o.label}</button>
                           </Fragment>))}
+                          <DeskRepPick4a reps={v.clReps} />
                         </div>
                       </>)}
                     </div>
@@ -3093,6 +3094,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         </div>
                       </Fragment>))}
                     </div>
+                    <DeskInfoAudit4a items={v.infoAudit} />
                   </div>
                   {!!(v.infoChat) && (<>
                     <div style={{ flex: "0 0 auto", padding: "14px 20px", borderTop: "1px solid var(--crm-rule)", background: "#fff" }}>

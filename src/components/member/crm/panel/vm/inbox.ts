@@ -91,14 +91,21 @@ export function inboxVM(ctx: PanelCtx) {
       const on = who === id;
       return { label, on, n: all.filter(r => r.seat.id === f && (!id || r.c.assignedTo === id)).length, bg: on ? "var(--crm-ink)" : "transparent", fg: on ? "#fff" : "var(--crm-muted)", bd: on ? "var(--crm-ink)" : "var(--crm-line)", pick: () => set(u => ({ ...u, inbWho: id })) };
     }) : [],
-    inbCols: (([["new", "New"], ["need", "Attention"], ["fup", "Follow up"], ["appt", "Appointment"], ["won", "Won"], ["lost", "Lost"], ["cold", "Cold leads"], ["blocked", FB_BLOCKED_CATEGORY]] as const).map(([k, t]) => [k, t, STATUS[t].dot, STATUS[t].tint] as const))
-      .map(([k, title, c, bg], i) => { const rows = list.filter(r => col(r) === k); return { title, c, bg, n: rows.length, rows, empty: !rows.length, on: (ui.inbCol ?? 0) === i, hot: k === "need",
+    // All first, and where the board opens (the owner, 2026-11-09: "All 要能看完全部的咨询" — it opened on New alone).
+    inbCols: withAll(list, ui.inbCol ?? 0, i => set(u => ({ ...u, inbCol: i })), (([["new", "New"], ["need", "Attention"], ["fup", "Follow up"], ["appt", "Appointment"], ["won", "Won"], ["lost", "Lost"], ["cold", "Cold leads"], ["blocked", FB_BLOCKED_CATEGORY]] as const).map(([k, t]) => [k, t, STATUS[t].dot, STATUS[t].tint] as const))
+      .map(([k, title, c, bg], i) => { const rows = list.filter(r => col(r) === k); return { title, c, bg, n: rows.length, rows, empty: !rows.length, on: (ui.inbCol ?? 0) === i + 1, hot: k === "need",
         // The chip above the board slides it to this column.
-        jump: () => { set(u => ({ ...u, inbCol: i })); const b = document.querySelector<HTMLElement>("[data-inb-board]"), el = b?.children[i] as HTMLElement | undefined; if (b && el) b.scrollTo({ left: el.offsetLeft - b.offsetLeft - 20, behavior: "smooth" }); } }; }),
+        jump: () => { set(u => ({ ...u, inbCol: i + 1 })); const b = document.querySelector<HTMLElement>("[data-inb-board]"), el = b?.children[0] as HTMLElement | undefined; if (b && el) b.scrollTo({ left: el.offsetLeft - b.offsetLeft - 20, behavior: "smooth" }); } }; })),
     openPc: () => set(u => ({ ...u, pcOpen: true })),
   };
 }
 export type InboxVM = ReturnType<typeof inboxVM>;
+
+/** "All" before the statuses: every chat the filters above leave, newest first as each status lists them. */
+function withAll<R, C extends { rows: R[]; on: boolean }>(rows: R[], at: number, pick: (i: number) => void, cols: C[]) {
+  const all = { ...cols[0], title: "All", c: "var(--crm-ink)", bg: "var(--crm-field)", n: rows.length, rows, empty: !rows.length, on: at === 0, hot: false, jump: () => pick(0) } as C;
+  return [all, ...cols];
+}
 
 /** Contacts (from the Inbox): everyone's customers A–Z under letter heads; a row opens the chat in its owner's CRM. */
 export function contactsVM(ctx: PanelCtx) {

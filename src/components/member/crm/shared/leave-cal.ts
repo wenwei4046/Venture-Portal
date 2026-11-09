@@ -139,19 +139,17 @@ export function leaveCalVM(x: LeaveCalIn) {
     const room0 = Math.max(0, 3 - Math.min(lanes, 3)), over = ls.filter(l => lane[l.id] >= 3).length + Math.max(0, aps.length - room0) > 0, room = over && room0 > 0 && lanes > 0 ? room0 - 1 : room0;
     const appts = aps.slice(0, room).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), dot: C.green, title: `${a.t} · ${a.cust} · ${name(a.who)}`,
       open: (e: { stopPropagation(): void }) => { e.stopPropagation(); x.acts.openAppt?.(a); } }));
-    const chips = isCal
-      ? Array.from({ length: Math.min(lanes, 3) }, (_, k) => {
+    // Both pages draw a leave of several days as ONE bar across them, in its own lane (the owner, 2026-11-09, on People:
+    // "连续假期就连起来" — People drew each day its own chip, as its prototype did).
+    const chips = Array.from({ length: Math.min(lanes, 3) }, (_, k) => {
         const l = ls.find(y => lane[y.id] === k);
         if (!l) return { key: `e${k}`, label: "", title: "", bg: "transparent", fg: "transparent", ml: "0", mr: "0", rad: "4px", edit: (e: { stopPropagation(): void }) => { e.stopPropagation(); } };
         const prev = dow > 0 && l.fromAt.slice(0, 10) < day, next = dow < 6 && day < l.toAt.slice(0, 10);
         return { key: l.id, label: prev ? "" : `${first(name(l.staffId))} · ${label(l)}`, title: `${name(l.staffId)} · ${label(l)} · ${rng(l)}`, bg: leaveTint(l.reason)[0], fg: leaveTint(l.reason)[1],
           ml: prev ? "-6px" : "0", mr: next ? "-7px" : "0", rad: `${prev ? 0 : 4}px ${next ? 0 : 4}px ${next ? 0 : 4}px ${prev ? 0 : 4}px`,
           edit: (e: { stopPropagation(): void }) => { e.stopPropagation(); edit(l); } };
-      })
-      // People: the prototype's chips — first three of the day, each its own (no lanes).
-      : ls.slice(0, 3).map(l => ({ key: l.id, label: `${first(name(l.staffId))} · ${label(l)}`, title: `${name(l.staffId)} · ${label(l)} · ${rng(l)}`, bg: leaveTint(l.reason)[0], fg: leaveTint(l.reason)[1],
-        ml: "0", mr: "0", rad: "4px", edit: (e: { stopPropagation(): void }) => { e.stopPropagation(); edit(l); } }));
-    const extra = isCal ? ls.filter(l => lane[l.id] >= 3).length + Math.max(0, aps.length - room) : Math.max(0, ls.length - 3);
+      });
+    const extra = ls.filter(l => lane[l.id] >= 3).length + Math.max(0, aps.length - room);
     return { day, num: dd(day).d, chips, appts, more: extra ? `+${extra} more` : "", bg: inM ? "#fff" : C.outMonth, numBg: t ? C.rust : "transparent", numFg: t ? "#fff" : inM ? C.ink : C.disabled,
       add: () => { if (SL && firstWho) openModal({ who: firstWho, from: `${day}T09:00`, to: `${day}T18:00` }); } };
   });
