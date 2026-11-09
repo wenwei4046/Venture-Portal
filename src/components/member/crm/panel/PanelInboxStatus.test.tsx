@@ -16,11 +16,12 @@ describe("the Team inbox's status dropdown", () => {
     await act(async () => {});
     await tap(screen.getAllByText("Inbox", { exact: true }).find(e => e.closest("nav")));
     const pick = () => screen.getByRole("button", { name: /^Status:/ });
-    expect(pick()).toHaveAttribute("aria-label", "Status: New");
+    // All first and where it opens (the owner, 2026-11-09: "All 要能看完全部的咨询").
+    expect(pick()).toHaveAttribute("aria-label", "Status: All");
     expect(screen.queryByRole("listbox")).toBeNull();
     await tap(pick());
-    expect(screen.getAllByRole("option").map(o => o.textContent?.replace(/\d+$/, ""))).toEqual(["New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads", "Blocked"]);
-    await tap(screen.getAllByRole("option")[2]);
+    expect(screen.getAllByRole("option").map(o => o.textContent?.replace(/\d+$/, ""))).toEqual(["All", "New", "Attention", "Follow up", "Appointment", "Won", "Lost", "Cold leads", "Blocked"]);
+    await tap(screen.getAllByRole("option")[3]);
     expect(pick()).toHaveAttribute("aria-label", "Status: Follow up");
     expect(screen.queryByRole("listbox")).toBeNull();
     await tap(pick());

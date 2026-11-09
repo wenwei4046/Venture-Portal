@@ -72,7 +72,8 @@ describe("a blocked chat lands only in Blocked", () => {
     expect(cols.map(c => c.title).slice(-2)).toEqual(["Cold leads", "Blocked"]);
     const of = Object.fromEntries(cols.map(c => [c.title, c.rows.map(r => r.name)]));
     expect(of.Blocked).toEqual(["BLK"]);
-    for (const [t, rows] of Object.entries(of)) if (t !== "Blocked") expect(rows).not.toContain("BLK");
+    for (const [t, rows] of Object.entries(of)) if (t !== "Blocked" && t !== "All") expect(rows).not.toContain("BLK");
+    expect(of.All).toHaveLength(3); // All lists every chat, Blocked included (2026-11-09).
     expect(of.Blocked.length + of.New.length + of["Cold leads"].length).toBe(3);
     expect(cols.find(c => c.title === "Blocked")!.rows[0].state).toBe(FB_BLOCKED);
     expect(cols.find(c => c.title === "Blocked")!.rows[0].needs).toBe(false);

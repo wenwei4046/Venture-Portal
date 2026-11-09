@@ -46,6 +46,9 @@ describe("the phone's Calendar, People and Team activity", () => {
   it("Team activity: the people and why somebody is out of turn", () => {
     render(<PhoneTeamActivity a={{ data, book: input.book, live: true, who: null, nameOf: id => people.find(p => p.id === id)?.name ?? "", roleOf: () => "", openChat: () => {} }} />);
     expect(screen.getByText("Team activity")).toBeTruthy();
+    // Out of turn with no leads: folded under Not in turn at the bottom (the owner, 2026-11-09).
+    expect(screen.queryByText("No CRM login")).toBeNull();
+    fireEvent.click(screen.getByText("Not in turn"));
     expect(screen.getByText("No CRM login")).toBeTruthy();
     expect(screen.getAllByText("Came")).toHaveLength(2);
   });
