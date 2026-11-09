@@ -131,25 +131,38 @@ export function replyWaits(c: Pick<CrmCustomer, "messages">): number[] {
 }
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 
-export interface OverviewCustomer { id: string; name: string; status: string; avgMin: number | null; ad: string }
-export interface OverviewPerson { id: string; name: string; n: number; avgMin: number | null; customers: OverviewCustomer[] }
-export interface OverviewAd { key: string; name: string; n: number; avgMin: number | null; people: OverviewPerson[] }
+/** A row's figures: its leads, average reply, appointments, show-ups, won and lost. */
+export interface OverviewFigs { n: number; avgMin: number | null; appt: number; show: number; won: number; lost: number }
+export interface OverviewCustomer { id: string; name: string; status: string; avgMin: number | null; ad: string; rep: string }
+export interface OverviewPerson extends OverviewFigs { id: string; name: string; customers: OverviewCustomer[] }
+export interface OverviewAd extends OverviewFigs { key: string; name: string; people: OverviewPerson[] }
 /**
  * The overall report (the owner, 2026-11-09: "不同的广告进来目前分配给了哪些业务，他们回复的平均时间，点开之后可以看到每个客户（包含
- * 他们的状态，平均回复时间，广告来源），和 open chat"): the period's leads by ad (most first, no ad last), each ad's people it is
- * with now (most first, nobody yet last) and each person's customers; an average reply is over every reply wait in those chats.
+ * 他们的状态，平均回复时间，广告来源），和 open chat"; then "salesperson & leads by ad & overview 是不是可以结合" — one report, two
+ * views): the period's leads by ad (most first, no ad last) and under each the people who have them now, or by salesperson
+ * (most first, nobody yet last) with every customer; an average reply is over every reply wait in those chats. An
+ * appointment is a visit not cancelled; a show-up a visit attended.
  */
-export function overviewReport(cs: CrmCustomer[], range: [number, number], adName: (c: CrmCustomer) => string, nameOf: (id: string) => string, statusOf: (c: CrmCustomer) => string): OverviewAd[] {
-  const leads = cs.filter(c => inRange(c.createdAt, range));
-  const byAd = new Map<string, CrmCustomer[]>();
-  for (const c of leads) { const k = c.adId || "none"; byAd.set(k, [...(byAd.get(k) ?? []), c]); }
-  const ads = [...byAd].map(([key, list]) => {
-    const byWho = new Map<string, CrmCustomer[]>();
-    for (const c of list) { const k = c.assignedTo || ""; byWho.set(k, [...(byWho.get(k) ?? []), c]); }
-    const people = [...byWho].map(([id, mine]) => ({ id, name: id ? nameOf(id) : "Nobody yet", n: mine.length, avgMin: mean(mine.flatMap(replyWaits)),
-      customers: mine.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(c => ({ id: c.id, name: c.name, status: statusOf(c), avgMin: mean(replyWaits(c)), ad: key === "none" ? "No ad" : adName(c) })) }))
+export function overviewReport(cs: CrmCustomer[], range: [number, number], adName: (c: CrmCustomer) => string, nameOf: (id: string) => string, statusOf: (c: CrmCustomer) => string,
+  visits: CrmVisit[] = [], ad: string = "all"): { byAd: OverviewAd[]; byRep: OverviewPerson[] } {
+  const live = new Map<string, CrmVisit[]>();
+  for (const v of visits) if (v.state !== "cancelled") live.set(v.customerId, [...(live.get(v.customerId) ?? []), v]);
+  const leads = cs.filter(c => inRange(c.createdAt, range) && (ad === "all" || (c.adId || "none") === ad));
+  const adOf = (c: CrmCustomer) => (c.adId ? adName(c) : "No ad");
+  const figs = (list: CrmCustomer[]): OverviewFigs => ({ n: list.length, avgMin: mean(list.flatMap(replyWaits)),
+    appt: list.filter(c => live.has(c.id)).length, show: list.filter(c => (live.get(c.id) ?? []).some(v => v.state === "attended")).length,
+    won: list.filter(c => c.status === "won").length, lost: list.filter(c => c.status === "lost").length });
+  const customer = (c: CrmCustomer): OverviewCustomer => ({ id: c.id, name: c.name, status: statusOf(c), avgMin: mean(replyWaits(c)), ad: adOf(c), rep: c.assignedTo ? nameOf(c.assignedTo) : "Nobody yet" });
+  const people = (list: CrmCustomer[]): OverviewPerson[] => {
+    const by = new Map<string, CrmCustomer[]>();
+    for (const c of list) { const k = c.assignedTo || ""; by.set(k, [...(by.get(k) ?? []), c]); }
+    return [...by].map(([id, mine]) => ({ id, name: id ? nameOf(id) : "Nobody yet", ...figs(mine),
+      customers: mine.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(customer) }))
       .sort((a, b) => (!a.id ? 1 : !b.id ? -1 : b.n - a.n || a.name.localeCompare(b.name)));
-    return { key, name: key === "none" ? "No ad" : adName(list[0]), n: list.length, avgMin: mean(list.flatMap(replyWaits)), people };
-  });
-  return ads.sort((a, b) => (a.key === "none" ? 1 : b.key === "none" ? -1 : b.n - a.n));
+  };
+  const byAdM = new Map<string, CrmCustomer[]>();
+  for (const c of leads) { const k = c.adId || "none"; byAdM.set(k, [...(byAdM.get(k) ?? []), c]); }
+  const byAd = [...byAdM].map(([key, list]) => ({ key, name: key === "none" ? "No ad" : adName(list[0]), ...figs(list), people: people(list) }))
+    .sort((a, b) => (a.key === "none" ? 1 : b.key === "none" ? -1 : b.n - a.n));
+  return { byAd, byRep: people(leads) };
 }
