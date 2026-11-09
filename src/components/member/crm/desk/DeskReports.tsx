@@ -314,7 +314,6 @@ export function DeskReports({ r, lba }: { r: R; ads?: AdsV; lba: LbaV }) {
           <Seg opts={r.periods} />
           <span style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{r.overview.rangeText}</span>
           <span style={{ width: "1px", height: "20px", background: "var(--crm-line)" }} />
-          <Seg opts={r.overview.bys} />
           <AdDrop o={r.overview} />
         </div>
       )}

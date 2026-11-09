@@ -160,7 +160,7 @@ export function reportsVM(ctx: DeskCtx) {
   };
 
   return {
-    kReports: ui.tab === "reports",
+    kReports: ui.tab === "reports" || ui.tab === "workspace",
     reports: {
       cat, cats: RP_CATS.map(([k, label]) => ({ label, on: k === cat, pick: () => patch({ rpCat: k }) })),
       periods: RP_PERIODS.map(([k, label]) => ({ label, on: k === per, pick: () => patch(k === "custom" ? { rpPer: k, rpDates: true } : { rpPer: k, rpDates: false }) })),

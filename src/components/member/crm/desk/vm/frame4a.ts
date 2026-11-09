@@ -129,18 +129,19 @@ interface HeadBits {
   kInsAct?: boolean;
   ap4: { tabs: { label: string; on: boolean; custom: boolean; pick: () => void }[] };
   addAd?: { canAdd: boolean; show: () => void };
-  reports?: { cats: { label: string; on: boolean; pick: () => void }[]; canCsv: boolean; csv: () => void };
+  reports?: { cat?: string; overview?: { bys: F4Tab[] }; cats: { label: string; on: boolean; pick: () => void }[]; canCsv: boolean; csv: () => void };
   dpOpen: () => void;
 }
 
 /** Assignment's tabs as the design names them (docs/design_handoff_crm, CRM Assignment People.dc.html). */
 const TAB_WORDS: Record<string, string> = { "Ads to teams": "Ad split", "Full time lead allocation": "Full time days", People: "Leave" };
 
-/** Reports' two tabs: Ready-made (the categories) and My reports (what was Workspace). */
-const rpTabs = (ctx: DeskCtx, mine: boolean): F4Tab[] => [
-  { label: "Ready-made", on: !mine, pick: () => ctx.patch({ tab: "reports" }) },
-  { label: "My reports", on: mine, pick: () => ctx.patch({ tab: "workspace" }) },
-];
+/**
+ * Reports' head tabs: My reports is gone (the owner, 2026-11-09: "如果把 my reports 删掉，by ad & by salesperson 调整他的画面 UI
+ * 可以吗") — Overview's By ad | By salesperson stand where Ready-made | My reports stood; the other reports have none. The
+ * saved reports themselves are kept (crm_workspace_*), only the page left.
+ */
+const rpTabs = (v: HeadBits): F4Tab[] => (v.reports?.cat === "overview" && v.reports.overview ? v.reports.overview.bys : []);
 
 /** Each page's head (frames 01–11): its tabs, its line and its one primary button — each bound to what the page already does. */
 export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit<F4Head, "title">>> {
@@ -170,9 +171,9 @@ export function heads4a(ctx: DeskCtx, v: HeadBits): Partial<Record<DeskTab, Omit
     auditlog: { tabs: [], sub: n(v.auCount, "change", "changes"), cta: { label: "Export CSV", icon: "download", act: v.auditCsv } },
     // Reports (2026-10-23): its categories as the head's tabs, Export CSV of the one on screen.
     // v2 frame 12: the categories are the second row of tabs; Ads performance is frame 05's body and its Export menu.
-    reports: { tabs: rpTabs(ctx, false), subTabs: v.reports?.cats ?? [], sub: "", cta: v.reports?.cats.find(c => c.on)?.label === "Ads performance"
+    reports: { tabs: rpTabs(v), subTabs: v.reports?.cats ?? [], sub: "", cta: v.reports?.cats.find(c => c.on)?.label === "Ads performance"
       ? { label: "Export", icon: "download", act: v.apToggleDl, menu: { open: v.apDlOpen, close: v.apToggleDl, items: v.apDl } }
       : v.reports?.canCsv ? { label: "Export", icon: "download", act: v.reports.csv } : null },
-    workspace: { tabs: rpTabs(ctx, true), sub: "", cta: null },
+    workspace: { tabs: rpTabs(v), subTabs: v.reports?.cats ?? [], sub: "", cta: null },
   };
 }
