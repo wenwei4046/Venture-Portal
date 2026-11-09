@@ -22,8 +22,8 @@ const OUT = join(ROOT, "src/components/member/app/irq/tpl");
 const CSS_OUT = join(ROOT, "src/components/member/app/irq/irq-css.ts");
 
 const FILES = [
-  ["IR Quote v9 Bold.dc.html", "QuoteTpl"],
-  ["Quote Settings v3 Bold.dc.html", "SettingsTpl"],
+  ["IR Quote v10.dc.html", "QuoteTpl"],
+  ["Quote Settings v4.dc.html", "SettingsTpl"],
   ["Quote Settings Mobile.dc.html", "SettingsMobileTpl"],
   ["Workspace.dc.html", "WorkspaceTpl"],
 ];
@@ -34,7 +34,7 @@ const FILES = [
 // spot to a value the app's logic sets, and must find its anchor exactly `count` times or the script stops.
 const NAV_BTN = '<button style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0 8px;border:0;background:transparent;color:#6B6B66">';
 const PATCHES = {
-  "IR Quote v9 Bold.dc.html": [
+  "IR Quote v10.dc.html": [
     // The app's own sidebar on a computer (with its real rows and counts) stands where the prototype drew a copy.
     ['<sc-if value="{{ desk }}" hint-placeholder-val="{{ false }}">\n    <aside', '<sc-if value="{{ deskAside }}" hint-placeholder-val="{{ false }}">\n    <aside'],
     // Fills the app's column rather than the browser window.
@@ -55,8 +55,14 @@ const PATCHES = {
     // The Change item sheet's header shows the item being replaced (the user, 2026-11-06), drawn as the list's own photos.
     ['<div style="min-width:0">\n              <p style="margin:0;font-size:11.5px;font-weight:650;letter-spacing:.08em;color:#111111">{{ sheet.eyebrow }}', '<div style="min-width:0;display:flex;align-items:flex-start;gap:12px"><sc-if value="{{ sheet.img }}" hint-placeholder-val="{{ false }}"><span onClick="{{ sheet.zoom }}" title="View larger" style="position:relative;flex:0 0 56px;width:56px;height:52px;border-radius:12px;background:#EEEEEA url(\'{{ sheet.img }}\') center/cover no-repeat;cursor:zoom-in"><span style="position:absolute;right:3px;bottom:3px;width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.92);display:grid;place-items:center;box-shadow:0 1px 3px rgba(20,20,18,0.15)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#34342F" strokeWidth="2.4" strokeLinecap="round"><path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3M11 8v6M8 11h6"></path></svg></span></span></sc-if><div style="min-width:0">\n              <p style="margin:0;font-size:11.5px;font-weight:650;letter-spacing:.08em;color:#111111">{{ sheet.eyebrow }}'],
     ['{{ staleText }}</p></sc-if>\n            </div>\n            <button aria-label="Close" onClick="{{ closeSheet }}"', '{{ staleText }}</p></sc-if>\n            </div></div>\n            <button aria-label="Close" onClick="{{ closeSheet }}"'],
+    // Sales upload no picture of their own: an image section shows the Principal's, with no Upload / Remove (the user, 2026-11-09).
+    ['<label style="display:flex;align-items:center;height:36px;padding:0 14px;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;font-size:13px;font-weight:650;color:#1F1F1C;cursor:pointer">Upload image<input type="file" accept="image/*" onChange="{{ xf.onUpload }}" style="display:none"></label>\n      <sc-if value="{{ xf.hasImg }}" hint-placeholder-val="{{ false }}"><button onClick="{{ xf.clear }}" style="height:36px;padding:0 10px;border:0;background:transparent;color:#8A2E1C;font-size:13px;font-weight:650">Remove</button></sc-if>',
+     '<sc-if value="{{ xf.canUpload }}" hint-placeholder-val="{{ false }}"><label style="display:flex;align-items:center;height:36px;padding:0 14px;border-radius:10px;border:1px solid #DEDED8;background:#FFFFFF;font-size:13px;font-weight:650;color:#1F1F1C;cursor:pointer">Upload image<input type="file" accept="image/*" onChange="{{ xf.onUpload }}" style="display:none"></label>\n      <sc-if value="{{ xf.hasImg }}" hint-placeholder-val="{{ false }}"><button onClick="{{ xf.clear }}" style="height:36px;padding:0 10px;border:0;background:transparent;color:#8A2E1C;font-size:13px;font-weight:650">Remove</button></sc-if></sc-if>'],
+    // …and a table section's picture cell, the same.
+    ['<label title="Upload image" style="display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed #DEDED8;background:#FFFFFF url(\'{{ xvc.img }}\') center/cover no-repeat;color:#111111;font-size:16px;cursor:pointer">{{ xvc.imgEmpty }}<input type="file" accept="image/*" onChange="{{ xvc.onUpload }}" style="display:none"></label>',
+     '<label title="{{ xvc.tip }}" style="display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed #DEDED8;background:#FFFFFF url(\'{{ xvc.img }}\') center/cover no-repeat;color:#111111;font-size:16px;cursor:{{ xvc.cursor }}">{{ xvc.imgEmpty }}<sc-if value="{{ xvc.canUpload }}" hint-placeholder-val="{{ false }}"><input type="file" accept="image/*" onChange="{{ xvc.onUpload }}" style="display:none"></sc-if></label>'],
   ],
-  "Quote Settings v3 Bold.dc.html": [
+  "Quote Settings v4.dc.html": [
     ["position:relative;height:100vh;width:100%;display:flex", "position:relative;height:{{ rootH }};width:100%;display:flex"],
     ['\n  <aside style="flex:0 0 240px', '\n  <sc-if value="{{ deskAside }}"><aside style="flex:0 0 240px'],
     ["    </div>\n  </aside>\n", "    </div>\n  </aside></sc-if>\n"],
@@ -281,7 +287,7 @@ const doc = win.document;
 mkdirSync(OUT, { recursive: true });
 const helmets = [];
 for (const [file, name] of FILES) {
-  const html = readFileSync(join(SRC, file), "utf8");
+  const html = readFileSync(join(SRC, file), "utf8").replace(/\r\n/g, "\n"); // a Windows checkout writes CRLF; the output never depends on it
   const start = html.indexOf("<x-dc>") + "<x-dc>".length;
   const end = html.indexOf('<script type="text/x-dc"');
   let tplHtml = html.slice(start, end);
@@ -347,8 +353,8 @@ const base = [
   rules,
 ].join("\n");
 const sheets = {
-  QUOTE: [globalsOf("IR Quote v9 Bold.dc.html"), globalsOf("Workspace.dc.html").replace(/\.irq-root\{[^}]*\}/g, "")],
-  SETTINGS: [globalsOf("Quote Settings v3 Bold.dc.html")],
+  QUOTE: [globalsOf("IR Quote v10.dc.html"), globalsOf("Workspace.dc.html").replace(/\.irq-root\{[^}]*\}/g, "")],
+  SETTINGS: [globalsOf("Quote Settings v4.dc.html")],
   SETTINGS_MOBILE: [globalsOf("Quote Settings Mobile.dc.html")],
 };
 const out = [

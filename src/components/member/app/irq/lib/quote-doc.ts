@@ -10,6 +10,7 @@ export const COLUMNS = [
   { key: "item", label: "ITEM", show: true, num: false },
   { key: "desc", label: "DESCRIPTION", show: true, num: false },
   { key: "code", label: "CODE/COLOUR", show: true, num: false },
+  { key: "photo", label: "PHOTO", show: true, num: false },
   { key: "qty", label: "QTY", show: true, num: true },
   { key: "price", label: "PRICE", show: false, num: true },
   { key: "sum", label: "SUM", show: false, num: true }
@@ -72,8 +73,21 @@ export function fieldRows(f, v, n, b) {
 }
 
 // Plain view-model for editing one field value (IR Quote and Buildings share it).
-export function fieldEditor(f, v, setV) {
-  const k = f.kind, val = v ?? "";
+/** The sections' answers with every picture the Principal's: an image section's own value, a table's picture cells its
+ * default rows' — whatever a draft kept from before (2026-11-09: sales upload no picture of their own). */
+export function principalPictures(blocks, extra) {
+  const out = { ...(extra || {}) };
+  (blocks || []).filter(b => b.type === "field").forEach(b => {
+    if (b.kind === "image") { delete out[b.id]; return; }
+    if (b.kind !== "table" || !Array.isArray(out[b.id])) return;
+    const pics = (b.columns || []).filter(c => c.kind === "image").map(c => c.id), base = Array.isArray(b.value) ? b.value : [];
+    if (pics.length) out[b.id] = out[b.id].map((r, i) => { const x = { ...r }; pics.forEach(id => { x[id] = (base[i] || {})[id] || ""; }); return x; });
+  });
+  return out;
+}
+// `upload: false` (the quote): sales put no picture of their own — an image is the Principal's, as Quote Settings set it (2026-11-09).
+export function fieldEditor(f, v, setV, { upload = true } = {}) {
+  const k = f.kind, val = k === "image" && !upload ? (f.value ?? "") : (v ?? "");
   const num = c => c.kind === "number" || c.kind === "money";
   const o = {
     label: f.label, required: !!f.required, span: ["long", "image", "table"].includes(k) ? "1 / -1" : "auto",
@@ -81,7 +95,7 @@ export function fieldEditor(f, v, setV) {
     inputType: k === "number" ? "number" : k === "date" ? "date" : k === "link" ? "url" : "text",
     value: k === "table" ? "" : String(val), ph: k === "link" ? "https://" : "",
     onChange: e => setV(e.target.value),
-    img: k === "image" ? String(val) : "", hasImg: k === "image" && !!val, imgEmpty: val ? "" : "No image",
+    img: k === "image" ? String(val) : "", hasImg: k === "image" && !!val, imgEmpty: val ? "" : "No image", canUpload: upload,
     onUpload: e => { const file = e.target.files && e.target.files[0]; e.target.value = ""; if (file) fileToDataUrl(file).then(setV); },
     clear: () => setV(""), cols: [], rows: [], grid: "", minW: "0", addRow: () => {}
   };
@@ -96,7 +110,8 @@ export function fieldEditor(f, v, setV) {
       cells: cols.map(c => ({
         isImg: c.kind === "image", isInput: c.kind !== "image",
         type: num(c) ? "number" : c.kind === "date" ? "date" : "text", ph: c.kind === "money" ? "RM" : "", align: num(c) ? "right" : "left",
-        value: r[c.id] ?? "", img: c.kind === "image" ? (r[c.id] || "") : "", imgEmpty: r[c.id] ? "" : "+",
+        value: r[c.id] ?? "", img: c.kind === "image" ? (r[c.id] || "") : "", imgEmpty: r[c.id] || !upload ? "" : "+",
+        canUpload: upload, cursor: upload ? "pointer" : "default", tip: upload ? "Upload image" : "",
         onChange: e => { const x = e.target.value; setRows(R => { R[ri][c.id] = x; }); },
         onUpload: e => { const file = e.target.files && e.target.files[0]; e.target.value = ""; if (file) fileToDataUrl(file, 600).then(d => setRows(R => { R[ri][c.id] = d; })); }
       }))
@@ -163,7 +178,7 @@ export function defaults(packagesJson, catalogJson) {
     buildings: [{ id: "bld-1", name: building, developer: packagesJson.buildingInfo?.developer || "", address: packagesJson.buildingInfo?.address || "", url: "https://www.skylineembassy.com/" }],
     packages,
     catalog: { kinds: { ...catalogJson.kinds }, items: catalogJson.items.map((it, i) => ({ id: "c" + i, ...it })) },
-    doc: { font: "Georgia", blocks: defaultBlocks(packagesJson.company) },
+    doc: { font: "Times", blocks: defaultBlocks(packagesJson.company) },
     bldFields: [],
     saved: null
   };
@@ -200,6 +215,11 @@ export const CRM_CUSTOMERS = [
   { id: "c4", name: "Priya Raman", phone: "011-6120 3348", ptype: "Condo", usize: "2R 1R", uloc: "Skyline Embassy, Block A", req: "Airbnb setup", budget: "RM 25k – 30k" },
   { id: "c5", name: "Lim Siew Ling", phone: "017-889 2210", ptype: "Landed", usize: "4R 3R", uloc: "Setia Alam", req: "Living and master bedroom only", budget: "RM 35k" }
 ];
+// Whether a quote-only field prints on the quotation. Core fields print unless unticked — but Billing address only
+// when the Principal ticks it (the user, 2026-11-09): it is also then asked on the quote's Customer step.
+export const printsOwn = f => f.id === "bill" ? f.print === true : f.core ? f.print !== false : !!f.print;
+export const billOn = cfg => (((cfg && cfg.custInfo) || {}).own || []).some(o => o.id === "bill" && o.print === true);
+export const factsOff = cfg => { const own = ((cfg && cfg.custInfo) || {}).own || []; const off = new Set(own.filter(o => o.core && !printsOwn(o)).map(o => o.id)); if (!billOn(cfg)) off.add("bill"); return off; };
 export const defaultCustInfo = () => ({
   crm: { name: { show: true, print: true }, phone: { show: true, print: false }, type: { show: true, print: false }, size: { show: true, print: false }, loc: { show: false, print: false }, req: { show: true, print: false }, budget: { show: true, print: false } },
   own: [
@@ -219,7 +239,15 @@ export function guessKind(name, kinds, strict) {
   return best;
 }
 export function fixKinds(cfg) { const K = cfg.catalog && cfg.catalog.kinds; (cfg.catalog && cfg.catalog.items || []).forEach(it => { if (it.kindLocked) return; if (it.kind && K[it.kind] && guessKind(it.name, { [it.kind]: K[it.kind] })) return; const g = guessKind(it.name, K, true); if (g && g !== it.kind) it.kind = g; }); return cfg; }
-export function load(packagesJson, catalogJson, key = STORE) { const c = withSum(fixKinds(load0(packagesJson, catalogJson, key))); if (!c.custInfo) c.custInfo = defaultCustInfo(); if (!Array.isArray(c.styles)) c.styles = DEFAULT_STYLES.map(x => ({ ...x })); return c; }
+// A room type's name is its room count, then its Note as typed — "3R 1R", "3R 1R Type A" (the user, 2026-11-09:
+// "几房几厕不动，但可能可以在后面加一点文字"). One without a room count keeps the name it was given.
+export const sizeName = spec => { const b = parseInt((spec || {}).beds), t = parseInt((spec || {}).baths); return b && t ? b + "R " + t + "R" : ""; };
+export const roomName = spec => [sizeName(spec), String((spec || {}).note || "").trim()].filter(Boolean).join(" ");
+export function nameRooms(cfg) {
+  (cfg.packages || []).forEach(p => { if (!sizeName(p.spec)) return; const lab = roomName(p.spec); p.groupLabel = lab; p.layout = lab; p.name = lab + " " + (p.style === "build" ? "BUILD IN" : "CLASSIC"); });
+  return cfg;
+}
+export function load(packagesJson, catalogJson, key = STORE) { const c = nameRooms(withSum(fixKinds(load0(packagesJson, catalogJson, key)))); if (!c.custInfo) c.custInfo = defaultCustInfo(); if (!Array.isArray(c.styles)) c.styles = DEFAULT_STYLES.map(x => ({ ...x })); return c; }
 function load0(packagesJson, catalogJson, key) {
   const base = defaults(packagesJson, catalogJson);
   try {
@@ -245,24 +273,50 @@ export function reset() { irqStorage.removeItem(STORE); }
 export function specText(spec, short = false) {
   if (!spec) return "";
   const pl = (n, w) => n ? `${n} ${short ? w.slice(0, 4).toLowerCase().replace("bedr", "bed").replace("bath", "bath") : w + (n === "1" ? "" : "s")}` : "";
-  return [pl(spec.beds, "Bedroom"), pl(spec.baths, "Bathroom"), spec.note && /twin|dual/i.test(spec.note) ? "Twin-Key" : "", spec.sqft ? `${spec.sqft} sq.ft.` : ""].filter(Boolean).join(" · ");
+  return [pl(spec.beds, "Bedroom"), pl(spec.baths, "Bathroom"), spec.sqft ? `${spec.sqft} sq.ft.` : ""].filter(Boolean).join(" · ");
 }
 
 export const FONTS = {
   Georgia: "Georgia, 'Noto Serif SC', serif",
   Helvetica: "Helvetica, Arial, 'Noto Sans SC', sans-serif",
-  Times: "'Times New Roman', Times, serif"
+  Times: "'Times New Roman', Times, 'Noto Serif SC', serif"
 };
 
 const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export const money = n => (n < 0 ? "-" : "") + Math.abs(n).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Style moodboard, laid out by photo count so nothing overlaps (max 12).
+export function moodRows(mb, n, b) {
+  const imgs = (mb.imgs || []).filter(Boolean).slice(0, 12), k = imgs.length;
+  if (!k) return "";
+  const tile = (src, extra) => `<div style="${extra}min-width:0;min-height:0;overflow:hidden;border-radius:3px;background:#EEEDE8"><img src="${esc(src)}" alt="" style="display:block;width:100%;height:100%;object-fit:cover"></div>`;
+  const head = `<tr style="break-after:avoid;page-break-after:avoid"><td colspan="${n}" style="padding:12px 6px 6px"><div style="display:flex;justify-content:space-between;align-items:baseline;font-size:${b.size}px"><span style="font-weight:bold;letter-spacing:.08em">STYLE PREVIEW · ${esc(String(mb.name || "").toUpperCase())}</span><span style="font-size:${b.size - 1}px;color:#6B6660">${esc([mb.note, k + " photo" + (k === 1 ? "" : "s")].filter(Boolean).join(" · "))}</span></div></td></tr>`;
+  const row = (inner, pad = "0 6px 4px") => `<tr style="break-inside:avoid;page-break-inside:avoid"><td colspan="${n}" style="padding:${pad}">${inner}</td></tr>`;
+  if (k <= 5) {
+    // 1–5: one large photo + the rest beside it
+    const L = {
+      1: ["1fr", "1fr", ["'a'"]], 2: ["1fr 1fr", "1fr", ["'a b'"]], 3: ["3fr 2fr", "1fr 1fr", ["'a b'", "'a c'"]],
+      4: ["2fr 1fr 1fr", "1fr 1fr", ["'a b b'", "'a c d'"]], 5: ["2fr 1fr 1fr", "1fr 1fr", ["'a b c'", "'a d e'"]]
+    }[k];
+    const cells = imgs.map((src, i) => tile(src, `grid-area:${"abcde"[i]};`)).join("");
+    return head + row(`<div style="display:grid;grid-template-columns:${L[0]};grid-template-rows:${L[1]};grid-template-areas:${L[2].join(" ")};gap:4px;height:${k === 1 ? 300 : 260}px">${cells}</div>`, "0 6px 6px");
+  }
+  // 6+: rows of three (2 when it can't split evenly). Each row is its own unit so the PDF can break between rows, never through a photo.
+  let out = head;
+  // row sizes: threes; a leftover single photo turns the last two rows into 2 + 2 (7 → 3·2·2, 10 → 3·3·2·2)
+  const sizes = Array(Math.floor(k / 3)).fill(3); if (k % 3 === 2) sizes.push(2); if (k % 3 === 1) sizes.splice(-1, 1, 2, 2);
+  let i = 0;
+  sizes.forEach((sz, r) => { const chunk = imgs.slice(i, i + sz); i += sz;
+    out += row(`<div style="display:grid;grid-template-columns:repeat(${sz},1fr);gap:4px;height:${sz === 3 ? 150 : 180}px">${chunk.map(src => tile(src, "")).join("")}</div>`, r === sizes.length - 1 ? "0 6px 6px" : "0 6px 4px"); });
+  return out;
+}
 
 // q: { facts: {key: value}, cats: [{name, rows: [{no,item,desc,code,qty,unit,sum}]}], discount, saving, total }
 export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}) {
   const co = config.company;
   const blocks = config.doc.blocks.filter(b => !b.hidden);
   const tb = config.doc.blocks.find(b => b.type === "table");
-  const cols = (tb ? tb.columns : COLUMNS).filter(c => c.show);
+  const cols = (tb ? tb.columns : COLUMNS).filter(c => c.show && !(excel && c.key === "photo"));
   const n = Math.max(cols.length, 4);
   const font = FONTS[config.doc.font] || FONTS.Georgia;
   const cell = (b, extra = "") => `text-align:${b.align};font-size:${b.size}px;${b.bold ? "font-weight:bold;" : ""}${b.italic ? "font-style:italic;" : ""}${b.underline ? "text-decoration:underline;" : ""}${extra}`;
@@ -286,7 +340,7 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
     } else if (b.type === "field") {
       out += fieldRows(b, (q.extra || {})[b.id] ?? b.value, n, b);
     } else if (b.type === "facts") {
-      const offK = new Set(((config.custInfo || {}).own || []).filter(o => o.core && o.print === false).map(o => o.id)); const L = b.labels.filter(f => !f.hidden && !offK.has(f.key));
+      const offK = factsOff(config); const L = b.labels.filter(f => !f.hidden && !offK.has(f.key));
       const half = Math.ceil(n / 2);
       for (let i = 0; i < L.length; i += 2) {
         const a = L[i], c = L[i + 1];
@@ -296,12 +350,13 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
       (q.custRows || []).forEach(r => { out += `<tr><td style="${cell(b, "font-weight:bold;padding:2px 6px")}">${esc(String(r.label).toUpperCase())} :</td><td colspan="${n - 1}" style="${cell(b, "padding:2px 6px")}">${esc(r.value || "-")}</td></tr>`; });
       const bx = q.building?.extra || {};
       (config.bldFields || []).filter(f => f.show).forEach(f => { out += fieldRows(f, bx[f.id], n, b); });
+      if (q.moodboard && !excel) out += moodRows(q.moodboard, n, b);
     } else if (b.type === "table") {
-      out += `<tr style="background:#E7E5DE">${cols.map(c => `<td style="padding:6px;border-top:1px solid #bbb;border-bottom:1px solid #bbb;font-weight:bold;font-size:${b.size - 1}px;${c.num ? "text-align:right" : ""}">${esc(c.label)}</td>`).join("")}</tr>`;
+      out += `<tr style="background:#E7E5DE">${cols.map(c => `<td style="padding:6px;border-top:1px solid #bbb;border-bottom:1px solid #bbb;font-weight:bold;font-size:${b.size - 1}px;${c.num ? "text-align:right" : c.key === "photo" ? "text-align:center" : ""}">${esc(c.label)}</td>`).join("")}</tr>`;
       q.cats.forEach(cat => {
         out += `<tr><td colspan="${n}" style="padding:10px 6px 3px;font-weight:bold;letter-spacing:.05em;font-size:${b.size}px">${esc(cat.name)}</td></tr>`;
         cat.rows.forEach(r => {
-          out += `<tr>${cols.map(c => { const v = c.key === "price" ? money(r.unit) : c.key === "sum" ? money(r.sum) : r[c.key]; return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;font-size:${b.size}px;${c.num ? "text-align:right" : ""}">${esc(v)}</td>`; }).join("")}</tr>`;
+          out += `<tr>${cols.map(c => { if (c.key === "photo") return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;width:64px;text-align:center;vertical-align:middle">${r.photo ? `<img src="${esc(r.photo)}" alt="" style="display:block;width:56px;height:56px;object-fit:contain;margin:0 auto">` : ""}</td>`; const v = c.key === "price" ? money(r.unit) : c.key === "sum" ? money(r.sum) : r[c.key]; return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;font-size:${b.size}px;${c.num ? "text-align:right" : ""}">${esc(v)}</td>`; }).join("")}</tr>`;
         });
       });
     } else if (b.type === "totals") {
@@ -320,7 +375,7 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
       out += `<tr><td colspan="${n}" style="height:14px"></td></tr><tr><td colspan="${half}" style="${cell(b, "padding:0 6px;vertical-align:bottom")}">${im(L)}______________________________<br>${esc(b.text || "Prepared by")}</td><td colspan="${n - half}" style="${cell(b, "padding:0 6px;vertical-align:bottom")}">${im(R)}______________________________<br>${esc(b.text2 || "Customer acknowledgement")}</td></tr>`;
     }
   });
-  const table = `<table style="width:100%;border-collapse:collapse;font-family:${font};font-size:12px;color:#1C1714">${out}</table>`;
+  const table = `<table style="width:100%;border-collapse:collapse;font-family:${font};font-size:12px;color:#1C1714;font-variant-numeric:lining-nums tabular-nums">${out}</table>`;
   if (excel) return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>${table}</body></html>`;
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:14mm}body{margin:0;padding:0}@media screen{body{padding:28px 30px}}</style></head><body>${table}</body></html>`;
 }

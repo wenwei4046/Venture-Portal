@@ -161,11 +161,7 @@ a:hover{text-decoration:underline}
             <span style="position:relative;display:grid;place-items:center;width:44px;height:44px;border-radius:12px;background:#FFFFFF;color:#111111"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
             <span style="position:relative;display:flex;flex-direction:column;gap:4px"><span style="font-family:'Space Grotesk',Manrope,sans-serif;font-size:21px;font-weight:700;letter-spacing:-.02em">New quote</span><span style="font-size:12.5px;color:#BDBDB5">Customer · Room · Style · Customize</span></span>
           </button>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-            <button onClick="{{ openWs }}" style="display:flex;flex-direction:column;align-items:flex-start;gap:16px;padding:16px;border-radius:16px;border:0;background:#FFFFFF;color:#1F1F1C;text-align:left;box-shadow:0 1px 2px rgba(20,20,18,.05)">
-              <span style="display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#F2F2EF"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15 9h.01"></path></svg></span>
-              <span style="display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">Drive</span><span style="font-size:12px;color:#6B6B66">Style photos</span></span>
-            </button>
+          <div style="display:grid;grid-template-columns:1fr;gap:10px">
             <div style="display:flex;flex-direction:column;align-items:flex-start;gap:16px;padding:16px;border-radius:16px;background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,18,.05)">
               <span style="display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#FFEBD9;color:#D96E0B"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H6v18h12V7zM14 3v4h4M9 13h6M9 17h4"></path></svg></span>
               <span style="display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">{{ homeDraftN }}</span><span style="font-size:12px;color:#6B6B66">In progress</span></span>
@@ -220,7 +216,7 @@ a:hover{text-decoration:underline}
                 </sc-if>
               </div>
               
-              <button onClick="{{ openWs }}" style="display:flex;align-items:center;gap:6px;position:relative;height:36px;padding:0 12px;border-radius:10px;border:0;background:transparent;color:#111111;font-size:13.5px;font-weight:650" style-hover="background:#EEEEEA"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4zM4 15l4-4 4 4 3-3 5 5M15 9h.01"></path></svg>Drive</button></div>
+              </div>
             </div>
           </div>
 
@@ -340,7 +336,19 @@ a:hover{text-decoration:underline}
                 <sc-for list="{{ custFields }}" as="f" hint-placeholder-count="6">
                   <label style="display:flex;flex-direction:column;gap:5px">
                     <span style="display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#34342F">{{ f.label }}<sc-if value="{{ f.req }}" hint-placeholder-val="{{ false }}"><span style="color:#B3261E">*</span></sc-if></span>
-                    <input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.ph }}" type="{{ f.type }}" style="height:42px;padding:0 12px;border-radius:10px;border:1px solid rgba(20,20,18,.12);background:#FFFFFF;font-size:15px;color:#1F1F1C;outline:none;box-sizing:border-box;width:100%" style-focus="border-color:#111111;box-shadow:0 0 0 3px rgba(17,17,17,.12)">
+                    <sc-if value="{{ f.isPlain }}" hint-placeholder-val="{{ true }}"><input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.ph }}" type="{{ f.type }}" style="height:42px;padding:0 12px;border-radius:10px;border:1px solid rgba(20,20,18,.12);background:#FFFFFF;font-size:15px;color:#1F1F1C;outline:none;box-sizing:border-box;width:100%" style-focus="border-color:#111111;box-shadow:0 0 0 3px rgba(17,17,17,.12)"></sc-if>
+                    <sc-if value="{{ f.isMoney }}" hint-placeholder-val="{{ false }}"><span style="position:relative;display:block"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:15px;font-weight:600;color:#6B6B66;pointer-events:none">RM</span><input value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.ph }}" type="text" inputMode="decimal" style="height:42px;padding:0 12px 0 44px;border-radius:10px;border:1px solid rgba(20,20,18,.12);background:#FFFFFF;font-size:15px;color:#1F1F1C;outline:none;box-sizing:border-box;width:100%" style-focus="border-color:#111111;box-shadow:0 0 0 3px rgba(17,17,17,.12)"></span></sc-if>
+                    <sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}"><span style="position:relative;display:block">
+                      <button type="button" onClick="{{ f.toggle }}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;height:42px;padding:0 12px;border-radius:10px;border:1px solid {{ f.selBorder }};box-shadow:{{ f.selRing }};background:#FFFFFF;font-size:15px;color:{{ f.selInk }};box-sizing:border-box;width:100%;font-family:inherit;cursor:pointer;text-align:left"><span>{{ f.selLabel }}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6B66" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                      <sc-if value="{{ f.open }}" hint-placeholder-val="{{ false }}">
+                        <span onClick="{{ f.close }}" style="position:fixed;inset:0;z-index:40"></span>
+                        <span role="listbox" style="position:absolute;left:0;right:0;top:46px;z-index:41;display:flex;flex-direction:column;padding:4px;border-radius:10px;background:#FFFFFF;border:1px solid #E7E7E2;box-shadow:0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.1)">
+                          <sc-for list="{{ f.opts }}" as="o" hint-placeholder-count="2">
+                            <button type="button" role="option" onClick="{{ o.pick }}" style="display:flex;align-items:center;justify-content:space-between;height:38px;padding:0 10px;border:0;border-radius:8px;background:{{ o.bg }};color:#1F1F1C;font-size:14.5px;font-weight:{{ o.fw }};font-family:inherit;text-align:left;cursor:pointer" style-hover="background:#F2F2EF">{{ o.label }}<sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D96E0B" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></button>
+                          </sc-for>
+                        </span>
+                      </sc-if>
+                    </span></sc-if>
                   </label>
                 </sc-for>
               </div>
@@ -402,7 +410,7 @@ a:hover{text-decoration:underline}
                   <span style="display:block;font-size:11.5px;font-weight:700;letter-spacing:.1em;color:#6B6B66">STYLE</span>
                   
                 </div>
-                <button onClick="{{ openWs }}" title="Drive" aria-label="Drive" style="display:grid;place-items:center;position:relative;width:40px;height:40px;padding:0;border-radius:12px;border:1px solid #DEDED8;background:#FFFFFF;color:#111111;width:36px;height:36px"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+                
               </div>
               <sc-if value="{{ phone }}" hint-placeholder-val="{{ false }}">
                 <div style="display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:0 20px">
@@ -453,11 +461,11 @@ a:hover{text-decoration:underline}
                     </sc-if>
                   </sc-if>
                   <sc-if value="{{ sv.noImg }}" hint-placeholder-val="{{ true }}">
-                    <button onClick="{{ openWs }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;aspect-ratio:16/7;border:0;border-bottom:1px solid rgba(20,20,18,.06);background:#F7F7F5;color:#6B6B66;font-size:13.5px">
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;aspect-ratio:16/7;border-bottom:1px solid rgba(20,20,18,.06);background:#F7F7F5;color:#6B6B66;font-size:13.5px;text-align:center;padding:0 16px">
                       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#D96E0B" strokeWidth="1.7" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path></svg>
                       <span style="font-weight:650;color:#1F1F1C">No style images yet</span>
-                      <span>Add {{ sv.name }} images in Drive, or a cover in Quote Settings</span>
-                    </button>
+                      <span>{{ sv.name }} photos are set by the company in Quote Settings</span>
+                    </div>
                   </sc-if>
                   <div style="padding:16px 18px 18px;display:flex;flex-direction:column;gap:12px">
                     <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -593,6 +601,9 @@ a:hover{text-decoration:underline}
                       <span style="display:flex;align-items:center;font-size:14px;font-weight:650;color:{{ l.nameColor }};text-decoration:{{ l.strike }}"><sc-if value="{{ l.locked }}" hint-placeholder-val="{{ false }}"><svg aria-label="Fixed price" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#97978F" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style="margin-right:4px;vertical-align:-1px"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"></path></svg></sc-if>{{ l.sumText }}</span>
                       <span style="font-size:11.5px;color:#6B6B66">{{ l.eachText }}</span>
                     </span>
+                    <sc-if value="{{ l.remarkOn }}" hint-placeholder-val="{{ false }}">
+                      <input value="{{ l.remarkV }}" onChange="{{ l.onRemark }}" placeholder="Remarks (shown on quotation)" aria-label="Remarks" style="flex:1 0 100%;height:34px;padding:0 10px;border-radius:8px;border:1px solid rgba(20,20,18,.1);background:#F7F7F5;font-size:13px;color:#1F1F1C;outline:none;box-sizing:border-box;font-family:inherit" style-focus="border-color:#111111;background:#FFFFFF">
+                    </sc-if>
                   </div>
                 </sc-for>
                 <sc-if value="{{ cz.addRow }}" hint-placeholder-val="{{ true }}"><sc-if value="{{ c.canAdd }}" hint-placeholder-val="{{ false }}">
@@ -637,6 +648,10 @@ a:hover{text-decoration:underline}
                   <div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:#6B6B66">Changes · {{ changeCount }}</span><span style="font-weight:650;font-variant-numeric:tabular-nums">{{ changesText }}</span></div>
                   <label style="display:flex;justify-content:space-between;align-items:center;font-size:14px"><span style="color:#6B6B66">Discount</span><span style="display:flex;align-items:center;gap:6px;width:140px;height:38px;padding:0 10px;border-radius:10px;border:1px solid #DEDED8;box-sizing:border-box"><span style="font-size:12.5px;font-weight:700">RM</span><input inputMode="decimal" placeholder="0.00" value="{{ discount }}" onChange="{{ onDiscount }}" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:15px;font-weight:650;text-align:right;color:#1F1F1C"></span></label>
                 </div>
+                <button type="button" role="checkbox" aria-checked="{{ mood.on }}" onClick="{{ mood.toggle }}" style="display:flex;align-items:flex-start;gap:10px;width:100%;padding:12px;border-radius:12px;border:1px solid #E7E7E2;background:#FFFFFF;text-align:left;color:#1F1F1C;font-family:inherit;cursor:{{ mood.cursor }};opacity:{{ mood.op }}">
+                    <span style="flex:0 0 20px;width:20px;height:20px;margin-top:1px;border-radius:6px;border:1.5px solid {{ mood.boxBorder }};background:{{ mood.boxBg }};box-sizing:border-box;display:grid;place-items:center;color:#111111"><sc-if value="{{ mood.on }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                    <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:650">Include style moodboard</span><span style="font-size:12px;color:#6B6B66;line-height:1.4">{{ mood.sub }}</span></span>
+                  </button>
                 
               </div>
             </sc-if>
@@ -700,6 +715,10 @@ a:hover{text-decoration:underline}
             <sc-if value="{{ step3 }}" hint-placeholder-val="{{ false }}">
               <section style="display:flex;flex-direction:column;gap:8px;padding:18px;border-radius:14px;border:1px solid rgba(20,20,18,.05);background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,18,.04),0 8px 24px rgba(20,20,18,.045)">
                 <h3 style="margin:0 0 2px;font-size:15px;font-weight:650">Export</h3>
+                <button type="button" role="checkbox" aria-checked="{{ mood.on }}" onClick="{{ mood.toggle }}" style="display:flex;align-items:flex-start;gap:10px;width:100%;padding:12px;border-radius:12px;border:1px solid #E7E7E2;background:#F7F7F5;text-align:left;color:#1F1F1C;font-family:inherit;cursor:{{ mood.cursor }};opacity:{{ mood.op }}">
+                    <span style="flex:0 0 20px;width:20px;height:20px;margin-top:1px;border-radius:6px;border:1.5px solid {{ mood.boxBorder }};background:{{ mood.boxBg }};box-sizing:border-box;display:grid;place-items:center;color:#111111"><sc-if value="{{ mood.on }}" hint-placeholder-val="{{ false }}"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                    <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:14px;font-weight:650">Include style moodboard</span><span style="font-size:12px;color:#6B6B66;line-height:1.4">{{ mood.sub }}</span></span>
+                  </button>
                 <sc-for list="{{ exportsDesk }}" as="ex" hint-placeholder-count="4">
                   <button onClick="{{ ex.run }}" style="display:flex;align-items:center;gap:12px;min-height:46px;padding:6px 14px;border-radius:12px;border:1px solid #E7E7E2;background:#FFFFFF;text-align:left;color:#1F1F1C">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="{{ ex.d }}"></path></svg>
@@ -975,7 +994,7 @@ a:hover{text-decoration:underline}
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;showItemPrices&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Quotation&quot;},&quot;markup&quot;:{&quot;editor&quot;:&quot;float&quot;,&quot;default&quot;:1.3,&quot;min&quot;:1,&quot;max&quot;:2,&quot;step&quot;:0.05,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Pricing&quot;},&quot;viewport&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;auto&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;phone&quot;,&quot;desktop&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Preview&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;showItemPrices&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Quotation&quot;},&quot;markup&quot;:{&quot;editor&quot;:&quot;float&quot;,&quot;default&quot;:1.3,&quot;min&quot;:1,&quot;max&quot;:2,&quot;step&quot;:0.05,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Pricing&quot;},&quot;viewport&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;auto&quot;,&quot;options&quot;:[&quot;auto&quot;,&quot;phone&quot;,&quot;desktop&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Preview&quot;},&quot;docFont&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Times&quot;,&quot;options&quot;:[&quot;Times&quot;,&quot;Helvetica&quot;,&quot;Georgia&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Quotation&quot;},&quot;salesPhotos&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Photos&quot;}}">
 const ICON = {
   home: "M3 10 12 3l9 7M5 9v12h5v-7h4v7h5V9",
   chart: "M4 20V10m5 10V4m5 16v-7m5 7V8M3 20h18",
@@ -1170,12 +1189,16 @@ class Component extends DCLogic {
     return { m, pkg, changes, changeSell, disc, total, xrows, xsum, adjust, xTitle: tb?.extraTitle || "OTHERS" };
   }
 
+  moodPhotos() { const styles = (this.cfg && this.cfg.styles) || [], sx = styles.find(x => x.id === this.state.styleId) || styles[0] || {}; const ok = s => /^(data:image|https?:|blob:)/.test(String(s || "")) || /\.(jpe?g|png|webp|gif)(\?|$)/i.test(String(s || ""));
+    return { sx, imgs: (sx.photos && sx.photos.length ? sx.photos : (sx.cover ? [sx.cover] : [])).filter(ok) }; }
+  moodboard() { if (!this.state.withMood) return null; const { sx, imgs } = this.moodPhotos(); if (!imgs.length) return null;
+    const pkg = this.state.data && this.state.data.packages.find(x => x.id === this.state.pid); return { name: sx.name || "", note: pkg && pkg.style === "build" ? "Build in" : "Classic", imgs }; }
   docRows(pkg, m) {
     let n = 0;
     return pkg.cats.map((c, ci) => {
       const rows = this.state.lines.filter(l => l.ci === ci && l.qty > 0).map(l => {
         const unit = Math.round(l.cost * m);
-        const ci2 = (this.state.catalog?.items || []).find(x => (l.code && x.code === l.code) || x.name === l.name) || {}; return { no: ++n, item: l.name, desc: l.desc || "", code: l.code || "", qty: l.qty, unit, sum: unit * l.qty, kind: ((this.state.catalog?.kinds || {})[l.kind] || {}).label || "", collection: ci2.collection || "", color: ci2.color || "", remark: "" };
+        const ci2 = (this.state.catalog?.items || []).find(x => (l.code && x.code === l.code) || x.name === l.name) || {}; return { no: ++n, item: l.name, desc: l.desc || "", code: l.code || "", photo: l.img || ci2.img || this.imgFor(l) || "", qty: l.qty, unit, sum: unit * l.qty, kind: ((this.state.catalog?.kinds || {})[l.kind] || {}).label || "", collection: ci2.collection || "", color: ci2.color || "", remark: l.remark || "" };
       });
       return { name: c.name, rows };
     }).filter(c => c.rows.length).concat((() => {
@@ -1199,7 +1222,7 @@ class Component extends DCLogic {
     if (this.lib) {
       const { m, pkg, total, disc, adjust } = this.calc();
       const adjSum = adjust.reduce((a, x) => a + x.amount, 0);
-      const cfg = JSON.parse(JSON.stringify(this.cfg));
+      const cfg = JSON.parse(JSON.stringify(this.cfg)); cfg.doc.font = this.props.docFont ?? "Times";
       const tb = cfg.doc.blocks.find(b => b.type === "table");
       if (tb && this.props.showItemPrices) tb.columns.forEach(c => { if (c.key === "price" || c.key === "sum") c.show = true; });
       const priced = tb && tb.columns.some(c => c.show && (c.key === "price" || c.key === "sum"));
@@ -1209,7 +1232,7 @@ class Component extends DCLogic {
       const facts = { att: c.att, by: c.by, bill: c.bill, building: c.building, address: [c.unit, c.building, cfg.buildings?.find(b => b.name === c.building)?.address].filter(Boolean).join(", "), unit: this.unitFact(pkg), layout: pkg.name, date: longDate(c.date) };
       (cfg.doc.blocks.find(b => b.type === "facts")?.labels || []).filter(f => f.custom).forEach(f => { facts[f.key] = this.state.extra[f.key] || ""; });
       const ci = cfg.custInfo || {}, custRows = [...(this.lib.CRM_FIELDS || []).filter(f => f.id !== "name" && (ci.crm || {})[f.id] && ci.crm[f.id].show && ci.crm[f.id].print).map(f => ({ label: f.label, value: (this.state.crm || {})[f.id] })), ...(ci.own || []).filter(f => !["unit", "bill", "building", "date", "by"].includes(f.id) && f.print).map(f => ({ label: f.label, value: this.state.extra["ci_" + f.id] }))];
-      return this.lib.renderDoc(cfg, { facts, adjust, custRows, extra: this.state.extra, sigs: this.state.sigs, building: cfg.buildings?.find(b => b.name === c.building), cats, discount: disc, saving: priced ? Math.max(0, list - (total - adjSum) - disc) : 0, total }, { excel: forExcel, title: this.fileBase() });
+      return this.lib.renderDoc(cfg, { facts, adjust, custRows, extra: this.state.extra, sigs: this.state.sigs, building: cfg.buildings?.find(b => b.name === c.building), cats, discount: disc, saving: priced ? Math.max(0, list - (total - adjSum) - disc) : 0, total, moodboard: this.moodboard() }, { excel: forExcel, title: this.fileBase() });
     }
     return this.docHtmlLegacy(forExcel);
   }
@@ -1259,11 +1282,18 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     const crmVal = id => id === "name" ? st.cust.att : (st.crm || {})[id] || "";
     const setCrm = id => e => { const val = e.target.value; if (id === "name") this.setState(s => ({ cust: { ...s.cust, att: val } })); else this.setState(s => ({ crm: { ...(s.crm || {}), [id]: val } })); };
     const fields = [
-      ...CF.filter(f => f.core || (ci.crm[f.id] || {}).show).map(f => ({ label: f.label, value: crmVal(f.id), ph: f.id === "name" ? "Customer name" : "", type: "text", onChange: setCrm(f.id), crm: true, req: !!f.core || !!(ci.crm[f.id] || {}).required })),
-      ...(ci.own || []).map(f => { const core = ["unit", "bill", "building", "date", "by"].includes(f.id), key = "ci_" + f.id;
-        return { label: f.label, value: core ? st.cust[f.id] : st.extra[key] || "", ph: f.ph || "", type: f.type === "date" ? "date" : f.type === "number" ? "number" : "text", crm: false, req: !!f.required,
+      ...CF.filter(f => f.core || (ci.crm[f.id] || {}).show).map(f => { const sel = f.id === "ptype", money = f.id === "budget", raw = crmVal(f.id);
+        const value = money ? String(raw || "").replace(/^\s*RM\s*/i, "") : sel ? (["Landed", "Condo"].find(o => o.toLowerCase() === String(raw || "").trim().toLowerCase()) || "") : raw;
+        const onChange = money ? e => { const val = e.target.value.replace(/[^0-9.,\-\sk+–]/gi, ""); this.setState(s => ({ crm: { ...(s.crm || {}), budget: val ? "RM " + val : "" } })); } : setCrm(f.id);
+        return { label: f.label, value, ph: f.id === "name" ? "Customer name" : money ? "0" : "", type: "text", onChange, crm: true, req: !!f.core || !!(ci.crm[f.id] || {}).required,
+          isSelect: sel, isMoney: money, isPlain: !sel && !money, selInk: value ? "#1F1F1C" : "#97978F", selLabel: value || "Select",
+          open: sel && st.selOpen === f.id, selBorder: sel && st.selOpen === f.id ? "#111111" : "rgba(20,20,18,.12)", selRing: sel && st.selOpen === f.id ? "0 0 0 3px rgba(17,17,17,.12)" : "none",
+          toggle: () => this.setState(s => ({ selOpen: s.selOpen === f.id ? null : f.id })), close: () => this.setState({ selOpen: null }),
+          opts: sel ? ["Landed", "Condo"].map(o => ({ label: o, on: o === value, bg: o === value ? "#FFF5EC" : "transparent", fw: o === value ? 650 : 500, pick: () => this.setState(s => ({ selOpen: null, crm: { ...(s.crm || {}), [f.id]: o }, cust: { ...s.cust, ptype: o } })) })) : [] }; }),
+      ...(ci.own || []).filter(f => f.id !== "bill").map(f => { const core = ["unit", "bill", "building", "date", "by"].includes(f.id), key = "ci_" + f.id;
+        return { label: f.label, value: core ? st.cust[f.id] : st.extra[key] || "", ph: f.ph || "", type: f.type === "date" ? "date" : f.type === "number" ? "number" : "text", crm: false, req: !!f.required, isPlain: true,
           onChange: core ? setCust(f.id) : e => { const val = e.target.value; this.setState(s => ({ extra: { ...s.extra, [key]: val } })); } }; }),
-      ...((this.cfg?.doc.blocks.find(b => b.type === "facts" && !b.hidden)?.labels) || []).filter(f => f.custom && !f.hidden).map(f => ({ label: f.label, value: st.extra[f.key] || "", ph: "", type: "text", crm: false, req: false, onChange: e => { const val = e.target.value; this.setState(s => ({ extra: { ...s.extra, [f.key]: val } })); } }))
+      ...((this.cfg?.doc.blocks.find(b => b.type === "facts" && !b.hidden)?.labels) || []).filter(f => f.custom && !f.hidden).map(f => ({ label: f.label, value: st.extra[f.key] || "", ph: "", type: "text", crm: false, req: false, isPlain: true, onChange: e => { const val = e.target.value; this.setState(s => ({ extra: { ...s.extra, [f.key]: val } })); } }))
     ];
     const q = (st.crmQ || "").trim().toLowerCase(), digits = q.replace(/\D/g, "");
     const list = (lib ? lib.CRM_CUSTOMERS : []).filter(c => !q || c.name.toLowerCase().includes(q) || (digits && c.phone.replace(/\D/g, "").includes(digits))).slice(0, 6);
@@ -1296,7 +1326,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
     return false;
   }
   styleStep(group, byId, style) {
-    const st = this.state, styles = (this.cfg && this.cfg.styles) || [], drive = st.drive || {};
+    const st = this.state, styles = (this.cfg && this.cfg.styles) || [], drive = this.props.salesPhotos ? (st.drive || {}) : {};
     const sid = st.styleId && styles.some(x => x.id === st.styleId) ? st.styleId : (styles[0] || {}).id;
     const styleCards = styles.map(x => { const imgs = drive[x.id] || [], cover = x.cover || (imgs[0] && imgs[0].src) || "", on = x.id === sid;
       return { name: x.name, desc: x.desc || "", count: imgs.length ? imgs.length + " photo" + (imgs.length === 1 ? "" : "s") : "", cover: this.u(cover), noCover: !cover, on, border: on ? "#111111" : "#E7E7E2", ring: on ? "0 0 0 1px #111111, 0 10px 24px rgba(17,17,17,.12)" : "0 1px 2px rgba(20,20,18,.04)", pick: () => this.setState({ styleId: x.id, gi: 0 }), chipBg: on ? "#111111" : "#FFFFFF", chipInk: on ? "#FFFFFF" : "#1F1F1C", chipBorder: on ? "#111111" : "#DEDED8" }; });
@@ -1331,7 +1361,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
   async exportPdf() {
     if (!this.checkReq()) return;
     let html = this.docHtml(false);
-    try { const ws = await import("./workspace-store.js"); const sx = ((this.cfg && this.cfg.styles) || []).find(x => x.id === this.state.styleId) || ((this.cfg && this.cfg.styles) || [])[0] || {}; const extra = await ws.pdfHtml(sx.id, sx.name); if (extra) html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, extra + "</body>") : html + extra; } catch (e) {}
+    try { const ws = await import("./workspace-store.js"); const sx = ((this.cfg && this.cfg.styles) || []).find(x => x.id === this.state.styleId) || ((this.cfg && this.cfg.styles) || [])[0] || {}; const extra = this.props.salesPhotos ? await ws.pdfHtml(sx.id, sx.name) : ""; if (extra) html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, extra + "</body>") : html + extra; } catch (e) {}
     const f = document.createElement("iframe");
     f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
     document.body.appendChild(f);
@@ -1398,7 +1428,8 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
             tag: ch ? ch.tag.toUpperCase() : "", delta: ch ? signed(ch.d) : "", tagInk: tone ? tone[0] : "", tagBg: tone ? tone[1] : "",
             ...((im) => ({ lImg: im, lCursor: im ? "zoom-in" : "default", lView: () => { if (!im) return; const zl = st.lines.filter(x => x.qty > 0).map(x => { const i2 = this.imgFor(x); const c2 = changes.find(y => y.l.id === x.id); return i2 ? { img: i2, name: title(x.name), code: x.code || "", delta: c2 ? signed(c2.d) : "In package", item: null } : null; }).filter(Boolean); this.openZoom(zl, zl.findIndex(z => z.img === im)); } }))(this.imgFor(l)),
             canSwap: !!l.kind, swap: () => this.openSheet({ mode: "swap", id: l.id }),
-            minus: () => this.bump(l.id, -1), plus: () => this.bump(l.id, 1), onQty: e => { const n = Math.max(0, Math.min(999, parseInt(e.target.value.replace(/\D/g, "")) || 0)); this.setLine(l.id, x => ({ ...x, qty: n })); }, undo: e => { if (e) e.stopPropagation(); this.undo(l); }
+            remarkOn: !!((this.cfg?.doc.blocks.find(b => b.type === "table")?.columns) || []).find(c => c.key === "remark" && c.show), remarkV: l.remark || "", onRemark: e => { const v = e.target.value; this.setLine(l.id, x => ({ ...x, remark: v })); },
+        minus: () => this.bump(l.id, -1), plus: () => this.bump(l.id, 1), onQty: e => { const n = Math.max(0, Math.min(999, parseInt(e.target.value.replace(/\D/g, "")) || 0)); this.setLine(l.id, x => ({ ...x, qty: n })); }, undo: e => { if (e) e.stopPropagation(); this.undo(l); }
           };
         })
       };
@@ -1471,6 +1502,10 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
 
     return {
       rootRef: this.rootRef, desk, phone, stepBarD: phone ? "none" : "flex", deskOnlyFlex: phone ? "none" : "flex",
+      mood: (() => { const { sx, imgs } = this.moodPhotos(), on = !!st.withMood && imgs.length > 0, none = !imgs.length;
+        return { on, none, boxBg: on ? "#F5871F" : "#FFFFFF", boxBorder: on ? "#F5871F" : "#C9C9C2", op: none ? .5 : 1, cursor: none ? "not-allowed" : "pointer",
+          sub: none ? "No photos for " + (sx.name || "this style") + " in Quote Settings" : (sx.name || "Style") + " · " + imgs.length + " photo" + (imgs.length === 1 ? "" : "s") + " under the customer details",
+          toggle: () => { if (!none) this.setState(s => ({ withMood: !s.withMood })); } }; })(),
       saveDraftC: () => { this.saveDraft(); this.setState({ confirm: { title: "Draft saved", sub: "Find it anytime under Quote · Drafts." } }); },
       doPdfC: () => { this.exportPdf(); this.setState({ confirm: { title: "PDF ready", sub: "Choose “Save as PDF” in the next screen to keep it on this device." } }); },
       confirmBox: st.confirm ? { ...st.confirm, close: () => this.setState({ confirm: null }) } : false,
