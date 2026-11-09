@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COLUMNS, FONTS, billOn, defaultCustInfo, defaults, factsOff, fieldEditor, fitSize, moodRows, nameRooms, principalPictures, printsOwn, renderDoc, roomName, specText } from "./quote-doc";
+import { COLUMNS, FONTS, billOn, defaultCustInfo, defaults, factsOff, fieldEditor, FIT_SCRIPT, moodRows, nameRooms, photoSizeOf, codeSizeOf, principalPictures, printsOwn, renderDoc, roomName, specText } from "./quote-doc";
 import packagesJson from "../data/packages.json";
 import catalogJson from "../data/catalog.json";
 
@@ -101,11 +101,11 @@ describe("the quotation (renderDoc)", () => {
     expect(keys.indexOf("photo")).toBe(keys.indexOf("code") + 1);
   });
 
-  it("prints a 56 × 56 photo, centred, and an empty cell when there is none", () => {
+  it("prints the photo (80 × 80 unless Quote settings says), centred, and an empty cell when there is none", () => {
     const html = renderDoc(cfg(), q());
-    expect(html).toContain('<img src="https://b2b.example/235001.jpg" alt="" style="display:block;width:56px;height:56px;object-fit:contain;margin:0 auto">');
+    expect(html).toContain('<img src="https://b2b.example/235001.jpg" alt="" style="display:block;width:80px;height:80px;object-fit:contain;margin:0 auto">');
     expect(html).toContain("text-align:center\">PHOTO</td>");
-    expect(html).toContain('width:64px;text-align:center;vertical-align:middle"></td>');
+    expect(html).toContain('width:88px;text-align:center;vertical-align:middle"></td>');
   });
 
   it("leaves the photos out of the Excel export", () => {
@@ -238,18 +238,55 @@ describe("the customer details", () => {
   it("stand in fixed columns of their own, labels on one line", () => {
     const html = doc({ att: "Tan Wei Ming" });
     expect(html).toContain('<table style="width:100%;table-layout:fixed;border-collapse:collapse"><colgroup><col style="width:17%"><col style="width:33%"><col style="width:17%"><col style="width:33%"></colgroup>');
-    expect(html).toMatch(/white-space:nowrap;font-size:12\.5px">ATTENTION :<\/td>/);
+    expect(html).toContain('white-space:nowrap;">ATTENTION :</td>'); // as Quote settings names it — the user sets its case
     expect(html).toContain('colspan="3"'); // PHONE : takes the rest of its row
   });
 
-  it("draw a long answer smaller, never under 72%, and keep a short one as it is", () => {
-    expect(fitSize("Tan Wei Ming", 12.5, 40)).toBe(12.5);
-    expect(fitSize("x".repeat(50), 12.5, 40)).toBe(10);
-    expect(fitSize("x".repeat(400), 12.5, 40)).toBe(9);
-    expect(doc({ att: "A".repeat(50) })).toContain(`font-size:9px">${"A".repeat(50)}</td>`);
+  // "怎么有大有小" — a guess by length shrank answers that fit; the page measures each and shrinks only what does not fit.
+  it("measure each detail in the page, at A4 width, drawing smaller only what does not fit", () => {
+    const html = doc({ att: "A".repeat(80) });
+    expect(html).toContain(`style="text-align:left;font-size:12.5px;padding:2px 6px;vertical-align:top;overflow-wrap:anywhere;">${"A".repeat(80)}</td>`);
+    expect(html.match(/data-fit=""/g)!.length).toBeGreaterThan(8);
+    expect(html).toContain(FIT_SCRIPT + "</body>");
+    expect(FIT_SCRIPT).toContain("de.style.width='748px'");
+    expect(FIT_SCRIPT).toContain("m=s*.72");
   });
 
   it("keep the item table's columns in the Excel export", () => {
     expect(doc({ att: "Tan" }, { excel: true })).not.toContain("table-layout:fixed");
+  });
+});
+
+// The user, 2026-11-09: "图片能不能大一点，并且我能只针对code/ colour 这边的资讯缩小文字吗？" — then "改在quote setting".
+describe("Quote settings › Item table › Photo size and Code / colour text", () => {
+  const withTable = (patch: Record<string, unknown>) => { const c = defaults(packagesJson, catalogJson); Object.assign(tableOf(c), patch); return c; };
+  const q = () => ({ facts: {}, custRows: [], total: 0, cats: [{ name: "LIVING", rows: [{ no: 1, item: "SOFA", desc: "", code: "235001 / 114 BLACK", photo: "https://b2b.example/a.jpg", qty: 1, unit: 1, sum: 1 }] }] });
+
+  it("draws the photo at 80px unless set, within 40–140", () => {
+    expect(photoSizeOf({})).toBe(80);
+    expect(photoSizeOf({ photoSize: 104 })).toBe(104);
+    expect(photoSizeOf({ photoSize: 300 })).toBe(140);
+    expect(renderDoc(withTable({}), q())).toContain("width:80px;height:80px;object-fit:contain");
+    expect(renderDoc(withTable({ photoSize: 120 }), q())).toContain("width:128px;text-align:center");
+  });
+
+  it("sizes CODE/COLOUR's text alone, the table's size unless set", () => {
+    expect(codeSizeOf({ size: 12 })).toBe(12);
+    expect(codeSizeOf({ size: 12, codeSize: 9.5 })).toBe(9.5);
+    const html = renderDoc(withTable({ codeSize: 9.5 }), q());
+    expect(html).toContain('font-size:9.5px">235001 / 114 BLACK</td>');
+    expect(html).toMatch(/font-size:12px;">SOFA<\/td>/); // the other columns keep the table's size
+  });
+});
+
+// The user, 2026-11-09: "我是否可以更改的左右间距呢？感觉item 隔了很远才到qty" — a column may have a width of its own.
+describe("Quote settings › Item table › a column's width", () => {
+  it("prints a column at the % it is given, the rest sharing what is left", () => {
+    const c = defaults(packagesJson, catalogJson);
+    tableOf(c).columns.find(x => x.key === "item")!.width = 25 as never;
+    const html = renderDoc(c, { facts: {}, cats: [], custRows: [], total: 0 });
+    expect(html).toContain('font-size:11px;;width:25%">ITEM</td>');
+    expect(html).not.toContain(";width:" + "NaN");
+    expect(renderDoc(defaults(packagesJson, catalogJson), { facts: {}, cats: [], custRows: [], total: 0 })).not.toMatch(/;width:\d+%">ITEM/);
   });
 });

@@ -328,12 +328,13 @@ export class SettingsLogic extends DcLogic {
     const p0 = cfg.packages.find(p => p.id === st.pid) || cfg.packages[0];
     const tb = cfg.doc.blocks.find(b => b.type === "table");
     const cols = (tb ? tb.columns : lib.COLUMNS).filter(c => c.show);
+    const samplePh = Math.round(lib.photoSizeOf(tb) * 40 / 56); // the A4 sample draws a 56px photo at 40px
     let n = 0, shown = 0, totalRows = 0;
     const sampleCats = [];
     (p0 ? p0.cats : []).forEach(c => {
       totalRows += c.items.length;
       if (sampleCats.length >= 2) return;
-      sampleCats.push({ name: c.name, rows: c.items.map(it => { n++; shown++; const unit = Math.round((+it.cost || 0) * m); const ph = ((cfg.catalog && cfg.catalog.items) || []).find(x => it.code && x.code === it.code) || {}; const r = { no: n, item: it.name, desc: it.desc, code: it.code, qty: it.qty, price: money(unit), sum: money(unit * it.qty) }; return { cells: cols.map(cl => cl.key === "photo" ? { v: "", isImg: true, isTxt: false, img: ph.img || "", noImg: !ph.img, align: "center" } : cl.key === "remark" ? { v: "Sales fills in", isImg: false, isTxt: true, align: "left", ink: "#97978F", fs: "italic" } : { v: r[cl.key] ?? ({ kind: (cfg.catalog.kinds[it.kind] || {}).label, collection: ph.collection, color: ph.color })[cl.key] ?? "", isImg: false, isTxt: true, align: cl.num ? "right" : "left", ink: "inherit", fs: "normal" }) }; }) });
+      sampleCats.push({ name: c.name, rows: c.items.map(it => { n++; shown++; const unit = Math.round((+it.cost || 0) * m); const ph = ((cfg.catalog && cfg.catalog.items) || []).find(x => it.code && x.code === it.code) || {}; const r = { no: n, item: it.name, desc: it.desc, code: it.code, qty: it.qty, price: money(unit), sum: money(unit * it.qty) }; return { cells: cols.map(cl => cl.key === "photo" ? { v: "", isImg: true, isTxt: false, img: ph.img || "", noImg: !ph.img, align: "center", ph: samplePh + "px" } : cl.key === "remark" ? { v: "Sales fills in", isImg: false, isTxt: true, align: "left", ink: "#97978F", fs: "italic", fz: "inherit" } : { v: r[cl.key] ?? ({ kind: (cfg.catalog.kinds[it.kind] || {}).label, collection: ph.collection, color: ph.color })[cl.key] ?? "", isImg: false, isTxt: true, align: cl.num ? "right" : "left", ink: "inherit", fs: "normal", fz: cl.key === "code" ? (lib.codeSizeOf(tb) / ((tb && tb.size) || 12)).toFixed(3) + "em" : "inherit" }) }; }) });
     });
     const sampleFacts = { att: "MR HANDSOME", by: "WILLIAM", bill: "-", building: p0?.building || "", address: p0?.building || "", unit: p0 ? [p0.layout, lib.specText(p0.spec)].filter(Boolean).join(" · ") : "", layout: lib.packageName(cfg.packages, p0), date: `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` };
     const edit = (fn) => e => { const v = e.currentTarget.innerText.replace(/\n+$/, ""); fn(v); };
@@ -443,6 +444,11 @@ export class SettingsLogic extends DcLogic {
             onUpload: e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; if (f) lib.fileToDataUrl(f, 600).then(d => this.setBlock(sb.id, x => { x.img = d; })); },
             clear: () => this.setBlock(sb.id, x => { x.img = ""; }), ir: tg("signIr"), cust: tg("signCust") };
         })() : false,
+        // Item table: Photo size (±8px, 40–140) and Code / colour text (±0.5px), each only while its column is there.
+        tbl: t === "table" ? (() => { const has = k => (sb.columns || []).some(c => c.key === k && c.show), ps = lib.photoSizeOf(sb), cz = lib.codeSizeOf(sb);
+          return { hasPhoto: has("photo"), hasCode: has("code"), phText: ps + "px", cdText: cz + "px",
+            phDn: () => this.setBlock(sb.id, x => { x.photoSize = Math.max(40, lib.photoSizeOf(x) - 8); }), phUp: () => this.setBlock(sb.id, x => { x.photoSize = Math.min(140, lib.photoSizeOf(x) + 8); }),
+            cdDn: () => this.setBlock(sb.id, x => { x.codeSize = Math.max(7, lib.codeSizeOf(x) - .5); }), cdUp: () => this.setBlock(sb.id, x => { x.codeSize = Math.min(20, lib.codeSizeOf(x) + .5); }) }; })() : false,
         isSpacer: t === "spacer", showStyle: t !== "spacer", sizeText: sb.size + "px", spaceText: Math.round(sb.size * 2) + "px",
         req: { bg: sb.required ? "#3E8A5C" : "#D5D2C8", justify: sb.required ? "flex-end" : "flex-start", toggle: e => { e.preventDefault(); this.setBlock(sb.id, x => { x.required = !x.required; }); } },
         fs: t === "field" ? this.fieldSettings(sb, fn => this.setBlock(sb.id, fn)) : false,
@@ -495,6 +501,7 @@ export class SettingsLogic extends DcLogic {
           label: c.label, boxBorder: c.show ? "0" : "1.5px solid #C4C1B6", boxBg: c.show ? "#111111" : "#FFFFFF",
           toggle: () => this.setBlock(sb.id, x => { x.columns[i].show = !x.columns[i].show; }),
           onLabel: e => { const v = e.target.value; this.setBlock(sb.id, x => { x.columns[i].label = v; }); },
+          w: c.width ? String(c.width) : "", onW: e => { const n = parseInt(String(e.target.value).replace(/D/g, ""), 10); this.setBlock(sb.id, x => { if (n > 0) x.columns[i].width = Math.min(80, n); else delete x.columns[i].width; }); }, // a column's width, % of the table; empty = shares what is left (2026-11-09)
           up: () => this.setBlock(sb.id, x => { if (i > 0) x.columns.splice(i - 1, 0, x.columns.splice(i, 1)[0]); }),
           down: () => this.setBlock(sb.id, x => { if (i < x.columns.length - 1) x.columns.splice(i + 1, 0, x.columns.splice(i, 1)[0]); })
         })) : null,
@@ -861,7 +868,7 @@ export class SettingsLogic extends DcLogic {
       colAdd: { stop: e => e.stopPropagation(), addCustom: e => { e.preventDefault(); const v = (e.target.cn.value || "").trim(); if (!v) return; const key = "c_" + lib.newId(""); this.setBlock(tb.id, x => { const at = x.columns.findIndex(c => c.key === "qty"); x.columns.splice(at < 0 ? x.columns.length : at, 0, { key, label: v.toUpperCase(), show: true, num: false, custom: true }); }); this.setState({ colAddOpen: false }); }, addRow: e => { if (e) e.stopPropagation(); this.setBlock(tb.id, x => { x.extraRows = [...(x.extraRows || []), { id: lib.newId("xr-"), item: "", qty: 1, price: "" }]; }); this.setState({ sel: tb.id }); }, btnD: st.colHover || st.colAddOpen ? "grid" : "none", enter: () => { if (!this.state.colHover) this.setState({ colHover: true }); }, leave: () => this.setState({ colHover: false, colAddOpen: false }), open: !!st.colAddOpen, toggle: e => { if (e) e.stopPropagation(); this.setState(z => ({ colAddOpen: !z.colAddOpen })); },
         opts: [["photo", "PHOTO"], ["kind", "CATEGORY"], ["collection", "COLLECTION"], ["color", "COLOUR"], ["remark", "REMARKS"]].map(([key, label]) => { const has = (tb.columns || []).some(c => c.key === key); return { label: label.charAt(0) + label.slice(1).toLowerCase(), off: has, op: has ? .4 : 1, add: () => { this.setBlock(tb.id, x => { const at = x.columns.findIndex(c => c.key === "qty"); x.columns.splice(at < 0 ? x.columns.length : at, 0, { key, label, show: true, num: false, custom: true }); }); this.setState({ colAddOpen: false }); } }; }) },
       tableHead: cols.map(c => ({ label: c.label, align: c.num ? "right" : c.key === "photo" ? "center" : "left", onBlur: edit(v => this.setBlock(tb.id, x => { const col = x.columns.find(y => y.key === c.key); col.label = v; })) })),
-      tableCols: cols.map(c => c.key === "photo" ? "44px" : c.key === "no" ? "28px" : c.key === "item" ? "minmax(120px,2.2fr)" : c.num ? "minmax(44px,.6fr)" : "minmax(70px,1fr)").join(" "),
+      tableCols: cols.map(c => +c.width > 0 ? c.width + "%" : c.key === "photo" ? (samplePh + 4) + "px" : c.key === "no" ? "28px" : c.key === "item" ? "minmax(120px,2.2fr)" : c.num ? "minmax(44px,.6fr)" : "minmax(70px,1fr)").join(" "),
       sampleCats, sampleMore: false ? `Sample from ${p0.groupLabel || p0.name} · ${totalRows - shown} more rows on the real quotation` : "",
       sampleTotal: p0 ? money(p0.price - 500) : "",
       // units
