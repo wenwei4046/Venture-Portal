@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { FinDrawer, drawerStyles as d } from '@/components/finv/Drawer'
 import { DrawerGroup as Group, DrawerLine as Line, fd } from '@/components/finv/DrawerParts'
 import { dueNote, statusText, statusTone, type HubInvoice } from '../_lib/invoice-model'
+import { PdfExportButton } from '@/components/finv/PdfExport'
 
 // An invoice in the hub's drawer (2026-10-14, the Finance revamp v2 — D10, the
 // prototype's `detailInv`): the dark hero, then Balance · Billing · Line items
@@ -177,9 +178,7 @@ export function InvoiceDrawer({
               View full page ↗
             </Link>
             {can.docExport ? (
-              <a href={`/billing/invoice-doc?id=${inv.id}`} target="_blank" rel="noopener noreferrer" className={d.headBtn}>
-                PDF
-              </a>
+              <PdfExportButton href={`/billing/invoice-doc?id=${inv.id}`} what="invoice" sub={no || undefined} className={d.headBtn} />
             ) : null}
           </>
         ) : null

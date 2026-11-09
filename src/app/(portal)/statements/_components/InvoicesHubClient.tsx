@@ -233,7 +233,7 @@ export default function InvoicesHubClient({
       { key: 'open', label: 'Open', onSelect: () => openInvoice(inv.id) },
       { key: 'new-tab', label: 'Open in new tab', onSelect: () => window.open(`/invoices/${inv.id}`, '_blank', 'noopener,noreferrer') },
     ]
-    if (can.docExport) items.push({ key: 'pdf', label: 'PDF', onSelect: () => window.open(`/billing/invoice-doc?id=${inv.id}`, '_blank', 'noopener,noreferrer') })
+    if (can.docExport) items.push({ key: 'pdf', label: 'PDF', onSelect: () => work.askPdf(`/billing/invoice-doc?id=${inv.id}`, inv.no ?? undefined) })
     const quiet = steps.filter((s) => s.kind !== 'danger')
     const loud = steps.filter((s) => s.kind === 'danger')
     if (quiet.length > 0) items.push('sep', ...quiet.map(item))

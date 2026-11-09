@@ -273,6 +273,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // answered with it) by Treasury (the page's box asked too).
   'payment_request_context', 'my_payment_requests', 'payment_request_save', 'payment_request_cancel', 'payment_request_file',
   'payment_requests_for_finance', 'payment_request_reject', 'payment_requests_for_pv', 'payment_requests_attach_pv', 'voucher_payees', 'voucher_payee_set', 'voucher_payee_copy',
+  'invoice_attachments_of', 'invoice_attachment_add', 'invoice_attachment_remove',
   // A department's approval first (mig 20261029200000): its requests read by Claims · View at Dept, the number waiting,
   // Approve and Reject by Claims · Approve at Dept (the page's box asked too); the By management approve ticks set by
   // whoever manages permissions.

@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { DateField } from '@/components/finv/DateField'
+import { FilesField } from '@/components/finv/FilesField'
+import { stageInto } from '@/lib/storage/stage'
+import { uploadInvoiceAttachments } from '@/app/(portal)/invoices/attachment-actions'
 import { DialogButton, DialogForm, Field, FinDialog, Hint, Input } from '@/components/finv/Dialog'
 import { money, neededSentence, num } from '@/components/finv/form-words'
 import fm from '@/components/finv/form.module.css'
@@ -185,6 +188,8 @@ export default function InvoiceLinesDialog({
   const [error, setError] = useState<string | null>(null)
   /** Some went in and some did not: the dialog only closes now. */
   const [partly, setPartly] = useState(false)
+  // Attachments (2026-11-09): filed with the draft straight after it is saved; one invoice at a time.
+  const [files, setFiles] = useState<File[]>([])
 
   const bill = parseBillTo(billTo)
   const company = companies.find((c) => c.id === bill.companyId) ?? null
@@ -344,7 +349,7 @@ export default function InvoiceLinesDialog({
       const label = co ? companyLabel(co) : 'A company'
       try {
         const res = await hubCreateLinesInvoice({ billKind: 'subsidiary', companyId: p.companyId, ...head(), lines: p.lines })
-        if (res.ok) made.push(res.value ?? 'A draft')
+        if (res.ok) made.push(res.value.no ?? 'A draft')
         else failures.push({ label, reason: res.reason })
       } catch (err) {
         failures.push({ label, reason: err instanceof Error ? err.message : 'It did not go through.' })
@@ -397,7 +402,20 @@ export default function InvoiceLinesDialog({
       } else {
         const res = await hubCreateLinesInvoice(payload)
         if (!res.ok) return setError(res.reason)
-        onDone(`${res.value ?? 'The invoice'} saved as draft`)
+        const no = res.value.no ?? 'The invoice'
+        let filed = ''
+        if (files.length > 0) {
+          try {
+            const form = new FormData()
+            form.set('invoice_id', res.value.id)
+            await stageInto(form, 'files', files)
+            const { count } = await uploadInvoiceAttachments(form)
+            filed = ` with ${count} ${count === 1 ? 'attachment' : 'attachments'}`
+          } catch (err) {
+            filed = ` — the attachments were not added (${err instanceof Error ? err.message : 'try again on its page'})`
+          }
+        }
+        onDone(`${no} saved as draft${filed}`)
       }
       onClose()
     } catch (err) {
@@ -606,6 +624,12 @@ export default function InvoiceLinesDialog({
         <Field label="Due date">
           <DateField value={dueDate} onChange={setDueDate} today={today} label="Due date" emptyText="No due date" onClear={() => setDueDate('')} />
         </Field>
+
+        {!editing && !several ? (
+          <Field label="Attachments">
+            <FilesField files={files} onChange={setFiles} />
+          </Field>
+        ) : null}
 
         {showPeriod ? (
           <Field label="Period" htmlFor="il-period">
