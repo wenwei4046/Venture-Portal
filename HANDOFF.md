@@ -1,5 +1,23 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-09 a (#985 SHIPPED, migration applied first) — Payment voucher's row menu and Pay into
+
+Session 171188af.
+
+- **MERGED:** squash `44ded087` (2026-11-09 04:35Z), every check green on `36cc16ab`, on the user's "上 migration，全绿就 merge" → "现在看并 merge". Unit tests (2/2) failed once in `GwpTab.test.tsx` (Product List, not this PR's: it fails the same with main's RowMenu); it passed on a re-run of that job.
+- **Migration `20261109120000_voucher_pay_into` on production FIRST**, after a dry run of the final file as Finance (rolled back): schema_migrations row, created_by `claude-pv-row-menu`; the 4 function bodies' md5 equal the file's. The one voucher made from a request (LOO WEN WEI, RM 39.69) was backfilled with MAYBANK …7881.
+- **Right-click** (the user: "这个right click 我要包括edit, copy, cancel 等等"; sample `mockups/pv-row-menu-mockup.html` in the OneDrive cwd, "照这个做"):
+  - The menu reads the voucher (`openVoucherPage`) and lists the drawer's own steps (`useVoucherSteps`, which now hands out `more`).
+  - Void, Reverse and Approve ask first.
+  - *Change GL account…* opens the voucher's page: `reassign_voucher_gl_account`'s DB guard names only `/payments/[id]`.
+  - Copy's gates now name `/payments`, `/payments/[id]` and `/receipts`.
+- **Pay into** (the user: "这里的payment 我想要带出对方的bank account number" → "就我自己开的pv … 可以自己填，但不是一定 … copy 的时候也要带过去 … payment voucher column 要包括这个"):
+  - Create payment's optional *Pay into bank* | *Account number*; Edit's pair; the drawer's line; a *Pay into* column. A copy carries it.
+  - Payment request's Create PV takes the request's account by a trigger.
+  - Kept in `payment_voucher_payees`, read and written only through `voucher_payees`, `voucher_payee_set` and `voucher_payee_copy` (`lib/voucher-payees`). It is never a payment_vouchers column: that table is read with select('*').
+  - DESIGN v4.242; `.claude/rules/finance/finance-view.md`.
+- **Not checked:** logged in on the live site.
+
 ## CHECKPOINT 2026-11-06 a (#959 SHIPPED, migration applied first) — a claim's Pay to
 
 Session 171188af.
