@@ -40,3 +40,12 @@ describe("the PDF's pages", () => {
     expect(pdf.trimEnd().endsWith("%%EOF")).toBe(true);
   });
 });
+
+// The user, 2026-11-09, the PDF's photos all the TV cabinet's: "为什么显示的图片不一样？是bug吗？". Every b2b photo is
+// /member/irq-photo?u=…, and html-to-image keys its picture cache on the address before "?" unless told otherwise.
+describe("the PDF's pictures", () => {
+  it("keep every photo apart (html-to-image's cache keyed on the whole address)", async () => {
+    const src = (await import("node:fs")).readFileSync("src/components/member/app/irq/lib/quote-pdf.ts", "utf8");
+    expect(src).toMatch(/toJpeg\(page, \{[^}]*includeQueryParams: true/);
+  });
+});

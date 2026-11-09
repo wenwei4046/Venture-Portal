@@ -88,15 +88,20 @@ export async function makeQuotePdf(html: string, scale = 2): Promise<Blob> {
       page.style.cssText = `position:fixed;left:-20000px;top:0;width:${A4.w}px;height:${A4.h}px;padding:${A4.margin}px;box-sizing:border-box;background:#ffffff;overflow:hidden`;
       const t = table.cloneNode(false) as HTMLTableElement;
       t.style.tableLayout = cols.length ? "fixed" : "";
-      if (cols.length) { const cg = document.createElement("colgroup"); cols.forEach(w => { const c = document.createElement("col"); c.style.width = w + "px"; cg.appendChild(c); }); t.appendChild(cg); }
       const body = document.createElement("tbody");
+      // A row of no height first, one cell per column at the full table's width: a fixed table takes its widths from its
+      // first row, so every page keeps the same columns. (A <colgroup> was not carried into the picture — each page then
+      // sized its columns by its own first row; the user, 2026-11-09.)
+      if (cols.length) { const sizer = document.createElement("tr"); sizer.style.cssText = "height:0;line-height:0;font-size:0"; cols.forEach(w => { const c = document.createElement("td"); c.style.cssText = `width:${w}px;padding:0;border:0;height:0`; sizer.appendChild(c); }); body.appendChild(sizer); }
       idx.forEach(i => body.appendChild(rows[i].cloneNode(true)));
       t.appendChild(body);
       page.appendChild(t);
       document.body.appendChild(page);
       try {
         // The page waits off screen; its picture is drawn from the origin (its own place would draw it outside the picture).
-        const url = await toJpeg(page, { pixelRatio: scale, backgroundColor: "#ffffff", quality: 0.9, skipFonts: true, width: A4.w, height: A4.h, style: { position: "static", left: "0", top: "0" } });
+        // includeQueryParams: every b2b photo is /member/irq-photo?u=…, and without it html-to-image keys its picture cache
+        // on the address before "?" — every product drew as the first one (the user, 2026-11-09: "为什么显示的图片不一样？").
+        const url = await toJpeg(page, { pixelRatio: scale, backgroundColor: "#ffffff", quality: 0.9, skipFonts: true, includeQueryParams: true, width: A4.w, height: A4.h, style: { position: "static", left: "0", top: "0" } });
         out.push({ bytes: dataUrlBytes(url), w: Math.round(A4.w * scale), h: Math.round(A4.h * scale) });
       } finally {
         page.remove();
