@@ -61,6 +61,25 @@ function fitDetails(root: HTMLElement) {
   });
 }
 
+/**
+ * Every picture carried inside the page as its own bytes (a data: address) before a page is drawn. html-to-image would
+ * fetch each one again while drawing, and a picture it cannot fetch is drawn as nothing (the user, 2026-11-09, on an
+ * iPhone: "手机分享和下载的pdf 没有图片"). One the browser cannot fetch keeps its box, empty: a picture that will not load
+ * stopped the whole PDF ("Could not make the PDF") — better the quotation without that one photo.
+ */
+export const NO_PICTURE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+export async function inlineImages(root: ParentNode, get: (src: string) => Promise<Blob> = src => fetch(src, { credentials: "same-origin" }).then(r => { if (!r.ok) throw new Error(String(r.status)); return r.blob(); })) {
+  const asData = (b: Blob) => new Promise<string>((done, fail) => { const r = new FileReader(); r.onload = () => done(String(r.result)); r.onerror = () => fail(r.error); r.readAsDataURL(b); });
+  const seen = new Map<string, Promise<string | null>>();
+  await Promise.all(Array.from(root.querySelectorAll("img")).map(async img => {
+    const src = img.getAttribute("src") || "";
+    if (!src || src.startsWith("data:")) return;
+    if (!seen.has(src)) seen.set(src, get(src).then(b => (b.type.startsWith("image/") ? asData(b) : null)).catch(() => null));
+    const data = await seen.get(src)!;
+    img.setAttribute("src", data || NO_PICTURE);
+  }));
+}
+
 const imagesReady = (root: HTMLElement) => Promise.all(Array.from(root.querySelectorAll("img")).map(img => img.complete && img.naturalWidth ? undefined : new Promise<void>(done => { img.onload = img.onerror = () => done(); setTimeout(done, 12_000); })));
 
 /** The quotation's HTML (quote-doc.ts › renderDoc) as a PDF file, A4, one picture a page. */
@@ -69,6 +88,7 @@ export async function makeQuotePdf(html: string, scale = 2): Promise<Blob> {
   const src = doc.querySelector("body > table") as HTMLTableElement | null;
   if (!src) throw new Error("No quotation to make a PDF of.");
   src.querySelectorAll("img").forEach(img => img.setAttribute("src", viaThisOrigin(img.getAttribute("src") || "")));
+  await inlineImages(src);
   const stage = document.createElement("div");
   stage.style.cssText = `position:fixed;left:-20000px;top:0;width:${INNER_W}px;background:#ffffff;color:#1C1714;-webkit-text-size-adjust:100%;text-size-adjust:100%`;
   stage.appendChild(document.importNode(src, true));
@@ -101,7 +121,11 @@ export async function makeQuotePdf(html: string, scale = 2): Promise<Blob> {
         // The page waits off screen; its picture is drawn from the origin (its own place would draw it outside the picture).
         // includeQueryParams: every b2b photo is /member/irq-photo?u=…, and without it html-to-image keys its picture cache
         // on the address before "?" — every product drew as the first one (the user, 2026-11-09: "为什么显示的图片不一样？").
-        const url = await toJpeg(page, { pixelRatio: scale, backgroundColor: "#ffffff", quality: 0.9, skipFonts: true, includeQueryParams: true, width: A4.w, height: A4.h, style: { position: "static", left: "0", top: "0" } });
+        const opts = { imagePlaceholder: NO_PICTURE, pixelRatio: scale, backgroundColor: "#ffffff", quality: 0.9, skipFonts: true, includeQueryParams: true, width: A4.w, height: A4.h, style: { position: "static", left: "0", top: "0" } };
+        // Safari (every iPhone browser) draws a page's pictures blank the first time it paints them inside the SVG
+        // html-to-image draws through; the second drawing has them. A page with pictures is drawn twice, the first thrown away.
+        if (page.querySelector("img")) await toJpeg(page, opts);
+        const url = await toJpeg(page, opts);
         out.push({ bytes: dataUrlBytes(url), w: Math.round(A4.w * scale), h: Math.round(A4.h * scale) });
       } finally {
         page.remove();

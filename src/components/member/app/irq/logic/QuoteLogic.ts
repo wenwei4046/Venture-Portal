@@ -407,19 +407,15 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
   }
   async exportPdf() {
     if (!this.checkReq()) return;
-    if (this.touch()) {
-      // A phone cannot print the hidden frame (the user, 2026-11-09: "下载成pdf 也是没有的"): it saves the PDF it made.
-      const ready = this.pdfReady();
-      if (ready) { this.saveFile(ready, this.fileBase() + ".pdf"); this.flash("PDF downloaded"); return; }
-      this.pdfWhenReady("Download PDF", blob => { this.saveFile(blob, this.fileBase() + ".pdf"); this.flash("PDF downloaded"); });
-      return;
-    }
-    let html = this.docHtml(false);
-    const f = document.createElement("iframe");
-    f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
-    document.body.appendChild(f);
-    const d = f.contentWindow.document; d.open(); d.write(html); d.close();
-    setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(() => f.remove(), 1500); }, 250);
+    const save = blob => { this.saveFile(blob, this.fileBase() + ".pdf"); this.flash("PDF downloaded"); };
+    const ready = this.pdfReady();
+    if (ready) { save(ready); return; }
+    // A phone cannot print the hidden frame (the user, 2026-11-09: "下载成pdf 也是没有的"): it saves the PDF it made, on a press of its own.
+    if (this.touch()) { this.pdfWhenReady("Download PDF", save); return; }
+    // A computer saved nothing either — the print screen opened and the file was the user's to make (2026-11-09: "点下载会导入到print, 但没有下载成功"):
+    // it now downloads the same PDF the phone makes, the moment it is made.
+    this.setState({ confirm: { title: "Preparing the PDF…", sub: "A few seconds, the photos included." } });
+    this.pdfFor().then(blob => { this.setState({ confirm: null }); save(blob); }, () => this.setState({ confirm: { title: "Could not make the PDF", sub: "Check the connection and try again." } }));
   }
   exportExcel() {
     if (!this.checkReq()) return;
@@ -575,7 +571,7 @@ ${co.terms.map(t => `<tr><td colspan="${cols}" style="padding:1px 6px;font-size:
           sub: none ? "No photos for " + (sx.name || "this style") + " in Quote Settings" : (sx.name || "Style") + " · " + imgs.length + " photo" + (imgs.length === 1 ? "" : "s") + " under the customer details",
           toggle: () => { if (!none) this.setState(s => ({ withMood: !s.withMood })); } }; })(),
       saveDraftC: () => { this.saveDraft(); this.setState({ confirm: { title: "Draft saved", sub: "Find it anytime under Quote · Drafts." } }); },
-      doPdfC: () => { this.exportPdf(); if (!this.touch()) this.setState({ confirm: { title: "PDF ready", sub: "Choose “Save as PDF” in the next screen to keep it on this device." } }); }, // a phone saves the file itself (exportPdf), no print screen
+      doPdfC: () => this.exportPdf(), // every device downloads the PDF itself (exportPdf), no print screen
       confirmBox: st.confirm ? { ...st.confirm, ok: st.confirm.ok || "OK", close: () => this.setState({ confirm: null }), act: () => { const run = st.confirm.run; this.setState({ confirm: null }); if (run) run(); } } : false,
       openShare: () => { if (!this.checkReq()) return; if (this.touch() && navigator.canShare) { this.share(); return; } this.setState({ shareOpen: true }); }, // a phone: the PDF, through its own share sheet
       shareSheet: st.shareOpen ? { close: () => this.setState({ shareOpen: false }), apps: (() => { const t = () => encodeURIComponent(this.shareText()), done = () => this.setState({ shareOpen: false });
