@@ -64,10 +64,12 @@ export function assignExtraVM(ctx: PanelCtx, asv: ReturnType<typeof assignVM> | 
       ...(data.can.manage ? [{ label: "Active", on: sec === "Act" && !ui.ftsOpen, pick: () => patch({ asSec: "Act", ftsOpen: false, actDraft: null }) }] : []),
       { label: "Full time", on: sec === "Ft", pick: go("Ft") },
       ...(data.can.manage ? [{ label: "Work type", on: !!ui.ftsOpen, pick: () => patch({ ftsOpen: true }) }] : []),
+      // The owner, 2026-11-09: "手机上的 assignment 也要加入 leave" — the desktop's Leave tab, as the handoff's phone People.
+      { label: "Leave", on: sec === "Lv" && !ui.ftsOpen, pick: () => patch({ asSec: "Lv", ftsOpen: false }) },
     ],
     heldAny: !!heldC.length, openHeld: () => patch({ hlOpen: true }),
     heldTitle: heldC.length + (heldC.length === 1 ? " lead" : " leads") + " over the limit",
-    onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft", onAct: sec === "Act",
+    onOrg: sec === "Org", onAds: sec === "Ads", onAw: sec === "Aw", onFt: sec === "Ft", onAct: sec === "Act", onLv: sec === "Lv",
     act: activeVM([
       { name: DIRECTOR_TEAM, color: DIRECTOR_C[0], people: data.people.filter(p => p.role === "hod").sort((a, b) => a.name.localeCompare(b.name)) },
       ...teams.map(t => ({ name: t.name, color: t.c, people: t.people })),

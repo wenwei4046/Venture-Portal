@@ -122,6 +122,8 @@ export function panelAppVM(ctx: PanelCtx) {
     th: insightHead(ctx, !!bl.showBell, ovAds, ovUp, ovAct),
     // Calendar (appointments + leave) and Assignment › People, and Team activity (docs/design_handoff_crm): the desktop's
     // view models, drawn as the prototypes' phone frames (shared/PhoneLeaveCal.tsx, shared/PhoneTeamActivity.tsx).
+    // Assignment › Leave on the phone (2026-11-09): the same leave records, Pause and Lock as the desktop's.
+    leaveCalP: show.as && ui.asSec === "Lv" ? leaveCalData({ data: ctx.data, me: ctx.me, now, act: ctx.act, teams: ctx.teams, directors: ctx.directors, readOnly: !!ctx.viewingAs, openAppt: () => {} }) : null,
     leaveCal: show.lc ? leaveCalData({ data: ctx.data, me: ctx.me, now, act: ctx.act, teams: ctx.teams, directors: ctx.directors, readOnly: !!ctx.viewingAs, openAppt: a => set(u => ({ ...u, calInfo: a.customerId })) }) : null,
     activity: show.act ? { data: ctx.data, book: peopleBook(ctx.data, ctx.teams, ctx.directors), live: ctx.live, who: null, nameOf: ctx.nameOf,
       roleOf: (id: string) => { const p = ctx.data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },

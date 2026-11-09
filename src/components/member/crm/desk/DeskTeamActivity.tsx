@@ -107,6 +107,14 @@ export function DeskTeamActivityView({ v }: { v: ActivityVM }) {
                 </div>
               </>)}
             </div>
+            {/* All ads, or one ad's leads (the owner, 2026-11-09: "加入可以筛选广告，这样我才能看到总体，或单独的广告分配"). */}
+            <span style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <select value={v.adVal} onChange={v.setAd} aria-label="Ad" style={{ appearance: "none", WebkitAppearance: "none", height: "36px", width: "240px", padding: "0 30px 0 12px", borderRadius: "7px",
+                border: `1px solid ${v.adOn ? "var(--crm-rust)" : "var(--crm-line)"}`, background: v.adOn ? "var(--crm-tint-attention)" : "#fff", font: `500 13px ${INTER}`, color: v.adOn ? "var(--crm-rust)" : "var(--crm-ink)", cursor: "pointer", outline: "none", textOverflow: "ellipsis" }}>
+                {v.ads.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+              </select>
+              <Svg d="m6 9 6 6 6-6" size={14} w={2.2} style={{ position: "absolute", right: "10px", pointerEvents: "none", color: "var(--crm-faint)" }} />
+            </span>
             <div style={{ display: "flex", padding: "3px", borderRadius: "9px", background: "var(--crm-field)" }}>
               {v.periods.map(p => <span key={p.label} {...press(p.go)} style={{ height: "30px", padding: "0 12px", borderRadius: "7px", display: "flex", alignItems: "center", font: `500 12.5px ${INTER}`, whiteSpace: "nowrap", background: p.bg, color: p.fg, boxShadow: p.sh, cursor: "pointer" }}>{p.label}</span>)}
             </div>

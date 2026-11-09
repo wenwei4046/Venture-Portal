@@ -87,6 +87,13 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
             <Chev style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "var(--crm-muted)" }} />
           </span>
         </div>
+        {/* All ads, or one ad's leads (the owner, 2026-11-09: "加入可以筛选广告"). */}
+        <span style={{ position: "relative", flex: "none", height: "40px", borderRadius: "20px", background: v.adOn ? "var(--crm-tint-attention)" : "var(--crm-field)", display: "flex", alignItems: "center" }}>
+          <select value={v.adVal} onChange={v.setAd} aria-label="Ad" style={{ appearance: "none", WebkitAppearance: "none", width: "100%", minWidth: 0, height: "40px", padding: "0 32px 0 14px", border: 0, background: "transparent", font: `500 ${fs(13.5)} ${INTER}`, color: v.adOn ? "var(--crm-rust)" : "var(--crm-ink)", cursor: "pointer", outline: "none", textOverflow: "ellipsis" }}>
+            {v.ads.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
+          </select>
+          <Chev style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "var(--crm-muted)" }} />
+        </span>
         {v.isCustom && (
           <span {...press(() => setPick(true))} style={{ alignSelf: "center", flex: "none", height: "36px", padding: "0 16px", borderRadius: "18px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "8px", font: `500 ${fs(13)} ${INTER}`, color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }}>
             {rangeWords(v.cFrom, v.cTo)}<Chev style={{ color: "var(--crm-muted)" }} />

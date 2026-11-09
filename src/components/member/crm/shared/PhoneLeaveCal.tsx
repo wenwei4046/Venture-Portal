@@ -80,7 +80,7 @@ export function PhoneCalendar({ input, top }: { input: In; top?: ReactNode }) {
 }
 
 /** Assignment › People's phone frame: the people by team, a person's sheet, the leave sheet. */
-export function PhonePeople({ input, top }: { input: In; top?: (add: ReactNode) => ReactNode }) {
+export function PhonePeople({ input, top, bare }: { input: In; top?: (add: ReactNode) => ReactNode; /** Inside a page that scrolls and pads itself (Assignment › Leave). */ bare?: boolean }) {
   const v = useLeaveCal("people", input);
   const add = v.canAdd ? (
     <span {...press(v.pAddLeave)} style={{ marginLeft: "auto", height: "40px", padding: "0 16px", borderRadius: "20px", display: "flex", alignItems: "center", gap: "6px", background: "var(--crm-rust)", color: "#fff", font: `500 ${fs(14)} ${INTER}`, cursor: "pointer" }}>
@@ -88,8 +88,8 @@ export function PhonePeople({ input, top }: { input: In; top?: (add: ReactNode) 
     </span>
   ) : null;
   return (
-    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", font: `400 ${fs(14)} ${INTER}`, color: "var(--crm-ink)" }}>
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: "12px", padding: "6px 20px 24px" }}>
+    <div style={{ flex: bare ? "none" : 1, minHeight: 0, display: "flex", flexDirection: "column", font: `400 ${fs(14)} ${INTER}`, color: "var(--crm-ink)" }}>
+      <div style={bare ? { flex: "none", display: "flex", flexDirection: "column", gap: "12px", paddingBottom: "24px" } : { flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", gap: "12px", padding: "6px 20px 24px" }}>
         {top ? top(add) : (
           <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px" }}>
             <h1 style={{ margin: 0, font: `500 ${fs(26)} ${TIGHT}`, letterSpacing: "-0.025em" }}>People</h1>{add}
