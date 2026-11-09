@@ -272,7 +272,7 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   // Own; a file's path to its requester or the treasury; Finance's list, Reject and Create PV (each split's Bill back?
   // answered with it) by Treasury (the page's box asked too).
   'payment_request_context', 'my_payment_requests', 'payment_request_save', 'payment_request_cancel', 'payment_request_file',
-  'payment_requests_for_finance', 'payment_request_reject', 'payment_requests_for_pv', 'payment_requests_attach_pv',
+  'payment_requests_for_finance', 'payment_request_reject', 'payment_requests_for_pv', 'payment_requests_attach_pv', 'voucher_payees', 'voucher_payee_set', 'voucher_payee_copy',
   // A department's approval first (mig 20261029200000): its requests read by Claims · View at Dept, the number waiting,
   // Approve and Reject by Claims · Approve at Dept (the page's box asked too); the By management approve ticks set by
   // whoever manages permissions.

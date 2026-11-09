@@ -6,7 +6,7 @@ import type { HubLedger, HubRow } from '../_lib/hub-ledger'
 // the list at once (the URL keeps it), the search narrows it, a voucher opens
 // the drawer, a salary batch its card, and the head's requests are menus.
 
-const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), drawer: vi.fn() }))
+const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), drawer: vi.fn(), openPage: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }) }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
@@ -33,6 +33,8 @@ vi.mock('./VoucherDrawer', async (orig) => {
   return { ...real, VoucherDrawer: ({ id }: { id: string | null }) => (mocks.drawer(id), id ? <div data-testid="drawer">{id}</div> : null) }
 })
 vi.mock('./AmendDateButton', () => ({ default: () => null }))
+// The row menu reads its voucher on a right-click (2026-11-09).
+vi.mock('../page-actions', () => ({ openVoucherPage: mocks.openPage }))
 vi.mock('./AmendRepaymentButton', () => ({ default: () => null }))
 
 import PaymentsHubClient from './PaymentsHubClient'
@@ -114,6 +116,7 @@ const names = () => screen.getAllByRole('row').slice(1).map((r) => within(r).get
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.openPage.mockResolvedValue({ ok: false, reason: 'not_found' })
   window.localStorage.clear()
   window.history.replaceState(null, '', '/payments')
 })
@@ -200,6 +203,35 @@ describe('the cards and the list', () => {
     fireEvent.click(screen.getAllByText('Payroll disbursement Sep 2026')[0])
     expect(screen.getByRole('button', { name: /Payroll batches/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Aina Rahman')).toBeInTheDocument()
+  })
+
+  // 2026-11-09 ("这个right click 我要包括edit, copy, cancel 等等"): the voucher's own steps, read on the right-click.
+  it('a voucher’s right-click: Open, then its steps for this reader, the ones that cannot be undone last', async () => {
+    const detail = {
+      id: '0002', no: 'HV-PV-202610-0002', status: 'draft', credit: false, reversible: false, amount: 1386, noCash: false,
+      bank: null, bankBalance: null, can: { create: true, edit: true, void: true, approve: false },
+    }
+    mocks.openPage.mockResolvedValue({ ok: true, detail, extras: null, canCopy: true })
+    draw()
+    await act(async () => undefined)
+    fireEvent.contextMenu(screen.getByText('Google Asia Pacific'))
+    expect(screen.getByRole('menuitem', { name: 'Open' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Reading what you can do…' })).toBeDisabled()
+    await act(async () => undefined)
+    expect(mocks.openPage).toHaveBeenCalledWith('0002')
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual([
+      'Open', 'Open in new tab', 'Edit', 'Submit for approval', 'Copy as a new draft', 'Void voucher',
+    ])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }))
+    expect(mocks.push).toHaveBeenCalledWith('/payments/0002/edit')
+  })
+
+  it('a reader the voucher does not open to keeps Open and nothing else', async () => {
+    draw()
+    await act(async () => undefined)
+    fireEvent.contextMenu(screen.getByText('Meta Platforms Ireland'))
+    await act(async () => undefined)
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Open', 'Open in new tab'])
   })
 
   it('Payroll batches: the band counts them, a member opens the drawer', async () => {

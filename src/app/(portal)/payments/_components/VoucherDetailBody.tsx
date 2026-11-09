@@ -118,6 +118,7 @@ export function VoucherDetailBody({
 
       <Group n="I." title={v.credit ? 'Received from' : 'Pay to'}>
         <Line label={v.credit ? 'Payer' : 'Payee'} value={v.payee} sub={v.payeeCompany ?? undefined} />
+        {v.payInto ? <Line label="Pay into" value={v.payInto} mono /> : null}
         <Line label="Description" value={v.description || '—'} />
         {v.method ? <Line label="Method" value={v.method} /> : null}
         {v.notes ? <Line label="Notes" value={v.notes} /> : null}

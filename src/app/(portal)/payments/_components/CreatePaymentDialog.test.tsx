@@ -95,7 +95,7 @@ describe('the dialog', () => {
     expect(within(dialog()).getByText('Create payment')).toBeInTheDocument()
     expect(within(dialog()).getByText('New payment voucher · HV-PV-202610')).toBeInTheDocument()
     const labels = Array.from(dialog().querySelectorAll('label')).map((l) => l.textContent)
-    expect(labels).toEqual(['Pay to', 'Payment date', 'From bank', 'Description', 'Lines', 'Attachments'])
+    expect(labels).toEqual(['Pay to', 'Payment date', 'Pay into bank', 'Account number', 'From bank', 'Description', 'Lines', 'Attachments'])
     expect(screen.getByPlaceholderText('Payee name')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('What is this for?')).toBeInTheDocument()
     expect(screen.getByLabelText('Line 1 description')).toHaveAttribute('placeholder', 'What this line is for')

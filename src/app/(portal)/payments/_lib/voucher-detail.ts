@@ -4,6 +4,8 @@ import { canDecide } from '@/lib/approval-domains'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
 import type { User } from '@/types'
+import { sees } from '@/lib/sensitive'
+import { payeeAsSeen, payIntoText, readVoucherPayees } from '@/lib/voucher-payees'
 
 // One voucher, as the hub's drawer draws it (2026-10-14, the Finance revamp v2
 // — D05 of `.design/fin-r2/handoff`): who it pays, when and from where, which
@@ -47,6 +49,8 @@ export interface VoucherDetail {
   amount: number
   payee: string
   payeeCompany: string | null
+  /** A payment's Pay into (2026-11-09) — the bank and account, as the reader may see the number. */
+  payInto?: string | null
   description: string | null
   notes: string | null
   /** "Bank transfer" — the method as written. */
@@ -265,6 +269,10 @@ export async function loadVoucherDetail(
   return {
     ok: true,
     detail: {
+      payInto: credit ? null : await (async () => {
+        const p = (await readVoucherPayees(supabase, [v.id])).get(v.id)
+        return p ? payIntoText(payeeAsSeen(p, sees(user, 'bank'))) : null
+      })(),
       id: v.id,
       no: v.voucher_no,
       status,

@@ -1,4 +1,5 @@
 import type { createClient } from '@/lib/supabase/server'
+import { isMaskedAccount, readVoucherPayees } from '@/lib/voucher-payees'
 import type { AccountType } from '@/lib/coa'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
@@ -33,6 +34,10 @@ export interface EditVoucher {
   amount: number
   payee_name: string
   payee_company_id: string | null
+  /** Pay into (2026-11-09): the bank, and the number as this reader may see it (`payee_account_masked`: not whole). */
+  payee_bank: string | null
+  payee_account_no: string | null
+  payee_account_masked: boolean
   bank_account_id: string | null
   description: string
   notes: string | null
@@ -128,6 +133,8 @@ export async function readVoucherEdit(supabase: Client, user: User, id: string):
     override_reason: s.override_reason ?? '',
   }))
 
+  const payee = (await readVoucherPayees(supabase, [voucher.id])).get(voucher.id) ?? null
+
   // For credit vouchers, pull the single source row's account as the
   // initial account_code (mig 205 backfilled one row per credit voucher).
   const initialCreditAccountCode = voucher.direction === 'credit' && sources && sources.length > 0 ? sources[0].account_code ?? null : null
@@ -145,6 +152,9 @@ export async function readVoucherEdit(supabase: Client, user: User, id: string):
         amount: Number(voucher.amount),
         payee_name: voucher.payee_name,
         payee_company_id: voucher.payee_company_id,
+        payee_bank: payee?.bank ?? null,
+        payee_account_no: payee?.account ?? null,
+        payee_account_masked: isMaskedAccount(payee?.account),
         bank_account_id: voucher.bank_account_id,
         description: voucher.description ?? '',
         notes: voucher.notes,
