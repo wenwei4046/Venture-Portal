@@ -11,17 +11,18 @@ import { initials } from "./data";
 import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, teamColours } from "./tokens";
 import { chatRows, teamNameOf } from "./data";
 import { CHANNEL } from "../../sales/vm/common";
-import { appointmentsReport, pctLabel, periodRange, RP_PERIODS, salespeopleReport, sourcesReport, waitLabel, type ApptVisit, type Part, type SalesRow } from "./reports";
+import { overviewReport, appointmentsReport, pctLabel, periodRange, RP_PERIODS, salespeopleReport, sourcesReport, waitLabel, type ApptVisit, type Part, type SalesRow } from "./reports";
 
-export type RpCat = "ads" | "lba" | "sales" | "appt" | "src";
-export const RP_CATS: [RpCat, string][] = [["ads", "Ads performance"], ["lba", "Leads by ad"], ["sales", "Salespeople"], ["appt", "Appointments & show-ups"], ["src", "Lead sources & status"]];
+export type RpCat = "overview" | "ads" | "lba" | "sales" | "appt" | "src";
+// Overview first and where Reports opens (the owner, 2026-11-09: "在 reports 中能不能整合一个总报告").
+export const RP_CATS: [RpCat, string][] = [["overview", "Overview"], ["ads", "Ads performance"], ["lba", "Leads by ad"], ["sales", "Salespeople"], ["appt", "Appointments & show-ups"], ["src", "Lead sources & status"]];
 
 const SALES_COLS: [keyof SalesRow, string, "n" | "pct" | "wait"][] = [["leads", "Leads", "n"], ["replyRate", "Replied", "pct"], ["firstReplyMin", "First reply", "wait"], ["appt", "Appts", "n"],
   ["apptRate", "Appt rate", "pct"], ["showed", "Showed up", "n"], ["showRate", "Show-up", "pct"], ["won", "Won", "n"], ["winRate", "Win rate", "pct"], ["lost", "Lost", "n"]];
 
 export function reportsVM(ctx: DeskCtx) {
   const { ui, set, patch, data, now, nameOf } = ctx;
-  const cat: RpCat = ui.rpCat ?? "ads", per = ui.rpPer ?? "month", range: [number, number] = per === "custom" && ui.rpRange ? [ui.rpRange.a, ui.rpRange.b] : periodRange(per, now);
+  const cat: RpCat = ui.rpCat ?? "overview", per = ui.rpPer ?? "month", range: [number, number] = per === "custom" && ui.rpRange ? [ui.rpRange.a, ui.rpRange.b] : periodRange(per, now);
   // v2 (frame 12b, note 05): each mini card has its stacked bar and a colour a row — the status ramp, the channels' own,
   // else the CRM series in order.
   const SERIES = ["var(--crm-ink)", "var(--crm-orange)", "var(--crm-brown)", "var(--crm-amber)", "var(--crm-series-5)", "var(--crm-series-7)", "var(--crm-track-2)"];
@@ -107,9 +108,20 @@ export function reportsVM(ctx: DeskCtx) {
     })(),
   };
 
+  // Overview: each ad → who has its leads (leads, average reply) → each customer (status, average reply, ad, Open chat).
+  const stOf = new Map(chatRows(ctx).map(r => [r.id, ["Overdue", "Urgent", "Reply soon"].includes(r.key) ? "Attention" : r.key === "Cold" ? "Cold leads" : r.key]));
+  const ov = overviewReport(data.customers, range, c => (c.adId && data.adNames?.[c.adId]?.name) || c.ad || `Ad ${c.adId}`, nameOf, c => stOf.get(c.id) ?? "New");
+  const overview = {
+    count: `${ov.length} ad${ov.length === 1 ? "" : "s"} · ${ov.reduce((n, a) => n + a.n, 0)} leads`,
+    ads: ov.map(a => ({ ...a, avg: waitLabel(a.avgMin), people: a.people.map(p => ({ ...p, avg: waitLabel(p.avgMin), late: (p.avgMin ?? 0) > 240,
+      customers: p.customers.map(x => ({ ...x, avg: waitLabel(x.avgMin), open: () => patch({ tab: "inbox", pane: "docked", kind: "chat", chat: x.id, ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null }) })) })) })),
+  };
+
   const csv = () => {
     const perL = RP_PERIODS.find(p => p[0] === per)![1];
-    const table: string[][] = cat === "sales" ? [["Salesperson", "Team", ...SALES_COLS.map(c => c[1])], ...sales.rows.map(r => [r.name, r.team, ...r.cells]), [sales.total.name, "", ...sales.total.cells]]
+    const table: string[][] = cat === "overview" ? [["Ad", "Salesperson", "Customer", "Status", "Average reply", "Ad source"],
+      ...overview.ads.flatMap(a => a.people.flatMap(p => p.customers.map(x => [a.name, p.name, x.name, x.status, x.avg, x.ad])))]
+      : cat === "sales" ? [["Salesperson", "Team", ...SALES_COLS.map(c => c[1])], ...sales.rows.map(r => [r.name, r.team, ...r.cells]), [sales.total.name, "", ...sales.total.cells]]
       : (cat === "appt" ? appt : src).cards.flatMap(c => [[c.title, "Count", "Share"], ...c.rows.map(r => [r.label, String(r.n), r.pct]), []]);
     const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
     const a = document.createElement("a");
@@ -124,7 +136,7 @@ export function reportsVM(ctx: DeskCtx) {
       cat, cats: RP_CATS.map(([k, label]) => ({ label, on: k === cat, pick: () => patch({ rpCat: k }) })),
       periods: RP_PERIODS.map(([k, label]) => ({ label, on: k === per, pick: () => patch(k === "custom" ? { rpPer: k, rpDates: true } : { rpPer: k, rpDates: false }) })),
       picker: ui.rpDates ? { value: ui.rpRange ?? { a: range[0], b: range[1] }, apply: (r: { a: number; b: number }) => patch({ rpPer: "custom", rpRange: r, rpDates: false }), cancel: () => patch({ rpDates: false }) } : null,
-      sales, sales2, appt, src, csv, canCsv: cat === "sales" || cat === "appt" || cat === "src",
+      sales, sales2, appt, src, overview, csv, canCsv: cat === "overview" || cat === "sales" || cat === "appt" || cat === "src",
       openAds: () => patch({ tab: "adsperf" }),
     },
   };

@@ -114,3 +114,42 @@ export function waitLabel(min: number | null): string {
   return h ? `${d} d ${h} h` : `${d} d`;
 }
 export const pctLabel = (r: number | null) => (r == null ? "—" : `${Math.round(r * 100)}%`);
+
+/**
+ * Every reply's wait in a chat, in minutes (the owner, 2026-11-09: the overall report's "平均回复时间"): each time the customer
+ * writes after us (or first), the time until our next own message — auto-replies are not a reply. A wait still open is not
+ * counted: it has no length yet.
+ */
+export function replyWaits(c: Pick<CrmCustomer, "messages">): number[] {
+  const out: number[] = [];
+  let since: string | null = null;
+  for (const m of c.messages) {
+    if (m.from === "lead") { if (!since) since = m.at; }
+    else if (!m.auto && since) { out.push(Math.max(0, (new Date(m.at).getTime() - new Date(since).getTime()) / 60000)); since = null; }
+  }
+  return out;
+}
+const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+export interface OverviewCustomer { id: string; name: string; status: string; avgMin: number | null; ad: string }
+export interface OverviewPerson { id: string; name: string; n: number; avgMin: number | null; customers: OverviewCustomer[] }
+export interface OverviewAd { key: string; name: string; n: number; avgMin: number | null; people: OverviewPerson[] }
+/**
+ * The overall report (the owner, 2026-11-09: "不同的广告进来目前分配给了哪些业务，他们回复的平均时间，点开之后可以看到每个客户（包含
+ * 他们的状态，平均回复时间，广告来源），和 open chat"): the period's leads by ad (most first, no ad last), each ad's people it is
+ * with now (most first, nobody yet last) and each person's customers; an average reply is over every reply wait in those chats.
+ */
+export function overviewReport(cs: CrmCustomer[], range: [number, number], adName: (c: CrmCustomer) => string, nameOf: (id: string) => string, statusOf: (c: CrmCustomer) => string): OverviewAd[] {
+  const leads = cs.filter(c => inRange(c.createdAt, range));
+  const byAd = new Map<string, CrmCustomer[]>();
+  for (const c of leads) { const k = c.adId || "none"; byAd.set(k, [...(byAd.get(k) ?? []), c]); }
+  const ads = [...byAd].map(([key, list]) => {
+    const byWho = new Map<string, CrmCustomer[]>();
+    for (const c of list) { const k = c.assignedTo || ""; byWho.set(k, [...(byWho.get(k) ?? []), c]); }
+    const people = [...byWho].map(([id, mine]) => ({ id, name: id ? nameOf(id) : "Nobody yet", n: mine.length, avgMin: mean(mine.flatMap(replyWaits)),
+      customers: mine.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(c => ({ id: c.id, name: c.name, status: statusOf(c), avgMin: mean(replyWaits(c)), ad: key === "none" ? "No ad" : adName(c) })) }))
+      .sort((a, b) => (!a.id ? 1 : !b.id ? -1 : b.n - a.n || a.name.localeCompare(b.name)));
+    return { key, name: key === "none" ? "No ad" : adName(list[0]), n: list.length, avgMin: mean(list.flatMap(replyWaits)), people };
+  });
+  return ads.sort((a, b) => (a.key === "none" ? 1 : b.key === "none" ? -1 : b.n - a.n));
+}
