@@ -1,5 +1,15 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-09 b (#986 SHIPPED, migration applied first) — Payroll request PVs pay into their bank; real bank numbers
+
+Session 171188af.
+
+- **MERGED:** squash `fea46413` (2026-11-09 05:52Z), every check green, on the user's "上 migration，全绿就 merge" → "现在看并 merge".
+- **Migration `20261109150000_payroll_pv_pay_into` on production FIRST** (schema_migrations row, created_by `claude-payroll-pv-pay-into`; function body md5 equals the file's). Trigger `payroll_transfer_gives_voucher_payee` AFTER INSERT ON payment_voucher_sources: a `payroll_bank_transfer` voucher from a `payroll_payment_request` takes Pay into (payment_voucher_payees) from the bank whose `gl_account_code` = the line's `account_code` (the destination bank). New vouchers only — the user: "不用" for the old ones.
+- **Real bank numbers** (the user: "Houzs Venture - 23600599248 (HLBB) / Houzs Venture - 141760013039511 (alliance)"), direct UPDATE of `bank_accounts.account_number` replacing demo values: Hong Leong (GL 3000, main) **23600599248**; Alliance (GL 3010, HR payroll) **141760013039511**.
+- DESIGN v4.243; `.claude/rules/finance/finance-view.md` sentence.
+- **Not checked:** logged in on the live site; no payroll request PV made since.
+
 ## CHECKPOINT 2026-11-09 a (#985 SHIPPED, migration applied first) — Payment voucher's row menu and Pay into
 
 Session 171188af.
