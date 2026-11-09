@@ -30,6 +30,9 @@ type SortKey = "leads" | "avg" | "waitMax" | "appt" | "show";
 
 export const fmt = (m: number | null) => (m == null ? "—" : m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
 const hm = (stamp: string) => stamp.slice(11, 16);
+const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** A log entry's day (the owner, 2026-11-09: "audit log 要加上日期"): "8 Nov". */
+const dm = (stamp: string) => (stamp.length >= 10 ? `${Number(stamp.slice(8, 10))} ${MON3[Number(stamp.slice(5, 7)) - 1]}` : "");
 const mins = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60_000));
 const COLS = "240px repeat(5,minmax(0,1fr))";
 
@@ -106,8 +109,8 @@ export function activityVM(x: ActivityIn) {
   const adN = new Map<string, number>(); stints0.forEach(s => adN.set(adOf(s), (adN.get(adOf(s)) ?? 0) + 1));
   if (adSel !== "all" && !adN.has(adSel)) adN.set(adSel, 0);
   const adName = (id: string) => id === "none" ? "No ad" : d.adNames?.[id]?.name ?? stints0.find(s => s.customer.adId === id)?.customer.ad ?? `Ad ${id}`;
-  const ads = [{ value: "all", label: `All ads · ${stints0.length}` },
-    ...[...adN].sort((a, b) => (a[0] === "none" ? 1 : b[0] === "none" ? -1 : b[1] - a[1])).map(([id, n]) => ({ value: id, label: `${adName(id)} · ${n}` }))];
+  const ads = [{ value: "all", name: "All ads", n: stints0.length, label: `All ads · ${stints0.length}` },
+    ...[...adN].sort((a, b) => (a[0] === "none" ? 1 : b[0] === "none" ? -1 : b[1] - a[1])).map(([id, n]) => ({ value: id, name: adName(id), n, label: `${adName(id)} · ${n}` }))];
   const byWho = new Map<string, Stint[]>();
   stints.forEach(s => { const l = byWho.get(s.who) ?? []; l.push(s); byWho.set(s.who, l); });
   const statusOf = (s: Stint) => (s.end ? "Handed away" : s.appt ? "Appointment" : s.customer.status === "follow_up" ? "Follow up" : s.customer.status === "appointment" ? "Appointment" : "New");
@@ -127,7 +130,7 @@ export function activityVM(x: ActivityIn) {
         const turn = book.turn(id, nowStamp), on = turn.on, open = !!st[openKey][id] || st.who === id, wl = LV(s.waitMax);
         const list = (byWho.get(id) ?? []).slice().reverse().map(l => {
           const w = waitOf(l), status = statusOf(l), SS = ST[status];
-          return { key: l.key, repT: w == null ? fmt(l.reply) : "", waitT: w != null ? fmt(w) : "", got: hm(l.got), name: l.customer.name,
+          return { key: l.key, repT: w == null ? fmt(l.reply) : "", waitT: w != null ? fmt(w) : "", got: hm(l.got), gotD: dm(l.got), name: l.customer.name,
             reply: w != null ? `waiting ${fmt(w)}` : `${fmt(l.reply)} reply`, rc: w != null ? (LV(w)[0] ? LV(w)[1] : "var(--crm-leave-annual-text)") : C.ink,
             go: () => set({ [leadKey]: { id, key: l.key } }), bg: sel && sel.key === l.key ? C.field : "transparent",
             status: w != null ? "" : status, sFg: SS[1] };
@@ -142,22 +145,22 @@ export function activityVM(x: ActivityIn) {
   };
   const drawer = (lead: { id: string; key: string } | null, close: () => void) => {
     const l = lead ? stints.find(s => s.key === lead.key) : undefined;
-    if (!l) return { open: false, close, name: "", ad: "", facts: [] as { k: string; v: string; c: string }[], events: [] as { key: string; t: string; title: string; sub: string; dot: string; c: string; top: string; bot: string }[], openChat: () => {} };
+    if (!l) return { open: false, close, name: "", ad: "", facts: [] as { k: string; v: string; c: string }[], events: [] as { key: string; t: string; d: string; title: string; sub: string; dot: string; c: string; top: string; bot: string }[], openChat: () => {} };
     const who = x.nameOf(l.who), w = waitOf(l);
-    const ev: { t: string; title: string; sub: string; dot: string; c?: string }[] = [
-      { t: hm(l.got), title: l.from ? `Moved to ${who}` : `Got by ${who}`, sub: l.from ? `from ${x.nameOf(l.from)}${l.by ? ` · by ${x.nameOf(l.by)}` : ""}` : `${l.customer.ad || "No ad"} · ${l.by ? `by ${x.nameOf(l.by)}` : "auto"}`, dot: C.ink },
+    const ev: { t: string; d?: string; title: string; sub: string; dot: string; c?: string }[] = [
+      { t: hm(l.got), d: dm(l.got), title: l.from ? `Moved to ${who}` : `Got by ${who}`, sub: l.from ? `from ${x.nameOf(l.from)}${l.by ? ` · by ${x.nameOf(l.by)}` : ""}` : `${l.customer.ad || "No ad"} · ${l.by ? `by ${x.nameOf(l.by)}` : "auto"}`, dot: C.ink },
     ];
-    if (l.reply == null && !l.end) { const lv = LV(w ?? 0); ev.push({ t: hm(nowStamp), title: `No reply · ${fmt(w)}`, sub: lv[0] || "still waiting", dot: lv[0] ? lv[1] : C.amber, c: lv[0] ? lv[1] : C.ink }); }
-    else if (l.reply != null && l.replyAt) ev.push({ t: hm(officeStamp(l.replyAt)), title: `First reply · ${fmt(l.reply)}`, sub: who, dot: C.green });
-    if (l.end && l.to) ev.push({ t: hm(officeStamp(l.end)), title: `Moved to ${x.nameOf(l.to)}`, sub: l.movedBy ? `by ${x.nameOf(l.movedBy)}` : "auto", dot: C.ink });
+    if (l.reply == null && !l.end) { const lv = LV(w ?? 0); ev.push({ t: hm(nowStamp), d: dm(nowStamp), title: `No reply · ${fmt(w)}`, sub: lv[0] || "still waiting", dot: lv[0] ? lv[1] : C.amber, c: lv[0] ? lv[1] : C.ink }); }
+    else if (l.reply != null && l.replyAt) ev.push({ t: hm(officeStamp(l.replyAt)), d: dm(officeStamp(l.replyAt)), title: `First reply · ${fmt(l.reply)}`, sub: who, dot: C.green });
+    if (l.end && l.to) ev.push({ t: hm(officeStamp(l.end)), d: dm(officeStamp(l.end)), title: `Moved to ${x.nameOf(l.to)}`, sub: l.movedBy ? `by ${x.nameOf(l.movedBy)}` : "auto", dot: C.ink });
     if (l.appt) {
       const when = l.apptWhen ? officeStamp(l.apptWhen) : null;
-      ev.push({ t: l.apptAt ? hm(officeStamp(l.apptAt)) : when ? hm(when) : "", title: "Appointment booked", sub: when ? new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kuala_Lumpur" }).format(new Date(l.apptWhen!)).replace(",", "") : "", dot: C.green });
+      ev.push({ t: l.apptAt ? hm(officeStamp(l.apptAt)) : when ? hm(when) : "", d: l.apptAt ? dm(officeStamp(l.apptAt)) : when ? dm(when) : "", title: "Appointment booked", sub: when ? new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kuala_Lumpur" }).format(new Date(l.apptWhen!)).replace(",", "") : "", dot: C.green });
     }
-    if (l.show && l.showAt) ev.push({ t: hm(officeStamp(l.showAt)), title: "Showed up", sub: "", dot: C.green });
+    if (l.show && l.showAt) ev.push({ t: hm(officeStamp(l.showAt)), d: dm(officeStamp(l.showAt)), title: "Showed up", sub: "", dot: C.green });
     return { open: true, close, name: l.customer.name, ad: l.from ? `from ${x.nameOf(l.from)}` : (l.customer.ad || "No ad"),
-      facts: [{ k: "Got", v: hm(l.got), c: C.ink }, { k: "First reply", v: w != null ? `waiting ${fmt(w)}` : fmt(l.reply), c: w != null && LV(w)[0] ? LV(w)[1] : C.ink }, { k: "Now with", v: l.to ? x.nameOf(l.to) : who, c: C.ink }],
-      events: ev.map((e, i) => ({ key: `${i}`, c: C.ink, ...e, top: i ? C.rule : "transparent", bot: i < ev.length - 1 ? C.rule : "transparent" })),
+      facts: [{ k: "Got", v: `${dm(l.got)}, ${hm(l.got)}`, c: C.ink }, { k: "First reply", v: w != null ? `waiting ${fmt(w)}` : fmt(l.reply), c: w != null && LV(w)[0] ? LV(w)[1] : C.ink }, { k: "Now with", v: l.to ? x.nameOf(l.to) : who, c: C.ink }],
+      events: ev.map((e, i) => ({ key: `${i}`, c: C.ink, d: "", ...e, top: i ? C.rule : "transparent", bot: i < ev.length - 1 ? C.rule : "transparent" })),
       openChat: () => { close(); x.openChat(l.customer.id); } };
   };
 

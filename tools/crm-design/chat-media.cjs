@@ -10,6 +10,7 @@
  * And a photo / video is ChatImg / ChatVideo: drawn from the phone's kept copy when there is one (shared/media-cache.ts).
  */
 module.exports =
+  '{!!(m.call) && (<CallCard c={m.call} />)}' +
   '{!!(m.album.length) && (<MediaAlbum items={m.album} more={m.albumMore} />)}' +
   '{!!(m.img) && (<ChatImg onClick={m.view} onLoad={m.shape} src={m.img} style={{ display: "block", width: "240px", maxWidth: "100%", height: m.mh, objectFit: "cover", borderRadius: "13px", background: "rgba(63,43,34,.08)", cursor: "zoom-in" }} />)}' +
   '{!!(m.vid) && (<span onClick={m.view} style={{ position: "relative", display: "block", width: "240px", maxWidth: "100%", height: m.mh, borderRadius: "13px", overflow: "hidden", background: "#000", cursor: "pointer" }}>' +

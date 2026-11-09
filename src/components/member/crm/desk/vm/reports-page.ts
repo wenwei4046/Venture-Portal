@@ -15,14 +15,16 @@ import { overviewReport, appointmentsReport, pctLabel, periodRange, RP_PERIODS, 
 
 export type RpCat = "overview" | "ads" | "lba" | "sales" | "appt" | "src";
 // Overview first and where Reports opens (the owner, 2026-11-09: "在 reports 中能不能整合一个总报告").
-export const RP_CATS: [RpCat, string][] = [["overview", "Overview"], ["ads", "Ads performance"], ["lba", "Leads by ad"], ["sales", "Salespeople"], ["appt", "Appointments & show-ups"], ["src", "Lead sources & status"]];
+// The owner, 2026-11-09 ("salesperson & leads by ad & overview 是不是可以结合" → "One report, two views"): Overview is the one
+// report for leads, salespeople and ads — Salespeople and Leads by ad left Reports' tabs (Leads by ad stays in Assignment).
+export const RP_CATS: [RpCat, string][] = [["overview", "Overview"], ["ads", "Ads performance"], ["appt", "Appointments & show-ups"], ["src", "Lead sources & status"]];
 
 const SALES_COLS: [keyof SalesRow, string, "n" | "pct" | "wait"][] = [["leads", "Leads", "n"], ["replyRate", "Replied", "pct"], ["firstReplyMin", "First reply", "wait"], ["appt", "Appts", "n"],
   ["apptRate", "Appt rate", "pct"], ["showed", "Showed up", "n"], ["showRate", "Show-up", "pct"], ["won", "Won", "n"], ["winRate", "Win rate", "pct"], ["lost", "Lost", "n"]];
 
 export function reportsVM(ctx: DeskCtx) {
   const { ui, set, patch, data, now, nameOf } = ctx;
-  const cat: RpCat = ui.rpCat ?? "overview", per = ui.rpPer ?? "month", range: [number, number] = per === "custom" && ui.rpRange ? [ui.rpRange.a, ui.rpRange.b] : periodRange(per, now);
+  const cat: RpCat = ui.rpCat && RP_CATS.some(c => c[0] === ui.rpCat) ? ui.rpCat : "overview", per = ui.rpPer ?? "month", range: [number, number] = per === "custom" && ui.rpRange ? [ui.rpRange.a, ui.rpRange.b] : periodRange(per, now);
   // v2 (frame 12b, note 05): each mini card has its stacked bar and a colour a row — the status ramp, the channels' own,
   // else the CRM series in order.
   const SERIES = ["var(--crm-ink)", "var(--crm-orange)", "var(--crm-brown)", "var(--crm-amber)", "var(--crm-series-5)", "var(--crm-series-7)", "var(--crm-track-2)"];
@@ -110,17 +112,28 @@ export function reportsVM(ctx: DeskCtx) {
 
   // Overview: each ad → who has its leads (leads, average reply) → each customer (status, average reply, ad, Open chat).
   const stOf = new Map(chatRows(ctx).map(r => [r.id, ["Overdue", "Urgent", "Reply soon"].includes(r.key) ? "Attention" : r.key === "Cold" ? "Cold leads" : r.key]));
-  const ov = overviewReport(data.customers, range, c => (c.adId && data.adNames?.[c.adId]?.name) || c.ad || `Ad ${c.adId}`, nameOf, c => stOf.get(c.id) ?? "New");
+  const adNm = (c: { adId?: string | null; ad: string }) => (c.adId && data.adNames?.[c.adId]?.name) || c.ad || `Ad ${c.adId}`;
+  const allAds = overviewReport(data.customers, range, adNm, nameOf, c => stOf.get(c.id) ?? "New", data.visits).byAd;
+  const rpAd = ui.rpAd && allAds.some(a => a.key === ui.rpAd) ? ui.rpAd : "all";
+  const ov = overviewReport(data.customers, range, adNm, nameOf, c => stOf.get(c.id) ?? "New", data.visits, rpAd);
+  const by = ui.rpOvBy ?? "ad";
+  const openChat = (id: string) => () => patch({ tab: "inbox", pane: "docked", kind: "chat", chat: id, ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null });
+  const figs = (x: { n: number; avgMin: number | null; appt: number; show: number; won: number; lost: number }) => ({ cells: [String(x.n), waitLabel(x.avgMin), String(x.appt), String(x.show), String(x.won), String(x.lost)], late: (x.avgMin ?? 0) > 240 });
+  const person = (p: (typeof ov.byRep)[number]) => ({ key: p.id, name: p.name, ...figs(p), customers: p.customers.map(x => ({ ...x, avg: waitLabel(x.avgMin), open: openChat(x.id) })) });
+  const leadsN = ov.byRep.reduce((n, p) => n + p.n, 0);
   const overview = {
-    count: `${ov.length} ad${ov.length === 1 ? "" : "s"} · ${ov.reduce((n, a) => n + a.n, 0)} leads`,
-    ads: ov.map(a => ({ ...a, avg: waitLabel(a.avgMin), people: a.people.map(p => ({ ...p, avg: waitLabel(p.avgMin), late: (p.avgMin ?? 0) > 240,
-      customers: p.customers.map(x => ({ ...x, avg: waitLabel(x.avgMin), open: () => patch({ tab: "inbox", pane: "docked", kind: "chat", chat: x.id, ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null }) })) })) })),
+    by, bys: ([["ad", "By ad"], ["rep", "By salesperson"]] as const).map(([k, label]) => ({ label, on: by === k, pick: () => patch({ rpOvBy: k }) })),
+    count: by === "ad" ? `${ov.byAd.length} ad${ov.byAd.length === 1 ? "" : "s"} · ${leadsN} leads` : `${ov.byRep.filter(p => p.id).length} people · ${leadsN} leads`,
+    adOpts: [{ value: "all", label: `All ads · ${allAds.reduce((n, a) => n + a.n, 0)}` }, ...allAds.map(a => ({ value: a.key, label: `${a.name} · ${a.n}` }))],
+    adVal: rpAd, setAd: (e: { target: { value: string } }) => patch({ rpAd: e.target.value }),
+    groups: by === "ad" ? ov.byAd.map(a => ({ key: a.key, name: a.name, ...figs(a), people: a.people.map(person) }))
+      : [{ key: "rep", name: "", ...figs({ n: 0, avgMin: null, appt: 0, show: 0, won: 0, lost: 0 }), people: ov.byRep.map(person) }],
   };
 
   const csv = () => {
     const perL = RP_PERIODS.find(p => p[0] === per)![1];
-    const table: string[][] = cat === "overview" ? [["Ad", "Salesperson", "Customer", "Status", "Average reply", "Ad source"],
-      ...overview.ads.flatMap(a => a.people.flatMap(p => p.customers.map(x => [a.name, p.name, x.name, x.status, x.avg, x.ad])))]
+    const table: string[][] = cat === "overview" ? [["Ad", "Salesperson", "Customer", "Status", "Average reply"],
+      ...ov.byRep.flatMap(p => p.customers.map(x => [x.ad, p.name, x.name, x.status, waitLabel(x.avgMin)]))]
       : cat === "sales" ? [["Salesperson", "Team", ...SALES_COLS.map(c => c[1])], ...sales.rows.map(r => [r.name, r.team, ...r.cells]), [sales.total.name, "", ...sales.total.cells]]
       : (cat === "appt" ? appt : src).cards.flatMap(c => [[c.title, "Count", "Share"], ...c.rows.map(r => [r.label, String(r.n), r.pct]), []]);
     const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);

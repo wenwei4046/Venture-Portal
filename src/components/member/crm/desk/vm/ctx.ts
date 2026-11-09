@@ -61,6 +61,10 @@ export interface DeskUi {
   insVsOff?: boolean;
   /** Customer info opened from the chat menu's Audit log: its log unfolded (2026-11-09). */
   infoAudit?: boolean;
+  /** Reports › Overview: the one ad shown ("all" or an ad's key) — the owner, 2026-11-09: "可以选广告". */
+  rpAd?: string;
+  /** Reports › Overview grouped by ad or by salesperson. */
+  rpOvBy?: "ad" | "rep";
   insOpen: boolean;
   /** 4a's Insight: the team opened in place to its people (frame 01). */
   insTeam: string | null;

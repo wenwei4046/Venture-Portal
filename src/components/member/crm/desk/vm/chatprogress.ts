@@ -103,7 +103,7 @@ export function chatProgressVM(ctx: DeskCtx, opItem: string) {
       const t = new Date(e.at), hm = t.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" });
       return { what: WHAT[e.kind] ?? "Change", detail: [came ? e.text.replace(/^Came in from /, "") : e.text, e.note].filter(Boolean).join(" · "),
         who: e.who ? (e.who === me.id ? "You" : nameOf(e.who)) : came ? "Meta" : "Automatic",
-        time: t.toDateString() === now.toDateString() ? hm : `${dShort(e.at)}, ${hm}`, main: ["appt", "won", "lost"].includes(e.kind), hot: e.kind === "status" };
+        time: `${dShort(e.at)}, ${hm}`, main: ["appt", "won", "lost"].includes(e.kind), hot: e.kind === "status" };
     }); }
   // The same Audit log under Customer info wherever it opens on its own — Insight's lists, the Calendar (the owner,
   // 2026-11-09: "能不能看到 audit log?").

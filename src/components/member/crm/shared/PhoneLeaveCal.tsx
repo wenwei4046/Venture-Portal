@@ -21,6 +21,12 @@ const SCRIM: CSSProperties = { position: "absolute", inset: 0, background: "rgba
 const SHEET: CSSProperties = { position: "absolute", left: 0, right: 0, bottom: 0, maxHeight: "94%", overflow: "auto", boxSizing: "border-box", padding: "10px 20px calc(30px + var(--sheet-safe, 0px))",
   borderRadius: "26px 26px 0 0", background: "#fff", display: "flex", flexDirection: "column", animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", color: "var(--crm-ink)", fontFamily: INTER };
 const HANDLE = <div style={{ width: "36px", height: "4px", borderRadius: "2px", background: "var(--crm-line)", margin: "0 auto", flex: "none" }} />;
+/**
+ * A date or time field drawn plain (the owner, 2026-11-09: "字好大，画面不好看" — an iPhone draws a native date field in its own
+ * large, centred type until its appearance is reset): left-aligned, the CRM's size (16 px, the phone's floor against zoom).
+ */
+const DT: CSSProperties = { height: "42px", minWidth: 0, width: "100%", padding: "0 12px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff",
+  font: `500 16px ${INTER}`, color: "var(--crm-ink)", appearance: "none", WebkitAppearance: "none", textAlign: "left", display: "flex", alignItems: "center" };
 const IN: CSSProperties = { height: "44px", minWidth: 0, padding: "0 12px", boxSizing: "border-box", borderRadius: "10px", border: "1px solid var(--crm-line)", background: "#fff", font: `500 ${fs(14)} ${INTER}`, color: "var(--crm-ink)" };
 
 /** Calendar's phone frame: title + round +, the two layers, the month, the day's list, the leave sheet. */
@@ -47,14 +53,27 @@ export function PhoneCalendar({ input, top }: { input: In; top?: ReactNode }) {
           <span {...press(v.pPrev)} aria-label="Previous month" style={{ marginLeft: "auto", width: "40px", height: "40px", borderRadius: "20px", display: "grid", placeItems: "center", cursor: "pointer" }}><Svg d="m15 18-6-6 6-6" size={18} /></span>
           <span {...press(v.pNext)} aria-label="Next month" style={{ width: "40px", height: "40px", borderRadius: "20px", display: "grid", placeItems: "center", cursor: "pointer" }}><Svg d="m9 18 6-6-6-6" size={18} /></span>
         </div>
-        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))" }}>
-          {v.pDow.map((d, i) => <span key={i} style={{ height: "24px", display: "grid", placeItems: "center", font: `500 ${fs(11)} ${INTER}`, color: "var(--crm-faint)" }}>{d}</span>)}
-          {v.pCells.map(c => (
-            <div key={c.day} onClick={c.pick} style={{ height: "48px", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", paddingTop: "4px", boxSizing: "border-box", cursor: "pointer" }}>
-              <span style={{ width: "32px", height: "32px", borderRadius: "16px", display: "grid", placeItems: "center", fontSize: fs(14), fontWeight: c.w, background: c.bg, color: c.fg, boxShadow: c.ring }}>{c.num}</span>
-              <span style={{ display: "flex", gap: "3px", height: "5px" }}>{c.dots.map((o, i) => <span key={i} style={{ width: "5px", height: "5px", borderRadius: "50%", background: o }} />)}</span>
-            </div>
-          ))}
+        {/* The month as a calendar app draws it (the owner, 2026-11-09: "手机版的每月日历能不能改成这样的呈现方式呢？能看到连续请假的人，
+            几点的时间有 appt（跟电脑端一样）"): each day a box — a leave a bar joined across its days, each visit its time and who, as
+            the desktop's month (leave-cal.ts › monthCells); a tap on a day lists it below, a bar edits its leave, a visit opens it. */}
+        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", margin: "0 -20px", borderTop: "1px solid var(--crm-rule-2)" }}>
+          {v.pDow.map((d, i) => <span key={i} style={{ height: "24px", display: "grid", placeItems: "center", font: `500 ${fs(11)} ${INTER}`, color: "var(--crm-faint)", borderBottom: "1px solid var(--crm-rule-2)" }}>{d}</span>)}
+          {v.monthCells.map((c, i) => { const pc = v.pCells.find(x => x.day === c.day);
+            return (
+              <div key={c.day} onClick={pc?.pick} style={{ minWidth: 0, minHeight: "88px", display: "flex", flexDirection: "column", gap: "2px", padding: "3px 2px 4px", boxSizing: "border-box",
+                borderRight: i % 7 < 6 ? "1px solid var(--crm-rule-2)" : undefined, borderBottom: "1px solid var(--crm-rule-2)", background: pc?.bg && pc.bg !== "transparent" && c.numBg === "transparent" ? "var(--crm-sel)" : c.bg, overflow: "hidden", cursor: "pointer" }}>
+                <span style={{ alignSelf: "center", minWidth: "20px", height: "20px", padding: "0 4px", boxSizing: "border-box", borderRadius: "10px", display: "grid", placeItems: "center", font: `500 ${fs(11.5)} ${INTER}`, background: c.numBg, color: c.numFg }}>{c.num}</span>
+                {c.chips.map(k => (
+                  <span key={k.key} onClick={k.edit} title={k.title} style={{ flex: "none", display: "block", height: "16px", lineHeight: "16px", padding: "0 3px", margin: `0 ${k.mr !== "0" ? "-3px" : "0"} 0 ${k.ml !== "0" ? "-3px" : "0"}`,
+                    borderRadius: k.rad.replace(/4px/g, "3px"), background: k.bg, color: k.fg, font: `600 ${fs(10)} ${INTER}`, whiteSpace: "nowrap", overflow: "hidden" }}>{k.label}</span>
+                ))}
+                {c.appts.map(x => (
+                  <span key={x.key} title={x.title} onClick={x.open} style={{ flex: "none", display: "block", height: "16px", lineHeight: "16px", padding: "0 3px", borderRadius: "3px", background: "var(--crm-tint-appt)",
+                    color: "var(--crm-ink)", font: `500 ${fs(10)} ${INTER}`, whiteSpace: "nowrap", overflow: "hidden" }}><b style={{ fontWeight: 650 }}>{x.t}</b> {x.who}</span>
+                ))}
+                {c.more && <span style={{ flex: "none", font: `500 ${fs(10)} ${INTER}`, color: "var(--crm-muted)", paddingLeft: "2px" }}>{c.more}</span>}
+              </div>
+            ); })}
         </div>
         <div style={{ flex: "none", display: "flex", flexDirection: "column", borderTop: "1px solid var(--crm-rule)", paddingTop: "12px" }}>
           <span style={{ font: `500 ${fs(13)} ${INTER}`, color: "var(--crm-muted)", paddingBottom: "4px" }}>{v.pDayLabel}</span>
@@ -153,7 +172,8 @@ export function PhonePeople({ input, top, bare }: { input: In; top?: (add: React
           {v.pn.may && <span {...press(v.pn.add)} style={{ flex: "none", height: "48px", borderRadius: "12px", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", font: `500 ${fs(15)} ${INTER}`, cursor: "pointer" }}>Add time off</span>}
         </div>
       </>)}
-      {v.pModalOn && <LeaveSheet v={v} />}
+      {/* + Leave asks whose (the owner, 2026-11-09: "leave 无法选择人"); a person's own sheet opens on them. */}
+      {v.pModalOn && <LeaveSheet v={v} withPerson />}
       <Toast v={v} />
     </div>
   );
@@ -166,7 +186,7 @@ function LeaveSheet({ v, withPerson }: { v: LeaveCalVM; withPerson?: boolean }) 
     <div onClick={v.cancelLeave} style={{ ...SCRIM, zIndex: 42 }} />
     <div style={{ ...SHEET, zIndex: 43, gap: "16px" }}>
       {HANDLE}
-      <span style={{ font: `500 ${fs(20)} ${TIGHT}` }}>{withPerson ? lv.title : `${lv.title} · ${lv.whoName}`}</span>
+      <span style={{ font: `500 ${fs(18)} ${TIGHT}` }}>{withPerson ? lv.title : `${lv.title} · ${lv.whoName}`}</span>
       {withPerson && (
         <label style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: fs(12), color: "var(--crm-muted)" }}>Person
           <select value={lv.who} onChange={lv.setWho} style={{ ...IN, appearance: "none", WebkitAppearance: "none" }}>
@@ -183,8 +203,8 @@ function LeaveSheet({ v, withPerson }: { v: LeaveCalVM; withPerson?: boolean }) 
       {lv.ends.map(e => (
         <label key={e.key} style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: fs(12), color: "var(--crm-muted)" }}>{e.label}
           <span style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 110px", gap: "8px" }}>
-            <input type="date" value={e.date} onChange={e.setDate} style={IN} />
-            <input type="time" step={1800} value={e.time} onChange={e.setTime} style={IN} />
+            <input type="date" value={e.date} onChange={e.setDate} style={DT} />
+            <input type="time" step={1800} value={e.time} onChange={e.setTime} style={DT} />
           </span>
         </label>
       ))}
