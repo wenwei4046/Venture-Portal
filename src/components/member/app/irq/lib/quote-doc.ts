@@ -311,24 +311,32 @@ export function moodRows(mb, n, b) {
   return out;
 }
 
-/** The text's size so it fits about `cap` characters on a line: the block's own, down to 72% of it; longer still wraps. */
-export const fitSize = (text, size, cap) => { const k = String(text ?? "").length; return k > cap ? Math.max(Math.round(size * 72) / 100, Math.round((size * cap / k) * 10) / 10) : size; };
+/** The item table's photo, in px (Quote settings › Item table › Photo size; 80 unless set — it was 56). */
+export const PHOTO_SIZE = 80;
+export const photoSizeOf = tb => Math.max(40, Math.min(140, +(tb && tb.photoSize) || PHOTO_SIZE));
+/** CODE/COLOUR's text, in px (Quote settings › Item table › Code / colour text; the table's own size unless set). */
+export const codeSizeOf = tb => Math.max(7, Math.min(20, +(tb && tb.codeSize) || +(tb && tb.size) || 12));
+/**
+ * Draws each [data-fit] cell on one line, smaller only as far as it must (down to 72%); one that still does not fit wraps.
+ * Measured in the page, so a short answer keeps its size (2026-11-09: "怎么有大有小" — a guess by length shrank some that fit).
+ */
+export const FIT_SCRIPT = "<script>(function(){var de=document.documentElement,w=de.style.width,c=document.querySelectorAll('[data-fit]');de.style.width='748px';for(var i=0;i<c.length;i++){var e=c[i],s=parseFloat(e.style.fontSize)||12,m=s*.72;e.style.whiteSpace='nowrap';while(e.scrollWidth>e.clientWidth+1&&s>m){s=Math.max(m,s-.25);e.style.fontSize=s+'px';}e.style.whiteSpace='';}de.style.width=w;})();</script>"; // measured at A4 (748px = 688px of print + the screen padding), then wrapping as usual
 
 /**
  * The customer details in columns of their own (the user, 2026-11-09: "这边的资料排版也很奇怪，能把这些栏位是固定的，客户输入的
- * 资料，如果太多就自动缩小文字"): label | answer | label | answer at fixed widths, whatever the item table's columns are; a
- * label stays on one line, an answer too long for its cell is drawn smaller, then wraps. The form's own fields (PHONE …)
- * take a label and the rest of the row. Excel keeps the table's own columns.
+ * 资料，如果太多就自动缩小文字"): label | answer | label | answer at fixed widths, whatever the item table's columns are. A label prints
+ * as Quote settings names it (the user sets its case); a label or answer too long for its cell is drawn smaller (`FIT_SCRIPT`). The form's own
+ * fields (PHONE …) take a label and the rest of the row. Excel keeps the table's own columns.
  */
 export function factsTable(L, q, b, cell, n) {
-  const lab = t => { const s = String(t ?? ""); return `<td style="${cell(b, "font-weight:bold;padding:2px 6px;vertical-align:top;" + (s.length > 18 ? "" : "white-space:nowrap;"))}font-size:${fitSize(s, b.size, 16)}px">${esc(s)}</td>`; };
-  const val = (v, cap, span = 1) => { const s = String(v || "-"); return `<td${span > 1 ? ` colspan="${span}"` : ""} style="${cell(b, "padding:2px 6px;vertical-align:top;overflow-wrap:anywhere;")}font-size:${fitSize(s, b.size, cap)}px">${esc(s)}</td>`; };
+  const lab = t => `<td data-fit="" style="${cell(b, "font-weight:bold;padding:2px 6px;vertical-align:top;white-space:nowrap;")}">${esc(t)}</td>`;
+  const val = (v, span = 1) => `<td data-fit=""${span > 1 ? ` colspan="${span}"` : ""} style="${cell(b, "padding:2px 6px;vertical-align:top;overflow-wrap:anywhere;")}">${esc(String(v || "-"))}</td>`;
   let rows = "";
   for (let i = 0; i < L.length; i += 2) {
     const a = L[i], c = L[i + 1];
-    rows += "<tr>" + lab(a.label) + val(q.facts[a.key], 34) + (c ? lab(c.label) + val(q.facts[c.key], 34) : "<td></td><td></td>") + "</tr>";
+    rows += "<tr>" + lab(a.label) + val(q.facts[a.key]) + (c ? lab(c.label) + val(q.facts[c.key]) : "<td></td><td></td>") + "</tr>";
   }
-  (q.custRows || []).forEach(r => { rows += "<tr>" + lab(String(r.label).toUpperCase() + " :") + val(r.value, 80, 3) + "</tr>"; });
+  (q.custRows || []).forEach(r => { rows += "<tr>" + lab(String(r.label).toUpperCase() + " :") + val(r.value, 3) + "</tr>"; });
   if (!rows) return "";
   return `<tr><td colspan="${n}" style="padding:0"><table style="width:100%;table-layout:fixed;border-collapse:collapse"><colgroup><col style="width:17%"><col style="width:33%"><col style="width:17%"><col style="width:33%"></colgroup>${rows}</table></td></tr>`;
 }
@@ -375,11 +383,12 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
       (config.bldFields || []).filter(f => f.show).forEach(f => { out += fieldRows(f, bx[f.id], n, b); });
       if (q.moodboard && !excel) out += moodRows(q.moodboard, n, b);
     } else if (b.type === "table") {
-      out += `<tr style="background:#E7E5DE">${cols.map(c => `<td style="padding:6px;border-top:1px solid #bbb;border-bottom:1px solid #bbb;font-weight:bold;font-size:${b.size - 1}px;${c.num ? "text-align:right" : c.key === "photo" ? "text-align:center" : ""}">${esc(c.label)}</td>`).join("")}</tr>`;
+      const ps = photoSizeOf(b), cs = codeSizeOf(b); // Quote settings › Item table: Photo size, Code / colour text (2026-11-09)
+      out += `<tr style="background:#E7E5DE">${cols.map(c => `<td style="padding:6px;border-top:1px solid #bbb;border-bottom:1px solid #bbb;font-weight:bold;font-size:${b.size - 1}px;${c.num ? "text-align:right" : c.key === "photo" ? "text-align:center" : ""}${+c.width > 0 ? ";width:" + Math.min(80, +c.width) + "%" : ""}">${esc(c.label)}</td>`).join("")}</tr>`;
       q.cats.forEach(cat => {
         out += `<tr><td colspan="${n}" style="padding:10px 6px 3px;font-weight:bold;letter-spacing:.05em;font-size:${b.size}px">${esc(cat.name)}</td></tr>`;
         cat.rows.forEach(r => {
-          out += `<tr>${cols.map(c => { if (c.key === "photo") return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;width:64px;text-align:center;vertical-align:middle">${r.photo ? `<img src="${esc(r.photo)}" alt="" style="display:block;width:56px;height:56px;object-fit:contain;margin:0 auto">` : ""}</td>`; const v = c.key === "price" ? money(r.unit) : c.key === "sum" ? money(r.sum) : r[c.key]; return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;font-size:${b.size}px;${c.num ? "text-align:right" : ""}">${esc(v)}</td>`; }).join("")}</tr>`;
+          out += `<tr>${cols.map(c => { if (c.key === "photo") return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;width:${ps + 8}px;text-align:center;vertical-align:middle">${r.photo ? `<img src="${esc(r.photo)}" alt="" style="display:block;width:${ps}px;height:${ps}px;object-fit:contain;margin:0 auto">` : ""}</td>`; if (c.key === "code") return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;font-size:${cs}px">${esc(r.code)}</td>`; const v = c.key === "price" ? money(r.unit) : c.key === "sum" ? money(r.sum) : r[c.key]; return `<td style="padding:4px 6px;border-bottom:1px solid #ddd;font-size:${b.size}px;${c.num ? "text-align:right" : ""}">${esc(v)}</td>`; }).join("")}</tr>`;
         });
       });
     } else if (b.type === "totals") {
@@ -400,5 +409,5 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
   });
   const table = `<table style="width:100%;border-collapse:collapse;font-family:${font};font-size:12px;color:#1C1714;font-variant-numeric:lining-nums tabular-nums">${out}</table>`;
   if (excel) return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>${table}</body></html>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>html{-webkit-text-size-adjust:100%;text-size-adjust:100%}@page{size:A4;margin:14mm}body{margin:0;padding:0}@media screen{body{padding:28px 30px}}</style></head><body>${table}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>html{-webkit-text-size-adjust:100%;text-size-adjust:100%}@page{size:A4;margin:14mm}body{margin:0;padding:0}@media screen{body{padding:28px 30px}}</style></head><body>${table}${FIT_SCRIPT}</body></html>`;
 }

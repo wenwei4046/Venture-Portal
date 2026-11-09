@@ -1066,6 +1066,12 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                   </button>
                                   {"\n                            "}
                                   <input value={dcValue(L_cl_k?.["label"])} onChange={L_cl_k?.["onLabel"]} style={{"flex":"1","minWidth":"0","height":"40px","padding":"0 12px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"14px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
+                                  <label title={"Column width, % of the table. Empty: shares what is left"} style={{"flex":"0 0 76px","display":"flex","alignItems":"center","gap":"4px","height":"40px","padding":"0 10px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","boxSizing":"border-box"}}>
+                                    <input value={dcValue(L_cl_k?.["w"])} onChange={L_cl_k?.["onW"]} placeholder={"auto"} inputMode={"numeric"} aria-label={"Column width"} style={{"flex":"1","minWidth":"0","width":"100%","border":"0","outline":"0","background":"transparent","fontSize":"13px","fontWeight":"600","color":"var(--irq-c-1f1f1c)","textAlign":"right","padding":"0"}} />
+                                    <span style={{"fontSize":"12px","color":"var(--irq-c-97978f)"}}>
+                                      {"%"}
+                                    </span>
+                                  </label>
                                   {"\n                          "}
                                 </div>
                                 {"\n                        "}
@@ -1258,6 +1264,47 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                             </div>
                           </div>
                           {"\n                    "}
+                        </>) : null}
+                        {"\n                    "}
+                        {(v["sel"]?.["tbl"]) ? (<>
+                          <div style={{"display":"flex","flexDirection":"column","gap":"10px"}}>
+                            {(v["sel"]?.["tbl"]?.["hasPhoto"]) ? (<>
+                              <div style={{"display":"flex","alignItems":"center","justifyContent":"space-between","gap":"12px"}}>
+                                <span style={{"fontSize":"13px","fontWeight":"650","color":"var(--irq-c-1f1f1c)"}}>
+                                  {"Photo size"}
+                                </span>
+                                <div style={{"display":"grid","gridTemplateColumns":"34px 56px 34px","alignItems":"center","height":"38px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)"}}>
+                                  <button aria-label={"Smaller"} onClick={v["sel"]?.["tbl"]?.["phDn"]} style={{"height":"36px","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"17px","padding":"0"}}>
+                                    {"−"}
+                                  </button>
+                                  <span style={{"textAlign":"center","fontSize":"13.5px","fontWeight":"650","fontVariantNumeric":"tabular-nums"}}>
+                                    {dcText(v["sel"]?.["tbl"]?.["phText"])}
+                                  </span>
+                                  <button aria-label={"Bigger"} onClick={v["sel"]?.["tbl"]?.["phUp"]} style={{"height":"36px","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"17px","padding":"0"}}>
+                                    {"+"}
+                                  </button>
+                                </div>
+                              </div>
+                            </>) : null}
+                            {(v["sel"]?.["tbl"]?.["hasCode"]) ? (<>
+                              <div style={{"display":"flex","alignItems":"center","justifyContent":"space-between","gap":"12px"}}>
+                                <span style={{"fontSize":"13px","fontWeight":"650","color":"var(--irq-c-1f1f1c)"}}>
+                                  {"Code / colour text"}
+                                </span>
+                                <div style={{"display":"grid","gridTemplateColumns":"34px 56px 34px","alignItems":"center","height":"38px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)"}}>
+                                  <button aria-label={"Smaller"} onClick={v["sel"]?.["tbl"]?.["cdDn"]} style={{"height":"36px","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"17px","padding":"0"}}>
+                                    {"−"}
+                                  </button>
+                                  <span style={{"textAlign":"center","fontSize":"13.5px","fontWeight":"650","fontVariantNumeric":"tabular-nums"}}>
+                                    {dcText(v["sel"]?.["tbl"]?.["cdText"])}
+                                  </span>
+                                  <button aria-label={"Bigger"} onClick={v["sel"]?.["tbl"]?.["cdUp"]} style={{"height":"36px","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"17px","padding":"0"}}>
+                                    {"+"}
+                                  </button>
+                                </div>
+                              </div>
+                            </>) : null}
+                          </div>
                         </>) : null}
                         {"\n                    "}
                         {(v["sel"]?.["showStyle"]) ? (<>
@@ -1611,12 +1658,12 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                         {dcList(L_sr_z?.["cells"]).map((L_ce_10, L_ce_10_i) => (
                                           <Fragment key={L_ce_10_i}>
                                             {(L_ce_10?.["isTxt"]) ? (<>
-                                              <span style={dcCss(`text-align:${dcS(L_ce_10?.["align"])};font-variant-numeric:tabular-nums;color:${dcS(L_ce_10?.["ink"])};font-style:${dcS(L_ce_10?.["fs"])}`)}>
+                                              <span style={dcCss(`text-align:${dcS(L_ce_10?.["align"])};font-variant-numeric:tabular-nums;color:${dcS(L_ce_10?.["ink"])};font-style:${dcS(L_ce_10?.["fs"])};font-size:${dcS(L_ce_10?.["fz"])}`)}>
                                                 {dcText(L_ce_10?.["v"])}
                                               </span>
                                             </>) : null}
                                             {(L_ce_10?.["isImg"]) ? (<>
-                                              <span style={dcCss(`display:block;width:40px;height:40px;margin:0 auto;border-radius:2px;background:var(--irq-c-f2f2ef) url('${dcS(L_ce_10?.["img"])}') center/contain no-repeat`)} />
+                                              <span style={dcCss(`display:block;width:${dcS(L_ce_10?.["ph"])};height:${dcS(L_ce_10?.["ph"])};margin:0 auto;border-radius:2px;background:var(--irq-c-f2f2ef) url('${dcS(L_ce_10?.["img"])}') center/contain no-repeat`)} />
                                             </>) : null}
                                           </Fragment>
                                         ))}
