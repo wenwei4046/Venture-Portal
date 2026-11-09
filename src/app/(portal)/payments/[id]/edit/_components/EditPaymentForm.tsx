@@ -134,6 +134,10 @@ export default function EditPaymentForm({
   const [amount, setAmount] = useState(voucher.amount.toFixed(2))
   const [payeeName, setPayeeName] = useState(voucher.payee_name)
   const [payeeCompanyId, setPayeeCompanyId] = useState(voucher.payee_company_id ?? '')
+  const [payeeBank, setPayeeBank] = useState(voucher.payee_bank ?? '')
+  const [payeeAccount, setPayeeAccount] = useState(voucher.payee_account_no ?? '')
+  // A number this reader sees as •••• is not theirs to change: it is shown, never sent.
+  const payeeOpen = !voucher.payee_account_masked
   const [bankAccountId, setBankAccountId] = useState(voucher.bank_account_id ?? '')
   const [description, setDescription] = useState(voucher.description)
   const [paymentMethod, setPaymentMethod] = useState(voucher.payment_method ?? 'bank_transfer')
@@ -210,6 +214,7 @@ export default function EditPaymentForm({
         targetPool,
         accountCode,
         rows: sourceRows,
+        ...(isDebit && payeeOpen ? { payeeBank, payeeAccount } : {}),
       }),
     )
   }
@@ -336,6 +341,43 @@ export default function EditPaymentForm({
           </select>
         </div>
       </div>
+
+      {/* Pay into (2026-11-09): optional — the bank and account the payee is paid into */}
+      {isDebit ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="edit-payee-bank" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+              Pay into bank (optional)
+            </label>
+            <input
+              id="edit-payee-bank"
+              type="text"
+              value={payeeBank}
+              readOnly={!payeeOpen}
+              maxLength={120}
+              placeholder="e.g. Maybank"
+              onChange={(e) => setPayeeBank(e.target.value)}
+              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm text-ink focus:outline-none focus:border-accent-border"
+            />
+          </div>
+          <div>
+            <label htmlFor="edit-payee-acct" className="block text-sm font-sans font-medium text-graphite mb-1.5">
+              Account number (optional)
+            </label>
+            <input
+              id="edit-payee-acct"
+              type="text"
+              inputMode="numeric"
+              value={payeeAccount}
+              readOnly={!payeeOpen}
+              maxLength={40}
+              onChange={(e) => setPayeeAccount(e.target.value)}
+              className="w-full px-3 py-2 bg-paper border border-hairline rounded-md text-sm font-mono text-ink focus:outline-none focus:border-accent-border"
+            />
+            {payeeOpen ? null : <p className="mt-1 text-xs text-muted">Only an account that sees bank numbers can change it.</p>}
+          </div>
+        </div>
+      ) : null}
 
       {/* Bank account + payment method */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

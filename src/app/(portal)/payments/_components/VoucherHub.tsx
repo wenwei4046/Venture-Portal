@@ -1,11 +1,18 @@
 'use client'
 
-import { useMemo, useState, useEffect, type MouseEvent, type ReactNode } from 'react'
+import { useMemo, useRef, useState, useEffect, type MouseEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import RowMenu, { type RowMenuAnchor, type RowMenuItem } from '@/components/RowMenu'
 import { BatchList, HeadButton, HubCards, HubHead, hubStyles as hs, type ChipTone } from '@/components/finv/Hub'
 import { FinTable, type FinColumn } from '@/components/finv/FinTable'
-import { DialogMenu, FinDialog } from '@/components/finv/Dialog'
+import { DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
+import { flash } from '@/components/hrv/toast'
+import ReassignGlAccountButton from '../[id]/_components/ReassignGlAccountButton'
+import { CopyVoucherDialog } from '../[id]/_components/CopyAsDraft'
+import { openVoucherPage } from '../page-actions'
+import type { VoucherDetail } from '../_lib/voucher-detail'
+import type { VoucherPageExtras } from '../_lib/voucher-page'
+import { useVoucherSteps } from './voucher-steps'
 import AmendDateButton from './AmendDateButton'
 import AmendRepaymentButton from './AmendRepaymentButton'
 import { VoucherDrawer, fd } from './VoucherDrawer'
@@ -21,6 +28,13 @@ import { CARD, cardLook, hubCards, plural, rm } from '../_lib/hub-cards'
 // Receipt's hub is the same parts (D09, `ledger.receipts`): *Receive*, its
 // cards All receipts … Received … Voided (no payroll), *Create receipt* and
 // *Loan repayment*, the figures +RM in green, Bank among the columns.
+//
+// A voucher's row menu (2026-11-09, the user: "这个right click 我要包括edit, copy, cancel 等等"; sample
+// mockups/pv-row-menu-mockup.html): Open · Open in new tab, then what the voucher's own page offers this reader in
+// the state it is in — Edit, Submit for approval, Approve, Return to draft, Copy as a new draft, Change date, Change
+// GL account — and last the ones that cannot be undone (Void voucher, Reverse payment / Void receipt), each asking
+// first in the drawer's own windows. The voucher is read on the right-click (openVoucherPage, the phone app's read):
+// its steps are the drawer's (useVoucherSteps), never a second copy of who may do what.
 
 const f2 = (n: number) => (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -33,6 +47,8 @@ const COLUMNS: FinColumn<HubRow>[] = [
   { key: 'date', label: 'Date', kind: 'date', width: 112, value: (r) => r.date, text: (r) => fd(r.date) },
   { key: 'cat', label: 'Category', kind: 'text', width: 130, value: (r) => r.cat.toLowerCase(), text: (r) => r.cat },
   { key: 'pool', label: 'Pool', kind: 'text', width: 120, value: (r) => r.pool.toLowerCase(), text: (r) => r.pool },
+  // Pay into (2026-11-09, "payment voucher column 要包括这个"): the bank and account the payee is paid into.
+  { key: 'payInto', label: 'Pay into', kind: 'text', width: 190, value: (r) => (r.payInto ?? '').toLowerCase(), text: (r) => r.payInto ?? '—' },
   {
     key: 'status',
     label: 'Status',
@@ -86,6 +102,11 @@ export default function VoucherHub({
   const [rowMenu, setRowMenu] = useState<{ row: HubRow; anchor: RowMenuAnchor } | null>(null)
   const [redate, setRedate] = useState<{ row: HubRow; nonce: number } | null>(null)
   const [amend, setAmend] = useState<{ row: HubRow; nonce: number } | null>(null)
+  // The voucher a row menu was opened on, read for its steps; and the Copy / Change GL window it opened.
+  const [menuRecord, setMenuRecord] = useState<{ detail: VoucherDetail; extras: VoucherPageExtras | null; canCopy: boolean } | null>(null)
+  const [menuReading, setMenuReading] = useState<string | null>(null)
+  const readingRef = useRef<string | null>(null)
+  const [menuExtra, setMenuExtra] = useState<{ kind: 'copy' | 'gl'; nonce: number } | null>(null)
 
   // The card in the URL, so a refresh or a link lands on it (no navigation: the list is here).
   useEffect(() => {
@@ -122,18 +143,79 @@ export default function VoucherHub({
     if (r.kind === 'batch') return
     e.preventDefault()
     setRowMenu({ row: r, anchor: { x: e.clientX, y: e.clientY } })
+    if (r.kind !== 'voucher') return
+    if (menuRecord?.detail.id === r.id) return
+    readingRef.current = r.id
+    setMenuReading(r.id)
+    // Only the last right-click's answer is kept.
+    const done = (record: typeof menuRecord) => {
+      if (readingRef.current !== r.id) return
+      readingRef.current = null
+      setMenuReading(null)
+      setMenuRecord(record)
+    }
+    void openVoucherPage(r.id).then(
+      (res) => done(res.ok ? { detail: res.detail, extras: res.extras, canCopy: res.canCopy } : null),
+      () => done(null),
+    )
   }
+
+  // The row menu's voucher: its steps, and their windows, are the drawer's.
+  const mv = menuRecord?.detail ?? null
+  const menuMore: DialogMenuItem[] = mv
+    ? [
+        ...(menuRecord?.canCopy ? [{ key: 'copy', label: 'Copy as a new draft', onClick: () => setMenuExtra({ kind: 'copy', nonce: Date.now() }) }] : []),
+        ...(menuRecord?.extras?.reassign ? [{ key: 'gl', label: 'Change GL account', onClick: () => setMenuExtra({ kind: 'gl', nonce: Date.now() }) }] : []),
+      ]
+    : []
+  const menuSteps = useVoucherSteps(mv, {
+    onDone: () => {
+      setMenuRecord(null)
+      router.refresh()
+    },
+    onFilesChanged: () => router.refresh(),
+    extraMore: menuMore,
+  })
+  useEffect(() => {
+    if (menuSteps.error) flash(menuSteps.error)
+  }, [menuSteps.error])
   let rowMenuNode = null
   if (rowMenu) {
     const r = rowMenu.row
     const href = hrefOf(r)
     const items: RowMenuItem[] = [{ key: 'open', label: 'Open', onSelect: () => openRow(r) }]
     if (href) items.push({ key: 'new-tab', label: 'Open in new tab', onSelect: () => window.open(href, '_blank', 'noopener,noreferrer') })
+    // The voucher's own steps, once read: the ones that change it, then the ones that cannot be undone.
+    const mine = r.kind === 'voucher' && mv?.id === r.id
+    const doing: RowMenuItem[] = []
+    const undoable: RowMenuItem[] = []
+    if (mine) {
+      for (const s of menuSteps.steps) {
+        if (s.kind === 'more') continue
+        const item: RowMenuItem = {
+          key: s.key,
+          label: s.label,
+          danger: s.kind === 'danger',
+          disabled: menuSteps.busy,
+          onSelect: () => (s.href ? router.push(s.href) : s.onClick?.()),
+        }
+        ;(s.kind === 'danger' ? undoable : doing).push(item)
+      }
+      for (const m of menuSteps.more) {
+        const item: RowMenuItem = { key: m.key, label: m.label, danger: !!m.danger, disabled: menuSteps.busy, onSelect: m.onClick }
+        ;(m.danger ? undoable : doing).push(item)
+      }
+    }
+    const ORDER = ['approve', 'edit', 'submit', 'back', 'copy', 'redate', 'gl', 'amend']
+    const rank = (i: RowMenuItem) => (i === 'sep' || !ORDER.includes(i.key) ? ORDER.length : ORDER.indexOf(i.key))
     const extra: RowMenuItem[] = [
+      ...doing,
       ...(r.amendDate ? [{ key: 'redate', label: 'Change date', hint: 'when the date was keyed wrong', onSelect: () => setRedate({ row: r, nonce: Date.now() }) }] : []),
       ...(r.amendAmount ? [{ key: 'amend', label: 'Change amount', hint: 'loan repayment rows', onSelect: () => setAmend({ row: r, nonce: Date.now() }) }] : []),
-    ]
+    ].sort((a, b) => rank(a) - rank(b))
+    if (r.kind === 'voucher' && menuReading === r.id) extra.push({ key: 'reading', label: 'Reading what you can do…', disabled: true, onSelect: () => {} })
     if (extra.length > 0) items.push('sep', ...extra)
+    if (undoable.length > 0) items.push('sep', ...undoable)
     rowMenuNode = <RowMenu title={`${r.no ?? r.cat} · ${statusWord(r.status)}`} anchor={rowMenu.anchor} items={items} onClose={() => setRowMenu(null)} />
   }
 
@@ -237,6 +319,20 @@ export default function VoucherHub({
       </FinDialog>
 
       {rowMenuNode}
+      {menuSteps.dialogs}
+      {mv && menuExtra?.kind === 'copy' ? (
+        <CopyVoucherDialog key={menuExtra.nonce} open onClose={() => setMenuExtra(null)} voucherId={mv.id} voucherNo={mv.no} />
+      ) : null}
+      {mv && menuExtra?.kind === 'gl' && menuRecord?.extras?.reassign ? (
+        <ReassignGlAccountButton
+          key={menuExtra.nonce}
+          autoOpen
+          hideTrigger
+          voucherId={mv.id}
+          fromOptions={menuRecord.extras.reassign.from}
+          accountOptions={menuRecord.extras.reassign.options}
+        />
+      ) : null}
       {redate?.row.amendDate ? (
         <AmendDateButton
           key={`${redate.row.id}:${redate.nonce}`}

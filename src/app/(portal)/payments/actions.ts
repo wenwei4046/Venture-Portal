@@ -15,6 +15,7 @@ import { mayActOn, requireActionOn, requireApproverOn, requirePermission } from 
 import { decision } from '@/lib/approval-domains'
 import { canSeePayrollPayouts } from '@/lib/roles'
 import { isPayrollReference } from '@/lib/payroll-vouchers'
+import { payeeProblem } from '@/lib/voucher-payees'
 import { postJournalEntry, r2 } from '@/lib/journal'
 import { adjustPool } from '@/lib/voucher-paid-helpers'
 import { ACCOUNT_TYPES, type AccountType } from '@/lib/coa'
@@ -100,6 +101,11 @@ async function makePaymentVoucher(formData: FormData) {
   const description = (formData.get('description') as string)?.trim() ?? ''
   const paymentMethod = (formData.get('payment_method') as string) || 'bank_transfer'
   const direction = (formData.get('direction') as string) || 'debit'
+  // Pay into (2026-11-09): optional, typed in Create payment — checked before anything is written.
+  const payeeBank = ((formData.get('payee_bank') as string) ?? '').trim()
+  const payeeAccount = ((formData.get('payee_account_no') as string) ?? '').trim()
+  const payeeBad = payeeProblem(payeeBank, payeeAccount)
+  if (payeeBad) throw new Error(payeeBad)
   // For billing_payment (settling an invoice) the journal is purely
   //   dr Bank / cr 3030 AR
   // The user-facing form doesn't need to ask for an account — revenue was
@@ -830,6 +836,11 @@ async function makePaymentVoucher(formData: FormData) {
   revalidatePath('/payments')
   revalidatePath('/dashboard')
 
+  if (payeeBank || payeeAccount) {
+    const { error: payeeErr } = await supabase.rpc('voucher_payee_set', { p_voucher: data.id, p_bank: payeeBank, p_account: payeeAccount })
+    if (payeeErr) throw new Error(`${voucherNo} was saved as a draft, but its Pay into was not: ${clause(payeeErr.message)}. Add it on Edit.`)
+  }
+
   return { id: data.id as string, voucherNo, user }
 }
 
@@ -1361,6 +1372,10 @@ async function copyPaymentVoucherWork(user: Awaited<ReturnType<typeof requireAct
     }
   }
 
+  // Its Pay into goes with it (2026-11-09, "如果下次我copy 的时候也要带过去"). Not carried is said, the copy stands.
+  const { error: payeeErr } = await supabase.rpc('voucher_payee_copy', { p_from: sourceId, p_to: created.id })
+  if (payeeErr) console.error('[copyPaymentVoucher] Pay into not copied:', payeeErr.message)
+
   revalidatePath('/payments')
   return { id: created.id as string, voucherNo }
 }
@@ -1645,6 +1660,16 @@ async function updatePaymentVoucherWork(userId: string, formData: FormData): Pro
   if (updErr) throw new Error(`Failed to update voucher: ${updErr.message}`)
   if (!updated || updated.length === 0) {
     throw new Error('Voucher status changed mid-edit (already approved or voided) — refresh and try again')
+  }
+
+  // Pay into (2026-11-09) — only when Edit changed it.
+  if (sent('payee_bank') || sent('payee_account_no')) {
+    const bank = text('payee_bank').trim()
+    const account = text('payee_account_no').trim()
+    const bad = payeeProblem(bank, account)
+    if (bad) throw new Error(bad)
+    const { error: payeeErr } = await supabase.rpc('voucher_payee_set', { p_voucher: id, p_bank: bank, p_account: account })
+    if (payeeErr) throw new Error(`Pay into was not saved: ${clause(payeeErr.message)}`)
   }
 
   // Replace source rows — only when they were sent (or a receipt's pool,

@@ -13,6 +13,7 @@ import { typeLabel, type AccountType } from '@/lib/coa'
 import { buildRepaymentSourceRows, type RepaymentRole } from '@/lib/repayment-source-rows'
 import { stageInto } from '@/lib/storage/stage'
 import { billBackAnswers, openSplits, type RequestVoucherStart } from '@/lib/payment-requests/model'
+import { payeeProblem } from '@/lib/voucher-payees'
 import { createPaymentFromDialog, type DialogPaymentResult } from '../actions'
 import { openCreatePayment } from '../create-actions'
 import type { CreatePaymentOptions } from '../_lib/create-payment-options'
@@ -112,6 +113,9 @@ export default function CreatePaymentDialog({
   const [opts, setOpts] = useState<CreatePaymentOptions | null>(initial)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [payee, setPayee] = useState(preset?.payee ?? '')
+  // Pay into (2026-11-09): optional — typed here for a payment of one's own; from requests, the database takes theirs.
+  const [payeeBank, setPayeeBank] = useState('')
+  const [payeeAccount, setPayeeAccount] = useState('')
   const [companyId, setCompanyId] = useState(preset?.companyId ?? '')
   const [bankId, setBankId] = useState(initial?.banks[0]?.id ?? '')
   const [desc, setDesc] = useState(preset?.description ?? '')
@@ -156,6 +160,8 @@ export default function CreatePaymentDialog({
 
   const reset = () => {
     setPayee(preset?.payee ?? '')
+    setPayeeBank('')
+    setPayeeAccount('')
     setCompanyId(preset?.companyId ?? '')
     setBankId(opts?.banks[0]?.id ?? '')
     setDesc(preset?.description ?? '')
@@ -264,6 +270,7 @@ export default function CreatePaymentDialog({
     neededSentence(need) ??
     (Math.abs(offBy) > 0.005 ? `The lines add up to RM ${money(lineSum)} — the amount is RM ${money(total)}.` : null) ??
     filesProblem(files) ??
+    (preset?.requests ? null : payeeProblem(payeeBank, payeeAccount)) ??
     (billBack.some((b) => b.billBack && !b.category) ? 'Keep a line of each request billed back — its invoice takes that line’s category.' : null)
   const ok = problem === null && !!opts
 
@@ -278,6 +285,10 @@ export default function CreatePaymentDialog({
     fd.set('reference_id', '')
     fd.set('payee_name', payee.trim())
     fd.set('payee_company_id', companyId)
+    if (!preset?.requests && (payeeBank.trim() || payeeAccount.trim())) {
+      fd.set('payee_bank', payeeBank.trim())
+      fd.set('payee_account_no', payeeAccount.trim())
+    }
     if (bankId) fd.set('bank_account_id', bankId)
     fd.set('amount', total.toFixed(2))
     fd.set('payment_date', date)
@@ -408,6 +419,17 @@ export default function CreatePaymentDialog({
             <DateField value={date} onChange={setDate} today={today} label="Payment date" />
           </Field>
         </div>
+
+        {preset?.requests ? null : (
+          <div className={fm.pair}>
+            <Field label="Pay into bank" htmlFor="cp-payee-bank">
+              <Input id="cp-payee-bank" value={payeeBank} onChange={(e) => setPayeeBank(e.target.value)} placeholder="Optional — e.g. Maybank" maxLength={120} />
+            </Field>
+            <Field label="Account number" htmlFor="cp-payee-acct">
+              <Input id="cp-payee-acct" mono inputMode="numeric" value={payeeAccount} onChange={(e) => setPayeeAccount(e.target.value)} placeholder="Optional" maxLength={40} />
+            </Field>
+          </div>
+        )}
 
         <div className={fm.pair}>
           <Field label="From bank" htmlFor="cp-bank">

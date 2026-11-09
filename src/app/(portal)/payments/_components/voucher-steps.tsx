@@ -58,6 +58,8 @@ export function useVoucherSteps(
   },
 ): {
   steps: VoucherStep[]
+  /** The ⋯ menu's rows (Copy · Change GL · Return to draft … then Void) — the hub's row menu lists them flat. */
+  more: DialogMenuItem[]
   busy: boolean
   error: string | null
   dialogs: ReactNode
@@ -236,5 +238,5 @@ export function useVoucherSteps(
     </>
   ) : null
 
-  return { steps, busy, error, dialogs, openFile, addFiles }
+  return { steps, more, busy, error, dialogs, openFile, addFiles }
 }

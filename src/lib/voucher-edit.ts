@@ -33,6 +33,9 @@ export interface VoucherEditFields {
   accountCode: string
   /** A payment's source rows. */
   rows: VoucherEditRow[]
+  /** Pay into (2026-11-09) — absent where the form does not offer it (the phone's sheet), or the number is not the reader's to see. */
+  payeeBank?: string
+  payeeAccount?: string
 }
 
 /** The voucher as stored, in the form's words. */
@@ -47,6 +50,8 @@ export function storedVoucherFields(
     payment_method: string | null
     payment_date: string | null
     target_pool: string | null
+    payee_bank?: string | null
+    payee_account_no?: string | null
   },
   sources: VoucherEditRow[],
   creditAccount: string | null,
@@ -55,6 +60,8 @@ export function storedVoucherFields(
     amount: v.amount.toFixed(2),
     payeeName: v.payee_name ?? '',
     payeeCompanyId: v.payee_company_id ?? '',
+    payeeBank: v.payee_bank ?? '',
+    payeeAccount: v.payee_account_no ?? '',
     bankAccountId: v.bank_account_id ?? '',
     description: v.description ?? '',
     paymentMethod: v.payment_method ?? 'bank_transfer',
@@ -93,6 +100,12 @@ export function voucherEditForm(id: string, direction: 'debit' | 'credit', was: 
   if (cents(now.amount) !== cents(was.amount)) fd.set('amount', now.amount.trim())
   if (now.payeeName.trim() !== was.payeeName.trim()) fd.set('payee_name', now.payeeName.trim())
   if (now.payeeCompanyId !== was.payeeCompanyId) fd.set('payee_company_id', now.payeeCompanyId)
+  // Pay into goes as a pair, and only when the form offers it and it changed.
+  if (now.payeeBank !== undefined && now.payeeAccount !== undefined
+      && (now.payeeBank.trim() !== (was.payeeBank ?? '').trim() || now.payeeAccount.replace(/[\s-]/g, '') !== (was.payeeAccount ?? '').replace(/[\s-]/g, ''))) {
+    fd.set('payee_bank', now.payeeBank.trim())
+    fd.set('payee_account_no', now.payeeAccount.trim())
+  }
   if (now.bankAccountId !== was.bankAccountId) fd.set('bank_account_id', now.bankAccountId)
   if (now.description.trim() !== was.description.trim()) fd.set('description', now.description.trim())
   if (now.paymentMethod !== was.paymentMethod) fd.set('payment_method', now.paymentMethod)

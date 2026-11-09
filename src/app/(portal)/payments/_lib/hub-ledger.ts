@@ -8,6 +8,8 @@ import { startRead } from '@/lib/start-read'
 import { officeDay, officeMonth, officeTime } from '@/lib/office-time'
 import { filterLockedBatches, isPayrollReference, lockPayrollBatches, type LockedBatch } from '@/lib/payroll-vouchers'
 import type { User } from '@/types'
+import { sees } from '@/lib/sensitive'
+import { payeeAsSeen, payIntoText, readVoucherPayees, type VoucherPayee } from '@/lib/voucher-payees'
 import type { VoucherRow } from '../_components/VouchersTable'
 
 // Payments' and Receipt's hubs (2026-10-14, the Finance revamp v2 — D02–D05,
@@ -72,6 +74,8 @@ export interface HubRow {
   amendDate: { kind: 'voucher' | 'repayment'; id: string; date: string } | null
   /** A received loan repayment's amount corrected in place — Change amount. */
   amendAmount: boolean
+  /** A payment's Pay into — "Maybank 5140…", "Maybank •••• 0009" (2026-11-09); none for most. */
+  payInto?: string | null
 }
 
 /** One member of a payroll batch: a voucher, or a department's total read by department. */
@@ -158,6 +162,8 @@ export interface HubLedgerInput {
   departments: string[]
   /** The office's month, `YYYY-MM`. */
   month: string
+  /** The payments' Pay into, by voucher id, as the reader may see it. */
+  payees?: ReadonlyMap<string, VoucherPayee>
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100
@@ -321,6 +327,7 @@ export function buildHubLedger(input: HubLedgerInput): HubLedger {
           ? { kind: 'voucher', id: v.id, date: v.payment_date.slice(0, 10) }
           : null,
       amendAmount: false,
+      payInto: payIntoText(input.payees?.get(v.id)),
     })
   }
   // A salary batch stands in a card as one row of the members it lists there:
@@ -522,6 +529,11 @@ export async function loadHubLedger(
   const banks = banksRead ? (((await banksRead).data ?? []) as Array<{ id: string; bank_name: string }>) : []
   const departments = departmentsRead ? (((await departmentsRead).data ?? []) as Array<{ name: string }>).map((d) => d.name) : []
   const extras = await extrasRead
+  // Pay into (2026-11-09): a payment's, through its reader — never a receipt's.
+  const seesBank = sees(user, 'bank')
+  const payees = receipts
+    ? undefined
+    : new Map([...(await readVoucherPayees(supabase, vouchers.map((v) => v.id)))].map(([id, p]) => [id, payeeAsSeen(p, seesBank)] as const))
 
   return buildHubLedger({
     direction,
@@ -534,5 +546,6 @@ export async function loadHubLedger(
     banks,
     departments,
     month: officeMonth(),
+    payees,
   })
 }

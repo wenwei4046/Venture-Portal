@@ -61,7 +61,8 @@ export default function RowMenu({ title, anchor, items, onClose }: Props) {
       top: Math.max(8, Math.min(anchor.y, window.innerHeight - height - 8)),
     })
     el.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus({ preventScroll: true })
-  }, [anchor.x, anchor.y])
+    // Placed again when its items grow (a voucher's steps arrive after the right-click, 2026-11-09).
+  }, [anchor.x, anchor.y, items.length])
 
   useEffect(() => {
     const away = (e: Event) => {
