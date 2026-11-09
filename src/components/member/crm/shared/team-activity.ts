@@ -130,7 +130,7 @@ export function activityVM(x: ActivityIn) {
         const turn = book.turn(id, nowStamp), on = turn.on, open = !!st[openKey][id] || st.who === id, wl = LV(s.waitMax);
         const list = (byWho.get(id) ?? []).slice().reverse().map(l => {
           const w = waitOf(l), status = statusOf(l), SS = ST[status];
-          return { key: l.key, repT: w == null ? fmt(l.reply) : "", waitT: w != null ? fmt(w) : "", got: hm(l.got), name: l.customer.name,
+          return { key: l.key, repT: w == null ? fmt(l.reply) : "", waitT: w != null ? fmt(w) : "", got: hm(l.got), gotD: dm(l.got), name: l.customer.name,
             reply: w != null ? `waiting ${fmt(w)}` : `${fmt(l.reply)} reply`, rc: w != null ? (LV(w)[0] ? LV(w)[1] : "var(--crm-leave-annual-text)") : C.ink,
             go: () => set({ [leadKey]: { id, key: l.key } }), bg: sel && sel.key === l.key ? C.field : "transparent",
             status: w != null ? "" : status, sFg: SS[1] };

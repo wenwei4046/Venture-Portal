@@ -65,7 +65,8 @@ export function DeskTeamActivityView({ v }: { v: ActivityVM }) {
           {r.list.map(l => (
             <div key={l.key} {...press(l.go)} className={s.row} style={{ display: "grid", gridTemplateColumns: v.cols, columnGap: "12px", alignItems: "center", height: "34px", fontSize: "12.5px", color: "var(--crm-list-sub)", fontVariantNumeric: "tabular-nums", cursor: "pointer", background: l.bg }}>
               <span style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, paddingLeft: "24px" }}>
-                <span style={{ flex: "none", width: "36px", font: `600 12px ${TIGHT}` }}>{l.got}</span>
+                {/* The day too (the owner, 2026-11-09: "audit log 加日期"). */}
+                <span style={{ flex: "none", width: "86px", font: `600 12px ${TIGHT}`, whiteSpace: "nowrap" }}><span style={{ fontWeight: 500, color: "var(--crm-faint)" }}>{l.gotD}</span> {l.got}</span>
                 <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-ink)" }}>{l.name}</span>
                 {l.status && <span style={{ flex: "none", whiteSpace: "nowrap", fontSize: "12px", color: l.sFg }}>{l.status}</span>}
               </span>
