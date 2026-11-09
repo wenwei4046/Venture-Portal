@@ -95,7 +95,8 @@ export function chatProgressVM(ctx: DeskCtx, opItem: string) {
     rail: ibSteps.map((s, i) => ({ dot: s.dot, ring: s.ring, size: s.size, tip: `${s.label} · ${s.date}`, gap: i === 4 ? "transparent" : "var(--crm-rule)" })),
     ev: ibR ? evRows(ibR, "12px") : [],
     // 4a's per-chat Audit log (frames 02b / 02c): the same journey, newest first, as a timeline — what, the detail, who.
-    audit4: ibR ? ibR.ev.slice().reverse().map(e => {
+    audit4: ibR ? auditOf(ibR) : [] };
+  function auditOf(r: (typeof rows)[number]) { return r.ev.slice().reverse().map(e => {
       const came = e.text.startsWith("Came in");
       const WHAT: Record<string, string> = { assign: "Assigned", move: "Moved", share: "Shared", reply: came ? "Lead arrived" : "First reply", appt: e.text.startsWith("Changed") ? "Visit changed" : "Visit booked",
         visit: "Checked in", status: "Status changed", won: "Won", lost: "Lost", remind: "Reminder", note: "Note added" };
@@ -103,9 +104,13 @@ export function chatProgressVM(ctx: DeskCtx, opItem: string) {
       return { what: WHAT[e.kind] ?? "Change", detail: [came ? e.text.replace(/^Came in from /, "") : e.text, e.note].filter(Boolean).join(" · "),
         who: e.who ? (e.who === me.id ? "You" : nameOf(e.who)) : came ? "Meta" : "Automatic",
         time: t.toDateString() === now.toDateString() ? hm : `${dShort(e.at)}, ${hm}`, main: ["appt", "won", "lost"].includes(e.kind), hot: e.kind === "status" };
-    }) : [] };
+    }); }
+  // The same Audit log under Customer info wherever it opens on its own — Insight's lists, the Calendar (the owner,
+  // 2026-11-09: "能不能看到 audit log?").
+  const infoR = ui.infoId ? rows.find(r => r.c.id === ui.infoId) : undefined;
+  const infoAudit = infoR ? auditOf(infoR) : [];
   return {
-    ibCp,
+    ibCp, infoAudit,
     cpOpen: open, isCpOp: opItem === "Chat progress",
     cpChips: ["All", ...ORD].map(k => { const on = f === k, pr = rows.filter(hasP), n = k === "All" ? pr.length : pr.filter(r => r.cur === k).length;
       return { label: k, n, bg: on ? "var(--crm-ink)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", bd: on ? "var(--crm-ink)" : "var(--crm-line)", nfg: on ? "var(--crm-rule)" : "var(--crm-muted)", pick: () => patch({ cpF: k }) }; }),

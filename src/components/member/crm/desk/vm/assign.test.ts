@@ -11,7 +11,7 @@ import { assignPageVM } from "./assign";
 import { DIRECTOR_SPLIT_KEY } from "./tokens";
 
 function harness(rule: CrmData["adRules"][number] | null, opts: { act?: Record<string, unknown>; rules?: CrmData["adRules"]; adNames?: CrmData["adNames"] } = {}) {
-  let ui: DeskUi = { ...initialDeskUi(), stage: "op" };
+  let ui: DeskUi = { ...initialDeskUi(), stage: "op", adSt: "all" }; // every ad (the list opens on Running since 2026-11-09)
   const data = {
     customers: [{ id: "c1", name: "Kenny", phone: "", channel: "whatsapp", adId: "AD1", ad: "Video Ads-15/10", status: "new", assignedTo: null, teamId: null,
       createdAt: new Date(2026, 9, 15).toISOString(), lastCustomerAt: null, unread: 0, details: { type: "", size: "", loc: "", req: "", budget: "" }, messages: [] }],

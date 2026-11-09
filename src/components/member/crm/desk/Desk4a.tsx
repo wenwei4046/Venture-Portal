@@ -385,6 +385,36 @@ interface InboxListBits {
 }
 
 /** Frame 02 · the Inbox's list (290 px): Everyone ▾, Search, the eight status tabs, the chats. */
+/** Inbox's statuses as one dropdown (the owner, 2026-11-09: "做下拉式" — the row of nine wrapped to three lines). */
+function StatusDrop({ tabs }: { tabs: { label: string; count: number | string; on: boolean; hot?: boolean; pick: () => void }[] }) {
+  const [open, setOpen] = useState(false);
+  const cur = tabs.find(t => t.on) ?? tabs[0];
+  if (!cur) return null;
+  return (
+    <span style={{ position: "relative", alignSelf: "flex-start" }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={`Status: ${cur.label}`} style={{ ...BTN, height: "32px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "6px",
+        font: "500 13px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)", whiteSpace: "nowrap" }} className="crm4a-outline">
+        <span style={{ color: "var(--crm-muted)", fontWeight: 400 }}>Status</span>{cur.label}
+        <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--crm-faint)" }}>{cur.count}</span><Ic name="chevron-down" size={13} />
+      </button>
+      {open && (<>
+        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
+        <div role="listbox" style={{ position: "absolute", top: "38px", left: 0, zIndex: 8, width: "220px", maxHeight: "440px", overflow: "auto", padding: "6px", background: "#fff", borderRadius: "10px",
+          boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "1px" }}>
+          {tabs.map(t => (
+            <button key={t.label} type="button" role="option" aria-selected={t.on} onClick={() => { t.pick(); setOpen(false); }} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", minHeight: "34px", padding: "4px 8px", borderRadius: "7px",
+              font: `${t.on ? 600 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)", background: t.on ? "var(--crm-sel)" : "transparent" }} className="crm4a-row">
+              <span style={{ flex: 1 }}>{t.label}</span>
+              <span style={{ fontVariantNumeric: "tabular-nums", font: "400 12px Inter, sans-serif", color: t.hot && t.count ? "var(--crm-oxblood)" : "var(--crm-faint)" }}>{t.count}</span>
+              <span style={{ width: "16px", display: "flex", color: "var(--crm-rust)" }}>{t.on && <Ic name="check" size={14} />}</span>
+            </button>
+          ))}
+        </div>
+      </>)}
+    </span>
+  );
+}
+
 export function DeskInboxList4a({ v }: { v: InboxListBits }) {
   const L = v.list4;
   return (
@@ -434,14 +464,7 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
             <input value={L.q} onChange={L.setQ} placeholder="Search" aria-label="Search chats" style={{ flex: 1, minWidth: 0, border: 0, outline: "none", background: "transparent", font: "inherit", color: "var(--crm-ink)", padding: 0 }} />
           </label>
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", rowGap: "6px" }}>
-          {L.tabs.map(t => (
-            <button key={t.label} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, display: "flex", alignItems: "baseline", gap: "5px", padding: "3px 0", font: `${t.on ? 600 : 400} 12px Inter, sans-serif`,
-              borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-ink-soft)" }}>
-              {t.label}<span style={{ fontVariantNumeric: "tabular-nums", color: t.hot && t.count ? "var(--crm-oxblood)" : "var(--crm-faint)" }}>{t.count}</span>
-            </button>
-          ))}
-        </div>
+        <StatusDrop tabs={L.tabs} />
         {/* One's own labels (2026-11-02): a chip each label in use, a click filters to it, again clears. */}
         {!!L.labels?.length && (
           <div aria-label="Labels" style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
@@ -2000,6 +2023,7 @@ export function DeskSettings4a({ v }: { v: SettingsBits & { upNextAccess?: UpNex
   const S = v.settings4;
   const [draft, setDraft] = useState<SetVals | null>(null);
   const [busy, setBusy] = useState(false);
+  const [typing, setTyping] = useState<{ k: SetKey; t: string } | null>(null);
   const d = draft ?? S.cur;
   const dirty = !!draft && (Object.keys(S.cur) as SetKey[]).some(k => draft[k] !== S.cur[k]);
   const rising = d.replySoonH >= 1 && d.replyUrgentH > d.replySoonH && d.replyOverdueH > d.replyUrgentH && d.replyOverdueH <= 24;
@@ -2031,9 +2055,13 @@ export function DeskSettings4a({ v }: { v: SettingsBits & { upNextAccess?: UpNex
                     // v2 frame 10: the hours typed in an 84 px box, the unit inside (as Split's boxes).
                     <label style={{ width: "84px", height: "34px", padding: "0 10px", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "3px", boxSizing: "border-box",
                       border: `1px solid ${rising ? "var(--crm-line)" : "var(--crm-oxblood)"}`, background: "#fff", font: `500 14px ${TIGHT}`, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>
-                      <input type="text" inputMode="numeric" value={String(d[k!] as number)} aria-label={`${r.t} hours`}
-                        onChange={e => { const n = parseInt(e.target.value.replace(/D/g, ""), 10); if (!Number.isNaN(n)) put(k!, Math.min(24, Math.max(1, n))); }}
-                        onKeyDown={e => { if (e.key === "ArrowUp") { e.preventDefault(); step(k!, 1); } if (e.key === "ArrowDown") { e.preventDefault(); step(k!, -1); } }}
+                      {/* Typed freely — emptied, two digits — and settled (1–24) on leaving the box or Enter (the owner, 2026-11-09:
+                          "hours 不好输入": an emptied box snapped back and "12" over "2" read 21). */}
+                      <input type="text" inputMode="numeric" value={typing?.k === k ? typing.t : String(d[k!] as number)} aria-label={`${r.t} hours`}
+                        onFocus={e => { setTyping({ k: k!, t: String(d[k!] as number) }); e.currentTarget.select(); }}
+                        onChange={e => { const t = e.target.value.replace(/D/g, "").slice(0, 2); setTyping({ k: k!, t }); const n = parseInt(t, 10); if (!Number.isNaN(n) && n >= 1 && n <= 24) put(k!, n); }}
+                        onBlur={() => setTyping(null)}
+                        onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); if (e.key === "ArrowUp") { e.preventDefault(); setTyping(null); step(k!, 1); } if (e.key === "ArrowDown") { e.preventDefault(); setTyping(null); step(k!, -1); } }}
                         style={{ width: "100%", minWidth: 0, border: 0, outline: "none", padding: 0, background: "transparent", font: "inherit", color: "inherit", textAlign: "right" }} />
                       <span style={{ color: "var(--crm-faint)", fontSize: "12px" }}>{k === "replyOverdueH" ? "h+" : "h"}</span>
                     </label>
@@ -2378,6 +2406,59 @@ function BookingPreview({ secs }: { secs: FormBits["cfBookPv"] }) {
         ))}
         <span style={{ marginTop: "4px", height: "30px", borderRadius: "8px", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", font: "600 11px Inter, sans-serif" }}>Book this slot</span>
       </div>
+    </div>
+  );
+}
+
+/** Leads › Sort's menu, then its salespeople (the owner, 2026-11-09: "要能选 sales person") — one picked shows only theirs. */
+export function DeskRepPick4a({ reps = [] }: { reps?: { label: string; n: number; bg: string; fg: string; w: number; pick: () => void }[] }) {
+  if (!reps.length) return null;
+  return (<>
+    <span style={{ height: "1px", margin: "6px 4px", background: "var(--crm-rule)" }} />
+    <span style={{ padding: "4px 10px 2px", fontSize: "11px", fontWeight: 700, letterSpacing: ".06em", color: "var(--crm-muted)" }}>SALESPERSON</span>
+    {reps.map(r => (
+      <button key={r.label} type="button" onClick={r.pick} style={{ height: "34px", padding: "0 10px", border: 0, borderRadius: "8px", background: r.bg, color: r.fg, font: "inherit", fontSize: "13.5px", fontWeight: r.w, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", flex: "none" }}>
+        <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</span>
+        <span style={{ fontSize: "12.5px", color: "var(--crm-muted)", fontWeight: 500 }}>{r.n}</span>
+      </button>
+    ))}
+  </>);
+}
+
+/** Customer info's own Audit log (the owner, 2026-11-09: "能不能看到 audit log?"): Inbox's per-chat log, folded until opened. */
+export function DeskInfoAudit4a({ items }: { items?: { what: string; detail: string; who: string; time: string; main: boolean; hot: boolean }[] }) {
+  const [open, setOpen] = useState(false);
+  if (!items) return null; // the prototype harness draws none
+  return (
+    <div style={{ border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden", flex: "none" }}>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} style={{ ...BTN, width: "100%", height: "46px", display: "flex", alignItems: "center", gap: "8px", padding: "0 14px", background: "#fff", color: "var(--crm-ink)" }}>
+        <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name="history" size={15} /></span>
+        <span style={{ font: "600 14px Inter, sans-serif" }}>Audit log</span>
+        <span style={{ font: "400 12.5px Inter, sans-serif", color: "var(--crm-muted)" }}>{items.length}</span>
+        <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-faint)", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}><Ic name="chevron-right" size={15} /></span>
+      </button>
+      {open && (
+        <div style={{ display: "flex", flexDirection: "column", padding: "12px 14px 2px", borderTop: "1px solid var(--crm-rule)", background: "var(--crm-hover)" }}>
+          {!items.length && <span style={{ padding: "8px 0 14px", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Nothing recorded yet</span>}
+          {items.map((a, i) => (
+            <div key={i} style={{ display: "flex", gap: "12px" }}>
+              <div style={{ width: "10px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <span style={{ width: "9px", height: "9px", marginTop: "4px", borderRadius: "50%", boxSizing: "border-box", background: a.hot ? "var(--crm-orange)" : a.main ? "var(--crm-rust)" : "#fff",
+                  border: `2px solid ${a.hot ? "var(--crm-orange)" : a.main ? "var(--crm-rust)" : "var(--crm-faint)"}` }} />
+                {i < items.length - 1 && <span style={{ flex: 1, width: "1px", background: "var(--crm-audit-line)" }} />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "3px", paddingBottom: "14px" }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+                  <div style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{a.what}</div>
+                  <div style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{a.time}</div>
+                </div>
+                {a.detail && <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)", overflowWrap: "anywhere" }}>{a.detail}</div>}
+                <div style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>{a.who}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

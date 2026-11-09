@@ -132,7 +132,7 @@ interface HeadBits {
 }
 
 /** Assignment's tabs as the design names them (docs/design_handoff_crm, CRM Assignment People.dc.html). */
-const TAB_WORDS: Record<string, string> = { "Ads to teams": "Ad split", "Full time lead allocation": "Full time days" };
+const TAB_WORDS: Record<string, string> = { "Ads to teams": "Ad split", "Full time lead allocation": "Full time days", People: "Leave" };
 
 /** Reports' two tabs: Ready-made (the categories) and My reports (what was Workspace). */
 const rpTabs = (ctx: DeskCtx, mine: boolean): F4Tab[] => [

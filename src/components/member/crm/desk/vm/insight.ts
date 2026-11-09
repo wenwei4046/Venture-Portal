@@ -268,6 +268,12 @@ export function clistVM(ctx: DeskCtx) {
   const O = ["Overdue", "Urgent", "Reply soon", "New", "Follow up", "Appointment", "Showed up", "No show yet", "Cold", "Won", "Lost"];
   const si = (s: string) => { const i = O.findIndex(o => s.startsWith(o)); return i < 0 ? 99 : i; };
   const k = ui.clSort || "Last chat";
+  // One salesperson at a time (the owner, 2026-11-09: "要能选 sales person"): picked under Sort's menu, kept while the
+  // list has them, everybody again when it has not.
+  const repN = new Map<string, number>(); for (const x of rows) repN.set(x.rep || "Unassigned", (repN.get(x.rep || "Unassigned") ?? 0) + 1);
+  const rep = ui.clRep && repN.has(ui.clRep) ? ui.clRep : null;
+  if (rep) rows = rows.filter(x => (x.rep || "Unassigned") === rep);
+  const tone = (on: boolean) => ({ bg: on ? "var(--crm-tint-attention)" : "transparent", fg: on ? "var(--crm-rust)" : "var(--crm-ink)", w: on ? 700 : 500 });
   const lastOf = (id: string) => all.find(x => x.id === id)?.last ?? 0;
   const sorted = rows.slice().sort(
     k === "Oldest chat" ? (a, b) => lastOf(a.id) - lastOf(b.id)
@@ -279,8 +285,10 @@ export function clistVM(ctx: DeskCtx) {
   return {
     clistN: isList ? `${rows.length} ${rows.length === 1 ? "customer" : "customers"}` : `${rows.length} ${rows.length === 1 ? "visit" : "visits"}`,
     clistEmpty: ui.kind === "clist" && !rows.length,
-    clSortLabel: k, clSortOpen: ui.clSortOpen, clSortToggle: () => set(u => ({ ...u, clSortOpen: !u.clSortOpen })),
+    clSortLabel: rep ? `${k} · ${rep}` : k, clSortOpen: ui.clSortOpen, clSortToggle: () => set(u => ({ ...u, clSortOpen: !u.clSortOpen })),
     clSorts: ["Last chat", "Oldest chat", "Status", "Salesperson", "Name A–Z"].map(s => ({ label: s, bg: s === k ? "var(--crm-tint-attention)" : "transparent", fg: s === k ? "var(--crm-rust)" : "var(--crm-ink)", w: s === k ? 700 : 500, pick: () => patch({ clSort: s, clSortOpen: false }) })),
+    clReps: repN.size > 1 || rep ? [{ label: "All salespeople", n: [...repN.values()].reduce((a, b) => a + b, 0), ...tone(!rep), pick: () => patch({ clRep: null, clSortOpen: false }) },
+      ...[...repN].sort((a, b) => a[0] === "Unassigned" ? 1 : b[0] === "Unassigned" ? -1 : a[0].localeCompare(b[0])).map(([name, n]) => ({ label: name, n, ...tone(rep === name), pick: () => patch({ clRep: name, clSortOpen: false }) }))] : [],
     clistRows: sorted.map(x => { const c = ST[x.status.split(" · ")[0]] ?? ST["Follow up"];
       return { name: x.name, ini: x.ini, sub: x.sub, status: x.status, stBg: c[0], stFg: c[1],
         open: () => key.startsWith("st:") ? patch({ kind: "chat", chat: x.id, fromList: true }) : patch({ kind: "info", infoId: x.id, infoFromChat: false }) }; }),

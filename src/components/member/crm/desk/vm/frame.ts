@@ -36,6 +36,9 @@ export function lists(ctx: DeskCtx): Record<string, [string, string, string][]> 
       ["Full time lead allocation", ftTeams ? `On for ${ftTeams} of ${ctx.teams.length} teams` : "Not set for any team", "users"],
       // Assignment › People (docs/design_handoff_crm, 2026-11-08): Active members, Member work type and each person's
       // Full time days, Pause and leave on one calendar.
+      // The owner, 2026-11-09: "assignment 原本应该还有 active people 的对吗？" — Active members is its own tab again, and People
+      // reads Leave ("people 改成 leave") — it is the leave calendar.
+      ["Active members", "", "users"],
       ["People", "", "users"],
     ],
     // Settings = Cold lead templates and Notifications (v2). History is the sidebar's Audit log now.
@@ -219,7 +222,7 @@ export function frameVM(ctx: DeskCtx) {
     showKicker: tab !== "showrooms" && tab !== "forms", // The section pill ("All assignment ⌄") is gone (the owner, 2026-10-13): the right menu already switches sections.
     showOpChip: false,
     isAdsOp: opItem[0] === "Ads to teams", notAdsOp: opItem[0] !== "Ads to teams" && opItem[0] !== "Full time lead allocation",
-    isFtOp: opItem[0] === "Full time lead allocation", isMwtOp: false, isActOp: false, isPeopleOp: tab === "assignment" && opItem[0] === "People", isLbaOp: opItem[0] === "Leads by ad", isHistOp: false, isSrOp: opItem[0] === "Showrooms", isCltOp: opItem[0] === "Cold lead templates",
+    isFtOp: opItem[0] === "Full time lead allocation", isMwtOp: false, isActOp: tab === "assignment" && opItem[0] === "Active members", isPeopleOp: tab === "assignment" && opItem[0] === "People", isLbaOp: opItem[0] === "Leads by ad", isHistOp: false, isSrOp: opItem[0] === "Showrooms", isCltOp: opItem[0] === "Cold lead templates",
     isCpOp: opItem[0] === "Chat progress", isFrmOp: opItem[0] === "Forms" && tab !== "forms", isNtfOp: tab === "settings" && opItem[0] === "Notifications", isGenOp: tab === "settings" && opItem[0] === "General", isLibOp: tab === "settings" && opItem[0] === "Reply library", isLinkOp: tab === "settings" && opItem[0] === "Booking link",
     // v2's page padding and title size: Ads to teams and Full time take the frame's whole width.
     // 4a: the pages' gutter under the head (frames 06–11): 16 px down, 36 px in.

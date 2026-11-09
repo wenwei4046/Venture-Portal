@@ -319,6 +319,24 @@ module.exports = function desk4a(body) {
     if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: split body");
     body = body.slice(0, a) + start + "\n                <DeskSplit4a v={v} />\n                " + '<div style={{ flex: "0 0 auto", display: "flex", gap: "8px", padding: "16px 24px", borderTop: "1px solid var(--crm-rule)" }}>' + body.slice(b + end.length);
   }
+  // Leads › pick one salesperson (the owner, 2026-11-09: "要能选 sales person"): under Sort's choices, the list's
+  // salespeople with their counts (insight.ts › clReps); the menu a little wider and scrolling when they are many.
+  body = once(body, '<div style={{ position: "absolute", top: "38px", right: "0", width: "180px", padding: "6px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "12px", boxShadow: "0 10px 30px rgba(42,22,12,.14)", display: "flex", flexDirection: "column" }}>',
+    '<div style={{ position: "absolute", top: "38px", right: "0", width: "220px", maxHeight: "min(70vh, 520px)", overflowY: "auto", padding: "6px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "12px", boxShadow: "0 10px 30px rgba(42,22,12,.14)", display: "flex", flexDirection: "column" }}>', "leads sort menu");
+  {
+    const start = "{(v.clSorts).map((o, o_i) => (<Fragment key={o_i}>", a = body.indexOf(start);
+    const end = "</Fragment>))}", b = body.indexOf(end, a);
+    if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: leads salesperson");
+    body = body.slice(0, b + end.length) + "\n                          <DeskRepPick4a reps={v.clReps} />" + body.slice(b + end.length);
+  }
+  // Customer info on its own (Insight's lists, the Calendar) ends with the customer's Audit log (the owner, 2026-11-09:
+  // "能不能看到 audit log?") — Inbox's per-chat log, folded until opened (Desk4a.tsx › DeskInfoAudit4a).
+  {
+    const start = "{(v.ci.rows).map((r, r_i) => (<Fragment key={r_i}>", a = body.indexOf(start);
+    const end = "</Fragment>))}\n                    </div>", b = body.indexOf(end, a);
+    if (a < 0 || b < a || body.indexOf(start, a + 1) >= 0) throw new Error("desk-4a: info audit");
+    body = body.slice(0, b + end.length) + "\n                    <DeskInfoAudit4a items={v.infoAudit} />" + body.slice(b + end.length);
+  }
   return body;
 };
 module.exports.el = el;
