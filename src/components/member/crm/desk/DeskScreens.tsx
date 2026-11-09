@@ -223,6 +223,15 @@ export default function DeskScreens(p: DeskScreensProps) {
       async setChannel(kind, id, name, linked, isDefault) {
         return !!(await call("crm_set_channel", { p_kind: kind, p_external: id, p_name: name, p_linked: linked, p_default: isDefault }));
       },
+      saveUiPref: (() => {
+        // A burst of clicks is one write per key (v4 notes 21 / 25: remembered per user, on the server).
+        const timers = new Map<string, ReturnType<typeof setTimeout>>();
+        return (key: string, value: unknown) => {
+          setData(d => ({ ...d, uiPrefs: { ...(d.uiPrefs ?? {}), [key]: value } }));
+          const t = timers.get(key); if (t) clearTimeout(t);
+          timers.set(key, setTimeout(() => { timers.delete(key); void call("crm_save_ui_pref", { p_key: key, p_value: value ?? null }); }, 600));
+        };
+      })(),
       saveRecents: (() => {
         // A burst of picks is one write, as the phone's (sales/actions.ts).
         let timer: ReturnType<typeof setTimeout> | null = null;

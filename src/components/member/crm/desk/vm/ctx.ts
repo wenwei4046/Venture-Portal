@@ -349,6 +349,8 @@ export interface DeskActions {
   setChannel(kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean): Promise<boolean>;
   /** One's emoji Recents, kept on the server as the phone keeps them (crm_save_recent_emoji). */
   saveRecents(list: string[]): void;
+  /** One's own screen choices on the server (crm_save_ui_pref, mig 20261110120000) — read back as data.uiPrefs[key]. */
+  saveUiPref(key: "adsFigures" | "reportCols", value: unknown): void;
   saveMeta(s: Parameters<typeof import("@/app/(member)/member/crm-channels-actions").saveCrmChannel>[0]): Promise<boolean>;
   /** v2 frame 09b: one business profile to the number's WhatsApp and / or Facebook Page, each answered on its own. */
   saveProfile(form: FormData): Promise<import("@/app/(member)/member/crm-channels-actions").ProfileSaveResult | null>;

@@ -369,6 +369,8 @@ export interface CrmData {
   notifDeleted?: string[];
   /** The chat composer's Recents (mig 20261014251500): this person's recent emoji, most recent first. */
   recentEmoji?: string[];
+  /** One's own screen choices kept on the server (mig 20261110120000, crm_save_ui_pref): adsFigures, reportCols. */
+  uiPrefs?: Record<string, unknown>;
   /** CRM Desktop rev 1 (B5): the Customer info form the Principal / Director set — every salesperson's Customer info follows it. */
   forms?: CrmForm[];
   /** The booking link's forms (mig 20261030040000, crm_forms.kind = 'booking'), the one in use first — what /b/<code> asks. */
@@ -552,7 +554,7 @@ export interface CrmDataRows {
   invites: CrmInviteRow[];
   shares: { contact_id: string; staff_id: string; invited_by: string | null; joined_at: string }[];
   events: CrmEventRow[];
-  staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null; notif_deleted?: string[] | null; recent_emoji?: string[] | null }[];
+  staffPrefs: { notifs_seen_at: string | null; notif_read?: string[] | null; notif_deleted?: string[] | null; recent_emoji?: string[] | null; ui_prefs?: Record<string, unknown> | null }[];
   /** CRM Desktop rev 1 (B5 / B6): absent where the database has none yet. */
   forms?: { id: string; name: string; sections: CrmForm["sections"] | null; sort_order: number; kind?: string | null }[];
   notes?: { id: string; contact_id: string; body: string; author: string | null; created_at: string }[];
@@ -747,6 +749,7 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     notifRead: rows.staffPrefs[0]?.notif_read ?? [],
     notifDeleted: rows.staffPrefs[0]?.notif_deleted ?? [],
     recentEmoji: rows.staffPrefs[0]?.recent_emoji ?? [],
+    uiPrefs: rows.staffPrefs[0]?.ui_prefs ?? {},
     settings: settingsFrom(rows.settings),
     apptTypes: apptTypesFrom(rows.apptTypes),
     adRules: rows.adRules.map(r => ({ adId: r.ad_source_id, label: r.ad_label ?? "", mode: r.mode, split: r.team_split ?? {}, pm: r.people_mode, pp: r.people ?? {}, startedAt: r.started_at, ...(r.team_modes ? { tm: r.team_modes } : {}), ...(r.together ? { together: true } : {}) })),

@@ -45,6 +45,8 @@ const CRM_WRITES = [
   "crm_star_message",
   // The chat composer's Recents (mig 20261014251500): one's own recent emoji.
   "crm_save_recent_emoji",
+  // One's own screen choices (mig 20261110120000, v4 notes 21 / 25): Ads performance figures + chart, Reports columns.
+  "crm_save_ui_pref",
   // An ad's name (mig 20261016120000), CRM · Manage.
   "crm_name_ad", "crm_add_ad", "crm_hide_ad",
   // CRM Desktop v2 · Channels: link / unlink a Page or number, its default (mig 20261015100000).
@@ -254,7 +256,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
         return x ? { ...r2, photo_url: x.photo_path ? `/member/crm-room-photo/${encodeURIComponent(r.id)}?v=${encodeURIComponent(x.photo_path)}` : null, map_google: x.map_google, map_waze: x.map_waze } : r2;
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
-      staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent }] : staffPrefs,
+      staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent, ui_prefs: more.uiPrefs }] : staffPrefs,
       forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, upNextEvents: more.upNextEvents, upNextStaff: more.upNextStaff, messengerBlocked: more.messengerBlocked, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
     }));
     // Where Meta shows every template's review (2026-11-04) — for whoever writes templates; the account's id, never a token.
@@ -281,7 +283,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents, upNextStaff, fbBlocked] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents, upNextStaff, fbBlocked, uiPrefs] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order, kind")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -322,8 +324,10 @@ async function desktopRows(db: Db, journey: boolean) {
     soft<{ staff_id: string }[]>(db.from("crm_staff").select("staff_id").eq("up_next", true)),
     // Messenger customers blocked on Facebook (mig 20261108150000; read softly, so the CRM opens before the column).
     soft<{ id: string }[]>(db.from("crm_contacts").select("id").eq("fb_blocked", true)),
+    // One's own screen choices (mig 20261110120000): empty before it.
+    soft<{ ui_prefs: Record<string, unknown> | null }[]>(db.from("crm_staff_prefs").select("ui_prefs")),
   ]);
-  return { messengerBlocked: fbBlocked.map(r => r.id), upNextStaff: upNextStaff.map(r => r.staff_id), upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
+  return { messengerBlocked: fbBlocked.map(r => r.id), upNextStaff: upNextStaff.map(r => r.staff_id), upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], uiPrefs: uiPrefs[0]?.ui_prefs ?? {}, adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */

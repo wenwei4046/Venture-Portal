@@ -1,0 +1,12 @@
+# 24 · Desktop Inbox (frame D5a) + nav + audit logs (owner, 2026-11-10)
+
+Spec: D5a in `CRM Optimized Desktop.dc.html`. Approved (owner, 2026-11-10: "use d5a"). List: 340px; Search + Brand menu; People / Status (2c) with tags and count; rows as phone 2d (fixed 20px line 1 and line 3, owner · ad on line 2, open chat on `#F7F3EF`, no left colour bar, no separate urgency line). Chat head, ⋮ menu, Customer info, Audit log rail as below.
+
+1. **Left nav "Team activity" and "Ads performance":** both are the same views as Insight › Team activity / Ads performance. Remove both left-nav entries; deep links go to the Insight tabs. (Team activity: it is the same view as Insight › Team activity (both `shared/team-activity.ts`). )
+2. **Brand in the Inbox:** add a Brand menu (All brands / The Conts / Dream Crafter — the same list as Insight's Brand) beside Search in the list head. It filters the list and the People / Status counts.
+3. **Chat ⋮ menu (desktop) = the phone's** (`sales/vm/chat.ts › hm.items`): Assign to (if allowed) · Share · Move (if allowed) · Customer info · Appointment · Label (notes/15) — then a divider and **Block NAME** in oxblood (same action as Inbox › More › Block).
+4. **Customer info panel:** same fields, calmer: sections Labels · Contact · Lead · Visit with sentence-case 12.5px heads that fold; inside, one key/value row each (label 92px `#A8968B`, value 13px 500, wraps); Labels as 24px chips + a plain rust "+ Add"; short dates. People / Status buttons without the rust outline (count badge ink).
+4b. **Audit log stays in its own right-hand panel, folded by default, same place as today** — not inside Customer info. Only its contents change to the format in 5.
+5. **One audit-log format everywhere** (chat Audit log, Customer info › Audit log, Insight › Team activity drawer, Settings › Audit log): the D4b timeline — date + time right-aligned in a 62px column, a dot on a 2px line (ink = assignment/move/edit, green = reply/appointment/show-up, oxblood = cancel/block/delete), title 14.5px 600, detail 13px muted ("before → after" for edits), newest at the bottom; no section heading inside the panel.
+6. **Voice notes on desktop:** drag-to-scrub and tap-to-jump (start from the middle), one note at a time — notes/13 and `Voice Note Scrub.dc.html` apply to the desktop chat too.
+7. **Chat head wait:** plain text, no pill — clock icon 12px + "Waiting 6 h", 13px 600 `#8A1F0A`, right side before ⋮.

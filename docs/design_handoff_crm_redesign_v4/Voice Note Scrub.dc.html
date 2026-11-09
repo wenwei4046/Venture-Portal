@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Inter+Tight:wght@400;500;600&amp;display=swap">
+<style>body{margin:0;background:#E9E2DA}a{color:#422315}a:hover{color:#8A1F0A}</style>
+</helmet>
+<div style="min-height:100vh;box-sizing:border-box;padding:56px 40px;display:flex;flex-wrap:wrap;gap:56px;justify-content:center;align-items:flex-start;font-family:Inter,sans-serif;color:#422315;background:#E9E2DA">
+  <div style="width:430px;height:760px;position:relative;overflow:hidden;border-radius:44px;box-shadow:0 0 0 10px #2A160C,0 30px 60px #2A160C40;display:flex;flex-direction:column;background:#FFFFFF">
+    <div style="height:62px;flex:none;display:flex;align-items:center;gap:10px;padding:0 12px 0 8px;margin-top:20px;border-bottom:1px solid #EEE8E3">
+      <span style="width:26px;height:26px;background:currentColor;mask:url(icons/chevron-left.svg) center/contain no-repeat"></span>
+      <div style="width:40px;height:40px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 14px 'Inter Tight',sans-serif;background:#FCEEE2">LL</div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><div style="font:600 16px Inter,sans-serif">Ly Loong</div><div style="font:400 12px Inter,sans-serif;color:#7A6255">WhatsApp</div></div>
+    </div>
+    <div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:12px 12px 24px;background:#F7F3EF">
+      <div style="align-self:center;font:500 11px Inter,sans-serif;letter-spacing:0.06em;text-transform:uppercase;padding:4px 10px;border-radius:10px;background:#FFFFFFB3;color:#7A6255">Today</div>
+      <sc-for list="{{ notes }}" as="n" hint-placeholder-count="2">
+        <div style="display:flex;justify-content:{{ n.justify }}">
+          <div style="width:300px;box-sizing:border-box;padding:6px 10px 6px 6px;border-radius:{{ n.radius }};display:flex;flex-direction:column;background:{{ n.bg }};box-shadow:0 1px 1px #2A160C14;user-select:none;-webkit-user-select:none">
+            <div style="display:flex;align-items:center;gap:6px">
+              <div onClick="{{ n.toggle }}" style="width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:{{ n.ink }}">
+                <sc-if value="{{ n.playing }}" hint-placeholder-val="{{ false }}"><span style="display:flex;gap:4px"><span style="width:4px;height:16px;border-radius:1px;background:currentColor"></span><span style="width:4px;height:16px;border-radius:1px;background:currentColor"></span></span></sc-if>
+                <sc-if value="{{ n.paused }}" hint-placeholder-val="{{ true }}"><span style="width:20px;height:20px;margin-left:3px;background:currentColor;mask:url(icons/play.svg) center/contain no-repeat"></span></sc-if>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+                <div onPointerDown="{{ n.down }}" onPointerMove="{{ n.move }}" onPointerUp="{{ n.up }}" onPointerCancel="{{ n.up }}" style="position:relative;height:44px;display:flex;align-items:center;gap:2px;cursor:pointer;touch-action:none">
+                  <sc-for list="{{ n.bars }}" as="b" hint-placeholder-count="28"><span style="flex:1;min-height:3px;border-radius:2px;pointer-events:none;height:{{ b.h }};background:{{ b.c }}"></span></sc-for>
+                  <span style="position:absolute;top:50%;pointer-events:none;border-radius:50%;left:{{ n.thumbLeft }};width:{{ n.thumb }};height:{{ n.thumb }};margin-top:{{ n.thumbMt }};background:{{ n.ink }};box-shadow:0 0 0 {{ n.ring }} {{ n.ringC }}"></span>
+                  <sc-if value="{{ n.dragging }}" hint-placeholder-val="{{ false }}">
+                    <span style="position:absolute;bottom:42px;pointer-events:none;transform:translateX(-50%);left:{{ n.pct }};padding:3px 8px;border-radius:8px;font:600 12px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap;background:#422315;color:#FFFFFF">{{ n.atLabel }}</span>
+                  </sc-if>
+                </div>
+                <div style="display:flex;align-items:center;margin-top:-8px;font:400 11px Inter,sans-serif;font-variant-numeric:tabular-nums;color:{{ n.meta }}"><span>{{ n.clock }}</span><span style="margin-left:auto">{{ n.time }}</span></div>
+              </div>
+              <sc-if value="{{ n.started }}" hint-placeholder-val="{{ false }}">
+                <div onClick="{{ n.faster }}" style="width:48px;height:30px;flex:none;border-radius:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;font:600 12px 'Inter Tight',sans-serif;font-variant-numeric:tabular-nums;background:{{ n.speedBg }};color:#FFFFFF">{{ n.speed }}</div>
+              </sc-if>
+              <sc-if value="{{ n.notStarted }}" hint-placeholder-val="{{ true }}">
+                <div style="width:48px;height:48px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font:500 15px 'Inter Tight',sans-serif;background:{{ n.avBg }};color:{{ n.avFg }}">{{ n.ini }}</div>
+              </sc-if>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="max-width:440px;display:flex;flex-direction:column;gap:18px;padding-top:8px">
+    <div style="font:500 30px 'Inter Tight',sans-serif;letter-spacing:-0.02em">Voice note · drag to seek</div>
+    <div style="font:400 15px/1.55 Inter,sans-serif;color:#5A4034;text-wrap:pretty">Try it on the left: drag along the waveform, or tap anywhere on it. Playback is simulated (24 s and 1:12).</div>
+    <div style="display:flex;flex-direction:column;border-top:1px solid #CDBFB5">
+      <sc-for list="{{ spec }}" as="sp" hint-placeholder-count="6">
+        <div style="display:flex;flex-direction:column;gap:3px;padding:12px 0;border-bottom:1px solid #DCCFC4">
+          <div style="font:600 14px Inter,sans-serif">{{ sp.t }}</div>
+          <div style="font:400 13px/1.5 Inter,sans-serif;color:#5A4034;text-wrap:pretty">{{ sp.d }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="font:400 12px/1.5 Inter,sans-serif;color:#7A6255">Code: src/components/member/crm/shared/voice-note.tsx. Replace onClick={seek} with pointer events plus setPointerCapture, and set touch-action: none on the track.</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { a: { at: 0, playing: false, dragging: false, started: false, speed: 1, wasPlaying: false }, b: { at: 31, playing: false, dragging: false, started: true, speed: 1.5, wasPlaying: false } };
+  meta = { a: { dur: 24, mine: false, seed: 7, time: '3:39 PM', ini: 'LL' }, b: { dur: 72, mine: true, seed: 3, time: '3:41 PM', ini: 'AR' } };
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      const s = {}; let ch = false;
+      for (const k of ['a', 'b']) { const n = this.state[k]; if (n.playing && !n.dragging) { ch = true; const at = n.at + 0.1 * n.speed;
+        s[k] = at >= this.meta[k].dur ? Object.assign({}, n, { at: 0, playing: false }) : Object.assign({}, n, { at }); } }
+      if (ch) this.setState(s);
+    }, 100);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  put(k, p) { this.setState(s => ({ [k]: Object.assign({}, s[k], p) })); }
+  ratio(e) { const r = e.currentTarget.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); }
+  bars(seed) { let h = 2166136261 ^ seed; return Array.from({ length: 28 }, () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return 0.25 + ((h >>> 0) % 1000) / 1333; }); }
+  renderVals() {
+    const clock = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+    const notes = ['a', 'b'].map(k => {
+      const n = this.state[k], m = this.meta[k], done = n.at / m.dur;
+      const ink = m.mine ? '#FFFFFF' : '#6F402C', dim = m.mine ? '#FFFFFF6B' : '#CDBFB5';
+      const pause = () => { if (this.state[k].playing) this.put(k, { playing: false }); };
+      return {
+        justify: m.mine ? 'flex-end' : 'flex-start', radius: m.mine ? '16px 16px 4px 16px' : '16px 16px 16px 4px', bg: m.mine ? '#BD4A19' : '#FFFFFF', ink, meta: m.mine ? '#F3CDBB' : '#A8968B',
+        playing: n.playing, paused: !n.playing, started: n.started, notStarted: !n.started, dragging: n.dragging, time: m.time, ini: m.ini,
+        avBg: m.mine ? '#F3CDBB' : '#F1E3DA', avFg: m.mine ? '#8A1F0A' : '#6F402C', speedBg: m.mine ? '#FFFFFF3D' : '#7A6255', speed: n.speed + '×',
+        bars: this.bars(m.seed).map((v, i) => ({ h: Math.round(v * 28) + 'px', c: i / 28 < done ? ink : dim })),
+        pct: (done * 100) + '%', thumb: n.dragging ? '18px' : '12px', thumbLeft: `calc(${done * 100}% - ${n.dragging ? 9 : 6}px)`, thumbMt: n.dragging ? '-9px' : '-6px',
+        ring: n.dragging ? '6px' : '0', ringC: m.mine ? '#FFFFFF40' : '#6F402C26',
+        clock: clock(n.playing || n.at ? n.at : m.dur), atLabel: clock(n.at) + ' / ' + clock(m.dur),
+        toggle: () => { const c = this.state[k]; this.put(k, { playing: !c.playing, started: true }); ['a', 'b'].filter(x => x !== k).forEach(x => this.state[x].playing && this.put(x, { playing: false })); },
+        faster: () => { const S = [1, 1.25, 1.5, 2]; this.put(k, { speed: S[(S.indexOf(this.state[k].speed) + 1) % 4] }); },
+        down: e => { e.currentTarget.setPointerCapture(e.pointerId); this.put(k, { dragging: true, at: this.ratio(e) * m.dur, wasPlaying: this.state[k].playing }); },
+        move: e => { if (this.state[k].dragging) this.put(k, { at: this.ratio(e) * m.dur }); },
+        up: () => { if (!this.state[k].dragging) return; this.put(k, { dragging: false, playing: true, started: true }); ['a', 'b'].filter(x => x !== k).forEach(x => this.state[x].playing && this.put(x, { playing: false })); },
+      };
+    });
+    const spec = [
+      { t: 'Drag', d: 'Hold anywhere on the waveform and slide. The dot grows to 18px with a soft ring, and a time label (0:12 / 0:24) follows your finger.' },
+      { t: 'Tap', d: 'Tapping the waveform jumps there. Release after a drag or tap and the note plays from that point, even if it was paused.' },
+      { t: 'Bigger hit area', d: 'The touch area is 44px tall (it was 28px); the bars stay 28px. The play button is 44 × 44.' },
+      { t: 'No page scroll while dragging', d: 'touch-action: none on the track and setPointerCapture, so a sideways drag never scrolls the chat.' },
+      { t: 'Unknown duration', d: 'iPhone fMP4 notes can report Infinity. Fall back to seeking to 1e9 once on load to read the real duration; until then show the waveform at 0 and allow seeking after it resolves.' },
+      { t: 'Kept as today', d: 'One note plays at a time; speed 1× · 1.25× · 1.5× · 2× replaces the picture after the first play.' },
+    ];
+    return { notes, spec };
+  }
+}
+</script>
+</body>
+</html>
