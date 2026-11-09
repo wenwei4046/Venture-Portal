@@ -565,7 +565,12 @@ const MEDIA_LABEL: Record<string, string> = {
 const MEDIA_KIND: Record<string, NonNullable<CrmChatMessage["media"]>["kind"]> = { image: "image", sticker: "image", video: "video", audio: "audio", document: "file" };
 const lostReasons = new Set<string>(CRM_LOST_REASONS.map(r => r.value));
 
-export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
+/** What a customer's message the channel handed over empty reads as — in the chat and its inbox line. */
+export const unshownWords = (ch?: string | null) =>
+  ch === "whatsapp" ? "📎 Sent something WhatsApp does not pass on · see it on the WhatsApp Business app"
+    : "📎 Sent something Messenger does not pass on · see it in Meta Business Suite";
+
+export function chatMessage(row: CrmMessageRowX, channel?: string | null): CrmChatMessage {
   const label = MEDIA_LABEL[row.kind];
   // A file to show: WhatsApp's media id, our own copy of what we sent, or Messenger's address — all through our route.
   const shown = row.media_id || row.media_path || row.media_url ? MEDIA_KIND[row.kind] : undefined;
@@ -576,11 +581,15 @@ export function chatMessage(row: CrmMessageRowX): CrmChatMessage {
   const text = row.kind === "template" || row.kind === "text" ? row.body ?? ""
     : fileName ? (caption && caption !== fileName ? caption : "")
     : shown ? row.body ?? "" : label ? (row.body ? `${label} · ${row.body}` : label) : row.body ?? "";
+  // A customer's message the channel handed over with nothing in it (the owner, 2026-11-09: "客户发的 attachment 又看不到了" —
+  // Ly Loong's 10:06 came from Messenger as its id alone, and Meta's own API holds no words, file or share for it: a post or
+  // reel Messenger does not pass to apps). It is named, never an empty bubble.
+  const unshown = row.direction === "in" && !shown && !text.trim() && !row.card;
   return {
     id: row.id,
     from: row.direction === "in" ? "lead" : "me",
     kind: row.kind,
-    text,
+    text: unshown ? unshownWords(channel) : text,
     at: row.sent_at,
     ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: fileName || row.body || "Document", ...(row.media_mime ? { mime: row.media_mime } : {}) } : {}) } } : {}),
     ...(row.direction === "out" && row.status && row.status !== "received" ? { status: row.status } : {}),
@@ -627,7 +636,7 @@ export function customerFromRow(row: CrmContactRowX, messages: CrmMessageRowX[])
     ...(row.lead_form && Array.isArray(row.lead_form.answers) ? { leadForm: { kind: row.lead_form.kind === "instant" ? "instant" as const : "messenger" as const, complete: row.lead_form.complete !== false,
       at: row.lead_form.at ?? null, answers: row.lead_form.answers.filter(x => x?.q).map(x => ({ q: String(x.q), a: String(x.a ?? "") })) } } : {}),
     detailsSaved: !!row.details_at,
-    messages: messages.filter(m => m.contact_id === row.id).sort((a, b) => a.sent_at.localeCompare(b.sent_at)).map(chatMessage),
+    messages: messages.filter(m => m.contact_id === row.id).sort((a, b) => a.sent_at.localeCompare(b.sent_at)).map(m => chatMessage(m, row.channel)),
   };
 }
 

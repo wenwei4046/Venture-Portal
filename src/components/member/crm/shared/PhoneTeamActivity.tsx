@@ -94,9 +94,10 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
         )}
         {pick && <DateRangePicker sheet value={{ a: at(v.cFrom, false), b: at(v.cTo, true) }} onCancel={() => setPick(false)}
           onApply={r => { v.setFrom({ target: { value: iso(r.a) } }); v.setTo({ target: { value: iso(r.b) } }); setPick(false); }} />}
-        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", padding: "4px 0 6px" }}>
+        {/* Centred, each figure over its word, on the desktop figures' band (the owner, 2026-11-09: "置中" — "Came" ran off the edge). */}
+        <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", padding: "12px 0", borderRadius: "12px", background: "var(--crm-sum)" }}>
           {v.pTiles.map(t => (
-            <div key={t.k} style={{ display: "flex", flexDirection: "column", gap: "5px", minWidth: 0 }}>
+            <div key={t.k} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", minWidth: 0, textAlign: "center" }}>
               <span style={{ font: `500 ${fs(22)} ${TIGHT}`, letterSpacing: "-0.02em", lineHeight: 1, color: t.c }}>{v.loading ? "—" : t.v}</span>
               <span style={{ fontSize: fs(11), color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{t.k}</span>
             </div>

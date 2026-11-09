@@ -45,6 +45,7 @@ import { crmChatTag } from "@/lib/push/notices";
 import { setUrgencyThresholds } from "@/lib/member/crm";
 import { useNavHistory, type NavFrame } from "./shared/nav-history";
 import { CHAT_LEFT, LEAD_LEFT, navFrameOf, type NavSnap } from "./shared/nav-frame";
+import { useKeepInboxScroll } from "./shared/inbox-scroll";
 
 /** Where a tapped phone notice opens the CRM (2026-10-14, lib/push/notices noticeUrl): a customer's chat, or the notifications. */
 export type CrmOpen = { chat: string } | { notifs: true };
@@ -99,6 +100,8 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   // with the apps. with all tab as well"): the colour crm.module.css draws at .app's top for the page on screen — white
   // (Mine, a chat), cream (the Team side), the glow's peach (either Profile) — written after every drawing.
   const appRef = useRef<HTMLDivElement>(null);
+  // Back from a chat, the Inbox is where it was (the owner, 2026-11-09).
+  useKeepInboxScroll(appRef);
   const paintsBar = live && !desk;
   useLayoutEffect(() => {
     if (paintsBar && appRef.current) paintStatusBar(topColorOf(appRef.current));

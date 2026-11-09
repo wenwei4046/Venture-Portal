@@ -18,10 +18,29 @@ interface ConversationPage {
   error?: unknown
 }
 
-/** The PSIDs a Page cannot reply to, from its conversations; `complete` when every conversation was read. */
+/**
+ * Every folder a Page's conversations sit in. The list reads the inbox alone unless a folder is named, and a person blocked
+ * from Business Suite is moved to its spam ("垃圾信息"), which the API calls `other` (the owner, 2026-11-09: Bailan Apo,
+ * blocked and moved to spam, never reached the CRM — `can_reply` false, in `other`, outside the inbox the sweep read).
+ */
+export const FOLDERS = ['inbox', 'other', 'spam', 'page_done'] as const
+
+/** The PSIDs a Page cannot reply to, from its conversations in every folder; `complete` when every one was read. */
 export async function blockedOnPage(pageId: string, token: string, fetchImpl: typeof fetch = fetch, maxPages = MAX_PAGES): Promise<{ psids: string[]; complete: boolean } | null> {
   const psids = new Set<string>()
-  let url: string | undefined = `${GRAPH}/${pageId}/conversations?platform=messenger&fields=can_reply,participants&limit=100`
+  let complete = true
+  for (const folder of FOLDERS) {
+    const got = await blockedInFolder(pageId, token, folder, fetchImpl, maxPages)
+    if (!got) return null
+    got.psids.forEach(p => psids.add(p))
+    complete &&= got.complete
+  }
+  return { psids: [...psids], complete }
+}
+
+async function blockedInFolder(pageId: string, token: string, folder: string, fetchImpl: typeof fetch, maxPages: number): Promise<{ psids: string[]; complete: boolean } | null> {
+  const psids = new Set<string>()
+  let url: string | undefined = `${GRAPH}/${pageId}/conversations?platform=messenger&folder=${folder}&fields=can_reply,participants&limit=100`
   for (let n = 0; url && n < maxPages; n++) {
     const r = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
     const j = (await r.json().catch(() => null)) as ConversationPage | null
