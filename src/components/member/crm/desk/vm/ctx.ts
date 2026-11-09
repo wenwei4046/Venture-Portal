@@ -57,6 +57,10 @@ export interface DeskUi {
   insRange: { a: number; b: number } | null;
   /** Insight's Custom dates open (shared/date-range.tsx, docs/design_handoff_crm/fixes/voice-and-dates.md). */
   insPick?: boolean;
+  /** Insight compares with nothing (the owner, 2026-11-09: "怎么关不了 VS"). */
+  insVsOff?: boolean;
+  /** Customer info opened from the chat menu's Audit log: its log unfolded (2026-11-09). */
+  infoAudit?: boolean;
   insOpen: boolean;
   /** 4a's Insight: the team opened in place to its people (frame 01). */
   insTeam: string | null;
@@ -176,7 +180,7 @@ export interface DeskUi {
   /** Ads Performance's table a page at a time (v2 frame 05: "5 rows + pager (Show 5/10/20)"). */
   apPer: number; apPg: number;
   /** Insight's own tabs (v2 frames 01 / 01b): Team performance | Ads performance. */
-  insTab: "team" | "ads" | "upnext";
+  insTab: "team" | "ads" | "upnext" | "activity";
   apChart: (string | null)[] | null; apChartOff: Record<string, boolean>; apChartShut: boolean; apTableShut: boolean;
   addAdOpen: boolean; addAdQ: string; addAdList: MetaAdRow[] | null | "error"; addAdId: string;
   mwtSaved: boolean;

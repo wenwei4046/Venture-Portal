@@ -187,6 +187,8 @@ export function activityVM(x: ActivityIn) {
     pMenuOpen: st.pMenu, pOpenMenu: () => set({ pMenu: true }), pCloseMenu: () => set({ pMenu: false }),
     periods: (["Today", "Week", "Month", "Custom"] as const).map(l => ({ label: l, ...seg(st.per === l), go: () => set({ per: l }) })),
     isCustom: st.per === "Custom", cFrom: st.from, cTo: st.to,
+    /** The first lead ever, for the picker's All time. */
+    allFrom: d.customers.reduce((m, c) => Math.min(m, new Date(c.createdAt).getTime() || m), Date.now()),
     setFrom: (e: { target: { value: string } }) => { const v = e.target.value; if (v) set(u => ({ from: v, to: u.to < v ? v : u.to })); },
     setTo: (e: { target: { value: string } }) => { const v = e.target.value; if (v) set({ to: v }); },
     tiles, cols: COLS, pTiles: tiles.map(t => ({ ...t, k: t.k === "Show-up" ? "Came" : t.k })),

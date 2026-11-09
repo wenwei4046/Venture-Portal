@@ -139,7 +139,7 @@ export function insightVM(ctx0: DeskCtx) {
     { label: "Reply 24 h", value: pct(rep24, n.leads), unit: "", ...pts(rate(rep24, n.leads), rate(prevLeads.filter(replied24).length, prevLeads.length)), open: openList("Reply 24 h") },
     { label: "Avg. reply", value: avgV[0], unit: avgV[1], ...(avgNow == null || avgPrev == null ? { d: "—", good: true } : { d: `${avgNow <= avgPrev ? "−" : "+"}${Math.abs(avgNow - avgPrev)} min`, good: avgNow <= avgPrev }), open: openList("Leads") },
     { label: "Won", value: wonRate(wonNow.n, n.leads) == null ? "—" : `${wonRate(wonNow.n, n.leads)}%`, unit: "", ...pts(wonRate(wonNow.n, n.leads), wonRate(wonPrev.n, prevLeads.length)), open: openList("Won") },
-  ].map((m, i) => ({ ...m, first: i === 0, deltaColor: m.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)" }));
+  ].map((m, i) => ({ ...m, first: i === 0, vs: !ctx.ui.insVsOff, deltaColor: m.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)" }));
   const teamsOut = [...dirRows, ...teams.map((t, k) => ({ name: t.name, lead: teamLead(t), ...rowOf(t.people.map(p => p.id)), dot: teamColours(k)[0],
     open: () => patch({ pane: "overlay", kind: "team", team: t.id, person: null }) }))];
 
@@ -186,12 +186,15 @@ export function insightVM(ctx0: DeskCtx) {
   const insAdMinW = Math.max(820, 40 + (IW.name ?? 220) + IH.slice(1).reduce((n, [k]) => n + (IW[k] ?? 72) + 12, 0));
   const lt = adPerf.reduce((a, x) => a + x._n, 0), at = adPerf.reduce((a, x) => a + Number(x.appt), 0);
   const mayUp = upNextOpen(ctx0.data, ctx0.me.id), upOn = ctx.ui.tab === "insight" && ctx.ui.insTab === "upnext" && mayUp;
+  // Team activity, Insight's fourth tab as on the phone (the owner, 2026-11-09: "刚刚在手机版增加的 team activity 功能也增加到电脑端").
+  const actOn = ctx.ui.tab === "insight" && ctx.ui.insTab === "activity" && mayUp;
   return {
-    kInsight: ctx.ui.tab === "insight" && ctx.ui.insTab !== "ads" && !upOn,
+    kInsight: ctx.ui.tab === "insight" && ctx.ui.insTab !== "ads" && !upOn && !actOn,
+    kInsAct: actOn,
     // Up next (docs/design_handoff_crm_up_next): the Principal, the Director and whoever has a downline; never a salesperson.
     kUpNext: upOn,
     upNextProps: upOn ? deskUpNextProps(ctx0) : null,
-    insTabs: ([["team", "Team performance"], ["ads", "Ads performance"], ...(mayUp ? [["upnext", "Up next"] as const] : [])] as const).map(([k, label]) => ({ label, on: (ctx.ui.insTab ?? "team") === k, pick: () => ctx.patch({ insTab: k }) })),
+    insTabs: ([["team", "Team performance"], ["ads", "Ads performance"], ...(mayUp ? [["upnext", "Up next"] as const, ["activity", "Team activity"] as const] : [])] as const).map(([k, label]) => ({ label, on: (ctx.ui.insTab ?? "team") === k, pick: () => ctx.patch({ insTab: k }) })),
     hero, heroStats, teams: teamsOut, leadStatus,
     // 4a (frame 01): the hero's six figures, the teams with their people (opened in place), all seven statuses.
     metrics4, status4, statusTotal: tot7,
@@ -212,7 +215,9 @@ export function insightVM(ctx0: DeskCtx) {
     })(),
     // 4a's head (2026-10-18): "1–31 Oct vs 1–30 Sep", and Export PDF — the period's figures and Team performance in the
     // Ads Performance report's house style (the owner's OK: "PDF 照你建议做").
-    insightSub: `${rangeLine(r)} vs ${rangeLine(pr)}`,
+    // The comparison is a pill beside it that can be turned off (the owner, 2026-11-09: "怎么关不了 VS").
+    insightSub: rangeLine(r),
+    insVs: { on: !ctx.ui.insVsOff, label: `vs ${rangeLine(pr)}`, toggle: () => patch({ insVsOff: !ctx.ui.insVsOff }) },
     insightPdf: () => {
       const title = `CRM Insight · ${rangeLine(r)} vs ${rangeLine(pr)} · Appt rate ${hero.value} · ${heroStats.map(s => `${s.label} ${s.value}`).join(" · ")}`;
       const head = ["Team", "Leads", "Appt rate", "Show-up", "Won", "Lost"];

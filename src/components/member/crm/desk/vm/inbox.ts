@@ -312,7 +312,10 @@ export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(
     // Move only when there is somebody to hand over to, as on the phone — the Principal keeps the design's top-level page.
     ...(upTo || top ? [["Move", "var(--crm-rust)", "M12 19V5M5 12l7-7 7 7", () => patch({ menu: false, kind: "move" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
     ["Share", "var(--crm-brown)", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6", () => patch({ menu: false, kind: "share" }), "", false],
-    ["Customer info", "var(--crm-brown)", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => { if (c) patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true }); }, "", true],
+    ["Customer info", "var(--crm-brown)", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => { if (c) patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true, infoAudit: false }); }, "", !data.can.manage],
+    // The chat's Audit log, for whoever manages the CRM (the owner, 2026-11-09: "新增 audit log（只给管理者看）"): Customer info
+    // with its log unfolded — who was given it, moved, shared, booked, and when.
+    ...(data.can.manage ? [["Audit log", "var(--crm-brown)", "M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2", () => { if (c) patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true, infoAudit: true }); }, "", true] as [string, string, string, () => void, string, boolean]] : []),
     ["Appointment", "var(--crm-ink-soft)", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => { if (c) patch({ menu: false, kind: "book", book: null }); }, "", false],
     [unread ? "Mark as read" : "Mark as unread", "var(--crm-ink-soft)", "M21 12a9 9 0 1 1-9-9M19 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
       () => { if (!c) return; if (unread) { flag({ markedUnread: false }, "Marked as read"); if (c.assignedTo === me.id) act.openChat(c.id); } else flag({ markedUnread: true }, "Marked as unread"); }, "", true],

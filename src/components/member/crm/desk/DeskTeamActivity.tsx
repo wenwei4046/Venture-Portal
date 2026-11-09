@@ -10,6 +10,10 @@ import type { PeopleBook } from "../shared/people-book";
 import { useTeamActivity } from "../shared/use-team-activity";
 import type { ActivityVM } from "../shared/team-activity";
 import s from "./leave-cal.module.css";
+import { DateRangePicker, rangeWords } from "../shared/date-range";
+
+const ymd = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const day = (x: string, end: boolean) => { const [y, m, dd] = x.split("-").map(Number); return end ? new Date(y, m - 1, dd, 23, 59, 59, 999).getTime() : new Date(y, m - 1, dd).getTime(); };
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const INTER = "Inter, sans-serif";
@@ -32,7 +36,7 @@ const GREY = { open: false };
 export function DeskTeamActivityView({ v }: { v: ActivityVM }) {
   const root = useRef<HTMLDivElement>(null);
   // The owner, 2026-11-09: the greyed people (out of today's turn with no leads) at the bottom, folded at first — as the phone.
-  const [greyOpen, setGrey] = useState(GREY.open);
+  const [greyOpen, setGrey] = useState(GREY.open), [pick, setPick] = useState(false), pickAt = useRef<HTMLButtonElement>(null);
   const setGreyOpen = (f: (o: boolean) => boolean) => setGrey(o => (GREY.open = f(o)));
   const rows = v.groups.flatMap(g => g.rows), active = rows.filter(r => r.op === 1), grey = rows.filter(r => r.op !== 1);
   const C: CSSProperties = { textAlign: "center", justifySelf: "center" };
@@ -123,11 +127,14 @@ export function DeskTeamActivityView({ v }: { v: ActivityVM }) {
               {v.periods.map(p => <span key={p.label} {...press(p.go)} style={{ height: "30px", padding: "0 12px", borderRadius: "7px", display: "flex", alignItems: "center", font: `500 12.5px ${INTER}`, whiteSpace: "nowrap", background: p.bg, color: p.fg, boxShadow: p.sh, cursor: "pointer" }}>{p.label}</span>)}
             </div>
           </div>
+          {/* Custom: the dates as one line that opens the CRM's picker, under it (as the phone and Insight; the owner, 2026-11-09). */}
           {v.isCustom && (
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <input type="date" value={v.cFrom} onChange={v.setFrom} style={DATE} /><span style={{ color: "var(--crm-faint)" }}>–</span><input type="date" value={v.cTo} onChange={v.setTo} style={DATE} />
-            </div>
+            <button ref={pickAt} type="button" onClick={() => setPick(p => !p)} style={{ height: "32px", padding: "0 12px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", display: "flex", alignItems: "center", gap: "8px", font: `500 12.5px ${INTER}`, color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }}>
+              {rangeWords(v.cFrom, v.cTo)}<Svg d="m6 9 6 6 6-6" size={13} w={2.2} style={{ color: "var(--crm-faint)" }} />
+            </button>
           )}
+          {pick && <DateRangePicker anchor={pickAt} value={{ a: day(v.cFrom, false), b: day(v.cTo, true) }} allFrom={v.allFrom} onCancel={() => setPick(false)}
+            onApply={r => { v.setFrom({ target: { value: ymd(r.a) } }); v.setTo({ target: { value: ymd(r.b) } }); setPick(false); }} />}
         </div>
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "0 36px 32px", display: "flex", flexDirection: "column", gap: "24px" }}>

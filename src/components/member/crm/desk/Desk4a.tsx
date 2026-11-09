@@ -205,12 +205,18 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
       <div style={{ font: `500 30px ${TIGHT}`, letterSpacing: "-0.025em", whiteSpace: "nowrap", color: "var(--crm-ink)" }}>{h.title}</div>
       {h.tabs.length > 0 && (
         <div style={{ display: "flex", gap: "22px", font: "500 13px Inter, sans-serif" }}>
-          {h.picker && <DateRangePicker value={h.picker.value} onApply={h.picker.apply} onCancel={h.picker.cancel} anchor={pickAt} />}
+          {h.picker && <DateRangePicker value={h.picker.value} onApply={h.picker.apply} onCancel={h.picker.cancel} anchor={pickAt} allFrom={h.picker.allFrom} />}
           {h.tabs.map(t => <button key={t.label} ref={h.picker?.tab === t.label ? pickAt : undefined} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: "6px 0", whiteSpace: "nowrap", font: "inherit",
             borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>)}
         </div>
       )}
       {h.sub && <div style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{h.sub}</div>}
+      {h.vs && (
+        <button type="button" onClick={h.vs.toggle} aria-pressed={h.vs.on} title={h.vs.on ? "Stop comparing" : "Compare with the period before"} style={{ ...BTN, flex: "none", height: "28px", padding: "0 10px", borderRadius: "14px", display: "inline-flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap",
+          font: "500 12.5px Inter, sans-serif", border: `1px solid ${h.vs.on ? "var(--crm-line)" : "var(--crm-rule)"}`, background: h.vs.on ? "var(--crm-field)" : "#fff", color: h.vs.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>
+          {h.vs.on ? <>{h.vs.label}<Ic name="x" size={12} /></> : <><Ic name="plus" size={12} />Compare</>}
+        </button>
+      )}
       <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "10px", flex: "none" }}>
         {extra}
         {/* v2 (2026-10-23, the owner: "全部根据新设计"; supersedes 2026-10-18's bell alone): CRM alerts is the outline button
@@ -283,7 +289,7 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
 }
 
 interface InsightBits {
-  metrics4: { label: string; value: string; unit: string; d: string; deltaColor: string; first: boolean; open: () => void }[];
+  metrics4: { label: string; value: string; unit: string; d: string; deltaColor: string; first: boolean; vs?: boolean; open: () => void }[];
   teams4: { name: string; sub: string; leads: string; appt: string; apptW: string; show: string; won: string; lost: string; dot: string; person: boolean; open: boolean; pick: () => void }[];
   status4: { label: string; n: number; color: string; text: string; pct: string; open: () => void }[];
   statusTotal: number;
@@ -315,7 +321,7 @@ export function DeskInsight4a({ v }: { v: InsightBits }) {
           <span style={{ font: `500 42px ${TIGHT}`, letterSpacing: "-0.035em", lineHeight: 1, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", color: m.first ? "var(--crm-rust)" : "var(--crm-ink)" }}>
             {m.value}{m.unit && <span style={{ fontSize: "0.42em", letterSpacing: 0, marginLeft: "3px", fontWeight: 400 }}>{m.unit}</span>}
           </span>
-          <span style={{ font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: m.deltaColor, whiteSpace: "nowrap" }}>{m.d} <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>vs last</span></span>
+          <span style={{ font: "500 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: m.deltaColor, whiteSpace: "nowrap" }}>{m.vs === false ? "" : <>{m.d} <span style={{ fontWeight: 400, color: "var(--crm-faint)" }}>vs last</span></>}</span>
         </button>
       ))}
     </div>
@@ -2426,8 +2432,9 @@ export function DeskRepPick4a({ reps = [] }: { reps?: { label: string; n: number
 }
 
 /** Customer info's own Audit log (the owner, 2026-11-09: "能不能看到 audit log?"): Inbox's per-chat log, folded until opened. */
-export function DeskInfoAudit4a({ items }: { items?: { what: string; detail: string; who: string; time: string; main: boolean; hot: boolean }[] }) {
-  const [open, setOpen] = useState(false);
+export function DeskInfoAudit4a({ items, open: openAt }: { open?: boolean; items?: { what: string; detail: string; who: string; time: string; main: boolean; hot: boolean }[] }) {
+  const [open, setOpen] = useState(!!openAt);
+  useEffect(() => { if (openAt) setOpen(true); }, [openAt]);
   if (!items) return null; // the prototype harness draws none
   return (
     <div style={{ border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden", flex: "none" }}>

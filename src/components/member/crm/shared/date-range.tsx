@@ -41,9 +41,20 @@ export function tapDay(a: string | null, b: string | null, day: string): { a: st
 /** The range as answered: From 00:00 to To 23:59:59.999, local time. */
 export function toRange(a: string, b: string | null): Range { return { a: dayStart(fromIso(a)), b: dayEnd(fromIso(b ?? a)) }; }
 
-export function DateRangePicker({ value, onApply, onCancel, anchor, future = false, sheet = false, today = new Date() }: {
+/**
+ * What opened a picker that names no anchor: the button last pressed (the owner, 2026-11-09: "日历也不应该出现在画面中间" —
+ * the Audit log's and Reports' pickers named none and sat in the screen's middle, over the page).
+ */
+let lastPress: HTMLElement | null = null;
+if (typeof document !== "undefined") document.addEventListener("pointerdown", e => { const t = (e.target as Element | null)?.closest?.("button,[role=button],a"); if (t instanceof HTMLElement) lastPress = t; }, true);
+
+export function DateRangePicker({ value, onApply, onCancel, anchor, future = false, sheet = false, today = new Date(), allFrom }: {
   value: Range | null; onApply(r: Range): void; onCancel(): void; anchor?: RefObject<HTMLElement | null>; future?: boolean; sheet?: boolean; today?: Date;
+  /** The first day there is anything to show: offers All time (the owner, 2026-11-09: "新增 All Time"). */
+  allFrom?: number;
 }) {
+  const opener = useRef<HTMLElement | null>(null);
+  if (!opener.current && !sheet) opener.current = lastPress;
   const todayIso = iso(today);
   const [a, setA] = useState<string | null>(value ? iso(new Date(value.a)) : null);
   const [b, setB] = useState<string | null>(value ? iso(new Date(value.b)) : null);
@@ -54,9 +65,10 @@ export function DateRangePicker({ value, onApply, onCancel, anchor, future = fal
   useLayoutEffect(() => {
     if (sheet) return;
     const place = () => {
-      const r = anchor?.current?.getBoundingClientRect(), el = box.current; if (!el) return;
+      const at = anchor?.current ?? (opener.current?.isConnected ? opener.current : null), rr = at?.getBoundingClientRect();
+      const r = rr && rr.width + rr.height > 0 ? rr : undefined, el = box.current; if (!el) return;
       const w = el.offsetWidth, h = el.offsetHeight, W = window.innerWidth, H = window.innerHeight;
-      const x = r ? r.left : (W - w) / 2, y = r ? r.bottom + 6 : (H - h) / 2;
+      const x = r ? r.left : W - w - 24, y = r ? r.bottom + 6 : 72;
       const left = Math.max(8, Math.min(x + w > W - 8 && r ? r.right - w : x, W - w - 8));
       const top = y + h > H - 8 && r && r.top - h - 6 >= 8 ? r.top - h - 6 : Math.max(8, Math.min(y, H - h - 8));
       setPos({ left, top });
@@ -82,6 +94,12 @@ export function DateRangePicker({ value, onApply, onCancel, anchor, future = fal
   };
   const apply = () => { if (a) onApply(toRange(a, b)); };
   const step = (n: number) => setMonth(m => new Date(m.getFullYear(), m.getMonth() + n, 1));
+  // Quick ranges, ending today: picking one fills From and To, Apply shows it.
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const quick: [string, Date, Date][] = [["Last 7 days", new Date(t0.getTime() - 6 * 86_400_000), t0], ["This month", new Date(t0.getFullYear(), t0.getMonth(), 1), t0],
+    ["Last month", new Date(t0.getFullYear(), t0.getMonth() - 1, 1), new Date(t0.getFullYear(), t0.getMonth(), 0)],
+    ...(allFrom != null ? [["All time", new Date(Math.min(allFrom, t0.getTime())), t0] as [string, Date, Date]] : [])];
+  const setQuick = (x: Date, y: Date) => { setA(iso(x)); setB(iso(y)); setMonth(new Date(y.getFullYear(), y.getMonth(), 1)); };
   const lo = a && b ? a : a, hi = b ?? a;
   const FIELD: CSSProperties = { flex: 1, minWidth: 0, height: "34px", padding: "0 8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", borderRadius: "7px", font: f(400, 12.5), color: "var(--crm-ink)", background: "#fff" };
   const BTN: CSSProperties = { height: "34px", padding: "0 14px", borderRadius: "7px", font: f(500, 13), cursor: "pointer", display: "flex", alignItems: "center", border: 0 };
@@ -90,8 +108,12 @@ export function DateRangePicker({ value, onApply, onCancel, anchor, future = fal
     <div ref={box} role="dialog" aria-label="Pick dates" onClick={e => e.stopPropagation()}
       style={sheet
         ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 1000, background: "#fff", borderRadius: "26px 26px 0 0", padding: "10px 20px calc(24px + var(--sheet-safe, 0px))", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "12px", animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", color: "var(--crm-ink)", fontFamily: "Inter, sans-serif" }
-        : { position: "fixed", zIndex: 1000, width: "300px", boxSizing: "border-box", padding: "14px", borderRadius: "10px", background: "#fff", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "10px", color: "var(--crm-ink)", fontFamily: "Inter, sans-serif", ...pos }}>
+        : { position: "fixed", zIndex: 1000, width: "320px", boxSizing: "border-box", padding: "14px", borderRadius: "10px", background: "#fff", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "10px", color: "var(--crm-ink)", fontFamily: "Inter, sans-serif", ...pos }}>
       {sheet && <div style={{ width: "36px", height: "4px", borderRadius: "2px", background: "var(--crm-line)", margin: "0 auto" }} />}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+        {quick.map(([l, x, y]) => { const on = a === iso(x) && (b ?? a) === iso(y);
+          return <button key={l} type="button" onClick={() => setQuick(x, y)} aria-pressed={on} style={{ height: "28px", padding: "0 10px", borderRadius: "14px", border: `1px solid ${on ? "var(--crm-ink)" : "var(--crm-line)"}`, background: on ? "var(--crm-ink)" : "#fff", color: on ? "#fff" : "var(--crm-ink)", font: f(500, 12), cursor: "pointer", whiteSpace: "nowrap" }}>{l}</button>; })}
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
         <button type="button" aria-label="Previous month" onClick={() => step(-1)} style={{ ...BTN, width: "30px", padding: 0, justifyContent: "center", background: "transparent", color: "var(--crm-ink)" }}>‹</button>
         <span style={{ flex: 1, textAlign: "center", font: f(500, 14), whiteSpace: "nowrap" }}>{MONF[month.getMonth()]} {month.getFullYear()}</span>

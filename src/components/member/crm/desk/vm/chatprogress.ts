@@ -110,7 +110,7 @@ export function chatProgressVM(ctx: DeskCtx, opItem: string) {
   const infoR = ui.infoId ? rows.find(r => r.c.id === ui.infoId) : undefined;
   const infoAudit = infoR ? auditOf(infoR) : [];
   return {
-    ibCp, infoAudit,
+    ibCp, infoAudit, infoAuditOpen: !!ui.infoAudit,
     cpOpen: open, isCpOp: opItem === "Chat progress",
     cpChips: ["All", ...ORD].map(k => { const on = f === k, pr = rows.filter(hasP), n = k === "All" ? pr.length : pr.filter(r => r.cur === k).length;
       return { label: k, n, bg: on ? "var(--crm-ink)" : "#fff", fg: on ? "#fff" : "var(--crm-ink)", bd: on ? "var(--crm-ink)" : "var(--crm-line)", nfg: on ? "var(--crm-rule)" : "var(--crm-muted)", pick: () => patch({ cpF: k }) }; }),

@@ -85,7 +85,7 @@ export function deskVM(ctx: DeskCtx) {
     // Calendar and Assignment › People (docs/design_handoff_crm): one leave record, one Pause, one Lock (shared/leave-cal*).
     leaveCal: leaveCalData({ data, me: ctx.me, now: ctx.now, act: ctx.act, teams: ctx.teams, directors: ctx.directors,
       openAppt: a => patch({ pane: "docked", kind: "info", visit: a.visitId, infoId: null }) }),
-    kActivity: ui.tab === "activity",
+    kActivity: ui.tab === "activity" || (ui.tab === "insight" && ui.insTab === "activity" && upNextOpen(data, ctx.me.id)),
     // Team activity (docs/design_handoff_crm): its own page, on the people book Calendar and People read.
     activity: { data, book: peopleBook(data, ctx.teams, ctx.directors), live: ctx.live, who: ui.actWho ?? null, nameOf: ctx.nameOf,
       roleOf: (id: string) => { const p = data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },
@@ -130,7 +130,7 @@ export function deskVM(ctx: DeskCtx) {
     periodOpts: (["day", "week", "month", "custom"] as const).map((k, i) => ({ label: ["Today", "This week", "This month", "Custom"][i], on: ui.insPer === k, off: ui.insPer !== k,
       // Custom opens the shared picker (any From and To, earlier months too); Apply sets the range (voice-and-dates.md §2).
       pick: () => (k === "custom" ? patch({ insPer: "custom", insPick: true, insRange: ui.insRange ?? { a: new Date(ctx.now.getFullYear(), ctx.now.getMonth(), 1).getTime(), b: ctx.now.getTime() } }) : patch({ insPer: k, insRange: null, insPick: false })) })),
-    insPicker: ui.insPick ? { value: ui.insRange, apply: (r: { a: number; b: number }) => patch({ insPer: "custom", insRange: r, insPick: false }), cancel: () => patch({ insPick: false }) } : null,
+    insPicker: ui.insPick ? { allFrom: data.customers.reduce((m, c) => Math.min(m, new Date(c.createdAt).getTime() || m), ctx.now.getTime()), value: ui.insRange, apply: (r: { a: number; b: number }) => patch({ insPer: "custom", insRange: r, insPick: false }), cancel: () => patch({ insPick: false }) } : null,
     periodNow: ({ day: "Today", week: "This week", month: "This month", custom: "Custom" } as const)[ui.insPer],
     // The toast's Undo (30 s): a Send to goes back to whoever had the customer; a delete brings the notifications back.
     canUndo: undoOn,
