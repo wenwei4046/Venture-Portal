@@ -9,11 +9,12 @@ import H from "../crm.module.css";
 import { PickEditor } from "../shared/pick-editor";
 import { PhoneUpNext } from "../shared/PhoneUpNext";
 import { PhoneTeamActivity } from "../shared/PhoneTeamActivity";
-import { PhoneCalendar, PhonePeople } from "../shared/PhoneLeaveCal";
+import { PhoneCalendar, PhoneLeaveAdd, PhonePeople } from "../shared/PhoneLeaveCal";
+import { PhoneShowrooms } from "./PhoneShowrooms";
 import { InfoValue } from "../shared/AdLink";
 import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aBookMode, Phone4aCustomBook, Phone4aHero, Phone4aKeepHeight, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStatusPick, Phone4aStrip, Phone4aTeamHead, Phone4aWhoPick } from "../shared/phone4a";
+import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aBookMode, Phone4aCustomBook, Phone4aKeepHeight, Phone4aLabelSheet, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStrip, Phone4aTeamHead, Phone4aTeamInbox, Phone4aTeamOverview } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -45,104 +46,9 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     </>)}
     {!!(v.show.ov) && (<>
       {!!(v.ov.onOverview) && (<>
-        <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 36px", display: "flex", flexDirection: "column", gap: "22px" }}>
+        <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 36px", display: "flex", flexDirection: "column", gap: "14px" }}>
           <Phone4aTeamHead h={v.th} />
-          <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <div onClick={v.ov.ovOpenPeriod} style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "center", gap: "12px", height: "56px", padding: "0 14px", boxSizing: "border-box", borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)", cursor: "pointer" }}>
-                <svg style={{ flex: "none", color: "var(--crm-rust)" }} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 5h14v15H5V5Zm3-3v5m8-5v5M5 10h14">
-                  </path>
-                </svg>
-                <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}>
-                  <strong style={{ fontSize: "calc(16px * var(--rv-type, 1))", fontWeight: "700", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{v.ov.adPerT}</strong>
-                  <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ov.adPerD}</span>
-                </span>
-                <svg style={{ flex: "none", color: "var(--crm-muted)" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m6 9 6 6 6-6">
-                  </path>
-                </svg><span onClick={e => { e.stopPropagation(); v.ov.cmpPick(); }} style={{ flex: "none", height: "32px", padding: "0 12px", borderRadius: "16px", display: "grid", placeItems: "center", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)", fontSize: "calc(14.13px * var(--rv-type, 1))", fontWeight: "500", cursor: "pointer" }}>{v.ov.vsLabel}</span>
-              </div>
-            </div>
-          </div>
-          <Phone4aHero items={v.ov.hero4} cols={2} compact />
-          {false && (<>
-            <section style={{ flex: "none", padding: "18px", borderRadius: "22px", background: "#fff", boxShadow: "0 1px 2px rgba(42,22,12,.04), 0 6px 18px rgba(42,22,12,.06)", display: "flex", flexDirection: "column", gap: "14px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-                <h2 style={{ margin: "0", fontSize: "calc(17px * var(--rv-type, 1))", fontWeight: "700" }}>Comparison</h2>
-                {!!(v.ov.cmpHas) && (<>
-                  <span style={{ flex: "none", display: "flex", alignItems: "center", gap: "14px" }}>
-                    <span onClick={v.ov.cmpOff} style={{ fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }}>Clear</span>
-                    <span onClick={v.ov.cmpToggle} style={{ flex: "none", display: "flex", alignItems: "center", gap: "4px", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-muted)", cursor: "pointer" }}>{v.ov.cmpToggleLbl}<svg style={{ transform: `rotate(${v.ov.cmpRot})` }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="m6 9 6 6 6-6">
-                        </path>
-                      </svg></span>
-                  </span>
-                </>)}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "10px 12px", borderRadius: "12px", background: "var(--crm-page)", fontSize: "calc(13px * var(--rv-type, 1))" }}>
-                <span onClick={v.ov.ovOpenPeriod} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--crm-ink)", fontWeight: "600", cursor: "pointer" }}>
-                  <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--crm-rust)" }}>
-                  </span>
-                  <span style={{ flex: "1", minWidth: "0" }}>{v.ov.cmpA}</span>
-                  <span style={{ flex: "none", fontWeight: "650", color: "var(--crm-rust)" }}>Change</span>
-                </span>
-                {!!(v.ov.cmpHas) && (<>
-                  <span onClick={v.ov.cmpPick} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--crm-muted)", cursor: "pointer" }}>
-                    <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--crm-st-won)" }}>
-                    </span>
-                    <span style={{ flex: "1", minWidth: "0" }}>vs {v.ov.cmpB}</span>
-                    <span style={{ flex: "none", fontWeight: "650", color: "var(--crm-rust)" }}>Change</span>
-                  </span>
-                </>)}
-                {!!(v.ov.cmpNone) && (<>
-                  <span onClick={v.ov.cmpPick} style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--crm-rust)", fontWeight: "650", cursor: "pointer" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                      <path d="M12 5v14M5 12h14">
-                      </path>
-                    </svg>Choose a period to compare</span>
-                </>)}
-              </div>
-              {!!(v.ov.cmpOpen) && (<>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" }}>
-                  {(v.ov.cmpRows).map((r, r_i) => (<Fragment key={r_i}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px", padding: "14px", borderRadius: "14px", border: "1px solid var(--crm-rule)" }}>
-                      <span style={{ fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: ".05em", textTransform: "uppercase", color: "var(--crm-muted)" }}>{r.label}</span>
-                      <strong style={{ fontSize: "calc(26px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.02em", color: "var(--crm-ink)", fontVariantNumeric: "tabular-nums" }}>{r.vA}</strong>
-                      <span style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px" }}>
-                        <span style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>vs {r.vB}</span>
-                        <span style={{ padding: "1px 6px", borderRadius: "6px", background: r.dBg, color: r.dFg, fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", whiteSpace: "nowrap" }}>{r.delta}</span>
-                      </span>
-                    </div>
-                  </Fragment>))}
-                </div>
-              </>)}
-            </section>
-          </>)}
-          <div style={{ flex: "none", display: "flex", alignItems: "baseline", gap: "10px", margin: "4px 0 -14px" }}><h2 style={{ flex: "1", margin: "0", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(20.65px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.01em" }}>Team performance</h2></div>
-          <section style={{ flex: "none", display: "flex", flexDirection: "column" }}>
-            
-            {(v.ov.teamRows).map((t, t_i) => (<Fragment key={t_i}>
-              <div style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--crm-rule)" }}>
-                <div onClick={t.toggle} style={{ display: "flex", flexDirection: "column", gap: "5px", padding: "11px 0", cursor: t.cur }}><span style={{ display: "flex", alignItems: "center", gap: "9px", minWidth: "0" }}><span style={{ flex: "none", width: "8px", height: "8px", borderRadius: "50%", background: t.c }} /><strong style={{ flex: "none", fontSize: "calc(16.3px * var(--rv-type, 1))", fontWeight: "500" }}>{t.name}</strong><span style={{ flex: "1", minWidth: "0" }} />{!!(t.canOpen) && (<span style={{ display: "flex", color: "var(--crm-faint)", transform: `rotate(${t.rot})`, transition: "transform 150ms" }}><Ic name="chevron-right" size={16} /></span>)}</span><span style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", columnGap: "8px", paddingLeft: "17px", fontSize: "calc(13.04px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap" }}><span>Leads <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.leads}</b></span><span>Appt <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.appt}</b></span><span>Show <b style={{ fontWeight: "600", color: "var(--crm-ink)" }}>{t.show}</b></span></span></div>
-                {!!(t.open) && (<>
-                  {(t.people).map((p, p_i) => (<Fragment key={p_i}>
-                    <div onClick={p.open} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 46px 50px 54px", gap: "6px", alignItems: "center", padding: `10px 0 10px ${p.pad}`, borderTop: "1px dashed var(--crm-rule)", cursor: "pointer" }} className={H.hov3}>
-                      <span style={{ minWidth: "0", display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ flex: "none", width: "32px", height: "32px", borderRadius: "50%", background: p.aBg, color: p.aFg, display: "grid", placeItems: "center", fontSize: "calc(12px * var(--rv-type, 1))", fontWeight: "650" }}>{p.ini}</span>
-                        <span style={{ minWidth: "0", display: "flex", flexDirection: "column" }}>
-                          <strong style={{ fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</strong>
-                          <small style={{ fontSize: "calc(11px * var(--rv-type, 1))", color: "var(--crm-muted)" }}>{p.tag}<b style={{ fontWeight: "650", color: "var(--crm-oxblood)" }}>{p.waiting}</b></small>
-                        </span>
-                      </span>
-                      <span style={{ textAlign: "right", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "650", fontVariantNumeric: "tabular-nums" }}>{p.leads}</span>
-                      <span style={{ textAlign: "right", fontSize: "calc(13px * var(--rv-type, 1))", fontVariantNumeric: "tabular-nums" }}>{p.appt}</span>
-                      <span style={{ textAlign: "right", fontSize: "calc(13px * var(--rv-type, 1))", fontVariantNumeric: "tabular-nums" }}>{p.show}</span>
-                    </div>
-                  </Fragment>))}
-                </>)}
-              </div>
-            </Fragment>))}
-          </section>
+          <Phone4aTeamOverview ov={v.ov} />
         </main>
         {!!(v.ov.ovrOpen) && (<>
           <div onClick={v.ov.ovrClose} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(42,22,12,.32)", animation: "fadeIn 200ms ease-out", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
@@ -222,53 +128,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     </>)}
     {!!(v.show.ib) && (<>
       {!!(v.ib.onInbox) && (<>
-        <main style={{ flex: "1 1 auto", minHeight: "0", overflow: "hidden", scrollbarWidth: "none", padding: "10px 20px 14px", display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-            <div style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-              <h1 style={{ margin: "0", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(32.61px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Inbox</h1>
-            </div>
-            <span onClick={v.ib.openPc} title="Contacts" aria-label="Contacts" style={{ order: "1", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-line)", background: "#fff", display: "grid", placeItems: "center", color: "var(--crm-ink)", cursor: "pointer" }}><Ic name="contact" size={18} /></span>
-            {!!(v.bellIn) && (<>
-              {!!(v.tm.on) && (<>
-                <span onClick={v.tm.swap} title={v.tm.title} aria-label={v.tm.title} style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", boxSizing: "border-box", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)", cursor: "pointer" }}><Ic name={v.tm.label === "Team" ? "users" : "user-round"} size={18} /></span>
-              </>)}
-              
-              <span onClick={v.bl.openNotifs} title="Notifications" style={{ position: "relative", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-line)", background: "#fff", display: "grid", placeItems: "center", color: "var(--crm-ink)", cursor: "pointer" }}><Ic name="bell" size={18} />{!!(v.bl.notifUnread) && (<span style={{ position: "absolute", top: "8px", right: "9px", width: "8px", height: "8px", boxSizing: "content-box", borderRadius: "50%", background: "var(--crm-orange)", border: "2px solid #fff" }} />)}</span>
-            </>)}
-          </div>
-          <Phone4aWhoPick v={v.ib.inbWhoMenu} />
-          <Phone4aStatusPick cols={v.ib.inbCols} />
-          <div data-inb-board="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "12px", overflowX: "hidden", overflowY: "hidden", scrollbarWidth: "none", margin: "-14px -20px -14px", padding: "14px 16px 14px", background: "var(--crm-hover)", scrollSnapType: "x mandatory", scrollPadding: "0 20px", userSelect: "none" }}>
-            {(v.ib.inbCols).filter(g => g.on).map((g, g_i) => (<Fragment key={g_i}>
-              <div style={{ flex: "1 1 auto", minWidth: "0", height: "100%", scrollSnapAlign: "start", display: "flex", flexDirection: "column", gap: "10px", boxSizing: "border-box", overflowY: "auto", scrollbarWidth: "none" }}>
-                
-                {(g.rows).map((r, r_i) => (<Fragment key={r_i}>
-                  <div onClick={r.open} onClickCapture={r.guard} onPointerDown={r.down} onPointerMove={r.move} onPointerUp={r.up} onPointerCancel={r.cancel} onContextMenu={r.noMenu} style={{ WebkitTouchCallout: "none", userSelect: "none", display: "flex", flexDirection: "column", gap: "6px", padding: "11px 12px", borderRadius: "14px", border: "1px solid var(--crm-line)", background: "#fff", cursor: "pointer" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ flex: "none", width: "28px", height: "28px", borderRadius: "50%", background: r.avBg, color: r.avFg, display: "grid", placeItems: "center", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(12.5px * var(--rv-type, 1))", fontWeight: "500" }}>{r.ini}</span>
-                      <strong style={{ flex: "1", minWidth: "0", fontSize: "calc(15.22px * var(--rv-type, 1))", fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</strong>
-                      <small style={{ flex: "none", fontSize: "calc(11px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>{r.at}</small>{!!(r.unread) && (<span style={{ flex: "none", minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", background: "var(--crm-rust)", color: "#fff", fontSize: "calc(11px * var(--rv-type, 1))", fontWeight: "700", display: "grid", placeItems: "center" }}>{r.unread}</span>)}
-                    </span>
-                    <span style={{ fontSize: "calc(14.13px * var(--rv-type, 1))", lineHeight: "18px", maxHeight: "36px", color: "var(--crm-ink-soft)", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{r.preview}</span>
-                    <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", fontSize: "calc(13.04px * var(--rv-type, 1))", lineHeight: "16px" }}>
-                      <span style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "center", gap: "8px", fontWeight: "400", color: r.toAssign ? "var(--crm-oxblood)" : "var(--crm-ink)" }}>
-                        <span style={{ flex: "none", width: "7px", height: "7px", borderRadius: "50%", background: r.wc }}>
-                        </span>
-                        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.who}</span>
-                      </span>
-                      {!!(r.needs) && (<>
-                        <span style={{ flex: "none", fontWeight: "400", color: r.uc, whiteSpace: "nowrap" }}>{r.state}</span>
-                      </>)}
-                    </span>
-                  </div>
-                </Fragment>))}
-                {!!(g.empty) && (<>
-                  <span style={{ padding: "18px 0", textAlign: "center", fontSize: "calc(13px * var(--rv-type, 1))", color: "var(--crm-faint)" }}>Nothing here</span>
-                </>)}
-              </div>
-            </Fragment>))}
-          </div>
-        </main>
+        <Phone4aTeamInbox ib={v.ib} tm={v.tm} bl={v.bl} bell={!!v.bellIn} />
       </>)}
     </>)}
     {!!(v.show.ld) && (<>
@@ -326,7 +186,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
                           </path>
                         </svg>
                       </span>
-                      <strong style={{ flex: "1", minWidth: "0", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)" }}>{it.label}</strong>
+                      <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}><strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)" }}>{it.label}</strong>{!!(it.sub) && (<small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</small>)}</span>
                     </div>
                   </Fragment>))}
                 </div>
@@ -379,6 +239,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
             </div></div>
             {!!(v.ld.lx.pk) && (<PickEditor pk={v.ld.lx.pk} />)}
             <ChatComposer key={v.ld.lx.cmp.key} v={v.ld.lx.cmp} />
+            <Phone4aLabelSheet s={v.ld.lx.label} />
       
           </>)}
           {!!(v.ld.lx.viewOnly) && (<>
@@ -701,7 +562,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
     {!!(v.show.as) && (<>
       {!!(v.as.onAssign) && (<>
         <main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 28px", display: "flex", flexDirection: "column", gap: "20px" }}>
-          <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "14px" }}><div style={{ display: "flex", alignItems: "center", gap: "10px" }}><h1 style={{ margin: "0", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(32.61px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Assignment</h1>{!!(v.asx.onAct) && (<Phone4aActiveSave v={v.asx.act} />)}</div><div data-drag-scroll="1" style={{ display: "flex", gap: "22px", borderBottom: "1px solid var(--crm-rule)", overflowX: "auto", overscrollBehaviorX: "contain", scrollbarWidth: "none", margin: "0 -20px", padding: "0 20px" }}>{(v.asx.tabs4).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "none", height: "36px", display: "inline-flex", alignItems: "center", marginBottom: "-1px", borderBottom: t.on ? "2px solid var(--crm-rust)" : "2px solid transparent", fontSize: "calc(16.3px * var(--rv-type, 1))", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", whiteSpace: "nowrap", cursor: "pointer" }}>{t.label}</span>))}</div></div>
+          <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}><div style={{ display: "flex", alignItems: "center", gap: "10px" }}><h1 style={{ flex: "1", minWidth: "0", margin: "0", fontFamily: "var(--font-display-rv), 'Inter Tight', Inter, sans-serif", fontSize: "calc(32.61px * var(--rv-type, 1))", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Assignment</h1>{!!(v.asx.onAct) && (<Phone4aActiveSave v={v.asx.act} />)}{!!(v.asx.onLv) && (<PhoneLeaveAdd />)}</div><div data-assign-tabs="" style={{ display: "flex", justifyContent: "space-between", gap: "8px", borderBottom: "1px solid var(--crm-tab-rule)" }}>{(v.asx.tabs4).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "none", padding: "4px 0 10px", marginBottom: "-1px", borderBottom: t.on ? "2px solid var(--crm-rust)" : "2px solid transparent", fontSize: "calc(15.22px * var(--rv-type, 1))", fontWeight: t.on ? "600" : "500", color: t.on ? "var(--crm-ink)" : "var(--crm-muted)", whiteSpace: "nowrap", cursor: "pointer" }}>{t.label}</span>))}</div></div>
           {!!(v.asx.onHome) && (<>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {(v.asx.cards).map((k, k_i) => (<Fragment key={k_i}>
@@ -864,7 +725,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               </div>
             </section>
           </>)}
-          {!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onLv && v.leaveCalP) && (<PhonePeople bare input={v.leaveCalP!} top={add => <div style={{ display: "flex" }}>{add}</div>} />)}{!!(v.asx.onFt) && (<>
+          {!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onLv && v.leaveCalP) && (<PhonePeople bare input={v.leaveCalP!} top={() => null} />)}{!!(v.asx.onFt) && (<>
             <section style={{ flex: "none", position: "relative", padding: "16px 16px 16px 20px", borderRadius: "20px", background: "var(--crm-tint-follow)", border: "1px solid var(--crm-tint-follow)", display: "flex", flexDirection: "column", gap: "12px", overflow: "hidden" }}>
               <span style={{ position: "absolute", left: "0", top: "0", bottom: "0", width: "5px", background: "var(--crm-brown)" }}>
               </span>
@@ -1371,7 +1232,8 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
         </div>
       </div>
     </>)}
-    {!!(v.rm.rmOpen) && (<>
+    {v.rm.page4 ? (<PhoneShowrooms v={v.rm.page4} />) : null}
+    {!!(v.rm.rmOpen && !v.rm.page4) && (<>
       <div style={{ position: "absolute", left: "0", right: "0", top: "0", bottom: "0", zIndex: "8", background: "var(--crm-page)", overflowY: "auto", scrollbarWidth: "none", padding: "4px 20px 32px", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "14px", animation: "fadeIn 160ms ease-out" }}>
         
         <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "6px" }}>

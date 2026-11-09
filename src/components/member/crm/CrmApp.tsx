@@ -9,7 +9,7 @@
  * behaviour is sales/vm/*.ts; every change is saved first (sales/actions.ts).
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from "react";
-import { fetchCrmData, fetchCrmReplyExamples } from "@/app/(member)/member/crm-actions";
+import { fetchCrmData } from "@/app/(member)/member/crm-actions";
 import { canFromRole, type CrmData } from "@/lib/member/crm-data";
 import { crmDemoData } from "@/lib/member/crm-demo-data";
 import H from "./crm.module.css";
@@ -46,6 +46,7 @@ import { setUrgencyThresholds } from "@/lib/member/crm";
 import { useNavHistory, type NavFrame } from "./shared/nav-history";
 import { CHAT_LEFT, LEAD_LEFT, navFrameOf, type NavSnap } from "./shared/nav-frame";
 import { useKeepInboxScroll } from "./shared/inbox-scroll";
+import { roomUnsaved } from "./panel/vm/rooms";
 
 /** Where a tapped phone notice opens the CRM (2026-10-14, lib/push/notices noticeUrl): a customer's chat, or the notifications. */
 export type CrmOpen = { chat: string } | { notifs: true };
@@ -148,8 +149,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
           const sig = JSON.stringify(r.data);
           if (sig === lastRead) return;
           lastRead = sig;
-          // The suggested replies' examples are read once (below) and kept across the reads.
-          setData(prev => { const n = keepSending(prev, r.data); return prev?.replyExamples ? { ...n, replyExamples: prev.replyExamples } : n; });
+          setData(prev => keepSending(prev, r.data));
           saveSnapshot(desk ? "desk" : "phone", r.data);
         }
       } finally { busy = false; }
@@ -160,14 +160,6 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
     window.addEventListener("focus", back);
     return () => { stopped = true; clearInterval(t); document.removeEventListener("visibilitychange", back); window.removeEventListener("focus", back); };
   }, [live, refs, desk]);
-  // What customers asked and our team answered, for the chat's suggested replies (2026-10-29): read once, once the CRM is there.
-  const haveData = !!data;
-  useEffect(() => {
-    if (!live || !haveData) return;
-    let current = true;
-    void fetchCrmReplyExamples().then(ex => { if (current && ex) setData(d => (d ? { ...d, replyExamples: ex } : d)); });
-    return () => { current = false; };
-  }, [live, haveData]);
   // Demo only: whose eyes, after the first paint (the server cannot read the address's ?crmAs).
   // Every chat's newest photos are fetched onto the phone ahead of being opened (shared/media-cache.ts › warmPhotos).
   useEffect(() => { if (live && data) warmPhotos(photosAhead(data.customers)); }, [live, data]);
@@ -254,11 +246,23 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   // The phone's Back steps back through the CRM (2026-10-20, shared/nav-history.ts): every screen — the side, its tab,
   // a chat, a sub-page, a sheet — is a step, and Back puts the one before it back. The desktop keeps desk/nav.ts.
   const navFrame = useMemo<NavFrame<NavSnap> | null>(() => (desk ? null : navFrameOf(ui, panelUi, hodMode, viewing, teamAs)), [desk, ui, panelUi, hodMode, viewing, teamAs]);
+  // Back on a showroom with unsaved changes asks first (frame 4a·3, notes/10 §4): the leave sheet opens, the page stays; a
+  // Back with the sheet open is Keep editing. Only Save draft or Discard changes then step back.
+  const panelNow = useRef(panelUi);
+  panelNow.current = panelUi;
+  const panelShown = useRef(false);
+  const beforeBack = useCallback(() => {
+    const u = panelNow.current, d = dataRef.current;
+    if (!panelShown.current || !d || !u.roomsOpen) return false;
+    if (u.rmLeave) { setPanelUi(x => ({ ...x, rmLeave: false })); return true; }
+    if (roomUnsaved(u, d)) { setPanelUi(x => ({ ...x, rmLeave: true })); return true; }
+    return false;
+  }, []);
   useNavHistory(navFrame, snap => {
     setHodMode(snap.hodMode); setViewing(snap.viewing); setTeamAs(snap.teamAs);
     setUi(u => ({ ...u, ...snap.sales, ...(u.chat !== snap.sales.chat ? CHAT_LEFT : {}) }));
     setPanelUi(u => ({ ...u, ...snap.panel, ...(u.lead !== snap.panel.lead ? LEAD_LEFT : {}) }));
-  });
+  }, "crmNav", beforeBack);
 
   const shell = (body: React.ReactNode, extra = "") => (
     // data-revenue-app: the portal's display serif stays off the CRM's headings (globals.css).
@@ -275,6 +279,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
   // A line instead of the CRM (loading, not in it): on a computer in the page, not in a phone-sized box.
   const notice = (line: React.ReactNode) => (desk ? <div className={D.desk}><p className={H.loading}>{line}</p></div> : shell(<p className={H.loading}>{line}</p>));
   onScreenChat.current = null;
+  panelShown.current = false;
   if (!data) return notice(problem || "Loading your customers…");
   const me = personOf(data.viewerId, data.people);
   if (!me) return notice(data.setup === "no_role"
@@ -364,6 +369,7 @@ export default function CrmApp({ live, salesperson, onExit, desk = false, deskAp
       },
     } as unknown as SalesCtx) : null;
     onScreenChat.current = panelUi.lead;
+    panelShown.current = true;
     return shell(<>
       {problem && <p className={H.problem}>{problem}</p>}
       {banner && <SalesShellBanners v={banner} />}

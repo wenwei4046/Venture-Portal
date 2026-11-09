@@ -3,6 +3,8 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { typePx } from "./type";
+import { useBackCloses } from "./back";
+import { inAppCameraWorks } from "./camera";
 
 /**
  * A chat's + sheet (the owner, 2026-10-14: "在 + 號中的功能，相冊（用於選照片，影片）、document / file、quick reply、auto
@@ -47,7 +49,8 @@ export const ATTACH_TILES = [
   ["photos", "Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "var(--crm-ink-soft)"],
   ["document", "Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "var(--crm-rust)"],
   ["quick", "Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "var(--crm-brown)"],
-  ["auto", "Auto replies", "M12 8v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", "var(--crm-brown)"],
+  // Auto replies wear lucide's bot (CRM v4 notes/09, frame M05) — the phone's Attach tile 4's (sales/vm/composer.ts › BOT_ICON).
+  ["auto", "Auto replies", "M12 8V4H8M6 8h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2ZM2 14h2M20 14h2M15 13v2M9 13v2", "var(--crm-brown)"],
 ] as const;
 
 /** The person's own auto replies as choices: welcome, after hours, each keyword reply — the ones with words. */
@@ -63,6 +66,9 @@ export function autoChoices(set: { welcome?: { text?: string }; after?: { text?:
 export function AttachSheetHost() {
   const s = useSyncExternalStore(f => { subs.add(f); return () => { subs.delete(f); }; }, () => state, () => null);
   const [view, setView] = useState<"" | "quick" | "auto">("");
+  // Its own Back step (notes/10 §1). The pickers open in the tap (a file picker needs it); the camera inside the app and a
+  // reply put in the box go on once the step is taken back.
+  const closeThen = useBackCloses(!!s, close, "crmAttach");
   useEffect(() => { setView(s?.view ?? ""); }, [s]);
   if (!s || typeof document === "undefined") return null;
   const list = view === "quick" ? s.quick : view === "auto" ? s.auto : null;
@@ -73,7 +79,7 @@ export function AttachSheetHost() {
         {!list ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", padding: "6px 0 4px" }}>
             {ATTACH_TILES.filter(([k]) => (k === "camera" ? !!s.camera : k === "photos" ? !!s.photos : k === "document" ? !!s.document : true)).map(([k, label, icon, color]) => (
-              <button key={k} type="button" onClick={() => { if (k === "quick" || k === "auto") { setView(k); return; } close(); (k === "camera" ? s.camera : k === "photos" ? s.photos : s.document)?.(); }}
+              <button key={k} type="button" onClick={() => { if (k === "quick" || k === "auto") { setView(k); return; } const go = k === "camera" ? s.camera : k === "photos" ? s.photos : s.document; if (k === "camera" && inAppCameraWorks()) { closeThen(go); return; } close(); go?.(); }}
                 style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "7px", border: 0, background: "transparent", cursor: "pointer", padding: "4px 0", color: "var(--crm-ink)", fontSize: typePx(12), fontWeight: 600 }}>
                 <span style={{ width: "54px", height: "54px", borderRadius: "27px", background: color, color: "#fff", display: "grid", placeItems: "center" }}>
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={icon} /></svg>
@@ -91,7 +97,7 @@ export function AttachSheetHost() {
             <div style={{ overflowY: "auto", minHeight: 0 }}>
               {!list.length && <p style={{ margin: "6px 2px 12px", color: "var(--crm-muted)", fontSize: typePx(14), lineHeight: 1.45 }}>{view === "quick" ? "No quick replies yet. Add them in Profile › Quick replies." : "No auto replies with words yet. Set them in Profile › Auto-reply."}</p>}
               {list.map((c, i) => (
-                <button key={i} type="button" onClick={() => { close(); s.pick(c.text); }}
+                <button key={i} type="button" onClick={() => closeThen(() => s.pick(c.text))}
                   style={{ width: "100%", display: "flex", flexDirection: "column", gap: "3px", padding: "11px 4px", border: 0, borderTop: i ? "1px solid var(--crm-rule-soft)" : 0, background: "transparent", textAlign: "left", cursor: "pointer" }}>
                   <strong style={{ fontSize: typePx(13), fontWeight: 650, color: "var(--crm-rust)" }}>{c.label}</strong>
                   <span style={{ fontSize: typePx(14), color: "var(--crm-ink)", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "pre-wrap" }}>{c.text}</span>

@@ -8,16 +8,20 @@
 import { DeskApptTypes } from "./DeskApptTypes";
 import type { apptTypesVM } from "./vm/appt-types";
 import { DeskKeyLog } from "./DeskKeyLog";
-export { DeskReplyLibrary as DeskReplyLibrary4a } from "./DeskReplyLibrary";
 export { DeskUpNext as DeskUpNext4a } from "./DeskUpNext";
+// v4 notes/21: Customise metrics as one reusable component (Ads performance's Columns and +, Reports' Columns).
+export { DeskMetricPicker as DeskMetricPicker4a } from "./DeskMetricPicker";
+export { DeskChatMenu4a, DeskChatWait4a } from "./DeskChatHead4a";
+export { DeskInboxSide4a, DeskInfoAudit4a } from "./DeskInfo4a";
 export { DeskBookingBar as DeskBookingBar4a, DeskBookingLink as DeskBookingLink4a, DeskPartnerPane as DeskPartnerPane4a } from "./DeskPartner";
 import type { KeyLogVM } from "./vm/key-log";
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { DateRangePicker } from "../shared/date-range";
-import { InfoValue } from "../shared/AdLink";
 import { boldRuns, wrapBold } from "../shared/bold-text";
 import { ViewAsList } from "./ViewAsList";
 import { Ic, type Icon4a } from "../shared/icons4a";
+import { AuditTimeline } from "../shared/audit-timeline";
+import { InboxFilter, MenuChip, type InboxFilterBits } from "./DeskMenuChip";
 import { usePanelOpenOn } from "./panel-state";
 import { DeskAdsChart, FoldHead, type AdsChartBits } from "./DeskAdsChart";
 import { avatarTint, STATUS } from "../shared/palette";
@@ -203,14 +207,33 @@ export function Desk4aHead({ f4, extra }: { f4: Frame4a; extra?: ReactNode }) {
     {f4.addCust && <DeskAddCustomer v={f4.addCust} />}
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "22px", padding: "26px 36px 22px", minWidth: 0 }}>
       <div style={{ font: `500 30px ${TIGHT}`, letterSpacing: "-0.025em", whiteSpace: "nowrap", color: "var(--crm-ink)" }}>{h.title}</div>
-      {h.tabs.length > 0 && (
+      {/* v4 notes/20 (frame D1a's period row): one segmented control — the sand track, a white pill on the one picked —
+          then the dates in grey, 20 px after it; Custom still opens the date picker under its own option. Ads performance
+          (D2a) adds "+ Compare" after the dates. */}
+      {h.seg && h.tabs.length > 0 && (
+        <div data-period-seg="" style={{ flex: "none", display: "flex", alignItems: "center", gap: "20px", minWidth: 0 }}>
+          <div role="group" aria-label="Period" style={{ display: "flex", padding: "3px", borderRadius: "10px", background: "var(--crm-field)" }}>
+            {h.picker && <DateRangePicker value={h.picker.value} onApply={h.picker.apply} onCancel={h.picker.cancel} anchor={pickAt} allFrom={h.picker.allFrom} />}
+            {h.tabs.map(t => <button key={t.label} ref={h.picker?.tab === t.label || (!h.picker && t.label === "Custom") ? pickAt : undefined} type="button" onClick={t.pick} aria-pressed={t.on}
+              style={{ ...BTN, height: "30px", padding: "0 14px", borderRadius: "8px", display: "flex", alignItems: "center", whiteSpace: "nowrap", font: `${t.on ? 600 : 500} 13.5px Inter, sans-serif`,
+                background: t.on ? "#fff" : "transparent", boxShadow: t.on ? "0 1px 2px #2A160C1F" : "none", color: t.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{t.label}</button>)}
+          </div>
+          {h.sub && <span data-period-dates="" style={{ font: "400 14px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{h.sub}</span>}
+          {h.cmp && (
+            <button type="button" onClick={h.cmp.toggle} aria-pressed={h.cmp.on} title={h.cmp.on ? "Stop comparing" : "Compare with the period before"} style={{ ...BTN, display: "flex", alignItems: "center", gap: "5px", whiteSpace: "nowrap", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
+              {h.cmp.on ? <>{h.cmp.label}<Ic name="x" size={13} /></> : <><Ic name="plus" size={13} />Compare</>}
+            </button>
+          )}
+        </div>
+      )}
+      {!h.seg && h.tabs.length > 0 && (
         <div style={{ display: "flex", gap: "22px", font: "500 13px Inter, sans-serif" }}>
           {h.picker && <DateRangePicker value={h.picker.value} onApply={h.picker.apply} onCancel={h.picker.cancel} anchor={pickAt} allFrom={h.picker.allFrom} />}
           {h.tabs.map(t => <button key={t.label} ref={h.picker?.tab === t.label ? pickAt : undefined} type="button" onClick={t.pick} aria-pressed={t.on} style={{ ...BTN, padding: "6px 0", whiteSpace: "nowrap", font: "inherit",
             borderBottom: `2px solid ${t.on ? "var(--crm-rust)" : "transparent"}`, color: t.on ? "var(--crm-ink)" : "var(--crm-faint)" }}>{t.label}</button>)}
         </div>
       )}
-      {h.sub && <div style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{h.sub}</div>}
+      {!h.seg && h.sub && <div style={{ font: "400 13px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{h.sub}</div>}
       {h.vs && (
         <button type="button" onClick={h.vs.toggle} aria-pressed={h.vs.on} title={h.vs.on ? "Stop comparing" : "Compare with the period before"} style={{ ...BTN, flex: "none", height: "28px", padding: "0 10px", borderRadius: "14px", display: "inline-flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap",
           font: "500 12.5px Inter, sans-serif", border: `1px solid ${h.vs.on ? "var(--crm-line)" : "var(--crm-rule)"}`, background: h.vs.on ? "var(--crm-field)" : "#fff", color: h.vs.on ? "var(--crm-ink)" : "var(--crm-muted)" }}>
@@ -380,97 +403,39 @@ export function DeskInsight4a({ v }: { v: InsightBits }) {
 interface WhoOpt { head?: boolean; sel?: boolean; label: string; n?: number; color?: string; isGroup?: boolean; isPerson?: boolean; avBg?: string; avFg?: string; ini?: string; pick?: () => void }
 interface InboxListBits {
   brandOpts?: { label: string; title: string; n: number; on: boolean; pick: () => void }[];
-  whoLabel: string; whoOpen: boolean; toggleWho: () => void; whoClear: () => void; whoOpts: WhoOpt[];
   list4: {
     q: string; setQ: (e: { target: { value: string } }) => void;
-    tabs: { label: string; count: number; on: boolean; hot: boolean; pick: () => void }[];
     labels?: { id: string; name: string; color: string; on: boolean; count: number; pick: () => void }[];
+    filter: InboxFilterBits;
     rows: { id: string; name: string; ini: string; avBg: string; avFg: string; ch: "whatsapp" | "messenger"; ad: string; msg: string; time: string; unread: string; dot: boolean; hot: boolean;
-      owner: string; pinned: boolean; muted: boolean; sel: boolean; note: string; noteColor: string; noteWeight: number; open: () => void; tags?: { t: string; c: string }[] }[];
+      owner: string; ownerDot: string; pinned: boolean; muted: boolean; sel: boolean; open: () => void; tags?: { t: string; c: string }[];
+      wait: { text: string; icon: "clock" | "triangle-alert"; color: string } | null; visit: string; cold: boolean; blocked: boolean }[];
   };
 }
 
-/** Frame 02 · the Inbox's list (290 px): Everyone ▾, Search, the eight status tabs, the chats. */
-/** Inbox's statuses as one dropdown (the owner, 2026-11-09: "做下拉式" — the row of nine wrapped to three lines). */
-function StatusDrop({ tabs }: { tabs: { label: string; count: number | string; on: boolean; hot?: boolean; pick: () => void }[] }) {
-  const [open, setOpen] = useState(false);
-  const cur = tabs.find(t => t.on) ?? tabs[0];
-  if (!cur) return null;
-  return (
-    <span style={{ position: "relative", alignSelf: "flex-start" }}>
-      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-label={`Status: ${cur.label}`} style={{ ...BTN, height: "32px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "6px",
-        font: "500 13px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)", whiteSpace: "nowrap" }} className="crm4a-outline">
-        <span style={{ color: "var(--crm-muted)", fontWeight: 400 }}>Status</span>{cur.label}
-        <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--crm-faint)" }}>{cur.count}</span><Ic name="chevron-down" size={13} />
-      </button>
-      {open && (<>
-        <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-        <div role="listbox" style={{ position: "absolute", top: "38px", left: 0, zIndex: 8, width: "220px", maxHeight: "440px", overflow: "auto", padding: "6px", background: "#fff", borderRadius: "10px",
-          boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "1px" }}>
-          {tabs.map(t => (
-            <button key={t.label} type="button" role="option" aria-selected={t.on} onClick={() => { t.pick(); setOpen(false); }} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", minHeight: "34px", padding: "4px 8px", borderRadius: "7px",
-              font: `${t.on ? 600 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)", background: t.on ? "var(--crm-sel)" : "transparent" }} className="crm4a-row">
-              <span style={{ flex: 1 }}>{t.label}</span>
-              <span style={{ fontVariantNumeric: "tabular-nums", font: "400 12px Inter, sans-serif", color: t.hot && t.count ? "var(--crm-oxblood)" : "var(--crm-faint)" }}>{t.count}</span>
-              <span style={{ width: "16px", display: "flex", color: "var(--crm-rust)" }}>{t.on && <Ic name="check" size={14} />}</span>
-            </button>
-          ))}
-        </div>
-      </>)}
-    </span>
-  );
-}
-
+/**
+ * v4 D5a (docs/design_handoff_crm_redesign_v4, notes/24): the Inbox's list, 340 px — Search + Brand on one line, People /
+ * Status (the phone's 2c) with the picked ones as tags and "N chats of M · Clear all", then the rows as the phone's 2d:
+ * every row the same height (line 1 and line 3 fixed at 20 px), name + label tags · time or the wait, owner · ad, the
+ * message + unread; the open chat on sand, no left colour bar, no separate urgency line.
+ */
 export function DeskInboxList4a({ v }: { v: InboxListBits }) {
   const L = v.list4;
+  const brand = v.brandOpts ?? [];
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "14px", padding: "16px 18px 12px" }}>
-        {/* The brand, as Lead View's Inbox (the owner, 2026-10-29: "不同专页像截图 3 那样分"): All · The Conts · Dream Crafter with
-            the chats waiting in each; the pick keeps every page of the CRM to that brand (DeskScreens › inBrand). */}
-        {!!v.brandOpts?.length && (
-          <div role="tablist" aria-label="Brand" style={{ display: "flex", alignItems: "center", gap: "4px", overflowX: "auto", scrollbarWidth: "none" }}>
-            {v.brandOpts.map(o => <button key={o.label} type="button" role="tab" aria-selected={o.on} title={o.title} onClick={o.pick} style={{ ...BTN, flex: "none", height: "30px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap",
-              font: `${o.on ? 600 : 500} 13px Inter, sans-serif`, background: o.on ? "var(--crm-ink)" : "transparent", color: o.on ? "#fff" : "var(--crm-ink-soft)" }}>
-              {o.label}<span style={{ font: "400 12px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: o.on ? "rgba(255,255,255,.75)" : "var(--crm-faint)" }}>{o.n}</span></button>)}
-          </div>
-        )}
+      <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "10px", padding: "14px 16px 12px", borderBottom: "1px solid var(--crm-rule)" }}>
         <div style={{ display: "flex", gap: "8px" }}>
-          <span style={{ position: "relative", flex: "none" }}>
-            <button type="button" onClick={v.toggleWho} aria-expanded={v.whoOpen} style={{ ...BTN, height: "36px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "6px",
-              font: "500 13px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)", whiteSpace: "nowrap", maxWidth: "150px" }} className="crm4a-outline">
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{v.whoLabel}</span><Ic name="chevron-down" size={13} />
-            </button>
-            {v.whoOpen && (<>
-              <div onClick={v.toggleWho} style={{ position: "fixed", inset: "-2000px", zIndex: 7 }} />
-              <div style={{ position: "absolute", top: "42px", left: 0, zIndex: 8, width: "260px", maxHeight: "440px", overflow: "auto", padding: "6px", background: "#fff", borderRadius: "10px",
-                boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", gap: "1px" }}>
-                <span style={{ padding: "6px 8px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}>SHOW THE INBOX OF</span>
-                {v.whoOpts.map((w, i) => w.head
-                  ? <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 8px 4px", font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", color: "var(--crm-faint)" }}>
-                      <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: w.color }} />{w.label}</div>
-                  : <button key={i} type="button" onClick={w.pick} style={{ ...BTN, display: "flex", alignItems: "center", gap: "10px", minHeight: "36px", padding: "4px 8px", borderRadius: "7px",
-                      font: `${w.sel ? 500 : 400} 13px Inter, sans-serif`, color: "var(--crm-ink)", background: w.sel ? "var(--crm-sel)" : "transparent" }} className="crm4a-row">
-                      {w.isGroup ? <span style={{ width: "24px", display: "grid", placeItems: "center" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: w.color }} /></span>
-                        : <span style={{ width: "24px", height: "24px", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 10px ${TIGHT}`, background: w.avBg, color: w.avFg }}>{w.ini}</span>}
-                      <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.label}</span>
-                      <span style={{ fontVariantNumeric: "tabular-nums", font: "400 12px Inter, sans-serif", color: "var(--crm-faint)" }}>{w.n ?? ""}</span>
-                      <span style={{ width: "16px", display: "flex", color: "var(--crm-rust)" }}>{w.sel && <Ic name="check" size={14} />}</span>
-                    </button>)}
-                <div style={{ position: "sticky", bottom: "-6px", display: "flex", gap: "8px", margin: "6px -6px -6px", padding: "8px", background: "#fff", borderTop: "1px solid var(--crm-rule-soft)" }}>
-                  <button type="button" onClick={v.whoClear} style={{ ...BTN, flex: 1, height: "32px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">Clear</button>
-                  <button type="button" onClick={v.toggleWho} style={{ ...BTN, flex: 1, height: "32px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary">Done</button>
-                </div>
-              </div>
-            </>)}
-          </span>
-          <label style={{ flex: 1, minWidth: 0, height: "36px", padding: "0 10px", borderRadius: "7px", display: "flex", alignItems: "center", gap: "8px", font: "400 13px Inter, sans-serif",
+          <label style={{ flex: 1, minWidth: 0, height: "36px", padding: "0 12px", borderRadius: "9px", display: "flex", alignItems: "center", gap: "8px", font: "400 13.5px Inter, sans-serif",
             background: "var(--crm-field)", color: "var(--crm-faint)", boxSizing: "border-box" }}>
             <Ic name="search" size={14} />
             <input value={L.q} onChange={L.setQ} placeholder="Search" aria-label="Search chats" style={{ flex: 1, minWidth: 0, border: 0, outline: "none", background: "transparent", font: "inherit", color: "var(--crm-ink)", padding: 0 }} />
           </label>
+          {/* The brand (notes/24 §2): All brands · The Conts · Dream Crafter, as Insight's — the CRM's own (DeskScreens › inBrand). */}
+          {brand.length > 0 && <MenuChip aria="Brand" label={brand.find(o => o.on)?.title ?? "All brands"} maxW={150} menuW={220}
+            opts={brand.map(o => ({ label: o.title, on: o.on, pick: o.pick, n: o.n || undefined }))} />}
         </div>
-        <StatusDrop tabs={L.tabs} />
+        <InboxFilter f={L.filter} />
         {/* One's own labels (2026-11-02): a chip each label in use, a click filters to it, again clears. */}
         {!!L.labels?.length && (
           <div aria-label="Labels" style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
@@ -486,38 +451,47 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
       </div>
       <div style={{ flex: 1, minHeight: 0, overflow: "auto" }} data-inbox-list="">
         {L.rows.map(r => (
-          <button key={r.id} type="button" onClick={r.open} aria-current={r.sel ? "true" : undefined} style={{ ...BTN, width: "100%", display: "flex", gap: "12px", padding: "14px 18px", position: "relative",
-            borderTop: "1px solid var(--crm-rule-soft)", background: r.sel ? "var(--crm-sel)" : "transparent", color: "var(--crm-ink)" }} className={r.sel ? undefined : "crm4a-row"}>
-            <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "2px", background: r.sel ? "var(--crm-rust)" : "transparent" }} />
-            <span style={{ width: "40px", height: "40px", flex: "none", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", font: `500 13px ${TIGHT}`, background: r.avBg, color: r.avFg }}>{r.ini}</span>
+          <button key={r.id} type="button" onClick={r.open} aria-current={r.sel ? "true" : undefined} data-inbox-row="" style={{ ...BTN, width: "100%", display: "flex", gap: "12px", padding: "12px 16px",
+            borderBottom: "1px solid var(--crm-rule-soft)", background: r.sel ? "var(--crm-field)" : "transparent", color: "var(--crm-ink)" }} className={r.sel ? undefined : "crm4a-row"}>
+            <span style={{ flex: "none", position: "relative", width: "40px", height: "40px" }}>
+              <span style={{ width: "40px", height: "40px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", font: `500 13px ${TIGHT}`, background: r.avBg, color: r.avFg }}>{r.ini}</span>
+              <span style={{ position: "absolute", right: "-2px", bottom: "-2px", width: "16px", height: "16px", boxSizing: "border-box", borderRadius: "50%", border: "2px solid #fff", display: "flex", alignItems: "center", justifyContent: "center",
+                background: r.ch === "whatsapp" ? "var(--crm-whatsapp)" : "var(--crm-messenger)", color: "#fff" }}><Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={8} sw={2.6} /></span>
+            </span>
             <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" }}>
-              <span style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-                <span style={{ font: `${r.hot ? 600 : 500} 14px Inter, sans-serif`, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
-                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px", font: "400 11px Inter, sans-serif", whiteSpace: "nowrap", color: r.hot ? "var(--crm-rust)" : "var(--crm-faint)" }}>
-                  {r.muted && <Ic name="bell" size={11} style={{ opacity: 0.6 }} />}{r.pinned && <Ic name="pin" size={11} />}{r.time}
+              {/* Line 1, 20 px: name + label tags · the time, or the wait (icon + "9 h" in its urgency colour). */}
+              <span style={{ display: "flex", alignItems: "center", gap: "6px", height: "20px" }}>
+                <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "6px", overflow: "hidden" }}>
+                  <span style={{ flex: "0 1 auto", minWidth: 0, font: `${r.hot ? 600 : 500} 14px Inter, sans-serif`, color: r.cold ? "var(--crm-muted)" : undefined, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                  {(r.tags ?? []).map(g => (
+                    <span key={g.t} style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "4px", height: "18px", padding: "0 6px", borderRadius: "9px", background: "var(--crm-field)", font: "500 10.5px Inter, sans-serif", color: "var(--crm-ink-soft)", whiteSpace: "nowrap" }}>
+                      <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: g.c }} />{g.t}</span>
+                  ))}
                 </span>
+                {r.muted && <span style={{ flex: "none", display: "flex", color: "var(--crm-faint)" }}><Ic name="bell" size={11} style={{ opacity: 0.6 }} /></span>}
+                {r.pinned && <span style={{ flex: "none", display: "flex", color: "var(--crm-faint)" }}><Ic name="pin" size={11} /></span>}
+                {r.wait
+                  ? <span style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "3px", font: "600 12px Inter, sans-serif", color: r.wait.color, whiteSpace: "nowrap" }}><Ic name={r.wait.icon} size={11} />{r.wait.text}</span>
+                  : <span style={{ flex: "none", font: "500 11.5px Inter, sans-serif", color: r.hot ? "var(--crm-rust)" : "var(--crm-faint)", whiteSpace: "nowrap" }}>{r.time}</span>}
               </span>
-              <span style={{ display: "flex", alignItems: "center", gap: "5px", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden" }}>
-                <span style={{ display: "flex", color: r.ch === "whatsapp" ? "var(--crm-whatsapp)" : "var(--crm-messenger)" }}><Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={12} /></span>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.ad}</span>
+              {/* Line 2: who has it (their team's dot) · the ad. */}
+              <span style={{ display: "flex", alignItems: "center", gap: "5px", height: "14px", font: "400 11.5px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden" }}>
+                <span style={{ flex: "none", width: "6px", height: "6px", borderRadius: "50%", background: r.ownerDot }} />
+                <span style={{ flex: "none", fontWeight: 500, color: "var(--crm-ink-soft)" }}>{r.owner}</span>
+                <span style={{ color: "var(--crm-faint-2)" }}>·</span>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-faint)" }} title={r.ad}>{r.ad}</span>
               </span>
-              <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ flex: 1, minWidth: 0, font: "400 13px Inter, sans-serif", color: "var(--crm-ink-soft)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.msg}</span>
-                {r.unread && <span style={{ minWidth: "18px", height: "18px", padding: "0 5px", boxSizing: "border-box", borderRadius: "9px", display: "flex", alignItems: "center", justifyContent: "center",
-                  font: `600 10px ${TIGHT}`, background: "var(--crm-rust)", color: "#fff" }}>{r.unread}</span>}
-                {r.dot && <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "var(--crm-rust)" }} />}
-              </span>
-              {!!r.tags?.length && (
-                <span style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-                  {r.tags.map(g => <span key={g.t} style={{ padding: "1px 7px", borderRadius: "9px", font: "500 10.5px Inter, sans-serif", color: "#fff", background: g.c }}>{g.t}</span>)}
+              {/* Line 3, 20 px: the message (a booked visit or a cold chat before it) + the unread badge. */}
+              <span style={{ display: "flex", alignItems: "center", gap: "6px", height: "20px" }}>
+                <span style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "4px", font: "400 13px Inter, sans-serif", color: r.blocked ? "var(--crm-faint)" : "var(--crm-ink-soft)", whiteSpace: "nowrap", overflow: "hidden" }}>
+                  {r.visit && <span style={{ flex: "none", display: "inline-flex", alignItems: "center", gap: "3px", fontWeight: 500, color: "var(--crm-brown)" }}><Ic name="calendar-check" size={13} />{r.visit} ·</span>}
+                  {r.cold && <span style={{ flex: "none", display: "flex", color: "var(--crm-faint)" }}><Ic name="lock" size={13} /></span>}
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{r.msg}</span>
                 </span>
-              )}
-              {(r.note || r.owner) && (
-                <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-                  {r.note && <span style={{ font: `${r.noteWeight} 11px Inter, sans-serif`, color: r.noteColor, whiteSpace: "nowrap" }}>{r.note}</span>}
-                  <span style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.owner}</span>
-                </span>
-              )}
+                {r.unread && <span style={{ flex: "none", minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center",
+                  font: `600 11px ${TIGHT}`, background: "var(--crm-rust)", color: "#fff" }}>{r.unread}</span>}
+                {r.dot && <span style={{ flex: "none", width: "10px", height: "10px", borderRadius: "50%", background: "var(--crm-rust)" }} />}
+              </span>
             </span>
           </button>
         ))}
@@ -527,120 +501,7 @@ export function DeskInboxList4a({ v }: { v: InboxListBits }) {
   );
 }
 
-interface InboxSideBits {
-  ibHas: boolean; ibNone: boolean; ibInfoShut: boolean; ibInfoFold: () => void; ibInfoRail: { open: () => void }; ibInfoW: number;
-  dragInfo: (e: never) => void; resetInfo: () => void;
-  ibInfo: { groups: { label: string; rows: { k: string; v: string; href: string | null; c: string; go?: (() => void) | null }[] }[] };
-  ibCpOpen: boolean; ibCpToggle: () => void; ibCpW?: number; dragCp?: (e: never) => void; resetCp?: () => void;
-  ibCp: { audit4: { what: string; detail: string; who: string; time: string; main: boolean; hot: boolean }[] };
-  ibBook: () => void; editInfo: () => void;
-  ibLabels?: { editing: boolean; toggleEdit: () => void; items: { key: string; name: string; color: string; on: boolean; toggle: () => void; remove: () => void }[];
-    draft: string; setDraft: (e: { target: { value: string } }) => void; canAdd: boolean; add: () => void };
-}
-
-function Strip({ label, icon, bg, onOpen }: { label: string; icon: "user-round" | "history"; bg: string; onOpen: () => void }) {
-  return (
-    // v2 (note 04): every folded rail is the one style — the cream nav, whatever its panel's colour (bg kept for the call sites).
-    <button type="button" onClick={onOpen} title={`Open ${label}`} data-bg={bg} style={{ ...BTN, width: "44px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", paddingTop: "20px",
-      borderLeft: "1px solid var(--crm-rule)", background: "var(--crm-cream-nav)" }}>
-      <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name={icon} size={16} /></span>
-      <span style={{ writingMode: "vertical-rl", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>{label}</span>
-      <span style={{ display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-left" size={13} /></span>
-    </button>
-  );
-}
-
-/** Frames 02 / 02b / 02c · Customer info (white) and this chat's Audit log, each folding to a 44 px strip. */
-export function DeskInboxSide4a({ v, value }: { v: InboxSideBits; value: (v: string, href: string | null) => ReactNode }) {
-  return (<>
-    {v.ibInfoShut ? <Strip label="Customer info" icon="user-round" bg="var(--crm-page)" onOpen={v.ibInfoRail.open} /> : (
-      <aside style={{ position: "relative", width: `${v.ibInfoW}px`, flex: "none", boxSizing: "border-box", display: "flex", flexDirection: "column", minHeight: 0, borderLeft: "1px solid var(--crm-rule)", background: "var(--crm-page)" }}>
-        <div onPointerDown={v.dragInfo as never} onDoubleClick={v.resetInfo} title="Drag to resize · double-click to reset" style={{ position: "absolute", left: "-5px", top: 0, bottom: 0, width: "9px", zIndex: 6, cursor: "col-resize", touchAction: "none" }} />
-        <button type="button" onClick={v.ibInfoFold} title="Fold Customer info" style={{ ...BTN, height: "62px", flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "0 20px",
-          font: `500 16px ${TIGHT}`, borderBottom: "1px solid var(--crm-rule)", color: "var(--crm-ink)" }}>
-          <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name="user-round" size={15} /></span>Customer info
-          <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-right" size={15} /></span>
-        </button>
-        <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column" }}>
-          {v.ibNone && <span style={{ padding: "40px 20px", textAlign: "center", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Pick a chat to see the customer</span>}
-          {v.ibHas && (<>
-            {v.ibLabels && (() => { const lb = v.ibLabels; return (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "16px 20px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <span style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>My labels</span>
-                  <button type="button" onClick={lb.toggleEdit} style={{ ...BTN, marginLeft: "auto", font: "500 12px Inter, sans-serif", color: "var(--crm-rust)" }}>{lb.editing ? "Done" : "Edit"}</button>
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                  {lb.items.map(l => (
-                    <span key={l.key} style={{ display: "flex", alignItems: "center" }}>
-                      <button type="button" onClick={lb.editing ? undefined : () => void l.toggle()} aria-pressed={l.on} title={lb.editing ? undefined : l.on ? "Take this label off" : "Put this label on"}
-                        style={{ ...BTN, height: "26px", padding: "0 10px", borderRadius: "13px", display: "flex", alignItems: "center", gap: "5px", cursor: lb.editing ? "default" : "pointer",
-                          font: `${l.on ? 600 : 500} 12px Inter, sans-serif`, border: `1px solid ${l.on ? l.color : "var(--crm-line)"}`, background: l.on ? l.color : "#fff", color: l.on ? "#fff" : "var(--crm-ink)" }}>
-                        {l.on ? <Ic name="check" size={12} /> : <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: l.color }} />}{l.name}
-                      </button>
-                      {lb.editing && <button type="button" onClick={() => void l.remove()} title={`Delete ${l.name}`} aria-label={`Delete ${l.name}`} style={{ ...BTN, marginLeft: "2px", display: "flex", color: "var(--crm-oxblood)" }}><Ic name="x" size={13} /></button>}
-                    </span>
-                  ))}
-                </div>
-                <form onSubmit={e => { e.preventDefault(); if (lb.canAdd) void lb.add(); }} style={{ display: "flex", gap: "6px" }}>
-                  <input value={lb.draft} onChange={lb.setDraft} placeholder="New label" aria-label="New label" maxLength={30}
-                    style={{ flex: 1, minWidth: 0, height: "30px", boxSizing: "border-box", padding: "0 10px", border: "1px solid var(--crm-line)", borderRadius: "7px", font: "400 12px Inter, sans-serif", color: "var(--crm-ink)", background: "#fff", outline: "none" }} />
-                  <button type="submit" disabled={!lb.canAdd} style={{ ...BTN, height: "30px", padding: "0 12px", borderRadius: "7px", font: "500 12px Inter, sans-serif", background: lb.canAdd ? "var(--crm-rust)" : "var(--crm-line)", color: "#fff", cursor: lb.canAdd ? "pointer" : "default" }}>Add</button>
-                </form>
-              </div>); })()}
-            {v.ibInfo.groups.map(g => (
-              <div key={g.label} style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "16px 20px", borderBottom: "1px solid var(--crm-rule-soft)" }}>
-                <div style={{ font: "500 10px Inter, sans-serif", letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{g.label}</div>
-                {g.rows.map(r => (
-                  <div key={r.k} style={{ display: "flex", justifyContent: "space-between", gap: "12px", font: "400 13px Inter, sans-serif" }}>
-                    <span style={{ color: "var(--crm-muted)", flex: "none" }}>{r.k}</span>
-                    <span style={{ textAlign: "right", fontWeight: 500, color: r.c, overflowWrap: "anywhere", minWidth: 0 }}>{r.go ? <InfoValue v={r.v} go={r.go} /> : value(r.v, r.href)}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-            <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: "8px" }}>
-              <button type="button" onClick={v.ibBook} style={{ ...BTN, height: "38px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#fff" }} className="crm4a-primary">Book a visit</button>
-              <button type="button" onClick={v.editInfo} style={{ ...BTN, height: "38px", borderRadius: "7px", textAlign: "center", font: "500 13px Inter, sans-serif", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }} className="crm4a-outline">Edit customer info</button>
-            </div>
-          </>)}
-        </div>
-      </aside>
-    )}
-    {!v.ibCpOpen ? <Strip label="Audit log" icon="history" bg="var(--crm-audit)" onOpen={v.ibCpToggle} /> : (
-      // v2 (frame 02b, note 06): --crm-hover under a --crm-sel head, --crm-sum-div lines, dragged at its left edge (240–520 px).
-      <aside style={{ position: "relative", width: `${v.ibCpW ?? 290}px`, flex: "none", boxSizing: "border-box", display: "flex", flexDirection: "column", minHeight: 0, borderLeft: "1px solid var(--crm-sum-div)", background: "var(--crm-hover)" }}>
-        {v.dragCp && <span onPointerDown={v.dragCp as never} onDoubleClick={v.resetCp} title="Drag to resize" style={{ position: "absolute", top: 0, bottom: 0, left: "-5px", width: "10px", zIndex: 2, cursor: "col-resize", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none" }}>
-          <span style={{ width: "3px", height: "36px", borderRadius: "2px", background: "var(--crm-audit-line)" }} /></span>}
-        <button type="button" onClick={v.ibCpToggle} title="Fold the Audit log" style={{ ...BTN, height: "62px", flex: "none", display: "flex", alignItems: "center", gap: "8px", padding: "0 20px", borderBottom: "1px solid var(--crm-sum-div)", background: "var(--crm-sum)", color: "var(--crm-ink)" }}>
-          <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name="history" size={15} /></span>
-          <span style={{ font: `500 16px ${TIGHT}` }}>Audit log</span><span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)" }}>this chat</span>
-          <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-faint)" }}><Ic name="chevron-right" size={15} /></span>
-        </button>
-        <div style={{ flex: 1, minHeight: 0, overflow: "auto", display: "flex", flexDirection: "column", padding: "16px 20px" }}>
-          {v.ibNone && <span style={{ padding: "24px 0", textAlign: "center", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Pick a chat to see its history</span>}
-          {v.ibHas && v.ibCp.audit4.map((a, i) => (
-            <div key={i} style={{ display: "flex", gap: "12px" }}>
-              <div style={{ width: "10px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <span style={{ width: "9px", height: "9px", marginTop: "4px", borderRadius: "50%", boxSizing: "border-box", background: a.hot ? "var(--crm-orange)" : a.main ? "var(--crm-rust)" : "#fff",
-                  border: `2px solid ${a.hot ? "var(--crm-orange)" : a.main ? "var(--crm-rust)" : "var(--crm-faint)"}` }} />
-                {i < v.ibCp.audit4.length - 1 && <span style={{ flex: 1, width: "1px", background: "var(--crm-audit-line)" }} />}
-              </div>
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "3px", paddingBottom: "16px" }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-                  <div style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{a.what}</div>
-                  <div style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{a.time}</div>
-                </div>
-                <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)" }}>{a.detail}</div>
-                <div style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>{a.who}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </aside>
-    )}
-  </>);
-}
+// Inbox's Customer info and Audit log rail (v4 notes/24 §4, §4b, §5) are desk/DeskInfo4a.tsx.
 
 interface PpSel { label: string; value: string; open: boolean; toggle: () => void; close: () => void; opts: { v: string; n: number; on: boolean; pick: () => void }[] }
 interface PpCell { pill: boolean; plain: boolean; v: string; bg: string; fg: string; dot?: string }
@@ -1267,7 +1128,7 @@ interface AdsCell { v: string; cv: string; d: string; dc: string; db: string; ba
 interface AdsBits {
   ap4: {
     cols: { id: string; label: string; arrow: string; num: boolean; sort: () => void }[];
-    rows: { name: string; headline: string; ch: "whatsapp" | "messenger"; cells: AdsCell[]; url?: string; hidden?: boolean; hide?: () => void }[];
+    rows: { name: string; headline: string; brand?: string; ch: "whatsapp" | "messenger"; cells: AdsCell[]; url?: string; hidden?: boolean; hide?: () => void }[];
     hiddenN?: number; showHidden?: boolean; toggleHidden?: () => void;
     total: { label: string; cells: AdsCell[] };
     cmp: boolean;
@@ -1276,19 +1137,22 @@ interface AdsBits {
   /** The chart over the table and the table's own fold (2026-10-23); absent in the prototype harness, which keeps 4a's table alone. */
   apChartV?: AdsChartBits & { tableShut: boolean; foldTable: () => void; adsN: number };
   apPager?: { range: string; per: number; sizes: number[]; setPer: (n: number) => void; pages: number; cur: number; go: (i: number) => void };
+  /** v4 D2a: the figure strip (absent in the prototype harness, which keeps the old table). */
+  apStrip?: AdsStripBits;
 }
+interface AdsStripBits { items: { key: string; label: string; total: string; color: string; remove: (() => void) | null }[]; canAdd: boolean; add: () => void; open: boolean; toggle: () => void }
 
 /**
  * An ad's name in Ads Performance: a small ↗ beside it opens the ad (the owner, 2026-10-24: "電腦版也要有可以導入看該廣告");
  * a right click offers View ad and, for CRM · Manage, Hide from Ads Performance / Show again ("右鍵點擊廣告名稱可以選擇hide").
  */
-function AdName({ r }: { r: { name: string; url?: string; hidden?: boolean; hide?: () => void } }) {
+function AdName({ r, link = true, font = "500 14px Inter, sans-serif" }: { r: { name: string; url?: string; hidden?: boolean; hide?: () => void }; link?: boolean; font?: string }) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const item: CSSProperties = { ...BTN, display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", textAlign: "left" };
   return (
     <span style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }} onContextMenu={e => { if (!r.url && !r.hide) return; e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY }); }}>
-      <span title={r.hide ? "Right click to hide" : undefined} style={{ font: "500 14px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: r.hidden ? "var(--crm-faint)" : "var(--crm-ink)" }}>{r.name}{r.hidden ? " · hidden" : ""}</span>
-      {r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" title="View ad" aria-label="View ad" onClick={e => e.stopPropagation()} style={{ flex: "none", width: "20px", height: "20px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-muted)" }}><Ic name="arrow-up-right" size={11} /></a>}
+      <span title={r.hide ? "Right click to hide" : undefined} style={{ font, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: r.hidden ? "var(--crm-faint)" : "var(--crm-ink)" }}>{r.name}{r.hidden ? " · hidden" : ""}</span>
+      {r.url && <a href={r.url} target="_blank" rel="noopener noreferrer" title="View ad" aria-label="View ad" onClick={e => e.stopPropagation()} style={{ visibility: link ? "visible" : "hidden", flex: "none", width: "20px", height: "20px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-muted)" }}><Ic name="arrow-up-right" size={11} /></a>}
       {menu && <>
         <span onClick={() => setMenu(null)} onContextMenu={e => { e.preventDefault(); setMenu(null); }} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
         <span role="menu" style={{ position: "fixed", left: menu.x, top: menu.y, zIndex: 41, minWidth: "210px", padding: "4px 0", borderRadius: "10px", background: "#fff", boxShadow: "0 8px 24px rgba(42,22,12,.18)", display: "flex", flexDirection: "column" }}>
@@ -1337,6 +1201,8 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
     );
   };
   const C = v.apChartV;
+  // v4 notes/21 (frame D2a): the figure strip, the chart folded under it, then By ad.
+  if (C && v.apStrip) return <DeskAdsD2a v={v} C={C} S={v.apStrip} />;
   // The ad's column stays put while the figures scroll sideways under it (the owner, 2026-10-29: "往右拉动时，广告名称栏位是
   // freeze 的"): sticky at the scroller's left, over the row's own padding, on the row's colour.
   const pin = (bg: string): CSSProperties => ({ position: "sticky", left: 0, zIndex: 1, marginLeft: "-12px", paddingLeft: "12px", alignSelf: "stretch", alignItems: "center", background: bg, boxShadow: "8px 0 8px -8px rgba(42,22,12,.18)" });
@@ -1382,6 +1248,108 @@ export function DeskAdsTable4a({ v }: { v: AdsBits }) {
       <div style={{ paddingBottom: "10px" }}><FoldHead title="By ad" sub={`${C.adsN} ads`} shut={C.tableShut} fold={C.foldTable} /></div>
       {!C.tableShut && table}
       {!C.tableShut && v.apPager && <AdsPager4a p={v.apPager} />}
+    </div>
+  );
+}
+
+/** D2a's table columns: Ad takes the rest, each figure its frame width (Leads 70 · Appts 70 · Appt rate 84 · Show-up 80 · Won 60 · Won rate 84 · Spend 96 · Per lead 90). */
+const D2A_W: Record<string, number> = { leads: 70, appt: 70, apptrate: 84, showrate: 80, won: 60, winrate: 84, spend: 96, cpl: 90 };
+/** A zero, 0%, an empty or "—" figure is faint (D2a: "zeros and — in grey so the real numbers stand out"). */
+export const adsFaint = (x: string) => !x || x === "—" || /^0(\.0+)?%?$/.test(x.trim());
+const adsShown = (c: AdsCell, id: string) => (/%$/.test(c.v) ? (id === "showrate" || id === "apptrate" ? `${Math.round(parseFloat(c.v))}%` : c.v.replace(/(\.\d)\d%$/, "$1%")) : c.v);
+
+/**
+ * v4 notes/21 · the figure strip (frame D2a): the picked figures in equal centred columns, each with an 8 px dot in its
+ * line's colour; hover one for × (it goes); + adds one (Customise metrics), Show chart opens the chart under the strip.
+ * Folded by default; which figures, their order and folded / open are kept per user on the server (vm/adsperf.ts).
+ */
+export function DeskAdsStrip({ S }: { S: AdsStripBits }) {
+  const [hov, setHov] = useState<string | null>(null);
+  return (
+    <div data-ads-strip="" style={{ flex: "none", display: "flex", alignItems: "stretch", height: "84px", boxSizing: "border-box", borderRadius: "14px", border: "1px solid var(--crm-rule)" }}>
+      <div style={{ flex: 1, minWidth: 0, display: "grid", gridTemplateColumns: `repeat(${Math.max(1, S.items.length)},minmax(0,1fr))`, alignItems: "center" }}>
+        {S.items.map((f, i) => (
+          <div key={f.key} data-ads-figure={f.key} onMouseEnter={() => setHov(f.key)} onMouseLeave={() => setHov(h => (h === f.key ? null : h))}
+            style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", minWidth: 0, padding: "0 8px", borderLeft: i ? "1px solid var(--crm-fig-div)" : undefined }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px", maxWidth: "100%", font: "500 12.5px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
+              <span style={{ width: "8px", height: "8px", flex: "none", borderRadius: "50%", background: f.color }} /><span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{f.label}</span>
+            </span>
+            <span style={{ maxWidth: "100%", font: `500 24px ${TIGHT}`, letterSpacing: "-0.01em", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.2 }}>{f.total}</span>
+            {f.remove && (
+              <button type="button" onClick={f.remove} aria-label={`Remove ${f.label}`} title={`Remove ${f.label}`} style={{ ...BTN, position: "absolute", top: "-14px", right: "8px", width: "20px", height: "20px", borderRadius: "50%", display: "grid", placeItems: "center",
+                background: "var(--crm-field)", color: "var(--crm-muted)", visibility: hov === f.key ? "visible" : "hidden" }}><Ic name="x" size={11} /></button>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "14px", padding: "0 20px", borderLeft: "1px solid var(--crm-rule)" }}>
+        <button type="button" onClick={S.add} disabled={!S.canAdd} title={S.canAdd ? "Add a figure" : "Six figures at most"} aria-label="Add a figure" style={{ ...BTN, width: "36px", height: "36px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+          background: "var(--crm-field)", color: S.canAdd ? "var(--crm-ink)" : "var(--crm-faint-2)", cursor: S.canAdd ? "pointer" : "default" }}><Ic name="plus" size={16} /></button>
+        <button type="button" onClick={S.toggle} aria-expanded={S.open} style={{ ...BTN, display: "flex", alignItems: "center", gap: "6px", font: "500 13.5px Inter, sans-serif", color: "var(--crm-rust)", whiteSpace: "nowrap" }}>
+          {S.open ? "Hide chart" : "Show chart"}<span style={{ display: "flex", transform: S.open ? "rotate(180deg)" : "none", transition: "transform .16s" }}><Ic name="chevron-down" size={13} /></span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** v4 notes/21 · Ads performance = frame D2a: the strip (chart folded under it), then By ad with Columns. */
+function DeskAdsD2a({ v, C, S }: { v: AdsBits; C: NonNullable<AdsBits["apChartV"]>; S: AdsStripBits }) {
+  const A = v.ap4;
+  const [hov, setHov] = useState<number | null>(null);
+  const grid = `minmax(240px,3fr) ${A.cols.map(c => `${D2A_W[c.id] ?? 90}px`).join(" ")}`;
+  const row = (h: string): CSSProperties => ({ display: "grid", gridTemplateColumns: grid, columnGap: "16px", height: h, alignItems: "center", padding: "0 12px" });
+  const cell = (c: AdsCell, id: string, lead: boolean) => {
+    const t = adsShown(c, id), faint = adsFaint(t);
+    return (
+      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", minWidth: 0 }}>
+        <span style={{ whiteSpace: "nowrap", fontWeight: lead && !faint ? 600 : undefined, color: faint ? "var(--crm-faint)" : "var(--crm-ink)" }}>{t}</span>
+        {A.cmp && c.d && <span style={{ font: "500 10px Inter, sans-serif", padding: "0 5px", borderRadius: "4px", background: c.db, color: c.dc, whiteSpace: "nowrap" }}>{c.d}</span>}
+      </span>
+    );
+  };
+  return (
+    <div data-ads-d2a="" style={{ display: "flex", flexDirection: "column", gap: "20px", minWidth: 0 }}>
+      <DeskAdsStrip S={S} />
+      {S.open && <DeskAdsChart v={C} head={false} />}
+      <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "8px", paddingBottom: "10px" }}>
+          <span style={{ font: `500 18px ${TIGHT}`, color: "var(--crm-ink)" }}>By ad</span>
+          <span style={{ font: "400 14px Inter, sans-serif", color: "var(--crm-faint)" }}>{C.adsN}</span>
+          {/* Columns replaces the dashed + column button (D2a), so nothing overlaps the header. */}
+          <button type="button" onClick={v.openMetrics} style={{ ...BTN, marginLeft: "auto", alignSelf: "center", display: "flex", alignItems: "center", gap: "6px", font: "500 13.5px Inter, sans-serif", color: "var(--crm-muted)" }}>
+            <Ic name="sliders-horizontal" size={14} />Columns
+          </button>
+        </div>
+        <div style={{ overflowX: "auto", minWidth: 0 }}><div style={{ display: "flex", flexDirection: "column", width: "max-content", minWidth: "100%" }}>
+          <div data-ads-head="" style={{ ...row("38px"), borderRadius: "8px", background: "var(--crm-hover)", font: "500 12.5px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
+            <button type="button" onClick={v.apSortName} style={{ ...BTN, padding: 0, font: "inherit", color: v.apNameArrow === "▲" || v.apNameArrow === "▼" ? "var(--crm-ink)" : "inherit" }}>Ad{v.apNameArrow === "▲" ? " ↑" : v.apNameArrow === "▼" ? " ↓" : ""}</button>
+            {A.cols.map(c => <button key={c.id} type="button" onClick={c.sort} style={{ ...BTN, padding: 0, font: "inherit", textAlign: "right", whiteSpace: "nowrap", color: c.arrow ? "var(--crm-ink)" : "inherit" }}>{c.label}{c.arrow ? ` ${c.arrow}` : ""}</button>)}
+          </div>
+          {A.rows.map((r, i) => (
+            <div key={i} data-ads-row="" onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(h => (h === i ? null : h))}
+              style={{ ...row("58px"), borderBottom: "1px solid var(--crm-rule-soft)", font: "400 14.5px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+                <span style={{ flex: "none", width: "28px", height: "28px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", background: r.ch === "whatsapp" ? "var(--crm-wa-tile)" : "var(--crm-msg-tile)", color: r.ch === "whatsapp" ? "var(--crm-wa-tile-ink)" : "var(--crm-messenger)" }}>
+                  <Ic name={r.ch === "whatsapp" ? "phone" : "message-circle"} size={14} />
+                </span>
+                <span style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
+                  {/* One line for the name, ↗ only on hover; the brand under it — the long name is not repeated. */}
+                  <AdName r={r} link={hov === i} font="500 14.5px Inter, sans-serif" />
+                  {r.brand && <span style={{ font: "400 12.5px Inter, sans-serif", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.brand}</span>}
+                </span>
+              </span>
+              {r.cells.map((c, j) => <Fragment key={j}>{cell(c, A.cols[j].id, A.cols[j].id === "leads")}</Fragment>)}
+            </div>
+          ))}
+          <div style={{ ...row("50px"), font: "500 14.5px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>
+            <span>{A.total.label}</span>
+            {A.total.cells.map((c, j) => <Fragment key={j}>{cell(c, A.cols[j].id, false)}</Fragment>)}
+          </div>
+          {!!A.hiddenN && <button type="button" onClick={A.toggleHidden} style={{ ...BTN, margin: "10px 12px 0", font: "500 12.5px Inter, sans-serif", color: "var(--crm-muted)" }}>{A.showHidden ? "Leave the hidden ads out" : `Hidden ads (${A.hiddenN}) · show`}</button>}
+        </div></div>
+        {v.apPager && <AdsPager4a p={v.apPager} />}
+      </div>
     </div>
   );
 }
@@ -2134,11 +2102,11 @@ function DeskUpNextAccess({ v }: { v: UpNextAccess }) {
 interface AuOpt { label: string; on: boolean; pick: () => void }
 interface AuditBits {
   auQ: string; setAuQ: (e: { target: { value: string } }) => void; auEmpty: boolean; auClear: () => void;
+  auLines?: import("../shared/audit-timeline").AuditLine[];
   au4: { open: "who" | "area" | "per" | null; toggle: (k: "who" | "area" | "per") => void; close: () => void; whoLabel: string; areaLabel: string; perLabel: string;
     who: AuOpt[]; areas: AuOpt[]; pers: AuOpt[]; picker?: { value: { a: number; b: number } | null; apply(r: { a: number; b: number }): void; cancel(): void } | null;
     rows: { time: string; day: string; who: string; sys: boolean; area: string; change: string; before: string; after: string }[] };
 }
-const AU_COLS = "111px 130px 111px 224px minmax(0,1fr)";
 /** Frame 11 · Audit log: a search, Everyone / All areas / Last 7 days, and the table When · Who · Area · Change · Before → after. */
 export function DeskAudit4a({ v }: { v: AuditBits }) {
   const A = v.au4;
@@ -2172,26 +2140,9 @@ export function DeskAudit4a({ v }: { v: AuditBits }) {
         <Menu k="area" label={A.areaLabel} opts={A.areas} />
         <Menu k="per" label={A.perLabel} opts={A.pers} />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", borderTop: "1px solid var(--crm-ink)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: AU_COLS, alignItems: "center", height: "42px", padding: "0 12px", background: "var(--crm-cream-nav)", borderBottom: "1px solid var(--crm-rule)", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-muted)" }}>
-          <span>When</span><span>Who</span><span>Area</span><span>Change</span><span>Before → after</span>
-        </div>
-        {A.rows.map((r, i) => (
-          <div key={i} style={{ display: "grid", gridTemplateColumns: AU_COLS, alignItems: "center", minHeight: "50px", padding: "6px 12px", boxSizing: "border-box", borderBottom: "1px solid var(--crm-rule-soft)", font: "400 13px Inter, sans-serif", color: "var(--crm-ink)" }}>
-            <span style={{ display: "flex", flexDirection: "column" }}><span style={{ fontVariantNumeric: "tabular-nums" }}>{r.time}</span><span style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-faint)" }}>{r.day}</span></span>
-            <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, paddingRight: "8px" }}>
-              <span style={{ width: "24px", height: "24px", flex: "none", borderRadius: "50%", display: "grid", placeItems: "center", font: `500 9px ${TIGHT}`, background: r.sys ? "var(--crm-field)" : avatarTint(r.who)[0], color: r.sys ? "var(--crm-ink-soft)" : avatarTint(r.who)[1] }}>{r.sys ? "S" : r.who.split(/\s+/).map(w => w[0] ?? "").join("").slice(0, 2).toUpperCase()}</span>
-              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.who}</span>
-            </span>
-            <span style={{ color: "var(--crm-ink-soft)" }}>{r.area}</span>
-            <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", paddingRight: "12px" }}>{r.change}</span>
-            <span style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-              <span style={{ color: "var(--crm-faint)", textDecoration: r.before === "—" ? "none" : "line-through", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "45%" }}>{r.before}</span>
-              <Ic name="chevron-right" size={12} style={{ color: "var(--crm-faint)", flex: "none" }} />
-              <span style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.after}</span>
-            </span>
-          </div>
-        ))}
+      {/* v4 notes/24 §5: one audit-log format everywhere — the D4b timeline, newest at the bottom (shared/audit-timeline.tsx). */}
+      <div data-audit-log="" style={{ display: "flex", flexDirection: "column", maxWidth: "760px", paddingTop: "8px" }}>
+        {!!v.auLines?.length && <AuditTimeline lines={v.auLines} />}
         {v.auEmpty && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", padding: "48px 20px", textAlign: "center" }}>
             <span style={{ font: "500 14px Inter, sans-serif", color: "var(--crm-ink)" }}>Nothing recorded under this filter</span>
@@ -2431,41 +2382,3 @@ export function DeskRepPick4a({ reps = [] }: { reps?: { label: string; n: number
   </>);
 }
 
-/** Customer info's own Audit log (the owner, 2026-11-09: "能不能看到 audit log?"): Inbox's per-chat log, folded until opened. */
-export function DeskInfoAudit4a({ items, open: openAt }: { open?: boolean; items?: { what: string; detail: string; who: string; time: string; main: boolean; hot: boolean }[] }) {
-  const [open, setOpen] = useState(!!openAt);
-  useEffect(() => { if (openAt) setOpen(true); }, [openAt]);
-  if (!items) return null; // the prototype harness draws none
-  return (
-    <div style={{ border: "1px solid var(--crm-rule)", borderRadius: "16px", overflow: "hidden", flex: "none" }}>
-      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} style={{ ...BTN, width: "100%", height: "46px", display: "flex", alignItems: "center", gap: "8px", padding: "0 14px", background: "#fff", color: "var(--crm-ink)" }}>
-        <span style={{ display: "flex", color: "var(--crm-brown)" }}><Ic name="history" size={15} /></span>
-        <span style={{ font: "600 14px Inter, sans-serif" }}>Audit log</span>
-        <span style={{ font: "400 12.5px Inter, sans-serif", color: "var(--crm-muted)" }}>{items.length}</span>
-        <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-faint)", transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}><Ic name="chevron-right" size={15} /></span>
-      </button>
-      {open && (
-        <div style={{ display: "flex", flexDirection: "column", padding: "12px 14px 2px", borderTop: "1px solid var(--crm-rule)", background: "var(--crm-hover)" }}>
-          {!items.length && <span style={{ padding: "8px 0 14px", font: "400 13px Inter, sans-serif", color: "var(--crm-muted)" }}>Nothing recorded yet</span>}
-          {items.map((a, i) => (
-            <div key={i} style={{ display: "flex", gap: "12px" }}>
-              <div style={{ width: "10px", flex: "none", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <span style={{ width: "9px", height: "9px", marginTop: "4px", borderRadius: "50%", boxSizing: "border-box", background: a.hot ? "var(--crm-orange)" : a.main ? "var(--crm-rust)" : "#fff",
-                  border: `2px solid ${a.hot ? "var(--crm-orange)" : a.main ? "var(--crm-rust)" : "var(--crm-faint)"}` }} />
-                {i < items.length - 1 && <span style={{ flex: 1, width: "1px", background: "var(--crm-audit-line)" }} />}
-              </div>
-              <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "3px", paddingBottom: "14px" }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-                  <div style={{ font: "500 13px Inter, sans-serif", color: "var(--crm-ink)" }}>{a.what}</div>
-                  <div style={{ marginLeft: "auto", font: "400 11px Inter, sans-serif", fontVariantNumeric: "tabular-nums", color: "var(--crm-muted)", whiteSpace: "nowrap" }}>{a.time}</div>
-                </div>
-                {a.detail && <div style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-ink-soft)", overflowWrap: "anywhere" }}>{a.detail}</div>}
-                <div style={{ font: "400 11px Inter, sans-serif", color: "var(--crm-muted)" }}>{a.who}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}

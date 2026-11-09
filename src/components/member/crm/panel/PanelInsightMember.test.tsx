@@ -16,7 +16,8 @@ describe("a member on Team Insight", () => {
     window.history.replaceState({}, "", "/member/preview?crmAs=boss");
     render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
     await act(async () => {});
-    expect(screen.queryByText(/^Won/)).toBeNull();
+    // v4 8b (2026-11-10, newer than "no Won for now"): Teams is a table with Won as its last column.
+    expect(screen.getByText("Won")).toBeInTheDocument();
     await tap(screen.getByText("Team Kelvin"));
     await tap(screen.getByText("Farah Aziz"));
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();

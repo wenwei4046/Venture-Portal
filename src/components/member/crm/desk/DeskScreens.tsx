@@ -26,6 +26,7 @@ import { useFollowNewest } from "../shared/stick";
 import { useReadWhenSeen } from "../shared/seen";
 import { MediaViewer } from "../shared/viewer";
 import { MessageMenu } from "../shared/msg-menu";
+import { ActionSheetHost } from "../shared/action-sheet";
 import { inBrand } from "./vm/insight";
 import { sourceOf, type SourcePick } from "@/lib/member/crm-source";
 
@@ -421,6 +422,8 @@ export default function DeskScreens(p: DeskScreensProps) {
       {/* The phone's photo / video / document viewer and the message dialogs (Forward, Info, Starred), shared. */}
       <MediaViewer />
       <MessageMenu />
+      {/* The cold chat's templates (CRM v4 notes/11: the warning row's Template, the + menu's Cold template) — the phone's sheet. */}
+      <ActionSheetHost />
     </div>
   );
 }

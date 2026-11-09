@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { typePx } from "./type";
+import { useBackCloses } from "./back";
 
 /**
  * A notification's summary (the owner, 2026-10-14: "在 notification 裡，我看不到重點，幫我類似做 summary，我點進去看到
@@ -30,6 +31,8 @@ const close = () => { state = null; emit(); };
 
 export function NotifSummaryHost() {
   const s = useSyncExternalStore(f => { subs.add(f); return () => { subs.delete(f); }; }, () => state, () => null);
+  // Its own Back step (notes/10 §1); Open chat goes on once that step is taken back.
+  const closeThen = useBackCloses(!!s, close, "crmSummary");
   useEffect(() => {
     if (!s) return;
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
@@ -78,11 +81,11 @@ export function NotifSummaryHost() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {s.action && (
-            <button type="button" onClick={() => { const go = s.action!.run; close(); go(); }}
+            <button type="button" onClick={() => closeThen(s.action!.run)}
               style={{ height: "46px", borderRadius: "23px", border: 0, background: "var(--crm-ink-soft)", color: "#fff", fontSize: typePx(15), fontWeight: 650, cursor: "pointer" }}>{s.action.label}</button>
           )}
           {s.openChat && (
-            <button type="button" onClick={() => { const go = s.openChat; close(); go?.(); }}
+            <button type="button" onClick={() => closeThen(s.openChat)}
               style={{ height: "46px", borderRadius: "23px", border: 0, background: "var(--crm-rust)", color: "#fff", fontSize: typePx(15), fontWeight: 650, cursor: "pointer" }}>Open chat</button>
           )}
           <button type="button" onClick={close}

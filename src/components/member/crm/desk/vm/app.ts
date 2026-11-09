@@ -4,6 +4,7 @@
  * from the CRM's data, the phone's writes and permissions, and the desktop's own (PROPOSALS.md B1–B9).
  */
 import { deskLabelsVM } from "./labels";
+import { labelSheetVM, type ChatLabelSheet } from "../../shared/label-sheet";
 import type { DeskCtx } from "./ctx";
 import { frameVM } from "./frame";
 import { leaveCalData } from "../../shared/leave-cal-data";
@@ -11,7 +12,7 @@ import { peopleBook } from "../../shared/people-book";
 import { upNextOpen } from "../../shared/up-next-data";
 import { jobTitle } from "../../shared/people";
 import { frame4aVM, heads4a } from "./frame4a";
-import { clistVM, insightVM } from "./insight";
+import { activityPeriod, clistVM, insightVM } from "./insight";
 import { alertsVM, assignVM, chatMenuVM, infoVM, inboxVM, moveHolder, teamPaneVM } from "./inbox";
 import { answerOf, formV2 } from "./form";
 import { initials } from "./data";
@@ -31,9 +32,21 @@ import { chatVM } from "./chat";
 import { railVM } from "./rail";
 import { bookVM, customerFormVM, historyVM, noteVM } from "./extras";
 import { adHref } from "../../shared/AdLink";
-import { urgencyOf } from "../../sales/vm/common";
+import { lastReal, urgencyOf } from "../../sales/vm/common";
 import { avatarTint } from "../../shared/palette";
 import { FB_BLOCKED, FB_BLOCKED_NOTE, isFbBlocked } from "../../shared/fb-blocked";
+
+/** The chat head's defaults (4a frame 02), spread first so each kind's head and the chat's wait lay over them. */
+const PH_BASE = { avBg: undefined, avFg: undefined, status: "", statusColor: "var(--crm-muted)", clock: false };
+
+/** v4 notes/24 §4: Customer info's short dates — First contact and Last chat as "8 Nov, 1:34 pm" (the form's own answers stay). */
+export function shortDateOf(c: DeskCtx["data"]["customers"][number], id: string): string | null {
+  if (id !== "first" && id !== "last") return null;
+  const at = id === "first" ? c.createdAt : lastReal(c)?.at;
+  if (!at) return "—";
+  const d = new Date(at), MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${d.getDate()} ${MON[d.getMonth()]}, ${d.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" })}`;
+}
 
 export function deskVM(ctx: DeskCtx) {
   const { ui, patch, data } = ctx;
@@ -88,6 +101,8 @@ export function deskVM(ctx: DeskCtx) {
     kActivity: ui.tab === "activity" || (ui.tab === "insight" && ui.insTab === "activity" && upNextOpen(data, ctx.me.id)),
     // Team activity (docs/design_handoff_crm): its own page, on the people book Calendar and People read.
     activity: { data, book: peopleBook(data, ctx.teams, ctx.directors), live: ctx.live, who: ui.actWho ?? null, nameOf: ctx.nameOf,
+      // v4 notes/22: under Insight the head's period is Team activity's (its own Today / Week / Month / Custom went).
+      period: ui.tab === "insight" ? activityPeriod(ui, ctx.now) : undefined,
       roleOf: (id: string) => { const p = data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },
       openChat: (id: string) => patch({ tab: "inbox", pane: "docked", kind: "chat", chat: id, ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null }) },
     workspace: { customers: data.customers, visits: data.visits, adNames: data.adNames ?? {}, nameOf: ctx.nameOf, now: ctx.now, live: ctx.live,
@@ -95,25 +110,28 @@ export function deskVM(ctx: DeskCtx) {
     ...chatProgressVM(ctx, op),
     // 4a's chat head (frame 02): the avatar in the customer's tint and, for a chat, the wait in oxblood ("Attention ·
     // waiting 6 h") or its status in the muted line's colour.
-    ph: { avBg: undefined as string | undefined, avFg: undefined as string | undefined, status: "", statusColor: "var(--crm-muted)", ...(heads[ui.kind] ?? heads.chat),
+    ph: { ...(PH_BASE as { avBg?: string; avFg?: string; status: string; statusColor: string; clock: boolean }), ...(heads[ui.kind] ?? heads.chat),
       ...(ui.kind === "chat" && cur ? (() => { const u = urgencyOf(cur, ctx.now), [avBg, avFg] = avatarTint(cur.name);
         // Blocked on Facebook (2026-11-08, shared/fb-blocked.ts) is said in place of the wait, muted.
         if (isFbBlocked(cur, data)) return { avBg, avFg, status: FB_BLOCKED, statusColor: "var(--crm-muted)" };
-        return { avBg, avFg, status: u.level !== "none" ? `Attention · waiting ${Math.floor(u.waitingMinutes / 60)} h` : "", statusColor: "var(--crm-oxblood)" }; })() : {}) },
+        // v4 notes/24 §7: plain text, no pill — a 12px clock and "Waiting 6 h", 600 13px oxblood, before ⋮.
+        return { avBg, avFg, status: u.level !== "none" ? `Waiting ${Math.floor(u.waitingMinutes / 60)} h` : "", statusColor: "var(--crm-oxblood)", clock: u.level !== "none" }; })() : {}) },
     // …and the composer gives way to one line (desk-4a.cjs' composer patch).
     fbBlocked: !!cur && isFbBlocked(cur, data), fbBlockedNote: FB_BLOCKED_NOTE,
     chatOwner: chat.owner, chatReply: chat.reply, msgs: chat.msgs, firstDay: chat.firstDay, draft: chat.draft, setDraft: chat.setDraft, draftKey: chat.draftKey, send: chat.send, micD: chat.micD, sendTitle: chat.sendTitle, photo: chat.photo,
     pinShown: chat.pinShown, pinText: chat.pinText, unpinMsg: chat.unpinMsg, replyOn: chat.replyOn, replyWho: chat.replyWho, replyText: chat.replyText, cancelReply: chat.cancelReply,
     attachOpen: chat.attachOpen, attachToggle: chat.attachToggle, attachClose: chat.attachClose, attachOpts: chat.attachOpts,
+    // CRM v4 notes/11: the WhatsApp cold warning row and the grey Send (desk-4a.cjs's composer patch).
+    waShut: chat.waShut, warnText: chat.warnText, warnBtn: chat.warnBtn, alertIcon: chat.alertIcon, openTpl: chat.openTpl,
+    sendBg: chat.sendBg, sendCursor: chat.sendCursor, sendSh: chat.sendSh, sendCls: chat.sendCls, chatPadB: chat.chatPadB, replyBottom: chat.replyBottom,
     emojiOpen: chat.emojiOpen, emojiToggle: chat.emojiToggle, emojiFg: chat.emojiFg, emoji: chat.emoji,
-    suggest: chat.suggest, suggestKey: chat.suggestKey, pickSuggest: chat.pickSuggest, suggestLogo: chat.suggestLogo, suggestLib: chat.suggestLib,
     // The design's one-message chat bindings, unused live (desk-chat-v2.cjs draws every message): the sample's values.
     sysLines: [] as { text: string; at: string }[], msgShown: false, chatIn: false, chatOut: false, chatText: "", chatTime: "", chatAppt: false,
     ...chatMenuVM(ctx, chat),
     // Inbox's Customer info column (v2): the Customer form's sections — what the CRM fills and what was asked (vm/form.ts).
     ibInfo: (() => { const c = cur; const secs = formV2(data);
       return { name: c?.name ?? "", ini: c ? initials(c.name) : "", groups: c ? secs.map(sec => ({ label: sec.label,
-        rows: sec.fields.filter(fl => fl.id !== "name").map((fl, i) => { const val = answerOf(data, c, fl, ctx.nameOf);
+        rows: sec.fields.filter(fl => fl.id !== "name").map((fl, i) => { const val = shortDateOf(c, fl.id) ?? answerOf(data, c, fl, ctx.nameOf);
           // The salesperson's name opens Team activity on them (docs/design_handoff_crm, 2026-11-08 — the person report's place).
           const who = fl.id === "sp" && c.assignedTo && upNextOpen(data, ctx.me.id) ? c.assignedTo : null;
           return { k: fl.label.replace(/ (RM)$/, ""), v: val, href: fl.id === "ad" ? adHref(c.adUrl) : null, go: who ? () => patch({ tab: "activity", pane: "closed", chat: null, actWho: who }) : null, bt: i ? "1px solid var(--crm-field)" : "0", w: val === "—" ? 400 : 650, c: val === "—" ? "var(--crm-faint)" : "var(--crm-ink)" }; }) })) : [] }; })(),
@@ -124,6 +142,13 @@ export function deskVM(ctx: DeskCtx) {
     openNote: () => { if (ui.chat) patch({ menu: false, kind: "note" }); },
     editInfo: () => patch({ kind: "form", cform: null }),
     ibLabels: deskLabelsVM(ctx, cur),
+    // v4 notes/15: ⋮ › Label and Customer info's + Add open the Label sheet — the phone's own (shared/label-sheet.ts).
+    labelSheet: ui.labPop && cur ? ({ ...labelSheetVM({ data, act: ctx.act, customerId: cur.id, form: ui.labPop.form,
+      put: p => ctx.set(u => (u.labPop ? { ...u, labPop: { view: p.view ?? u.labPop.view, form: "form" in p ? p.form ?? null : u.labPop.form } } : u)) }),
+      list: ui.labPop.view === "labels", editing: ui.labPop.view === "labelEdit", done: () => patch({ labPop: null }) } as ChatLabelSheet) : null,
+    openLabels: () => patch({ labPop: { view: "labels", form: null } }),
+    // v4 notes/24 §4: Customer info's sections fold, each on its own (kept while the desktop is open).
+    infoFold: ui.infoFold ?? [], toggleInfoFold: (label: string) => ctx.set(u => ({ ...u, infoFold: (u.infoFold ?? []).includes(label) ? (u.infoFold ?? []).filter(x => x !== label) : [...(u.infoFold ?? []), label] })),
     kBook: ui.kind === "book", kNote: ui.kind === "note", kForm: ui.kind === "form",
     book: bookVM(ctx, cur), note: noteVM(ctx, cur), cform: customerFormVM(ctx, data.customers.find(c => c.id === (ui.infoId ?? ui.chat ?? ""))), history: historyVM(ctx),
     cyclePeriod: () => { const order = ["month", "week", "day"] as const, i = order.indexOf(ui.insPer as (typeof order)[number]); patch({ insPer: order[(i + 1) % order.length], insRange: null }); },

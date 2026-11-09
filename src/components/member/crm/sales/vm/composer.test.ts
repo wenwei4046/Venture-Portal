@@ -28,8 +28,8 @@ describe("the composer's content is the prototype's", () => {
     expect(PROTO).toContain(`'${ICON.mic}'`);
     // 4a (2026-10-18): the tiles keep the prototype's colours as their --crm-* tokens (tools/crm-design/palette-4a.cjs)
     const palette = createRequire(import.meta.url)("../../../../../../tools/crm-design/palette-4a.cjs") as (s: string) => string;
-    // Suggest reply is the CRM's own (in Auto replies' place since 2026-10-29), not the prototype's.
-    for (const [label, icon, color] of TILES.filter(t => t[0] !== "Suggest reply")) {
+    // Auto replies wear the bot since CRM v4 (notes/09, frame M05): the CRM's own, not the prototype's icon.
+    for (const [label, icon, color] of TILES.filter(t => t[0] !== "Auto replies")) {
       const at = PROTO.indexOf(`['${label}', '${icon}', '#`);
       expect(at, label).toBeGreaterThan(-1);
       expect(palette(PROTO.slice(at, PROTO.indexOf("]", at) + 1))).toBe(`['${label}', '${icon}', '${color}']`);

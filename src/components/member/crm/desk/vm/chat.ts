@@ -13,20 +13,16 @@ import { sourceOf } from "@/lib/member/crm-source";
 import type { CrmChatMessage, CrmCustomer } from "@/lib/member/crm-data";
 import { CRM_LOST_REASONS } from "@/lib/member/crm";
 import { first, initials } from "./data";
-import { quietFailure } from "../../sales/vm/chat";
+import { quietFailure, shownStatus } from "../../sales/vm/chat";
 import type { DeskCtx } from "./ctx";
 import { albumsOf, galleryOf, mediaOf, mediaWord, MINE_BG, MINE_TIME, NO_MEDIA, tickColor } from "../../shared/chat-media";
 import { MENU_ICON, REACTIONS, openMsgView, openStarred } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
-import { ATTACH_TILES, DOC_ACCEPT } from "../../shared/attach-sheet";
-import { fillWithFor, libraryFor, suggestReplies, waitingWords } from "../../shared/suggest-reply";
-import { openSuggest } from "../../shared/suggest-float";
-
-// A + menu row holds one line (its height is fixed — two suggestions ran over each other, the owner's screenshot 2026-10-29):
-// a suggestion shows its start there; the pick still fills the box with the whole of it.
-const oneLine = (t: string) => { const s = t.replace(/\s+/g, " ").trim(); return s.length > 22 ? `${s.slice(0, 22)}…` : s; };
-const SPARK = "M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z";
-import { CATS, ICON as CMP_ICON, emojiView, pushRecent } from "../../sales/vm/composer";
+import { ATTACH_TILES, DOC_ACCEPT, autoChoices } from "../../shared/attach-sheet";
+import { openColdTemplates } from "../../shared/cold-templates";
+import { isFbBlocked } from "../../shared/fb-blocked";
+import { windowShut } from "../../sales/vm/common";
+import { ALERT_ICON, CATS, COLD_ICON, ICON as CMP_ICON, SHUT_GREY, emojiView, pushRecent, waShutText } from "../../sales/vm/composer";
 import { adKindLabel } from "../../shared/AdLink";
 
 const DAY = 86_400_000;
@@ -112,7 +108,8 @@ export function messagesOf(ctx: DeskCtx, c: CrmCustomer): Msg[] {
       reactBar: REACTIONS.map(e => ({ e, bg: rx === e ? "var(--crm-field)" : "transparent", pick: () => { patch({ msgMenu: null }); void act.react(m.id, rx === e ? "" : e); } })),
       // Your own bubble: the brand's orange, white words, white time and ticks (the owner, 2026-10-16 — the phone's, chat-media.ts).
       outBg: MINE_BG, outFg: "#fff", outTime: MINE_TIME,
-      acts, tick: tickColor(m.status), hasTick: mine && m.status !== "failed" && m.status !== "sending", failed: m.status === "failed" && !quietFailure(m.status, m.error),
+      // A Messenger send refused past the window is drawn as sent — its tick and time — until Human Agent (v4 notes/12).
+      acts, tick: tickColor(shownStatus(m)), hasTick: mine && shownStatus(m) !== "failed" && m.status !== "sending", failed: m.status === "failed" && !quietFailure(m.status, m.error),
       quote: q ? { who: q.from === "me" ? "You" : c.name, text: q.text || mediaWord(q) } : null, quoteMargin: media.pad === NO_MEDIA.pad ? "0 0 6px" : "0 0 4px", appt,
     };
   });
@@ -129,7 +126,12 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
   const draft = c ? ui.draft[c.id] ?? "" : "";
   const setD = (v: string) => { if (c) set(u => ({ ...u, draft: { ...u.draft, [c.id]: v } })); };
   const replyMsg = c && ui.replyTo ? c.messages.find(m => m.id === ui.replyTo) : undefined;
-  const send = () => { if (!c || !draft.trim()) return; const text = draft, rt = replyMsg?.id ?? null; setD(""); patch({ replyTo: null });
+  // A WhatsApp chat past its 24 h window (CRM v4 notes/11, frame 6a·2 as the phone's): the warning row over the composer,
+  // Send and the mic grey and inactive — typing allowed, the draft kept. Not a customer blocked on Facebook (their own line).
+  const waShut = !!c && c.channel === "whatsapp" && windowShut(c, ctx.now) && !isFbBlocked(c, data);
+  const tplOn = data.settings?.suggestTemplate !== false;
+  const openTpl = () => { if (c) void openColdTemplates(c, act); };
+  const send = () => { if (!c || !draft.trim() || waShut) return; const text = draft, rt = replyMsg?.id ?? null; setD(""); patch({ replyTo: null });
     void act.send(c.id, text, rt).then(ok => { if (!ok) setD(text); }); };
   const pick = (accept: string, multiple = false, capture = false) => { if (!c || typeof document === "undefined") return; const inp = document.createElement("input"); inp.type = "file"; inp.accept = accept; inp.multiple = multiple;
     if (capture) inp.setAttribute("capture", "environment");
@@ -140,19 +142,21 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
   const pinnedId = c ? data.prefs[c.id]?.pinnedMessageId ?? null : null, pinned = c && pinnedId ? c.messages.find(m => m.id === pinnedId) : undefined;
   // The + menu: the phone's + sheet's choices; Quick replies and Auto replies list their texts in the same menu.
   const view = ui.attachView;
-  // Auto replies' place is Suggest reply since 2026-10-29 (the owner: "替换 auto replies"): the suggested replies for the
-  // customer's waiting words (shared/suggest-reply.ts), as the phone's floating logo offers them.
+  // Auto replies are back in Suggest reply's place (CRM v4 notes/09; as before 2026-10-29): one's saved welcome /
+  // after-hours / keyword replies, into the reply box. Past the window on WhatsApp the row is Cold template (the phone's
+  // Attach tile 4 since 2026-11-04), opening the templates — Settings › Suggest a template off, Auto replies stays.
+  const coldTile = waShut && tplOn;
   const choices = view === "quick" ? data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : q.message.slice(0, 24), text: q.message }))
-    : view === "auto" && c ? suggestReplies(c, data.replyExamples ?? [], data.quickReplies).map(s => ({ label: oneLine(s.text), text: s.text })) : [];
+    : view === "auto" ? autoChoices(data.autoReplies) : [];
   const attachOpts = view ? [
     { label: "Back", bg: "var(--crm-muted)", d: "M15 18l-6-6 6-6", sep: false, pick: () => patch({ attachView: "" }) },
-    ...(choices.length ? choices.map((x, i) => ({ label: x.label, bg: view === "quick" ? "var(--crm-brown)" : "var(--crm-brown)", d: view === "quick" ? ATTACH_TILES[3][2] : ATTACH_TILES[4][2], sep: i === 0,
+    ...(choices.length ? choices.map((x, i) => ({ label: x.label, bg: "var(--crm-brown)", d: view === "quick" ? ATTACH_TILES[3][2] : ATTACH_TILES[4][2], sep: i === 0,
       pick: () => { setD(x.text); patch({ attachOpen: false, attachView: "" }); } }))
-      : [{ label: view === "quick" ? "No quick replies yet" : "No suggestion for the last message yet", bg: "var(--crm-faint)", d: ATTACH_TILES[view === "quick" ? 3 : 4][2], sep: true, pick: () => {} }]),
-  ] : ATTACH_TILES.map(([k, label0, d0, bg0], i) => { const sug = k === "auto"; const label = sug ? "Suggest reply" : label0, d = sug ? SPARK : d0, bg = sug ? "var(--crm-rust)" : bg0; return { label, bg, d, sep: i === 3,
+      : [{ label: view === "quick" ? "No quick replies yet" : "No auto replies yet", bg: "var(--crm-faint)", d: ATTACH_TILES[view === "quick" ? 3 : 4][2], sep: true, pick: () => {} }]),
+  ] : ATTACH_TILES.map(([k, label0, d0, bg0], i) => { const cold = k === "auto" && coldTile; const label = cold ? "Cold template" : label0, d = cold ? COLD_ICON : d0, bg = cold ? "var(--crm-rust)" : bg0; return { label, bg, d, sep: i === 3,
     pick: () => {
-      if (k === "auto") { patch({ attachOpen: false, attachView: "" }); openSuggest(); return; }
-      if (k === "quick") { patch({ attachView: k }); return; }
+      if (cold) { patch({ attachOpen: false, attachView: "" }); openTpl(); return; }
+      if (k === "quick" || k === "auto") { patch({ attachView: k }); return; }
       patch({ attachOpen: false });
       if (k === "camera") pick("image/*,video/*", false, true); else if (k === "photos") pick("image/*,video/*", true); else pick(DOC_ACCEPT, true);
     } }; });
@@ -168,9 +172,11 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
       cats: CATS.map(([id, label, icon]) => ({ label, d: CMP_ICON[icon], on: !emo?.searching && emo?.ecat === id, pick: () => emoSet({ ecat: id, searching: false, q: "" }) })),
       list: (ev?.list ?? []).map(e => ({ e, pick: () => { setD(draft + e); const r = pushRecent(mine, e); patch({ recents: r }); ctx.deskAct.saveRecents(r); } })) },
     c, msgs, firstDay, draft,
-    // The suggested replies' floating logo over the reply box (2026-10-29: "电脑版也加漂浮 logo"), as the phone's.
-    suggest: c ? suggestReplies(c, data.replyExamples ?? [], data.quickReplies, 3, { library: data.replyLibrary, ...fillWithFor(data, c, ctx.me.name, ctx.now) }) : undefined, suggestKey: c?.id ?? "", pickSuggest: (text: string) => setD(text),
-    suggestLogo: !!c && !!waitingWords(c), suggestLib: c ? libraryFor(c, data.replyLibrary, fillWithFor(data, c, ctx.me.name, ctx.now)) : undefined,
+    // notes/11: the WhatsApp cold warning row directly above the composer (full width, 8px over it), its Template button
+    // (none while Suggest a template is off); Send / the mic grey, the wall and the reply quote clear of the row.
+    waShut, warnText: waShut && c ? waShutText(first(c.name)) : "", warnBtn: waShut && tplOn, alertIcon: ALERT_ICON, openTpl,
+    sendBg: waShut ? SHUT_GREY : "var(--crm-rust)", sendCursor: waShut ? "default" : "pointer", sendSh: waShut ? "none" : "0 6px 20px rgba(42,22,12,.15)",
+    sendCls: waShut ? undefined : "crm4a-primary", chatPadB: waShut ? "20px 24px 168px" : "20px 24px 104px", replyBottom: waShut ? "144px" : "82px",
     setDraft: (e: { target: { value: string } }) => setD(e.target.value),
     draftKey: (e: { key: string; shiftKey: boolean; preventDefault(): void }) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } },
     send, micD: draft.trim() ? "M5 12h14M13 6l6 6-6 6" : "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0m7 7v3",

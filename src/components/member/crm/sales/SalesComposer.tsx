@@ -53,6 +53,22 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
           {!!(p.tplOn) && (<span onClick={p.openTpl} style={{ height: "46px", borderRadius: "23px", background: "var(--crm-rust)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>)}
         </div>
       </>)}
+      {!!(p.fbLine) && (<>
+        <div data-fb-blocked="" style={{ flex: "none", margin: "8px 12px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div style={{ minHeight: "52px", borderRadius: "26px", display: "flex", alignItems: "center", gap: "10px", padding: "0 18px", boxSizing: "border-box", background: "var(--crm-rule-soft)", border: "1px solid var(--crm-line)", color: "var(--crm-ink-soft)" }}>
+            <svg style={{ flex: "none" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <span style={{ flex: "1", minWidth: "0", fontSize: "calc(14px * var(--rv-type, 1))", fontWeight: "500", lineHeight: "1.35" }}>{p.fbLine}</span>
+          </div>
+          <div style={{ fontSize: "calc(12px * var(--rv-type, 1))", lineHeight: "1.45", color: "var(--crm-muted)", textAlign: "center", padding: "0 12px", textWrap: "pretty" }}>{p.fbSub}</div>
+        </div>
+      </>)}
+      {!!(p.warnOn) && (<>
+        <div data-wa-cold="" style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", margin: "0 12px 2px", padding: "10px 10px 10px 14px", borderRadius: "16px", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)" }}>
+          <svg style={{ flex: "none" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={p.alertIcon}></path></svg>
+          <span style={{ flex: "1", minWidth: "0", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "500", lineHeight: "1.4" }}>{p.warnText}</span>
+          {!!(p.warnBtn) && (<span onClick={p.openTpl} onMouseDown={p.keep} role="button" style={{ flex: "none", height: "36px", padding: "0 12px", borderRadius: "18px", display: "flex", alignItems: "center", fontSize: "calc(13px * var(--rv-type, 1))", fontWeight: "500", background: "var(--crm-rust)", color: "#fff", cursor: "pointer" }}>Template</span>)}
+        </div>
+      </>)}
       {!!(p.isA) && (<>
         <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", padding: "8px 12px 10px" }}>
           {!!(p.recOn) && (<>
@@ -90,7 +106,7 @@ export default function SalesComposer({ p }: { p: ComposerVM }) {
               </span>
             </>)}
           </span>)}
-          <span onClick={p.mainAct} onMouseDown={p.keep} onPointerDown={p.mainDown} onContextMenu={p.noMenu} title={p.mainTitle} style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", cursor: "pointer", boxShadow: "0 3px 9px rgba(189,74,25,.18)", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
+          <span onClick={p.mainAct} onMouseDown={p.keep} onPointerDown={p.mainDown} onContextMenu={p.noMenu} title={p.mainTitle} style={{ flex: "none", width: "52px", height: "52px", borderRadius: "50%", display: "grid", placeItems: "center", background: p.mainBg, color: "#fff", cursor: p.mainCursor, boxShadow: p.mainSh, touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
               <path d={p.mainIcon}>
               </path>

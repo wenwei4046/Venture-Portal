@@ -491,6 +491,26 @@ html:has([data-revenue-app]) { overscroll-behavior-y: none; }
   --crm-series-tint-5: #F7F0EB;
   --crm-series-tint-6: #F7F0EB;
   --crm-series-tint-7: #F7F0EB;
+  /* docs/design_handoff_crm_redesign_v4 (2026-11-10): the Inbox — a picked chip's count on ink (10b), the Team card's border (2d). */
+  --crm-on-dark-meta: #E0CFC4;
+  --crm-card-line: #EEE3DA;
+  /* v4 README's tokens with none of their own yet: the green of a reply / appointment / show-up (audit dots, Live), the audit rail. */
+  --crm-v4-green: #2F7A4A;
+  --crm-audit-rail: #EEE6DF;
+  /* v4 D5a: the line over Block NAME in the desktop chat's ⋮ menu. */
+  --crm-menu-divider: #F1EBE6;
+  /* v4 4a / 4a·3: the line round a red-lettered outline button (Discard, Delete this showroom). */
+  --crm-v4-danger-line: #F0D5CB;
+  /* v4 desktop Insight (D2a / D4b): a figure strip's and a facts row's dividers; an ad's channel tile (WhatsApp, Messenger). */
+  --crm-fig-div: #F1EBE6;
+  --crm-wa-tile: #E7F6EC;
+  --crm-wa-tile-ink: #1E9E4F;
+  --crm-msg-tile: #E6F0FE;
+  /* v4 notes/19 + every CRM calendar (shared/cal-look.ts): the month grid's lines; v4 8e: Team activity's late Waiting figure on espresso. */
+  --crm-cal-grid: #F3EEEA;
+  --crm-strip-late: #FFB38A;
+  /* v4 13d / 13e: Assignment's tab row rule. */
+  --crm-tab-rule: #E6DED7;
 }
 
 /* ─── The design system's tokens (2026-10-14) ───

@@ -13,6 +13,7 @@ import type { DeskCtx, HistRow } from "./ctx";
 import { arrayDrag } from "./columns";
 import { MON } from "./insight";
 import { officeStamp } from "@/lib/member/crm-data";
+import { auditWhen, type AuditLine, type AuditTone } from "../../shared/audit-timeline";
 
 const DAY = 86_400_000;
 const CAT: Record<string, [string, string, string]> = { chat: ["Chat flow", "var(--crm-rust)", "var(--crm-tint-attention)"], marketing: ["Marketing", "var(--crm-ink-soft)", "var(--crm-tint-cold)"], management: ["Management", "var(--crm-ink-soft)", "var(--crm-tint-new)"] };
@@ -101,6 +102,21 @@ export function facet(e: E): { area: string; change: string; before: string; aft
   return { area, change: e.target ? `${e.action} · ${e.target}` : e.action, before: "—", after: e.detail || "—" };
 }
 
+/** The dot (notes/24 §5): oxblood for a cancel, a block, a delete, a loss; green for a reply, an appointment, a show-up, a win; ink for the rest. */
+export function auditTone(action: string): AuditTone {
+  if (/cancel|block|delet|remov|lost|declin/i.test(action)) return "oxblood";
+  if (/repl|appointment booked|visit booked|show|check|won|first reply/i.test(action)) return "green";
+  return "ink";
+}
+
+/** Settings › Audit log as the D4b timeline: the change as the title, "before → after" (or what it became) and who · where under it. */
+export function auditLines(rows: E[]): AuditLine[] {
+  return rows.slice().reverse().map((e, i) => {
+    const f = facet(e), change = f.before !== "—" ? `${f.before} → ${f.after}` : f.after !== "—" ? f.after : "";
+    return { key: `${e.at}-${i}`, ...auditWhen(e.at), title: f.change, tone: auditTone(e.action), detail: [change, `${e.who} · ${f.area}`].filter(Boolean).join(" · ") };
+  });
+}
+
 export function auditVM(ctx: DeskCtx) {
   const { ui, set, patch, now } = ctx;
   const all = ui.tab === "auditlog" ? auditEvents(ctx) : [];
@@ -154,6 +170,8 @@ export function auditVM(ctx: DeskCtx) {
         return { time: time(e.at).replace(/\s?(am|pm)$/i, ""), day: d.replace(/ · .*$/, "").replace(/^(\d+ \w+)$/, (x) => { const t = new Date(e.at); return `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][t.getDay()]} ${x}`; }),
           who: e.who, sys, ...f }; }),
     },
+    // v4 notes/24 §5: the same rows as the D4b timeline — oldest first, so the newest is at the bottom (auditLines).
+    auLines: auditLines(rows),
     auEmpty: !rows.length, auHas: rows.length > 0, auClear: () => patch({ auWho: "all", auQ: "", auArea: "all" }),
   };
 }

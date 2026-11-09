@@ -6,7 +6,9 @@
  */
 import type { ChangeEvent, MouseEvent, PointerEvent } from "react";
 import type { CrmCustomer } from "@/lib/member/crm-data";
-import { STATUS_LABEL, isCold, lastChat, lastReal, urgencyOf } from "../../sales/vm/common";
+import { CHANNEL, STATUS_LABEL, isCold, lastChat, lastReal, urgencyOf } from "../../sales/vm/common";
+import { visitShort, waitOf } from "../../sales/vm/inbox";
+import type { PanelUi } from "../ui";
 import { phoneLabel, telHref } from "../../sales/vm/customer";
 import { first, ini, NO_SEAT, seatOf, type PanelCtx } from "./common";
 
@@ -109,9 +111,122 @@ export function inboxVM(ctx: PanelCtx) {
         // The chip above the board slides it to this column.
         jump: () => { set(u => ({ ...u, inbCol: i + 1 })); const b = document.querySelector<HTMLElement>("[data-inb-board]"), el = b?.children[0] as HTMLElement | undefined; if (b && el) b.scrollTo({ left: el.offsetLeft - b.offsetLeft - 20, behavior: "smooth" }); } }; })),
     openPc: () => set(u => ({ ...u, pcOpen: true })),
+    t2: teamListVM(ctx, all, chipDefs, col),
   };
 }
 export type InboxVM = ReturnType<typeof inboxVM>;
+
+type Row = ReturnType<typeof chatRow>;
+/** The Team inbox's statuses, in Mine's order (MINE AND TEAM SHOW THE SAME CATEGORIES, 2026-10-14). */
+const CATS = ([["new", "New"], ["need", "Attention"], ["fup", "Follow up"], ["appt", "Appointment"], ["won", "Won"], ["lost", "Lost"], ["cold", "Cold leads"], ["blocked", FB_BLOCKED_CATEGORY]] as const)
+  .map(([k, t]) => ({ k, t, dot: STATUS[t].dot }));
+
+/**
+ * v4 · the Team inbox (frame 2d, notes/17; filters exactly frame 2c / 2c·2): People and Status are multi-select — a team
+ * picked is the whole team unless some of its people are picked too, then only those; each pick is a removable tag; "N
+ * chats of M"; the filter sheet (2c·2) edits a draft and "Show N chats" applies it. The list is cards in the 10b layout,
+ * newest first; a card's status shows only while more than one status is in view (Status = All, or two or more picked).
+ * Search opens in place of the two buttons, as Mine's. The earlier whose-chats pick (inbTeam / inbWho — Insight's person
+ * still opens the Inbox on them) reads as a People pick until the filters are next changed.
+ */
+export function teamListVM(ctx: PanelCtx, all: Row[], chipDefs: [string, string, string][], col: (r: Row) => string) {
+  const { ui, set, now, data } = ctx;
+  const sel: string[] = ui.inbWho ? [`person:${ui.inbWho}`] : ui.inbTeam ? [`team:${ui.inbTeam}`] : ui.inbPeople ?? [];
+  const st = ui.inbSt ?? [];
+  const q = (ui.inbQ ?? "").trim().toLowerCase();
+  const teamDefs = chipDefs.filter(([id]) => id).map(([id, label, dot]) => ({ id, label, dot, people: id === "hod" ? ctx.directors : ctx.teams.find(t => t.id === id)?.people ?? [] }));
+  const teamOfPerson = (pid: string) => teamDefs.find(t => t.people.some(p => p.id === pid));
+  /** Does a chat belong to this People pick? */
+  const inPeople = (pick: string[]) => {
+    const teams = pick.filter(k => k.startsWith("team:")).map(k => k.slice(5)), people = pick.filter(k => k.startsWith("person:")).map(k => k.slice(7));
+    return (r: Row) => {
+      if (!pick.length) return true;
+      if (teams.includes(r.seat.id)) {
+        const mine = people.filter(p => teamOfPerson(p)?.id === r.seat.id);
+        return !mine.length || mine.includes(r.c.assignedTo ?? "");
+      }
+      return people.includes(r.c.assignedTo ?? "");
+    };
+  };
+  const inSt = (pick: string[]) => (r: Row) => !pick.length || pick.includes(col(r));
+  const said = (r: Row) => !q || `${r.name} ${r.preview} ${r.c.ad} ${r.who}`.toLowerCase().includes(q) || !!saidInChat(r.c, q);
+  const list = all.filter(r => inPeople(sel)(r) && inSt(st)(r) && said(r));
+  const write = (people: string[], status: string[]) => set(u => ({ ...u, inbTeam: "", inbWho: "", inbPeople: people, inbSt: status }));
+  const labelsOf = (c: CrmCustomer) => (data.customerLabels?.[c.id] ?? []).map(id => data.labels?.find(l => l.id === id)).filter((l): l is NonNullable<typeof l> => !!l);
+  const stMany = st.length !== 1;
+  const catOf = (k: string) => CATS.find(x => x.k === k)!;
+
+  // The tags under the buttons: teams, then people (their team's dot), then statuses (a square).
+  const nameOfPerson = (pid: string) => teamDefs.flatMap(t => t.people).find(p => p.id === pid)?.name ?? ctx.nameOf(pid);
+  const tags = [
+    ...sel.map(k => {
+      const team = k.startsWith("team:"), id = k.slice(team ? 5 : 7), t = team ? teamDefs.find(x => x.id === id) : teamOfPerson(id);
+      // Removing a team takes its people with it.
+      const drop = team ? sel.filter(x => x !== k && !(x.startsWith("person:") && teamOfPerson(x.slice(7))?.id === id)) : sel.filter(x => x !== k);
+      return { key: k, label: team ? t?.label ?? "Team" : nameOfPerson(id), dot: t?.dot ?? "var(--crm-muted)", square: false, remove: () => write(drop, st) };
+    }),
+    ...st.map(k => ({ key: `st:${k}`, label: catOf(k).t, dot: catOf(k).dot, square: true, remove: () => write(sel, st.filter(x => x !== k)) })),
+  ];
+
+  // The 2c·2 sheet: a draft of both picks, applied by "Show N chats".
+  const sh = ui.inbSheet ?? null;
+  const putSheet = (p: Partial<NonNullable<PanelUi["inbSheet"]>>) => set(u => ({ ...u, inbSheet: u.inbSheet ? { ...u.inbSheet, ...p } : u.inbSheet }));
+  const dp = sh?.people ?? [], ds = sh?.st ?? [];
+  const toggle = (arr: string[], k: string) => (arr.includes(k) ? arr.filter(x => x !== k) : [...arr, k]);
+  const draftN = all.filter(r => inPeople(dp)(r) && inSt(ds)(r) && said(r)).length;
+  const sheet = sh ? {
+    at: sh.at,
+    teams: [
+      { key: "", label: "Everyone", dot: !dp.length ? "var(--crm-rust)" : "var(--crm-faint-2)", n: all.length, on: !dp.length, toggle: () => putSheet({ people: [] }) },
+      ...teamDefs.map(t => {
+        const k = `team:${t.id}`, on = dp.includes(k);
+        return { key: k, label: t.label, dot: t.dot, n: all.filter(r => r.seat.id === t.id).length, on,
+          toggle: () => putSheet({ people: on ? dp.filter(x => x !== k && !(x.startsWith("person:") && teamOfPerson(x.slice(7))?.id === t.id)) : [...dp, k] }) };
+      }),
+    ],
+    // Each team picked lists its people: All (the whole team) or some of them.
+    members: teamDefs.filter(t => dp.includes(`team:${t.id}`)).map(t => {
+      const picked = t.people.filter(p => dp.includes(`person:${p.id}`));
+      return { key: t.id, title: `${t.label} · people`, chips: [
+        { key: "", label: "All", n: all.filter(r => r.seat.id === t.id).length, on: !picked.length, toggle: () => putSheet({ people: dp.filter(x => !(x.startsWith("person:") && teamOfPerson(x.slice(7))?.id === t.id)) }) },
+        ...t.people.map(p => ({ key: p.id, label: p.name, n: all.filter(r => r.c.assignedTo === p.id).length, on: dp.includes(`person:${p.id}`), toggle: () => putSheet({ people: toggle(dp, `person:${p.id}`) }) })),
+      ] };
+    }),
+    statuses: CATS.map(x => ({ key: x.k, label: x.t, dot: x.dot, n: all.filter(r => col(r) === x.k).length, hot: x.k === "need", on: ds.includes(x.k), toggle: () => putSheet({ st: toggle(ds, x.k) }) })),
+    clear: () => putSheet({ people: [], st: [] }),
+    cancel: () => set(u => ({ ...u, inbSheet: null })),
+    applyLabel: `Show ${draftN} chat${draftN === 1 ? "" : "s"}`,
+    apply: () => set(u => ({ ...u, inbTeam: "", inbWho: "", inbPeople: dp, inbSt: ds, inbSheet: null })),
+  } : null;
+  const open = (at: "people" | "status") => () => set(u => ({ ...u, inbSheet: { at, people: sel, st } }));
+  const nP = sel.length, nS = st.length;
+
+  return {
+    peopleN: nP, statusN: nS, openPeople: open("people"), openStatus: open("status"),
+    tags, count: `${list.length} chat${list.length === 1 ? "" : "s"}`, of: `of ${all.length}`, canClear: !!(nP || nS),
+    clearAll: () => write([], []),
+    searchOpen: !!ui.inbSearch || !!ui.inbQ, q: ui.inbQ ?? "",
+    openSearch: () => set(u => ({ ...u, inbSearch: true })), cancelSearch: () => set(u => ({ ...u, inbSearch: false, inbQ: "" })),
+    setQ: (e: ChangeEvent<HTMLInputElement>) => { const v = e.target.value; set(u => ({ ...u, inbQ: v })); }, clearQ: () => set(u => ({ ...u, inbQ: "" })),
+    sheet,
+    empty: !list.length,
+    cards: list.map(r => {
+      const u = urgencyOf(r.c, now), cold = isCold(r.c, now), blocked = isFbBlocked(r.c, data), k = col(r), unread = !!r.c.unread;
+      return {
+        id: r.c.id, name: r.name, ini: r.ini, avBg: r.avBg, avFg: r.avFg,
+        chanFg: CHANNEL[r.c.channel].fg, chanIc: (r.c.channel === "whatsapp" ? "phone" : "message-circle") as "phone" | "message-circle", chanName: CHANNEL[r.c.channel].name,
+        nameW: unread ? 600 : 500, nameC: cold ? "var(--crm-muted)" : "var(--crm-ink)",
+        at: r.at, whenC: unread ? "var(--crm-rust)" : "var(--crm-faint)",
+        ...waitOf(u, !cold && !blocked),
+        tags: labelsOf(r.c).map(l => ({ t: l.name, c: l.color })),
+        who: r.who, wc: r.wc, toAssign: r.toAssign, ad: r.c.ad,
+        stShow: stMany, st: catOf(k).t, stDot: catOf(k).dot,
+        preview: r.preview, unread: r.unread, cold, visit: visitShort(data.visits, r.c.id, now),
+        open: r.open, down: r.down, move: r.move, up: r.up, cancel: r.cancel, guard: r.guard, noMenu: r.noMenu,
+      };
+    }),
+  };
+}
 
 /** "All" before the statuses: every chat the filters above leave, newest first as each status lists them. */
 function withAll<R, C extends { rows: R[]; on: boolean }>(rows: R[], at: number, pick: (i: number) => void, cols: C[]) {

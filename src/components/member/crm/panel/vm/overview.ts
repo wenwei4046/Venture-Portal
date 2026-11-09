@@ -31,13 +31,13 @@ export function overviewVM(ctx: PanelCtx) {
   const row = (id: string, name: string, who: string, c: string, ids: string[], people: typeof teams[number]["people"], tints: [string, string], list?: () => void) => {
     const s = ofStaff(ids), canOpen = people.length > 0 || !!list, open = !list && !!ui.openT[id];
     return {
-      name, who, c, lead: ini(who.replace(/^(Senior TL|TL|Own customers ·)\s*/, "")), leads: s.leads, appt: pct(s.booked, s.leads), show: pct(s.came, s.due),
+      name, who, c, lead: ini(who.replace(/^(Senior TL|TL|Own customers ·)\s*/, "")), leads: s.leads, appt: pct(s.booked, s.leads), show: pct(s.came, s.due), won: s.won,
       canOpen, open: canOpen && open, rot: open ? "90deg" : "0deg", cur: canOpen ? "pointer" : "default",
       toggle: list ?? (canOpen ? () => set(u => ({ ...u, openT: { ...u.openT, [id]: !open } })) : undefined),
       people: people.map(p => {
         const v = ofStaff([p.id]), w = waiting.filter(x => x.assignedTo === p.id).length, lead = p.role === "tl" || p.role === "stl";
         return { name: p.name, ini: ini(p.name), aBg: lead ? tints[1] : tints[0], aFg: lead ? "#fff" : tints[1], tag: tagOf(p), waiting: w ? ` · ${w} waiting` : "",
-          pad: `${p.role === "tl" ? 0 : 12}px`, leads: v.leads, appt: pct(v.booked, v.leads), show: pct(v.came, v.due),
+          pad: `${p.role === "tl" ? 0 : 12}px`, leads: v.leads, appt: pct(v.booked, v.leads), show: pct(v.came, v.due), won: v.won,
           // The owner, 2026-10-23: a member opens the Team inbox filtered to them, still as oneself — never as them (View as is Profile's).
           open: () => set(u => ({ ...u, tab: "inbox", lead: null, inbTeam: seatOf(ctx, p.id)?.id ?? "", inbWho: p.id, inbCol: 0 })) };
       }),
@@ -56,11 +56,11 @@ export function overviewVM(ctx: PanelCtx) {
   const P = numbersOf(data.customers, data.visits, prevR, now);
   const r100 = (x: number, y: number) => (y ? (x / y) * 100 : null);
   const pts = (a: number | null, b: number | null) => { if (a == null || b == null) return { delta: "", good: true }; const d = Math.round((a - b) * 10) / 10;
-    return { delta: `${d > 0 ? "+" : d < 0 ? "−" : "±"}${Math.abs(d)} pts vs last`, good: d >= 0 }; };
+    return { delta: `${d > 0 ? "+" : d < 0 ? "−" : "±"}${Math.abs(d)}`, good: d >= 0 }; };
   const grow = all.leads - P.leads, growP = P.leads ? Math.round((grow / P.leads) * 100) : null;
   const hero4 = [
     { label: "Appt rate", value: pct(all.booked, all.leads), ...pts(r100(all.booked, all.leads), r100(P.booked, P.leads)) },
-    { label: "Leads", open: () => patch({ cLs: "leads", cLsWho: null }), value: String(all.leads), delta: growP == null ? "" : `${growP > 0 ? "+" : growP < 0 ? "−" : "±"}${Math.abs(growP)}% vs last`, good: grow >= 0 },
+    { label: "Leads", open: () => patch({ cLs: "leads", cLsWho: null }), value: String(all.leads), delta: growP == null ? "" : `${growP > 0 ? "+" : growP < 0 ? "−" : "±"}${Math.abs(growP)}%`, good: grow >= 0 },
     { label: "Show-up", value: pct(all.came, all.due), ...pts(r100(all.came, all.due), r100(P.came, P.due)) },
     { label: "Reply 24 h", value: pct(all.replied24, all.waits), ...pts(r100(all.replied24, all.waits), r100(P.replied24, P.waits)) },
   ];

@@ -2,7 +2,7 @@
 
 import type { ChangeEvent } from "react";
 import { openActions } from "./action-sheet";
-import { openCamera } from "./camera";
+import { inAppCameraWorks, openCamera } from "./camera";
 import { InAppCamera } from "./in-app-camera";
 
 /**
@@ -22,8 +22,9 @@ export function askKeyPhoto(ask: Ask, warn: (text: string) => void) {
   openActions({
     title: ask.title, sub: ask.sub,
     actions: [
-      { label: "Take photo", primary: true, run: () => openCamera(KEY_CAMERA_ID, warn) },
-      { label: "Choose from Photos", run: () => document.getElementById(KEY_PICK_ID)?.click() },
+      // The phone's own camera and Photos open in the tap; the camera inside the app after the sheet's Back step (notes/10 §1).
+      { label: "Take photo", primary: true, now: !inAppCameraWorks(), run: () => openCamera(KEY_CAMERA_ID, warn) },
+      { label: "Choose from Photos", now: true, run: () => document.getElementById(KEY_PICK_ID)?.click() },
     ],
   });
 }

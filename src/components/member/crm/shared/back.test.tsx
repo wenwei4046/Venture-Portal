@@ -94,3 +94,29 @@ describe("a step stacked on the chat, after Next rewrote the chat's entry (2026-
     h.restore();
   });
 });
+
+// notes/10 §1 (2026-11-10): a sheet's choice that goes on somewhere (Open chat, another sheet, the camera) takes the
+// sheet's step back FIRST and goes on once the browser has landed — run at once, the next step stood on the sheet's and
+// the sheet's own Back took it (the camera opened from + closed again, a chat opened from a summary left).
+describe("a sheet closed by a choice that goes on (closeThen)", () => {
+  it("its step is taken back, then the choice runs; a step the choice pushes stands and the next Back is its own", async () => {
+    const h = fakeHistory();
+    const closeSheet = vi.fn(), closeCamera = vi.fn();
+    const sheet = renderHook(({ open }) => useBackCloses(open, closeSheet, "crmAttach"), { initialProps: { open: true } });
+    expect(h.depth).toBe(1);
+    let camera: ReturnType<typeof renderHook> | null = null;
+    act(() => sheet.result.current(() => { camera = renderHook(() => useBackCloses(true, closeCamera, "crmCamera")); }));
+    expect(closeSheet).toHaveBeenCalledTimes(1);
+    sheet.rerender({ open: false });
+    expect(camera).toBeNull(); // not before the browser has landed
+    await settle();
+    expect(camera).not.toBeNull();
+    expect(h.depth).toBe(1);
+    expect(closeCamera).not.toHaveBeenCalled();
+    h.pressBack(); await settle();
+    expect(closeCamera).toHaveBeenCalledTimes(1);
+    expect(h.depth).toBe(0);
+    sheet.unmount(); camera!.unmount();
+    h.restore();
+  });
+});

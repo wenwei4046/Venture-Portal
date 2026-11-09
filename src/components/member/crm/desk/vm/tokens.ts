@@ -36,8 +36,10 @@ export const PANEL_TABS: [import("./ctx").DeskTab, string][] = [["insight", "Ins
 /**
  * The sidebar's groups: [label, pages]. 13 pages in 4 groups (docs/design_handoff_crm, CRM Navigation Audit, decided
  * 2026-11-08): Team activity joins the reading pages; Workspace is Reports › My reports, so it has no row of its own.
+ * v4 (notes/24 §1, 2026-11-10): Team activity and Ads performance leave the sidebar — they are Insight's own tabs, and an
+ * old link or a kept place opens them there (nav.ts › retiredTab).
  */
-export const NAV_GROUPS: [string, import("./ctx").DeskTab[]][] = [["", ["insight", "inbox", "people", "calendar", "activity"]], ["MARKETING", ["adsperf", "assignment"]], ["REPORTS", ["reports"]], ["MANAGEMENT", ["showrooms", "forms", "channels", "settings", "auditlog"]]];
+export const NAV_GROUPS: [string, import("./ctx").DeskTab[]][] = [["", ["insight", "inbox", "people", "calendar"]], ["MARKETING", ["assignment"]], ["REPORTS", ["reports"]], ["MANAGEMENT", ["showrooms", "forms", "channels", "settings", "auditlog"]]];
 /** Team activity: View at All, or a leader with somebody under them (Up next's reach, upNextOpen); never a salesperson. */
 export const LEADER_TABS = new Set(["activity"]);
 /**

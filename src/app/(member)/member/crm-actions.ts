@@ -257,7 +257,7 @@ export async function fetchCrmData(opts: { journey?: boolean } = {}): Promise<{ 
       }),
       events: more.journey.length ? [...events, ...more.journey] : events,
       staffPrefs: staffPrefs.length ? [{ ...staffPrefs[0], notif_deleted: more.deleted, recent_emoji: more.recent, ui_prefs: more.uiPrefs }] : staffPrefs,
-      forms: more.forms, notes: more.notes, stars: more.stars, library: more.library, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, upNextEvents: more.upNextEvents, upNextStaff: more.upNextStaff, messengerBlocked: more.messengerBlocked, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
+      forms: more.forms, notes: more.notes, stars: more.stars, partnerBookings: more.partnerBookings, partnerLinks: more.partnerLinks, leaves: more.leaves, upNextEvents: more.upNextEvents, upNextStaff: more.upNextStaff, messengerBlocked: more.messengerBlocked, adNames: more.adNames, settings: more.settings, locked: more.locked, apptTypes: more.apptTypes,
     }));
     // Where Meta shows every template's review (2026-11-04) — for whoever writes templates; the account's id, never a token.
     const wabaId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID?.trim();
@@ -283,7 +283,7 @@ async function desktopRows(db: Db, journey: boolean) {
   const soft = async <T,>(query: PromiseLike<{ data: T | null; error: unknown }>): Promise<T | []> => {
     try { const { data, error } = await query; return error || !data ? [] : data; } catch { return []; }
   };
-  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, library, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents, upNextStaff, fbBlocked, uiPrefs] = await Promise.all([
+  const [forms, notes, extras, rooms, prefs, events, stars, recent, adNames, settings, locked, roomMore, apptTypes, partnerBookings, leaves, partnerLinks, leadForms, roomDrafts, upNextEvents, upNextStaff, fbBlocked, uiPrefs] = await Promise.all([
     soft<NonNullable<CrmDataRows["forms"]>>(db.from("crm_forms").select("id, name, sections, sort_order, kind")),
     soft<NonNullable<CrmDataRows["notes"]>>(db.from("crm_notes").select("id, contact_id, body, author, created_at").order("created_at", { ascending: false }).limit(2000)),
     soft<{ id: string; extra: Record<string, string> }[]>(db.from("crm_contacts").select("id, extra").neq("extra", "{}").limit(5000)),
@@ -305,8 +305,6 @@ async function desktopRows(db: Db, journey: boolean) {
     soft<{ id: string; remarks: string | null; deleted_at: string | null; key_handover?: boolean }[]>(db.from("crm_showrooms").select("id, remarks, deleted_at, key_handover")),
     // Appointment types (mig 20261025040000): null before it, so the two built in stay.
     (async () => { try { const { data, error } = await db.rpc("crm_appt_types_read"); return error ? null : (data as unknown); } catch { return null; } })(),
-    // The reply library (mig 20261029170000): empty before it.
-    soft<{ id: string; title: string; category: string; body: string; keywords: string[] | null; sort_order: number }[]>(db.from("crm_reply_library").select("id, title, category, body, keywords, sort_order").order("sort_order")),
     // A partner's bookings through its link (mig 20261029190000), the last two months and ahead: on the calendar.
     soft<NonNullable<CrmDataRows["partnerBookings"]>>(db.from("crm_partner_bookings").select("id, ref, partner, showroom, start_at, minutes, state, booker_name, booker_phone, customer_name, customer_phone, info, remarks, booker_note, created_at")
       .gte("start_at", new Date(Date.now() - 62 * 86_400_000).toISOString()).order("start_at").limit(2000)),
@@ -327,7 +325,7 @@ async function desktopRows(db: Db, journey: boolean) {
     // One's own screen choices (mig 20261110120000): empty before it.
     soft<{ ui_prefs: Record<string, unknown> | null }[]>(db.from("crm_staff_prefs").select("ui_prefs")),
   ]);
-  return { messengerBlocked: fbBlocked.map(r => r.id), upNextStaff: upNextStaff.map(r => r.staff_id), upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], uiPrefs: uiPrefs[0]?.ui_prefs ?? {}, adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, library, partnerBookings, partnerLinks, leaves };
+  return { messengerBlocked: fbBlocked.map(r => r.id), upNextStaff: upNextStaff.map(r => r.staff_id), upNextEvents, roomDrafts, leadForms, roomMore, forms, notes, extras, rooms, deleted: prefs[0]?.notif_deleted ?? [], journey: events, stars, recent: recent[0]?.recent_emoji ?? [], uiPrefs: uiPrefs[0]?.ui_prefs ?? {}, adNames, settings, locked: locked.map(l => l.staff_id), apptTypes, partnerBookings, partnerLinks, leaves };
 }
 
 /** The showroom's own map links (B4), read by the server — never the browser's; none before the migration. */
@@ -450,23 +448,6 @@ export async function reactToMessage(messageId: string, emoji: string): Promise<
     return { ok: true };
   } catch (error) {
     return { ok: false, error: friendly(error, "The reaction could not be sent.") };
-  }
-}
-
-/**
- * What customers asked and our team answered (crm_reply_examples, mig 20261029150000) — the chat's suggested replies' experience.
- * Null when it cannot be read (before the migration, or not in the CRM); the chat then suggests from quick replies alone.
- */
-export async function fetchCrmReplyExamples(): Promise<{ q: string; a: string; won?: boolean; appt?: boolean }[] | null> {
-  try {
-    const db = await session();
-    await requireCrm("view");
-    const { data, error } = await db.rpc("crm_reply_examples");
-    if (error || !Array.isArray(data)) return null;
-    return (data as { q?: unknown; a?: unknown; won?: unknown; appt?: unknown }[]).filter(x => typeof x.q === "string" && typeof x.a === "string")
-      .map(x => ({ q: x.q as string, a: x.a as string, won: !!x.won, appt: !!x.appt }));
-  } catch {
-    return null;
   }
 }
 

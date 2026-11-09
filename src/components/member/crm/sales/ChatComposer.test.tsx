@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CrmApp from "../CrmApp";
-import { HOLD_HINT, ICON } from "./vm/composer";
+import { HOLD_HINT, ICON, initialComposer, type ComposerIn } from "./vm/composer";
+import ChatComposer from "./ChatComposer";
 
 // The chat composer (the owner's Claude Design handoff "Typing bar UI mobile chat design", 2026-10-14 —
 // docs/design/chat-composer) in the salesperson's chat, on the demo's data as /member/preview draws it: the One pill
@@ -134,11 +135,11 @@ describe("the Sticker panel", () => {
 });
 
 describe("the Attach panel", () => {
-  it("holds Photos, Document, Quick replies and Suggest reply (Auto replies until 2026-10-29) — the CRM's own", async () => {
+  it("holds Photos, Document, Quick replies and Auto replies (back from Suggest reply, CRM v4 notes/09) — the CRM's own", async () => {
     await openChat();
     await tap(byTitle("Attach"));
     const panel = composer().querySelector<HTMLElement>("[data-attach]")!;
-    expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Suggest reply"]);
+    expect([...panel.querySelectorAll(":scope > div > span")].map(t => t.textContent)).toEqual(["Photos", "Document", "Quick replies", "Auto replies"]);
     // A card floating over the chat, as tall as its tiles (2026-10-15): not the keyboard's height, not in the stack's flow.
     expect(panel.style.position).toBe("absolute");
     expect(panel.style.height).toBe("");
@@ -349,5 +350,42 @@ describe("the iPhone's screen drawn away from what is visible", () => {
     for (const k of ["innerHeight", "innerWidth"] as const) delete (window as unknown as Record<string, unknown>)[k];
     delete (document.documentElement as unknown as Record<string, unknown>).clientHeight;
     delete (navigator as unknown as Record<string, unknown>).userAgent;
+  });
+});
+
+// CRM v4 notes/11 (frame 6a·2): a WhatsApp chat whose 24 h window is shut — the warning row over the bar from the moment
+// the chat opens, the Template button opening the templates, Send grey and inactive, the draft kept.
+describe("WhatsApp past its window", () => {
+  function shut(over: Partial<ComposerIn> = {}) {
+    const send = vi.fn(), openTpl = vi.fn(), setDraft = vi.fn();
+    const v: ComposerIn = {
+      key: "c1", state: initialComposer(), set: () => {}, placeholder: "Reply to Ahmad…", draft: "Ok I can arrange delivery on Saturday", setDraft,
+      canSend: true, send, warm: true, openTpl, tplOn: true, coldTile: true, waShut: "Ahmad", reply: null, cancelReply: () => {}, slash: null, rec: null,
+      voiceStart: async () => true, voiceStop: () => {}, camera: () => {}, tile: () => {}, recents: [], saveRecents: () => {}, ...over,
+    };
+    render(<main><ChatComposer v={v} /></main>);
+    return { send, openTpl };
+  }
+  it("draws the warning and a grey Send that sends nothing", async () => {
+    const { send, openTpl } = shut();
+    const row = composer().querySelector<HTMLElement>("[data-wa-cold]")!;
+    expect(row.textContent).toContain("WhatsApp won’t deliver this. After 24 h only a template reaches Ahmad.");
+    expect(row.style.background).toBe("var(--crm-tint-attention)");
+    await tap(screen.getByText("Template"));
+    expect(openTpl).toHaveBeenCalledOnce();
+    const main = byTitle("Send")!;
+    expect(main.style.background).toBe("var(--crm-faint-2)");
+    await tap(main);
+    expect(send).not.toHaveBeenCalled();
+    expect(box().value).toBe("Ok I can arrange delivery on Saturday");
+  });
+  it("Settings › Suggest a template off: the warning without the Template button", () => {
+    shut({ tplOn: false });
+    expect(composer().querySelector("[data-wa-cold]")).not.toBeNull();
+    expect(screen.queryByText("Template")).toBeNull();
+  });
+  it("an open window has no warning", () => {
+    shut({ waShut: undefined });
+    expect(composer().querySelector("[data-wa-cold]")).toBeNull();
   });
 });

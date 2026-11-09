@@ -21,11 +21,38 @@ import { adsReportParam } from "@/lib/member/crm-ads-report";
 import { inSource, type SourcePick } from "@/lib/member/crm-source";
 import type { CrmData } from "@/lib/member/crm-data";
 import { upNextAdsOf, upNextBookOf, upNextOpen } from "../../shared/up-next-data";
+import { officeStamp } from "../../shared/leave-cal-data";
 
 /** Up next's props on the desktop. View as (no viewAs on the ctx): that person's line, read-only. */
 function deskUpNextProps(ctx: DeskCtx) {
   const own = !!ctx.viewAs;
-  return { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: own ? null : ctx.me.id, canAct: own };
+  return { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: own ? null : ctx.me.id, canAct: own, today: leadsToday(ctx.data, ctx.now), lastAt: lastLeadAt(ctx.data.events), now: ctx.now };
+}
+
+/** Each person's leads today (v4 D3a's "Leads today", the #1 card's "3 leads today"): the customers given to them today,
+ * the office's day — the journey's `assigned` events, as Team activity counts a lead got. */
+export function leadsToday(d: CrmData, now: Date): Record<string, number> {
+  const day = officeStamp(now).slice(0, 10), out: Record<string, number> = {};
+  for (const e of d.events) {
+    const to = e.kind === "assigned" ? (e.data as { to?: unknown }).to : null;
+    if (typeof to === "string" && to && officeStamp(e.at).slice(0, 10) === day) out[to] = (out[to] ?? 0) + 1;
+  }
+  return out;
+}
+
+/** Each person's newest lead (the journey's `assigned` events) — Up next's Last lead column and the #1 card's line. */
+export function lastLeadAt(events: { kind: string; data: Record<string, unknown>; at: string }[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const e of events) { const to = e.kind === "assigned" ? e.data.to : null; if (typeof to === "string" && to && (!out[to] || out[to] < e.at)) out[to] = e.at; }
+  return out;
+}
+
+/** Insight's period as Team activity names it (v4 notes/22: the head's period drives the tab). */
+export function activityPeriod(ui: { insPer: DeskCtx["ui"]["insPer"]; insRange: { a: number; b: number } | null }, now: Date): { per: "Today" | "Week" | "Month" | "Custom"; from: string; to: string } {
+  const ymd = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  if (ui.insPer === "custom" && ui.insRange) return { per: "Custom", from: ymd(ui.insRange.a), to: ymd(ui.insRange.b) };
+  const today = ymd(now.getTime()), first = `${today.slice(0, 7)}-01`;
+  return { per: ui.insPer === "day" ? "Today" : ui.insPer === "week" ? "Week" : "Month", from: first, to: today };
 }
 
 /** Insight for one brand (the owner, 2026-10-29: "Insight 要可以筛选 DC / The Conts"): its customers, their visits and journey. */
@@ -43,6 +70,11 @@ export function insightRange(ctx: DeskCtx) {
   const per = ctx.ui.insPer, r = periodRange(per === "custom" ? "custom" : per, ctx.ui.insRange, ctx.now);
   const name = per === "month" ? MON[ctx.now.getMonth()] : per === "week" ? "This week" : per === "day" ? "Today" : "This period";
   return { r, name };
+}
+
+/** The head's dates (v4 notes/20): "1–30 Nov", or one day with its weekday, "Tue 10 Nov" (frames D3a / D4a). */
+export function insightDates(r: { a: number; b: number }): string {
+  return r.a === r.b ? `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(r.a).getDay()]} ${rangeLine(r)}` : rangeLine(r);
 }
 
 /** Replied within 24 h: the customer's first message answered by us (not an auto-reply) within 24 hours (dev changes B2 / D1). */
@@ -139,7 +171,7 @@ export function insightVM(ctx0: DeskCtx) {
     { label: "Reply 24 h", value: pct(rep24, n.leads), unit: "", ...pts(rate(rep24, n.leads), rate(prevLeads.filter(replied24).length, prevLeads.length)), open: openList("Reply 24 h") },
     { label: "Avg. reply", value: avgV[0], unit: avgV[1], ...(avgNow == null || avgPrev == null ? { d: "—", good: true } : { d: `${avgNow <= avgPrev ? "−" : "+"}${Math.abs(avgNow - avgPrev)} min`, good: avgNow <= avgPrev }), open: openList("Leads") },
     { label: "Won", value: wonRate(wonNow.n, n.leads) == null ? "—" : `${wonRate(wonNow.n, n.leads)}%`, unit: "", ...pts(wonRate(wonNow.n, n.leads), wonRate(wonPrev.n, prevLeads.length)), open: openList("Won") },
-  ].map((m, i) => ({ ...m, first: i === 0, vs: !ctx.ui.insVsOff, deltaColor: m.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)" }));
+  ].map((m, i) => ({ ...m, first: i === 0, vs: true, deltaColor: m.good ? "var(--crm-ink-soft)" : "var(--crm-oxblood)" }));
   const teamsOut = [...dirRows, ...teams.map((t, k) => ({ name: t.name, lead: teamLead(t), ...rowOf(t.people.map(p => p.id)), dot: teamColours(k)[0],
     open: () => patch({ pane: "overlay", kind: "team", team: t.id, person: null }) }))];
 
@@ -216,7 +248,9 @@ export function insightVM(ctx0: DeskCtx) {
     // 4a's head (2026-10-18): "1–31 Oct vs 1–30 Sep", and Export PDF — the period's figures and Team performance in the
     // Ads Performance report's house style (the owner's OK: "PDF 照你建议做").
     // The comparison is a pill beside it that can be turned off (the owner, 2026-11-09: "怎么关不了 VS").
-    insightSub: rangeLine(r),
+    // v4 notes/20: the dates in grey after the period ("1–30 Nov"; one day with its weekday, "Tue 10 Nov" — D3a / D4a).
+    insightSub: insightDates(r),
+    // v4 notes/20: the "vs … ×" chip went, so nothing turns the comparison off any more (the figures compare as before).
     insVs: { on: !ctx.ui.insVsOff, label: `vs ${rangeLine(pr)}`, toggle: () => patch({ insVsOff: !ctx.ui.insVsOff }) },
     insightPdf: () => {
       const title = `CRM Insight · ${rangeLine(r)} vs ${rangeLine(pr)} · Appt rate ${hero.value} · ${heroStats.map(s => `${s.label} ${s.value}`).join(" · ")}`;

@@ -125,6 +125,10 @@ module.exports = [
     '<span onClick={v.rm.rmNext} role="button" aria-label="Next showroom" style={{ width: "34px", height: "34px", display: "grid", placeItems: "center", color: "#BD4A19", opacity: v.rm.rmNextOp, cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6"></path></svg></span></span>)}' +
     '<span onClick={v.rm.rmAdd} role="button" aria-label="Add showroom" title="Add showroom" style={{ flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid #EBDDD2", background: "#fff", color: "#BD4A19", display: "grid", placeItems: "center", cursor: "pointer" }}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"></path></svg></span></div>'],
   [/\n *<span onClick=\{v\.rm\.rmAdd\} style=\{\{[^\n]*\n[\s\S]*?<\/svg>Add showroom<\/span>/, ""],
+  // v4 turn 3 / 4 (frames 3a, 4a, 4a·2, 4a·3 — docs/design_handoff_crm_redesign_v4): Showrooms is one page with a tab a
+  // showroom, a draft until Publish and the leave sheet on Back — hand-written (panel/PhoneShowrooms.tsx on vm/rooms.ts ›
+  // showroomsPageVM). The page drawn here stays only for the full editor (Add closure), whose page4 is null.
+  ["{!!(v.rm.rmOpen) && (<>", "{v.rm.page4 ? (<PhoneShowrooms v={v.rm.page4} />) : null}\n    {!!(v.rm.rmOpen && !v.rm.page4) && (<>"],
   // 2026-10-16 (the owner: the chat showed Meta's headline "Chat with us" — "顯示廣告的名稱，不然業務也看不懂"): the ad editor's
   // title is its name, typed in place for CRM · Manage (vm/assign.ts › naming; crm_name_ad), Meta's headline as the hint.
   ['<h2 style={{ margin: "0", fontSize: "22px", fontWeight: "700", letterSpacing: "-.02em" }}>{v.as.ae.name}</h2>',

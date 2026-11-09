@@ -92,6 +92,29 @@ const ABOVE = [
   '          {!!(p.tplOn) && (<span onClick={p.openTpl} style={{ height: "46px", borderRadius: "23px", background: "#BD4A19", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", fontSize: "15px", fontWeight: "650", cursor: "pointer" }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H8l-4 4V5Zm4 4h8M8 12h5"></path></svg>Send template message</span>)}',
   '        </div>',
   '      </>)}',
+  // Blocked on Facebook (CRM v4, turn-7 frame 7b of docs/design_handoff_crm_redesign_v4 — "one grey line instead of the
+  // card"): in the bar's place one grey pill (52 high, radius 26, #F4F0EC on a #E2D8D0 line) — the lock 18 and "Kumar
+  // can’t receive messages" 500 14/1.35 — and under it, centred, why and where the chat lives (12/1.45 muted).
+  '      {!!(p.fbLine) && (<>',
+  '        <div data-fb-blocked="" style={{ flex: "none", margin: "8px 12px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>',
+  '          <div style={{ minHeight: "52px", borderRadius: "26px", display: "flex", alignItems: "center", gap: "10px", padding: "0 18px", boxSizing: "border-box", background: "var(--crm-rule-soft)", border: "1px solid var(--crm-line)", color: "var(--crm-ink-soft)" }}>',
+  '            <svg style={{ flex: "none" }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>',
+  '            <span style={{ flex: "1", minWidth: "0", fontSize: "14px", fontWeight: "500", lineHeight: "1.35" }}>{p.fbLine}</span>',
+  '          </div>',
+  '          <div style={{ fontSize: "12px", lineHeight: "1.45", color: "var(--crm-muted)", textAlign: "center", padding: "0 12px", textWrap: "pretty" }}>{p.fbSub}</div>',
+  '        </div>',
+  '      </>)}',
+  // A WhatsApp chat whose 24 h window is shut (CRM v4 notes/11, frame 6a·2 of docs/design_handoff_crm_redesign_v4): a
+  // warning row on the bar from the moment the chat opens — triangle-alert 16, the words 500 13/1.4, the Template button
+  // (36 high, radius 18; none while Settings › Suggest a template is off). In the stack, so the list pads itself clear of
+  // it; 10px over the pill (its 2px + the bar's 8px), as the frame's 76px over a bar 66px high.
+  '      {!!(p.warnOn) && (<>',
+  '        <div data-wa-cold="" style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px", margin: "0 12px 2px", padding: "10px 10px 10px 14px", borderRadius: "16px", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)" }}>',
+  '          <svg style={{ flex: "none" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={p.alertIcon}></path></svg>',
+  '          <span style={{ flex: "1", minWidth: "0", fontSize: "13px", fontWeight: "500", lineHeight: "1.4" }}>{p.warnText}</span>',
+  '          {!!(p.warnBtn) && (<span onClick={p.openTpl} onMouseDown={p.keep} role="button" style={{ flex: "none", height: "36px", padding: "0 12px", borderRadius: "18px", display: "flex", alignItems: "center", fontSize: "13px", fontWeight: "500", background: "#BD4A19", color: "#fff", cursor: "pointer" }}>Template</span>)}',
+  '        </div>',
+  '      </>)}',
   '      ',
 ].join("\n");
 const PILL = '<span style={{ flex: "1", minWidth: "0", display: "flex", alignItems: "flex-end", minHeight: "46px", boxSizing: "border-box", padding: "0 4px", borderRadius: "23px", background: "#fff", boxShadow: "0 1px 2px rgba(63,43,34,.14)" }}>';
@@ -118,8 +141,8 @@ const PATCHES = [
   ['<span onClick={p.toggleAttach} title="Attach" style={{', '<span onClick={p.toggleAttach} onMouseDown={p.keep} title="Attach" style={{',
     "as the sticker toggle: the attach panel takes the keyboard's place in one step"],
   ['<span onClick={p.mainAct} title={p.mainTitle} style={{ flex: "none", width: "46px", height: "46px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", cursor: "pointer", boxShadow: "0 3px 9px rgba(189,74,25,.18)" }}>',
-    '<span onClick={p.mainAct} onMouseDown={p.keep} onPointerDown={p.mainDown} onContextMenu={p.noMenu} title={p.mainTitle} style={{ flex: "none", width: "46px", height: "46px", borderRadius: "50%", display: "grid", placeItems: "center", background: "#BD4A19", color: "#fff", cursor: "pointer", boxShadow: "0 3px 9px rgba(189,74,25,.18)", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>',
-    "Send keeps the keyboard up; the mic is held to record (the phone's long-press menu and text selection stay away)"],
+    '<span onClick={p.mainAct} onMouseDown={p.keep} onPointerDown={p.mainDown} onContextMenu={p.noMenu} title={p.mainTitle} style={{ flex: "none", width: "46px", height: "46px", borderRadius: "50%", display: "grid", placeItems: "center", background: p.mainBg, color: "#fff", cursor: p.mainCursor, boxShadow: p.mainSh, touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}>',
+    "Send keeps the keyboard up; the mic is held to record (the phone's long-press menu and text selection stay away); grey and inactive while WhatsApp's window is shut (CRM v4 notes/11: p.mainBg / mainCursor / mainSh)"],
   ['<div style={{ height: "280px", boxSizing: "border-box", background: "#fff", borderRadius: "22px 22px 0 0", boxShadow: "0 -6px 20px rgba(63,43,34,.08),0 -1px 0 #EFE4DA", display: "flex", flexDirection: "column", animation: "sheetUp 240ms cubic-bezier(.2,.8,.2,1)" }}>',
     '<div data-panel="" style={{ height: p.panelH, boxSizing: "border-box", background: "#fff", borderRadius: "22px 22px 0 0", boxShadow: "0 -6px 20px rgba(63,43,34,.08),0 -1px 0 #EFE4DA", display: "flex", flexDirection: "column", animation: "cmpUp 240ms cubic-bezier(.2,.8,.2,1)" }}>',
     "the panel is the keyboard's last height (280 until one is measured); the prototype's sheetUp is the CRM's cmpUp (the CRM's own sheetUp slides a sheet 100%, and a pull on a sheetUp closes it — shared/swipe-close.ts)"],

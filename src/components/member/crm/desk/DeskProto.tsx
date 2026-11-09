@@ -42,6 +42,8 @@ function protoChats(p: Record<string, unknown>) {
     chats: ((p.chats ?? []) as Record<string, unknown>[]).map(c => ({ ...c, timeFg: "#A8968B" })),
     draft: "", micD: MIC, emojiOpen: false, emojiFg: "#806B60", emojiToggle: noop, emoji: null, sendTitle: "Voice note",
     setDraft: noop, draftKey: noop, send: noop, photo: noop,
+    // The composer as the design draws it: no WhatsApp cold row (CRM v4 notes/11 binds these live).
+    waShut: false, sendBg: "var(--crm-rust)", sendCursor: "pointer", sendSh: "0 6px 20px rgba(42,22,12,.15)", sendCls: "crm4a-primary", chatPadB: "20px 24px 104px", replyBottom: "82px",
     awInfo: noop, awBook: noop, openNote: noop, editInfo: noop, cyclePeriod: noop, openInfo: noop, openBook: noop, freeLabel: "Free · 2 per slot",
     kBook: false, kNote: false, kForm: false,
     // Insight's ad table header as the design writes it (the live one sorts and sizes — BUILD-NOTES.md).

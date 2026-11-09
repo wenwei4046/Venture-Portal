@@ -18,7 +18,6 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import SalesComposer from "./SalesComposer";
-import { SuggestFloat } from "../shared/suggest-float";
 import { BOX_MAX, BOX_MIN, HOLD_HINT, PANEL_H, composerVM, dropLast, flash, focusBox, togglePanel, type ComposerIn, type ComposerPanel } from "./vm/composer";
 
 /** A press held this long records; shorter is a tap. */
@@ -207,8 +206,8 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   // …and the chat's list pads itself by the composer in that frame too, so the newest message never slips under a panel
   // or a growing reply box (a ResizeObserver alone would answer a frame later: the list sits beside the composer).
   // (What changes its height, not every keystroke's new objects.)
-  const hasReply = !!v.reply, slashRows = v.slash ? v.slash.list.length : -1, recording = !!v.rec;
-  useLayoutEffect(() => { putInsets.current(); }, [shown, taH, capH, kbH, hasReply, slashRows, recording, v.warm]);
+  const hasReply = !!v.reply, waShut = !!v.waShut, slashRows = v.slash ? v.slash.list.length : -1, recording = !!v.rec;
+  useLayoutEffect(() => { putInsets.current(); }, [shown, taH, capH, kbH, hasReply, slashRows, recording, v.warm, waShut]);
 
   // A panel waiting for the keyboard goes anyway if none comes (a computer, a hardware keyboard).
   useEffect(() => {
@@ -363,8 +362,6 @@ export default function ChatComposer({ v }: { v: ComposerIn }) {
   return (<>
     {/* Where this composer is in the chat (the stack and the screen are found from it). */}
     <span ref={anchorRef} hidden />
-    {/* Suggested replies' floating logo (2026-10-29): there while the customer's words wait and the box is empty. */}
-    {v.suggest && <SuggestFloat key={v.key} list={v.suggest} library={v.suggestLibrary} pick={v.setDraft} showLogo={!!v.suggestLogo && !!v.suggest.length && !v.draft && !v.rec} />}
     <SalesComposer p={p} />
   </>);
 }

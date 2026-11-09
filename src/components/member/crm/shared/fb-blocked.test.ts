@@ -101,15 +101,16 @@ describe("a blocked chat says so and offers no composer", () => {
     expect(chatStripOf(blocked, now, true)).toEqual({ cold: true, left: FB_BLOCKED, right: "", dot: "var(--crm-faint-2)" });
     expect(chatStripOf(waiting, now).left).toMatch(/^Attention/);
   });
-  it("the composer is the cold card, titled Blocked on Facebook, with no template button", () => {
+  // v4 turn-7 frame 7b: one grey line in the bar's place — "Kumar can’t receive messages" — and why under it, no card.
+  it("the composer gives way to one grey line naming who cannot receive, with why under it (7b), no cold card", () => {
     const dom = { shown: null, taH: 22, taRef: null, panelH: 280 } as unknown as ComposerDom;
     const vm = (blockedChat: boolean) => composerVM({
       key: "c", state: initialComposer(), set: () => {}, placeholder: "", draft: "", setDraft: () => {}, canSend: false, send: () => {},
-      warm: !blockedChat, blocked: blockedChat, openTpl: () => {}, tplOn: true, coldSub: "x", recents: [], saveRecents: () => {},
+      warm: !blockedChat, blocked: blockedChat, blockedWho: "Kumar", openTpl: () => {}, tplOn: true, coldSub: "x", recents: [], saveRecents: () => {},
     } as unknown as ComposerIn, dom);
     const b = vm(true);
-    expect(b).toMatchObject({ isA: false, chatCold: true, coldTitle: FB_BLOCKED, tplOn: false });
-    expect(vm(false)).toMatchObject({ isA: true, chatCold: false });
+    expect(b).toMatchObject({ isA: false, chatCold: false, fbLine: "Kumar can’t receive messages", fbSub: "Facebook stopped this Page from replying. The chat stays in Blocked.", tplOn: false });
+    expect(vm(false)).toMatchObject({ isA: true, chatCold: false, fbLine: "", fbSub: "" });
     expect(FB_BLOCKED_NOTE).toBe("Blocked on Facebook — they can't receive messages");
   });
 });

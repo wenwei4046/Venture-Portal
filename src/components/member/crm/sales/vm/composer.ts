@@ -7,7 +7,7 @@
  * the mic). The Sticker panel's GIF and Sticker tabs are not live (the owner: "这2个分页就不用上线先") — Emoji is its tab.
  */
 import type { ChangeEvent, MouseEvent, PointerEvent as RPointerEvent, Ref } from "react";
-import { FB_BLOCKED, FB_BLOCKED_SUB } from "../../shared/fb-blocked";
+import { FB_BLOCKED, FB_BLOCKED_LINE_SUB, FB_BLOCKED_SUB, fbBlockedLine } from "../../shared/fb-blocked";
 
 /** null: the keyboard or nothing under the bar. */
 export type ComposerPanel = null | "sticker" | "attach";
@@ -62,13 +62,22 @@ export const NAMES: Readonly<Record<string, string>> = { bed: "🛏️", mattres
 /** The panel's tabs: Emoji alone while GIF and Sticker wait (the owner, 2026-10-14). */
 export const TABS: readonly (readonly [string, string, string])[] = [["emoji", "Emoji", ICON.smile]];
 
-/** The Attach panel's tiles (the prototype's TILES) — the CRM's own Photos, Document, Quick replies, and Suggest reply (in Auto
- * replies' place since 2026-10-29: "替换 auto replies"). */
+/** The Attach panel's tiles (the prototype's TILES) — the CRM's own Photos, Document, Quick replies and Auto replies (frame M05;
+ * back in tile 4 since CRM v4, notes/09 — Suggest reply, which held it from 2026-10-29, is gone). Its icon is lucide's bot. */
+/** lucide bot (docs/design_handoff_crm_redesign_v4/icons/bot.svg) as one path. */
+export const BOT_ICON = "M12 8V4H8M6 8h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2ZM2 14h2M20 14h2M15 13v2M9 13v2";
+/** lucide triangle-alert as one path: the WhatsApp cold warning row (notes/11). */
+export const ALERT_ICON = "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3ZM12 9v4M12 17h.01";
+/** The grey of Send and the mic while WhatsApp's window is shut (frame 6a·2: --crm-faint-2). */
+export const SHUT_GREY = "var(--crm-faint-2)";
+/** The warning row's words (frame 6a·2). */
+export const waShutText = (first: string) => `WhatsApp won’t deliver this. After 24 h only a template reaches ${first}.`;
+
 export const TILES = [
   ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "var(--crm-ink-soft)"],
   ["Document", "M7 3h7l5 5v13H7V3Zm7 0v5h5", "var(--crm-rust)"],
   ["Quick replies", "M13 2 4 14h7l-1 8 9-12h-7l1-8Z", "var(--crm-brown)"],
-  ["Suggest reply", "M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z", "var(--crm-rust)"],
+  ["Auto replies", BOT_ICON, "var(--crm-brown)"],
 ] as const;
 export type TileLabel = (typeof TILES)[number][0];
 /** Cold template's tile: the envelope the ⋮ menu's Send template message wears. */
@@ -152,6 +161,8 @@ export const homeBg = (panel: ComposerPanel) => (panel === "sticker" ? "#fff" : 
 type Click = (e: MouseEvent<HTMLElement>) => void;
 export interface ComposerVM {
   isA: boolean; recOn: boolean; chatCold: boolean;
+  /** Blocked on Facebook (v4 frame 7b): one grey line in the bar's place — "Kumar can’t receive messages" — and why under it. */
+  fbLine: string; fbSub: string;
   draft: string; placeholder: string; taH: string; taRef: Ref<HTMLTextAreaElement>;
   onDraft: (e: ChangeEvent<HTMLTextAreaElement>) => void; focus: () => void; blur: () => void;
   toggleSticker: Click; stkFg: string; stkIcon: string;
@@ -168,6 +179,10 @@ export interface ComposerVM {
   replyText: string; replyWho: string; cancelReply: Click;
   slashOpen: boolean; slashQ: string; slashEmpty: boolean; slashList: { title: string; text: string; rule: string; pick: () => void }[]; qrEdit?: Click;
   openTpl: Click;
+  /** notes/11: the WhatsApp cold warning row over the bar, its words, and its Template button (Suggest a template on). */
+  warnOn: boolean; warnText: string; warnBtn: boolean; alertIcon: string;
+  /** The main button: rust, or grey and inactive while WhatsApp's window is shut. */
+  mainBg: string; mainSh: string; mainCursor: string;
   /** Settings › Suggest a template: the cold chat's template button, else the line saying the window is shut. */
   tplOn: boolean; tplOff: boolean;
   /** Frame M08: the cold card's line — who last wrote when, and what opens the chat again. */
@@ -195,11 +210,13 @@ export interface ComposerIn {
   warm: boolean;
   /** Blocked on Facebook (shared/fb-blocked.ts): no composer, the cold card says why (pass warm: false too). */
   blocked?: boolean;
+  /** The customer's first name for the blocked line (7b). */
+  blockedWho?: string;
   openTpl: () => void;
   /** Settings › Suggest a template (on unless Settings turned it off). */
   tplOn?: boolean;
   /** A WhatsApp chat past its window (2026-11-04, the owner: "我在crm 没找到可以send cold template 的地方，帮我suggest reply 改成cold"):
-   *  Attach's Suggest reply — nothing to suggest past the window — is Cold template, opening the templates (openTpl). */
+   *  Attach's tile 4 is Cold template, opening the templates (openTpl). */
   coldTile?: boolean;
   /** The cold card's line (common.ts › coldLine). */
   coldSub?: string;
@@ -219,12 +236,10 @@ export interface ComposerIn {
   /** One's recent emoji (crm_staff_prefs.recent_emoji), most recent first. */
   recents: readonly string[];
   saveRecents: (list: string[]) => void;
-  /** Suggested replies for the customer's waiting words (shared/suggest-reply.ts, 2026-10-29): a pick fills the box. */
-  suggest?: { text: string; why: string }[];
-  /** The floating logo: only while the customer's words wait for us (Suggest reply opens any time). */
-  suggestLogo?: boolean;
-  /** The reply library, filled for this customer, to browse under the suggestions (2026-10-29). */
-  suggestLibrary?: { title: string; category: string; text: string }[];
+  /** A WhatsApp chat whose 24 h window is shut (notes/11, frame 6a·2), not blocked on Facebook: the customer's first name.
+   *  The warning row stands over the bar from the moment the chat opens; Send and the mic are grey and do nothing; typing
+   *  is allowed and the draft kept. */
+  waShut?: string;
 }
 
 /** What only the phone knows, measured by ChatComposer. */
@@ -256,6 +271,8 @@ const noMenu: Click = e => e.preventDefault();
 /** The bindings: the prototype's phone(k), on the chat's live draft and the phone's measurements. */
 export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
   const s = v.state, set = v.set, has = !!v.draft.trim(), shown = d.shown;
+  // WhatsApp past its window (notes/11): nothing sends and the mic records nothing — a voice note would not be delivered either.
+  const waShut = v.warm && !!v.waShut;
   const emo = emojiView(s, v.recents);
   const add = (e: string) => {
     v.setDraft(v.draft + e);
@@ -263,7 +280,9 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
   };
   return {
     // The bar's row stays while recording — its pill gives way to the recording row and the main button is Send.
-    isA: v.warm, recOn: v.warm && !!v.rec, chatCold: !v.warm,
+    isA: v.warm, recOn: v.warm && !!v.rec, chatCold: !v.warm && !v.blocked,
+    // Blocked on Facebook: one grey line, not the cold card (v4 frame 7b).
+    fbLine: v.blocked ? fbBlockedLine(v.blockedWho) : "", fbSub: v.blocked ? FB_BLOCKED_LINE_SUB : "",
     draft: v.draft, placeholder: v.placeholder, taH: `${d.taH}px`, taRef: d.taRef,
     onDraft: e => v.setDraft(e.target.value), focus: d.focusBox, blur: d.blurBox,
     toggleSticker: () => d.swap("sticker"), stkIcon: shown === "sticker" ? ICON.kb : ICON.stk, stkFg: shown === "sticker" ? RUST : SUB,
@@ -271,9 +290,10 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     camera: () => { set(x => ({ ...x, panel: null, kb: false })); v.camera(); },
     // Send: the message goes, the box empties (the chat's own send); the Sticker panel stays if open. With no words the
     // mic is held (ChatComposer › mainDown); a tap only says so.
-    mainAct: has ? () => { if (!v.canSend) return; set(afterSend); v.send(); } : v.rec ? d.recTap : noop,
+    mainAct: waShut ? noop : has ? () => { if (!v.canSend) return; set(afterSend); v.send(); } : v.rec ? d.recTap : noop,
     mainTitle: v.rec ? "Send voice note" : has ? "Send" : "Voice note", mainIcon: has || v.rec ? ICON.send : ICON.mic,
-    mainDown: has ? noop : d.mainDown, noMenu, keep,
+    mainDown: has || waShut ? noop : d.mainDown, noMenu, keep,
+    mainBg: waShut ? SHUT_GREY : RUST, mainSh: waShut ? "none" : "0 3px 9px rgba(189,74,25,.18)", mainCursor: waShut ? "default" : "pointer",
     sticker: shown === "sticker", attach: shown === "attach", panelH: `${d.panelH}px`,
     searching: s.searching, notSearching: !s.searching, q: s.q, onQ: e => set(x => ({ ...x, q: e.target.value })),
     searchPh: "Search emoji", searchBg: s.searching ? "var(--crm-tint-attention)" : "var(--crm-rule-soft)", searchFg: s.searching ? RUST : "var(--crm-ink)",
@@ -286,13 +306,15 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
       const a = s.ecat === id && !(s.searching && s.q.trim());
       return { label, icon: ICON[ic], fg: a ? RUST : MUTED, sw: a ? 2 : 1.7, line: a ? RUST : "transparent", pick: () => set(x => pickCat(x, id)) };
     }),
-    tiles: TILES.map(([label, icon, color]) => label === "Suggest reply" && v.coldTile
-      ? { label: "Cold template", icon: COLD_ICON, color, go: () => { set(x => ({ ...x, panel: null, kb: false })); v.openTpl(); } }
+    // Past the window on WhatsApp tile 4 is Cold template, unchanged from 2026-11-04 (rust, the envelope).
+    tiles: TILES.map(([label, icon, color]) => label === "Auto replies" && v.coldTile
+      ? { label: "Cold template", icon: COLD_ICON, color: RUST, go: () => { set(x => ({ ...x, panel: null, kb: false })); v.openTpl(); } }
       : { label, icon, color, go: () => { set(x => ({ ...x, panel: null, kb: false })); v.tile(label); } }),
     homeBg: homeBg(shown), toast: s.toast,
     replyText: v.reply?.text ?? "", replyWho: v.reply?.who ?? "", cancelReply: () => v.cancelReply(),
     slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: v.qrEdit ? () => v.qrEdit?.() : undefined,
-    openTpl: () => v.openTpl(), tplOn: v.tplOn !== false && !v.blocked, tplOff: v.tplOn === false && !v.blocked,
+    openTpl: () => v.openTpl(),
+    warnOn: waShut, warnText: waShut ? waShutText(v.waShut as string) : "", warnBtn: waShut && v.tplOn !== false, alertIcon: ALERT_ICON, tplOn: v.tplOn !== false && !v.blocked, tplOff: v.tplOn === false && !v.blocked,
     // Blocked on Facebook: the cold card says so, with no template button (shared/fb-blocked.ts).
     coldTitle: v.blocked ? FB_BLOCKED : "This chat is cold", coldSub: v.blocked ? FB_BLOCKED_SUB : v.coldSub ?? "",
     recTime: v.rec?.time ?? "", recCancel: () => d.recCancel(), trashRef: d.trashRef,

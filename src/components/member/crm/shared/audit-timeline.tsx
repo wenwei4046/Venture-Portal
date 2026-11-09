@@ -27,17 +27,17 @@ export interface AuditLine {
   onClick?: () => void;
 }
 
-export const AUDIT_DOT: Record<AuditTone, string> = { ink: "#422315", green: "#2F7A4A", oxblood: "#8A1F0A" };
+export const AUDIT_DOT: Record<AuditTone, string> = { ink: "var(--crm-ink)", green: "var(--crm-v4-green)", oxblood: "var(--crm-oxblood)" };
 
 const row: CSSProperties = { display: "grid", gridTemplateColumns: "62px 18px minmax(0,1fr)", columnGap: 10 };
 const when: CSSProperties = {
   display: "flex", flexDirection: "column", gap: 2, paddingTop: 1,
-  font: "500 12px var(--font-inter, Inter), sans-serif", color: "#A8968B", textAlign: "right", fontVariantNumeric: "tabular-nums",
+  font: "500 12px var(--font-inter, Inter), sans-serif", color: "var(--crm-faint)", textAlign: "right", fontVariantNumeric: "tabular-nums",
 };
 const rail: CSSProperties = { display: "flex", flexDirection: "column", alignItems: "center" };
 const body: CSSProperties = { display: "flex", flexDirection: "column", gap: 3, paddingBottom: 18, minWidth: 0 };
-const titleStyle: CSSProperties = { font: "600 14.5px var(--font-inter, Inter), sans-serif", color: "#422315", overflowWrap: "anywhere" };
-const detailStyle: CSSProperties = { font: "400 13px/1.4 var(--font-inter, Inter), sans-serif", color: "#7A6255", overflowWrap: "anywhere" };
+const titleStyle: CSSProperties = { font: "600 14.5px var(--font-inter, Inter), sans-serif", color: "var(--crm-ink)", overflowWrap: "anywhere" };
+const detailStyle: CSSProperties = { font: "400 13px/1.4 var(--font-inter, Inter), sans-serif", color: "var(--crm-muted)", overflowWrap: "anywhere" };
 
 /** Day + month in the timeline's words ("8 Nov"), and the 24-hour time ("8:40"), in the office's clock (UTC+8). */
 export function auditWhen(iso: string): { date: string; time: string } {
@@ -57,7 +57,7 @@ export function AuditTimeline({ lines, empty = "Nothing yet", style }: { lines: 
             <span style={when}>{l.date ? <span>{l.date}</span> : null}<span>{l.time}</span></span>
             <span style={rail} aria-hidden>
               <span style={{ width: 10, height: 10, marginTop: 4, borderRadius: "50%", background: AUDIT_DOT[l.tone ?? "ink"], flex: "none" }} />
-              <span style={{ flex: 1, width: 2, background: last ? "transparent" : "#EEE6DF", minHeight: 34 }} />
+              <span style={{ flex: 1, width: 2, background: last ? "transparent" : "var(--crm-audit-rail)", minHeight: 34 }} />
             </span>
             <span style={body}>
               <span style={titleStyle}>{l.title}</span>

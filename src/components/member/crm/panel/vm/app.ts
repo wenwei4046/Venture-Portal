@@ -163,7 +163,8 @@ export function panelAppVM(ctx: PanelCtx) {
     // chat's shows — not the same words twice (user 2026-10-11).
     toast: show.ld && ld?.onLead ? "" : ui.toast, toastBottom: lead ? "92px" : "78px",
     // A chat open has no bottom bar, as Mine's (the owner, 2026-10-14).
-    navOn: !lead,
+    // …nor Showrooms (v4 turn-4 frames 4a–4a·3 draw no tab bar: its own Save draft · Publish bar stands at the bottom).
+    navOn: !lead && !ui.roomsOpen,
   };
 }
 export type PanelAppVM = ReturnType<typeof panelAppVM>;

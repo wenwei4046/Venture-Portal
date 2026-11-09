@@ -216,7 +216,6 @@ export interface CrmRoom {
 export interface CrmPrefs { pinned: boolean; muted: boolean; hidden: boolean; blocked: boolean; pinnedMessageId: string | null; /** Marked unread by this person (swipe right › Unread, 2026-10-14); opening the chat takes it off. */ markedUnread?: boolean }
 export interface CrmLabel { id: string; name: string; color: string }
 export interface CrmQuickReply { id: string; shortcut: string; message: string }
-/** A reply in the company's reply library (mig 20261029170000): {name}, {me}, {project} … filled in for the customer on screen. */
 /** A booking a partner made through its link (mig 20261029190000): it takes its slot on the calendar; no CRM customer. */
 export interface CrmPartnerBooking {
   id: string; ref: string; partner: string; showroomId: string; start: string; minutes: number; state: "booked" | "cancelled";
@@ -229,7 +228,6 @@ export interface CrmLeave { id: string; staffId: string; from: string; to: strin
 export interface CrmUpNextEvent { id: number; at: string; actor: string | null; action: string; staff: string | null; ad: string | null; before: Record<string, unknown> | null; after: Record<string, unknown> | null }
 /** A partner's booking link (CRM · Manage only). */
 export interface CrmPartnerLink { id: string; name: string; code: string; on: boolean }
-export interface CrmReplyItem { id: string | null; title: string; category: string; body: string; keywords: string[] }
 
 export interface CrmAutoReply { on: boolean; text: string; img?: string | null; imgName?: string }
 export interface CrmAutoReplySet {
@@ -326,10 +324,6 @@ export interface CrmData {
   labels: CrmLabel[];
   customerLabels: Record<string, string[]>;
   quickReplies: CrmQuickReply[];
-  /** What customers asked and our team answered (crm_reply_examples, 2026-10-29) — the suggested replies' experience; read once, absent until then. */
-  replyExamples?: { q: string; a: string; won?: boolean; appt?: boolean }[];
-  /** The company's reply library, in its order (empty before the migration). */
-  replyLibrary?: CrmReplyItem[];
   /** Partners' bookings through their links (mig 20261029190000) and the links themselves (CRM · Manage). */
   partnerBookings?: CrmPartnerBooking[];
   partnerLinks?: CrmPartnerLink[];
@@ -539,8 +533,6 @@ export interface CrmDataRows {
   hides: { message_id: string }[];
   /** One's own starred messages (mig 20261014060000); absent before it. */
   stars?: { message_id: string }[];
-  /** The reply library (mig 20261029170000). */
-  library?: { id: string; title: string; category: string; body: string; keywords: string[] | null; sort_order: number }[];
   partnerBookings?: { id: string; ref: string; partner: string; showroom: string; start_at: string; minutes: number | null; state: "booked" | "cancelled"; booker_name: string; booker_phone: string | null; customer_name: string; customer_phone: string | null; info: Record<string, string> | null; remarks: string | null; booker_note: string | null; created_at: string }[];
   partnerLinks?: { id: string; name: string; code: string; on: boolean }[];
   leaves?: { id: string; staff_id: string; starts_on: string; ends_on: string; note: string | null; from_at?: string | null; to_at?: string | null; reason?: string | null }[];
@@ -735,7 +727,6 @@ export function crmDataFromRows(rows: CrmDataRows): CrmData {
     messengerBlocked: rows.messengerBlocked ?? [],
     upNextEvents: (rows.upNextEvents ?? []).map(e => ({ id: e.id, at: e.at, actor: e.actor, action: String(e.data.action ?? ""), staff: (e.data.staff as string | null) ?? null, ad: (e.data.ad as string | null) ?? null,
       before: (e.data.before as Record<string, unknown> | null) ?? null, after: (e.data.after as Record<string, unknown> | null) ?? null })),
-    replyLibrary: (rows.library ?? []).map(r => ({ id: r.id, title: r.title, category: r.category ?? "", body: r.body, keywords: r.keywords ?? [] })),
     labels: [...rows.labels].sort((a, b) => a.sort_order - b.sort_order).map(l => ({ id: l.id, name: l.name, color: l.color })),
     customerLabels,
     quickReplies: [...rows.quickReplies].sort((a, b) => a.sort_order - b.sort_order).map(q => ({ id: q.id, shortcut: q.shortcut, message: q.message })),

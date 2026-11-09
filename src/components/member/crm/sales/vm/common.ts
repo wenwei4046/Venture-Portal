@@ -140,22 +140,25 @@ export interface SalesCtx {
  * pale orange; a cold chat grey ("Cold · no reply for N days" / "Window closed"). From the status and the customer's
  * last message time only.
  */
-export function chatStripOf(c: CrmCustomer, now: Date, blocked = false) {
+export function chatStripOf(c: CrmCustomer, now: Date, blocked = false, approved = HUMAN_AGENT_APPROVED) {
+  // A Messenger chat says only its status until Human Agent is approved (v4 notes/12): its sends past the window look
+  // sent, so neither "Window closed" nor "Reply window · N h left" is said on the right.
+  const quiet = c.channel === "messenger" && !approved;
   const H = 3_600_000, last = c.lastCustomerAt ? new Date(c.lastCustomerAt).getTime() : null;
   // Blocked on Facebook (2026-11-08, shared/fb-blocked.ts): said in place of the wait and the window, grey as a cold chat.
   if (blocked) return { cold: true, left: FB_BLOCKED, right: "", dot: "var(--crm-faint-2)" };
-  if (isCold(c, now)) {
+  if (isCold(c, now, approved)) {
     const lr = lastReal(c), since = now.getTime() - new Date(lr?.at ?? now).getTime(), days = Math.max(1, Math.floor(since / (24 * H)));
     // The customer wrote last and nobody answered: how long they have waited (hours under two days).
     const left = lr?.from === "lead"
       ? (since < 48 * H ? `Cold · waited ${Math.floor(since / H)} h for a reply` : `Cold · waited ${days} days for a reply`)
       : `Cold · no reply for ${days} ${days === 1 ? "day" : "days"}`;
-    return { cold: true, left, right: "Window closed", dot: "var(--crm-faint-2)" };
+    return { cold: true, left, right: quiet ? "" : "Window closed", dot: "var(--crm-faint-2)" };
   }
   const u = urgencyOf(c, now), attention = u.level !== "none", h = Math.floor(u.waitingMinutes / 60);
   const left = (attention ? "Attention" : STATUS_LABEL[c.status]) + (attention && h >= 1 ? ` · waiting ${h} h` : "");
   const leftMs = last == null ? 0 : last + 24 * H - now.getTime();
-  const right = last == null ? "" : leftMs <= 0 ? "Window closed" : leftMs >= H ? `Reply window · ${Math.floor(leftMs / H)} h left` : `Reply window · ${Math.max(1, Math.floor(leftMs / 60_000))} min left`;
+  const right = last == null || quiet ? "" : leftMs <= 0 ? "Window closed" : leftMs >= H ? `Reply window · ${Math.floor(leftMs / H)} h left` : `Reply window · ${Math.max(1, Math.floor(leftMs / 60_000))} min left`;
   const dot = attention ? "var(--crm-st-attention)" : c.status === "new" ? "var(--crm-st-new)" : c.status === "follow_up" ? "var(--crm-st-follow)" : c.status === "appointment" ? "var(--crm-st-appt)" : c.status === "won" ? "var(--crm-st-won)" : "var(--crm-st-lost)";
   return { cold: false, left, right, dot };
 }

@@ -34,10 +34,19 @@ export function dropStep(key: string) { standing.delete(key); }
  * on screen (its ‹), the step is taken back. A step stacked on ours (the camera, the viewer) popping lands on ours —
  * `key` still in the state (pushStep) — and leaves this open.
  */
-export function useBackCloses(open: boolean, close: () => void, key: string) {
+export function useBackCloses(open: boolean, close: () => void, key: string): (then?: () => void) => void {
   const pushed = useRef(false);
   const latest = useRef(close);
   latest.current = close;
+  /**
+   * Closed by a choice that goes on somewhere (notes/10 §1, 2026-11-10 — a sheet's button that opens a chat, another sheet,
+   * the camera): our step is taken back FIRST and `then` runs once the browser has landed under it. Run at once, a step
+   * `then` pushes (a chat, the camera) stood on ours while our Back was still on its way, and that Back took IT.
+   */
+  const closeThen = useRef((then?: () => void) => {
+    if (pushed.current) { pushed.current = false; dropStep(key); backThen(then); } else if (then) then();
+    latest.current();
+  }).current;
   useEffect(() => {
     if (!open) return;
     if (!pushed.current) pushed.current = pushStep(key);
@@ -54,4 +63,23 @@ export function useBackCloses(open: boolean, close: () => void, key: string) {
       if (pushed.current) { pushed.current = false; dropStep(key); try { history.back(); } catch { /* gone already */ } }
     };
   }, [open, key]);
+  return closeThen;
+}
+
+/**
+ * history.back(), then `then` once the browser has landed (its popstate), or after 400 ms if none comes (a history
+ * already at its start). Other code's popstate listeners see that Back as any other.
+ */
+export function backThen(then?: () => void) {
+  let done = false;
+  const land = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener("popstate", land);
+    clearTimeout(t);
+    then?.();
+  };
+  window.addEventListener("popstate", land);
+  const t = setTimeout(land, 400);
+  try { history.back(); } catch { land(); }
 }

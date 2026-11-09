@@ -6,8 +6,9 @@
  * Delete closes it for good — off every booking list, its past visits kept.
  */
 import type { ChangeEvent, SyntheticEvent } from "react";
-import type { CrmBlock, CrmRoom } from "@/lib/member/crm-data";
-import type { RoomDraft } from "../ui";
+import type { CrmBlock, CrmData, CrmRoom } from "@/lib/member/crm-data";
+import type { PanelUi, RoomDraft } from "../ui";
+import { draftOf as deskDraftOf, draftFromStore, draftToStore, roomOf } from "../../desk/vm/showrooms";
 import { t12 } from "../../sales/vm/chat";
 import { gb, stop, type PanelCtx } from "./common";
 
@@ -41,6 +42,8 @@ function hoursOf(d: RoomDraft, on: (h: number, k: number) => boolean, begin: (p:
     if (g && g.hours === h) { g.days.push(k); g.label = `${DN[g.days[0]]} – ${DN[k]}`; } else groups.push({ label: DN[k], hours: h, open: !!r, days: [k] }); });
   const hourOf = (v: string) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(0, Math.min(24, n)) : null; };
   return {
+    // v4 3a: Copy Mon to all — every other day takes Monday's hours, or closes with it.
+    copyMon: () => (rs[0] ? setDays([1, 2, 3, 4, 5, 6], rs[0].f, rs[0].t) : setDays([1, 2, 3, 4, 5, 6], 0, null)),
     all: { f: pad2(first.f), t: pad2(first.t), apply: (fv: string, tv: string) => { const f = hourOf(fv), t = hourOf(tv); if (f == null || t == null || t <= f) return; const open = rs.map((r, k) => (r ? k : -1)).filter(k => k >= 0); setDays(open.length ? open : [0, 1, 2, 3, 4, 5, 6], f, t); } },
     groups: groups.map(g => ({ label: g.label, hours: g.hours, open: g.open, days: g.days.map(k => { const r = rs[k];
       return { l: DN[k], open: !!r, f: r ? pad2(r.f) : pad2(first.f), t: r ? pad2(r.t) : pad2(first.t),
@@ -207,6 +210,8 @@ export function roomsVM(ctx: PanelCtx) {
   const H24 = tp ? (tp.h % 12) + (tp.ap === "pm" ? 12 : 0) : 0, val = tp ? `${String(H24).padStart(2, "0")}:${String(tp.m).padStart(2, "0")}` : "";
   const del = ui.rmDel != null ? shown[ui.rmDel] : undefined;
   return {
+    // v4 (3a / 4a): the in-place page is PanelShowrooms4; the old page stays only for the full editor (Add closure).
+    fullEd: !!ed && !ed.quick, page4: ui.roomsOpen && !(ed && !ed.quick) ? showroomsPageVM(ctx) : null,
     rmOpen: ui.roomsOpen, stop, closeRooms: () => patch({ roomsOpen: false, rmEdit: null }),
     rmAdd: () => patch({ rmEdit: { ...draftOf(null, rooms.length), quick: true }, rmAt: rooms.length }),
     rmList: rmList.filter((_, i) => i === at),
@@ -228,6 +233,191 @@ export function roomsVM(ctx: PanelCtx) {
   };
 }
 export type RoomsVM = ReturnType<typeof roomsVM>;
+
+// ── v4 turn 3 / 4 (frames 3a, 4a, 4a·2, 4a·3 — docs/design_handoff_crm_redesign_v4): Showrooms as ONE page with a tab a
+// showroom. Back and + in the header; the details, Opening hours (a row a weekday, Copy Mon to all, the slot grid as a
+// fine-tune link), Visits per slot, Closures, Remarks, Delete at the foot. Changes are a DRAFT until Publish: the bar says
+// how many, Save draft keeps them under the saver's name (crm_save_showroom_draft — the desktop's own store and shape, so
+// a draft saved on either side opens on the other), Publish writes the showroom as before (crm_save_showroom_full).
+// A showroom with a saved draft opens on it: its tab carries the saver's initials, a banner names who and when and what
+// changed. Back (the header's ‹ or the phone's) with unsaved changes asks Save draft / Discard changes / Keep editing.
+
+const DAY_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+/** A showroom as the desktop keeps it, from the phone's draft (the room's photo and map links kept as they are). */
+function roomLike(d: RoomDraft, r: CrmRoom | null): CrmRoom {
+  return { id: r?.id ?? "", name: d.name, active: true, address: d.addr, slots: [...d.slots], cap: d.cap, weekly: [...d.weekly], blocks: d.blocks.map(b => ({ ...b })) as CrmBlock[],
+    photo: r?.photo ?? null, mapGoogle: r?.mapGoogle ?? null, mapWaze: r?.mapWaze ?? null, remarks: d.remarks ?? "" };
+}
+/** The phone's draft as crm_showroom_drafts keeps it — the desktop's SrDraft (desk/vm/showrooms.ts). */
+export function roomDraftToStore(d: RoomDraft, r: CrmRoom | null): Record<string, unknown> { return draftToStore(deskDraftOf(roomLike(d, r))); }
+/** A kept draft (either side's) back into the phone's, laid over the showroom as it stands. */
+export function roomDraftFromStore(stored: unknown, r: CrmRoom | null, i: number): RoomDraft {
+  const sr = draftFromStore(stored, r), x = roomOf(sr);
+  return draftOf({ id: r?.id ?? "", name: sr.dispName, active: true, address: x.address, slots: x.slots, cap: x.cap, weekly: x.weekly, blocks: x.blocks, remarks: sr.remarks ?? "" }, i);
+}
+/** Each weekday's opening hours as Opening hours shows them ("10:00 – 21:00" / "Closed"), Monday first. */
+function dayHours(d: RoomDraft): string[] {
+  const hourOf = (s: string) => Number(s.split("@")[0].split(":")[0]);
+  return DN.map((_, k) => {
+    if (d.weekly.includes(WI[k])) return "Closed";
+    const hs = d.slots.filter(s => sDays(s).includes(k)).map(hourOf).sort((a, b) => a - b);
+    return hs.length ? `${pad2(hs[0])} – ${pad2(hs[hs.length - 1] + 1)}` : "Closed";
+  });
+}
+/** What changed from `a` to `b`, in the banner's words ("Visits per slot 3 → 4", "Sunday closed"). */
+export function roomChanges(a: RoomDraft, b: RoomDraft): string[] {
+  const out: string[] = [];
+  if (a.name.trim() !== b.name.trim()) out.push("Name");
+  if (a.addr.trim() !== b.addr.trim()) out.push("Address");
+  const ha = dayHours(a), hb = dayHours(b);
+  let hours = false;
+  ha.forEach((h, k) => {
+    if (h === hb[k]) return;
+    hours = true;
+    out.push(hb[k] === "Closed" ? `${DAY_FULL[k]} closed` : h === "Closed" ? `${DAY_FULL[k]} open` : `${DAY_FULL[k]} hours`);
+  });
+  if (!hours && JSON.stringify(srt(a.slots)) !== JSON.stringify(srt(b.slots))) out.push("Slot grid");
+  if (a.cap !== b.cap) out.push(`Visits per slot ${a.cap} → ${b.cap}`);
+  const bk = (d: RoomDraft) => JSON.stringify(d.blocks.map(x => [x.a, x.b || x.a, x.why ?? "", (x as CrmBlock).t1 ?? "", (x as CrmBlock).t2 ?? ""]).sort());
+  if (bk(a) !== bk(b)) out.push("Closures");
+  if ((a.remarks ?? "").trim() !== (b.remarks ?? "").trim()) out.push("Remarks");
+  return out;
+}
+const initialsOf = (name: string) => name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]!.toUpperCase()).join("") || "?";
+/** When a draft was saved, on the office's clock: "14:02" today, "8 Nov, 14:02" before. */
+function savedAt(iso: string, now: Date): string {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return "";
+  const o = new Date(t.getTime() + 8 * 3_600_000), n = new Date(now.getTime() + 8 * 3_600_000);
+  const hm = `${String(o.getUTCHours()).padStart(2, "0")}:${String(o.getUTCMinutes()).padStart(2, "0")}`;
+  const same = o.getUTCFullYear() === n.getUTCFullYear() && o.getUTCMonth() === n.getUTCMonth() && o.getUTCDate() === n.getUTCDate();
+  return same ? hm : `${o.getUTCDate()} ${MONS[o.getUTCMonth()]}, ${hm}`;
+}
+const MONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** A tab's name: a word every showroom's name starts with ("HOUZS") is left off — "Puchong", "Setia Alam". */
+function tabNames(names: string[]): string[] {
+  const words = names.map(n => n.trim().split(/\s+/));
+  const w = words[0]?.[0];
+  const shared = names.length > 1 && !!w && words.every(p => p.length > 1 && p[0].toLowerCase() === w.toLowerCase());
+  return names.map((n, i) => (shared ? words[i].slice(1).join(" ") : n.trim()) || "New showroom");
+}
+
+/** The kept draft's key for a showroom: its id, or "new" for one not added yet (the desktop's). */
+const draftKeyOf = (r: CrmRoom | null) => r?.id ?? "new";
+
+/** How many changes the showroom edited in place holds that are saved nowhere — Back asks before they are lost (4a·3). */
+export function roomUnsaved(ui: Pick<PanelUi, "rmEdit">, data: Pick<CrmData, "rooms" | "roomDrafts">): number {
+  const ed = ui.rmEdit;
+  if (!ed || !ed.quick) return 0;
+  const rooms = data.rooms.filter(r => r.active), r = ed.id ? rooms.find(x => x.id === ed.id) ?? null : null;
+  const kept = data.roomDrafts?.[draftKeyOf(r)];
+  const base = kept ? roomDraftFromStore(kept.draft, r, ed.i) : draftOf(r, ed.i);
+  return roomChanges(base, ed).length;
+}
+
+export function showroomsPageVM(ctx: PanelCtx) {
+  const { ui, set, patch, data, act, now } = ctx;
+  const rooms = data.rooms.filter(r => r.active), ed = ui.rmEdit;
+  const keptNew = data.roomDrafts?.new;
+  // A showroom being added — or one whose draft is kept — is one more tab.
+  const shown: (CrmRoom | null)[] = [...rooms, ...((ed && ed.id === null) || keptNew ? [null] : [])];
+  const at = Math.min(Math.max(0, ed ? ed.i : ui.rmAt ?? 0), Math.max(0, shown.length - 1));
+  const r = shown[at] ?? null;
+  const key = draftKeyOf(r), kept = data.roomDrafts?.[key];
+  const published = draftOf(r, at);
+  const base = kept ? roomDraftFromStore(kept.draft, r, at) : published;
+  const mine = !!ed && !!ed.quick && ed.i === at;
+  const d: RoomDraft = mine ? ed! : base;
+  const local = mine ? roomChanges(base, d) : [];
+  const notLive = kept ? roomChanges(published, base) : [];
+  const begin = (p: Partial<RoomDraft>) => set(u => ({ ...u, rmEdit: { ...(u.rmEdit && u.rmEdit.i === at && u.rmEdit.quick ? u.rmEdit : { ...base, quick: true }), ...p } }));
+  const hourOf = (s: string) => Number(s.split("@")[0].split(":")[0]);
+  const on = (h: number, k: number) => d.slots.some(s => hourOf(s) === h && sDays(s).includes(k)) && !d.weekly.includes(WI[k]);
+  const hours = hoursOf(d, on, begin), dh = dayHours(d);
+  const q4 = rmQuick(ctx, r, at, d, begin);
+  const who = kept ? data.people.find(p => p.id === kept.by)?.name ?? "" : "";
+  const newDraft = () => ({ ...(keptNew ? roomDraftFromStore(keptNew.draft, null, rooms.length) : draftOf(null, rooms.length)), quick: true });
+  // Where the page goes once the leave sheet is answered: out (Back), another tab, or + (−1).
+  const leave = (to?: number) => patch(to === undefined ? { roomsOpen: false, rmEdit: null, rmLeave: false }
+    : to < 0 ? { rmLeave: false, rmEdit: newDraft(), rmAt: rooms.length } : { rmLeave: false, rmEdit: null, rmAt: to });
+  const pending = (): number | undefined => (typeof ui.rmLeave === "object" && ui.rmLeave ? ui.rmLeave.to : undefined);
+  const saveDraft = async () => !!act.saveRoomDraft && (await act.saveRoomDraft(key, roomDraftToStore(d, r)));
+  const nameOfTab = (x: CrmRoom | null) => x?.name ?? (ed && ed.id === null ? ed.name : keptNew ? roomDraftFromStore(keptNew.draft, null, rooms.length).name : "");
+  const names = tabNames(shown.map(nameOfTab));
+  const tagOf = (by: string | null | undefined) => { const n = by ? data.people.find(p => p.id === by)?.name ?? "" : ""; return `${n ? initialsOf(n) + " " : ""}draft`; };
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  return {
+    back: () => (local.length ? patch({ rmLeave: true }) : patch({ roomsOpen: false, rmEdit: null })),
+    add: () => (local.length ? patch({ rmLeave: { to: -1 } }) : leave(-1)),
+    tabs: shown.map((x, i) => {
+      const k = data.roomDrafts?.[draftKeyOf(x)];
+      return { label: names[i], on: i === at, tag: k ? tagOf(k.by) : "",
+        pick: () => { if (i !== at) { if (local.length) patch({ rmLeave: { to: i } }); else leave(i); } } };
+    }),
+    banner: kept ? { ini: who ? initialsOf(who) : "", title: `${who ? `${who}’s draft` : "Draft"} · saved ${savedAt(kept.at, now)}`,
+      sub: `${notLive.length ? notLive.join(", ") + ". " : ""}Sales still see the published version.` } : null,
+    name: d.name, setName: q4.setName, addr: d.addr, setAddr: (e: ChangeEvent<HTMLTextAreaElement>) => begin({ addr: e.target.value }),
+    gmaps: q4.gmaps, waze: q4.waze, hasAddr: q4.hasAddr,
+    days: hours.groups.flatMap(g => g.days).map((x, k) => ({ l: x.l, hours: dh[k], open: dh[k] !== "Closed", f: x.f, t: x.t, set: x.set, toggle: x.toggle })),
+    copyMon: hours.copyMon,
+    gridDays: q4.days, grid: q4.grid, odd: q4.odd,
+    cap: d.cap, capMinus: q4.capMinus, capPlus: q4.capPlus,
+    closures: d.blocks.map(b => ({ date: b.a === (b.b || b.a) ? dF(b.a) : `${dF(b.a)} – ${dF(b.b)}`,
+      sub: [(b as CrmBlock).t1 && (b as CrmBlock).t2 ? `${t12((b as CrmBlock).t1!)} – ${t12((b as CrmBlock).t2!)}` : "All day", b.why].filter(Boolean).join(" · "),
+      rm: () => begin({ blocks: d.blocks.filter(x => x !== b) }) })),
+    addClosure: q4.addClosure,
+    remarks: d.remarks ?? "", setRemarks: q4.setRemarks,
+    canDel: !!r, del: () => patch({ rmDel: at }),
+    // The bar: unsaved changes (Save draft · Publish), else a kept draft (Discard · Publish), else none.
+    bar: local.length ? { kind: "dirty" as const, title: `${plural(local.length, "unsaved change")}`, sub: "Sales see the published version" }
+      : kept ? { kind: "draft" as const, title: "Draft saved", sub: `${plural(Math.max(1, notLive.length), "change")} not live` } : null,
+    canDraft: !!act.saveRoomDraft,
+    saveDraft: () => void saveDraft().then(ok => { if (ok) patch({ rmEdit: null }); }),
+    discardDraft: () => void (act.saveRoomDraft ? act.saveRoomDraft(key, null) : Promise.resolve(false)).then(ok => { if (ok) patch({ rmEdit: null }); }),
+    publish: () => void act.saveRoom({ id: r?.id ?? null, name: d.name.trim() || "Showroom", address: d.addr.trim(), active: true, slots: d.slots, cap: d.cap, weekly: d.weekly, blocks: d.blocks })
+      .then(async id => {
+        if (!id) return;
+        if ((d.remarks ?? "") !== (r?.remarks ?? "") && !(await act.saveRoomRemarks(id, d.remarks ?? ""))) return;
+        if (kept && act.saveRoomDraft) await act.saveRoomDraft(key, null);
+        patch({ rmEdit: null, rmAt: at });
+      }),
+    // 4a·3: Back with unsaved changes.
+    leaveOpen: !!ui.rmLeave && local.length > 0,
+    leaveSub: `${plural(local.length, "change")} to ${d.name.trim() || "this showroom"}. A draft keeps them under your name; sales won’t see them.`,
+    leaveSave: () => void saveDraft().then(ok => { if (ok) leave(pending()); }),
+    leaveDiscard: () => leave(pending()),
+    leaveKeep: () => patch({ rmLeave: false }),
+  };
+}
+export type ShowroomsPageVM = ReturnType<typeof showroomsPageVM>;
+
+/** The in-place page's fields the 4a page (T07) already worked out: map links, visits per slot, the slot grid. */
+function rmQuick(ctx: PanelCtx, r: CrmRoom | null, i: number, d: RoomDraft, begin: (p: Partial<RoomDraft>) => void) {
+  const { patch } = ctx;
+  const q = encodeURIComponent(d.addr || d.name);
+  const hourOf = (s: string) => Number(s.split("@")[0].split(":")[0]);
+  const on = (h: number, k: number) => d.slots.some(s => hourOf(s) === h && sDays(s).includes(k)) && !d.weekly.includes(WI[k]);
+  const toggle = (h: number, k: number) => {
+    const isOn = d.slots.some(s => hourOf(s) === h && sDays(s).includes(k));
+    let next = d.slots;
+    if (isOn) next = d.slots.flatMap(s => { if (hourOf(s) !== h) return [s]; const ds = sDays(s).filter(x => x !== k), b = s.split("@")[0]; return ds.length ? [ds.length === 7 ? b : `${b}@${ds.join("")}`] : []; });
+    else { const b = `${String(h).padStart(2, "0")}:00`, ex = d.slots.find(s => s.split("@")[0] === b), ds = ex ? [...sDays(ex), k].sort() : [k];
+      next = [...d.slots.filter(s => s !== ex), ds.length === 7 ? b : `${b}@${ds.join("")}`]; }
+    begin({ slots: srt(next), ...(isOn ? {} : { weekly: d.weekly.filter(x => x !== WI[k]) }) });
+  };
+  return {
+    setName: (e: ChangeEvent<HTMLInputElement>) => begin({ name: e.target.value }),
+    gmaps: `https://www.google.com/maps/search/?api=1&query=${q}`, waze: `https://waze.com/ul?q=${q}&navigate=yes`, hasAddr: !!d.addr,
+    capMinus: d.cap > 1 ? () => begin({ cap: d.cap - 1 }) : undefined, capPlus: d.cap < 10 ? () => begin({ cap: d.cap + 1 }) : undefined,
+    days: ["M", "T", "W", "T", "F", "S", "S"],
+    grid: Array.from({ length: 24 }, (_, h) => ({ label: `${h % 12 || 12}${h < 12 ? "am" : "pm"}`, cells: WD.map((_, k) => ({ on: on(h, k), pick: () => toggle(h, k) })) })),
+    odd: d.slots.filter(s => !s.split("@")[0].endsWith(":00")).map(s => t12(s)),
+    // Add closure opens the full editor (its closures box) on what is on screen.
+    addClosure: () => patch({ rmEdit: { ...d, i, id: r?.id ?? null, quick: false } }),
+    setRemarks: (e: ChangeEvent<HTMLTextAreaElement>) => begin({ remarks: e.target.value.slice(0, 1000) }),
+  };
+}
+
 
 /** The editor's fields while a row is only being viewed (the design reads them either way). */
 const NOOP = () => {};

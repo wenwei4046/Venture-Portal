@@ -85,11 +85,11 @@ export function frameVM(ctx: DeskCtx) {
   // Inbox's four columns (v2): list › chat › Customer info › Chat progress (a 44 px rail when shut), each dragged to size.
   const ibOn = tab === "inbox" && (pane === "docked" || pane === "empty");
   const ibHas = pane === "docked";
-  // 4a (frames 02 / 02b / 02c, change list 13): the list 290, Customer info 260, the chat's Audit log 290 — each a 44 px
+  // 4a (frames 02 / 02b / 02c, change list 13): the list 290 (340 since v4 D5a, notes/24), Customer info 260, the chat's Audit log 290 — each a 44 px
   // strip when folded, docked beside the chat at every width. From 1680 px both may be open; below, opening one folds
   // the other (the toggles below).
   const ibCpOpen = !!ui.ibCp, ibCpDock = ibCpOpen;
-  const ibListW = ui.ibListW ?? 290, ibInfoW = ui.ibInfoW ?? 260, ibCpW = ui.ibCpW ?? 290;
+  const ibListW = ui.ibListW ?? 340, ibInfoW = ui.ibInfoW ?? 260, ibCpW = ui.ibCpW ?? 290;
   const BOTH = W >= 1680;
   // Customer info opens by default (the owner, 2026-10-16); on a narrow screen (1280) it starts folded so the chat keeps room.
   const infoShut = ui.ibInfoShut ?? (crmW - ibListW - ibInfoW - 44 < 300);
@@ -191,7 +191,7 @@ export function frameVM(ctx: DeskCtx) {
     // Customer info folds to a strip and back (the owner, 2026-10-16: "右邊的 customer info 做也能收起的功能，但是 default 是開著的").
     ibInfoShut: infoShut, ibInfoFold: () => patch({ ibInfoShut: true }), ibInfoRail: { title: "Customer info", open: () => patch({ ibInfoShut: false, ...(BOTH ? {} : { ibCp: false }) }) },
     // v2 (note 06): the list 300–480 px, the Audit log 240–520 px, the chat keeping at least 420 (ibSpare).
-    dragList: edgeDrag(set, "ibListW", ibListW, 1, 290, Math.min(480, ibListW + ibSpare)), dragInfo: edgeDrag(set, "ibInfoW", ibInfoW, -1, 220, Math.min(440, ibInfoW + ibSpare)),
+    dragList: edgeDrag(set, "ibListW", ibListW, 1, 340, Math.min(480, ibListW + ibSpare)), dragInfo: edgeDrag(set, "ibInfoW", ibInfoW, -1, 220, Math.min(440, ibInfoW + ibSpare)),
     dragCp: edgeDrag(set, "ibCpW", ibCpW, -1, 240, ibCpDock ? Math.min(520, ibCpW + ibSpare) : 520),
     resetList: () => patch({ ibListW: null }), resetInfo: () => patch({ ibInfoW: null }), resetCp: () => patch({ ibCpW: null }),
     ibCpOpen: ibOn && ibCpOpen, ibCpClosed: ibOn && !ibCpDock,
@@ -223,13 +223,13 @@ export function frameVM(ctx: DeskCtx) {
     showOpChip: false,
     isAdsOp: opItem[0] === "Ads to teams", notAdsOp: opItem[0] !== "Ads to teams" && opItem[0] !== "Full time lead allocation",
     isFtOp: opItem[0] === "Full time lead allocation", isMwtOp: false, isActOp: tab === "assignment" && opItem[0] === "Active members", isPeopleOp: tab === "assignment" && opItem[0] === "People", isLbaOp: opItem[0] === "Leads by ad", isHistOp: false, isSrOp: opItem[0] === "Showrooms", isCltOp: opItem[0] === "Cold lead templates",
-    isCpOp: opItem[0] === "Chat progress", isFrmOp: opItem[0] === "Forms" && tab !== "forms", isNtfOp: tab === "settings" && opItem[0] === "Notifications", isGenOp: tab === "settings" && opItem[0] === "General", isLibOp: tab === "settings" && opItem[0] === "Reply library", isLinkOp: tab === "settings" && opItem[0] === "Booking link",
+    isCpOp: opItem[0] === "Chat progress", isFrmOp: opItem[0] === "Forms" && tab !== "forms", isNtfOp: tab === "settings" && opItem[0] === "Notifications", isGenOp: tab === "settings" && opItem[0] === "General", isLinkOp: tab === "settings" && opItem[0] === "Booking link",
     // v2's page padding and title size: Ads to teams and Full time take the frame's whole width.
     // 4a: the pages' gutter under the head (frames 06–11): 16 px down, 36 px in.
-    pagePad: tab === "forms" || (tab === "assignment" && opItem[0] === "People") ? "0" : opItem[0] === "Ads to teams" ? "16px 28px 20px 36px" : tab === "settings" && (opItem[0] === "General" || opItem[0] === "Reply library" || opItem[0] === "Booking link") ? "6px 36px 32px" : "16px 36px 32px",
+    pagePad: tab === "forms" || (tab === "assignment" && opItem[0] === "People") ? "0" : opItem[0] === "Ads to teams" ? "16px 28px 20px 36px" : tab === "settings" && (opItem[0] === "General" || opItem[0] === "Booking link") ? "6px 36px 32px" : "16px 36px 32px",
     h1Size: opItem[0] === "Full time lead allocation" || opItem[0] === "Ads to teams" ? "22px" : "34px",
     kAudit: tab === "auditlog", kPeople: tab === "people", kCh: tab === "channels", cfOn: tab === "forms",
-    plainOp: !["Ads to teams", "Leads by ad", "People", "Active members", "Full time lead allocation", "Member work type", "Cold lead templates", "Showrooms", "Forms"].includes(opItem[0]) && !(tab === "settings" && (opItem[0] === "Notifications" || opItem[0] === "General" || opItem[0] === "Reply library" || opItem[0] === "Booking link")),
+    plainOp: !["Ads to teams", "Leads by ad", "People", "Active members", "Full time lead allocation", "Member work type", "Cold lead templates", "Showrooms", "Forms"].includes(opItem[0]) && !(tab === "settings" && (opItem[0] === "Notifications" || opItem[0] === "General" || opItem[0] === "Booking link")),
     opItem: opItem[0],
     showToast: !!ui.toast, toastText: ui.toast, canUndo: !!undo && undo.until > ctx.now.getTime(),
     // The Revenue app's own top bar (desk-patches.cjs).

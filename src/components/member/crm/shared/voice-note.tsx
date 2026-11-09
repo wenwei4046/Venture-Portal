@@ -36,6 +36,8 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
   const [dur, setDur] = useState(0);
   const [speed, setSpeed] = useState(lastSpeed);
   const shape = useRef(bars(src));
+  /** Seeking to the end once to learn a length the file did not say (Infinity). */
+  const probing = useRef(false);
   useEffect(() => { shape.current = bars(src); }, [src]);
   useEffect(() => { if (audio.current) audio.current.playbackRate = speed; }, [speed]);
 
@@ -47,15 +49,51 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
     if (a.paused) { takeTurn(a); setStarted(true); void a.play().catch(() => {}); } else a.pause();
   };
   const faster = () => { const s = nextSpeed(speed); lastSpeed = s; setSpeed(s); };
-  const seek = (e: React.MouseEvent<HTMLSpanElement>) => {
-    const a = audio.current, r = e.currentTarget.getBoundingClientRect();
-    if (!a || !dur) return;
-    a.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * dur;
-    setAt(a.currentTime);
+  // Drag to scrub, tap to jump (docs/design_handoff_crm_redesign_v4 › Voice Note Scrub.dc.html, notes/13): the finger is
+  // held on the waveform (pointer capture, no page scroll), the dot grows with a ring and a time label follows it; the
+  // release plays from there, even if the note was paused — through the play button's own path (takeTurn), so only one
+  // note plays. Pressing down on this note while another plays leaves that one playing until the release; dragging the
+  // note that plays pauses it while the finger is down.
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef<{ id: number } | null>(null);
+  const ratioOf = (e: React.PointerEvent<HTMLSpanElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return r.width > 0 ? Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) : 0;
   };
-  const done = dur ? at / dur : 0;
+  const down = (e: React.PointerEvent<HTMLSpanElement>) => {
+    e.stopPropagation();
+    const a = audio.current;
+    if (!a || !dur || (e.pointerType === "mouse" && e.button !== 0)) return;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* the pointer is gone */ }
+    drag.current = { id: e.pointerId };
+    if (!a.paused) a.pause();
+    setDragging(true);
+    setAt(ratioOf(e) * dur);
+  };
+  const move = (e: React.PointerEvent<HTMLSpanElement>) => {
+    e.stopPropagation();
+    if (!drag.current || drag.current.id !== e.pointerId) return;
+    setAt(ratioOf(e) * dur);
+  };
+  const up = (e: React.PointerEvent<HTMLSpanElement>) => {
+    e.stopPropagation();
+    const a = audio.current;
+    if (!drag.current || drag.current.id !== e.pointerId) return;
+    drag.current = null;
+    setDragging(false);
+    if (!a) return;
+    const to = ratioOf(e) * dur;
+    a.currentTime = to;
+    setAt(to);
+    if (e.type === "pointercancel") return;
+    a.playbackRate = speed;
+    takeTurn(a); setStarted(true); void a.play()?.catch(() => {});
+  };
+  const done = dur ? Math.min(1, at / dur) : 0;
   // On your own bubble — the brand's orange since 2026-10-15 (shared/chat-media.ts › MINE_BG) — the controls are white.
   const ink = mine ? "#fff" : "var(--crm-muted)", dim = mine ? "rgba(255,255,255,.42)" : "rgba(107,123,140,.35)";
+  // The prototype's thumb: 12px, 18px with a 6px ring while dragged (its ring colours).
+  const thumb = dragging ? 18 : 12, ringC = mine ? "rgba(255,255,255,.25)" : "rgba(111,64,44,.15)";
 
   return (
     // WhatsApp's layout (the owner, 2026-10-15, WhatsApp's voice bubble beside ours: "人 icon 至中（較大），語音 bar 也至中"):
@@ -64,21 +102,36 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
     // left of the picture (`mediaOf` › audio: `timeTop` −18px, `inPad` 62px on the right).
     <span style={{ display: "flex", alignItems: "center", gap: "8px", width: "248px", maxWidth: "100%", minHeight: "56px", padding: "2px 0" }}>
       <audio ref={audio} src={src} preload="metadata"
-        onLoadedMetadata={e => { const d = e.currentTarget.duration; e.currentTarget.playbackRate = speed; if (Number.isFinite(d)) setDur(d); }}
-        onDurationChange={e => { const d = e.currentTarget.duration; if (Number.isFinite(d)) setDur(d); }}
-        onTimeUpdate={e => setAt(e.currentTarget.currentTime)} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
+        onLoadedMetadata={e => {
+          const a = e.currentTarget, d = a.duration; a.playbackRate = speed;
+          if (Number.isFinite(d)) setDur(d);
+          // An iPhone's fMP4 note can say Infinity (the prototype's spec): seek far once to read its real length.
+          else if (d === Infinity && !probing.current) { probing.current = true; try { a.currentTime = 1e9; } catch { /* not seekable yet */ } }
+        }}
+        onDurationChange={e => {
+          const a = e.currentTarget, d = a.duration;
+          if (!Number.isFinite(d)) return;
+          setDur(d);
+          if (probing.current) { probing.current = false; try { a.currentTime = 0; } catch { /* fine */ } setAt(0); }
+        }}
+        onTimeUpdate={e => { if (!drag.current && !probing.current) setAt(e.currentTarget.currentTime); }} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
         onEnded={() => { setPlaying(false); setAt(0); }} style={{ display: "none" }} />
-      <button type="button" onClick={toggle} aria-label={playing ? "Pause" : "Play"} style={{ flex: "none", width: "36px", height: "36px", borderRadius: "18px", border: 0, background: "transparent", color: ink, display: "grid", placeItems: "center", cursor: "pointer", padding: 0 }}>
+      <button type="button" onClick={toggle} aria-label={playing ? "Pause" : "Play"} style={{ flex: "none", width: "44px", height: "44px", borderRadius: "22px", border: 0, background: "transparent", color: ink, display: "grid", placeItems: "center", cursor: "pointer", padding: 0 }}>
         <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor">{playing ? <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" /> : <path d="M8 5.5v13l10.5-6.5z" />}</svg>
       </button>
-      <span style={{ flex: "1", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", gap: "3px", paddingTop: "12px" }}>
-        <span onClick={seek} style={{ position: "relative", height: "28px", display: "flex", alignItems: "center", gap: "2px", cursor: "pointer" }}>
+      <span style={{ flex: "1", minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center", paddingTop: "4px" }}>
+        {/* The touch area is 44px tall; the bars stay 28px (the prototype). */}
+        <span data-voice-track="" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}
+          style={{ position: "relative", height: "44px", display: "flex", alignItems: "center", gap: "2px", cursor: "pointer", touchAction: "none", userSelect: "none", WebkitUserSelect: "none" }}>
           {shape.current.map((v, i) => (
-            <span key={i} style={{ flex: "1", height: `${Math.round(v * 100)}%`, minHeight: "3px", borderRadius: "2px", background: i / BARS < done ? ink : dim }} />
+            <span key={i} style={{ flex: "1", height: `${Math.round(v * 28)}px`, minHeight: "3px", borderRadius: "2px", pointerEvents: "none", background: i / BARS < done ? ink : dim }} />
           ))}
-          <span style={{ position: "absolute", left: `calc(${done * 100}% - 5px)`, top: "50%", width: "10px", height: "10px", marginTop: "-5px", borderRadius: "5px", background: ink }} />
+          <span style={{ position: "absolute", left: `calc(${done * 100}% - ${thumb / 2}px)`, top: "50%", width: `${thumb}px`, height: `${thumb}px`, marginTop: `-${thumb / 2}px`, borderRadius: "50%", pointerEvents: "none", background: ink, boxShadow: `0 0 0 ${dragging ? 6 : 0}px ${ringC}` }} />
+          {dragging && (
+            <span style={{ position: "absolute", bottom: "42px", left: `${done * 100}%`, transform: "translateX(-50%)", pointerEvents: "none", padding: "3px 8px", borderRadius: "8px", font: `600 ${typePx(12)} var(--font-display-rv), 'Inter Tight', Inter, sans-serif`, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", background: "var(--crm-ink)", color: "#fff", zIndex: 2 }}>{clock(at)} / {clock(dur)}</span>
+          )}
         </span>
-        <span style={{ height: "14px", fontSize: typePx(11), lineHeight: "14px", color: ink, fontVariantNumeric: "tabular-nums" }}>{clock(playing || at ? at : dur)}</span>
+        <span style={{ height: "14px", marginTop: "-5px", fontSize: typePx(11), lineHeight: "14px", color: ink, fontVariantNumeric: "tabular-nums" }}>{clock(playing || at || dragging ? at : dur)}</span>
       </span>
       {started
         ? <button type="button" onClick={faster} aria-label={`Speed ${speedLabel(speed)}`} title="Playback speed"

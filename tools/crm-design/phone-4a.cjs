@@ -90,7 +90,32 @@ function inbox(body) {
     `<span style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "${F(12)}", fontWeight: "500", color: "var(--crm-faint)", whiteSpace: "nowrap" }}><Ic name="lock" size={12} />Cold lead</span>`, "row cold");
   // M03: a filter with nothing in it shows the frame's empty state under the chips.
   body = once(body, '<section style={{ flex: "none", margin: "-4px -20px 0" }}>', '{!!(v.empty4) && (<Phone4aEmpty e={v.empty4} />)}<section style={{ flex: "none", margin: "-4px -20px 0" }}>', "inbox empty");
+  return inboxV4(body);
+}
+
+/** v4 · frame 10b (docs/design_handoff_crm_redesign_v4, notes/16, 2026-11-10): the title row, the search / ad row and the
+ * chip strip become Phone4aInboxHead (search is an icon that opens the field in place of the chips; All ads leads the
+ * chip row), and the rows Phone4aInboxRows (every row the same height; the wait in the time's place; label tags after the
+ * name). Their handlers are the same view model's; the toast, the empty state, More and the ad sheet stay generated. */
+function inboxV4(body) {
+  body = once(body, '<main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>',
+    '<main style={{ flex: "1 1 auto", minHeight: "0", overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 0", display: "flex", flexDirection: "column", gap: "14px" }}>', "inbox v4 main");
+  body = swap(body, '<div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "-2px" }}>', "div", "<Phone4aInboxHead v={v} />", "inbox v4 title row");
+  body = swap(body, '<div style={{ flex: "none", display: "flex", gap: "8px" }}><span onClick={v.openAd}', "div", "", "inbox v4 search row");
+  body = swap(body, '<div data-drag-scroll="1" style={{ flex: "none", display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", margin: "0 -20px", padding: "0 20px", cursor: "grab"', "div", "", "inbox v4 chips");
+  body = swap(body, '<section style={{ flex: "none", margin: "-4px -20px 0" }}>', "section", "<Phone4aInboxRows v={v} />", "inbox v4 rows");
   return body;
+}
+
+/** v4 · frame 2d (notes/17) with frame 2c's filters: the Team inbox page — title row, People / Status, tags, "N chats of
+ * M", the cards — is Phone4aTeamInbox (shared/inbox-v4.tsx) on panel/vm/inbox.ts › t2; it replaces T02's board. */
+function teamInboxV4(body) {
+  const at = body.indexOf("{!!(v.ib.onInbox) && (<>");
+  if (at < 0) throw new Error("phone-4a: team inbox v4");
+  const m = body.indexOf("<main ", at);
+  if (m < 0 || m - at > 200) throw new Error("phone-4a: team inbox v4 main");
+  const [x, y] = el(body.slice(m), body.slice(m, m + 60), "main", "team inbox v4 main");
+  return body.slice(0, m + x) + "<Phone4aTeamInbox ib={v.ib} tm={v.tm} bl={v.bl} bell={!!v.bellIn} />" + body.slice(m + y);
 }
 
 
@@ -223,6 +248,8 @@ function sales(name, body) {
   if (name === "SalesChat") body = chat(body, "v.cl");
   if (name === "SalesChat") body = once(body, "<span onClick={v.confirmBook}", "<Phone4aRoomRemarks text={v.bookRemarks} /><span onClick={v.confirmBook}", "book remarks");
   if (name === "SalesChat") body = bookModes(body, "v");
+  // v4 notes/15 (frame 11b): ⋮ › Label opens the Label sheet over the chat (shared/label-sheet-view.tsx).
+  if (name === "SalesChat") body = once(body, "<ChatComposer key={v.cmp.key} v={v.cmp} />", "<ChatComposer key={v.cmp.key} v={v.cmp} />\n      <Phone4aLabelSheet s={v.hm.label} />", "chat label sheet");
   if (name === "SalesProfile") body = notifs(profile(body, 3));
   // Auto-reply: one page at a time with Save (the owner, 2026-10-24: "auto reply 做成分頁式 … 記得要有save").
   if (name === "SalesProfile") { const a = body.indexOf("{!!(v.profAuto) && (<>"), e = body.indexOf("\n      </>)}", a); if (a < 0 || e < 0) throw new Error("phone-4a: auto-reply page");
@@ -306,6 +333,20 @@ function teamInsight(body) {
   body = once(body, '<span style={{ flex: "1", minWidth: "0", fontSize: "calc(15.22px * var(--rv-type, 1))", color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.who}</span>', '<span style={{ flex: "1", minWidth: "0" }} />', "team who");
   body = once(body, '<h1 style={{ flex: "none", margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Ads Performance</h1>',
     '{v.ad.inIns ? (<Phone4aTeamHead h={v.th} />) : (<h1 style={{ flex: "none", margin: "0", fontSize: "calc(28px * var(--rv-type, 1))", fontWeight: "700", letterSpacing: "-.03em", lineHeight: "1.2" }}>Ads Performance</h1>)}', "ads under insight head");
+  // v4 8b (docs/design_handoff_crm_redesign_v4): under the head, the period row, the hero with each change beside its figure,
+  // Teams as a table — one hand-written block (shared/phone4a.tsx › Phone4aTeamOverview) in place of the period card, the
+  // (hidden) Comparison and Team performance; the page starts 6 px down with 14 px between rows, as every Insight side.
+  {
+    const head = body.indexOf("<Phone4aTeamHead h={v.th} />");
+    const main = body.lastIndexOf("<main ", head);
+    const mainOpen = body.slice(main, body.indexOf(">", main) + 1);
+    if (!mainOpen.includes('padding: "10px 20px 36px", display: "flex", flexDirection: "column", gap: "22px"')) throw new Error("phone-4a: team overview main");
+    body = body.slice(0, main) + mainOpen.replace('padding: "10px 20px 36px", display: "flex", flexDirection: "column", gap: "22px"', 'padding: "6px 20px 36px", display: "flex", flexDirection: "column", gap: "14px"') + body.slice(main + mainOpen.length);
+    const from = body.indexOf("<Phone4aTeamHead h={v.th} />", main) + "<Phone4aTeamHead h={v.th} />".length;
+    const end = body.indexOf("</main>", from);
+    if (from < main || end < 0 || !body.slice(from, end).includes("{(v.ov.teamRows).map")) throw new Error("phone-4a: team overview body");
+    body = body.slice(0, from) + "\n          <Phone4aTeamOverview ov={v.ov} />\n        " + body.slice(end);
+  }
   return body;
 }
 
@@ -382,7 +423,10 @@ function teamAssign(body) {
   if (at < 0) throw new Error("phone-4a: team assign");
   const home = body.indexOf("{!!(v.asx.onHome) && (<>", at);
   const [, h1e] = el(body.slice(home), '<div style={{ flex: "none", display: "flex", alignItems: "flex-start", gap: "8px" }}>', "div", "assign head");
-  const head = `<div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "14px" }}><div style={{ display: "flex", alignItems: "center", gap: "10px" }}><h1 style={{ margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Assignment</h1>{!!(v.asx.onAct) && (<Phone4aActiveSave v={v.asx.act} />)}</div><div data-drag-scroll="1" style={{ display: "flex", gap: "22px", borderBottom: "1px solid var(--crm-rule)", overflowX: "auto", overscrollBehaviorX: "contain", scrollbarWidth: "none", margin: "0 -20px", padding: "0 20px" }}>{(v.asx.tabs4).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "none", height: "36px", display: "inline-flex", alignItems: "center", marginBottom: "-1px", borderBottom: t.on ? "2px solid var(--crm-rust)" : "2px solid transparent", fontSize: "${F(15)}", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", whiteSpace: "nowrap", cursor: "pointer" }}>{t.label}</span>))}</div></div>`;
+  // v4 13d / 13e (notes/18-A): + Leave beside the title on the Leave tab (one row saved; shared/PhoneLeaveCal.tsx ›
+  // PhoneLeaveAdd); the tabs 14 px, 500 / 600 when on, spread with space-between so all five fit at 390 px, on = ink + a
+  // 2 px rust underline, the row on a 1 px rule.
+  const head = `<div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px" }}><div style={{ display: "flex", alignItems: "center", gap: "10px" }}><h1 style={{ flex: "1", minWidth: "0", margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Assignment</h1>{!!(v.asx.onAct) && (<Phone4aActiveSave v={v.asx.act} />)}{!!(v.asx.onLv) && (<PhoneLeaveAdd />)}</div><div data-assign-tabs="" style={{ display: "flex", justifyContent: "space-between", gap: "8px", borderBottom: "1px solid var(--crm-tab-rule)" }}>{(v.asx.tabs4).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "none", padding: "4px 0 10px", marginBottom: "-1px", borderBottom: t.on ? "2px solid var(--crm-rust)" : "2px solid transparent", fontSize: "${F(14)}", fontWeight: t.on ? "600" : "500", color: t.on ? "var(--crm-ink)" : "var(--crm-muted)", whiteSpace: "nowrap", cursor: "pointer" }}>{t.label}</span>))}</div></div>`;
   // The home's title block becomes the tabs, shown on every section (onHome is false now — draw it unconditionally).
   const blockEnd = body.indexOf("</>)}", home + h1e);
   body = body.slice(0, home) + head + body.slice(blockEnd + 5);
@@ -540,10 +584,15 @@ function panel(body) {
   // Change list 16 · the bottom bar (T01).
   body = swap(body, '<nav style={{ flex: "none", display: v.navOn ? "flex" : "none", alignItems: "flex-end", height: "62px"', "nav", "<Phone4aBar items={v.nv.nav} hidden={!v.navOn} />", "panel bottom bar");
   body = panelChat(body);
+  // v4 notes/15 (frames 11a / 11b): the Team chat's ⋮ items carry their second line (Label: the chat's labels) as Mine's
+  // do, and ⋮ › Label opens the Label sheet over the chat (shared/label-sheet-view.tsx).
+  body = once(body, '<strong style={{ flex: "1", minWidth: "0", fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)" }}>{it.label}</strong>',
+    '<span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px" }}><strong style={{ fontSize: "calc(15px * var(--rv-type, 1))", fontWeight: "650", color: "var(--crm-ink)" }}>{it.label}</strong>{!!(it.sub) && (<small style={{ fontSize: "calc(12px * var(--rv-type, 1))", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{it.sub}</small>)}</span>', "team chat menu sub line");
+  body = once(body, "<ChatComposer key={v.ld.lx.cmp.key} v={v.ld.lx.cmp} />", "<ChatComposer key={v.ld.lx.cmp.key} v={v.ld.lx.cmp} />\n            <Phone4aLabelSheet s={v.ld.lx.label} />", "team chat label sheet");
   body = once(body, "<span onClick={v.ld.lx.confirm}", "<Phone4aRoomRemarks text={v.ld.lx.bookRemarks} /><span onClick={v.ld.lx.confirm}", "panel book remarks");
   body = bookModes(body, "v.ld.lx");
   body = teamInsight(body);
-  body = teamInbox(body);
+  body = teamInboxV4(teamInbox(body));
   body = teamAssign(body);
   body = teamSplit(body);
   // Split leads' and Full time's lists keep every card whole on an iPhone (2026-10-23, the owner: "数据被 overlap"): Safari
@@ -555,7 +604,7 @@ function panel(body) {
     'overflowY: "auto", scrollbarWidth: "none", padding: "14px 16px 0", display: "flex", flexDirection: "column", gap: "14px" }} data-scroll-keep="">', "full time list keeps its cards");
   // Assignment › Active (2026-10-22, the owner: "把这个 active member 的功能独立在" Ads to teams 后面): every team, each
   // person Active or Locked (shared/locked.ts › activeGroups, crm_set_locked).
-  body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onLv && v.leaveCalP) && (<PhonePeople bare input={v.leaveCalP!} top={add => <div style={{ display: \"flex\" }}>{add}</div>} />)}{!!(v.asx.onFt) && (<>", "assign active");
+  body = once(body, "{!!(v.asx.onFt) && (<>", "{!!(v.asx.onAct) && (<Phone4aActive v={v.asx.act} />)}{!!(v.asx.onLv && v.leaveCalP) && (<PhonePeople bare input={v.leaveCalP!} top={() => null} />)}{!!(v.asx.onFt) && (<>", "assign active");
   // Assignment › Leave (the owner, 2026-11-09: "手机上的 assignment 也要加入 leave"): the handoff's phone People — each person,
   // their time off and + Leave (shared/PhoneLeaveCal.tsx › PhonePeople, bare inside Assignment's own scroll).
   body = teamCalendar(body);

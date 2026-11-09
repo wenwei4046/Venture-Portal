@@ -14,15 +14,24 @@ import { panelLike } from "./frame";
 import { insightRange } from "./insight";
 import { numbersOf, pct } from "../../panel/vm/common";
 import { DIRECTOR_C, DIRECTOR_TEAM, ST, teamColours } from "./tokens";
-import { avatarTint } from "../../shared/palette";
+import { avatarTint, STATUS } from "../../shared/palette";
 import { adHref } from "../../shared/AdLink";
 import { isNewChat } from "../../shared/new-chat";
 import { saidInChat, snippetAround } from "../../shared/chat-search";
 import { jobTitle, personOf, teamAssignees } from "../../shared/people";
 import { labelsOn } from "./labels";
+import { deskChatMenu } from "./chat-menu";
 import { FB_BLOCKED, FB_BLOCKED_CATEGORY } from "../../shared/fb-blocked";
 
 const chip = (key: string) => ST[key] ?? ST["Follow up"];
+
+/** Inbox's Status picks (v4 D5a): ui.inbF as a list of the known statuses ("All", or one or more joined by ","). */
+export function stPicked(inbF: string | null | undefined, known: string[]): string[] {
+  if (!inbF || inbF === "All") return [];
+  return inbF.split(",").map(s => s.trim()).filter((s, i, a) => s && s !== "All" && known.includes(s) && a.indexOf(s) === i);
+}
+/** …and back: none picked is "All". */
+export const joinPicked = (st: string[]) => (st.length ? st.join(",") : "All");
 
 export function inboxVM(ctx: DeskCtx) {
   const { ui, set, patch, data, teams, W, now } = ctx;
@@ -85,7 +94,11 @@ export function inboxVM(ctx: DeskCtx) {
         ["All", () => true, false], ["New", x => !isCold(x) && !isBlocked(x) && isNewChat(x.c), false], ["Attention", x => ["Overdue", "Urgent", "Reply soon"].includes(x.key), true],
         ["Follow up", x => x.key === "Follow up", false], ["Appointment", x => x.key === "Appointment", false], ["Won", x => x.key === "Won", false],
         ["Lost", x => x.key === "Lost", false], ["Cold leads", isCold, false], [FB_BLOCKED_CATEGORY, isBlocked, false]];
-      const cur = T4.find(t => t[0] === ui.inbF) ?? T4[0];
+      // v4 D5a (notes/24, phone 2c): Status is several at once — ui.inbF holds the picked ones joined by "," ("All" = none),
+      // so every "back to All" elsewhere still clears it; People is ui.whoSel (teams and people, several at once).
+      const stSel = stPicked(ui.inbF, T4.map(t => t[0]));
+      const stF = (x: ChatRow) => !stSel.length || stSel.some(l => T4.find(t => t[0] === l)![1](x));
+      const cur: [string, (x: ChatRow) => boolean, boolean] = ["", stF, false];
       const q = (ui.ibQ ?? "").trim().toLowerCase();
       const hit = (x: ChatRow) => !q || x.name.toLowerCase().includes(q) || x.msg.toLowerCase().includes(q) || (x.ad ?? "").toLowerCase().includes(q) || sourceOf(x.c).label.toLowerCase().includes(q) || !!saidInChat(x.c, q);
       // Found further back in the chat: the row shows the message that holds the words, not the last one.
@@ -95,24 +108,51 @@ export function inboxVM(ctx: DeskCtx) {
       const hasLab = (x: ChatRow) => !lab || (data.customerLabels?.[x.id] ?? []).includes(lab);
       const used = (data.labels ?? []).filter(l => shown.some(x => (data.customerLabels?.[x.id] ?? []).includes(l.id)));
       const rows = [...shown.filter(cur[1]).filter(hasLab).filter(hit)].sort((a, b) => Number(!!pref(b.id)?.pinned) - Number(!!pref(a.id)?.pinned));
-      const DAY_MS = 86400000, fmtVisit = (t: Date) => `${t.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}, ${t.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toLowerCase()}`;
+      // The team colour of whoever has the chat (the Director's, a team's, else none).
+      const dotOf = (x: ChatRow) => { const id = x.ownerId;
+        if (id && ctx.directors.some(d => d.id === id)) return DIRECTOR_C[0];
+        const k = teams.findIndex(t => (id && (t.id === id || t.people.some(p => p.id === id))) || (!id && (x.teamId === t.id || x.team === t.name)));
+        return k < 0 ? "var(--crm-faint-2)" : teamColours(k)[0]; };
+      const STATUS_DOT: Record<string, string> = { New: STATUS.New.dot, Attention: STATUS.Attention.dot, "Follow up": STATUS["Follow up"].dot, Appointment: STATUS.Appointment.dot,
+        Won: STATUS.Won.dot, Lost: STATUS.Lost.dot, "Cold leads": STATUS["Cold leads"].dot, [FB_BLOCKED_CATEGORY]: STATUS.Blocked.dot };
+      // People: what one person / a whole team matches (ui.whoSel's own rule); a draft is counted before it is applied.
+      const countFor = (who: string[], st: string[]) => all.filter(x => !who.length || who.some(w => match1(w, x)))
+        .filter(x => !st.length || st.some(l => T4.find(t => t[0] === l)?.[1](x))).filter(hasLab).filter(hit).length;
+      const teamOpts = [...(ctx.directors.length ? [{ key: "dir", val: null as string | null, label: DIRECTOR_TEAM, dot: DIRECTOR_C[0], people: ctx.directors }] : []),
+        ...teams.map((t, k) => ({ key: t.id, val: `team:${t.id}` as string | null, label: t.name, dot: teamColours(k)[0], people: t.people }))];
+      const visitWord = (t: Date) => `${t.toLocaleDateString("en-GB", { weekday: "short", timeZone: "Asia/Kuala_Lumpur" })} ${t.toLocaleTimeString("en-US", { hour: "numeric", minute: t.getMinutes() ? "2-digit" : undefined, timeZone: "Asia/Kuala_Lumpur" }).toLowerCase()}`;
       return {
         q: ui.ibQ ?? "", setQ: (e: { target: { value: string } }) => patch({ ibQ: e.target.value }),
-        tabs: T4.map(([label, f, hot]) => ({ label, count: shown.filter(f).filter(hasLab).length, on: label === cur[0], hot, pick: () => patch({ inbF: label }) })),
+        tabs: T4.map(([label, f, hot]) => ({ label, count: shown.filter(f).filter(hasLab).length, on: label === "All" ? !stSel.length : stSel.includes(label), hot, pick: () => patch({ inbF: label }) })),
         labels: used.map(l => ({ id: l.id, name: l.name, color: l.color, on: l.id === lab, count: shown.filter(cur[1]).filter(x => (data.customerLabels?.[x.id] ?? []).includes(l.id)).length,
           pick: () => patch({ ibLabel: l.id === lab ? null : l.id }) })),
+        // v4 D5a: People / Status (phone 2c) — each button's badge the number picked, the removable tags, "N chats of M".
+        filter: {
+          peopleN: whoSel.length, statusN: stSel.length, who: whoSel, st: stSel,
+          teams: teamOpts.map(t => ({ key: t.key, val: t.val, label: t.label, dot: t.dot, n: t.val ? all.filter(x => match1(t.val!, x)).length : all.filter(x => ctx.directors.some(d => d.id === x.ownerId)).length,
+            people: t.people.map(p => ({ id: p.id, label: p.name, n: all.filter(x => x.ownerId === p.id).length })) })),
+          statuses: T4.filter(t => t[0] !== "All").map(([label, f, hot]) => ({ label, dot: STATUS_DOT[label] ?? "var(--crm-faint-2)", n: shown.filter(f).filter(hasLab).length, hot })),
+          chips: [...whoSel.map(w => ({ key: w, label: whoName(w), dot: w.startsWith("team:") ? teamColours(teams.findIndex(t => t.id === w.slice(5)))[0] : dotOf({ ownerId: w } as ChatRow), round: true,
+            remove: () => set(u => ({ ...u, whoSel: u.whoSel.filter(x => x !== w) })) })),
+            ...stSel.map(l => ({ key: `st:${l}`, label: l, dot: STATUS_DOT[l] ?? "var(--crm-faint-2)", round: false, remove: () => patch({ inbF: joinPicked(stSel.filter(x => x !== l)) }) }))],
+          shownN: rows.length, totalN: all.length,
+          count: countFor,
+          apply: (who: string[], st: string[]) => patch({ whoSel: who, inbF: joinPicked(st), whoOpen: false }),
+          clear: () => patch({ whoSel: [], inbF: "All", ibLabel: null }),
+        },
         rows: rows.map(x => {
           const p = pref(x.id), n = x.c.unread, dot = !n && !!p?.markedUnread, [avBg, avFg] = avatarTint(x.name);
           const u = urgencyOf(x.c, now), visit = data.visits.filter(v => v.customerId === x.id && v.state === "booked" && new Date(v.start) >= now).sort((a, b) => a.start.localeCompare(b.start))[0];
-          const lastIn = x.c.lastCustomerAt ? new Date(x.c.lastCustomerAt).getTime() : null;
-          const note = isBlocked(x) ? { text: FB_BLOCKED, kind: "mute" } : u.level !== "none" ? { text: u.label, kind: u.level === "soon" ? "warm" : "hot" }
-            : visit ? { text: `Visit · ${fmtVisit(new Date(visit.start))}`, kind: "calm" }
-              : isCold(x) && lastIn ? { text: `Cold · ${Math.max(1, Math.floor((now.getTime() - lastIn) / DAY_MS))} d`, kind: "mute" } : null;
           const sel = ui.pane === "docked" && ui.chat === x.id;
-          return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: [sourceOf(x.c).brandLabel, x.ad].filter(Boolean).join(" · "), msg: preview(x), time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
-            hot: n > 0 || dot, owner: x.owner, pinned: !!p?.pinned, muted: !!p?.muted, sel, tags: labelsOn(data, x.id).map(l => ({ t: l.name, c: l.color })),
-            note: note?.text ?? "", noteColor: !note ? "" : note.kind === "hot" ? "var(--crm-oxblood)" : note.kind === "warm" ? "var(--crm-ink)" : note.kind === "calm" ? "var(--crm-ink-soft)" : "var(--crm-faint)",
-            noteWeight: note?.kind === "hot" ? 600 : 500, noteIcon: !note ? null : note.kind === "calm" ? "calendar" : note.kind === "hot" && u.level === "overdue" ? "triangle-alert" : "clock",
+          // v4 D5a (phone 2d / 10b): line 1 the time, or the wait when the chat waits (icon + "9 h" in its urgency colour);
+          // no separate urgency line — a booked visit and a cold chat say so before the message.
+          const wait = u.level === "none" || isCold(x) || isBlocked(x) ? null
+            : { text: `${Math.floor(u.waitingMinutes / 60)} h`, icon: u.level === "overdue" ? "triangle-alert" as const : "clock" as const, color: u.level === "soon" ? "var(--crm-text-appt)" : "var(--crm-oxblood)" };
+          return { id: x.id, name: x.name, ini: x.ini, avBg, avFg, ch: x.c.channel, ad: x.ad || sourceOf(x.c).label, msg: isBlocked(x) ? FB_BLOCKED : preview(x), time: x.time, unread: n > 0 ? (n > 99 ? "99+" : String(n)) : "", dot,
+            hot: n > 0 || dot, owner: x.owner, ownerDot: dotOf(x), pinned: !!p?.pinned, muted: !!p?.muted, sel, tags: labelsOn(data, x.id).map(l => ({ t: l.name, c: l.color })),
+            wait, visit: visit ? visitWord(new Date(visit.start)) : "", cold: isCold(x), blocked: isBlocked(x),
+            // A blocked chat still says so (shared/fb-blocked.ts) — drawn on line 3 in place of the message, not a line of its own.
+            note: isBlocked(x) ? FB_BLOCKED : "", noteColor: "", noteWeight: 500, noteIcon: null,
             open: () => patch({ pane: "docked", kind: "chat", chat: x.id, fromTeam: false, menu: false, msgMenu: null, replyTo: null, attachOpen: false, emo: null }) };
         }),
       };
@@ -299,31 +339,14 @@ export const moveHolder = (ctx: DeskCtx, c: DeskCtx["data"]["customers"][number]
 export function chatMenuVM(ctx: DeskCtx, chat: { starCount: number; starredOpen(): void }) {
   const { ui, patch, data, me, act, nameOf, teams } = ctx;
   const c = ui.chat ? data.customers.find(x => x.id === ui.chat) : undefined;
-  const pref = c ? data.prefs[c.id] : undefined;
-  const unread = !!c && (!!pref?.markedUnread || c.unread > 0), muted = !!pref?.muted, pinned = !!pref?.pinned;
-  const flag = (p: Partial<{ markedUnread: boolean; muted: boolean; pinned: boolean }>, msg: string) => { if (!c) return; patch({ menu: false, toast: msg }); void act.setPref(c.id, p); };
   const top = me.role === "boss";
   // Whom a Move asks: the superior of whoever has the customer, never oneself.
   const holder = moveHolder(ctx, c);
   const up = personOf(personOf(holder, data.people)?.uplineId, data.people);
   const upTo = up && up.id !== me.id ? up : undefined;
-  const items: [string, string, string, () => void, string, boolean][] = [
-    ...(data.can.manage || leaderAssignees(ctx, c).length ? [["Assign to", "var(--crm-ink-soft)", "M7 17 3 13l4-4M3 13h14M17 7l4 4-4 4M21 11H7", () => patch({ menu: false, kind: "assign" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
-    // Move only when there is somebody to hand over to, as on the phone — the Principal keeps the design's top-level page.
-    ...(upTo || top ? [["Move", "var(--crm-rust)", "M12 19V5M5 12l7-7 7 7", () => patch({ menu: false, kind: "move" }), "", false] as [string, string, string, () => void, string, boolean]] : []),
-    ["Share", "var(--crm-brown)", "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM19 8v6M22 11h-6", () => patch({ menu: false, kind: "share" }), "", false],
-    ["Customer info", "var(--crm-brown)", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => { if (c) patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true, infoAudit: false }); }, "", !data.can.manage],
-    // The chat's Audit log, for whoever manages the CRM (the owner, 2026-11-09: "新增 audit log（只给管理者看）"): Customer info
-    // with its log unfolded — who was given it, moved, shared, booked, and when.
-    ...(data.can.manage ? [["Audit log", "var(--crm-brown)", "M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2", () => { if (c) patch({ menu: false, kind: "info", infoId: c.id, visit: null, infoFromChat: true, infoAudit: true }); }, "", true] as [string, string, string, () => void, string, boolean]] : []),
-    ["Appointment", "var(--crm-ink-soft)", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => { if (c) patch({ menu: false, kind: "book", book: null }); }, "", false],
-    [unread ? "Mark as read" : "Mark as unread", "var(--crm-ink-soft)", "M21 12a9 9 0 1 1-9-9M19 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
-      () => { if (!c) return; if (unread) { flag({ markedUnread: false }, "Marked as read"); if (c.assignedTo === me.id) act.openChat(c.id); } else flag({ markedUnread: true }, "Marked as unread"); }, "", true],
-    [muted ? "Unmute" : "Mute notifications", "var(--crm-ink-soft)", muted ? "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" : "M18 8a6 6 0 0 0-9.3-5M6 8c0 7-3 7-3 9h14M10 21h4M2 2l20 20",
-      () => flag({ muted: !muted }, muted ? "Notifications on" : "Muted · no alerts for this chat"), muted ? "Muted" : "", false],
-    [pinned ? "Unpin chat" : "Pin chat", "var(--crm-muted)", "M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z", () => flag({ pinned: !pinned }, pinned ? "Unpinned" : "Pinned to the top of Inbox"), "", false],
-  ];
-  const chatMenuItems = items.map(([label, col, d, run, sub, sep]) => ({ label, c: col, d, run, sub: sub || null, sep }));
+  // v4 notes/24 §3: the phone's ⋮ items (sales/vm/chat.ts › hm.items) + a divider and Block NAME — desk/vm/chat-menu.ts.
+  const chatMenuItems = deskChatMenu(ctx, c, { assign: data.can.manage || leaderAssignees(ctx, c).length > 0, assignSub: data.can.manage ? "Give this customer to anyone" : "Give to someone in your team",
+    move: !!(upTo || top), moveSub: upTo ? `Hand over to ${upTo.name.split(/\s+/)[0]}` : "" });
 
   // Move / Share's people.
   const kind = ui.kind, cn = c?.name ?? "";

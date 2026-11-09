@@ -12,6 +12,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { typePx } from "./type";
+import { CAL } from "./cal-look";
 
 const f = (w: number, px: number) => `${w} ${typePx(px)} Inter, sans-serif`;
 
@@ -122,12 +123,13 @@ export function DateRangePicker({ value, onApply, onCancel, anchor, future = fal
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", rowGap: "2px" }}>
         {DOW.map((d, i) => <span key={i} style={{ textAlign: "center", font: f(500, 11), color: "var(--crm-faint)", height: "22px", lineHeight: "22px" }}>{d}</span>)}
         {cells.map(c => {
-          const off = !future && c.s > todayIso, end = c.s === lo || c.s === hi, mid = !!lo && !!hi && c.s > lo && c.s < hi;
+          // The CRM's one range-picker look (cal-look.ts, as the phone's period sheets): the ends rust, the peach band between, today a rust ring.
+          const off = !future && c.s > todayIso, end = c.s === lo || c.s === hi, mid = !!lo && !!hi && c.s > lo && c.s < hi, today = c.s === todayIso && !end;
           return (
-            <button key={c.s} type="button" disabled={off} onClick={() => tap(c.s)} aria-pressed={end}
-              style={{ height: "32px", border: 0, padding: 0, cursor: off ? "default" : "pointer", font: f(end ? 600 : 400, 12.5), borderRadius: end ? "7px" : 0,
-                background: end ? "var(--crm-ink)" : mid ? "var(--crm-sel)" : "transparent", color: end ? "#fff" : off ? "var(--crm-disabled)" : c.inM ? "var(--crm-ink)" : "var(--crm-faint)",
-                boxShadow: c.s === todayIso && !end ? "inset 0 0 0 1.5px var(--crm-rust)" : "none" }}>{c.d.getDate()}</button>
+            <button key={c.s} type="button" disabled={off} onClick={() => tap(c.s)} aria-pressed={end} aria-label={c.s} data-day={c.s}
+              style={{ height: "32px", border: 0, padding: 0, cursor: off ? "default" : "pointer", font: f(end || today ? 600 : 400, 12.5), borderRadius: end || today ? "7px" : 0,
+                background: end ? CAL.pickBg : mid ? CAL.rangeBg : "transparent", boxShadow: today ? CAL.todayRing : "none",
+                color: end ? CAL.pickFg : off ? CAL.offFg : c.inM ? CAL.dayFg : CAL.outFg }}>{c.d.getDate()}</button>
           );
         })}
       </div>

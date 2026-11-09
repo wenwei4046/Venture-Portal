@@ -8,6 +8,7 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode }
 import type { LeaveCalIn, LeaveCalVM } from "../shared/leave-cal";
 import { useLeaveCal } from "../shared/use-leave-cal";
 import s from "./leave-cal.module.css";
+import { CAL } from "../shared/cal-look";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const INTER = "Inter, sans-serif";
@@ -20,7 +21,7 @@ const FIELD: CSSProperties = { height: "40px", padding: "0 10px", boxSizing: "bo
 
 /** The page: title row (Calendar's layer toggles), the toolbar, Month or Week, the panel, the modal, the toast. */
 export function DeskLeaveCalPage({ mode, input, title, bare }: { mode: "calendar" | "people"; input: Omit<LeaveCalIn, "mode" | "ui" | "set" | "flash">; title: string; bare?: boolean }) {
-  const v = useLeaveCal(mode, input);
+  const v = useLeaveCal(mode, input, { desk: true });
   return <DeskLeaveCal v={v} title={title} bare={bare} />;
 }
 
@@ -61,7 +62,7 @@ export function DeskLeaveCal({ v, title, tabs, bare }: { v: LeaveCalVM; title: s
         <span style={{ font: `500 18px ${TIGHT}`, whiteSpace: "nowrap" }}>{v.weekLabel}</span>
         {v.notThisWeek && <span {...press(v.thisWeek)} style={{ font: `500 12.5px ${INTER}`, color: "var(--crm-rust)", cursor: "pointer" }}>{v.todayLabel}</span>}
         <div style={{ marginLeft: "auto", minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "16px", fontSize: "12px", color: "var(--crm-muted)" }}>
-          {v.showAppt && <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--crm-green)" }} />Appt</span>}
+          {v.showAppt && <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: CAL.apptDot }} />Appt</span>}
           {v.showLeave && <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "10px", height: "10px", borderRadius: "3px", background: "var(--crm-full-time)" }} />Full time</span>}
           {v.legend.map(l => <span key={l.label} style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "10px", height: "10px", borderRadius: "3px", background: l.bg }} />{l.label}</span>)}
         </div>
@@ -77,21 +78,30 @@ export function DeskLeaveCal({ v, title, tabs, bare }: { v: LeaveCalVM; title: s
           <div style={{ flex: "none", display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", borderBottom: "1px solid var(--crm-rule)" }}>
             {v.dowHead.map(d => <span key={d} style={{ height: "36px", display: "flex", alignItems: "center", paddingLeft: "10px", ...LABEL }}>{d}</span>)}
           </div>
-          <div style={{ flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gridAutoRows: "minmax(0,1fr)", borderLeft: "1px solid var(--crm-rule-2)" }}>
-            {v.monthCells.map(c => (
-              <div key={c.day} onClick={c.add} className={s.cell} style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: "3px", padding: "6px 6px 4px", boxSizing: "border-box", borderRight: "1px solid var(--crm-rule-2)", borderBottom: "1px solid var(--crm-rule-2)", background: c.bg, overflow: "hidden", cursor: "pointer" }}>
+          {/* Each week a row: a leave ONE bar laid across its days in its lane (never cut by a cell, never over another), the
+              appointments under the lanes, "+N more" past the room — the phone's rule (v4 notes/19 §3), at the desktop's size. */}
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", borderLeft: `1px solid ${CAL.grid}` }}>
+            {v.weeks.map(w => (
+            <div key={w.key} data-cal-week="" style={{ flex: "1 1 0", minHeight: 0, position: "relative", display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))" }}>
+            {w.dDays.map(c => (
+              <div key={c.day} onClick={c.add} data-day={c.day} className={s.cell} style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: "3px", padding: "6px 6px 4px", boxSizing: "border-box", borderRight: `1px solid ${CAL.grid}`, borderBottom: `1px solid ${CAL.grid}`, background: c.bg, overflow: "hidden", cursor: "pointer" }}>
                 <span style={{ flex: "none", alignSelf: "flex-start", minWidth: "22px", height: "22px", padding: "0 5px", boxSizing: "border-box", borderRadius: "11px", display: "grid", placeItems: "center", font: `500 12px ${INTER}`, background: c.numBg, color: c.numFg }}>{c.num}</span>
-                {c.chips.map(k => (
-                  <span key={k.key} onClick={k.edit} title={k.title} style={{ flex: "none", display: "block", height: "20px", lineHeight: "20px", padding: "0 6px", margin: `0 ${k.mr} 0 ${k.ml}`, borderRadius: k.rad, background: k.bg, color: k.fg, fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.label}</span>
-                ))}
+                {w.lanes.length > 0 && <span aria-hidden style={{ flex: "none", height: `${w.lanes.length * 23 - 3}px` }} />}
                 {c.appts.map(a => (
                   <span key={a.key} title={a.title} onClick={a.open} className={s.name} style={{ flex: "none", display: "flex", alignItems: "center", gap: "5px", height: "18px", padding: "0 4px", minWidth: 0, fontSize: "11px", color: "var(--crm-ink)", cursor: "pointer" }}>
                     <span style={{ width: "6px", height: "6px", borderRadius: "50%", flex: "none", background: a.dot }} /><b style={{ fontWeight: 600, flex: "none" }}>{a.t}</b>
                     <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: "var(--crm-muted)" }}>{a.who}</span>
                   </span>
                 ))}
-                {c.more && <span style={{ flex: "none", fontSize: "11px", color: "var(--crm-muted)", paddingLeft: "4px" }}>{c.more}</span>}
+                {c.more && <span data-more="" style={{ flex: "none", fontSize: "11px", fontWeight: 600, color: "var(--crm-muted)", paddingLeft: "4px" }}>{c.more}</span>}
               </div>
+            ))}
+            {w.bars.map(b => (
+              <span key={b.key} onClick={b.editD} title={b.title} data-leave-bar="" style={{ position: "absolute", top: `${31 + b.lane * 23}px`, height: "20px", lineHeight: "20px",
+                left: `calc(${b.c0} * 100% / 7 + ${b.roundL ? 4 : 0}px)`, width: `calc(${b.span} * 100% / 7 - ${(b.roundL ? 4 : 0) + (b.roundR ? 5 : 0)}px)`, boxSizing: "border-box", padding: "0 6px",
+                borderRadius: `${b.roundL ? 4 : 0}px ${b.roundR ? 4 : 0}px ${b.roundR ? 4 : 0}px ${b.roundL ? 4 : 0}px`, background: b.bg, color: b.fg, fontSize: "11px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: "pointer" }}>{b.label}</span>
+            ))}
+            </div>
             ))}
           </div>
         </div>
@@ -122,7 +132,7 @@ export function DeskLeaveCal({ v, title, tabs, bare }: { v: LeaveCalVM; title: s
                         <span style={{ display: "block", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.label}</span>
                         {c.appt && (
                           <span style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0, fontSize: "11.5px", fontWeight: 500, color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden" }}>
-                            <span style={{ width: "6px", height: "6px", borderRadius: "50%", flex: "none", background: "var(--crm-green)" }} />{c.appt}
+                            <span style={{ width: "6px", height: "6px", borderRadius: "50%", flex: "none", background: CAL.apptDot }} />{c.appt}
                           </span>
                         )}
                       </span>

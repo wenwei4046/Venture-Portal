@@ -31,11 +31,20 @@ export interface PanelUi {
   inbWho: string;
   /** 4a (T02): the status tab last tapped above the board, underlined. */
   inbCol: number;
+  /** v4 2d / 2c: the People filter ("team:<id>" / "person:<staff id>"), the Status filter (category keys), the 2c·2 sheet
+   * with its draft, and the search open in place of the People / Status buttons. Empty = everybody / every status. */
+  inbPeople?: string[];
+  inbSt?: string[];
+  inbSheet?: { at: "people" | "status"; people: string[]; st: string[] } | null;
+  inbQ?: string;
+  inbSearch?: boolean;
   pcOpen: boolean;
   pcQ: string;
   // One customer's chat (from Calendar / Awaiting reply)
   lead: string | null;
   pMenu: boolean;
+  /** ⋮ › Label (v4 notes/15): the Label sheet over the chat — its list or its form, and the form being typed. */
+  pLabel?: { view: import("../shared/label-sheet").LabelView; form: import("../shared/label-sheet").LabelFormState | null } | null;
   pInfo: boolean;
   /** The customer form (Book visit step 1 of 2 for a customer with no details yet, or Customer info › Edit). */
   pForm: CustomerForm | null;
@@ -104,6 +113,9 @@ export interface PanelUi {
   rmEdit: RoomDraft | null;
   rmTP: { h: number; m: number; ap: "am" | "pm" } | null;
   rmDel: number | null;
+  /** 4a·3: Back with unsaved showroom changes asks Save draft / Discard changes / Keep editing (CrmApp beforeBack); `to`:
+   *  another tab (its index) or + (−1) was tapped instead, where the page goes once it is answered. */
+  rmLeave?: boolean | { to: number };
   /** The showroom on screen — Showrooms shows one at a time, ‹ › between them (2026-10-16). */
   rmAt: number;
   /** The ad editor's name while it is typed (null = the ad's name as saved). */

@@ -1,3 +1,4 @@
+alertIcon
 attFg
 attach
 bar
@@ -12,14 +13,19 @@ delKey
 draft
 emoLabel
 emojis
+fbLine
+fbSub
 focus
 homeBg
 isA
 isEmoji
 keep
 mainAct
+mainBg
+mainCursor
 mainDown
 mainIcon
+mainSh
 mainTitle
 noMenu
 notSearching
@@ -58,3 +64,6 @@ toggleSearch
 toggleSticker
 tplOn
 trashRef
+warnBtn
+warnOn
+warnText

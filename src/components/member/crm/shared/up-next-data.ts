@@ -2,13 +2,26 @@
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { CrmData } from "@/lib/member/crm-data";
 import { DIRECTOR_COLOUR, teamColour } from "./palette";
+import { officeStamp } from "./leave-cal-data";
 import { DIRECTOR_KEY, type UpNextAd, type UpNextBook } from "./up-next";
 
 /** The Principal, the Revenue Director and whoever has a downline; a salesperson never (the database refuses them too). */
 export const upNextOpen = (d: CrmData, me: string) => d.can.viewAll || d.people.some(p => p.uplineId === me);
 
+/** Leads today per person: each time a customer was given to them today (the journey's `assigned`, Team activity's LEAD GOT). */
+export function leadsTodayOf(d: CrmData, now: Date = new Date()): Map<string, number> {
+  const today = officeStamp(now).slice(0, 10), n = new Map<string, number>();
+  d.events.forEach(e => {
+    const to = e.kind === "assigned" ? (e.data as { to?: unknown } | null)?.to : null;
+    if (typeof to === "string" && officeStamp(new Date(e.at)).slice(0, 10) === today) n.set(to, (n.get(to) ?? 0) + 1);
+  });
+  return n;
+}
+
 export function upNextBookOf(teams: { id: string; name: string }[], nameOf: (id: string | null | undefined) => string, d: CrmData): UpNextBook {
+  let today: Map<string, number> | null = null;
   return {
+    todayOf: id => (today ??= leadsTodayOf(d)).get(id) ?? 0,
     nameOf,
     teamOf: key => {
       if (key === DIRECTOR_KEY) return { name: "Revenue Director", dot: DIRECTOR_COLOUR[0] };

@@ -9,7 +9,7 @@ import type { MetaFig } from "@/lib/member/crm-ad-names-meta";
 import { adsReportParam } from "@/lib/member/crm-ads-report";
 import { adStatusOf } from "@/lib/member/crm-ad-running";
 import type { DeskCtx } from "./ctx";
-import { INS_CARDS, MON } from "./insight";
+import { INS_CARDS, MON, insightRange } from "./insight";
 import { columnSizer } from "./columns";
 import { CHART_DEF, CHART_MAX, chartFmt, chartFmtOf, dailySeries, dayLabel, daysOf, SERIES, SERIES_TINT } from "./adschart";
 import { ST_META } from "./tokens";
@@ -54,9 +54,20 @@ export function moveHeld(list: string[], from: number | null | undefined, to: nu
 const CHART_METRICS = ALL.filter(m => m[3] !== "t" && m[0] !== "dbudget").map(m => [m[0], m[1], chartFmtOf(m[3])] as const);
 // 4a's columns (frame 05): Leads, Appts, Appt rate, Show-up, Won, Won rate, Spend, Per lead — the rest from +. Spend and Per
 // lead say RM in their heads (2026-10-23, the owner: "spend（加RM） & per lead （加RM）").
+/** The figures picked for the strip and the chart, as kept on the server (v4 notes/21). */
+export interface AdsFigures { figures: string[]; open: boolean }
+/** The kept choice read back: only metrics the chart knows, six at most; folded unless kept open. Null figures = today's five. */
+export function adsFiguresPref(raw: unknown): { figures: string[] | null; open: boolean } {
+  const o = raw && typeof raw === "object" ? (raw as Partial<AdsFigures>) : {};
+  const figs = Array.isArray(o.figures) ? [...new Set(o.figures.filter((k): k is string => typeof k === "string" && CHART_METRICS.some(m => m[0] === k)))].slice(0, CHART_MAX) : [];
+  return { figures: figs.length ? figs : null, open: o.open === true };
+}
+const chartPick = (l: string[]) => (l.length ? l.slice(0, CHART_MAX) : CHART_DEF);
+/** The strip's words (D2a): Spent · Leads · Per lead · Appointments · Impressions. */
+const STRIP_LABEL: Record<string, string> = { spend: "Spent", leads: "Leads", cpl: "Per lead", appt: "Appointments", impr: "Impressions", reach: "Reach", won: "Won", showup: "Show-ups" };
 export const DEF = ["leads", "appt", "apptrate", "showrate", "won", "winrate", "spend", "cpl"];
 /** 4a's short headers (frame 05) for the columns it draws; others keep their names. */
-const SHORT: Record<string, string> = { leads: "Leads", appt: "Appts", apptrate: "Appt rate", showrate: "Show-up", won: "Won", winrate: "Won rate", spend: "Spend (RM)", cpl: "Per lead (RM)" };
+const SHORT: Record<string, string> = { leads: "Leads", appt: "Appts", apptrate: "Appt rate", showrate: "Show-up", won: "Won", winrate: "Won rate", spend: "Spend (RM)", cpl: "Per lead" };
 const COSTY = /^(cpr|cpm|cpc|cpl|spend|cpp|cpmsg|cpcall|cpe|cpthru|cpappt|cpwon|blocks)$/;
 const DAY = 86_400_000;
 export const isoOf = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -115,9 +126,12 @@ export function adsPerfVM(ctx: DeskCtx) {
     // 4a's head tab This week (frame 05).
     ["This week", T - ((now.getDay() + 6) % 7) * DAY, T, ""]];
   const custom = ui.apRange === "custom";
-  const [ra, rb] = custom ? [tOf(ui.apF), tOf(ui.apT)] : [R[ui.apRange as number][1], R[ui.apRange as number][2]];
+  // v4 notes/21 (D2a): under Insight the head's period is the range — the third filter ("This month · 1 Nov – 10 Nov") went —
+  // up to today, so its dates read "1–10 Nov"; Compare in the head compares with the days just before.
+  const onIns = ui.tab === "insight", ir = onIns ? insightRange(ctx).r : null;
+  const [ra, rb] = ir ? [Math.min(ir.a, T), Math.max(Math.min(ir.a, T), Math.min(ir.b, T))] : custom ? [tOf(ui.apF), tOf(ui.apT)] : [R[ui.apRange as number][1], R[ui.apRange as number][2]];
   const len = Math.round((rb - ra) / DAY) + 1;
-  const cmp = ui.apCmp, cmode = ui.apCmpMode ?? 0;
+  const cmp = ui.apCmp, cmode = ir ? 0 : ui.apCmpMode ?? 0;
   const [ca, cb] = cmode === "range" || cmode === "custom" ? [tOf(ui.apCF), tOf(ui.apCT)]
     : cmode === 1 ? [new Date(new Date(ra).getFullYear(), new Date(ra).getMonth() - 1, new Date(ra).getDate()).getTime(), new Date(new Date(rb).getFullYear(), new Date(rb).getMonth() - 1, new Date(rb).getDate()).getTime()]
       : cmode === 2 ? [new Date(new Date(ra).getFullYear() - 1, new Date(ra).getMonth(), new Date(ra).getDate()).getTime(), new Date(new Date(rb).getFullYear() - 1, new Date(rb).getMonth(), new Date(rb).getDate()).getTime()]
@@ -211,13 +225,19 @@ export function adsPerfVM(ctx: DeskCtx) {
   // The chart over the table (vm/adschart.ts): the range's days, a tile a metric — its total as the table's — and its line.
   const dayKey = rkey(ra, rb), daily = ui.apDaily?.[dayKey] ?? {};
   const apDayNeed = metaIds.filter(id => !(id in daily)).length ? { key: dayKey, since: isoOf(ra), until: isoOf(rb), ids: metaIds.filter(id => !(id in daily)) } : null;
-  const slots = ui.apChart ?? CHART_DEF, chosen = slots.filter((k): k is string => !!k);
+  // v4 notes/21: the figures picked (which, in their order) and the chart folded / open are the user's own, kept on the
+  // server (data.uiPrefs.adsFigures, saveUiPref) so they follow them across refresh, next login and another computer; the
+  // first visit has today's five, folded. The same figures are the chart's lines.
+  const pref = adsFiguresPref(data.uiPrefs?.adsFigures);
+  const slots: (string | null)[] = pref.figures ?? ui.apChart ?? CHART_DEF, chosen = slots.filter((k): k is string => !!k);
+  const chartOpen = pref.open;
+  const keepFigures = (figures: string[], open: boolean) => ctx.deskAct.saveUiPref("adsFigures", { figures, open } satisfies AdsFigures);
   const days = daysOf(ra, rb);
   const series = dailySeries(chosen, days, allCs, data.visits, metaIds.map(id => daily[id]));
   const total = (k: string) => val(allCs, AD.map(x => x.id), k, ra, rb);
   const setSlot = (i: number, k: string | null) => set(u => { const s = [...(u.apChart ?? CHART_DEF)]; while (s.length <= i) s.push(null); s[i] = k; return { ...u, apChart: s }; });
   const apChartV = {
-    shut: ui.apChartShut, fold: () => set(u => ({ ...u, apChartShut: !u.apChartShut })),
+    shut: !chartOpen, fold: () => keepFigures(chosen, !chartOpen), plain: true,
     tableShut: ui.apTableShut, foldTable: () => set(u => ({ ...u, apTableShut: !u.apTableShut })), adsN: AD.length,
     reading: !!apDayNeed && metaIds.length > 0, range: rangeTxt(ra, rb),
     days: days.map(d => ({ iso: d, label: dayLabel(d) })),
@@ -230,18 +250,31 @@ export function adsPerfVM(ctx: DeskCtx) {
         change: (e: { target: { value: string } }) => setSlot(i, e.target.value),
         remove: chosen.length > 1 ? () => setSlot(i, null) : null };
     }),
-    canAdd: true,
+    canAdd: chosen.length < CHART_MAX,
     // + opens Customise metrics on the chart's tiles — the table's + list (2026-10-23).
     add: () => patch({ pane: "docked", kind: "metrics", mFor: "chart", mDraft: null, mDrag: null }),
     lines: slots.map((k, i) => (k && !ui.apChartOff[k] ? { key: k, color: SERIES[i], fmt: CHART_METRICS.find(x => x[0] === k)![2], label: CHART_METRICS.find(x => x[0] === k)![1], values: series[k] } : null))
       .filter((l): l is NonNullable<typeof l> => !!l),
+  };
+  // The figure strip over the table (D2a): the figures in equal centred columns, each with its line's colour; + adds one
+  // (Customise metrics, the chart's list), hover × takes one off, Show chart opens the chart under it.
+  const apStrip = {
+    items: slots.map((k, i) => (k ? { key: k, label: STRIP_LABEL[k] ?? CHART_METRICS.find(x => x[0] === k)![1], total: chartFmt(total(k), CHART_METRICS.find(x => x[0] === k)![2]), color: SERIES[i],
+      remove: chosen.length > 1 ? () => keepFigures(chosen.filter(x => x !== k), chartOpen) : null } : null)).filter((x): x is NonNullable<typeof x> => !!x),
+    canAdd: chosen.length < CHART_MAX, add: () => patch({ pane: "docked", kind: "metrics", mFor: "chart", mDraft: null, mDrag: null }),
+    open: chartOpen, toggle: () => keepFigures(chosen, !chartOpen),
   };
   // The table a page at a time: 5 / 10 / 20 (v2 frame 05); the total row stays every ad's.
   const per = ui.apPer || 5, pages = Math.max(1, Math.ceil(ADs.length / per)), pg = Math.min(ui.apPg, pages - 1);
   const apPager = { range: ADs.length ? `${pg * per + 1}–${Math.min(ADs.length, pg * per + per)} of ${ADs.length} ads` : "0 ads", per, sizes: [5, 10, 20],
     setPer: (n: number) => patch({ apPer: n, apPg: 0 }), pages, cur: pg, go: (i: number) => patch({ apPg: i }) };
   return {
-    apNeed, apDayNeed, apChartV, apPager,
+    apNeed, apDayNeed, apChartV, apPager, apStrip,
+    // D2a: under Insight the range button (the third filter) goes — the head's period drives the page.
+    apInIns: onIns,
+    // D2a: "+ Compare" in Insight's head (the range button that held it went); on, it reads "vs 22–31 Oct" with ×.
+    insCmp: onIns && ui.insTab === "ads" ? { on: cmp, label: `vs ${rangeTxt(ca, cb)}`, toggle: () => patch({ apCmp: !cmp, apCmpMode: 0 }) } : null,
+    ...(onIns && ui.insTab === "ads" ? { insightSub: rangeTxt(ra, rb) } : {}),
     // Insight › Ads performance (v2 frame 01b) is this page's body under Insight's head.
     kAdsPerf: ui.tab === "adsperf" || (ui.tab === "insight" && ui.insTab === "ads") || (ui.tab === "reports" && ui.rpCat === "ads"),
     // 4a (frame 05): the head's tabs, the table's rows with their channel and Meta's headline, the total under an ink rule.
@@ -250,7 +283,7 @@ export function adsPerfVM(ctx: DeskCtx) {
         custom: k === "custom", pick: () => { if (k !== "custom") patch({ apRange: k }); } })),
       cols: cols.map(m => ({ id: m[0], label: SHORT[m[0]] ?? m[1] + (m[3] === "rm" || m[3] === "rm2" ? " (RM)" : ""), arrow: srt?.k === m[0] ? (srt.dir === "asc" ? "↑" : "↓") : "", num: m[3] !== "t",
         sort: () => set(u => { const c = u.apSort; return { ...u, apSort: !c || c.k !== m[0] ? { k: m[0], dir: "desc" } : c.dir === "desc" ? { k: m[0], dir: "asc" } : null }; }) })),
-      rows: ADs.slice(pg * per, pg * per + per).map(a => ({ name: a.name, headline: [a.brand, a.cs.find(c => c.adHeadline)?.adHeadline ?? ""].filter(Boolean).join(" · "), ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
+      rows: ADs.slice(pg * per, pg * per + per).map(a => ({ name: a.name, brand: a.brand, headline: [a.brand, a.cs.find(c => c.adHeadline)?.adHeadline ?? ""].filter(Boolean).join(" · "), ch: (a.ch === "WhatsApp" ? "whatsapp" : "messenger") as "whatsapp" | "messenger",
         // The ad itself (the newest https link Meta sent with its leads, else Ads Manager), and hiding it from this list.
         // The ad itself, asked of Meta by the server (/member/crm-ad), not one customer's referral link (2026-10-29).
         url: a.id.startsWith("ch:") ? "" : `/member/crm-ad/${encodeURIComponent(a.id)}`,
@@ -288,8 +321,8 @@ export function adsPerfVM(ctx: DeskCtx) {
     dpApply: () => set(u => (u.dp ? { ...u, apRange: "custom", apF: u.dp.from, apT: u.dp.to, apCF: u.dp.cf, apCT: u.dp.ct, apPreset: u.dp.preset, apCmp: u.dp.cmp, apCmpMode: "range", dp: { ...u.dp, open: false } } : u)),
     dp: dpVM,
     openMetrics: () => patch({ pane: "docked", kind: "metrics", mFor: "ads", mDraft: null, mDrag: null }),
-    saveMetrics: () => set(u => ({ ...u, ...(u.mFor === "cards" ? { insCards: (u.mDraft ?? baseOf(u)).length ? u.mDraft ?? baseOf(u) : INS_CARDS }
-      : u.mFor === "chart" ? { apChart: (u.mDraft ?? baseOf(u)).length ? (u.mDraft ?? baseOf(u)).slice(0, CHART_MAX) : CHART_DEF } : { apSel: u.mDraft ?? baseOf(u) }), mDraft: null, mDrag: null, pane: "closed" })),
+    saveMetrics: () => { if (forChart) keepFigures(chartPick(ui.mDraft ?? baseOf(ui)).filter((k): k is string => !!k), chartOpen); set(u => ({ ...u, ...(u.mFor === "cards" ? { insCards: (u.mDraft ?? baseOf(u)).length ? u.mDraft ?? baseOf(u) : INS_CARDS }
+      : u.mFor === "chart" ? { apChart: chartPick(u.mDraft ?? baseOf(u)) } : { apSel: u.mDraft ?? baseOf(u) }), mDraft: null, mDrag: null, pane: "closed" })); },
     mDirty: !!ui.mDraft && JSON.stringify(ui.mDraft) !== JSON.stringify(baseOf(ui)),
     mq: ui.mq, setMq: (e: { target: { value: string } }) => patch({ mq: e.target.value }), resetMetrics: () => patch({ mDraft: [...(forCards ? INS_CARDS : forChart ? CHART_DEF.filter((k): k is string => !!k) : DEF)] }),
     mFoldAllLabel: METRICS.every(g => ui.mFold[g[0]]) ? "Expand all" : "Collapse all",

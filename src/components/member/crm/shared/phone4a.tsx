@@ -16,7 +16,10 @@ import type { ActiveVM } from "./locked";
 import type { ApplyWindowVM } from "./apply-ads";
 export { Phone4aAdsPerf } from "./phone-ads-perf";
 export { Phone4aAutoReply } from "./auto-reply-pages";
+export { Phone4aLabelSheet } from "./label-sheet-view";
 export { Phone4aBookMode, Phone4aCustomBook, Phone4aKeepHeight } from "./custom-book";
+// v4 (2026-11-10): the Inbox, Mine = frame 10b and Team = frame 2d with frame 2c's filters (inbox-v4.tsx).
+export { Phone4aInboxHead, Phone4aInboxRows, Phone4aTeamInbox } from "./inbox-v4";
 
 /** A frame's on-screen px as the app's scaled size. */
 export const fs = (px: number) => typePx(Math.round((px / PHONE_TYPE) * 100) / 100);
@@ -197,20 +200,87 @@ export function Phone4aHero({ items, cols, compact }: { items: { label: string; 
  * Manage, Team performance | Ads performance (the Ads side is the Ads Performance page drawn under this head). */
 export function Phone4aTeamHead({ h }: { h: { greet: string; sub: string; ini: string; house: boolean; exit: () => void; sw: { ads: boolean; up: boolean; act?: boolean; canAds: boolean; canUp: boolean; canAct?: boolean; team: () => void; adsPick: () => void; upPick: () => void; actPick?: () => void } | null } }) {
   // Order (the owner, 2026-11-09: "整理一下手机版的 insight 顺序; team-ads-up next-activity"): Team · Ads · Up next · Activity.
-  // Up next's handoff: the words Team · Ads · Up next at 12 px, the one on show 600 — the old full names kept for a screen reader.
+  // v4 8b (every Insight side): the words at 13 px, 500 / 600 on show; the full names kept for a screen reader.
   const seg = (label: string, on: boolean, pick: () => void, aria?: string) => (
-    <button type="button" onClick={pick} aria-pressed={on} aria-label={aria} style={{ ...BTN, flex: 1, height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs(12), fontWeight: on ? 600 : 500,
-      background: on ? "#fff" : "transparent", boxShadow: on ? "0 1px 2px rgba(42,22,12,.12)" : "none", color: on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{label}</button>);
-  return (<>
+    <button type="button" onClick={pick} aria-pressed={on} aria-label={aria} style={{ ...BTN, flex: 1, height: "34px", borderRadius: "17px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: fs(13), fontWeight: on ? 600 : 500,
+      background: on ? "#fff" : "transparent", boxShadow: on ? "0 1px 2px #2A160C1F" : "none", color: on ? "var(--crm-ink)" : "var(--crm-muted)" }}>{label}</button>);
+  // One block, 14 px between its rows whatever page it heads — so Team · Ads · Up next · Activity never move (the owner:
+  // "no layout jump when switching segments"). v4 8b: "Good morning, Peter" stays; the line under it goes.
+  return (
+    <div data-team-head="" style={{ flex: "none", display: "flex", flexDirection: "column", gap: "14px" }}>
     <div style={{ flex: "none", display: "flex", alignItems: "center", gap: "10px" }}>
-      <span style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "var(--crm-ink)", color: "#fff", display: "grid", placeItems: "center", fontFamily: TIGHT, fontSize: fs(14), fontWeight: 500 }}>{h.ini}</span>
+      <span style={{ flex: "none", width: "40px", height: "40px", borderRadius: "50%", background: "var(--crm-ink)", color: "var(--crm-on-light)", display: "grid", placeItems: "center", fontFamily: TIGHT, fontSize: fs(14), fontWeight: 500 }}>{h.ini}</span>
       <span style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <h1 style={{ margin: 0, fontFamily: TIGHT, fontSize: fs(20), fontWeight: 500, letterSpacing: "-0.01em", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.greet}</h1>
-        <span style={{ fontSize: fs(12), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.sub}</span>
+        <h1 title={h.sub || undefined} style={{ margin: 0, fontFamily: TIGHT, fontSize: fs(20), fontWeight: 500, letterSpacing: "-0.01em", lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{h.greet}</h1>
       </span>
       {h.house && <button type="button" onClick={h.exit} title="Back to Revenue app" aria-label="Back to Revenue app" style={{ ...BTN, flex: "none", width: "40px", height: "40px", borderRadius: "50%", display: "grid", placeItems: "center", boxSizing: "border-box", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}><Ic name="house" size={18} /></button>}
     </div>
     {h.sw && <div style={{ flex: "none", display: "flex", padding: "3px", borderRadius: "20px", background: "var(--crm-field)" }}>{seg("Team", !h.sw.ads && !h.sw.up && !h.sw.act, h.sw.team, "Team performance")}{h.sw.canAds && seg("Ads", h.sw.ads, h.sw.adsPick, "Ads performance")}{h.sw.canUp && seg("Up next", h.sw.up, h.sw.upPick)}{h.sw.canAct && h.sw.actPick && seg("Activity", !!h.sw.act, h.sw.actPick, "Team activity")}</div>}
+    </div>
+  );
+}
+
+type OvPerson = { name: string; ini: string; aBg: string; aFg: string; tag: string; waiting: string; pad: string; leads: number; appt: string; show: string; won?: number; open: () => void };
+type OvTeam = { name: string; c: string; leads: number; appt: string; show: string; won?: number; canOpen: boolean; open: boolean; rot: string; cur: string; toggle?: () => void; people: OvPerson[] };
+/**
+ * v4 8b · Team Insight under its head: the period as one row (This month ▾ and the dates · vs Sep), the rust 2 × 2 hero
+ * with each change beside its figure ("vs last" said once, by the row above), and Teams as a table — the column names
+ * once, a row a team (Leads · Appt · Show · Won); a team still opens to its people, in the same columns.
+ */
+export function Phone4aTeamOverview({ ov }: { ov: { adPerT: string; adPerD: string; vsLabel: string; ovOpenPeriod: () => void; cmpPick: () => void;
+  hero4: { label: string; value: string; delta: string; good: boolean; open?: () => void }[]; teamRows: OvTeam[] } }) {
+  const COLS = "minmax(0,1fr) 44px 44px 44px 52px";
+  const num = (bold: boolean): CSSProperties => ({ textAlign: "right", fontWeight: bold ? 500 : 400, whiteSpace: "nowrap" });
+  return (<>
+    <div data-ov-period="" style={{ flex: "none", display: "flex", alignItems: "center", gap: "6px" }}>
+      <button type="button" onClick={ov.ovOpenPeriod} aria-label={`Period: ${ov.adPerT}`} style={{ ...BTN, flex: "none", height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "18px", display: "flex", alignItems: "center", gap: "6px", fontSize: fs(13), fontWeight: 500, background: "var(--crm-field)", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{ov.adPerT}<Ic name="chevron-down" size={13} /></button>
+      <span style={{ marginLeft: "auto", minWidth: 0, display: "flex", alignItems: "center", gap: "4px", fontSize: fs(12), color: "var(--crm-muted)", whiteSpace: "nowrap" }}>
+        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{ov.adPerD}</span>
+        <button type="button" onClick={ov.cmpPick} style={{ ...BTN, flex: "none", color: "var(--crm-muted)" }}>· {ov.vsLabel}</button>
+      </span>
+    </div>
+    <div data-ov-hero="" style={{ flex: "none", display: "grid", gridTemplateColumns: "1fr 1fr", rowGap: "12px", padding: "14px 0", borderRadius: "16px", background: "var(--crm-rust)", color: "#fff" }}>
+      {ov.hero4.map((m, i) => (
+        <div key={m.label} onClick={m.open} role={m.open ? "button" : undefined} style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: 0, padding: "0 16px", borderLeft: i % 2 ? "1px solid rgba(255,255,255,.22)" : "1px solid transparent", cursor: m.open ? "pointer" : "default" }}>
+          <span style={{ width: "18px", height: "2px", background: i ? "transparent" : "var(--crm-amber)" }} />
+          <span style={{ fontSize: fs(12), fontWeight: 500, color: "var(--crm-peach-soft)", whiteSpace: "nowrap" }}>{m.label}</span>
+          <span style={{ display: "flex", alignItems: "baseline", gap: "8px", minWidth: 0, whiteSpace: "nowrap" }}>
+            <span style={{ fontFamily: TIGHT, fontWeight: 500, fontSize: fs(24), letterSpacing: "-0.02em", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{m.value}</span>
+            {m.delta && <span style={{ fontSize: fs(11), fontWeight: 500, color: m.good ? "var(--crm-delta-good)" : "var(--crm-delta-bad)", overflow: "hidden", textOverflow: "ellipsis" }}>{m.delta}</span>}
+          </span>
+        </div>
+      ))}
+    </div>
+    <div data-ov-teams="" style={{ flex: "none", display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "grid", gridTemplateColumns: COLS, columnGap: "6px", alignItems: "baseline", paddingBottom: "8px", borderBottom: "1px solid var(--crm-rule)" }}>
+        <h2 style={{ margin: 0, fontFamily: TIGHT, fontSize: fs(17), fontWeight: 500 }}>Teams</h2>
+        {["Leads", "Appt", "Show", "Won"].map(c => <span key={c} style={{ fontSize: fs(11), fontWeight: 500, color: "var(--crm-muted)", textAlign: "right" }}>{c}</span>)}
+      </div>
+      {ov.teamRows.map(t => (
+        <div key={t.name} style={{ display: "flex", flexDirection: "column", borderBottom: "1px solid var(--crm-rule-soft)" }}>
+          <div onClick={t.toggle} role={t.canOpen ? "button" : undefined} aria-expanded={t.canOpen ? t.open : undefined} style={{ display: "grid", gridTemplateColumns: COLS, columnGap: "6px", alignItems: "center", minHeight: "52px", fontSize: fs(14), fontWeight: 500, fontVariantNumeric: "tabular-nums", cursor: t.cur }}>
+            <span style={{ minWidth: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ flex: "none", width: "9px", height: "9px", borderRadius: "50%", background: t.c }} />
+              <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.name}</span>
+              {t.canOpen && <span style={{ flex: "none", display: "flex", color: "var(--crm-faint-2)", transform: `rotate(${t.rot})`, transition: "transform 150ms" }}><Ic name="chevron-right" size={12} /></span>}
+            </span>
+            <span style={num(true)}>{t.leads}</span><span style={num(false)}>{t.appt}</span><span style={num(false)}>{t.show}</span><span style={num(false)}>{t.won ?? "—"}</span>
+          </div>
+          {t.open && t.people.map(p => (
+            <div key={p.name} onClick={p.open} role="button" style={{ display: "grid", gridTemplateColumns: COLS, columnGap: "6px", alignItems: "center", minHeight: "48px", padding: `0 0 0 ${p.pad}`, borderTop: "1px dashed var(--crm-rule)", fontSize: fs(13), fontVariantNumeric: "tabular-nums", cursor: "pointer" }}>
+              <span style={{ minWidth: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ flex: "none", width: "28px", height: "28px", borderRadius: "50%", background: p.aBg, color: p.aFg, display: "grid", placeItems: "center", fontSize: fs(11), fontWeight: 600 }}>{p.ini}</span>
+                <span style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+                  <span style={{ fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</span>
+                  <span style={{ fontSize: fs(11), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.tag}<b style={{ fontWeight: 600, color: "var(--crm-oxblood)" }}>{p.waiting}</b></span>
+                </span>
+              </span>
+              <span style={num(true)}>{p.leads}</span><span style={num(false)}>{p.appt}</span><span style={num(false)}>{p.show}</span><span style={num(false)}>{p.won ?? "—"}</span>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   </>);
 }
 
