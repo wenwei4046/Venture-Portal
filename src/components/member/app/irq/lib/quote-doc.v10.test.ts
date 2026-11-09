@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COLUMNS, FONTS, billOn, defaultCustInfo, defaults, factsOff, fieldEditor, moodRows, nameRooms, principalPictures, printsOwn, renderDoc, roomName, specText } from "./quote-doc";
+import { COLUMNS, FONTS, billOn, defaultCustInfo, defaults, factsOff, fieldEditor, fitSize, moodRows, nameRooms, principalPictures, printsOwn, renderDoc, roomName, specText } from "./quote-doc";
 import packagesJson from "../data/packages.json";
 import catalogJson from "../data/catalog.json";
 
@@ -219,5 +219,37 @@ describe("a room type's name", () => {
 
   it("no longer repeats Twin-Key in the unit line, the name carries it", () => {
     expect(specText({ beds: "3", baths: "2", note: "Twin-Key", sqft: "1,000" })).toBe("3 Bedrooms · 2 Bathrooms · 1,000 sq.ft.");
+  });
+});
+
+// The user, 2026-11-06 and again 2026-11-09 (an iPhone: the address and "We refer to our meeting…" drawn huge, over
+// each other): iOS inflated the document's text inside the iframe. The page turns that off.
+describe("the quotation on an iPhone", () => {
+  it("turns off iOS's text inflation", () => {
+    const html = renderDoc(defaults(packagesJson, catalogJson), { facts: {}, cats: [], custRows: [], total: 0 });
+    expect(html).toContain("html{-webkit-text-size-adjust:100%;text-size-adjust:100%}");
+  });
+});
+
+// The user, 2026-11-09, circling the details block: "能把这些栏位是固定的，客户输入的资料，如果太多就自动缩小文字".
+describe("the customer details", () => {
+  const doc = (facts: Record<string, string>, opts = {}) => renderDoc(defaults(packagesJson, catalogJson), { facts, cats: [], custRows: [{ label: "Phone", value: "012-338 4471" }], total: 0 }, opts);
+
+  it("stand in fixed columns of their own, labels on one line", () => {
+    const html = doc({ att: "Tan Wei Ming" });
+    expect(html).toContain('<table style="width:100%;table-layout:fixed;border-collapse:collapse"><colgroup><col style="width:17%"><col style="width:33%"><col style="width:17%"><col style="width:33%"></colgroup>');
+    expect(html).toMatch(/white-space:nowrap;font-size:12\.5px">ATTENTION :<\/td>/);
+    expect(html).toContain('colspan="3"'); // PHONE : takes the rest of its row
+  });
+
+  it("draw a long answer smaller, never under 72%, and keep a short one as it is", () => {
+    expect(fitSize("Tan Wei Ming", 12.5, 40)).toBe(12.5);
+    expect(fitSize("x".repeat(50), 12.5, 40)).toBe(10);
+    expect(fitSize("x".repeat(400), 12.5, 40)).toBe(9);
+    expect(doc({ att: "A".repeat(50) })).toContain(`font-size:9px">${"A".repeat(50)}</td>`);
+  });
+
+  it("keep the item table's columns in the Excel export", () => {
+    expect(doc({ att: "Tan" }, { excel: true })).not.toContain("table-layout:fixed");
   });
 });

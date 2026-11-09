@@ -311,6 +311,28 @@ export function moodRows(mb, n, b) {
   return out;
 }
 
+/** The text's size so it fits about `cap` characters on a line: the block's own, down to 72% of it; longer still wraps. */
+export const fitSize = (text, size, cap) => { const k = String(text ?? "").length; return k > cap ? Math.max(Math.round(size * 72) / 100, Math.round((size * cap / k) * 10) / 10) : size; };
+
+/**
+ * The customer details in columns of their own (the user, 2026-11-09: "这边的资料排版也很奇怪，能把这些栏位是固定的，客户输入的
+ * 资料，如果太多就自动缩小文字"): label | answer | label | answer at fixed widths, whatever the item table's columns are; a
+ * label stays on one line, an answer too long for its cell is drawn smaller, then wraps. The form's own fields (PHONE …)
+ * take a label and the rest of the row. Excel keeps the table's own columns.
+ */
+export function factsTable(L, q, b, cell, n) {
+  const lab = t => { const s = String(t ?? ""); return `<td style="${cell(b, "font-weight:bold;padding:2px 6px;vertical-align:top;" + (s.length > 18 ? "" : "white-space:nowrap;"))}font-size:${fitSize(s, b.size, 16)}px">${esc(s)}</td>`; };
+  const val = (v, cap, span = 1) => { const s = String(v || "-"); return `<td${span > 1 ? ` colspan="${span}"` : ""} style="${cell(b, "padding:2px 6px;vertical-align:top;overflow-wrap:anywhere;")}font-size:${fitSize(s, b.size, cap)}px">${esc(s)}</td>`; };
+  let rows = "";
+  for (let i = 0; i < L.length; i += 2) {
+    const a = L[i], c = L[i + 1];
+    rows += "<tr>" + lab(a.label) + val(q.facts[a.key], 34) + (c ? lab(c.label) + val(q.facts[c.key], 34) : "<td></td><td></td>") + "</tr>";
+  }
+  (q.custRows || []).forEach(r => { rows += "<tr>" + lab(String(r.label).toUpperCase() + " :") + val(r.value, 80, 3) + "</tr>"; });
+  if (!rows) return "";
+  return `<tr><td colspan="${n}" style="padding:0"><table style="width:100%;table-layout:fixed;border-collapse:collapse"><colgroup><col style="width:17%"><col style="width:33%"><col style="width:17%"><col style="width:33%"></colgroup>${rows}</table></td></tr>`;
+}
+
 // q: { facts: {key: value}, cats: [{name, rows: [{no,item,desc,code,qty,unit,sum}]}], discount, saving, total }
 export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}) {
   const co = config.company;
@@ -342,12 +364,13 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
     } else if (b.type === "facts") {
       const offK = factsOff(config); const L = b.labels.filter(f => !f.hidden && !offK.has(f.key));
       const half = Math.ceil(n / 2);
-      for (let i = 0; i < L.length; i += 2) {
+      if (!excel) out += factsTable(L, q, b, cell, n);
+      else for (let i = 0; i < L.length; i += 2) {
         const a = L[i], c = L[i + 1];
         out += `<tr><td style="${cell(b, "font-weight:bold;padding:2px 6px")}">${esc(a.label)}</td><td colspan="${half - 1}" style="${cell(b, "padding:2px 6px")}">${esc(q.facts[a.key] || "-")}</td>` +
           (c ? `<td style="${cell(b, "font-weight:bold;padding:2px 6px")}">${esc(c.label)}</td><td colspan="${n - half - 1}" style="${cell(b, "padding:2px 6px")}">${esc(q.facts[c.key] || "-")}</td>` : "") + "</tr>";
       }
-      (q.custRows || []).forEach(r => { out += `<tr><td style="${cell(b, "font-weight:bold;padding:2px 6px")}">${esc(String(r.label).toUpperCase())} :</td><td colspan="${n - 1}" style="${cell(b, "padding:2px 6px")}">${esc(r.value || "-")}</td></tr>`; });
+      if (excel) (q.custRows || []).forEach(r => { out += `<tr><td style="${cell(b, "font-weight:bold;padding:2px 6px")}">${esc(String(r.label).toUpperCase())} :</td><td colspan="${n - 1}" style="${cell(b, "padding:2px 6px")}">${esc(r.value || "-")}</td></tr>`; });
       const bx = q.building?.extra || {};
       (config.bldFields || []).filter(f => f.show).forEach(f => { out += fieldRows(f, bx[f.id], n, b); });
       if (q.moodboard && !excel) out += moodRows(q.moodboard, n, b);
@@ -377,5 +400,5 @@ export function renderDoc(config, q, { excel = false, title = "Quotation" } = {}
   });
   const table = `<table style="width:100%;border-collapse:collapse;font-family:${font};font-size:12px;color:#1C1714;font-variant-numeric:lining-nums tabular-nums">${out}</table>`;
   if (excel) return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"></head><body>${table}</body></html>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:14mm}body{margin:0;padding:0}@media screen{body{padding:28px 30px}}</style></head><body>${table}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>html{-webkit-text-size-adjust:100%;text-size-adjust:100%}@page{size:A4;margin:14mm}body{margin:0;padding:0}@media screen{body{padding:28px 30px}}</style></head><body>${table}</body></html>`;
 }

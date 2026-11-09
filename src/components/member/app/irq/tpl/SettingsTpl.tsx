@@ -1891,6 +1891,15 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                       <span style={{"fontSize":"13px","color":"var(--irq-c-6b6b66)"}}>
                         {dcText(v["ed"]?.["sub"])}
                       </span>
+                      <div style={{"alignSelf":"center","display":"flex","gap":"2px","padding":"3px","borderRadius":"11px","background":"var(--irq-c-eeeeea)"}}>
+                        {dcList(v["ed"]?.["vers"]).map((L_vt_1a, L_vt_1a_i) => (
+                          <Fragment key={L_vt_1a_i}>
+                            <button onClick={L_vt_1a?.["pick"]} title={L_vt_1a?.["tip"]} style={dcCss(`height:28px;padding:0 12px;border:0;border-radius:8px;background:${dcS(L_vt_1a?.["bg"])};color:${dcS(L_vt_1a?.["ink"])};box-shadow:${dcS(L_vt_1a?.["shadow"])};font-size:12.5px;font-weight:650;white-space:nowrap;cursor:pointer`)}>
+                              {dcText(L_vt_1a?.["label"])}
+                            </button>
+                          </Fragment>
+                        ))}
+                      </div>
                       {"\n                  "}
                       <span style={{"flex":"1"}} />
                       {"\n                  "}
@@ -2005,26 +2014,26 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                         {"\n                    "}
                         <div style={{"display":"flex","alignItems":"center","gap":"8px","overflowX":"auto","scrollbarWidth":"none"}}>
                           {"\n                      "}
-                          {dcList(v["ed"]?.["sp"]?.["photos"]).map((L_ph_1a, L_ph_1a_i) => (
-                            <Fragment key={L_ph_1a_i}>
+                          {dcList(v["ed"]?.["sp"]?.["photos"]).map((L_ph_1b, L_ph_1b_i) => (
+                            <Fragment key={L_ph_1b_i}>
                               {"\n                        "}
-                              <div draggable={"true"} onDragStart={L_ph_1a?.["dragStart"]} onDragOver={L_ph_1a?.["dragOver"]} onDrop={L_ph_1a?.["drop"]} style={dcCss(`position:relative;flex:0 0 auto;width:96px;height:72px;border-radius:10px;background:var(--irq-c-eeeeea) url('${dcS(L_ph_1a?.["src"])}') center/cover no-repeat;cursor:grab;box-shadow:${dcS(L_ph_1a?.["ring"])}`)}>
+                              <div draggable={"true"} onDragStart={L_ph_1b?.["dragStart"]} onDragOver={L_ph_1b?.["dragOver"]} onDrop={L_ph_1b?.["drop"]} style={dcCss(`position:relative;flex:0 0 auto;width:96px;height:72px;border-radius:10px;background:var(--irq-c-eeeeea) url('${dcS(L_ph_1b?.["src"])}') center/cover no-repeat;cursor:grab;box-shadow:${dcS(L_ph_1b?.["ring"])}`)}>
                                 {"\n                          "}
-                                {(L_ph_1a?.["cover"]) ? (<>
+                                {(L_ph_1b?.["cover"]) ? (<>
                                   <span style={{"position":"absolute","left":"6px","top":"6px","height":"20px","padding":"0 8px","borderRadius":"10px","background":"var(--irq-c-f5871f)","fontSize":"10.5px","fontWeight":"700","lineHeight":"20px","color":"var(--irq-c-111111)"}}>
                                     {"Cover"}
                                   </span>
                                 </>) : null}
                                 {"\n                          "}
-                                {(L_ph_1a?.["notCover"]) ? (<>
-                                  <button onClick={L_ph_1a?.["pin"]} title={"Set as cover"} aria-label={"Set as cover"} style={{"position":"absolute","left":"5px","bottom":"5px","width":"24px","height":"24px","borderRadius":"50%","border":"0","padding":"0","background":"rgba(255,255,255,.94)","color":"var(--irq-c-111111)","display":"grid","placeItems":"center"}}>
+                                {(L_ph_1b?.["notCover"]) ? (<>
+                                  <button onClick={L_ph_1b?.["pin"]} title={"Set as cover"} aria-label={"Set as cover"} style={{"position":"absolute","left":"5px","bottom":"5px","width":"24px","height":"24px","borderRadius":"50%","border":"0","padding":"0","background":"rgba(255,255,255,.94)","color":"var(--irq-c-111111)","display":"grid","placeItems":"center"}}>
                                     <svg width={"13"} height={"13"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"2.2"} strokeLinecap={"round"} strokeLinejoin={"round"}>
                                       <path d={"M12 17v5M5 3h14l-2 7 3 4H4l3-4z"} />
                                     </svg>
                                   </button>
                                 </>) : null}
                                 {"\n                          "}
-                                <button onClick={L_ph_1a?.["remove"]} aria-label={"Remove photo"} style={{"position":"absolute","right":"5px","top":"5px","width":"24px","height":"24px","borderRadius":"50%","border":"0","background":"rgba(20,20,18,.72)","color":"var(--irq-c-ffffff)","fontSize":"14px","lineHeight":"24px","padding":"0"}}>
+                                <button onClick={L_ph_1b?.["remove"]} aria-label={"Remove photo"} style={{"position":"absolute","right":"5px","top":"5px","width":"24px","height":"24px","borderRadius":"50%","border":"0","background":"rgba(20,20,18,.72)","color":"var(--irq-c-ffffff)","fontSize":"14px","lineHeight":"24px","padding":"0"}}>
                                   {"×"}
                                 </button>
                                 {"\n                        "}
@@ -2044,12 +2053,12 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                           {"\n                      "}
                           <div style={{"flex":"0 0 auto","display":"flex","gap":"2px","padding":"2px","borderRadius":"8px","background":"var(--irq-c-eeeeea)"}}>
                             {"\n                        "}
-                            {dcList(v["ed"]?.["sp"]?.["modes"]).map((L_md_1b, L_md_1b_i) => (
-                              <Fragment key={L_md_1b_i}>
+                            {dcList(v["ed"]?.["sp"]?.["modes"]).map((L_md_1c, L_md_1c_i) => (
+                              <Fragment key={L_md_1c_i}>
                                 {"\n                          "}
-                                <button onClick={L_md_1b?.["pick"]} title={L_md_1b?.["label"]} aria-label={L_md_1b?.["label"]} style={dcCss(`display:grid;place-items:center;width:34px;height:28px;border-radius:6px;border:0;padding:0;background:${dcS(L_md_1b?.["bg"])};box-shadow:${dcS(L_md_1b?.["shadow"])};color:${dcS(L_md_1b?.["color"])}`)}>
+                                <button onClick={L_md_1c?.["pick"]} title={L_md_1c?.["label"]} aria-label={L_md_1c?.["label"]} style={dcCss(`display:grid;place-items:center;width:34px;height:28px;border-radius:6px;border:0;padding:0;background:${dcS(L_md_1c?.["bg"])};box-shadow:${dcS(L_md_1c?.["shadow"])};color:${dcS(L_md_1c?.["color"])}`)}>
                                   <svg width={"16"} height={"16"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"1.9"} strokeLinecap={"round"} strokeLinejoin={"round"}>
-                                    <path d={L_md_1b?.["d"]} />
+                                    <path d={L_md_1c?.["d"]} />
                                   </svg>
                                 </button>
                                 {"\n                        "}
@@ -2125,23 +2134,23 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                             {"\n                      "}
                           </div>
                           {"\n                      "}
-                          {dcList(v["ed"]?.["cats"]).map((L_c_1c, L_c_1c_i) => (
-                            <Fragment key={L_c_1c_i}>
+                          {dcList(v["ed"]?.["cats"]).map((L_c_1d, L_c_1d_i) => (
+                            <Fragment key={L_c_1d_i}>
                               {"\n                        "}
                               <div style={{"display":"flex","alignItems":"center","gap":"6px","padding":"6px 10px 6px 8px","background":"var(--irq-c-eeeeea)","borderBottom":"1px solid var(--irq-c-e7e7e2)"}}>
                                 {"\n                          "}
-                                <button onClick={L_c_1c?.["toggle"]} aria-label={"Collapse"} style={{"width":"28px","height":"28px","border":"0","borderRadius":"7px","background":"transparent","color":"var(--irq-c-55554f)","display":"grid","placeItems":"center","padding":"0"}}>
-                                  <svg width={"16"} height={"16"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"2.2"} strokeLinecap={"round"} strokeLinejoin={"round"} style={dcCss(`transform:${dcS(L_c_1c?.["rot"])};transition:transform .15s`)}>
+                                <button onClick={L_c_1d?.["toggle"]} aria-label={"Collapse"} style={{"width":"28px","height":"28px","border":"0","borderRadius":"7px","background":"transparent","color":"var(--irq-c-55554f)","display":"grid","placeItems":"center","padding":"0"}}>
+                                  <svg width={"16"} height={"16"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"2.2"} strokeLinecap={"round"} strokeLinejoin={"round"} style={dcCss(`transform:${dcS(L_c_1d?.["rot"])};transition:transform .15s`)}>
                                     <path d={"m6 9 6 6 6-6"} />
                                   </svg>
                                 </button>
                                 {"\n                          "}
-                                <input value={dcValue(L_c_1c?.["name"])} onChange={L_c_1c?.["onName"]} style={{"flex":"0 1 260px","minWidth":"0","height":"32px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"13px","fontWeight":"700","letterSpacing":".04em","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pg"} />
+                                <input value={dcValue(L_c_1d?.["name"])} onChange={L_c_1d?.["onName"]} style={{"flex":"0 1 260px","minWidth":"0","height":"32px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"13px","fontWeight":"700","letterSpacing":".04em","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pg"} />
                                 {"\n                          "}
                                 <span style={{"fontSize":"12px","color":"var(--irq-c-6b6b66)"}}>
-                                  {dcText(L_c_1c?.["count"])}
+                                  {dcText(L_c_1d?.["count"])}
                                 </span>
-                                <select value={dcValue(L_c_1c?.["section"])} onChange={L_c_1c?.["onSection"]} aria-label={"Furniture or services"} style={{"height":"28px","padding":"0 6px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"12px","fontWeight":"600","color":"var(--irq-c-1f1f1c)"}}>
+                                <select value={dcValue(L_c_1d?.["section"])} onChange={L_c_1d?.["onSection"]} aria-label={"Furniture or services"} style={{"height":"28px","padding":"0 6px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"12px","fontWeight":"600","color":"var(--irq-c-1f1f1c)"}}>
                                   <option value={"furn"}>
                                     {"Furniture"}
                                   </option>
@@ -2153,40 +2162,40 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                 <span style={{"flex":"1"}} />
                                 {"\n                          "}
                                 <span style={{"fontSize":"13px","fontWeight":"650","fontVariantNumeric":"tabular-nums"}}>
-                                  {dcText(L_c_1c?.["sum"])}
+                                  {dcText(L_c_1d?.["sum"])}
                                 </span>
                                 {"\n                          "}
-                                <button aria-label={"Remove category"} onClick={L_c_1c?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"16px"}}>
+                                <button aria-label={"Remove category"} onClick={L_c_1d?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"16px"}}>
                                   {"×"}
                                 </button>
                                 {"\n                        "}
                               </div>
                               {"\n                        "}
-                              {(L_c_1c?.["open"]) ? (<>
+                              {(L_c_1d?.["open"]) ? (<>
                                 {"\n                        "}
-                                {dcList(L_c_1c?.["rows"]).map((L_r_1d, L_r_1d_i) => (
-                                  <Fragment key={L_r_1d_i}>
+                                {dcList(L_c_1d?.["rows"]).map((L_r_1e, L_r_1e_i) => (
+                                  <Fragment key={L_r_1e_i}>
                                     {"\n                          "}
-                                    <div style={dcCss(`display:grid;grid-template-columns:minmax(180px,2fr) minmax(110px,1fr) minmax(110px,1fr) 120px 168px 64px 96px 36px;align-items:center;border-bottom:1px solid var(--irq-c-eeeeea);background:${dcS(L_r_1d?.["bg"])}`)}>
+                                    <div style={dcCss(`display:grid;grid-template-columns:minmax(180px,2fr) minmax(110px,1fr) minmax(110px,1fr) 120px 168px 64px 96px 36px;align-items:center;border-bottom:1px solid var(--irq-c-eeeeea);background:${dcS(L_r_1e?.["bg"])}`)}>
                                       {"\n                            "}
                                       <span style={{"padding":"6px 6px 6px 10px"}}>
-                                        <input value={dcValue(L_r_1d?.["name"])} onChange={L_r_1d?.["onName"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
+                                        <input value={dcValue(L_r_1e?.["name"])} onChange={L_r_1e?.["onName"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
                                       </span>
                                       {"\n                            "}
                                       <span style={{"padding":"6px 4px"}}>
-                                        <input value={dcValue(L_r_1d?.["desc"])} onChange={L_r_1d?.["onDesc"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
+                                        <input value={dcValue(L_r_1e?.["desc"])} onChange={L_r_1e?.["onDesc"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
                                       </span>
                                       {"\n                            "}
                                       <span style={{"padding":"6px 4px"}}>
-                                        <input value={dcValue(L_r_1d?.["code"])} onChange={L_r_1d?.["onCode"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontFamily":"var(--font-mono),Menlo,monospace","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
+                                        <input value={dcValue(L_r_1e?.["code"])} onChange={L_r_1e?.["onCode"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontFamily":"var(--font-mono),Menlo,monospace","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
                                       </span>
                                       {"\n                            "}
                                       <span style={{"padding":"6px 4px"}}>
-                                        <select key={L_r_1d?.["selKey"]} defaultValue={L_r_1d?.["kind"]} onChange={L_r_1d?.["onKind"]} style={dcCss(`appearance:${dcS(L_r_1d?.["kindApp"])};-webkit-appearance:${dcS(L_r_1d?.["kindApp"])};width:100%;height:34px;padding:0 4px;border-radius:8px;border:1px solid ${dcS(L_r_1d?.["kindBorder"])};background:${dcS(L_r_1d?.["kindBg"])};color:${dcS(L_r_1d?.["kindInk"])};font-size:12.5px;outline:none`)}>
-                                          {dcList(v["kindOpts"]).map((L_ko_1e, L_ko_1e_i) => (
-                                            <Fragment key={L_ko_1e_i}>
-                                              <option value={dcValue(L_ko_1e?.["v"])}>
-                                                {dcText(L_ko_1e?.["l"])}
+                                        <select key={L_r_1e?.["selKey"]} defaultValue={L_r_1e?.["kind"]} onChange={L_r_1e?.["onKind"]} style={dcCss(`appearance:${dcS(L_r_1e?.["kindApp"])};-webkit-appearance:${dcS(L_r_1e?.["kindApp"])};width:100%;height:34px;padding:0 4px;border-radius:8px;border:1px solid ${dcS(L_r_1e?.["kindBorder"])};background:${dcS(L_r_1e?.["kindBg"])};color:${dcS(L_r_1e?.["kindInk"])};font-size:12.5px;outline:none`)}>
+                                          {dcList(v["kindOpts"]).map((L_ko_1f, L_ko_1f_i) => (
+                                            <Fragment key={L_ko_1f_i}>
+                                              <option value={dcValue(L_ko_1f?.["v"])}>
+                                                {dcText(L_ko_1f?.["l"])}
                                               </option>
                                             </Fragment>
                                           ))}
@@ -2194,22 +2203,22 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                       </span>
                                       {"\n                            "}
                                       <span style={{"display":"flex","alignItems":"center","gap":"4px","padding":"6px 4px"}}>
-                                        <button onClick={L_r_1d?.["toggleFix"]} title={L_r_1d?.["srcTip"]} style={{"flex":"0 0 56px","width":"56px","height":"28px","display":"flex","alignItems":"center","gap":"6px","padding":"0 6px","borderRadius":"7px","border":"0","background":"transparent","color":"var(--irq-c-55554f)","fontSize":"12px","fontWeight":"600","cursor":"pointer"}} className={"irq-p1"}>
-                                          <span style={dcCss(`flex:0 0 7px;width:7px;height:7px;border-radius:50%;background:${dcS(L_r_1d?.["srcDot"])}`)} />
-                                          {dcText(L_r_1d?.["srcLabel"])}
+                                        <button onClick={L_r_1e?.["toggleFix"]} title={L_r_1e?.["srcTip"]} style={{"flex":"0 0 56px","width":"56px","height":"28px","display":"flex","alignItems":"center","gap":"6px","padding":"0 6px","borderRadius":"7px","border":"0","background":"transparent","color":"var(--irq-c-55554f)","fontSize":"12px","fontWeight":"600","cursor":"pointer"}} className={"irq-p1"}>
+                                          <span style={dcCss(`flex:0 0 7px;width:7px;height:7px;border-radius:50%;background:${dcS(L_r_1e?.["srcDot"])}`)} />
+                                          {dcText(L_r_1e?.["srcLabel"])}
                                         </button>
-                                        <input inputMode={"decimal"} value={dcValue(L_r_1d?.["cost"])} onChange={L_r_1d?.["onCost"]} readOnly={L_r_1d?.["locked"]} placeholder={"—"} style={dcCss(`flex:1;min-width:0;box-sizing:border-box;height:34px;padding:0 8px;border-radius:8px;border:1px solid ${dcS(L_r_1d?.["costBorder"])};background:${dcS(L_r_1d?.["costBg"])};font-size:13.5px;text-align:right;color:var(--irq-c-1f1f1c);outline:none;font-variant-numeric:tabular-nums`)} />
+                                        <input inputMode={"decimal"} value={dcValue(L_r_1e?.["cost"])} onChange={L_r_1e?.["onCost"]} readOnly={L_r_1e?.["locked"]} placeholder={"—"} style={dcCss(`flex:1;min-width:0;box-sizing:border-box;height:34px;padding:0 8px;border-radius:8px;border:1px solid ${dcS(L_r_1e?.["costBorder"])};background:${dcS(L_r_1e?.["costBg"])};font-size:13.5px;text-align:right;color:var(--irq-c-1f1f1c);outline:none;font-variant-numeric:tabular-nums`)} />
                                       </span>
                                       {"\n                            "}
                                       <span style={{"padding":"6px 4px"}}>
-                                        <input inputMode={"numeric"} value={dcValue(L_r_1d?.["qty"])} onChange={L_r_1d?.["onQty"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","textAlign":"right","color":"var(--irq-c-1f1f1c)","outline":"none","fontVariantNumeric":"tabular-nums"}} />
+                                        <input inputMode={"numeric"} value={dcValue(L_r_1e?.["qty"])} onChange={L_r_1e?.["onQty"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","textAlign":"right","color":"var(--irq-c-1f1f1c)","outline":"none","fontVariantNumeric":"tabular-nums"}} />
                                       </span>
                                       {"\n                            "}
                                       <span style={{"padding":"0 14px","textAlign":"right","fontSize":"13.5px","fontWeight":"600","fontVariantNumeric":"tabular-nums"}}>
-                                        {dcText(L_r_1d?.["sum"])}
+                                        {dcText(L_r_1e?.["sum"])}
                                       </span>
                                       {"\n                            "}
-                                      <button aria-label={"Remove row"} onClick={L_r_1d?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"16px"}}>
+                                      <button aria-label={"Remove row"} onClick={L_r_1e?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"16px"}}>
                                         {"×"}
                                       </button>
                                       {"\n                          "}
@@ -2218,7 +2227,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                   </Fragment>
                                 ))}
                                 {"\n                        "}
-                                <button onClick={L_c_1c?.["addRow"]} style={{"width":"100%","height":"38px","padding":"0 14px","border":"0","borderBottom":"1px solid var(--irq-c-eeeeea)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-111111)","fontSize":"13px","fontWeight":"650","textAlign":"left"}}>
+                                <button onClick={L_c_1d?.["addRow"]} style={{"width":"100%","height":"38px","padding":"0 14px","border":"0","borderBottom":"1px solid var(--irq-c-eeeeea)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-111111)","fontSize":"13px","fontWeight":"650","textAlign":"left"}}>
                                   {"+ Add row"}
                                 </button>
                                 {"\n                        "}
@@ -2353,30 +2362,30 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                             {"\n                    "}
                           </div>
                           {"\n                    "}
-                          {dcList(v["imp"]?.["steps"]).map((L_gs_1f, L_gs_1f_i) => (
-                            <Fragment key={L_gs_1f_i}>
+                          {dcList(v["imp"]?.["steps"]).map((L_gs_1g, L_gs_1g_i) => (
+                            <Fragment key={L_gs_1g_i}>
                               {"\n                      "}
                               <div style={{"display":"grid","gridTemplateColumns":"24px minmax(0,1fr)","gap":"8px","alignItems":"start"}}>
                                 {"\n                        "}
-                                <span style={dcCss(`display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:${dcS(L_gs_1f?.["dotBg"])};color:${dcS(L_gs_1f?.["dotInk"])};font-size:11.5px;font-weight:700`)}>
-                                  {dcText(L_gs_1f?.["n"])}
+                                <span style={dcCss(`display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:${dcS(L_gs_1g?.["dotBg"])};color:${dcS(L_gs_1g?.["dotInk"])};font-size:11.5px;font-weight:700`)}>
+                                  {dcText(L_gs_1g?.["n"])}
                                 </span>
                                 {"\n                        "}
                                 <div style={{"display":"flex","flexDirection":"column","gap":"5px","minWidth":"0"}}>
                                   {"\n                          "}
                                   <span style={{"color":"var(--irq-c-1f1f1c)"}}>
-                                    {dcText(L_gs_1f?.["text"])}
+                                    {dcText(L_gs_1g?.["text"])}
                                   </span>
                                   {"\n                          "}
-                                  {(L_gs_1f?.["code"]) ? (<>
+                                  {(L_gs_1g?.["code"]) ? (<>
                                     <code style={{"alignSelf":"flex-start","padding":"3px 8px","borderRadius":"6px","background":"var(--irq-c-ffffff)","border":"1px solid var(--irq-c-deded8)","fontFamily":"var(--font-mono),Menlo,monospace","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)"}}>
-                                      {dcText(L_gs_1f?.["code"])}
+                                      {dcText(L_gs_1g?.["code"])}
                                     </code>
                                   </>) : null}
                                   {"\n                          "}
-                                  {(L_gs_1f?.["btn"]) ? (<>
-                                    <button onClick={L_gs_1f?.["act"]} style={{"alignSelf":"flex-start","height":"32px","padding":"0 14px","borderRadius":"8px","border":"0","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"12.5px","fontWeight":"650"}}>
-                                      {dcText(L_gs_1f?.["btn"])}
+                                  {(L_gs_1g?.["btn"]) ? (<>
+                                    <button onClick={L_gs_1g?.["act"]} style={{"alignSelf":"flex-start","height":"32px","padding":"0 14px","borderRadius":"8px","border":"0","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"12.5px","fontWeight":"650"}}>
+                                      {dcText(L_gs_1g?.["btn"])}
                                     </button>
                                   </>) : null}
                                   {"\n                        "}
@@ -2484,10 +2493,10 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                         {"\n                    "}
                         <select value={dcValue(v["rev"]?.["cat"])} onChange={v["rev"]?.["onCat"]} aria-label={"Website category"} style={{"height":"30px","padding":"0 8px","borderRadius":"15px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"12.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)"}}>
                           {"\n                      "}
-                          {dcList(v["rev"]?.["catOpts"]).map((L_co_1g, L_co_1g_i) => (
-                            <Fragment key={L_co_1g_i}>
-                              <option value={dcValue(L_co_1g?.["v"])}>
-                                {dcText(L_co_1g?.["l"])}
+                          {dcList(v["rev"]?.["catOpts"]).map((L_co_1h, L_co_1h_i) => (
+                            <Fragment key={L_co_1h_i}>
+                              <option value={dcValue(L_co_1h?.["v"])}>
+                                {dcText(L_co_1h?.["l"])}
                               </option>
                             </Fragment>
                           ))}
@@ -2496,11 +2505,11 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                         {"\n                  "}
                       </>) : null}
                       {"\n                  "}
-                      {dcList(v["rev"]?.["filters"]).map((L_rf_1h, L_rf_1h_i) => (
-                        <Fragment key={L_rf_1h_i}>
+                      {dcList(v["rev"]?.["filters"]).map((L_rf_1i, L_rf_1i_i) => (
+                        <Fragment key={L_rf_1i_i}>
                           {"\n                    "}
-                          <button onClick={L_rf_1h?.["pick"]} style={dcCss(`height:30px;padding:0 12px;border-radius:15px;border:1px solid ${dcS(L_rf_1h?.["border"])};background:${dcS(L_rf_1h?.["bg"])};color:${dcS(L_rf_1h?.["ink"])};font-size:12.5px;font-weight:650`)}>
-                            {dcText(L_rf_1h?.["label"])}
+                          <button onClick={L_rf_1i?.["pick"]} style={dcCss(`height:30px;padding:0 12px;border-radius:15px;border:1px solid ${dcS(L_rf_1i?.["border"])};background:${dcS(L_rf_1i?.["bg"])};color:${dcS(L_rf_1i?.["ink"])};font-size:12.5px;font-weight:650`)}>
+                            {dcText(L_rf_1i?.["label"])}
                           </button>
                           {"\n                  "}
                         </Fragment>
@@ -2512,37 +2521,37 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                   {"\n              "}
                   <div style={{"maxHeight":"420px","overflow":"auto"}}>
                     {"\n                "}
-                    {dcList(v["rev"]?.["rows"]).map((L_rr_1i, L_rr_1i_i) => (
-                      <Fragment key={L_rr_1i_i}>
+                    {dcList(v["rev"]?.["rows"]).map((L_rr_1j, L_rr_1j_i) => (
+                      <Fragment key={L_rr_1j_i}>
                         {"\n                  "}
-                        <label style={dcCss(`display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--irq-c-eeeeea);cursor:pointer;opacity:${dcS(L_rr_1i?.["op"])}`)}>
+                        <label style={dcCss(`display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--irq-c-eeeeea);cursor:pointer;opacity:${dcS(L_rr_1j?.["op"])}`)}>
                           {"\n                    "}
-                          <input type={"checkbox"} checked={dcChecked(L_rr_1i?.["sel"])} onChange={L_rr_1i?.["toggle"]} disabled={L_rr_1i?.["locked"]} style={{"width":"18px","height":"18px","accentColor":"var(--irq-c-111111)"}} />
+                          <input type={"checkbox"} checked={dcChecked(L_rr_1j?.["sel"])} onChange={L_rr_1j?.["toggle"]} disabled={L_rr_1j?.["locked"]} style={{"width":"18px","height":"18px","accentColor":"var(--irq-c-111111)"}} />
                           {"\n                    "}
-                          <span style={dcCss(`flex:0 0 48px;width:48px;height:44px;border-radius:8px;background:var(--irq-c-eeeeea) url('${dcS(L_rr_1i?.["img"])}') center/cover no-repeat`)} />
+                          <span style={dcCss(`flex:0 0 48px;width:48px;height:44px;border-radius:8px;background:var(--irq-c-eeeeea) url('${dcS(L_rr_1j?.["img"])}') center/cover no-repeat`)} />
                           {"\n                    "}
                           <span style={{"flex":"1","minWidth":"0","display":"flex","flexDirection":"column","gap":"2px"}}>
                             {"\n                      "}
                             <span style={{"fontSize":"14px","fontWeight":"600","color":"var(--irq-c-1f1f1c)","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis"}}>
-                              {dcText(L_rr_1i?.["name"])}
+                              {dcText(L_rr_1j?.["name"])}
                             </span>
                             {"\n                      "}
                             <span style={{"fontSize":"12.5px","color":"var(--irq-c-6b6b66)","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis"}}>
-                              {dcText(L_rr_1i?.["meta"])}
+                              {dcText(L_rr_1j?.["meta"])}
                             </span>
                             {"\n                      "}
-                            {(L_rr_1i?.["hasDetails"]) ? (<>
+                            {(L_rr_1j?.["hasDetails"]) ? (<>
                               {"\n                        "}
                               <span style={{"display":"flex","flexWrap":"wrap","gap":"4px","marginTop":"3px"}}>
                                 {"\n                          "}
-                                {dcList(L_rr_1i?.["details"]).map((L_dt_1j, L_dt_1j_i) => (
-                                  <Fragment key={L_dt_1j_i}>
+                                {dcList(L_rr_1j?.["details"]).map((L_dt_1k, L_dt_1k_i) => (
+                                  <Fragment key={L_dt_1k_i}>
                                     {"\n                            "}
-                                    <span title={L_dt_1j?.["full"]} style={dcCss(`display:inline-flex;align-items:center;gap:4px;max-width:100%;height:22px;padding:0 8px;border-radius:6px;background:${dcS(L_dt_1j?.["bg"])};color:${dcS(L_dt_1j?.["ink"])};font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis`)}>
+                                    <span title={L_dt_1k?.["full"]} style={dcCss(`display:inline-flex;align-items:center;gap:4px;max-width:100%;height:22px;padding:0 8px;border-radius:6px;background:${dcS(L_dt_1k?.["bg"])};color:${dcS(L_dt_1k?.["ink"])};font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis`)}>
                                       <strong style={{"fontWeight":"650"}}>
-                                        {dcText(L_dt_1j?.["k"])}
+                                        {dcText(L_dt_1k?.["k"])}
                                       </strong>
-                                      {dcText(L_dt_1j?.["v"])}
+                                      {dcText(L_dt_1k?.["v"])}
                                     </span>
                                     {"\n                          "}
                                   </Fragment>
@@ -2554,12 +2563,12 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                             {"\n                    "}
                           </span>
                           {"\n                    "}
-                          <span style={dcCss(`flex:0 0 auto;height:22px;padding:0 9px;border-radius:11px;background:${dcS(L_rr_1i?.["chipBg"])};color:${dcS(L_rr_1i?.["chipInk"])};font-size:11.5px;font-weight:700;line-height:22px`)}>
-                            {dcText(L_rr_1i?.["chip"])}
+                          <span style={dcCss(`flex:0 0 auto;height:22px;padding:0 9px;border-radius:11px;background:${dcS(L_rr_1j?.["chipBg"])};color:${dcS(L_rr_1j?.["chipInk"])};font-size:11.5px;font-weight:700;line-height:22px`)}>
+                            {dcText(L_rr_1j?.["chip"])}
                           </span>
                           {"\n                    "}
                           <span style={{"flex":"0 0 110px","textAlign":"right","fontSize":"14px","fontWeight":"600","fontVariantNumeric":"tabular-nums","color":"var(--irq-c-1f1f1c)"}}>
-                            {dcText(L_rr_1i?.["price"])}
+                            {dcText(L_rr_1j?.["price"])}
                           </span>
                           {"\n                  "}
                         </label>
@@ -2581,19 +2590,19 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                         {"\n                    "}
                         <div style={{"display":"grid","gridTemplateColumns":"repeat(auto-fill,minmax(240px,1fr))","gap":"6px 14px","marginTop":"8px","maxHeight":"220px","overflow":"auto"}}>
                           {"\n                      "}
-                          {dcList(v["rev"]?.["catMap"]).map((L_cm_1k, L_cm_1k_i) => (
-                            <Fragment key={L_cm_1k_i}>
+                          {dcList(v["rev"]?.["catMap"]).map((L_cm_1l, L_cm_1l_i) => (
+                            <Fragment key={L_cm_1l_i}>
                               {"\n                        "}
                               <label style={{"display":"flex","alignItems":"center","gap":"8px","minWidth":"0"}}>
                                 {"\n                          "}
                                 <span style={{"flex":"1","minWidth":"0","overflow":"hidden","textOverflow":"ellipsis","whiteSpace":"nowrap","color":"var(--irq-c-1f1f1c)"}}>
-                                  {dcText(L_cm_1k?.["name"])}{" "}
+                                  {dcText(L_cm_1l?.["name"])}{" "}
                                   <span style={{"color":"var(--irq-c-6b6b66)"}}>
-                                    {"· "}{dcText(L_cm_1k?.["n"])}
+                                    {"· "}{dcText(L_cm_1l?.["n"])}
                                   </span>
                                 </span>
                                 {"\n                          "}
-                                <select value={dcValue(L_cm_1k?.["kind"])} onChange={L_cm_1k?.["onKind"]} style={{"flex":"0 0 120px","height":"30px","padding":"0 4px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)"}}>
+                                <select value={dcValue(L_cm_1l?.["kind"])} onChange={L_cm_1l?.["onKind"]} style={{"flex":"0 0 120px","height":"30px","padding":"0 4px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)"}}>
                                   {"\n                            "}
                                   <option value={"+web"}>
                                     {"Same as website"}
@@ -2603,10 +2612,10 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                     {"Skip"}
                                   </option>
                                   {"\n                            "}
-                                  {dcList(v["kindOptsReq"]).map((L_ko_1l, L_ko_1l_i) => (
-                                    <Fragment key={L_ko_1l_i}>
-                                      <option value={dcValue(L_ko_1l?.["v"])}>
-                                        {dcText(L_ko_1l?.["l"])}
+                                  {dcList(v["kindOptsReq"]).map((L_ko_1m, L_ko_1m_i) => (
+                                    <Fragment key={L_ko_1m_i}>
+                                      <option value={dcValue(L_ko_1m?.["v"])}>
+                                        {dcText(L_ko_1m?.["l"])}
                                       </option>
                                     </Fragment>
                                   ))}
@@ -2629,10 +2638,10 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                       <label style={{"display":"flex","alignItems":"center","gap":"8px","fontSize":"13px","color":"var(--irq-c-6b6b66)"}}>
                         {"New items go to\n                    "}
                         <select value={dcValue(v["rev"]?.["kind"])} onChange={v["rev"]?.["onKind"]} style={{"height":"34px","padding":"0 6px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13px","color":"var(--irq-c-1f1f1c)"}}>
-                          {dcList(v["kindOptsReq"]).map((L_rk_1m, L_rk_1m_i) => (
-                            <Fragment key={L_rk_1m_i}>
-                              <option value={dcValue(L_rk_1m?.["v"])}>
-                                {dcText(L_rk_1m?.["l"])}
+                          {dcList(v["kindOptsReq"]).map((L_rk_1n, L_rk_1n_i) => (
+                            <Fragment key={L_rk_1n_i}>
+                              <option value={dcValue(L_rk_1n?.["v"])}>
+                                {dcText(L_rk_1n?.["l"])}
                               </option>
                             </Fragment>
                           ))}
@@ -2673,10 +2682,10 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                 {"\n            "}
                 <select value={dcValue(v["kindFilter"])} onChange={v["onKindFilter"]} aria-label={"Category"} style={{"flex":"0 1 220px","minWidth":"160px","height":"40px","padding":"0 10px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)"}}>
                   {"\n              "}
-                  {dcList(v["kindSelOpts"]).map((L_kf_1n, L_kf_1n_i) => (
-                    <Fragment key={L_kf_1n_i}>
-                      <option value={dcValue(L_kf_1n?.["v"])}>
-                        {dcText(L_kf_1n?.["l"])}
+                  {dcList(v["kindSelOpts"]).map((L_kf_1o, L_kf_1o_i) => (
+                    <Fragment key={L_kf_1o_i}>
+                      <option value={dcValue(L_kf_1o?.["v"])}>
+                        {dcText(L_kf_1o?.["l"])}
                       </option>
                     </Fragment>
                   ))}
@@ -2754,10 +2763,10 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                     <option value={""}>
                       {"Move to category…"}
                     </option>
-                    {dcList(v["kindOptsReq"]).map((L_ko_1o, L_ko_1o_i) => (
-                      <Fragment key={L_ko_1o_i}>
-                        <option value={dcValue(L_ko_1o?.["v"])}>
-                          {dcText(L_ko_1o?.["l"])}
+                    {dcList(v["kindOptsReq"]).map((L_ko_1p, L_ko_1p_i) => (
+                      <Fragment key={L_ko_1p_i}>
+                        <option value={dcValue(L_ko_1p?.["v"])}>
+                          {dcText(L_ko_1p?.["l"])}
                         </option>
                       </Fragment>
                     ))}
@@ -2814,41 +2823,41 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                       {"\n              "}
                     </div>
                     {"\n              "}
-                    {dcList(v["catPageRows"]).map((L_r_1p, L_r_1p_i) => (
-                      <Fragment key={L_r_1p_i}>
+                    {dcList(v["catPageRows"]).map((L_r_1q, L_r_1q_i) => (
+                      <Fragment key={L_r_1q_i}>
                         {"\n                "}
-                        <div style={dcCss(`display:grid;grid-template-columns:40px 56px 110px minmax(220px,1fr) 140px 110px 120px 92px 36px;align-items:center;border-bottom:1px solid var(--irq-c-eeeeea);background:${dcS(L_r_1p?.["rowBg"])}`)}>
+                        <div style={dcCss(`display:grid;grid-template-columns:40px 56px 110px minmax(220px,1fr) 140px 110px 120px 92px 36px;align-items:center;border-bottom:1px solid var(--irq-c-eeeeea);background:${dcS(L_r_1q?.["rowBg"])}`)}>
                           {"\n                  "}
                           <span style={{"display":"grid","placeItems":"center"}}>
-                            <input type={"checkbox"} aria-label={"Select item"} checked={dcChecked(L_r_1p?.["selected"])} onChange={L_r_1p?.["onSel"]} style={{"width":"17px","height":"17px","margin":"0","accentColor":"var(--irq-c-111111)","cursor":"pointer"}} className={"irq-ph irq-p7"} />
+                            <input type={"checkbox"} aria-label={"Select item"} checked={dcChecked(L_r_1q?.["selected"])} onChange={L_r_1q?.["onSel"]} style={{"width":"17px","height":"17px","margin":"0","accentColor":"var(--irq-c-111111)","cursor":"pointer"}} className={"irq-ph irq-p7"} />
                           </span>
                           {"\n                  "}
                           <label title={"Add or change the photo"} style={{"padding":"6px 6px 6px 0","cursor":"pointer"}}>
-                            <span style={dcCss(`display:grid;place-items:center;width:44px;height:40px;border-radius:9px;background:var(--irq-c-eeeeea) url('${dcS(L_r_1p?.["img"])}') center/cover no-repeat;font-size:10px;font-weight:700;color:var(--irq-c-111111)`)}>
-                              {dcText(L_r_1p?.["initials"])}
+                            <span style={dcCss(`display:grid;place-items:center;width:44px;height:40px;border-radius:9px;background:var(--irq-c-eeeeea) url('${dcS(L_r_1q?.["img"])}') center/cover no-repeat;font-size:10px;font-weight:700;color:var(--irq-c-111111)`)}>
+                              {dcText(L_r_1q?.["initials"])}
                             </span>
-                            <input type={"file"} accept={"image/*"} onChange={L_r_1p?.["onImg"]} style={{"display":"none"}} />
+                            <input type={"file"} accept={"image/*"} onChange={L_r_1q?.["onImg"]} style={{"display":"none"}} />
                           </label>
                           {"\n                  "}
                           <span style={{"padding":"6px 4px"}}>
-                            <input value={dcValue(L_r_1p?.["code"])} onChange={L_r_1p?.["onCode"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontFamily":"var(--font-mono),Menlo,monospace","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph irq-p7"} />
+                            <input value={dcValue(L_r_1q?.["code"])} onChange={L_r_1q?.["onCode"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontFamily":"var(--font-mono),Menlo,monospace","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph irq-p7"} />
                           </span>
                           {"\n                  "}
                           <span style={{"padding":"6px 4px","display":"flex","flexDirection":"column","gap":"2px","minWidth":"0"}}>
-                            <input value={dcValue(L_r_1p?.["name"])} onChange={L_r_1p?.["onName"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"13.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph irq-p7"} />
-                            {(L_r_1p?.["specs"]) ? (<>
-                              <span title={L_r_1p?.["specs"]} style={{"padding":"0 8px","fontSize":"11.5px","color":"var(--irq-c-6b6b66)","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis"}}>
-                                {dcText(L_r_1p?.["specs"])}
+                            <input value={dcValue(L_r_1q?.["name"])} onChange={L_r_1q?.["onName"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"13.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph irq-p7"} />
+                            {(L_r_1q?.["specs"]) ? (<>
+                              <span title={L_r_1q?.["specs"]} style={{"padding":"0 8px","fontSize":"11.5px","color":"var(--irq-c-6b6b66)","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis"}}>
+                                {dcText(L_r_1q?.["specs"])}
                               </span>
                             </>) : null}
                           </span>
                           {"\n                  "}
                           <span style={{"padding":"6px 4px"}}>
-                            <select value={dcValue(L_r_1p?.["kind"])} onChange={L_r_1p?.["onKind"]} style={{"width":"100%","height":"34px","padding":"0 4px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph irq-p7"}>
-                              {dcList(v["kindOptsReq"]).map((L_ko_1q, L_ko_1q_i) => (
-                                <Fragment key={L_ko_1q_i}>
-                                  <option value={dcValue(L_ko_1q?.["v"])}>
-                                    {dcText(L_ko_1q?.["l"])}
+                            <select value={dcValue(L_r_1q?.["kind"])} onChange={L_r_1q?.["onKind"]} style={{"width":"100%","height":"34px","padding":"0 4px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-ph irq-p7"}>
+                              {dcList(v["kindOptsReq"]).map((L_ko_1r, L_ko_1r_i) => (
+                                <Fragment key={L_ko_1r_i}>
+                                  <option value={dcValue(L_ko_1r?.["v"])}>
+                                    {dcText(L_ko_1r?.["l"])}
                                   </option>
                                 </Fragment>
                               ))}
@@ -2856,28 +2865,28 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                           </span>
                           {"\n                  "}
                           <span style={{"padding":"6px 4px"}}>
-                            <input inputMode={"decimal"} value={dcValue(L_r_1p?.["cost"])} onChange={L_r_1p?.["onCost"]} placeholder={"—"} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","textAlign":"right","color":"var(--irq-c-1f1f1c)","outline":"none","fontVariantNumeric":"tabular-nums"}} />
+                            <input inputMode={"decimal"} value={dcValue(L_r_1q?.["cost"])} onChange={L_r_1q?.["onCost"]} placeholder={"—"} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","textAlign":"right","color":"var(--irq-c-1f1f1c)","outline":"none","fontVariantNumeric":"tabular-nums"}} />
                           </span>
                           {"\n                  "}
                           <span style={{"padding":"6px 8px"}}>
                             {"\n                    "}
-                            {(L_r_1p?.["chip"]) ? (<>
-                              <button onClick={L_r_1p?.["toggleSample"]} style={dcCss(`height:24px;padding:0 8px;border-radius:12px;border:0;background:${dcS(L_r_1p?.["chipBg"])};color:${dcS(L_r_1p?.["chipInk"])};font-size:10.5px;font-weight:700;letter-spacing:.04em`)}>
-                                {dcText(L_r_1p?.["chip"])}
+                            {(L_r_1q?.["chip"]) ? (<>
+                              <button onClick={L_r_1q?.["toggleSample"]} style={dcCss(`height:24px;padding:0 8px;border-radius:12px;border:0;background:${dcS(L_r_1q?.["chipBg"])};color:${dcS(L_r_1q?.["chipInk"])};font-size:10.5px;font-weight:700;letter-spacing:.04em`)}>
+                                {dcText(L_r_1q?.["chip"])}
                               </button>
                             </>) : null}
                             {"\n                  "}
                           </span>
                           {"\n                  "}
                           <span style={{"padding":"6px 8px"}}>
-                            <button onClick={L_r_1p?.["togglePause"]} title={L_r_1p?.["pauseTitle"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:26px;padding:0 4px 0 2px;border:0;background:transparent;font-size:12px;font-weight:600;color:${dcS(L_r_1p?.["pauseInk"])}`)}>
-                              <span style={dcCss(`position:relative;width:30px;height:18px;border-radius:9px;background:${dcS(L_r_1p?.["trackBg"])}`)}>
-                                <span style={dcCss(`position:absolute;top:2px;left:${dcS(L_r_1p?.["knobX"])};width:14px;height:14px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
+                            <button onClick={L_r_1q?.["togglePause"]} title={L_r_1q?.["pauseTitle"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:26px;padding:0 4px 0 2px;border:0;background:transparent;font-size:12px;font-weight:600;color:${dcS(L_r_1q?.["pauseInk"])}`)}>
+                              <span style={dcCss(`position:relative;width:30px;height:18px;border-radius:9px;background:${dcS(L_r_1q?.["trackBg"])}`)}>
+                                <span style={dcCss(`position:absolute;top:2px;left:${dcS(L_r_1q?.["knobX"])};width:14px;height:14px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
                               </span>
                             </button>
                           </span>
                           {"\n                  "}
-                          <button aria-label={"Remove item"} onClick={L_r_1p?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"16px"}}>
+                          <button aria-label={"Remove item"} onClick={L_r_1q?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"16px"}}>
                             {"×"}
                           </button>
                           {"\n                "}
@@ -2901,10 +2910,10 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                   {"\n              "}
                   <span style={{"display":"flex","gap":"2px","padding":"2px","borderRadius":"8px","background":"var(--irq-c-eeeeea)"}}>
                     {"\n                "}
-                    {dcList(v["pager"]?.["sizes"]).map((L_ps_1r, L_ps_1r_i) => (
-                      <Fragment key={L_ps_1r_i}>
-                        <button onClick={L_ps_1r?.["pick"]} style={dcCss(`height:28px;padding:0 10px;border-radius:6px;border:0;background:${dcS(L_ps_1r?.["bg"])};color:${dcS(L_ps_1r?.["ink"])};box-shadow:${dcS(L_ps_1r?.["shadow"])};font-size:12.5px;font-weight:650`)}>
-                          {dcText(L_ps_1r?.["label"])}
+                    {dcList(v["pager"]?.["sizes"]).map((L_ps_1s, L_ps_1s_i) => (
+                      <Fragment key={L_ps_1s_i}>
+                        <button onClick={L_ps_1s?.["pick"]} style={dcCss(`height:28px;padding:0 10px;border-radius:6px;border:0;background:${dcS(L_ps_1s?.["bg"])};color:${dcS(L_ps_1s?.["ink"])};box-shadow:${dcS(L_ps_1s?.["shadow"])};font-size:12.5px;font-weight:650`)}>
+                          {dcText(L_ps_1s?.["label"])}
                         </button>
                       </Fragment>
                     ))}
@@ -2993,14 +3002,14 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                       {"\n              "}
                     </div>
                     {"\n              "}
-                    {dcList(v["ciCrm"]).map((L_cf_1s, L_cf_1s_i) => (
-                      <Fragment key={L_cf_1s_i}>
+                    {dcList(v["ciCrm"]).map((L_cf_1t, L_cf_1t_i) => (
+                      <Fragment key={L_cf_1t_i}>
                         {"\n                "}
                         <div style={{"display":"grid","gridTemplateColumns":"minmax(0,1fr) 90px 52px 52px 52px","alignItems":"center","minHeight":"48px","padding":"0 18px","borderTop":"1px solid var(--irq-c-eeeeea)"}}>
                           {"\n                  "}
                           <span style={{"display":"flex","alignItems":"center","gap":"8px","fontSize":"14px","fontWeight":"600"}}>
-                            {dcText(L_cf_1s?.["label"])}
-                            {(L_cf_1s?.["core"]) ? (<>
+                            {dcText(L_cf_1t?.["label"])}
+                            {(L_cf_1t?.["core"]) ? (<>
                               <span style={{"height":"20px","padding":"0 7px","borderRadius":"10px","background":"var(--irq-c-eeeeea)","color":"var(--irq-c-6b6b66)","fontSize":"10.5px","fontWeight":"700","lineHeight":"20px"}}>
                                 {"Core"}
                               </span>
@@ -3008,23 +3017,23 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                           </span>
                           {"\n                  "}
                           <span style={{"fontSize":"12.5px","color":"var(--irq-c-6b6b66)"}}>
-                            {dcText(L_cf_1s?.["section"])}
+                            {dcText(L_cf_1t?.["section"])}
                           </span>
                           {"\n                  "}
-                          <button onClick={L_cf_1s?.["toggleReq"]} disabled={L_cf_1s?.["lockReq"]} aria-label={"Toggle"} style={dcCss(`justify-self:center;width:22px;height:22px;border-radius:6px;border:1.5px solid ${dcS(L_cf_1s?.["rq"]?.["bg"])};padding:0;background:${dcS(L_cf_1s?.["rq"]?.["fill"])};opacity:${dcS(L_cf_1s?.["rq"]?.["op"])};display:grid;place-items:center;cursor:pointer;box-sizing:border-box`)}>
-                            <svg width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"3.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{ ...dcCss(`opacity:${dcS(L_cf_1s?.["rq"]?.["tick"])}`), ...{"stroke":"var(--irq-c-ffffff)"} }}>
+                          <button onClick={L_cf_1t?.["toggleReq"]} disabled={L_cf_1t?.["lockReq"]} aria-label={"Toggle"} style={dcCss(`justify-self:center;width:22px;height:22px;border-radius:6px;border:1.5px solid ${dcS(L_cf_1t?.["rq"]?.["bg"])};padding:0;background:${dcS(L_cf_1t?.["rq"]?.["fill"])};opacity:${dcS(L_cf_1t?.["rq"]?.["op"])};display:grid;place-items:center;cursor:pointer;box-sizing:border-box`)}>
+                            <svg width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"3.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{ ...dcCss(`opacity:${dcS(L_cf_1t?.["rq"]?.["tick"])}`), ...{"stroke":"var(--irq-c-ffffff)"} }}>
                               <path d={"m5 12 5 5 9-10"} />
                             </svg>
                           </button>
                           {"\n                  "}
-                          <button onClick={L_cf_1s?.["toggleShow"]} disabled={L_cf_1s?.["lockShow"]} aria-label={"Toggle"} style={dcCss(`justify-self:center;width:22px;height:22px;border-radius:6px;border:1.5px solid ${dcS(L_cf_1s?.["sh"]?.["bg"])};padding:0;background:${dcS(L_cf_1s?.["sh"]?.["fill"])};opacity:${dcS(L_cf_1s?.["sh"]?.["op"])};display:grid;place-items:center;cursor:pointer;box-sizing:border-box`)}>
-                            <svg width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"3.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{ ...dcCss(`opacity:${dcS(L_cf_1s?.["sh"]?.["tick"])}`), ...{"stroke":"var(--irq-c-ffffff)"} }}>
+                          <button onClick={L_cf_1t?.["toggleShow"]} disabled={L_cf_1t?.["lockShow"]} aria-label={"Toggle"} style={dcCss(`justify-self:center;width:22px;height:22px;border-radius:6px;border:1.5px solid ${dcS(L_cf_1t?.["sh"]?.["bg"])};padding:0;background:${dcS(L_cf_1t?.["sh"]?.["fill"])};opacity:${dcS(L_cf_1t?.["sh"]?.["op"])};display:grid;place-items:center;cursor:pointer;box-sizing:border-box`)}>
+                            <svg width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"3.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{ ...dcCss(`opacity:${dcS(L_cf_1t?.["sh"]?.["tick"])}`), ...{"stroke":"var(--irq-c-ffffff)"} }}>
                               <path d={"m5 12 5 5 9-10"} />
                             </svg>
                           </button>
                           {"\n                  "}
-                          <button onClick={L_cf_1s?.["togglePrint"]} disabled={L_cf_1s?.["lockPrint"]} aria-label={"Toggle"} style={dcCss(`justify-self:center;width:22px;height:22px;border-radius:6px;border:1.5px solid ${dcS(L_cf_1s?.["pr"]?.["bg"])};padding:0;background:${dcS(L_cf_1s?.["pr"]?.["fill"])};opacity:${dcS(L_cf_1s?.["pr"]?.["op"])};display:grid;place-items:center;cursor:pointer;box-sizing:border-box`)}>
-                            <svg width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"3.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{ ...dcCss(`opacity:${dcS(L_cf_1s?.["pr"]?.["tick"])}`), ...{"stroke":"var(--irq-c-ffffff)"} }}>
+                          <button onClick={L_cf_1t?.["togglePrint"]} disabled={L_cf_1t?.["lockPrint"]} aria-label={"Toggle"} style={dcCss(`justify-self:center;width:22px;height:22px;border-radius:6px;border:1.5px solid ${dcS(L_cf_1t?.["pr"]?.["bg"])};padding:0;background:${dcS(L_cf_1t?.["pr"]?.["fill"])};opacity:${dcS(L_cf_1t?.["pr"]?.["op"])};display:grid;place-items:center;cursor:pointer;box-sizing:border-box`)}>
+                            <svg width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"3.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{ ...dcCss(`opacity:${dcS(L_cf_1t?.["pr"]?.["tick"])}`), ...{"stroke":"var(--irq-c-ffffff)"} }}>
                               <path d={"m5 12 5 5 9-10"} />
                             </svg>
                           </button>
@@ -3073,25 +3082,25 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                       {"\n              "}
                     </div>
                     {"\n              "}
-                    {dcList(v["ciOwn"]).map((L_of_1t, L_of_1t_i) => (
-                      <Fragment key={L_of_1t_i}>
+                    {dcList(v["ciOwn"]).map((L_of_1u, L_of_1u_i) => (
+                      <Fragment key={L_of_1u_i}>
                         {"\n                "}
                         <div style={{"display":"grid","gridTemplateColumns":"56px minmax(0,1fr) 130px 52px 52px 36px","alignItems":"center","minHeight":"48px","padding":"0 18px","borderTop":"1px solid var(--irq-c-eeeeea)"}}>
                           {"\n                  "}
                           <span style={{"display":"flex","gap":"2px"}}>
-                            <button onClick={L_of_1t?.["up"]} disabled={L_of_1t?.["first"]} aria-label={"Move up"} style={dcCss(`width:24px;height:28px;border:0;border-radius:6px;background:transparent;color:var(--irq-c-6b6b66);opacity:${dcS(L_of_1t?.["upOp"])}`)}>
+                            <button onClick={L_of_1u?.["up"]} disabled={L_of_1u?.["first"]} aria-label={"Move up"} style={dcCss(`width:24px;height:28px;border:0;border-radius:6px;background:transparent;color:var(--irq-c-6b6b66);opacity:${dcS(L_of_1u?.["upOp"])}`)}>
                               {"↑"}
                             </button>
-                            <button onClick={L_of_1t?.["down"]} disabled={L_of_1t?.["last"]} aria-label={"Move down"} style={dcCss(`width:24px;height:28px;border:0;border-radius:6px;background:transparent;color:var(--irq-c-6b6b66);opacity:${dcS(L_of_1t?.["downOp"])}`)}>
+                            <button onClick={L_of_1u?.["down"]} disabled={L_of_1u?.["last"]} aria-label={"Move down"} style={dcCss(`width:24px;height:28px;border:0;border-radius:6px;background:transparent;color:var(--irq-c-6b6b66);opacity:${dcS(L_of_1u?.["downOp"])}`)}>
                               {"↓"}
                             </button>
                           </span>
                           {"\n                  "}
                           <span style={{"display":"flex","alignItems":"center","gap":"8px","minWidth":"0","paddingRight":"10px"}}>
-                            <input value={dcValue(L_of_1t?.["label"])} onChange={L_of_1t?.["onLabel"]} style={{"flex":"1","minWidth":"0","height":"34px","padding":"0 8px","marginLeft":"-8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"14px","fontWeight":"500","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pi irq-p7"} />
+                            <input value={dcValue(L_of_1u?.["label"])} onChange={L_of_1u?.["onLabel"]} style={{"flex":"1","minWidth":"0","height":"34px","padding":"0 8px","marginLeft":"-8px","borderRadius":"8px","border":"1px solid transparent","background":"transparent","fontSize":"14px","fontWeight":"500","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pi irq-p7"} />
                           </span>
                           {"\n                  "}
-                          <select value={dcValue(L_of_1t?.["type"])} onChange={L_of_1t?.["onType"]} disabled={L_of_1t?.["core"]} style={dcCss(`appearance:${dcS(L_of_1t?.["app"])};-webkit-appearance:${dcS(L_of_1t?.["app"])};height:34px;padding:0 4px;margin-left:-4px;border-radius:8px;border:1px solid transparent;background:transparent;font-size:12.5px;color:var(--irq-c-6b6b66);outline:none;opacity:${dcS(L_of_1t?.["typeOp"])}`)}>
+                          <select value={dcValue(L_of_1u?.["type"])} onChange={L_of_1u?.["onType"]} disabled={L_of_1u?.["core"]} style={dcCss(`appearance:${dcS(L_of_1u?.["app"])};-webkit-appearance:${dcS(L_of_1u?.["app"])};height:34px;padding:0 4px;margin-left:-4px;border-radius:8px;border:1px solid transparent;background:transparent;font-size:12.5px;color:var(--irq-c-6b6b66);outline:none;opacity:${dcS(L_of_1u?.["typeOp"])}`)}>
                             {"\n                    "}
                             <option value={"short"}>
                               {"Short text"}
@@ -3108,19 +3117,19 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                             {"\n                  "}
                           </select>
                           {"\n                  "}
-                          <button onClick={L_of_1t?.["toggleReq"]} disabled={L_of_1t?.["never"]} aria-label={"Toggle"} style={dcCss(`justify-self:center;width:22px;height:22px;border-radius:6px;border:1.5px solid ${dcS(L_of_1t?.["rq"]?.["bg"])};padding:0;background:${dcS(L_of_1t?.["rq"]?.["fill"])};opacity:${dcS(L_of_1t?.["rq"]?.["op"])};display:grid;place-items:center;cursor:pointer;box-sizing:border-box`)}>
-                            <svg width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"3.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{ ...dcCss(`opacity:${dcS(L_of_1t?.["rq"]?.["tick"])}`), ...{"stroke":"var(--irq-c-ffffff)"} }}>
+                          <button onClick={L_of_1u?.["toggleReq"]} disabled={L_of_1u?.["never"]} aria-label={"Toggle"} style={dcCss(`justify-self:center;width:22px;height:22px;border-radius:6px;border:1.5px solid ${dcS(L_of_1u?.["rq"]?.["bg"])};padding:0;background:${dcS(L_of_1u?.["rq"]?.["fill"])};opacity:${dcS(L_of_1u?.["rq"]?.["op"])};display:grid;place-items:center;cursor:pointer;box-sizing:border-box`)}>
+                            <svg width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"3.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{ ...dcCss(`opacity:${dcS(L_of_1u?.["rq"]?.["tick"])}`), ...{"stroke":"var(--irq-c-ffffff)"} }}>
                               <path d={"m5 12 5 5 9-10"} />
                             </svg>
                           </button>
                           {"\n                  "}
-                          <button onClick={L_of_1t?.["togglePrint"]} disabled={L_of_1t?.["never"]} aria-label={"Toggle"} style={dcCss(`justify-self:center;width:22px;height:22px;border-radius:6px;border:1.5px solid ${dcS(L_of_1t?.["pr"]?.["bg"])};padding:0;background:${dcS(L_of_1t?.["pr"]?.["fill"])};opacity:${dcS(L_of_1t?.["pr"]?.["op"])};display:grid;place-items:center;cursor:pointer;box-sizing:border-box`)}>
-                            <svg width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"3.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{ ...dcCss(`opacity:${dcS(L_of_1t?.["pr"]?.["tick"])}`), ...{"stroke":"var(--irq-c-ffffff)"} }}>
+                          <button onClick={L_of_1u?.["togglePrint"]} disabled={L_of_1u?.["never"]} aria-label={"Toggle"} style={dcCss(`justify-self:center;width:22px;height:22px;border-radius:6px;border:1.5px solid ${dcS(L_of_1u?.["pr"]?.["bg"])};padding:0;background:${dcS(L_of_1u?.["pr"]?.["fill"])};opacity:${dcS(L_of_1u?.["pr"]?.["op"])};display:grid;place-items:center;cursor:pointer;box-sizing:border-box`)}>
+                            <svg width={"12"} height={"12"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"3.4"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{ ...dcCss(`opacity:${dcS(L_of_1u?.["pr"]?.["tick"])}`), ...{"stroke":"var(--irq-c-ffffff)"} }}>
                               <path d={"m5 12 5 5 9-10"} />
                             </svg>
                           </button>
                           {"\n                  "}
-                          <button onClick={L_of_1t?.["remove"]} disabled={L_of_1t?.["core"]} aria-label={"Remove field"} style={dcCss(`width:30px;height:30px;border:0;border-radius:8px;background:${dcS(L_of_1t?.["delBg"])};color:var(--irq-c-8a2e1c);font-size:16px;opacity:${dcS(L_of_1t?.["delOp"])}`)}>
+                          <button onClick={L_of_1u?.["remove"]} disabled={L_of_1u?.["core"]} aria-label={"Remove field"} style={dcCss(`width:30px;height:30px;border:0;border-radius:8px;background:${dcS(L_of_1u?.["delBg"])};color:var(--irq-c-8a2e1c);font-size:16px;opacity:${dcS(L_of_1u?.["delOp"])}`)}>
                             {"×"}
                           </button>
                           {"\n                "}
@@ -3155,12 +3164,12 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                     {"\n              "}
                     <span style={{"display":"flex","gap":"2px","padding":"2px","borderRadius":"8px","background":"var(--irq-c-eeeeea)"}}>
                       {"\n                "}
-                      {dcList(v["ciPvTabs"]).map((L_pt_1u, L_pt_1u_i) => (
-                        <Fragment key={L_pt_1u_i}>
+                      {dcList(v["ciPvTabs"]).map((L_pt_1v, L_pt_1v_i) => (
+                        <Fragment key={L_pt_1v_i}>
                           {"\n                  "}
-                          <button onClick={L_pt_1u?.["pick"]} title={L_pt_1u?.["label"]} aria-label={L_pt_1u?.["label"]} style={dcCss(`display:grid;place-items:center;width:32px;height:26px;border-radius:6px;border:0;padding:0;background:${dcS(L_pt_1u?.["bg"])};color:${dcS(L_pt_1u?.["ink"])};box-shadow:${dcS(L_pt_1u?.["shadow"])}`)}>
+                          <button onClick={L_pt_1v?.["pick"]} title={L_pt_1v?.["label"]} aria-label={L_pt_1v?.["label"]} style={dcCss(`display:grid;place-items:center;width:32px;height:26px;border-radius:6px;border:0;padding:0;background:${dcS(L_pt_1v?.["bg"])};color:${dcS(L_pt_1v?.["ink"])};box-shadow:${dcS(L_pt_1v?.["shadow"])}`)}>
                             <svg width={"15"} height={"15"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"1.9"} strokeLinecap={"round"} strokeLinejoin={"round"}>
-                              <path d={L_pt_1u?.["d"]} />
+                              <path d={L_pt_1v?.["d"]} />
                             </svg>
                           </button>
                           {"\n                "}
@@ -3232,14 +3241,14 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                 {"Search CRM"}
                               </div>
                               {"\n                      "}
-                              {dcList(v["ciPrevForm"]).map((L_pf_1v, L_pf_1v_i) => (
-                                <Fragment key={L_pf_1v_i}>
+                              {dcList(v["ciPrevForm"]).map((L_pf_1w, L_pf_1w_i) => (
+                                <Fragment key={L_pf_1w_i}>
                                   {"\n                        "}
                                   <div style={{"display":"flex","flexDirection":"column","gap":"6px"}}>
                                     {"\n                          "}
                                     <span style={{"fontSize":"13px","fontWeight":"700","color":"var(--irq-c-34342f)"}}>
-                                      {dcText(L_pf_1v?.["label"])}
-                                      {(L_pf_1v?.["req"]) ? (<>
+                                      {dcText(L_pf_1w?.["label"])}
+                                      {(L_pf_1w?.["req"]) ? (<>
                                         <span style={{"color":"var(--irq-c-b3261e)"}}>
                                           {" *"}
                                         </span>
@@ -3288,14 +3297,14 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                       {"\n              "}
                       <div style={{"display":"grid","gridTemplateColumns":"1fr 1fr","gap":"12px 10px"}}>
                         {"\n                "}
-                        {dcList(v["ciPrevForm"]).map((L_pf_1w, L_pf_1w_i) => (
-                          <Fragment key={L_pf_1w_i}>
+                        {dcList(v["ciPrevForm"]).map((L_pf_1x, L_pf_1x_i) => (
+                          <Fragment key={L_pf_1x_i}>
                             {"\n                  "}
                             <div style={{"display":"flex","flexDirection":"column","gap":"5px","minWidth":"0"}}>
                               {"\n                    "}
                               <span style={{"fontSize":"11.5px","fontWeight":"700","color":"var(--irq-c-34342f)","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis"}}>
-                                {dcText(L_pf_1w?.["label"])}
-                                {(L_pf_1w?.["req"]) ? (<>
+                                {dcText(L_pf_1x?.["label"])}
+                                {(L_pf_1x?.["req"]) ? (<>
                                   <span style={{"color":"var(--irq-c-b3261e)"}}>
                                     {" *"}
                                   </span>
@@ -3343,14 +3352,14 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                       {"\n                "}
                       <div style={{"display":"grid","gridTemplateColumns":"auto 1fr","gap":"5px 14px","fontSize":"10.5px"}}>
                         {"\n                  "}
-                        {dcList(v["ciPrevPrint"]).map((L_pp_1x, L_pp_1x_i) => (
-                          <Fragment key={L_pp_1x_i}>
+                        {dcList(v["ciPrevPrint"]).map((L_pp_1y, L_pp_1y_i) => (
+                          <Fragment key={L_pp_1y_i}>
                             {"\n                    "}
                             <span style={{"fontWeight":"700","whiteSpace":"nowrap"}}>
-                              {dcText(L_pp_1x?.["label"])}
+                              {dcText(L_pp_1y?.["label"])}
                             </span>
                             <span style={{"color":"var(--irq-c-34342f)","whiteSpace":"nowrap","overflow":"hidden","textOverflow":"ellipsis","borderBottom":"1px dotted var(--irq-c-deded8)"}}>
-                              {dcText(L_pp_1x?.["value"])}
+                              {dcText(L_pp_1y?.["value"])}
                             </span>
                             {"\n                  "}
                           </Fragment>
@@ -3400,37 +3409,37 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                       <span />
                     </div>
                     {"\n            "}
-                    {dcList(v["kindRows"]).map((L_k_1y, L_k_1y_i) => (
-                      <Fragment key={L_k_1y_i}>
+                    {dcList(v["kindRows"]).map((L_k_1z, L_k_1z_i) => (
+                      <Fragment key={L_k_1z_i}>
                         {"\n              "}
                         <div style={{"minWidth":"760px","display":"grid","gridTemplateColumns":"120px 150px 180px minmax(0,1fr) 100px 36px","alignItems":"center","borderBottom":"1px solid var(--irq-c-eeeeea)"}}>
                           {"\n                "}
                           <span style={{"padding":"0 14px","fontFamily":"var(--font-mono),Menlo,monospace","fontSize":"12.5px","color":"var(--irq-c-6b6b66)"}}>
-                            {dcText(L_k_1y?.["key"])}
+                            {dcText(L_k_1z?.["key"])}
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 4px"}}>
-                            <input value={dcValue(L_k_1y?.["room"])} onChange={L_k_1y?.["onRoom"]} placeholder={"e.g. LIVING ROOM"} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
+                            <input value={dcValue(L_k_1z?.["room"])} onChange={L_k_1z?.["onRoom"]} placeholder={"e.g. LIVING ROOM"} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"12.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 4px"}}>
-                            <input value={dcValue(L_k_1y?.["label"])} onChange={L_k_1y?.["onLabel"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
+                            <input value={dcValue(L_k_1z?.["label"])} onChange={L_k_1z?.["onLabel"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 4px"}}>
-                            <input value={dcValue(L_k_1y?.["url"])} onChange={L_k_1y?.["onUrl"]} placeholder={"https://www.b2bfurnituresupply.com/…"} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
+                            <input value={dcValue(L_k_1z?.["url"])} onChange={L_k_1z?.["onUrl"]} placeholder={"https://www.b2bfurnituresupply.com/…"} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 8px"}}>
-                            <button onClick={L_k_1y?.["togglePause"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:26px;padding:0;border:0;background:transparent;font-size:12px;font-weight:600;color:${dcS(L_k_1y?.["pauseInk"])}`)}>
-                              <span style={dcCss(`position:relative;width:30px;height:18px;border-radius:9px;background:${dcS(L_k_1y?.["trackBg"])}`)}>
-                                <span style={dcCss(`position:absolute;top:2px;left:${dcS(L_k_1y?.["knobX"])};width:14px;height:14px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
+                            <button onClick={L_k_1z?.["togglePause"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:26px;padding:0;border:0;background:transparent;font-size:12px;font-weight:600;color:${dcS(L_k_1z?.["pauseInk"])}`)}>
+                              <span style={dcCss(`position:relative;width:30px;height:18px;border-radius:9px;background:${dcS(L_k_1z?.["trackBg"])}`)}>
+                                <span style={dcCss(`position:absolute;top:2px;left:${dcS(L_k_1z?.["knobX"])};width:14px;height:14px;border-radius:50%;background:var(--irq-c-ffffff);box-shadow:0 1px 2px rgba(0,0,0,.2)`)} />
                               </span>
-                              {dcText(L_k_1y?.["pauseLabel"])}
+                              {dcText(L_k_1z?.["pauseLabel"])}
                             </button>
                           </span>
                           {"\n                "}
-                          <button aria-label={"Remove category"} onClick={L_k_1y?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"16px"}}>
+                          <button aria-label={"Remove category"} onClick={L_k_1z?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"16px"}}>
                             {"×"}
                           </button>
                           {"\n              "}
@@ -3482,14 +3491,14 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                 {"\n            "}
                 <div style={{"display":"grid","gridTemplateColumns":"repeat(auto-fill,minmax(min(100%,260px),1fr))","gap":"12px"}}>
                   {"\n              "}
-                  {dcList(v["styleRows"]).map((L_sr_1z, L_sr_1z_i) => (
-                    <Fragment key={L_sr_1z_i}>
+                  {dcList(v["styleRows"]).map((L_sr_20, L_sr_20_i) => (
+                    <Fragment key={L_sr_20_i}>
                       {"\n                "}
                       <div style={{"display":"flex","flexDirection":"column","borderRadius":"16px","border":"1px solid var(--irq-c-e7e7e2)","background":"var(--irq-c-ffffff)","overflow":"hidden"}}>
                         {"\n                  "}
-                        <label style={dcCss(`position:relative;display:block;aspect-ratio:16/10;background:var(--irq-c-eeeeea) url('${dcS(L_sr_1z?.["cover"])}') center/cover no-repeat;cursor:pointer`)}>
+                        <label style={dcCss(`position:relative;display:block;aspect-ratio:16/10;background:var(--irq-c-eeeeea) url('${dcS(L_sr_20?.["cover"])}') center/cover no-repeat;cursor:pointer`)}>
                           {"\n                    "}
-                          {(L_sr_1z?.["noCover"]) ? (<>
+                          {(L_sr_20?.["noCover"]) ? (<>
                             <span style={{"position":"absolute","inset":"0","display":"flex","flexDirection":"column","alignItems":"center","justifyContent":"center","gap":"4px","color":"var(--irq-c-6b6b66)","fontSize":"13px"}}>
                               <svg width={"22"} height={"22"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"}>
                                 <path d={"M12 16V4m-5 5 5-5 5 5M4 20h16"} />
@@ -3498,32 +3507,32 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                             </span>
                           </>) : null}
                           {"\n                    "}
-                          {(L_sr_1z?.["hasCover"]) ? (<>
+                          {(L_sr_20?.["hasCover"]) ? (<>
                             <span style={{"position":"absolute","right":"8px","bottom":"8px","height":"26px","padding":"0 10px","borderRadius":"13px","background":"rgba(255,255,255,.92)","color":"var(--irq-c-111111)","fontSize":"12px","fontWeight":"650","lineHeight":"26px"}}>
                               {"+ Photos"}
                             </span>
                           </>) : null}
                           {"\n                    "}
-                          <input type={"file"} accept={"image/*"} multiple={"multiple"} onChange={L_sr_1z?.["onFiles"]} style={{"display":"none"}} />
+                          <input type={"file"} accept={"image/*"} multiple={"multiple"} onChange={L_sr_20?.["onFiles"]} style={{"display":"none"}} />
                           {"\n                  "}
                         </label>
                         {"\n                  "}
                         <div style={{"display":"flex","gap":"6px","overflowX":"auto","scrollbarWidth":"none","padding":"10px 14px 0"}}>
                           {"\n                    "}
-                          {dcList(L_sr_1z?.["photos"]).map((L_ph_20, L_ph_20_i) => (
-                            <Fragment key={L_ph_20_i}>
+                          {dcList(L_sr_20?.["photos"]).map((L_ph_21, L_ph_21_i) => (
+                            <Fragment key={L_ph_21_i}>
                               {"\n                      "}
-                              <div style={dcCss(`position:relative;flex:0 0 56px;width:56px;height:56px;border-radius:8px;background:var(--irq-c-eeeeea) url('${dcS(L_ph_20?.["src"])}') center/cover no-repeat;box-shadow:${dcS(L_ph_20?.["ring"])}`)}>
+                              <div style={dcCss(`position:relative;flex:0 0 56px;width:56px;height:56px;border-radius:8px;background:var(--irq-c-eeeeea) url('${dcS(L_ph_21?.["src"])}') center/cover no-repeat;box-shadow:${dcS(L_ph_21?.["ring"])}`)}>
                                 {"\n                        "}
-                                {(L_ph_20?.["notCover"]) ? (<>
-                                  <button onClick={L_ph_20?.["pin"]} title={"Set as cover"} style={{"position":"absolute","left":"3px","bottom":"3px","width":"20px","height":"20px","borderRadius":"50%","border":"0","padding":"0","background":"rgba(255,255,255,.94)","display":"grid","placeItems":"center"}}>
+                                {(L_ph_21?.["notCover"]) ? (<>
+                                  <button onClick={L_ph_21?.["pin"]} title={"Set as cover"} style={{"position":"absolute","left":"3px","bottom":"3px","width":"20px","height":"20px","borderRadius":"50%","border":"0","padding":"0","background":"rgba(255,255,255,.94)","display":"grid","placeItems":"center"}}>
                                     <svg width={"10"} height={"10"} viewBox={"0 0 24 24"} fill={"none"} strokeWidth={"2.6"} strokeLinecap={"round"} strokeLinejoin={"round"} style={{"stroke":"var(--irq-c-111111)"}}>
                                       <path d={"M12 17v5M5 3h14l-2 7 3 4H4l3-4z"} />
                                     </svg>
                                   </button>
                                 </>) : null}
                                 {"\n                        "}
-                                <button onClick={L_ph_20?.["remove"]} title={"Remove"} style={{"position":"absolute","right":"3px","top":"3px","width":"18px","height":"18px","borderRadius":"50%","border":"0","padding":"0","background":"rgba(20,20,18,.72)","color":"var(--irq-c-ffffff)","fontSize":"11px","lineHeight":"18px"}}>
+                                <button onClick={L_ph_21?.["remove"]} title={"Remove"} style={{"position":"absolute","right":"3px","top":"3px","width":"18px","height":"18px","borderRadius":"50%","border":"0","padding":"0","background":"rgba(20,20,18,.72)","color":"var(--irq-c-ffffff)","fontSize":"11px","lineHeight":"18px"}}>
                                   {"×"}
                                 </button>
                                 {"\n                      "}
@@ -3536,37 +3545,37 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                             <svg width={"16"} height={"16"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"2.2"} strokeLinecap={"round"}>
                               <path d={"M12 5v14M5 12h14"} />
                             </svg>
-                            <input type={"file"} accept={"image/*"} multiple={"multiple"} onChange={L_sr_1z?.["onFiles"]} style={{"display":"none"}} />
+                            <input type={"file"} accept={"image/*"} multiple={"multiple"} onChange={L_sr_20?.["onFiles"]} style={{"display":"none"}} />
                           </label>
                           {"\n                  "}
                         </div>
                         {"\n                  "}
                         <div style={{"display":"flex","flexDirection":"column","gap":"6px","padding":"12px 14px 12px"}}>
                           {"\n                    "}
-                          <input value={dcValue(L_sr_1z?.["name"])} onChange={L_sr_1z?.["onName"]} placeholder={"Style name"} style={{"height":"36px","padding":"0 8px","margin":"0 -8px","border":"1px solid transparent","borderRadius":"8px","background":"transparent","fontSize":"16px","fontWeight":"650","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pg"} />
+                          <input value={dcValue(L_sr_20?.["name"])} onChange={L_sr_20?.["onName"]} placeholder={"Style name"} style={{"height":"36px","padding":"0 8px","margin":"0 -8px","border":"1px solid transparent","borderRadius":"8px","background":"transparent","fontSize":"16px","fontWeight":"650","color":"var(--irq-c-1f1f1c)","outline":"none"}} className={"irq-pg"} />
                           {"\n                    "}
-                          <input value={dcValue(L_sr_1z?.["desc"])} onChange={L_sr_1z?.["onDesc"]} placeholder={"Short description for the client"} style={{"height":"34px","padding":"0 8px","margin":"0 -8px","border":"1px solid transparent","borderRadius":"8px","background":"transparent","fontSize":"13px","color":"var(--irq-c-6b6b66)","outline":"none"}} className={"irq-pg"} />
+                          <input value={dcValue(L_sr_20?.["desc"])} onChange={L_sr_20?.["onDesc"]} placeholder={"Short description for the client"} style={{"height":"34px","padding":"0 8px","margin":"0 -8px","border":"1px solid transparent","borderRadius":"8px","background":"transparent","fontSize":"13px","color":"var(--irq-c-6b6b66)","outline":"none"}} className={"irq-pg"} />
                           {"\n                    "}
                           <div style={{"display":"flex","alignItems":"center","gap":"6px","paddingTop":"4px"}}>
                             {"\n                      "}
-                            <button onClick={L_sr_1z?.["up"]} disabled={L_sr_1z?.["first"]} aria-label={"Move left"} style={dcCss(`width:32px;height:32px;border:1px solid var(--irq-c-deded8);border-radius:8px;background:var(--irq-c-ffffff);color:var(--irq-c-1f1f1c);opacity:${dcS(L_sr_1z?.["upOp"])}`)}>
+                            <button onClick={L_sr_20?.["up"]} disabled={L_sr_20?.["first"]} aria-label={"Move left"} style={dcCss(`width:32px;height:32px;border:1px solid var(--irq-c-deded8);border-radius:8px;background:var(--irq-c-ffffff);color:var(--irq-c-1f1f1c);opacity:${dcS(L_sr_20?.["upOp"])}`)}>
                               {"←"}
                             </button>
                             {"\n                      "}
-                            <button onClick={L_sr_1z?.["down"]} disabled={L_sr_1z?.["last"]} aria-label={"Move right"} style={dcCss(`width:32px;height:32px;border:1px solid var(--irq-c-deded8);border-radius:8px;background:var(--irq-c-ffffff);color:var(--irq-c-1f1f1c);opacity:${dcS(L_sr_1z?.["downOp"])}`)}>
+                            <button onClick={L_sr_20?.["down"]} disabled={L_sr_20?.["last"]} aria-label={"Move right"} style={dcCss(`width:32px;height:32px;border:1px solid var(--irq-c-deded8);border-radius:8px;background:var(--irq-c-ffffff);color:var(--irq-c-1f1f1c);opacity:${dcS(L_sr_20?.["downOp"])}`)}>
                               {"→"}
                             </button>
                             {"\n                      "}
                             <span style={{"flex":"1"}} />
                             {"\n                      "}
-                            {(L_sr_1z?.["hasCover"]) ? (<>
-                              <button onClick={L_sr_1z?.["clearCover"]} style={{"height":"32px","padding":"0 8px","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)","fontSize":"12.5px","fontWeight":"650"}}>
+                            {(L_sr_20?.["hasCover"]) ? (<>
+                              <button onClick={L_sr_20?.["clearCover"]} style={{"height":"32px","padding":"0 8px","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)","fontSize":"12.5px","fontWeight":"650"}}>
                                 {"Remove cover"}
                               </button>
                             </>) : null}
                             {"\n                      "}
-                            <button onClick={L_sr_1z?.["remove"]} style={dcCss(`height:32px;padding:0 10px;border:0;border-radius:8px;background:${dcS(L_sr_1z?.["delBg"])};color:var(--irq-c-8a2e1c);font-size:12.5px;font-weight:650`)}>
-                              {dcText(L_sr_1z?.["delLabel"])}
+                            <button onClick={L_sr_20?.["remove"]} style={dcCss(`height:32px;padding:0 10px;border:0;border-radius:8px;background:${dcS(L_sr_20?.["delBg"])};color:var(--irq-c-8a2e1c);font-size:12.5px;font-weight:650`)}>
+                              {dcText(L_sr_20?.["delLabel"])}
                             </button>
                             {"\n                    "}
                           </div>
@@ -3623,89 +3632,89 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                       <span />
                     </div>
                     {"\n            "}
-                    {dcList(v["bldRows"]).map((L_b_21, L_b_21_i) => (
-                      <Fragment key={L_b_21_i}>
+                    {dcList(v["bldRows"]).map((L_b_22, L_b_22_i) => (
+                      <Fragment key={L_b_22_i}>
                         {"\n              "}
                         <div style={{"display":"grid","gridTemplateColumns":"minmax(160px,1fr) minmax(130px,.8fr) minmax(200px,1.4fr) minmax(240px,1.4fr) 100px 36px","alignItems":"center","borderBottom":"1px solid var(--irq-c-eeeeea)"}}>
                           {"\n                "}
                           <span style={{"padding":"6px 4px 6px 10px"}}>
-                            <input value={dcValue(L_b_21?.["name"])} onChange={L_b_21?.["onName"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
+                            <input value={dcValue(L_b_22?.["name"])} onChange={L_b_22?.["onName"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","fontWeight":"600","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 4px"}}>
-                            <input value={dcValue(L_b_21?.["developer"])} onChange={L_b_21?.["onDeveloper"]} placeholder={"Developer"} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
+                            <input value={dcValue(L_b_22?.["developer"])} onChange={L_b_22?.["onDeveloper"]} placeholder={"Developer"} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 4px"}}>
-                            <input value={dcValue(L_b_21?.["address"])} onChange={L_b_21?.["onAddress"]} placeholder={"Address"} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
+                            <input value={dcValue(L_b_22?.["address"])} onChange={L_b_22?.["onAddress"]} placeholder={"Address"} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none"}} />
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 4px","display":"flex","alignItems":"center","gap":"6px","minWidth":"0"}}>
                             {"\n                  "}
                             <label style={{"flex":"1","minWidth":"0","display":"flex","alignItems":"center","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","boxSizing":"border-box"}}>
                               {"\n                                          "}
-                              <input value={dcValue(L_b_21?.["url"])} onChange={L_b_21?.["onUrl"]} onPaste={L_b_21?.["onPasteUrl"]} placeholder={"Paste link to read"} style={{"flex":"1","minWidth":"0","border":"0","outline":"0","background":"transparent","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)"}} />
+                              <input value={dcValue(L_b_22?.["url"])} onChange={L_b_22?.["onUrl"]} onPaste={L_b_22?.["onPasteUrl"]} placeholder={"Paste link to read"} style={{"flex":"1","minWidth":"0","border":"0","outline":"0","background":"transparent","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)"}} />
                               {"\n                  "}
                             </label>
                             {"\n                  "}
-                            <button onClick={L_b_21?.["read"]} disabled={L_b_21?.["readBusy"]} style={{"flex":"0 0 auto","height":"34px","padding":"0 12px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"13px","fontWeight":"650"}}>
-                              {dcText(L_b_21?.["readLabel"])}
+                            <button onClick={L_b_22?.["read"]} disabled={L_b_22?.["readBusy"]} style={{"flex":"0 0 auto","height":"34px","padding":"0 12px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","color":"var(--irq-c-1f1f1c)","fontSize":"13px","fontWeight":"650"}}>
+                              {dcText(L_b_22?.["readLabel"])}
                             </button>
                             {"\n                "}
                           </span>
                           {"\n                "}
                           <span style={{"padding":"0 14px","textAlign":"right","fontSize":"13.5px","fontVariantNumeric":"tabular-nums"}}>
-                            {dcText(L_b_21?.["count"])}
+                            {dcText(L_b_22?.["count"])}
                           </span>
                           {"\n                "}
-                          <button aria-label={"Remove building"} onClick={L_b_21?.["remove"]} title={L_b_21?.["removeTitle"]} style={dcCss(`width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:${dcS(L_b_21?.["removeInk"])};padding:0;font-size:16px`)}>
+                          <button aria-label={"Remove building"} onClick={L_b_22?.["remove"]} title={L_b_22?.["removeTitle"]} style={dcCss(`width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:${dcS(L_b_22?.["removeInk"])};padding:0;font-size:16px`)}>
                             {"×"}
                           </button>
                           {"\n                "}
-                          {(L_b_21?.["hasExtra"]) ? (<>
+                          {(L_b_22?.["hasExtra"]) ? (<>
                             {"\n                  "}
                             <div style={{"gridColumn":"1 / -1","display":"grid","gridTemplateColumns":"repeat(auto-fill,minmax(220px,1fr))","gap":"10px","padding":"2px 14px 14px 10px"}}>
                               {"\n                    "}
-                              {dcList(L_b_21?.["extra"]).map((L_bx_22, L_bx_22_i) => (
-                                <Fragment key={L_bx_22_i}>
-                                  <div style={dcCss(`display:flex;flex-direction:column;gap:5px;min-width:0;grid-column:${dcS(L_bx_22?.["span"])}`)}>
+                              {dcList(L_b_22?.["extra"]).map((L_bx_23, L_bx_23_i) => (
+                                <Fragment key={L_bx_23_i}>
+                                  <div style={dcCss(`display:flex;flex-direction:column;gap:5px;min-width:0;grid-column:${dcS(L_bx_23?.["span"])}`)}>
                                     {"\n  "}
                                     <span style={{"fontSize":"12.5px","fontWeight":"600","color":"var(--irq-c-6b6b66)"}}>
-                                      {dcText(L_bx_22?.["label"])}
-                                      {(L_bx_22?.["required"]) ? (<>
+                                      {dcText(L_bx_23?.["label"])}
+                                      {(L_bx_23?.["required"]) ? (<>
                                         <span style={{"color":"var(--irq-c-111111)"}}>
                                           {" *"}
                                         </span>
                                       </>) : null}
                                     </span>
                                     {"\n  "}
-                                    {(L_bx_22?.["isInput"]) ? (<>
+                                    {(L_bx_23?.["isInput"]) ? (<>
                                       {"\n    "}
-                                      <input type={L_bx_22?.["inputType"]} value={dcValue(L_bx_22?.["value"])} onChange={L_bx_22?.["onChange"]} placeholder={L_bx_22?.["ph"]} style={{"height":"34px","padding":"0 10px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","width":"100%"}} />
+                                      <input type={L_bx_23?.["inputType"]} value={dcValue(L_bx_23?.["value"])} onChange={L_bx_23?.["onChange"]} placeholder={L_bx_23?.["ph"]} style={{"height":"34px","padding":"0 10px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","width":"100%"}} />
                                       {"\n  "}
                                     </>) : null}
                                     {"\n  "}
-                                    {(L_bx_22?.["isLong"]) ? (<>
+                                    {(L_bx_23?.["isLong"]) ? (<>
                                       {"\n    "}
-                                      <textarea value={dcValue(L_bx_22?.["value"])} onChange={L_bx_22?.["onChange"]} rows={"3"} style={{"width":"100%","boxSizing":"border-box","padding":"10px 10px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","lineHeight":"1.5","color":"var(--irq-c-1f1f1c)","resize":"vertical","outline":"none","fontFamily":"inherit"}} />
+                                      <textarea value={dcValue(L_bx_23?.["value"])} onChange={L_bx_23?.["onChange"]} rows={"3"} style={{"width":"100%","boxSizing":"border-box","padding":"10px 10px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","lineHeight":"1.5","color":"var(--irq-c-1f1f1c)","resize":"vertical","outline":"none","fontFamily":"inherit"}} />
                                       {"\n  "}
                                     </>) : null}
                                     {"\n  "}
-                                    {(L_bx_22?.["isImage"]) ? (<>
+                                    {(L_bx_23?.["isImage"]) ? (<>
                                       {"\n    "}
                                       <div style={{"display":"flex","alignItems":"center","gap":"10px","flexWrap":"wrap"}}>
                                         {"\n      "}
-                                        <div role={"img"} aria-label={L_bx_22?.["label"]} style={dcCss(`flex:0 0 72px;width:72px;height:72px;border-radius:10px;border:1px dashed var(--irq-c-d2d2cb);background:var(--irq-c-ffffff) url('${dcS(L_bx_22?.["img"])}') center/contain no-repeat;display:grid;place-items:center;font-size:11px;color:var(--irq-c-97978f)`)}>
-                                          {dcText(L_bx_22?.["imgEmpty"])}
+                                        <div role={"img"} aria-label={L_bx_23?.["label"]} style={dcCss(`flex:0 0 72px;width:72px;height:72px;border-radius:10px;border:1px dashed var(--irq-c-d2d2cb);background:var(--irq-c-ffffff) url('${dcS(L_bx_23?.["img"])}') center/contain no-repeat;display:grid;place-items:center;font-size:11px;color:var(--irq-c-97978f)`)}>
+                                          {dcText(L_bx_23?.["imgEmpty"])}
                                         </div>
                                         {"\n      "}
                                         <label style={{"display":"flex","alignItems":"center","height":"36px","padding":"0 14px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13px","fontWeight":"650","color":"var(--irq-c-1f1f1c)","cursor":"pointer"}}>
                                           {"Upload image"}
-                                          <input type={"file"} accept={"image/*"} onChange={L_bx_22?.["onUpload"]} style={{"display":"none"}} />
+                                          <input type={"file"} accept={"image/*"} onChange={L_bx_23?.["onUpload"]} style={{"display":"none"}} />
                                         </label>
                                         {"\n      "}
-                                        {(L_bx_22?.["hasImg"]) ? (<>
-                                          <button onClick={L_bx_22?.["clear"]} style={{"height":"36px","padding":"0 10px","border":"0","background":"transparent","color":"var(--irq-c-8a2e1c)","fontSize":"13px","fontWeight":"650"}}>
+                                        {(L_bx_23?.["hasImg"]) ? (<>
+                                          <button onClick={L_bx_23?.["clear"]} style={{"height":"36px","padding":"0 10px","border":"0","background":"transparent","color":"var(--irq-c-8a2e1c)","fontSize":"13px","fontWeight":"650"}}>
                                             {"Remove"}
                                           </button>
                                         </>) : null}
@@ -3714,18 +3723,18 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                       {"\n  "}
                                     </>) : null}
                                     {"\n  "}
-                                    {(L_bx_22?.["isTable"]) ? (<>
+                                    {(L_bx_23?.["isTable"]) ? (<>
                                       {"\n    "}
                                       <div style={{"overflowX":"auto","border":"1px solid var(--irq-c-deded8)","borderRadius":"8px","background":"var(--irq-c-ffffff)"}}>
                                         {"\n      "}
-                                        <div style={dcCss(`min-width:${dcS(L_bx_22?.["minW"])}`)}>
+                                        <div style={dcCss(`min-width:${dcS(L_bx_23?.["minW"])}`)}>
                                           {"\n        "}
-                                          <div style={dcCss(`display:grid;grid-template-columns:${dcS(L_bx_22?.["grid"])};background:var(--irq-c-f0f0ed);border-bottom:1px solid var(--irq-c-e7e7e2);font-size:11.5px;font-weight:700;letter-spacing:.05em;color:var(--irq-c-6b6b66)`)}>
+                                          <div style={dcCss(`display:grid;grid-template-columns:${dcS(L_bx_23?.["grid"])};background:var(--irq-c-f0f0ed);border-bottom:1px solid var(--irq-c-e7e7e2);font-size:11.5px;font-weight:700;letter-spacing:.05em;color:var(--irq-c-6b6b66)`)}>
                                             {"\n          "}
-                                            {dcList(L_bx_22?.["cols"]).map((L_bvh_23, L_bvh_23_i) => (
-                                              <Fragment key={L_bvh_23_i}>
-                                                <span style={dcCss(`padding:8px 10px;text-align:${dcS(L_bvh_23?.["align"])}`)}>
-                                                  {dcText(L_bvh_23?.["label"])}
+                                            {dcList(L_bx_23?.["cols"]).map((L_bvh_24, L_bvh_24_i) => (
+                                              <Fragment key={L_bvh_24_i}>
+                                                <span style={dcCss(`padding:8px 10px;text-align:${dcS(L_bvh_24?.["align"])}`)}>
+                                                  {dcText(L_bvh_24?.["label"])}
                                                 </span>
                                               </Fragment>
                                             ))}
@@ -3733,24 +3742,24 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                             {"\n        "}
                                           </div>
                                           {"\n        "}
-                                          {dcList(L_bx_22?.["rows"]).map((L_bvr_24, L_bvr_24_i) => (
-                                            <Fragment key={L_bvr_24_i}>
+                                          {dcList(L_bx_23?.["rows"]).map((L_bvr_25, L_bvr_25_i) => (
+                                            <Fragment key={L_bvr_25_i}>
                                               {"\n          "}
-                                              <div style={dcCss(`display:grid;grid-template-columns:${dcS(L_bx_22?.["grid"])};align-items:center;border-bottom:1px solid var(--irq-c-eeeeea)`)}>
+                                              <div style={dcCss(`display:grid;grid-template-columns:${dcS(L_bx_23?.["grid"])};align-items:center;border-bottom:1px solid var(--irq-c-eeeeea)`)}>
                                                 {"\n            "}
-                                                {dcList(L_bvr_24?.["cells"]).map((L_bvc_25, L_bvc_25_i) => (
-                                                  <Fragment key={L_bvc_25_i}>
+                                                {dcList(L_bvr_25?.["cells"]).map((L_bvc_26, L_bvc_26_i) => (
+                                                  <Fragment key={L_bvc_26_i}>
                                                     {"\n              "}
                                                     <span style={{"padding":"3px 4px","minWidth":"0"}}>
                                                       {"\n                "}
-                                                      {(L_bvc_25?.["isInput"]) ? (<>
-                                                        <input type={L_bvc_25?.["type"]} value={dcValue(L_bvc_25?.["value"])} onChange={L_bvc_25?.["onChange"]} placeholder={L_bvc_25?.["ph"]} style={dcCss(`width:100%;box-sizing:border-box;height:34px;padding:0 8px;border:0;border-radius:6px;outline:none;background:transparent;font-size:13.5px;color:var(--irq-c-1f1f1c);text-align:${dcS(L_bvc_25?.["align"])}`)} className={"irq-p5"} />
+                                                      {(L_bvc_26?.["isInput"]) ? (<>
+                                                        <input type={L_bvc_26?.["type"]} value={dcValue(L_bvc_26?.["value"])} onChange={L_bvc_26?.["onChange"]} placeholder={L_bvc_26?.["ph"]} style={dcCss(`width:100%;box-sizing:border-box;height:34px;padding:0 8px;border:0;border-radius:6px;outline:none;background:transparent;font-size:13.5px;color:var(--irq-c-1f1f1c);text-align:${dcS(L_bvc_26?.["align"])}`)} className={"irq-p5"} />
                                                       </>) : null}
                                                       {"\n                "}
-                                                      {(L_bvc_25?.["isImg"]) ? (<>
-                                                        <label title={"Upload image"} style={dcCss(`display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed var(--irq-c-d2d2cb);background:var(--irq-c-ffffff) url('${dcS(L_bvc_25?.["img"])}') center/cover no-repeat;color:var(--irq-c-111111);font-size:16px;cursor:pointer`)}>
-                                                          {dcText(L_bvc_25?.["imgEmpty"])}
-                                                          <input type={"file"} accept={"image/*"} onChange={L_bvc_25?.["onUpload"]} style={{"display":"none"}} />
+                                                      {(L_bvc_26?.["isImg"]) ? (<>
+                                                        <label title={"Upload image"} style={dcCss(`display:grid;place-items:center;width:44px;height:44px;border-radius:8px;border:1px dashed var(--irq-c-d2d2cb);background:var(--irq-c-ffffff) url('${dcS(L_bvc_26?.["img"])}') center/cover no-repeat;color:var(--irq-c-111111);font-size:16px;cursor:pointer`)}>
+                                                          {dcText(L_bvc_26?.["imgEmpty"])}
+                                                          <input type={"file"} accept={"image/*"} onChange={L_bvc_26?.["onUpload"]} style={{"display":"none"}} />
                                                         </label>
                                                       </>) : null}
                                                       {"\n              "}
@@ -3759,7 +3768,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                                   </Fragment>
                                                 ))}
                                                 {"\n            "}
-                                                <button aria-label={"Remove row"} onClick={L_bvr_24?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"15px"}}>
+                                                <button aria-label={"Remove row"} onClick={L_bvr_25?.["remove"]} style={{"width":"30px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"15px"}}>
                                                   {"×"}
                                                 </button>
                                                 {"\n          "}
@@ -3772,7 +3781,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                         {"\n    "}
                                       </div>
                                       {"\n    "}
-                                      <button onClick={L_bx_22?.["addRow"]} style={{"alignSelf":"flex-start","height":"30px","padding":"0","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"13px","fontWeight":"650"}}>
+                                      <button onClick={L_bx_23?.["addRow"]} style={{"alignSelf":"flex-start","height":"30px","padding":"0","border":"0","background":"transparent","color":"var(--irq-c-111111)","fontSize":"13px","fontWeight":"650"}}>
                                         {"+ Add row"}
                                       </button>
                                       {"\n  "}
@@ -3785,14 +3794,14 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                             {"\n                "}
                           </>) : null}
                           {"\n                "}
-                          {(L_b_21?.["hasStatus"]) ? (<>
+                          {(L_b_22?.["hasStatus"]) ? (<>
                             <div style={{"gridColumn":"1 / -1","display":"flex","flexDirection":"column","gap":"8px","padding":"0 14px 12px 10px"}}>
                               {"\n                  "}
-                              <span style={dcCss(`font-size:12.5px;color:${dcS(L_b_21?.["statusInk"])}`)}>
-                                {dcText(L_b_21?.["status"])}
+                              <span style={dcCss(`font-size:12.5px;color:${dcS(L_b_22?.["statusInk"])}`)}>
+                                {dcText(L_b_22?.["status"])}
                               </span>
                               {"\n                  "}
-                              {(L_b_21?.["found"]) ? (<>
+                              {(L_b_22?.["found"]) ? (<>
                                 {"\n                    "}
                                 <div style={{"display":"flex","flexDirection":"column","gap":"10px","padding":"12px 14px","borderRadius":"12px","background":"var(--irq-c-f2f2ef)","border":"1px solid var(--irq-c-e7e7e2)"}}>
                                   {"\n                      "}
@@ -3803,7 +3812,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                         {"Name "}
                                       </span>
                                       <strong>
-                                        {dcText(L_b_21?.["found"]?.["name"])}
+                                        {dcText(L_b_22?.["found"]?.["name"])}
                                       </strong>
                                     </span>
                                     {"\n                        "}
@@ -3812,7 +3821,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                         {"Developer "}
                                       </span>
                                       <strong>
-                                        {dcText(L_b_21?.["found"]?.["developer"])}
+                                        {dcText(L_b_22?.["found"]?.["developer"])}
                                       </strong>
                                     </span>
                                     {"\n                        "}
@@ -3821,7 +3830,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                         {"Address "}
                                       </span>
                                       <strong>
-                                        {dcText(L_b_21?.["found"]?.["address"])}
+                                        {dcText(L_b_22?.["found"]?.["address"])}
                                       </strong>
                                     </span>
                                     {"\n                      "}
@@ -3829,14 +3838,14 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                   {"\n                      "}
                                   <div style={{"display":"flex","flexWrap":"wrap","gap":"6px"}}>
                                     {"\n                        "}
-                                    {dcList(L_b_21?.["found"]?.["units"]).map((L_u_26, L_u_26_i) => (
-                                      <Fragment key={L_u_26_i}>
+                                    {dcList(L_b_22?.["found"]?.["units"]).map((L_u_27, L_u_27_i) => (
+                                      <Fragment key={L_u_27_i}>
                                         {"\n                          "}
                                         <span style={{"padding":"4px 10px","borderRadius":"999px","background":"var(--irq-c-ffffff)","border":"1px solid var(--irq-c-e7e7e2)","fontSize":"12.5px"}}>
                                           <strong>
-                                            {dcText(L_u_26?.["type"])}
+                                            {dcText(L_u_27?.["type"])}
                                           </strong>
-                                          {" · "}{dcText(L_u_26?.["text"])}
+                                          {" · "}{dcText(L_u_27?.["text"])}
                                         </span>
                                         {"\n                        "}
                                       </Fragment>
@@ -3846,11 +3855,11 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                   {"\n                      "}
                                   <div style={{"display":"flex","alignItems":"center","gap":"10px","flexWrap":"wrap"}}>
                                     {"\n                        "}
-                                    <button onClick={L_b_21?.["apply"]} style={{"height":"34px","padding":"0 14px","borderRadius":"8px","border":"0","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"13px","fontWeight":"650"}}>
+                                    <button onClick={L_b_22?.["apply"]} style={{"height":"34px","padding":"0 14px","borderRadius":"8px","border":"0","background":"var(--irq-c-111111)","color":"var(--irq-c-ffffff)","fontSize":"13px","fontWeight":"650"}}>
                                       {"Apply"}
                                     </button>
                                     {"\n                        "}
-                                    <button onClick={L_b_21?.["dismiss"]} style={{"height":"34px","padding":"0 12px","borderRadius":"8px","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)","fontSize":"13px","fontWeight":"600"}}>
+                                    <button onClick={L_b_22?.["dismiss"]} style={{"height":"34px","padding":"0 12px","borderRadius":"8px","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)","fontSize":"13px","fontWeight":"600"}}>
                                       {"Dismiss"}
                                     </button>
                                     {"\n                        "}
@@ -3885,36 +3894,36 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                   </span>
                 </div>
                 {"\n            "}
-                {dcList(v["bfRows"]).map((L_bf_27, L_bf_27_i) => (
-                  <Fragment key={L_bf_27_i}>
+                {dcList(v["bfRows"]).map((L_bf_28, L_bf_28_i) => (
+                  <Fragment key={L_bf_28_i}>
                     {"\n              "}
                     <div style={{"borderBottom":"1px solid var(--irq-c-eeeeea)"}}>
                       {"\n                "}
-                      <div onClick={L_bf_27?.["select"]} style={dcCss(`display:flex;align-items:center;gap:10px;min-height:44px;padding:0 10px 0 14px;background:${dcS(L_bf_27?.["rowBg"])};cursor:pointer`)}>
+                      <div onClick={L_bf_28?.["select"]} style={dcCss(`display:flex;align-items:center;gap:10px;min-height:44px;padding:0 10px 0 14px;background:${dcS(L_bf_28?.["rowBg"])};cursor:pointer`)}>
                         {"\n                  "}
-                        <span style={dcCss(`flex:1;min-width:0;font-size:13.5px;font-weight:600;color:${dcS(L_bf_27?.["ink"])};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`)}>
-                          {dcText(L_bf_27?.["label"])}
+                        <span style={dcCss(`flex:1;min-width:0;font-size:13.5px;font-weight:600;color:${dcS(L_bf_28?.["ink"])};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`)}>
+                          {dcText(L_bf_28?.["label"])}
                         </span>
                         {"\n                  "}
                         <span style={{"height":"20px","padding":"0 7px","borderRadius":"5px","background":"var(--irq-c-eeeeea)","color":"var(--irq-c-6b6b66)","fontSize":"11.5px","fontWeight":"600","lineHeight":"20px","whiteSpace":"nowrap"}}>
-                          {dcText(L_bf_27?.["badge"])}
+                          {dcText(L_bf_28?.["badge"])}
                         </span>
                         {"\n                  "}
-                        <button title={"Show on quotation"} onClick={L_bf_27?.["toggleShow"]} style={{"display":"flex","alignItems":"center","gap":"5px","height":"30px","padding":"0 8px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","fontSize":"12.5px","whiteSpace":"nowrap"}}>
+                        <button title={"Show on quotation"} onClick={L_bf_28?.["toggleShow"]} style={{"display":"flex","alignItems":"center","gap":"5px","height":"30px","padding":"0 8px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","fontSize":"12.5px","whiteSpace":"nowrap"}}>
                           {"\n                    "}
                           <svg width={"15"} height={"15"} viewBox={"0 0 24 24"} fill={"none"} stroke={"currentColor"} strokeWidth={"1.8"} strokeLinecap={"round"} strokeLinejoin={"round"}>
-                            <path d={L_bf_27?.["eye"]} />
+                            <path d={L_bf_28?.["eye"]} />
                           </svg>
-                          {dcText(L_bf_27?.["showText"])}{"\n                  "}
+                          {dcText(L_bf_28?.["showText"])}{"\n                  "}
                         </button>
                         {"\n                  "}
-                        <button aria-label={"Remove field"} onClick={L_bf_27?.["remove"]} style={{"width":"28px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"15px"}}>
+                        <button aria-label={"Remove field"} onClick={L_bf_28?.["remove"]} style={{"width":"28px","height":"30px","border":"0","borderRadius":"8px","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"15px"}}>
                           {"×"}
                         </button>
                         {"\n                "}
                       </div>
                       {"\n                "}
-                      {(L_bf_27?.["open"]) ? (<>
+                      {(L_bf_28?.["open"]) ? (<>
                         {"\n                  "}
                         <div style={{"padding":"4px 14px 16px"}}>
                           <div style={{"display":"flex","flexDirection":"column","gap":"12px"}}>
@@ -3923,7 +3932,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                               <span style={{"fontSize":"12.5px","fontWeight":"650","color":"var(--irq-c-1f1f1c)"}}>
                                 {"Name"}
                               </span>
-                              <input value={dcValue(L_bf_27?.["fs"]?.["label"])} onChange={L_bf_27?.["fs"]?.["onLabel"]} style={{"height":"38px","padding":"0 12px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","width":"100%"}} />
+                              <input value={dcValue(L_bf_28?.["fs"]?.["label"])} onChange={L_bf_28?.["fs"]?.["onLabel"]} style={{"height":"38px","padding":"0 12px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","width":"100%"}} />
                             </label>
                             {"\n  "}
                             <div style={{"display":"flex","flexDirection":"column","gap":"6px"}}>
@@ -3932,13 +3941,13 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                               </span>
                               {"\n    "}
                               <div style={{"display":"flex","flexWrap":"wrap","gap":"6px"}}>
-                                {dcList(L_bf_27?.["fs"]?.["kinds"]).map((L_bsk_28, L_bsk_28_i) => (
-                                  <Fragment key={L_bsk_28_i}>
-                                    <button onClick={L_bsk_28?.["pick"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:16px;border:1px solid ${dcS(L_bsk_28?.["border"])};background:${dcS(L_bsk_28?.["bg"])};color:${dcS(L_bsk_28?.["ink"])};font-size:12.5px;font-weight:650;white-space:nowrap`)}>
+                                {dcList(L_bf_28?.["fs"]?.["kinds"]).map((L_bsk_29, L_bsk_29_i) => (
+                                  <Fragment key={L_bsk_29_i}>
+                                    <button onClick={L_bsk_29?.["pick"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:16px;border:1px solid ${dcS(L_bsk_29?.["border"])};background:${dcS(L_bsk_29?.["bg"])};color:${dcS(L_bsk_29?.["ink"])};font-size:12.5px;font-weight:650;white-space:nowrap`)}>
                                       <span style={{"fontSize":"11px","opacity":".75"}}>
-                                        {dcText(L_bsk_28?.["icon"])}
+                                        {dcText(L_bsk_29?.["icon"])}
                                       </span>
-                                      {dcText(L_bsk_28?.["label"])}
+                                      {dcText(L_bsk_29?.["label"])}
                                     </button>
                                   </Fragment>
                                 ))}
@@ -3946,7 +3955,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                               {"\n  "}
                             </div>
                             {"\n  "}
-                            {(L_bf_27?.["fs"]?.["isTable"]) ? (<>
+                            {(L_bf_28?.["fs"]?.["isTable"]) ? (<>
                               {"\n    "}
                               <div style={{"display":"flex","flexDirection":"column","gap":"8px"}}>
                                 {"\n      "}
@@ -3955,26 +3964,26 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                     {"Table columns"}
                                   </span>
                                   <span style={{"fontSize":"12px","color":"var(--irq-c-6b6b66)"}}>
-                                    {dcText(L_bf_27?.["fs"]?.["colCount"])}
+                                    {dcText(L_bf_28?.["fs"]?.["colCount"])}
                                   </span>
                                 </div>
                                 {"\n      "}
                                 <div style={{"display":"flex","flexWrap":"wrap","gap":"8px"}}>
                                   {"\n        "}
-                                  {dcList(L_bf_27?.["fs"]?.["cols"]).map((L_bsc_29, L_bsc_29_i) => (
-                                    <Fragment key={L_bsc_29_i}>
+                                  {dcList(L_bf_28?.["fs"]?.["cols"]).map((L_bsc_2a, L_bsc_2a_i) => (
+                                    <Fragment key={L_bsc_2a_i}>
                                       {"\n          "}
-                                      <button onClick={L_bsc_29?.["select"]} style={dcCss(`display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:92px;padding:7px 12px;border-radius:10px;border:1px solid var(--irq-c-deded8);background:var(--irq-c-ffffff);box-shadow:${dcS(L_bsc_29?.["line"])};text-align:left`)}>
+                                      <button onClick={L_bsc_2a?.["select"]} style={dcCss(`display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:92px;padding:7px 12px;border-radius:10px;border:1px solid var(--irq-c-deded8);background:var(--irq-c-ffffff);box-shadow:${dcS(L_bsc_2a?.["line"])};text-align:left`)}>
                                         {"\n            "}
                                         <span style={{"fontSize":"13.5px","fontWeight":"650","color":"var(--irq-c-1f1f1c)","whiteSpace":"nowrap"}}>
                                           <span style={{"fontSize":"10.5px","color":"var(--irq-c-6b6b66)","marginRight":"5px"}}>
-                                            {dcText(L_bsc_29?.["icon"])}
+                                            {dcText(L_bsc_2a?.["icon"])}
                                           </span>
-                                          {dcText(L_bsc_29?.["label"])}
+                                          {dcText(L_bsc_2a?.["label"])}
                                         </span>
                                         {"\n            "}
                                         <span style={{"fontSize":"11.5px","color":"var(--irq-c-6b6b66)"}}>
-                                          {dcText(L_bsc_29?.["kindLabel"])}
+                                          {dcText(L_bsc_2a?.["kindLabel"])}
                                         </span>
                                         {"\n          "}
                                       </button>
@@ -3982,13 +3991,13 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                     </Fragment>
                                   ))}
                                   {"\n        "}
-                                  <button aria-label={"Add column"} onClick={L_bf_27?.["fs"]?.["addCol"]} style={{"width":"44px","minHeight":"46px","borderRadius":"10px","border":"1px dashed var(--irq-c-d2d2cb)","background":"transparent","color":"var(--irq-c-111111)","fontSize":"17px","padding":"0"}}>
+                                  <button aria-label={"Add column"} onClick={L_bf_28?.["fs"]?.["addCol"]} style={{"width":"44px","minHeight":"46px","borderRadius":"10px","border":"1px dashed var(--irq-c-d2d2cb)","background":"transparent","color":"var(--irq-c-111111)","fontSize":"17px","padding":"0"}}>
                                     {"+"}
                                   </button>
                                   {"\n      "}
                                 </div>
                                 {"\n      "}
-                                {(L_bf_27?.["fs"]?.["col"]) ? (<>
+                                {(L_bf_28?.["fs"]?.["col"]) ? (<>
                                   {"\n        "}
                                   <div style={{"display":"flex","flexDirection":"column","gap":"10px","padding":"14px","borderRadius":"12px","border":"1px solid var(--irq-c-e7e7e2)","background":"var(--irq-c-ffffff)"}}>
                                     {"\n          "}
@@ -3996,7 +4005,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                       <span style={{"fontSize":"11.5px","fontWeight":"700","letterSpacing":".08em","color":"var(--irq-c-6b6b66)"}}>
                                         {"COLUMN SETTINGS"}
                                       </span>
-                                      <button aria-label={"Close"} onClick={L_bf_27?.["fs"]?.["col"]?.["close"]} style={{"width":"26px","height":"26px","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"15px"}}>
+                                      <button aria-label={"Close"} onClick={L_bf_28?.["fs"]?.["col"]?.["close"]} style={{"width":"26px","height":"26px","border":"0","background":"transparent","color":"var(--irq-c-6b6b66)","padding":"0","fontSize":"15px"}}>
                                         {"×"}
                                       </button>
                                     </div>
@@ -4005,7 +4014,7 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                       <span style={{"fontSize":"12.5px","fontWeight":"650","color":"var(--irq-c-1f1f1c)"}}>
                                         {"Name"}
                                       </span>
-                                      <input value={dcValue(L_bf_27?.["fs"]?.["col"]?.["label"])} onChange={L_bf_27?.["fs"]?.["col"]?.["onLabel"]} style={{"height":"38px","padding":"0 12px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","width":"100%"}} />
+                                      <input value={dcValue(L_bf_28?.["fs"]?.["col"]?.["label"])} onChange={L_bf_28?.["fs"]?.["col"]?.["onLabel"]} style={{"height":"38px","padding":"0 12px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","width":"100%"}} />
                                     </label>
                                     {"\n          "}
                                     <span style={{"fontSize":"12.5px","fontWeight":"650","color":"var(--irq-c-1f1f1c)"}}>
@@ -4013,19 +4022,19 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                                     </span>
                                     {"\n          "}
                                     <div style={{"display":"flex","flexWrap":"wrap","gap":"6px"}}>
-                                      {dcList(L_bf_27?.["fs"]?.["col"]?.["kinds"]).map((L_bsck_2a, L_bsck_2a_i) => (
-                                        <Fragment key={L_bsck_2a_i}>
-                                          <button onClick={L_bsck_2a?.["pick"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:16px;border:1px solid ${dcS(L_bsck_2a?.["border"])};background:${dcS(L_bsck_2a?.["bg"])};color:${dcS(L_bsck_2a?.["ink"])};font-size:12.5px;font-weight:650;white-space:nowrap`)}>
+                                      {dcList(L_bf_28?.["fs"]?.["col"]?.["kinds"]).map((L_bsck_2b, L_bsck_2b_i) => (
+                                        <Fragment key={L_bsck_2b_i}>
+                                          <button onClick={L_bsck_2b?.["pick"]} style={dcCss(`display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:16px;border:1px solid ${dcS(L_bsck_2b?.["border"])};background:${dcS(L_bsck_2b?.["bg"])};color:${dcS(L_bsck_2b?.["ink"])};font-size:12.5px;font-weight:650;white-space:nowrap`)}>
                                             <span style={{"fontSize":"11px","opacity":".75"}}>
-                                              {dcText(L_bsck_2a?.["icon"])}
+                                              {dcText(L_bsck_2b?.["icon"])}
                                             </span>
-                                            {dcText(L_bsck_2a?.["label"])}
+                                            {dcText(L_bsck_2b?.["label"])}
                                           </button>
                                         </Fragment>
                                       ))}
                                     </div>
                                     {"\n          "}
-                                    <button onClick={L_bf_27?.["fs"]?.["col"]?.["remove"]} style={{"alignSelf":"flex-start","height":"28px","padding":"0","border":"0","background":"transparent","color":"var(--irq-c-8a2e1c)","fontSize":"13px","fontWeight":"650"}}>
+                                    <button onClick={L_bf_28?.["fs"]?.["col"]?.["remove"]} style={{"alignSelf":"flex-start","height":"28px","padding":"0","border":"0","background":"transparent","color":"var(--irq-c-8a2e1c)","fontSize":"13px","fontWeight":"650"}}>
                                       {"Remove column"}
                                     </button>
                                     {"\n        "}
@@ -4058,23 +4067,23 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                     {"\n    "}
                     <input value={dcValue(v["bldComp"]?.["name"])} onChange={v["bldComp"]?.["onName"]} onKeyDown={v["bldComp"]?.["onKey"]} placeholder={v["bldComp"]?.["ph"]} style={{"height":"38px","padding":"0 12px","borderRadius":"10px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","color":"var(--irq-c-1f1f1c)","outline":"none","boxSizing":"border-box","width":"100%"}} />
                     {"\n    "}
-                    {dcList(v["bldComp"]?.["groups"]).map((L_bqg_2b, L_bqg_2b_i) => (
-                      <Fragment key={L_bqg_2b_i}>
+                    {dcList(v["bldComp"]?.["groups"]).map((L_bqg_2c, L_bqg_2c_i) => (
+                      <Fragment key={L_bqg_2c_i}>
                         {"\n      "}
                         <div style={{"display":"flex","flexDirection":"column","gap":"6px"}}>
                           {"\n        "}
-                          {(L_bqg_2b?.["title"]) ? (<>
+                          {(L_bqg_2c?.["title"]) ? (<>
                             <span style={{"fontSize":"11px","fontWeight":"700","letterSpacing":".08em","color":"var(--irq-c-6b6b66)"}}>
-                              {dcText(L_bqg_2b?.["title"])}
+                              {dcText(L_bqg_2c?.["title"])}
                             </span>
                           </>) : null}
                           {"\n        "}
                           <div style={{"display":"flex","flexWrap":"wrap","gap":"5px"}}>
                             {"\n          "}
-                            {dcList(L_bqg_2b?.["kinds"]).map((L_bqk_2c, L_bqk_2c_i) => (
-                              <Fragment key={L_bqk_2c_i}>
-                                <button onClick={L_bqk_2c?.["pick"]} style={dcCss(`height:28px;padding:0 10px;border-radius:14px;border:1px solid ${dcS(L_bqk_2c?.["border"])};background:${dcS(L_bqk_2c?.["bg"])};color:${dcS(L_bqk_2c?.["ink"])};font-size:12.5px;font-weight:600;white-space:nowrap`)}>
-                                  {dcText(L_bqk_2c?.["label"])}
+                            {dcList(L_bqg_2c?.["kinds"]).map((L_bqk_2d, L_bqk_2d_i) => (
+                              <Fragment key={L_bqk_2d_i}>
+                                <button onClick={L_bqk_2d?.["pick"]} style={dcCss(`height:28px;padding:0 10px;border-radius:14px;border:1px solid ${dcS(L_bqk_2d?.["border"])};background:${dcS(L_bqk_2d?.["bg"])};color:${dcS(L_bqk_2d?.["ink"])};font-size:12.5px;font-weight:600;white-space:nowrap`)}>
+                                  {dcText(L_bqk_2d?.["label"])}
                                 </button>
                               </Fragment>
                             ))}
@@ -4203,33 +4212,33 @@ export function renderSettings(v: DcVals, C: DcComponents) {
                       {"\n            "}
                     </div>
                     {"\n            "}
-                    {dcList(v["priceRows"]).map((L_p_2d, L_p_2d_i) => (
-                      <Fragment key={L_p_2d_i}>
+                    {dcList(v["priceRows"]).map((L_p_2e, L_p_2e_i) => (
+                      <Fragment key={L_p_2e_i}>
                         {"\n              "}
-                        <div style={dcCss(`display:grid;grid-template-columns:minmax(200px,1.4fr) 120px 130px 150px 110px 150px;align-items:center;border-bottom:1px solid var(--irq-c-eeeeea);background:${dcS(L_p_2d?.["bg"])}`)}>
+                        <div style={dcCss(`display:grid;grid-template-columns:minmax(200px,1.4fr) 120px 130px 150px 110px 150px;align-items:center;border-bottom:1px solid var(--irq-c-eeeeea);background:${dcS(L_p_2e?.["bg"])}`)}>
                           {"\n                "}
                           <span style={{"padding":"6px 14px","fontSize":"13.5px","fontWeight":"650"}}>
-                            {dcText(L_p_2d?.["name"])}
+                            {dcText(L_p_2e?.["name"])}
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 8px","fontSize":"13px","color":"var(--irq-c-6b6b66)"}}>
-                            {dcText(L_p_2d?.["style"])}
+                            {dcText(L_p_2e?.["style"])}
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 8px","textAlign":"right","fontSize":"13.5px","fontVariantNumeric":"tabular-nums"}}>
-                            {dcText(L_p_2d?.["cost"])}
+                            {dcText(L_p_2e?.["cost"])}
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 4px"}}>
-                            <input inputMode={"decimal"} value={dcValue(L_p_2d?.["price"])} onChange={L_p_2d?.["onPrice"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","fontWeight":"650","textAlign":"right","color":"var(--irq-c-1f1f1c)","outline":"none","fontVariantNumeric":"tabular-nums"}} />
+                            <input inputMode={"decimal"} value={dcValue(L_p_2e?.["price"])} onChange={L_p_2e?.["onPrice"]} style={{"width":"100%","boxSizing":"border-box","height":"34px","padding":"0 8px","borderRadius":"8px","border":"1px solid var(--irq-c-deded8)","background":"var(--irq-c-ffffff)","fontSize":"13.5px","fontWeight":"650","textAlign":"right","color":"var(--irq-c-1f1f1c)","outline":"none","fontVariantNumeric":"tabular-nums"}} />
                           </span>
                           {"\n                "}
-                          <span style={dcCss(`padding:6px 8px;text-align:right;font-size:13.5px;font-weight:650;color:${dcS(L_p_2d?.["effInk"])}`)}>
-                            {dcText(L_p_2d?.["effective"])}
+                          <span style={dcCss(`padding:6px 8px;text-align:right;font-size:13.5px;font-weight:650;color:${dcS(L_p_2e?.["effInk"])}`)}>
+                            {dcText(L_p_2e?.["effective"])}
                           </span>
                           {"\n                "}
                           <span style={{"padding":"6px 14px","textAlign":"right","fontSize":"13.5px","color":"var(--irq-c-6b6b66)","fontVariantNumeric":"tabular-nums"}}>
-                            {dcText(L_p_2d?.["suggested"])}
+                            {dcText(L_p_2e?.["suggested"])}
                           </span>
                           {"\n              "}
                         </div>

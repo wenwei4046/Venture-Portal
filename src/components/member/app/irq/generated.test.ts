@@ -42,6 +42,17 @@ describe("the generated IR Quote templates", () => {
     }
   });
 
+  // 2026-11-09: an iPhone drew a date field's value at the top of its box; touch screens centre it, after the older date rule.
+  it("centre a date field's value on a touch screen", () => {
+    const at = IRQ_CSS_QUOTE.indexOf("@media (pointer: coarse) { input[type='date'] { -webkit-appearance: none; appearance: none; display: flex; align-items: center; }");
+    expect(at).toBeGreaterThan(IRQ_CSS_QUOTE.indexOf("display: block; text-align: left; }"));
+  });
+
+  it("put Classic | Build in beside a room type's title in Quote settings", () => {
+    const settings = tpls.find(([f]) => f === "SettingsTpl.tsx")![1];
+    expect(settings).toContain('v["ed"]?.["vers"]');
+  });
+
   it("show the item being replaced in the Change item sheet's header", () => {
     const quote = tpls.find(([f]) => f === "QuoteTpl.tsx")![1];
     expect(quote).toContain('v["sheet"]?.["img"]');
