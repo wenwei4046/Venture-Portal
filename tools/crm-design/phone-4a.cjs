@@ -357,6 +357,10 @@ function teamInbox(body) {
     const i = b.indexOf(open), j = i < 0 ? -1 : b.indexOf("</div>", i);
     if (i < 0 || j < 0 || b.indexOf(open, i + 1) >= 0 || !b.slice(i, j).includes("{(v.ib.inbCols).map(")) throw new Error("phone-4a: team status dropdown");
     b = b.slice(0, i) + "<Phone4aStatusPick cols={v.ib.inbCols} />" + b.slice(j + "</div>".length); }
+  // Whose chats: one dropdown in place of the team chips and the people chips (the owner, 2026-11-09: "inbox 中的人员，做筛选").
+  { const i = b.indexOf("{!!(v.ib.inbHasChips) && (<>"), j = b.indexOf("<Phone4aStatusPick cols={v.ib.inbCols} />", i);
+    if (i < 0 || j < 0 || !b.slice(i, j).includes("v.ib.inbWhoChips")) throw new Error("phone-4a: team who pick");
+    b = b.slice(0, i) + "<Phone4aWhoPick v={v.ib.inbWhoMenu} />\n          " + b.slice(j); }
   // The board shows the status picked above it, full width, and no longer pans sideways (the owner, 2026-10-24: "怎麼可以隨意
   // 拖動" — the tabs and the board's columns drifted apart).
   b = once(b, '<div data-inb-board="1" data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "12px", overflowX: "auto", overflowY: "hidden",',

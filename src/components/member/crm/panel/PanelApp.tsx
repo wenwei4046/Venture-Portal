@@ -13,7 +13,7 @@ import { PhoneCalendar, PhonePeople } from "../shared/PhoneLeaveCal";
 import { InfoValue } from "../shared/AdLink";
 import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
 import ChatComposer from "../sales/ChatComposer";
-import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aBookMode, Phone4aChip, Phone4aCustomBook, Phone4aHero, Phone4aKeepHeight, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStatusPick, Phone4aStrip, Phone4aTeamHead } from "../shared/phone4a";
+import { Phone4aActive, Phone4aActiveSave, Phone4aAdCard, Phone4aAdjustSheet, Phone4aAdsPerf, Phone4aBar, Phone4aBookMode, Phone4aCustomBook, Phone4aHero, Phone4aKeepHeight, Phone4aProfile, Phone4aRoom, Phone4aRoomRemarks, Phone4aSplitTeams, Phone4aStatusPick, Phone4aStrip, Phone4aTeamHead, Phone4aWhoPick } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { PanelAppVM } from "./vm/app";
 
@@ -236,20 +236,7 @@ export default function PanelApp({ v }: { v: PanelAppVM }) {
               <span onClick={v.bl.openNotifs} title="Notifications" style={{ position: "relative", flex: "none", width: "40px", height: "40px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-line)", background: "#fff", display: "grid", placeItems: "center", color: "var(--crm-ink)", cursor: "pointer" }}><Ic name="bell" size={18} />{!!(v.bl.notifUnread) && (<span style={{ position: "absolute", top: "8px", right: "9px", width: "8px", height: "8px", boxSizing: "content-box", borderRadius: "50%", background: "var(--crm-orange)", border: "2px solid #fff" }} />)}</span>
             </>)}
           </div>
-          {!!(v.ib.inbHasChips) && (<>
-            <div style={{ flex: "none", display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", margin: "0 -20px", padding: "0 20px" }}>
-              {(v.ib.inbChips).map((c, c_i) => (<Fragment key={c_i}>
-                <Phone4aChip label={c.label} count={c.n} on={c.on} onClick={c.pick}>{c.dot && c.label !== "All" ? <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: c.on ? "#fff" : c.dot }} /> : null}</Phone4aChip>
-              </Fragment>))}
-            </div>
-          </>)}
-          {!!(v.ib.inbHasWho) && (<>
-            <div data-drag-scroll="1" style={{ flex: "0 0 auto", display: "flex", gap: "6px", overflowX: "auto", scrollbarWidth: "none", margin: "-4px -20px 0", padding: "0 20px", userSelect: "none" }}>
-              {(v.ib.inbWhoChips).map((c, c_i) => (<Fragment key={c_i}>
-                <Phone4aChip label={c.label} count={c.n} on={c.on} onClick={c.pick} />
-              </Fragment>))}
-            </div>
-          </>)}
+          <Phone4aWhoPick v={v.ib.inbWhoMenu} />
           <Phone4aStatusPick cols={v.ib.inbCols} />
           <div data-inb-board="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "12px", overflowX: "hidden", overflowY: "hidden", scrollbarWidth: "none", margin: "-14px -20px -14px", padding: "14px 16px 14px", background: "var(--crm-hover)", scrollSnapType: "x mandatory", scrollPadding: "0 20px", userSelect: "none" }}>
             {(v.ib.inbCols).filter(g => g.on).map((g, g_i) => (<Fragment key={g_i}>

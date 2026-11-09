@@ -134,9 +134,13 @@ export function presets(now: Date): Record<"day" | "week" | "month", Range> & { 
 export function dateSheetVM(ctx: PanelCtx) {
   const { ui, patch, set, now } = ctx;
   const isC = ui.period === "custom" && !!ui.ovRange, P = presets(now), T = day0(now);
+  // All time (the owner, 2026-11-09: "把过去 30 days 删掉，变为所有时间"): the CRM's first lead's day to today.
+  const firstLead = ctx.data.customers.reduce((m, c) => (c.createdAt && c.createdAt < m ? c.createdAt : m), new Date(T).toISOString());
+  const allTime: Range = { a: day0(new Date(firstLead)), b: T };
+  const isAll = isC && !!ui.ovRange && ui.ovRange.a === allTime.a && ui.ovRange.b === allTime.b;
   const cur = periodRange(ui.period, ui.ovRange, now);
   const ovRgTxt = isC && ui.ovRange ? rangeText(ui.ovRange) : "";
-  const perT = isC ? "Custom" : { day: "Today", week: "This week", month: "This month", custom: "This month" }[ui.period];
+  const perT = isAll ? "All time" : isC ? "Custom" : { day: "Today", week: "This week", month: "This month", custom: "This month" }[ui.period];
   const perD = isC ? ovRgTxt : ui.period === "day" ? gb(now, { weekday: "short", day: "numeric", month: "short" }) : ui.period === "week" ? rangeText(P.week) : gb(now, { month: "long", year: "numeric" });
   const sh = ui.ovSheet, setS = (p: Partial<NonNullable<PanelUi["ovSheet"]>>) => set(u => (u.ovSheet ? { ...u, ovSheet: { ...u.ovSheet, ...p } } : u));
   const open = (only: boolean, tab: "a" | "b") => patch({ ovSheet: { a: cur.a, b: cur.b, per: isC ? null : (ui.period as "day" | "week" | "month"), ca: ui.cmp?.a ?? null, cb: ui.cmp?.b ?? null, tab, only, cm: [new Date(cur.a).getFullYear(), new Date(cur.a).getMonth()], step: 0 } });
@@ -158,7 +162,7 @@ export function dateSheetVM(ctx: PanelCtx) {
   const lo = onB ? (hasB ? Math.min(sh.ca!, sh.cb!) : null) : A0, hi = onB ? (hasB ? Math.max(sh.ca!, sh.cb!) : null) : A1;
   const cm = sh.cm, c1 = new Date(cm[0], cm[1], 1), l0 = (c1.getDay() + 6) % 7, rr = Math.ceil((l0 + new Date(cm[0], cm[1] + 1, 0).getDate()) / 7);
   const ACC = "var(--crm-rust)", BAND = "var(--crm-tint-attention)";
-  const list: [string, Range, "day" | "week" | "month" | null][] = [["Today", P.day, "day"], ["This week", P.week, "week"], ["This month", P.month, "month"], ["Last 7 days", P.last7, null], ["Last 30 days", P.last30, null], ["Last month", P.lastMonth, null]];
+  const list: [string, Range, "day" | "week" | "month" | null][] = [["Today", P.day, "day"], ["This week", P.week, "week"], ["This month", P.month, "month"], ["Last 7 days", P.last7, null], ["All time", allTime, null], ["Last month", P.lastMonth, null]];
   const cLo = hasB ? Math.min(sh.ca!, sh.cb!) : null, cHi = hasB ? Math.max(sh.ca!, sh.cb!) : null;
   return {
     ...base,
