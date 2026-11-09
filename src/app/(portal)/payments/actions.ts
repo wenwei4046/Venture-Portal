@@ -1780,7 +1780,7 @@ export async function reassignVoucherGlAccount(
   formData: FormData,
 ): Promise<{ error?: string; changed?: number }> {
   try {
-    await requireActionOn(['/payments', '/payments/[id]', '/receipts'], 'treasury', 'edit')
+    await requireActionOn('/payments/[id]', 'treasury', 'edit')
     const supabase = await createClient()
 
     const id = ((formData.get('id') as string) ?? '').trim()

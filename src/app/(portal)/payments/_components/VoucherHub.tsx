@@ -7,7 +7,6 @@ import { BatchList, HeadButton, HubCards, HubHead, hubStyles as hs, type ChipTon
 import { FinTable, type FinColumn } from '@/components/finv/FinTable'
 import { DialogMenu, FinDialog, type DialogMenuItem } from '@/components/finv/Dialog'
 import { flash } from '@/components/hrv/toast'
-import ReassignGlAccountButton from '../[id]/_components/ReassignGlAccountButton'
 import { CopyVoucherDialog } from '../[id]/_components/CopyAsDraft'
 import { openVoucherPage } from '../page-actions'
 import type { VoucherDetail } from '../_lib/voucher-detail'
@@ -106,7 +105,7 @@ export default function VoucherHub({
   const [menuRecord, setMenuRecord] = useState<{ detail: VoucherDetail; extras: VoucherPageExtras | null; canCopy: boolean } | null>(null)
   const [menuReading, setMenuReading] = useState<string | null>(null)
   const readingRef = useRef<string | null>(null)
-  const [menuExtra, setMenuExtra] = useState<{ kind: 'copy' | 'gl'; nonce: number } | null>(null)
+  const [menuExtra, setMenuExtra] = useState<{ kind: 'copy'; nonce: number } | null>(null)
 
   // The card in the URL, so a refresh or a link lands on it (no navigation: the list is here).
   useEffect(() => {
@@ -165,7 +164,8 @@ export default function VoucherHub({
   const menuMore: DialogMenuItem[] = mv
     ? [
         ...(menuRecord?.canCopy ? [{ key: 'copy', label: 'Copy as a new draft', onClick: () => setMenuExtra({ kind: 'copy', nonce: Date.now() }) }] : []),
-        ...(menuRecord?.extras?.reassign ? [{ key: 'gl', label: 'Change GL account', onClick: () => setMenuExtra({ kind: 'gl', nonce: Date.now() }) }] : []),
+        // Change GL account is the voucher page's (its gate names that page): the menu opens it there.
+        ...(menuRecord?.extras?.reassign ? [{ key: 'gl', label: 'Change GL account…', onClick: () => router.push(`/payments/${menuRecord.detail.id}`) }] : []),
       ]
     : []
   const menuSteps = useVoucherSteps(mv, {
@@ -322,16 +322,6 @@ export default function VoucherHub({
       {menuSteps.dialogs}
       {mv && menuExtra?.kind === 'copy' ? (
         <CopyVoucherDialog key={menuExtra.nonce} open onClose={() => setMenuExtra(null)} voucherId={mv.id} voucherNo={mv.no} />
-      ) : null}
-      {mv && menuExtra?.kind === 'gl' && menuRecord?.extras?.reassign ? (
-        <ReassignGlAccountButton
-          key={menuExtra.nonce}
-          autoOpen
-          hideTrigger
-          voucherId={mv.id}
-          fromOptions={menuRecord.extras.reassign.from}
-          accountOptions={menuRecord.extras.reassign.options}
-        />
       ) : null}
       {redate?.row.amendDate ? (
         <AmendDateButton

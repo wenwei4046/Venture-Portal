@@ -65,7 +65,7 @@ DECLARE
   v_bank    text := nullif(btrim(coalesce(p_bank, '')), '');
   v_account text := nullif(regexp_replace(coalesce(p_account, ''), '[[:space:]-]', '', 'g'), '');
 BEGIN
-  PERFORM public.tab_write_guard(ARRAY['/payments', '/payments/[id]'], ARRAY['treasury.create', 'treasury.edit']);
+  PERFORM public.tab_write_guard(ARRAY['/payments', '/payments/requests'], ARRAY['treasury.create', 'treasury.edit']);
   IF auth.uid() IS NULL OR NOT coalesce(public.has_any_action(ARRAY['treasury.create', 'treasury.edit']), false) THEN
     RAISE EXCEPTION 'Pay into needs Treasury · Create or Edit.' USING ERRCODE = '42501';
   END IF;
@@ -151,6 +151,25 @@ SELECT DISTINCT ON (r.pv_id) r.pv_id, r.payee_bank,
    AND (r.payee_bank IS NOT NULL OR r.payee_account_no ~ '^[0-9A-Za-z]{4,30}$')
  ORDER BY r.pv_id, r.submitted_at
 ON CONFLICT (voucher_id) DO NOTHING;
+
+-- The guards the scan reads (tab-write-guards.test.ts), checked against the bodies above.
+CREATE OR REPLACE FUNCTION pg_temp.tab_guard(p_sig text, p_pages text, p_wants text[])
+RETURNS void
+LANGUAGE plpgsql AS $g$
+DECLARE
+  v_line text := format('PERFORM public.tab_write_guard(%s, ARRAY[%s]);', p_pages,
+    array_to_string(ARRAY(SELECT quote_literal(w) FROM unnest(p_wants) w), ', '));
+BEGIN
+  IF position(v_line IN (SELECT prosrc FROM pg_proc WHERE oid = p_sig::regprocedure)) = 0 THEN
+    RAISE EXCEPTION '% does not ask its page: % is not in its body', p_sig, v_line;
+  END IF;
+END
+$g$;
+
+SELECT pg_temp.tab_guard('public.voucher_payee_set(uuid, text, text)',
+  $$ARRAY['/payments', '/payments/requests']$$, ARRAY['treasury.create', 'treasury.edit']);
+SELECT pg_temp.tab_guard('public.voucher_payee_copy(uuid, uuid)',
+  $$ARRAY['/payments', '/payments/[id]', '/receipts']$$, ARRAY['treasury.create']);
 
 REVOKE ALL ON FUNCTION public.voucher_payees(uuid[]) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.voucher_payee_set(uuid, text, text) FROM PUBLIC, anon;
