@@ -361,6 +361,10 @@ function teamInbox(body) {
   { const i = b.indexOf("{!!(v.ib.inbHasChips) && (<>"), j = b.indexOf("<Phone4aStatusPick cols={v.ib.inbCols} />", i);
     if (i < 0 || j < 0 || !b.slice(i, j).includes("v.ib.inbWhoChips")) throw new Error("phone-4a: team who pick");
     b = b.slice(0, i) + "<Phone4aWhoPick v={v.ib.inbWhoMenu} />\n          " + b.slice(j); }
+  // The board's column heading repeated the Status dropdown over it — "■ All 167" twice (the owner, 2026-11-09: "overlap").
+  { const k = b.indexOf("data-inb-board"), h = '<span style={{ display: "flex", alignItems: "center", gap: "8px", padding: "2px 4px" }}>', i = b.indexOf(h, k);
+    if (k < 0 || i < 0 || i - k > 1500) throw new Error("phone-4a: board heading");
+    const [x, y] = el(b.slice(i), h, "span", "board heading"); b = b.slice(0, i + x) + b.slice(i + y); }
   // The board shows the status picked above it, full width, and no longer pans sideways (the owner, 2026-10-24: "怎麼可以隨意
   // 拖動" — the tabs and the board's columns drifted apart).
   b = once(b, '<div data-inb-board="1" data-drag-scroll="1" style={{ flex: "1 1 0", minHeight: "0", display: "flex", alignItems: "stretch", gap: "12px", overflowX: "auto", overflowY: "hidden",',
@@ -378,7 +382,7 @@ function teamAssign(body) {
   if (at < 0) throw new Error("phone-4a: team assign");
   const home = body.indexOf("{!!(v.asx.onHome) && (<>", at);
   const [, h1e] = el(body.slice(home), '<div style={{ flex: "none", display: "flex", alignItems: "flex-start", gap: "8px" }}>', "div", "assign head");
-  const head = `<div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "14px" }}><div style={{ display: "flex", alignItems: "center", gap: "10px" }}><h1 style={{ margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Assignment</h1>{!!(v.asx.onAct) && (<Phone4aActiveSave v={v.asx.act} />)}</div><div style={{ display: "flex", gap: "22px", borderBottom: "1px solid var(--crm-rule)" }}>{(v.asx.tabs4).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ height: "36px", display: "inline-flex", alignItems: "center", marginBottom: "-1px", borderBottom: t.on ? "2px solid var(--crm-rust)" : "2px solid transparent", fontSize: "${F(15)}", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", whiteSpace: "nowrap", cursor: "pointer" }}>{t.label}</span>))}</div></div>`;
+  const head = `<div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "14px" }}><div style={{ display: "flex", alignItems: "center", gap: "10px" }}><h1 style={{ margin: "0", fontFamily: "${TIGHT}", fontSize: "${F(30)}", fontWeight: "500", letterSpacing: "-0.025em", lineHeight: "1.2" }}>Assignment</h1>{!!(v.asx.onAct) && (<Phone4aActiveSave v={v.asx.act} />)}</div><div data-drag-scroll="1" style={{ display: "flex", gap: "22px", borderBottom: "1px solid var(--crm-rule)", overflowX: "auto", overscrollBehaviorX: "contain", scrollbarWidth: "none", margin: "0 -20px", padding: "0 20px" }}>{(v.asx.tabs4).map((t, t_i) => (<span key={t_i} onClick={t.pick} style={{ flex: "none", height: "36px", display: "inline-flex", alignItems: "center", marginBottom: "-1px", borderBottom: t.on ? "2px solid var(--crm-rust)" : "2px solid transparent", fontSize: "${F(15)}", fontWeight: t.on ? "500" : "400", color: t.on ? "var(--crm-ink)" : "var(--crm-faint)", whiteSpace: "nowrap", cursor: "pointer" }}>{t.label}</span>))}</div></div>`;
   // The home's title block becomes the tabs, shown on every section (onHome is false now — draw it unconditionally).
   const blockEnd = body.indexOf("</>)}", home + h1e);
   body = body.slice(0, home) + head + body.slice(blockEnd + 5);

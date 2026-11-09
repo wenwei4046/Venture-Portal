@@ -177,8 +177,8 @@ export function DeskTeamActivityView({ v }: { v: ActivityVM }) {
           </div>
           <div style={{ flex: 1, overflow: "auto", padding: "12px 22px" }}>
             {v.d.events.map(e => (
-              <div key={e.key} style={{ display: "grid", gridTemplateColumns: "44px 12px minmax(0,1fr)", columnGap: "10px" }}>
-                <span style={{ paddingTop: "10px", textAlign: "right", font: `600 12px ${TIGHT}`, color: "var(--crm-muted)" }}>{e.t}</span>
+              <div key={e.key} style={{ display: "grid", gridTemplateColumns: "48px 12px minmax(0,1fr)", columnGap: "10px" }}>
+                <span style={{ paddingTop: "10px", textAlign: "right", font: `600 12px ${TIGHT}`, color: "var(--crm-muted)" }}>{e.d && <span style={{ display: "block", font: `500 ${"10.5px"} ${INTER}`, color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{e.d}</span>}{e.t}</span>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                   <span style={{ width: "1px", height: "14px", background: e.top }} /><span style={{ width: "9px", height: "9px", borderRadius: "50%", flex: "none", background: e.dot }} /><span style={{ flex: 1, width: "1px", background: e.bot }} />
                 </div>

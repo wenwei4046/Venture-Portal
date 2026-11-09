@@ -4,7 +4,7 @@
  * element, on shared/team-activity.ts, the desktop's own view model. Its sheets fade their scrim in and slide up as
  * every Control panel sheet (the owner, 2026-11-08). Sizes are the Revenue app's (typePx).
  */
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { DateRangePicker, rangeWords } from "./date-range";
 import type { CrmData } from "@/lib/member/crm-data";
 import type { PeopleBook } from "./people-book";
@@ -26,6 +26,39 @@ export interface PhoneActivityIn { data: CrmData; book: PeopleBook; live: boolea
 export function PhoneTeamActivity({ a, top }: { a: PhoneActivityIn; top?: ReactNode }) {
   const v = useTeamActivity(a);
   return <PhoneTeamActivityView v={v} top={top} />;
+}
+
+function AdPick({ v }: { v: ActivityVM }) {
+  const [open, setOpen] = useState(false);
+  const cur = v.ads.find(a => a.value === v.adVal) ?? v.ads[0];
+  useEffect(() => {
+    if (!open) return;
+    const on = (e: Event) => { if (!(e.target as Element | null)?.closest?.("[data-ad-pick]")) setOpen(false); };
+    document.addEventListener("click", on);
+    return () => document.removeEventListener("click", on);
+  }, [open]);
+  return (
+    <div data-ad-pick="" style={{ flex: "none", position: "relative", zIndex: 6 }}>
+      <span {...press(() => setOpen(o => !o))} aria-expanded={open} aria-label={`Ad: ${cur.name}`} style={{ height: "40px", padding: "0 12px 0 14px", boxSizing: "border-box", borderRadius: "20px", display: "flex", alignItems: "center", gap: "8px",
+        background: v.adOn ? "var(--crm-tint-attention)" : "var(--crm-field)", font: `500 ${fs(13.5)} ${INTER}`, color: "var(--crm-ink)", cursor: "pointer" }}>
+        <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{cur.name}</span>
+        <span style={{ flex: "none", color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{cur.n}</span>
+        <Chev style={{ flex: "none", color: "var(--crm-muted)" }} />
+      </span>
+      {open && (
+        <div role="listbox" aria-label="Ad" style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 7, padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "12px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", maxHeight: "50vh", overflowY: "auto" }}>
+          {v.ads.map(a => { const on = a.value === v.adVal;
+            return (
+              <span key={a.value} {...press(() => { v.setAd({ target: { value: a.value } }); setOpen(false); })} role="option" aria-selected={on}
+                style={{ flex: "none", minHeight: "40px", padding: "8px 10px", boxSizing: "border-box", borderRadius: "8px", display: "flex", alignItems: "center", gap: "10px", background: on ? "var(--crm-field)" : "transparent", cursor: "pointer" }}>
+                <span style={{ flex: 1, minWidth: 0, font: `${on ? 600 : 400} ${fs(13)} ${INTER}`, lineHeight: 1.35, color: "var(--crm-ink)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{a.name}</span>
+                <span style={{ flex: "none", font: `400 ${fs(12.5)} ${INTER}`, color: "var(--crm-faint)", fontVariantNumeric: "tabular-nums" }}>{a.n}</span>
+              </span>
+            ); })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** The fold, kept with the page's filters across a chat (use-team-activity.ts). */
@@ -91,13 +124,9 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
             <Chev style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "var(--crm-muted)" }} />
           </span>
         </div>
-        {/* All ads, or one ad's leads (the owner, 2026-11-09: "加入可以筛选广告"). */}
-        <span style={{ position: "relative", flex: "none", height: "40px", borderRadius: "20px", background: v.adOn ? "var(--crm-tint-attention)" : "var(--crm-field)", display: "flex", alignItems: "center" }}>
-          <select value={v.adVal} onChange={v.setAd} aria-label="Ad" style={{ appearance: "none", WebkitAppearance: "none", width: "100%", minWidth: 0, height: "40px", padding: "0 32px 0 14px", border: 0, background: "transparent", font: `500 ${fs(13.5)} ${INTER}`, color: v.adOn ? "var(--crm-rust)" : "var(--crm-ink)", cursor: "pointer", outline: "none", textOverflow: "ellipsis" }}>
-            {v.ads.map(a => <option key={a.value} value={a.value}>{a.label}</option>)}
-          </select>
-          <Chev style={{ position: "absolute", right: "12px", pointerEvents: "none", color: "var(--crm-muted)" }} />
-        </span>
+        {/* All ads, or one ad's leads (the owner, 2026-11-09: "加入可以筛选广告"; then "选择广告时，画面不好看，字太大了" — the
+            iPhone's own list drew the long ad names large): the CRM's dropdown, each ad on up to two lines with its count. */}
+        <AdPick v={v} />
         {v.isCustom && (
           <span {...press(() => setPick(true))} style={{ alignSelf: "center", flex: "none", height: "36px", padding: "0 16px", borderRadius: "18px", background: "var(--crm-field)", display: "flex", alignItems: "center", gap: "8px", font: `500 ${fs(13)} ${INTER}`, color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }}>
             {rangeWords(v.cFrom, v.cTo)}<Chev style={{ color: "var(--crm-muted)" }} />
@@ -154,8 +183,8 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
           </div>
           <div style={{ flex: 1, overflow: "auto", padding: "10px 22px" }}>
             {v.pd.events.map(e => (
-              <div key={e.key} style={{ display: "grid", gridTemplateColumns: "42px 12px minmax(0,1fr)", columnGap: "10px" }}>
-                <span style={{ paddingTop: "10px", textAlign: "right", font: `600 ${fs(12)} ${TIGHT}`, color: "var(--crm-muted)" }}>{e.t}</span>
+              <div key={e.key} style={{ display: "grid", gridTemplateColumns: "48px 12px minmax(0,1fr)", columnGap: "10px" }}>
+                <span style={{ paddingTop: "10px", textAlign: "right", font: `600 ${fs(12)} ${TIGHT}`, color: "var(--crm-muted)" }}>{e.d && <span style={{ display: "block", font: `500 ${fs(10.5)} ${INTER}`, color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{e.d}</span>}{e.t}</span>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                   <span style={{ width: "1px", height: "14px", background: e.top }} /><span style={{ width: "9px", height: "9px", borderRadius: "50%", flex: "none", background: e.dot }} /><span style={{ flex: 1, width: "1px", background: e.bot }} />
                 </div>

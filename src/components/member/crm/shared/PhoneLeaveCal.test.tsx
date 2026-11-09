@@ -31,6 +31,13 @@ describe("the phone's Calendar, People and Team activity", () => {
     expect(screen.getByText("Chea Huan · Annual")).toBeTruthy();
   });
 
+  it("Calendar: each day a box — a leave one bar across its days, a visit its time (the owner, 2026-11-09)", () => {
+    render(<PhoneCalendar input={input} />);
+    const bars = screen.getAllByTitle(/Chea Huan · Annual/);
+    expect(bars.map(b => b.textContent)).toEqual(["Chea · Annual", ""]); // 9 Nov names it, 10 Nov carries the bar on
+    expect(screen.getAllByText("11:00").find(e => e.tagName === "B")!.parentElement!.textContent).toBe("11:00 Chea");
+  });
+
   it("People: one line per person, its sheet with the days, Pause and Lock", () => {
     render(<PhonePeople input={input} />);
     expect(screen.getByText("Leads Mon–Fri")).toBeTruthy();
