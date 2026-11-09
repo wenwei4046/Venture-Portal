@@ -127,7 +127,8 @@ export function panelAppVM(ctx: PanelCtx) {
     leaveCal: show.lc ? leaveCalData({ data: ctx.data, me: ctx.me, now, act: ctx.act, teams: ctx.teams, directors: ctx.directors, readOnly: !!ctx.viewingAs, openAppt: a => set(u => ({ ...u, calInfo: a.customerId })) }) : null,
     activity: show.act ? { data: ctx.data, book: peopleBook(ctx.data, ctx.teams, ctx.directors), live: ctx.live, who: null, nameOf: ctx.nameOf,
       roleOf: (id: string) => { const p = ctx.data.people.find(x => x.id === id); return p ? jobTitle(p) : ""; },
-      openChat: (id: string) => set(u => ({ ...u, tab: "inbox", lead: id })) } : null,
+      // The chat opens over Insight, so Back comes to Team activity as it was left (the owner, 2026-11-09).
+      openChat: (id: string) => set(u => ({ ...u, lead: id })) } : null,
     upNext: ovUp ? { live: ctx.live, book: upNextBookOf(ctx.teams, ctx.nameOf, ctx.data), ads: upNextAdsOf(ctx.data, ctx.now), line: ctx.viewingAs ? ctx.me.id : null, canAct: !ctx.viewingAs } : null,
     // v3 T06 · Profile as the prototype draws it (the owner, 2026-10-23: "我的profile 應該長這樣才對").
     pf6: show.pf ? profile6(ctx, !!bl.showBell) : null,

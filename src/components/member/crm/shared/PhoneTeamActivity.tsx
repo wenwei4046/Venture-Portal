@@ -28,10 +28,14 @@ export function PhoneTeamActivity({ a, top }: { a: PhoneActivityIn; top?: ReactN
   return <PhoneTeamActivityView v={v} top={top} />;
 }
 
+/** The fold, kept with the page's filters across a chat (use-team-activity.ts). */
+const GREY = { open: false };
+
 export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNode }) {
   // The owner, 2026-11-09: the greyed people (out of today's turn with no leads) go to the bottom, folded at first; Custom is
   // one centred line of dates on the CRM's own picker (the phone's native one was large and dark).
-  const [greyOpen, setGreyOpen] = useState(false), [pick, setPick] = useState(false);
+  const [greyOpen, setGrey] = useState(GREY.open), [pick, setPick] = useState(false);
+  const setGreyOpen = (f: (o: boolean) => boolean) => setGrey(o => (GREY.open = f(o)));
   const active = v.pRows.filter(r => r.op === 1), grey = v.pRows.filter(r => r.op !== 1);
   const iso = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const at = (s: string, end: boolean) => { const [y, m, d] = s.split("-").map(Number); return end ? new Date(y, m - 1, d, 23, 59, 59, 999).getTime() : new Date(y, m - 1, d).getTime(); };

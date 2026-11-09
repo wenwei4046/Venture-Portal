@@ -11,12 +11,23 @@ import { officeStamp } from "./leave-cal-data";
 import type { PeopleBook } from "./people-book";
 import { activityVM, periodDays, periodStartIso, type ActivityUi, type AssignedRow } from "./team-activity";
 
+/**
+ * The page's filters, kept while the CRM is open (the owner, 2026-11-09: "我点了 team activity，也做了一些筛选条件，等我看完
+ * 聊天记录返回时，要一样的筛选条件 不要重新来过"): a chat replaces the page, which is drawn again on the way back — with the
+ * person or team, period, dates, ad, sort and open rows it had. Menus and the lead drawer start shut.
+ */
+let KEPT: ActivityUi | null = null;
+/** Tests start fresh. */
+export const forgetActivityFilters = () => { KEPT = null; };
+
 export function useTeamActivity(o: { data: CrmData; book: PeopleBook; live: boolean; who: string | null; nameOf(id: string | null | undefined): string; roleOf(id: string): string; openChat(id: string): void }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 60_000); return () => clearInterval(t); }, []);
   const today = officeStamp(now).slice(0, 10);
-  const [ui, setUi] = useState<ActivityUi>(() => ({ team: "all", who: o.who, menu: false, per: "Today", from: `${today.slice(0, 7)}-01`, to: today,
-    open: o.who ? { [o.who]: true } : {}, lead: null, sort: null, pMenu: false, pOpen: {}, pLead: null }));
+  const [ui, setUi] = useState<ActivityUi>(() => KEPT && !o.who ? { ...KEPT, menu: false, pMenu: false, lead: null, pLead: null }
+    : ({ team: "all", who: o.who, menu: false, per: "Today", from: `${today.slice(0, 7)}-01`, to: today,
+      open: o.who ? { [o.who]: true } : {}, lead: null, sort: null, pMenu: false, pOpen: {}, pLead: null }));
+  useEffect(() => { KEPT = ui; }, [ui]);
   // Opened again on another person (Inbox's name): the page follows.
   const lastWho = useRef(o.who);
   useEffect(() => { if (o.who !== lastWho.current) { lastWho.current = o.who; setUi(u => ({ ...u, team: "all", who: o.who, open: o.who ? { ...u.open, [o.who]: true } : u.open })); } }, [o.who]);

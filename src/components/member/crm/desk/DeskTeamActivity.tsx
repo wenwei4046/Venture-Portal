@@ -26,10 +26,14 @@ export function DeskTeamActivity({ a }: { a: DeskActivityIn }) {
   return <DeskTeamActivityView v={v} />;
 }
 
+/** The fold, kept with the page's filters across a chat (use-team-activity.ts). */
+const GREY = { open: false };
+
 export function DeskTeamActivityView({ v }: { v: ActivityVM }) {
   const root = useRef<HTMLDivElement>(null);
   // The owner, 2026-11-09: the greyed people (out of today's turn with no leads) at the bottom, folded at first — as the phone.
-  const [greyOpen, setGreyOpen] = useState(false);
+  const [greyOpen, setGrey] = useState(GREY.open);
+  const setGreyOpen = (f: (o: boolean) => boolean) => setGrey(o => (GREY.open = f(o)));
   const rows = v.groups.flatMap(g => g.rows), active = rows.filter(r => r.op === 1), grey = rows.filter(r => r.op !== 1);
   const C: CSSProperties = { textAlign: "center", justifySelf: "center" };
   const row = (r: ActivityVM["groups"][number]["rows"][number]) => (
