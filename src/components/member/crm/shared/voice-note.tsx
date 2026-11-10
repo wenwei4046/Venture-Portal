@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { onlyOneAudio, takeTurn } from "./one-audio";
 import { typePx } from "./type";
+import { useGone } from "./media-gone";
+import { GoneTile } from "./gone-tile";
 
 onlyOneAudio();
 
@@ -36,6 +38,8 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
   const [dur, setDur] = useState(0);
   const [speed, setSpeed] = useState(lastSpeed);
   const shape = useRef(bars(src));
+  // A customer's voice note Meta no longer serves (2026-11-10): the quiet tile, asked once after it fails to load.
+  const g = useGone(src);
   /** Seeking to the end once to learn a length the file did not say (Infinity). */
   const probing = useRef(false);
   useEffect(() => { shape.current = bars(src); }, [src]);
@@ -95,13 +99,14 @@ export function VoiceNote({ src, mine }: { src: string; mine?: boolean }) {
   // The prototype's thumb: 12px, 18px with a 6px ring while dragged (its ring colours).
   const thumb = dragging ? 18 : 12, ringC = mine ? "rgba(255,255,255,.25)" : "rgba(111,64,44,.15)";
 
+  if (g.gone) return <GoneTile kind="audio" channel={g.gone} style={{ width: "248px", maxWidth: "100%", minHeight: "64px" }} />;
   return (
     // WhatsApp's layout (the owner, 2026-10-15, WhatsApp's voice bubble beside ours: "人 icon 至中（較大），語音 bar 也至中"):
     // play on the left, the waveform in the middle with its duration under it, the speaker's 52px picture on the right
     // centred on the whole bubble (the speed takes its place once played); the bubble's time sits on the duration's line,
     // left of the picture (`mediaOf` › audio: `timeTop` −18px, `inPad` 62px on the right).
     <span style={{ display: "flex", alignItems: "center", gap: "8px", width: "248px", maxWidth: "100%", minHeight: "56px", padding: "2px 0" }}>
-      <audio ref={audio} src={src} preload="metadata"
+      <audio ref={audio} src={src} preload="metadata" onError={g.check}
         onLoadedMetadata={e => {
           const a = e.currentTarget, d = a.duration; a.playbackRate = speed;
           if (Number.isFinite(d)) setDur(d);

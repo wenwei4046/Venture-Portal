@@ -7,6 +7,7 @@
  */
 import { CRM_LOST_REASONS, type CrmLead, type CrmLostReason, type CrmMessage, type CrmStatus } from "./crm";
 import type { CrmRole } from "./crm-team";
+import { goneAtMeta } from "@/lib/whatsapp/media";
 import type { CrmContactRow, CrmMessageRow, CrmPeopleRow } from "./crm-live";
 
 export type CrmChannel = "whatsapp" | "messenger";
@@ -90,7 +91,9 @@ export interface CrmChatMessage {
   /** The customer's reaction to this message (mig 20261025050000). */
   theirReaction?: string;
   card?: CrmCard;
-  media?: { kind: "image" | "video" | "audio" | "file"; url: string; name?: string; mime?: string };
+  media?: { kind: "image" | "video" | "audio" | "file"; url: string; name?: string; mime?: string;
+    /** A customer's file Meta no longer serves and we never kept (2026-11-10): the chat draws "no longer available". */
+    gone?: "whatsapp" | "messenger" };
   /** A call the customer made that we missed (Messenger, 2026-11-09) — drawn as Messenger's missed call with Call back. */
   call?: CrmMissedCall;
 }
@@ -593,6 +596,8 @@ export function chatMessage(row: CrmMessageRowX, channel?: string | null, who?: 
   // Ly Loong's 10:06 came from Messenger as its id alone, and Meta's own API holds no words, file or share for it: a post or
   // reel Messenger does not pass to apps). It is named, never an empty bubble.
   const unshown = row.direction === "in" && !shown && !text.trim() && !row.card;
+  // Gone at Meta (WhatsApp keeps a customer's file 7 days, Messenger until its oe=) and never kept in crm-media.
+  const gone = shown && row.direction === "in" ? goneAtMeta(row) : null;
   return {
     id: row.id,
     from: row.direction === "in" ? "lead" : "me",
@@ -601,7 +606,7 @@ export function chatMessage(row: CrmMessageRowX, channel?: string | null, who?: 
     text: unshown ? (channel === "messenger" ? "" : unshownWords(channel)) : text,
     ...(unshown && channel === "messenger" && who?.page && who.psid ? { call: { thread: businessSuiteThread(who.page, who.psid), ...(who.phone ? { phone: who.phone } : {}) } } : {}),
     at: row.sent_at,
-    ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: fileName || row.body || "Document", ...(row.media_mime ? { mime: row.media_mime } : {}) } : {}) } } : {}),
+    ...(shown ? { media: { kind: shown, url: `/member/crm-media/${row.id}`, ...(shown === "file" ? { name: fileName || row.body || "Document", ...(row.media_mime ? { mime: row.media_mime } : {}) } : {}), ...(gone ? { gone } : {}) } } : {}),
     ...(row.direction === "out" && row.status && row.status !== "received" ? { status: row.status } : {}),
     ...(row.error ? { error: row.error } : {}),
     ...(row.auto ? { auto: true } : {}),

@@ -28,7 +28,7 @@ import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWor
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
 import { typePx } from "../../shared/type";
-import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "./composer";
+import { composerOf, dismiss as dismissComposer, initialComposer, messengerPast7, type ComposerIn, type ComposerState, type TileLabel } from "./composer";
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
@@ -528,6 +528,7 @@ export function chatVM(ctx: SalesCtx) {
     coldTile: shut && c.channel === "whatsapp" && data.settings?.suggestTemplate !== false,
     // A WhatsApp chat past its window (notes/11, CRM v4): the warning row over the bar, Send and the mic grey.
     waShut: shut && c.channel === "whatsapp" && !fbBlocked ? first : undefined,
+    msShut: messengerPast7(c, now) && !fbBlocked ? first : undefined,
     reply: ui.reply ? { who: ui.reply.from === "me" ? "You" : c.name, text: plain(ui.reply.text) } : null,
     cancelReply: () => patch({ reply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,

@@ -4,6 +4,7 @@ import { adminClient } from '@/lib/supabase/admin'
 import { pushSoon } from '@/lib/push/outbox'
 import { adIdsOf, nameAdsFromMeta } from '@/lib/member/crm-ad-names-meta'
 import { sendAutoReplies } from '@/lib/member/crm-auto-reply'
+import { keepCustomerMedia } from '@/lib/member/crm-media-keep'
 import { signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 import { parseMessengerDelivery } from '@/lib/messenger/webhook'
 import { pageToken, profileName } from '@/lib/messenger/send'
@@ -37,6 +38,9 @@ import { keepMedia } from '@/lib/leads/media-keep'
  *     refused delivery is logged straight to crm_channel_events; after the answer, an ad with no name yet is named
  *     from Ads Manager through crm_ads_unnamed / crm_meta_name_ad (service role only, mig 20261019100000), and the
  *     chat's person's auto-replies go through crm_auto_reply_due / _claim / _done (mig 20261019120000).
+ *   - after the answer, each customer attachment is copied into the private bucket crm-media and recorded through
+ *     crm_media_to_keep / crm_keep_in_media (service role only, mig 20261110140000 — the owner, 2026-11-10: "Yes, copy
+ *     on arrival"; Meta's signed address expires). A copy that fails is logged and retried by the hourly sweep.
  *   - before it, the customer's name is asked of Meta with the Page's token
  *     (best effort, 3 s): Messenger, unlike WhatsApp, does not send it.
  *   - excluded from the session middleware.
@@ -206,5 +210,9 @@ export async function POST(request: Request) {
   // The auto-replies of whoever the chat is given to (lib/member/crm-auto-reply.ts), once Meta has its answer.
   const said = messages.map(m => m.externalId)
   if (said.length) after(() => sendAutoReplies(client(), 'messenger', said, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => undefined))
+  // Each customer file copied into crm-media once Meta has its answer (2026-11-10, the owner: "Yes, copy on arrival" —
+  // Messenger's signed address dies in ~10–30 days; lib/member/crm-media-keep.ts). Never fails the delivery.
+  const withMedia = messages.filter(m => m.mediaUrl).map(m => m.externalId)
+  if (withMedia.length) after(() => keepCustomerMedia(client(), { externalIds: withMedia, budgetMs: 40_000 }).then(() => undefined))
   return NextResponse.json({ ok: true, result: data })
 }

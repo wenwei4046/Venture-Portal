@@ -29,7 +29,8 @@ vi.mock('@/lib/push/outbox', () => ({ flushPush: vi.fn(async () => { calls.push(
 vi.mock('@/lib/hiring/leftovers', () => ({ sweepHiringLeftovers: vi.fn(async () => ({ expired: 0, listed: 0, deleted: 0 })) }))
 vi.mock('@/lib/documentation/drive-bin-sweep', () => ({ sweepDataCenterBin: vi.fn(async () => ({ expired: 0, deleted: 0, orphans: 0 })) }))
 vi.mock('@/lib/member/crm-ad-names-meta', () => ({ refreshAdStatuses: vi.fn(async () => 0) }))
-vi.mock('@/lib/storage/sweep', () => ({ sweepFileObjects: vi.fn(async () => ({ rowsWithoutFile: 0, filesWithoutRow: 0, stagedLeft: 0 })) }))
+vi.mock('@/lib/member/crm-media-keep', () => ({ keepCustomerMedia: vi.fn(async () => { calls.push('keepCustomerMedia'); return { listed: 0, kept: 0 } }) }))
+vi.mock('@/lib/storage/sweep',() => ({ sweepFileObjects: vi.fn(async () => ({ rowsWithoutFile: 0, filesWithoutRow: 0, stagedLeft: 0 })) }))
 
 import { GET } from './route'
 

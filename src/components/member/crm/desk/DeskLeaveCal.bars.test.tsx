@@ -28,3 +28,20 @@ describe("the desktop Calendar's month", () => {
     expect(bars[2].style.left).toContain("0 * 100% / 7");
   });
 });
+
+describe("a day no leave crosses keeps no room for the week's bars (the owner, 2026-11-10: \"不要 20:00 上面的空格\")", () => {
+  it("Wednesday's appointment sits right under its number while a leave runs Fri – Sun that week", async () => {
+    const { leaveCalVM, leaveCalStart } = await import("../shared/leave-cal");
+    const appt = { who: "a", day: "2026-11-11", t: "20:00", cust: "Kim", customerId: "c1", visitId: "v1" };
+    const v = leaveCalVM({ book: peopleBook(data, [{ id: "tl", name: "Team Stanley", tl: people[0], people: people.slice(1) }], []), leaves, appts: [appt],
+      now: "2026-11-06T18:00", canEdit: () => true, canLock: true, acts, mode: "calendar", ui: { ...leaveCalStart("2026-11-06T18:00", "calendar"), month: "2026-11" },
+      set: () => {}, flash: () => {} } as never);
+    const week = v.weeks.find(w => w.days.some(d => d.day === "2026-11-11"))!;
+    const wed = week.days.find(d => d.day === "2026-11-11")!, fri = week.days.find(d => d.day === "2026-11-13")!;
+    expect(week.bars.length).toBeGreaterThan(0);
+    expect(wed.used).toBe(0);
+    expect(wed.appts.map(a => a.t)).toEqual(["20:00"]);
+    expect(fri.used).toBeGreaterThan(0);
+    expect(week.dDays.find(d => d.day === "2026-11-11")!.dLanes).toBe(0);
+  });
+});

@@ -220,7 +220,7 @@ export function DeskUpNext({ live, book, ads, canAct, line, today = {}, lastAt =
           return (
             <div key={m.id} data-un-row={m.id} onMouseEnter={() => { setHov(m.id); m.hovOn(); }} onMouseLeave={() => { setHov(h => (h === m.id ? null : h)); m.hovOff(); }}
               style={{ minWidth: `${UN_MIN}px`, boxSizing: "border-box", display: "grid", gridTemplateColumns: UN_COLS, columnGap: "16px", height: "56px", alignItems: "center", padding: "0 12px", borderBottom: "1px solid var(--crm-rule-soft)", font: `400 14.5px ${INTER}`, fontVariantNumeric: "tabular-nums", background: on ? "var(--crm-hover)" : "transparent" }}>
-              <span style={{ width: "30px", height: "30px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", font: `500 13px ${TIGHT}`, background: "var(--crm-field)", color: "var(--crm-muted)" }}>{m.nextTxt === "10+" ? "10+" : i + 2}</span>
+              <span style={{ width: "30px", height: "30px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", font: `500 13px ${TIGHT}`, background: "var(--crm-field)", color: "var(--crm-muted)" }}>{i + 2}</span>
               <span style={{ fontWeight: 500, ...CLIP }}>{m.name}</span>
               <span style={{ color: "var(--crm-muted)", ...CLIP }}>{m.team}</span>
               <span style={{ textAlign: "right", color: k ? "var(--crm-ink)" : "var(--crm-faint)" }}>{k}</span>

@@ -198,11 +198,11 @@ export function Phone4aInboxRows({ v }: { v: { leadsView: MineRow[] } }) {
 
 type T2 = TeamVM["t2"];
 
-/** A People / Status button (2c): 44 px, radius 14, its count of picks as a rust badge; rust-ringed while something is picked. */
+/** A People / Status button (2c): 44 px, radius 14, its count of picks as a rust badge. No rust ring while something is picked (the owner, 2026-11-10: "红色边框不要"). */
 function FilterBtn({ icon, label, n, open }: { icon: ReactNode; label: string; n: number; open: () => void }) {
   return (
     <button type="button" onClick={open} aria-label={n ? `${label} · ${n} picked` : label}
-      style={{ ...BTN, flex: 1, minWidth: 0, height: "44px", padding: "0 12px", borderRadius: "14px", display: "flex", alignItems: "center", gap: "8px", background: n ? "var(--crm-sel)" : "var(--crm-field)", border: `1px solid ${n ? "var(--crm-rust)" : "var(--crm-field)"}`, color: "var(--crm-ink)" }}>
+      style={{ ...BTN, flex: 1, minWidth: 0, height: "44px", padding: "0 12px", borderRadius: "14px", display: "flex", alignItems: "center", gap: "8px", background: n ? "var(--crm-sel)" : "var(--crm-field)", border: `1px solid ${n ? "var(--crm-sel)" : "var(--crm-field)"}`, color: "var(--crm-ink)" }}>
       {icon}
       <span style={{ flex: 1, minWidth: 0, textAlign: "left", fontSize: fs(14), fontWeight: 600, ...ELLIPSIS }}>{label}</span>
       {!!n && <span style={{ flex: "none", minWidth: "20px", height: "20px", padding: "0 6px", boxSizing: "border-box", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: TIGHT, fontSize: fs(11), fontWeight: 600, background: "var(--crm-rust)", color: "var(--crm-page)" }}>{n}</span>}

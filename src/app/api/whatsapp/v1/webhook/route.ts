@@ -4,6 +4,7 @@ import { adminClient } from '@/lib/supabase/admin'
 import { pushSoon } from '@/lib/push/outbox'
 import { adIdsOf, nameAdsFromMeta } from '@/lib/member/crm-ad-names-meta'
 import { sendAutoReplies } from '@/lib/member/crm-auto-reply'
+import { keepCustomerMedia } from '@/lib/member/crm-media-keep'
 import { parseDelivery, signatureValid, verifyHandshake } from '@/lib/whatsapp/webhook'
 
 /**
@@ -23,6 +24,9 @@ import { parseDelivery, signatureValid, verifyHandshake } from '@/lib/whatsapp/w
  *     a refused delivery is logged straight to crm_channel_events; after the answer, an ad with no name yet is
  *     named from Ads Manager through crm_ads_unnamed / crm_meta_name_ad (service role only, mig 20261019100000), and
  *     the chat's person's auto-replies go through crm_auto_reply_due / _claim / _done (mig 20261019120000).
+ *   - after the answer, each customer file is copied into the private bucket crm-media and recorded through
+ *     crm_media_to_keep / crm_keep_in_media (service role only, mig 20261110140000 — the owner, 2026-11-10: "Yes, copy
+ *     on arrival"; Meta keeps a media id 7 days). A copy that fails is logged and retried by the hourly sweep.
  *   - the path is excluded from the session middleware.
  *   - a delivery that brought customers' messages is pushed to the phones of whoever has those chats once Meta has
  *     its answer (`pushSoon`, mig 20261014030000 wrote the notices beside the messages) — through the outbox's own
@@ -36,6 +40,8 @@ import { parseDelivery, signatureValid, verifyHandshake } from '@/lib/whatsapp/w
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// The customer files copied after the answer (`after`, 20 s a file at most) need the time.
+export const maxDuration = 60
 
 // The crm_* tables / RPC postdate database.types.ts — untyped-client convention.
 function client(): SupabaseClient {
@@ -106,5 +112,9 @@ export async function POST(request: Request) {
   // The auto-replies of whoever the chat is given to (lib/member/crm-auto-reply.ts), once Meta has its answer.
   const said = delivery.messages.map(m => m.externalId)
   if (said.length) after(() => sendAutoReplies(client(), 'whatsapp', said, process.env.META_SYSTEM_USER_TOKEN?.trim()).then(() => undefined))
+  // Each customer file copied into crm-media once Meta has its answer (2026-11-10, the owner: "Yes, copy on arrival" —
+  // WhatsApp keeps a media id 7 days; lib/member/crm-media-keep.ts). Never fails the delivery; the hourly sweep retries.
+  const withMedia = delivery.messages.filter(m => m.mediaId).map(m => m.externalId)
+  if (withMedia.length) after(() => keepCustomerMedia(client(), { externalIds: withMedia, budgetMs: 40_000, token: process.env.META_SYSTEM_USER_TOKEN?.trim() }).then(() => undefined))
   return NextResponse.json({ ok: true, result: data })
 }

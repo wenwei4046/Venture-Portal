@@ -259,6 +259,8 @@ export const DEFINER_RPCS: ReadonlySet<string> = new Set([
   'crm_ads_unnamed', 'crm_meta_name_ad', 'crm_ads_to_check', 'crm_meta_ad_status', 'crm_set_messenger_blocked',
   // Auto-replies sent (mig 20261019120000): the webhooks' service role alone — EXECUTE for nobody else.
   'crm_auto_reply_due', 'crm_auto_reply_claim', 'crm_auto_reply_done',
+  // A customer's file kept on arrival (mig 20261110140000): the webhooks' and the hourly sweep's service role alone.
+  'crm_media_to_keep', 'crm_keep_in_media',
   // The Product List (mig 20261014100000): a bill and a scheme never open to its key — the costing gaps ask
   // Product List · View, the cost setting Product List · Edit, both running as their owner.
   'revenue_costing_gaps', 'catalogue_save_cost_setting',
