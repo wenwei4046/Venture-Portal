@@ -8,7 +8,7 @@ import { toEngineInput } from '@/lib/commission/run-payload'
 import { monthCommissionableValue, needsMonthValue } from '@/lib/commission/director-pay'
 import { carriesInto } from '@/lib/commission/carry'
 import { officeToday } from '@/lib/office-time'
-import { loadMonthOrders } from './month-orders'
+import { loadHalfComms, loadMonthOrders } from './month-orders'
 import { loadBillsByDocNo, loadFeedFloor } from './row-origins'
 import { isOldBillDate } from '@/lib/commission/row-origin'
 import { namesFabricSeries, readFabricSeries } from './fabric-series'
@@ -29,6 +29,7 @@ import type {
   SchemeRow,
 } from '@/lib/commission/run-payload'
 import type { DirectorTerms, EngineInput } from '@/lib/commission/types'
+import type { HalfCommMark } from '@/lib/commission/bill-half-comm'
 import { sharesOfUpsales, upsaleBillId, type UpsaleRow } from '@/lib/commission/upsales'
 
 interface QueryResult {
@@ -84,6 +85,8 @@ export interface CommissionInputContext {
   subDepartmentId: string
   /** These orders never reach the engine because they have no matched person. */
   unmatchedOrderNos: string[]
+  /** Half comm (2026-11-10): who halved which bill, and why — the Status chip's tooltip. Absent in older fixtures. */
+  halfComms?: Map<string, HalfCommMark>
 }
 
 export interface CommissionInputOptions {
@@ -300,7 +303,7 @@ export async function loadCommissionInput(
   }))]
   // A KPI item that is a fabric series (2026-10-29) finds a line's fabric on the ERP's fabric list.
   const needsFabrics = namesFabricSeries([...kpiItems, ...currentKpiItems])
-  const [lines, shares, priorRuns, upsaleBillShares, fabrics] = await Promise.all([
+  const [lines, shares, priorRuns, upsaleBillShares, fabrics, halfComms] = await Promise.all([
     readByKeys<SalesLineRow & { order_id: string }>('sales order lines', orderIds, (chunk, from, to) =>
       supabase.from('sales_order_lines')
         .select('id, order_id, item_group, product_code, product_name, qty, line_amount, brand_code, cost_amount, option_charge_amount, description2, variants:raw->variants')
@@ -316,6 +319,8 @@ export async function loadCommissionInput(
       (chunk, from, to) => supabase.from('sales_order_shares').select('order_id, staff_id, share_pct')
         .in('order_id', chunk).order('order_id').order('staff_id').range(from, to)),
     needsFabrics ? readFabricSeries(supabase) : Promise.resolve([]),
+    // Half comm (2026-11-10): the bills paid half their commission.
+    loadHalfComms(supabase, orderIds),
   ])
   const upsaleShares = sharesOfUpsales(upsales, upsaleDocBills, upsaleBillShares)
 
@@ -325,7 +330,10 @@ export async function loadCommissionInput(
     current.push(line)
     linesByOrder.set(line.order_id, current)
   }
-  for (const order of orderRows) order.sales_order_lines = linesByOrder.get(order.id) ?? []
+  for (const order of orderRows) {
+    order.sales_order_lines = linesByOrder.get(order.id) ?? []
+    if (halfComms.has(order.id)) order.half_comm = true
+  }
 
   // Load statements directly: nested arrays have their own PostgREST row cap.
   type PriorStatementRow = NonNullable<PriorMonthRow['comm_statements']>[number] & { run_id: string }
@@ -396,5 +404,6 @@ export async function loadCommissionInput(
     schemeId: scheme.id,
     subDepartmentId: scheme.sub_department_id,
     unmatchedOrderNos: [...new Set(orderRows.filter(order => order.staff_id === null).map(order => order.order_no))],
+    halfComms,
   }
 }

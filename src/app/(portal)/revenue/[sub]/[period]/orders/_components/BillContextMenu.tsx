@@ -3,8 +3,9 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { excludeOrder, includeOrder, moveOrder, setOrderBrand, shareOrder, unshareOrder, type BillBrandResult, type BillCountResult } from '../../../../run-actions'
+import { excludeOrder, includeOrder, moveOrder, setHalfComm, setOrderBrand, shareOrder, unshareOrder, type BillBrandResult, type BillCountResult } from '../../../../run-actions'
 import type { BillCountAction } from '@/lib/commission/bill-exclusion'
+import type { BillHalfCommAction, BillHalfCommResult } from '@/lib/commission/bill-half-comm'
 import type { BillBrandAction, BrandOption } from '@/lib/commission/bill-brand'
 import { moveProblem, type BillMoveAction, type BillMoveResult } from '@/lib/commission/bill-move'
 import {
@@ -51,6 +52,15 @@ export interface BillShareOutcome {
   undone?: boolean
 }
 
+/** What *Half comm…* or *Full comm again* did (2026-11-10). */
+export interface BillHalfCommOutcome {
+  orderId: string
+  orderNo: string
+  /** True: it pays half now. False: full again. */
+  halved: boolean
+  result: BillHalfCommResult
+}
+
 /** What *Move to another salesperson…* did (2026-10-12). */
 export interface BillMoveOutcome {
   result: BillMoveResult
@@ -79,11 +89,17 @@ interface Props {
    * team it may go to. Null or absent: no row.
    */
   move?: { action: BillMoveAction; candidates: readonly ShareCandidate[] } | null
+  /**
+   * *Half comm…* / *Full comm again* (2026-11-10): what the menu may do, and
+   * who halved it and why while it is half. Null or absent: no row.
+   */
+  halfComm?: { action: BillHalfCommAction; detail: string | null } | null
   onClose: () => void
   onDone: (outcome: BillMenuOutcome) => void
   onBrandDone?: (outcome: BillBrandOutcome) => void
   onShareDone?: (outcome: BillShareOutcome) => void
   onMoveDone?: (outcome: BillMoveOutcome) => void
+  onHalfCommDone?: (outcome: BillHalfCommOutcome) => void
 }
 
 /**
@@ -100,13 +116,14 @@ interface Props {
  * menu itself since 2026-10-12, and in the panel — gives a part back to the
  * owner.
  */
-export default function BillContextMenu({ bill, anchor, monthLabel, link = null, brand = null, share = null, move = null, onClose, onDone, onBrandDone, onShareDone, onMoveDone }: Props) {
+export default function BillContextMenu({ bill, anchor, monthLabel, link = null, brand = null, share = null, move = null, halfComm = null, onClose, onDone, onBrandDone, onShareDone, onMoveDone, onHalfCommDone }: Props) {
   const router = useRouter()
   const boundary = useRef<HTMLDivElement>(null)
   const countButton = useRef<HTMLButtonElement>(null)
   const brandButton = useRef<HTMLButtonElement>(null)
   const shareButton = useRef<HTMLButtonElement>(null)
   const moveButton = useRef<HTMLButtonElement>(null)
+  const halfButton = useRef<HTMLButtonElement>(null)
   const restoreFocus = useRef<HTMLButtonElement | null>(null)
   const writing = useRef(false)
   const [pending, startTransition] = useTransition()
@@ -123,6 +140,9 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
   const [moveTo, setMoveTo] = useState('')
   const [moveNote, setMoveNote] = useState('')
   const [note, setNote] = useState('')
+  const [halfPanel, setHalfPanel] = useState<{ anchor: MenuAnchor } | null>(null)
+  const [halfStacked, setHalfStacked] = useState(false)
+  const [halfNote, setHalfNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const noteId = useId()
   const confirmId = useId()
@@ -133,6 +153,8 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
   const moveId = useId()
   const moveToId = useId()
   const moveNoteId = useId()
+  const halfId = useId()
+  const halfNoteId = useId()
   const action = bill.action
   const nameOf = (code: string) => brand?.options.find(o => o.code === code)?.name ?? code
 
@@ -166,7 +188,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
   useLayoutEffect(() => {
     restoreFocus.current?.focus({ preventScroll: true })
     restoreFocus.current = null
-  }, [confirm, brandPanel, sharePanel, movePanel])
+  }, [confirm, brandPanel, sharePanel, movePanel, halfPanel])
 
   function openConfirm() {
     if (writing.current || !countButton.current) return
@@ -174,6 +196,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     setBrandPanel(null)
     setSharePanel(null)
     setMovePanel(null)
+    setHalfPanel(null)
     setConfirm({ anchor: beside(countButton.current) })
   }
 
@@ -183,6 +206,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     setConfirm(null)
     setSharePanel(null)
     setMovePanel(null)
+    setHalfPanel(null)
     setBrandPanel({ anchor: beside(brandButton.current) })
   }
 
@@ -201,6 +225,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     setConfirm(null)
     setBrandPanel(null)
     setSharePanel(null)
+    setHalfPanel(null)
     setMoveTo('')
     setMoveNote('')
     setMovePanel({ anchor: beside(moveButton.current) })
@@ -256,6 +281,84 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     )
   }
 
+  // ── Half comm (2026-11-10) ───────────────────────────────────────────────
+  // The user: "commission value 5000, commission percentage 6%; commission get
+  // RM300, 当我按了 half comm 就会是 total commission RM150". Like Don't count:
+  // a confirm panel with Why (optional); while it is half, *Full comm again*
+  // in one click.
+  const halfAction = halfComm?.action ?? null
+
+  function openHalf() {
+    if (writing.current || !halfButton.current) return
+    setError(null)
+    setConfirm(null)
+    setBrandPanel(null)
+    setSharePanel(null)
+    setMovePanel(null)
+    setHalfNote('')
+    setHalfPanel({ anchor: beside(halfButton.current) })
+  }
+
+  function backFromHalf() {
+    if (writing.current) return
+    restoreFocus.current = halfButton.current
+    setHalfPanel(null)
+    setHalfStacked(false)
+    setError(null)
+  }
+
+  function runHalf(half: boolean) {
+    if (writing.current) return
+    writing.current = true
+    setError(null)
+    startTransition(async () => {
+      try {
+        const answer = await setHalfComm(bill.orderId, half, half ? halfNote : null)
+        // A refusal comes back as words (a closed month, a paid run): it stays in the panel.
+        if (!answer.ok) {
+          setError(answer.reason)
+          return
+        }
+        router.refresh()
+        writing.current = false
+        onHalfCommDone?.({ orderId: bill.orderId, orderNo: bill.orderNo, halved: half, result: answer.result })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'That did not save'
+        if (!message.includes('NEXT_REDIRECT')) setError(message)
+      } finally {
+        writing.current = false
+      }
+    })
+  }
+
+  function halfRow() {
+    if (!halfAction) return null
+    switch (halfAction.kind) {
+      case 'half':
+        return (
+          <button ref={halfButton} type="button" role="menuitem" tabIndex={-1} aria-haspopup="dialog"
+            aria-expanded={!!halfPanel} aria-controls={halfPanel ? halfId : undefined} disabled={pending}
+            title="Pays half its commission — its override too" onClick={openHalf}>
+            Half comm…
+          </button>
+        )
+      case 'full':
+        return (
+          <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={() => runHalf(false)}
+            title={halfComm?.detail ?? undefined}>
+            Full comm again
+          </button>
+        )
+      case 'locked':
+        return (
+          <button type="button" role="menuitem" tabIndex={-1} disabled
+            title={[halfComm?.detail, halfAction.reason].filter(Boolean).join(' — ')}>
+            {halfAction.halved ? 'Full comm again' : 'Half comm'}
+          </button>
+        )
+    }
+  }
+
   // ── Share this bill (2026-09-30) ─────────────────────────────────────────
   // Who with, and their part; Save writes it. The owner is never offered —
   // their part is what nobody else holds — and a holder already on the bill
@@ -275,6 +378,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
     setConfirm(null)
     setBrandPanel(null)
     setMovePanel(null)
+    setHalfPanel(null)
     setShareWith('')
     setPartText(String(defaultPartFor(holders, shareAction.ownerStaffId, '')))
     setSharePanel({ anchor: beside(shareButton.current) })
@@ -480,7 +584,7 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
   return createPortal(
     <div ref={boundary} className={`${styles.layer} sheet-theme`} onContextMenu={event => event.preventDefault()}>
       <MenuPanel label={`Actions for ${bill.orderNo}`} anchor={anchor} focus
-        hidden={(!!confirm && confirmStacked) || (!!brandPanel && brandStacked) || (!!sharePanel && shareStacked) || (!!movePanel && moveStacked)}
+        hidden={(!!confirm && confirmStacked) || (!!brandPanel && brandStacked) || (!!sharePanel && shareStacked) || (!!movePanel && moveStacked) || (!!halfPanel && halfStacked)}
         onBack={close} onClose={close}>
         <div className={styles.menuHeading}>{bill.orderNo}{bill.who ? ` · ${bill.who}` : ''}</div>
         <button type="button" role="menuitem" tabIndex={-1} disabled={pending} onClick={() => open(bill.href, false)}>
@@ -497,10 +601,11 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
         {shareRow()}
         {cancelShareRows()}
         {moveRow()}
+        {halfRow()}
         {countRow()}
         {brandRow()}
-        {!confirm && !brandPanel && !sharePanel && !movePanel && pending ? <p role="status" className={styles.hint}>Saving…</p> : null}
-        {!confirm && !brandPanel && !sharePanel && !movePanel && error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        {!confirm && !brandPanel && !sharePanel && !movePanel && !halfPanel && pending ? <p role="status" className={styles.hint}>Saving…</p> : null}
+        {!confirm && !brandPanel && !sharePanel && !movePanel && !halfPanel && error ? <p role="alert" className={styles.error}>{error}</p> : null}
       </MenuPanel>
 
       {movePanel && moveAction ? (
@@ -554,6 +659,34 @@ export default function BillContextMenu({ bill, anchor, monthLabel, link = null,
               </button>
             </>
           ) : null}
+          {pending ? <p role="status" className={styles.hint}>Saving…</p> : null}
+          {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+        </MenuPanel>
+      ) : null}
+
+      {halfPanel ? (
+        <MenuPanel id={halfId} label={`Half comm on ${bill.orderNo}`} anchor={halfPanel.anchor} submenu dialog focus
+          onStackedChange={setHalfStacked} onBack={backFromHalf} onClose={close}>
+          <div className={styles.menuHeading}>Half comm on {bill.orderNo}?</div>
+          <p className={styles.confirmCopy}>
+            It pays half its commission in <strong>{monthLabel}</strong> — and its upline half the override on
+            it. Its sales count in full, and its KPI items are paid in full.
+          </p>
+          <label className={styles.dateField} htmlFor={halfNoteId}>
+            Why (optional)
+            <input id={halfNoteId} type="text" value={halfNote} maxLength={500} disabled={pending}
+              placeholder="e.g. discount the customer asked for"
+              onChange={event => { setHalfNote(event.target.value); setError(null) }}
+              onKeyDown={event => {
+                if (event.key !== 'Enter') return
+                event.preventDefault()
+                runHalf(true)
+              }} />
+          </label>
+          <button type="button" disabled={pending} onClick={backFromHalf}>Cancel</button>
+          <button type="button" className={styles.primary} disabled={pending} onClick={() => runHalf(true)}>
+            Half comm
+          </button>
           {pending ? <p role="status" className={styles.hint}>Saving…</p> : null}
           {error ? <p role="alert" className={styles.error}>{error}</p> : null}
         </MenuPanel>

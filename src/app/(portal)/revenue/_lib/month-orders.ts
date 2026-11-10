@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllRowsAsWritten, fetchByKeys } from '@/lib/paginate'
 import type { HandExclusion } from '@/lib/commission/bill-exclusion'
 import type { BrandOption } from '@/lib/commission/bill-brand'
+import type { HalfCommMark } from '@/lib/commission/bill-half-comm'
 
 /**
  * A month's sales orders, as `revenue_month_orders` returns them.
@@ -268,6 +269,26 @@ export async function loadOrderExclusions(
       .in('order_id', chunk) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
   )
   return new Map(rows.map(r => [r.order_id, { note: r.note, byName: r.excluded_by_name, at: r.excluded_at }]))
+}
+
+// ─── Half comm (2026-11-10) ─────────────────────────────────────────────────
+
+/**
+ * The bills paid half their commission (`sales_order_half_comm`), with who
+ * and why, by order id. Chunked like the shares: a month is hundreds of ids.
+ */
+export async function loadHalfComms(
+  supabase: SupabaseClient,
+  orderIds: readonly string[],
+): Promise<Map<string, HalfCommMark>> {
+  type Row = { order_id: string; note: string | null; set_by_name: string | null; set_at: string }
+  const rows = await fetchByKeys<Row, string>(orderIds, chunk =>
+    supabase
+      .from('sales_order_half_comm')
+      .select('order_id, note, set_by_name, set_at')
+      .in('order_id', chunk) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>,
+  )
+  return new Map(rows.map(r => [r.order_id, { note: r.note, byName: r.set_by_name, at: r.set_at }]))
 }
 
 // ─── Brands picked by hand (2026-09-27) ─────────────────────────────────────

@@ -205,6 +205,8 @@ export const INVOKER_READS: Readonly<Record<string, readonly string[]>> = {
   revenue_apply_fair_calendar: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_order_lines', 'sales_orders'],
   revenue_dismiss_double_claim: ['comm_double_claim_dismissals', 'comm_order_releases', 'comm_runs', 'hr_staff_costs', 'sales_import_batches', 'sales_orders', 'users'],
   revenue_exclude_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_orders', 'users'],
+  revenue_full_comm_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_half_comm', 'sales_orders'],
+  revenue_half_comm_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_half_comm', 'sales_orders', 'users'],
   revenue_fair_calendar: ['comm_organisers', 'comm_venue_events', 'comm_venues', 'sales_import_batches', 'sales_orders'],
   revenue_fair_calendar_moves: ['comm_order_releases', 'comm_organisers', 'comm_runs', 'comm_venue_events', 'hr_staff_costs', 'sales_import_batches', 'sales_orders'],
   revenue_include_order: ['comm_order_releases', 'comm_runs', 'comm_sub_departments', 'departments', 'sales_import_batches', 'sales_order_exclusions', 'sales_order_lines', 'sales_orders', 'users'],

@@ -10,6 +10,7 @@ import { brandLabel, exhibitionBrandOf, inExhibition, placeOf, NO_BRAND, NO_FAIR
 import { buildCommissionWorkbench } from '@/lib/commission/workbench'
 import { commissionByBill, type BillCommission } from '@/lib/commission/bill-commission'
 import { billCountAction, describeExclusion, exclusionReason } from '@/lib/commission/bill-exclusion'
+import { billHalfCommAction, describeHalfComm, HALF_COMM_LABEL } from '@/lib/commission/bill-half-comm'
 import { billBrandAction } from '@/lib/commission/bill-brand'
 import { readsNoSales } from '@/lib/commission/no-sales'
 import { rowOrigin } from '@/lib/commission/row-origin'
@@ -19,6 +20,7 @@ import {
   loadMonthOrders,
   loadOrderBrandPicks,
   loadOrderExclusions,
+  loadHalfComms,
   loadOrderShares,
   loadShareTeam,
   loadUncostedProducts,
@@ -91,13 +93,15 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
   // bill can be, and only where the scheme has a ladder to pick from.
   // …and, for one exhibition, the fair and the ERP booth each bill was
   // written at — the same read the month's Sales exhibition grouped them by.
-  const [shares, team, exclusions, brandOptions, brandPicks, placed] = await Promise.all([
+  const [shares, team, exclusions, brandOptions, brandPicks, placed, halfComms] = await Promise.all([
     loadOrderShares(supabase, all.map(o => o.orderId)),
     loadShareTeam(supabase, subDept.schemeId),
     loadOrderExclusions(supabase, all.filter(o => o.cancelled).map(o => o.orderId)),
     loadBrandOptions(supabase, subDept.schemeId),
     loadOrderBrandPicks(supabase, all.filter(o => !o.cancelled).map(o => o.orderId)),
     exhibition ? loadOrderFairs(supabase, all.map(o => o.orderId)) : Promise.resolve(new Map<string, OrderFair>()),
+    // Half comm (2026-11-10): which live bills pay half, who said so and why.
+    loadHalfComms(supabase, all.filter(o => !o.cancelled).map(o => o.orderId)),
   ])
   const sharesByOrder = new Map<string, typeof shares>()
   for (const sh of shares) sharesByOrder.set(sh.orderId, [...(sharesByOrder.get(sh.orderId) ?? []), sh])
@@ -243,7 +247,7 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       marginValue: o.marginCost === null ? null : Math.round((o.marginRevenue - o.marginCost) * 100) / 100,
       marginKeyed: o.marginSource === 'manual',
       noSales: readsNoSales(o),
-      status: reason ?? (!o.staffId ? 'Pays nobody' : !o.depositMet ? 'Deposit pending' : 'Included'),
+      status: reason ?? (!o.staffId ? 'Pays nobody' : !o.depositMet ? 'Deposit pending' : halfComms.has(o.orderId) ? HALF_COMM_LABEL : 'Included'),
       cancelled: o.cancelled,
       exclusionDetail: byHand ? describeExclusion(byHand) : null,
       countAction: billCountAction({ ...o, excludedByHand: Boolean(byHand) }, { runLocked, monthLabel }),
@@ -285,6 +289,9 @@ export default async function MonthOrdersPage({ params, searchParams }: PageProp
       // Moved here from another salesperson (2026-10-12).
       moved: workbench?.moves?.[o.orderId] ?? null,
       commissionOnly: commissionOnly(o.orderId),
+      // Half comm (2026-11-10): the menu's row, and the why on the Status.
+      halfCommAction: billHalfCommAction({ halfComm: halfComms.has(o.orderId), cancelled: o.cancelled }, { runLocked, monthLabel }),
+      halfCommDetail: halfComms.has(o.orderId) ? describeHalfComm(halfComms.get(o.orderId)!) : null,
     }
   })
 

@@ -260,6 +260,8 @@ export const TABLE_WRITES: Readonly<Record<string, TableWrites>> = {
   sales_order_brand_picks: each(REVENUE_WORK),
   sales_order_erp_changes: each(REVENUE_WORK),
   sales_order_exclusions: each(REVENUE_WORK),
+  // Half comm (2026-11-10, mig 20261110160000).
+  sales_order_half_comm: each(REVENUE_WORK),
   sales_order_lines: each(REVENUE_WORK),
   sales_order_reassignments: each(REVENUE_WORK),
   sales_order_shares: each(REVENUE_WORK),

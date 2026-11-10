@@ -9,12 +9,14 @@ const mocks = vi.hoisted(() => ({
   shareOrder: vi.fn(),
   unshareOrder: vi.fn(),
   moveOrder: vi.fn(),
+  setHalfComm: vi.fn(),
   refresh: vi.fn(),
   push: vi.fn(),
 }))
 vi.mock('../../../../run-actions', () => ({
   excludeOrder: mocks.excludeOrder, includeOrder: mocks.includeOrder,
   shareOrder: mocks.shareOrder, unshareOrder: mocks.unshareOrder, moveOrder: mocks.moveOrder,
+  setHalfComm: mocks.setHalfComm,
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: mocks.refresh, push: mocks.push }) }))
 
@@ -432,5 +434,62 @@ describe('BillContextMenu — Move to another salesperson…', () => {
     const row = within(root).getByRole('menuitem', { name: /Move to another salesperson/ })
     expect(row).toBeDisabled()
     expect(row).toHaveAttribute('title', 'The run for September 2026 has paid — reopen it before moving its bills')
+  })
+})
+
+describe('BillContextMenu — Half comm (2026-11-10)', () => {
+  const half = { action: { kind: 'half' as const }, detail: null }
+
+  it('sits above Don’t count, and halves nothing until its own confirmation, with the why typed there', async () => {
+    mocks.setHalfComm.mockResolvedValue({ ok: true, result: { orderNo: 'HC-SO-013493', changed: true } })
+    const onHalfCommDone = vi.fn()
+    const { root } = menu({ kind: 'exclude' }, { halfComm: half, onHalfCommDone })
+    const rows = within(root).getAllByRole('menuitem').map(r => r.textContent)
+    expect(rows.indexOf('Half comm…')).toBe(rows.indexOf("Don't count this bill…") - 1)
+
+    fireEvent.click(within(root).getByRole('menuitem', { name: 'Half comm…' }))
+    expect(mocks.setHalfComm).not.toHaveBeenCalled()
+    const panel = screen.getByRole('dialog', { name: 'Half comm on HC-SO-013493' })
+    expect(within(panel).getByText(/Its sales count in full/)).toBeInTheDocument()
+    fireEvent.change(within(panel).getByLabelText(/Why/), { target: { value: 'discount' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Half comm' }))
+
+    await waitFor(() => expect(onHalfCommDone).toHaveBeenCalled())
+    expect(mocks.setHalfComm).toHaveBeenCalledWith('order-1', true, 'discount')
+    expect(mocks.refresh).toHaveBeenCalled()
+    expect(onHalfCommDone.mock.calls[0][0]).toMatchObject({ orderId: 'order-1', halved: true })
+  })
+
+  it('keeps a refusal in the panel', async () => {
+    mocks.setHalfComm.mockResolvedValue({ ok: false, reason: 'LUIS TEO’s October 2026 is closed.' })
+    const { root } = menu({ kind: 'exclude' }, { halfComm: half })
+    fireEvent.click(within(root).getByRole('menuitem', { name: 'Half comm…' }))
+    const panel = screen.getByRole('dialog', { name: 'Half comm on HC-SO-013493' })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Half comm' }))
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('closed')
+  })
+
+  it('pays it in full again in one click, the why on hover', async () => {
+    mocks.setHalfComm.mockResolvedValue({ ok: true, result: { orderNo: 'HC-SO-013493', changed: true } })
+    const onHalfCommDone = vi.fn()
+    const { root } = menu({ kind: 'exclude' }, { halfComm: { action: { kind: 'full' }, detail: 'Half comm by HR on 10 Nov 2026 — discount' }, onHalfCommDone })
+    const row = within(root).getByRole('menuitem', { name: 'Full comm again' })
+    expect(row).toHaveAttribute('title', 'Half comm by HR on 10 Nov 2026 — discount')
+    fireEvent.click(row)
+    await waitFor(() => expect(onHalfCommDone).toHaveBeenCalled())
+    expect(mocks.setHalfComm).toHaveBeenCalledWith('order-1', false, null)
+  })
+
+  it('is shut, with why, where Don’t count is', () => {
+    const { root } = menu({ kind: 'locked', excludedByHand: false, reason: 'paid' },
+      { halfComm: { action: { kind: 'locked', halved: false, reason: 'The run for October 2026 has paid' }, detail: null } })
+    const row = within(root).getByRole('menuitem', { name: 'Half comm' })
+    expect(row).toBeDisabled()
+    expect(row).toHaveAttribute('title', 'The run for October 2026 has paid')
+  })
+
+  it('has no row where none is offered', () => {
+    const { root } = menu({ kind: 'exclude' })
+    expect(within(root).queryByRole('menuitem', { name: /Half comm|Full comm/ })).toBeNull()
   })
 })
