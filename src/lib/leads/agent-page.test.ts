@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AuditChange } from '@/lib/audit/changes'
-import { endsWarn, faqCat, knowledgeLog, pbCat } from './agent-page'
+import { brandRowState, endsWarn, faqCat, knowledgeLog, pbCat } from './agent-page'
 
 describe('the left lists', () => {
   it('sorts fixed answers by their words', () => {
@@ -33,5 +33,22 @@ describe('knowledgeLog', () => {
       ch(4, 'DELETE', k, null, '2026-10-21T02:00:00Z'),
     ], 'b1', [{ id: 'f9', validUntil: '2026-10-31' }])
     expect(rows.map(r => [r.act, r.ref])).toEqual([['Expired', 'f9'], ['Removed', 'f1'], ['Paused', 'f1'], ['Added', 'f1']])
+  })
+})
+
+// Knowledge › Add files, 2026-11-10: every top folder of 2990s already added left a brand box that looked clickable
+// and did nothing, and the "already added" note never showed.
+describe('brandRowState', () => {
+  const inner = ['folder:sofa', 'folder:mattress', 'folder:testing']
+  it('every folder in it added: added and locked', () => {
+    expect(brandRowState(inner, new Set(inner), [])).toEqual({ added: true, lock: true, on: false })
+  })
+  it('some still to add: open; ticked once the rest are picked now', () => {
+    const have = new Set(['folder:sofa'])
+    expect(brandRowState(inner, have, [])).toEqual({ added: false, lock: false, on: false })
+    expect(brandRowState(inner, have, ['folder:mattress', 'folder:testing'])).toEqual({ added: false, lock: false, on: true })
+  })
+  it('nothing in it: locked', () => {
+    expect(brandRowState([], new Set(), [])).toEqual({ added: false, lock: true, on: false })
   })
 })

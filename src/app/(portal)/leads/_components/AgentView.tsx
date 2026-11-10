@@ -9,7 +9,7 @@ import {
   APPROACHES, AVOIDS, BLOCK_PRESETS, GOALS, INSTRUCTIONS, LENGTHS, PHONE_WORDS, SALES_HABITS, TONES, agentReads, settingsOf,
   type AgentMore, type AgentSettings, type DataFile, type FixedAnswer, type KnowledgePick, type PlaySituation,
 } from '@/lib/leads/agent'
-import { FAQ_CATS, PLAY_CATS, endsWarn, faqCat, knowledgeLog, pbCat, type LogRow } from '@/lib/leads/agent-page'
+import { FAQ_CATS, PLAY_CATS, brandRowState, endsWarn, faqCat, knowledgeLog, pbCat, type LogRow } from '@/lib/leads/agent-page'
 import { dayMon, dcState, dcTree, extOf, hostOf, placeOf, readLine, type DataFolder, type Place, type ReadLevel } from '@/lib/leads/data-center'
 import { DEFAULT_LEARN, memoryMeta, moveSource, rateOf, readEntries, type FileQuestion, type LearnSettings, type MemoryLine, type MemorySuggestion } from '@/lib/leads/agent-memory'
 import type { LeadOutlet } from '@/lib/leads/outlets'
@@ -842,7 +842,10 @@ function Picker({ links, brandId, brandName, d, t, files, folders, busy, onClose
   const realKey = (r: Row) => (r.isDir && r.ref.startsWith('B:') ? null : r.key)
   const pickedDirs = pick.filter(k => k.startsWith('folder:')).map(k => k.slice(7))
   const haveDir = (p: Place) => have.has(`folder:${p}`)
+  // A brand's own folder (or Shared) is picked through what sits right in it (brandRowState).
+  const rootInner = (p: Place) => [...t.kids(p).map(k => `folder:${k.place}`), ...t.filesIn(p).map(f => `file:${f.id}`)]
   const rowState = (r: Row) => {
+    if (r.isDir && r.ref.startsWith('B:')) return brandRowState(rootInner(r.ref), have, pick)
     const added = realKey(r) ? have.has(r.key) : false
     const inDir = r.anc.some(x => pickedDirs.includes(x) || haveDir(x))
     return { added, lock: added || inDir, on: pick.includes(r.key) }
@@ -850,8 +853,9 @@ function Picker({ links, brandId, brandName, d, t, files, folders, busy, onClose
   const linkList = files.filter(f => f.kind === 'link' && (f.brandId === null || f.brandId === brandId) && !have.has(`link:${f.id}`))
   const toggleRow = (r: Row) => {
     if (r.isDir && r.ref.startsWith('B:')) {
-      // The brand's folder: tick each of its folders and files at the top.
-      const inner = [...t.kids(r.ref).map(k => `folder:${k.place}`), ...t.filesIn(r.ref).map(f => `file:${f.id}`)].filter(k => !have.has(k))
+      // The brand's folder: tick each of its folders and files at the top (nothing when all are added already).
+      if (rowState(r).lock) return
+      const inner = rootInner(r.ref).filter(k => !have.has(k))
       const all = inner.every(k => pick.includes(k))
       setPick(p => (all ? p.filter(k => !inner.includes(k)) : [...new Set([...p, ...inner])]))
       return
@@ -896,9 +900,8 @@ function Picker({ links, brandId, brandName, d, t, files, folders, busy, onClose
             )
           }) : rows.map(r => {
             const st = rowState(r)
-            const brandRoot = r.isDir && r.ref.startsWith('B:')
             return (
-              <div key={r.key} className={a.pkRow} role="checkbox" aria-checked={st.on || st.lock} data-lock={!brandRoot && st.lock && !st.on ? '' : undefined} style={{ paddingLeft: 10 + r.depth * 18 }} onClick={() => toggleRow(r)}>
+              <div key={r.key} className={a.pkRow} role="checkbox" aria-checked={st.on || st.lock} aria-disabled={st.lock || undefined} data-lock={st.lock && !st.on ? '' : undefined} style={{ paddingLeft: 10 + r.depth * 18 }} onClick={() => toggleRow(r)}>
                 <button type="button" className={a.pkChev} data-off={r.has ? undefined : ''} aria-expanded={!shut[r.ref]} aria-label="Fold"
                   onClick={e => { e.stopPropagation(); if (r.isDir) setShut(x => ({ ...x, [r.ref]: !x[r.ref] })) }}><LeadIcon name="chevron-right" size={13} /></button>
                 <span className={a.pkBox}>{st.on || st.lock ? '✓' : ''}</span>

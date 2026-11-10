@@ -45,6 +45,8 @@
 }
 .filterBtn[data-on] { background: rgb(var(--lv-sel)); border-color: rgb(var(--lv-sel-line)); color: rgb(var(--lv-fg)); }
 .filterPop { width: 280px; gap: 10px; padding: 12px; }
+/* The popover is a flex column that scrolls; its rows keep their own heights instead of being squeezed (2026-11-10). */
+.filterPop > * { flex-shrink: 0; }
 .filterSearch {
   display: flex;
   align-items: center;
@@ -55,7 +57,9 @@
   background: rgb(var(--lv-surface-sel));
   color: rgb(var(--lv-fg-4));
 }
-.filterSearch input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 13px; color: rgb(var(--lv-fg)); padding: 0; }
+.filterSearch input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; box-shadow: none; background: transparent; appearance: none; -webkit-appearance: none; font: inherit; font-size: 13px; color: rgb(var(--lv-fg)); padding: 0; }
+/* The browser's own search-field look (its clear cross, its decoration) is not Lead View's (2026-11-10). */
+.filterSearch input::-webkit-search-decoration, .filterSearch input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
 .filterSearch input::placeholder { color: rgb(var(--lv-fg-4)); opacity: 1; }
 .filterChips { display: flex; flex-wrap: wrap; gap: 6px; }
 .filterHead { flex-basis: 100%; font-size: 11px; letter-spacing: 0.1em; color: rgb(var(--lv-fg-4)); }
