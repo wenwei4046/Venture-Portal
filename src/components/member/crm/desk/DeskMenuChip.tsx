@@ -5,7 +5,7 @@
  * two buttons with the number picked, the picked ones as removable tags, "N chats of M · Clear all", and a popover where
  * teams, people and statuses are picked several at once and "Show N chats" applies them.
  */
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Ic } from "../shared/icons4a";
 
 const BTN: CSSProperties = { border: 0, background: "transparent", font: "inherit", color: "inherit", cursor: "pointer", textAlign: "left", margin: 0, padding: 0, boxSizing: "border-box" };
@@ -57,9 +57,27 @@ const pill = (on: boolean, h: number): CSSProperties => ({ ...BTN, height: `${h}
   font: "500 13px Inter, sans-serif", background: on ? "var(--crm-sel)" : "#fff", border: `1px solid ${on ? "var(--crm-rust)" : "var(--crm-line)"}`, color: "var(--crm-ink)", whiteSpace: "nowrap" });
 
 /** D5a's filter: People / Status buttons, the tags, the result line; either button opens the 2c·2 picker over the list. */
+const POP_W = 400;
+
 export function InboxFilter({ f }: { f: InboxFilterBits }) {
   const [draft, setDraft] = useState<{ who: string[]; st: string[] } | null>(null);
-  const open = (sec: "people" | "status") => { setDraft({ who: f.who, st: f.st }); setTimeout(() => document.querySelector(`[data-ib-sec="${sec}"]`)?.scrollIntoView({ block: "nearest" }), 0); };
+  // Where the popover stands on the screen: fixed under the buttons, so the 340 px list column (overflow: auto) never cuts
+  // it (the owner, 2026-11-10, a screenshot: "overlap") — kept inside the window, its height to the window's foot.
+  const row = useRef<HTMLDivElement>(null);
+  const [at, setAt] = useState<{ top: number; left: number; maxH: number } | null>(null);
+  const place = () => {
+    const r = row.current?.getBoundingClientRect();
+    if (!r) return;
+    const top = r.bottom + 8, left = Math.max(12, Math.min(r.left, window.innerWidth - POP_W - 12));
+    setAt({ top, left, maxH: Math.max(240, Math.min(620, window.innerHeight - top - 16)) });
+  };
+  const isOpen = !!draft;
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [isOpen]);
+  const open = (sec: "people" | "status") => { place(); setDraft({ who: f.who, st: f.st }); setTimeout(() => document.querySelector(`[data-ib-sec="${sec}"]`)?.scrollIntoView({ block: "nearest" }), 0); };
   const tg = (list: string[], v: string) => (list.includes(v) ? list.filter(x => x !== v) : [...list, v]);
   const Btn = ({ sec, label, n }: { sec: "people" | "status"; label: string; n: number }) => (
     <button type="button" onClick={() => open(sec)} aria-expanded={!!draft} style={{ ...BTN, flex: 1, minWidth: 0, height: "36px", padding: "0 10px", borderRadius: "9px", display: "flex", alignItems: "center", gap: "7px",
@@ -73,11 +91,11 @@ export function InboxFilter({ f }: { f: InboxFilterBits }) {
   const d = draft;
   return (
     <>
-      <div style={{ display: "flex", gap: "8px", position: "relative" }}>
+      <div ref={row} style={{ display: "flex", gap: "8px", position: "relative" }}>
         <Btn sec="people" label="People" n={f.peopleN} /><Btn sec="status" label="Status" n={f.statusN} />
         {d && (<>
-          <div onClick={() => setDraft(null)} style={{ position: "fixed", inset: 0, zIndex: 20 }} />
-          <div role="dialog" aria-label="Filter chats" style={{ position: "absolute", top: "44px", left: 0, zIndex: 21, width: "400px", maxHeight: "min(620px, calc(100vh - 220px))", overflow: "auto", boxSizing: "border-box", padding: "18px 20px 20px",
+          <div onClick={() => setDraft(null)} style={{ position: "fixed", inset: 0, zIndex: 59 }} />
+          <div role="dialog" aria-label="Filter chats" style={{ position: "fixed", top: `${at?.top ?? 0}px`, left: `${at?.left ?? 0}px`, zIndex: 60, width: `${POP_W}px`, maxWidth: "calc(100vw - 24px)", maxHeight: `${at?.maxH ?? 620}px`, overflow: "auto", boxSizing: "border-box", padding: "18px 20px 20px",
             background: "#fff", borderRadius: "16px", boxShadow: "0 16px 36px rgba(42,22,12,.16)", display: "flex", flexDirection: "column", gap: "18px" }}>
             <div style={{ display: "flex", alignItems: "center" }}>
               <span style={{ font: `500 20px ${TIGHT}`, letterSpacing: "-0.01em", color: "var(--crm-ink)" }}>Filter chats</span>
