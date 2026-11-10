@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Chip, Facts, HistoryEvent, SecLabel, hv } from '@/components/hrv/kit'
+import { Select } from '@/components/hrv/select'
 import { flash } from '@/components/hrv/toast'
 import { adminMemberAction, type AdminMemberData, type AdminMemberInput } from '@/app/(member)/member/actions'
 import type { MemberRequest } from '@/lib/member/types'
@@ -370,11 +371,11 @@ function Detail({
         {open && r.kind === 'claim' ? (
           <div className={s.when}>
             <span className={s.replLabel}>Payroll month</span>
-            <select className={s.date} value={month} onChange={e => setMonth(e.target.value)} aria-label="Payroll month" disabled={busy || !can}>
+            <Select className={s.date} value={month} onChange={e => setMonth(e.target.value)} aria-label="Payroll month" disabled={busy || !can}>
               {claimMonthChoices(officeMonth(), claimOwnMonth(r.detail, officeDay(r.submittedAt ?? r.createdAt).format('YYYY-MM-DD'))).map(o => (
                 <option key={o.value || 'auto'} value={o.value}>{o.label}</option>
               ))}
-            </select>
+            </Select>
           </div>
         ) : null}
 
