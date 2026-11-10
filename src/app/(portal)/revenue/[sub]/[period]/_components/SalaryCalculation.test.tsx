@@ -42,7 +42,7 @@ const pencil = () => screen.getByRole('button', { name: 'Edit CHEA HUAN’s pay 
 
 beforeEach(() => {
   vi.clearAllMocks()
-  savePayLines.mockResolvedValue({ earnings: 500, deductions: 0, payrollUpdated: true })
+  savePayLines.mockResolvedValue({ ok: true, earnings: 500, deductions: 0, payrollUpdated: true })
 })
 afterEach(cleanup)
 
@@ -138,7 +138,20 @@ describe('SalaryCalculation · the pay lines on a salesperson’s month', () => 
     expect(savePayLines).not.toHaveBeenCalled()
   })
 
+  // Regression 2026-11-10: the action THREW its refusal, and production showed
+  // "Minified React error #441" instead of the sentence. It answers it now.
   it('shows the database’s refusal and keeps what was typed', async () => {
+    savePayLines.mockResolvedValue({ ok: false, reason: 'Pay lines for CHEA HUAN changed since you opened them. Reload and try again' })
+    renderSalary()
+    fireEvent.click(pencil())
+    fireEvent.change(screen.getByRole('textbox', { name: 'Line 1 amount' }), { target: { value: '80' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save lines' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('changed since you opened them')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Line 1 amount' })).toHaveValue('80')
+  })
+
+  it('still shows a failure the action throws (the network, a sign-in that ran out)', async () => {
     savePayLines.mockRejectedValue(new Error('Pay lines for CHEA HUAN changed since you opened them. Reload and try again'))
     renderSalary()
     fireEvent.click(pencil())
