@@ -50,6 +50,11 @@ export interface FinColumn<R> {
   tone?: (r: R) => 'ledger' | 'danger' | null
   /** A small tag after the words (Payment request's "2 → 1 PV") — kept in sight, and not what the filter lists. */
   tag?: (r: R) => string | null
+  /**
+   * What the filter lists for a row when one cell holds several (2026-11-10 — Billing Allocator's Staff: each company
+   * in a person's split); a row passes when any of them is ticked. Left out, the cell's own words.
+   */
+  filterValues?: (r: R) => string[]
 }
 
 type Sort = { key: string; dir: 'asc' | 'desc' } | null
@@ -236,7 +241,9 @@ export function FinTable<R>({
 
   // ── Filters, then the sort ──
   const active = Object.entries(filters).filter(([k, v]) => v.length > 0 && byKey.has(k))
-  const filtered = active.length === 0 ? rows : rows.filter((r) => active.every(([k, vals]) => vals.includes(byKey.get(k)!.text(r))))
+  const valuesOf = (c: FinColumn<R>, r: R) => (c.filterValues ? c.filterValues(r) : [c.text(r)])
+  const filtered =
+    active.length === 0 ? rows : rows.filter((r) => active.every(([k, vals]) => valuesOf(byKey.get(k)!, r).some((v) => vals.includes(v))))
   const sorted = useMemo(() => {
     if (!sort || !byKey.has(sort.key)) return filtered
     const col = byKey.get(sort.key)!
@@ -313,8 +320,7 @@ export function FinTable<R>({
     if (!filterCol) return []
     const counts = new Map<string, number>()
     for (const r of rows) {
-      const t = filterCol.text(r)
-      counts.set(t, (counts.get(t) ?? 0) + 1)
+      for (const t of new Set(filterCol.filterValues ? filterCol.filterValues(r) : [filterCol.text(r)])) counts.set(t, (counts.get(t) ?? 0) + 1)
     }
     return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   }, [filterCol, rows])

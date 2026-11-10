@@ -288,15 +288,17 @@ describe('the hub’s other lists', () => {
     expect(screen.queryByText('HV own')).toBeNull()
   })
 
-  it('Staff: a row a person — name and department, splits and the day added, active or not — and the list’s own buttons', async () => {
+  it('Staff: a row a person — name, department, splits, the day added, active or not — and the list’s own buttons', async () => {
     mocks.snapshot.mockResolvedValue({})
     mocks.getSnapshot.mockResolvedValue({ rows: [{ staffName: 'Carrie Ong', status: 'active', department: 'Finance', targetId: null, pct: 30 }], savedAt: '2026-09-30T06:00:00Z' })
     show({ initialCard: 'staff' })
-    const carrie = screen.getByText('Carrie Ong · Finance').parentElement!
-    expect(carrie).toHaveTextContent('HV own 30% · 2990 70% · added 04 Sep 2026')
+    await flush()
+    const carrie = rowOf('Carrie Ong')
+    for (const words of ['Finance', 'HV own 30% · 2990 70%', '04 Sep 2026']) expect(carrie).toHaveTextContent(words)
     expect(within(carrie).getByText('active')).toHaveAttribute('data-tone', 'ledger')
-    expect(within(screen.getByText('Ah Kow').parentElement!).getByText('inactive')).toHaveAttribute('data-tone', 'muted')
-    fireEvent.click(within(carrie).getByRole('button', { name: 'Edit' }))
+    expect(within(rowOf('Ah Kow')).getByText('inactive')).toHaveAttribute('data-tone', 'def')
+    // A row opens its Edit (2026-11-10: the list is a table now).
+    fireEvent.click(within(carrie).getByText('Carrie Ong'))
     expect(mocks.dialog).toHaveBeenLastCalledWith('staff', expect.objectContaining({ person: expect.objectContaining({ id: 's1' }) }))
     fireEvent.click(screen.getByRole('button', { name: '+ Add staff' }))
     expect(mocks.dialog).toHaveBeenLastCalledWith('staff', expect.objectContaining({ person: null }))
@@ -313,11 +315,28 @@ describe('the hub’s other lists', () => {
     expect(mocks.dialog).toHaveBeenLastCalledWith('snapshot', expect.objectContaining({ period: '2026-08', savedAt: '2026-09-30T06:00:00Z' }))
   })
 
-  it('Staff: searches by name, department or company', () => {
+  it('Staff: searches by name, department or company', async () => {
     show({ initialCard: 'staff' })
+    await flush()
     fireEvent.change(screen.getByPlaceholderText('Search name / department / company…'), { target: { value: 'finance' } })
-    expect(screen.getByText('1 of 2')).toBeInTheDocument()
+    expect(screen.getByText('1 of 2 people')).toBeInTheDocument()
     expect(screen.queryByText('Ah Kow')).toBeNull()
+  })
+
+  it('Staff: filters by department, by status, and by each company in a split (the user: "我的filter 的function")', async () => {
+    show({ initialCard: 'staff' })
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Split · Company' }))
+    const pop = screen.getByRole('dialog', { name: 'Filter · Split · Company' })
+    expect(within(pop).getByRole('menuitemcheckbox', { name: /^HV own/ })).toHaveTextContent('1')
+    expect(within(pop).getByRole('menuitemcheckbox', { name: /^2990/ })).toHaveTextContent('1')
+    fireEvent.click(within(pop).getByRole('menuitemcheckbox', { name: /^2990/ }))
+    expect(rowOf('Carrie Ong')).toBeTruthy()
+    expect(screen.queryByText('Ah Kow')).toBeNull()
+    expect(screen.getByText('1 of 2 · filtered')).toBeInTheDocument()
+    fireEvent.click(within(pop).getByRole('button', { name: 'Clear' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Filter Department' }))
+    expect(screen.getByRole('dialog', { name: 'Filter · Department' })).toHaveTextContent('Finance')
   })
 
   it('Setup: the companies switched on or off, the categories and templates, each edited in its dialog', async () => {

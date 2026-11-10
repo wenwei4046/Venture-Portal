@@ -157,17 +157,28 @@ export default function AllocatorHub({
   // ── Staff ──
   const sq = staffQuery.trim().toLowerCase()
   const staffLabel = (s: StaffRow) => splitsText(s.splits.map((x) => ({ label: x.targetId === null ? 'HV own' : x.label.replace(/ \(dept\)$/, ''), pct: x.pct })))
-  const staffItems: ItemRow[] = [...data.staff]
+  // Staff as a table (2026-11-10, the user: "我的filter 的function" → sample `mockups/allocator-staff-filter-mockup.html`, "B"):
+  // each column sorts, and Department, Company and Status filter — Company by each company in a person's split.
+  const staffRows: StaffRow[] = [...data.staff]
     .filter((s) => !sq || `${s.name} ${s.department} ${staffLabel(s)}`.toLowerCase().includes(sq))
     .sort((x, y) => (y.createdAt || '').localeCompare(x.createdAt || '') || x.name.localeCompare(y.name))
-    .map((s) => ({
-      key: s.id,
-      label: s.department ? `${s.name} · ${s.department}` : s.name,
-      sub: `${staffLabel(s)} · added ${fd(s.createdAt ? recordedOn({ createdAt: s.createdAt }) : null)}`,
-      value: s.status,
-      valueTone: s.status === 'active' ? 'ledger' : 'muted',
-      action: can.edit ? { label: 'Edit', onClick: () => open({ kind: 'staff', person: s }) } : null,
-    }))
+  const companiesOf = (s: StaffRow) => s.splits.map((x) => (x.targetId === null ? 'HV own' : x.label.replace(/ (dept)$/, '')))
+  const addedOn = (s: StaffRow) => (s.createdAt ? (recordedOn({ createdAt: s.createdAt }) ?? '') : '')
+  const staffColumns: FinColumn<StaffRow>[] = [
+    { key: 'name', label: 'Name', kind: 'name', fixed: true, width: 200, min: 140, value: (s) => s.name.toLowerCase(), text: (s) => s.name },
+    { key: 'dept', label: 'Department', kind: 'text', fixed: true, width: 170, min: 120, value: (s) => s.department.toLowerCase(), text: (s) => s.department || '—' },
+    { key: 'split', label: 'Split · Company', kind: 'desc', fixed: true, width: 340, min: 200, value: (s) => staffLabel(s).toLowerCase(), text: (s) => staffLabel(s), filterValues: companiesOf },
+    { key: 'added', label: 'Added', kind: 'date', width: 112, value: (s) => addedOn(s), text: (s) => fd(addedOn(s) || null) },
+    {
+      key: 'status',
+      label: 'Status',
+      kind: 'chip',
+      width: 100,
+      value: (s) => s.status,
+      text: (s) => s.status,
+      chip: (s) => ({ text: s.status, tone: s.status === 'active' ? 'ledger' : 'def' }),
+    },
+  ]
 
   // ── Setup ──
   const companyRows: ItemRow[] = data.companySettings.map((c) => ({
@@ -273,7 +284,23 @@ export default function AllocatorHub({
           active={card}
           onSelect={(k) => setCard(k as AllocatorCard)}
         />
-        {card === 'records' ? (
+        {card === 'staff' ? (
+          <FinTable
+            layoutId="fin.allocator.staff"
+            title={listTitle}
+            rows={staffRows}
+            rowKey={(s) => s.id}
+            columns={staffColumns}
+            amountOf={() => 0}
+            search={{ value: staffQuery, onChange: setStaffQuery, placeholder: 'Search name / department / company…' }}
+            countLabel={(n) => (sq ? `${n} of ${plural(data.staff.length, 'person', 'people')}` : plural(n, 'person', 'people'))}
+            onRowClick={(s) => (can.edit ? open({ kind: 'staff', person: s }) : undefined)}
+            emptyText={sq ? 'Nobody matches.' : 'The list is empty — add the people Headcount counts.'}
+            canSetDefault={canSetDefault}
+            defaultShown={['added', 'status']}
+            tools={tools}
+          />
+        ) : card === 'records' ? (
           <FinTable
             layoutId="fin.allocations"
             title={listTitle}
@@ -299,25 +326,16 @@ export default function AllocatorHub({
             amountOf={(t) => t.amount}
             onRowClick={() => {}}
             emptyText=""
-            search={card === 'staff' ? { value: staffQuery, onChange: setStaffQuery, placeholder: 'Search name / department / company…' } : null}
+            search={null}
             countText={
               card === 'company'
                 ? plural(shares.length, 'company', 'companies')
-                : card === 'staff'
-                  ? plural(data.staff.length, 'person', 'people')
-                  : `${plural(data.templates.length, 'template', 'templates')} · ${plural(data.categories.length, 'category', 'categories')}`
+                : `${plural(data.templates.length, 'template', 'templates')} · ${plural(data.categories.length, 'category', 'categories')}`
             }
             tools={tools}
           >
             {card === 'company' ? (
               <ItemList title="Share by company" count={plural(shares.length, 'company', 'companies')} items={companyItems} empty={`Nothing allocated in ${monthName} yet.`} />
-            ) : card === 'staff' ? (
-              <ItemList
-                title="Staff"
-                count={sq ? `${staffItems.length} of ${data.staff.length}` : plural(data.staff.length, 'person', 'people')}
-                items={staffItems}
-                empty={sq ? 'Nobody matches.' : 'The list is empty — add the people Headcount counts.'}
-              />
             ) : (
               <>
                 <ItemList title="Companies" count={`${enabled} / ${data.companySettings.length} enabled`} items={companyRows} empty="No active companies." />
