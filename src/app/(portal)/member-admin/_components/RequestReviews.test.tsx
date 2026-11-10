@@ -103,6 +103,24 @@ describe('RequestReviews', () => {
     expect(flash).toHaveBeenCalledWith('Claim approved — added to payroll')
   })
 
+  // 2026-11-10, RQ-2611-020: an Other claim for 30 Oct – 1 Nov went into November;
+  // HR picks the month instead. Automatic sends none (above); a pick is sent as is.
+  it('sends the payroll month HR picked', async () => {
+    show({}, 'claim')
+    const picker = within(detail()).getByRole('combobox', { name: 'Payroll month' })
+    expect(picker).toHaveValue('')
+    expect(within(picker).getAllByRole('option')[0]).toHaveTextContent(/^Automatic · /)
+    const october = within(picker).getAllByRole('option').find(o => (o as HTMLOptionElement).value !== '')!
+    fireEvent.change(picker, { target: { value: (october as HTMLOptionElement).value } })
+    await act(async () => {
+      fireEvent.click(within(detail()).getByRole('button', { name: 'Approve · add to payroll' }))
+    })
+    expect(action).toHaveBeenCalledWith({
+      action: 'approve', route: 'payroll', requestId: 'claim', note: '', month: (october as HTMLOptionElement).value,
+    })
+    expect(flash).toHaveBeenCalledWith(expect.stringMatching(/^Claim approved — added to the \w{3} \d{4} payroll$/))
+  })
+
   it('says where an approved claim’s money comes from', () => {
     show({ requests: [{ ...base.requests[1], status: 'approved', payout: { route: 'payment', payrollMonth: null, voucherNo: null, voucherStatus: null } }] }, 'claim')
     expect(detail()).toHaveTextContent('Payment requested — waiting for Finance')
