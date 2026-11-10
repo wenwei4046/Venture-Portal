@@ -56,3 +56,13 @@ export function knowledgeLog(changes: AuditChange[], brandId: string, expired: A
   for (const f of expired) rows.push({ key: `x${f.id}`, at: `${f.validUntil}T16:00:00Z`, act: 'Expired', kind: 'file', ref: f.id, by: 'Auto' })
   return rows.sort((a, b) => b.at.localeCompare(a.at))
 }
+
+/**
+ * Knowledge › Add files: a brand's own folder (or Shared) is picked through what sits right in it — added once each of
+ * those is, and then locked, so its box never looks clickable when a click would add nothing (the user, 2026-11-10:
+ * "为什么不能勾"). Empty, it is locked too. `on` = everything in it is added or picked now, some of it picked now.
+ */
+export function brandRowState(inner: string[], have: ReadonlySet<string>, pick: readonly string[]): { added: boolean; lock: boolean; on: boolean } {
+  const added = inner.length > 0 && inner.every(k => have.has(k))
+  return { added, lock: added || !inner.length, on: !added && inner.length > 0 && inner.every(k => have.has(k) || pick.includes(k)) }
+}
