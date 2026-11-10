@@ -9,7 +9,8 @@ import type { MemberRequest } from '@/lib/member/types'
 import { claimPayoutLine, readClaimPayout } from '@/lib/member/claim-payout'
 import { revenuePath, subDeptSlug } from '@/lib/revenue'
 import { shortDay } from '@/lib/commission/sales-group-requests'
-import { officeToday } from '@/lib/office-time'
+import { officeDay, officeMonth, officeToday } from '@/lib/office-time'
+import { AUTOMATIC_MONTH, claimApprovedDone, claimMonthChoices, claimOwnMonth } from '@/lib/member/claim-payroll-month'
 import {
   ACCEPT_NOTE,
   REQUEST_FILTERS,
@@ -68,6 +69,8 @@ export default function RequestReviews({
   // A replacement's choice, kept per request while HR looks at others.
   const [seats, setSeats] = useState<Record<string, string>>({})
   const [dates, setDates] = useState<Record<string, string>>({})
+  // A claim's payroll month, picked per request (2026-11-10); empty = Automatic.
+  const [months, setMonths] = useState<Record<string, string>>({})
 
   const shown = filterRequests(data.requests, filter)
   const selected = data.requests.find(r => r.id === picked) ?? shown[0] ?? null
@@ -181,6 +184,8 @@ export default function RequestReviews({
             setSeat={v => setSeats(m => ({ ...m, [selected.id]: v }))}
             date={dates[selected.id]}
             setDate={v => setDates(m => ({ ...m, [selected.id]: v }))}
+            month={months[selected.id] ?? AUTOMATIC_MONTH}
+            setMonth={v => setMonths(m => ({ ...m, [selected.id]: v }))}
             run={run}
             approve={approve}
             unschedule={unschedule}
@@ -205,6 +210,8 @@ function Detail({
   setSeat,
   date: dateChosen,
   setDate,
+  month,
+  setMonth,
   run,
   approve,
   unschedule,
@@ -220,6 +227,8 @@ function Detail({
   setSeat: (v: string) => void
   date: string | undefined
   setDate: (v: string) => void
+  month: string
+  setMonth: (v: string) => void
   run: (act: Act) => void
   approve: (r: MemberRequest, seat: string, successor: string | null, date: string, sub: string | null) => void
   unschedule: (r: MemberRequest) => void
@@ -252,7 +261,13 @@ function Detail({
   } else if (open && r.kind === 'claim') {
     acts = [moreInfo, reject,
       { label: 'Approve · request payment', input: { action: 'approve', route: 'payment', ...base, note }, done: 'Claim approved — a payment request goes to Finance' },
-      { label: 'Approve · add to payroll', primary: true, input: { action: 'approve', route: 'payroll', ...base, note }, done: 'Claim approved — added to payroll' },
+      {
+        label: 'Approve · add to payroll',
+        primary: true,
+        // HR's month, or none — Automatic (2026-11-10, `lib/member/claim-payroll-month.ts`).
+        input: { action: 'approve', route: 'payroll', ...base, note, ...(month ? { month } : {}) },
+        done: claimApprovedDone(month),
+      },
     ]
   } else if (open && r.kind === 'replacement') {
     acts = [moreInfo, reject]
@@ -349,6 +364,17 @@ function Detail({
               <input type="date" className={s.date} value={date} onChange={e => setDate(e.target.value)} aria-label="Effective date" />
               <span className={s.whenText}>{date ? effectiveWhen(date, today) : ''}</span>
             </div>
+          </div>
+        ) : null}
+
+        {open && r.kind === 'claim' ? (
+          <div className={s.when}>
+            <span className={s.replLabel}>Payroll month</span>
+            <select className={s.date} value={month} onChange={e => setMonth(e.target.value)} aria-label="Payroll month" disabled={busy || !can}>
+              {claimMonthChoices(officeMonth(), claimOwnMonth(r.detail, officeDay(r.submittedAt ?? r.createdAt).format('YYYY-MM-DD'))).map(o => (
+                <option key={o.value || 'auto'} value={o.value}>{o.label}</option>
+              ))}
+            </select>
           </div>
         ) : null}
 
