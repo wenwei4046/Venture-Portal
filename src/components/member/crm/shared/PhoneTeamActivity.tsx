@@ -14,6 +14,7 @@ import { ACT_TOP_PHONE, foldTop, type ActivityVM } from "./team-activity";
 import { fs } from "./phone4a";
 import { V4 } from "./up-next-style";
 import { useTeamActivity } from "./use-team-activity";
+import { AuditTimeline } from "./audit-timeline";
 
 const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 const INTER = "Inter, sans-serif";
@@ -185,18 +186,8 @@ export function PhoneTeamActivityView({ v, top }: { v: ActivityVM; top?: ReactNo
             {v.pd.facts.map(f => <div key={f.k} style={{ display: "flex", flexDirection: "column", gap: "3px", minWidth: 0 }}><span style={{ fontSize: fs(11), color: "var(--crm-faint)" }}>{f.k}</span><span style={{ font: `500 ${fs(15)} ${TIGHT}`, color: f.c, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{f.v}</span></div>)}
           </div>
           <div style={{ flex: 1, overflow: "auto", padding: "10px 22px" }}>
-            {v.pd.events.map(e => (
-              <div key={e.key} style={{ display: "grid", gridTemplateColumns: "48px 12px minmax(0,1fr)", columnGap: "10px" }}>
-                <span style={{ paddingTop: "10px", textAlign: "right", font: `600 ${fs(12)} ${TIGHT}`, color: "var(--crm-muted)" }}>{e.d && <span style={{ display: "block", font: `500 ${fs(10.5)} ${INTER}`, color: "var(--crm-faint)", whiteSpace: "nowrap" }}>{e.d}</span>}{e.t}</span>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <span style={{ width: "1px", height: "14px", background: e.top }} /><span style={{ width: "9px", height: "9px", borderRadius: "50%", flex: "none", background: e.dot }} /><span style={{ flex: 1, width: "1px", background: e.bot }} />
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px", padding: "8px 0 14px", fontSize: fs(13.5) }}>
-                  <span style={{ fontWeight: 600, color: e.c }}>{e.title}</span>
-                  {e.sub && <span style={{ fontSize: fs(12), color: "var(--crm-faint)" }}>{e.sub}</span>}
-                </div>
-              </div>
-            ))}
+            {/* ONE log per customer (the owner, 2026-11-10) — the D4b timeline, as every audit log. */}
+            <AuditTimeline lines={v.pd.lines} style={{ paddingTop: "8px" }} />
           </div>
           <div style={{ padding: "12px 22px calc(30px + var(--sheet-safe, 0px))" }}>
             <span {...press(v.pd.openChat)} style={{ height: "48px", borderRadius: "12px", display: "grid", placeItems: "center", background: "var(--crm-rust)", color: "#fff", font: `500 ${fs(15)} ${INTER}`, cursor: "pointer" }}>Open chat</span>

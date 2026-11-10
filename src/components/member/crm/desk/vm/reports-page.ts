@@ -14,8 +14,8 @@ import { DEFAULT_CRM_SETTINGS } from "@/lib/member/crm-data";
 import { initials, chatRows } from "./data";
 import { STATUS_LABEL } from "../../sales/vm/common";
 import { fmt } from "../../shared/team-activity";
-import { auditWhen, type AuditLine, type AuditTone } from "../../shared/audit-timeline";
-import { journey } from "./chatprogress";
+import { auditWhen, type AuditLine } from "../../shared/audit-timeline";
+import { customerLog } from "../../shared/customer-audit";
 import { alertsUnreadN } from "./inbox";
 import { rangeLine } from "./frame4a";
 import { isoOf } from "./adsperf";
@@ -119,14 +119,11 @@ export function reportsVM(ctx: DeskCtx) {
       close,
       // A customer opened: their log as D4b draws it — the facts, the timeline (newest at the bottom), Open chat.
       lead: lead ? (() => {
-        const c = lead.c, ev = journey(ctx, c), firstOurs = c.messages.find(m => m.from === "me" && !m.auto), firstLead = c.messages.find(m => m.from === "lead");
+        const c = lead.c, firstOurs = c.messages.find(m => m.from === "me" && !m.auto), firstLead = c.messages.find(m => m.from === "lead");
         const s = replyState(c, data.visits, now);
         const firstReply = firstOurs && firstLead ? fmt((new Date(firstOurs.at).getTime() - new Date(firstLead.at).getTime()) / 60_000) : s.kind === "never" ? `waiting ${fmt((now.getTime() - s.since) / 60_000)}` : "—";
-        const TONE: Record<string, AuditTone> = { reply: "green", appt: "green", visit: "green", won: "green", lost: "oxblood" };
-        const TITLE: Record<string, string> = { assign: "Assigned", move: "Moved", share: "Shared", appt: "Visit booked", visit: "Showed up", status: "Status changed", won: "Won", lost: "Lost", remind: "Reminder", note: "Note added" };
-        const lines: AuditLine[] = ev.map((e, i) => { const w = auditWhen(e.at), came = e.text.startsWith("Came in");
-          return { key: i, ...w, title: came ? "Lead arrived" : e.kind === "reply" ? "First reply" : e.kind === "appt" && e.text.startsWith("Changed") ? "Visit changed" : TITLE[e.kind] ?? "Change",
-            detail: [came ? e.text.replace(/^Came in from /, "") : e.text, e.note, e.who ? `by ${nameOf(e.who)}` : ""].filter(Boolean).join(" · "), tone: came ? "ink" : TONE[e.kind] ?? "ink" }; });
+        // ONE log per customer (the owner, 2026-11-10) — the same lines as the chat's Audit log and Team activity's drawer.
+        const lines: AuditLine[] = customerLog({ data, customer: c, nameOf, now });
         return { id: c.id, name: c.name, ini: initials(c.name), ad: lead.ad,
           facts: [{ k: "Got", v: `${dm(c.createdAt)}, ${auditWhen(c.createdAt).time}` }, { k: "First reply", v: firstReply }, { k: "Now with", v: c.assignedTo ? nameOf(c.assignedTo) : "Nobody yet" }],
           lines, back: () => patch({ rpLead: null }), openChat: () => openChat(c.id) };
