@@ -766,9 +766,35 @@ function commissionOnlyLine(
     basisAmount: basis,
     rate,
     qty: null,
-    amount: round2(round2(basis * rate) * penalty.multiplier),
-    note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''}${penalty.note} · old bill, commission only`,
+    amount: halved(order, round2(round2(basis * rate) * penalty.multiplier)),
+    note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''}${penalty.note}${halfNote(order)} · old bill, commission only`,
   }
+}
+
+/**
+ * HALF COMM (2026-11-10, a bill's menu on Comm Cal — the user: "commission
+ * value 5000, commission percentage 6%; commission get RM300, 当我按了 half comm
+ * 就会是 total commission RM150"). What the bill PAYS is halved — its own
+ * commission line and its part of its holder's override base, so the upline's
+ * override on it too — after its margin's penalty; its SALES are not (Pass A's
+ * own revenue, the group's, a rung, a group incentive's target) and its KPI
+ * items are paid whole.
+ */
+export const HALF_COMM = 0.5
+
+/** What a bill's half comm leaves of an amount it pays: half, else all of it. */
+function halfOf(order: Pick<SalesOrder, 'halfComm'>): number {
+  return order.halfComm ? HALF_COMM : 1
+}
+
+/** An amount the bill pays, halved when it is half comm. */
+function halved(order: Pick<SalesOrder, 'halfComm'>, amount: number): number {
+  return order.halfComm ? round2(amount * HALF_COMM) : amount
+}
+
+/** The line's word for it. */
+function halfNote(order: Pick<SalesOrder, 'halfComm'>): string {
+  return order.halfComm ? ' · half comm' : ''
 }
 
 export function computeCommissionRun(input: EngineInput): EngineResult {
@@ -1078,15 +1104,15 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
         const opr = orderRevenueSplit(order, kpiIndex, groupIndex).main
         if (opr === 0) continue
         const carried = order.periodMonth !== input.periodMonth
-        draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + opr)
+        draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + opr * halfOf(order))
         draft.lines.push({
           component: 'product_revenue',
           sourceOrderId: order.id,
           basisAmount: opr,
           rate: headRate,
           qty: null,
-          amount: round2(opr * headRate),
-          note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''} · director's own bill`,
+          amount: halved(order, round2(opr * headRate)),
+          note: `${order.orderNo} · ${order.orderDate}${carried ? ` · carried from ${order.periodMonth.slice(0, 7)}` : ''} · director's own bill${halfNote(order)}`,
         })
       }
       // An old bill topped up (2026-11-07): their rate on it too, and — as
@@ -1135,7 +1161,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       }
 
       if (scheme.enableMarginPenalty && bill.pct === null && base.revenue > 0) ordersWithoutCost++
-      draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + opr * multiplier)
+      // The override base: cut by the margin, and halved on a half-comm bill.
+      draft.penaltyWeightedRevenue = round2(draft.penaltyWeightedRevenue + opr * multiplier * halfOf(order))
 
       const penaltyNote = penaltyBand
         ? ` · ${penaltyBand.label} (${round2(bill.pct! * 100)}% margin${bill.source === 'manual' ? ', keyed in' : ''}) × ${multiplier}`
@@ -1145,16 +1172,17 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       // C1 — one line per order, so the drill-down reads like a ledger.
       if (scheme.enableProductRevenue && opr !== 0 && rate > 0) {
         const full = round2(opr * rate)
-        const paid = round2(full * multiplier)
-        withheldOnThisBill = round2(withheldOnThisBill + (full - paid))
+        const cut = round2(full * multiplier)
+        // What the margin withheld; half comm is no penalty and is not counted in it.
+        withheldOnThisBill = round2(withheldOnThisBill + (full - cut))
         draft.lines.push({
           component: 'product_revenue',
           sourceOrderId: order.id,
           basisAmount: opr,
           rate,
           qty: null,
-          amount: paid,
-          note: `${order.orderNo} · ${order.orderDate}${carriedNote}${penaltyNote}`,
+          amount: halved(order, cut),
+          note: `${order.orderNo} · ${order.orderDate}${carriedNote}${penaltyNote}${halfNote(order)}`,
         })
       }
 
@@ -1210,7 +1238,8 @@ export function computeCommissionRun(input: EngineInput): EngineResult {
       if (!line) continue
       draft.lines.push(line)
       if (penaltyBand) {
-        const withheld = round2(round2(line.basisAmount * rate) - line.amount)
+        const full = round2(line.basisAmount * rate)
+        const withheld = round2(full - round2(full * multiplier))
         draft.marginPenaltyWithheld = round2(draft.marginPenaltyWithheld + withheld)
         penalised.push({
           staffId: draft.staffId,

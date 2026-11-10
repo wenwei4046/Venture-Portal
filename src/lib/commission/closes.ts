@@ -102,6 +102,8 @@ export interface ClosedBill {
   total: number
   /** An old bill topped up (2026-11-07): it paid its commission and was no sale of theirs. */
   commissionOnly?: true
+  /** Half comm (2026-11-10): it paid half its commission. */
+  halfComm?: true
 }
 
 /** An override line as it stood at close: who it came from, and how much. */
@@ -146,6 +148,7 @@ export function closeSummary(person: WorkbenchPerson, nameOf: (staffId: string) 
     bills: person.personalRows.map(r => ({
       id: r.orderId, no: r.orderNo, status: r.status, total: r.totalCommission,
       ...(r.commissionOnly ? { commissionOnly: true as const } : {}),
+      ...(r.halfComm ? { halfComm: true as const } : {}),
     })),
     overrides: [...overrides].map(([staffId, amount]) => ({ staffId, name: nameOf(staffId), amount })),
   }
@@ -232,7 +235,7 @@ export function parseCloseSummary(raw: unknown, fallbackName: string): CloseSumm
       const id = r ? str(r.id) : null
       if (!r || !id) return []
       const status = STATUSES.find(s => s === r.status) ?? 'eligible'
-      return [{ id, no: str(r.no) ?? id, status, total: num(r.total), ...(r.commissionOnly === true ? { commissionOnly: true as const } : {}) }]
+      return [{ id, no: str(r.no) ?? id, status, total: num(r.total), ...(r.commissionOnly === true ? { commissionOnly: true as const } : {}), ...(r.halfComm === true ? { halfComm: true as const } : {}) }]
     }),
     overrides: overrides.flatMap(v => {
       const r = v && typeof v === 'object' ? v as Record<string, unknown> : null

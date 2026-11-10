@@ -147,6 +147,15 @@ export interface SalesOrder {
    */
   commissionOnly?: boolean
   /**
+   * Half comm (2026-11-10, a bill's menu on Comm Cal; `sales_order_half_comm`):
+   * the bill's own commission is halved — RM 5,000 at 6% pays RM 150, not
+   * RM 300 — and so is what it puts in its holder's override base, so the
+   * upline's override on it is halved too. Its SALES stay whole (the rung, the
+   * group's revenue, a group incentive's target, the month's figures) and its
+   * KPI items are paid in full. A shared bill's every part carries it.
+   */
+  halfComm?: boolean
+  /**
    * Set on every part of a SHARED bill, the owner's included
    * (`splitOrdersByShares`, 2026-09-30): whose bill it is and who holds which
    * part. Display only — the engine pays each part as the ordinary bill it is,

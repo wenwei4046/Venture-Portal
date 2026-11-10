@@ -164,6 +164,7 @@ export const TABLE_READS: Readonly<Record<string, readonly Want[]>> = {
   // The ERP audit trail (mig 20261013010000): whoever reads a month's bills.
   sales_order_erp_changes: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_exclusions: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
+  sales_order_half_comm: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_reassignments: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_lines: ['product_list.view', 'revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],
   sales_order_shares: ['revenue.create', 'revenue.edit', 'revenue.manage', 'revenue.view:own'],

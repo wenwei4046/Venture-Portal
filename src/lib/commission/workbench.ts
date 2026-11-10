@@ -1,5 +1,5 @@
 import {
-  billMargin, classifyLine, computeCommissionRun, costBasisOf, EMPTY_KPI_INDEX, indexItemGroups,
+  billMargin, classifyLine, computeCommissionRun, costBasisOf, EMPTY_KPI_INDEX, HALF_COMM, indexItemGroups,
   indexKpiItems, isDepositMet, marginBase, noSalesCost, orderRevenueSplit, penaltyBandFor, round2,
 } from './engine'
 import { kpiItemLabel, kpiSourceOf } from './kpi'
@@ -72,6 +72,11 @@ export interface CommissionOrderRow {
    * absent reads as an ordinary bill.
    */
   commissionOnly?: boolean
+  /**
+   * Half comm (2026-11-10, `SalesOrder.halfComm`): its commission and its part
+   * of the override are halved; its sales and KPI are whole. Absent: paid in full.
+   */
+  halfComm?: boolean
   /** Everything on the bill — transport, disposal and every other charge included. */
   orderTotal: number
   /**
@@ -334,7 +339,9 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
     const component = (kind: 'product_revenue' | 'kpi_item') => sum(sourceLines.filter(line => line.component === kind).map(line => line.amount))
     const key = `${order.staffId}:${order.id}`
     const kpiRevenue = split.kpiAmount
-    overrideBases.set(key, eligible && !commissionOnly ? round2(round2(productRevenue * multiplier) + (input.scheme.overrideIncludesKpi ? kpiRevenue : 0)) : 0)
+    // Half comm (2026-11-10): the bill's part of the override base is halved, as the engine's is — its KPI is not.
+    const half = order.halfComm ? HALF_COMM : 1
+    overrideBases.set(key, eligible && !commissionOnly ? round2(round2(productRevenue * multiplier * half) + (input.scheme.overrideIncludesKpi ? kpiRevenue : 0)) : 0)
     return {
       key, orderId: order.id, originalOrderId: order.id, orderNo: order.orderNo,
       refNo: meta?.refNo ?? null, paperNo: meta?.paperNo ?? null,
@@ -346,7 +353,7 @@ export function buildCommissionWorkbench(input: EngineInput, options: WorkbenchO
       // brand riding on it does not make it that brand's too (2026-09-27).
       brands: order.brandCode ? [order.brandCode] : [...new Set(order.lines.flatMap(line => line.brandCode ? [line.brandCode] : []))],
       categories: [...new Set(order.lines.map(line => line.itemGroup))],
-      upsale: !!order.upsale, commissionOnly, orderTotal: order.orderTotal,
+      upsale: !!order.upsale, commissionOnly, ...(order.halfComm ? { halfComm: true } : {}), orderTotal: order.orderTotal,
       commissionableValue: orderCommissionableValue(order, groupIndex),
       paidAmount: order.paidAmount,
       productRevenue, marginRevenue: base.revenue,
