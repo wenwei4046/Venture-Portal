@@ -4,6 +4,7 @@ import { buildPayRow, type PayRow, type TaxMode } from '@/lib/revenue-pay'
 import { normalisePayLine, payLineTotals, type PayLine } from '@/lib/revenue-pay-lines'
 import { fetchAllRows } from '@/lib/paginate'
 import { loadPayBeforeRun } from './pay-preview-before-run'
+import { payPreviewSource } from '@/lib/commission/pay-preview-source'
 
 /**
  * The month's pay board: every salesperson in the run, from the commission the
@@ -163,8 +164,11 @@ export async function loadPayBoard(
       .eq('run_id', run.id).order('id').range(from, to)) : Promise.resolve([]),
   ])
   // Past the individual-pay gate: the salary inputs and the month's pay lines.
+  // A run with no statements (the empty draft a first close opens) names
+  // nobody, so it is read as no run (`payPreviewSource`, 2026-11-10).
+  const source = payPreviewSource(run, (statementData ?? []).length, options.allowWithoutRun ?? false)
   const [previewData, linesByPerson] = await Promise.all([
-    !run && options.allowWithoutRun
+    source === 'before_run'
       ? loadPayBeforeRun(supabase, subDepartmentId, period, options.previewStaffIds)
       : Promise.resolve(savedPreviewData),
     loadPayLines(supabase, period),
