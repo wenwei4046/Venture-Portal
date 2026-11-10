@@ -32,7 +32,7 @@ export const speedLabel = (s: number) => `${s}×`;
 
 /**
  * Another view's colours for the same note (Lead View v3, docs/design_handoff_lead_view_v3 › 1. Voice notes: its bubble
- * colours, `#5E524A` controls, Figtree). Unset, the CRM's own (`mine` decides). Same sizes, motion and one-at-a-time.
+ * colours, its muted-brown controls, Figtree). Unset, the CRM's own (`mine` decides). Same sizes, motion and one-at-a-time.
  */
 export type VoicePalette = {
   ink: string; dim: string; ring: string; tipBg: string; font: string;
