@@ -12,6 +12,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { typePx } from "./type";
+import { CAL } from "./cal-look";
 
 const f = (w: number, px: number) => `${w} ${typePx(px)} Inter, sans-serif`;
 
@@ -103,6 +104,8 @@ export function DateRangePicker({ value, onApply, onCancel, anchor, future = fal
   const lo = a && b ? a : a, hi = b ?? a;
   const FIELD: CSSProperties = { flex: 1, minWidth: 0, height: "34px", padding: "0 8px", boxSizing: "border-box", border: "1px solid var(--crm-line)", borderRadius: "7px", font: f(400, 12.5), color: "var(--crm-ink)", background: "#fff" };
   const BTN: CSSProperties = { height: "34px", padding: "0 14px", borderRadius: "7px", font: f(500, 13), cursor: "pointer", display: "flex", alignItems: "center", border: 0 };
+  /** The phone sheet's month arrows: the Insight period sheet's 34 px white circles. */
+  const ROUND: CSSProperties = { width: "34px", height: "34px", padding: 0, border: 0, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(42,22,12,.10)", display: "grid", placeItems: "center", color: "var(--crm-ink)", font: f(500, 16), cursor: "pointer" };
 
   const body = (
     <div ref={box} role="dialog" aria-label="Pick dates" onClick={e => e.stopPropagation()}
@@ -115,19 +118,34 @@ export function DateRangePicker({ value, onApply, onCancel, anchor, future = fal
           return <button key={l} type="button" onClick={() => setQuick(x, y)} aria-pressed={on} style={{ height: "28px", padding: "0 10px", borderRadius: "14px", border: `1px solid ${on ? "var(--crm-ink)" : "var(--crm-line)"}`, background: on ? "var(--crm-ink)" : "#fff", color: on ? "#fff" : "var(--crm-ink)", font: f(500, 12), cursor: "pointer", whiteSpace: "nowrap" }}>{l}</button>; })}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        <button type="button" aria-label="Previous month" onClick={() => step(-1)} style={{ ...BTN, width: "30px", padding: 0, justifyContent: "center", background: "transparent", color: "var(--crm-ink)" }}>‹</button>
-        <span style={{ flex: 1, textAlign: "center", font: f(500, 14), whiteSpace: "nowrap" }}>{MONF[month.getMonth()]} {month.getFullYear()}</span>
-        <button type="button" aria-label="Next month" onClick={() => step(1)} style={{ ...BTN, width: "30px", padding: 0, justifyContent: "center", background: "transparent", color: "var(--crm-ink)" }}>›</button>
+        <button type="button" aria-label="Previous month" onClick={() => step(-1)} style={sheet ? ROUND : { ...BTN, width: "30px", padding: 0, justifyContent: "center", background: "transparent", color: "var(--crm-ink)" }}>‹</button>
+        <span style={{ flex: 1, textAlign: "center", font: sheet ? f(700, 16) : f(500, 14), whiteSpace: "nowrap" }}>{MONF[month.getMonth()]} {month.getFullYear()}</span>
+        <button type="button" aria-label="Next month" onClick={() => step(1)} style={sheet ? ROUND : { ...BTN, width: "30px", padding: 0, justifyContent: "center", background: "transparent", color: "var(--crm-ink)" }}>›</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", rowGap: "2px" }}>
         {DOW.map((d, i) => <span key={i} style={{ textAlign: "center", font: f(500, 11), color: "var(--crm-faint)", height: "22px", lineHeight: "22px" }}>{d}</span>)}
-        {cells.map(c => {
-          const off = !future && c.s > todayIso, end = c.s === lo || c.s === hi, mid = !!lo && !!hi && c.s > lo && c.s < hi;
+        {cells.map((c, i) => {
+          // The CRM's one range-picker look (cal-look.ts, as the phone's period sheets): the ends rust, the peach band between, today a rust ring.
+          const off = !future && c.s > todayIso, end = c.s === lo || c.s === hi, mid = !!lo && !!hi && c.s > lo && c.s < hi, today = c.s === todayIso && !end;
+          // On a phone the sheet draws its days as the Insight period sheet does (panel/vm/common.ts › ovrCells): a 36 px circle
+          // in a 40 px cell, the band a pill across the range that rounds at the range's ends and the row's edges.
+          if (sheet) {
+            const band = !!lo && !!hi && lo !== hi && (mid || end), col = i % 7, l = c.s === lo || col === 0, r = c.s === hi || col === 6;
+            return (
+              <button key={c.s} type="button" disabled={off} onClick={() => tap(c.s)} aria-pressed={end} aria-label={c.s} data-day={c.s}
+                style={{ height: "40px", border: 0, padding: 0, display: "grid", placeItems: "center", cursor: off ? "default" : "pointer", background: band ? CAL.rangeBg : "transparent",
+                  borderRadius: band ? `${l ? 20 : 0}px ${r ? 20 : 0}px ${r ? 20 : 0}px ${l ? 20 : 0}px` : 0 }}>
+                <span style={{ width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", font: f(end || today ? 700 : 500, 14), fontVariantNumeric: "tabular-nums",
+                  background: end ? CAL.pickBg : today ? "#fff" : "transparent", boxShadow: end ? "0 3px 8px rgba(42,22,12,.22)" : today ? CAL.todayRing : "none",
+                  color: end ? CAL.pickFg : off ? CAL.offFg : c.inM ? CAL.dayFg : CAL.outFg }}>{c.d.getDate()}</span>
+              </button>
+            );
+          }
           return (
-            <button key={c.s} type="button" disabled={off} onClick={() => tap(c.s)} aria-pressed={end}
-              style={{ height: "32px", border: 0, padding: 0, cursor: off ? "default" : "pointer", font: f(end ? 600 : 400, 12.5), borderRadius: end ? "7px" : 0,
-                background: end ? "var(--crm-ink)" : mid ? "var(--crm-sel)" : "transparent", color: end ? "#fff" : off ? "var(--crm-disabled)" : c.inM ? "var(--crm-ink)" : "var(--crm-faint)",
-                boxShadow: c.s === todayIso && !end ? "inset 0 0 0 1.5px var(--crm-rust)" : "none" }}>{c.d.getDate()}</button>
+            <button key={c.s} type="button" disabled={off} onClick={() => tap(c.s)} aria-pressed={end} aria-label={c.s} data-day={c.s}
+              style={{ height: "32px", border: 0, padding: 0, cursor: off ? "default" : "pointer", font: f(end || today ? 600 : 400, 12.5), borderRadius: end || today ? "7px" : 0,
+                background: end ? CAL.pickBg : mid ? CAL.rangeBg : "transparent", boxShadow: today ? CAL.todayRing : "none",
+                color: end ? CAL.pickFg : off ? CAL.offFg : c.inM ? CAL.dayFg : CAL.outFg }}>{c.d.getDate()}</button>
           );
         })}
       </div>

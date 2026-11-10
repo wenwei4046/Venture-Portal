@@ -86,6 +86,10 @@ export interface DeskUi {
   ibQ: string;
   /** Labels (2026-11-02): the Inbox's label filter (one's own label id), Customer info's new label and its edit mode. */
   ibLabel?: string | null; labNew?: string; labEdit?: boolean;
+  /** v4 notes/15 · the Label sheet over the chat (⋮ › Label, Customer info's + Add): its list or its form, the form typed. */
+  labPop?: { view: import("../../shared/label-sheet").LabelView; form: import("../../shared/label-sheet").LabelFormState | null } | null;
+  /** v4 notes/24 §4 · Customer info's folded sections (their labels). */
+  infoFold?: string[];
   /** 4a Calendar's Book a visit: its customer picker (open, the search). */
   bookPick: boolean; bookQ: string;
   // Assignment
@@ -178,6 +182,8 @@ export interface DeskUi {
   rpRange?: { a: number; b: number } | null; rpDates?: boolean; auRange?: { a: number; b: number } | null; auDates?: boolean; rpSort: { k: string; dir: "asc" | "desc" } | null;
   /** Reports › Salespeople (v2 12c / 12c·2): the team filter, the search, the person picked (their panel folded), the lead opened. */
   rpTeam: string; rpQ: string; rpPick: string | null; rpPickShut: boolean; rpLead: string | null;
+  /** Reports › Overview (v4 D6a): the ad whose people the picked person's side panel lists ("all" = every ad). */
+  rpPickAd?: string | null;
   /** Ads Performance: Meta's figures by range ("from|to") and ad (null = one the token cannot see). */
   apMeta: Record<string, Record<string, MetaFig | null>>;
   /** Ads Performance's chart (2026-10-23): Meta's figures day by day, by range ("from|to") and ad (null = not readable). */
@@ -349,6 +355,8 @@ export interface DeskActions {
   setChannel(kind: "page" | "wa", id: string, name: string, linked: boolean, isDefault: boolean): Promise<boolean>;
   /** One's emoji Recents, kept on the server as the phone keeps them (crm_save_recent_emoji). */
   saveRecents(list: string[]): void;
+  /** One's own screen choices on the server (crm_save_ui_pref, mig 20261110120000) — read back as data.uiPrefs[key]. */
+  saveUiPref(key: "adsFigures" | "reportCols", value: unknown): void;
   saveMeta(s: Parameters<typeof import("@/app/(member)/member/crm-channels-actions").saveCrmChannel>[0]): Promise<boolean>;
   /** v2 frame 09b: one business profile to the number's WhatsApp and / or Facebook Page, each answered on its own. */
   saveProfile(form: FormData): Promise<import("@/app/(member)/member/crm-channels-actions").ProfileSaveResult | null>;

@@ -8,12 +8,13 @@
  */
 import type { CrmLeave } from "@/lib/member/crm-data";
 import { C } from "./palette";
+import { CAL, calDay, calLeave } from "./cal-look";
 import {
-  DOW, MONF, REASONS, addDays, dd, dowOf, leaveOnDay, leaveRange, leaveTint, leaveWord, shiftMonth,
+  DOW, MONF, REASONS, addDays, dd, dowOf, leaveOnDay, leaveRange, leaveWord, shiftMonth,
   type PeopleBook, type Reason,
 } from "./people-book";
 
-export interface LeaveModal { editId: string | null; who: string; from: string; to: string; reason: Reason; note: string; whoOpen?: boolean; phone?: boolean }
+export interface LeaveModal { editId: string | null; who: string; from: string; to: string; reason: Reason; note: string; whoOpen?: boolean; phone?: boolean; /** Change's search (13e). */ whoQ?: string }
 export interface LeaveCalUi {
   view: "month" | "week"; month: string; week: string; panel: string | null; pp: boolean; modal: LeaveModal | null;
   showAppt: boolean; showLeave: boolean; pDay: string; toast: string | null;
@@ -52,6 +53,9 @@ export function leaveCalStart(now: string, mode: "calendar" | "people"): LeaveCa
 }
 
 const TIMES = Array.from({ length: 48 }, (_, i) => ({ v: `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}` }));
+const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "Mon, 10 Nov 2026" (13e's date field). */
+export const longDay = (day: string) => { const [y, mo, d] = day.split("-").map(Number); const w = new Date(Date.UTC(y, mo - 1, d)).getUTCDay(); return `${WD[w]}, ${d} ${MON3[mo - 1]} ${y}`; };
 const ini = (n: string) => n.split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
 const first = (n: string) => n.split(" ")[0];
 const label = leaveWord;
@@ -99,7 +103,7 @@ export function leaveCalVM(x: LeaveCalIn) {
     return {
       id, name: p.name, status: s.label, nameFg: dim ? C.faint : C.ink, rowBg: "transparent",
       open: () => set({ panel: id, pp: false }), popen: () => set({ panel: id, pp: true }),
-      stFg: cur ? leaveTint(cur.reason)[1] : s.code === "paused" ? C.rust : C.listSub,
+      stFg: cur ? calLeave(cur.reason)[1] : s.code === "paused" ? C.rust : C.listSub,
       pLine: s.code === "login" || s.code === "locked" ? s.label : s.code === "paused" ? "Paused"
         : cur ? `${label(cur)} · back ${(() => { const b = dd(addDays(cur.toAt.slice(0, 10), 1)); return `${b.d} ${b.m}`; })()}` : daysLine(id),
       cells: days.map((day, i) => {
@@ -108,7 +112,7 @@ export function leaveCalVM(x: LeaveCalIn) {
         const colBg = isToday ? C.hover : "transparent";
         if (l) {
           const prev = leaveOn(id, addDays(day, -1)) === l && i > 0, next = leaveOn(id, addDays(day, 1)) === l && i < 6;
-          const [bg, fg] = leaveTint(l.reason);
+          const [bg, fg] = calLeave(l.reason);
           const part = l.fromAt.slice(0, 10) === l.toAt.slice(0, 10) ? ` · ${l.fromAt.slice(11)}` : "";
           return { appt: "", bg, fg, label: prev ? "" : label(l) + part, rad: `${prev ? 0 : 6}px ${next ? 0 : 6}px ${next ? 0 : 6}px ${prev ? 0 : 6}px`,
             ml: prev ? "0" : "3px", mr: next ? "0" : "3px", colBg, title: `${label(l)} · ${rng(l)}`, click: () => edit(l) };
@@ -137,7 +141,7 @@ export function leaveCalVM(x: LeaveCalIn) {
     const ls = SL ? leaves.filter(l => leaveOnDay(l, day)) : [], aps = apptsOn(null, day);
     const lanes = ls.length ? Math.max(...ls.map(l => lane[l.id])) + 1 : 0, dow = i % 7;
     const room0 = Math.max(0, 3 - Math.min(lanes, 3)), over = ls.filter(l => lane[l.id] >= 3).length + Math.max(0, aps.length - room0) > 0, room = over && room0 > 0 && lanes > 0 ? room0 - 1 : room0;
-    const appts = aps.slice(0, room).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), dot: C.green, title: `${a.t} · ${a.cust} · ${name(a.who)}`,
+    const appts = aps.slice(0, room).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), dot: CAL.apptDot, title: `${a.t} · ${a.cust} · ${name(a.who)}`,
       open: (e: { stopPropagation(): void }) => { e.stopPropagation(); x.acts.openAppt?.(a); } }));
     // Both pages draw a leave of several days as ONE bar across them, in its own lane (the owner, 2026-11-09, on People:
     // "连续假期就连起来" — People drew each day its own chip, as its prototype did).
@@ -145,13 +149,69 @@ export function leaveCalVM(x: LeaveCalIn) {
         const l = ls.find(y => lane[y.id] === k);
         if (!l) return { key: `e${k}`, label: "", title: "", bg: "transparent", fg: "transparent", ml: "0", mr: "0", rad: "4px", edit: (e: { stopPropagation(): void }) => { e.stopPropagation(); } };
         const prev = dow > 0 && l.fromAt.slice(0, 10) < day, next = dow < 6 && day < l.toAt.slice(0, 10);
-        return { key: l.id, label: prev ? "" : `${first(name(l.staffId))} · ${label(l)}`, title: `${name(l.staffId)} · ${label(l)} · ${rng(l)}`, bg: leaveTint(l.reason)[0], fg: leaveTint(l.reason)[1],
+        return { key: l.id, label: prev ? "" : `${first(name(l.staffId))} · ${label(l)}`, title: `${name(l.staffId)} · ${label(l)} · ${rng(l)}`, bg: calLeave(l.reason)[0], fg: calLeave(l.reason)[1],
           ml: prev ? "-6px" : "0", mr: next ? "-7px" : "0", rad: `${prev ? 0 : 4}px ${next ? 0 : 4}px ${next ? 0 : 4}px ${prev ? 0 : 4}px`,
           edit: (e: { stopPropagation(): void }) => { e.stopPropagation(); edit(l); } };
       });
     const extra = ls.filter(l => lane[l.id] >= 3).length + Math.max(0, aps.length - room);
-    return { day, num: dd(day).d, chips, appts, more: extra ? `+${extra} more` : "", bg: inM ? "#fff" : C.outMonth, numBg: t ? C.rust : "transparent", numFg: t ? "#fff" : inM ? C.ink : C.disabled,
+    const nd = calDay({ today: t, picked: false, inMonth: inM });
+    return { day, num: dd(day).d, chips, appts, more: extra ? `+${extra} more` : "", bg: inM ? "#fff" : CAL.outBg, numBg: nd.bg, numFg: nd.fg,
       add: () => { if (SL && firstWho) openModal({ who: firstWho, from: `${day}T09:00`, to: `${day}T18:00` }); } };
+  });
+  /*
+   * The month by week rows (v4 notes/19 §3, every calendar since): each leave is ONE bar per week row, laid across the
+   * days it covers in its own lane (left = its first day's column, width = its days), so its words have the whole bar and
+   * end in an ellipsis only at the bar's own end — never a 55 px cell, never over the next bar. A one-day leave is a tall
+   * bar of two lines (name / reason). Lanes are the week's own (max 3, then "+N" on the days a hidden one covers).
+   * Appointments go under the lanes, one a line, as many as the cell's room; the rest are "+N" (notes/19 §7).
+   */
+  const LANES = 3;
+  const weeks = Array.from({ length: nCells / 7 }, (_, w) => {
+    const cells = monthCells.slice(w * 7, w * 7 + 7), d0 = cells[0].day, d6 = cells[6].day;
+    const col = (day: string) => Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${d0}T00:00:00Z`)) / 86_400_000);
+    const inWeek = SL ? leaves.filter(l => l.fromAt.slice(0, 10) <= d6 && l.toAt.slice(0, 10) >= d0)
+      .sort((a, b) => (a.fromAt < b.fromAt ? -1 : a.fromAt > b.fromAt ? 1 : a.toAt > b.toAt ? -1 : a.toAt < b.toAt ? 1 : a.id < b.id ? -1 : 1)) : [];
+    const ends: number[] = [];
+    const segs = inWeek.map(l => {
+      const s = l.fromAt.slice(0, 10), e = l.toAt.slice(0, 10), c0 = s < d0 ? 0 : col(s), c1 = e > d6 ? 6 : col(e);
+      let k = ends.findIndex(x => x < c0);
+      if (k < 0) { k = ends.length; ends.push(c1); } else ends[k] = c1;
+      return { l, k, c0, c1, single: s === e, startsHere: s >= d0, endsHere: e <= d6 };
+    });
+    const shown = segs.filter(g => g.k < LANES);
+    const lanes = Array.from({ length: Math.min(ends.length, LANES) }, (_, k) => shown.some(g => g.k === k && g.single));
+    const bars = shown.map(g => {
+      const [bg, fg] = calLeave(g.l.reason);
+      return { key: `${g.l.id}@${w}`, lane: g.k, c0: g.c0, c1: g.c1, span: g.c1 - g.c0 + 1, single: g.single,
+        who: first(name(g.l.staffId)), word: label(g.l), label: `${first(name(g.l.staffId))} · ${label(g.l)}`,
+        title: `${name(g.l.staffId)} · ${label(g.l)} · ${rng(g.l)}`, bg, fg, roundL: g.startsHere, roundR: g.endsHere,
+        edit: (e: { stopPropagation(): void }) => { e.stopPropagation(); edit(g.l, true); },
+        editD: (e: { stopPropagation(): void }) => { e.stopPropagation(); edit(g.l); } };
+    });
+    // The phone's room (notes/19 §4: 72 px cells): 3 px top, the 20 px number, 2 px; each lane 16 px (a tall one 26) + 2.
+    const used = lanes.reduce((a, tall) => a + (tall ? 26 : 16) + 2, 0);
+    const room = Math.max(0, Math.floor((72 - 3 - 20 - 2 - 4 - used) / 14));
+    const days = cells.map((c, i) => {
+      const aps = apptsOn(null, c.day), hidden = segs.filter(g => g.k >= LANES && g.c0 <= i && i <= g.c1).length;
+      const over = hidden + aps.length > room;
+      const fit = over ? Math.max(0, room - 1) : aps.length;
+      const extra = hidden + aps.length - fit;
+      const sel = c.day === st.pDay, today = c.day === TODAY, inM = c.day.slice(0, 7) === st.month;
+      const nd = calDay({ today, picked: false, inMonth: inM });
+      return { day: c.day, num: c.num, inM, sel, bg: sel ? CAL.selBg : inM ? "#fff" : CAL.outBg, numBg: nd.bg, numFg: nd.fg, numW: nd.w,
+        appts: aps.slice(0, fit).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), title: `${a.t} · ${a.cust} · ${name(a.who)}`,
+          open: (e: { stopPropagation(): void }) => { e.stopPropagation(); x.acts.openAppt?.(a); } })),
+        more: extra > 0 ? `+${extra}` : "", pick: () => set({ pDay: c.day, month: c.day.slice(0, 7) }) };
+    });
+    // The desktop keeps its own room (≈100 px rows: 22 px number, 20 px lanes, 18 px appointment lines).
+    const dRoom = Math.max(0, Math.floor((96 - 10 - 22 - 3 - lanes.length * 23) / 21));
+    const dDays = cells.map((c, i) => {
+      const aps = apptsOn(null, c.day), hidden = segs.filter(g => g.k >= LANES && g.c0 <= i && i <= g.c1).length;
+      const fit = hidden + aps.length > dRoom ? Math.max(0, dRoom - 1) : aps.length, extra = hidden + aps.length - fit;
+      return { ...c, appts: aps.slice(0, fit).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), dot: CAL.apptDot, title: `${a.t} · ${a.cust} · ${name(a.who)}`,
+        open: (e: { stopPropagation(): void }) => { e.stopPropagation(); x.acts.openAppt?.(a); } })), more: extra > 0 ? `+${extra} more` : "" };
+    });
+    return { key: d0, lanes, bars, days, dDays };
   });
 
   const pid = st.panel, m = st.modal;
@@ -171,7 +231,7 @@ export function leaveCalVM(x: LeaveCalIn) {
       }),
       leaves: ls.map(l => {
         const past = l.toAt < now, cur = l.fromAt <= now && now <= l.toAt;
-        return { id: l.id, label: label(l), when: past ? "past" : cur ? "now" : "upcoming", range: rng(l), bg: leaveTint(l.reason)[0], op: past ? 0.5 : 1, editable: !past && may,
+        return { id: l.id, label: label(l), when: past ? "past" : cur ? "now" : "upcoming", range: rng(l), bg: calLeave(l.reason)[0], op: past ? 0.5 : 1, editable: !past && may,
           edit: () => { if (!past) edit(l, st.pp); },
           del: async () => { if (await x.acts.removeLeave(l.id)) x.flash("Leave removed"); } };
       }),
@@ -199,13 +259,19 @@ export function leaveCalVM(x: LeaveCalIn) {
     });
   };
   const patchModal = (p: Partial<LeaveModal>) => set(u => (u.modal ? { modal: { ...u.modal, ...p } } : {}));
+  const openFor = (id: string, phone = true) => {
+    if (!x.canEdit(id)) return;
+    const mine = leaves.filter(l => l.staffId === id && l.toAt >= now).sort((a, b) => (a.fromAt < b.fromAt ? -1 : 1));
+    if (mine[0]) edit(mine[0], phone);
+    else openModal({ who: id, from: `${TODAY}T09:00`, to: `${TODAY}T18:00`, phone });
+  };
 
   // ── Phone ──────────────────────────────────────────────────────────────────────────────────────────────────────────
   const leavesOn = (day: string) => (SL ? leaves.filter(l => leaveOnDay(l, day)) : []);
   const pCells = Array.from({ length: nCells }, (_, i) => {
     const day = addDays(gridStart, i), inM = day.slice(0, 7) === st.month, sel = day === st.pDay, t = day === TODAY;
-    const dots = [...new Set(leavesOn(day).map(l => leaveTint(l.reason)[1]))].slice(0, 2);
-    if (apptsOn(null, day).length) dots.push(C.green);
+    const dots = [...new Set(leavesOn(day).map(l => calLeave(l.reason)[1]))].slice(0, 2);
+    if (apptsOn(null, day).length) dots.push(CAL.apptDot);
     return { day, num: dd(day).d, dots, w: sel || t ? 600 : 400, bg: sel ? C.ink : "transparent", fg: sel ? "#fff" : t ? C.rust : inM ? C.ink : C.disabled,
       ring: t && !sel ? `inset 0 0 0 1.5px ${C.rust}` : "none", pick: () => set({ pDay: day, month: day.slice(0, 7) }) };
   });
@@ -213,9 +279,9 @@ export function leaveCalVM(x: LeaveCalIn) {
   const pItems = [
     ...leavesOn(pd).map(l => {
       const s = l.fromAt.slice(0, 10), e = l.toAt.slice(0, 10), allDay = s < pd && pd < e;
-      return { key: l.id, t: allDay ? "All day" : s === pd ? l.fromAt.slice(11) : "until", tFg: C.listSub, bar: leaveTint(l.reason)[0], title: `${name(l.staffId)} · ${label(l)}`, sub: rng(l), go: () => edit(l, true) };
+      return { key: l.id, t: allDay ? "All day" : s === pd ? l.fromAt.slice(11) : "until", tFg: C.listSub, bar: calLeave(l.reason)[0], title: `${name(l.staffId)} · ${label(l)}`, sub: rng(l), go: () => edit(l, true) };
     }),
-    ...apptsOn(null, pd).map(a => ({ key: a.visitId, t: a.t, tFg: C.ink, bar: C.green, title: a.cust, sub: `Appointment · ${name(a.who)}`, go: () => x.acts.openAppt?.(a) })),
+    ...apptsOn(null, pd).map(a => ({ key: a.visitId, t: a.t, tFg: C.ink, bar: CAL.apptDot, title: a.cust, sub: `Appointment · ${name(a.who)}`, go: () => x.acts.openAppt?.(a) })),
   ];
   const peopleIds = book.groups.flatMap(g => g.people.map(p => p.id)).filter((id, i, a) => a.indexOf(id) === i && x.canEdit(id));
 
@@ -235,16 +301,20 @@ export function leaveCalVM(x: LeaveCalIn) {
     thisWeek: () => set({ week: THIS_MON, month: THIS_MONTH, pDay: TODAY }),
     prevWeek: () => set(s => (s.view === "month" ? { month: shiftMonth(s.month, -1) } : { week: addDays(s.week, -7) })),
     nextWeek: () => set(s => (s.view === "month" ? { month: shiftMonth(s.month, 1) } : { week: addDays(s.week, 7) })),
-    isMonth, isWeek: !isMonth, dowHead: DOW, monthCells,
+    isMonth, isWeek: !isMonth, dowHead: DOW, monthCells, weeks,
     views: ([["month", "Month"], ["week", "Week"]] as const).map(([k, lbl]) => {
       const on = st.view === k;
       return { key: k, label: lbl, bg: on ? "#fff" : "transparent", fg: on ? C.ink : C.muted, sh: on ? "0 1px 2px rgba(42,22,12,.12)" : "none", go: () => set({ view: k }) };
     }),
     days: days.map((day, i) => { const t = day === TODAY; return { day, dow: DOW[i], num: dd(day).d, fg: t ? C.ink : C.muted, w: t ? 600 : 500, numBg: t ? C.rust : "transparent", numFg: t ? "#fff" : "inherit" }; }),
-    legend: (SL ? REASONS : []).map(k => ({ label: k, bg: leaveTint(k)[0] })),
+    legend: (SL ? REASONS : []).map(k => ({ label: k, bg: calLeave(k)[0] })),
     groups,
     addLeave: () => { if (firstWho) openModal({ who: firstWho, from: `${TODAY}T09:00`, to: `${TODAY}T18:00` }); },
-    pAddLeave: () => { if (firstWho) set({ pp: true, modal: { editId: null, reason: "Annual", note: "", phone: true, who: firstWho, from: `${TODAY}T09:00`, to: `${TODAY}T18:00` } }); },
+    // v4 notes/18-A: + Leave opens Add leave on the first person they may edit, with Change to pick another.
+    pAddLeave: () => { if (firstWho) openModal({ who: firstWho, from: `${TODAY}T09:00`, to: `${TODAY}T18:00`, phone: true }); },
+    /** A name tapped (or Up next's "the Add leave sheet with the person set"): their leave now or next opens as Edit leave
+     *  (with Remove), else Add leave with them set. Nothing for a person this viewer may not edit. */
+    pOpenFor: (id: string, phone = true) => openFor(id, phone),
     pAdd: () => { if (firstWho) openModal({ who: firstWho, from: `${pd}T09:00`, to: `${pd}T18:00`, phone: true }); },
     panelOn: !!pid && !st.pp, pPanelOn: !!pid && st.pp, pn, closePanel: () => set({ panel: null, pp: false }),
     modalOn: !!m && !m.phone, pModalOn: !!m && !!m.phone, cancelLeave: () => set({ modal: null }), saveLeave: () => { void save(); },
@@ -255,7 +325,14 @@ export function leaveCalVM(x: LeaveCalIn) {
       people: peopleIds.map(id => ({ id, name: name(id), team: book.teamOf(id).name, dot: book.teamOf(id).dot, w: id === m.who ? 600 : 400, bg: id === m.who ? C.field : "transparent", sel: id === m.who,
         pick: () => patchModal({ who: id, whoOpen: false }) })),
       whoOpen: !!m.whoOpen, toggleWho: () => patchModal({ whoOpen: !m.whoOpen }),
-      whoName: name(m.who), whoTeam: book.teamOf(m.who).name, whoDot: book.teamOf(m.who).dot,
+      whoName: name(m.who), whoTeam: book.teamOf(m.who).name, whoDot: book.teamOf(m.who).dot, whoIni: ini(name(m.who)),
+      // Change (13e): every person they may edit, by team, with a search.
+      whoQ: m.whoQ ?? "", setWhoQ: (e: { target: { value: string } }) => patchModal({ whoQ: e.target.value }),
+      whoGroups: book.groups.map(g => ({ name: g.name, dot: g.dot, rows: g.people.filter(p => x.canEdit(p.id) && (!m.whoQ || p.name.toLowerCase().includes(m.whoQ.trim().toLowerCase())))
+        .map(p => ({ id: p.id, name: p.name, ini: ini(p.name), sel: p.id === m.who, pick: () => patchModal({ who: p.id, whoOpen: false, whoQ: "" }) })) })).filter(g => g.rows.length),
+      canRemove: !!m.editId,
+      remove: async () => { if (!m.editId) return; if (await x.acts.removeLeave(m.editId)) { set({ modal: null }); x.flash("Leave removed"); } },
+      dayWords: (k: "from" | "to") => longDay(m[k].slice(0, 10)),
       reasons: REASONS.map(r => ({ label: r, bg: m.reason === r ? C.ink : "#fff", fg: m.reason === r ? "#fff" : C.ink, bd: m.reason === r ? C.ink : C.line, pick: () => patchModal({ reason: r }) })),
       isOther: m.reason === "Other", note: m.note, setNote: (e: { target: { value: string } }) => patchModal({ note: e.target.value }),
       ends: ([["From", "from"], ["To", "to"]] as const).map(([lb, k]) => ({ key: k, label: lb, date: m[k].split("T")[0], time: m[k].split("T")[1], setDate: setEnd(k, "d"), setTime: setEnd(k, "t") })),

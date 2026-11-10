@@ -25,16 +25,63 @@ export interface ActivityUi {
   pMenu: boolean; pOpen: Record<string, boolean>; pLead: { id: string; key: string } | null;
   /** The ad shown ("all", an ad's id, or "none" = leads from no ad) — the owner, 2026-11-09: "加入可以筛选广告". */
   ad?: string;
+  /** "Show N more" opened (v4 notes/14b) — kept with the page's filters. */
+  more?: boolean;
 }
-type SortKey = "leads" | "avg" | "waitMax" | "appt" | "show";
+export type SortKey = "leads" | "avg" | "waitMax" | "appt" | "show";
 
-export const fmt = (m: number | null) => (m == null ? "—" : m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
+/**
+ * ONE time format for Avg and Wait, phone and desktop (v4 notes/14b, README "Time format"): under an hour `4m`; an hour
+ * or more `1h 05m` (minutes padded); a day or more `1d 3h`.
+ */
+export const fmt = (m: number | null) => {
+  if (m == null) return "—";
+  const v = Math.max(0, Math.round(m));
+  if (v < 60) return `${v}m`;
+  if (v < 1440) return `${Math.floor(v / 60)}h ${String(v % 60).padStart(2, "0")}m`;
+  return `${Math.floor(v / 1440)}d ${Math.floor((v % 1440) / 60)}h`;
+};
+
+/** How many rows show before "Show N more" (v4 notes/14b: the phone 5, notes/22: the desktop 6). */
+export const ACT_TOP_PHONE = 5;
+export const ACT_TOP_DESK = 6;
+export type ActSort = { k: SortKey; d: 1 | -1 } | null;
+/** The raw figures a row is sorted by. */
+export interface ActNums { leads: number; avg: number | null; waitMax: number; appt: number; show: number }
+/**
+ * The rows' order (v4 notes/14b): with no header tapped, leads high → low, ties by the shorter Avg (none last), then
+ * name; a tapped header sorts by it instead. Either way people with 0 leads are always last.
+ */
+export function activityOrder<T extends { name: string; nums: ActNums }>(rows: T[], sort: ActSort): T[] {
+  const zero = (r: T) => (r.nums.leads === 0 ? 1 : 0);
+  const avg = (r: T) => (r.nums.avg == null ? Number.POSITIVE_INFINITY : r.nums.avg);
+  return rows.slice().sort((a, b) => {
+    const z = zero(a) - zero(b);
+    if (z) return z;
+    if (sort) {
+      const va = sort.k === "avg" ? (a.nums.avg ?? -1) : a.nums[sort.k], vb = sort.k === "avg" ? (b.nums.avg ?? -1) : b.nums[sort.k];
+      if (va !== vb) return (va - vb) * sort.d;
+    } else {
+      if (a.nums.leads !== b.nums.leads) return b.nums.leads - a.nums.leads;
+      const x = avg(a), y = avg(b);
+      if (x !== y) return x < y ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+}
+/** The top `n` and how many fold behind "Show N more" (none when `n` or fewer, or opened). */
+export function foldTop<T>(rows: T[], n: number, open: boolean): { shown: T[]; more: number } {
+  if (open || rows.length <= n) return { shown: rows, more: 0 };
+  return { shown: rows.slice(0, n), more: rows.length - n };
+}
 const hm = (stamp: string) => stamp.slice(11, 16);
 const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 /** A log entry's day (the owner, 2026-11-09: "audit log 要加上日期"): "8 Nov". */
 const dm = (stamp: string) => (stamp.length >= 10 ? `${Number(stamp.slice(8, 10))} ${MON3[Number(stamp.slice(5, 7)) - 1]}` : "");
 const mins = (a: string, b: string) => Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60_000));
 const COLS = "240px repeat(5,minmax(0,1fr))";
+/** v4 8e: the figure strip's Waiting number when any wait is late (on espresso). */
+export const STRIP_LATE = "var(--crm-strip-late)";
 
 /** One lead got: a stint of one customer with one person. */
 export interface Stint {
@@ -122,11 +169,10 @@ export function activityVM(x: ActivityIn) {
   };
   const teams = book.groups;
   const groups = (openKey: "open" | "pOpen", leadKey: "lead" | "pLead") => {
-    const sortKey = st.sort?.k ?? null, dir = st.sort?.d ?? 1, sel = st[leadKey];
+    const sel = st[leadKey];
     return teams.filter(t => st.team === "all" || t.key === st.team).map(t => {
       const rows = t.people.filter(p => !st.who || p.id === st.who).map(p => ({ id: p.id, s: stat(p.id) }));
-      if (sortKey) rows.sort((a, b) => ((a.s[sortKey] ?? -1) - (b.s[sortKey] ?? -1)) * dir);
-      return { name: t.name, dot: t.dot, rows: rows.map(({ id, s }) => {
+      return { name: t.name, dot: t.dot, rows: activityOrder(rows.map(({ id, s }) => {
         const turn = book.turn(id, nowStamp), on = turn.on, open = !!st[openKey][id] || st.who === id, wl = LV(s.waitMax);
         const list = (byWho.get(id) ?? []).slice().reverse().map(l => {
           const w = waitOf(l), status = statusOf(l), SS = ST[status];
@@ -135,12 +181,15 @@ export function activityVM(x: ActivityIn) {
             go: () => set({ [leadKey]: { id, key: l.key } }), bg: sel && sel.key === l.key ? C.field : "transparent",
             status: w != null ? "" : status, sFg: SS[1] };
         });
-        return { id, rowFg: on || s.leads ? C.ink : "var(--crm-disabled)", waitTxt: s.waitN ? (s.waitMax >= 60 ? `${Math.floor(s.waitMax / 60)}h${String(s.waitMax % 60).padStart(2, "0")}` : `${s.waitMax}m`) : "—",
+        // v4 8e: a late wait (past the first reply line) in oxblood 600, other figures and "—" faint; no pill.
+        const late = s.waitN > 0 && !!wl[0];
+        return { id, nums: s as ActNums, late, rowFg: on || s.leads ? C.ink : "var(--crm-disabled)",
+          waitC: late ? C.oxblood : C.faint, waitShown: s.waitN ? fmt(s.waitMax) : "—",
           tdot: t.dot, name: book.person(id)?.name ?? x.nameOf(id), nameFg: on ? C.ink : C.faint, turn: turn.why, off: !on, op: on || s.leads ? 1 : 0.55,
           leads: s.leads, avg: fmt(s.avg), avgFg: LV(s.avg || 0)[1], waitOn: s.waitN > 0, waitOff: s.waitN === 0, wait: fmt(s.waitMax), waitFg: wl[1],
           appt: s.appt, show: s.show, open, rot: open ? "90deg" : "0deg", bg: "transparent", none: !list.length,
           toggle: () => set(u => ({ [openKey]: { ...u[openKey], [id]: !u[openKey][id] } })), list };
-      }) };
+      }), st.sort ?? null) };
     });
   };
   const drawer = (lead: { id: string; key: string } | null, close: () => void) => {
@@ -181,6 +230,7 @@ export function activityVM(x: ActivityIn) {
     menu.push(row({ key: `t${t.key}`, label: t.name, dot: t.dot, w: 600, bt: C.rule2, h: "38px", ph: "48px", bg: st.team === t.key && !st.who ? C.field : "transparent", go: pick(t.key, null) }));
     t.people.forEach(p => menu.push(row({ key: `p${t.key}${p.id}`, label: p.name, role: x.roleOf(p.id), pl: "25px", bg: st.who === p.id ? C.field : "transparent", go: pick("all", p.id) })));
   });
+  const anyLate = all.some(s => s.waitN > 0 && !!LV(s.waitMax)[0]);
   const tiles = ([["Leads", String(sum("leads"))], ["Avg reply", fmt(repAll.length ? Math.round(repAll.reduce((a, b) => a + b, 0) / repAll.length) : null)], ["Waiting", String(sum("waitN"))], ["Appt", String(sum("appt"))], ["Show-up", String(sum("show"))]] as const)
     .map(([k, v], i) => ({ k, v, bl: i ? C.heroLine : "transparent", c: k === "Waiting" && lateAll ? C.rust : C.ink }));
   const pGroups = groups("pOpen", "pLead");
@@ -194,12 +244,19 @@ export function activityVM(x: ActivityIn) {
     allFrom: d.customers.reduce((m, c) => Math.min(m, new Date(c.createdAt).getTime() || m), Date.now()),
     setFrom: (e: { target: { value: string } }) => { const v = e.target.value; if (v) set(u => ({ from: v, to: u.to < v ? v : u.to })); },
     setTo: (e: { target: { value: string } }) => { const v = e.target.value; if (v) set({ to: v }); },
-    tiles, cols: COLS, pTiles: tiles.map(t => ({ ...t, k: t.k === "Show-up" ? "Came" : t.k })),
+    tiles, cols: COLS,
+    // v4 8e: the espresso strip — white figures, the Waiting figure #FFB38A when any wait is late; "Avg", "Came".
+    pTiles: tiles.map(t => ({ ...t, k: t.k === "Show-up" ? "Came" : t.k === "Avg reply" ? "Avg" : t.k, c: t.k === "Waiting" && anyLate ? STRIP_LATE : "#fff" })),
+    anyLate,
     ads, adVal: adSel, adOn: adSel !== "all", setAd: (e: { target: { value: string } }) => set({ ad: e.target.value }),
     perVal: st.per, setPer: (e: { target: { value: string } }) => set({ per: e.target.value as Period }),
     heads: H.map(([label, k, just]) => { const on = !!k && sortKey === k; return { label, just: just ?? "flex-end", fg: on ? C.ink : C.faint, arrow: on ? (dir > 0 ? "↑" : "↓") : "",
       sort: () => { if (k) set(u => ({ sort: u.sort && u.sort.k === k ? (u.sort.d < 0 ? null : { k, d: -1 }) : { k, d: 1 } })); } }; }),
-    groups: groups("open", "lead"), pRows: pGroups.flatMap(g => g.rows),
+    groups: groups("open", "lead"),
+    /** Everyone in one list, in the rows' order (activityOrder) — the phone's table. */
+    pRows: activityOrder(pGroups.flatMap(g => g.rows), st.sort ?? null),
+    /** "Show N more" (foldTop): opened or not, and its switch. */
+    moreOpen: !!st.more, toggleMore: () => set(u => ({ more: !u.more })),
     dOpen: !!st.lead, dClose: () => set({ lead: null }), d: drawer(st.lead, () => set({ lead: null })),
     pd: drawer(st.pLead, () => set({ pLead: null })),
     range,

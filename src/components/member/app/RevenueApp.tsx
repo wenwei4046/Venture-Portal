@@ -105,6 +105,7 @@ import type { HonourKind, MemoVM, RequestKindVM, WorkKey } from "./profile/profi
 import { protoVaGroups } from "./fixtures/proto-profile";
 import CrmApp, { type CrmOpen } from "../crm/CrmApp";
 import { IrQuoteScreen, IrQuoteSettingsScreen, type IrQuoteNav } from "./irq/IrQuoteScreens";
+import { useBackStep } from "./useBackStep";
 import { openIrqPreview } from "./irq/open-preview";
 import { crmOpenTarget, type Notices } from "@/lib/push/notices";
 import { readNotices } from "@/lib/push/actions";
@@ -366,6 +367,9 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // a membership whose code is IR opens Quote on it, never the brand list.
   const irQuote = membership?.code === "IR";
   const [irqSettings, setIrqSettings] = useState(false);
+  // Where Quotation settings were opened from (v4 notes/18-B): "crm" = CRM › Profile › Quotation settings, whose Back
+  // (and the phone's) returns to the CRM on Profile; null = the Quote screen or the sidebar, as before.
+  const [irqFrom, setIrqFrom] = useState<"crm" | null>(null);
   // Quote settings' Preview opens the quote in another tab on the unpublished settings (`irqPreview`).
   const irqPreview = useMemo(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("irqPreview"), []);
   // Keyed on the ids, never the membership object: a refresh hands back a new `data`, and a new context would
@@ -665,8 +669,14 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   const openIrqSettings = useCallback(() => {
     setSheet(null); setNfOpen(false); setVaOpen(false); closeProfileSheets();
     if (onProducts) router.push(appHref({ ...baseRoute, screen: "quote" }, window.location.origin), { scroll: false });
+    setIrqFrom(null);
     setIrqSettings(true);
   }, [onProducts, closeProfileSheets, router, baseRoute]);
+  // From the CRM (a phone): the settings open OVER the CRM, which stays drawn under them — its Profile, its scroll, its
+  // Back steps — so their Back puts it back as it was (v4 notes/18-B; it dropped the person outside the CRM).
+  const openIrqFromCrm = useCallback(() => { openIrqSettings(); setIrqFrom("crm"); }, [openIrqSettings]);
+  // The phone's Back over them does what their ‹ does: back to the CRM's Profile (one history step of ours while open).
+  useBackStep("irqSettings", () => setIrqSettings(false), irqSettings && irqFrom === "crm" && onCrm && !desk);
   const irqNav = useCallback((to: IrQuoteNav | "Quote") => {
     setIrqSettings(false);
     goScreen(to === "Today" ? "today" : to === "Insight" ? "insight" : to === "Arena" ? "arena" : to === "Profile" ? "account" : "quote");
@@ -1474,7 +1484,8 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
   // IR Quote (2026-11-05): on a computer it fills the app's column under the app's own sidebar and top bar; on a phone it
   // is the whole screen, with the handoff's own header and bottom bar (`irqLayer`).
   const irqReadOnly = (principal && !!route.staff) || !quoteSends;
-  const irqOn = !onProducts && (irqSettings || (route.screen === "quote" && irQuote));
+  const irqOverCrm = irqSettings && irqFrom === "crm" && onCrm && !desk && !!crm;
+  const irqOn = !onProducts && !irqOverCrm && (irqSettings || (route.screen === "quote" && irQuote));
   if (irqOn && irqSettings) {
     page = (
       <div className={desk ? s.irqColumn : s.irqLayer}>
@@ -1621,7 +1632,7 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
       // The CRM is the signed-in account's own (the Principal: the Control panel), whoever is being viewed.
       // On a computer the Control panel draws the app's frame itself (CRM Desktop rev 1): its greeting, bell and links are these.
       page = <CrmApp live={!initialData.demo} salesperson={data.profile.name} desk={desk} open={crmOpen} onReady={() => setCrmReady(true)}
-        onExit={exitCrm} onQuoteSettings={!desk && productList ? openIrqSettings : undefined} deskApp={desk ? {
+        onExit={exitCrm} onQuoteSettings={!desk && productList ? openIrqFromCrm : undefined} deskApp={desk ? {
         greeting: fixture?.greeting ?? greeting(), subName: membership?.name ?? "", dateLine: `${longDayLabel(today)} · ${quarterLabel(today)}`,
         bellUnread: nfCount > 0 || nf.items.some(n => n.unread), notifCount: nfCount,
         go: screen => goScreen(screen), openNotifications: openNotif, openBell: toggleNotif, openSubDept: () => openSheet("sd"), signOut,
@@ -1655,6 +1666,19 @@ export default function RevenueApp({ initialData, initialSearch, children, produ
     }
   } else {
     page = <Pending screen={route.screen} />;
+  }
+  // The CRM on a phone, with Quotation settings over it when they were opened from it (v4 notes/18-B): one wrapper always,
+  // so the CRM is never drawn afresh as they open and close; hidden, not unmounted, under them.
+  if (onCrm && crm && !desk) {
+    page = (<>
+      <div style={{ display: "contents", visibility: irqOverCrm ? "hidden" : undefined }} aria-hidden={irqOverCrm || undefined}>{page}</div>
+      {irqOverCrm && (
+        <div className={s.irqLayer}>
+          <IrQuoteSettingsScreen phone inApp={false} rootH="100%" readOnly={!!viewed} offline={data.demo || fixture ? { name: me.name } : undefined}
+            onNav={irqNav} onBack={() => setIrqSettings(false)} onPreview={irqPreviewOpen} />
+        </div>
+      )}
+    </>);
   }
   // The CRM on a computer takes the whole column, as the Product List does (2026-10-12).
   const deskCrm = desk && route.screen === "account" && route.pf === "crm" && !!crm;

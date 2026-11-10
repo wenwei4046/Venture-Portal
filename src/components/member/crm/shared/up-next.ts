@@ -28,7 +28,11 @@ export interface UpNextRead {
 }
 export interface UpNextAd { id: string; name: string; sub: string }
 export interface UpNextTeam { name: string; dot: string }
-export interface UpNextBook { nameOf(id: string): string; teamOf(key: string): UpNextTeam; adName(id: string): string }
+export interface UpNextBook {
+  nameOf(id: string): string; teamOf(key: string): UpNextTeam; adName(id: string): string;
+  /** v4 9g: the person's leads today, as Team activity counts them (a customer given to them today). */
+  todayOf?(id: string): number;
+}
 
 export const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const ORD = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th"];
@@ -48,6 +52,14 @@ export function agoWords(iso: string | null | undefined, nowOffice: string): str
   if (min < 60) return `${min} min ago`;
   const h = Math.floor(min / 60);
   return h < 24 ? `${h} h ago` : `${Math.floor(h / 24)} d ago`;
+}
+
+/** v4 9g: when the last lead went, as the README's time format — "8:40" today, "8 Nov, 8:40" before. */
+export function lastWhen(iso: string, nowOffice: string): string {
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(iso));
+  const g = (t: string) => p.find(x => x.type === t)?.value ?? "";
+  const day = `${g("year")}-${g("month")}-${g("day")}`, hm = `${Number(g("hour")) % 24}:${g("minute")}`;
+  return day === nowOffice.slice(0, 10) ? hm : `${Number(g("day"))} ${MON[Number(g("month")) - 1]}, ${hm}`;
 }
 
 export const OFF_WORDS: Record<Exclude<UpNextWhy, "leave" | null>, string> = {
@@ -99,7 +111,8 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
   };
   const slots = out.map((o, i) => {
     const t = book.teamOf(o.team), key = `c${i}`;
-    return { teamShort: t.name.replace(/^Team /, ""), k: i + 1, id: o.staff, name: nameOf(o.staff), ini: ini(nameOf(o.staff)), team: t.name, dot: t.dot, why: whyOf(o), whyLong: whyLong(o),
+    const today = book.todayOf?.(o.staff) ?? 0;
+    return { teamShort: t.name.replace(/^Team /, ""), k: i + 1, today, todayLine: today ? `${t.name} · ${today} lead${today === 1 ? "" : "s"} today` : t.name, id: o.staff, name: nameOf(o.staff), ini: ini(nameOf(o.staff)), team: t.name, dot: t.dot, why: whyOf(o), whyLong: whyLong(o),
       pinned: o.pinned, notPinned: !o.pinned, act: may(o.staff),
       skip: () => a.skip(o.staff), pause: () => a.pause(o.staff), give: () => a.give(o.staff), open: () => a.set({ sheet: { id: o.staff, k: i + 1 } }),
       actOp: ui.hov === key && may(o.staff) ? 1 : 0, hovOn: () => a.set({ hov: key }), hovOff: () => a.set({ hov: null }) };
@@ -131,7 +144,7 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
   const splitLine = !single ? (r.together && shares.length ? `All ads counted together: ${splitText} · set in Assignment` : "Each ad keeps its own split from Assignment. This view adds them together.")
     : shares.length ? `Split for this ad: ${splitText} · set in Assignment`
     : "No split for this ad · set in Assignment";
-  const last = r.last ? { name: nameOf(r.last.staff), meta: [book.teamOf(teamKeyOf(r.last.staff)).name, agoWords(r.last.at, r.now), single ? "" : book.adName(r.last.ad)].filter(Boolean).join(" · "), when: agoWords(r.last.at, r.now) } : { name: "—", meta: "", when: "" };
+  const last = r.last ? { at: lastWhen(r.last.at, r.now), name: nameOf(r.last.staff), meta: [book.teamOf(teamKeyOf(r.last.staff)).name, agoWords(r.last.at, r.now), single ? "" : book.adName(r.last.ad)].filter(Boolean).join(" · "), when: agoWords(r.last.at, r.now) } : { at: "", name: "—", meta: "", when: "" };
   // Leave: who is on leave now, then what is coming.
   const nowLeave = r.people.filter(p => p.why === "leave" && p.leave).map(p => ({ ...p.leave!, staff: p.staff, now: true }));
   const upcoming = [...nowLeave, ...r.upcoming.map(l => ({ ...l, now: false }))].map(l => {
@@ -155,7 +168,12 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
     last, ltabs, tabIn: ui.ltab === "in", tabOff: ui.ltab === "off", tabUp: ui.ltab === "up",
     upCount: upcoming.length, upNone: !upcoming.length, upcoming,
     firstLine: slots[0] ? (ui.why ? slots[0].why : slots[0].team) : "",
-    inTurn, inCount: inTurn.length, offCount: off.length, first: slots[0] ?? null, chain: ui.more ? slots.slice(1) : slots.slice(1, 4), greyed: off,
+    inTurn, inCount: inTurn.length,
+    // v4 9g: everyone in turn after #1, in the dealer's order — the circle's number, the name, "{team} · {n} today".
+    queue: inTurn.filter(m => m.id !== slots[0]?.id).map(m => {
+      const n = book.todayOf?.(m.id) ?? 0, team = m.team.replace(/^Team /, "");
+      return { id: m.id, num: m.nextTxt.replace(/^#/, ""), name: m.name, right: n ? `${team} · ${n} today` : team, open: m.open };
+    }), offCount: off.length, first: slots[0] ?? null, chain: ui.more ? slots.slice(1) : slots.slice(1, 4), greyed: off,
     moreLabel: ui.more ? "Show less" : `${Math.max(slots.length - 4, 0)} more`, moreOpen: ui.more,
     whyOn: () => a.set({ why: true }), whyOff: () => a.set({ why: false }), toggleMore: () => a.set({ more: !ui.more }),
     pickList, unpin: a.unpin, pickOpen: ui.pick, togglePick: () => a.set({ pick: !ui.pick }),

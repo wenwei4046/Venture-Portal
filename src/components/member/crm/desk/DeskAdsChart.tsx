@@ -16,6 +16,8 @@ const TIGHT = "var(--font-display-rv), 'Inter Tight', Inter, sans-serif";
 
 export interface AdsChartBits {
   shut: boolean; fold: () => void; reading: boolean; range: string;
+  /** v4 notes/21 (D2a): opened under the figure strip, the cards lose their fills, × and ▾ — the strip does that job. */
+  plain?: boolean;
   days: { iso: string; label: string }[];
   tiles: ({ key: string; label: string; total: string; color: string; tint: string; on: boolean; toggle: () => void; options: { v: string; label: string }[]; change: (e: { target: { value: string } }) => void; remove: (() => void) | null } | null)[];
   canAdd: boolean; add: () => void;
@@ -35,7 +37,7 @@ export function FoldHead({ title, sub, shut, fold }: { title: string; sub?: stri
 
 const W = 1000, H = 108, PAD_T = 8, PAD_B = 22;
 
-export function DeskAdsChart({ v }: { v: AdsChartBits }) {
+export function DeskAdsChart({ v, head = true }: { v: AdsChartBits; head?: boolean }) {
   const [hover, setHover] = useState<number | null>(null);
   const n = v.days.length;
   const x = (i: number) => (n <= 1 ? W / 2 : (i / (n - 1)) * W);
@@ -46,30 +48,30 @@ export function DeskAdsChart({ v }: { v: AdsChartBits }) {
   const lines = v.lines.map(l => { const s = scaled(l.values); return { ...l, s, d: pathOf(s, x, y) }; });
   return (
     <div style={{ flex: "none", display: "flex", flexDirection: "column", gap: "12px", padding: "12px 16px 10px", marginBottom: "12px", border: "1px solid var(--crm-rule)", borderRadius: "10px", background: "var(--crm-page)" }}>
-      <FoldHead title="Performance chart" sub={`${v.range}${v.reading ? " · reading Meta's figures…" : ""}`} shut={v.shut} fold={v.fold} />
-      {!v.shut && (
+      {head && <FoldHead title="Performance chart" sub={`${v.range}${v.reading ? " · reading Meta's figures…" : ""}`} shut={v.shut} fold={v.fold} />}
+      {(!head || !v.shut) && (
         <>
           <div style={{ display: "flex", gap: "8px" }}>
             {v.tiles.map(t => t && (
-              <div key={t.key} style={{ position: "relative", flex: "1 1 0px", minWidth: 0, height: "56px", boxSizing: "border-box", padding: "8px 12px", borderRadius: "8px", background: t.tint, borderTop: `3px solid ${t.color}`,
+              <div key={t.key} style={{ position: "relative", flex: "1 1 0px", minWidth: 0, height: "56px", boxSizing: "border-box", padding: "8px 12px", borderRadius: "8px", background: v.plain ? "transparent" : t.tint, borderTop: v.plain ? "0" : `3px solid ${t.color}`,
                 display: "flex", flexDirection: "column", justifyContent: "space-between", opacity: t.on ? 1 : 0.55 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", font: "500 12px Inter, sans-serif", color: "var(--crm-ink-soft)", minWidth: 0 }}>
                   <span style={{ width: "8px", height: "8px", flex: "none", borderRadius: "50%", background: t.color }} />
                   <span style={{ position: "relative", flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: "6px" }}>
                     <span style={{ minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.label}</span>
-                    <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-faint)", flex: "none" }}><Ic name="chevron-down" size={11} /></span>
+                    {!v.plain && <span style={{ marginLeft: "auto", display: "flex", color: "var(--crm-faint)", flex: "none" }}><Ic name="chevron-down" size={11} /></span>}
                     {/* The metric's menu: the label and its chevron are a native select laid over them. */}
-                    <select value={t.key} onChange={t.change} aria-label="Metric" style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%" }}>
+                    {!v.plain && <select value={t.key} onChange={t.change} aria-label="Metric" style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%" }}>
                       {t.options.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
-                    </select>
+                    </select>}
                   </span>
-                  {t.remove && <button type="button" onClick={t.remove} title="Take this metric off" style={{ ...BTN, display: "flex", flex: "none", color: "var(--crm-faint)" }}><Ic name="x" size={11} /></button>}
+                  {t.remove && !v.plain && <button type="button" onClick={t.remove} title="Take this metric off" style={{ ...BTN, display: "flex", flex: "none", color: "var(--crm-faint)" }}><Ic name="x" size={11} /></button>}
                 </div>
                 <button type="button" onClick={t.toggle} title={t.on ? "Hide its line" : "Show its line"} aria-pressed={t.on}
                   style={{ ...BTN, display: "block", width: "100%", font: `500 20px ${TIGHT}`, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: "normal" }}>{t.total}</button>
               </div>
             ))}
-            {v.canAdd && (
+            {v.canAdd && !v.plain && (
               <button type="button" onClick={v.add} title="Choose the metrics (the table's Customise metrics list)" style={{ ...BTN, flex: "0 0 auto", width: "44px", height: "56px", borderRadius: "8px", border: "1px dashed var(--crm-rust)", color: "var(--crm-rust)", display: "grid", placeItems: "center" }}>
                 <Ic name="plus" size={14} />
               </button>

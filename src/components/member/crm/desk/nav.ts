@@ -6,7 +6,7 @@
  * refresh opens on the same place. Toasts, drafts and half-typed things are not steps.
  * Next's router keeps its own state in history entries; window.history.pushState merges ours beside it (Next 15).
  */
-import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useLayoutEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { DeskUi } from "./vm/ctx";
 
 // v2 (README › Navigation persistence): the open ad, Channels' tab and Audit log's tab are steps too.
@@ -15,6 +15,18 @@ type NavKey = (typeof NAV_KEYS)[number];
 export type DeskPlace = Pick<DeskUi, NavKey>;
 
 const KEY = "crm-desk-place";
+
+/**
+ * The left nav's Team activity and Ads performance are gone (v4 notes/24 §1, 2026-11-10): they were the same views as
+ * Insight › Team activity / Ads performance, so a kept place, a Back step or a link that still names one opens the Insight
+ * tab instead.
+ */
+export function retiredTab<T extends Partial<DeskUi>>(p: T): T {
+  if (p.tab === "adsperf") return { ...p, tab: "insight", insTab: "ads", pane: "closed" };
+  if (p.tab === "activity") return { ...p, tab: "insight", insTab: "activity", pane: "closed" };
+  return p;
+}
+const isRetired = (tab: string | undefined) => tab === "adsperf" || tab === "activity";
 
 export function placeOf(ui: DeskUi): DeskPlace {
   const out = {} as Record<NavKey, unknown>;
@@ -37,7 +49,7 @@ export function readPlace(raw: string | null): Partial<DeskPlace> | null {
 /** The place this tab last was (a refresh opens on it), laid over a fresh desk. */
 export function withSavedPlace(fresh: DeskUi): DeskUi {
   if (typeof window === "undefined") return fresh;
-  try { return { ...fresh, ...(readPlace(sessionStorage.getItem(KEY)) ?? {}) }; } catch { return fresh; }
+  try { return retiredTab({ ...fresh, ...(readPlace(sessionStorage.getItem(KEY)) ?? {}) }); } catch { return fresh; }
 }
 
 export function useDeskPlace(ui: DeskUi, setUi: Dispatch<SetStateAction<DeskUi>>) {
@@ -47,13 +59,16 @@ export function useDeskPlace(ui: DeskUi, setUi: Dispatch<SetStateAction<DeskUi>>
       const p = readPlace(JSON.stringify((e.state as { crmDesk?: unknown } | null)?.crmDesk ?? null));
       if (!p) return;
       fromBack.current = true;
-      setUi(u => ({ ...u, ...p }));
+      setUi(u => retiredTab({ ...u, ...p }));
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, [setUi]);
+  // A page that left the nav, reached by a link inside the CRM: its Insight tab, before anything is drawn or kept.
+  useLayoutEffect(() => { if (isRetired(ui.tab)) setUi(u => retiredTab(u)); }, [ui.tab, setUi]);
   // Each new place: a history step (not when it came from Back / Forward), and kept for a refresh.
   useEffect(() => {
+    if (isRetired(ui.tab)) return; // never a step of its own: it becomes its Insight tab at once
     const place = placeOf(ui), s = JSON.stringify(place);
     if (s === last.current) return;
     const first = last.current === null;

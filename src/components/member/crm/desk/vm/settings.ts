@@ -6,7 +6,7 @@
  * (crm_read_notifs); what the Principal or Director sets here is what everybody's CRM uses.
  */
 import { formFromRow, infoLabel } from "@/lib/crm-partner/model";
-import type { CrmLeave, CrmReplyItem, CrmTemplate } from "@/lib/member/crm-data";
+import type { CrmLeave, CrmTemplate } from "@/lib/member/crm-data";
 import { panelNotifs } from "../../panel/vm/notifs";
 import { urgencyOf } from "../../sales/vm/common";
 import { DEFAULT_CRM_SETTINGS, type CrmSettings } from "@/lib/member/crm-data";
@@ -253,11 +253,6 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     can: !!data.can.manage, cur,
     save: (st: CrmSettings) => act.saveSettings(st).then(okd => { if (okd) patch({ toast: "Saved · Settings" }); return okd; }),
   };
-  // Settings › Reply library (2026-10-29): the company's good replies, kept by CRM · Manage, read by everybody.
-  const replyLib = {
-    can: !!data.can.manage, items: data.replyLibrary ?? [],
-    save: (items: CrmReplyItem[]) => act.saveReplyLibrary(items).then(okd => { if (okd) patch({ toast: "Saved · Reply library" }); return okd; }),
-  };
   // A partner's booking link (mig 20261029190000): the link, and the booking open in the pane.
   const pb = (data.partnerBookings ?? []).find(b => b.id === ui.partner);
   const partnerPane = pb ? {
@@ -277,7 +272,7 @@ export function settingsVM(ctx: DeskCtx, opItem: string) {
     toast: (msg: string) => patch({ toast: msg }),
   };
   return {
-    set4, settings4, upNextAccess, replyLib, partnerPane, partnerLink,
+    set4, settings4, upNextAccess, partnerPane, partnerLink,
     actVM, mwtTeams, mwtDirty: dirty, mwtClean: !dirty, mwtBtnBg: dirty ? "var(--crm-rust)" : "var(--crm-line)", mwtBtnCur: dirty ? "pointer" : "default", mwtSavedMsg: !dirty && ui.mwtSaved, mwtSave,
     cltOpen: !ui.frmOpen && !!cE && opItem === "Cold lead templates" && sheetOpen, cltE: cE ?? card({ t: { id: "", name: "", ch: "whatsapp", st: "draft", body: "", on: false, metaName: null, language: "en", reason: null }, status: "Draft", ch: "WhatsApp" }),
     cltTaRef: { current: null },

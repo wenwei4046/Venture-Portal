@@ -32,10 +32,10 @@ import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerI
 
 const NO_PRESS: Partial<ReturnType<typeof pressToOpen>> = {};
 import { CHAT_WALL } from "../wall";
-import { fillWithFor, libraryFor, suggestReplies, waitingWords } from "../../shared/suggest-reply";
-import { openSuggest } from "../../shared/suggest-float";
+import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { avatarTint } from "../../shared/palette";
 import { isFbBlocked } from "../../shared/fb-blocked";
+import { LABEL_ICON, labelSheetVM, labelSub, type ChatLabelSheet } from "../../shared/label-sheet";
 
 const RUST = "var(--crm-rust)", INK = "var(--crm-ink)", SUB = "rgb(128 107 96)", BD = "var(--crm-rule)";
 /** Own bubbles (rev 1010 §1.2; was var(--crm-tint-attention)). */
@@ -114,6 +114,10 @@ export function windowLeft(c: CrmCustomer, now: Date): string {
  */
 export const quietFailure = (status: string | null | undefined, error: string | null | undefined, approved = HUMAN_AGENT_APPROVED) =>
   status === "failed" && !approved && !!error && /since the customer’s last message/.test(error);
+
+/** The status a message is DRAWN with: a quiet failure (above) is drawn as sent — the same tick and time (notes/12). */
+export const shownStatus = (m: Pick<CrmChatMessage, "status" | "error">, approved = HUMAN_AGENT_APPROVED) =>
+  (quietFailure(m.status, m.error, approved) ? "sent" : m.status);
 
 export function failNote(error: string | null | undefined): string {
   // A reply past Meta's window is kept here and never sent (crm-actions › keptUnsent, 2026-10-30).
@@ -195,9 +199,10 @@ export function chatVM(ctx: SalesCtx) {
       // A starred message shows ★ by its time (the message menu's Star, 2026-10-14).
       timeJustify: "flex-end", timeColor: mine ? MINE_TIME : SUB, by, at: (stars.has(key) ? "★ " : "") + msgTime(m.at),
       failNote: mine && m.status === "failed" && !quietFailure(m.status, m.error) ? failNote(m.error) : "",
-      tick: mine, tickColor: tickColor(read ? "read" : m.status), tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : m.status === "failed" ? "Not delivered" : "Delivered",
+      // A Messenger send refused past the window is drawn as sent until Human Agent (notes/12 — shownStatus).
+      tick: mine, tickColor: tickColor(read ? "read" : shownStatus(m)), tickLabel: m.status === "sending" ? "Sending" : read ? "Read" : shownStatus(m) === "failed" ? "Not delivered" : "Delivered",
       // Sending: a small clock until it went (then the two ticks); not delivered: a "!" (shared/chat-media.ts).
-      tickPath: tickPathOf(m.status),
+      tickPath: tickPathOf(shownStatus(m)),
       showTools: ui.hover === key, enter: () => patch({ hover: key }), leave: () => set(u => (u.hover === key ? { ...u, hover: null } : u)),
       openMenu: () => patch({ menu: { msgId: key, full: true, from: m.from, text: m.text } }),
       // A long press: WhatsApp's menu (shared/msg-menu.tsx) — reactions, Reply, Copy, Pin, Delete for me.
@@ -276,9 +281,15 @@ export function chatVM(ctx: SalesCtx) {
       ...(superior ? [["Move", "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", () => setHm({ menu: false, move: true, sel: null }), `Hand over to ${firstName(superior.name)}`, "var(--crm-tint-cold)", "var(--crm-ink-soft)"]] : []),
       ["Customer info", "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", () => setHm({ menu: false, info: true }), "", "var(--crm-tint-follow)", "var(--crm-brown)"],
       ["Appointment", "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", () => setHm({ menu: false, appt: true }), "", "var(--crm-tint-new)", "var(--crm-ink-soft)"],
+      // Label (notes/15, frame 11a): the chat’s labels, or "Add a label"; the Label sheet over the chat.
+      ["Label", LABEL_ICON, () => setHm({ menu: false, label: "labels", lform: null }), labelSub(data, c.id), "var(--crm-tint-appt)", "var(--crm-text-appt)"],
       // A WhatsApp chat past its 24 hours: the template is here, since the bar stays a bar (2026-10-30 — a reply typed is kept, not sent).
       ...(shut && c.channel === "whatsapp" && data.settings?.suggestTemplate !== false ? [["Send template message", "M4 6h16v12H4zM4 7l8 6 8-6", () => { setHm({ menu: false }); void openTpl(); }, "Reopens the chat on WhatsApp", "var(--crm-tint-attention)", "var(--crm-rust)"]] : []),
     ] as [string, string, () => void, string, string, string][]).map(([label, icon, go, sub, bg, fg]) => ({ label, icon, go, sub, bg, fg })),
+    // 11b: the Label sheet — the Inbox’s own (shared/label-sheet.ts) with Done, no Back to a More menu.
+    label: hm.label ? ({ ...labelSheetVM({ data, act, customerId: c.id, form: hm.lform ?? null,
+      put: p => setHm({ ...(p.view ? { label: p.view } : {}), ...("form" in p ? { lform: p.form ?? null } : {}) }) }),
+      list: hm.label === "labels", editing: hm.label === "labelEdit", done: () => patch({ hm: null }) } as ChatLabelSheet) : null,
     apptOpen: !!hm.appt, apptHas: !!nextVisit, apptNone: !nextVisit,
     apptRoom: nextVisit ? (roomOf(nextVisit.showroomId)?.name ?? "").replace(/ showroom$/i, "") : "",
     // An online / elsewhere visit carries its link and the salesperson's remarks here too (2026-10-24).
@@ -503,19 +514,20 @@ export function chatVM(ctx: SalesCtx) {
     if (label === "Photos") document.getElementById("crm-pick-photo")?.click();
     else if (label === "Document") document.getElementById("crm-pick-file")?.click();
     else if (label === "Quick replies") patch({ qr: true });
-    // Suggest reply (in Auto replies' place, 2026-10-29): the suggested replies' list over the chat.
-    else openSuggest();
+    // Auto replies (back in tile 4, notes/09 — CRM v4; as before 2026-10-29): one's saved welcome / after-hours / keyword
+    // replies, into the reply box to send by hand.
+    else openAttach({ view: "auto", quick: [], auto: autoChoices(data.autoReplies), pick: text => setDraft(text) });
   };
   const cmp: ComposerIn = {
     key: c.id, state: composerOf(ui.cmp, c.id) ?? initialComposer(), set: setCmp,
     placeholder: `Reply to ${first}…`, draft, setDraft, canSend: !!draft.trim() && !ui.sending, send: () => void sendDraft(),
     // Past the window too: the reply is kept in the chat, marked not sent (crm-actions › keptUnsent, 2026-10-30) — but
     // never to a customer blocked on Facebook, who can receive nothing.
-    warm: !fbBlocked, blocked: fbBlocked,
+    warm: !fbBlocked, blocked: fbBlocked, blockedWho: first,
     openTpl: () => void openTpl(), tplOn: data.settings?.suggestTemplate !== false, coldSub: coldLine(c, now),
     coldTile: shut && c.channel === "whatsapp" && data.settings?.suggestTemplate !== false,
-    suggest: shut || fbBlocked ? undefined : suggestReplies(c, data.replyExamples ?? [], data.quickReplies, 3, { library: data.replyLibrary, ...fillWithFor(data, c, owner.name, now) }), suggestLogo: !!waitingWords(c),
-    suggestLibrary: shut || fbBlocked ? undefined : libraryFor(c, data.replyLibrary, fillWithFor(data, c, owner.name, now)),
+    // A WhatsApp chat past its window (notes/11, CRM v4): the warning row over the bar, Send and the mic grey.
+    waShut: shut && c.channel === "whatsapp" && !fbBlocked ? first : undefined,
     reply: ui.reply ? { who: ui.reply.from === "me" ? "You" : c.name, text: plain(ui.reply.text) } : null,
     cancelReply: () => patch({ reply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,

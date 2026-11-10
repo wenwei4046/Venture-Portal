@@ -8,6 +8,10 @@ import type { CrmCustomer } from "@/lib/member/crm-data";
 import type { DeskCtx } from "./ctx";
 import { initials, teamNameOf } from "./data";
 import { DIRECTOR_C, DIRECTOR_TEAM, teamColours } from "./tokens";
+import { auditWhen, type AuditLine, type AuditTone } from "../../shared/audit-timeline";
+
+/** A journey step's dot (notes/24 §5): green for a reply, a visit, a show-up, a win; oxblood for a loss; ink for the rest. */
+const AUDIT_TONE: Record<string, AuditTone> = { reply: "green", appt: "green", visit: "green", won: "green", lost: "oxblood" };
 
 const SC: Record<string, [string, string]> = { New: ["var(--crm-tint-attention)", "var(--crm-rust)"], "Follow up": ["var(--crm-field)", "var(--crm-ink-soft)"], Appointment: ["var(--crm-tint-cold)", "var(--crm-ink-soft)"], Visit: ["var(--crm-tint-follow)", "var(--crm-brown)"], Won: ["var(--crm-tint-follow)", "var(--crm-brown)"], Lost: ["var(--crm-tint-attention)", "var(--crm-oxblood)"] };
 const KD: Record<string, [string, string, string]> = {
@@ -96,14 +100,16 @@ export function chatProgressVM(ctx: DeskCtx, opItem: string) {
     ev: ibR ? evRows(ibR, "12px") : [],
     // 4a's per-chat Audit log (frames 02b / 02c): the same journey, newest first, as a timeline — what, the detail, who.
     audit4: ibR ? auditOf(ibR) : [] };
-  function auditOf(r: (typeof rows)[number]) { return r.ev.slice().reverse().map(e => {
+  // v4 notes/24 §5: one audit-log format everywhere — the D4b timeline (shared/audit-timeline.tsx), oldest first so the
+  // newest is at the bottom; the dot ink for assignment / move / edit, green for reply / appointment / show-up / won,
+  // oxblood for lost; the detail says what, then who.
+  function auditOf(r: (typeof rows)[number]): AuditLine[] { return r.ev.map((e, i) => {
       const came = e.text.startsWith("Came in");
       const WHAT: Record<string, string> = { assign: "Assigned", move: "Moved", share: "Shared", reply: came ? "Lead arrived" : "First reply", appt: e.text.startsWith("Changed") ? "Visit changed" : "Visit booked",
         visit: "Checked in", status: "Status changed", won: "Won", lost: "Lost", remind: "Reminder", note: "Note added" };
-      const t = new Date(e.at), hm = t.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" });
-      return { what: WHAT[e.kind] ?? "Change", detail: [came ? e.text.replace(/^Came in from /, "") : e.text, e.note].filter(Boolean).join(" · "),
-        who: e.who ? (e.who === me.id ? "You" : nameOf(e.who)) : came ? "Meta" : "Automatic",
-        time: `${dShort(e.at)}, ${hm}`, main: ["appt", "won", "lost"].includes(e.kind), hot: e.kind === "status" };
+      const who = e.who ? (e.who === me.id ? "You" : nameOf(e.who)) : came ? "Meta" : "Automatic";
+      return { key: `${e.at}-${i}`, ...auditWhen(e.at), title: WHAT[e.kind] ?? "Change", tone: AUDIT_TONE[e.kind] ?? "ink",
+        detail: [came ? e.text.replace(/^Came in from /, "") : e.text, e.note, who].filter(Boolean).join(" · ") };
     }); }
   // The same Audit log under Customer info wherever it opens on its own — Insight's lists, the Calendar (the owner,
   // 2026-11-09: "能不能看到 audit log?").

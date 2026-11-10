@@ -8,7 +8,7 @@ import type { ApptType } from "@/lib/member/crm-data";
 import { crmWrite, fetchMetaAds, refreshCrmTemplates, submitCrmTemplate } from "@/app/(member)/member/crm-actions";
 import type { MetaAdRow } from "@/lib/member/crm-ad-names-meta";
 import { adToSync } from "@/lib/member/crm-ad-running";
-import type { CrmData, CrmLeave, CrmReplyItem, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
+import type { CrmData, CrmLeave, CrmRoom, CrmTemplate, CrmSettings } from "@/lib/member/crm-data";
 import type { SalesActions } from "../sales/actions";
 import { teamOf } from "../shared/people";
 import { officeTime } from "@/lib/office-time";
@@ -29,8 +29,6 @@ export interface PanelActions extends SalesActions {
   metaAds(sync: boolean): Promise<MetaAdRow[] | null>;
   /** Settings › General (crm_save_settings, CRM · Manage): the reply lines, the template button, auto-assign. */
   saveSettings(s: CrmSettings): Promise<boolean>;
-  /** Settings › Reply library (crm_save_reply_library, CRM · Manage; 2026-10-29): the whole library, in its order. */
-  saveReplyLibrary(items: CrmReplyItem[]): Promise<boolean>;
   /** A partner's booking link (mig 20261029190000, CRM · Manage): on / off, or a new address. */
   setPartnerLink(id: string, on: boolean | null, newCode: boolean): Promise<boolean>;
   /** Cancel a booking a partner made through its link. */
@@ -70,6 +68,8 @@ export interface PanelActions extends SalesActions {
   removeRoom(id: string): Promise<boolean>;
   /** v3 T07: a showroom's staff-only remarks (crm_save_showroom_remarks), as the desktop's frame 07. */
   saveRoomRemarks(id: string, remarks: string): Promise<boolean>;
+  /** v4 4a: a showroom's draft kept until Publish (crm_save_showroom_draft — the desktop's store; room = its id or "new"); null takes it away. */
+  saveRoomDraft?(room: string, draft: Record<string, unknown> | null): Promise<boolean>;
   /** A showroom hands the unit's key over, or not (crm_set_showroom_keys, the owner 2026-10-29). */
   setRoomKeys(id: string, on: boolean): Promise<boolean>;
   /** The showrooms in this order (crm_set_showroom_order): every list and picker follows it. */
@@ -98,14 +98,6 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     async saveSettings(st) {
       if (!(await write("crm_save_settings", { p_soon: st.replySoonH, p_urgent: st.replyUrgentH, p_overdue: st.replyOverdueH, p_suggest: st.suggestTemplate, p_auto: st.autoAssign, p_push: st.pushMessages, p_reminders: st.reminders, p_team_alerts: st.teamAlerts, p_send_auto: st.sendAutoReply }))) return false;
       setData(d => ({ ...d, settings: st }));
-      return true;
-    },
-    async saveReplyLibrary(items) {
-      const r = await write("crm_save_reply_library", { p_items: items.map(i => ({ id: i.id, title: i.title, category: i.category, body: i.body, keywords: i.keywords })) });
-      if (!r) return false;
-      // The database answers the library as saved (new rows with their ids); the demo keeps what was sent.
-      const saved = Array.isArray(r.data) ? (r.data as CrmReplyItem[]).map(x => ({ ...x, category: x.category ?? "", keywords: x.keywords ?? [] })) : items;
-      setData(d => ({ ...d, replyLibrary: saved }));
       return true;
     },
     async setPartnerLink(id, on, newCode) {
@@ -326,6 +318,16 @@ export function makePanelActions(base: SalesActions, { live, data, setData }: { 
     async saveRoomRemarks(id, remarks) {
       if (!(await write("crm_save_showroom_remarks", { p_id: id, p_remarks: remarks }))) return false;
       setData(d => ({ ...d, rooms: d.rooms.map(r => (r.id === id ? { ...r, remarks } : r)) }));
+      return true;
+    },
+    async saveRoomDraft(room, draft) {
+      if (!(await write("crm_save_showroom_draft", { p_room: room, p_draft: draft }))) return false;
+      const by = data().viewerId;
+      setData(d => {
+        const next = { ...(d.roomDrafts ?? {}) };
+        if (draft) next[room] = { draft, by, at: new Date().toISOString() }; else delete next[room];
+        return { ...d, roomDrafts: next };
+      });
       return true;
     },
     async setRoomKeys(id, on) {

@@ -26,7 +26,7 @@ const BTN = { border: 0, background: "transparent", padding: 0, font: "inherit",
 const DAY = 86_400_000;
 const MAX = 4;
 /** Four colours that tell apart at a glance (the owner, 2026-10-24: "顏色有點像" — the desktop's series sat too close here). */
-const COLORS = ["var(--crm-rust)", "var(--crm-messenger)", "var(--crm-today)", "var(--crm-amber)"];
+const COLORS = ["var(--crm-rust)", "var(--crm-messenger)", "var(--crm-v4-green)", "var(--crm-amber)"]; // v4 8c's four
 /** What the phone offers: the CRM's own figures and Meta's that the server reads (the rest of the desktop's list stays there). */
 const OFFER = ["leads", "appt", "apptrate", "showup", "showrate", "won", "winrate", "spend", "dbudget", "cpl", "cpappt", "msgconv", "cpmsg", "impr", "reach", "clicks", "ctr", "cpc", "cpm"];
 const DEF = ["leads", "apptrate", "spend", "cpl"];
@@ -78,6 +78,13 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
   }, [customers, p.adNames]);
   // Each ad's status, as the desktop's filter works it out: Ads Manager's word, else its last lead (the owner, 2026-11-08:
   // "没得选状态？" — the phone had no status filter). An ad of another status leaves the list, the tiles and the chart.
+  const [menu, setMenu] = useState<"per" | "src" | "st" | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const on = (e: Event) => { if (!(e.target as Element | null)?.closest?.("[data-ads-filters]")) setMenu(null); };
+    document.addEventListener("click", on);
+    return () => document.removeEventListener("click", on);
+  }, [menu]);
   const [stF, setStF] = useState<AdStatusPick>("Running"); // Running first (the owner, 2026-11-09: "ads performance 默认开 running")
   const statusOf = (a: (typeof ads)[number]) => adStatusOf(p.adNames[a.id], a.cs.map(c => c.createdAt).sort().at(-1) ?? null, p.now);
   const stCount = (k: AdStatusPick) => ads.filter(a => !a.hidden && (k === "all" || statusOf(a) === k)).length;
@@ -114,70 +121,70 @@ export function Phone4aAdsPerf({ p, head }: { p: { customers: CrmCustomer[]; vis
     return { t: `${d > 0 ? "+" : d < 0 ? "−" : "±"}${Math.abs(Math.round(d))}%`, good };
   };
   const delta = (k: string) => change(k, tot[k], totB[k]);
-  const chip = (on: boolean): CSSProperties => ({ ...BTN, flex: "none", height: "30px", padding: "0 12px", borderRadius: "15px", fontSize: fs(12.5), fontWeight: 500, background: on ? "var(--crm-rust)" : "var(--crm-field)", color: on ? "#fff" : "var(--crm-ink)" });
-  const card: CSSProperties = { borderRadius: "16px", background: "#fff", border: "1px solid var(--crm-rule)" };
+  const card: CSSProperties = { borderRadius: "14px", background: "#fff", border: "1px solid var(--crm-nav-line)" };
+  // v4 8c: the three dropdowns.
+  const pill: CSSProperties = { ...BTN, flex: "0 1 auto", minWidth: 0, height: "36px", padding: "0 12px", boxSizing: "border-box", borderRadius: "18px", display: "flex", alignItems: "center", gap: "6px", fontSize: fs(13), fontWeight: 500, background: "var(--crm-field)", color: "var(--crm-ink)", whiteSpace: "nowrap" };
+  const opt = (on: boolean): CSSProperties => ({ ...BTN, flex: "none", minHeight: "40px", padding: "8px 10px", boxSizing: "border-box", borderRadius: "8px", display: "flex", alignItems: "center", gap: "8px", fontSize: fs(13), fontWeight: on ? 600 : 400, background: on ? "var(--crm-field)" : "transparent", color: "var(--crm-ink)", textAlign: "left" });
+  const perWord = p.custom ? `${short(r.a)}${r.a !== r.b ? ` – ${short(r.b)}` : ""}` : p.chips.find(c => c.on)?.label ?? "Period";
+  const srcWord = SOURCE_PICKS.find(o => o.v === src)?.label ?? "All sources";
 
   return (
-    <main style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "10px 20px 28px", display: "flex", flexDirection: "column", gap: "14px" }}>
+    <main style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto", scrollbarWidth: "none", padding: "6px 20px 28px", display: "flex", flexDirection: "column", gap: "14px" }}>
       {head}
-      {/* The period, and "vs the period before" */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          {p.chips.map(c => <button key={c.label} type="button" onClick={c.pick} style={chip(c.on)}>{c.label}</button>)}
-          <span style={{ marginLeft: "auto" }} />
-          {/* One button: its sheet has Period and Compare to (the owner, 2026-10-24, of a second compare button: "刪掉右邊的"). */}
-          <button type="button" aria-label="Pick dates" title="Pick dates" aria-pressed={p.custom} onClick={p.openDates} style={{ ...BTN, flex: "none", width: "30px", height: "30px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", background: p.custom ? "var(--crm-ink)" : "#fff", color: p.custom ? "#fff" : "var(--crm-ink)" }}><Ic name="calendar" size={14} /></button>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", overflowX: "auto", scrollbarWidth: "none" }}>
-          {SOURCE_PICKS.map(s => <button key={s.v} type="button" onClick={() => setSrc(s.v)} style={{ ...chip(src === s.v), height: "28px", fontSize: fs(12) }}>{s.label}</button>)}
-        </div>
-        {/* Status, as the desktop's filter: its colours, the ads of each counted. */}
-        <div data-ads-status="" style={{ display: "flex", alignItems: "center", gap: "6px", overflowX: "auto", scrollbarWidth: "none" }}>
-          {AD_STATUSES.map(k => { const [label, dot, , bg, fg] = ST_META[k], on = stF === k;
-            return <button key={k} type="button" aria-pressed={on} onClick={() => setStF(k)} style={{ ...BTN, flex: "none", height: "28px", padding: "0 11px", borderRadius: "14px", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: fs(12), fontWeight: on ? 600 : 500, background: on ? bg : "transparent", color: on ? fg : "var(--crm-ink)", border: on ? "1px solid transparent" : "1px solid var(--crm-line)" }}>
-              {k !== "all" && <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: dot }} />}{label}<span style={{ color: "var(--crm-faint)", fontWeight: 500 }}>{stCount(k)}</span></button>; })}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: fs(12), color: "var(--crm-muted)" }}>
-          <span>{short(r.a)}{r.a !== r.b ? ` – ${short(r.b)}` : ""}</span>
-          {cmp && <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: "6px" }}>vs {short(rb.a)}{rb.a !== rb.b ? ` – ${short(rb.b)}` : ""}
-            <button type="button" aria-label="Stop comparing" onClick={p.clearCompare} style={{ ...BTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={12} /></button></span>}
-        </div>
+      {/* v4 8c: the period, the source and the status — one row of three dropdowns (the chip rows and the date line go). */}
+      <div data-ads-filters="" style={{ flex: "none", position: "relative", zIndex: 6, display: "flex", alignItems: "center", gap: "6px" }}>
+        <button type="button" aria-label={`Period: ${perWord}`} aria-expanded={menu === "per"} onClick={() => setMenu(m => (m === "per" ? null : "per"))} style={pill}><span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{perWord}</span><Ic name="chevron-down" size={13} /></button>
+        <button type="button" aria-label={`Source: ${srcWord}`} aria-expanded={menu === "src"} onClick={() => setMenu(m => (m === "src" ? null : "src"))} style={pill}><span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{srcWord}</span><Ic name="chevron-down" size={13} /></button>
+        <button type="button" aria-label={`Status: ${ST_META[stF][0]}`} aria-expanded={menu === "st"} onClick={() => setMenu(m => (m === "st" ? null : "st"))} style={pill}>
+          {stF !== "all" && <span style={{ flex: "none", width: "7px", height: "7px", borderRadius: "50%", background: stF === "Running" ? "var(--crm-v4-green)" : ST_META[stF][1] }} />}
+          <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{ST_META[stF][0]} {stCount(stF)}</span><Ic name="chevron-down" size={13} /></button>
+        {menu && (
+          <div role="listbox" style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, zIndex: 7, padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "12px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", maxHeight: "50vh", overflowY: "auto" }}>
+            {menu === "per" && [...p.chips.map(c => ({ k: c.label, label: c.label, on: c.on && !p.custom, go: c.pick })), { k: "Custom", label: "Custom…", on: p.custom, go: p.openDates }].map(o => <button key={o.k} type="button" role="option" aria-selected={o.on} onClick={() => { setMenu(null); o.go(); }} style={opt(o.on)}>{o.label}</button>)}
+            {menu === "src" && SOURCE_PICKS.map(o => <button key={o.v} type="button" role="option" aria-selected={src === o.v} onClick={() => { setMenu(null); setSrc(o.v); }} style={opt(src === o.v)}>{o.label}</button>)}
+            {menu === "st" && AD_STATUSES.map(k => <button key={k} type="button" role="option" aria-selected={stF === k} onClick={() => { setMenu(null); setStF(k); }} style={opt(stF === k)}>{k !== "all" && <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: k === "Running" ? "var(--crm-v4-green)" : ST_META[k][1] }} />}{ST_META[k][0]}<span style={{ marginLeft: "auto", color: "var(--crm-faint)" }}>{stCount(k)}</span></button>)}
+          </div>
+        )}
       </div>
+      {cmp && <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "-6px", fontSize: fs(12), color: "var(--crm-muted)" }}>vs {short(rb.a)}{rb.a !== rb.b ? ` – ${short(rb.b)}` : ""}
+        <button type="button" aria-label="Stop comparing" onClick={p.clearCompare} style={{ ...BTN, display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={12} /></button></div>}
 
       {/* The metrics: a tile each, × to take one off, + to add (up to four) */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
         {keys.map((k, i) => { const d = delta(k), def = defOf(k); return (
           <div key={k} style={{ ...card, position: "relative", padding: "10px 12px", display: "flex", flexDirection: "column", gap: "2px", boxShadow: `inset 3px 0 0 ${COLORS[i]}` }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: fs(11.5), color: "var(--crm-muted)", paddingRight: "16px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{def?.[1] ?? k}</span>
-            <span style={{ fontFamily: TIGHT, fontSize: fs(20), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{show(k, tot[k])}</span>
-            <span style={{ minHeight: "14px", fontSize: fs(11), fontWeight: 500, color: d ? (d.good ? "var(--crm-today)" : "var(--crm-oxblood)") : "var(--crm-faint)" }}>{d ? `${d.t} vs before` : cmp ? "—" : ""}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: fs(12), color: "var(--crm-muted)", paddingRight: "16px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label(k)}</span>
+            {/* v4 8c: the change beside its figure; "vs before" said once, not on every tile. */}
+            <span style={{ display: "flex", alignItems: "baseline", gap: "8px", minWidth: 0, whiteSpace: "nowrap" }}>
+              <span style={{ fontFamily: TIGHT, fontSize: fs(20), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)" }}>{show(k, tot[k])}</span>
+              {d && <span data-delta="" style={{ fontSize: fs(11), fontWeight: 500, color: d.good ? "var(--crm-v4-green)" : "var(--crm-oxblood)" }}>{d.t}</span>}
+            </span>
             {keys.length > 1 && <button type="button" aria-label={`Remove ${def?.[1] ?? k}`} onClick={() => setKeys(keys.filter(x => x !== k))} style={{ ...BTN, position: "absolute", top: "8px", right: "8px", display: "flex", color: "var(--crm-faint)" }}><Ic name="x" size={12} /></button>}
           </div>); })}
         {keys.length < MAX && <button type="button" onClick={() => setPick(true)} style={{ ...BTN, ...card, borderStyle: "dashed", minHeight: "74px", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px", fontSize: fs(13), fontWeight: 500, color: "var(--crm-rust)" }}><Ic name="plus" size={14} />Metric</button>}
       </div>
 
       {/* Day by day: one line a metric, each against its own highest day */}
-      <div style={{ ...card, padding: "12px 12px 8px" }}>
+      <div style={{ ...card, padding: "12px" }}>
         <Chart days={days} lines={keys.map((k, i) => ({ k, c: COLORS[i], v: series[k] ?? [] }))} />
       </div>
 
       {/* Every ad with those figures */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-        <span style={{ fontFamily: TIGHT, fontSize: fs(15), fontWeight: 500 }}>By ad <span style={{ fontFamily: "Inter, sans-serif", fontSize: fs(12), fontWeight: 400, color: "var(--crm-faint)" }}>{rows.length}</span></span>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <span style={{ display: "flex", alignItems: "baseline", gap: "6px", fontFamily: TIGHT, fontSize: fs(15), fontWeight: 500, marginBottom: "8px" }}>By ad <span style={{ fontFamily: "Inter, sans-serif", fontSize: fs(12), fontWeight: 400, color: "var(--crm-faint)" }}>{rows.length}</span></span>
         {!rows.length && <span style={{ padding: "12px 0", fontSize: fs(13), color: "var(--crm-faint)" }}>No leads from an ad in this period.</span>}
         {rows.map(a => { const on = openAd === a.id; return (
-          <div key={a.id} role="button" tabIndex={0} onClick={() => setOpenAd(on ? null : a.id)} style={{ ...BTN, ...card, padding: "10px 12px", display: "flex", flexDirection: "column", gap: "8px", textAlign: "left" }}>
+          <div key={a.id} data-ad-row="" role="button" tabIndex={0} onClick={() => setOpenAd(on ? null : a.id)} style={{ ...BTN, padding: "10px 0", borderBottom: "1px solid var(--crm-rule-soft)", display: "flex", flexDirection: "column", gap: "6px", textAlign: "left" }}>
             <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ flex: 1, minWidth: 0, fontSize: fs(13.5), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: on ? "normal" : "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: fs(14), fontWeight: 500, color: "var(--crm-ink)", whiteSpace: on ? "normal" : "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.name}</span>
               {/* View ad, a small icon right of the name (the owner, 2026-10-24: "只需要view ad（做成小小的圖標即可）做廣告名字右邊"). */}
-              <a href={a.url} target="_blank" rel="noopener noreferrer" title="View ad" aria-label="View ad" onClick={e => e.stopPropagation()} style={{ flex: "none", width: "26px", height: "26px", borderRadius: "50%", display: "grid", placeItems: "center", border: "1px solid var(--crm-line)", color: "var(--crm-ink)" }}><Ic name="arrow-up-right" size={12} /></a>
-              <span style={{ display: "flex", color: "var(--crm-faint-2)", transform: on ? "rotate(180deg)" : "none", transition: "transform 160ms" }}><Ic name="chevron-down" size={13} /></span>
+              <a href={a.url} target="_blank" rel="noopener noreferrer" title="View ad" aria-label="View ad" onClick={e => e.stopPropagation()} style={{ flex: "none", width: "26px", height: "26px", margin: "-5px -6px -5px 0", display: "grid", placeItems: "center", color: "var(--crm-muted)" }}><Ic name="arrow-up-right" size={13} /></a>
             </span>
             <span style={{ display: "grid", gridTemplateColumns: `repeat(${keys.length}, minmax(0,1fr))`, gap: "6px" }}>
-              {keys.map((k, i) => <span key={k} style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
-                <span style={{ fontSize: fs(10.5), color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><span style={{ display: "inline-block", width: "6px", height: "6px", borderRadius: "50%", background: COLORS[i], marginRight: "4px" }} />{label(k)}</span>
-                <span style={{ fontSize: fs(13), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)", whiteSpace: "nowrap" }}>{show(k, a.f[k])}</span>
-                {cmp && (() => { const c = change(k, a.f[k], a.fb?.[k]); return <span style={{ fontSize: fs(10.5), fontWeight: 500, whiteSpace: "nowrap", color: c ? (c.good ? "var(--crm-today)" : "var(--crm-oxblood)") : "var(--crm-faint)" }}>{c ? c.t : "—"}</span>; })()}
+              {/* v4 8c: the metric names go — each figure's dot is its tile's colour above. */}
+              {keys.map((k, i) => <span key={k} title={label(k)} style={{ display: "flex", flexDirection: "column", gap: "1px", minWidth: 0 }}>
+                <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: fs(13), fontWeight: 500, fontVariantNumeric: "tabular-nums", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden" }}><span style={{ flex: "none", width: "6px", height: "6px", borderRadius: "50%", background: COLORS[i] }} />{show(k, a.f[k])}</span>
+                {cmp && (() => { const c = change(k, a.f[k], a.fb?.[k]); return <span style={{ fontSize: fs(10.5), fontWeight: 500, whiteSpace: "nowrap", color: c ? (c.good ? "var(--crm-v4-green)" : "var(--crm-oxblood)") : "var(--crm-faint)" }}>{c ? c.t : "—"}</span>; })()}
               </span>)}
             </span>
             {on && <span style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", paddingTop: "8px", borderTop: "1px solid var(--crm-rule-soft)", fontSize: fs(12), color: "var(--crm-muted)" }}>
@@ -219,12 +226,12 @@ function Chart({ days, lines }: { days: string[]; lines: { k: string; c: string;
   const path = (v: (number | null)[]) => { const s = scaled(v); let d = ""; s.forEach((y, i) => { if (y == null) return; d += `${d ? "L" : "M"}${((i / n) * W).toFixed(1)},${(H - 6 - y * (H - 12)).toFixed(1)}`; }); return d; };
   const empty = lines.every(l => l.v.every(x => x == null || x === 0));
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="120" preserveAspectRatio="none" role="img" aria-label="Day by day">
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="96" preserveAspectRatio="none" role="img" aria-label="Day by day">
         {[0.25, 0.5, 0.75].map(f => <line key={f} x1="0" x2={W} y1={H * f} y2={H * f} stroke="var(--crm-rule-soft)" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
         {lines.map(l => <path key={l.k} d={path(l.v)} fill="none" stroke={l.c} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />)}
       </svg>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: fs(10.5), color: "var(--crm-faint)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: fs(11), color: "var(--crm-faint)" }}>
         <span>{days[0] ? dayLabel(days[0]) : ""}</span>{empty && <span>No activity yet</span>}<span>{days.length > 1 ? dayLabel(days[days.length - 1]) : ""}</span>
       </div>
     </div>

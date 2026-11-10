@@ -26,6 +26,7 @@ import { useFollowNewest } from "../shared/stick";
 import { useReadWhenSeen } from "../shared/seen";
 import { MediaViewer } from "../shared/viewer";
 import { MessageMenu } from "../shared/msg-menu";
+import { ActionSheetHost } from "../shared/action-sheet";
 import { inBrand } from "./vm/insight";
 import { sourceOf, type SourcePick } from "@/lib/member/crm-source";
 
@@ -223,6 +224,15 @@ export default function DeskScreens(p: DeskScreensProps) {
       async setChannel(kind, id, name, linked, isDefault) {
         return !!(await call("crm_set_channel", { p_kind: kind, p_external: id, p_name: name, p_linked: linked, p_default: isDefault }));
       },
+      saveUiPref: (() => {
+        // A burst of clicks is one write per key (v4 notes 21 / 25: remembered per user, on the server).
+        const timers = new Map<string, ReturnType<typeof setTimeout>>();
+        return (key: string, value: unknown) => {
+          setData(d => ({ ...d, uiPrefs: { ...(d.uiPrefs ?? {}), [key]: value } }));
+          const t = timers.get(key); if (t) clearTimeout(t);
+          timers.set(key, setTimeout(() => { timers.delete(key); void call("crm_save_ui_pref", { p_key: key, p_value: value ?? null }); }, 600));
+        };
+      })(),
       saveRecents: (() => {
         // A burst of picks is one write, as the phone's (sales/actions.ts).
         let timer: ReturnType<typeof setTimeout> | null = null;
@@ -412,6 +422,8 @@ export default function DeskScreens(p: DeskScreensProps) {
       {/* The phone's photo / video / document viewer and the message dialogs (Forward, Info, Starred), shared. */}
       <MediaViewer />
       <MessageMenu />
+      {/* The cold chat's templates (CRM v4 notes/11: the warning row's Template, the + menu's Cold template) — the phone's sheet. */}
+      <ActionSheetHost />
     </div>
   );
 }

@@ -58,7 +58,9 @@ describe("the CRM's three round buttons, on the first page alone", () => {
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
     const toTeam = swapToTeam()!;
     expect(toTeam.getAttribute("title")).toMatch(/^Mine/);
-    expect(house()!.previousElementSibling).toBe(toTeam);
+    // v4 10b (notes/16): search · Team | Mine · bell · house.
+    expect(bell()!.previousElementSibling).toBe(toTeam);
+    expect(house()!.previousElementSibling).toBe(bell());
 
     await tap(toTeam);
     expect(screen.getByRole("heading", { name: "Inbox" })).toBeInTheDocument();
@@ -76,7 +78,8 @@ describe("the CRM's three round buttons, on the first page alone", () => {
     noButtons();
     expect(screen.queryByText("Who gets each new enquiry")).toBeNull();
     await go("Calendar");
-    expect(screen.getByRole("heading", { name: "Calendar" })).toBeInTheDocument();
+    // v4 notes/19 §1: the Calendar's title is its month row ("November 2026") — one header row.
+    expect(screen.getByRole("heading", { name: /^[A-Z][a-z]+ \d{4}$/ })).toBeInTheDocument();
     noButtons();
     expect(screen.queryByText(/visits · \d+ upcoming/)).toBeNull();
     // v3 T06 (2026-10-23): Team's Profile has the house top-right, as the prototype.

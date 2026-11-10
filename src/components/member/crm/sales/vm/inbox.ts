@@ -7,7 +7,8 @@
  */
 import { sourceOf } from "@/lib/member/crm-source";
 import type { ChangeEvent, MouseEvent } from "react";
-import { DEFAULT_LABELS, LABEL_SWATCHES, type CrmCustomer, type CrmLabel } from "@/lib/member/crm-data";
+import type { CrmCustomer, CrmLabel } from "@/lib/member/crm-data";
+import { labelSheetVM } from "../../shared/label-sheet";
 import { BORDER, CHANNEL, dayLabel, firstName, ini, INK, isCold, lastChat, lastReal, STATUS_LABEL, stop, timeLabel, urgencyOf, type PEvent, type SalesCtx } from "./common";
 import type { InboxFilter } from "../ui";
 import { isNewChat } from "../../shared/new-chat";
@@ -33,7 +34,29 @@ export const lastAt = (c: CrmCustomer) => {
   return m ? new Date(m.at).getTime() : new Date(c.createdAt).getTime();
 };
 
-const OWNER_COLORS = ["var(--crm-ink-soft)", "var(--crm-ink-soft)", "var(--crm-brown)", "var(--crm-brown)", "var(--crm-muted)"];
+/** v4 10b / 2d: the wait that replaces a waiting chat's time — its icon, "9 h", and the urgency's colour (the frames:
+ * Overdue triangle and Urgent clock in oxblood, Reply soon's clock in the appointment amber's text colour). */
+export function waitOf(u: { level: string; waitingMinutes: number }, on: boolean) {
+  const show = on && u.level !== "none";
+  return {
+    waitShow: show,
+    waitIc: (u.level === "overdue" ? "triangle-alert" : "clock") as "triangle-alert" | "clock",
+    waitTxt: show ? `${Math.floor(u.waitingMinutes / 60)} h` : "",
+    waitC: u.level === "soon" ? "var(--crm-text-appt)" : "var(--crm-oxblood)",
+  };
+}
+
+/** v4 10b: the customer's next booked visit, short — "Sat 11 am" within the week ahead, else "14 Nov, 11 am"; "" with none. */
+export function visitShort(visits: { customerId: string; state: string; start: string }[], customerId: string, now: Date): string {
+  const v = visits.filter(x => x.customerId === customerId && x.state === "booked").sort((a, b) => a.start.localeCompare(b.start))[0];
+  if (!v) return "";
+  const d = new Date(v.start), h = d.getHours(), m = d.getMinutes();
+  const t = `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "am" : "pm"}`;
+  const days = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86_400_000);
+  return days >= 0 && days < 7 ? `${d.toLocaleDateString("en-MY", { weekday: "short" })} ${t}` : `${d.getDate()} ${d.toLocaleDateString("en-GB", { month: "short" }).slice(0, 3)}, ${t}`;
+}
+
+const OWNER_COLORS =["var(--crm-ink-soft)", "var(--crm-ink-soft)", "var(--crm-brown)", "var(--crm-brown)", "var(--crm-muted)"];
 
 export function inboxVM(ctx: SalesCtx) {
   const { ui, set, patch, data, now, mine, refs, act, owner, nameOf } = ctx;
@@ -154,6 +177,12 @@ export function inboxVM(ctx: SalesCtx) {
       unread: c.unread || (marked(c) ? "\u00a0" : 0), chanName: sourceOf(c).label, chanFg: ch.fg, chanIcon: ch.icon, cold,
       ownerTag: shared ? firstName(nameOf(c.assignedTo)) : "", ownerC: shared ? ownerColor.get(c.assignedTo!)! : "var(--crm-muted)",
       urgShow: !cold && !bl && u.level !== "none", urg: u.label, urg3b: u.color,
+      // v4 10b (notes/16): a waiting chat shows the wait where the time is — clock / triangle + "9 h", 13px 600; Reply soon
+      // in the frame's amber text, Urgent and Overdue oxblood. A cold chat's name is muted and its message has a lock; a
+      // booked visit leads the message line.
+      ...waitOf(u, !cold && !bl),
+      nameC: cold ? "var(--crm-muted)" : "var(--crm-ink)",
+      visit: visitShort(ctx.data.visits, c.id, now),
       firstVisit: firstMarked ? `${dayLabel(new Date(firstMarked.start))}, ${timeLabel(new Date(firstMarked.start))}` : "",
       tags: labelsOf(c).map(l => ({ t: l.name, c: l.color })),
       rule: n ? `1px solid ${BORDER}` : "0", isMuted: mu, isPinned: pi, iconRight: c.unread || marked(c) ? "28px" : "0px", padR: `${32 + (mu ? 22 : 0) + (pi ? 22 : 0)}px`,
@@ -177,14 +206,9 @@ export function inboxVM(ctx: SalesCtx) {
   const ml = ui.moreLead ? mine.find(c => c.id === ui.moreLead) : undefined;
   const mp = ml ? data.prefs[ml.id] : undefined;
   const closeMore = () => patch({ moreLead: null, moreView: "main" });
-  // The design's four labels until the person keeps a list of their own.
-  const labelList: { id: string | null; name: string; color: string }[] = data.labels.length ? data.labels : DEFAULT_LABELS.map(l => ({ id: null, ...l }));
-  const mine2 = ml ? labelsOf(ml).map(l => l.name) : [];
-  const keyOf = (l: { id: string | null; name: string }) => l.id ?? `name:${l.name}`;
-  const fm = ui.labelForm ?? { key: null, name: "", color: LABEL_SWATCHES[0] };
-  const okName = !!fm.name.trim() && !labelList.some(l => keyOf(l) !== fm.key && l.name.toLowerCase() === fm.name.trim().toLowerCase());
-  /** Labels exist in the database before one goes on a customer. */
-  const ensure = async () => (data.labels.length ? data.labels : await act.saveLabels(labelList.map(l => ({ name: l.name, color: l.color }))));
+  // The Label view: one code path with the chat's ⋮ › Label (shared/label-sheet.ts, notes/15).
+  const { names: mine2, ...labelSheet } = labelSheetVM({ data, act, customerId: ml?.id ?? null, form: ui.labelForm,
+    put: p => patch({ ...(p.view ? { moreView: p.view } : {}), ...("form" in p ? { labelForm: p.form ?? null } : {}) }) });
   const togglePref = (k: "pinned" | "muted") => async () => { if (!ml) return; closeMore(); await act.setPref(ml.id, { [k]: !mp?.[k] }); };
 
   // Frame M03: a filter (or a search) with nothing in it says what shows there and offers every chat again.
@@ -206,6 +230,9 @@ export function inboxVM(ctx: SalesCtx) {
   return {
     empty4,
     q: ui.q, setQ: (e: ChangeEvent<HTMLInputElement>) => patch({ q: e.target.value }), clearQ: () => patch({ q: "" }),
+    // v4 10b: search is an icon; it opens the field in place of the chip row, and Cancel clears it and closes it. A search
+    // already typed (kept across a chat) keeps the field open.
+    searchOpen: !!ui.qOpen || !!ui.q, openSearch: () => patch({ qOpen: true }), cancelSearch: () => patch({ qOpen: false, q: "" }),
     inboxToast: !ui.chat && ui.toast ? ui.toast : "",
     chips3b, leadsView, stop,
     adLabel: !ui.adSel.length ? "All ads" : ui.adSel.length === 1 ? ui.adSel[0].split(" · ")[0] : `${ui.adSel.length} ads`,
@@ -235,34 +262,8 @@ export function inboxVM(ctx: SalesCtx) {
     // Block: off this person's Inbox and Contacts (the customer stays in the CRM; WhatsApp itself is not told).
     moreBlockLabel: ml ? `Block ${ml.name}` : "",
     moreBlock: async () => { if (!ml) return; const name = ml.name; closeMore(); await act.setPref(ml.id, { blocked: true, hidden: true }); act.toast(`${name} blocked · removed from your Inbox`); },
-    labelItems: labelList.map((l, k) => {
-      const on = mine2.includes(l.name);
-      return { label: l.name, dot: l.color, rule: k ? "1px solid var(--crm-rule)" : "0", on, ring: on ? "var(--crm-rust)" : "var(--crm-line)", fill: on ? "var(--crm-rust)" : "transparent",
-        edit: (e: MouseEvent) => { e.stopPropagation(); patch({ moreView: "labelEdit", labelForm: { key: keyOf(l), name: l.name, color: l.color } }); },
-        go: async () => {
-          if (!ml) return;
-          const saved = await ensure();
-          const lab = saved?.find(x => x.name.toLowerCase() === l.name.toLowerCase());
-          if (lab) await act.setLabel(ml.id, lab.id, !on);
-        } };
-    }),
-    labelNew: () => patch({ moreView: "labelEdit", labelForm: { key: null, name: "", color: LABEL_SWATCHES[0] } }),
-    labelFormBack: () => patch({ moreView: "labels" }),
-    labelFormTitle: fm.key == null ? "New label" : "Edit label",
-    labelFormName: fm.name, labelCanDelete: fm.key != null,
-    labelSetName: (e: ChangeEvent<HTMLInputElement>) => patch({ labelForm: { ...fm, name: e.target.value } }),
-    labelSwatches: LABEL_SWATCHES.map(c => ({ c, ring: c === fm.color ? "#fff" : c, pick: () => patch({ labelForm: { ...fm, color: c } }) })),
-    labelSaveBg: okName ? "var(--crm-rust)" : "var(--crm-line)", labelSaveCur: okName ? "pointer" : "default",
-    labelSave: okName ? async () => {
-      const nm = fm.name.trim();
-      const next = fm.key == null ? [...labelList.map(l => ({ id: l.id, name: l.name, color: l.color })), { id: null, name: nm, color: fm.color }]
-        : labelList.map(l => (keyOf(l) === fm.key ? { id: l.id, name: nm, color: fm.color } : { id: l.id, name: l.name, color: l.color }));
-      if (await act.saveLabels(next)) patch({ moreView: "labels", labelForm: null });
-    } : undefined,
-    labelDelete: async () => {
-      if (fm.key == null) return;
-      if (await act.saveLabels(labelList.filter(l => keyOf(l) !== fm.key).map(l => ({ id: l.id, name: l.name, color: l.color })))) patch({ moreView: "labels", labelForm: null });
-    },
+    // Label · tick, edit, New label, the form (shared/label-sheet.ts — the chat’s ⋮ › Label uses the same).
+    ...labelSheet,
   };
 }
 export type InboxVM = ReturnType<typeof inboxVM>;

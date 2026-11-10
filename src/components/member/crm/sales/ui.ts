@@ -51,6 +51,8 @@ export interface SalesUi {
   chat: string | null;
   // Inbox
   q: string;
+  /** v4 10b: the search field is open in place of the chip row (the header's search icon; Cancel clears and closes). */
+  qOpen?: boolean;
   filter: InboxFilter;
   adSel: string[];
   adSheet: { sel: string[] } | null;
@@ -80,7 +82,9 @@ export interface SalesUi {
   qrPage: "list" | "new" | null;
   qrNew: { s: string; m: string };
   qrEditIdx: number | null;
-  hm: { menu?: boolean; share?: boolean; ssel?: string[]; move?: boolean; assign?: boolean; sel?: string | null; info?: boolean; appt?: boolean; toast?: string } | null;
+  hm: { menu?: boolean; share?: boolean; ssel?: string[]; move?: boolean; assign?: boolean; sel?: string | null; info?: boolean; appt?: boolean; toast?: string;
+    /** ⋮ › Label (notes/15): the Label sheet over the chat — its list or its form, and the form being typed. */
+    label?: import("../shared/label-sheet").LabelView; lform?: import("../shared/label-sheet").LabelFormState | null } | null;
   cform: CustomerForm | null;
   book: BookState | null;
   cancelAsk: string | null;

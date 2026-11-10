@@ -83,9 +83,10 @@ module.exports = function desk4a(body) {
   if (body.split(DAY_OLD).length - 1 < 2) throw new Error("desk-4a: day labels");
   body = body.split(DAY_OLD).join(DAY_NEW);
   body = every(body, 'borderRadius: "16px 16px 16px 4px", boxShadow: "rgba(42,22,12,.1) 0 1px 1px", background: "#fff", color: "var(--crm-ink)" }}>',
-    'borderRadius: "14px 14px 14px 4px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}>', "customer bubble");
+    // v4 D5a: bubbles are 16 px round with a 4 px tail and a 1 px shadow again (no hairline), as v2 drew them.
+    'borderRadius: "16px 16px 16px 4px", boxShadow: "rgba(42,22,12,.08) 0 1px 1px", background: "#fff", color: "var(--crm-ink)" }}>', "customer bubble");
   body = every(body, 'borderRadius: "16px 16px 4px 16px", boxShadow: "rgba(42,22,12,.1) 0 1px 1px", background: m.outBg ?? "var(--crm-tint-attention)", color: m.outFg ?? "var(--crm-ink)" }}>',
-    'borderRadius: "14px 14px 4px 14px", border: `1px solid ${m.outBg ?? "var(--crm-tint-attention)"}`, background: m.outBg ?? "var(--crm-tint-attention)", color: m.outFg ?? "var(--crm-ink)" }}>', "own bubble");
+    'borderRadius: "16px 16px 4px 16px", boxShadow: "rgba(42,22,12,.08) 0 1px 1px", background: m.outBg ?? "var(--crm-tint-attention)", color: m.outFg ?? "var(--crm-ink)" }}>', "own bubble");
   body = swap(body, '<div data-msg={m.id} onClick={m.appt.go} style={{ cursor: "pointer", alignSelf: "flex-end", width: "300px"', "div",
     `<div data-msg={m.id} onClick={m.appt.go} style={{ cursor: "pointer", alignSelf: "flex-end", maxWidth: "78%", padding: "10px 14px 8px", boxSizing: "border-box", borderRadius: "14px 14px 4px 14px", background: "var(--crm-rust)", border: "1px solid var(--crm-rust)", color: "#fff", display: "flex", flexDirection: "column", gap: "4px" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "3px", padding: "2px" }}>
@@ -97,12 +98,13 @@ module.exports = function desk4a(body) {
                       </div>`, "visit card");
   // The composer floats over the wall: the reply bar sits just above it, the pill and the mic 22 px from the foot.
   body = once(body, '<div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "10px", padding: "8px 16px", background: "#fff", borderTop: "1px solid var(--crm-rule)" }}>\n                      <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px", paddingLeft: "10px", borderLeft: "3px solid var(--crm-rust)" }}>',
-    '<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "82px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "12px", boxShadow: "0 6px 20px rgba(42,22,12,.08)" }}>\n                      <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px", paddingLeft: "10px", borderLeft: "3px solid var(--crm-rust)" }}>', "reply bar");
+    '<div style={{ position: "absolute", left: "24px", right: "24px", bottom: v.replyBottom, zIndex: "3", display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "12px", boxShadow: "0 6px 20px rgba(42,22,12,.08)" }}>\n                      <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px", paddingLeft: "10px", borderLeft: "3px solid var(--crm-rust)" }}>', "reply bar");
   body = swap(body, '<div style={{ flex: "0 0 auto", background: "#fff", padding: "12px 16px", borderTop: "1px solid var(--crm-rule)", display: "flex", alignItems: "center", gap: "6px" }}>\n                    <span style={{ position: "relative", flex: "0 0 auto" }}>', "div",
-    // The suggested replies' floating logo over the reply box, as the phone's (the owner, 2026-10-29: "电脑版也加漂浮 logo").
-    // A customer blocked on Facebook (2026-11-08, the owner: "对话框写 block") can receive nothing: the composer and its
-    // suggestions give way to one muted line in the pill's place (shared/fb-blocked.ts › FB_BLOCKED_NOTE).
-    `{v.fbBlocked ? (<div data-fb-blocked="" style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", height: "50px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 18px", borderRadius: "25px", background: "var(--crm-field)", border: "1px solid var(--crm-line)", font: "500 14px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.fbBlockedNote}</div>) : (<>{v.suggest && <SuggestFloat key={v.suggestKey} list={v.suggest} pick={v.pickSuggest} library={v.suggestLib} showLogo={v.suggestLogo && !!v.suggest.length && !v.draft} desk />}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
+    // A customer blocked on Facebook (2026-11-08, the owner: "对话框写 block") can receive nothing: the composer gives way
+    // to one muted line in the pill's place (shared/fb-blocked.ts › FB_BLOCKED_NOTE). A WhatsApp chat past its window (CRM v4
+    // notes/11, frame 6a·2): the warning row 8px over the composer, its Template button opening the templates; Send grey
+    // (v.sendBg / sendCursor / sendSh / sendCls). The suggested replies' floating logo is gone (notes/09).
+    `{v.fbBlocked ? (<div data-fb-blocked="" style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", height: "50px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 18px", borderRadius: "25px", background: "var(--crm-field)", border: "1px solid var(--crm-line)", font: "500 14px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.fbBlockedNote}</div>) : (<>{!!(v.waShut) && (<div data-wa-cold="" style={{ position: "absolute", left: "24px", right: "24px", bottom: "80px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px", padding: "10px 10px 10px 14px", borderRadius: "16px", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)" }}><svg style={{ flex: "0 0 auto" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={v.alertIcon}></path></svg><span style={{ flex: "1", minWidth: "0", font: "500 13px/1.4 Inter, sans-serif" }}>{v.warnText}</span>{!!(v.warnBtn) && (<button type="button" onClick={v.openTpl} style={{ flex: "0 0 auto", height: "36px", padding: "0 12px", border: "0", borderRadius: "18px", display: "flex", alignItems: "center", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#fff", cursor: "pointer" }}>Template</button>)}</div>)}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
                     <div style={{ flex: "1", minWidth: "0", height: "50px", borderRadius: "25px", display: "flex", alignItems: "center", gap: "16px", padding: "0 18px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-line)", boxShadow: "0 6px 20px rgba(42,22,12,.08)", color: "var(--crm-muted)" }}>
                       <span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" x2="9.01" y1="9" y2="9"></line><line x1="15" x2="15.01" y1="9" y2="9"></line></svg>{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}
@@ -127,27 +129,28 @@ module.exports = function desk4a(body) {
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
                       </span>
                     </div>
-                    <span title={v.sendTitle} onClick={v.send} style={{ flex: "0 0 auto", width: "50px", height: "50px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer", boxShadow: "0 6px 20px rgba(42,22,12,.15)" }} className="crm4a-primary">
+                    <span title={v.sendTitle} onClick={v.send} style={{ flex: "0 0 auto", width: "50px", height: "50px", borderRadius: "50%", background: v.sendBg, color: "#fff", display: "grid", placeItems: "center", cursor: v.sendCursor, boxShadow: v.sendSh }} className={v.sendCls}>
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={v.micD}></path></svg>
                     </span>
                   </div></>)}`, "composer");
 
-  // Frame 02 · the chat's head: 62 px, the avatar in its tint, the name, ad · channel, the wait in oxblood, ⋮ — and no
+  // Frame 02 · the chat's head (v4 D5a: 64 px + its 1 px rule, 20 px a side, a 38 px avatar in 13 px, the name 600): the avatar in its tint, the name, ad · channel, the wait in oxblood, ⋮ — and no
   // close (×) while the chat sits in Inbox's columns (the list picks another; other panes keep theirs).
   body = once(body, '<div style={{ flex: "0 0 60px", height: "60px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 0 16px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>',
-    '<div style={{ flex: "0 0 62px", height: "62px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "12px", padding: "0 22px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>', "pane head");
+    '<div style={{ flex: "0 0 65px", height: "65px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "12px", padding: "0 20px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>', "pane head");
   body = once(body, '<span style={{ flex: "0 0 auto", width: "34px", height: "34px", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: "11px", fontWeight: "700", background: "var(--crm-tint-cold)", color: "var(--crm-ink)" }}>{v.ph.avatar}</span>',
-    '<span style={{ flex: "0 0 auto", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", font: "500 12px var(--font-display-rv), \'Inter Tight\', Inter, sans-serif", background: v.ph.avBg ?? "var(--crm-cream)", color: v.ph.avFg ?? "var(--crm-ink)" }}>{v.ph.avatar}</span>', "pane avatar");
+    '<span style={{ flex: "0 0 auto", width: "38px", height: "38px", borderRadius: "50%", display: "grid", placeItems: "center", font: "500 13px var(--font-display-rv), \'Inter Tight\', Inter, sans-serif", background: v.ph.avBg ?? "var(--crm-cream)", color: v.ph.avFg ?? "var(--crm-ink)" }}>{v.ph.avatar}</span>', "pane avatar");
   body = once(body, '<strong style={{ fontSize: "15px", fontWeight: "650", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.title}</strong>\n                    <span style={{ fontSize: "12.5px", color: v.ph.subColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.sub}</span>\n                  </span>',
-    '<strong style={{ font: "500 15px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.title}</strong>\n                    <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.sub}</span>\n                  </span>\n                  {!!(v.ph.status) && (<span style={{ flex: "0 0 auto", font: "600 12px Inter, sans-serif", color: v.ph.statusColor, whiteSpace: "nowrap" }}>{v.ph.status}</span>)}', "pane title");
+    '<strong style={{ font: "600 15px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.title}</strong>\n                    <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.sub}</span>\n                  </span>\n                  <DeskChatWait4a ph={v.ph} />', "pane title");
   {
     const start = '<button type="button" onClick={v.closePane} title="Close (Esc)" style={{ width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", display: "grid", placeItems: "cente';
     const at = body.lastIndexOf(start); if (at < 0) throw new Error("desk-4a: pane close");
     const [a, b] = el(body.slice(at), start, "button", "pane close");
     body = body.slice(0, at) + `{!!(!v.ibCols || !v.kChat) && (${body.slice(at + a, at + b)})}` + body.slice(at + b);
   }
-  body = once(body, '<button type="button" onClick={v.toggleMenu} title="More" style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1px solid var(--crm-rule)"',
-    '<button type="button" onClick={v.toggleMenu} title="More" style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1px solid var(--crm-line)"', "pane menu");
+  // v4 notes/24 §3 / §7 (frame D5a): the wait as plain text with its clock (DeskChatWait4a, in "pane title" above); ⋮ a 34px
+  // sand circle and its menu the phone's items + a divider and Block NAME (DeskChatMenu4a, desk/DeskChatHead4a.tsx).
+  body = fragSwap(body, "{!!(v.ph.menu) && (<>", "{!!(v.ph.menu) && (<DeskChatMenu4a v={v} />)}", "pane menu");
 
   // Frame 03 · Contacts: 4a's search, filters and table (DeskContacts4a); the rail is 4a's (DeskRail4a) — Breakdown,
   // the page's figures under it, the customer picked — and the Calendar's rail the same component (frame 04).
@@ -176,9 +179,10 @@ module.exports = function desk4a(body) {
     const dp = toolbar.slice(d0, d1);
     // v2 (frame 05, note 02): the two controls 34 px on one row (6 px over, 10 under); Export is the head's primary now and
     // the info line is gone; the range button has no calendar icon.
-    const OUT = 'display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap"';
+    // v4 notes/21 (D2a): Running ▾ · All sources ▾ are sand pills (34 px, radius 8, #F7F3EF, 13.5 px), 20 px over and under.
+    const OUT = 'display: "inline-flex", alignItems: "center", gap: "7px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "8px", border: "0", background: "var(--crm-field)", font: "500 13.5px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap"';
     const POP = 'position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column"';
-    const tb4 = `<div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "6px 0 10px" }}>
+    const tb4 = `<div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: v.apStrip ? "20px 0" : "6px 0 10px" }}>
                   <span style={{ position: "relative" }}>
                     <button type="button" onClick={v.apStToggle} style={{ ${OUT} }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.apStOpen) && (<><div onClick={v.apStToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ ${POP}, left: "0" }}>{(v.apStOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.dot }}></span><span style={{ flex: "1" }}>{o.label}</span><span style={{ color: "var(--crm-faint)" }}>{o.n}</span></button>))}</div></>)}
@@ -187,10 +191,10 @@ module.exports = function desk4a(body) {
                     <button type="button" onClick={v.apSrcToggle} style={{ ${OUT} }} className="crm4a-outline">{v.apSrcCur.label}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.apSrcOpen) && (<><div onClick={v.apSrcToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ ${POP}, left: "0" }}>{(v.apSrcOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", flex: "none", whiteSpace: "nowrap", height: "34px", padding: "0 10px", paddingLeft: o.pad, border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", fontWeight: o.w, color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}>{o.label}</button>))}</div></>)}
                   </span>
-                  <span style={{ position: "relative" }}>
+                  {!(v.apInIns) && (<span style={{ position: "relative" }}>
                     <button type="button" onClick={v.dpOpen} style={{ ${OUT} }} className="crm4a-outline">{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     ${dp}
-                  </span>
+                  </span>)}
                 </div>`;
     body = body.slice(0, t0 + ta) + tb4 + body.slice(t0 + tb);
     // the table
@@ -274,12 +278,14 @@ module.exports = function desk4a(body) {
     // Insight › Up next (docs/design_handoff_crm_up_next): its own component, a third tab beside the two above.
     body = body.slice(0, head) + "{!!(v.kInsight) && (<DeskInsight4a v={v} />)}\n              {!!(v.kUpNext && v.upNextProps) && (<DeskUpNext4a {...v.upNextProps!} />)}\n              " + body.slice(close);
   }
+  // v4 notes/21: Customise metrics (the pane Ads performance's Columns and its figure strip's + open) is a component of its
+  // own, DeskMetricPicker.tsx, drawn exactly as before, so Reports' Columns (notes/25) can use the same picker.
+  body = fragSwap(body, "{!!(v.kMetrics) && (<>", "{!!(v.kMetrics) && (<DeskMetricPicker4a v={v} />)}", "metric picker");
   // Frame 10 · Settings: a General tab first, the frame's two-column groups (Desk4a.tsx › DeskSettings4a); Cold lead
   // templates and Notifications, production's, stay as the head's other two tabs.
-  body = once(body, '{!!(v.isNtfOp) && (<>', '{!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLibOp) && (<DeskReplyLibrary4a v={v.replyLib} />)}{!!(v.isLinkOp) && (<DeskBookingLink4a v={v.partnerLink} />)}{!!(v.isNtfOp) && (<>', "settings general");
+  body = once(body, '{!!(v.isNtfOp) && (<>', '{!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLinkOp) && (<DeskBookingLink4a v={v.partnerLink} />)}{!!(v.isNtfOp) && (<>', "settings general");
   // A partner's booking open in the pane (mig 20261029190000): its own card, beside Customer info.
   body = once(body, '{!!(v.kInfo) && (<>', '{!!(v.kPartner) && (<DeskPartnerPane4a v={v.partnerPane} close={v.closePane} />)}{!!(v.kInfo) && (<>', "partner pane");
-  // Settings › Reply library (2026-10-29, the owner: good replies kept for the salespeople, names filled in for the customer).
   // Frame 11 · Audit log: a search, three menus and the five-column table (Desk4a.tsx › DeskAudit4a). Production's three
   // tabs are the Area menu's areas; its stats band went into the head's count.
   {
@@ -294,6 +300,11 @@ module.exports = function desk4a(body) {
   body = once(body, '<p style={{ flex: "0 0 auto", margin: "0", padding: "8px 20px", fontSize: "12px", color: "var(--crm-muted)", background: "#fff" }}>{v.chatOwner}</p>', "", "v2 chat owner line");
   // v2 (2026-10-23, note 06 › Inbox and Audit log colours): the chat wall is #F7F3EF, no longer cream.
   body = every(body, 'padding: "20px 24px 104px", backgroundColor: "var(--crm-cream)" }}>', 'padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>', "v2 chat wall");
+  // CRM v4 notes/11: the open chat's wall clears the WhatsApp cold warning row (104 + its 56 + 8) — the Inbox chat's only
+  // (the awaiting preview's wall, the other one, has no composer).
+  body = once(body, 'gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>\n                    {!!(v.firstDay)',
+    // v4 D5a: the Inbox chat's messages 10 px apart (its padding, v.chatPadB, is 28 px a side).
+    'gap: "10px", padding: v.chatPadB, backgroundColor: "var(--crm-field)" }}>\n                    {!!(v.firstDay)', "chat wall clears the cold row");
   body = once(body, "{!!(v.kAdsPerf) && (<>", "{!!(v.kActivity) && (<DeskTeamActivity a={v.activity} />)}{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>", "reports page");
   // Team activity (docs/design_handoff_crm, 2026-11-08): a sidebar page of its own, DeskTeamActivity.tsx.
   // Workspace (2026-10-27, the owner: "workspace 可以放在左边report的下方（独立）"): one's own Weekly / Monthly reports, DeskWorkspace.tsx.

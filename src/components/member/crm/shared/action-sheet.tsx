@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { typePx } from "./type";
+import { useBackCloses } from "./back";
 
 /**
  * A small bottom sheet of choices — a title, a line under it, and its buttons (the owner, 2026-10-14: after Book visit
@@ -10,7 +11,9 @@ import { typePx } from "./type";
  * a tap outside or Esc closes it. A choice may carry its words under its label (the Team chat's templates, 2026-10-15:
  * the message each one sends); a long list scrolls inside the sheet.
  */
-export type SheetAction = { label: string; danger?: boolean; primary?: boolean; detail?: string; run: () => void };
+/** `now`: run in the tap itself, as the sheet closes — a choice that opens the phone's file picker needs the tap (else the
+ * choice runs once the sheet's Back step is taken back, notes/10 §1). */
+export type SheetAction = { label: string; danger?: boolean; primary?: boolean; detail?: string; run: () => void; now?: boolean };
 export type ActionSheet = { title: string; sub?: string; actions: SheetAction[] };
 
 let state: ActionSheet | null = null;
@@ -24,6 +27,8 @@ export function closeActions() { close(); }
 
 export function ActionSheetHost() {
   const s = useSyncExternalStore(f => { subs.add(f); return () => { subs.delete(f); }; }, () => state, () => null);
+  // A bottom sheet holds its own Back step (notes/10 §1): the phone's Back closes it, not the screen under it.
+  const closeThen = useBackCloses(!!s, close, "crmActions");
   useEffect(() => {
     if (!s) return;
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
@@ -39,7 +44,7 @@ export function ActionSheetHost() {
         {!!s.sub && <span style={{ flex: "none", fontSize: typePx(14), color: "var(--crm-muted)", lineHeight: 1.45, marginTop: "-4px" }}>{s.sub}</span>}
         <div style={{ minHeight: 0, overflowY: "auto", scrollbarWidth: "none", display: "flex", flexDirection: "column", gap: "8px", marginTop: "6px" }}>
           {s.actions.map((a, i) => (
-            <button key={i} type="button" onClick={() => { close(); a.run(); }}
+            <button key={i} type="button" onClick={() => { if (a.now) { close(); a.run(); } else closeThen(a.run); }}
               style={a.detail
                 ? { flex: "none", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "4px", padding: "12px 16px", borderRadius: "16px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)", textAlign: "left", fontSize: typePx(15), fontWeight: 650, cursor: "pointer" }
                 : { flex: "none", height: "46px", borderRadius: "23px", border: a.primary ? 0 : "1px solid var(--crm-line)", background: a.primary ? "var(--crm-rust)" : "#fff", color: a.primary ? "#fff" : a.danger ? "var(--crm-oxblood)" : "var(--crm-ink)", fontSize: typePx(15), fontWeight: 650, cursor: "pointer" }}>

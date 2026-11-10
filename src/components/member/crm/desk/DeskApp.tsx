@@ -14,9 +14,8 @@ import { DeskReports } from "./DeskReports";
 import { DeskWorkspace } from "./DeskWorkspace";
 import { DeskLeaveCalPage } from "./DeskLeaveCal";
 import { DeskTeamActivity } from "./DeskTeamActivity";
-import { SuggestFloat } from "../shared/suggest-float";
 import { DeskTemplateFormat, DeskTemplateKind, DeskTemplateReview, WaText } from "./DeskTemplateMeta";
-import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskChannels4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInfoAudit4a, DeskInsight4a, DeskPartnerPane4a, DeskRail4a, DeskRepPick4a, DeskReplyLibrary4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a, DeskUpNext4a } from "./Desk4a";
+import { Desk4aHead, Desk4aSide, Desk4aTop, DeskAdList4a, DeskAdTabs4a, DeskAdsTable4a, DeskAudit4a, DeskBookingBar4a, DeskBookingLink4a, DeskCalFigures4a, DeskChannels4a, DeskChatMenu4a, DeskChatWait4a, DeskContactFigures4a, DeskContacts4a, DeskForm4a, DeskInboxList4a, DeskInboxSide4a, DeskInfoAudit4a, DeskInsight4a, DeskMetricPicker4a, DeskPartnerPane4a, DeskRail4a, DeskRepPick4a, DeskSettings4a, DeskShowrooms4a, DeskSplit4a, DeskUpNext4a } from "./Desk4a";
 import { DeskBook, DeskCardPicker, DeskAlerts, DeskAnalysis, DeskContactSide, DeskCustomerForm, DeskEmoji, DeskFoldRail, DeskActive, DeskAddAd, DeskLeadsByAd, DeskFormPages, DeskHistory, DeskNote, DeskPager, DeskPhoneForm, DeskPie, DeskRail } from "./DeskExtras";
 import type { DeskVM } from "./vm/app";
 
@@ -349,7 +348,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                   </div>
                 </div>
               </>)}
-              {!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLibOp) && (<DeskReplyLibrary4a v={v.replyLib} />)}{!!(v.isLinkOp) && (<DeskBookingLink4a v={v.partnerLink} />)}{!!(v.isNtfOp) && (<>
+              {!!(v.isGenOp) && (<DeskSettings4a v={v} />)}{!!(v.isLinkOp) && (<DeskBookingLink4a v={v.partnerLink} />)}{!!(v.isNtfOp) && (<>
                 <span style={{ fontSize: "15px", color: "var(--crm-muted)", marginTop: "-12px" }}>{v.ntfHead}</span>
                 <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
@@ -1760,7 +1759,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>
                   <span style={{ alignSelf: "center", padding: "0 0 6px", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{v.aw.time}</span>
                   {!!(v.aw.inn) && (<>
-                    <div style={{ alignSelf: "flex-start", maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: "14px 14px 14px 4px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}>
+                    <div style={{ alignSelf: "flex-start", maxWidth: "80%", padding: "10px 13px", boxSizing: "border-box", borderRadius: "16px 16px 16px 4px", boxShadow: "rgba(42,22,12,.08) 0 1px 1px", background: "#fff", color: "var(--crm-ink)" }}>
                       <p style={{ margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{v.aw.msg}</p>
                       <span style={{ display: "flex", justifyContent: "flex-end", marginTop: "4px", fontSize: "11px", color: "var(--crm-muted)" }}>{v.aw.clock}</span>
                     </div>
@@ -2490,17 +2489,17 @@ export default function DeskApp({ v }: { v: DeskVM }) {
               </>)}
               {!!(v.kPeople) && (<DeskContacts4a v={v} pager={<DeskPager v={v.ppPager} />} />)}
               {!!(v.kAudit) && (<DeskAudit4a v={v} />)} {!!(v.kActivity) && (<DeskTeamActivity a={v.activity} />)}{!!(v.kReports) && (<DeskReports r={v.reports} ads={v} lba={v.leadsByAd} />)}{!!(v.kWorkspace) && (<DeskWorkspace w={v.workspace} />)}{!!(v.kAdsPerf) && (<>
-                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: "6px 0 10px" }}>
+                <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", padding: v.apStrip ? "20px 0" : "6px 0 10px" }}>
                   <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.apStToggle} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    <button type="button" onClick={v.apStToggle} style={{ display: "inline-flex", alignItems: "center", gap: "7px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "8px", border: "0", background: "var(--crm-field)", font: "500 13.5px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline"><span style={{ width: "7px", height: "7px", borderRadius: "50%", background: v.apStCur.dot }}></span>{v.apStCur.label}<span style={{ color: "var(--crm-faint)" }}>{v.apStCur.n}</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.apStOpen) && (<><div onClick={v.apStToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", left: "0" }}>{(v.apStOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", gap: "10px", height: "34px", padding: "0 10px", border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}><span style={{ width: "8px", height: "8px", borderRadius: "50%", background: o.dot }}></span><span style={{ flex: "1" }}>{o.label}</span><span style={{ color: "var(--crm-faint)" }}>{o.n}</span></button>))}</div></>)}
                   </span>
                   <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.apSrcToggle} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline">{v.apSrcCur.label}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                    <button type="button" onClick={v.apSrcToggle} style={{ display: "inline-flex", alignItems: "center", gap: "7px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "8px", border: "0", background: "var(--crm-field)", font: "500 13.5px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline">{v.apSrcCur.label}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.apSrcOpen) && (<><div onClick={v.apSrcToggle} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}></div><div style={{ position: "absolute", top: "42px", zIndex: "8", minWidth: "200px", padding: "6px", boxSizing: "border-box", background: "#fff", borderRadius: "10px", boxShadow: "0 14px 36px rgba(42,22,12,.18)", display: "flex", flexDirection: "column", left: "0" }}>{(v.apSrcOpts).map((o, o_i) => (<button key={o_i} type="button" onClick={o.pick} style={{ display: "flex", alignItems: "center", flex: "none", whiteSpace: "nowrap", height: "34px", padding: "0 10px", paddingLeft: o.pad, border: "0", borderRadius: "7px", background: o.bg, font: "500 13px Inter, sans-serif", fontWeight: o.w, color: "var(--crm-ink)", cursor: "pointer", textAlign: "left" }}>{o.label}</button>))}</div></>)}
                   </span>
-                  <span style={{ position: "relative" }}>
-                    <button type="button" onClick={v.dpOpen} style={{ display: "inline-flex", alignItems: "center", gap: "8px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "7px", border: "1px solid var(--crm-line)", background: "transparent", font: "500 13px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline">{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                  {!(v.apInIns) && (<span style={{ position: "relative" }}>
+                    <button type="button" onClick={v.dpOpen} style={{ display: "inline-flex", alignItems: "center", gap: "7px", height: "34px", padding: "0 12px", boxSizing: "border-box", borderRadius: "8px", border: "0", background: "var(--crm-field)", font: "500 13.5px Inter, sans-serif", color: "var(--crm-ink)", cursor: "pointer", whiteSpace: "nowrap" }} className="crm4a-outline">{v.apRangeLabel}{!!(v.apCmpOn) && (<span style={{ color: "var(--crm-rust)" }}>{v.apCmpLabel}</span>)}<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"></path></svg></button>
                     {!!(v.dp.open) && (<>
                       <div onClick={v.dpCancel} style={{ position: "fixed", inset: "-2000px", zIndex: "7" }}>
                       </div>
@@ -2581,7 +2580,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         </div>
                       </div>
                     </>)}
-                  </span>
+                  </span>)}
                 </div>
                 {!!(v.apCmpOn) && (<>
                   <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", gap: "18px", fontSize: "13px", fontWeight: "650" }}>
@@ -2624,50 +2623,16 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                 </div>
               </>)}
               {!!(v.paneFull) && (<>
-                <div style={{ flex: "0 0 62px", height: "62px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "12px", padding: "0 22px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>
+                <div style={{ flex: "0 0 65px", height: "65px", boxSizing: "border-box", display: "flex", alignItems: "center", gap: "12px", padding: "0 20px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>
                   {!!(v.ph.avatar) && (<>
-                    <span style={{ flex: "0 0 auto", width: "36px", height: "36px", borderRadius: "50%", display: "grid", placeItems: "center", font: "500 12px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", background: v.ph.avBg ?? "var(--crm-cream)", color: v.ph.avFg ?? "var(--crm-ink)" }}>{v.ph.avatar}</span>
+                    <span style={{ flex: "0 0 auto", width: "38px", height: "38px", borderRadius: "50%", display: "grid", placeItems: "center", font: "500 13px var(--font-display-rv), 'Inter Tight', Inter, sans-serif", background: v.ph.avBg ?? "var(--crm-cream)", color: v.ph.avFg ?? "var(--crm-ink)" }}>{v.ph.avatar}</span>
                   </>)}
                   <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px" }}>
-                    <strong style={{ font: "500 15px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.title}</strong>
+                    <strong style={{ font: "600 15px Inter, sans-serif", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.title}</strong>
                     <span style={{ font: "400 12px Inter, sans-serif", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.ph.sub}</span>
                   </span>
-                  {!!(v.ph.status) && (<span style={{ flex: "0 0 auto", font: "600 12px Inter, sans-serif", color: v.ph.statusColor, whiteSpace: "nowrap" }}>{v.ph.status}</span>)}
-                  {!!(v.ph.menu) && (<>
-                    <span style={{ position: "relative", flex: "0 0 auto" }}>
-                      <button type="button" onClick={v.toggleMenu} title="More" style={{ width: "34px", height: "34px", borderRadius: "50%", border: "1px solid var(--crm-line)", background: v.menuBtnBg, display: "grid", placeItems: "center", boxSizing: "border-box", cursor: "pointer" }} className={DH.h8}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--crm-ink)">
-                          <circle cx="12" cy="5" r="1.8">
-                          </circle>
-                          <circle cx="12" cy="12" r="1.8">
-                          </circle>
-                          <circle cx="12" cy="19" r="1.8">
-                          </circle>
-                        </svg>
-                      </button>
-                      {!!(v.menuOpen) && (<>
-                        <div onClick={v.closeMenu} style={{ position: "fixed", inset: "-2000px", zIndex: "7", background: "transparent" }}>
-                        </div>
-                        <div style={{ position: "absolute", top: "40px", right: "0", zIndex: "8", width: "240px", padding: "6px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-rule)", borderRadius: "16px", boxShadow: "0 10px 28px rgba(42,22,12,.16)", display: "flex", flexDirection: "column" }}>
-                          {(v.chatMenuItems).map((o, o_i) => (<Fragment key={o_i}>
-                            {!!(o.sep) && (<>
-                              <span style={{ height: "1px", margin: "4px 10px", background: "var(--crm-field)" }}>
-                              </span>
-                            </>)}
-                            <button type="button" onClick={o.run} style={{ display: "flex", alignItems: "center", gap: "14px", minHeight: "42px", padding: "4px 12px", border: "0", borderRadius: "10px", background: "transparent", font: "inherit", fontSize: "14px", fontWeight: "550", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className={DH.h8}>
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={o.c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 20px" }}>
-                                <path d={o.d}>
-                                </path>
-                              </svg>
-                              <span style={{ flex: "1", display: "flex", flexDirection: "column", gap: "1px" }}>{o.label}{!!(o.sub) && (<>
-                                  <span style={{ fontSize: "12px", fontWeight: "500", color: "var(--crm-muted)" }}>{o.sub}</span>
-                                </>)}</span>
-                            </button>
-                          </Fragment>))}
-                        </div>
-                      </>)}
-                    </span>
-                  </>)}
+                  <DeskChatWait4a ph={v.ph} />
+                  {!!(v.ph.menu) && (<DeskChatMenu4a v={v} />)}
                   {!!(!v.ibCols || !v.kChat) && (<button type="button" onClick={v.closePane} title="Close (Esc)" style={{ width: "34px", height: "34px", boxSizing: "border-box", borderRadius: "50%", border: "1px solid var(--crm-rule)", background: "#fff", display: "grid", placeItems: "center", cursor: "pointer", color: "var(--crm-ink)" }} className={DH.h8}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M18 6 6 18M6 6l12 12">
@@ -2689,7 +2654,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </svg>{v.backPersonLabel}</button>
                   </>)}
                   
-                  <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", padding: "20px 24px 104px", backgroundColor: "var(--crm-field)" }}>
+                  <div style={{ flex: "1", minHeight: "0", overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", padding: v.chatPadB, backgroundColor: "var(--crm-field)" }}>
                     {!!(v.firstDay) && (<><span style={{ alignSelf: "center", padding: "0 0 6px", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{v.firstDay}</span></>)}{!!(v.pinShown) && (<>
                       <div style={{ position: "sticky", top: "-10px", zIndex: "3", margin: "-10px -20px 0", display: "flex", alignItems: "center", gap: "10px", padding: "8px 20px", background: "#fff", borderBottom: "1px solid var(--crm-rule)" }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-rust)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2704,7 +2669,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     </Fragment>))}
                     {(v.msgs).map((m, m_i) => (<Fragment key={m.key}>{!!(m.day) && (<><span style={{ alignSelf: "center", padding: "0 0 6px", font: "500 11px Inter, sans-serif", letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--crm-faint)" }}>{m.day}</span></>)}{!!(m.sys) && (<><span style={{ alignSelf: "center", maxWidth: "86%", padding: "6px 12px", borderRadius: "10px", background: "rgba(107,100,90,.12)", color: "var(--crm-ink-soft)", fontSize: "12px", fontWeight: "600", textAlign: "center" }}>{m.sys}</span></>)}{!!(m.inn) && (<>
                         <div onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ position: "relative", alignSelf: "flex-start", maxWidth: "80%", marginBottom: m.rxGap }}>
-                          <div data-msg={m.id} style={{ display: "flow-root", padding: m.pad, boxSizing: "border-box", borderRadius: "14px 14px 14px 4px", border: "1px solid var(--crm-line)", background: "#fff", color: "var(--crm-ink)" }}>
+                          <div data-msg={m.id} style={{ display: "flow-root", padding: m.pad, boxSizing: "border-box", borderRadius: "16px 16px 16px 4px", boxShadow: "rgba(42,22,12,.08) 0 1px 1px", background: "#fff", color: "var(--crm-ink)" }}>
                             {!!(m.quote) && (<span style={{ display: "flex", flexDirection: "column", gap: "1px", margin: m.quoteMargin, padding: "6px 10px", borderRadius: "10px", borderLeft: "3px solid var(--crm-rust)", background: "rgba(42,22,12,.06)" }}><strong style={{ fontSize: "12px", fontWeight: "650", color: "var(--crm-rust)" }}>{m.quote.who}</strong><span style={{ fontSize: "13px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.quote.text}</span></span>)}{!!(m.call) && (<CallCard c={m.call} />)}{!!(m.album.length) && (<MediaAlbum items={m.album} more={m.albumMore} />)}{!!(m.img) && (<ChatImg onClick={m.view} onLoad={m.shape} src={m.img} style={{ display: "block", width: "240px", maxWidth: "100%", height: m.mh, objectFit: "cover", borderRadius: "13px", background: "rgba(42,22,12,.08)", cursor: "zoom-in" }} />)}{!!(m.vid) && (<span onClick={m.view} style={{ position: "relative", display: "block", width: "240px", maxWidth: "100%", height: m.mh, borderRadius: "13px", overflow: "hidden", background: "#000", cursor: "pointer" }}><ChatVideo src={m.vidSrc} base={m.vid} onLoadedMetadata={m.shape} style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /><span style={{ position: "absolute", left: "50%", top: "50%", width: "52px", height: "52px", margin: "-26px 0 0 -26px", borderRadius: "26px", background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg></span></span>)}{!!(m.aud) && (<VoiceNote src={m.aud} mine={m.voiceMine} />)}{!!(m.file && m.isPdf) && (<PdfCard src={m.file} name={m.docName} onOpen={m.view} />)}{!!(m.file && !m.isPdf) && (<span onClick={m.view} style={{ display: "flex", alignItems: "center", gap: "10px", width: "250px", maxWidth: "100%", padding: "10px", boxSizing: "border-box", borderRadius: "12px", background: "var(--crm-page)", cursor: "pointer" }}><span style={{ flex: "none", width: "34px", height: "40px", borderRadius: "5px", background: "var(--crm-oxblood)", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700", letterSpacing: ".02em" }}>{m.docType}</span><span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}><strong style={{ fontSize: "14px", fontWeight: "600", lineHeight: "1.3", color: "var(--crm-ink)", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.docName}</strong><small style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{m.docType}</small></span></span>)}{!!(m.text) && (<p style={{ display: m.pShow, padding: m.inPad, margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>)}
                             <span style={{ display: m.tDisp, float: m.tFloat, marginLeft: m.tML, marginBottom: m.tMB, alignItems: "center", justifyContent: "flex-end", gap: "3px", marginTop: m.timeTop, padding: m.inPad, fontSize: "11px", color: "var(--crm-muted)" }}>{!!(m.starred) && (<>
                                 <span style={{ color: "var(--crm-brown)", fontSize: "12px" }}>★</span>
@@ -2741,7 +2706,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         </div>
                       </>)}{!!(m.out) && (<>
                         <div onMouseEnter={m.enter} onMouseLeave={m.leave} style={{ position: "relative", alignSelf: "flex-end", maxWidth: "80%", marginBottom: m.rxGap }}>
-                          <div data-msg={m.id} style={{ display: "flow-root", padding: m.pad, boxSizing: "border-box", borderRadius: "14px 14px 4px 14px", border: `1px solid ${m.outBg ?? "var(--crm-tint-attention)"}`, background: m.outBg ?? "var(--crm-tint-attention)", color: m.outFg ?? "var(--crm-ink)" }}>
+                          <div data-msg={m.id} style={{ display: "flow-root", padding: m.pad, boxSizing: "border-box", borderRadius: "16px 16px 4px 16px", boxShadow: "rgba(42,22,12,.08) 0 1px 1px", background: m.outBg ?? "var(--crm-tint-attention)", color: m.outFg ?? "var(--crm-ink)" }}>
                             {!!(m.quote) && (<span style={{ display: "flex", flexDirection: "column", gap: "1px", margin: m.quoteMargin, padding: "6px 10px", borderRadius: "10px", borderLeft: m.outBg ? "3px solid #fff" : "3px solid var(--crm-rust)", background: m.outBg ? "rgba(255,255,255,.18)" : "rgba(42,22,12,.06)" }}><strong style={{ fontSize: "12px", fontWeight: "650", color: m.outBg ? "#fff" : "var(--crm-rust)" }}>{m.quote.who}</strong><span style={{ fontSize: "13px", color: m.outBg ? "rgba(255,255,255,.9)" : "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.quote.text}</span></span>)}{!!(m.call) && (<CallCard c={m.call} />)}{!!(m.album.length) && (<MediaAlbum items={m.album} more={m.albumMore} />)}{!!(m.img) && (<ChatImg onClick={m.view} onLoad={m.shape} src={m.img} style={{ display: "block", width: "240px", maxWidth: "100%", height: m.mh, objectFit: "cover", borderRadius: "13px", background: "rgba(42,22,12,.08)", cursor: "zoom-in" }} />)}{!!(m.vid) && (<span onClick={m.view} style={{ position: "relative", display: "block", width: "240px", maxWidth: "100%", height: m.mh, borderRadius: "13px", overflow: "hidden", background: "#000", cursor: "pointer" }}><ChatVideo src={m.vidSrc} base={m.vid} onLoadedMetadata={m.shape} style={{ display: "block", width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /><span style={{ position: "absolute", left: "50%", top: "50%", width: "52px", height: "52px", margin: "-26px 0 0 -26px", borderRadius: "26px", background: "rgba(0,0,0,.45)", display: "grid", placeItems: "center" }}><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg></span></span>)}{!!(m.aud) && (<VoiceNote src={m.aud} mine={m.voiceMine} />)}{!!(m.file && m.isPdf) && (<PdfCard src={m.file} name={m.docName} onOpen={m.view} />)}{!!(m.file && !m.isPdf) && (<span onClick={m.view} style={{ display: "flex", alignItems: "center", gap: "10px", width: "250px", maxWidth: "100%", padding: "10px", boxSizing: "border-box", borderRadius: "12px", background: "var(--crm-page)", cursor: "pointer" }}><span style={{ flex: "none", width: "34px", height: "40px", borderRadius: "5px", background: "var(--crm-oxblood)", color: "#fff", display: "grid", placeItems: "center", fontSize: "10px", fontWeight: "700", letterSpacing: ".02em" }}>{m.docType}</span><span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}><strong style={{ fontSize: "14px", fontWeight: "600", lineHeight: "1.3", color: "var(--crm-ink)", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: "2", WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.docName}</strong><small style={{ fontSize: "12px", color: "var(--crm-muted)" }}>{m.docType}</small></span></span>)}{!!(m.text) && (<p style={{ display: m.pShow, padding: m.inPad, margin: "0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", fontSize: "14px", lineHeight: "1.45" }}>{m.text}</p>)}
                             <span style={{ display: m.tDisp, float: m.tFloat, marginLeft: m.tML, marginBottom: m.tMB, alignItems: "center", justifyContent: "flex-end", gap: "3px", marginTop: m.timeTop, padding: m.inPad, fontSize: "11px", color: m.outTime ?? "var(--crm-muted)" }}>{!!(m.starred) && (<>
                                 <span style={{ color: "var(--crm-brown)", fontSize: "12px" }}>★</span>
@@ -2791,7 +2756,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     </>)}</Fragment>))}<span data-chat-end="1" style={{ display: "none" }}></span>
                   </div>
                   {!!(v.replyOn) && (<>
-                    <div style={{ position: "absolute", left: "24px", right: "24px", bottom: "82px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "12px", boxShadow: "0 6px 20px rgba(42,22,12,.08)" }}>
+                    <div style={{ position: "absolute", left: "24px", right: "24px", bottom: v.replyBottom, zIndex: "3", display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", background: "#fff", border: "1px solid var(--crm-line)", borderRadius: "12px", boxShadow: "0 6px 20px rgba(42,22,12,.08)" }}>
                       <span style={{ flex: "1", minWidth: "0", display: "flex", flexDirection: "column", gap: "1px", paddingLeft: "10px", borderLeft: "3px solid var(--crm-rust)" }}>
                         <strong style={{ fontSize: "12px", fontWeight: "650", color: "var(--crm-rust)" }}>{v.replyWho}</strong>
                         <span style={{ fontSize: "13px", color: "var(--crm-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.replyText}</span>
@@ -2804,7 +2769,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                       </button>
                     </div>
                   </>)}
-                  {v.fbBlocked ? (<div data-fb-blocked="" style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", height: "50px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 18px", borderRadius: "25px", background: "var(--crm-field)", border: "1px solid var(--crm-line)", font: "500 14px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.fbBlockedNote}</div>) : (<>{v.suggest && <SuggestFloat key={v.suggestKey} list={v.suggest} pick={v.pickSuggest} library={v.suggestLib} showLogo={v.suggestLogo && !!v.suggest.length && !v.draft} desk />}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
+                  {v.fbBlocked ? (<div data-fb-blocked="" style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", height: "50px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 18px", borderRadius: "25px", background: "var(--crm-field)", border: "1px solid var(--crm-line)", font: "500 14px Inter, sans-serif", color: "var(--crm-muted)" }}>{v.fbBlockedNote}</div>) : (<>{!!(v.waShut) && (<div data-wa-cold="" style={{ position: "absolute", left: "24px", right: "24px", bottom: "80px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px", padding: "10px 10px 10px 14px", borderRadius: "16px", background: "var(--crm-tint-attention)", color: "var(--crm-oxblood)" }}><svg style={{ flex: "0 0 auto" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={v.alertIcon}></path></svg><span style={{ flex: "1", minWidth: "0", font: "500 13px/1.4 Inter, sans-serif" }}>{v.warnText}</span>{!!(v.warnBtn) && (<button type="button" onClick={v.openTpl} style={{ flex: "0 0 auto", height: "36px", padding: "0 12px", border: "0", borderRadius: "18px", display: "flex", alignItems: "center", font: "500 13px Inter, sans-serif", background: "var(--crm-rust)", color: "#fff", cursor: "pointer" }}>Template</button>)}</div>)}<div style={{ position: "absolute", left: "24px", right: "24px", bottom: "22px", zIndex: "3", display: "flex", alignItems: "center", gap: "10px" }}>
                     <div style={{ flex: "1", minWidth: "0", height: "50px", borderRadius: "25px", display: "flex", alignItems: "center", gap: "16px", padding: "0 18px", boxSizing: "border-box", background: "#fff", border: "1px solid var(--crm-line)", boxShadow: "0 6px 20px rgba(42,22,12,.08)", color: "var(--crm-muted)" }}>
                       <span title="Emoji" onClick={v.emojiToggle} style={{ position: "relative", flex: "0 0 auto", display: "grid", placeItems: "center", color: v.emojiFg, cursor: "pointer" }}>
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" x2="9.01" y1="9" y2="9"></line><line x1="15" x2="15.01" y1="9" y2="9"></line></svg>{!!(v.emojiOpen) && (<DeskEmoji v={v.emoji} />)}
@@ -2829,7 +2794,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                         <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
                       </span>
                     </div>
-                    <span title={v.sendTitle} onClick={v.send} style={{ flex: "0 0 auto", width: "50px", height: "50px", borderRadius: "50%", background: "var(--crm-rust)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer", boxShadow: "0 6px 20px rgba(42,22,12,.15)" }} className="crm4a-primary">
+                    <span title={v.sendTitle} onClick={v.send} style={{ flex: "0 0 auto", width: "50px", height: "50px", borderRadius: "50%", background: v.sendBg, color: "#fff", display: "grid", placeItems: "center", cursor: v.sendCursor, boxShadow: v.sendSh }} className={v.sendCls}>
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={v.micD}></path></svg>
                     </span>
                   </div></>)}
@@ -2947,87 +2912,7 @@ export default function DeskApp({ v }: { v: DeskVM }) {
                     </>)}
                   </div>
                 </>)}
-                {!!(v.kMetrics) && (<>
-                  <div style={{ flex: "0 0 auto", padding: "14px 18px", background: "#fff", borderBottom: "1px solid var(--crm-field)" }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: "8px", height: "40px", padding: "0 12px", border: "1px solid var(--crm-line)", borderRadius: "10px" }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3">
-                        </path>
-                      </svg>
-                      <input type="text" value={v.mq} onChange={v.setMq} placeholder="Search metrics" style={{ flex: "1", minWidth: "0", border: "0", outline: "none", font: "inherit", fontSize: "14px", color: "var(--crm-ink)", background: "transparent" }} />
-                    </span>
-                  </div>
-                  <div style={{ flex: "1", minHeight: "0", overflow: "auto", background: "#fff", padding: "6px 10px 12px" }}>
-                    <button type="button" onClick={v.mOrdFold} style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", marginTop: "6px", padding: "10px 8px", border: "0", background: "transparent", font: "inherit", textAlign: "left", cursor: "pointer" }} className={DH.h4}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: `rotate(${v.mOrdRot}deg)`, transition: "transform .15s" }}>
-                        <path d="m6 9 6 6 6-6">
-                        </path>
-                      </svg>
-                      <strong style={{ flex: "1", fontSize: "13px", fontWeight: "700", color: "var(--crm-ink)" }}>Column order</strong>
-                      <span style={{ fontSize: "11.5px", color: "var(--crm-muted)" }}>Drag to reorder</span>
-                    </button>
-                    {!!(v.mOrdOpen) && (<>
-                      <div style={{ display: "flex", flexDirection: "column", margin: "0 8px 8px", border: "1px solid var(--crm-rule)", borderRadius: "12px", padding: "4px" }}>
-                        {(v.mOrder).map((o, o_i) => (<Fragment key={o_i}>
-                          <div draggable="true" onDragStart={o.dStart} onDragOver={o.dOver} onDrop={o.dDrop} onDragEnd={o.dEnd} style={{ position: "relative", zIndex: o.z, display: "flex", alignItems: "center", gap: "12px", height: "44px", padding: "0 8px 0 10px", borderBottom: `1px solid ${o.bd}`, background: o.bg, boxShadow: o.sh, borderRadius: "6px", cursor: "grab" }} className={DH.h4}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--crm-ink-soft)" strokeWidth="2.2" strokeLinecap="round">
-                              <path d="M5 9h14M5 15h14">
-                              </path>
-                            </svg>
-                            <span style={{ flex: "1", minWidth: "0", fontSize: "14px", fontWeight: "600", color: "var(--crm-ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o.label}</span>
-                            <button type="button" onClick={o.rm} title="Remove" style={{ width: "30px", height: "30px", border: "0", borderRadius: "50%", background: "transparent", display: "grid", placeItems: "center", cursor: "pointer" }} className={DH.h3}>
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--crm-ink-soft)" strokeWidth="1.8" strokeLinecap="round">
-                                <circle cx="12" cy="12" r="9">
-                                </circle>
-                                <path d="m9 9 6 6M15 9l-6 6">
-                                </path>
-                              </svg>
-                            </button>
-                          </div>
-                        </Fragment>))}
-                      </div>
-                    </>)}
-                    <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 8px 0" }}>
-                      <button type="button" onClick={v.mFoldAll} style={{ height: "28px", padding: "0 8px", border: "0", borderRadius: "8px", background: "transparent", font: "inherit", fontSize: "12.5px", fontWeight: "650", color: "var(--crm-rust)", cursor: "pointer" }} className={DH.h8}>{v.mFoldAllLabel}</button>
-                    </div>
-                    {(v.mGroups).map((g, g_i) => (<Fragment key={g_i}>
-                      <button type="button" onClick={g.fold} style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", marginTop: "6px", padding: "10px 8px", border: "0", borderTop: "1px solid var(--crm-field)", background: "transparent", font: "inherit", textAlign: "left", cursor: "pointer" }} className={DH.h4}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--crm-muted)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ flex: "0 0 auto", transform: `rotate(${g.rot}deg)`, transition: "transform .15s" }}>
-                          <path d="m6 9 6 6 6-6">
-                          </path>
-                        </svg>
-                        <strong style={{ flex: "1", fontSize: "13px", fontWeight: "700", color: "var(--crm-ink)" }}>{g.label}</strong>
-                        <span style={{ fontSize: "11.5px", fontWeight: "600", color: "var(--crm-muted)" }}>{g.nSel}</span>
-                        <span style={{ fontSize: "11.5px", color: "var(--crm-faint)" }}>· {g.src}</span>
-                      </button>
-                      {!!(g.open) && (<>
-                        {(g.items).map((m, m_i) => (<Fragment key={m_i}>
-                          <button type="button" onClick={m.toggle} style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", minHeight: "40px", padding: "4px 8px", border: "0", borderRadius: "9px", background: "transparent", font: "inherit", color: "var(--crm-ink)", textAlign: "left", cursor: "pointer" }} className={DH.h8}>
-                            <span style={{ flex: "0 0 20px", width: "20px", height: "20px", boxSizing: "border-box", borderRadius: "6px", border: `1.5px solid ${m.bd}`, background: m.bg, display: "grid", placeItems: "center" }}>
-                              {!!(m.on) && (<>
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="m5 12 5 5 9-10">
-                                  </path>
-                                </svg>
-                              </>)}
-                            </span>
-                            <span style={{ flex: "1", display: "flex", flexDirection: "column" }}>
-                              <span style={{ fontSize: "14px", fontWeight: "600" }}>{m.label}</span>
-                              <span style={{ fontSize: "11.5px", color: "var(--crm-muted)" }}>{m.hint}</span>
-                            </span>
-                          </button>
-                        </Fragment>))}
-                      </>)}
-                    </Fragment>))}
-                  </div>
-                  <div style={{ flex: "0 0 auto", display: "flex", gap: "10px", padding: "14px 18px", borderTop: "1px solid var(--crm-rule)", background: "#fff" }}>
-                    <button type="button" onClick={v.resetMetrics} style={{ flex: "1", height: "44px", borderRadius: "22px", border: "1px solid var(--crm-line)", background: "#fff", font: "inherit", fontSize: "15px", fontWeight: "650", color: "var(--crm-ink)", cursor: "pointer" }}>Reset</button>
-                    <button type="button" onClick={v.saveMetrics} style={{ flex: "1", height: "44px", borderRadius: "22px", border: "0", background: "var(--crm-rust)", font: "inherit", fontSize: "15px", fontWeight: "650", color: "#fff", cursor: "pointer" }} className={DH.h26}>Save</button>
-                  </div>
-                  {!!(v.mDirty) && (<>
-                    <span style={{ flex: "0 0 auto", padding: "0 18px 12px", fontSize: "12.5px", color: "var(--crm-brown)", textAlign: "center", background: "#fff" }}>Unsaved changes · the table updates when you save</span>
-                  </>)}
-                </>)}
+                {!!(v.kMetrics) && (<DeskMetricPicker4a v={v} />)}
                 {!!(v.kClist) && (<>
                   <div style={{ flex: "0 0 auto", position: "relative", zIndex: "5", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "10px 18px", borderBottom: "1px solid var(--crm-rule)", background: "var(--crm-cream-nav)" }}>
                     <span style={{ fontSize: "13px", color: "var(--crm-muted)" }}>{v.clistN}</span>

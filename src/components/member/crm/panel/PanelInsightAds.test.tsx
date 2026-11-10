@@ -15,15 +15,15 @@ describe("Team Insight's Ads performance side", () => {
     render(<CrmApp live={false} salesperson="You" onExit={() => {}} />);
     await act(async () => {});
     expect(screen.getByRole("heading", { name: "Hello, Principal" })).toBeInTheDocument();
-    expect(screen.getByText("Team performance", { selector: "h2" })).toBeInTheDocument();
+    expect(screen.getByText("Teams", { selector: "h2" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Ads performance" }));
     await act(async () => {});
     expect(screen.getByRole("heading", { name: "Hello, Principal" })).toBeInTheDocument();
-    expect(screen.queryByText("Team performance", { selector: "h2" })).toBeNull();
+    expect(screen.queryByText("Teams", { selector: "h2" })).toBeNull();
     expect(screen.getByRole("button", { name: "Ads performance" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.queryByRole("heading", { name: "Ads Performance" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Team performance" }));
     await act(async () => {});
-    expect(screen.getByText("Team performance", { selector: "h2" })).toBeInTheDocument();
+    expect(screen.getByText("Teams", { selector: "h2" })).toBeInTheDocument();
   });
 });

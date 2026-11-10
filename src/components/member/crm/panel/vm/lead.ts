@@ -12,7 +12,8 @@ import { customBookVM, customPrefill } from "../../shared/custom-book";
 import { DEFAULT_QUICK_REPLIES, type CrmChatMessage, type CrmCustomer } from "@/lib/member/crm-data";
 import { chatStripOf, coldLine, DAY, day0, dayLabel, daySep, gb, msgTime, timeLabel, windowShut } from "../../sales/vm/common";
 import { avatarTint } from "../../shared/palette";
-import { failNote, quietFailure, roomClosed, roomSlots, slotAt, slotBlocked } from "../../sales/vm/chat";
+import { failNote, quietFailure, roomClosed, roomSlots, shownStatus, slotAt, slotBlocked } from "../../sales/vm/chat";
+import { LABEL_ICON, labelSheetVM, labelSub, type ChatLabelSheet } from "../../shared/label-sheet";
 import { bookingSkipsForm, infoRows } from "../../sales/vm/customer";
 import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
@@ -25,9 +26,8 @@ import { albumsOf, galleryOf, INLINE_TIME, MINE_BG, MINE_TIME, mediaOf, mediaWor
 import { focusDraft, MENU_ICON, openMsgMenu, openStarred, pressToOpen } from "../../shared/msg-menu";
 import { autoChoices, openAttach } from "../../shared/attach-sheet";
 import { forwardChats, messageInfo } from "../../shared/msg-info";
-import { actionsOnScreen, closeActions, openActions, type ActionSheet } from "../../shared/action-sheet";
-import { fillWithFor, libraryFor, suggestReplies, waitingWords } from "../../shared/suggest-reply";
-import { openSuggest } from "../../shared/suggest-float";
+import { openActions } from "../../shared/action-sheet";
+import { openColdTemplates } from "../../shared/cold-templates";
 import { isFbBlocked } from "../../shared/fb-blocked";
 
 /** The voice note's on-screen clock (one recording at a time; shared/voice.ts holds the recorder). */
@@ -106,7 +106,8 @@ export function leadVM(ctx: PanelCtx) {
           { label: "Delete for me", icon: MENU_ICON.del, danger: true, run: () => void ctx.act.hideMessage(m.id) },
         ],
       }), () => { patch({ pReply: { chat: c?.id ?? "", msgId: m.id, who: mine ? "You" : c?.name ?? "", text: m.text || mediaWord(m) } }); focusDraft(); }) },
-      tickC: tickColor(m.status), tickPath: tickPathOf(m.status),
+      // A Messenger send refused past the window is drawn as sent until Human Agent (notes/12 — shownStatus).
+      tickC: tickColor(shownStatus(m)), tickPath: tickPathOf(shownStatus(m)),
       // Not delivered says why under it, as in Mine's chat (2026-10-17 — the owner: two videos WhatsApp refused showed
       // in the Team chat as sent; only Mine's said so).
       failNote: mine && m.status === "failed" && !quietFailure(m.status, m.error) ? failNote(m.error) : "",
@@ -116,7 +117,7 @@ export function leadVM(ctx: PanelCtx) {
       ...visitCard(m.card), pDisp: !md && !m.card && m.text ? "inline" : m.card || (mk === "file" && (!m.text || m.text === md?.name)) || (shows && !m.text) ? "none" : "block" };
   });
   return {
-    onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pReply: null, pCmp: null, pPick: null, toast: "", pMenu: false, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
+    onLead: on, toast: ui.toast, stop, back: () => patch({ lead: null, pReply: null, pCmp: null, pPick: null, toast: "", pMenu: false, pLabel: null, pInfo: false, pForm: null, pBook: null, reSheet: false, pick: "" }),
     ld: {
       // 4a (M04 / change list 18): the customer's tint, "ad · channel", the status strip.
       avBg: avatarTint(c?.name ?? "")[0], avFg: avatarTint(c?.name ?? "")[1], sub: [c?.ad, c ? (c.channel === "messenger" ? "Messenger" : "WhatsApp") : ""].filter(Boolean).join(" · "),
@@ -205,26 +206,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
   // (closed, it stays closed: a template is never offered over another chat).
   const shut = !!c && windowShut(c, now);
   const fbBlocked = !!c && isFbBlocked(c, ctx.data);
-  const openTpl = async () => {
-    if (!c) return;
-    const name = first(c.name), id = c.id;
-    if (c.channel === "messenger") { openActions({ title: "Messenger has no templates", sub: "After 7 days Messenger allows no message from the Page. Call the customer instead.", actions: [{ label: "Close", run: NONE }] }); return; }
-    const reading: ActionSheet = { title: "Send template message", sub: "Reading the templates you may send.", actions: [{ label: "Close", run: NONE }] };
-    openActions(reading);
-    const tpls = await act.loadTemplates();
-    if (actionsOnScreen() !== reading) return;
-    // The read failed: its toast says why.
-    if (!tpls) { closeActions(); return; }
-    if (!tpls.length) { openActions({ title: "No templates switched on", sub: "Switch approved templates on in Profile › Cold lead templates.", actions: [{ label: "Close", run: NONE }] }); return; }
-    openActions({ title: "Send template message", sub: `Only template messages reach ${name} until they write again.`, actions: [
-      ...tpls.map(t => {
-        const params = Array.from({ length: t.params }, (_, i) => (i === 0 ? name : ""));
-        return { label: t.label ?? t.name.replace(/_/g, " ").replace(/^\w/, x => x.toUpperCase()), detail: t.text.replace(/\{\{\s*(\d+)\s*\}\}/g, (_, n) => params[Number(n) - 1] || "…"),
-          run: () => { void oneAtATime(`send:${id}:${t.name}`, () => act.sendTemplate(id, t, params)); } };
-      }),
-      { label: "Close", run: NONE },
-    ] });
-  };
+  const openTpl = async () => { if (c) await openColdTemplates(c, act); };
   // "/" in the reply box lists one's quick replies, as Mine's (the ones saved in Mine › Profile, the design's set until then).
   const qrs = data.quickReplies.length ? data.quickReplies : DEFAULT_QUICK_REPLIES.map((q, i) => ({ id: "d" + i, ...q }));
   const slash = /^\/(\S*)$/.exec(draft), sq = slash ? slash[1].toLowerCase() : "";
@@ -235,17 +217,19 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     if (label === "Photos") document.getElementById("crm-panel-photo")?.click();
     else if (label === "Document") document.getElementById("crm-panel-file")?.click();
     else if (label === "Quick replies") openAttach({ ...textChoices, view: "quick" });
-    else openSuggest();
+    // Auto replies (notes/09, CRM v4 — back in tile 4 as before 2026-10-29): one's saved welcome / after-hours / keyword
+    // replies, into the reply box to send by hand.
+    else openAttach({ ...textChoices, view: "auto" });
   };
   const setCmp = (f: (s: ComposerState) => ComposerState) => set(u => ({ ...u, pCmp: { ...f(composerOf(u.pCmp, cid) ?? initialComposer()), chat: cid } }));
   // The composer (the chat composer handoff — sales/ChatComposer.tsx), Mine's exactly; its words this chat's draft.
   const cmp: ComposerIn = {
     key: cid, state: composerOf(ui.pCmp, cid) ?? initialComposer(), set: setCmp,
     placeholder: c ? `Reply to ${first(c.name)}…` : "", draft, setDraft, canSend: has, send: () => void send(),
-    warm: !fbBlocked, blocked: fbBlocked, openTpl: () => void openTpl(), tplOn: ctx.data.settings?.suggestTemplate !== false, coldSub: c ? coldLine(c, now) : "",
+    warm: !fbBlocked, blocked: fbBlocked, blockedWho: c ? first(c.name) : "", openTpl: () => void openTpl(), tplOn: ctx.data.settings?.suggestTemplate !== false, coldSub: c ? coldLine(c, now) : "",
     coldTile: !!c && shut && c.channel === "whatsapp" && ctx.data.settings?.suggestTemplate !== false,
-    suggest: c && !shut && !fbBlocked ? suggestReplies(c, ctx.data.replyExamples ?? [], ctx.data.quickReplies, 3, { library: ctx.data.replyLibrary, ...fillWithFor(ctx.data, c, ctx.me.name, now) }) : undefined, suggestLogo: !!c && !!waitingWords(c),
-    suggestLibrary: c && !shut && !fbBlocked ? libraryFor(c, ctx.data.replyLibrary, fillWithFor(ctx.data, c, ctx.me.name, now)) : undefined,
+    // A WhatsApp chat past its window (notes/11, CRM v4): the warning row over the bar, Send and the mic grey.
+    waShut: c && shut && c.channel === "whatsapp" && !fbBlocked ? first(c.name) : undefined,
     reply: reply ? { who: reply.who, text: reply.text } : null, cancelReply: () => patch({ pReply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()) } : null,
@@ -340,9 +324,15 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
       ...(ctx.assign === "any" || assignees(ctx, c).length ? [{ label: "Assign to", icon: "M17 3l4 4-4 4M3 7h18M7 21l-4-4 4-4M21 17H3", bg: "var(--crm-tint-cold)", fg: "var(--crm-ink-soft)", go: () => patch({ pMenu: false, reSheet: true }) }] : []),
       { label: "Customer info", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0", bg: "var(--crm-tint-follow)", fg: "var(--crm-brown)", go: () => patch({ pMenu: false, pInfo: true }) },
       { label: "Appointment", icon: "M5 5h14v16H5V5Zm3-3v6m8-6v6M5 11h14", bg: "var(--crm-tint-new)", fg: "var(--crm-ink-soft)", go: appointment },
+      // Label (v4 notes/15, frame 11a): the chat’s labels, or "Add a label"; the Label sheet over the chat.
+      ...(c ? [{ label: "Label", icon: LABEL_ICON, sub: labelSub(data, c.id), bg: "var(--crm-tint-appt)", fg: "var(--crm-text-appt)", go: () => patch({ pMenu: false, pLabel: { view: "labels", form: null } }) }] : []),
       // A WhatsApp chat past its 24 hours: the template is here, since the bar stays a bar (2026-10-30).
       ...(c && shut && c.channel === "whatsapp" && ctx.data.settings?.suggestTemplate !== false ? [{ label: "Send template message", icon: "M4 6h16v12H4zM4 7l8 6 8-6", bg: "var(--crm-tint-attention)", fg: "var(--crm-rust)", go: () => { patch({ pMenu: false }); void openTpl(); } }] : []),
-    ],
+    ] as { label: string; icon: string; bg: string; fg: string; go: () => void; sub?: string }[],
+    // 11b: the Label sheet — the Inbox’s own (shared/label-sheet.ts) with Done.
+    label: on && c && ui.pLabel ? ({ ...labelSheetVM({ data, act, customerId: c.id, form: ui.pLabel.form,
+      put: p => set(u => (u.pLabel ? { ...u, pLabel: { view: p.view ?? u.pLabel.view, form: "form" in p ? p.form ?? null : u.pLabel.form } } : u)) }),
+      list: ui.pLabel.view === "labels", editing: ui.pLabel.view === "labelEdit", done: () => patch({ pLabel: null }) } as ChatLabelSheet) : null,
     shareOpen: false, closeShare: NONE, shareList: [] as { name: string; role: string; ini: string; pick: () => void }[],
     infoOpen: on && ui.pInfo, closeInfo: () => patch({ pInfo: false }), info,
     editInfo: () => { if (c) patch({ pInfo: false, pForm: { customerId: c.id, edit: true } }); },

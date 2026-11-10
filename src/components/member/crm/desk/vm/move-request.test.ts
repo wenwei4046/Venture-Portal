@@ -115,3 +115,20 @@ describe("CRM alerts' Invitations: answered on the computer too", () => {
     expect(alertsVM(ctxOf(PETER, { invites }).ctx).alertsP.invites).toEqual([]);
   });
 });
+
+describe("the desktop ⋮ keeps Mark as unread · Mute · Pin (v4, the owner 2026-11-10: \"要\")", () => {
+  it("after the phone's items and Label, before Block", () => {
+    const { ctx } = ctxOf(PETER, { chat: "own" });
+    const labels = menuLabels(ctx);
+    expect(labels.slice(-4)).toEqual(["Mark as unread", "Mute notifications", "Pin chat", "Block Customer own"]);
+    expect(labels.indexOf("Label")).toBeLessThan(labels.indexOf("Mark as unread"));
+  });
+  it("each writes one's own pref", () => {
+    const { ctx, act } = ctxOf(PETER, { chat: "own" });
+    const items = chatMenuVM(ctx, STAR).chatMenuItems;
+    items.find(i => i.label === "Pin chat")!.run();
+    items.find(i => i.label === "Mute notifications")!.run();
+    items.find(i => i.label === "Mark as unread")!.run();
+    expect(act.setPref.mock.calls).toEqual([["own", { pinned: true }], ["own", { muted: true }], ["own", { markedUnread: true }]]);
+  });
+});

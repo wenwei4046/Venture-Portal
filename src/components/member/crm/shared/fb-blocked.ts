@@ -13,6 +13,9 @@ export const FB_BLOCKED_CATEGORY = "Blocked";
 /** The line in the composer's place (the desktop); the phone's cold card has FB_BLOCKED over FB_BLOCKED_SUB. */
 export const FB_BLOCKED_NOTE = "Blocked on Facebook — they can't receive messages";
 export const FB_BLOCKED_SUB = "They can't receive messages.";
+/** The phone chat's one grey line in the bar's place and the line under it (v4 frame 7b, which replaced the card). */
+export const fbBlockedLine = (first?: string) => `${first || "They"} can’t receive messages`;
+export const FB_BLOCKED_LINE_SUB = "Facebook stopped this Page from replying. The chat stays in Blocked.";
 
 const sets = new WeakMap<readonly string[], Set<string>>();
 

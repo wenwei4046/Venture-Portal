@@ -1,80 +1,56 @@
 /**
- * Reports' page (2026-10-23; vm/reports.ts holds the arithmetic): the category in the head's tabs — Ads performance and
- * Leads by ad as their own pages draw them, Salespeople, Appointments & show-ups and Lead sources & status — a period
- * for the last three, and Export CSV of the category on screen.
+ * Reports' page (2026-10-23; vm/reports.ts holds the arithmetic). v4 D6a (docs/design_handoff_crm_redesign_v4, notes/25):
+ * the title and three tabs on one row — Overview · Ads performance · Appointments & show-ups (Lead sources & status is
+ * gone: its counts are Overview's optional columns) — then one filter row: the brand (the CRM's own, as the Inbox's), the
+ * period (Today · This week · This month · Custom, Last month and All time among Custom's presets) with its dates in grey,
+ * the ad, and Group by Ad · Salesperson. Overview's ads start folded; an ad opens to its people (top 6, "+N more"); a
+ * person opens a 420 px side panel of their leads in plain sentences, needs-a-reply first; a customer opens their log (the
+ * D4b timeline). Columns adds Spend, Per lead, Won rate, each status and Channel, remembered per user on the server.
  */
 import type { DeskCtx } from "./ctx";
-import { INSIGHT_SOURCES, inBrand } from "./insight";
-import type { SourcePick } from "@/lib/member/crm-source";
-import { adStatusOf } from "@/lib/member/crm-ad-running";
-import { lbaStatus } from "./leads-by-ad";
-import { panelLeads } from "./lead-panel";
-import { initials } from "./data";
-import { DIRECTOR_C, DIRECTOR_SPLIT_KEY, DIRECTOR_TEAM, teamColours } from "./tokens";
-import { chatRows, teamNameOf } from "./data";
-import { CHANNEL } from "../../sales/vm/common";
-import { overviewReport, appointmentsReport, pctLabel, periodRange, RP_PERIODS, salespeopleReport, sourcesReport, waitLabel, type ApptVisit, type Part, type SalesRow } from "./reports";
+import { INSIGHT_SOURCES } from "./insight";
+import type { CrmCustomer } from "@/lib/member/crm-data";
+import { DEFAULT_CRM_SETTINGS } from "@/lib/member/crm-data";
+import { initials, chatRows } from "./data";
+import { STATUS_LABEL } from "../../sales/vm/common";
+import { fmt } from "../../shared/team-activity";
+import { auditWhen, type AuditLine, type AuditTone } from "../../shared/audit-timeline";
+import { journey } from "./chatprogress";
+import { alertsUnreadN } from "./inbox";
+import { rangeLine } from "./frame4a";
+import { isoOf } from "./adsperf";
+import {
+  overviewReport, appointmentsReport, pctLabel, periodRange, RP_PERIODS, waitLabel, replyState, needsReply, waitWords, readReportCols, reportColumns,
+  RP_PICKS, colValue, sortByCol, type ApptVisit, type Part, type OverviewFigs, type OverviewPerson, type RpColKey, type ReplyKind,
+} from "./reports";
 
 export type RpCat = "overview" | "ads" | "lba" | "sales" | "appt" | "src";
-// Overview first and where Reports opens (the owner, 2026-11-09: "在 reports 中能不能整合一个总报告").
-// The owner, 2026-11-09 ("salesperson & leads by ad & overview 是不是可以结合" → "One report, two views"): Overview is the one
-// report for leads, salespeople and ads — Salespeople and Leads by ad left Reports' tabs (Leads by ad stays in Assignment).
-export const RP_CATS: [RpCat, string][] = [["overview", "Overview"], ["ads", "Ads performance"], ["appt", "Appointments & show-ups"], ["src", "Lead sources & status"]];
+// Overview first and where Reports opens (the owner, 2026-11-09). v4 D6a: three tabs; Lead sources & status merged into
+// Overview's Columns, Salespeople and Leads by ad into Overview's Group by (2026-11-09).
+export const RP_CATS: [RpCat, string][] = [["overview", "Overview"], ["ads", "Ads performance"], ["appt", "Appointments & show-ups"]];
 
-const SALES_COLS: [keyof SalesRow, string, "n" | "pct" | "wait"][] = [["leads", "Leads", "n"], ["replyRate", "Replied", "pct"], ["firstReplyMin", "First reply", "wait"], ["appt", "Appts", "n"],
-  ["apptRate", "Appt rate", "pct"], ["showed", "Showed up", "n"], ["showRate", "Show-up", "pct"], ["won", "Won", "n"], ["winRate", "Win rate", "pct"], ["lost", "Lost", "n"]];
+/** The plain sentence a customer's row says in the side panel, and its colour. */
+export function replySentence(k: ReplyKind, since: number, visitAt: string | null, now: Date, status: string): { text: string; tone: "oxblood" | "muted" | "green" } {
+  const ago = waitWords(now.getTime() - since);
+  if (k === "never") return { text: `Never replied · ${ago}`, tone: "oxblood" };
+  if (k === "ours") return { text: `Needs our reply · ${ago}`, tone: "oxblood" };
+  if (k === "theirs") return { text: `Customer hasn't replied · ${ago}`, tone: "muted" };
+  if (k === "visit" && visitAt) {
+    const d = new Date(visitAt);
+    return { text: `Visit booked · ${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kuala_Lumpur" }).replace(",", "")}`, tone: "green" };
+  }
+  return { text: status, tone: status === "Won" ? "green" : "muted" };
+}
 
 export function reportsVM(ctx: DeskCtx) {
   const { ui, set, patch, data, now, nameOf } = ctx;
-  const cat: RpCat = ui.rpCat && RP_CATS.some(c => c[0] === ui.rpCat) ? ui.rpCat : "overview", per = ui.rpPer ?? "month", range: [number, number] = per === "custom" && ui.rpRange ? [ui.rpRange.a, ui.rpRange.b] : periodRange(per, now);
-  // v2 (frame 12b, note 05): each mini card has its stacked bar and a colour a row — the status ramp, the channels' own,
-  // else the CRM series in order.
+  const cat: RpCat = ui.rpCat && RP_CATS.some(c => c[0] === ui.rpCat) ? ui.rpCat : "overview";
+  const per = ui.rpPer && (RP_PERIODS.some(p => p[0] === ui.rpPer) || ui.rpPer === "last" || ui.rpPer === "all") ? ui.rpPer : "month";
+  const range: [number, number] = per === "custom" && ui.rpRange ? [ui.rpRange.a, ui.rpRange.b] : periodRange(per, now);
+  // v2 (frame 12b, note 05): each mini card has its stacked bar and a colour a row — the status ramp, else the series.
   const SERIES = ["var(--crm-ink)", "var(--crm-orange)", "var(--crm-brown)", "var(--crm-amber)", "var(--crm-series-5)", "var(--crm-series-7)", "var(--crm-track-2)"];
-  const NAMED: Record<string, string> = { New: "var(--crm-ink)", Attention: "var(--crm-orange)", "Follow up": "var(--crm-brown)", Appointment: "var(--crm-amber)", Won: "var(--crm-series-5)", Lost: "var(--crm-series-7)", "Cold leads": "var(--crm-track-2)",
-    WhatsApp: "var(--crm-whatsapp)", Messenger: "var(--crm-messenger)", "Not filled yet": "var(--crm-track-2)", "Not given": "var(--crm-track-2)" };
   const card = (title: string, rows: Part[], palette: string[] = SERIES) => ({ title, total: rows.reduce((n, r) => n + r.n, 0),
-    rows: rows.map((r, i) => ({ ...r, pct: pctLabel(r.share), w: Math.round(r.share * 100), color: NAMED[r.label] ?? palette[i % palette.length] })) });
-
-  // Salespeople: sortable by any figure (▼ first), the team's name under each person.
-  const sr = salespeopleReport(data.customers, data.visits, range, nameOf, id => teamNameOf(ctx, id));
-  const so = ui.rpSort;
-  const val = (r: SalesRow, k: keyof SalesRow) => (k === "name" ? r.name : (r[k] as number | null) ?? -1);
-  const rows = so ? [...sr.rows].sort((a, b) => { const x = val(a, so.k as keyof SalesRow), y = val(b, so.k as keyof SalesRow);
-    const c = typeof x === "string" ? x.localeCompare(String(y)) : x - Number(y); return so.dir === "asc" ? c : -c; }) : sr.rows;
-  const cell = (r: SalesRow, k: keyof SalesRow, f: "n" | "pct" | "wait") => (f === "pct" ? pctLabel(r[k] as number | null) : f === "wait" ? waitLabel(r[k] as number | null) : String(r[k]));
-  // v2 (frame 12c): the team filter (All teams, the Director, each team — a dot each), a search, each person's avatar and
-  // team dot, count · rate pairs, First reply over 4 h in red; a person opens the panel of their leads (12c·2).
-  const teamOfId = (id: string) => ctx.directors.some(d => d.id === id) ? { id: DIRECTOR_SPLIT_KEY, name: DIRECTOR_TEAM, color: DIRECTOR_C[0] }
-    : (() => { const k = ctx.teams.findIndex(t => t.id === id || t.people.some(p => p.id === id)); return k < 0 ? null : { id: ctx.teams[k].id, name: ctx.teams[k].name, color: teamColours(k)[0] }; })();
-  const rpTeam = ui.rpTeam ?? "all", rpQ = (ui.rpQ ?? "").trim().toLowerCase();
-  const fRows = rows.filter(r => (rpTeam === "all" || (r.id && teamOfId(r.id)?.id === rpTeam)) && (!rpQ || r.name.toLowerCase().includes(rpQ)));
-  const pickR = ui.rpPick ? sr.rows.find(r => r.id === ui.rpPick) : undefined;
-  const leadIds = (id: string) => data.customers.filter(c => c.assignedTo === id && (() => { const t = new Date(c.createdAt).getTime(); return t >= range[0] && t <= range[1]; })()).map(c => c.id);
-  const perWord = RP_PERIODS.find(p => p[0] === per)?.[1] ?? "";
-  const sales2 = {
-    teams: [{ id: "all", label: "All teams", dot: null as string | null }, ...(ctx.directors.length ? [{ id: DIRECTOR_SPLIT_KEY, label: "Director", dot: DIRECTOR_C[0] as string | null }] : []),
-      ...ctx.teams.map((t, k) => ({ id: t.id, label: t.name.replace(/^Team /, ""), dot: teamColours(k)[0] as string | null }))].map(t => ({ ...t, on: rpTeam === t.id, pick: () => patch({ rpTeam: t.id }) })),
-    q: ui.rpQ ?? "", setQ: (e: { target: { value: string } }) => patch({ rpQ: e.target.value }),
-    count: `${fRows.filter(r => r.id).length} people · ${fRows.reduce((n, r) => n + r.leads, 0)} leads`,
-    people: fRows.map(r => { const tm = r.id ? teamOfId(r.id) : null;
-      return { id: r.id, name: r.name, ini: r.id ? initials(r.name) : "–", team: tm?.name ?? r.team, dot: tm?.color ?? "var(--crm-faint-2)", none: !r.id, on: !!r.id && ui.rpPick === r.id,
-        leads: r.leads, replied: pctLabel(r.replyRate), first: waitLabel(r.firstReplyMin), late: (r.firstReplyMin ?? 0) > 240,
-        appt: [r.appt, pctLabel(r.apptRate)] as [number, string], show: [r.showed, pctLabel(r.showRate)] as [number, string], won: [r.won, pctLabel(r.winRate)] as [number, string], lost: r.lost,
-        pick: () => { if (r.id) patch({ rpPick: ui.rpPick === r.id ? null : r.id, rpLead: null }); } }; }),
-    total: { leads: sr.total.leads, replied: pctLabel(sr.total.replyRate), first: waitLabel(sr.total.firstReplyMin), appt: [sr.total.appt, pctLabel(sr.total.apptRate)] as [number, string],
-      show: [sr.total.showed, pctLabel(sr.total.showRate)] as [number, string], won: [sr.total.won, pctLabel(sr.total.winRate)] as [number, string], lost: sr.total.lost },
-    sort: (k: keyof SalesRow) => ({ on: so?.k === k, dir: so?.dir ?? "desc", pick: () => set(u => ({ ...u, rpSort: !u.rpSort || u.rpSort.k !== k ? { k, dir: "desc" } : u.rpSort.dir === "desc" ? { k, dir: "asc" } : null })) }),
-    panel: pickR && pickR.id ? (() => { const tm = teamOfId(pickR.id), ids = leadIds(pickR.id);
-      return { name: pickR.name, ini: initials(pickR.name), team: tm?.name ?? pickR.team, teamDot: tm?.color ?? "var(--crm-faint-2)", n: ids.length, line: `· ${perWord} · all ads`,
-        shut: !!ui.rpPickShut, fold: () => patch({ rpPickShut: true }), unfold: () => patch({ rpPickShut: false }), close: () => patch({ rpPick: null, rpLead: null }),
-        rail: `${pickR.name} · ${ids.length} lead${ids.length === 1 ? "" : "s"}`, leads: panelLeads(ctx, ids, ui.rpLead, id => patch({ rpLead: id })) }; })() : null,
-  };
-  const sales = {
-    cols: SALES_COLS.map(([k, label]) => ({ k, label, arrow: so?.k === k ? (so.dir === "asc" ? "↑" : "↓") : "",
-      sort: () => set(u => ({ ...u, rpSort: !u.rpSort || u.rpSort.k !== k ? { k, dir: "desc" } : u.rpSort.dir === "desc" ? { k, dir: "asc" } : null })) })),
-    rows: rows.map(r => ({ id: r.id, name: r.name, team: r.team, cells: SALES_COLS.map(([k, , f]) => cell(r, k, f)), none: !r.id })),
-    total: { name: sr.total.name, cells: SALES_COLS.map(([k, , f]) => cell(sr.total, k, f)) },
-  };
+    rows: rows.map((r, i) => ({ ...r, pct: pctLabel(r.share), w: Math.round(r.share * 100), color: palette[i % palette.length] })) });
 
   // Appointments: every visit of the period by its own day, cancelled ones too.
   const visits: ApptVisit[] = data.visits.filter(v => { const t = new Date(v.start).getTime(); return t >= range[0] && t <= range[1]; }).map(v => {
@@ -91,67 +67,95 @@ export function reportsVM(ctx: DeskCtx) {
     cards: [card("By outcome", ar.byOutcome), card("By showroom", ar.byRoom), card("By salesperson", ar.byRep), card("By weekday", ar.byDow), card("By time", ar.byTime)],
   };
 
-  // Lead sources & status: the inbox's own status names (a wait is Attention, a shut window Cold leads).
-  const st = new Map(chatRows(ctx).map(r => [r.id, ["Overdue", "Urgent", "Reply soon"].includes(r.key) ? "Attention" : r.key === "Cold" ? "Cold leads" : r.key]));
-  const srcR = sourcesReport(data.customers, range, c => st.get(c.id) ?? "New", c => CHANNEL[c.channel].name), sf = srcR.figures;
-  const src = {
-    tiles: [["Leads", String(sf.leads), ""], ["From ads", String(sf.fromAds), pctLabel(sf.leads ? sf.fromAds / sf.leads : null)], ["Won", String(sf.won), pctLabel(sf.leads ? sf.won / sf.leads : null)], ["Lost", String(sf.lost), pctLabel(sf.leads ? sf.lost / sf.leads : null)]]
-      .map(([k, v, pct]) => ({ k, v, pct })),
-    // v2 (12b): By ad is a full-width table (channel, status, leads, share); the mini cards are status, channel, property type, why lost.
-    cards: [card("By status", srcR.byStatus), card("By source", srcR.bySource), card("By property type", srcR.byType, ["var(--crm-brown)", "var(--crm-series-5)", "var(--crm-series-7)", "var(--crm-amber)"]),
-      card("Why they were lost", srcR.lostWhy, ["var(--crm-oxblood)", "var(--crm-rust)", "var(--crm-series-5)", "var(--crm-series-7)"])],
-    ads: (() => {
-      const inR = data.customers.filter(c => { const t = new Date(c.createdAt).getTime(); return c.adId && t >= range[0] && t <= range[1]; });
-      const by = new Map<string, typeof inR>(); inR.forEach(c => by.set(c.adId!, [...(by.get(c.adId!) ?? []), c]));
-      const rows = [...by].map(([id, cs]) => ({ id, name: cs[0].ad || data.adNames?.[id]?.name || `Ad ${id}`, n: cs.length, wa: cs.some(c => c.channel === "whatsapp"),
-        status: lbaStatus(data.adNames?.[id], adStatusOf(data.adNames?.[id], data.customers.filter(c => c.adId === id).map(c => c.createdAt).sort().at(-1) ?? null, now), now) }))
-        .sort((a, b) => b.n - a.n);
-      const max = Math.max(1, ...rows.map(r => r.n)), tot = inR.length;
-      const PILL: Record<string, [string, string]> = { Running: ["var(--crm-tint-new)", "var(--crm-ink)"], Paused: ["var(--crm-tint-appt)", "var(--crm-text-appt)"], Ended: ["var(--crm-tint-lost)", "var(--crm-muted)"], Pending: ["var(--crm-field)", "var(--crm-muted)"] };
-      return { count: `${rows.length} ad${rows.length === 1 ? "" : "s"} · ${tot} leads`, rows: rows.map(r => ({ ...r, channel: r.wa ? "WhatsApp" : "Messenger", pct: pctLabel(tot ? r.n / tot : null), w: Math.round((r.n / max) * 100), stBg: PILL[r.status][0], stFg: PILL[r.status][1] })) };
-    })(),
-  };
-
-  // Overview: each ad → who has its leads (leads, average reply) → each customer (status, average reply, ad, Open chat).
+  // ── Overview (D6a) ──
+  // The status words the Inbox uses (a wait is Attention, a shut window Cold leads).
   const stOf = new Map(chatRows(ctx).map(r => [r.id, ["Overdue", "Urgent", "Reply soon"].includes(r.key) ? "Attention" : r.key === "Cold" ? "Cold leads" : r.key]));
-  // One brand or all (the owner, 2026-11-09: "可筛选品牌"), as Insight's switch; and the dates the figures are of, said
-  // beside the period ("选择时间后，要显示目前的数据是哪个时间").
-  const brand = (ui.rpSrc ?? "all") as SourcePick, bd = inBrand(data, brand);
-  const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const rangeText = (() => {
-    if (!Number.isFinite(range[0])) return "All time";
-    const a = new Date(range[0]), b = new Date(Math.min(range[1], now.getTime()));
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
-      ? `${a.getDate()} – ${b.getDate()} ${MON3[b.getMonth()]} ${b.getFullYear()}`
-      : `${a.getDate()} ${MON3[a.getMonth()]}${a.getFullYear() !== b.getFullYear() ? ` ${a.getFullYear()}` : ""} – ${b.getDate()} ${MON3[b.getMonth()]} ${b.getFullYear()}`;
-  })();
+  const statusOf = (c: CrmCustomer) => stOf.get(c.id) ?? "New";
+  // The brand is the CRM's own (ui.insSrc, the Inbox's and Insight's — DeskScreens keeps every page to it).
+  const brand = ui.insSrc ?? "all";
+  const brands = INSIGHT_SOURCES.map(([k, label]) => ({ label: k === "all" ? "All brands" : label, on: brand === k, pick: () => patch({ insSrc: k, rpAd: "all", rpPick: null, rpLead: null }) }));
   const adNm = (c: { adId?: string | null; ad: string }) => (c.adId && data.adNames?.[c.adId]?.name) || c.ad || `Ad ${c.adId}`;
-  const allAds = overviewReport(bd.customers, range, adNm, nameOf, c => stOf.get(c.id) ?? "New", bd.visits).byAd;
+  const allAds = overviewReport(data.customers, range, adNm, nameOf, statusOf, data.visits, "all", now).byAd;
   const rpAd = ui.rpAd && allAds.some(a => a.key === ui.rpAd) ? ui.rpAd : "all";
-  const ov = overviewReport(bd.customers, range, adNm, nameOf, c => stOf.get(c.id) ?? "New", bd.visits, rpAd);
+  const ov = overviewReport(data.customers, range, adNm, nameOf, statusOf, data.visits, rpAd, now);
   const by = ui.rpOvBy ?? "ad";
-  const openChat = (id: string) => () => patch({ tab: "inbox", pane: "docked", kind: "chat", chat: id, ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null });
-  const figs = (x: { n: number; avgMin: number | null; appt: number; show: number; won: number; lost: number }) => ({ cells: [String(x.n), waitLabel(x.avgMin), String(x.appt), String(x.show), String(x.won), String(x.lost)], late: (x.avgMin ?? 0) > 240 });
-  const person = (p: (typeof ov.byRep)[number]) => ({ key: p.id, name: p.name, ...figs(p), customers: p.customers.map(x => ({ ...x, avg: waitLabel(x.avgMin), open: openChat(x.id) })) });
+  const picks = readReportCols(data.uiPrefs?.reportCols);
+  const cols = reportColumns(picks);
+  const sort = ui.rpSort && cols.some(c => c[0] === ui.rpSort!.k) ? ui.rpSort as { k: RpColKey; dir: "asc" | "desc" } : { k: "leads" as RpColKey, dir: "desc" as const };
+  const lateMin = (data.settings ?? DEFAULT_CRM_SETTINGS).replyUrgentH * 60;
+  // Spend: Meta's figure for the ad over this period, when Ads performance has read it (ui.apMeta, keyed "from|to").
+  const rkey = `${isoOf(Math.max(range[0], 0))}|${isoOf(Math.min(range[1], now.getTime()))}`;
+  const spendOf = (key: string): number | null => { const f = ui.apMeta?.[rkey]?.[key]; return f ? f.spend : null; };
+  const cell = (f: OverviewFigs, k: RpColKey, spend: number | null) => {
+    const v = colValue(f, k, spend);
+    const text = v == null ? "—" : k === "avg" ? fmt(v) : k === "spend" ? `RM ${Math.round(v).toLocaleString("en-MY")}` : k === "perLead" ? `RM ${v.toFixed(2)}` : k === "wonRate" ? pctLabel(v) : String(v);
+    return { k, text, grey: v == null || v === 0, late: k === "avg" && v != null && v >= lateMin };
+  };
+  const cellsOf = (f: OverviewFigs, spend: number | null) => cols.map(([k]) => cell(f, k, spend));
+  const pickPerson = (ad: string, id: string) => () => patch({ rpPick: ui.rpPick === id && (ui.rpPickAd ?? "all") === ad ? null : id, rpPickAd: ad, rpLead: null });
+  const personRow = (p: OverviewPerson, ad: string) => ({ key: p.id || "none", name: p.name, none: !p.id, need: p.need ? `${p.need} need${p.need === 1 ? "s" : ""} a reply` : "",
+    on: !!p.id && ui.rpPick === p.id && (ui.rpPickAd ?? "all") === ad, cells: cellsOf(p, null), pick: p.id ? pickPerson(ad, p.id) : null, v: (k: RpColKey) => colValue(p, k, null) });
+  const ads = sortByCol(ov.byAd.map(a => ({ ...a, v: (k: RpColKey) => colValue(a, k, spendOf(a.key)) })), sort.k, sort.dir).map(a => ({
+    key: a.key, name: a.name, wa: a.channel === "whatsapp", cells: cellsOf(a, spendOf(a.key)),
+    people: sortByCol(a.people.map(p => personRow(p, a.key)), sort.k, sort.dir),
+  }));
+  const people = sortByCol(ov.byRep.map(p => personRow(p, "all")), sort.k, sort.dir);
   const leadsN = ov.byRep.reduce((n, p) => n + p.n, 0);
+
+  // The person picked: their leads (from the ad opened, or every ad when grouped by salesperson) in the side panel.
+  const pickAd = ui.rpPickAd ?? "all";
+  const src = ui.rpPick ? (pickAd === "all" ? ov.byRep : ov.byAd.find(a => a.key === pickAd)?.people ?? []).find(p => p.id === ui.rpPick) : undefined;
+  const close = () => patch({ rpPick: null, rpPickAd: null, rpLead: null });
+  const openChat = (id: string) => patch({ tab: "inbox", pane: "docked", kind: "chat", chat: id, ibListW: null, ibInfoW: null, ibCpW: null, ibCp: null });
+  const dm = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Kuala_Lumpur" });
+  const panel = src ? (() => {
+    const rows = src.customers.map(x => { const s = replyState(x.c, data.visits, now); return { x, s }; })
+      .sort((a, b) => Number(needsReply(b.s.kind)) - Number(needsReply(a.s.kind)) || (needsReply(a.s.kind) ? a.s.since - b.s.since : b.x.c.createdAt.localeCompare(a.x.c.createdAt)));
+    const lead = ui.rpLead ? src.customers.find(x => x.id === ui.rpLead) : undefined;
+    return {
+      name: src.name, sub: pickAd === "all" ? (rpAd === "all" ? "All ads" : ov.byAd[0]?.name ?? "") : ov.byAd.find(a => a.key === pickAd)?.name ?? "",
+      facts: [{ k: "Leads", v: String(src.n), hot: false }, { k: "Avg reply", v: fmt(src.avgMin), hot: false }, { k: "Need a reply", v: String(src.need), hot: src.need > 0 }],
+      customers: rows.map(({ x, s }) => ({ id: x.id, name: x.name, got: `Got ${dm(x.c.createdAt)}`, ...replySentence(s.kind, s.since, s.visitAt, now, STATUS_LABEL[x.c.status]), status: STATUS_LABEL[x.c.status], open: () => patch({ rpLead: x.id }) })),
+      close,
+      // A customer opened: their log as D4b draws it — the facts, the timeline (newest at the bottom), Open chat.
+      lead: lead ? (() => {
+        const c = lead.c, ev = journey(ctx, c), firstOurs = c.messages.find(m => m.from === "me" && !m.auto), firstLead = c.messages.find(m => m.from === "lead");
+        const s = replyState(c, data.visits, now);
+        const firstReply = firstOurs && firstLead ? fmt((new Date(firstOurs.at).getTime() - new Date(firstLead.at).getTime()) / 60_000) : s.kind === "never" ? `waiting ${fmt((now.getTime() - s.since) / 60_000)}` : "—";
+        const TONE: Record<string, AuditTone> = { reply: "green", appt: "green", visit: "green", won: "green", lost: "oxblood" };
+        const TITLE: Record<string, string> = { assign: "Assigned", move: "Moved", share: "Shared", appt: "Visit booked", visit: "Showed up", status: "Status changed", won: "Won", lost: "Lost", remind: "Reminder", note: "Note added" };
+        const lines: AuditLine[] = ev.map((e, i) => { const w = auditWhen(e.at), came = e.text.startsWith("Came in");
+          return { key: i, ...w, title: came ? "Lead arrived" : e.kind === "reply" ? "First reply" : e.kind === "appt" && e.text.startsWith("Changed") ? "Visit changed" : TITLE[e.kind] ?? "Change",
+            detail: [came ? e.text.replace(/^Came in from /, "") : e.text, e.note, e.who ? `by ${nameOf(e.who)}` : ""].filter(Boolean).join(" · "), tone: came ? "ink" : TONE[e.kind] ?? "ink" }; });
+        return { id: c.id, name: c.name, ini: initials(c.name), ad: lead.ad,
+          facts: [{ k: "Got", v: `${dm(c.createdAt)}, ${auditWhen(c.createdAt).time}` }, { k: "First reply", v: firstReply }, { k: "Now with", v: c.assignedTo ? nameOf(c.assignedTo) : "Nobody yet" }],
+          lines, back: () => patch({ rpLead: null }), openChat: () => openChat(c.id) };
+      })() : null,
+    };
+  })() : null;
+
   const overview = {
-    rangeText, srcs: INSIGHT_SOURCES.map(([k, label]) => ({ label, on: brand === k, pick: () => patch({ rpSrc: k, rpAd: "all" }) })),
+    brands, brandLabel: brands.find(b => b.on)?.label ?? "All brands",
+    rangeText: rangeLine({ a: Number.isFinite(range[0]) ? range[0] : now.getTime(), b: Math.min(range[1], now.getTime()) }),
     adOn: rpAd !== "all", adLabel: rpAd === "all" ? "All ads" : allAds.find(a => a.key === rpAd)?.name ?? "All ads",
-    adN: rpAd === "all" ? allAds.reduce((n, a) => n + a.n, 0) : allAds.find(a => a.key === rpAd)?.n ?? 0,
-    by, bys: ([["ad", "By ad"], ["rep", "By salesperson"]] as const).map(([k, label]) => ({ label, on: by === k, pick: () => patch({ rpOvBy: k }) })),
-    count: by === "ad" ? `${ov.byAd.length} ad${ov.byAd.length === 1 ? "" : "s"} · ${leadsN} leads` : `${ov.byRep.filter(p => p.id).length} people · ${leadsN} leads`,
     adOpts: [{ value: "all", label: "All ads", n: allAds.reduce((n, a) => n + a.n, 0) }, ...allAds.map(a => ({ value: a.key, label: a.name, n: a.n }))],
-    adVal: rpAd, setAd: (e: { target: { value: string } }) => patch({ rpAd: e.target.value }),
-    groups: by === "ad" ? ov.byAd.map(a => ({ key: a.key, name: a.name, ...figs(a), people: a.people.map(person) }))
-      : [{ key: "rep", name: "", ...figs({ n: 0, avgMin: null, appt: 0, show: 0, won: 0, lost: 0 }), people: ov.byRep.map(person) }],
+    adVal: rpAd, setAd: (v: string) => patch({ rpAd: v, rpPick: null, rpLead: null }),
+    by, bys: ([["ad", "Ad"], ["rep", "Salesperson"]] as const).map(([k, label]) => ({ label, on: by === k, pick: () => patch({ rpOvBy: k, rpPick: null, rpLead: null }) })),
+    title: by === "ad" ? "By ad" : "By salesperson",
+    count: by === "ad" ? `${ov.byAd.length} ad${ov.byAd.length === 1 ? "" : "s"} · ${leadsN} lead${leadsN === 1 ? "" : "s"}` : `${ov.byRep.filter(p => p.id).length} people · ${leadsN} lead${leadsN === 1 ? "" : "s"}`,
+    heads: cols.map(([k, label, w]) => ({ k, label, w, on: sort.k === k, arrow: sort.k === k ? (sort.dir === "desc" ? " ↓" : " ↑") : "",
+      pick: () => set(u => ({ ...u, rpSort: !u.rpSort || u.rpSort.k !== k ? { k, dir: "desc" } : u.rpSort.dir === "desc" ? { k, dir: "asc" } : null })) })),
+    ads, people, panel,
+    // Columns (notes/25): the picker's choices, ticked or not; each tick saved for this user on the server.
+    picker: RP_PICKS.map(([k, label]) => ({ k, label, on: picks.includes(k), group: k.startsWith("st:") ? "Statuses" : k === "channel" ? "Channel" : "Figures",
+      toggle: () => ctx.deskAct.saveUiPref("reportCols", picks.includes(k) ? picks.filter(x => x !== k) : RP_PICKS.map(p => p[0]).filter(x => x === k || picks.includes(x))) })),
   };
 
   const csv = () => {
-    const perL = RP_PERIODS.find(p => p[0] === per)![1];
+    const perL = per === "custom" ? overview.rangeText : RP_PERIODS.find(p => p[0] === per)?.[1] ?? "";
     const table: string[][] = cat === "overview" ? [["Ad", "Salesperson", "Customer", "Status", "Average reply"],
       ...ov.byRep.flatMap(p => p.customers.map(x => [x.ad, p.name, x.name, x.status, waitLabel(x.avgMin)]))]
-      : cat === "sales" ? [["Salesperson", "Team", ...SALES_COLS.map(c => c[1])], ...sales.rows.map(r => [r.name, r.team, ...r.cells]), [sales.total.name, "", ...sales.total.cells]]
-      : (cat === "appt" ? appt : src).cards.flatMap(c => [[c.title, "Count", "Share"], ...c.rows.map(r => [r.label, String(r.n), r.pct]), []]);
+      : appt.cards.flatMap(c => [[c.title, "Count", "Share"], ...c.rows.map(r => [r.label, String(r.n), r.pct]), []]);
     const esc = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([table.map(r => r.map(esc).join(",")).join("\n")], { type: "text/csv" }));
@@ -159,14 +163,19 @@ export function reportsVM(ctx: DeskCtx) {
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   };
 
+  const alertsN = alertsUnreadN(ctx);
   return {
     kReports: ui.tab === "reports" || ui.tab === "workspace",
     reports: {
-      cat, cats: RP_CATS.map(([k, label]) => ({ label, on: k === cat, pick: () => patch({ rpCat: k }) })),
-      periods: RP_PERIODS.map(([k, label]) => ({ label, on: k === per, pick: () => patch(k === "custom" ? { rpPer: k, rpDates: true } : { rpPer: k, rpDates: false }) })),
-      picker: ui.rpDates ? { value: ui.rpRange ?? { a: range[0], b: range[1] }, apply: (r: { a: number; b: number }) => patch({ rpPer: "custom", rpRange: r, rpDates: false }), cancel: () => patch({ rpDates: false }) } : null,
-      sales, sales2, appt, src, overview, csv, canCsv: cat === "overview" || cat === "sales" || cat === "appt" || cat === "src",
-      openAds: () => patch({ tab: "adsperf" }),
+      cat, cats: RP_CATS.map(([k, label]) => ({ label, on: k === cat, pick: () => patch({ rpCat: k, rpPick: null, rpLead: null }) })),
+      periods: RP_PERIODS.map(([k, label]) => ({ label, on: k === per || (k === "custom" && (per === "last" || per === "all")), pick: () => patch(k === "custom" ? { rpDates: true } : { rpPer: k, rpDates: false }) })),
+      // Custom's calendar: dates can be picked, Last month and All time are its presets (allFrom = the first lead).
+      picker: ui.rpDates ? { value: { a: Number.isFinite(range[0]) ? range[0] : now.getTime(), b: Math.min(range[1], now.getTime()) },
+        allFrom: data.customers.reduce((m, c) => Math.min(m, new Date(c.createdAt).getTime() || m), now.getTime()),
+        apply: (r: { a: number; b: number }) => patch({ rpPer: "custom", rpRange: r, rpDates: false }), cancel: () => patch({ rpDates: false }) } : null,
+      appt, overview, csv, canCsv: cat === "overview" || cat === "appt",
+      alertsN: alertsN ? String(alertsN) : "", openAlerts: () => patch({ pane: "overlay", kind: "alerts" }),
+      openAds: () => patch({ tab: "insight", insTab: "ads", pane: "closed" }),
     },
   };
 }

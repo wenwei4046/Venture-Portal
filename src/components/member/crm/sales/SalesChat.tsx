@@ -10,7 +10,7 @@ import ChatComposer from "./ChatComposer";
 import { PickEditor } from "../shared/pick-editor";
 import { InfoValue } from "../shared/AdLink";
 import { CallCard, ChatImg, ChatVideo, MediaAlbum, PdfCard, VoiceNote } from "../shared/chat-media-parts";
-import { Phone4aBookMode, Phone4aCustomBook, Phone4aKeepHeight, Phone4aRoomRemarks, Phone4aStrip } from "../shared/phone4a";
+import { Phone4aBookMode, Phone4aCustomBook, Phone4aKeepHeight, Phone4aLabelSheet, Phone4aRoomRemarks, Phone4aStrip } from "../shared/phone4a";
 import { Ic } from "../shared/icons4a";
 import type { ChatVM } from "./vm/chat";
 
@@ -168,6 +168,7 @@ export default function SalesChat({ v }: { v: ChatVM }) {
         </Fragment>))}
       </div></div>
       <ChatComposer key={v.cmp.key} v={v.cmp} />
+      <Phone4aLabelSheet s={v.hm.label} />
       {!!(v.hm.apptOpen) && (<>
         <div onClick={v.hm.close} style={{ position: "absolute", inset: "0", zIndex: "8", background: "rgba(42,22,12,.32)", display: "flex", flexDirection: "column", justifyContent: "flex-end", animation: "fadeIn 200ms ease-out" }}>
           <div onClick={v.stop} style={{ animation: "sheetUp 320ms cubic-bezier(.2,.8,.2,1)", background: "#fff", borderRadius: "24px 24px 0 0", padding: "10px 20px 24px", display: "flex", flexDirection: "column", gap: "14px" }}>

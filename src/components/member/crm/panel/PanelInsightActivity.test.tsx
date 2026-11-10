@@ -17,6 +17,7 @@ describe("Team activity on the phone's Insight", () => {
     const sw = screen.getByRole("button", { name: "Team activity" }).parentElement!;
     expect([...sw.children].map(b => b.textContent)).toEqual(["Team", "Ads", "Up next", "Activity"]);
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Team activity" })); });
-    expect(screen.getByRole("heading", { name: "Team activity" })).toBeInTheDocument();
+    // v4 8e: no "Team activity" title (the switch says Activity) — the espresso figure strip.
+    expect(document.querySelector("[data-act-strip]")).not.toBeNull();
   });
 });
