@@ -1,5 +1,20 @@
 # HOUZS Venture Portal — Session Handoff
 
+## CHECKPOINT 2026-11-10 a (#1003 SHIPPED) — Billing Allocator's Staff as a table with filters
+
+Session 171188af.
+
+- **MERGED:** squash `f0af45ae` (2026-11-10 09:00Z), every check green, on the user's "全绿就 merge". Unit tests (2/2) failed once in `GwpTab.test.tsx` (Product List, not ours — the same flake as #985 / #991); it passed on a re-run of that job. No migration.
+- **What the user asked:** a screenshot of Billing Allocator › Staff, "我的filter 的function". Sample `mockups/allocator-staff-filter-mockup.html` (OneDrive cwd), A = filter chips, B = table with ▽ per column; the user chose "B".
+- **Built:** Staff is its own `FinTable` (`fin.allocator.staff`):
+  - Name, Department and Split · Company are always on show; Added and Status are on by default.
+  - Every column sorts and filters.
+  - `FinColumn.filterValues` (new, optional) lets Split · Company list each company in a split, HV own included.
+  - A row opens Edit; the old Edit button is gone.
+  - View only: snapshots and invoices are unchanged.
+  - DESIGN v4.245; `.claude/rules/finance/finance-view.md` › BILLING ALLOCATOR › STAFF AS A TABLE.
+- **Not checked:** logged in on the live site.
+
 ## CHECKPOINT 2026-11-09 c (#991 SHIPPED, migration applied first) — Invoice attachments; PDFs with their attachments
 
 Session 171188af.
