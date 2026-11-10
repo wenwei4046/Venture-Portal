@@ -85,6 +85,19 @@ describe("Up next = v4 frame 9g", () => {
     expect(f.queue.map(q => q.id)).not.toContain(f.first!.id); // #1 is the card, not a row
     expect(f.first!.todayLine).not.toMatch(/today/);
   });
+
+  it("the line is numbered 2, 3, 4 … in order (no gaps, no 10+), five shown, the rest behind Show N more (the owner, 2026-11-10)", () => {
+    const r = new UpNextDemo().read("all");
+    const ui = { ad: "all", adOpen: false, tip: false, pick: false, more: false, why: false, hov: null, sheet: null, ltab: "in" as const };
+    const noop = () => {};
+    const acts = { set: noop, pickAd: noop, skip: noop, pause: noop, resume: noop, give: noop, unpin: noop, openLeave: noop, endLeave: noop, cancelLeave: noop };
+    const all = upNextFrame(r, demoBook, [], { ...ui, qAll: true }, acts, true);
+    expect(all.queue.map(q => q.num)).toEqual(all.queue.map((_, k) => String(k + 2)));
+    const folded = upNextFrame(r, demoBook, [], ui, acts, true);
+    expect(folded.queue.length).toBe(Math.min(5, all.queue.length));
+    expect(folded.queueMore).toBe(Math.max(0, all.queue.length - 5));
+    expect(folded.queue.map(q => q.id)).toEqual(all.queue.slice(0, 5).map(q => q.id));
+  });
 });
 
 describe("9g's figures", () => {

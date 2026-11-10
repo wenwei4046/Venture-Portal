@@ -15,7 +15,7 @@ import { avatarTint } from "../../shared/palette";
 import { failNote, quietFailure, roomClosed, roomSlots, shownStatus, slotAt, slotBlocked } from "../../sales/vm/chat";
 import { LABEL_ICON, labelSheetVM, labelSub, type ChatLabelSheet } from "../../shared/label-sheet";
 import { bookingSkipsForm, infoRows } from "../../sales/vm/customer";
-import { composerOf, dismiss as dismissComposer, initialComposer, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
+import { composerOf, dismiss as dismissComposer, initialComposer, messengerPast7, type ComposerIn, type ComposerState, type TileLabel } from "../../sales/vm/composer";
 import { first, ini, pickGroups, stop, type PanelCtx } from "./common";
 import { teamAssignees } from "../../shared/people";
 import { oneAtATime } from "../../shared/once";
@@ -230,6 +230,7 @@ function lxVM(ctx: PanelCtx, c: CrmCustomer | undefined, on: boolean) {
     coldTile: !!c && shut && c.channel === "whatsapp" && ctx.data.settings?.suggestTemplate !== false,
     // A WhatsApp chat past its window (notes/11, CRM v4): the warning row over the bar, Send and the mic grey.
     waShut: c && shut && c.channel === "whatsapp" && !fbBlocked ? first(c.name) : undefined,
+    msShut: c && messengerPast7(c, now) && !fbBlocked ? first(c.name) : undefined,
     reply: reply ? { who: reply.who, text: reply.text } : null, cancelReply: () => patch({ pReply: null }),
     slash: slash ? { q: sq, empty: !hits.length, list: hits.map((q, i) => ({ title: q.shortcut, text: q.message, rule: i ? "1px solid var(--crm-rule)" : "0", pick: () => setDraft(q.message) })) } : null,
     rec: recOn ? { time: recTime(ui.pRec as number, ui.pRecTick && ui.pRecTick > (ui.pRec as number) ? ui.pRecTick : Date.now()) } : null,

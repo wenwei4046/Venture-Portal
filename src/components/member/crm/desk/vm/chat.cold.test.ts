@@ -78,3 +78,15 @@ describe("the desktop + menu (notes/09)", () => {
     expect(vm.attachOpts[4].bg).toBe("var(--crm-rust)");
   });
 });
+
+describe("the desktop chat on Messenger past 7 days (the owner, 2026-11-10)", () => {
+  it("the warning row in Messenger's words, no Template button, no Cold template, Send grey", () => {
+    const { vm, send } = vmFor(customer("messenger", 8 * 24));
+    expect(vm.waShut).toBe(true);
+    expect(vm.warnText).toBe("Messenger won’t deliver this. After 7 days only a new message from Ahmad reopens the chat.");
+    expect(vm.warnBtn).toBe(false);
+    expect(vm.attachOpts.map(o => o.label)).not.toContain("Cold template");
+    vm.send();
+    expect(send).not.toHaveBeenCalled();
+  });
+});

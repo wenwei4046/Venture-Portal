@@ -89,7 +89,6 @@ export function PhoneCalendar({ input, top }: { input: In; top?: ReactNode }) {
 
 /** One week row: seven 72 px cells, the leave bars laid over them (each across its own days), then appointments. */
 function PhoneWeek({ w }: { w: LeaveCalVM["weeks"][number] }) {
-  const used = w.lanes.reduce((a, t) => a + laneH(t) + 2, 0);
   const topOf = (k: number) => LANE_TOP + w.lanes.slice(0, k).reduce((a, t) => a + laneH(t) + 2, 0);
   return (
     <div data-cal-week="" style={{ position: "relative", display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))" }}>
@@ -97,7 +96,7 @@ function PhoneWeek({ w }: { w: LeaveCalVM["weeks"][number] }) {
         <div key={c.day} {...press(c.pick)} data-day={c.day} aria-pressed={c.sel} style={{ minWidth: 0, minHeight: "72px", display: "flex", flexDirection: "column", gap: "2px", padding: "3px 2px 4px", boxSizing: "border-box",
           borderRight: i < 6 ? `1px solid ${CAL.grid}` : undefined, borderBottom: `1px solid ${CAL.grid}`, background: c.bg, cursor: "pointer" }}>
           <span style={{ flex: "none", alignSelf: "center", minWidth: "20px", height: "20px", padding: "0 4px", boxSizing: "border-box", borderRadius: "10px", display: "grid", placeItems: "center", font: `${c.numW} ${fs(11.5)} ${INTER}`, background: c.numBg, color: c.numFg }}>{c.num}</span>
-          {used > 0 && <span aria-hidden style={{ flex: "none", height: `${used - 2}px` }} />}
+          {c.used > 0 && <span aria-hidden style={{ flex: "none", height: `${c.used - 2}px` }} />}
           {c.appts.map(a => (
             <span key={a.key} title={a.title} onClick={a.open} data-appt="" style={{ flex: "none", display: "flex", alignItems: "center", gap: "3px", minWidth: 0, height: "12px", lineHeight: "12px", whiteSpace: "nowrap", overflow: "hidden", cursor: "pointer" }}>
               <span style={{ flex: "none", width: "5px", height: "5px", borderRadius: "50%", background: CAL.apptDot }} />

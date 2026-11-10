@@ -69,8 +69,13 @@ export const OFF_WORDS: Record<Exclude<UpNextWhy, "leave" | null>, string> = {
 const OFF_ORDER = ["paused", "at_limit", "not_full_time", "no_share", "not_on_ad"];
 const OFF_MINI: Record<string, string> = { "not Full time today": "not Full time", "team not on this ad": "not on this ad" };
 
+/** How many of the line after #1 the phone shows before Show N more (the owner, 2026-11-10: "默认展开5个"). */
+export const QUEUE_TOP = 5;
+
 export interface UpNextUi {
   ad: string; adOpen: boolean; tip: boolean; pick: boolean; more: boolean; why: boolean; hov: string | null;
+  /** The phone's line (9g) shows five, the rest behind Show N more (the owner, 2026-11-10). */
+  qAll?: boolean;
   sheet: { id: string; k: number } | null; ltab: "in" | "off" | "up";
 }
 export interface UpNextActs {
@@ -170,10 +175,15 @@ export function upNextFrame(r: UpNextRead, book: UpNextBook, ads: UpNextAd[], ui
     firstLine: slots[0] ? (ui.why ? slots[0].why : slots[0].team) : "",
     inTurn, inCount: inTurn.length,
     // v4 9g: everyone in turn after #1, in the dealer's order — the circle's number, the name, "{team} · {n} today".
-    queue: inTurn.filter(m => m.id !== slots[0]?.id).map(m => {
+    // Numbered by place in the line, 2, 3, 4 … in the dealer's order (the owner, 2026-11-10: "数字没有顺序" — it was the
+    // first of the next ten leads each would get, so a person dealt #1 and #5 left gaps, and past ten read "10+").
+    // Five on screen, the rest behind "Show N more" ("默认展开5个，剩下的收起").
+    queue: inTurn.filter(m => m.id !== slots[0]?.id).map((m, k) => {
       const n = book.todayOf?.(m.id) ?? 0, team = m.team.replace(/^Team /, "");
-      return { id: m.id, num: m.nextTxt.replace(/^#/, ""), name: m.name, right: n ? `${team} · ${n} today` : team, open: m.open };
-    }), offCount: off.length, first: slots[0] ?? null, chain: ui.more ? slots.slice(1) : slots.slice(1, 4), greyed: off,
+      return { id: m.id, num: String(k + 2), name: m.name, right: n ? `${team} · ${n} today` : team, open: m.open };
+    }).filter((_, k) => ui.qAll || k < QUEUE_TOP),
+    queueMore: Math.max(0, inTurn.filter(m => m.id !== slots[0]?.id).length - QUEUE_TOP), queueAll: !!ui.qAll,
+    toggleQueue: () => a.set({ qAll: !ui.qAll }), offCount: off.length, first: slots[0] ?? null, chain: ui.more ? slots.slice(1) : slots.slice(1, 4), greyed: off,
     moreLabel: ui.more ? "Show less" : `${Math.max(slots.length - 4, 0)} more`, moreOpen: ui.more,
     whyOn: () => a.set({ why: true }), whyOff: () => a.set({ why: false }), toggleMore: () => a.set({ more: !ui.more }),
     pickList, unpin: a.unpin, pickOpen: ui.pick, togglePick: () => a.set({ pick: !ui.pick }),

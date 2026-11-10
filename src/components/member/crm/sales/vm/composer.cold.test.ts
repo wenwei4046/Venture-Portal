@@ -38,7 +38,7 @@ describe("Attach past the window", () => {
 function shutVM(o: Partial<ComposerIn>) {
   const send = vi.fn(), voiceStart = vi.fn(), mainDown = vi.fn(), recTap = vi.fn(), openTpl = vi.fn();
   const v = loose<ComposerIn>({ key: "c1", state: initialComposer(), set: () => {}, placeholder: "Reply to Ahmad…", draft: "", canSend: false, warm: true,
-    reply: null, slash: null, rec: null, recents: [], openTpl, send, voiceStart, tplOn: true, ...o });
+    reply: null, slash: null, rec: null, recents: [], openTpl, send, voiceStart, tplOn: true, waShut: undefined, msShut: undefined, ...o });
   const d = loose<ComposerDom>({ taH: 20, panelH: 280, slide: 0, shown: null, mainDown, recTap });
   return { p: composerVM(v, d), send, mainDown, openTpl };
 }
@@ -77,5 +77,26 @@ describe("WhatsApp past its window (notes/11)", () => {
     expect(p.mainBg).toBe("var(--crm-rust)");
     p.mainAct({} as never);
     expect(send).toHaveBeenCalledOnce();
+  });
+});
+
+describe("Messenger past 7 days (the owner, 2026-11-10: \"messenger 超过7天的要有提示语，像 WA 超过24小时的那样\")", () => {
+  it("the same row in Messenger's words, no Template button; Send grey and inactive, the draft kept", () => {
+    const { p, send } = shutVM({ msShut: "Kah", draft: "Hi", canSend: true });
+    expect(p.warnOn).toBe(true);
+    expect(p.warnText).toBe("Messenger won’t deliver this. After 7 days only a new message from Kah reopens the chat.");
+    expect(p.warnBtn).toBe(false);
+    expect(p.mainBg).toBe(SHUT_GREY);
+    p.mainAct({} as never);
+    expect(send).not.toHaveBeenCalled();
+    expect(p.draft).toBe("Hi");
+  });
+  it("past 7 days only, and Messenger only", async () => {
+    const { messengerPast7 } = await import("./composer");
+    const now = new Date("2026-11-10T00:00:00Z");
+    expect(messengerPast7({ channel: "messenger", lastCustomerAt: "2026-11-02T23:00:00Z" }, now)).toBe(true);
+    expect(messengerPast7({ channel: "messenger", lastCustomerAt: "2026-11-03T01:00:00Z" }, now)).toBe(false);
+    expect(messengerPast7({ channel: "whatsapp", lastCustomerAt: "2026-10-01T00:00:00Z" }, now)).toBe(false);
+    expect(messengerPast7({ channel: "messenger", lastCustomerAt: null }, now)).toBe(false);
   });
 });

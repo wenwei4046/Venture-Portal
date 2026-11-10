@@ -141,6 +141,13 @@ export function PhoneUpNext({ head, live, book, ads, canAct, line }: { head: Rea
             <span style={{ flex: "none", maxWidth: "45%", font: `400 ${fs(12)} Inter, sans-serif`, color: "var(--crm-faint)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{q.right}</span>
           </div>
         ))}
+        {/* Five on screen, the rest folded (the owner, 2026-11-10) — Activity's "Show N more" row (8e): 13px 500 rust, 44px, centred. */}
+        {d.queueMore > 0 && (
+          <button type="button" onClick={d.toggleQueue} aria-expanded={d.queueAll} style={{ border: 0, background: "none", padding: 0, height: "44px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", font: `500 ${fs(13)} Inter, sans-serif`, color: "var(--crm-rust)", cursor: "pointer" }}>
+            {d.queueAll ? "Show less" : `Show ${d.queueMore} more`}
+            <span style={{ display: "flex", transform: d.queueAll ? "rotate(180deg)" : "none", transition: "transform 150ms" }}><Ic name="chevron-down" size={13} /></span>
+          </button>
+        )}
       </div>
       <div style={{ flex: "none", display: "flex", gap: "8px" }}>
         {listBtn("Not in turn", d.offCount, "off")}

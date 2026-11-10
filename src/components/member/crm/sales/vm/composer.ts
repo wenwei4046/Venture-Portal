@@ -72,6 +72,12 @@ export const ALERT_ICON = "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h
 export const SHUT_GREY = "var(--crm-faint-2)";
 /** The warning row's words (frame 6a·2). */
 export const waShutText = (first: string) => `WhatsApp won’t deliver this. After 24 h only a template reaches ${first}.`;
+/** Messenger past 7 days (the owner, 2026-11-10: "messenger 超过7天的要有提示语，像 WA 超过24小时的那样"): the same row, its words —
+ *  Messenger has no template, so no button. Nothing reaches the customer until they write again. */
+export const msShutText = (first: string) => `Messenger won’t deliver this. After 7 days only a new message from ${first} reopens the chat.`;
+/** A Messenger customer's last message more than 7 days ago (Meta's outer limit, with or without Human Agent). */
+export const messengerPast7 = (c: { channel: string; lastCustomerAt: string | null }, now: Date | number) =>
+  c.channel === "messenger" && !!c.lastCustomerAt && +now - new Date(c.lastCustomerAt).getTime() > 7 * 86_400_000;
 
 export const TILES = [
   ["Photos", "M4 5h16v14H4V5Zm0 10 4-4 4 4 3-3 5 5M15 9h.01", "var(--crm-ink-soft)"],
@@ -240,6 +246,9 @@ export interface ComposerIn {
    *  The warning row stands over the bar from the moment the chat opens; Send and the mic are grey and do nothing; typing
    *  is allowed and the draft kept. */
   waShut?: string;
+  /** A Messenger chat past 7 days (the owner, 2026-11-10): the customer's first name — the same row in Messenger's words,
+   *  no Template button; Send and the mic grey, as waShut. */
+  msShut?: string;
 }
 
 /** What only the phone knows, measured by ChatComposer. */
@@ -272,7 +281,7 @@ const noMenu: Click = e => e.preventDefault();
 export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
   const s = v.state, set = v.set, has = !!v.draft.trim(), shown = d.shown;
   // WhatsApp past its window (notes/11): nothing sends and the mic records nothing — a voice note would not be delivered either.
-  const waShut = v.warm && !!v.waShut;
+  const waShut = v.warm && (!!v.waShut || !!v.msShut), isMs = !v.waShut && !!v.msShut;
   const emo = emojiView(s, v.recents);
   const add = (e: string) => {
     v.setDraft(v.draft + e);
@@ -314,7 +323,7 @@ export function composerVM(v: ComposerIn, d: ComposerDom): ComposerVM {
     replyText: v.reply?.text ?? "", replyWho: v.reply?.who ?? "", cancelReply: () => v.cancelReply(),
     slashOpen: !!v.slash, slashQ: v.slash ? `/${v.slash.q}` : "", slashEmpty: !!v.slash?.empty, slashList: v.slash?.list ?? [], qrEdit: v.qrEdit ? () => v.qrEdit?.() : undefined,
     openTpl: () => v.openTpl(),
-    warnOn: waShut, warnText: waShut ? waShutText(v.waShut as string) : "", warnBtn: waShut && v.tplOn !== false, alertIcon: ALERT_ICON, tplOn: v.tplOn !== false && !v.blocked, tplOff: v.tplOn === false && !v.blocked,
+    warnOn: waShut, warnText: !waShut ? "" : isMs ? msShutText(v.msShut as string) : waShutText(v.waShut as string), warnBtn: waShut && !isMs && v.tplOn !== false, alertIcon: ALERT_ICON, tplOn: v.tplOn !== false && !v.blocked, tplOff: v.tplOn === false && !v.blocked,
     // Blocked on Facebook: the cold card says so, with no template button (shared/fb-blocked.ts).
     coldTitle: v.blocked ? FB_BLOCKED : "This chat is cold", coldSub: v.blocked ? FB_BLOCKED_SUB : v.coldSub ?? "",
     recTime: v.rec?.time ?? "", recCancel: () => d.recCancel(), trashRef: d.trashRef,

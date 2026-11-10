@@ -188,27 +188,30 @@ export function leaveCalVM(x: LeaveCalIn) {
         edit: (e: { stopPropagation(): void }) => { e.stopPropagation(); edit(g.l, true); },
         editD: (e: { stopPropagation(): void }) => { e.stopPropagation(); edit(g.l); } };
     });
+    // A day keeps room only for the lanes a bar crosses ON THAT DAY — the lanes up to its highest one; a day no bar crosses
+    // starts its appointments right under its number (the owner, 2026-11-10: "不要 20:00 上面的空格").
+    const topLane = (i: number) => Math.max(-1, ...shown.filter(g => g.c0 <= i && i <= g.c1).map(g => g.k));
     // The phone's room (notes/19 §4: 72 px cells): 3 px top, the 20 px number, 2 px; each lane 16 px (a tall one 26) + 2.
-    const used = lanes.reduce((a, tall) => a + (tall ? 26 : 16) + 2, 0);
-    const room = Math.max(0, Math.floor((72 - 3 - 20 - 2 - 4 - used) / 14));
+    const usedOn = (i: number) => lanes.slice(0, topLane(i) + 1).reduce((a, tall) => a + (tall ? 26 : 16) + 2, 0);
     const days = cells.map((c, i) => {
+      const used = usedOn(i), room = Math.max(0, Math.floor((72 - 3 - 20 - 2 - 4 - used) / 14));
       const aps = apptsOn(null, c.day), hidden = segs.filter(g => g.k >= LANES && g.c0 <= i && i <= g.c1).length;
       const over = hidden + aps.length > room;
       const fit = over ? Math.max(0, room - 1) : aps.length;
       const extra = hidden + aps.length - fit;
       const sel = c.day === st.pDay, today = c.day === TODAY, inM = c.day.slice(0, 7) === st.month;
       const nd = calDay({ today, picked: false, inMonth: inM });
-      return { day: c.day, num: c.num, inM, sel, bg: sel ? CAL.selBg : inM ? "#fff" : CAL.outBg, numBg: nd.bg, numFg: nd.fg, numW: nd.w,
+      return { day: c.day, num: c.num, inM, sel, used, bg: sel ? CAL.selBg : inM ? "#fff" : CAL.outBg, numBg: nd.bg, numFg: nd.fg, numW: nd.w,
         appts: aps.slice(0, fit).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), title: `${a.t} · ${a.cust} · ${name(a.who)}`,
           open: (e: { stopPropagation(): void }) => { e.stopPropagation(); x.acts.openAppt?.(a); } })),
         more: extra > 0 ? `+${extra}` : "", pick: () => set({ pDay: c.day, month: c.day.slice(0, 7) }) };
     });
     // The desktop keeps its own room (≈100 px rows: 22 px number, 20 px lanes, 18 px appointment lines).
-    const dRoom = Math.max(0, Math.floor((96 - 10 - 22 - 3 - lanes.length * 23) / 21));
     const dDays = cells.map((c, i) => {
+      const dLanes = topLane(i) + 1, dRoom = Math.max(0, Math.floor((96 - 10 - 22 - 3 - dLanes * 23) / 21));
       const aps = apptsOn(null, c.day), hidden = segs.filter(g => g.k >= LANES && g.c0 <= i && i <= g.c1).length;
       const fit = hidden + aps.length > dRoom ? Math.max(0, dRoom - 1) : aps.length, extra = hidden + aps.length - fit;
-      return { ...c, appts: aps.slice(0, fit).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), dot: CAL.apptDot, title: `${a.t} · ${a.cust} · ${name(a.who)}`,
+      return { ...c, dLanes, appts: aps.slice(0, fit).map(a => ({ key: a.visitId, t: a.t, who: first(name(a.who)), dot: CAL.apptDot, title: `${a.t} · ${a.cust} · ${name(a.who)}`,
         open: (e: { stopPropagation(): void }) => { e.stopPropagation(); x.acts.openAppt?.(a); } })), more: extra > 0 ? `+${extra} more` : "" };
     });
     return { key: d0, lanes, bars, days, dDays };

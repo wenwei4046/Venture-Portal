@@ -22,7 +22,7 @@ import { ATTACH_TILES, DOC_ACCEPT, autoChoices } from "../../shared/attach-sheet
 import { openColdTemplates } from "../../shared/cold-templates";
 import { isFbBlocked } from "../../shared/fb-blocked";
 import { windowShut } from "../../sales/vm/common";
-import { ALERT_ICON, CATS, COLD_ICON, ICON as CMP_ICON, SHUT_GREY, emojiView, pushRecent, waShutText } from "../../sales/vm/composer";
+import { ALERT_ICON, CATS, COLD_ICON, ICON as CMP_ICON, SHUT_GREY, emojiView, messengerPast7, msShutText, pushRecent, waShutText } from "../../sales/vm/composer";
 import { adKindLabel } from "../../shared/AdLink";
 
 const DAY = 86_400_000;
@@ -128,7 +128,9 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
   const replyMsg = c && ui.replyTo ? c.messages.find(m => m.id === ui.replyTo) : undefined;
   // A WhatsApp chat past its 24 h window (CRM v4 notes/11, frame 6a·2 as the phone's): the warning row over the composer,
   // Send and the mic grey and inactive — typing allowed, the draft kept. Not a customer blocked on Facebook (their own line).
-  const waShut = !!c && c.channel === "whatsapp" && windowShut(c, ctx.now) && !isFbBlocked(c, data);
+  // …and a Messenger chat past 7 days (the owner, 2026-11-10): the same row in Messenger's words, no Template button.
+  const msShut = !!c && messengerPast7(c, ctx.now) && !isFbBlocked(c, data);
+  const waShut = (!!c && c.channel === "whatsapp" && windowShut(c, ctx.now) && !isFbBlocked(c, data)) || msShut;
   const tplOn = data.settings?.suggestTemplate !== false;
   const openTpl = () => { if (c) void openColdTemplates(c, act); };
   const send = () => { if (!c || !draft.trim() || waShut) return; const text = draft, rt = replyMsg?.id ?? null; setD(""); patch({ replyTo: null });
@@ -145,7 +147,7 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
   // Auto replies are back in Suggest reply's place (CRM v4 notes/09; as before 2026-10-29): one's saved welcome /
   // after-hours / keyword replies, into the reply box. Past the window on WhatsApp the row is Cold template (the phone's
   // Attach tile 4 since 2026-11-04), opening the templates — Settings › Suggest a template off, Auto replies stays.
-  const coldTile = waShut && tplOn;
+  const coldTile = waShut && !msShut && tplOn;
   const choices = view === "quick" ? data.quickReplies.map(q => ({ label: q.shortcut ? `/${q.shortcut}` : q.message.slice(0, 24), text: q.message }))
     : view === "auto" ? autoChoices(data.autoReplies) : [];
   const attachOpts = view ? [
@@ -174,7 +176,7 @@ export function chatVM(ctx: DeskCtx, id: string | null) {
     c, msgs, firstDay, draft,
     // notes/11: the WhatsApp cold warning row directly above the composer (full width, 8px over it), its Template button
     // (none while Suggest a template is off); Send / the mic grey, the wall and the reply quote clear of the row.
-    waShut, warnText: waShut && c ? waShutText(first(c.name)) : "", warnBtn: waShut && tplOn, alertIcon: ALERT_ICON, openTpl,
+    waShut, warnText: waShut && c ? (msShut ? msShutText(first(c.name)) : waShutText(first(c.name))) : "", warnBtn: waShut && !msShut && tplOn, alertIcon: ALERT_ICON, openTpl,
     sendBg: waShut ? SHUT_GREY : "var(--crm-rust)", sendCursor: waShut ? "default" : "pointer", sendSh: waShut ? "none" : "0 6px 20px rgba(42,22,12,.15)",
     sendCls: waShut ? undefined : "crm4a-primary", chatPadB: waShut ? "20px 28px 168px" : "20px 28px 104px", replyBottom: waShut ? "144px" : "82px",
     setDraft: (e: { target: { value: string } }) => setD(e.target.value),
