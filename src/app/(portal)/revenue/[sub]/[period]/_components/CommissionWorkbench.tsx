@@ -21,7 +21,9 @@ import type { CommissionWorkbenchData } from '../../../_lib/commission-workbench
 import { excludeOrder, includeOrder } from '../../../run-actions'
 import { nameWarnings, payrollState, unassignedOldBillWarnings, unmatchedWarnings, type RunStatus } from '@/lib/commission/payroll-send'
 import { useEntryScroll } from '@/components/layout/useEntryScroll'
-import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillMoveOutcome, type BillShareOutcome } from '../orders/_components/BillContextMenu'
+import BillContextMenu, { type BillBrandOutcome, type BillHalfCommOutcome, type BillMenuOutcome, type BillMoveOutcome, type BillShareOutcome } from '../orders/_components/BillContextMenu'
+import HalfCommNotice from '../orders/_components/HalfCommNotice'
+import { billHalfCommAction, describeHalfComm, HALF_COMM_LABEL, type BillHalfCommAction } from '@/lib/commission/bill-half-comm'
 import BillCountNotice from '../orders/_components/BillCountNotice'
 import BillShareNotice from '../orders/_components/BillShareNotice'
 import BillMoveNotice from '../orders/_components/BillMoveNotice'
@@ -248,6 +250,7 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
   const [brandDone, setBrandDone] = useState<string | null>(null)
   const [shareDone, setShareDone] = useState<BillShareOutcome | null>(null)
   const [moveDone, setMoveDone] = useState<BillMoveOutcome | null>(null)
+  const [halfDone, setHalfDone] = useState<BillHalfCommOutcome | null>(null)
   // The ledger's own button is the real Don't count too (user 2026-09-27): it
   // answers on the same notice, with the same Undo, as the right-click menu.
   const [billPending, startBill] = useTransition()
@@ -613,6 +616,25 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     setShareDone(null)
     setMoveDone(outcome)
   }
+  // Half comm (2026-11-10): locked where Don't count is — a paid run, a closed holder.
+  function halfActionFor(row: CommissionOrderRow | OverrideOrderRow): BillHalfCommAction | null {
+    return billHalfCommAction(
+      { halfComm: !!row.halfComm, upsale: row.upsale },
+      { runLocked: lockedMonths.has(row.periodMonth), closedReason: closedHolder(row, 'changing what this bill pays'), monthLabel: monthName(row.periodMonth) },
+    )
+  }
+  function halfDetail(orderId: string): string | null {
+    const mark = data.halfComms?.[orderId]
+    return mark ? describeHalfComm(mark) : null
+  }
+  function halfMenuDone(outcome: BillHalfCommOutcome) {
+    billMenu.closeMenu()
+    setBillDone(null)
+    setBrandDone(null)
+    setShareDone(null)
+    setMoveDone(null)
+    setHalfDone(outcome.result.changed ? outcome : null)
+  }
   // The notice's *Open NAME*: the ledger the bill now sits on, the notice kept.
   function openMovedHolder(staffId: string) {
     const outcome = moveDone
@@ -704,9 +726,15 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     const own = row as CommissionOrderRow
     switch (key) {
       // Why a row from another month is here: a word on a wash, and the month it came from.
-      case 'status': return origin
-        ? <><span className={`chip ${ORIGIN_TONE[origin.kind]}`}><span className="dot" />{origin.label}</span><small>{origin.detail}</small></>
-        : <span className={s.muted}>—</span>
+      case 'status': {
+        // Half comm (2026-11-10): its own chip, the why on hover — beside where the row came from.
+        const half = row.halfComm
+          ? <span className="chip danger" title={halfDetail(row.orderId) ?? undefined}><span className="dot" />{HALF_COMM_LABEL}</span>
+          : null
+        return origin
+          ? <>{half}<span className={`chip ${ORIGIN_TONE[origin.kind]}`}><span className="dot" />{origin.label}</span><small>{origin.detail}</small></>
+          : half ?? <span className={s.muted}>—</span>
+      }
       // An upsale is no bill, so it has no paper of its own.
       case 'ref': return row.upsale ? <span className={s.muted}>—</span> : <PaperRefCell refNo={row.refNo} paperNo={row.paperNo} />
       // A shared bill names every holder, the owner first; the ledger's own person in bold.
@@ -847,6 +875,8 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
     {moveDone && <BillMoveNotice key={`${moveDone.result.orderId}:${moveDone.result.to.staffId}:${moveDone.undone ? 'undone' : 'done'}`}
       outcome={moveDone} className={s.notice} buttonClassName={s.ghostButton} onChange={setMoveDone}
       onOpenHolder={openMovedHolder} currentStaffId={isPersonView ? personId : null} />}
+    {halfDone && <HalfCommNotice key={`${halfDone.orderId}:${halfDone.halved}`} outcome={halfDone} monthLabel={monthLabel}
+      className={s.notice} buttonClassName={s.ghostButton} onChange={setHalfDone} />}
     {error && <p className={s.warning} role="alert">{error}</p>}
   </>
 
@@ -1111,7 +1141,12 @@ export default function CommissionWorkbench({ data, sub, period, runStatus, save
         const action = moveActionFor(billMenu.menu.row)
         return action ? { action, candidates: shareCandidates } : null
       })()}
-      onClose={billMenu.closeMenu} onDone={billMenuDone} onBrandDone={brandMenuDone} onShareDone={shareMenuDone} onMoveDone={moveMenuDone} />}
+      halfComm={(() => {
+        const action = halfActionFor(billMenu.menu.row)
+        return action ? { action, detail: halfDetail(billMenu.menu.row.orderId) } : null
+      })()}
+      onClose={billMenu.closeMenu} onDone={billMenuDone} onBrandDone={brandMenuDone} onShareDone={shareMenuDone} onMoveDone={moveMenuDone}
+      onHalfCommDone={halfMenuDone} />}
   </section>
 }
 

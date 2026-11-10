@@ -2040,3 +2040,86 @@ describe('a gift with purchase leaves the margin (2026-11-08)', () => {
     ])).toEqual([{ id: 'g', buy: ['ECOBLISS (Q)'], gifts: [{ code: 'MF PILLOW', perUnit: 2 }, { code: 'MP (Q)', perUnit: 1 }] }])
   })
 })
+
+// 2026-11-10 (Comm Cal › a bill's menu › Half comm — the user: "commission value 5000, commission percentage 6%;
+// commission get RM300, 当我按了 half comm 就会是 total commission RM150"; and asked the rest: the upline's override on
+// it halved too, its sales counted in full, its KPI items paid in full).
+describe('half comm halves what a bill pays, never its sales (2026-11-10)', () => {
+  // A 6% Specialist under the 7% Team Assistant, under the 9% Team Leader.
+  const SIX: HierarchyNode[] = [node('tl', null, 'tl_9'), node('ta', 'tl', 'ta_7'), node('rs', 'ta', 'rs_6')]
+  const halfComm = (o: SalesOrder): SalesOrder => ({ ...o, halfComm: true })
+  const bill = (id: string, amount: number) => order(id, 'rs', [['MATTRESS', 'M1', 1, amount]])
+
+  it('pays RM 5,000 at 6% RM 150, not RM 300 — and says half comm on the line', () => {
+    const full = find(run({ hierarchy: SIX, orders: [bill('1', 5_000)] }).statements, 'rs')
+    expect(full.productCommission).toBe(300)
+    const rs = find(run({ hierarchy: SIX, orders: [halfComm(bill('1', 5_000))] }).statements, 'rs')
+    expect(rs.productCommission).toBe(150)
+    expect(rs.totalCommission).toBe(150)
+    expect(rs.lines.find(l => l.component === 'product_revenue')).toMatchObject({
+      basisAmount: 5_000, rate: 0.06, amount: 150, note: 'SO-1 · 2026-07-06 · half comm',
+    })
+  })
+
+  it('halves the override up the line on it', () => {
+    const r = run({ hierarchy: SIX, orders: [halfComm(bill('1', 5_000))] })
+    expect(find(r.statements, 'ta').overrideCommission).toBe(25) // (7 − 6)% of 5,000 = 50, halved
+    expect(find(r.statements, 'tl').overrideCommission).toBe(50) // (9 − 7)% of 5,000 = 100, halved
+    expect(find(r.statements, 'rs').penaltyWeightedRevenue).toBe(2_500)
+  })
+
+  it('counts its sales in full — own, group, and the rung they climb', () => {
+    const r = run({ hierarchy: SIX, orders: [halfComm(bill('1', 5_000))] })
+    expect(find(r.statements, 'rs').productRevenue).toBe(5_000)
+    expect(find(r.statements, 'ta').groupRevenue).toBe(5_000)
+    expect(find(r.statements, 'tl').groupRevenue).toBe(5_000)
+    // RM 300,000 of group sales lifts a variable 6% to Team Assistant whether or not the bill pays half.
+    const variable = [node('rs', null, 'rs_6', 'variable')]
+    expect(find(run({ hierarchy: variable, orders: [halfComm(bill('1', 300_000))] }).statements, 'rs').effectiveRankKey).toBe('ta_7')
+  })
+
+  it('pays its KPI items in full', () => {
+    const o = halfComm(order('1', 'rs', [['MATTRESS', 'M1', 1, 5_000], ['ACC', 'AK-CS AIRLOFT COMFY PIL', 2, 100]]))
+    const rs = find(run({ hierarchy: SIX, orders: [o] }).statements, 'rs')
+    expect(rs.kpiCommission).toBe(100) // 2 × RM 50, whole
+    expect(rs.productCommission).toBe(150) // 5,000 × 6%, halved
+  })
+
+  it('halves after the margin cut, and the penalty withheld is the margin’s alone', () => {
+    // 26% on Akemi's ladder: Below margin Tier 1 × 0.5 — RM 10,000 at 6% is 600 → 300, then half comm → 150.
+    const thin = halfComm(order('1', 'rs', [['MATTRESS', 'M1', 1, 10_000, 7_400]]))
+    const r = run({ hierarchy: SIX, orders: [thin] })
+    const rs = find(r.statements, 'rs')
+    expect(rs.productCommission).toBe(150)
+    expect(rs.marginPenaltyWithheld).toBe(300)
+    expect(rs.productRevenue).toBe(5_000) // the margin's cut, as before — half comm cuts no sales
+    expect(r.penalised[0].withheld).toBe(300)
+    expect(rs.lines.find(l => l.component === 'product_revenue')?.note).toMatch(/× 0\.5 · half comm$/)
+  })
+
+  it('halves each holder’s part of a shared bill', () => {
+    const parts = splitOrdersByShares([halfComm(bill('1', 10_000))], [{ orderId: '1', staffId: 'ta', pct: 0.5 }])
+    const r = run({ hierarchy: SIX, orders: parts })
+    expect(find(r.statements, 'rs').productCommission).toBe(150) // 5,000 × 6%, halved
+    expect(find(r.statements, 'ta').productCommission).toBe(175) // 5,000 × 7%, halved
+    expect(find(r.statements, 'rs').productRevenue).toBe(5_000)
+  })
+
+  it('halves a director’s own bill too, and an old bill topped up', () => {
+    const head = run({
+      hierarchy: SIX, departmentHeadIds: ['director'],
+      directors: [{ staffId: 'director', rankKey: 'rs_6', fixedAmount: 0, salesThreshold: null, incentiveAmount: 0 }],
+      orders: [{ ...halfComm(bill('1', 5_000)), staffId: 'director' }],
+    })
+    expect(find(head.statements, 'director').productCommission).toBe(150)
+    expect(find(head.statements, 'director').productRevenue).toBe(5_000)
+    const old = run({ hierarchy: SIX, orders: [{ ...halfComm(bill('1', 5_000)), commissionOnly: true }] })
+    expect(find(old.statements, 'rs').productCommission).toBe(150)
+  })
+
+  it('leaves a bill without it as it was', () => {
+    const r = run({ hierarchy: SIX, orders: [bill('1', 5_000), halfComm(bill('2', 5_000))] })
+    expect(find(r.statements, 'rs').productCommission).toBe(450) // 300 + 150
+    expect(find(r.statements, 'rs').productRevenue).toBe(10_000)
+  })
+})

@@ -242,6 +242,8 @@ export interface SalesOrderRow {
   brand_code?: string | null
   /** `erp_sync` for the ERP's bills (2026-11-07: only those can be an old bill topped up). Absent in older fixtures. */
   source?: string | null
+  /** Half comm (2026-11-10, `sales_order_half_comm`): set by the loader, never a column. */
+  half_comm?: boolean
   sales_order_lines: SalesLineRow[] | null
 }
 
@@ -446,6 +448,8 @@ export function toEngineInput(rows: RunSourceRows): EngineInput {
       // An old bill topped up pays its holder commission only (2026-11-07).
       ...((o.source ?? 'erp_sync') === 'erp_sync' && isOldBillDate(o.order_date, o.period_month, rows.feedFloor ?? null)
         ? { commissionOnly: true } : {}),
+      // Half comm (2026-11-10): the bill's own commission and override base halved.
+      ...(o.half_comm ? { halfComm: true } : {}),
       manualMarginPct: numOrNull(o.manual_margin_pct),
       brandCode: o.brand_code?.trim() || null,
       lines: (o.sales_order_lines ?? []).map(l => ({

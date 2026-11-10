@@ -228,3 +228,33 @@ describe('an old bill topped up', () => {
     expect(bills.find(b => b.id === 'one')).not.toHaveProperty('commissionOnly')
   })
 })
+
+// ─── Half comm (2026-11-10) ─────────────────────────────────────────────────
+
+describe('a half-comm bill', () => {
+  const half = input({ orders: [sale('one', 1_000, { halfComm: true })] })
+  const plain = input({ orders: [sale('one')] })
+
+  it('closes at the figure the page shows: half the commission, the whole sale', () => {
+    const melvin = board(half).people.find(p => p.staffId === 'agent')!
+    const before = board(plain).people.find(p => p.staffId === 'agent')!
+    expect(salespersonFigures(melvin)).toMatchObject({ orders: 1, salesValue: 1_000, commissionable: 1_000 })
+    expect(melvin.personalTotal).toBe(before.personalTotal / 2)
+    expect(melvin.reconciliationDifference).toBe(0)
+    expect(closeOf(half, 'agent').total).toBe(melvin.totalCommission)
+  })
+
+  it('halves the upline’s override on it, row and total alike', () => {
+    const leader = board(half).people.find(p => p.staffId === 'leader')!
+    const before = board(plain).people.find(p => p.staffId === 'leader')!
+    expect(leader.overrideTotal).toBe(before.overrideTotal / 2)
+    expect(leader.overridingRows.map(r => r.overrideAmount)).toEqual([before.overrideTotal / 2])
+    expect(leader.reconciliationDifference).toBe(0)
+  })
+
+  it('is kept as such by the close, through JSON', () => {
+    const bills = closeOf(half, 'agent').summary.bills
+    expect(bills.find(b => b.id === 'one')).toMatchObject({ id: 'one', halfComm: true })
+    expect(closeOf(plain, 'agent').summary.bills.find(b => b.id === 'one')).not.toHaveProperty('halfComm')
+  })
+})

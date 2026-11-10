@@ -8,6 +8,7 @@ import { assertBillsNotClosed, billsClosedReason, staffClosedReason } from './_l
 import { loadOrderShares, loadShareTeam } from './_lib/month-orders'
 import { holdersOf, type BillShareAnswer, type BillShareResult, type ShareHolder } from '@/lib/commission/bill-share'
 import type { BillMoveAnswer } from '@/lib/commission/bill-move'
+import type { BillHalfCommAnswer, BillHalfCommResult } from '@/lib/commission/bill-half-comm'
 
 /**
  * What a commission month's people change by hand: shares, moves, bills that
@@ -315,6 +316,42 @@ export async function includeOrder(orderId: string): Promise<BillCountResult> {
   if (error) throw new Error(error.message)
   revalidatePath('/revenue', 'layout')
   return data as BillCountResult
+}
+
+// ─── Half comm (2026-11-10) ─────────────────────────────────────────────────
+
+/** The half-comm list's own refusals (a paid month, a bill that does not count), as words. */
+const HALF_COMM_REFUSALS = new Set(['23RUN', '23EXC'])
+
+/**
+ * Half comm, or Full comm again (2026-11-10, a bill's menu on Comm Cal; the
+ * user: "commission value 5000, commission percentage 6%; commission get
+ * RM300, 当我按了 half comm 就会是 total commission RM150"): the bill's own
+ * commission and the override on it are halved; its sales and KPI items stay
+ * whole. The rule is the database's (`revenue_half_comm_order` /
+ * `revenue_full_comm_order`, mig 20261110160000); this also refuses, as Don't
+ * count does, a bill somebody paid on it has closed.
+ *
+ * Answers with what it did, or with why not (`BillHalfCommAnswer`) — never a
+ * thrown refusal, which production shows as "Minified React error #441".
+ */
+export async function setHalfComm(orderId: string, half: boolean, note?: string | null): Promise<BillHalfCommAnswer> {
+  await requireActionOn('/revenue/[sub]/[period]', 'revenue', 'edit')
+  if (typeof orderId !== 'string' || !orderId) return { ok: false, reason: 'Which bill?' }
+  const why = typeof note === 'string' ? note.trim().slice(0, 500) : ''
+  const supabase = await client()
+  const closed = await billsClosedReason(supabase, [orderId])
+  if (closed) return { ok: false, reason: closed }
+  const { data, error } = half
+    ? await supabase.rpc('revenue_half_comm_order', { p_order_id: orderId, p_note: why || null })
+    : await supabase.rpc('revenue_full_comm_order', { p_order_id: orderId })
+  if (error) {
+    if (HALF_COMM_REFUSALS.has(error.code ?? '')) return { ok: false, reason: error.message }
+    throw new Error(error.message)
+  }
+  const result = data as BillHalfCommResult
+  if (result.changed) revalidatePath('/revenue', 'layout')
+  return { ok: true, result }
 }
 
 /** What giving a bill a brand by hand — or taking the pick off — did. */

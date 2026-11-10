@@ -11,7 +11,9 @@ import { billMoveAction, movedNote, type BillMoveAction, type BillMoved } from '
 import s from '../../_components/commission-workbench.module.css'
 import NoCommission, { COMMISSIONABLE_HINT, SALES_VALUE_HINT } from '../../_components/NoCommission'
 import PaperRefCell from '../../_components/PaperRefCell'
-import BillContextMenu, { type BillBrandOutcome, type BillMenuOutcome, type BillMoveOutcome, type BillShareOutcome } from './BillContextMenu'
+import BillContextMenu, { type BillBrandOutcome, type BillHalfCommOutcome, type BillMenuOutcome, type BillMoveOutcome, type BillShareOutcome } from './BillContextMenu'
+import HalfCommNotice from './HalfCommNotice'
+import type { BillHalfCommAction } from '@/lib/commission/bill-half-comm'
 import BillCountNotice from './BillCountNotice'
 import BillShareNotice from './BillShareNotice'
 import BillMoveNotice from './BillMoveNotice'
@@ -89,6 +91,10 @@ export interface BillRow {
    * is no sale — listed, its commission in the subtotal, out of the sales ones.
    */
   commissionOnly?: boolean
+  /** Half comm (2026-11-10): what the menu may do about it — null for a bill that does not count. */
+  halfCommAction?: BillHalfCommAction | null
+  /** "Half comm by HR on 10 Nov 2026 — why", while it is half: the Status tooltip. */
+  halfCommDetail?: string | null
 }
 
 type Column =
@@ -150,6 +156,7 @@ export default function AllBillsTable({ rows, team, commissionNote, initialShowE
   const [brandDone, setBrandDone] = useState<string | null>(null)
   const [shareDone, setShareDone] = useState<BillShareOutcome | null>(null)
   const [moveDone, setMoveDone] = useState<BillMoveOutcome | null>(null)
+  const [halfDone, setHalfDone] = useState<BillHalfCommOutcome | null>(null)
 
   const excludedCount = rows.filter(r => r.cancelled).length
   const brands = useMemo(() => [...new Set(rows.flatMap(r => r.brands))].sort(), [rows])
@@ -208,6 +215,15 @@ export default function AllBillsTable({ rows, team, commissionNote, initialShowE
     setBrandDone(null)
     setMoveDone(null)
     setShareDone(outcome)
+  }
+
+  function halfMenuDone(outcome: BillHalfCommOutcome) {
+    closeMenu()
+    setDone(null)
+    setBrandDone(null)
+    setShareDone(null)
+    setMoveDone(null)
+    setHalfDone(outcome.result.changed ? outcome : null)
   }
 
   function moveMenuDone(outcome: BillMoveOutcome) {
@@ -330,6 +346,8 @@ export default function AllBillsTable({ rows, team, commissionNote, initialShowE
       outcome={shareDone} className={s.notice} buttonClassName={s.ghostButton} onChange={setShareDone} />}
     {moveDone && <BillMoveNotice key={`${moveDone.result.orderId}:${moveDone.result.to.staffId}:${moveDone.undone ? 'undone' : 'done'}`}
       outcome={moveDone} className={s.notice} buttonClassName={s.ghostButton} onChange={setMoveDone} />}
+    {halfDone && <HalfCommNotice key={`${halfDone.orderId}:${halfDone.halved}`} outcome={halfDone} monthLabel={monthLabel}
+      className={s.notice} buttonClassName={s.ghostButton} onChange={setHalfDone} />}
 
     <div className={s.tableFrame}>
       <div className={s.tableScroll} role="region" aria-label="All bills, scroll horizontally" tabIndex={0}>
@@ -349,7 +367,7 @@ export default function AllBillsTable({ rows, team, commissionNote, initialShowE
                 <div>
                   <Link href={r.href}>{r.orderNo}</Link>
                   <small className={r.status === 'Deposit pending' ? 'text-alert' : undefined}
-                    title={r.exclusionDetail ?? undefined}>{r.status}</small>
+                    title={r.exclusionDetail ?? r.halfCommDetail ?? undefined}>{r.status}</small>
                 </div>
                 <button type="button" className={s.rowMenuButton} aria-haspopup="menu" data-bill-menu-trigger
                   aria-expanded={isOpenOn(r)} aria-label={`Actions for ${r.orderNo}`}
@@ -398,6 +416,8 @@ export default function AllBillsTable({ rows, team, commissionNote, initialShowE
         const action = moveActionOf(menu.row)
         return action ? { action, candidates: team } : null
       })()}
-      onClose={closeMenu} onDone={menuDone} onBrandDone={brandMenuDone} onShareDone={shareMenuDone} onMoveDone={moveMenuDone} />}
+      halfComm={menu.row.halfCommAction ? { action: menu.row.halfCommAction, detail: menu.row.halfCommDetail ?? null } : null}
+      onClose={closeMenu} onDone={menuDone} onBrandDone={brandMenuDone} onShareDone={shareMenuDone} onMoveDone={moveMenuDone}
+      onHalfCommDone={halfMenuDone} />}
   </div>
 }
