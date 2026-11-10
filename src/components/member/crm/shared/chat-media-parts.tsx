@@ -5,6 +5,9 @@ import { cachedFacts, pdfFacts, sizeLabel, type PdfFacts } from "./pdf";
 import { keepImage, keepPoster, useKeptSrc } from "./media-cache";
 import { firstFrameSrc } from "./chat-media";
 import { typePx } from "./type";
+import { useGone } from "./media-gone";
+import { GoneTile } from "./gone-tile";
+export { GoneTile } from "./gone-tile";
 export { VoiceNote } from "./voice-note";
 
 /**
@@ -15,17 +18,21 @@ export { VoiceNote } from "./voice-note";
 export function PdfCard({ src, name, onOpen }: { src: string; name: string; onOpen?: () => void }) {
   const [facts, setFacts] = useState<PdfFacts | null>(() => (typeof window === "undefined" ? null : cachedFacts(src)));
   const box = useRef<HTMLSpanElement>(null);
+  const g = useGone(src);
   useEffect(() => {
-    if (facts || !box.current) return;
+    if (facts || g.gone || !box.current) return;
     let on = true;
     const io = new IntersectionObserver(es => {
       if (!es.some(e => e.isIntersecting)) return;
       io.disconnect();
-      void pdfFacts(src).then(f => { if (on && f) setFacts(f); });
+      // A PDF that could not be read is asked once whether it is gone at Meta (2026-11-10).
+      void pdfFacts(src).then(f => { if (on && f) setFacts(f); else if (on) g.check(); });
     });
     io.observe(box.current);
     return () => { on = false; io.disconnect(); };
-  }, [src, facts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [src, facts, g.gone]);
+  if (g.gone && !facts) return <GoneTile kind="file" channel={g.gone} style={{ width: "250px", maxWidth: "100%", minHeight: "64px" }} />;
   const line = [facts?.pages ? `${facts.pages} page${facts.pages === 1 ? "" : "s"}` : "", facts ? sizeLabel(facts.bytes) : "", "pdf"].filter(Boolean).join(" · ");
   return (
     <span ref={box} onClick={onOpen} style={{ display: "block", width: "250px", maxWidth: "100%", borderRadius: "12px", overflow: "hidden", background: "var(--crm-page)", cursor: "pointer" }}>
@@ -93,20 +100,23 @@ function useRetry(src: string) {
 }
 
 export function ChatImg({ src, onClick, onLoad, style, alt = "Photo", loading }: { src: string; onClick?: () => void; onLoad?: React.ReactEventHandler<HTMLImageElement>; style?: React.CSSProperties; alt?: string; loading?: "lazy" | "eager" }) {
-  const kept = useKeptSrc(src), r = useRetry(src), [bad, setBad] = useState(false);
+  const kept = useKeptSrc(src), r = useRetry(src), [bad, setBad] = useState(false), g = useGone(src);
   useEffect(() => setBad(false), [src, r.n]);
   const shown = kept.src ? (kept.kept ? kept.src : retrySrc(kept.src, r.n)) : null;
+  // Gone at Meta and not on this phone: the tile, no more tries (a copy the phone kept still shows).
+  if (g.gone && kept.src && !kept.kept) return <GoneTile kind="image" channel={g.gone} style={{ width: style?.width, height: style?.height }} />;
   return (
     <img onClick={onClick} alt={bad ? "" : alt} loading={loading} style={bad ? { ...style, visibility: "hidden" } : style} {...(shown ? { src: shown } : {})}
-      onError={() => { setBad(true); r.failed(); }}
+      onError={() => { setBad(true); if (!r.n) g.check(); r.failed(); }}
       onLoad={e => { setBad(false); onLoad?.(e); if (!kept.kept && kept.src === src) keepImage(src); }} />
   );
 }
 
 export function ChatVideo({ src, base, onLoadedMetadata, style }: { src: string; base: string; onLoadedMetadata?: React.ReactEventHandler<HTMLVideoElement>; style?: React.CSSProperties }) {
-  const poster = useKeptSrc(base, true), r = useRetry(src);
+  const poster = useKeptSrc(base, true), r = useRetry(src), g = useGone(base);
+  if (g.gone) return <GoneTile kind="video" channel={g.gone} style={{ width: style?.width, height: style?.height }} />;
   return (
-    <video key={r.n} src={retrySrc(src, r.n)} poster={poster.src ?? undefined} muted playsInline preload="metadata" style={style} onError={r.failed}
+    <video key={r.n} src={retrySrc(src, r.n)} poster={poster.src ?? undefined} muted playsInline preload="metadata" style={style} onError={() => { if (!r.n) g.check(); r.failed(); }}
       onLoadedMetadata={e => {
         onLoadedMetadata?.(e);
         // No picture kept and still at its start (a browser that took no `#t=`): asked for a moment in, an iPhone draws it.

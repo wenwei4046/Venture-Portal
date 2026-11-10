@@ -7,6 +7,7 @@ import { sweepHiringLeftovers } from '@/lib/hiring/leftovers'
 import { sweepDataCenterBin } from '@/lib/documentation/drive-bin-sweep'
 import { refreshAdStatuses } from '@/lib/member/crm-ad-names-meta'
 import { refreshMessengerBlocked } from '@/lib/messenger/blocked'
+import { keepCustomerMedia } from '@/lib/member/crm-media-keep'
 import { sweepFileObjects } from '@/lib/storage/sweep'
 
 export const runtime = 'nodejs'
@@ -69,6 +70,10 @@ export async function GET(request: Request) {
     // CRM Pages' conversations are read for can_reply = false (lib/messenger/blocked.ts). Best effort — a count only.
     const fbBlocked = await refreshMessengerBlocked(db, process.env.META_SYSTEM_USER_TOKEN?.trim())
     if (fbBlocked) console.info('Messenger blocked customers changed', fbBlocked)
+    // A customer's file a webhook could not copy into crm-media (mig 20261110140000 — the owner, 2026-11-10: "Yes, copy
+    // on arrival"): asked again while Meta still has it, 20 a run, each at most 6 times. Counts only.
+    const media = await keepCustomerMedia(db, { limit: 20, budgetMs: 20_000, token: process.env.META_SYSTEM_USER_TOKEN?.trim() })
+    if (media.listed) console.info('CRM customer files kept', media.kept, 'of', media.listed)
     // Phone notifications a write left unsent (mig 20261011180000) — through the outbox's own secret, not the service role.
     await flushPush()
     // Hiring's leftovers (mig 20261011210000; the user: every hour, even when nobody touches Hiring): files no

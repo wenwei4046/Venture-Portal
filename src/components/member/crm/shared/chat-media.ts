@@ -2,6 +2,7 @@ import type { SyntheticEvent } from "react";
 import type { CrmChatMessage } from "@/lib/member/crm-data";
 import type { AlbumTile } from "./chat-media-parts";
 import { docLabel, mediaHeight, openViewer, rememberShape, type ViewerItem } from "./viewer";
+import { goneOf, goneWords, markGone } from "./media-gone";
 
 /**
  * A message's photo, video, voice note or document as both chats draw it (the salesperson's and the panel's; markup
@@ -94,6 +95,10 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
   const md = m.media;
   if (!md) return { ...NO_MEDIA, voiceMine };
   const k = md.kind, url = md.url, framed = k === "image" || k === "video" || k === "file";
+  // A customer's file gone at Meta and never kept (2026-11-10): ChatImg / ChatVideo / VoiceNote / PdfCard draw the tile;
+  // a plain document's tile says so itself and opens nothing.
+  if (md.gone) markGone(url, md.gone);
+  const lost = md.gone ?? goneOf(url);
   return {
     ...NO_MEDIA, voiceMine,
     img: k === "image" ? url : "",
@@ -103,11 +108,11 @@ export function mediaOf(m: Msg, gallery: ViewerItem[], album?: Msg[]): typeof NO
     aud: k === "audio" ? url : "",
     file: k === "file" ? url : "",
     mh: k === "image" || k === "video" ? mediaHeight(url) : "",
-    docName: k === "file" ? md.name || "Document" : "",
+    docName: k === "file" ? (lost && docLabel(md.name, md.mime) !== "PDF" ? `${goneWords("file", lost).title} · ${goneWords("file", lost).why}` : md.name || "Document") : "",
     docType: k === "file" ? docLabel(md.name, md.mime) : "",
     isPdf: k === "file" && docLabel(md.name, md.mime) === "PDF",
     view: k === "audio" ? undefined
-      : k === "file" ? () => openViewer([{ kind: "file", url, name: md.name, mime: md.mime }], 0)
+      : k === "file" ? (lost ? undefined : () => openViewer([{ kind: "file", url, name: md.name, mime: md.mime }], 0))
       : open(url),
     shape: k === "image" || k === "video" ? e => {
       const t = e.currentTarget as HTMLImageElement & HTMLVideoElement;
